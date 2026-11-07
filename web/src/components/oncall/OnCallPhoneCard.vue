@@ -273,6 +273,8 @@ withDefaults(
   { admin: false },
 );
 
+const emit = defineEmits<{ licenseDenied: [features: string[]] }>();
+
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
@@ -289,6 +291,10 @@ const contact = computed(() => contactRead.data.value ?? null);
 const loadFailed = computed(
   () => contactRead.isError.value && !licenseDeniedFeatures(contactRead.error.value),
 );
+watch(contactRead.error, (err) => {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+});
 
 const saveContact = useMutation(() => setContactMutation(orgId.value, email.value));
 const sendCodeWrite = useMutation(() => sendCodeMutation(orgId.value, email.value));

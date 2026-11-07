@@ -261,6 +261,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { formatMicrosDuration } from "@/utils/formatters";
 import {
   SERVICE_DIMENSION,
@@ -282,7 +283,7 @@ const props = withDefaults(
   defineProps<{
     preview?: RoutingPreview | null;
     teams?: { id: string; name: string }[];
-    aliases?: { id: string; display?: string }[];
+    aliases?: { id: string; display?: string; fields?: string[] }[];
     catalogue?: DimensionCatalogue;
     services?: DiscoveredService[];
     /** Signals that need an owner, offered as starting points. */
@@ -317,6 +318,7 @@ const emit = defineEmits<{
   /** Debounced: the conditions or priority settled on a new question. */
   (e: "run", query: SimulatorQuery): void;
   (e: "send-test", value: { team_id: string; priority: string }): void;
+  (e: "licenseDenied", features: string[]): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -520,6 +522,10 @@ const escalation = useQuery(() =>
     { enabled: !!props.preview?.team_id && !!orgId.value, retry: false },
   ),
 );
+watch(escalation.error, (err) => {
+  const denied = licenseDeniedFeatures(err);
+  if (denied) emit("licenseDenied", denied);
+});
 
 /// The ladder's first step, which pages every target on it at once; null until the ladder has loaded.
 const firstStep = computed<PreviewRung | null>(() => {

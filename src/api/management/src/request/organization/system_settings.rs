@@ -180,7 +180,7 @@ pub async fn get_setting(
         ("category" = Option<String>, Query, description = "Filter by setting category"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = std::collections::HashMap<String, config::meta::system_settings::SystemSetting>),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(

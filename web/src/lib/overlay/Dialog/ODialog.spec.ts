@@ -133,6 +133,16 @@ describe("ODialog", () => {
     expect(wrapper.find("[data-o2-dialog]").exists()).toBe(true);
   });
 
+  it("uses ariaTitle as the hidden dialog title", () => {
+    const wrapper = mount(ODialog, {
+      props: { open: true, ariaTitle: "Welcome", showClose: false },
+    });
+    const content = wrapper.findComponent(DialogContent);
+    const id = content.attributes("aria-labelledby");
+    expect(wrapper.find(`#${id}`).text()).toBe("Welcome");
+    expect(wrapper.text().match(/Welcome/g)).toHaveLength(2);
+  });
+
   describe("header-right slot", () => {
     it("renders header-right slot content", () => {
       const wrapper = mount(ODialog, {

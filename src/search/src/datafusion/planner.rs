@@ -1,0 +1,177 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use datafusion::{
+    catalog::Session,
+    common::Result as DataFusionResult,
+    error::DataFusionError,
+    execution::context::QueryPlanner,
+    logical_expr::{
+        LogicalPlan, UserDefinedLogicalNode, physical_planning_context::PhysicalPlanningContext,
+    },
+    physical_plan::{ExecutionPlan, expressions::Column},
+    physical_planner::{DefaultPhysicalPlanner, ExtensionPlanner, PhysicalPlanner},
+};
+
+use crate::datafusion::{
+    logical_plan::{deduplication::DeduplicationLogicalNode, shared_subplan::SharedSubplanNode},
+    physical_plan::{
+        deduplication_exec::DeduplicationExec, shared_subplan_exec::SharedSubplanMarkerExec,
+    },
+};
+
+// A query planner that wrap datafusion's default planner with extension planner
+#[derive(Debug)]
+pub struct OpenobserveQueryPlanner {}
+
+impl Default for OpenobserveQueryPlanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl OpenobserveQueryPlanner {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl QueryPlanner for OpenobserveQueryPlanner {
+    async fn create_physical_plan(
+        &self,
+        logical_plan: &LogicalPlan,
+        session_state: &dyn Session,
+    ) -> DataFusionResult<Arc<dyn ExecutionPlan>> {
+        let planners: Vec<Arc<dyn ExtensionPlanner + Send + Sync>> = vec![
+            Arc::new(DeduplicationExecPlanner::new()),
+            Arc::new(SharedSubplanPlanner::new()),
+        ];
+
+        DefaultPhysicalPlanner::with_extension_planners(planners)
+            .create_physical_plan(logical_plan, session_state)
+            .await
+    }
+}
+
+/// A physical planner that convert a `DeduplicationLogicalNode` into `DeduplicationExec`,
+#[derive(Debug)]
+pub struct DeduplicationExecPlanner {}
+
+impl Default for DeduplicationExecPlanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DeduplicationExecPlanner {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl ExtensionPlanner for DeduplicationExecPlanner {
+    async fn plan_extension(
+        &self,
+        _planner: &dyn PhysicalPlanner,
+        node: &dyn UserDefinedLogicalNode,
+        _logical_inputs: &[&LogicalPlan],
+        physical_inputs: &[Arc<dyn ExecutionPlan>],
+        _session_state: &dyn Session,
+        _planning_ctx: &PhysicalPlanningContext,
+    ) -> DataFusionResult<Option<Arc<dyn ExecutionPlan>>> {
+        let Some(deduplication_node) = node.as_any().downcast_ref::<DeduplicationLogicalNode>()
+        else {
+            return Ok(None);
+        };
+
+        if physical_inputs.len() != 1 {
+            return Err(DataFusionError::Plan(
+                "DeduplicationExecPlanner expects only one input".to_string(),
+            ));
+        }
+
+        let input = physical_inputs.first().unwrap();
+        let schema = input.schema();
+
+        let deduplication_columns = deduplication_node
+            .deduplication_columns
+            .iter()
+            .map(|c| Column::new_with_schema(c.name(), &schema).unwrap())
+            .collect();
+
+        let max_rows = deduplication_node.max_rows;
+        let deduplication_exec =
+            DeduplicationExec::new(input.clone(), deduplication_columns, max_rows);
+        Ok(Some(Arc::new(deduplication_exec)))
+    }
+}
+
+/// A physical planner that converts a `SharedSubplanNode` into a `SharedSubplanMarkerExec`.
+#[derive(Debug, Default)]
+pub struct SharedSubplanPlanner {}
+
+impl SharedSubplanPlanner {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl ExtensionPlanner for SharedSubplanPlanner {
+    async fn plan_extension(
+        &self,
+        _planner: &dyn PhysicalPlanner,
+        node: &dyn UserDefinedLogicalNode,
+        _logical_inputs: &[&LogicalPlan],
+        physical_inputs: &[Arc<dyn ExecutionPlan>],
+        _session_state: &dyn Session,
+        _planning_ctx: &PhysicalPlanningContext,
+    ) -> DataFusionResult<Option<Arc<dyn ExecutionPlan>>> {
+        let Some(shared) = node.as_any().downcast_ref::<SharedSubplanNode>() else {
+            return Ok(None);
+        };
+        let [input] = physical_inputs else {
+            return Err(DataFusionError::Plan(
+                "SharedSubplanPlanner expects exactly one input".to_string(),
+            ));
+        };
+        Ok(Some(Arc::new(SharedSubplanMarkerExec::new(
+            shared.id,
+            Arc::clone(input),
+        ))))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_openobserve_query_planner_new() {
+        let planner = OpenobserveQueryPlanner::new();
+        let _: &OpenobserveQueryPlanner = &planner;
+    }
+
+    #[test]
+    fn test_deduplication_exec_planner_new() {
+        let planner = DeduplicationExecPlanner::new();
+        let _: &DeduplicationExecPlanner = &planner;
+    }
+}

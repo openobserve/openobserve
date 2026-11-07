@@ -896,7 +896,9 @@ async function fetchTraces() {
     const rumQuery = {
       query: {
         sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr}${having} ORDER BY _date ASC, _trace_id ASC`,
-        start_time: props.rumWindowUs?.start ?? searchStartTime,
+        start_time: props.rumWindowUs
+          ? Math.min(props.rumWindowUs.start, searchStartTime)
+          : searchStartTime,
         // Rows keep arriving after the last device-clock event, so a re-fetch must reach "now".
         end_time: props.rumWindowUs
           ? Math.max(props.rumWindowUs.end, Date.now() * 1000)
@@ -1163,6 +1165,15 @@ watch(
     closeTraceDetail();
     // Stop the previous session's streams; fetchTraces supersedes the rest of its work.
     cancelInFlightStreams();
+    fetchTraces();
+  },
+);
+
+// The replay arrival bounds can become available after this tab's first fetch.
+watch(
+  () => [props.rumWindowUs?.start, props.rumWindowUs?.end],
+  (now, before) => {
+    if (now[0] === before[0] && now[1] === before[1]) return;
     fetchTraces();
   },
 );

@@ -73,8 +73,6 @@ const input = (name: string) => ({
   template: `<input data-stub="${name}" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
 });
 
-const dayReset = vi.fn();
-
 const mountDrawer = (open = true) =>
   mount(RecentSearchesDrawer, {
     props: { source: "logs", open },
@@ -83,7 +81,7 @@ const mountDrawer = (open = true) =>
       stubs: {
         ODrawer: {
           props: ["open"],
-          template: `<div v-if="open"><slot name="header-left" /><slot /><slot name="footer" /></div>`,
+          template: `<div v-if="open"><slot name="header-left" /><slot name="header-right" /><slot /><slot name="footer" /></div>`,
         },
         ODialog: {
           props: ["open"],
@@ -98,8 +96,6 @@ const mountDrawer = (open = true) =>
           template: `<button v-bind="$attrs" @click="$emit('select')"><slot /></button>`,
         },
         OSearchInput: input("search"),
-        OSelect: input("select"),
-        RecentSearchesDayPicker: { ...input("date"), methods: { reset: dayReset } },
         OSwitch: {
           props: ["modelValue"],
           emits: ["update:modelValue"],
@@ -110,12 +106,6 @@ const mountDrawer = (open = true) =>
           emits: ["update:modelValue"],
           template: `<input type="checkbox" :checked="modelValue" @change="$emit('update:modelValue', $event.target.checked)" />`,
         },
-        OToggleGroup: {
-          props: ["modelValue"],
-          emits: ["update:modelValue"],
-          template: `<div><button data-test="scope-all" @click="$emit('update:modelValue', 'all')" /><slot /></div>`,
-        },
-        OToggleGroupItem: { template: "<span><slot /></span>" },
         OTimeCell: true,
         OTooltip: true,
       },
@@ -145,41 +135,90 @@ describe("RecentSearchesDrawer", () => {
     const days = wrapper.findAll('[data-test="recent-searches-day"]');
     expect(days).toHaveLength(2);
     expect(days[0].text()).toContain("Today");
-    expect(days[1].text()).toContain("ran 4x");
+    expect(days[0].find("h3").text()).toBe("Today · 1");
+    expect(days[1].text()).toContain("Ran 4x · last at");
   });
 
-  it("sends every filter to the server", async () => {
+  it("sends the search text, scope and status chip to the server", async () => {
     const wrapper = mountDrawer();
     await flushPromises();
     await wrapper.find('[data-stub="search"]').setValue("checkout");
-    const selects = wrapper.findAll('[data-stub="select"]');
-    await selects[0].setValue("k8s");
-    await selects[1].setValue("error");
-    await wrapper.find('[data-stub="date"]').setValue("2026-10-27");
-    await wrapper.find('[data-test="recent-searches-starred-only"]').setValue(true);
+    await wrapper.find('[data-test="recent-searches-status-error"]').trigger("click");
     await flushPromises();
-    const bounds = {
-      ran_from: new Date(2026, 9, 27).getTime() * 1000,
-      ran_to: new Date(2026, 9, 28).getTime() * 1000 - 1,
-    };
     expect(lastParams()).toEqual({
       source: "logs",
       q: "checkout",
-      stream: "k8s",
       status: "error",
-      starred: true,
-      ...bounds,
       limit: 50,
       offset: 0,
     });
 
-    await wrapper.find('[data-test="scope-all"]').trigger("click");
+    await wrapper.find('[data-test="recent-searches-status-starred"]').trigger("click");
+    await flushPromises();
+    expect(lastParams()).toEqual({
+      source: "logs",
+      q: "checkout",
+      status: "error",
+      starred: true,
+      limit: 50,
+      offset: 0,
+    });
+
+    await wrapper.find('[data-test="recent-searches-scope-all"]').trigger("click");
     await flushPromises();
     expect(lastParams().source).toBe("logs,traces,metrics");
   });
 
+  describe("No results", () => {
+    const ROWS = [
+      row("hit"),
+      row("empty", { context: { no_results: true } }),
+      row("bad", { status: "error", context: { error: "boom" } }),
+    ];
+    const ids = (wrapper: ReturnType<typeof mountDrawer>) =>
+      wrapper
+        .findAll('[data-test^="recent-searches-drawer-row-"]')
+        .map((r) => r.attributes("data-test")?.replace("recent-searches-drawer-row-", ""));
+
+    it("tells a zero-hit ok run from a success by its context, in the dot and the label", async () => {
+      api.list.mockResolvedValue({ data: ROWS });
+      const wrapper = mountDrawer();
+      await flushPromises();
+      const label = (id: string) =>
+        wrapper.find(`[data-test="recent-searches-status-label-${id}"]`).text();
+      expect(label("hit")).toBe("Success");
+      expect(label("empty")).toBe("No results");
+      expect(label("bad")).toBe("Error");
+      expect(wrapper.findAll('[data-test="recent-searches-status-dot-no_results"]')).toHaveLength(
+        1,
+      );
+    });
+
+    it("filters the loaded rows client-side, asking the server only for ok runs", async () => {
+      api.list.mockResolvedValue({ data: ROWS.filter((r) => r.status === "ok") });
+      const wrapper = mountDrawer();
+      await flushPromises();
+      await wrapper.find('[data-test="recent-searches-status-no_results"]').trigger("click");
+      await flushPromises();
+      expect(lastParams()).toMatchObject({ status: "ok" });
+      expect(ids(wrapper)).toEqual(["empty"]);
+      await wrapper.find('[data-test="recent-searches-status-ok"]').trigger("click");
+      await flushPromises();
+      expect(ids(wrapper)).toEqual(["hit"]);
+    });
+  });
+
+  it("shows the total in the header badge and Showing N of M in the footer", async () => {
+    api.count.mockImplementation((_org: string, params: { starred: boolean }) =>
+      Promise.resolve({ data: { count: params.starred ? 1 : 5 } }),
+    );
+    const wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.find('[data-test="recent-searches-count"]').text()).toBe("6");
+    expect(wrapper.find('[data-test="recent-searches-showing"]').text()).toBe("Showing 2 of 6");
+  });
+
   describe("Reset filters", () => {
-    const RESET = '[data-test="recent-searches-reset-filters"]';
     // Opened already filtered, so the unfiltered list is never cached and Reset must fetch it.
     const mountFiltered = async () => {
       const wrapper = mountDrawer(false);
@@ -187,47 +226,16 @@ describe("RecentSearchesDrawer", () => {
       await wrapper.setProps({ open: true });
       await flushPromises();
       await wrapper.find('[data-stub="search"]').setValue("checkout");
-      await wrapper.findAll('[data-stub="select"]')[0].setValue("k8s");
-      await wrapper.find('[data-stub="date"]').setValue("2026-10-27");
-      await wrapper.find('[data-test="recent-searches-starred-only"]').setValue(true);
       await flushPromises();
       expect(api.list.mock.calls.every(([, params]) => params.status === "error")).toBe(true);
       return wrapper;
     };
     const expectCleared = (wrapper: ReturnType<typeof mountDrawer>) => {
       expect((wrapper.find('[data-stub="search"]').element as HTMLInputElement).value).toBe("");
-      const selects = wrapper.findAll('[data-stub="select"]');
-      expect((selects[0].element as HTMLInputElement).value).toBe("");
-      expect((selects[1].element as HTMLInputElement).value).toBe("all");
-      expect((wrapper.find('[data-stub="date"]').element as HTMLInputElement).value).toBe("");
-      expect(dayReset).toHaveBeenCalled();
-      expect(
-        (wrapper.find('[data-test="recent-searches-starred-only"]').element as HTMLInputElement)
-          .checked,
-      ).toBe(false);
       expect(lastParams()).toEqual({ source: "logs", limit: 50, offset: 0 });
-      expect(wrapper.find(RESET).exists()).toBe(false);
     };
 
-    it("is hidden with no filter and shows once any one filter is set", async () => {
-      const wrapper = mountDrawer();
-      await flushPromises();
-      expect(wrapper.find(RESET).exists()).toBe(false);
-      await wrapper.find('[data-stub="date"]').setValue("2026-10-27");
-      expect(wrapper.find(RESET).exists()).toBe(true);
-      await wrapper.find('[data-stub="date"]').setValue("");
-      await wrapper.findAll('[data-stub="select"]')[1].setValue("ok");
-      expect(wrapper.find(RESET).exists()).toBe(true);
-    });
-
-    it("clears all five filters and refetches unfiltered", async () => {
-      const wrapper = await mountFiltered();
-      await wrapper.find(RESET).trigger("click");
-      await flushPromises();
-      expectCleared(wrapper);
-    });
-
-    it("does the same from the filtered empty state", async () => {
+    it("clears the search and status chip from the filtered empty state", async () => {
       api.list.mockResolvedValue({ data: [] });
       const wrapper = await mountFiltered();
       const empty = wrapper.find('[data-test="recent-searches-drawer-empty"]');
@@ -545,7 +553,7 @@ describe("RecentSearchesDrawer", () => {
       include_starred: false,
     });
 
-    await wrapper.find('[data-test="scope-all"]').trigger("click");
+    await wrapper.find('[data-test="recent-searches-scope-all"]').trigger("click");
     await wrapper.find('[data-test="recent-searches-clear-btn"]').trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="recent-searches-clear-body"]').text()).toContain(
@@ -581,7 +589,7 @@ describe("RecentSearchesDrawer", () => {
   });
 });
 
-describe("Starred only (real checkbox)", () => {
+describe("Starred chip", () => {
   const ROWS = [row("today"), row("starred", { starred: true }), row("other")];
 
   beforeEach(() => {
@@ -591,9 +599,9 @@ describe("Starred only (real checkbox)", () => {
     );
   });
 
-  const mountWithRealCheckbox = () =>
+  const mountWithRealChips = (source = "logs") =>
     mount(RecentSearchesDrawer, {
-      props: { source: "logs", open: true },
+      props: { source, open: true },
       global: {
         plugins: [store],
         stubs: {
@@ -607,20 +615,66 @@ describe("Starred only (real checkbox)", () => {
         },
       },
     });
-  const shownRows = (wrapper: ReturnType<typeof mountWithRealCheckbox>) =>
+  const shownRows = (wrapper: ReturnType<typeof mountWithRealChips>) =>
     wrapper.findAll('[data-test^="recent-searches-drawer-row-"]').length;
-  const box = (wrapper: ReturnType<typeof mountWithRealCheckbox>) =>
-    wrapper.find('[data-test="recent-searches-starred-only"] [role="checkbox"]');
+  const chip = (wrapper: ReturnType<typeof mountWithRealChips>, key: string) =>
+    wrapper.find(`[data-test="recent-searches-status-${key}"]`);
 
-  it("shows a checked box and only starred rows, also after the drawer is closed and reopened", async () => {
-    const wrapper = mountWithRealCheckbox();
+  it("hides the No results chip for metrics but keeps it for logs and the all-pages scope", async () => {
+    const metrics = mountWithRealChips("metrics");
+    await flushPromises();
+    expect(chip(metrics, "no_results").exists()).toBe(false);
+    await metrics.find('[data-test="recent-searches-scope-all"]').trigger("click");
+    expect(chip(metrics, "no_results").exists()).toBe(true);
+    expect(
+      mountWithRealChips("logs").find('[data-test="recent-searches-status-no_results"]').exists(),
+    ).toBe(true);
+  });
+
+  it("treats a chosen No results as any once the scope narrows to metrics", async () => {
+    const wrapper = mountWithRealChips("metrics");
+    await flushPromises();
+    await wrapper.find('[data-test="recent-searches-scope-all"]').trigger("click");
+    await chip(wrapper, "no_results").trigger("click");
+    await wrapper.find('[data-test="recent-searches-scope-page"]').trigger("click");
+    await flushPromises();
+    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
+    const metricsCalls = api.list.mock.calls.filter(([, p]) => p.source === "metrics");
+    expect(metricsCalls.every(([, p]) => p.status === undefined)).toBe(true);
+  });
+
+  it("shows no total in the footer until the count query resolves", async () => {
+    api.count.mockImplementation(() => new Promise(() => {}));
+    const wrapper = mountWithRealChips();
+    await flushPromises();
+    expect(wrapper.find('[data-test="recent-searches-showing"]').text()).toBe("Showing 3");
+  });
+
+  it("renders no footer text for the empty state or an error", async () => {
+    api.list.mockResolvedValue({ data: [] });
+    const empty = mountWithRealChips();
+    await flushPromises();
+    expect(empty.find('[data-test="recent-searches-showing"]').exists()).toBe(false);
+    api.list.mockRejectedValue(new Error("boom"));
+    const failed = mountWithRealChips();
+    await flushPromises();
+    expect(failed.find('[data-test="recent-searches-showing"]').exists()).toBe(false);
+  });
+
+  it("selects Starred, shows only starred rows, also after the drawer is closed and reopened", async () => {
+    const wrapper = mountWithRealChips();
     await flushPromises();
     expect(shownRows(wrapper)).toBe(3);
-    expect(box(wrapper).attributes("aria-checked")).toBe("false");
+    expect(chip(wrapper, "any").text()).toBe("Any status");
+    expect(chip(wrapper, "starred").text()).toBe("Starred");
+    expect(wrapper.find('[data-test="recent-searches-scope-page"]').text()).toBe("Logs");
+    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("false");
 
-    await box(wrapper).trigger("click");
+    await chip(wrapper, "starred").trigger("click");
     await flushPromises();
-    expect(box(wrapper).attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("true");
+    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
     expect(api.list).toHaveBeenLastCalledWith(
       "default",
       expect.objectContaining({ starred: true }),
@@ -628,15 +682,102 @@ describe("Starred only (real checkbox)", () => {
     expect(shownRows(wrapper)).toBe(1);
 
     await wrapper.setProps({ open: false });
-    await wrapper.setProps({ open: true });
+    (wrapper.vm as unknown as { show: () => void }).show();
     await flushPromises();
-    expect(box(wrapper).attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("true");
     expect(shownRows(wrapper)).toBe(1);
 
-    await box(wrapper).trigger("click");
+    await chip(wrapper, "starred").trigger("click");
     await flushPromises();
-    expect(box(wrapper).attributes("aria-checked")).toBe("false");
+    expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("false");
     expect(shownRows(wrapper)).toBe(3);
+  });
+
+  it("hides Reset all with no filter and clears search, scope, status and Starred when clicked", async () => {
+    const wrapper = mountWithRealChips();
+    await flushPromises();
+    const reset = () => wrapper.find('[data-test="recent-searches-reset-filters"]');
+    expect(reset().exists()).toBe(false);
+    await chip(wrapper, "error").trigger("click");
+    await chip(wrapper, "starred").trigger("click");
+    await wrapper.find('[data-test="recent-searches-scope-all"]').trigger("click");
+    await flushPromises();
+    expect(reset().exists()).toBe(true);
+    await reset().trigger("click");
+    await flushPromises();
+    expect(reset().exists()).toBe(false);
+    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("false");
+    expect(
+      wrapper.find('[data-test="recent-searches-scope-page"]').attributes("aria-checked"),
+    ).toBe("true");
+    expect(shownRows(wrapper)).toBe(3);
+  });
+
+  it("combines Starred with a status chip and labels both groups", async () => {
+    const wrapper = mountWithRealChips();
+    await flushPromises();
+    await chip(wrapper, "error").trigger("click");
+    await chip(wrapper, "starred").trigger("click");
+    await flushPromises();
+    expect(api.list).toHaveBeenLastCalledWith(
+      "default",
+      expect.objectContaining({ status: "error", starred: true }),
+    );
+    expect(chip(wrapper, "error").attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("true");
+    const group = wrapper.find('[data-test="recent-searches-status"]');
+    expect(group.attributes("role")).toBe("radiogroup");
+    expect(group.attributes("aria-label")).toBe("Run status");
+    expect(wrapper.find('[data-test="recent-searches-scope"]').attributes("aria-label")).toBe(
+      "Search scope",
+    );
+  });
+
+  describe("client-side status chips", () => {
+    const PAGE = 50;
+    const page = (prefix: string, noResults: boolean) =>
+      Array.from({ length: PAGE }, (_, i) =>
+        row(`${prefix}${i}`, noResults ? { context: { no_results: true } } : {}),
+      );
+    const footer = (wrapper: ReturnType<typeof mountWithRealChips>) =>
+      wrapper.find('[data-test="recent-searches-showing"]').text();
+
+    it("keeps fetching pages while the chip hides every loaded row", async () => {
+      api.list.mockImplementation((_o: string, p: { offset: number }) =>
+        Promise.resolve({ data: p.offset === 0 ? page("e", true) : page("s", false).slice(0, 3) }),
+      );
+      const wrapper = mountWithRealChips();
+      await flushPromises();
+      await chip(wrapper, "ok").trigger("click");
+      await flushPromises();
+      expect(api.list).toHaveBeenCalledTimes(3);
+      expect(shownRows(wrapper)).toBe(3);
+      expect(wrapper.find('[data-test="recent-searches-drawer-empty"]').exists()).toBe(false);
+      expect(footer(wrapper)).toBe("Showing 3");
+    });
+
+    it("stops scanning at the page cap", async () => {
+      api.list.mockImplementation(() => Promise.resolve({ data: page("e", true) }));
+      const wrapper = mountWithRealChips();
+      await flushPromises();
+      await chip(wrapper, "ok").trigger("click");
+      await flushPromises();
+      expect(api.list).toHaveBeenCalledTimes(11);
+      expect(wrapper.find('[data-test="recent-searches-drawer-empty"]').exists()).toBe(true);
+    });
+
+    it("counts a server-side filter with the same filters", async () => {
+      api.count.mockImplementation((_o: string, p: { status?: string }) =>
+        Promise.resolve({ data: { count: p.status === "error" ? 7 : 40 } }),
+      );
+      const wrapper = mountWithRealChips();
+      await flushPromises();
+      await chip(wrapper, "error").trigger("click");
+      await flushPromises();
+      expect(api.count).toHaveBeenCalledWith("default", { source: "logs", status: "error" });
+      expect(footer(wrapper)).toBe("Showing 3 of 7");
+    });
   });
 
   it("shows a cut query's full multi-line text on hover, line breaks and indentation kept", async () => {

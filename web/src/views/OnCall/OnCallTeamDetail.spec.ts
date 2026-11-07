@@ -17,6 +17,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import type { ComponentPublicInstance } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
@@ -1667,6 +1668,152 @@ describe("OnCallTeamDetail", () => {
 
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(true);
     expect(wrapper.findComponent({ name: "OnCallTeamAttention" }).exists()).toBe(false);
+  });
+
+  describe("a license denial", () => {
+    const DENIAL = {
+      response: {
+        status: 403,
+        data: {
+          code: 40001,
+          message: "Features not included in your license: oncall",
+          error_detail: "oncall",
+        },
+      },
+    };
+
+    function expectLocked(wrapper: ReturnType<typeof render>) {
+      const lock = wrapper.findComponent(LicenseDeniedState);
+      expect(lock.props("features")).toEqual(["oncall"]);
+      expect(lock.attributes("data-test")).toBe("oncall-team-detail-license-denied");
+      for (const gone of [
+        "oncall-team-detail-error",
+        "oncall-team-coverage",
+        "oncall-team-refresh",
+        "oncall-team-override-btn",
+        "oncall-team-detail-edit-btn",
+      ]) {
+        expect(wrapper.find(`[data-test="${gone}"]`).exists()).toBe(false);
+      }
+      expect(wrapper.findComponent({ name: "OnCallTeamAttention" }).exists()).toBe(false);
+    }
+
+    /// Reads are issued together and some may be answered from cache, so any one can carry the denial.
+    it.each([
+      "listTeams",
+      "getTeam",
+      "listMembers",
+      "getSchedule",
+      "getPolicy",
+      "whoIsOnCall",
+    ] as const)("replaces the body when %s is denied", async (read) => {
+      service[read].mockRejectedValueOnce(DENIAL);
+      const wrapper = render();
+      await flushPromises();
+
+      expectLocked(wrapper);
+    });
+
+    it("replaces a loaded team when a refresh is denied", async () => {
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(true);
+
+      service.getTeam.mockRejectedValueOnce(DENIAL);
+      await wrapper.find('[data-test="oncall-team-refresh"]').trigger("click");
+      await flushPromises();
+
+      expectLocked(wrapper);
+    });
+
+    /// These run once the team is on screen, so a cached team can be followed by a denied insight.
+    it.each([
+      "listOwnershipRules",
+      "listResponses",
+      "teamOverview",
+      "teamReachability",
+      "teamConfigRisks",
+      "teamLoad",
+      "escalationPreview",
+      "getRoutingConfig",
+    ] as const)("replaces a loaded team when only %s is denied", async (read) => {
+      queryClient.clear();
+      __resetOnCallRoutingConfig();
+      service[read].mockRejectedValueOnce(DENIAL);
+      const wrapper = render();
+      await flushPromises();
+
+      expectLocked(wrapper);
+      expect(toasted).not.toHaveBeenCalled();
+    });
+
+    /// Each tab reads for itself after the page settled, so each one can be the first to be refused.
+    it.each([
+      ["members", "OnCallMembers"],
+      ["schedule", "OnCallCoverList"],
+      ["schedule", "OnCallSchedulePresets"],
+      ["schedule", "OnCallScheduleEditor"],
+      ["policy", "OnCallPolicyEditor"],
+      ["ownership", "OnCallOwnership"],
+    ])("locks when the %s tab's %s reports a denial", async (tab, name) => {
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", tab);
+      await flushPromises();
+
+      wrapper.findComponent({ name }).vm.$emit("licenseDenied", ["oncall"]);
+      await flushPromises();
+
+      expectLocked(wrapper);
+    });
+
+    it("locks, with no error toast, when the read an editor starts from is denied", async () => {
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "policy");
+      await flushPromises();
+
+      service.getPolicy.mockRejectedValueOnce(DENIAL);
+      wrapper.findComponent({ name: "OnCallEscalationLadder" }).vm.$emit("edit");
+      await flushPromises();
+
+      expectLocked(wrapper);
+      expect(toasted).not.toHaveBeenCalled();
+    });
+
+    it("locks, with no error toast, when the calendar read is denied", async () => {
+      service.getSchedule.mockResolvedValue(ok({ rotations: [rotation("rot_a", "Primary")] }));
+      service.resolvedSchedule.mockRejectedValueOnce(DENIAL);
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+
+      wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .vm.$emit("update:window", { from: 1_000, to: 2_000 });
+      await flushPromises();
+
+      expectLocked(wrapper);
+      expect(toasted).not.toHaveBeenCalled();
+    });
+
+    it("keeps the calendar's error toast for any other failure", async () => {
+      service.getSchedule.mockResolvedValue(ok({ rotations: [rotation("rot_a", "Primary")] }));
+      service.resolvedSchedule.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+
+      wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .vm.$emit("update:window", { from: 1_000, to: 2_000 });
+      await flushPromises();
+
+      expect(wrapper.findComponent(LicenseDeniedState).exists()).toBe(false);
+      expect(toasted).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
   });
 
   /// Deleting a team, then hitting the browser's Back button onto its now-gone

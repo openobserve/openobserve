@@ -497,17 +497,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // QueryConfig then keeps `_meta` fresh via its own syncMeta watcher, and
   // re-seeds `_ui.checkEvery` from the stored frequency at setup.
   const withFormExtras = (obj: any): any => {
+    // A response-only key: moved into `_ui`, which every save path strips.
+    const { locked_target_names: lockedTargetNames, ...alert } = obj ?? {};
     const groupBy: string[] = Array.isArray(obj?.query_condition?.aggregation?.group_by)
       ? obj.query_condition.aggregation.group_by.filter((g: string) => g)
       : [];
     const freq = frequencyDisplay(obj);
     return {
-      ...obj,
+      ...alert,
       logGroupBy: groupBy,
       _ui: obj?._ui ?? {
         checkEvery: freq.checkEvery,
         pendingPeriod: pendingPeriodDisplay(obj).value,
         forecast: formForecastOf(obj),
+        lockedTargetNames,
       },
       _meta:
         obj?._meta ??

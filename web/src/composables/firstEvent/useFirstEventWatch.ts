@@ -30,8 +30,10 @@ import { gt } from "@/types/i18n";
 import {
   USER_DATA_STREAM_TYPES,
   isUserDataStream,
+  type StreamOwnership,
   type UserDataStreamType,
 } from "@/utils/internalStreams";
+import { isSampleStreamName } from "@/utils/sampleData/catalog";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "./firstEventBudget";
 import {
   DEFAULT_INGEST_ALLOWED_IN_FUTURE_H,
@@ -48,6 +50,11 @@ import {
 import { markDetectionSeen, orgHasUserStreams, readFirstDataRecord } from "./useFirstDataNotice";
 
 export type StreamSignal = UserDataStreamType;
+
+// sample streams are user-type streams the app loads itself, so they never count as the first event
+const isWatchable = (stream: StreamOwnership, type: string) =>
+  isUserDataStream(stream, type) && !isSampleStreamName(stream.name ?? "");
+
 export type FirstEventState =
   "idle" | "waiting" | "received" | "rejected" | "no-requests" | "stopped";
 export type DiagnosisTrigger = "auto" | "troubleshoot";
@@ -415,7 +422,7 @@ export function useFirstEventWatch(
       total = res.total;
       rows.push(
         ...(res.list as StreamRow[]).filter(
-          (s) => s?.name?.includes(keyword) && isUserDataStream(s, ctx.type),
+          (s) => s?.name?.includes(keyword) && isWatchable(s, ctx.type),
         ),
       );
       if (offset + STREAM_PROBE_PAGE >= res.total) break;
@@ -499,7 +506,7 @@ export function useFirstEventWatch(
       sinceUs,
     };
     state.value = "received";
-    markDetectionSeen(ctx.org);
+    markDetectionSeen(ctx.org, { type: ctx.type, name: stream });
     halt();
     forgetEngagement();
   };
@@ -648,7 +655,7 @@ export function useFirstEventWatch(
       if (!list || stale(ctx)) return;
       known.total = res.total;
       for (const s of list) {
-        if (!known.names.has(s.name) && isUserDataStream(s, type)) {
+        if (!known.names.has(s.name) && isWatchable(s, type)) {
           pending.set(s.name, s);
         }
       }

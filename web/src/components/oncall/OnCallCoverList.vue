@@ -137,6 +137,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { deleteOverrideMutation, teamOverridesQuery } from "@/services/oncall.queries";
 import type { Override, Rotation } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { formatInZone } from "@/utils/oncall";
 import { serverMessageOf } from "@/utils/slackLink";
 
@@ -168,7 +169,7 @@ const props = withDefaults(
   { timezone: "UTC", window: null, rotations: () => [], rotationId: null },
 );
 
-const emit = defineEmits<{ changed: [] }>();
+const emit = defineEmits<{ changed: []; licenseDenied: [features: string[]] }>();
 
 const { t } = useI18nTyped();
 
@@ -272,8 +273,10 @@ async function fetchCovers(force = false) {
       : res;
     // Newest first, the one in force where two overlap; the windowed read does not promise that order.
     covers.value = [...all].sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id));
-  } catch {
+  } catch (err) {
     if (readId !== latestCoversRead) return;
+    const denied = licenseDeniedFeatures(err);
+    if (denied) emit("licenseDenied", denied);
     // No error over the calendar: it still answers who is on call.
     covers.value = [];
   } finally {

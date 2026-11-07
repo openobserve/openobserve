@@ -19,7 +19,7 @@ use config::{
     cluster::is_offline,
     meta::stream::{FileKey, StreamType},
 };
-use search::datafusion::merge::MergeMode;
+use search::merge::MergeMode;
 use tokio::sync::{Mutex, mpsc};
 
 #[derive(Clone)]

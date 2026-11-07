@@ -29,7 +29,7 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
-use search::datafusion::merge::MergeMode;
+use search::merge::MergeMode;
 use search_service::file_list;
 use tokio::{
     sync::{Semaphore, mpsc},

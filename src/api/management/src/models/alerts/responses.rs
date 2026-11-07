@@ -27,7 +27,13 @@ use super::{Alert, FrequencyType, QueryCondition, TriggerCondition};
 
 /// HTTP response body for `GetAlert` endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-pub struct GetAlertResponseBody(pub Alert);
+pub struct GetAlertResponseBody {
+    #[serde(flatten)]
+    pub alert: Alert,
+    /// Display names of the alert's locked workflows and on-call team, by id, for the edit form.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub locked_target_names: HashMap<String, String>,
+}
 
 /// HTTP response body for `ListAlerts` endpoint.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -72,7 +78,8 @@ pub struct ListAlertsResponseBodyItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_trained_at: Option<i64>,
     /// Scheduler status string. Only present for `anomaly_detection` items.
-    /// Values: "waiting" | "ready" | "training" | "failed" | "disabled"
+    /// Values: "waiting" | "ready" | "training" | "failed" | "disabled" | "waiting_for_data" |
+    /// "not_applicable"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     /// Last error message from training or detection. Only present for `anomaly_detection` items.
@@ -458,7 +465,10 @@ pub struct EnableAlertResponseBody {
 
 impl From<(meta_alerts::Alert, Option<Trigger>)> for GetAlertResponseBody {
     fn from(value: (meta_alerts::Alert, Option<Trigger>)) -> Self {
-        Self(value.into())
+        Self {
+            alert: value.into(),
+            locked_target_names: HashMap::new(),
+        }
     }
 }
 

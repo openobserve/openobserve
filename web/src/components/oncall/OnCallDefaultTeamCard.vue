@@ -189,13 +189,7 @@ const defaultTeamDirty = computed(
   () => draftDefaultTeam.value !== (routingConfig.value?.default_team_id ?? null),
 );
 
-/// Always 200 — an org that never nominated answers with nulls. A failure
-/// leaves the card unset-looking rather than breaking the screen, and unset is
-/// the honest reading of "could not load" here: neither claims a catch-all.
-/// Shared with the ownership table beside it and the policy editor's
-/// ladder-end warning. Three components read this and each fetched its own,
-/// so the same request went out twice on one screen and the copies disagreed
-/// the moment one of them wrote.
+/// Always 200: an org with no catch-all answers with nulls, and a failed load reads as unset.
 async function fetchRoutingConfig() {
   await loadRoutingConfig(orgId.value);
   draftDefaultTeam.value = routingConfig.value?.default_team_id ?? null;

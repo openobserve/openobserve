@@ -192,16 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Response time -->
     <template #cell-responseTime="{ row }">
       <span
-        v-if="(row as any).responseTime"
+        v-if="(row as any).responseTime != null"
         class="font-mono text-sm font-semibold"
-        :class="
-          parseFloat((row as any).responseTime) < 300
-            ? 'text-status-success-text'
-            : parseFloat((row as any).responseTime) < 1000
-              ? 'text-status-warning-text'
-              : 'text-status-error-text'
-        "
-        >{{ (row as any).responseTime }}</span
+        :class="responseTimeClass(row)"
+        >{{ formatMs((row as any).responseTime) }}</span
       >
       <span v-else class="text-sm">—</span>
     </template>
@@ -246,16 +240,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
         :delay="0"
       >
-        <div class="flex cursor-pointer items-center gap-1">
-          <span class="max-w-[4.375rem] truncate text-xs">{{
-            locationLabel((row as any).locations[0])
-          }}</span>
-          <span
-            v-if="(row as any).locations.length > 1"
-            class="rounded-default bg-surface-subtle shrink-0 px-1 py-0.5 text-xs font-bold whitespace-nowrap"
-            >+{{ (row as any).locations.length - 1 }}</span
-          >
-        </div>
+        <FitItems :items="(row as any).locations" class="cursor-pointer">
+          <template #default="{ item }">
+            <span class="block truncate text-xs">{{ locationLabel(item as string) }}</span>
+          </template>
+          <template #more="{ count }">
+            <span
+              class="rounded-default bg-surface-subtle px-1 py-0.5 text-xs font-bold whitespace-nowrap"
+              >+{{ count }}</span
+            >
+          </template>
+        </FitItems>
       </OTooltip>
       <span v-else class="text-xs">—</span>
     </template>
@@ -618,6 +613,8 @@ import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
+import { formatMs } from "@/utils/formatters";
 
 type Mode = "all" | "browser";
 
@@ -696,6 +693,18 @@ const props = withDefaults(
 
 function locationLabel(id: string): string {
   return props.locationNames[id] ?? id;
+}
+
+// TanStack's sortUndefined only applies to undefined, so a never-run check has to read as that.
+function responseTimeSortValue(row: any): number | undefined {
+  return row.responseTime ?? undefined;
+}
+
+function responseTimeClass(row: any): string {
+  // A browser value is whole-journey wall-clock time, so latency limits say nothing about it.
+  if (row.type === "BROWSER") return "";
+  if (row.responseTime < 300) return "text-status-success-text";
+  return row.responseTime < 1000 ? "text-status-warning-text" : "text-status-error-text";
 }
 
 const emit = defineEmits<{
@@ -805,7 +814,8 @@ const HISTORY_COL: OTableColumnDef = {
 const RESPONSE_TIME_COL: OTableColumnDef = {
   id: "responseTime",
   header: t("synthetics.table.response"),
-  accessorKey: "responseTime",
+  accessorFn: responseTimeSortValue,
+  sortUndefined: "last",
   size: COL.responseTime,
   minSize: 72,
   sortable: true,
@@ -815,7 +825,8 @@ const RESPONSE_TIME_COL: OTableColumnDef = {
 const PAGE_LOAD_COL: OTableColumnDef = {
   id: "responseTime",
   header: t("synthetics.table.pageLoad"),
-  accessorKey: "responseTime",
+  accessorFn: responseTimeSortValue,
+  sortUndefined: "last",
   size: COL.responseTime,
   minSize: 80,
   sortable: true,

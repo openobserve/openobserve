@@ -55,7 +55,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     ),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset created", content_type = "application/json", body = Object),
+        (status = 200, description = "Toolset created", content_type = "application/json", body = ToolsetResponse),
         (status = 400, description = "Invalid request", content_type = "application/json"),
         (status = 409, description = "Toolset with this name already exists", content_type = "application/json"),
     ),
@@ -127,7 +127,7 @@ pub async fn create(
     ),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset details", content_type = "application/json", body = Object),
+        (status = 200, description = "Toolset details", content_type = "application/json", body = ToolsetResponse),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
@@ -181,7 +181,7 @@ pub struct ListQuery {
     ),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "List of toolsets", content_type = "application/json", body = Object),
+        (status = 200, description = "List of toolsets", content_type = "application/json", body = ToolsetListResponse),
         (status = 400, description = "Invalid query parameters, such as a negative limit"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
@@ -236,7 +236,7 @@ pub async fn list(
     ),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset updated", content_type = "application/json", body = Object),
+        (status = 200, description = "Toolset updated", content_type = "application/json", body = ToolsetResponse),
         (status = 400, description = "Invalid request", content_type = "application/json"),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
     ),
@@ -305,7 +305,7 @@ pub async fn update(
     ),
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset deleted", content_type = "application/json", body = Object),
+        (status = 200, description = "Toolset deleted", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),

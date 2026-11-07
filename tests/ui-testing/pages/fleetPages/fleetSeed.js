@@ -6,6 +6,14 @@ const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/uti
 const FLEET_PREFIX = 'fl_auto_';
 const CONFIG_PREFIX = 'fl-auto-';
 const LIST_PAGE = 'offset=0&limit=1000';
+const OPAMP_PROTOBUF = 'application/x-protobuf';
+// ReportsStatus | AcceptsRemoteConfig | ReportsRemoteConfig: the least a rollout member advertises.
+const MEMBER_CAPABILITIES = 0x1 | 0x2 | 0x1000;
+const REMOTE_CONFIG_FAILED = 3;
+// A node flushes OpAMP reports to the table in batches, then the rollout engine ticks every 10 s.
+const REPORT_FLUSH_TIMEOUT_MS = 60000;
+// One poll keeps the member online for 10 min and the phase never times out first, whatever the org defaults.
+const SILENT_MEMBER_SETTINGS = { heartbeat_interval_secs: 60, offline_heartbeats: 10, phase_timeout_secs: 3600 };
 
 const FLEET_YAML = {
   seed: 'service:\n  pipelines:\n    logs: {}\n',
@@ -86,6 +94,43 @@ const FLEET_YAML = {
     '',
   ].join('\n'),
 };
+
+function varint(n) {
+  const out = [];
+  let v = n;
+  while (v > 0x7f) {
+    out.push((v & 0x7f) | 0x80);
+    v = Math.floor(v / 128);
+  }
+  out.push(v);
+  return Buffer.from(out);
+}
+
+function varintField(num, value) {
+  return Buffer.concat([varint(num << 3), varint(value)]);
+}
+
+function bytesField(num, bytes) {
+  return Buffer.concat([varint((num << 3) | 2), varint(bytes.length), bytes]);
+}
+
+// AgentToServer: 1 instance_uid, 2 sequence_num, 4 capabilities, 7 RemoteConfigStatus (1 hash, 2 status, 3 error).
+function agentToServer(collectorId, seq, rejectedHashHex) {
+  const parts = [
+    bytesField(1, Buffer.from(collectorId.replace(/-/g, ''), 'hex')),
+    varintField(2, seq),
+    varintField(4, MEMBER_CAPABILITIES),
+  ];
+  if (rejectedHashHex) {
+    const status = Buffer.concat([
+      bytesField(1, Buffer.from(rejectedHashHex, 'hex')),
+      varintField(2, REMOTE_CONFIG_FAILED),
+      bytesField(3, Buffer.from('fleet automation rejects this version')),
+    ]);
+    parts.push(bytesField(7, status));
+  }
+  return Buffer.concat(parts);
+}
 
 class FleetSeed {
   constructor(page) {
@@ -197,13 +242,64 @@ class FleetSeed {
     return { id: body.id };
   }
 
-  async waitForRolloutStatus(rolloutId, status) {
+  async setFleetSettings(fleetId, settings) {
+    return await this.ok('PUT', `/fleet/fleets/${fleetId}/settings`, settings, `set settings of fleet ${fleetId}`);
+  }
+
+  async waitForRolloutStatus(rolloutId, status, timeout = 30000) {
     await expect
       .poll(async () => (await this.call('GET', `/fleet/rollouts/${rolloutId}`)).body?.status, {
-        timeout: 30000,
+        timeout,
         message: `rollout ${rolloutId} never reached ${status}`,
       })
       .toBe(status);
+  }
+
+  // Speaks OpAMP over HTTP as a collector with no process behind it, authenticated by the fleet token.
+  async opampPoll(token, collectorId, seq, rejectedHashHex = null) {
+    const resp = await this.page.request.fetch(this.apiUrl('/v1/opamp'), {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`fleet:${token}`).toString('base64')}`,
+        'Content-Type': OPAMP_PROTOBUF,
+      },
+      data: agentToServer(collectorId, seq, rejectedHashHex),
+    });
+    if (resp.status() !== 200) {
+      throw new Error(`OpAMP poll as ${collectorId} -> ${resp.status()} ${(await resp.text()).slice(0, 300)}`);
+    }
+  }
+
+  // A first rollout whose only member rejects the version, so it halts as proven bad and offers Fix forward.
+  async seedRejectedRollout(suffix, yaml) {
+    const fleet = await this.createFleet(suffix);
+    await this.setFleetSettings(fleet.id, SILENT_MEMBER_SETTINGS);
+    const token = await this.createToken(fleet.id, suffix);
+    const config = await this.createConfig(suffix, yaml);
+    const version = await this.publishConfig(config, yaml);
+    const collectorId = crypto.randomUUID();
+    await this.opampPoll(token.token, collectorId, 1);
+    await expect
+      .poll(async () => (await this.call('GET', `/fleet/collectors/${collectorId}`)).body?.capabilities ?? [], {
+        timeout: REPORT_FLUSH_TIMEOUT_MS,
+        message: `collector ${collectorId} never reported AcceptsRemoteConfig`,
+      })
+      .toContain('AcceptsRemoteConfig');
+
+    const { id: rolloutId } = await this.setDesired(fleet.id, config, version);
+    const started = await this.ok('GET', `/fleet/rollouts/${rolloutId}`, undefined, `get rollout ${rolloutId}`);
+    if (started.status !== 'in_progress' || started.total !== 1) {
+      throw new Error(`rollout ${rolloutId} did not start on the polled collector: ${JSON.stringify(started).slice(0, 300)}`);
+    }
+    const { hash } = await this.ok('GET', `/fleet/configs/${config}/versions/${version}`, undefined, `get ${config} v${version}`);
+    await this.opampPoll(token.token, collectorId, 2, hash);
+    await this.waitForRolloutStatus(rolloutId, 'halted', REPORT_FLUSH_TIMEOUT_MS);
+    const halted = await this.ok('GET', `/fleet/rollouts/${rolloutId}`, undefined, `get rollout ${rolloutId}`);
+    if (halted.halt?.class !== 'proven_bad' || !halted.halt.exits.includes('fix_forward')) {
+      throw new Error(`rollout ${rolloutId} halted without a Fix forward exit: ${JSON.stringify(halted.halt)}`);
+    }
+    testLogger.info('Seeded halted rollout', { fleet: fleet.id, rolloutId, config, version });
+    return { fleetId: fleet.id, rolloutId, config, version };
   }
 
   async rolloutsForConfig(configId) {
@@ -318,7 +414,7 @@ class FleetSeed {
   }
 
   async cleanup() {
-    const removed = { tokens: 0, fleets: 0, configs: 0, roles: 0, users: 0 };
+    const removed = { tokens: 0, collectors: 0, fleets: 0, configs: 0, roles: 0, users: 0 };
     const mine = async (path, key) => {
       const res = await this.call('GET', path);
       if (res.status >= 400) return [];
@@ -336,6 +432,11 @@ class FleetSeed {
       }
     }
     for (const f of fleets) {
+      // A fleet still holding collectors refuses its delete.
+      for (const c of await mine(`/fleet/collectors?fleet=${f.id}&${LIST_PAGE}`, (c) => c?.id)) {
+        await this.call('DELETE', `/fleet/collectors/${c.id}`);
+        removed.collectors += 1;
+      }
       await this.call('DELETE', `/fleet/fleets/${f.id}`);
       removed.fleets += 1;
     }

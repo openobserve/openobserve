@@ -676,7 +676,7 @@ function mapMonitor(m: ApiMonitor) {
     type: m.type.toUpperCase(),
     interval: formatFrequency(m.frequency),
     status: normalizeMonitorStatus(m.status),
-    responseTime: m.last_response_ms !== null ? `${m.last_response_ms}ms` : null,
+    responseTime: m.last_response_ms,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
     // Raw microsecond epoch — drives the relative Last Check cell.

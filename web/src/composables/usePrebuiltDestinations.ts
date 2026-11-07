@@ -30,6 +30,7 @@ import {
   generateDestinationUrl,
   generateDestinationHeaders,
   generatePrebuiltMetadata,
+  templateChannelFor,
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory,
 } from "@/utils/prebuilt-templates";
@@ -402,6 +403,7 @@ export function usePrebuiltDestinations() {
   async function testDestination(
     type: string,
     credentials: Record<string, any>,
+    template?: string,
   ): Promise<TestResult> {
     const requestVersion = ++testRequestVersion;
     try {
@@ -450,37 +452,11 @@ export function usePrebuiltDestinations() {
         }
       }
 
-      // Ensure system templates are fetched
-      await fetchSystemTemplates();
-
-      // Get template from cache or fetch from backend
-      let templateBody = config.templateBody; // Fallback
-      const cachedTemplate = getSystemTemplate(type);
-
-      if (cachedTemplate?.body) {
-        templateBody = cachedTemplate.body;
-      } else {
-        // Try fetching directly if not in cache
-        try {
-          const templateResponse = await templatesService.get_by_name({
-            org_identifier: organizationIdentifier.value,
-            template_name: config.templateName,
-          });
-          if (templateResponse.data?.body) {
-            templateBody = templateResponse.data.body;
-          }
-        } catch (error) {
-          console.warn("Failed to fetch template from backend, using fallback:", error);
-          // Continue with hardcoded template as fallback
-        }
-      }
-
-      // Generate test payload with fetched template
       const testUrl = generateDestinationUrl(type, credentials);
       const testHeaders = generateDestinationHeaders(type, credentials);
-
-      // Generate preview using fetched template
-      const testBody = fillSampleData(templateBody, credentials);
+      const testBody = template
+        ? await renderTemplateBody(template, { type, credentials })
+        : await generatePreview(type, credentials);
 
       // For email type, send email-specific test request to backend
       if (type === "email") {
@@ -545,20 +521,33 @@ export function usePrebuiltDestinations() {
    * cached copy. A content template is rendered by the backend for the webhook
    * channel; a raw body gets sample values. Errors propagate to the caller.
    */
-  async function renderTemplateBody(name: string): Promise<string> {
+  async function renderTemplateBody(
+    name: string,
+    prebuilt?: { type: string; credentials: Record<string, any> },
+  ): Promise<string> {
     const response = await templatesService.get_by_name({
       org_identifier: organizationIdentifier.value,
       template_name: name,
     });
     const template: Template = response.data;
     if (template.kind === "content") {
+      const channel = prebuilt
+        ? templateChannelFor(
+            prebuilt.type,
+            generateDestinationUrl(prebuilt.type, prebuilt.credentials),
+          )
+        : "webhook";
       const preview = await templatesService.preview({
         org_identifier: organizationIdentifier.value,
-        data: { definition: JSON.parse(template.body), channel: "webhook" },
+        data: { definition: JSON.parse(template.body), channel },
       });
-      return JSON.stringify(preview.data.payload, null, 2);
+      const payload = preview.data.payload;
+      if (channel === "email") return payload.html;
+      // The server renderer leaves the integration key to the destination.
+      if (channel === "pagerduty") payload.routing_key = prebuilt?.credentials.integrationKey;
+      return JSON.stringify(payload, null, 2);
     }
-    return fillSampleData(String(template.body ?? ""));
+    return fillSampleData(String(template.body ?? ""), prebuilt?.credentials);
   }
 
   /**

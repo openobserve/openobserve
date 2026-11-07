@@ -82,8 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="o2-flap-pill text-badge-purple-solid-text bg-badge-purple-solid-bg pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 flex -translate-x-1/2 items-center gap-1.25 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap shadow-md"
             >
-              <span class="font-semibold"
-                >{{ "⚡" }} {{ t("alerts.historyTimeline.flapping") }}</span
+              <span class="inline-flex items-center gap-0.5 font-semibold"
+                ><OIcon name="bolt" size="xs" />{{ t("alerts.historyTimeline.flapping") }}</span
               >
               <span class="font-normal opacity-60">•</span>{{ seg.flips }}
               {{ t("alerts.historyTimeline.flipsSuffix") }}
@@ -150,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
   isErrorOutcome,
   isFiringOutcome,

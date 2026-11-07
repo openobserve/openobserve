@@ -53,6 +53,9 @@ const DEK_CACHE_TTL: Duration = Duration::from_secs(300);
 /// Key state, installed once by [`boot`] from `src/main.rs` and `tests/integration_test.rs`.
 static MASTER_KEY: OnceLock<KeyState> = OnceLock::new();
 
+/// Whether `O2_ONCALL_MASTER_KEY` is set, installed once from `src/main.rs`.
+static ONCALL_KEY: OnceLock<bool> = OnceLock::new();
+
 const NO_KEY_WARNING: &str = "O2_MASTER_ENCRYPTION_KEY is not set: cipher keys are stored base64-encoded only, readable by anyone with database access";
 
 impl std::fmt::Display for EntryKind {
@@ -448,6 +451,13 @@ pub fn install_master_key(state: KeyState) -> Result<(), errors::Error> {
         .map_err(|_| errors::Error::Message("cipher master key already installed".to_string()))
 }
 
+/// Records once whether `O2_ONCALL_MASTER_KEY` is set; a second call errors. [strong]
+pub fn install_oncall_key(set: bool) -> Result<(), errors::Error> {
+    ONCALL_KEY
+        .set(set)
+        .map_err(|_| errors::Error::Message("on-call key already installed".to_string()))
+}
+
 /// Returns the mode; errors before install or with secrets off. [no side effects; depends on B9-K1]
 pub fn master_key() -> Result<&'static MasterKeyMode, errors::Error> {
     match MASTER_KEY.get() {
@@ -464,6 +474,11 @@ pub fn master_key() -> Result<&'static MasterKeyMode, errors::Error> {
 /// Says whether key rows are wrapped under a master key (AES mode installed). [no-fail]
 pub fn is_encrypting() -> bool {
     encrypting(MASTER_KEY.get())
+}
+
+/// Whether telephony and Slack may store secrets: AES mode or the on-call key. [no-fail]
+pub fn oncall_secrets_on() -> bool {
+    oncall_on(MASTER_KEY.get(), ONCALL_KEY.get().copied().unwrap_or(false))
 }
 
 /// Installs the mode and re-wraps, or turns secrets off. [weak: as `apply_rewraps`; else no write]
@@ -510,6 +525,14 @@ fn missing_key_warning(key_b64: Option<&str>) -> Option<&'static str> {
 
 fn encrypting(state: Option<&KeyState>) -> bool {
     matches!(state, Some(Ok(MasterKeyMode::Aes(_))))
+}
+
+fn oncall_on(state: Option<&KeyState>, oncall_key: bool) -> bool {
+    match state {
+        Some(Ok(MasterKeyMode::Aes(_))) => true,
+        Some(Ok(MasterKeyMode::None)) => oncall_key,
+        Some(Err(_)) | None => false,
+    }
 }
 
 /// Turns a plaintext key into the stored text for the mode. [pure]
@@ -728,6 +751,26 @@ mod tests {
         (outcome, installed)
     }
 
+    #[test]
+    fn oncall_secrets_need_aes_or_the_oncall_key_and_never_secrets_off() {
+        let off = || Err(KeyProblem::WrappedRowsButNoKey { count: 1 });
+        for (state, oncall_key, expected) in [
+            (None, true, false),
+            (Some(Ok(aes(1))), false, true),
+            (Some(Ok(aes(1))), true, true),
+            (Some(Ok(MasterKeyMode::None)), false, false),
+            (Some(Ok(MasterKeyMode::None)), true, true),
+            (Some(off()), true, false),
+        ] {
+            let name = state.as_ref().map(|s| s.as_ref().map(MasterKeyMode::name));
+            assert_eq!(
+                oncall_on(state.as_ref(), oncall_key),
+                expected,
+                "{name:?} {oncall_key}"
+            );
+        }
+    }
+
     // The only test touching the process-global state, so install order cannot race.
     #[tokio::test]
     async fn b9_r2_r3_r16_install_is_once_and_required() {
@@ -768,6 +811,11 @@ mod tests {
         let err = add(entry).await.unwrap_err();
         assert!(err.to_string().contains(&problem.to_string()), "{err}");
         assert!(!is_encrypting());
+
+        // Installed as off so no other test in this binary sees on-call secrets on.
+        install_oncall_key(false).unwrap();
+        assert!(install_oncall_key(true).is_err());
+        assert!(!oncall_secrets_on());
     }
 
     #[test]

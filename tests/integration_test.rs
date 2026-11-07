@@ -45,7 +45,7 @@ mod tests {
             dashboards::{Dashboard, v5},
             pipeline::{
                 Pipeline,
-                components::{DerivedStream, PipelineSource},
+                components::{DerivedStream, Edge, Node, NodeData, PipelineSource},
             },
             stream::StreamType,
             triggers::{ScheduledTriggerData, Trigger, TriggerModule, TriggerStatus},
@@ -62,7 +62,9 @@ mod tests {
     use ingestion_common::IngestionResponse;
     use openobserve::migration;
     use openobserve_api_grpc::handler::grpc::{
-        auth::check_internal_auth, flight::FlightServiceImpl, request::logs::LogsServer,
+        auth::check_internal_auth,
+        flight::FlightServiceImpl,
+        request::{ingest::Ingester, logs::LogsServer},
     };
     use openobserve_api_http::handler::http::router::{
         basic_routes, config_routes, other_service_routes, service_routes,
@@ -400,6 +402,9 @@ mod tests {
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
         let logs_svc = LogsServiceServer::new(LogsServer);
+        let ingest_svc = proto::cluster_rpc::ingest_server::IngestServer::new(Ingester)
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
 
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
@@ -407,6 +412,7 @@ mod tests {
             .add_service(search_svc)
             .add_service(flight_svc)
             .add_service(logs_svc)
+            .add_service(ingest_svc)
             .serve(gaddr)
             .await
             .expect("gRPC server init failed");
@@ -615,6 +621,7 @@ mod tests {
         test_derived_stream_invalid_timerange_with_cron_frequency().await;
         e2e_handle_derived_stream_evaluation_failure().await;
         e2e_cleanup_test_pipeline().await;
+        e2e_pipeline_trigger_moves().await;
 
         test_enrichment_table_integration().await;
         test_enrichment_table_local_all_sequential().await;
@@ -6632,13 +6639,13 @@ mod tests {
         log::info!("{:?}", status);
         assert!(status.is_success());
         let alert_response: GetAlertResponseBody = serde_json::from_slice(&body).unwrap();
-        assert_eq!(alert_response.0.name, "alertChk");
+        assert_eq!(alert_response.alert.name, "alertChk");
         assert_eq!(
-            alert_response.0.stream_type,
+            alert_response.alert.stream_type,
             openobserve_api_management::models::alerts::StreamType::Logs
         );
-        assert_eq!(alert_response.0.stream_name, "olympics_schema");
-        assert!(alert_response.0.enabled);
+        assert_eq!(alert_response.alert.stream_name, "olympics_schema");
+        assert!(alert_response.alert.enabled);
     }
 
     async fn e2e_handle_alert_after_destination_retries() {
@@ -7685,6 +7692,668 @@ mod tests {
 
         // Clean up test pipelines
         let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
+    }
+
+    /// #3383: every case runs even if another fails, so a run names all that broke.
+    async fn e2e_pipeline_trigger_moves() {
+        let window = e2e_pipeline_window();
+        e2e_pipeline_ingest(window).await;
+        let mut failed = Vec::new();
+        for (name, case) in e2e_pipeline_trigger_cases(window) {
+            if tokio::spawn(case).await.is_err() {
+                failed.push(name);
+            }
+        }
+        assert!(
+            failed.is_empty(),
+            "pipeline trigger cases failed: {failed:?}"
+        );
+    }
+
+    type PipelineTriggerCase = (
+        &'static str,
+        std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>,
+    );
+
+    fn e2e_pipeline_trigger_cases(window: i64) -> Vec<PipelineTriggerCase> {
+        vec![
+            ("rename_interval", Box::pin(e2e_rename_keeps_the_row(false))),
+            ("rename_cron", Box::pin(e2e_rename_keeps_the_row(true))),
+            (
+                "overwrite_rename",
+                Box::pin(e2e_overwrite_rename_keeps_the_row()),
+            ),
+            (
+                "description_only",
+                Box::pin(e2e_description_update_keeps_the_row()),
+            ),
+            (
+                "rename_new_schedule",
+                Box::pin(e2e_rename_with_new_schedule_reschedules()),
+            ),
+            (
+                "overwrite_to_realtime",
+                Box::pin(e2e_overwrite_to_realtime_leaves_no_row()),
+            ),
+            (
+                "rename_during_run",
+                Box::pin(e2e_rename_during_run_is_refused()),
+            ),
+            (
+                "rename_then_run",
+                Box::pin(e2e_renamed_pipeline_writes_rows_once(window)),
+            ),
+            (
+                "stale_with_current_row",
+                Box::pin(e2e_stale_row_with_current_row_deletes_itself(window)),
+            ),
+            (
+                "stale_disabled",
+                Box::pin(e2e_stale_row_of_disabled_pipeline_deletes_itself(window)),
+            ),
+            (
+                "stale_only_row",
+                Box::pin(e2e_stale_only_row_runs_then_moves(window)),
+            ),
+            (
+                "stale_cache",
+                Box::pin(e2e_stale_cache_deletes_nothing(window)),
+            ),
+            (
+                "retry_repairs_missing_trigger",
+                Box::pin(e2e_retry_repairs_a_missing_trigger()),
+            ),
+            ("rename_enable", Box::pin(e2e_rename_and_enable_runs_soon())),
+            (
+                "delete_old_key_row",
+                Box::pin(e2e_delete_removes_older_rows()),
+            ),
+            (
+                "retry_keeps_old_key_row",
+                Box::pin(e2e_retry_keeps_a_row_under_an_older_key()),
+            ),
+            (
+                "stale_unreadable",
+                Box::pin(e2e_stale_row_that_cannot_be_checked_writes_nothing(window)),
+            ),
+            ("slash_name", Box::pin(e2e_slash_name_keeps_its_row(window))),
+        ]
+    }
+
+    const E2E_PIPELINE_SRC: &str = "pipeline_trigger_src";
+    const E2E_PIPELINE_ROWS: i64 = 20;
+    const E2E_PIPELINE_PERIOD_MICROS: i64 = 5 * 60 * 1_000_000;
+    const E2E_PIPELINE_FAR_RUN: i64 = 4_000_000_000_000_000;
+
+    /// Start of the last whole 5 minute window, which every case evaluates.
+    fn e2e_pipeline_window() -> i64 {
+        let now = Utc::now().timestamp_micros();
+        now - now % E2E_PIPELINE_PERIOD_MICROS - E2E_PIPELINE_PERIOD_MICROS
+    }
+
+    async fn e2e_pipeline_ingest(window: i64) {
+        let rows: Vec<_> = (0..E2E_PIPELINE_ROWS)
+            .map(|seq| serde_json::json!({"_timestamp": window + seq * 1_000_000, "seq": seq}))
+            .collect();
+        let app = init_test_router();
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/e2e/{E2E_PIPELINE_SRC}/_json"),
+            Some(auth_headers(setup())),
+            Some(serde_json::to_string(&rows).unwrap()),
+        )
+        .await;
+        assert!(status.is_success(), "{}", String::from_utf8_lossy(&body));
+    }
+
+    fn e2e_scheduled_pipeline(id: &str, name: &str, cron: bool) -> Pipeline {
+        let trigger_condition = if cron {
+            TriggerCondition {
+                period: 5,
+                frequency_type: config::meta::alerts::FrequencyType::Cron,
+                cron: "0 */5 * * * *".to_string(),
+                ..Default::default()
+            }
+        } else {
+            TriggerCondition {
+                period: 5,
+                frequency: 5,
+                ..Default::default()
+            }
+        };
+        let query = DerivedStream {
+            org_id: "e2e".to_string(),
+            stream_type: StreamType::Logs,
+            query_condition: QueryCondition {
+                query_type: config::meta::alerts::QueryType::SQL,
+                sql: Some(format!(
+                    "SELECT _timestamp, seq FROM \"{E2E_PIPELINE_SRC}\""
+                )),
+                ..Default::default()
+            },
+            trigger_condition,
+            ..Default::default()
+        };
+        e2e_pipeline_of(id, name, NodeData::Query(query))
+    }
+
+    fn e2e_pipeline_of(id: &str, name: &str, source: NodeData) -> Pipeline {
+        let node =
+            |id: &str, data, io: &str| Node::new(id.to_string(), data, 0.0, 0.0, io.to_string());
+        let dest = config::meta::stream::StreamParams {
+            org_id: "e2e".to_string().into(),
+            stream_name: format!("{id}_dst").into(),
+            stream_type: StreamType::Logs,
+        };
+        Pipeline {
+            id: id.to_string(),
+            version: 1,
+            enabled: true,
+            org: "e2e".to_string(),
+            name: name.to_string(),
+            description: String::new(),
+            source: PipelineSource::Scheduled(DerivedStream::default()),
+            kind: Default::default(),
+            nodes: vec![
+                node("src", source, "input"),
+                node("dst", NodeData::Stream(dest), "output"),
+            ],
+            edges: vec![Edge::new("src".to_string(), "dst".to_string())],
+        }
+    }
+
+    async fn e2e_overwrite_pipeline(pipeline: &Pipeline) -> StatusCode {
+        let (status, _) = make_request(
+            &init_test_router(),
+            Method::POST,
+            "/api/e2e/pipelines?overwrite=true",
+            Some(auth_headers(setup())),
+            Some(serde_json::to_string(pipeline).unwrap()),
+        )
+        .await;
+        status
+    }
+
+    async fn e2e_update_pipeline(pipeline: &Pipeline) -> StatusCode {
+        let (status, _) = make_request(
+            &init_test_router(),
+            Method::PUT,
+            "/api/e2e/pipelines",
+            Some(auth_headers(setup())),
+            Some(serde_json::to_string(pipeline).unwrap()),
+        )
+        .await;
+        status
+    }
+
+    async fn e2e_stored_pipeline(id: &str) -> Pipeline {
+        openobserve_core::pipeline::db::get_by_id(id).await.unwrap()
+    }
+
+    /// Creates the pipeline and returns the stored copy with its one trigger row.
+    async fn e2e_create_scheduled(id: &str, name: &str, cron: bool) -> (Pipeline, Trigger) {
+        let status = e2e_overwrite_pipeline(&e2e_scheduled_pipeline(id, name, cron)).await;
+        assert!(status.is_success(), "create {id}: {status}");
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{id}: {rows:?}");
+        (
+            e2e_stored_pipeline(id).await,
+            rows.into_iter().next().unwrap(),
+        )
+    }
+
+    async fn e2e_pipeline_triggers(id: &str) -> Vec<Trigger> {
+        let suffix = format!("/{id}");
+        db::scheduler::list_by_org("e2e", Some(TriggerModule::DerivedStream))
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|trigger| trigger.module_key.ends_with(&suffix))
+            .collect()
+    }
+
+    fn e2e_cursor(period_end_time: i64) -> String {
+        ScheduledTriggerData {
+            period_end_time: Some(period_end_time),
+            ..Default::default()
+        }
+        .to_json_string()
+    }
+
+    fn e2e_cursor_of(trigger: &Trigger) -> Option<i64> {
+        ScheduledTriggerData::from_json_string(&trigger.data)
+            .unwrap()
+            .period_end_time
+    }
+
+    /// Writes a recognizable cursor and next run onto the row.
+    async fn e2e_seed_trigger(trigger: &Trigger, cursor: i64, next_run_at: i64) -> Trigger {
+        let seeded = Trigger {
+            data: e2e_cursor(cursor),
+            next_run_at,
+            ..trigger.clone()
+        };
+        db::scheduler::update_trigger(seeded, false, "")
+            .await
+            .unwrap();
+        db::scheduler::get("e2e", TriggerModule::DerivedStream, &trigger.module_key)
+            .await
+            .unwrap()
+    }
+
+    /// A row left behind by an older rename, as `pipeline_name` used to key it.
+    async fn e2e_push_stale_trigger(id: &str, old_name: &str, cursor: i64) -> String {
+        let module_key = format!("logs/e2e/{old_name}/{id}");
+        db::scheduler::push(Trigger {
+            org: "e2e".to_string(),
+            module: TriggerModule::DerivedStream,
+            module_key: module_key.clone(),
+            next_run_at: Utc::now().timestamp_micros(),
+            data: e2e_cursor(cursor),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        module_key
+    }
+
+    /// Runs the row the way a worker that claimed it does.
+    async fn e2e_run_trigger(module_key: &str) {
+        e2e_try_run_trigger(module_key).await.unwrap();
+    }
+
+    async fn e2e_try_run_trigger(module_key: &str) -> Result<(), anyhow::Error> {
+        let row = db::scheduler::get("e2e", TriggerModule::DerivedStream, module_key)
+            .await
+            .unwrap();
+        db::scheduler::update_status(
+            "e2e",
+            TriggerModule::DerivedStream,
+            module_key,
+            TriggerStatus::Processing,
+            0,
+            None,
+            false,
+            "",
+        )
+        .await
+        .unwrap();
+        let now = Utc::now().timestamp_micros();
+        let claimed = Trigger {
+            status: TriggerStatus::Processing,
+            start_time: Some(now),
+            next_run_at: now,
+            ..row
+        };
+        handle_triggers("e2e_pipeline_trigger", claimed).await
+    }
+
+    /// Rows in the destination of pipeline `id`; a stream that was never written counts as none.
+    async fn e2e_destination_rows(id: &str) -> i64 {
+        let now = Utc::now().timestamp_micros();
+        let body = serde_json::json!({"query": {
+            "sql": format!("SELECT count(*) AS n FROM \"{id}_dst\""),
+            "from": 0,
+            "size": 1,
+            "start_time": now - 2 * 3600 * 1_000_000,
+            "end_time": now,
+        }});
+        let (status, body) = make_request(
+            &init_test_router(),
+            Method::POST,
+            "/api/e2e/_search",
+            Some(auth_headers(setup())),
+            Some(body.to_string()),
+        )
+        .await;
+        let body: json::Value = json::from_slice(&body).unwrap();
+        if !status.is_success() {
+            // Any other failure must not pass as "wrote nothing".
+            assert_eq!(body["code"], 20002, "{status}: {body}");
+            return 0;
+        }
+        body["hits"][0]["n"].as_i64().unwrap_or_default()
+    }
+
+    async fn e2e_delete_scheduled(id: &str) {
+        openobserve_core::pipeline::delete_pipeline(id)
+            .await
+            .unwrap();
+    }
+
+    async fn e2e_rename_keeps_the_row(cron: bool) {
+        let id = if cron {
+            "rename_cron_pl"
+        } else {
+            "rename_interval_pl"
+        };
+        let (mut pipeline, row) = e2e_create_scheduled(id, "rename_old", cron).await;
+        let seeded = e2e_seed_trigger(&row, 111, E2E_PIPELINE_FAR_RUN).await;
+
+        pipeline.name = "rename_new".to_string();
+        assert_eq!(e2e_update_pipeline(&pipeline).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, format!("logs/e2e/rename_new/{id}"));
+        assert_eq!(rows[0].id, seeded.id);
+        assert_eq!(rows[0].data, seeded.data);
+        assert_eq!(rows[0].next_run_at, E2E_PIPELINE_FAR_RUN);
+        assert_eq!(e2e_stored_pipeline(id).await.name, "rename_new");
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_overwrite_rename_keeps_the_row() {
+        let id = "overwrite_rename_pl";
+        let (mut pipeline, row) = e2e_create_scheduled(id, "overwrite_old", false).await;
+        let seeded = e2e_seed_trigger(&row, 222, E2E_PIPELINE_FAR_RUN).await;
+
+        pipeline.name = "overwrite_new".to_string();
+        assert_eq!(e2e_overwrite_pipeline(&pipeline).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, format!("logs/e2e/overwrite_new/{id}"));
+        assert_eq!(rows[0].data, seeded.data);
+        assert_eq!(rows[0].next_run_at, E2E_PIPELINE_FAR_RUN);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_description_update_keeps_the_row() {
+        let id = "description_pl";
+        let (mut pipeline, row) = e2e_create_scheduled(id, "description_name", false).await;
+        let seeded = e2e_seed_trigger(&row, 333, E2E_PIPELINE_FAR_RUN).await;
+
+        pipeline.description = "only this changed".to_string();
+        assert_eq!(e2e_update_pipeline(&pipeline).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, seeded.module_key);
+        assert_eq!(rows[0].id, seeded.id);
+        assert_eq!(rows[0].data, seeded.data);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_rename_with_new_schedule_reschedules() {
+        let id = "rename_schedule_pl";
+        let (mut pipeline, row) = e2e_create_scheduled(id, "schedule_old", false).await;
+        let seeded = e2e_seed_trigger(&row, 444, E2E_PIPELINE_FAR_RUN).await;
+
+        pipeline.name = "schedule_new".to_string();
+        let NodeData::Query(query) = &mut pipeline.nodes[0].data else {
+            panic!("the first node is the query");
+        };
+        query.trigger_condition.frequency = 10;
+        assert_eq!(e2e_update_pipeline(&pipeline).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, format!("logs/e2e/schedule_new/{id}"));
+        assert_eq!(rows[0].data, seeded.data);
+        assert_ne!(rows[0].next_run_at, E2E_PIPELINE_FAR_RUN);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_overwrite_to_realtime_leaves_no_row() {
+        let id = "overwrite_realtime_pl";
+        e2e_create_scheduled(id, "realtime_name", false).await;
+
+        let source = config::meta::stream::StreamParams {
+            org_id: "e2e".to_string().into(),
+            stream_name: "overwrite_realtime_src".to_string().into(),
+            stream_type: StreamType::Logs,
+        };
+        let realtime = e2e_pipeline_of(id, "realtime_name", NodeData::Stream(source));
+        assert_eq!(e2e_overwrite_pipeline(&realtime).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert!(rows.is_empty(), "{rows:?}");
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_rename_during_run_is_refused() {
+        let id = "rename_during_run_pl";
+        let (mut pipeline, row) = e2e_create_scheduled(id, "running_old", false).await;
+        let seeded = e2e_seed_trigger(&row, 555, E2E_PIPELINE_FAR_RUN).await;
+        db::scheduler::update_status(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &seeded.module_key,
+            TriggerStatus::Processing,
+            0,
+            None,
+            false,
+            "",
+        )
+        .await
+        .unwrap();
+
+        let version = pipeline.version;
+        pipeline.name = "running_new".to_string();
+        assert_eq!(e2e_update_pipeline(&pipeline).await, StatusCode::CONFLICT);
+        assert_eq!(
+            e2e_overwrite_pipeline(&pipeline).await,
+            StatusCode::CONFLICT
+        );
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, seeded.module_key);
+        assert_eq!(rows[0].status, TriggerStatus::Processing);
+        assert_eq!(rows[0].data, seeded.data);
+        let stored = e2e_stored_pipeline(id).await;
+        assert_eq!(stored.name, "running_old");
+        assert_eq!(stored.version, version);
+        e2e_delete_scheduled(id).await;
+    }
+
+    /// The reported defect: after a rename every result row arrived twice.
+    async fn e2e_renamed_pipeline_writes_rows_once(window: i64) {
+        let id = "rename_then_run_pl";
+        let (mut pipeline, row) = e2e_create_scheduled(id, "writes_old", false).await;
+        e2e_seed_trigger(&row, window, Utc::now().timestamp_micros()).await;
+
+        pipeline.name = "writes_new".to_string();
+        assert_eq!(e2e_update_pipeline(&pipeline).await, StatusCode::OK);
+        for trigger in e2e_pipeline_triggers(id).await {
+            e2e_run_trigger(&trigger.module_key).await;
+        }
+
+        assert_eq!(e2e_destination_rows(id).await, E2E_PIPELINE_ROWS);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_stale_row_with_current_row_deletes_itself(window: i64) {
+        let id = "stale_current_pl";
+        let (_, row) = e2e_create_scheduled(id, "stale_current_new", false).await;
+        let current = e2e_seed_trigger(&row, 666, E2E_PIPELINE_FAR_RUN).await;
+        let stale = e2e_push_stale_trigger(id, "stale_current_old", window).await;
+
+        e2e_run_trigger(&stale).await;
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, current.module_key);
+        assert_eq!(rows[0].data, current.data);
+        assert_eq!(e2e_destination_rows(id).await, 0);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_stale_row_of_disabled_pipeline_deletes_itself(window: i64) {
+        let id = "stale_disabled_pl";
+        let (pipeline, row) = e2e_create_scheduled(id, "stale_disabled_new", false).await;
+        db::scheduler::delete("e2e", TriggerModule::DerivedStream, &row.module_key)
+            .await
+            .unwrap();
+        openobserve_core::pipeline::enable_pipeline("e2e", &pipeline.id, false, false)
+            .await
+            .unwrap();
+        let stale = e2e_push_stale_trigger(id, "stale_disabled_old", window).await;
+
+        e2e_run_trigger(&stale).await;
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert!(rows.is_empty(), "{rows:?}");
+        assert_eq!(e2e_destination_rows(id).await, 0);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_stale_only_row_runs_then_moves(window: i64) {
+        let id = "stale_only_pl";
+        let (_, row) = e2e_create_scheduled(id, "stale_only_new", false).await;
+        db::scheduler::delete("e2e", TriggerModule::DerivedStream, &row.module_key)
+            .await
+            .unwrap();
+        let stale = e2e_push_stale_trigger(id, "stale_only_old", window).await;
+
+        e2e_run_trigger(&stale).await;
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, row.module_key);
+        assert_eq!(rows[0].status, TriggerStatus::Waiting);
+        assert_eq!(
+            e2e_cursor_of(&rows[0]),
+            Some(window + E2E_PIPELINE_PERIOD_MICROS)
+        );
+        assert_eq!(e2e_destination_rows(id).await, E2E_PIPELINE_ROWS);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_stale_cache_deletes_nothing(window: i64) {
+        let id = "stale_cache_pl";
+        let (pipeline, row) = e2e_create_scheduled(id, "stale_cache_new", false).await;
+        let seeded = e2e_seed_trigger(&row, window, Utc::now().timestamp_micros()).await;
+        let old = Pipeline {
+            name: "stale_cache_old".to_string(),
+            ..pipeline
+        };
+        openobserve_core::pipeline::db::cache_scheduled_pipeline(&old).await;
+
+        e2e_run_trigger(&seeded.module_key).await;
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, seeded.module_key);
+        assert_eq!(
+            e2e_cursor_of(&rows[0]),
+            Some(window + E2E_PIPELINE_PERIOD_MICROS)
+        );
+        assert_eq!(e2e_destination_rows(id).await, E2E_PIPELINE_ROWS);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_rename_and_enable_runs_soon() {
+        let id = "rename_enable_pl";
+        let (mut pipeline, _) = e2e_create_scheduled(id, "rename_enable_old", false).await;
+        pipeline.enabled = false;
+        assert_eq!(e2e_update_pipeline(&pipeline).await, StatusCode::OK);
+        let row = e2e_pipeline_triggers(id).await.remove(0);
+        e2e_seed_trigger(&row, 555, E2E_PIPELINE_FAR_RUN).await;
+
+        let mut pipeline = e2e_stored_pipeline(id).await;
+        pipeline.name = "rename_enable_new".to_string();
+        pipeline.enabled = true;
+        assert_eq!(e2e_update_pipeline(&pipeline).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(
+            rows[0].module_key,
+            format!("logs/e2e/rename_enable_new/{id}")
+        );
+        assert!(rows[0].next_run_at < E2E_PIPELINE_FAR_RUN, "{rows:?}");
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_delete_removes_older_rows() {
+        let id = "delete_old_key_pl";
+        e2e_create_scheduled(id, "delete_old_key_new", false).await;
+        e2e_push_stale_trigger(id, "delete_old_key_old", 666).await;
+
+        e2e_delete_scheduled(id).await;
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert!(rows.is_empty(), "{rows:?}");
+    }
+
+    async fn e2e_retry_repairs_a_missing_trigger() {
+        let id = "retry_repair_pl";
+        let (_, row) = e2e_create_scheduled(id, "retry_repair", false).await;
+        db::scheduler::delete("e2e", TriggerModule::DerivedStream, &row.module_key)
+            .await
+            .unwrap();
+
+        // The pipeline write bumped the version, and the retried body still has the old one.
+        let mut retried = e2e_stored_pipeline(id).await;
+        retried.version -= 1;
+        assert_eq!(e2e_update_pipeline(&retried).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, row.module_key);
+        e2e_delete_scheduled(id).await;
+    }
+
+    async fn e2e_retry_keeps_a_row_under_an_older_key() {
+        let id = "retry_old_key_pl";
+        let (_, row) = e2e_create_scheduled(id, "retry_old_key_new", false).await;
+        db::scheduler::delete("e2e", TriggerModule::DerivedStream, &row.module_key)
+            .await
+            .unwrap();
+        let stale = e2e_push_stale_trigger(id, "retry_old_key_old", 444).await;
+
+        let stored = e2e_stored_pipeline(id).await;
+        assert_eq!(e2e_update_pipeline(&stored).await, StatusCode::OK);
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, stale);
+        db::scheduler::delete("e2e", TriggerModule::DerivedStream, &stale)
+            .await
+            .unwrap();
+        openobserve_core::pipeline::delete_pipeline(id)
+            .await
+            .unwrap();
+    }
+
+    async fn e2e_stale_row_that_cannot_be_checked_writes_nothing(window: i64) {
+        let id = "stale_unread_pl";
+        let (pipeline, row) = e2e_create_scheduled(id, "stale_unread_new", false).await;
+        let stale = e2e_push_stale_trigger(id, "stale_unread_old", window).await;
+        // The cache still holds the pipeline, and the database read now fails.
+        openobserve_core::pipeline::db::cache_scheduled_pipeline(&pipeline).await;
+        infra::pipeline::delete(id).await.unwrap();
+
+        assert!(e2e_try_run_trigger(&stale).await.is_err());
+
+        assert_eq!(e2e_destination_rows(id).await, 0);
+        for key in [&stale, &row.module_key] {
+            db::scheduler::delete("e2e", TriggerModule::DerivedStream, key)
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn e2e_slash_name_keeps_its_row(window: i64) {
+        let id = "slash_name_pl";
+        let (_, row) = e2e_create_scheduled(id, "team/slash", false).await;
+        assert_eq!(row.module_key, format!("logs/e2e/team/slash/{id}"));
+        let seeded = e2e_seed_trigger(&row, window, Utc::now().timestamp_micros()).await;
+
+        e2e_run_trigger(&seeded.module_key).await;
+
+        let rows = e2e_pipeline_triggers(id).await;
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].module_key, seeded.module_key);
+        assert_eq!(
+            e2e_cursor_of(&rows[0]),
+            Some(window + E2E_PIPELINE_PERIOD_MICROS)
+        );
+        assert_eq!(e2e_destination_rows(id).await, E2E_PIPELINE_ROWS);
+        e2e_delete_scheduled(id).await;
     }
 
     async fn get_pipeline_from_api(pipeline_name: &str) -> ApiPipeline {

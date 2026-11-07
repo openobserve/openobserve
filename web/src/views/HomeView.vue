@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open="firstDataNotice.open"
           @dismiss="firstDataNotice.dismiss"
         />
+        <SampleDataHomeBanner v-if="activeHomeTab === 'overview'" class="mt-2.5 mb-1" />
         <FirstDataPanel
           v-if="flagOn && isDataTab && arrived"
           signal="any"
@@ -269,7 +270,9 @@ import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
 import { FIRST_DATA_NOTICE } from "@/composables/firstEvent/useFirstDataNotice";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
+import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
+import SampleDataHomeBanner from "@/components/sampleData/SampleDataHomeBanner.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -456,7 +459,29 @@ export default defineComponent({
       );
     }
 
-    watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
+    // An org with no stream at all opens on Overview's setup state, not the assistant; that choice
+    // is the app's, so it is not saved as the user's tab.
+    let skipSave = false;
+    watch(activeHomeTab, (val) => {
+      if (skipSave) {
+        skipSave = false;
+        return;
+      }
+      localStorage.setItem(LS_ACTIVE_TAB_KEY, val);
+    });
+    const { hasAnyStream, isFetching } = useOrgHasUserData(
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    // O2's own streams count, so the _meta org keeps the assistant; a stale cached list may be out of date
+    watch(
+      [hasAnyStream, isFetching],
+      ([has, fetching]) => {
+        if (has !== false || fetching || activeHomeTab.value !== "ai") return;
+        skipSave = true;
+        activeHomeTab.value = "overview";
+      },
+      { immediate: true },
+    );
 
     // The cached pin can be stale from another device, so it is re-read without holding the tab; a stale folder is caught by onPinnedUnavailable.
     function revalidatePin() {
@@ -596,6 +621,7 @@ export default defineComponent({
     FirstDataPanel,
     FirstDataNotice,
     HomeNoDataState,
+    SampleDataHomeBanner,
     HomeViewSkeleton,
     TrialPeriod,
     OEmptyState,

@@ -88,7 +88,7 @@ pub async fn get_view(Path(path): Path<(String, String)>) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = crate::common::meta::saved_view::ViewsWithoutData, example = json!([{
                 "org_id": "some-org-id",
                 "view_name": "view-name",
                 "view_id": "view-id",

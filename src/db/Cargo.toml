@@ -50,6 +50,7 @@ tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
 transform.workspace = true
+utoipa.workspace = true
 vrl.workspace = true
 
 [dev-dependencies]

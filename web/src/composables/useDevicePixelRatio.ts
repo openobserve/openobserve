@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, ref, type Ref } from "vue";
 
 interface CanvasLayer {
   dpr: number;
@@ -30,6 +30,8 @@ interface CanvasPainter {
   refresh: (opt: { paintAll: boolean }) => unknown;
 }
 
+type EChartsLike = { getZr?: () => unknown };
+
 type LegacyMediaQueryList = Partial<
   Pick<MediaQueryList, "matches" | "addEventListener" | "removeEventListener">
 > & {
@@ -37,9 +39,10 @@ type LegacyMediaQueryList = Partial<
   removeListener?: (fn: () => void) => void;
 };
 
-/** The ratio right now; ECharts' own default is the one read when zrender was first imported. */
-export const currentDevicePixelRatio = (): number =>
-  (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+let warnedUnrecognisedPainter = false;
+
+/** The ratio right now, never below 1 like zrender's own default, so zoomed-out charts and their exports keep full resolution. */
+export const currentDevicePixelRatio = (): number => Math.max(rawDevicePixelRatio(), 1);
 
 /** Whether one CSS pixel spans a non-whole number of device pixels (Windows display scaling, browser zoom), where the browser resamples canvases. */
 export const isFractionalDevicePixelRatio = (ratio: number): boolean => !Number.isInteger(ratio);
@@ -58,7 +61,8 @@ export const watchDevicePixelRatio = (onChange: (ratio: number) => void): (() =>
 
   // A resolution query only flips once, when the ratio leaves the value it was built for, so it is rebuilt after each change.
   const arm = () => {
-    mql = ratioQuery(currentDevicePixelRatio());
+    // Armed on the raw ratio: a clamped one would never match below 1, so zoom changes there would go unseen.
+    mql = ratioQuery(rawDevicePixelRatio());
     if (typeof mql?.addEventListener === "function") mql.addEventListener("change", handleChange);
     else mql?.addListener?.(handleChange);
   };
@@ -82,14 +86,32 @@ export const useDevicePixelRatioChange = (onChange: (ratio: number) => void): vo
   onUnmounted(() => stop());
 };
 
+/** Whether a chart's canvas should be shown pixelated, kept true only while it is rasterized at the current fractional ratio; call `sync` after each re-init. */
+export const useChartPixelRatio = (
+  getChart: () => EChartsLike | null | undefined,
+): { pixelated: Ref<boolean>; sync: () => void } => {
+  const pixelated = ref(isFractionalDevicePixelRatio(currentDevicePixelRatio()));
+  // A skipped apply (SVG, echarts-gl) leaves a bitmap at the old ratio, which nearest-neighbour scaling would make jagged.
+  const sync = () => {
+    const ratio = currentDevicePixelRatio();
+    pixelated.value =
+      isFractionalDevicePixelRatio(ratio) && canvasPainterOf(getChart())?.dpr === ratio;
+  };
+  useDevicePixelRatioChange((ratio) => {
+    applyDevicePixelRatio(getChart(), ratio);
+    sync();
+  });
+  return { pixelated, sync };
+};
+
 /** Re-rasterizes a mounted canvas chart at `ratio` in place, keeping its instance, handlers and interaction state; returns whether it changed anything. */
 export const applyDevicePixelRatio = (
-  chart: { getZr?: () => unknown } | null | undefined,
+  chart: EChartsLike | null | undefined,
   ratio: number,
 ): boolean => {
   // ECharts has no public setter for the ratio, so this updates zrender 6.1's canvas painter fields directly.
-  const painter = (chart?.getZr?.() as { painter?: Partial<CanvasPainter> } | undefined)?.painter;
-  if (!painter || painter.type !== "canvas" || painter.dpr === ratio) return false;
+  const painter = canvasPainterOf(chart);
+  if (!painter || painter.dpr === ratio) return false;
   const { getLayers, getWidth, getHeight, refresh } = painter;
   if (
     typeof getLayers !== "function" ||
@@ -97,6 +119,7 @@ export const applyDevicePixelRatio = (
     typeof getHeight !== "function" ||
     typeof refresh !== "function"
   ) {
+    warnUnrecognisedPainter("its canvas painter lacks the methods it relies on");
     return false;
   }
   const layers = Object.values(getLayers.call(painter) ?? {}) as Partial<CanvasLayer>[];
@@ -110,14 +133,34 @@ export const applyDevicePixelRatio = (
   }
   const width = getWidth.call(painter);
   const height = getHeight.call(painter);
-  // Layers made later (hover, incremental) are built from painter.dpr, so setting it covers them too.
-  painter.dpr = ratio;
-  layers.forEach((layer) => {
-    layer.dpr = ratio;
-    layer.ctx.dpr = ratio;
-    layer.resize(width, height);
-  });
-  refresh.call(painter, { paintAll: true });
+  const previous = painter.dpr;
+  const previousLayers = layers.map((layer) => ({ dpr: layer.dpr, ctxDpr: layer.ctx.dpr }));
+  try {
+    // Layers made later (hover, incremental) are built from painter.dpr, so setting it covers them too.
+    painter.dpr = ratio;
+    layers.forEach((layer) => {
+      layer.dpr = ratio;
+      layer.ctx.dpr = ratio;
+      layer.resize(width, height);
+    });
+    refresh.call(painter, { paintAll: true });
+  } catch (e) {
+    // Restored so painter.dpr still differs from the next ratio and a later change retries.
+    painter.dpr = previous;
+    layers.forEach((layer, i) => {
+      layer.dpr = previousLayers[i].dpr;
+      layer.ctx.dpr = previousLayers[i].ctxDpr;
+    });
+    // Layers resized before the throw hold a cleared bitmap at the new ratio, so they are rebuilt at the old one.
+    try {
+      layers.forEach((layer) => layer.resize(width, height));
+      refresh.call(painter, { paintAll: true });
+    } catch {
+      // The next init rebuilds the canvas; nothing more can be done in place.
+    }
+    warnUnrecognisedPainter(`re-rasterizing threw: ${String(e)}`);
+    return false;
+  }
   return true;
 };
 
@@ -131,4 +174,18 @@ const ratioQuery = (ratio: number): LegacyMediaQueryList | null => {
   return prefixed?.matches ? prefixed : standard;
 };
 
-export default useDevicePixelRatioChange;
+const rawDevicePixelRatio = (): number =>
+  (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+
+const canvasPainterOf = (
+  chart: EChartsLike | null | undefined,
+): Partial<CanvasPainter> | undefined => {
+  const painter = (chart?.getZr?.() as { painter?: Partial<CanvasPainter> } | undefined)?.painter;
+  return painter?.type === "canvas" ? painter : undefined;
+};
+
+const warnUnrecognisedPainter = (reason: string) => {
+  if (warnedUnrecognisedPainter) return;
+  warnedUnrecognisedPainter = true;
+  console.warn(`Could not re-rasterize a chart at the new device pixel ratio: ${reason}.`);
+};

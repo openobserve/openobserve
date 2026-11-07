@@ -291,7 +291,6 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
     }
 
     let now = config::utils::time::now();
-    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
     // if the stream partition_time_level is daily we only allow one compactor
     let mut need_release_ids = Vec::new();
@@ -313,12 +312,25 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         let partition_time_level =
             get_partition_time_level_at(stream_type, Some(&stream_settings), job.offsets);
         // to avoid compacting conflict with retention, need check the data retention time
-        let stream_data_retention_end = if stream_settings.data_retention > 0 {
-            now - Duration::try_days(stream_settings.data_retention).unwrap()
-        } else {
-            data_lifecycle_end
+        let retention_days = match db::organization::stream_retention_days(
+            &org_id,
+            stream_type,
+            &stream_name,
+            stream_settings.data_retention,
+        )
+        .await
+        {
+            Ok(days) => days,
+            Err(e) => {
+                log::error!(
+                    "[COMPACTOR] merge job [{}] can't read retention, retry later: {e}",
+                    job.stream
+                );
+                need_release_ids.push(job.id);
+                continue;
+            }
         };
-        if job.offsets <= stream_data_retention_end.timestamp_micros() {
+        if retention::past_retention(job.offsets, retention_days, now) {
             need_done_ids.push(job.id); // the data will be deleted by retention, just skip
             continue;
         }

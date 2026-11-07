@@ -84,6 +84,30 @@ describe("OnCallSetupBanner", () => {
   });
   afterEach(() => window.localStorage.clear());
 
+  it.each([
+    "listTeams",
+    "coverageGaps",
+    "listOwnershipRules",
+    "listResponses",
+    "getPolicy",
+  ] as const)("tells the page when the license refuses %s", async (read) => {
+    answer();
+    service[read].mockRejectedValueOnce({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
+    const wrapper = await render();
+
+    expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+  });
+
+  it("does not report any other failed read as a denial", async () => {
+    answer();
+    service.listTeams.mockRejectedValueOnce({ response: { status: 403, data: {} } });
+    const wrapper = await render();
+
+    expect(wrapper.emitted("licenseDenied")).toBeUndefined();
+  });
+
   /// Answered from its own reads, so the bar names the same next step the Pages checklist would.
   it("names the next undone step while setup is unfinished", async () => {
     answer();

@@ -57,12 +57,7 @@ import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import DOMPurify from "dompurify";
 import { withChartFont } from "@/utils/fonts";
 import { useTheme } from "@/composables/useTheme";
-import {
-  applyDevicePixelRatio,
-  currentDevicePixelRatio,
-  isFractionalDevicePixelRatio,
-  useDevicePixelRatioChange,
-} from "@/composables/useDevicePixelRatio";
+import { currentDevicePixelRatio, useChartPixelRatio } from "@/composables/useDevicePixelRatio";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 
 // Register necessary components.
@@ -155,6 +150,7 @@ export default defineComponent({
           renderer: "canvas",
           devicePixelRatio: currentDevicePixelRatio(),
         });
+        syncPixelRatio();
         chartDark = dark;
         if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
           reinitWhenSized();
@@ -242,11 +238,9 @@ export default defineComponent({
       { deep: true },
     );
     watch(isDark, () => initChart());
-    const fractionalPixelRatio = ref(isFractionalDevicePixelRatio(currentDevicePixelRatio()));
-    useDevicePixelRatioChange((ratio) => {
-      fractionalPixelRatio.value = isFractionalDevicePixelRatio(ratio);
-      applyDevicePixelRatio(chart, ratio);
-    });
+    const { pixelated: fractionalPixelRatio, sync: syncPixelRatio } = useChartPixelRatio(
+      () => chart,
+    );
 
     onUnmounted(() => {
       zeroSizeReinitObserver?.disconnect();

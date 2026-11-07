@@ -47,6 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="model.spinner" #icon>
           <OSpinner size="xs" data-test="incident-ai-analysis-spinner" />
         </template>
+        <template v-else-if="model.locked" #icon>
+          <OIcon name="lock" size="xs" class="lock-chip" data-test="incident-ai-analysis-lock" />
+        </template>
         {{ model.label }}
       </OBadge>
       <span
@@ -88,11 +91,13 @@ import { useStore } from "vuex";
 import { isAxiosError } from "axios";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Incident } from "@/services/incidents";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaTrigger } from "@/composables/useRcaTrigger";
 import { rcaCellModel, type RcaCellTone } from "@/utils/incidents/rcaCell";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
@@ -127,10 +132,12 @@ const { t } = useI18nTyped();
 const store = useStore();
 const { requestRca } = useRcaTrigger();
 const timezone = useViewerTimezone();
+const aiLock = useLicenseLock("ai_assistant");
 
 const model = computed(() =>
   rcaCellModel(props.incident, {
     rcaEnabled: props.rcaEnabled,
+    lockedReason: aiLock.locked.value ? aiLock.lockedReason.value : undefined,
     now: props.now,
     timezone: timezone.value,
   }),
