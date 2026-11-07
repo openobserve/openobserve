@@ -10239,6 +10239,7 @@
     "minimum": "735beee2e390c797",
     "minutes": "4f846a84e7fc9ef6",
     "moreActions": "f8d46c2570e70736",
+    "moreOptionsSettingsDraft": "b36a419f9dfd6ec7",
     "moveDashboardToAnotherFolder": {
       "moveDashboard": "27e4c99aa58fbb44",
       "moveFailed": "3f61e6da5e7bfb5b",
@@ -11457,6 +11458,7 @@
       "failedToSaveChanges": "cd51b3228c7b5196",
       "failedToUpdateJson": "d562c825eabdca2e",
       "moreRefreshOptions": "d1859c9c35018ebc",
+      "moreShareOptions": "234ae80bcb93ec52",
       "panelDeleted": "e108e21b8ad710f4",
       "panelDeletionFailed": "733a3438177ab919",
       "panelMoveFailed": "91b7ce15ff1ea83f",
@@ -24444,6 +24446,7 @@
     "autoRefreshRelativeOnly": "aa80e980ffd9a743",
     "autoRefreshSeconds": "381a8e9699052f3a",
     "autoRefreshTitle": "c7c026a80acf8742",
+    "autoRefreshTrigger": "580475b8858a9805",
     "autoRefreshWithValue": "3d78966de06b8a24",
     "autoRunAppliesTo": "35edf23a1023e723",
     "autoRunEnabled": "a514f0398472da36",
