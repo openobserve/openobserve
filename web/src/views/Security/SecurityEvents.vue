@@ -39,6 +39,7 @@ import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.v
 import SecurityEventDrawer from "./SecurityEventDrawer.vue";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
+import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { generateTraceContext } from "@/utils/auth";
 import {
   bestMatch,
@@ -895,31 +896,16 @@ async function runHistogram(seq: number, run: SearchRun) {
   const { start, end } = timeRange.value;
   const interval = histogramInterval((end - start) / 1000);
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql: histogramSql(
-              stream,
-              whereParts(filters.value, false),
-              severityField.value,
-              interval.sql,
-            ),
-            start_time: start,
-            end_time: end,
-            from: 0,
-            size: -1,
-          },
-        },
-        page_type: "logs",
-        signal: run.controller.signal,
-        traceparent: run.histogramTrace.traceparent,
-      },
-      "ui",
+    const { hits } = await runSql(
+      orgId.value,
+      histogramSql(stream, whereParts(filters.value, false), severityField.value, interval.sql),
+      start,
+      end,
+      -1,
+      { signal: run.controller.signal, traceId: run.histogramTrace.traceId },
     );
     if (seq !== searchSeq) return;
-    histogram.value = foldHistogram(res.data?.hits ?? [], !!severityField.value);
+    histogram.value = foldHistogram(hits, !!severityField.value);
     histogramFresh.value = true;
   } catch {
     if (seq === searchSeq) histogram.value = null;
@@ -1018,23 +1004,14 @@ async function fetchTopValues(
   if (!stream) return [];
   const { start, end } = timeRange.value;
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql: topValuesSql(stream, sqlMode.value ? [] : whereParts(filters.value), field, limit),
-            start_time: start,
-            end_time: end,
-            from: 0,
-            size: limit,
-          },
-        },
-        page_type: "logs",
-      },
-      "ui",
+    const { hits } = await runSql(
+      orgId.value,
+      topValuesSql(stream, sqlMode.value ? [] : whereParts(filters.value), field, limit),
+      start,
+      end,
+      limit,
     );
-    return (res.data?.hits ?? [])
+    return hits
       .filter((h: any) => h.zo_value !== null && h.zo_value !== undefined && h.zo_value !== "")
       .map((h: any) => ({ value: String(h.zo_value), count: Number(h.zo_n ?? 0) }));
   } catch {
@@ -1267,21 +1244,13 @@ async function runSearch() {
   histogramFresh.value = false;
   const histogramDone = runHistogram(seq, run);
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: { sql: buildSQL(), start_time: start, end_time: end, from: 0, size: PAGE_ROWS },
-        },
-        page_type: "logs",
-        signal: run.controller.signal,
-        traceparent: run.searchTrace.traceparent,
-      },
-      "ui",
-    );
+    const res = await runSql(orgId.value, buildSQL(), start, end, PAGE_ROWS, {
+      signal: run.controller.signal,
+      traceId: run.searchTrace.traceId,
+    });
     if (seq !== searchSeq) return;
-    events.value = res.data?.hits ?? [];
-    total.value = res.data?.total ?? events.value.length;
+    events.value = res.hits;
+    total.value = res.total ?? events.value.length;
     if (!schemaFields.value.length && events.value.length) {
       schemaFields.value = Object.keys(events.value[0]).map((k) => ({ name: k, ftype: "Utf8" }));
       initColumns(schemaFields.value);
@@ -1328,23 +1297,13 @@ async function restoreDrawerFromUrl() {
   const stream = selectedStream.value;
   if (Number.isFinite(tsNum) && stream) {
     try {
-      const res = await searchService.search(
-        {
-          org_identifier: orgId.value,
-          query: {
-            query: {
-              sql: `SELECT * FROM "${stream.replace(/"/g, '""')}" WHERE _timestamp = ${tsNum}`,
-              start_time: tsNum - 1_000_000,
-              end_time: tsNum + 1_000_000,
-              from: 0,
-              size: 100,
-            },
-          },
-          page_type: "logs",
-        },
-        "ui",
+      const { hits } = await runSql(
+        orgId.value,
+        `SELECT * FROM "${stream.replace(/"/g, '""')}" WHERE _timestamp = ${tsNum}`,
+        tsNum - 1_000_000,
+        tsNum + 1_000_000,
+        100,
       );
-      const hits: Record<string, any>[] = res.data?.hits ?? [];
       // Several events can share the timestamp; the content key picks the one linked.
       const hit = pendingEventKey.value
         ? hits.find((h) => eventKey(h) === pendingEventKey.value)

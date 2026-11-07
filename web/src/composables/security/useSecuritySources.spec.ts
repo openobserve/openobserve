@@ -4,13 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ocsfPacks from "@/services/ocsfPacks";
 import streamService from "@/services/stream";
-import searchService from "@/services/search";
+import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { useSecuritySources } from "@/composables/security/useSecuritySources";
 import { isLocalPrefsMigrated } from "@/utils/security/sourceSelection";
 
 vi.mock("@/services/ocsfPacks", () => ({ default: { saveSetting: vi.fn() } }));
 vi.mock("@/services/stream", () => ({ default: { nameList: vi.fn(), schema: vi.fn() } }));
-vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+vi.mock("@/composables/security/useSecurityStreamPlans", () => ({ runSql: vi.fn() }));
 
 const svc = ocsfPacks as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const streamMock = streamService as unknown as Record<string, ReturnType<typeof vi.fn>>;
@@ -30,7 +30,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   streamMock.schema.mockResolvedValue({ data: { schema: [] } });
-  (searchService as any).search.mockResolvedValue({ data: { hits: [] } });
+  vi.mocked(runSql).mockResolvedValue({ hits: [], partial: false, functionError: "" });
   svc.saveSetting.mockResolvedValue({ data: {} });
 });
 

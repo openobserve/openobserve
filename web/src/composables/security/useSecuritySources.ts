@@ -3,7 +3,7 @@
 import { computed, ref, shallowRef } from "vue";
 
 import ocsfPacks from "@/services/ocsfPacks";
-import searchService from "@/services/search";
+import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import streamService from "@/services/stream";
 import type { SecuritySetting } from "@/utils/security/ocsfPipeline";
 import { quoteIdent } from "@/utils/security/sql";
@@ -45,23 +45,14 @@ const running = new Map<string, Promise<void>>();
 async function sampleRows(orgId: string, stream: string): Promise<Record<string, unknown>[]> {
   const endUs = Date.now() * 1000;
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId,
-        query: {
-          query: {
-            sql: `SELECT * FROM ${quoteIdent(stream)}`,
-            start_time: endUs - SAMPLE_WINDOW_US,
-            end_time: endUs,
-            from: 0,
-            size: SAMPLE_ROWS,
-          },
-        },
-        page_type: "logs",
-      },
-      "ui",
+    const { hits } = await runSql(
+      orgId,
+      `SELECT * FROM ${quoteIdent(stream)}`,
+      endUs - SAMPLE_WINDOW_US,
+      endUs,
+      SAMPLE_ROWS,
     );
-    return res.data?.hits ?? [];
+    return hits;
   } catch {
     return [];
   }

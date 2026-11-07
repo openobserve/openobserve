@@ -44,7 +44,7 @@ use crate::common::{
 };
 
 /// Most ids one request may name; keeps the generated predicate bounded.
-const MAX_ALERT_IDS: usize = 500;
+pub(crate) const MAX_ALERT_IDS: usize = 500;
 
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
 const OPTIONAL_HISTORY_COLUMNS: [&str; 7] = [

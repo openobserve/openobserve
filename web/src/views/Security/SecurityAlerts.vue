@@ -35,7 +35,7 @@ import SecurityNotices, { type SecurityNotice } from "@/components/security/Secu
 import { useAlertHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
 import { useAlertHistorySummary } from "@/composables/security/useAlertHistorySummary";
 import { isErrorOutcome, isFiringOutcome } from "@/utils/alerts/runOutcome";
-import searchService from "@/services/search";
+import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { useSiemDetections, type DetectionRow } from "@/composables/security/useSiemDetections";
 import { whereOfDetectionSql } from "@/utils/security/detection";
@@ -731,16 +731,7 @@ async function loadEvidence() {
   if (!f || !evidenceSql.value || !f.row.start_time || !f.row.end_time) return;
   evidenceLoading.value = true;
   const run = (sql: string, size: number) =>
-    searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: { sql, start_time: f.row.start_time, end_time: f.row.end_time, from: 0, size },
-        },
-        page_type: "logs",
-      },
-      "ui",
-    );
+    runSql(orgId.value, sql, f.row.start_time, f.row.end_time, size);
   try {
     // A separate COUNT: the rows query's `total` is capped at its own page size.
     const [rows, count] = await Promise.all([
@@ -751,10 +742,10 @@ async function loadEvidence() {
       ),
     ]);
     if (mine !== evidenceSeq) return;
-    const hits: Record<string, unknown>[] = rows.data?.hits ?? [];
+    const hits = rows.hits;
     const source = hits.length ? bestMatch(Object.keys(hits[0]), { sample: hits[0] }) : null;
     evidence.value = normalizeEvents(hits, source?.source ?? null);
-    evidenceCount.value = Number(count.data?.hits?.[0]?.zo_n ?? hits.length);
+    evidenceCount.value = Number(count.hits[0]?.zo_n ?? hits.length);
   } catch (e: any) {
     if (mine !== evidenceSeq) return;
     evidenceError.value =

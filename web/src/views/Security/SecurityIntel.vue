@@ -45,7 +45,7 @@ import threatIntel, {
   RemoveRefused,
   type IntelTable,
 } from "@/services/threat_intel";
-import searchService from "@/services/search";
+import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { useIntelSweep, MAX_SWEEP_QUERIES } from "@/composables/security/useIntelSweep";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import {
@@ -688,29 +688,19 @@ async function loadTimeline() {
   await Promise.all(
     m.sightings.slice(0, SERIES_LIMIT).map(async (s, i) => {
       try {
-        const res = await searchService.search(
-          {
-            org_identifier: orgId.value,
-            query: {
-              query: {
-                sql: sightingsSql(
-                  s.stream,
-                  s.column,
-                  m.indicator.type as Exclude<IndicatorType, "cidr">,
-                  m.indicator.indicator,
-                  interval.sql,
-                ),
-                start_time: window.start,
-                end_time: window.end,
-                from: 0,
-                size: -1,
-              },
-            },
-            page_type: "logs",
-          },
-          "ui",
+        const { hits } = await runSql(
+          orgId.value,
+          sightingsSql(
+            s.stream,
+            s.column,
+            m.indicator.type as Exclude<IndicatorType, "cidr">,
+            m.indicator.indicator,
+            interval.sql,
+          ),
+          window.start,
+          window.end,
         );
-        for (const hit of res.data?.hits ?? []) {
+        for (const hit of hits) {
           const ts = histogramKeyToMs(hit.zo_ts);
           if (ts === null) continue;
           const counts = buckets.get(ts) ?? {};

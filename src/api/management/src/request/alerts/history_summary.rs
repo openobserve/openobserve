@@ -35,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
-use super::history::{alert_ids_predicate, parse_alert_ids, restrict_to_permitted};
+use super::history::{MAX_ALERT_IDS, alert_ids_predicate, parse_alert_ids, restrict_to_permitted};
 use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
@@ -107,7 +107,8 @@ pub async fn get_alert_history_summary(
         Ok(range) => range,
         Err(msg) => return MetaHttpResponse::bad_request(msg),
     };
-    let interval = summary::bucket_interval_secs(query.interval, end_time - start_time);
+    let interval =
+        summary::bucket_interval_secs(query.interval, end_time.saturating_sub(start_time));
     let empty = || {
         MetaHttpResponse::json(AlertHistorySummaryResponse {
             start_time,
@@ -136,7 +137,13 @@ pub async fn get_alert_history_summary(
         return empty();
     }
 
-    let id_predicate = ids.as_deref().map(alert_ids_predicate);
+    // Past the explicit-list cap, one LIKE per id makes an unbounded predicate; filter rows
+    // instead.
+    let filter_in_rust = ids.as_ref().is_some_and(|ids| ids.len() > MAX_ALERT_IDS);
+    let id_predicate = ids
+        .as_deref()
+        .filter(|_| !filter_in_rust)
+        .map(alert_ids_predicate);
     let sql = summary::summary_sql(
         &org_id,
         start_time,
@@ -185,7 +192,10 @@ pub async fn get_alert_history_summary(
     };
 
     let is_partial = result.hits.len() as i64 >= MAX_ROWS;
-    let rows = summary::summarize_hits(&result.hits);
+    let mut rows = summary::summarize_hits(&result.hits);
+    if let Some(ids) = ids.as_deref().filter(|_| filter_in_rust) {
+        summary::retain_alerts(&mut rows, ids);
+    }
     MetaHttpResponse::json(AlertHistorySummaryResponse {
         start_time,
         end_time,

@@ -3,7 +3,7 @@
 // Coverage is returned with matches, so an empty result is told apart from "nothing could have matched".
 
 import { ref, shallowRef } from "vue";
-import searchService from "@/services/search";
+import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import streamService from "@/services/stream";
 import { bestMatch } from "@/utils/security/classify";
 import { FieldIndex } from "@/utils/security/fields";
@@ -154,25 +154,16 @@ export function useIntelSweep() {
         for (let task = queue.shift(); task; task = queue.shift()) {
           if (mySeq !== seq) return;
           try {
-            const res = await searchService.search(
-              {
-                org_identifier: orgId,
-                query: {
-                  query: {
-                    sql: sweepSql(task.stream, task.column, task.type, task.values),
-                    start_time: window.start,
-                    end_time: window.end,
-                    from: 0,
-                    size: task.values.length,
-                  },
-                },
-                page_type: "logs",
-              },
-              "ui",
+            const res = await runSql(
+              orgId,
+              sweepSql(task.stream, task.column, task.type, task.values),
+              window.start,
+              window.end,
+              task.values.length,
             );
-            results.push({ ...task, rows: res.data?.hits ?? [] });
+            results.push({ ...task, rows: res.hits });
             // A partial answer still counts its rows, but the column was not fully searched.
-            if (res.data?.is_partial || res.data?.function_error) {
+            if (res.partial || res.functionError) {
               partialTasks.push(task);
               partialResults.value += 1;
             }

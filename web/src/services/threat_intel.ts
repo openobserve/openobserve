@@ -3,7 +3,7 @@
 // Intel tables are ordinary enrichment tables, so one added elsewhere shows up when its name marks it as intel.
 
 import jsTransformService from "@/services/jstransform";
-import searchService from "@/services/search";
+import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import streamService from "@/services/stream";
 import {
   INTEL_COLUMNS,
@@ -62,20 +62,15 @@ const threatIntel = {
     const end = Date.now() * 1000 + 3_600_000_000;
     const name = `"${table.replace(/"/g, '""')}"`;
     const run = (sql: string, size: number) =>
-      searchService.search(
-        {
-          org_identifier: orgId,
-          query: { query: { sql, start_time: 1_000_000, end_time: end, from: 0, size } },
-          page_type: "enrichment_tables",
-          use_cache: false,
-        },
-        "ui",
-      );
+      runSql(orgId, sql, 1_000_000, end, size, {
+        pageType: "enrichment_tables",
+        useCache: false,
+      });
     const [rows, count] = await Promise.all([
       run(`SELECT * FROM ${name}`, INTEL_READ_LIMIT),
       run(`SELECT COUNT(*) AS zo_n FROM ${name}`, 1),
     ]);
-    const raw: Record<string, unknown>[] = rows.data?.hits ?? [];
+    const raw: Record<string, unknown>[] = rows.hits;
     const indicators: Indicator[] = [];
     let skipped = 0;
     let blank = 0;
@@ -92,7 +87,7 @@ const threatIntel = {
     return {
       raw,
       indicators,
-      rowCount: Number(count.data?.hits?.[0]?.zo_n ?? raw.length),
+      rowCount: Number(count.hits[0]?.zo_n ?? raw.length),
       skipped,
       blank,
       columns,

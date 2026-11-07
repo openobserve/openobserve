@@ -4,8 +4,10 @@
 
 import { ref, shallowRef } from "vue";
 
-import searchService from "@/services/search";
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import store from "@/stores";
 import streamService from "@/services/stream";
+import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { bestMatch } from "@/utils/security/classify";
 import {
   LARGE_STREAM_ROWS,
@@ -65,6 +67,8 @@ export function createLimiter(concurrency = QUERY_CONCURRENCY) {
 
 export interface SqlResult {
   hits: Record<string, unknown>[];
+  /** The stream's reported total; absent when no metadata came back. */
+  total?: number;
   /** The engine answered with part of the data (a node or partition missing). */
   partial: boolean;
   /** A query function reported an error; the rows may be incomplete. */
@@ -74,33 +78,108 @@ export interface SqlResult {
 export interface SqlOptions {
   /** Aborts the request when the page leaves or starts over. */
   signal?: AbortSignal;
-  traceparent?: string;
+  /** Lets a caller cancel the query on the server by its trace id. */
+  traceId?: string;
+  pageType?: string;
+  /** False when the result cache may hold a stale answer, as for a replaced enrichment table. */
+  useCache?: boolean;
 }
 
-/** One search; throws on failure, and says when the answer is partial. */
-export async function runSql(
+/** One `_search_stream` search; throws on failure, and says when the answer is partial. */
+export function runSql(
   orgId: string,
   sql: string,
   startUs: number,
   endUs: number,
   size = -1,
-  { signal, traceparent }: SqlOptions = {},
+  {
+    signal,
+    traceId = generateTraceContext().traceId,
+    pageType = "logs",
+    useCache = true,
+  }: SqlOptions = {},
 ): Promise<SqlResult> {
-  const res = await searchService.search(
-    {
-      org_identifier: orgId,
-      query: { query: { sql, start_time: startUs, end_time: endUs, from: 0, size } },
-      page_type: "logs",
-      signal,
-      traceparent,
-    },
-    "ui",
-  );
-  return {
-    hits: res.data?.hits ?? [],
-    partial: !!res.data?.is_partial,
-    functionError: String(res.data?.function_error ?? ""),
-  };
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+  const useBase64 = store.state.zoConfig?.sql_base64_enabled;
+  return new Promise((resolve, reject) => {
+    const aborted = () => new DOMException("The search was aborted", "AbortError");
+    if (signal?.aborted) return reject(aborted());
+    let streamingAggs = false;
+    let hits: Record<string, unknown>[] = [];
+    const metadataHits: Record<string, unknown>[] = [];
+    let total: number | undefined;
+    let partial = false;
+    let functionError = "";
+    const onAbort = () => {
+      cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId });
+      reject(aborted());
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const done = () => signal?.removeEventListener("abort", onAbort);
+
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          query: {
+            sql: useBase64 ? b64EncodeUnicode(sql) : sql,
+            start_time: startUs,
+            end_time: endUs,
+            from: 0,
+            size,
+          },
+          ...(useBase64 ? { encoding: "base64" } : {}),
+        },
+        type: "search",
+        pageType,
+        searchType: "ui",
+        traceId,
+        org_id: orgId,
+        clear_cache: !useCache,
+      },
+      {
+        data: (_payload: unknown, response: any) => {
+          const content = response?.content ?? {};
+          const results = content.results ?? {};
+          if (response?.type === "search_response_metadata") {
+            streamingAggs ||= Boolean(results.streaming_aggs ?? content.streaming_aggs);
+            partial ||= Boolean(results.is_partial);
+            if (results.function_error) functionError = String(results.function_error);
+            if (typeof results.total === "number") {
+              total = streamingAggs ? results.total : (total ?? 0) + results.total;
+            }
+            // A cached response can carry its hits on metadata alone, so keep them as a fallback.
+            if (Array.isArray(results.hits)) metadataHits.push(...results.hits);
+            return;
+          }
+          if (response?.type !== "search_response_hits") return;
+          const chunk: Record<string, unknown>[] = results.hits ?? [];
+          if (!Array.isArray(chunk) || !chunk.length) return;
+          // A streaming aggregate resends the whole result, so it replaces rather than appends.
+          hits = streamingAggs ? [...chunk] : [...hits, ...chunk];
+        },
+        error: (_payload: unknown, response: any) => {
+          done();
+          const body = response?.content ?? response ?? {};
+          const error: any = new Error(
+            String(body.message ?? body.error ?? body.error_detail ?? "search failed"),
+          );
+          error.status = body.status;
+          error.code = body.code;
+          error.response = { data: body };
+          reject(error);
+        },
+        complete: () => {
+          done();
+          resolve({
+            hits: hits.length ? hits : metadataHits,
+            total,
+            partial,
+            functionError,
+          });
+        },
+      },
+    );
+  });
 }
 
 export interface PlanOptions {

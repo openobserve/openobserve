@@ -4,7 +4,7 @@
 
 import { computed, ref, shallowRef } from "vue";
 
-import searchService from "@/services/search";
+import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import type { SourceType } from "@/utils/security/sourceTypes";
 import type { ApplicableRule } from "@/utils/security/sigma";
 import { applicableRules } from "@/utils/security/sigma";
@@ -54,17 +54,8 @@ export function useSigmaRules() {
         stream,
         runnable.map((entry) => entry.compiled.where),
       );
-      const res = await searchService.search(
-        {
-          org_identifier: orgId,
-          query: {
-            query: { sql, start_time: range.start, end_time: range.end, from: 0, size: 1 },
-          },
-          page_type: "logs",
-        },
-        "ui",
-      );
-      const row = res.data?.hits?.[0] ?? {};
+      const { hits } = await runSql(orgId, sql, range.start, range.end, 1);
+      const row = hits[0] ?? {};
       // Rebuilt rather than mutated so the shallowRef actually notifies.
       const counts = new Map<ApplicableRule, number>();
       runnable.forEach((entry, index) => {

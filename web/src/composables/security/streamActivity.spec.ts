@@ -3,7 +3,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const search = vi.fn();
-vi.mock("@/services/search", () => ({ default: { search: (...a: unknown[]) => search(...a) } }));
+vi.mock("./useSecurityStreamPlans", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./useSecurityStreamPlans")>()),
+  runSql: (...a: unknown[]) => search(...a),
+}));
 
 import { withRecentActivity } from "./streamActivity";
 
@@ -20,7 +23,7 @@ describe("withRecentActivity", () => {
   });
 
   it("patches a stream whose stats have not caught up with its data", async () => {
-    search.mockResolvedValue({ data: { hits: [{ zo_n: 42, zo_last: NOW - 60_000_000 }] } });
+    search.mockResolvedValue({ hits: [{ zo_n: 42, zo_last: NOW - 60_000_000 }] });
     const list = [
       { name: "fresh", stats: { doc_num: 0, doc_time_max: 0 } },
       { name: "other", stats: { doc_num: 0, doc_time_max: 0 } },
@@ -33,7 +36,7 @@ describe("withRecentActivity", () => {
   });
 
   it("keeps the stats when the stream really is silent or unreadable", async () => {
-    search.mockResolvedValueOnce({ data: { hits: [{ zo_n: 0, zo_last: null }] } });
+    search.mockResolvedValueOnce({ hits: [{ zo_n: 0, zo_last: null }] });
     search.mockRejectedValueOnce(new Error("boom"));
     const list = [
       { name: "a", stats: { doc_num: 5, doc_time_max: NOW - 48 * HOUR } },

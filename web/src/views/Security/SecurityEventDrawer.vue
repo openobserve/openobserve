@@ -12,7 +12,7 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import searchService from "@/services/search";
+import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import SecurityRecordDrawer, {
   type RecordFact,
@@ -179,19 +179,10 @@ async function evaluateRules() {
       props.stream,
       rules.map((r) => r.compiled.where),
     )} WHERE ${eventMatchWhere(props.event)}`;
-    const res = await searchService.search(
-      {
-        org_identifier: props.orgId,
-        query: {
-          query: { sql, start_time: ts - 1_000_000, end_time: ts + 1_000_000, from: 0, size: 1 },
-        },
-        page_type: "logs",
-      },
-      "ui",
-    );
+    const { hits } = await runSql(props.orgId, sql, ts - 1_000_000, ts + 1_000_000, 1);
     // A different event may have been opened while this one was evaluating.
     if (eventKey(props.event) !== key) return;
-    const row = res.data?.hits?.[0] ?? {};
+    const row = hits[0] ?? {};
     matched.value = rules.filter((_, i) => Number(row[`r${i}`] ?? 0) > 0);
   } catch (e: any) {
     if (eventKey(props.event) !== key) return;
