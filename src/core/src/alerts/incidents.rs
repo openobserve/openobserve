@@ -4058,13 +4058,16 @@ mod tests {
     async fn a_run_started_while_rca_is_off_ends_rca_disabled() {
         use config::meta::alerts::rca_runs::{RunState, RunTrigger};
 
-        use crate::alerts::rca_runs::tests::{db, failures, new_incident, start, stored, timeline};
+        use crate::alerts::rca_runs::tests::{
+            db, failures, new_incident, rca_off, start, stored, timeline,
+        };
 
         let _db = db().await;
+        rca_off();
         let cfg = o2_enterprise::enterprise::common::config::get_config();
         assert!(
             !(cfg.incidents.enabled && cfg.incidents.rca_enabled),
-            "db() pins RCA off"
+            "rca_off() turned RCA off"
         );
         let (org, inc) = new_incident(None).await;
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
@@ -4276,10 +4279,11 @@ mod tests {
 
         use crate::alerts::rca_runs::{
             StartOutcome, StartRun, start_run,
-            tests::{db, incident_start, new_incident, start, stored},
+            tests::{db, incident_start, new_incident, rca_off, start, stored},
         };
 
         let _db = db().await;
+        rca_off();
         let (org, inc) = new_incident(None).await;
         let source_run = start(&org, &inc, RunTrigger::Manual).await;
         crate::alerts::rca_runs::fail_run(

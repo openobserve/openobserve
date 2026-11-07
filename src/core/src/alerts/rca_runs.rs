@@ -601,9 +601,6 @@ pub(crate) mod tests {
                      where no .env sets ZO_META_STORE",
                     cfg.common.meta_store
                 );
-                // These tests drive the RCA-off guard, so pin it off whatever the default.
-                unsafe { std::env::set_var("O2_INCIDENTS_RCA_ENABLED", "false") };
-                o2_enterprise::enterprise::common::config::refresh_config().unwrap();
                 std::fs::create_dir_all(&cfg.common.data_db_dir).unwrap();
                 let conn = infra::db::get_orm_client_rw().await;
                 let backend = conn.get_database_backend();
@@ -635,6 +632,12 @@ pub(crate) mod tests {
             })
             .await;
         LOCK.lock().await
+    }
+
+    /// Turn RCA off for a test of the RCA-off guard; RCA is on by default.
+    pub(crate) fn rca_off() {
+        unsafe { std::env::set_var("O2_INCIDENTS_RCA_ENABLED", "false") };
+        o2_enterprise::enterprise::common::config::refresh_config().unwrap();
     }
 
     /// A fresh org with one open incident that was never analyzed.
