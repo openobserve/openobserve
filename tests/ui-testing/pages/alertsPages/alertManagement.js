@@ -76,6 +76,14 @@ export class AlertManagement {
         await expect(this.cloneDialog()).toBeVisible({ timeout: 10000 });
     }
 
+    rowLastOutcome(alertName) {
+        return this.page.locator(`[data-test="alert-list-${alertName}-last-outcome"]`);
+    }
+
+    async clickRowEdit(alertName) {
+        await this.page.locator(this.locators.alertUpdateButton.replace('{alertName}', alertName)).first().click();
+    }
+
     /**
      * The dialog's Save button.
      *

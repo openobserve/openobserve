@@ -22,6 +22,7 @@ GROUP_DEST = "auto_mute_group_dest"
 MICROS = 1_000_000
 MINUTE = 60 * MICROS
 DAY = 24 * 60 * MINUTE
+CAP_FILL_LIMIT = 1000
 
 
 @pytest.fixture(scope="module")
@@ -94,6 +95,42 @@ def _evaluations(alerts, name: str, feed, n: int) -> None:
         return len(seen) > n
 
     wait_until(_check, timeout=90 * n + 60, interval=5, msg=f"{n} more evaluation(s) of {name}")
+
+
+def _upcoming(alerts, alert_id: str):
+    start = _now() + DAY
+    return alerts._v2("POST", "downtimes?folder=default", json={
+        "targets": [{"module": "alerts", "folders": {"kind": "all"}, "ids": [alert_id]}],
+        "schedule": {"repeat": "none", "starts_at": start, "ends_at": start + MINUTE,
+                     "timezone": "UTC", "duration_secs": 60},
+        "show_banner": False,
+    })
+
+
+def _cancel_row(alerts, downtime_id: str):
+    return alerts._v2("POST", f"downtimes/{downtime_id}/cancel?folder=default")
+
+
+def _upcoming_once_room(alerts, alert_id: str) -> str:
+    def _try():
+        r = _upcoming(alerts, alert_id)
+        return r.json()["id"] if r.status_code == 201 else None
+
+    return wait_until(_try, timeout=30, interval=2, msg="a new downtime fits once a row has ended")
+
+
+def _mute_once_room(alerts, alert_id: str, body: dict) -> str:
+    def _try():
+        r = _mute(alerts, alert_id, body)
+        return r.json()["downtime_id"] if r.status_code == 201 else None
+
+    return wait_until(_try, timeout=30, interval=2, msg="a mute fits once a row has ended")
+
+
+def _assert_at_the_cap(alerts, alert_id: str) -> None:
+    r = _upcoming(alerts, alert_id)
+    assert r.status_code != 201, r.text
+    assert "the most allowed" in r.text, r.text
 
 
 def test_the_oss_build_refuses_every_mute_route(alerts, mute_served):
@@ -301,4 +338,48 @@ def test_a_mute_past_the_org_cap_answers_409_and_changes_nothing(alerts, enterpr
     finally:
         for dt in fillers:
             alerts._v2("POST", f"downtimes/{dt}/cancel?folder=default")
+            alerts._v2("DELETE", f"downtimes/{dt}?folder=default")
+
+
+def test_ended_and_cancelled_downtimes_leave_room_under_the_org_cap(alerts, enterprise):
+    """Every terminal status frees its place at the very edge of the cap, and the row is still stored (ENT#3273)."""
+    stream = uniq("mute_room_s")
+    _, alert_id = _single(alerts, stream)
+    rows: list[str] = []
+    try:
+        refused = None
+        for _ in range(CAP_FILL_LIMIT):
+            refused = _upcoming(alerts, alert_id)
+            if refused.status_code != 201:
+                break
+            rows.append(refused.json()["id"])
+        else:
+            pytest.fail(f"no downtime cap within {CAP_FILL_LIMIT} rows on this server")
+        assert "the most allowed" in refused.text, refused.text
+
+        cancelled = rows[0]
+        assert _cancel_row(alerts, cancelled).status_code == 200
+        assert _downtime(alerts, cancelled)["status"] == "cancelled"
+        rows.append(_upcoming_once_room(alerts, alert_id))
+        _assert_at_the_cap(alerts, alert_id)
+
+        assert _cancel_row(alerts, rows[1]).status_code == 200
+        muted = _mute_once_room(alerts, alert_id, {"minutes": 30})
+        rows.append(muted)
+        _assert_at_the_cap(alerts, alert_id)
+        assert _cancel(alerts, alert_id, muted).status_code == 200
+        assert _downtime(alerts, muted)["status"] == "ended_early"
+
+        short = _mute_once_room(alerts, alert_id, {"minutes": 1})
+        rows.append(short)
+        _assert_at_the_cap(alerts, alert_id)
+        wait_until(lambda: _downtime(alerts, short)["status"] == "ended", timeout=120, interval=3,
+                   msg="the one-minute mute reaches its end")
+
+        rows.append(_upcoming_once_room(alerts, alert_id))
+        for row, status in ((cancelled, "cancelled"), (muted, "ended_early"), (short, "ended")):
+            assert _downtime(alerts, row)["status"] == status, "a freed place must not come from losing the row"
+    finally:
+        for dt in rows:
+            _cancel_row(alerts, dt)
             alerts._v2("DELETE", f"downtimes/{dt}?folder=default")
