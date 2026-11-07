@@ -13,17 +13,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::ops::ControlFlow;
+
 use config::{
-    HISTOGRAM_BREAKDOWN_FIELDS, meta::stream::StreamType, utils::sql::is_eligible_for_histogram,
+    HISTOGRAM_BREAKDOWN_FIELDS,
+    meta::stream::StreamType,
+    utils::{
+        sql::is_eligible_for_histogram,
+        time::{now_micros, parse_timezone_to_offset_at, parse_timezone_to_offset_opt},
+    },
 };
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
-    ast::{SetExpr, Statement},
+    ast::{
+        Expr, FunctionArg, FunctionArgExpr, FunctionArguments, SetExpr, Statement, Value, VisitMut,
+        visit_expressions_mut,
+    },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
-use super::{RE_HISTOGRAM, visitor::histogram_interval::generate_histogram_interval};
+use super::{
+    RE_HISTOGRAM,
+    visitor::histogram_interval::{
+        HistogramIntervalVisitor, generate_histogram_interval, histogram_timezone_literal,
+    },
+};
 
 pub fn handle_histogram(
     origin_sql: &mut String,
@@ -56,10 +71,112 @@ pub fn handle_histogram(
     };
     let field = args.first().unwrap_or(&"_timestamp");
 
+    let timezone = captures
+        .get(1)
+        .and_then(|args| args.as_str().split(',').nth(2))
+        .map_or_else(String::new, |value| format!(",{}", value.trim()));
+
     *origin_sql = origin_sql.replace(
         captures.get(0).unwrap().as_str(),
-        &format!("histogram({field},'{interval}')"),
+        &format!("histogram({field},'{interval}'{timezone})"),
     );
+}
+
+/// The timezone argument of the first `histogram()` in the SQL.
+pub fn histogram_timezone_arg(sql: &str) -> Result<Option<String>, Error> {
+    let Some(call) = first_histogram_call(sql) else {
+        return Ok(None);
+    };
+    if let Some(error) = call.error {
+        return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error)));
+    }
+    Ok(call.timezone)
+}
+
+/// The offset east of UTC that `histogram()` buckets use; the SQL argument beats the request.
+pub fn histogram_offset_micros(
+    sql: &str,
+    timezone: Option<&str>,
+    end_time: i64,
+) -> Result<i64, Error> {
+    let sql_timezone = histogram_timezone_arg(sql)?;
+    timezone_offset_micros(sql_timezone.as_deref().or(timezone), end_time)
+}
+
+/// Cache coverage requires every histogram to use the same shifted timestamp coordinate.
+pub fn histogram_cache_offset_micros(
+    sql: &str,
+    timezone: Option<&str>,
+    end_time: i64,
+) -> Result<Option<i64>, Error> {
+    let mut statements = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|error| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error.to_string())))?;
+    let mut timezones = Vec::new();
+    for statement in &mut statements {
+        let _ = visit_expressions_mut(statement, |expr| {
+            if let Expr::Function(func) = expr
+                && func.name.to_string().eq_ignore_ascii_case("histogram")
+                && let FunctionArguments::List(list) = &func.args
+            {
+                timezones.push(list.args.get(2).map(histogram_timezone_literal).transpose());
+            }
+            ControlFlow::<()>::Continue(())
+        });
+    }
+    let mut offset = None;
+    for sql_timezone in timezones {
+        let sql_timezone =
+            sql_timezone.map_err(|error| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error)))?;
+        let current = timezone_offset_micros(sql_timezone.as_deref().or(timezone), end_time)?;
+        if let Some(previous) = offset
+            && previous != current
+        {
+            return Ok(None);
+        }
+        offset = Some(current);
+    }
+    Ok(Some(offset.unwrap_or_default()))
+}
+
+/// Replaces named zones by their offset at the request end, so partitions and deltas agree.
+pub fn pin_histogram_timezone(
+    sql: &mut String,
+    timezone: &mut Option<String>,
+    end_time: i64,
+) -> Result<(), Error> {
+    let end_time = if end_time > 0 { end_time } else { now_micros() };
+    if sql.to_ascii_lowercase().contains("histogram") {
+        let mut statements = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+            .map_err(|error| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error.to_string())))?;
+        let mut changed = false;
+        for statement in &mut statements {
+            let result = visit_expressions_mut(statement, |expr| {
+                match pin_named_zone_argument(expr, end_time) {
+                    Ok(updated) => {
+                        changed |= updated;
+                        ControlFlow::Continue(())
+                    }
+                    Err(error) => ControlFlow::Break(error),
+                }
+            });
+            if let ControlFlow::Break(error) = result {
+                return Err(error);
+            }
+        }
+        if changed {
+            *sql = statements
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("; ");
+        }
+    }
+    if let Some(tz) = timezone.as_deref()
+        && let Some(fixed) = fixed_offset_of_named_zone(tz, end_time)
+    {
+        *timezone = Some(fixed);
+    }
+    Ok(())
 }
 
 /// Converts an original query to a histogram query
@@ -229,9 +346,163 @@ fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
     }
 }
 
+fn timezone_offset_micros(timezone: Option<&str>, end_time: i64) -> Result<i64, Error> {
+    let Some(tz) = timezone else {
+        return Ok(0);
+    };
+    parse_timezone_to_offset_at(tz, end_time)
+        .and_then(|offset| offset.checked_mul(1_000_000))
+        .ok_or_else(|| Error::Message(format!("Invalid timezone in histogram(): '{tz}'")))
+}
+
+/// Reads the first `histogram()` from the parsed SQL, because a regex misses valid spellings.
+fn first_histogram_call(sql: &str) -> Option<HistogramIntervalVisitor> {
+    if !sql.to_ascii_lowercase().contains("histogram") {
+        return None;
+    }
+    let statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).ok()?;
+    let mut visitor = HistogramIntervalVisitor::new((0, 0));
+    for mut statement in statements {
+        let _ = statement.visit(&mut visitor);
+    }
+    visitor.is_histogram.then_some(visitor)
+}
+
+fn pin_named_zone_argument(expr: &mut Expr, end_time: i64) -> Result<bool, Error> {
+    let Expr::Function(func) = expr else {
+        return Ok(false);
+    };
+    if !func.name.to_string().eq_ignore_ascii_case("histogram") {
+        return Ok(false);
+    }
+    let FunctionArguments::List(list) = &mut func.args else {
+        return Ok(false);
+    };
+    let Some(arg) = list.args.get_mut(2) else {
+        return Ok(false);
+    };
+    let timezone = histogram_timezone_literal(arg)
+        .map_err(|error| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error)))?;
+    let fixed = fixed_offset_of_named_zone(&timezone, end_time);
+    let FunctionArg::Unnamed(FunctionArgExpr::Expr(arg)) = arg else {
+        return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "histogram() timezone must be a constant string".to_string(),
+        )));
+    };
+    if let Expr::Value(literal) = without_brackets(arg) {
+        if let Some(fixed) = fixed {
+            literal.value = Value::SingleQuotedString(fixed);
+            return Ok(true);
+        }
+        return Ok(false);
+    }
+    *arg = Expr::Value(Value::SingleQuotedString(fixed.unwrap_or(timezone)).into());
+    Ok(true)
+}
+
+fn without_brackets(expr: &mut Expr) -> &mut Expr {
+    match expr {
+        Expr::Nested(inner) => without_brackets(inner),
+        other => other,
+    }
+}
+
+fn fixed_offset_of_named_zone(tz: &str, end_time: i64) -> Option<String> {
+    if parse_timezone_to_offset_opt(tz).is_some() {
+        return None;
+    }
+    let secs = parse_timezone_to_offset_at(tz, end_time)?;
+    let (sign, secs) = if secs < 0 { ('-', -secs) } else { ('+', secs) };
+    let mut fixed = format!("{sign}{:02}:{:02}", secs / 3600, secs % 3600 / 60);
+    if secs % 60 != 0 {
+        fixed.push_str(&format!(":{:02}", secs % 60));
+    }
+    Some(fixed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn timezone_constant_arguments_do_not_fall_back() {
+        for expression in [
+            "CASE WHEN true THEN '+05:30' ELSE '-08:00' END",
+            "CAST('+05:30' AS VARCHAR)",
+            "concat('+05', ':30')",
+        ] {
+            let sql = format!("SELECT histogram(_timestamp, '1 day', {expression}) FROM t");
+            assert_eq!(
+                histogram_offset_micros(&sql, Some("UTC"), 1_782_864_000_000_000).unwrap(),
+                19_800_000_000,
+                "{expression}"
+            );
+        }
+        let sql = "SELECT histogram(_timestamp, '1 day', _timestamp) FROM t";
+        assert!(histogram_offset_micros(sql, Some("UTC"), 1_782_864_000_000_000).is_err());
+        let sql = "SELECT histogram(_timestamp, '1 day', NULL) FROM t";
+        assert!(histogram_offset_micros(sql, Some("+05:30"), 1_782_864_000_000_000).is_err());
+    }
+
+    #[test]
+    fn timezone_sql_precedence_and_named_zone_stability() {
+        const HOUR: i64 = 3_600_000_000;
+        const JULY: i64 = 1_782_864_000_000_000;
+        const JANUARY: i64 = 1_767_225_600_000_000;
+        for sql in [
+            "SELECT histogram(_timestamp, '1 day', '+05:30') FROM t",
+            "SELECT histogram (_timestamp, '1 day', ('+05:30')) FROM t",
+            "SELECT histogram/*x*/(_timestamp, '1 day', $$+05:30$$) FROM t",
+        ] {
+            assert_eq!(
+                super::histogram_offset_micros(sql, Some("-08:00"), JULY).unwrap(),
+                11 * HOUR / 2
+            );
+        }
+        let sql = "SELECT histogram(_timestamp, '1 day') FROM t";
+        assert_eq!(
+            super::histogram_offset_micros(sql, Some("-08:00"), JULY).unwrap(),
+            -8 * HOUR
+        );
+        assert!(super::histogram_offset_micros(sql, Some("Invalid/Zone"), JULY).is_err());
+        for (zone, reference, fixed) in [
+            ("America/Los_Angeles", JULY, "-07:00"),
+            ("Africa/Monrovia", 31_536_000_000_000, "-00:44:30"),
+        ] {
+            let mut sql = format!(
+                "SELECT histogram(_timestamp, '1 day', '{zone}') FROM t WHERE name = '{zone}'"
+            );
+            let mut timezone = Some(zone.to_string());
+            super::pin_histogram_timezone(&mut sql, &mut timezone, reference).unwrap();
+            assert_eq!(
+                super::histogram_timezone_arg(&sql).unwrap().as_deref(),
+                Some(fixed)
+            );
+            assert_eq!(timezone.as_deref(), Some(fixed));
+            let pinned = sql.clone();
+            let offset =
+                super::histogram_offset_micros(&sql, timezone.as_deref(), reference).unwrap();
+            super::pin_histogram_timezone(&mut sql, &mut timezone, JANUARY).unwrap();
+            assert_eq!(sql, pinned);
+            assert_eq!(
+                super::histogram_offset_micros(&sql, timezone.as_deref(), JANUARY).unwrap(),
+                offset
+            );
+            assert!(sql.contains(&format!("WHERE name = '{zone}'")));
+        }
+    }
+
+    #[test]
+    fn timezone_survives_interval_normalization() {
+        for timezone in ["+05:30", "-08:00", "UTC", "America/Los_Angeles"] {
+            let mut sql = format!("SELECT histogram(_timestamp, '1 day', '{timezone}') FROM t");
+            super::handle_histogram(&mut sql, (0, 0), 3600);
+            assert_eq!(
+                sql,
+                format!("SELECT histogram(_timestamp,'3600 second','{timezone}') FROM t")
+            );
+        }
+    }
 
     #[test]
     fn test_handle_histogram() {

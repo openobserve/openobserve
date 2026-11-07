@@ -307,12 +307,17 @@ pub fn parse_timezone_to_offset_opt(offset: &str) -> Option<i64> {
         return None;
     };
 
-    // convert time (HH:MM) to seconds
+    let parts = time.split(':').collect::<Vec<_>>();
+    let (minutes, extra_seconds) = match parts.as_slice() {
+        [_, _, seconds] => (&parts[..2], seconds.parse::<i64>().ok()?),
+        _ => (parts.as_slice(), 0),
+    };
     let mut seconds: i64 = 0;
-    for part in time.split(':') {
+    for part in minutes {
         let val = part.parse::<i64>().ok()?;
         seconds = seconds.checked_mul(60)?.checked_add(val.checked_mul(60)?)?;
     }
+    let seconds = seconds.checked_add(extra_seconds)?;
 
     sign.checked_mul(seconds)
 }
@@ -604,6 +609,18 @@ mod tests {
         assert_eq!(parse_timezone_to_offset_opt("+ab:cd"), None);
         assert_eq!(parse_timezone_to_offset_opt("+1:1:1:1:1:1:1:1:1:1:1"), None);
         assert_eq!(parse_timezone_to_offset_opt("-9223372036854775807:0"), None);
+    }
+
+    #[test]
+    fn timezone_second_precision_roundtrip() {
+        let reference = 31_536_000_000_000;
+        assert_eq!(
+            parse_timezone_to_offset_at("Africa/Monrovia", reference),
+            Some(-2670)
+        );
+        assert_eq!(parse_timezone_to_offset_opt("-00:44:30"), Some(-2670));
+        assert_eq!(parse_timezone_to_offset_opt("+00:44:30"), Some(2670));
+        assert_eq!(parse_timezone_to_offset_opt("+05:30:00"), Some(19800));
     }
 
     #[test]

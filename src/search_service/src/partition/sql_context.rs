@@ -29,7 +29,7 @@ use proto::cluster_rpc;
 use crate::{
     cache::{cacher::get_ts_col_order_by, result_utils::is_ts_order_field},
     partition::aggregate::is_streaming_aggregate,
-    sql::Sql,
+    sql::{Sql, histogram::histogram_offset_micros},
 };
 
 /// SQL-derived context for a search partition request.
@@ -44,6 +44,7 @@ pub struct PartitionSqlContext {
     pub use_single_partition: bool,
     pub is_histogram_eligible: bool,
     pub sql_order_by: OrderBy,
+    pub histogram_offset: i64,
 }
 
 impl PartitionSqlContext {
@@ -57,9 +58,15 @@ impl PartitionSqlContext {
             end_time: req.end_time,
             sql: req.sql.to_string(),
             histogram_interval: req.histogram_interval,
+            timezone: req.timezone.clone(),
             ..Default::default()
         };
         let sql = Sql::new(&query, org_id, stream_type, None).await?;
+        let histogram_offset = if sql.histogram_interval.is_some() {
+            histogram_offset_micros(&sql.sql, sql.timezone.as_deref(), req.end_time)?
+        } else {
+            0
+        };
 
         let is_explain = is_explain_query(&req.sql);
         let is_complex = is_complex_query(&req.sql).unwrap_or(false);
@@ -101,6 +108,7 @@ impl PartitionSqlContext {
             use_single_partition,
             is_histogram_eligible,
             sql_order_by,
+            histogram_offset,
         })
     }
 
@@ -171,6 +179,268 @@ mod tests {
             use_single_partition: false,
             is_histogram_eligible: false,
             sql_order_by: OrderBy::Desc,
+            histogram_offset: 0,
+        }
+    }
+
+    async fn execute_timezone_query(sql: &Sql, timestamp: i64) -> Vec<i64> {
+        use std::sync::Arc;
+
+        use ::search::datafusion::{
+            optimizer::rewrite_histogram::RewriteHistogram, udf::time::histogram,
+        };
+        use arrow::{
+            array::{Int64Array, TimestampMicrosecondArray},
+            record_batch::RecordBatch,
+        };
+        use arrow_schema::{DataType, Field, Schema};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "_timestamp",
+            DataType::Int64,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int64Array::from(vec![timestamp]))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        ctx.register_table(
+            "t",
+            Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+        )
+        .unwrap();
+        ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
+        ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(
+            sql.time_range.0,
+            sql.time_range.1,
+            sql.histogram_interval.unwrap_or_default(),
+            sql.timezone.clone(),
+        )));
+        let batches = ctx.sql(&sql.sql).await.unwrap().collect().await.unwrap();
+        batches[0]
+            .columns()
+            .iter()
+            .filter_map(|column| {
+                column
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .map(|array| array.value(0))
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn timezone_constant_expression_matches_execution_and_partitions() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+        const DAY: i64 = 86_400_000_000;
+        const OFFSET: i64 = 19_800_000_000;
+        const START: i64 = 1_757_376_000_000_000;
+        let org = "timezone_constant_expression";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                "_timestamp",
+                DataType::Int64,
+                false,
+            )])),
+        );
+        for expression in [
+            "CASE WHEN true THEN '+05:30' ELSE '-08:00' END",
+            "CAST('+05:30' AS VARCHAR)",
+        ] {
+            let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
+            "sql": format!("SELECT histogram(_timestamp, '1 day', {expression}) AS ts, count(*) FROM t GROUP BY ts ORDER BY ts"),
+            "start_time": START, "end_time": START + 3 * DAY, "timezone": "UTC", "histogram_interval": 86400
+        })).unwrap();
+            let ctx = PartitionSqlContext::new(&req, org, StreamType::Logs)
+                .await
+                .unwrap();
+            let timestamp = START + DAY + 67_500_000_000;
+            assert_eq!(
+                execute_timezone_query(&ctx.sql, timestamp).await,
+                vec![START + 2 * DAY]
+            );
+            assert_eq!(ctx.histogram_offset, OFFSET);
+            let settings = crate::partition::settings::PartitionSettings {
+                min_step: DAY,
+                step: DAY,
+            };
+            let mut partitions = crate::partition::generate_partitions(&ctx, &settings);
+            partitions.sort();
+            for pair in partitions.windows(2) {
+                assert_eq!(pair[0][1], pair[1][0]);
+                assert_eq!(
+                    config::meta::histogram_origin::histogram_bucket_offset(
+                        pair[0][1] + OFFSET,
+                        DAY
+                    ),
+                    0
+                );
+            }
+            let mut request = config::meta::search::Request::default();
+            request.query.sql = req.sql;
+            request.query.start_time = req.start_time;
+            request.query.end_time = req.end_time;
+            request.query.timezone = req.timezone;
+            request.query.histogram_interval = req.histogram_interval;
+            let (cache, _) = crate::cache::prepare_cache_response(
+                "constant",
+                org,
+                StreamType::Logs,
+                &mut request,
+                true,
+            )
+            .await
+            .unwrap();
+            assert_eq!(cache.ts_offset, OFFSET);
+        }
+    }
+
+    #[tokio::test]
+    async fn timezone_typed_null_constant_preserves_utc() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+        const START: i64 = 1_757_376_000_000_000;
+        let org = "timezone_typed_null";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                "_timestamp",
+                DataType::Int64,
+                false,
+            )])),
+        );
+        let query = "SELECT histogram(_timestamp, '1 day', CASE WHEN false THEN '+05:30' ELSE NULL END) AS ts FROM t";
+        let mut raw = mk(vec![], true, Some(86400), Some("ts")).sql;
+        raw.sql = query.to_string();
+        raw.time_range = (START, START + 86_400_000_000);
+        raw.timezone = Some("+05:30".to_string());
+        assert_eq!(
+            execute_timezone_query(&raw, START + 67_500_000_000).await,
+            vec![START]
+        );
+        let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({"sql": query, "start_time": raw.time_range.0, "end_time": raw.time_range.1, "timezone": "+05:30", "histogram_interval": 86400})).unwrap();
+        let ctx = PartitionSqlContext::new(&req, org, StreamType::Logs)
+            .await
+            .unwrap();
+        assert_eq!(ctx.histogram_offset, 0);
+        assert_eq!(
+            execute_timezone_query(&ctx.sql, START + 67_500_000_000).await,
+            vec![START]
+        );
+    }
+
+    #[tokio::test]
+    async fn timezone_later_named_argument_stays_fixed_across_delta_end() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+        const JANUARY: i64 = 1_767_225_600_000_000;
+        const JULY: i64 = 1_782_864_000_000_000;
+        let org = "timezone_later_named_argument";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                "_timestamp",
+                DataType::Int64,
+                false,
+            )])),
+        );
+        let mut request = config::meta::search::Request::default();
+        request.query.sql = "SELECT histogram(_timestamp, '1 day') AS first, histogram(_timestamp, '1 day', 'America/Los_Angeles') AS second, count(*) FROM t GROUP BY first, second".to_string();
+        request.query.start_time = JANUARY;
+        request.query.end_time = JULY;
+        request.query.timezone = Some("America/Los_Angeles".to_string());
+        request.query.histogram_interval = 86400;
+        crate::cache::prepare_cache_response("later", org, StreamType::Logs, &mut request, true)
+            .await
+            .unwrap();
+        request.query.end_time = JANUARY + 8 * 3_600_000_000;
+        let ctx = PartitionSqlContext::new(
+            &SearchPartitionRequest::from(&request),
+            org,
+            StreamType::Logs,
+        )
+        .await
+        .unwrap();
+        let labels = execute_timezone_query(&ctx.sql, JANUARY + 27_000_000_000).await;
+        assert_eq!(labels, vec![JANUARY, JANUARY]);
+    }
+
+    #[tokio::test]
+    async fn timezone_partitions_keep_bucket_counts_whole() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            "timezone_partition/logs/t".to_string(),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                "_timestamp",
+                DataType::Int64,
+                false,
+            )])),
+        );
+        let plain: SearchPartitionRequest = serde_json::from_value(serde_json::json!({"sql": "SELECT _timestamp FROM t", "start_time": 1, "end_time": 2, "timezone": "Invalid/Zone"})).unwrap();
+        assert_eq!(
+            PartitionSqlContext::new(&plain, "timezone_partition", StreamType::Logs)
+                .await
+                .unwrap()
+                .histogram_offset,
+            0
+        );
+        const HOUR: i64 = 3_600_000_000;
+        const DAY: i64 = 24 * HOUR;
+        let start = 1_757_376_000_000_000;
+        let end = start + 3 * DAY;
+        for (zone, offset) in [("+05:30", 11 * HOUR / 2), ("-08:00", -8 * HOUR), ("UTC", 0)] {
+            let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
+                "sql": "SELECT histogram(_timestamp, '1 day') AS ts, count(*) FROM t GROUP BY ts",
+                "start_time": start, "end_time": end, "timezone": zone,
+                "histogram_interval": 86400
+            }))
+            .unwrap();
+            let ctx = PartitionSqlContext::new(&req, "timezone_partition", StreamType::Logs)
+                .await
+                .unwrap();
+            assert_eq!(ctx.histogram_offset, offset);
+            assert_eq!(ctx.sql.timezone.as_deref(), Some(zone));
+            let settings = crate::partition::settings::PartitionSettings {
+                min_step: DAY,
+                step: DAY,
+            };
+            let mut partitions = crate::partition::generate_partitions(&ctx, &settings);
+            partitions.sort();
+            assert_eq!(partitions.first().unwrap()[0], start);
+            assert_eq!(partitions.last().unwrap()[1], end);
+            for pair in partitions.windows(2) {
+                assert_eq!(pair[0][1], pair[1][0]);
+                assert_eq!(
+                    config::meta::histogram_origin::histogram_bucket_offset(
+                        pair[0][1] + offset,
+                        DAY
+                    ),
+                    0,
+                    "{zone}: {partitions:?}"
+                );
+            }
+            let mut bucket_partitions = std::collections::BTreeMap::new();
+            let mut partitioned_counts = std::collections::BTreeMap::new();
+            let mut full_counts = std::collections::BTreeMap::new();
+            for ts in (start..end).step_by(HOUR as usize) {
+                let key = ts + offset
+                    - config::meta::histogram_origin::histogram_bucket_offset(ts + offset, DAY);
+                *full_counts.entry(key).or_insert(0) += 1;
+                let part = partitions
+                    .iter()
+                    .position(|[a, b]| ts >= *a && ts < *b)
+                    .unwrap();
+                if let Some(previous) = bucket_partitions.insert(key, part) {
+                    assert_eq!(previous, part, "{zone}: bucket {key} split");
+                }
+                *partitioned_counts.entry(key).or_insert(0) += 1;
+            }
+            assert_eq!(partitioned_counts, full_counts);
         }
     }
 

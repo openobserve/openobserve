@@ -48,7 +48,7 @@ pub async fn write_results_to_cache(
     accumulated_results: &mut Vec<SearchResultType>,
     clear_cache: bool,
 ) -> Result<(), infra::errors::Error> {
-    if accumulated_results.is_empty() {
+    if accumulated_results.is_empty() || !c_resp.cache_query_response {
         return Ok(());
     }
 
@@ -109,6 +109,7 @@ pub async fn write_results_to_cache(
             c_resp.is_descending,
             clear_cache,
             is_histogram_non_ts_order,
+            c_resp.ts_offset,
         )
         .await;
         log::info!(

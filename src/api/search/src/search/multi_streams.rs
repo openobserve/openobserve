@@ -1707,6 +1707,7 @@ mod tests {
             query_fn: None,
             streaming_output: false,
             histogram_interval: 0,
+            timezone: None,
         };
 
         assert!(!request.sql.is_empty());
@@ -2298,6 +2299,7 @@ mod tests {
                 query_fn: None,
                 streaming_output: false,
                 histogram_interval: 0,
+                timezone: None,
             }),
         )
         .await;
@@ -2494,6 +2496,7 @@ mod tests {
                 query_fn: None,
                 streaming_output: false,
                 histogram_interval: 0,
+                timezone: None,
             }),
         )
         .await;

@@ -108,7 +108,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
                     if let Some(histogram_interval) = get_histogram_interval(&args[0])
                         && is_on_histogram_origin_grid(&args[2], histogram_interval as i64)
                     {
-                        let (start_time, end_time) = self.time_range;
+                        let (start_time, end_time) =
+                            (self.time_range.0 + ts_offset, self.time_range.1 + ts_offset);
                         // round the bucket edges to even start
                         let rounding_by = histogram_interval as i64;
                         let min_value =
@@ -287,7 +288,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
                             if let Some(histogram_interval) = get_histogram_interval(&args[0])
                                 && is_on_histogram_origin_grid(&args[2], histogram_interval as i64)
                             {
-                                let (start_time, end_time) = self.time_range;
+                                let (start_time, end_time) =
+                                    (self.time_range.0 + ts_offset, self.time_range.1 + ts_offset);
                                 let rounding_by = histogram_interval as i64;
                                 let min_value =
                                     start_time - histogram_bucket_offset(start_time, rounding_by);
@@ -342,6 +344,193 @@ mod tests {
         udf::time::histogram,
     };
 
+    async fn assert_timezone_index_counts_match_scan(
+        ctx: &SessionContext,
+        sql: &str,
+        mode: IndexOptimizeMode,
+    ) -> Result<()> {
+        use arrow::{
+            array::{Int64Array, StringArray, TimestampMicrosecondArray},
+            record_batch::RecordBatch,
+        };
+        use config::tantivy::query::histogram_collector::{
+            MultiHistogramCollector, SimpleHistogramCollector,
+        };
+        use datafusion::datasource::MemTable;
+        use tantivy::{
+            Index, TantivyDocument, Term,
+            query::TermQuery,
+            schema::{FAST, INDEXED, IndexRecordOption, STRING},
+        };
+        const START: i64 = 1_757_376_000_000_000;
+        const DAY: i64 = 86_400_000_000;
+        let timestamps = vec![
+            START,
+            START + 1,
+            START + DAY - 1,
+            START + DAY,
+            START + 2 * DAY - 2,
+            START + 2 * DAY - 1,
+        ];
+        let levels = vec!["keep", "drop", "keep", "keep", "drop", "keep"];
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("level", DataType::Utf8, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(timestamps.clone())),
+                Arc::new(StringArray::from(levels.clone())),
+            ],
+        )?;
+        ctx.deregister_table("events")?;
+        ctx.register_table(
+            "events",
+            Arc::new(MemTable::try_new(schema, vec![vec![batch]])?),
+        )?;
+        let scan_sql = sql.replace("FROM t", "FROM events WHERE level = 'keep'");
+        let batches = ctx.sql(&scan_sql).await?.collect().await?;
+        let mut scan = Vec::new();
+        for batch in batches {
+            let keys = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<TimestampMicrosecondArray>()
+                .unwrap();
+            let counts = batch
+                .column(batch.num_columns() - 1)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap();
+            scan.extend((0..batch.num_rows()).map(|i| (keys.value(i), counts.value(i) as u64)));
+        }
+        let mut schema = tantivy::schema::Schema::builder();
+        let ts = schema.add_i64_field("_timestamp", FAST | INDEXED);
+        let level = schema.add_text_field("level", STRING | FAST);
+        let index = Index::create_in_ram(schema.build());
+        let mut writer = index.writer(15_000_000).unwrap();
+        for (timestamp, level_value) in timestamps.iter().zip(&levels) {
+            let mut doc = TantivyDocument::default();
+            doc.add_i64(ts, *timestamp);
+            doc.add_text(level, *level_value);
+            writer.add_document(doc).unwrap();
+        }
+        writer.commit().unwrap();
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        let query = TermQuery::new(
+            Term::from_field_text(level, "keep"),
+            IndexRecordOption::Basic,
+        );
+        let mut indexed = match mode {
+            IndexOptimizeMode::SimpleHistogram(min, width, buckets, offset) => searcher
+                .search(
+                    &query,
+                    &SimpleHistogramCollector::new(
+                        "_timestamp".to_string(),
+                        min,
+                        width,
+                        buckets,
+                        offset,
+                    ),
+                )
+                .unwrap()
+                .into_iter()
+                .enumerate()
+                .filter(|(_, count)| *count > 0)
+                .map(|(i, count)| (min + i as i64 * width as i64, count))
+                .collect::<Vec<_>>(),
+            IndexOptimizeMode::SimpleMultiHistogram(min, max, width, offset, field) => searcher
+                .search(
+                    &query,
+                    &MultiHistogramCollector::new(
+                        "_timestamp".to_string(),
+                        field,
+                        min,
+                        max,
+                        width,
+                        offset,
+                    ),
+                )
+                .unwrap()
+                .into_iter()
+                .map(|(key, _, count)| (key, count))
+                .collect(),
+            other => panic!("unexpected histogram mode: {other:?}"),
+        };
+        scan.sort();
+        indexed.sort();
+        assert_eq!(indexed, scan, "{sql}");
+        assert_eq!(indexed.iter().map(|(_, count)| count).sum::<u64>(), 4);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn timezone_index_bounds_cover_range_edges() -> Result<()> {
+        const HOUR: i64 = 3_600_000_000;
+        const DAY: i64 = 24 * HOUR;
+        let start = 1_757_376_000_000_000;
+        let end = start + 2 * DAY;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("level", DataType::Utf8, false),
+        ]));
+        for (timezone, offset) in [("+05:30", 11 * HOUR / 2), ("-08:00", -8 * HOUR), ("UTC", 0)] {
+            let state = SessionStateBuilder::new()
+                .with_default_features()
+                .with_optimizer_rule(Arc::new(RewriteHistogram::new(start, end, 86400, None)))
+                .build();
+            let ctx = SessionContext::new_with_state(state);
+            ctx.register_table("t", Arc::new(NewEmptyTable::new("t", schema.clone())))?;
+            ctx.register_udf(histogram::HISTOGRAM_UDF.clone());
+            let min = start + offset - histogram_bucket_offset(start + offset, DAY);
+            let max = end + offset;
+            for breakdown in [false, true] {
+                let extra = if breakdown { ", level" } else { "" };
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '1 day', '{timezone}') as ts{extra}, count(*) as cnt FROM t GROUP BY ts{extra}"
+                );
+                let logical = ctx.state().create_logical_plan(&sql).await?;
+                let physical = ctx.state().create_physical_plan(&logical).await?;
+                let partial = Arc::new(get_partial_aggregate_plan(physical).unwrap());
+                if breakdown {
+                    let mode = is_simple_multi_histogram(
+                        partial,
+                        (start, end),
+                        HashSet::from(["level".to_string()]),
+                    );
+                    assert_eq!(
+                        mode,
+                        Some(IndexOptimizeMode::SimpleMultiHistogram(
+                            min,
+                            max,
+                            DAY as u64,
+                            offset,
+                            "level".to_string()
+                        )),
+                        "{timezone}"
+                    );
+                    assert_timezone_index_counts_match_scan(&ctx, &sql, mode.unwrap()).await?;
+                } else {
+                    let mode = is_simple_histogram(partial, (start, end));
+                    assert_eq!(
+                        mode,
+                        Some(IndexOptimizeMode::SimpleHistogram(
+                            min,
+                            DAY as u64,
+                            ((max - min) as f64 / DAY as f64).ceil() as usize,
+                            offset
+                        )),
+                        "{timezone}"
+                    );
+                    assert_timezone_index_counts_match_scan(&ctx, &sql, mode.unwrap()).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_is_simple_histogram() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![
@@ -383,7 +572,7 @@ mod tests {
             (
                 "SELECT histogram(_timestamp, '1 minute', '+08:00') as ts, count(*) as cnt from t group by ts",
                 Some(IndexOptimizeMode::SimpleHistogram(
-                    1757401680000000,
+                    1757430480000000,
                     60000000,
                     16,
                     28800000000,
@@ -502,8 +691,8 @@ mod tests {
             (
                 "SELECT histogram(_timestamp, '1 minute', '-05:30') as ts, level, count(*) as cnt from t group by ts, level",
                 Some(IndexOptimizeMode::SimpleMultiHistogram(
-                    1757401680000000,
-                    1757402594060000,
+                    1757381880000000,
+                    1757382794060000,
                     60000000,
                     -19800000000,
                     "level".to_string(),
