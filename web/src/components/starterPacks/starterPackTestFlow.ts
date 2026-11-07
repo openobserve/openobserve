@@ -19,6 +19,7 @@ import { vi } from "vitest";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 
 export const PACK = {
+  titleKey: "starterPacks.kubernetes.title",
   id: "kubernetes",
   titleKey: "starterPacks.kubernetes.title",
   dashboards: [{ id: "overview", title: "Overview" }],
@@ -47,6 +48,12 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
     interrupted: ref(false),
     isAdmin: ref(false),
     items: ref([]),
+    keepOff: vi.fn(async () => undefined),
+    packLink: () => "http://x/web/alert-library/packs/kubernetes?org_identifier=org",
+    packRoute: computed(() => ({ name: "starterPack", params: { pack: "kubernetes" } })),
+    remindAlerts: ref(true),
+    skipped: ref([]),
+    trackAlertEdit: vi.fn((_pack: unknown, _ids: unknown, work: () => unknown) => work()),
     land: vi.fn(async () => undefined),
     licensed: ref(true),
     load: vi.fn(async () => undefined),

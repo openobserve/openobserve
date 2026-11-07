@@ -124,6 +124,7 @@ const useHttpStreaming = () => {
       meta?: any;
       clear_cache?: boolean;
       use_cache?: boolean;
+      skipCache?: boolean;
     },
     handlers: {
       data: (data: any, response: any) => void;
@@ -178,8 +179,11 @@ const useHttpStreaming = () => {
     meta?: any;
     clear_cache?: boolean;
     use_cache?: boolean;
+    /** For a caller that must never read a stored partial result as the answer. */
+    skipCache?: boolean;
   }) => {
-    const { traceId, org_id, type, queryReq, searchType, pageType, meta, clear_cache } = data;
+    const { traceId, org_id, type, queryReq, searchType, pageType, meta, clear_cache, skipCache } =
+      data;
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
@@ -188,9 +192,10 @@ const useHttpStreaming = () => {
 
     // Construct URL based on search type
     let url = "";
-    const use_cache =
-      data.use_cache ??
-      ((window as any).use_cache !== undefined ? (window as any).use_cache : true);
+    const use_cache = skipCache
+      ? false
+      : (data.use_cache ??
+        ((window as any).use_cache !== undefined ? (window as any).use_cache : true));
 
     // Check if this is a multi-stream request (similar to search.ts logic)
     const isMultiStream = typeof queryReq.query?.sql !== "string";

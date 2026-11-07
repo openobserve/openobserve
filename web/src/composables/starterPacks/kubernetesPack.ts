@@ -48,6 +48,7 @@ const loadKubernetesOverview = async (): Promise<Record<string, any>> => {
 
 export const KUBERNETES_PACK: StarterPack = {
   id: "kubernetes",
+  version: "1.0.0",
   titleKey: "starterPacks.kubernetes.title",
   descriptionKey: "starterPacks.kubernetes.description",
   folder: { name: "Kubernetes", description: "Installed by the Kubernetes starter pack" },

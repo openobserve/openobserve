@@ -30,7 +30,15 @@ const render = async () => {
   fake.flow.loaded.value = false;
   const wrapper = mount(StarterPackHomeCard, {
     props: { org: "org" },
-    global: { plugins: [i18n], stubs: { StarterPackDrawer: true, OIcon: true } },
+    global: {
+      plugins: [i18n],
+      stubs: {
+        StarterPackDrawer: true,
+        StarterPackHealthLine: true,
+        TurnOnAlertsDrawer: true,
+        OIcon: true,
+      },
+    },
   });
   fake.flow.loaded.value = true;
   await flushPromises();
@@ -64,6 +72,21 @@ describe("StarterPackHomeCard", () => {
       loadUserCount: vi.fn(),
       hide: vi.fn(),
     };
+  });
+
+  it("reminds until alerts are on, and Keep off asks the flow to stop", async () => {
+    fake.flow.record.value = { items: [] };
+    const wrapper = await render();
+    expect(has(wrapper, "home-pack-reminder")).toBe(true);
+    await wrapper.get('[data-test="home-pack-reminder-keep-off-btn"]').trigger("click");
+    expect(fake.flow.keepOff).toHaveBeenCalled();
+    fake.flow.remindAlerts.value = false;
+    await nextTick();
+    expect(has(wrapper, "home-pack-reminder")).toBe(false);
+  });
+
+  it("copies a link to the pack page, not the page the asker is on", async () => {
+    expect(fake.flow.packLink()).toContain("/alert-library/packs/kubernetes");
   });
 
   it("keeps a skeleton while checking, and offers the pack once matched", async () => {
@@ -150,13 +173,14 @@ describe("StarterPackHomeCard", () => {
     expect(fake.flow.land).toHaveBeenCalledWith();
   });
 
-  it("swaps to the reminder after setup and links Turn on alerts", async () => {
+  it("swaps to the reminder after setup and links the pack page", async () => {
     fake.flow.record = shallowRef({ status: "complete" });
     const wrapper = await render();
     expect(has(wrapper, "home-pack-card")).toBe(false);
     expect(has(wrapper, "home-pack-alerts-on-tile")).toBe(true);
-    await wrapper.get('[data-test="home-pack-reminder-turn-on-btn"]').trigger("click");
-    expect(fake.push).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
+    await wrapper.get('[data-test="home-pack-view-btn"]').trigger("click");
+    expect(fake.push).toHaveBeenCalledWith(expect.objectContaining({ name: "starterPack" }));
+    expect(has(wrapper, "home-pack-reminder-turn-on-btn")).toBe(true);
   });
 
   it("surfaces an interrupted install before anything else", async () => {

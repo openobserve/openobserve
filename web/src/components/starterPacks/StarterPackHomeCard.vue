@@ -30,6 +30,8 @@ import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlo
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 import StarterPackInstallCard from "./StarterPackInstallCard.vue";
+import StarterPackHealthLine from "./StarterPackHealthLine.vue";
+import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
 
 const props = defineProps<{ org: string }>();
 
@@ -41,6 +43,7 @@ const matcher = useStarterPackMatcher(props.org);
 const { dismissed, dismiss, restore } = usePackDismissal("home", props.org, pack.id);
 const orgHide = usePackHiddenForOrg(props.org, pack.id);
 const drawerOpen = ref(false);
+const turnOnOpen = ref(false);
 
 onMounted(() => {
   void flow.load();
@@ -105,7 +108,14 @@ const startSetup = async () => {
 const retryCheck = () => Promise.all([flow.load(), matcher.retry()]);
 const library = () =>
   router.push({ name: "alertLibrary", query: { org_identifier: props.org } }).catch(() => {});
-const openAlerts = () => router.push(flow.alertsRoute.value).catch(() => {});
+const viewPack = () => router.push(flow.packRoute.value).catch(() => {});
+const keepOff = async () => {
+  try {
+    await flow.keepOff();
+  } catch {
+    toast({ variant: "error", message: t("starterPacks.home.keepOffFailed") });
+  }
+};
 const setHidden = async (work: () => Promise<void>) => {
   try {
     await work();
@@ -113,7 +123,7 @@ const setHidden = async (work: () => Promise<void>) => {
     toast({ variant: "error", message: t("starterPacks.home.hideFailed") });
   }
 };
-const copyLink = () => copyToClipboard(window.location.href, t);
+const copyLink = () => copyToClipboard(flow.packLink(), t);
 </script>
 
 <template>
@@ -184,13 +194,25 @@ const copyLink = () => copyToClipboard(window.location.href, t);
     </OBanner>
 
     <div v-else-if="view === 'installed'" class="flex flex-col gap-3">
-      <OBanner variant="info" dense inline-actions data-test="home-pack-reminder">
-        {{
-          flow.alertsOff.value > 0
-            ? t("starterPacks.home.reminder", { count: flow.alertsOff.value }, flow.alertsOff.value)
-            : t("starterPacks.home.reminderDone")
-        }}
+      <StarterPackHealthLine :org="props.org" />
+      <OBanner
+        v-if="flow.remindAlerts.value"
+        variant="info"
+        dense
+        inline-actions
+        data-test="home-pack-reminder"
+      >
+        {{ t("starterPacks.home.reminder", { count: flow.alertsOff.value }, flow.alertsOff.value) }}
         <template #actions>
+          <OButton
+            v-if="flow.canManage.value"
+            variant="ghost"
+            size="sm-action"
+            data-test="home-pack-reminder-keep-off-btn"
+            @click="keepOff"
+          >
+            {{ t("starterPacks.home.keepOff") }}
+          </OButton>
           <OButton
             variant="ghost"
             size="sm-action"
@@ -203,16 +225,15 @@ const copyLink = () => copyToClipboard(window.location.href, t);
             variant="outline"
             size="sm-action"
             data-test="home-pack-view-btn"
-            @click="drawerOpen = true"
+            @click="viewPack"
           >
             {{ t("starterPacks.home.viewPack") }}
           </OButton>
           <OButton
-            v-if="flow.alertsOff.value > 0"
             variant="primary"
             size="sm-action"
             data-test="home-pack-reminder-turn-on-btn"
-            @click="openAlerts"
+            @click="turnOnOpen = true"
           >
             {{ t("starterPacks.home.turnOn") }}
           </OButton>
@@ -303,5 +324,6 @@ const copyLink = () => copyToClipboard(window.location.href, t);
       :clusters="matcher.clusters.value"
       @copy-link="copyLink"
     />
+    <TurnOnAlertsDrawer v-model:open="turnOnOpen" :flow="flow" :clusters="matcher.clusters.value" />
   </div>
 </template>
