@@ -347,7 +347,7 @@ describe("AddAlertView.vue", () => {
 
       const wrapper = await mountEditing();
 
-      expect(alertsService.get_by_alert_id).toHaveBeenCalledWith("test-org", "alert-1");
+      expect(alertsService.get_by_alert_id).toHaveBeenCalledWith("test-org", "alert-1", undefined);
 
       const form = wrapper.findComponent(AddAlertStub);
       expect(form.props("isUpdated")).toBe(true);

@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { request } = require('@playwright/test');
 const {
-  urls, api, uniq, simpleAlert, multiAlert, createAlert, findAlertId, listAlerts,
+  urls, api, uniq, simpleAlert, multiAlert, createAlert, findAlertId, listAlerts, listAlertsInFolder,
   getAlertGroups, ingest, isFiringOutcome,
 } = require('./alerts-api-helpers.js');
 
@@ -57,7 +57,9 @@ async function waitFiring(page, alert, { timeoutMs = 240_000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     await alert.feed();
-    const item = await listItem(page, alert.name);
+    const item = alert.folder
+      ? (await listAlertsInFolder(page, alert.folder)).find((a) => a.name === alert.name) || null
+      : await listItem(page, alert.name);
     if (item?.firing_started_at && isFiringOutcome(item.last_outcome)) return item;
     if (Date.now() > deadline) throw new Error(`${alert.name} never fired: ${JSON.stringify(item)}`);
     await page.waitForTimeout(5000);

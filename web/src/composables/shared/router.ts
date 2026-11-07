@@ -188,6 +188,7 @@ const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const PublicDashboardLinks = () => import("@/views/Dashboards/PublicLinks.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
+const FiringAlerts = () => import("@/components/alerts/FiringAlerts.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
@@ -979,6 +980,18 @@ const useRoutes = () => {
       component: AlertList,
       meta: {
         titleKey: "menu.alerts",
+        licenseFeature: "alerts",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/firing",
+      name: "alertFiring",
+      component: FiringAlerts,
+      meta: {
+        titleKey: "alerts.firing.title",
         licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
