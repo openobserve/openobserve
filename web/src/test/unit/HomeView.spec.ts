@@ -49,16 +49,21 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import settingsService from "@/services/settings";
 
-// Mock router
-const mockRouter = {
-  push: vi.fn(),
-  resolve: vi.fn(),
-};
+const { mockRouter, mockRoute } = vi.hoisted(() => ({
+  mockRouter: {
+    push: vi.fn(),
+    replace: vi.fn().mockResolvedValue(undefined),
+    resolve: vi.fn(),
+  },
+  mockRoute: { name: "home", path: "/home", query: {}, params: {} },
+}));
 
-const mockRoute = {
-  name: "home",
-  path: "/home",
-};
+// HomeView reads the route through useRoute(), which `global.mocks` does not reach.
+vi.mock("vue-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue-router")>()),
+  useRoute: () => mockRoute,
+  useRouter: () => mockRouter,
+}));
 
 describe("HomeView.vue", () => {
   let wrapper: any;

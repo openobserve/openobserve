@@ -269,16 +269,16 @@ export function writeHome(userOrgKey: string, delta: HomePrefs): void {
   mergeJson("local", LOCAL_KEYS.home(userOrgKey), delta);
 }
 
-/** Copies the unscoped legacy tab state once; a saved `ai` tab becomes `overview` because the AI tab is gone. */
+/** Copies the unscoped legacy tab state once; a saved `ai` tab stays, since the AI tab is the assistant's page. */
 export function migrateHome(userOrgKey: string): HomePrefs {
   const current = readHome(userOrgKey);
   if (current.migratedFromUnscoped) return current;
   const legacyOrder = readJson<unknown>("local", LEGACY_HOME_ORDER);
   const order = Array.isArray(legacyOrder)
-    ? [...new Set(legacyOrder.map((id) => (id === "ai" ? "overview" : String(id))))]
+    ? [...new Set(legacyOrder.map((id) => String(id)))]
     : current.order;
   const legacyActive = readRaw("local", LEGACY_HOME_ACTIVE);
-  const active = legacyActive === "ai" ? "overview" : (legacyActive ?? current.active ?? null);
+  const active = legacyActive ?? current.active ?? null;
   return mergeJson<HomePrefs>("local", LOCAL_KEYS.home(userOrgKey), {
     ...(order && { order }),
     active,

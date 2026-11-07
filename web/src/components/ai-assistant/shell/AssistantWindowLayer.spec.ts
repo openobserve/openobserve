@@ -126,7 +126,7 @@ describe("AssistantWindowLayer", () => {
     const { store } = fake.current;
     const sid = newChat();
     store.floatChat(sid, { focus: "none" });
-    await setup("/assistant");
+    await setup("/?thread=");
     expect(windows()).toHaveLength(0);
     expect(store.windowOf(sid)?.state).toBe("open");
     mounted.splice(0).forEach((wrapper) => wrapper.unmount());
@@ -219,6 +219,23 @@ describe("AssistantWindowLayer", () => {
     document.body.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
     await flushPromises();
     expect(el.hasAttribute("data-collapsed")).toBe(false);
+  });
+
+  it("keeps the Threads bar shown while a keyboard user is on its toggle", async () => {
+    const { store } = fake.current;
+    const sid = newChat();
+    store.floatChat(sid, { focus: "none" });
+    store.minimiseWindow(sid, "button");
+    await setup();
+    const bar = document.body.querySelector<HTMLElement>('[data-test="threads-bar"]')!;
+    const toggle = document.body.querySelector<HTMLElement>('[data-test="threads-bar-toggle"]')!;
+    const box = { left: 0, right: 500, top: 0, bottom: 500 } as DOMRect;
+    bar.getBoundingClientRect = () => box;
+    toggle.getBoundingClientRect = () => box;
+    vi.spyOn(toggle, "matches").mockReturnValue(true);
+    toggle.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    await flushPromises();
+    expect(bar.style.display).not.toBe("none");
   });
 
   it("returns focus to the page control it came from after the last window minimises", async () => {

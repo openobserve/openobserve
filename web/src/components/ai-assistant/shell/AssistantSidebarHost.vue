@@ -123,6 +123,7 @@ import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
+import { isFullThreadRoute } from "@/composables/assistant/pure";
 import {
   SIDEBAR_MIN_REM,
   TEAR_OFF_REM,
@@ -200,7 +201,7 @@ useAssistantShortcuts();
 
 // G0 and G1 mount no container at all, so the page holds nothing of the assistant (SH-01 AC 8).
 const mountable = computed(() => !UNMOUNTED_GATES.has(capability.gate.value));
-const onAssistantRoute = computed(() => route.name === "assistant");
+const onAssistantRoute = computed(() => isFullThreadRoute(route));
 // Below `lg` there are no windows: with no sidebar chat, the sheet shows the window in front.
 const sheetWindowSid = computed(() => {
   if (lgUp.value || placement.placement.value.kind !== "hidden") return null;

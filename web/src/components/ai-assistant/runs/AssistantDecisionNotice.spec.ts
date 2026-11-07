@@ -246,7 +246,7 @@ describe("AssistantDecisionNotice", () => {
       fake.runs = fakeRuns();
       fake.runs.decisions.value = [decision("a")];
       const router = fakeRouter();
-      await router.push("/assistant");
+      await router.push({ name: "home", query: { tab: "ai", thread: "" } });
       mount(AssistantDecisionNotice, {
         attachTo: document.body,
         global: { plugins: [router, fakeVuex()] },

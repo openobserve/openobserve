@@ -27,6 +27,7 @@ import {
   commitTurnAgent,
   currentAgent,
   defaultAgentFor,
+  doorAgent,
   nextAgent,
   revertHandoff,
   rosterOf,
@@ -223,5 +224,22 @@ describe("agents: suggestions and doors", () => {
     expect(door("troubleshoot", "log_row")).toBe("sre");
     expect(door("explain", "alert_firing")).toBe("sre");
     expect(door("explain", "log_row")).toBeNull();
+  });
+
+  it("pins a door's agent only when the roster lists it available, else the default assistant", () => {
+    const roster = (sre: boolean, o2 = true) => [
+      { id: "o2-ai" as const, pickable: true, available: o2 },
+      {
+        id: "sre" as const,
+        pickable: true,
+        available: sre,
+        ...(!sre && { reason: "disabled" as const }),
+      },
+    ];
+    expect(doorAgent("sre", roster(true))).toBe("sre");
+    expect(doorAgent("sre", roster(false))).toBe("o2-ai");
+    expect(doorAgent("sre", roster(false, false))).toBeNull();
+    expect(doorAgent("sre", undefined)).toBeNull();
+    expect(doorAgent(null, roster(true))).toBeNull();
   });
 });

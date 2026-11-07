@@ -17,6 +17,7 @@ import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { effectScope } from "vue";
 
+import { createAlertDetailContextProvider } from "@/composables/contextProviders/alertDetailContextProvider";
 import { homeContextOf } from "@/composables/contextProviders/homeContextProvider";
 import type { OverviewNowSnapshot } from "@/composables/contextProviders/types";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
@@ -671,6 +672,42 @@ describe("the request", () => {
       alertId: "a9",
       dashboardId: "d3",
     });
+  });
+
+  it("sends the alert page's name, state and condition, and drops them all with the alert chip", () => {
+    const provider = createAlertDetailContextProvider(
+      () => ({
+        alertId: "al-1",
+        state: "firing",
+        alert: {
+          name: "checkout 5xx",
+          stream_name: "checkout",
+          stream_type: "logs",
+          query_condition: { type: "sql", sql: "SELECT count(*) FROM checkout" },
+          trigger_condition: { operator: ">=", threshold: 5, period: 10 },
+        },
+      }),
+      { state: { selectedOrganization: { identifier: "acme" } } },
+    );
+    const page = provider.getContext() as PageContext;
+    const sent = wireContextOf(
+      page,
+      { chips: [], timeOverride: null, removedPageKeys: [] },
+      { org: "acme" },
+    );
+    expect(sent).toMatchObject({
+      alertId: "al-1",
+      alertName: "checkout 5xx",
+      alertState: "firing",
+      alertCondition: "SELECT count(*) FROM checkout · >= 5 · 10 min window",
+    });
+    const removed = wireContextOf(
+      page,
+      { chips: [], timeOverride: null, removedPageKeys: ["alertId"] },
+      { org: "acme" },
+    );
+    for (const key of ["alertId", "alertName", "alertState", "alertCondition"])
+      expect(removed).not.toHaveProperty(key);
   });
 
   it("sends typed attachments instead of blocks when the server takes them (B-09)", () => {

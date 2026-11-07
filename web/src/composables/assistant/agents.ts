@@ -263,6 +263,17 @@ export function suggestionFor(
     : null;
 }
 
+/** The agent a door may pin: the wanted one when the roster lists it available, else the default assistant. */
+export function doorAgent(
+  wanted: AgentId | null,
+  agents: CapabilityAgent[] | undefined,
+): AgentId | null {
+  if (!wanted || !rosterOffersChoice(agents)) return null;
+  const available = (id: AgentId) => agents?.some((row) => row.id === id && row.available);
+  if (available(wanted)) return wanted;
+  return available(DEFAULT_AGENT) ? DEFAULT_AGENT : null;
+}
+
 /** The default of `60` §3.1 and D6 §3.1–3.2; `null` leaves the org default to the server. */
 export function defaultAgentFor(door: {
   entryVerb: EntryVerb;

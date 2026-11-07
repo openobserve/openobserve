@@ -19,6 +19,7 @@ import { computed } from "vue";
 
 import type { LocalRecord } from "@/composables/assistant/historyDb";
 import aiChatShare from "@/services/ai_chat_share";
+import assistant from "@/services/assistant";
 import { raw } from "@/types/i18n";
 import { setOrgTimeZoneSource } from "@/utils/formatters";
 
@@ -90,10 +91,11 @@ async function setup(
     seed = SEED,
     canChat = "yes" as const,
     persistence = false,
+    historySearch = false,
     patchHistory = (history: any) => history,
   } = {},
 ) {
-  fake.current = fakeAssistant("available", { persistence, canChat }, {}, 80, true);
+  fake.current = fakeAssistant("available", { persistence, canChat, historySearch }, {}, 80, true);
   for (const row of seed) fake.current.db.rows.set(row.id, structuredClone(row));
   fake.current.history = patchHistory(fake.current.history);
   const router = fakeRouter();
@@ -210,6 +212,50 @@ describe("AssistantHistoryList", () => {
     expect(wrapper.get('[data-test="assistant-history-no-match"]').text()).toContain(
       "No chats match “zzz”",
     );
+  });
+
+  it("says nothing matches, not No chats yet, when the server search finds nothing", async () => {
+    vi.spyOn(assistant, "listChats").mockImplementation(async (_org, params = {}) => ({
+      chats: params.q
+        ? []
+        : [
+            {
+              session_id: "0190a1b2-c3d4-7e5f-8a9b-00000000aaaa",
+              title: "Saved",
+              created_at: 1,
+              updated_at: 2,
+            },
+          ],
+    }));
+    const { wrapper, history } = await setup(
+      {},
+      { seed: [], persistence: true, historySearch: true },
+    );
+    await vi.waitFor(() => expect(rowButtons(wrapper)).toHaveLength(1));
+    history.setFilter({ q: "zzz" });
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="assistant-history-no-match"]').exists()).toBe(true),
+    );
+    expect(wrapper.find('[data-test="assistant-history-empty"]').exists()).toBe(false);
+  });
+
+  it("shows the skeleton, not No chats match, while a server search is still loading", async () => {
+    vi.spyOn(assistant, "listChats").mockImplementation((_org, params = {}) =>
+      params.q ? new Promise(() => {}) : Promise.resolve({ chats: [] }),
+    );
+    const { wrapper, history } = await setup(
+      {},
+      {
+        seed: [record(9, NOW - 60_000, { title: "Browser only" })],
+        persistence: true,
+        historySearch: true,
+      },
+    );
+    await vi.waitFor(() => expect(rowButtons(wrapper)).toHaveLength(1));
+    history.setFilter({ q: "zzz" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-history-no-match"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-history-skeleton"]').exists()).toBe(true);
   });
 
   it("shows the empty state without Delete all chats", async () => {

@@ -129,7 +129,7 @@ describe("navigation applier", () => {
   });
 
   it.each([
-    ["home", { home_tab: "overview", org_identifier: "org1" }],
+    ["home", { home_tab: "ai", org_identifier: "org1" }],
     ["ingestion", { org_identifier: "org1" }],
   ])("opens %s, which link cards may now name", async (name, query) => {
     const { env, sid, router } = makeEnv();
@@ -186,7 +186,7 @@ describe("navigation applier", () => {
     expect(env.openTab).toHaveBeenCalled();
   });
 
-  it("opens Back to Overview on the armed row and range, in Home's own keys", async () => {
+  it("opens Back to Home on the armed row and range, in Home's own keys", async () => {
     const { env, sid, router } = makeEnv();
     armHomeReturn(sid, { row: "service:checkout-api", from: 100, to: 200 });
     await navigationApplier(
@@ -195,7 +195,7 @@ describe("navigation applier", () => {
       env,
     );
     expect(lastQuery(router.push)).toEqual({
-      home_tab: "overview",
+      home_tab: "ai",
       row: "service:checkout-api",
       from: "100",
       to: "200",

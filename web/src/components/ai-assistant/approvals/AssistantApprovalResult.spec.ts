@@ -47,6 +47,7 @@ const BATCH = approvalOf({
 const block: ContentBlock = { type: "approval", approval: BATCH };
 
 const routes = [
+  { path: "/dashboards/view", name: "viewDashboard", component: { render: () => null } },
   { path: "/alerts", name: "alertList", component: { render: () => null } },
   { path: "/alerts/:alert_id", name: "alertDetail", component: { render: () => null } },
 ];
@@ -339,6 +340,69 @@ describe("AssistantApprovalResult", () => {
     ).toContain("/alerts/a1");
   });
 
+  it("names a denied create by its title, never by the tool id o2-ai puts in its target", () => {
+    const create = approvalOf({
+      type: "confirmation_required",
+      id: "c9",
+      tool: "CreateDashboard",
+      kind: "create",
+      targets: [{ type: "dashboard", name: "CreateDashboard" }],
+      args: { org_id: "default", request_body: { title: "QA approval test" } },
+    });
+    const { wrapper } = mountRecord(
+      { outcome: { state: "declined", at: 1 } },
+      { blocks: [{ type: "approval", approval: create }] },
+    );
+    expect(line(wrapper)).toBe("Denied: create dashboard QA approval test");
+  });
+
+  it("opens what an approved create made, by the id its result carries", () => {
+    const create = approvalOf({
+      type: "confirmation_required",
+      id: "c9",
+      tool: "CreateAlert",
+      kind: "create",
+      targets: [{ type: "alert", name: "qa_error_burst" }],
+      args: { request_body: { name: "qa_error_burst" } },
+    });
+    const blocks: ContentBlock[] = [{ type: "approval", approval: create }];
+    const made = (item: Record<string, unknown>) =>
+      mountRecord(
+        {
+          outcome: { state: "done", at: 1 },
+          result: {
+            status: "done",
+            items: [{ type: "alert", name: "qa_error_burst", status: "done", ...item }],
+            resolvedBy: "ada@example.com",
+            resolvedAt: 1,
+          },
+        },
+        { blocks },
+      ).wrapper.find('[data-test="assistant-approval-result-open"]');
+    expect(made({ id: "a7" }).attributes("href")).toContain("/alerts/a7");
+    expect(made({ link: "/alerts/a8" }).attributes("href")).toBe("/alerts/a8");
+    expect(made({ link: "https://evil.example/x" }).exists()).toBe(false);
+    expect(made({}).exists()).toBe(false);
+  });
+
+  it("opens a new panel's dashboard", () => {
+    const panel = approvalOf({
+      type: "confirmation_required",
+      id: "c9",
+      tool: "AddPanel",
+      kind: "create",
+      targets: [{ type: "panel", name: "d1", id: "d1" }],
+      args: { dashboard_id: "d1", request_body: { panel: { title: "Total Error Logs" } } },
+    });
+    const { wrapper } = mountRecord(
+      { outcome: { state: "done", at: 1 } },
+      { blocks: [{ type: "approval", approval: panel }] },
+    );
+    expect(
+      wrapper.get('[data-test="assistant-approval-result-open"]').attributes("href"),
+    ).toContain("d1");
+  });
+
   it("stays quiet while its turn still runs elsewhere, and when the turn's own expired outcome says it", () => {
     expect(
       mountRecord(null, { live: true })
@@ -375,6 +439,19 @@ describe("AssistantApprovalResult", () => {
     expect(approved.text()).not.toContain("another tab");
     expect(approved.find('[data-test="assistant-approval-result-meta"]').text()).toMatch(/^you · /);
     expect(line(reopened({ approved: false, at: 1 }))).toBe("Denied: delete 2 alerts");
+  });
+
+  it("keeps the server's detail as the reason when the reopened record has no card to name it", () => {
+    const orphan = (resolved: Record<string, unknown>) =>
+      mountRecord(null, {
+        blocks: [
+          { type: "approval_result", resolved: { id: "gone", recorded: true, ...resolved } },
+        ],
+      }).wrapper;
+    expect(line(orphan({ approved: false, at: 1 }))).toBe("Denied a change the assistant proposed");
+    expect(line(orphan({ approved: false, at: 1, detail: "User declined the request" }))).toBe(
+      "Denied a change the assistant proposed · User declined the request",
+    );
   });
 
   it("keeps the record of a Deny made here when its confirmation_resolved follows", () => {

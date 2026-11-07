@@ -1294,10 +1294,15 @@ export default defineComponent({
         () => logsReapplyRequest.value.seq,
         () => (isAssistantV2() ? router.currentRoute.value.query.t : undefined),
       ],
-      async ([type, seq], [, prevSeq]) => {
+      async ([type, seq, nonce], [prevType, prevSeq, prevNonce]) => {
         const requested = seq !== prevSeq;
         const runRequested = requested && logsReapplyRequest.value.run;
-        if (requested || type === "search_history_re_apply" || type === "ai_chat_query") {
+        // The run's own URL rewrite keeps the page type but drops `t`; only a new link re-applies.
+        const newLink = type !== prevType || (nonce !== undefined && nonce !== prevNonce);
+        if (
+          requested ||
+          (newLink && (type === "search_history_re_apply" || type === "ai_chat_query"))
+        ) {
           searchObj.meta.jobId = "";
           resetRunStateForReapply();
 

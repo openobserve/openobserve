@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @announce="(key) => speak(t(`assistant.announce.${key}`))"
       @mode-started="(mode) => modeStarted(win.sid, mode)"
     />
-    <AssistantTray
+    <ThreadsBar
       v-show="!trayHidden"
       ref="tray"
       :order="shell.trayOrder"
@@ -64,6 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { ASSISTANT_SURFACES_SELECTOR } from "@/composables/assistant/pure";
+
 const MAIN_SELECTOR = "main[data-test='main-content']";
 
 const UNMOUNTED_GATES: ReadonlySet<string> = new Set(["loading", "not_entitled", "not_configured"]);
@@ -71,7 +73,7 @@ const UNMOUNTED_GATES: ReadonlySet<string> = new Set(["loading", "not_entitled",
 const BAND_VAR = "--o-assistant-inset-bottom";
 
 // Only the assistant's own surfaces stay out of the focus-not-obscured check.
-const OWN_SURFACES = "[data-assistant-window], [data-test='assistant-tray'], [data-assistant-root]";
+const OWN_SURFACES = `${ASSISTANT_SURFACES_SELECTOR}, [data-test='assistant-tray']`;
 
 const FULL_TRAY_BARS = 4;
 
@@ -84,6 +86,7 @@ const WIDE_VIEWPORT_REM = 80;
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
+import { isFullThreadRoute } from "@/composables/assistant/pure";
 import {
   TRAY_FOOTPRINT_REM,
   coversFully,
@@ -105,7 +108,7 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
-import AssistantTray from "./AssistantTray.vue";
+import ThreadsBar from "./ThreadsBar.vue";
 import AssistantWindow from "./AssistantWindow.vue";
 import { tearOffRequest, type WindowKeyboardMode } from "./assistantWindowHost";
 
@@ -116,7 +119,7 @@ const capability = useAssistantCapability();
 const route = useRoute();
 const { lgUp } = useBreakpoint();
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
-const tray = ref<InstanceType<typeof AssistantTray> | null>(null);
+const tray = ref<InstanceType<typeof ThreadsBar> | null>(null);
 const dropTarget = ref<DropTarget>(null);
 const modalOpen = ref(false);
 const trayHidden = ref(false);
@@ -129,13 +132,16 @@ let modalWatch: MutationObserver | null = null;
 
 const shell = computed(() => store.state.shell);
 const mountable = computed(() => !UNMOUNTED_GATES.has(capability.gate.value));
-const shown = computed(() => lgUp.value && route.name !== "assistant");
+const shown = computed(() => lgUp.value && !isFullThreadRoute(route));
 const openWindows = computed(() => openWindowsOf(shell.value));
 const focusedSid = computed(() => {
   const focused = shell.value.lastFocusedContainer;
   return focused && focused !== "sidebar" ? focused.window : null;
 });
-const trayShown = computed(() => shown.value && shell.value.trayOrder.length > 0);
+// The bar also shows for threads and incident runs, so its element, not the tray order, reserves the band.
+const trayShown = computed(
+  () => shown.value && (shell.value.trayOrder.length > 0 || !!tray.value?.el),
+);
 const bandRem = computed(() => (trayShown.value ? TRAY_FOOTPRINT_REM : 0));
 const trayBars = computed(() =>
   viewportRem.value >= WIDE_VIEWPORT_REM ? FULL_TRAY_BARS : NARROW_TRAY_BARS,

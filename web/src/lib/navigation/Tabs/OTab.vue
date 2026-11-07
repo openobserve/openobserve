@@ -73,12 +73,20 @@ const baseClasses = computed<string>(() =>
     // Named group so the grip (and consumer affordances like a rename pencil)
     // can fade in on tab hover without colliding with consumer `group` usage.
     "group/otab",
-    "relative items-center",
-    isVertical.value ? "flex justify-start gap-2" : "inline-flex justify-center gap-1.5",
-    // The rail's px-1 plus this px-2 puts a vertical tab's icon on the 12px page-edge grid line.
-    // Reorderable tabs keep a fixed 0.75rem gutter for the grip, so hovering or editing never shifts the label.
+    "relative items-center gap-1.5",
+    isVertical.value ? "flex justify-start" : "inline-flex justify-center",
+    // Horizontal inset. A vertical (side-rail) tab is a selectable PILL, so the
+    // rail container insets it (px-1.5) to give the pill breathing room from the
+    // rail edges. With that 6px container inset + the tab's own 2px active border
+    // + this ps-1, the label lands on the page-edge grid line (12px) while the
+    // pill never touches the rail edge. Rails add the px-1.5; tabs don't hand-roll
+    // their own padding override.
+    // Reorderable tabs widen the left inset to a gutter wider than the grip, which hosts the
+    // hover-revealed drag grip. The gutter is tied to `reorderable` (not
+    // per-press state), so a tab is pixel-identical at rest, on hover, and
+    // while its label is being edited — the grip only ever changes opacity.
     isReorderable.value
-      ? "ps-3 pe-2"
+      ? "ps-4.5 pe-2"
       : isVertical.value
         ? "px-2"
         : slots.trailing
@@ -190,7 +198,7 @@ const heightClasses = computed<string>(() => {
         v-if="isReorderable && !isDisabled"
         aria-hidden="true"
         data-otab-grip
-        class="absolute inset-y-0 left-0 z-10 flex w-3 items-center justify-center transition-opacity duration-150"
+        class="absolute inset-y-0 left-0 z-10 flex w-4 items-center justify-center transition-opacity duration-150"
         :class="
           isDraggable
             ? 'cursor-grab opacity-0 group-hover/otab:opacity-50 hover:!opacity-100 active:cursor-grabbing'

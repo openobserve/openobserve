@@ -23,7 +23,7 @@ import {
 } from "@/services/assistantAnalytics";
 import { gt, raw, type I18nKey } from "@/types/i18n";
 
-import { defaultAgentFor, rosterOffersChoice } from "./agents";
+import { defaultAgentFor, doorAgent } from "./agents";
 import {
   MAIN_MIN_REM,
   SIDEBAR_MIN_REM,
@@ -400,8 +400,7 @@ function dockOf(session: AssistantSession): string | null {
 function applyDoorAgent(store: OpenAssistantEnv["store"], sid: Sid, args: OpenAssistantArgs): void {
   const session = store.state.sessions[sid];
   if (!session || session.agentId || session.messages.length > 0) return;
-  if (!rosterOffersChoice(store.state.capability.agents)) return;
-  const agent = args.agent ?? defaultAgentFor(args);
+  const agent = doorAgent(args.agent ?? defaultAgentFor(args), store.state.capability.agents);
   if (agent) store.pickAgent(sid, agent, "door");
 }
 

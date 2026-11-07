@@ -100,7 +100,7 @@ const anomaly: OverviewNowRow = {
   at: 1_762_299_000_000_000,
 };
 
-// The shape `useOverviewNow` produces, so the provider is tested against its real producer contract.
+// The shape `useHomeNow` produces, so the provider is tested against its real producer contract.
 const snapshot = (overrides: Partial<OverviewNowSnapshot> = {}): OverviewNowSnapshot => ({
   rows: [incident("inc-7"), service("checkout-api"), anomaly, alert("al-9")],
   selectedKey: "service:checkout-api",

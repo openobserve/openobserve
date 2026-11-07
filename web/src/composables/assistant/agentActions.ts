@@ -81,9 +81,12 @@ export function createAgentActions(core: AgentActionsCore, resend: () => Resend)
         void core.deps.approvals.withdraw(sid, "withdrawn");
       }
       trackAssistant("ai_handoff", { step: "accepted" });
+      // The hand-off asks about the window the thread kept, as a typed follow-up would.
+      const kept = toRaw(session.composer.timeOverride);
+      const timeOverride = kept ? { ...kept } : null;
       return resend()(
         sid,
-        { text: prompt, chips: [], images: [], mentions: [], timeOverride: null },
+        { text: prompt, chips: [], images: [], mentions: [], timeOverride },
         "continue",
       );
     },

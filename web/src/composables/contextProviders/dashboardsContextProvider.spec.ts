@@ -132,4 +132,135 @@ describe("createDashboardsContextProvider", () => {
     expect(context.organization_identifier).toBe("");
     expect(context.user_intent).toBe("view dashboard");
   });
+  it("sends the range the dashboard applies, not the 15 min fallback", () => {
+    // pickerValueToTimeObj builds these Dates from microsecond timestamps.
+    const startMicros = Date.parse("2026-11-07T00:00:00Z") * 1000;
+    const endMicros = Date.parse("2026-11-07T06:00:00Z") * 1000;
+    const start = new Date(startMicros);
+    const end = new Date(endMicros);
+    const provider = createDashboardsContextProvider(
+      { query: { dashboard: "d1" } },
+      { state: {} },
+      undefined,
+      false,
+      { data: { title: "QA inpage dash", tabs: [] } },
+      () => ({ start_time: start, end_time: end, relativeTimePeriod: "6h" }),
+    );
+
+    expect(provider.getContext().timeRange).toEqual({
+      type: "relative",
+      relativeTimePeriod: "6h",
+      startTime: startMicros,
+      endTime: endMicros,
+    });
+  });
+
+  it("sends an absolute range without a period", () => {
+    const start = new Date(1_000_000);
+    const end = new Date(2_000_000);
+    const provider = createDashboardsContextProvider(
+      { query: {} },
+      { state: {} },
+      undefined,
+      false,
+      { data: {} },
+      () => ({ start_time: start, end_time: end }),
+    );
+
+    expect(provider.getContext().timeRange).toEqual({
+      type: "absolute",
+      startTime: 1_000_000,
+      endTime: 2_000_000,
+    });
+  });
+
+  it("scopes a viewed dashboard to its panels' streams on the open tab, never a made-up default", () => {
+    const dashboard = {
+      title: "QA inpage dash",
+      tabs: [
+        {
+          tabId: "t1",
+          panels: [
+            {
+              queryType: "sql",
+              queries: [{ fields: { stream: "app_logs", stream_type: "logs" } }],
+            },
+            { queryType: "sql", queries: [{ fields: { stream: "app_logs" } }] },
+          ],
+        },
+        { tabId: "t2", panels: [{ queries: [{ fields: { stream: "other" } }] }] },
+      ],
+    };
+    const context = createDashboardsContextProvider(
+      { query: { dashboard: "d1", tab: "t1" } },
+      { state: {} },
+      undefined,
+      false,
+      { data: dashboard },
+    ).getContext();
+
+    expect(context.dashboardName).toBe("QA inpage dash");
+    expect(context.selectedStreams).toEqual(["app_logs"]);
+    expect(context.streamType).toBe("logs");
+  });
+
+  it("scopes to the first tab when the URL names none, and omits the type of a mixed scope", () => {
+    const dashboard = {
+      tabs: [
+        {
+          tabId: "t1",
+          panels: [
+            { queryType: "sql", queries: [{ fields: { stream: "app_logs" } }] },
+            { queryType: "promql", queries: [{ fields: { stream: "cpu_usage" } }] },
+          ],
+        },
+        { tabId: "t2", panels: [{ queries: [{ fields: { stream: "hidden" } }] }] },
+      ],
+    };
+    const context = createDashboardsContextProvider(
+      { query: { dashboard: "d1" } },
+      { state: {} },
+      undefined,
+      false,
+      { data: dashboard },
+    ).getContext();
+
+    expect(context.selectedStreams).toEqual(["app_logs", "cpu_usage"]);
+    expect(context.streamType).toBeUndefined();
+  });
+
+  it("sends no stream when neither the dashboard nor the panel names one", () => {
+    const viewed = createDashboardsContextProvider(
+      { query: { dashboard: "d1" } },
+      { state: {} },
+      undefined,
+      false,
+      { data: { title: "Empty", tabs: [{ tabId: "t1", panels: [] }] } },
+    ).getContext();
+    const editing = createDashboardsContextProvider(
+      { query: { dashboard: "d1" } },
+      { state: {} },
+      { data: { queries: [{ fields: { stream: "" } }] }, layout: { currentQueryIndex: 0 } },
+      false,
+    ).getContext();
+
+    expect(viewed.selectedStreams).toBeUndefined();
+    expect(editing.selectedStreams).toBeUndefined();
+    expect(viewed.timeRange).toBeUndefined();
+  });
+
+  it("reads a metrics panel's stream type from its query type", () => {
+    const context = createDashboardsContextProvider(
+      { query: { dashboard: "d1" } },
+      { state: {} },
+      {
+        data: { queryType: "promql", queries: [{ fields: { stream: "cpu" } }] },
+        layout: { currentQueryIndex: 0 },
+      },
+      false,
+    ).getContext();
+
+    expect(context.selectedStreams).toEqual(["cpu"]);
+    expect(context.streamType).toBe("metrics");
+  });
 });

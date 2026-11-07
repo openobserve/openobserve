@@ -185,17 +185,17 @@ describe("MainLayout — Go to shortcut", () => {
     expect(palette().props("open")).toBe(true);
   });
 
-  it("focuses the Overview field on Home instead of opening the palette", async () => {
+  it("opens the palette on Home even while the Ask box listens, since / is its own key", async () => {
     const focus = vi.fn();
     stopFocus = onOverviewFocusRequest(focus);
     await mountV2(true, "home");
     goTo()!.handler(new KeyboardEvent("keydown"));
     await flushPromises();
-    expect(focus).toHaveBeenCalledTimes(1);
-    expect(palette().exists()).toBe(false);
+    expect(focus).not.toHaveBeenCalled();
+    expect(palette().props("open")).toBe(true);
   });
 
-  it("opens the palette on Home when no Overview field listens, and marks the trip", async () => {
+  it("opens the palette on Home and marks the trip", async () => {
     await mountV2(true, "home");
     goTo()!.handler(new KeyboardEvent("keydown"));
     await flushPromises();

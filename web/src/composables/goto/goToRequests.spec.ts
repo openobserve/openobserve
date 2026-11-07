@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   onGoToRequest,
   onOverviewFocusRequest,
+  overviewFocusListening,
   requestGoTo,
   requestOverviewFocus,
 } from "./goToRequests";
@@ -50,6 +51,17 @@ describe("goToRequests", () => {
     off();
     expect(requestOverviewFocus()).toBe(false);
     expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a listening ask field only while one is subscribed", () => {
+    expect(overviewFocusListening.value).toBe(false);
+    const offA = onOverviewFocusRequest(vi.fn());
+    const offB = onOverviewFocusRequest(vi.fn());
+    expect(overviewFocusListening.value).toBe(true);
+    offA();
+    expect(overviewFocusListening.value).toBe(true);
+    offB();
+    expect(overviewFocusListening.value).toBe(false);
   });
 
   it("keeps the two channels apart", () => {

@@ -385,6 +385,9 @@ const LEAD_HTML = "[&_p:first-child]:text-text-heading [&_p:first-child]:font-me
 
 const LEAD_TEXT = "text-text-heading font-medium";
 
+// The server cuts a ```findings fence out of the prose but leaves the label the model wrote above it.
+const FINDINGS_LABEL = /[ \t]*(?:#{1,6}[ \t]+)?(?:\*\*|__)?Findings:?(?:\*\*|__)?:?\s*$/i;
+
 /** Lets a later package render its block kind; replaces an earlier registration of the same kind. */
 export function registerBlockRenderer(
   kind: ContentBlock["type"] | string,
@@ -485,6 +488,16 @@ const blocks = computed<ContentBlock[]>(() => {
   return [{ type: "text", text: String(content) }];
 });
 
+const shownBlocks = computed<ContentBlock[]>(() =>
+  blocks.value.some((block) => block.type === "findings")
+    ? blocks.value.map((block) =>
+        block.type === "text" && block.text
+          ? { ...block, text: withoutFindingsLabel(block.text) }
+          : block,
+      )
+    : blocks.value,
+);
+
 // A record from before the v2 composer has its blocks in the text; a v2 message keeps typed text and chips apart.
 const legacyUser = computed(() =>
   props.message.role === "user" && props.message.sentAt === undefined
@@ -550,10 +563,10 @@ const rendered = computed<Rendered[]>(() => {
   const out: Rendered[] = [];
   const links = new Set<string>();
   // The conclusion leads the answer wherever its frame landed among the text.
-  const findingsIndex = blocks.value.findIndex((block) => block.type === "findings");
-  if (findingsIndex >= 0)
-    out.push(...renderBlock(blocks.value[findingsIndex], findingsIndex, links));
-  blocks.value.forEach((block, index) => {
+  const shown = shownBlocks.value;
+  const findingsIndex = shown.findIndex((block) => block.type === "findings");
+  if (findingsIndex >= 0) out.push(...renderBlock(shown[findingsIndex], findingsIndex, links));
+  shown.forEach((block, index) => {
     if (index !== findingsIndex) out.push(...renderBlock(block, index, links));
   });
   toolLinksOf(props.message).forEach((action, index) => {
@@ -645,6 +658,14 @@ function renderBlock(block: ContentBlock, index: number, links: Set<string>): Re
     trackAssistant("ai_block_invalid", { block_kind: block.type as BlockKind });
   }
   return [];
+}
+
+// Only a line that is nothing but the label, and only as the last line of its text block.
+function withoutFindingsLabel(text: string): string {
+  const match = FINDINGS_LABEL.exec(text);
+  if (!match) return text;
+  const before = text.slice(0, match.index);
+  return before === "" || before.endsWith("\n") ? before : text;
 }
 
 // One card per destination, whatever proposed it.

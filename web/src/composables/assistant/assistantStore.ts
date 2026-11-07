@@ -256,6 +256,14 @@ export interface AssistantStoreInternal extends AssistantStoreApi {
   trackSave(sid: Sid, save: Promise<unknown>): void;
   /** Once per restore: the draft came back from storage and how many images it lost (CT-06 AC 3). */
   takeRestoredDraft(sid: Sid): { imageCount: number } | null;
+  /** After a send: the window stays for follow-ups unless the page has its own range (`null` = not read yet). */
+  keepThreadWindow(
+    sid: Sid,
+    sent: ComposerState["timeOverride"],
+    pageHasRange: boolean | null,
+  ): void;
+  /** A new active chat on the window the previous one asked about, unless that window is the previous thread's own. */
+  startNewChat(init: SessionInit): Sid;
   /** Resends the latest prompt as a new attempt; the composer draft is untouched (EB-09 AC 2). */
   regenerate(sid: Sid): Promise<TurnTerminal>;
   /** Sends an edited prompt as a new turn captioned "Edited from message {n}" (without B-12, EB-09 AC 4). */
@@ -622,6 +630,8 @@ function createCore(
         ...(pendingAgent && { agentId: pendingAgent }),
         ...(unsent && { unsent: true }),
       });
+      if (state.shell.activeSid === session.sid)
+        rememberSelection(session.userOrgKey, restorable(session) ? session.sid : null);
     },
     persistPlacement() {
       const { placement, previousPlacement } = state.shell;
@@ -638,7 +648,10 @@ function createCore(
         state.recent = [sid, ...state.recent.filter((id) => id !== sid)];
         if (state.shell.placement.kind !== "hidden") state.sessions[sid].unread = false;
       }
-      if (state.ready && state.userOrgKey) rememberSelection(state.userOrgKey, sid);
+      const chosen = sid ? state.sessions[sid] : undefined;
+      // A chat with nothing sent and nothing kept has no history, so a reload would only fetch a 404.
+      if (state.ready && state.userOrgKey)
+        rememberSelection(state.userOrgKey, chosen && restorable(chosen) ? chosen.sid : null);
       core.releaseIdle();
     },
     releaseIdle() {
@@ -671,7 +684,21 @@ function createSessionSlice(core: StoreCore) {
     | "annotate"
     | "trackSave"
     | "adoptSession"
+    | "startNewChat"
   > = {
+    startNewChat(init) {
+      const previous = core.session(state.shell.activeSid);
+      const range =
+        previous && !ownsWindow(previous) ? toRaw(previous.composer.timeOverride) : null;
+      core.setActive(null);
+      const sid = api.createSession(init);
+      const fresh = core.session(sid);
+      if (range && fresh) {
+        fresh.composer.timeOverride = { ...range };
+        core.persistDraft(fresh);
+      }
+      return sid;
+    },
     createSession(init) {
       if (!state.ready || !state.userOrgKey) throw new Error("The assistant store is inert here");
       if (init.ephemeral) {
@@ -1082,7 +1109,19 @@ function createComposerSlice(core: StoreCore) {
     | "entryNotice"
     | "setEntryNotice"
     | "takeRestoredDraft"
+    | "keepThreadWindow"
   > = {
+    keepThreadWindow(sid, sent, pageHasRange) {
+      const session = core.session(sid);
+      if (!session) return;
+      const range = session.composer.timeOverride;
+      // A window picked while the page was read is the user's next one, so only the sent one goes.
+      if (pageHasRange && range && sameWindow(range, sent) && !ownsWindow(session))
+        session.composer.timeOverride = null;
+      // Text typed while the page was read is queued for writing, so only an empty box drops the draft.
+      if (session.composer.timeOverride || holdsInput(session.composer)) core.persistDraft(session);
+      else core.drafts.remove(session.userOrgKey, sid);
+    },
     stage(sid, payload) {
       edit(sid, (composer) => {
         for (const chip of payload.chips ?? []) {
@@ -1260,8 +1299,10 @@ function createTurnSlice(core: StoreCore) {
     if (!shownNow(core, session)) session.unread = true;
     // A draft typed while the turn ran is not the one that was sent, so it stays.
     const stored = core.drafts.read(session.userOrgKey, sid);
-    if (terminal.state !== "refused" && (!stored || isSentDraft(stored, sent)))
-      core.drafts.remove(session.userOrgKey, sid);
+    const spent = terminal.state !== "refused" && (!stored || isSentDraft(stored, sent));
+    // The thread's window outlives the sent text, so a reload keeps asking about the same window.
+    if (spent && session.composer.timeOverride) core.persistDraft(session);
+    else if (spent) core.drafts.remove(session.userOrgKey, sid);
     core.releaseIdle();
     return terminal;
   };
@@ -1757,7 +1798,9 @@ function restoreStoredDraft(core: StoreCore, sid: Sid): void {
   if (agentId && session.messages.length === 0) session.agentId = agentId;
   else if (agentId && agentId !== currentAgent(session)) session.nextAgentId = agentId;
   session.composer.homeStarter = stored.homeStarter;
-  core.restoredDrafts.set(sid, { imageCount });
+  // A thread keeps its window on the composer, so a window alone is not a draft to announce.
+  if (stored.text || stored.chips.length > 0 || imageCount > 0)
+    core.restoredDrafts.set(sid, { imageCount });
 }
 
 // Only an unavailable history revives the chat; only a chat history calls gone (404) or forbidden (403) loses its draft (S9).
@@ -1936,6 +1979,41 @@ function isIdle(core: StoreCore, session: AssistantSession): boolean {
     !session.pendingConsent &&
     !(turn.state === "done" && turn.saved === "not_saved") &&
     !core.savesPending.has(session.sid)
+  );
+}
+
+// A door's absolute window that the thread's first question asked about is that thread's subject (Investigate).
+function ownsWindow(session: AssistantSession): boolean {
+  const range = session.composer.timeOverride;
+  if (!range || range.period || session.origin.entryKind !== "object_verb") return false;
+  const first = session.messages.find((message) => message.role === "user");
+  // Before the first send the door's window is still this thread's subject-to-be.
+  if (!first) return true;
+  return sameWindow(range, first.sentWindow ?? null);
+}
+
+function holdsInput(composer: ComposerState): boolean {
+  return (
+    composer.text.trim() !== "" ||
+    !!composer.replyStash?.trim() ||
+    composer.chips.length > 0 ||
+    composer.images.length > 0
+  );
+}
+
+function sameWindow(
+  a: { from: number; to: number } | null | undefined,
+  b: { from: number; to: number } | null | undefined,
+): boolean {
+  return !!a && !!b && a.from === b.from && a.to === b.to;
+}
+
+function restorable(session: AssistantSession): boolean {
+  return (
+    session.messages.length > 0 ||
+    session.record.serverBacked ||
+    !isEmptySession(session) ||
+    !!session.composer.timeOverride
   );
 }
 

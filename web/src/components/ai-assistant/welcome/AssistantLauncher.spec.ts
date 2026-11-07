@@ -390,7 +390,7 @@ describe("AssistantLauncher", () => {
       const { wrapper } = setupOn({ layout: "overview" });
       await flushPromises();
       const chips = () => wrapper.find('[data-test="assistant-launcher-page-chips"]');
-      expect(chips().text()).toContain("Incidents on Overview (1)");
+      expect(chips().text()).toContain("Incidents on Home (1)");
       await chips().get('[data-test="assistant-context-chip-remove"]').trigger("click");
       expect(chips().find('[data-state="ghost"]').exists()).toBe(true);
       await input(wrapper).setValue("why?");
@@ -400,6 +400,29 @@ describe("AssistantLauncher", () => {
       await input(wrapper).setValue("and now?");
       await input(wrapper).trigger("keydown", { key: "Enter" });
       expect(open.mock.calls[1][0].payload.removedPageKeys).toBeUndefined();
+    });
+
+    it("takes a page chip's click to the Now section and still removes on its x", async () => {
+      contextRegistry.register("home", { getContext: () => HOME_PAGE as never });
+      contextRegistry.setActive("home");
+      const section = document.createElement("section");
+      section.dataset.test = "home-now";
+      const scroll = vi.fn();
+      section.scrollIntoView = scroll;
+      document.body.appendChild(section);
+      try {
+        const { wrapper } = setupOn({ layout: "overview" });
+        await flushPromises();
+        const chips = () => wrapper.find('[data-test="assistant-launcher-page-chips"]');
+        await chips().get('[data-test="assistant-context-chip-button"]').trigger("click");
+        expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ block: "start" }));
+        expect(document.activeElement).toBe(section);
+        await chips().get('[data-test="assistant-context-chip-remove"]').trigger("click");
+        expect(chips().find('[data-state="ghost"]').exists()).toBe(true);
+        expect(scroll).toHaveBeenCalledTimes(1);
+      } finally {
+        section.remove();
+      }
     });
 
     it("lists Go to matches before the ask and opens an arrowed match with the way back", async () => {

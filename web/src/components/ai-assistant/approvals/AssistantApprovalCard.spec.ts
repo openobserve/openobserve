@@ -15,6 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createStore } from "vuex";
 
 import { runEscapeLadder } from "@/composables/assistant";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -251,6 +252,60 @@ describe("AssistantApprovalCard", () => {
     const wrapper = mountCard(cardOf(frame));
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-approval-heading"]').text()).toBe(heading);
+  });
+
+  it("names a create by its title, never by the tool id o2-ai puts in its target", async () => {
+    const wrapper = mountCard(
+      cardOf({
+        type: "confirmation_required",
+        tool: "CreateDashboard",
+        kind: "create",
+        targets: [{ type: "dashboard", name: "CreateDashboard" }],
+        args: { org_id: "default", request_body: { title: "QA approval test" } },
+      }),
+    );
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-approval-heading"]').text()).toBe(
+      "Create dashboard QA approval test",
+    );
+  });
+
+  it("names a new panel by its title and its dashboard by name, never by the dashboard id", async () => {
+    const store = createStore({
+      state: {
+        organizationData: {
+          allDashboardList: {
+            default: [{ dashboardId: "7524560427116658688", title: "QA inpage dash" }],
+          },
+        },
+      },
+    });
+    const wrapper = mount(AssistantApprovalCard, {
+      props: {
+        card: cardOf({
+          type: "confirmation_required",
+          tool: "AddPanel",
+          kind: "create",
+          targets: [{ type: "panel", name: "7524560427116658688", id: "7524560427116658688" }],
+          args: {
+            org_id: "default",
+            dashboard_id: "7524560427116658688",
+            request_body: { tabId: "default", panel: { title: "Total Error Logs" } },
+          },
+        }),
+        org: "default",
+      },
+      attachTo: document.body,
+      global: { plugins: [fakeRouter(routes), store] },
+    });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-approval-heading"]').text()).toBe(
+      "Create panel Total Error Logs",
+    );
+    const meta = wrapper.get('[data-test="assistant-approval-meta"]').text();
+    expect(meta).toContain("QA inpage dash");
+    expect(wrapper.text()).not.toContain("7524560427116658688");
+    wrapper.unmount();
   });
 
   it("keeps the diff in Details and reads Approve, primary", async () => {

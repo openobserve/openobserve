@@ -75,7 +75,17 @@ const MAX_QUESTION_CHARS = 2_000;
 
 const MAX_JSON_KEYS = 40;
 
-const MAX_JSON_DEPTH = 3;
+// A dashboard's tabs, panels, queries, fields and filter groups nest about this deep.
+const MAX_JSON_DEPTH = 16;
+
+const MAX_JSON_NODES = 2_000;
+
+// With MAX_JSON_NODES, holds a worst-case value to a few hundred KB.
+const MAX_JSON_CHARS = 200_000;
+
+const JSON_DROPPED = "…";
+
+const JSON_KINDS: ReadonlySet<string> = new Set(["string", "number", "boolean", "object"]);
 
 const DELETE_TOOL = /delete/i;
 
@@ -1263,19 +1273,44 @@ function resourceOfTool(tool: string): string {
   return noun.replace(/s$/i, "") || "object";
 }
 
-function boundedJson(value: unknown, depth = 0): unknown {
-  if (typeof value === "string") return value.slice(0, MAX_LINE_CHARS);
-  if (typeof value === "number" || typeof value === "boolean" || value === null) return value;
-  if (depth >= MAX_JSON_DEPTH || typeof value !== "object") return undefined;
-  if (Array.isArray(value))
-    return value.slice(0, MAX_JSON_KEYS).map((v) => boundedJson(v, depth + 1));
-  const out: Record<string, unknown> = {};
-  for (const [key, v] of Object.entries(value as Record<string, unknown>).slice(0, MAX_JSON_KEYS)) {
-    const kept = boundedJson(v, depth + 1);
-    // A parsed `__proto__` key would re-parent the object instead of adding a field.
-    if (kept !== undefined && !UNSAFE_KEYS.has(key)) out[key.slice(0, 60)] = kept;
+function boundedJson(
+  value: unknown,
+  depth = 0,
+  budget = { left: MAX_JSON_NODES, chars: MAX_JSON_CHARS },
+): unknown {
+  if (!JSON_KINDS.has(typeof value)) return undefined;
+  // A cut value shows as a placeholder; dropping it would render as null in the diff.
+  if (--budget.left < 0 || budget.chars <= 0) return JSON_DROPPED;
+  if (typeof value === "string") {
+    const kept = value.slice(0, Math.min(MAX_LINE_CHARS, budget.chars));
+    budget.chars -= kept.length;
+    return kept;
   }
+  if (typeof value !== "object" || value === null) return value;
+  if (depth >= MAX_JSON_DEPTH) return JSON_DROPPED;
+  if (Array.isArray(value))
+    return value
+      .slice(0, MAX_JSON_KEYS)
+      .map((v) => boundedJson(v, depth + 1, budget) ?? JSON_DROPPED);
+  const entries = Object.entries(value as Record<string, unknown>).slice(0, MAX_JSON_KEYS);
+  // Top-level ids and names are spent first so a bulky sibling before them cannot cut them.
+  const order =
+    depth === 0 ? [...entries].sort(([, a], [, b]) => +isBulk(a) - +isBulk(b)) : entries;
+  const kept = new Map<string, unknown>();
+  for (const [key, v] of order) {
+    const bounded = boundedJson(v, depth + 1, budget);
+    // A parsed `__proto__` key would re-parent the object instead of adding a field.
+    if (bounded === undefined || UNSAFE_KEYS.has(key)) continue;
+    kept.set(key, bounded);
+    budget.chars -= Math.min(key.length, 60);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key] of entries) if (kept.has(key)) out[key.slice(0, 60)] = kept.get(key);
   return out;
+}
+
+function isBulk(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
 }
 
 // Seconds or milliseconds on the wire; anything else is no expiry.

@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- A chosen row moves as the list re-sorts, so its bubble would be left over the nav (X1) -->
               <OTruncatedText
                 class="text-text-body min-w-12"
+                :lines="2"
                 :tooltip="chosen ? false : fullTitle"
                 >{{ row.title }}</OTruncatedText
               >

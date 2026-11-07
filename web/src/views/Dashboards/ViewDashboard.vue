@@ -801,6 +801,7 @@ import {
 } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
+import { useAssistantDashboardWrites } from "./assistantDashboardWrites";
 import {
   getManager,
   getShortcutDef,
@@ -830,6 +831,7 @@ import {
   stripKioskParams,
 } from "@/utils/dashboard/kiosk";
 import { minAutoRefreshSeconds, resolveOpenRefreshInterval } from "@/utils/dashboard/autoRefresh";
+import { noteDashboardVisit } from "@/views/home/homeStorage";
 import {
   PLAYLIST_VIEW_PATH,
   isPlaylistEmbed,
@@ -1245,6 +1247,7 @@ export default defineComponent({
         undefined,
         false,
         currentDashboardData,
+        getAppliedGlobalTime,
       );
       contextRegistry.register("dashboards", dashboardProvider);
       contextRegistry.setActive("dashboards");
@@ -1346,6 +1349,12 @@ export default defineComponent({
       // Set the dashboard data - RenderDashboardCharts will initialize the variables manager
       currentDashboardData.data = dashboard;
       applyOpeningRefresh(dashboard);
+      noteDashboardVisit(
+        store.state.userInfo?.email,
+        store.state.selectedOrganization?.identifier,
+        dashboard,
+        String(route.query.folder ?? "default"),
+      );
 
       // set selected tab from query params
       const selectedTab = dashboard?.tabs?.find((tab: any) => tab.tabId === route.query.tab);
@@ -2771,6 +2780,14 @@ export default defineComponent({
     onMounted(() => {
       onDashboardEvent(handleAiDashboardEvent);
     });
+    useAssistantDashboardWrites(
+      () => String(route.query.dashboard ?? ""),
+      () =>
+        handleAiDashboardEvent({
+          type: "dashboard_updated",
+          dashboardId: String(route.query.dashboard ?? ""),
+        }),
+    );
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);

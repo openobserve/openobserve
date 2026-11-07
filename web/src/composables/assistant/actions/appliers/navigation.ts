@@ -90,7 +90,7 @@ export function registerNavigationAppliers(): void {
 }
 
 function overviewQuery(state: HomeReturnState | null): Record<string, string> {
-  const query: Record<string, string> = { home_tab: "overview" };
+  const query: Record<string, string> = { home_tab: "ai" };
   if (state?.row) query.row = state.row;
   if (state?.period) query.period = state.period;
   if (state?.from !== undefined) query.from = String(state.from);

@@ -548,7 +548,7 @@ const connectionLost = computed(
 const refusedAgentName = computed(() =>
   agentName(agentIdOf(props.error?.agent) ?? DEFAULT_AGENT, t),
 );
-// Picking never sends, so the draft stays and the next Send is the hand-off (`80` §1.3).
+// A failed hand-off's pick only sets the next Send; a refusal's pick also sends what bounced (`80` §1.3).
 const agentFallback = computed(() => {
   const error = props.error;
   if (props.readonly || !props.sid || !error) return null;
@@ -580,7 +580,7 @@ const title = computed<I18nText>(() => {
       if (!props.error) return t("assistant.error.unknown.title");
       if (connectionLost.value) return t("assistant.turn.connectionLost");
       if (props.kind === "refused" && code.value === "agent_unreachable")
-        return t("assistant.send.unreachable");
+        return t("assistant.error.agent_unreachable.title", { agent: refusedAgentName.value });
       if (creditCopy.value) return t(creditCopy.value.titleKey, creditParams.value);
       const copy = { t, org: props.org, product, elapsedMs: props.elapsedMs ?? 0 };
       const { key, params } = errorTitle(props.error, copy);
@@ -702,8 +702,12 @@ const hint = computed<I18nText | null>(() => {
 });
 
 function useAgentFallback(): void {
-  if (agentFallback.value && props.sid)
-    agentStore()?.pickAgent(props.sid, agentFallback.value.agent, "fallback");
+  const fallback = agentFallback.value;
+  const store = agentStore();
+  if (!fallback || !props.sid || !store) return;
+  store.pickAgent(props.sid, fallback.agent, "fallback");
+  // Retry resends the refused turn's own snapshot, not whatever the composer holds by now.
+  if (props.kind === "refused") void store.retry(props.sid);
 }
 
 function stopTimer(): void {

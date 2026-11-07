@@ -272,6 +272,42 @@ describe("markdown.ts strict profile", () => {
     expect(html).toContain('502 and<wbr data-claim="0">.');
   });
 
+  it("drops the model's footnote list, including lines whose marker o2-ai already removed", () => {
+    const done = render(
+      "Ingestion stopped [^call_a].\n\n[^call_a]: StreamSchema stats (`doc_time_max`)\n: SearchSQL grouped-by-level query over 1h window",
+    );
+    expect(done.claims).toEqual(["call_a"]);
+    const html = htmlOf(done.parts);
+    expect(html).not.toContain("SearchSQL");
+    expect(html).not.toContain("StreamSchema");
+    expect(markdownToPlainText("Up [^c1].\n\n[^c1]: StreamSchema\n: SearchSQL")).toBe("Up.");
+    expect(markdownToPlainText("Up.\n\n: StreamSchema\n: SearchSQL")).toBe("Up.");
+    const fenced = render("```\n[^a]: kept\n: kept too\n```");
+    expect(fenced.parts.at(-1)).toMatchObject({ kind: "code", code: "[^a]: kept\n: kept too" });
+    expect(htmlOf(render("Note: this stays.\n\nA: and so does this").parts)).toContain(
+      "A: and so does this",
+    );
+  });
+
+  it("keeps prose, definition lists and nested fences that only look like a footnote list", () => {
+    expect(markdownToPlainText("Use [^a-z]: matches any non-letter.")).toContain("matches");
+    const listed = markdownToPlainText("Term\n\n: a definition\n\nMore prose.");
+    expect(listed).toContain("a definition");
+    const nested = render("Up [^a].\n\n````\n```\n[^a]: kept\n: kept too\n````");
+    expect(nested.parts.at(-1)).toMatchObject({
+      kind: "code",
+      code: "```\n[^a]: kept\n: kept too",
+    });
+  });
+
+  it("closes the space a removed marker left before punctuation", () => {
+    expect(htmlOf(render("not just no errors .\n\nAnd **bold** , then 1 .5").parts)).toContain(
+      "not just no errors.",
+    );
+    const html = htmlOf(render("Rows [^2] . And **bold** , then 1 .5").parts);
+    expect(html).toContain("Rows. And <strong>bold</strong>, then 1 .5");
+  });
+
   it("leaves an empty slot against the cited word, never a space before punctuation", () => {
     const done = render("Cart returned 502 [^call_3], then [^call_1].");
     const html = htmlOf(done.parts);

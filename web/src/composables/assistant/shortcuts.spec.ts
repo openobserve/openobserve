@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, defineComponent, h, ref } from "vue";
 
+import { useShortcuts } from "@/lib/vue-shortcut-manager/composables";
 import { getManager, resetManager } from "@/lib/vue-shortcut-manager/manager";
 import {
   SHORTCUT_REGISTRY,
@@ -197,6 +198,28 @@ describe("registration", () => {
     expect(openAssistant).toHaveBeenCalledTimes(1);
     second.wrapper.unmount();
     first.wrapper.unmount();
+  });
+});
+
+describe("assistantHistory beside page scopes", () => {
+  it("leaves a page-scoped shortcut firing while the history chord is bound", async () => {
+    const focusQuery = vi.fn();
+    const page = mount(
+      defineComponent({
+        setup() {
+          useShortcuts([{ id: "logsFocusQuery", handler: focusQuery }]);
+          return () => h("div");
+        },
+      }),
+      { attachTo: document.body },
+    );
+    const host = mountShortcuts("available");
+    await flushPromises();
+    expect(getManager()!.getById("assistantHistory")).toBeDefined();
+    press("/");
+    expect(focusQuery).toHaveBeenCalledTimes(1);
+    host.wrapper.unmount();
+    page.unmount();
   });
 });
 

@@ -13,8 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { computed, shallowRef } from "vue";
+
 const goToHandlers = new Set<GoToHandler>();
 const overviewFocusHandlers = new Set<() => void>();
+// The Set is not reactive, so its size is mirrored for callers that gate on a listener.
+const overviewFocusCount = shallowRef(0);
+
+/** True while a Home Ask box listens for `/`, so the key is only captured when something answers it. */
+export const overviewFocusListening = computed(() => overviewFocusCount.value > 0);
 
 export type GoToSource = "shortcut" | "editor";
 
@@ -32,7 +39,7 @@ export function onGoToRequest(handler: GoToHandler): () => void {
   };
 }
 
-/** Focuses the Home ask field; false when none is mounted, so the caller opens the palette instead. */
+/** Focuses the Home Ask box (the `/` key); false when none is mounted. */
 export function requestOverviewFocus(): boolean {
   if (overviewFocusHandlers.size === 0) return false;
   for (const handler of [...overviewFocusHandlers]) handler();
@@ -41,7 +48,9 @@ export function requestOverviewFocus(): boolean {
 
 export function onOverviewFocusRequest(handler: () => void): () => void {
   overviewFocusHandlers.add(handler);
+  overviewFocusCount.value = overviewFocusHandlers.size;
   return () => {
     overviewFocusHandlers.delete(handler);
+    overviewFocusCount.value = overviewFocusHandlers.size;
   };
 }

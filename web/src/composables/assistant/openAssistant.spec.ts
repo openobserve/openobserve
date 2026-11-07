@@ -791,6 +791,33 @@ describe("openAssistant: door default agent (MULTI-AGENT-06)", () => {
     expect(h.store.state.sessions[sid].agentId).toBe("generate-query");
   });
 
+  it("sends an investigation to the default assistant while the Investigator is unavailable", async () => {
+    const h = setup();
+    const roster = ROSTER.map((row) =>
+      row.id === "sre" ? { ...row, available: false, reason: "disabled" as const } : row,
+    );
+    h.store.syncCapability({ ...capability, agents: roster });
+    const call = explain({
+      intent: "stage",
+      entryVerb: "troubleshoot",
+      objectKind: "alert_firing",
+    });
+    const { sid } = ok(await h.open(call));
+    expect(h.store.state.sessions[sid].agentId).toBe("o2-ai");
+  });
+
+  it("gives an investigation the Investigator when the roster lists it available", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const call = explain({
+      intent: "stage",
+      entryVerb: "troubleshoot",
+      objectKind: "alert_firing",
+    });
+    const { sid } = ok(await h.open(call));
+    expect(h.store.state.sessions[sid].agentId).toBe("sre");
+  });
+
   it("names no agent without a roster, so the server keeps routing", async () => {
     const h = setup();
     const { sid } = ok(await h.open(explain({ intent: "stage", agent: "sre" })));
