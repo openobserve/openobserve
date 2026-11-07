@@ -897,6 +897,14 @@ export class RumProductAnalyticsPage {
         return (text || '').match(/^\s*([\d.,]+%?)/)?.[1] ?? null;
     }
 
+    /** Asserts a KPI card shows `label` as visible text and returns the card's and the label's boxes; a tooltip-only label fails. */
+    async expectKpiLabelVisible(key, label) {
+        const card = this.page.locator(`[data-test="rum-analytics-kpi-${key}"]`);
+        const labelText = card.getByText(label, { exact: true });
+        await expect(labelText).toBeVisible();
+        return { cardBox: await card.boundingBox(), labelBox: await labelText.boundingBox() };
+    }
+
     /** Text of the whole page; regression checks assert a raw server error never reaches it. */
     async expectPageNotToContain(text) {
         await expect(this.body).not.toContainText(text);

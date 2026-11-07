@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily report</title>
+  <!--O2_CONFIG-->
+  <script src="/sdk/openobserve-rum.js"></script>
+  <script src="/rum-init.js"></script>
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <header class="bar" data-test="sg-heading"><strong>Daily report</strong><span>Page 2</span></header>
+  <main>
+    <section class="panel">
+      <p data-test="sg-report-status">Report refreshed 0 times</p>
+      <button data-test="sg-refresh-report-btn" type="button">Refresh report</button>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var count = 0;
+      var status = document.querySelector('[data-test="sg-report-status"]');
+      document.querySelector('[data-test="sg-refresh-report-btn"]').addEventListener('click', function () {
+        count += 1;
+        status.textContent = 'Report refreshed ' + count + ' times';
+      });
+    })();
+  </script>
+</body>
+</html>

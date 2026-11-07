@@ -8,6 +8,7 @@ export class RumReplayPlayerPage {
         this.page = page;
         this.playerTime = page.locator('[data-test="video-player-time"]');
         this.playerDuration = page.locator('[data-test="video-player-duration"]');
+        this.tabNotice = page.locator('[data-test="session-viewer-tab-notice"]');
         // The replay surface carries no data-test; its id is the stable hook, and a click on it toggles playback.
         this.playerSurface = page.locator('#player');
         this.replayFrameBody = page.frameLocator('#player iframe').locator('body');
@@ -37,6 +38,11 @@ export class RumReplayPlayerPage {
         return ((await this.playerDuration.textContent()) || '').trim();
     }
 
+    /** Fails on both the unbuilt placeholder "00.00" and an empty "00:00". */
+    async expectDurationKnown() {
+        await expect(this.playerDuration).toHaveText(/^(?!0+:00$)\d{2}(:\d{2}){1,2}$/);
+    }
+
     async frameText() {
         return this.replayFrameBody.innerText({ timeout: 1000 }).catch(() => '');
     }
@@ -59,12 +65,27 @@ export class RumReplayPlayerPage {
         await expect(this.speedSelect).toHaveText('1x');
     }
 
+    /** The notice only shows while the playhead is inside the gap, so it is checked during playback. */
+    async expectGapNoticeShown(timeoutMs = 60000) {
+        await expect(this.tabNotice).toContainText(/recording has a gap from \d+:\d+/, { timeout: timeoutMs });
+    }
+
     async startPlayback() {
         await expect(this.playerTime).toHaveText(/^0+:00$/);
         await this.playerSurface.click();
         await expect
             .poll(() => this.playedSeconds(), { timeout: 15000, message: 'playback must start after clicking the replay' })
             .toBeGreaterThan(0);
+    }
+
+    /** For a replay that opens past 00:00 because its first snapshot came late: playback must move on from where it opened. */
+    async resumePlaybackFromOpening() {
+        const opening = await this.playedSeconds();
+        await this.playerSurface.click();
+        await expect
+            .poll(() => this.playedSeconds(), { timeout: 15000, message: 'playback must start after clicking the replay' })
+            .toBeGreaterThan(opening);
+        return opening;
     }
 
     /** Faults are cumulative, so one raised before the target fails the poll and is printed beside the time playback reached. */
