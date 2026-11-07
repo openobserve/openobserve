@@ -98,8 +98,8 @@ const summary = computed(() => {
       <template #trigger>{{ t("search.savedViewsRowLabel") }}</template>
       <template #icon-right>
         <span class="ms-auto flex items-center gap-1">
-          <span v-if="slots.actions" class="w-7 shrink-0" aria-hidden="true" />
           <OIcon name="chevron-right" size="sm" />
+          <span v-if="slots.actions" class="w-8 shrink-0" aria-hidden="true" />
         </span>
       </template>
       <SavedViewsMenu
@@ -113,7 +113,7 @@ const summary = computed(() => {
     <span
       v-if="slots.actions"
       ref="actions"
-      class="absolute end-9 top-1/2 flex -translate-y-1/2 items-center"
+      class="absolute end-3 top-1/2 flex -translate-y-1/2 items-center"
     >
       <slot name="actions" />
     </span>
