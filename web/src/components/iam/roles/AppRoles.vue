@@ -347,7 +347,9 @@ const loadServiceAccounts = async (): Promise<any[] | null> => {
   try {
     return (
       (await queryClient.fetchQuery(
-        serviceAccountsQuery(store.state.selectedOrganization.identifier),
+        serviceAccountsQuery(store.state.selectedOrganization.identifier, {
+          silentForbidden: true,
+        }),
       )) ?? []
     );
   } catch {

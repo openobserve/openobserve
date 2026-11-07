@@ -198,7 +198,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     <template #cell-user_count="{ row }">
       <OButton
         v-if="typeof row.user_count === 'number'"
-        variant="ghost-primary"
+        :variant="row.user_count === 0 ? 'ghost-muted' : 'ghost-primary'"
         size="xs"
         class="tabular-nums"
         :aria-label="`${row.role_name}: ${row.user_count} ${t('iam.roleUsers')}`"
@@ -212,7 +212,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     <template #cell-service_account_count="{ row }">
       <OButton
         v-if="typeof row.service_account_count === 'number'"
-        variant="ghost-primary"
+        :variant="row.service_account_count === 0 ? 'ghost-muted' : 'ghost-primary'"
         size="xs"
         class="tabular-nums"
         :aria-label="`${row.role_name}: ${row.service_account_count} ${t('iam.serviceAccounts')}`"

@@ -37,6 +37,16 @@ describe("RoleTable member count columns", () => {
     wrapper.unmount();
   });
 
+  it("renders a zero count with the muted variant and a non-zero count with the primary one", async () => {
+    const wrapper = mountTable([{ role_name: "bots", user_count: 0, service_account_count: 2 }]);
+    await flushPromises();
+    const variant = (id: string) =>
+      wrapper.find(`[data-test="iam-roles-bots-${id}-link"]`).attributes("data-o2-variant");
+    expect(variant("users")).toBe("ghost-muted");
+    expect(variant("service-accounts")).toBe("ghost-primary");
+    wrapper.unmount();
+  });
+
   it("labels each count button with its role and column", async () => {
     const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: 2 }]);
     await flushPromises();
