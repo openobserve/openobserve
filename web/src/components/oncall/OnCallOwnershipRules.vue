@@ -270,7 +270,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OwnershipRuleStats } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { compareRulePrecedence, fieldLabel } from "@/utils/oncall";
+import { fieldLabel } from "@/utils/oncall";
 
 interface RuleCondition {
   name: string;
@@ -324,14 +324,9 @@ const { t } = useI18nTyped();
 const store = useStore();
 const timezone = computed<string | undefined>(() => store.state.timezone || undefined);
 
-/// Most specific first, the order the engine consults them; the endpoint returns storage order.
-const orgOrdered = computed(() => props.rules.slice().sort(compareRulePrecedence));
-
-/// A team's tab lists its own rules but numbers each by its place in the org's order.
+/// The endpoint sends the org's rules in the engine's precedence, so a team's tab numbers by the org-wide place.
 const ordered = computed(() =>
-  props.teamId
-    ? orgOrdered.value.filter((rule) => rule.team_id === props.teamId)
-    : orgOrdered.value,
+  props.teamId ? props.rules.filter((rule) => rule.team_id === props.teamId) : props.rules,
 );
 
 const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
@@ -340,7 +335,7 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.ruleOrder"),
     size: 70,
     sortable: false,
-    accessorFn: (row: OwnershipRuleStats) => orgOrdered.value.indexOf(row) + 1,
+    accessorFn: (row: OwnershipRuleStats) => props.rules.indexOf(row) + 1,
     meta: { align: "center" },
   },
   {
