@@ -51,6 +51,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #actions-overflow>
         <OButton
+          v-if="packsEnabled"
+          variant="outline"
+          size="sm"
+          icon-left="hub"
+          data-test="alert-library-pack-link"
+          @click="openPack"
+        >
+          {{ t("starterPacks.page.title", { title: t(KUBERNETES_PACK.titleKey) }) }}
+        </OButton>
+        <OButton
           variant="outline"
           size="sm"
           icon-left="open-in-new"
@@ -401,6 +411,8 @@ import useStreams from "@/composables/useStreams";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -424,6 +436,15 @@ const CONTRIBUTE_URL = "https://github.com/openobserve/o2-alerts-library";
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const packsEnabled = STARTER_PACKS_ENABLED;
+const openPack = () =>
+  router
+    .push({
+      name: "starterPack",
+      params: { pack: KUBERNETES_PACK.id },
+      query: { org_identifier: store.state.selectedOrganization?.identifier },
+    })
+    .catch(() => {});
 
 const { manifest, isLoading, error, loadManifest, loadAlertFile, isReady } = useAlertLibrary();
 const anomalyAccess = useAnomalyLibraryAccess();

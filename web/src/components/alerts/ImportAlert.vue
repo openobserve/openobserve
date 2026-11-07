@@ -292,6 +292,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { rewriteAlert } from "@/composables/starterPacks/streamRewriter";
+import { useRewriteChecks } from "@/composables/starterPacks/useRewriteChecks";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -433,11 +435,26 @@ export default defineComponent({
       }
     };
 
-    const updateStreamFields = (stream_name: string, index: number) => {
-      if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].stream_name = stream_name;
+    const rewriteChecks = useRewriteChecks(store.state.selectedOrganization.identifier);
+    const streamPicks: Record<number, number> = {};
+
+    // The query must read the stream the user chose, or the alert saves and stays silent.
+    const updateStreamFields = async (stream_name: string, index: number) => {
+      const alert = baseImportRef.value?.jsonArrayOfObj[index];
+      if (!alert) return;
+      const pick = (streamPicks[index] ?? 0) + 1;
+      streamPicks[index] = pick;
+      try {
+        const renames = alert.stream_name ? [{ from: alert.stream_name, to: stream_name }] : [];
+        const { doc } = await rewriteAlert({ ...alert, stream_name }, renames, rewriteChecks);
+        if (streamPicks[index] !== pick) return;
+        baseImportRef.value.jsonArrayOfObj[index] = doc;
         // Directly update jsonStr without triggering editor re-render
         baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
+      } catch {
+        if (streamPicks[index] !== pick) return;
+        userSelectedStreamName.value[index] = "";
+        toast({ variant: "error", message: t("alerts.import.streamRewriteFailed") });
       }
     };
 

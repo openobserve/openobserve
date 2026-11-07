@@ -9788,7 +9788,10 @@
       "dashboardImportedSuccessfully": "Dashboard Imported Successfully",
       "pleaseEnterJsonObject": "Please Enter a JSON object for import",
       "titleRequired": "Title is required for dashboard - {index}  and should be a string",
-      "dashboardValidationError": "Dashboard {index}: {error}"
+      "dashboardValidationError": "Dashboard {index}: {error}",
+      "streamMapTitle": "Streams not found in this organization",
+      "streamMapLabel": "Read {stream} from",
+      "streamRewriteFailed": "A query couldn't be moved to the chosen stream, so this dashboard was not imported."
     },
     "variableSettingsPage": {
       "variables": "Variables",
@@ -12083,7 +12086,8 @@
       "thresholdPositiveNumber": "Alert - {index}: Threshold should be a positive number greater than 0 and should be a number.",
       "silenceNonNegativeNumber": "Alert - {index}: Cooldown period should be a positive number greater than or equal to 0 and should be a number.",
       "frequencyTypeInvalid": "Alert - {index}: Frequency Type must be 'minutes' or 'cron' and should be a string.",
-      "cronExpressionInvalid": "Alert - {index}: Cron expression should be a valid cron expression."
+      "cronExpressionInvalid": "Alert - {index}: Cron expression should be a valid cron expression.",
+      "streamRewriteFailed": "This alert's query couldn't be moved to that stream, so nothing changed."
     },
     "composite": {
       "child": "Child alert",
@@ -15077,9 +15081,10 @@
       "alertsOnLabel": "Alerts on",
       "alertsOnValue": "{on} of {total}",
       "reminder": "{count} Kubernetes alert is off | {count} Kubernetes alerts are off",
-      "reminderDone": "Kubernetes monitoring is set up",
       "turnOn": "Turn on alerts",
-      "viewPack": "View pack"
+      "viewPack": "View pack",
+      "keepOff": "Keep off",
+      "keepOffFailed": "Couldn't save that. Try again."
     },
     "drawer": {
       "title": "What gets created",
@@ -15148,7 +15153,8 @@
       "attention": "{count} item needs your attention | {count} items need your attention",
       "seeWhich": "See which",
       "available": "available for {hours} h",
-      "availableSoon": "available for under 1 h"
+      "availableSoon": "available for under 1 h",
+      "watching": "{on} Kubernetes alerts are watching · {off} left off"
     },
     "undo": {
       "title": "Undo setup?",
@@ -15159,6 +15165,94 @@
       "loseCover": "{count} live alert loses cover | {count} live alerts lose cover",
       "removes": "Removes {count} item | Removes {count} items",
       "keeps": "Keeps any item you changed. The folder stays if it still holds one."
+    },
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning"
+    },
+    "health": {
+      "line": "{title}: no data since {since}.",
+      "checkCollector": "Check your collector"
+    },
+    "turnOn": {
+      "title": "Turn on {title} alerts",
+      "checking": "Checking {done} of {total} alerts against past data…",
+      "loadFailed": "Couldn't load these alerts",
+      "noDataYet": "No data to check yet.",
+      "headlineDay": "Your {alerts} chosen alerts would have fired {incidents} incidents in the last 24 h | Your {alerts} chosen alerts would have fired 1 incident in the last 24 h | Your {alerts} chosen alerts would have fired {incidents} incidents in the last 24 h",
+      "headlineSoFar": "Your {alerts} chosen alerts would have fired {incidents} incidents. So far, {window} checked | Your {alerts} chosen alerts would have fired 1 incident. So far, {window} checked | Your {alerts} chosen alerts would have fired {incidents} incidents. So far, {window} checked",
+      "minutes": "{count} min",
+      "hours": "{count} h",
+      "partOf": "{part} of {whole}",
+      "lowConfidence": "Low confidence",
+      "leftOff": "Left off: {names} would have fired {count} incidents. | Left off: {names} would have fired 1 incident. | Left off: {names} would have fired {count} incidents.",
+      "historyNote": "This is an estimate from a query over past data, up to 24 h, because the alerts have not run yet.",
+      "colAlert": "Alert",
+      "colWouldFire": "Would have fired",
+      "colChecked": "History checked",
+      "expand": "Show details",
+      "rowFailed": "Couldn't check history. You can still turn it on.",
+      "noData": "No data",
+      "incidents": "{count} incidents | 1 incident | {count} incidents",
+      "runs": "· {count} runs | · 1 run | · {count} runs",
+      "partly": "Partly checked",
+      "noisy": "Left off, over 2 incidents",
+      "condition": "Condition",
+      "editThreshold": "Edit threshold",
+      "duration": "Duration",
+      "stream": "Stream",
+      "query": "Query",
+      "noiseRule": "Every alert follows one rule: more than 2 incidents in the checked time starts it off. You can still tick it.",
+      "scopeTitle": "Alert scope",
+      "limit": "Limit to some clusters",
+      "limited": "Limited to {count} clusters | Limited to 1 cluster | Limited to {count} clusters",
+      "limitNote": "New clusters are not watched until you add them.",
+      "critical": "Critical alerts go to",
+      "warning": "Warnings go to",
+      "criticalRequired": "Choose a destination. Without one these alerts reach nobody.",
+      "warningRequired": "Choose one, or untick the warning alerts.",
+      "newDestination": "New destination",
+      "oncallTitle": "On-call also gets these",
+      "oncallUnknown": "We can't tell which team this reaches until it fires. Routing here uses labels on the alert.",
+      "cost": "About {queries} background queries a day. Checking history ran {checks} queries, once. Scan size isn't shown yet. It can be estimated only where the data exists.",
+      "forbidden": "You can't turn on these alerts",
+      "partial": "{names} didn't turn on.",
+      "submit": "Turn on {count} alerts | Turn on 1 alert | Turn on {count} alerts"
+    },
+    "page": {
+      "title": "{title} pack",
+      "breadcrumb": "Alert Library › Packs",
+      "turnOffAll": "Turn off all pack alerts",
+      "askAdmin": "Ask an admin for access to the {folder} folder",
+      "loadFailed": "Couldn't load this pack",
+      "notSetUp": "This pack isn't set up in this org",
+      "setUpIn": "Set up in",
+      "colState": "State",
+      "colFired": "Fired in 7 days",
+      "colNotifies": "Notifies",
+      "watching": "Watching",
+      "off": "Off",
+      "muteFor": "Mute for…",
+      "turnOff": "Turn off",
+      "turnOn": "Turn on",
+      "about": "About this setup",
+      "setUpBy": "Set up by {who}",
+      "date": "Date: {date}",
+      "version": "Version: {version}",
+      "queries": "Background queries: about {count} a day",
+      "scanNote": "Scan size isn't shown yet. It can be estimated only where the data exists.",
+      "items": "What it set up",
+      "dashboards": "Kubernetes dashboard",
+      "repair": "Reads {to} instead of {from}",
+      "skipped": "{name}: couldn't fit this to your data, skipped",
+      "reads": "Reads",
+      "streams": "Streams: {count}",
+      "whoCanSee": "Who can see it",
+      "folderAccess": "Anyone with access to the {folder} folder",
+      "manageAccess": "Manage access",
+      "threshold": "Threshold",
+      "open": "Open",
+      "thresholdFailed": "Couldn't save the threshold. Nothing changed."
     }
   },
   "alert_library": {

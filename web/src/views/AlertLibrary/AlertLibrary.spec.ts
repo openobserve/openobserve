@@ -104,6 +104,7 @@ const getStreams = vi.fn();
 const openAlertCreation = vi.fn(() => true);
 const toastMock = vi.fn();
 
+vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: false }));
 vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/composables/alerts/useAlertLibrary")>();
   return {

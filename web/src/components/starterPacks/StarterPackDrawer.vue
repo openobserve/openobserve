@@ -166,12 +166,7 @@ const finishLanding = async () => {
 };
 const manage = () => {
   open.value = false;
-  void router
-    .push({
-      name: "alertLibrary",
-      query: { org_identifier: flow.alertsRoute.value.query.org_identifier },
-    })
-    .catch(() => {});
+  void router.push(flow.packRoute.value).catch(() => {});
 };
 const retry = async () => {
   if (await flow.install()) await finishLanding();

@@ -118,6 +118,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
+      <StarterPackHealthLine
+        v-if="packsEnabled"
+        :key="store.state.selectedOrganization?.identifier"
+        :org="store.state.selectedOrganization?.identifier"
+      />
       <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
         <!-- Left: FolderList -->
         <div
@@ -1371,6 +1376,8 @@ import { activates } from "@/lib/core/Button/activation";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
+import StarterPackHealthLine from "@/components/starterPacks/StarterPackHealthLine.vue";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import { alertsToTerraform } from "@/utils/alerts/alertTerraform";
@@ -1430,6 +1437,7 @@ function parseQueryChoice<T extends string>(value: unknown, choices: readonly T[
 export default defineComponent({
   name: "AlertList",
   components: {
+    StarterPackHealthLine,
     MutedChip,
     AckChip,
     AlertMuteUntilDialog,
@@ -4736,6 +4744,7 @@ export default defineComponent({
     ]);
 
     return {
+      packsEnabled: STARTER_PACKS_ENABLED,
       downtimesEnabled,
       muteDialogOpen,
       muteSelection,

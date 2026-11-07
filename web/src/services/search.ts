@@ -135,6 +135,9 @@ const search = {
     return http({ headers: { traceparent } }).post(url, query, axiosConfig);
   },
 
+  promql_parse_tree: (org_identifier: string, query: string) =>
+    http().post(`/api/${org_identifier}/prometheus/api/v1/parse_tree`, { query }),
+
   result_schema: (
     {
       org_identifier,
