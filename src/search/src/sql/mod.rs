@@ -143,6 +143,9 @@ impl Sql {
         extract_patterns: bool,
         marked_chat_history_reader: bool,
     ) -> Result<Sql, Error> {
+        let mut query = query.clone();
+        histogram::pin_histogram_timezone(&mut query.sql, &mut query.timezone, query.end_time)?;
+        let query = &query;
         let cfg = get_config();
         let sql = query.sql.clone();
         let offset = query.from as i64;

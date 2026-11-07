@@ -2165,6 +2165,7 @@ mod tests {
                 histogram_interval: 0,
                 sampling_ratio: None,
                 search_type: None,
+                timezone: None,
             }),
         )
         .await;

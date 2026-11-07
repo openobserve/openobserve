@@ -13,10 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::ControlFlow;
+use std::{ops::ControlFlow, sync::Arc};
 
+use datafusion::{
+    common::DFSchema,
+    logical_expr::{Expr as LogicalExpr, simplify::SimplifyContext},
+    optimizer::simplify_expressions::ExprSimplifier,
+    prelude::SessionContext,
+    scalar::ScalarValue,
+};
 use infra::errors::{Error, ErrorCodes};
-use sqlparser::ast::{Expr, FunctionArguments, VisitorMut};
+use sqlparser::ast::{Expr, FunctionArg, FunctionArgExpr, FunctionArguments, VisitorMut};
 
 #[derive(Debug)]
 pub struct HistogramIntervalVisitor {
@@ -24,6 +31,7 @@ pub struct HistogramIntervalVisitor {
     pub interval: Option<i64>,
     time_range: (i64, i64),
     pub error: Option<String>,
+    pub timezone: Option<String>,
 }
 
 impl HistogramIntervalVisitor {
@@ -33,6 +41,7 @@ impl HistogramIntervalVisitor {
             interval: None,
             time_range,
             error: None,
+            timezone: None,
         }
     }
 }
@@ -62,6 +71,13 @@ impl VisitorMut for HistogramIntervalVisitor {
                     v
                 } else {
                     generate_histogram_interval(self.time_range).to_string()
+                };
+                self.timezone = match args.next().map(histogram_timezone_literal).transpose() {
+                    Ok(timezone) => timezone,
+                    Err(error) => {
+                        self.error = Some(error);
+                        return ControlFlow::Break(());
+                    }
                 };
                 let interval_seconds =
                     convert_histogram_interval_to_seconds(&interval).unwrap_or_default();
@@ -218,6 +234,42 @@ pub fn validate_and_adjust_histogram_interval(
     // If no valid interval found (requested interval is larger than max valid interval)
     // Return the maximum valid interval (1 day)
     *valid_intervals.last().unwrap()
+}
+
+pub(in crate::sql) fn histogram_timezone_literal(arg: &FunctionArg) -> Result<String, String> {
+    let FunctionArg::Unnamed(FunctionArgExpr::Expr(expr)) = arg else {
+        return Err("histogram() timezone must be a constant string".to_string());
+    };
+    let mut expr = expr;
+    while let Expr::Nested(inner) = expr {
+        expr = inner;
+    }
+    if let Expr::Value(value) = expr
+        && let Some(value) = value.value.clone().into_string()
+    {
+        return Ok(value);
+    }
+    let schema = Arc::new(DFSchema::empty());
+    let expr = SessionContext::new()
+        .state()
+        .create_logical_expr(&expr.to_string(), &schema)
+        .map_err(|error| format!("Invalid histogram() timezone expression: {error}"))?;
+    let simplifier = ExprSimplifier::new(
+        SimplifyContext::builder()
+            .with_schema(schema.clone())
+            .build(),
+    );
+    let expr = simplifier
+        .coerce(expr, &schema)
+        .and_then(|expr| simplifier.simplify(expr))
+        .map_err(|error| format!("Invalid histogram() timezone expression: {error}"))?;
+    match expr {
+        LogicalExpr::Literal(
+            ScalarValue::Utf8(value) | ScalarValue::Utf8View(value) | ScalarValue::LargeUtf8(value),
+            _,
+        ) => Ok(value.unwrap_or_default()),
+        _ => Err("histogram() timezone must resolve to a constant string".to_string()),
+    }
 }
 
 #[cfg(test)]

@@ -668,6 +668,8 @@ pub struct SearchPartitionRequest {
     pub sampling_ratio: Option<f64>,
     #[serde(default)]
     pub search_type: Option<SearchEventType>,
+    #[serde(default)]
+    pub timezone: Option<String>,
 }
 
 impl SearchPartitionRequest {
@@ -703,6 +705,7 @@ impl From<&Request> for SearchPartitionRequest {
             histogram_interval: req.query.histogram_interval,
             sampling_ratio: req.query.sampling_ratio,
             search_type: req.search_type,
+            timezone: req.query.timezone.clone(),
         }
     }
 }
@@ -1298,6 +1301,8 @@ pub struct MultiSearchPartitionRequest {
     pub streaming_output: bool,
     #[serde(default)]
     pub histogram_interval: i64,
+    #[serde(default)]
+    pub timezone: Option<String>,
 }
 
 impl MultiSearchPartitionRequest {
@@ -2109,6 +2114,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn timezone_partition_request_roundtrip() {
+        let value = serde_json::json!({"sql": "SELECT histogram(_timestamp) FROM t", "start_time": 1, "end_time": 2, "timezone": "+05:30"});
+        let request: super::SearchPartitionRequest = serde_json::from_value(value).unwrap();
+        assert_eq!(serde_json::to_value(request).unwrap()["timezone"], "+05:30");
+        let value = serde_json::json!({"sql": ["SELECT histogram(_timestamp) FROM t"], "start_time": 1, "end_time": 2, "timezone": "-08:00"});
+        let request: super::MultiSearchPartitionRequest = serde_json::from_value(value).unwrap();
+        assert_eq!(serde_json::to_value(request).unwrap()["timezone"], "-08:00");
+        let mut request = super::Request::default();
+        request.query.timezone = Some("+05:30".to_string());
+        let partition = super::SearchPartitionRequest::from(&request);
+        assert_eq!(
+            serde_json::to_value(partition).unwrap()["timezone"],
+            "+05:30"
+        );
+    }
+
+    #[test]
     fn test_response() {
         let mut res = Response::default();
         res.set_total(10);
@@ -2335,6 +2357,7 @@ mod tests {
             histogram_interval: 0,
             sampling_ratio: None,
             search_type: None,
+            timezone: None,
         };
 
         req.decode().unwrap();
@@ -3074,6 +3097,7 @@ mod tests {
             query_fn: Some("test_fn".to_string()),
             streaming_output: true,
             histogram_interval: 3600,
+            timezone: None,
         };
         assert_eq!(request.sql.len(), 2);
         assert_eq!(request.start_time, 100);
