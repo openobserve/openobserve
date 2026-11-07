@@ -2328,6 +2328,8 @@
     "translatingStackTrace": "Traduction de la trace de pile avec les source maps...",
     "translatingStackTraceHint": "Cela peut prendre quelques instants",
     "sourceMapsNotAvailable": "Source Maps non disponibles",
+    "mobileSourceMapsNotApplicable": "Les source maps ne s'appliquent pas aux erreurs iOS et Android",
+    "mobileSourceMapsNotApplicableBody": "Les source maps JavaScript importées ne peuvent pas résoudre les frames de pile natives mobiles. Consultez la pile d'origine dans l'onglet {tab}.",
     "sourceMapsNotAvailableBody": "Pour afficher des traces de pile détaillées avec le code source original et les numéros de ligne, veuillez télécharger les source maps pour cette application.",
     "serviceBadge": "Service :",
     "versionBadge": "Version :",

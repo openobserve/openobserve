@@ -2328,6 +2328,8 @@
     "translatingStackTrace": "Translating stack trace with source maps...",
     "translatingStackTraceHint": "This may take a few moments",
     "sourceMapsNotAvailable": "Source Maps Not Available",
+    "mobileSourceMapsNotApplicable": "Source maps do not apply to iOS and Android errors",
+    "mobileSourceMapsNotApplicableBody": "Uploaded JavaScript source maps cannot resolve native mobile stack frames. Read the original stack in the {tab} tab.",
     "sourceMapsNotAvailableBody": "To view detailed stack traces with original source code and line numbers, please upload source maps for this application.",
     "serviceBadge": "Service:",
     "versionBadge": "Version:",

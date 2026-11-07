@@ -2328,6 +2328,8 @@
     "translatingStackTrace": "Kaynak haritaları ile yığın izi çevriliyor...",
     "translatingStackTraceHint": "Bu birkaç dakika sürebilir",
     "sourceMapsNotAvailable": "Kaynak Haritaları Mevcut Değil",
+    "mobileSourceMapsNotApplicable": "Kaynak haritaları iOS ve Android hataları için geçerli değildir",
+    "mobileSourceMapsNotApplicableBody": "Yüklenen JavaScript kaynak haritaları yerel mobil yığın çerçevelerini çözemez. Orijinal yığını {tab} sekmesinde okuyun.",
     "sourceMapsNotAvailableBody": "Orijinal kaynak kodu ve satır numaralarıyla ayrıntılı yığın izlerini görüntülemek için lütfen bu uygulama için kaynak haritaları yükleyin.",
     "serviceBadge": "Hizmet:",
     "versionBadge": "Sürüm:",
