@@ -306,7 +306,7 @@ function sourceHint(name: string): I18nText | undefined {
   return entry?.reason === "name" ? t("siem.events.nameSource") : undefined;
 }
 const otherStreamNames = computed(() =>
-  allStreamNames.value.filter((n) => !secStreamNames.value.includes(n)),
+  allStreamNames.value.filter((n) => !secStreamNames.value.includes(n) && !n.startsWith("_o2_")),
 );
 /** Stats re-read from the data for sources the stream stats have not caught up on. */
 const freshStats = ref<Map<string, any>>(new Map());
@@ -323,12 +323,22 @@ const streamStats = computed(
 const streamOptions = computed(() => {
   const opts: SelectOption[] = [];
   if (secStreamNames.value.length) {
-    opts.push({ label: t("siem.events.securityStreams"), value: "__h_sec__", header: true });
-    secStreamNames.value.forEach((n) => opts.push({ label: raw(n), value: n }));
+    opts.push({
+      label: t("siem.events.securityStreams"),
+      value: "__h_sec__",
+      header: true,
+      headerCount: String(secStreamNames.value.length),
+    });
+    secStreamNames.value.forEach((n) => opts.push({ label: raw(n), value: n, icon: "shield" }));
   }
   if (otherStreamNames.value.length) {
-    opts.push({ label: t("siem.events.otherStreams"), value: "__h_other__", header: true });
-    otherStreamNames.value.forEach((n) => opts.push({ label: raw(n), value: n }));
+    opts.push({
+      label: t("siem.events.otherStreams"),
+      value: "__h_other__",
+      header: true,
+      headerCount: String(otherStreamNames.value.length),
+    });
+    otherStreamNames.value.forEach((n) => opts.push({ label: raw(n), value: n, icon: "database" }));
   }
   return opts;
 });
@@ -1580,6 +1590,7 @@ function widenTo(period: string) {
             <OSelect
               :model-value="selectedStream"
               :options="streamOptions"
+              icon-key="icon"
               :placeholder="t('siem.events.selectStream')"
               :loading="streamsLoading"
               searchable
