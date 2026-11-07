@@ -243,6 +243,7 @@ const useRoutes = () => {
   const parentRoutes: any = [
     {
       path: "/login",
+      name: "login",
       component: Login,
       meta: {
         titleKey: "login.login",
