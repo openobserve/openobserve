@@ -124,13 +124,21 @@ function blank(user: string): UserProfile {
   };
 }
 
-/** Folds the two aggregates from any number of streams into one profile per user. */
+/** Folds the two aggregates from any number of streams into one profile per user, on top of `prior` (left untouched). */
 export function buildProfiles(
   perStream: { stream: string; hours: HourHit[]; ips: IpHit[]; failureKnown?: boolean }[],
+  prior?: Map<string, UserProfile>,
 ): Map<string, UserProfile> {
-  const profiles = new Map<string, UserProfile>();
+  const profiles = new Map(prior);
+  // A prior profile is copied before its first change, since published risks still point at it.
+  const own = new Set<UserProfile>();
   const get = (user: string) => {
-    const p = profiles.get(user) ?? blank(user);
+    const old = profiles.get(user);
+    if (old && own.has(old)) return old;
+    const p = old
+      ? { ...old, ips: new Map(old.ips), hours: new Map(old.hours), streams: new Set(old.streams) }
+      : blank(user);
+    own.add(p);
     profiles.set(user, p);
     return p;
   };

@@ -11,6 +11,7 @@ import {
   batches,
   candidateColumns,
   foldMatches,
+  sweepColumnRows,
   sweepSql,
   type Indicator,
   type IndicatorMatch,
@@ -45,7 +46,7 @@ export interface SweepCoverage {
 
 interface Task {
   stream: string;
-  column: string;
+  columns: string[];
   type: SweepType;
   values: string[];
 }
@@ -105,11 +106,17 @@ export function useIntelSweep() {
       streams.value = names;
 
       const valuesByType = new Map<SweepType, string[]>();
+      const seenValues = new Map<SweepType, Set<string>>();
       for (const i of indicators) {
         if (i.type === "cidr") continue;
         const list = valuesByType.get(i.type) ?? [];
-        if (!list.includes(i.indicator)) list.push(i.indicator);
+        const seen = seenValues.get(i.type) ?? new Set<string>();
+        if (!seen.has(i.indicator)) {
+          seen.add(i.indicator);
+          list.push(i.indicator);
+        }
         valuesByType.set(i.type, list);
+        seenValues.set(i.type, seen);
       }
 
       const settled = await runPool(names.map((stream) => () => columnsFor(orgId, stream)));
@@ -125,9 +132,9 @@ export function useIntelSweep() {
       for (const [type, values] of valuesByType) {
         const list: Task[] = [];
         names.forEach((stream, s) => {
-          for (const column of resolvers[s](type)) {
-            for (const batch of batches(values)) list.push({ stream, column, type, values: batch });
-          }
+          const columns = resolvers[s](type);
+          if (!columns.length) return;
+          for (const batch of batches(values)) list.push({ stream, columns, type, values: batch });
         });
         perType.push(list);
       }
@@ -154,14 +161,16 @@ export function useIntelSweep() {
           try {
             const res = await runSql(
               orgId,
-              sweepSql(task.stream, task.column, task.type, task.values),
+              sweepSql(task.stream, task.columns, task.type, task.values),
               window.start,
               window.end,
-              task.values.length,
+              -1,
               { signal },
             );
-            results.push({ ...task, rows: res.hits });
-            // A partial answer still counts its rows, but the column was not fully searched.
+            for (const { column, rows } of sweepColumnRows(task.columns, res.hits)) {
+              results.push({ stream: task.stream, column, type: task.type, rows });
+            }
+            // A partial (or capped) answer still counts its rows, but its columns were not fully searched.
             if (res.partial || res.functionError) {
               partialTasks.push(task);
               partialResults.value += 1;
@@ -178,18 +187,19 @@ export function useIntelSweep() {
       await Promise.all(Array.from({ length: CONCURRENCY }, worker));
       if (stale()) return;
       // A column counts as searched only when none of its batches was dropped by the cap or failed.
-      const key = (t: Task) => `${t.type}|${t.stream}|${t.column}`;
-      const incomplete = new Set([...dropped, ...failedTasks, ...partialTasks].map(key));
+      const keys = (t: Task) => t.columns.map((column) => `${t.type}|${t.stream}|${column}`);
+      const incomplete = new Set([...dropped, ...failedTasks, ...partialTasks].flatMap(keys));
       coverage.value = [...valuesByType].map(([type, values]) => {
         const columns: { stream: string; column: string }[] = [];
         const skippedCols: { stream: string; column: string }[] = [];
         const seen = new Set<string>();
         for (const t of tasks) {
-          if (t.type !== type || seen.has(key(t))) continue;
-          seen.add(key(t));
-          (incomplete.has(key(t)) ? skippedCols : columns).push({
-            stream: t.stream,
-            column: t.column,
+          if (t.type !== type) continue;
+          t.columns.forEach((column) => {
+            const k = `${t.type}|${t.stream}|${column}`;
+            if (seen.has(k)) return;
+            seen.add(k);
+            (incomplete.has(k) ? skippedCols : columns).push({ stream: t.stream, column });
           });
         }
         return { type, indicators: values.length, columns, skipped: skippedCols };

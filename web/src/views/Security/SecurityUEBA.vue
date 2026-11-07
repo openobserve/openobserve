@@ -55,6 +55,7 @@ import {
   type UebaSignal,
   type UebaSignalKind,
   type UebaWindows,
+  type UserProfile,
   type UserRisk,
 } from "@/utils/security/ueba";
 import {
@@ -254,10 +255,39 @@ function publishStatus() {
     .sort((a, b) => a.stream.localeCompare(b.stream));
 }
 
+/** Profiles of the runs folded so far; a run that is no longer current forces a rebuild. */
+let folded = {
+  runs: new Set<StreamRun>(),
+  now: new Map<string, UserProfile>(),
+  base: new Map<string, UserProfile>(),
+};
+
+function foldProfiles(ok: StreamRun[]) {
+  const live = new Set(ok);
+  if ([...folded.runs].some((r) => !live.has(r))) {
+    folded = { runs: new Set(), now: new Map(), base: new Map() };
+  }
+  const fresh = ok.filter((r) => !folded.runs.has(r));
+  if (!fresh.length) return folded;
+  folded = {
+    runs: new Set([...folded.runs, ...fresh]),
+    now: buildProfiles(
+      fresh.map((r) => r.now),
+      folded.now,
+    ),
+    base: buildProfiles(
+      fresh.map((r) => r.base),
+      folded.base,
+    ),
+  };
+  return folded;
+}
+
 /** Scores every stream that has answered; a failed stream is dropped whole. */
 function publishRisks() {
   const all = [...runs.values()];
   const ok = all.filter((r) => !r.pending && !r.failed);
+  const profiles = foldProfiles(ok);
   // A stream still loading may hold the history that makes a user not new.
   const final = !all.some((r) => r.pending);
   const cutStreams = new Set(ok.filter((r) => r.limitedRows !== null).map((r) => r.plan.stream));
@@ -266,12 +296,7 @@ function publishRisks() {
     ips: !ok.some((r) => r.baseCut.ips),
     streamsWithHistory: new Set(ok.filter((r) => r.hasHistory).map((r) => r.plan.stream)),
   };
-  const scored = scoreAll(
-    buildProfiles(ok.map((r) => r.now)),
-    buildProfiles(ok.map((r) => r.base)),
-    pageWindows(),
-    complete,
-  );
+  const scored = scoreAll(profiles.now, profiles.base, pageWindows(), complete);
   const touchesCut = (r: UserRisk) =>
     [...r.current.streams, ...(r.baseline?.streams ?? [])].some((st) => cutStreams.has(st));
   // A cut stream's one-slice baseline cannot say "never seen", nor weigh its user's volume or failure rate.

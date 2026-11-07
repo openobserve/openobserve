@@ -44,7 +44,9 @@ use crate::common::{
 };
 
 /// Most ids one request may name; keeps the generated predicate bounded.
-pub(crate) const MAX_ALERT_IDS: usize = 500;
+const MAX_ALERT_IDS: usize = 500;
+/// Longer id lists become one regex, since each leading-wildcard LIKE is a separate scan.
+const LIKE_PREDICATE_MAX_IDS: usize = 20;
 
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
 const OPTIONAL_HISTORY_COLUMNS: [&str; 7] = [
@@ -731,7 +733,7 @@ pub async fn get_alert_history(
         if ids.is_empty() {
             return empty();
         }
-        where_clause.push_str(&format!(" AND ({})", siem_ids_predicate(&ids)));
+        where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(&ids)));
     } else if let Some(permitted_ids) = permitted_alert_ids {
         // Filter by permitted alerts only
         if permitted_ids.is_empty() {
@@ -1349,10 +1351,21 @@ pub(crate) fn restrict_to_permitted(ids: Vec<String>, permitted: Option<&[String
 
 /// Matches trigger rows of the given alerts; the key is `"{alert_name}/{alert_id}"`.
 pub(crate) fn alert_ids_predicate(ids: &[String]) -> String {
-    ids.iter()
-        .map(|id| format!("key LIKE '%/{id}'"))
+    if ids.len() <= LIKE_PREDICATE_MAX_IDS {
+        return ids
+            .iter()
+            .map(|id| format!("key LIKE '%/{id}'"))
+            .collect::<Vec<_>>()
+            .join(" OR ");
+    }
+    // Ids are KSUIDs; anything else is dropped, so the alternation needs no escaping.
+    let alternation = ids
+        .iter()
+        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
+        .map(String::as_str)
         .collect::<Vec<_>>()
-        .join(" OR ")
+        .join("|");
+    format!("regexp_like(key, '/({alternation})$')")
 }
 
 /// A `status IN (...)` predicate; each outcome also matches its legacy spellings.
@@ -1382,21 +1395,6 @@ pub(crate) fn outcome_predicate(raw: &str) -> Result<String, String> {
         .collect::<Vec<_>>()
         .join(", ");
     Ok(format!("status IN ({list})"))
-}
-
-/// A SIEM id list has no request cap, so past it one regex replaces the per-id LIKEs.
-#[cfg(feature = "enterprise")]
-fn siem_ids_predicate(ids: &[String]) -> String {
-    if ids.len() > MAX_ALERT_IDS {
-        o2_enterprise::enterprise::security::history_summary::alert_ids_regex_predicate(ids)
-    } else {
-        alert_ids_predicate(ids)
-    }
-}
-
-#[cfg(not(feature = "enterprise"))]
-fn siem_ids_predicate(ids: &[String]) -> String {
-    alert_ids_predicate(ids)
 }
 
 #[cfg(test)]
@@ -1435,6 +1433,23 @@ mod tests {
             alert_ids_predicate(&ids),
             "key LIKE '%/a' OR key LIKE '%/b'"
         );
+    }
+
+    #[test]
+    fn test_alert_ids_predicate_uses_one_regex_for_long_lists() {
+        let mut ids: Vec<String> = (0..LIKE_PREDICATE_MAX_IDS)
+            .map(|i| format!("id{i}"))
+            .collect();
+        assert!(alert_ids_predicate(&ids).starts_with("key LIKE"));
+        ids.push("x' OR 1=1".to_string());
+        ids.push("last".to_string());
+        let predicate = alert_ids_predicate(&ids);
+        assert!(
+            predicate.starts_with("regexp_like(key, '/(id0|id1|"),
+            "{predicate}"
+        );
+        assert!(predicate.ends_with("|id19|last)$')"), "{predicate}");
+        assert!(!predicate.contains("OR 1=1"), "{predicate}");
     }
 
     #[test]

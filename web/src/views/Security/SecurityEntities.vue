@@ -200,8 +200,10 @@ function startRun(plan: StreamPlan, mine: number, signal: AbortSignal) {
           }
           run.pending -= 1;
           if (mine !== seq || runs.get(plan.stream) !== run) return;
-          answered.value = true;
-          publishRows();
+          if (!run.pending) {
+            answered.value = true;
+            publishRows();
+          }
           publishStatus();
         }),
   );

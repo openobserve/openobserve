@@ -45,7 +45,7 @@ import threatIntel, {
   RemoveRefused,
   type IntelTable,
 } from "@/services/threat_intel";
-import { runSql } from "@/composables/security/useSecurityStreamPlans";
+import { runPool, runSql } from "@/composables/security/useSecurityStreamPlans";
 import { useIntelSweep, MAX_SWEEP_QUERIES } from "@/composables/security/useIntelSweep";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import {
@@ -116,9 +116,9 @@ async function loadIndicators(): Promise<boolean> {
   loadError.value = "";
   try {
     const list = await threatIntel.listTables(orgId.value);
-    const reads = await Promise.all(
-      list.map((tb) => threatIntel.readTable(orgId.value, tb.name).catch(() => null)),
-    );
+    const reads = (
+      await runPool(list.map((tb) => () => threatIntel.readTable(orgId.value, tb.name)))
+    ).map((r) => (r.status === "fulfilled" ? r.value : null));
     if (mySeq !== loadSeq) return false;
     tables.value = list;
     const all: Indicator[] = [];

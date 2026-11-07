@@ -24,6 +24,7 @@ import {
   refang,
   rowToIndicator,
   sightingsSql,
+  sweepColumnRows,
   sweepSql,
   type Indicator,
 } from "./intel";
@@ -175,17 +176,55 @@ describe("sweep", () => {
   });
 
   it("casts the column, escapes values and folds case where the type does", () => {
-    expect(sweepSql("s", "src_ip", "ip", ["1.2.3.4", "o'x"])).toBe(
-      `SELECT LOWER(CAST("src_ip" AS VARCHAR)) AS zo_value, COUNT(*) AS zo_n, MIN(_timestamp) AS zo_first, ` +
-        `MAX(_timestamp) AS zo_last, MIN(CAST("src_ip" AS VARCHAR)) AS zo_raw FROM "s" ` +
-        `WHERE LOWER(CAST("src_ip" AS VARCHAR)) IN ('1.2.3.4', 'o''x') GROUP BY zo_value`,
+    expect(sweepSql("s", ["src_ip"], "ip", ["1.2.3.4", "o'x"])).toBe(
+      `SELECT CASE WHEN LOWER(CAST("src_ip" AS VARCHAR)) IN ('1.2.3.4', 'o''x') ` +
+        `THEN LOWER(CAST("src_ip" AS VARCHAR)) END AS zo_v0, COUNT(*) AS zo_n, MIN(_timestamp) AS zo_first, ` +
+        `MAX(_timestamp) AS zo_last, MIN(CAST("src_ip" AS VARCHAR)) AS zo_raw0 FROM "s" ` +
+        `WHERE LOWER(CAST("src_ip" AS VARCHAR)) IN ('1.2.3.4', 'o''x') GROUP BY zo_v0`,
     );
-    expect(sweepSql("s", "host", "domain", ["a.com"])).toContain(
+    expect(sweepSql("s", ["url"], "url", ["http://a.com/X"])).toContain(
+      `WHERE CAST("url" AS VARCHAR) IN ('http://a.com/X')`,
+    );
+    expect(sweepSql("s", ["host"], "domain", ["a.com"])).toContain(
       `LOWER(CAST("host" AS VARCHAR)) IN ('a.com')`,
     );
     expect(sightingsSql("s", "u", "email", "a@b.co", "1 hour")).toContain(
       `LOWER(CAST("u" AS VARCHAR)) = 'a@b.co'`,
     );
+  });
+
+  it("ORs every column into one search, grouped per column", () => {
+    const sql = sweepSql("s", ["dst_ip", "src_ip"], "ip", ["1.2.3.4"]);
+    expect(sql).toContain(
+      `WHERE LOWER(CAST("dst_ip" AS VARCHAR)) IN ('1.2.3.4') OR LOWER(CAST("src_ip" AS VARCHAR)) IN ('1.2.3.4')`,
+    );
+    expect(sql).toContain(`MIN(CAST("src_ip" AS VARCHAR)) AS zo_raw1`);
+    expect(sql).toMatch(/GROUP BY zo_v0, zo_v1$/);
+  });
+
+  it("splits folded rows back into one row per column and value", () => {
+    const rows = [
+      { zo_v0: "a.com", zo_v1: null, zo_n: 2, zo_first: 10, zo_last: 20, zo_raw0: "A.com" },
+      {
+        zo_v0: "a.com",
+        zo_v1: "b.com",
+        zo_n: 3,
+        zo_first: 5,
+        zo_last: 15,
+        zo_raw0: "a.com",
+        zo_raw1: "b.com",
+      },
+    ];
+    expect(sweepColumnRows(["host", "sni"], rows)).toEqual([
+      {
+        column: "host",
+        rows: [{ zo_value: "a.com", zo_n: 5, zo_first: 5, zo_last: 20, zo_raw: "A.com" }],
+      },
+      {
+        column: "sni",
+        rows: [{ zo_value: "b.com", zo_n: 3, zo_first: 5, zo_last: 15, zo_raw: "b.com" }],
+      },
+    ]);
   });
 
   it("batches long lists", () => {
@@ -270,7 +309,9 @@ describe("IPv6", () => {
   });
 
   it("folds case for IPs in the sweep", () => {
-    expect(sweepSql("s", "ip", "ip", ["2001:db8::1"])).toContain(`LOWER(CAST("ip" AS VARCHAR)) IN`);
+    expect(sweepSql("s", ["ip"], "ip", ["2001:db8::1"])).toContain(
+      `LOWER(CAST("ip" AS VARCHAR)) IN`,
+    );
   });
 });
 

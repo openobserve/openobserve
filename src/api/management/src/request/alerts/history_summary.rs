@@ -35,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
-use super::history::{MAX_ALERT_IDS, alert_ids_predicate, parse_alert_ids, restrict_to_permitted};
+use super::history::{alert_ids_predicate, parse_alert_ids, restrict_to_permitted};
 use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
@@ -137,14 +137,7 @@ pub async fn get_alert_history_summary(
         return empty();
     }
 
-    // Past the cap, one LIKE per id is unbounded, so a single regex filters in SQL instead.
-    let id_predicate = ids.as_deref().map(|ids| {
-        if ids.len() > MAX_ALERT_IDS {
-            summary::alert_ids_regex_predicate(ids)
-        } else {
-            alert_ids_predicate(ids)
-        }
-    });
+    let id_predicate = ids.as_deref().map(alert_ids_predicate);
     let sql = summary::summary_sql(
         &org_id,
         start_time,

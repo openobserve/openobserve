@@ -1054,13 +1054,34 @@ const {
   countHits,
 } = useSigmaRules();
 const showRules = ref(false);
+let compiledKey = "";
+let countedKey = "";
 
 function refreshRules() {
-  compileFor(detected.value?.source ?? null, fieldNames.value);
   const stream = selectedStream.value;
-  if (!stream || !runnableCount.value) return;
-  void countHits(orgId.value, stream, timeRange.value);
+  const { start, end } = timeRange.value;
+  const key = JSON.stringify([
+    orgId.value,
+    stream,
+    detected.value?.source.id ?? null,
+    fieldNames.value,
+    start,
+    end,
+  ]);
+  // Recompiling clears the counts, so it only happens when their inputs change.
+  if (key !== compiledKey) {
+    compileFor(detected.value?.source ?? null, fieldNames.value);
+    compiledKey = key;
+  }
+  if (!showRules.value || !stream || !runnableCount.value || key === countedKey) return;
+  countedKey = key;
+  void countHits(orgId.value, stream, timeRange.value).then(() => {
+    if (rulesError.value && countedKey === key) countedKey = "";
+  });
 }
+watch(showRules, (open) => {
+  if (open) refreshRules();
+});
 
 function createDetectionFrom(sigmaId: string) {
   router.push({

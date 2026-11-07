@@ -225,6 +225,22 @@ describe("scoring", () => {
   });
 });
 
+describe("buildProfiles", () => {
+  it("folds onto prior profiles as if folded together, leaving the prior ones unchanged", () => {
+    const a = { stream: "a", hours: [hour("ann", 9, 10, 1, 5)], ips: [ip("ann", "1.1.1.1", 10)] };
+    const b = {
+      stream: "b",
+      hours: [hour("ann", 9, 4, 0, 3), hour("bob", 2, 7)],
+      ips: [ip("ann", "1.1.1.1", 4)],
+    };
+    const prior = buildProfiles([a]);
+    const ann = prior.get("ann")!;
+    expect(buildProfiles([b], prior)).toEqual(buildProfiles([a, b]));
+    expect(prior.size).toBe(1);
+    expect(ann).toEqual(buildProfiles([a]).get("ann"));
+  });
+});
+
 describe("withholdSignals", () => {
   it("drops novelty signals as not evaluated and re-scores the rest", () => {
     const now = profile([hour("eve", 3, 40)], [ip("eve", "8.8.8.8", 40)]).get("eve")!;

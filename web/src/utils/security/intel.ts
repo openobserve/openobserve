@@ -426,21 +426,63 @@ export function batches<T>(items: T[], size = SWEEP_BATCH): T[][] {
   return out;
 }
 
-/** The column is cast so a mistyped column cannot fail the sweep; `zo_raw` keeps the stored spelling. */
+/** One search over all columns; `zo_v{i}` is null where column i did not match, so groups stay bounded. */
 export function sweepSql(
   stream: string,
-  column: string,
+  columns: string[],
   type: SweepType,
   values: string[],
 ): string {
-  const col = `CAST(${quoteIdent(column)} AS VARCHAR)`;
-  const expr = CASE_FOLDED.includes(type) ? `LOWER(${col})` : col;
   const list = values.map(quoteString).join(", ");
+  const parts = columns.map((column) => {
+    const col = `CAST(${quoteIdent(column)} AS VARCHAR)`;
+    const expr = CASE_FOLDED.includes(type) ? `LOWER(${col})` : col;
+    return { col, expr, test: `${expr} IN (${list})` };
+  });
+  const keys = parts.map((p, i) => `CASE WHEN ${p.test} THEN ${p.expr} END AS zo_v${i}`);
+  const raws = parts.map((p, i) => `MIN(${p.col}) AS zo_raw${i}`);
   return (
-    `SELECT ${expr} AS zo_value, COUNT(*) AS zo_n, MIN(_timestamp) AS zo_first, ` +
-    `MAX(_timestamp) AS zo_last, MIN(${col}) AS zo_raw FROM ${quoteIdent(stream)} ` +
-    `WHERE ${expr} IN (${list}) GROUP BY zo_value`
+    `SELECT ${keys.join(", ")}, COUNT(*) AS zo_n, MIN(_timestamp) AS zo_first, ` +
+    `MAX(_timestamp) AS zo_last, ${raws.join(", ")} FROM ${quoteIdent(stream)} ` +
+    `WHERE ${parts.map((p) => p.test).join(" OR ")} GROUP BY ${parts.map((_, i) => `zo_v${i}`).join(", ")}`
   );
+}
+
+/** Splits a `sweepSql` answer into per-column rows, one per matched value. */
+export function sweepColumnRows(
+  columns: string[],
+  rows: Record<string, unknown>[],
+): { column: string; rows: Record<string, unknown>[] }[] {
+  return columns.map((column, i) => {
+    const byValue = new Map<
+      string,
+      { zo_value: string; zo_n: number; zo_first: number; zo_last: number; zo_raw: string }
+    >();
+    for (const row of rows) {
+      const value = row[`zo_v${i}`];
+      if (value === null || value === undefined) continue;
+      const n = Number(row.zo_n ?? 0) || 0;
+      const first = Number(row.zo_first ?? 0) || 0;
+      const last = Number(row.zo_last ?? 0) || 0;
+      const raw = String(row[`zo_raw${i}`] ?? value);
+      const prev = byValue.get(String(value));
+      if (!prev) {
+        byValue.set(String(value), {
+          zo_value: String(value),
+          zo_n: n,
+          zo_first: first,
+          zo_last: last,
+          zo_raw: raw,
+        });
+        continue;
+      }
+      prev.zo_n += n;
+      prev.zo_first = Math.min(prev.zo_first, first);
+      prev.zo_last = Math.max(prev.zo_last, last);
+      if (raw < prev.zo_raw) prev.zo_raw = raw;
+    }
+    return { column, rows: [...byValue.values()] };
+  });
 }
 
 /** One indicator's sightings over time in one column, for the drawer timeline. */

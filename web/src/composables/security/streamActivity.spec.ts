@@ -8,7 +8,7 @@ vi.mock("./useSecurityStreamPlans", async (importOriginal) => ({
   runSql: (...a: unknown[]) => search(...a),
 }));
 
-import { withRecentActivity } from "./streamActivity";
+import { QUIET_RECHECK_US, withRecentActivity } from "./streamActivity";
 
 const NOW = 1_800_000_000_000_000;
 const HOUR = 3_600_000_000;
@@ -43,5 +43,27 @@ describe("withRecentActivity", () => {
       { name: "b", stats: {} },
     ];
     expect(await withRecentActivity("o", list, ["a", "b"], NOW)).toBe(list);
+  });
+
+  it("does not count a stream again until the quiet confirmation ages out", async () => {
+    search.mockResolvedValue({ hits: [{ zo_n: 0, zo_last: null }] });
+    const list = [{ name: "quiet", stats: {} }];
+    await withRecentActivity("o", list, ["quiet"], NOW);
+    await withRecentActivity("o", list, ["quiet"], NOW + QUIET_RECHECK_US - 1);
+    expect(search).toHaveBeenCalledTimes(1);
+    // Another org's stream of the same name is its own stream.
+    await withRecentActivity("o2", list, ["quiet"], NOW + 1);
+    expect(search).toHaveBeenCalledTimes(2);
+    await withRecentActivity("o", list, ["quiet"], NOW + QUIET_RECHECK_US);
+    expect(search).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps counting a stream whose stats lag behind its data", async () => {
+    search.mockResolvedValue({ hits: [{ zo_n: 3, zo_last: NOW - 60_000_000 }] });
+    const list = [{ name: "lagging", stats: {} }];
+    await withRecentActivity("o", list, ["lagging"], NOW);
+    const out = await withRecentActivity("o", list, ["lagging"], NOW + 60_000_000);
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(out[0].stats).toMatchObject({ doc_num: 3 });
   });
 });

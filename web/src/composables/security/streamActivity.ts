@@ -8,6 +8,11 @@ import { quoteIdent } from "@/utils/security/sql";
 
 type StreamRow = { name: string; stats?: Record<string, any> } & Record<string, any>;
 
+/** How long a stream the count found empty is trusted to stay quiet before it is counted again. */
+export const QUIET_RECHECK_US = 10 * 60 * 1_000_000;
+/** org/stream -> when a count last found it empty; spares the 60 s auto-refresh a search per quiet stream. */
+const confirmedQuiet = new Map<string, number>();
+
 /** Patches not-live streams' stats from a last-day count; a stream the count cannot read keeps its stats. */
 export async function withRecentActivity<T extends StreamRow>(
   orgId: string,
@@ -16,7 +21,13 @@ export async function withRecentActivity<T extends StreamRow>(
   nowUs: number = Date.now() * 1000,
 ): Promise<T[]> {
   const wanted = new Set(names);
-  const stale = list.filter((s) => wanted.has(s.name) && sourceHealth(s.stats, nowUs) !== "live");
+  const quietKey = (name: string) => `${orgId}/${name}`;
+  const stale = list.filter(
+    (s) =>
+      wanted.has(s.name) &&
+      sourceHealth(s.stats, nowUs) !== "live" &&
+      nowUs - (confirmedQuiet.get(quietKey(s.name)) ?? -Infinity) >= QUIET_RECHECK_US,
+  );
   if (!stale.length) return list;
 
   const settled = await runPool(
@@ -36,7 +47,11 @@ export async function withRecentActivity<T extends StreamRow>(
     const row = result.value.hits[0] ?? {};
     const count = Number(row.zo_n ?? 0);
     const last = Number(row.zo_last ?? 0);
-    if (!count || !last) return;
+    if (!count || !last) {
+      confirmedQuiet.set(quietKey(stale[i].name), nowUs);
+      return;
+    }
+    confirmedQuiet.delete(quietKey(stale[i].name));
     const stats = stale[i].stats ?? {};
     patched.set(stale[i].name, {
       ...stats,
