@@ -6,10 +6,15 @@ on:
     - cron: '30 17 * * *'  # 11:00 PM IST
     - cron: '30 23 * * *'  # 5:00 AM IST
   workflow_dispatch:
+  # A PR that adds or edits a RegressionSet spec runs only those specs, under the same ready-for-ci + non-draft gate as playwright.yml.
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, ready_for_review]
+    paths:
+      - "tests/ui-testing/playwright-tests/RegressionSet/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' }}
 
 permissions:
   contents: read
@@ -53,11 +58,14 @@ jobs:
   check_main_changed:
     timeout-minutes: 5
     name: check_main_changed
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
     runs-on: ubuntu-latest
     permissions:
       actions: read  # for `gh run list` (last run's head_sha)
+      pull-requests: read
     outputs:
       should_run: ${{ steps.decide.outputs.should_run }}
+      pr_specs: ${{ steps.decide.outputs.pr_specs }}
     steps:
       - id: decide
         env:
@@ -67,6 +75,14 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Manual dispatch — running regardless of main changes."
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SPECS=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+              --jq '.[] | select(.status != "removed") | .filename | select(test("^tests/ui-testing/playwright-tests/RegressionSet/[A-Za-z0-9_./-]+\\.spec\\.js$"))' | tr '\n' ' ')
+            echo "pr_specs=${SPECS}" >> "$GITHUB_OUTPUT"
+            if [ -n "${SPECS// /}" ]; then echo "should_run=true" >> "$GITHUB_OUTPUT"; echo "Changed RegressionSet specs: ${SPECS}"
+            else echo "should_run=false" >> "$GITHUB_OUTPUT"; echo "::notice::no added or edited RegressionSet spec in this PR — skipping."; fi
             exit 0
           fi
           # On a scheduled run github.sha is main's tip, so no checkout is needed.
@@ -181,9 +197,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - id: gen
+        env:
+          PR_SPECS: ${{ needs.check_main_changed.outputs.pr_specs }}
         run: |
           MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix_regression.json)
           if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            printf '%s' "$MATRIX" > "$RUNNER_TEMP/matrix.json"; printf '%s\n' $PR_SPECS > "$RUNNER_TEMP/changed.txt"
+            MATRIX=$(node .github/scripts/regression-pr-matrix.js "$RUNNER_TEMP/matrix.json" "$RUNNER_TEMP/changed.txt")
+            if [ "$(printf '%s' "$MATRIX" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).include.length)")" = "0" ]; then
+              echo "::error::no regression shard serves the folder of any changed spec (${PR_SPECS})"; exit 1
+            fi
+          fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', '))"
 
@@ -544,7 +569,7 @@ jobs:
     timeout-minutes: 10
     name: Report to OpenObserve
     needs: [build_binary, ui_integration_tests, merge_reports]
-    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' && github.event_name != 'pull_request' }}
     runs-on:
       labels: eks-openobserve-standard-4
     permissions:
@@ -730,8 +755,9 @@ jobs:
     runs-on:
       labels: eks-openobserve-standard-4
     permissions: {}
-    needs: [build_binary, ui_integration_tests, merge_reports]
-    if: always()
+    needs: [check_main_changed, build_binary, ui_integration_tests, merge_reports]
+    # An unlabelled or draft PR skips check_main_changed, and must not take a runner for this summary.
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.check_main_changed.result == 'success') }}
     steps:
       - name: Check test results
         run: |
@@ -769,7 +795,8 @@ jobs:
   report_result:
     name: Report result
     needs: [ui_integration_tests, playwright_summary]
-    if: ${{ always() && needs.ui_integration_tests.result != 'skipped' }}
+    # A PR's subset run says nothing about main, so it must not open or close the main-failure issue.
+    if: ${{ always() && needs.ui_integration_tests.result != 'skipped' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
