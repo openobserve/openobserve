@@ -486,6 +486,22 @@ describe("useAiChat", () => {
       expect(result).toBe(mockResponse);
     });
 
+    it("should log a dropped connection as a warning, not an error", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const error = new TypeError("Failed to fetch");
+      mockFetch.mockRejectedValue(error);
+
+      const result = await aiChatComposable.fetchAiChat(mockMessages, "gpt-4", "test-org");
+
+      expect(result).toBeNull();
+      expect(errorSpy).not.toHaveBeenCalledWith("Error fetching AI chat:", expect.anything());
+      expect(warnSpy).toHaveBeenCalledWith("Error fetching AI chat:", error);
+
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
     it("should return null when fetch throws an error", async () => {
       const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       mockFetch.mockRejectedValue(new Error("Network error"));

@@ -141,6 +141,7 @@
       "datetime-paste-invalid-values-14648.spec.js",
       "iam-users-15546-edit-dialog-cancel.spec.js",
       "query-management-sql-tooltip.spec.js",
+      "signup-2795-signed-in-redirect.spec.js",
       "login-2962-entry-payload.spec.js"
     ],
     "disabled": []

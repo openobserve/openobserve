@@ -263,9 +263,36 @@ describe("DateTime rail", () => {
 
       el("date-time-relative-3-h-btn")!.click();
       await flushPromises();
+      await openMenu();
       expect(calendarItem("yesterday")?.className).not.toContain(SELECTED_CLASS);
       expect(el("date-time-relative-3-h-btn")?.className).toContain(SELECTED_CLASS);
       expect(lastEmit().relativeTimePeriod).toBe("3h");
+    });
+
+    it("closes the panel when a relative chip is picked with autoApply", async () => {
+      createWrapper({ autoApply: true });
+      await flushPromises();
+      await openMenu();
+      expect(el("date-time-relative-3-h-btn")).not.toBeNull();
+      const hidesBefore = (wrapper!.emitted("hide") ?? []).length;
+
+      el("date-time-relative-3-h-btn")!.click();
+      await flushPromises();
+
+      expect(wrapper!.vm.menuOpen).toBe(false);
+      expect((wrapper!.emitted("hide") ?? []).length).toBe(hidesBefore + 1);
+      expect(lastEmit().relativeTimePeriod).toBe("3h");
+    });
+
+    it("keeps the panel open when a relative chip is picked without autoApply", async () => {
+      createWrapper({ autoApply: false });
+      await flushPromises();
+      await openMenu();
+
+      el("date-time-relative-3-h-btn")!.click();
+      await flushPromises();
+
+      expect(el("date-time-relative-3-h-btn")).not.toBeNull();
     });
 
     it("disables ranges longer than the query-range limit and explains why", async () => {
