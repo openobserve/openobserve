@@ -398,7 +398,10 @@ const kindOf = (end: FlowEnd) => (end.kind === "external" ? null : detailKindOf(
 const canOpen = (end: FlowEnd) => isBoundary(end) || kindOf(end) != null;
 
 function openEnd(end: FlowEnd) {
-  if (isBoundary(end)) return toggleNamespace(boundaryKey(end));
+  if (isBoundary(end)) {
+    toggleNamespace(boundaryKey(end));
+    return;
+  }
   const kind = kindOf(end);
   if (!kind) return;
   emit("open", {
