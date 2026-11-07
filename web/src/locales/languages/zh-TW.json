@@ -2329,6 +2329,8 @@
     "translatingStackTrace": "正在使用原始碼映射翻譯堆疊追蹤……",
     "translatingStackTraceHint": "這可能需要一些時間",
     "sourceMapsNotAvailable": "原始碼映射不可用",
+    "mobileSourceMapsNotApplicable": "Source Map 不適用於 iOS 與 Android 錯誤",
+    "mobileSourceMapsNotApplicableBody": "上傳的 JavaScript Source Map 無法解析原生行動裝置的堆疊框架。請在 {tab} 分頁中查看原始堆疊。",
     "sourceMapsNotAvailableBody": "若要檢視包含原始原始碼和行號的詳細堆疊追蹤，請為此應用程式上傳原始碼映射。",
     "serviceBadge": "服務：",
     "versionBadge": "版本：",

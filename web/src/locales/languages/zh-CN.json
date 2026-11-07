@@ -2329,6 +2329,8 @@
     "translatingStackTrace": "正在使用源代码映射翻译堆栈跟踪...",
     "translatingStackTraceHint": "这可能需要一些时间",
     "sourceMapsNotAvailable": "源代码映射不可用",
+    "mobileSourceMapsNotApplicable": "源映射不适用于 iOS 和 Android 错误",
+    "mobileSourceMapsNotApplicableBody": "上传的 JavaScript 源映射无法解析原生移动端堆栈帧。请在 {tab} 标签页中查看原始堆栈。",
     "sourceMapsNotAvailableBody": "要查看包含原始源代码和行号的详细堆栈跟踪，请上传此应用程序的源代码映射。",
     "serviceBadge": "服务:",
     "versionBadge": "版本:",

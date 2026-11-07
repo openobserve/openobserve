@@ -2329,6 +2329,8 @@
     "translatingStackTrace": "Stacktrace vertalen met source maps...",
     "translatingStackTraceHint": "Dit kan even duren",
     "sourceMapsNotAvailable": "Source Maps niet beschikbaar",
+    "mobileSourceMapsNotApplicable": "Source maps zijn niet van toepassing op iOS- en Android-fouten",
+    "mobileSourceMapsNotApplicableBody": "Geüploade JavaScript-sourcemaps kunnen native mobiele stackframes niet oplossen. Lees de oorspronkelijke stack in het tabblad {tab}.",
     "sourceMapsNotAvailableBody": "Om gedetailleerde stacktraces met originele broncode en regelnummers te bekijken, upload dan source maps voor deze toepassing.",
     "serviceBadge": "Service:",
     "versionBadge": "Versie:",

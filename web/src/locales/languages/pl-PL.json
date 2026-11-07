@@ -2329,6 +2329,8 @@
     "translatingStackTrace": "Tłumaczenie śladu stosu z mapami źródłowymi...",
     "translatingStackTraceHint": "To może zająć chwilę",
     "sourceMapsNotAvailable": "Mapy źródłowe niedostępne",
+    "mobileSourceMapsNotApplicable": "Mapy źródłowe nie dotyczą błędów iOS i Androida",
+    "mobileSourceMapsNotApplicableBody": "Przesłane mapy źródłowe JavaScript nie mogą rozwiązać natywnych ramek stosu aplikacji mobilnych. Odczytaj oryginalny stos w zakładce {tab}.",
     "sourceMapsNotAvailableBody": "Aby wyświetlić szczegółowe ślady stosu z oryginalnym kodem źródłowym i numerami linii, prześlij mapy źródłowe dla tej aplikacji.",
     "serviceBadge": "Usługa:",
     "versionBadge": "Wersja:",

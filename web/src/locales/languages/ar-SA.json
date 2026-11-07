@@ -2329,6 +2329,8 @@
     "translatingStackTrace": "ترجمة تتبع المكدس باستخدام خرائط المصدر...",
     "translatingStackTraceHint": "قد يستغرق هذا بضع لحظات",
     "sourceMapsNotAvailable": "خرائط المصدر غير متوفرة",
+    "mobileSourceMapsNotApplicable": "لا تنطبق خرائط المصدر على أخطاء iOS وAndroid",
+    "mobileSourceMapsNotApplicableBody": "لا تستطيع خرائط مصدر JavaScript المرفوعة تحليل إطارات المكدس الأصلية للأجهزة الجوّالة. اقرأ المكدس الأصلي في علامة التبويب {tab}.",
     "sourceMapsNotAvailableBody": "لعرض تتبعات المكدس (stack traces) التفصيلية مع الشيفرة المصدرية الأصلية وأرقام الأسطر، يرجى رفع خرائط المصدر لهذا التطبيق.",
     "serviceBadge": "الخدمة:",
     "versionBadge": "النسخة:",
