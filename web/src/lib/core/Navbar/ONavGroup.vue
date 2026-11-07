@@ -394,9 +394,6 @@ async function positionFlyout() {
     ...horizontalPosition,
     top: `${rect.top}px`,
     maxHeight: `${maxHeight}px`,
-    overflowY: "auto",
-    // Without this the wheel chains to the page at the end of the list and onScroll closes the flyout.
-    overscrollBehavior: "contain",
     zIndex: "6000",
   };
   await nextTick();
@@ -406,6 +403,7 @@ async function positionFlyout() {
     ...flyoutStyle.value,
     top: `${Math.max(VIEWPORT_MARGIN, Math.min(rect.top, maxTop))}px`,
   };
+  flyoutRef.value?.querySelector("[aria-current]")?.scrollIntoView?.({ block: "nearest" });
 }
 
 /**
@@ -664,7 +662,7 @@ function onChildClick(event: MouseEvent, child: SubnavChild) {
 // focus away from an input the user is typing in.
 function onChildMouseenter(event: MouseEvent) {
   if (isInputFocused()) return;
-  (event.currentTarget as HTMLElement)?.focus();
+  (event.currentTarget as HTMLElement)?.focus({ preventScroll: true });
 }
 </script>
 
@@ -860,7 +858,7 @@ function onChildMouseenter(event: MouseEvent) {
         role="menu"
         :aria-label="title"
         :aria-describedby="showTrialNote ? trialNoteId : undefined"
-        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay min-w-52 border border-transparent p-1"
+        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay min-w-52 overflow-y-auto overscroll-contain border border-transparent p-1"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"

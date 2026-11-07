@@ -287,18 +287,36 @@ describe("ONavGroup", () => {
     });
 
     it("caps a flyout taller than the viewport, scrolls it and pins it to the top margin", async () => {
-      const style = await openWithFlyoutHeight(900);
+      const style = await openWithFlyoutHeight(484);
 
       expect(style).toContain("max-height: 484px");
-      expect(style).toContain("overflow-y: auto");
-      expect(style).toContain("overscroll-behavior: contain");
+      expect(flyout().classes()).toEqual(
+        expect.arrayContaining(["overflow-y-auto", "overscroll-contain"]),
+      );
       expect(style).toContain("top: 8px");
     });
 
-    it("keeps a flyout that fits at the tile's top, clamped above the bottom margin", async () => {
+    it("moves a flyout that fits up just enough to clear the bottom margin", async () => {
+      const style = await openWithFlyoutHeight(300);
+
+      expect(style).toContain("max-height: 484px");
+      expect(style).toContain("top: 192px");
+    });
+
+    it("keeps a flyout that fits comfortably at the tile's top", async () => {
       const style = await openWithFlyoutHeight(100);
 
       expect(style).toContain("top: 300px");
+    });
+
+    it("focuses a hovered row without scrolling the flyout under the pointer", async () => {
+      await openWithFlyoutHeight(484);
+      const row = flyout().find("a[data-test^='nav-group-item-']").element as HTMLElement;
+      const focus = vi.spyOn(row, "focus");
+
+      await flyout().find("a[data-test^='nav-group-item-']").trigger("mouseenter");
+
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
     });
   });
 
@@ -1001,6 +1019,17 @@ describe("ONavGroup", () => {
     it("marks only Notification Destinations on /alert-destinations", async () => {
       wrapper = await mountAt("/alert-destinations");
       expect(activeNames(wrapper)).toEqual(["alertDestinations"]);
+    });
+
+    it("scrolls the current page's row into view when the flyout opens", async () => {
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      try {
+        wrapper = await mountAt("/alert-templates");
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+      } finally {
+        Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+      }
     });
 
     it("marks only Templates on /alert-templates", async () => {
