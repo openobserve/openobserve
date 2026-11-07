@@ -51,7 +51,6 @@ use db::{
 #[cfg(feature = "enterprise")]
 use infra::table::workflows::WorkflowTriggerEntity;
 use infra::{db::get_orm_client_ro, schema::unwrap_stream_settings, table};
-use itertools::Itertools;
 use lettre::{
     AsyncTransport, Message,
     message::{Attachment, MessageBuilder, MultiPart, SinglePart},
@@ -90,6 +89,7 @@ use crate::{
         },
     },
     auth::is_ofga_unsupported,
+    authz::FolderAccess,
     common::{infra::config::ORGANIZATIONS, meta::authz::Authz, utils::ssrf_guard::SsrfGuard},
     short_url,
 };
@@ -1676,21 +1676,24 @@ pub async fn list_v2<C: ConnectionTrait>(
     user_id: Option<&str>,
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, AlertError> {
-    let (permissions, is_all_permitted) =
-        match permitted_alerts(&params.org_id, user_id, params.folder_id.as_deref()).await? {
-            Some(ps) => {
-                let org_all_permitted = ps.contains(&format!("alert:_all_{}", params.org_id));
-                (ps, org_all_permitted)
-            }
-            None => (vec![], true),
-        };
-
-    let alerts = db::alerts::alert::list_with_folders(conn, params)
+    let org_id = params.org_id.clone();
+    let is_org_wide = params.folder_id.is_none();
+    let permissions = permitted_alerts(&org_id, user_id, params.folder_id.as_deref())
         .await?
-        .into_iter()
-        .filter(|(f, a)| is_all_permitted || is_alert_permitted(f, a, &permissions))
-        .collect_vec();
-    Ok(alerts)
+        .filter(|ps| !ps.contains(&format!("alert:_all_{org_id}")));
+
+    let alerts = db::alerts::alert::list_with_folders(conn, params).await?;
+    let Some(permissions) = permissions else {
+        return Ok(alerts);
+    };
+    // `permitted_alerts` admits everything in a folder whose GET it checked, but an org-wide list
+    // names no folder, so each folder the alerts sit in is checked here instead.
+    let folders = if is_org_wide {
+        alert_folder_access(&org_id, user_id, &alerts).await?
+    } else {
+        HashMap::new()
+    };
+    Ok(filter_listed_alerts(alerts, &permissions, &folders))
 }
 
 /// Whether an individual grant in `permissions` covers `alert`, by its old or new OpenFGA id.
@@ -1700,6 +1703,57 @@ pub(crate) fn is_alert_permitted(folder: &Folder, alert: &Alert, permissions: &[
             permissions.contains(&format!("alert:{}/{id}", folder.folder_id))
                 || permissions.contains(&format!("alert:{id}"))
         })
+}
+
+/// Keeps the alerts whose folder `folders` lets the caller read, and those `permissions` grant.
+fn filter_listed_alerts(
+    alerts: Vec<(Folder, Alert)>,
+    permissions: &[String],
+    folders: &HashMap<String, FolderAccess>,
+) -> Vec<(Folder, Alert)> {
+    alerts
+        .into_iter()
+        .filter(|(f, a)| {
+            folders.get(&f.folder_id).is_some_and(|access| access.get)
+                || is_alert_permitted(f, a, permissions)
+        })
+        .collect()
+}
+
+/// The LIST and GET checks an alert folder listing makes, for each folder `alerts` sit in.
+#[cfg(feature = "enterprise")]
+async fn alert_folder_access(
+    org_id: &str,
+    user_id: Option<&str>,
+    alerts: &[(Folder, Alert)],
+) -> Result<HashMap<String, FolderAccess>, AlertError> {
+    let Some(user_id) = user_id else {
+        return Err(AlertError::PermittedAlertsMissingUser);
+    };
+    let role = match db::user::get(Some(org_id), user_id).await {
+        Ok(Some(user)) => user.role,
+        _ => return Err(AlertError::UserNotFound),
+    };
+    let folders = alerts.iter().map(|(f, _)| f.folder_id.clone()).collect();
+    Ok(crate::authz::folder_access(
+        org_id,
+        user_id,
+        &role,
+        &["v2", org_id, "alerts"],
+        &get_ofga_type("alert_folders"),
+        folders,
+    )
+    .await)
+}
+
+/// Without fine-grained permissions `permitted_alerts` filters nothing, so no folder is checked.
+#[cfg(not(feature = "enterprise"))]
+async fn alert_folder_access(
+    _org_id: &str,
+    _user_id: Option<&str>,
+    _alerts: &[(Folder, Alert)],
+) -> Result<HashMap<String, FolderAccess>, AlertError> {
+    Ok(HashMap::new())
 }
 
 /// Deletes an alert by its KSUID primary key, unconditionally.
@@ -5542,6 +5596,61 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    fn listed(folder_id: &str, name: &str) -> (Folder, Alert) {
+        let folder = Folder {
+            folder_id: folder_id.to_string(),
+            ..Default::default()
+        };
+        let mut alert = Alert::default();
+        alert.name = name.to_string();
+        (folder, alert)
+    }
+
+    fn listed_names(alerts: Vec<(Folder, Alert)>) -> Vec<String> {
+        alerts.into_iter().map(|(_, a)| a.name).collect()
+    }
+
+    #[test]
+    fn an_org_wide_list_keeps_the_alerts_of_a_folder_the_caller_can_read() {
+        let alerts = vec![
+            listed("readable", "a"),
+            listed("listable", "b"),
+            listed("unchecked", "c"),
+        ];
+        let folders = HashMap::from([
+            (
+                "readable".to_string(),
+                FolderAccess {
+                    list: true,
+                    get: true,
+                },
+            ),
+            (
+                "listable".to_string(),
+                FolderAccess {
+                    list: true,
+                    get: false,
+                },
+            ),
+        ]);
+        let kept = filter_listed_alerts(alerts, &[], &folders);
+        assert_eq!(listed_names(kept), ["a"]);
+    }
+
+    #[test]
+    fn an_individual_grant_admits_an_alert_its_folder_does_not() {
+        let alerts = vec![listed("listable", "b"), listed("listable", "c")];
+        let folders = HashMap::from([(
+            "listable".to_string(),
+            FolderAccess {
+                list: true,
+                get: false,
+            },
+        )]);
+        let kept = filter_listed_alerts(alerts, &["alert:b".to_string()], &folders);
+        assert_eq!(listed_names(kept), ["b"]);
+    }
 
     #[test]
     fn a_failed_send_keeps_its_text_and_hides_the_body_when_asked() {
