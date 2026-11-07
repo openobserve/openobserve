@@ -463,7 +463,7 @@ export interface ExperimentComparisonDimension {
   normalized: boolean;
   baselineSampleCount: number;
   candidateSampleCount: number;
-  /** The side's own category name, when it has one unambiguous label. */
+  /** The side's own category or boolean value, when it has one unambiguous value. */
   baselineLabel: string | null;
   candidateLabel: string | null;
   /** Normalized trial spread per side; only where a side ran more than one trial. */

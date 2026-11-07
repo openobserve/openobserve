@@ -445,6 +445,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Conversation body — natural height; the page scrolls, not this. -->
                 <div>
+                  <!-- Long session: the newest page of turns is loaded; older ones page in. -->
+                  <OBanner
+                    v-if="detail && traces.length < detail.turns"
+                    variant="info"
+                    dense
+                    inline-actions
+                    class="mx-2 mt-2"
+                    data-test="session-older-turns-banner"
+                  >
+                    {{
+                      t("traces.sessionDetail.olderTurnsNotice", {
+                        loaded: traces.length,
+                        total: detail.turns,
+                      })
+                    }}
+                    <template v-if="hasOlderTurns" #actions>
+                      <OButton
+                        data-test="session-load-older-turns-btn"
+                        variant="outline"
+                        size="sm"
+                        :loading="loadingOlderTurns"
+                        @click="loadOlderTurns"
+                      >
+                        {{ t("traces.sessionDetail.loadOlderTurns") }}
+                      </OButton>
+                    </template>
+                  </OBanner>
                   <!-- turn list (Collapsed view) -->
                   <div v-show="viewMode === 'collapsed'" class="flex flex-col gap-2 p-2">
                     <!-- column headers — clickable sort controls for the three metric bars
@@ -512,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :tooltip="false"
                             class="text-compact text-text-heading font-semibold"
                           >
-                            {{ trace.turnUserMessage || "—" }}
+                            {{ turnTitle(trace) }}
                           </OTruncatedText>
                           <OTruncatedText
                             as="div"
@@ -611,6 +638,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span class="text-text-heading text-xs font-bold">
                                 {{ t("traces.sessionDetail.roles.user") }}
                               </span>
+                              <!-- AIO-22: harness text hidden by the agent's patterns; Show puts it back. -->
+                              <button
+                                v-if="turnDetail(trace.traceId)?.harnessHidden"
+                                type="button"
+                                class="text-2xs text-text-muted ms-auto me-2 hover:underline"
+                                :data-test="`session-turn-harness-${trace.traceId}`"
+                                @click.stop="revealHarness(trace.traceId)"
+                              >
+                                {{
+                                  t(
+                                    "readableSessions.hidden",
+                                    { n: turnDetail(trace.traceId)!.harnessHidden },
+                                    turnDetail(trace.traceId)!.harnessHidden!,
+                                  )
+                                }}
+                                · {{ t("readableSessions.show") }}
+                              </button>
                               <OIcon
                                 v-if="turnDetail(trace.traceId)?.userMessage"
                                 name="content-copy"
@@ -633,6 +677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      "Show calls" thread used by the Pretty view (ThreadView) -->
                           <ThreadToolCalls
                             :tool-calls="toolCallsForTurn(trace.traceId)"
+                            collapsed
                             @span-selected="onSpanSelected"
                           />
 
@@ -986,6 +1031,8 @@ import {
   type TurnDetail,
 } from "./composables/useSessions";
 import { buildTurnDetail } from "./threadView.utils";
+import { patternsForAgent, stripHarness, type HarnessPatternRule } from "./harnessText";
+import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -998,6 +1045,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import TurnPreviewCard from "./TurnPreviewCard.vue";
 import SessionRibbon from "./SessionRibbon.vue";
 import ThreadView from "./ThreadView.vue";
@@ -1024,7 +1073,7 @@ const route = useRoute();
 const router = useRouter();
 const store = useStore();
 
-const { fetchSession, fetchSessionSpans } = useSessions();
+const { fetchSession, fetchSessionSpans, fetchSessionAgent } = useSessions();
 const detail = ref<SessionDetail | null>(null);
 const traces = ref<SessionTraceRow[]>([]);
 const loading = ref(false);
@@ -1249,6 +1298,8 @@ const kpiCards = computed<
   };
   const tokens = splitNumberWithUnit(d.tokens);
   const turnWord = t("traces.sessionDetail.turnLabel");
+  const loaded = traces.value.length;
+  const partial = loaded < d.turns;
 
   return [
     {
@@ -1257,9 +1308,16 @@ const kpiCards = computed<
       label: t("traces.sessionDetail.kpi.turns"),
       value: String(d.turns),
       unit: "",
-      subLead: t("traces.sessionDetail.kpiSub.turns", {
-        duration: `${dur.value}${dur.unit}`,
-      }),
+      // The value is the session's turn count; with older turns not loaded the
+      // duration (and every other tile) covers only the loaded ones.
+      subLead: partial
+        ? t("traces.sessionDetail.kpiSub.turnsLoaded", {
+            loaded,
+            duration: `${dur.value}${dur.unit}`,
+          })
+        : t("traces.sessionDetail.kpiSub.turns", {
+            duration: `${dur.value}${dur.unit}`,
+          }),
       subTurns: [],
       subTail: "",
     },
@@ -1273,18 +1331,31 @@ const kpiCards = computed<
       // that the tile stays neutral so the colour means "this session broke".
       variant: s.errRate > 50 ? "danger" : undefined,
       // Up to 3 error turns → jump chips. More than that → a "Filter Errors"
-      // button (chips would be an overwhelming wall of numbers).
+      // button (chips would be an overwhelming wall of numbers). Errors are
+      // counted over the loaded turns, so that is the denominator.
       subLead: !s.errors
-        ? t("traces.sessionDetail.kpiSub.errorsNone", { total: d.turns })
+        ? partial
+          ? t("traces.sessionDetail.kpiSub.errorsNoneLoaded", { total: loaded })
+          : t("traces.sessionDetail.kpiSub.errorsNone", { total: loaded })
         : s.errors > 3
-          ? t("traces.sessionDetail.kpiSub.errorsLeadMany", {
-              errors: s.errors,
-              total: d.turns,
-            })
-          : t("traces.sessionDetail.kpiSub.errorsLead", {
-              errors: s.errors,
-              total: d.turns,
-            }),
+          ? partial
+            ? t("traces.sessionDetail.kpiSub.errorsLeadManyLoaded", {
+                errors: s.errors,
+                total: loaded,
+              })
+            : t("traces.sessionDetail.kpiSub.errorsLeadMany", {
+                errors: s.errors,
+                total: loaded,
+              })
+          : partial
+            ? t("traces.sessionDetail.kpiSub.errorsLeadLoaded", {
+                errors: s.errors,
+                total: loaded,
+              })
+            : t("traces.sessionDetail.kpiSub.errorsLead", {
+                errors: s.errors,
+                total: loaded,
+              }),
       subTurns: s.errors > 3 ? [] : s.errorTurnNums.map((n) => ({ n, label: raw(String(n)) })),
       filterErrors: s.errors > 3,
       subTail: "",
@@ -1436,7 +1507,7 @@ const expandedTurns = reactive<Record<string, boolean>>({});
 // the transcript can never disagree. Spans are grouped by `trace_id`; the
 // per-trace projection lives in `threadView.utils` alongside ThreadView's, so
 // the two views classify spans identically.
-const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
+const turnDetailsByTrace = computed<Record<string, TurnDetail & { harnessHidden?: number }>>(() => {
   const byTrace: Record<string, any[]> = {};
   for (const s of sessionSpans.value) {
     const tid = String(s.trace_id || "");
@@ -1444,9 +1515,28 @@ const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
     (byTrace[tid] ||= []).push(s);
   }
 
-  const out: Record<string, TurnDetail> = {};
+  const patterns = patternsForAgent(harnessRules.value, sessionAgent.value);
+  const out: Record<string, TurnDetail & { harnessHidden?: number }> = {};
   for (const tid of Object.keys(byTrace)) {
-    out[tid] = buildTurnDetail(tid, byTrace[tid]);
+    const detail = buildTurnDetail(tid, byTrace[tid]);
+    const content = detail.userMessage?.content;
+    const stripped =
+      patterns.length && content && !revealedHarness.value.has(tid)
+        ? stripHarness(content, patterns)
+        : null;
+    out[tid] =
+      stripped?.hidden && detail.userMessage
+        ? {
+            ...detail,
+            userMessage: {
+              ...detail.userMessage,
+              content: stripped.text
+                ? raw(stripped.text)
+                : t("readableSessions.onlyHarness", { tag: `<${stripped.only}>` }),
+            },
+            harnessHidden: stripped.hidden,
+          }
+        : detail;
   }
   return out;
 });
@@ -1485,7 +1575,7 @@ function originalTurnIndex(traceId: string): number {
 function isExpanded(traceId: string): boolean {
   return !!expandedTurns[traceId];
 }
-function turnDetail(traceId: string): TurnDetail | undefined {
+function turnDetail(traceId: string): (TurnDetail & { harnessHidden?: number }) | undefined {
   return turnDetailsByTrace.value[traceId];
 }
 
@@ -1519,25 +1609,102 @@ function toggleTurn(traceId: string) {
 // once on first switch (all gen_ai spans across the session's traces).
 const viewMode = ref<"collapsed" | "pretty">("collapsed");
 const sessionSpans = ref<any[]>([]);
-const sessionSpansLoading = ref(false);
-const sessionSpansLoaded = ref(false);
 
+// AIO-22: the session's agent and its harness patterns (GenAI Agent Mapping).
+// Turn previews hide that text; "Show" puts it back for one turn. The spans and
+// the span sidebar always keep everything.
+const harnessRules = ref<HarnessPatternRule[]>([]);
+const revealedHarness = ref<Set<string>>(new Set());
+const sessionAgent = ref<string | null>(null);
+function revealHarness(traceId: string) {
+  revealedHarness.value = new Set(revealedHarness.value).add(traceId);
+}
+// Looked up only once some agent has patterns and the turns are known.
+async function loadSessionAgent() {
+  if (!harnessRules.value.length || !traces.value.length) return;
+  sessionAgent.value = await fetchSessionAgent(
+    streamName.value,
+    traces.value.map((tr) => tr.traceId),
+    sessionEvaluationRange.value.startTime,
+    sessionEvaluationRange.value.endTime,
+  );
+}
+// The turn row's title, with harness text hidden like the turn body.
+function turnTitle(tr: SessionTraceRow) {
+  const patterns = patternsForAgent(harnessRules.value, sessionAgent.value);
+  if (!tr.turnUserMessage || !patterns.length || revealedHarness.value.has(tr.traceId))
+    return raw(tr.turnUserMessage || "—");
+  const stripped = stripHarness(tr.turnUserMessage, patterns);
+  return stripped.text
+    ? raw(stripped.text)
+    : t("readableSessions.onlyHarness", { tag: `<${stripped.only}>` });
+}
+// Enterprise only; elsewhere the request fails and previews stay as they are.
+genAiAgentMappingService
+  .get(store.state.selectedOrganization?.identifier ?? "")
+  .then((c) => {
+    harnessRules.value = c.harness_patterns;
+    loadSessionAgent();
+  })
+  .catch(() => {});
+// Span loads in flight: the first page's and, after "Load older turns", the
+// older page's can overlap.
+const spanLoads = ref(0);
+const sessionSpansLoading = computed(() => spanLoads.value > 0);
+// Turns whose spans are in `sessionSpans` or on their way.
+const spansRequested = new Set<string>();
+
+// Fetches the spans of the loaded turns that have none yet and merges them in.
 async function loadSessionSpans() {
-  if (sessionSpansLoaded.value || sessionSpansLoading.value) return;
-  sessionSpansLoading.value = true;
+  const pending = traces.value.filter((tr) => !spansRequested.has(tr.traceId));
+  if (!pending.length) return;
+  for (const tr of pending) spansRequested.add(tr.traceId);
+  spanLoads.value++;
   try {
-    sessionSpans.value = await fetchSessionSpans(
+    // The details endpoint widens the link's window to the whole session, so
+    // turns can start before `from`; fetch their spans over the session's range.
+    const rows = await fetchSessionSpans(
       streamName.value,
-      traces.value.map((tr) => tr.traceId),
-      startTime.value,
-      endTime.value,
+      pending,
+      sessionEvaluationRange.value.startTime,
+      sessionEvaluationRange.value.endTime,
     );
-    sessionSpansLoaded.value = true;
+    sessionSpans.value = [...sessionSpans.value, ...rows].sort(
+      (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),
+    );
   } catch (e: any) {
     console.error("Session spans fetch error:", e?.raw ?? e);
-    sessionSpans.value = [];
+    // The next expand / view switch tries these turns again.
+    for (const tr of pending) spansRequested.delete(tr.traceId);
   } finally {
-    sessionSpansLoading.value = false;
+    spanLoads.value--;
+  }
+}
+
+// "Load older turns": the details API pages newest first, so the next page
+// goes before the loaded turns. Their spans follow in the background.
+const hasOlderTurns = ref(false);
+const loadingOlderTurns = ref(false);
+async function loadOlderTurns() {
+  if (loadingOlderTurns.value) return;
+  loadingOlderTurns.value = true;
+  try {
+    const result = await fetchSession(
+      streamName.value,
+      sessionId.value,
+      startTime.value,
+      endTime.value,
+      traces.value,
+    );
+    detail.value = result.detail;
+    traces.value = result.traces;
+    hasOlderTurns.value = result.hasOlder;
+    loadSessionSpans();
+  } catch (e: any) {
+    console.error("Older session turns fetch error:", e?.message, e?.raw ?? e);
+    toast({ variant: "error", message: t("traces.sessionDetail.loadOlderTurnsFailed") });
+  } finally {
+    loadingOlderTurns.value = false;
   }
 }
 
@@ -1673,8 +1840,8 @@ function openTrace(traceId: string) {
     query: {
       stream: streamName.value,
       trace_id: traceId,
-      from: startTime.value,
-      to: endTime.value,
+      from: sessionEvaluationRange.value.startTime,
+      to: sessionEvaluationRange.value.endTime,
       org_identifier: store.state.selectedOrganization?.identifier,
     },
   });
@@ -1733,6 +1900,8 @@ async function load() {
     );
     detail.value = result.detail;
     traces.value = result.traces;
+    hasOlderTurns.value = result.hasOlder;
+    loadSessionAgent();
     // Fetch the session spans in the background — powers the rail's Tool
     // Hotspots and makes the Pretty view instant. Not awaited (the page is
     // usable from `traces` alone).

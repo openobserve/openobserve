@@ -86,6 +86,12 @@ const skeletons = (wrapper: ReturnType<typeof mountPane>) =>
 const unavailable = (wrapper: ReturnType<typeof mountPane>) =>
   wrapper.find('[data-test="quality-score-pane-full-unavailable"]');
 
+const TraceDrawerStub = {
+  name: "AiTraceDrawer",
+  props: ["open", "view", "trace", "evaluator"],
+  template: "<div />",
+};
+
 function mountPane(props: Record<string, unknown> = {}) {
   return mount(QualityScorePane, {
     props: {
@@ -96,7 +102,10 @@ function mountPane(props: Record<string, unknown> = {}) {
       loading: false,
       ...props,
     },
-    global: { plugins: [store, withQueryClient()], stubs: { AddToDatasetDrawer: DrawerStub } },
+    global: {
+      plugins: [store, withQueryClient()],
+      stubs: { AddToDatasetDrawer: DrawerStub, AiTraceDrawer: TraceDrawerStub },
+    },
   });
 }
 
@@ -185,31 +194,30 @@ describe("QualityScorePane", () => {
     );
   });
 
-  it("opens the target and the evaluator trace from the footer in the same tab", async () => {
+  // AIO-21: the trace and its judge open in a drawer on this page, so the
+  // scope, the score list and the selected score stay put.
+  it("opens the scored trace and its judge in the trace drawer, without leaving the page", async () => {
     const wrapper = mountPane();
-    const trace = {
-      name: "traceDetails",
-      query: {
-        org_identifier: "default",
-        from: 1791199600000000 - 3_600_000_000,
-        to: 1791199600000000 + 3_600_000_000,
-        stream: "default",
-        trace_id: "70d86ea9c0ffee",
-      },
-    };
+    const drawer = () => wrapper.findComponent({ name: "AiTraceDrawer" });
     await wrapper.find('[data-test="quality-score-pane-open-target"]').trigger("click");
-    expect(push).toHaveBeenLastCalledWith(trace);
-    await wrapper.find('[data-test="quality-score-pane-open-evaluator"]').trigger("click");
-    expect(push).toHaveBeenLastCalledWith({
-      name: "traceDetails",
-      query: {
-        org_identifier: "default",
-        stream: "_evaluator",
-        trace_id: "eval-trace-1",
-        from: 1791199632199574 - 3_600_000_000,
-        to: 1791199632199574 + 3_600_000_000,
-      },
+    expect(push).not.toHaveBeenCalled();
+    expect(drawer().props("open")).toBe(true);
+    expect(drawer().props("view")).toBe("trace");
+    expect(drawer().props("trace")).toEqual({
+      traceId: "70d86ea9c0ffee",
+      stream: "default",
+      startTime: 1791199600000000 - 3_600_000_000,
+      endTime: 1791199600000000 + 3_600_000_000,
+      spanId: undefined,
     });
+    expect(drawer().props("evaluator")).toEqual({
+      traceId: "eval-trace-1",
+      stream: "_evaluator",
+      startTime: 1791199632199574 - 3_600_000_000,
+      endTime: 1791199632199574 + 3_600_000_000,
+    });
+    await wrapper.find('[data-test="quality-score-pane-open-evaluator"]').trigger("click");
+    expect(drawer().props("view")).toBe("evaluator");
     expect(window.open).not.toHaveBeenCalled();
     expect(wrapper.find('[data-test="quality-score-pane-open-target"]').text()).toBe("Open trace");
   });

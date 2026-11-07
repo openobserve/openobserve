@@ -89,8 +89,9 @@ pub struct ExperimentComparisonDimensionBody {
     pub score_config_version: Option<String>,
     pub baseline: Option<f64>,
     pub candidate: Option<f64>,
-    /// Original category names for categorical dimensions when each side has
-    /// one unambiguous label; `null` otherwise.
+    /// Original category names for categorical dimensions, or `true`/`false`
+    /// for boolean ones, when each side has one unambiguous value; `null`
+    /// otherwise.
     pub baseline_label: Option<String>,
     pub candidate_label: Option<String>,
     pub delta: Option<f64>,
@@ -162,8 +163,8 @@ pub struct ExperimentComparisonSummaryDimensionBody {
     pub score_config_version: Option<String>,
     pub baseline: Option<f64>,
     pub candidate: Option<f64>,
-    /// Original category names when every value represented by that side's
-    /// aggregate has the same label; `null` otherwise.
+    /// Original category (or boolean) values when every value represented by
+    /// that side's aggregate has the same one; `null` otherwise.
     pub baseline_label: Option<String>,
     pub candidate_label: Option<String>,
     pub delta: Option<f64>,

@@ -45,15 +45,18 @@ pub struct Scorer {
     pub updated_at: i64,
 }
 
-impl From<Model> for Scorer {
-    fn from(model: Model) -> Self {
-        Self {
+impl TryFrom<Model> for Scorer {
+    /// The scorer type the row carries, when this node does not know it.
+    type Error = String;
+
+    fn try_from(model: Model) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: model.id,
             org_id: model.org_id,
             entity_id: model.entity_id,
             name: model.name,
             version: model.version,
-            scorer_type: model.scorer_type,
+            scorer_type: model.scorer_type.parse()?,
             description: model.description,
             produces_score_config_id: model.produces_score_config_id,
             produces_score_config_version: model.produces_score_config_version,
@@ -63,8 +66,30 @@ impl From<Model> for Scorer {
             is_active: model.is_active,
             created_at: model.created_at,
             updated_at: model.updated_at,
-        }
+        })
     }
+}
+
+/// One row read by id; a type this node does not know is an error, as the
+/// caller asked for this scorer and cannot run it.
+fn known(model: Model) -> Result<Scorer, errors::Error> {
+    Scorer::try_from(model).map_err(|scorer_type| {
+        errors::Error::Message(format!("Unknown scorer type '{scorer_type}'"))
+    })
+}
+
+/// Rows of a type this node does not know (a newer node wrote them) are left
+/// out, so one such row cannot fail a whole list.
+fn known_rows(records: Vec<Model>) -> impl Iterator<Item = Scorer> {
+    records
+        .into_iter()
+        .filter_map(|model| match Scorer::try_from(model) {
+            Ok(scorer) => Some(scorer),
+            Err(scorer_type) => {
+                log::warn!("[Scorer] skipping a row of unknown scorer type '{scorer_type}'");
+                None
+            }
+        })
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
@@ -89,7 +114,7 @@ pub async fn add(scorer: &Scorer) -> Result<(), errors::Error> {
         entity_id: Set(scorer.entity_id.clone()),
         name: Set(scorer.name.clone()),
         version: Set(scorer.version),
-        scorer_type: Set(scorer.scorer_type),
+        scorer_type: Set(scorer.scorer_type.to_string()),
         description: Set(scorer.description.clone()),
         produces_score_config_id: Set(scorer.produces_score_config_id.clone()),
         produces_score_config_version: Set(scorer.produces_score_config_version),
@@ -114,7 +139,7 @@ pub async fn update(scorer: &Scorer) -> Result<(), errors::Error> {
         entity_id: Set(scorer.entity_id.clone()),
         name: Set(scorer.name.clone()),
         version: Set(scorer.version),
-        scorer_type: Set(scorer.scorer_type),
+        scorer_type: Set(scorer.scorer_type.to_string()),
         description: Set(scorer.description.clone()),
         produces_score_config_id: Set(scorer.produces_score_config_id.clone()),
         produces_score_config_version: Set(scorer.produces_score_config_version),
@@ -139,7 +164,8 @@ pub async fn get(id: &str) -> Result<Option<Scorer>, errors::Error> {
         .filter(Column::Id.eq(id))
         .one(client)
         .await?
-        .map(Scorer::from);
+        .map(known)
+        .transpose()?;
 
     Ok(record)
 }
@@ -157,7 +183,8 @@ pub async fn get_by_entity_id(
         .order_by(Column::Version, Order::Desc)
         .one(client)
         .await?
-        .map(Scorer::from);
+        .map(known)
+        .transpose()?;
 
     Ok(record)
 }
@@ -175,7 +202,8 @@ pub async fn get_by_entity_id_and_version(
         .filter(Column::Version.eq(version))
         .one(client)
         .await?
-        .map(Scorer::from);
+        .map(known)
+        .transpose()?;
 
     Ok(record)
 }
@@ -201,7 +229,7 @@ pub async fn get_by_entity_ids_and_versions(
         .filter(identities)
         .all(get_orm_client_ro().await)
         .await
-        .map(|records| records.into_iter().map(Scorer::from).collect())
+        .map(|records| known_rows(records).collect())
         .map_err(Into::into)
 }
 
@@ -215,7 +243,8 @@ pub async fn get_by_active_name(org_id: &str, name: &str) -> Result<Option<Score
         .order_by(Column::Version, Order::Desc)
         .one(client)
         .await?
-        .map(Scorer::from);
+        .map(known)
+        .transpose()?;
 
     Ok(record)
 }
@@ -228,12 +257,9 @@ pub async fn get_versions(org_id: &str, entity_id: &str) -> Result<Vec<Scorer>, 
         .filter(Column::EntityId.eq(entity_id))
         .order_by(Column::Version, Order::Desc)
         .all(client)
-        .await?
-        .into_iter()
-        .map(Scorer::from)
-        .collect();
+        .await?;
 
-    Ok(records)
+    Ok(known_rows(records).collect())
 }
 
 /// Updating a scorer deactivates its previous versions, so each entity has one
@@ -257,7 +283,7 @@ pub async fn get_by_type(
 ) -> Result<Vec<Scorer>, errors::Error> {
     let records: Vec<Model> = Entity::find()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::ScorerType.eq(*scorer_type))
+        .filter(Column::ScorerType.eq(scorer_type.as_str()))
         .filter(Column::IsActive.eq(true))
         .order_by(Column::Name, Order::Asc)
         .order_by(Column::Version, Order::Desc)
@@ -270,9 +296,7 @@ pub async fn get_by_type(
 /// Keep the highest version per logical entity (rows arrive version-descending).
 fn latest_per_entity(records: Vec<Model>) -> Vec<Scorer> {
     let mut seen = std::collections::HashSet::new();
-    records
-        .into_iter()
-        .map(Scorer::from)
+    known_rows(records)
         .filter(|s| seen.insert(s.entity_id.clone()))
         .collect()
 }
@@ -358,7 +382,7 @@ mod tests {
             entity_id: "scorer-entity-1".to_string(),
             name: "faithfulness_judge".to_string(),
             version: 1,
-            scorer_type: ScorerType::LlmJudge,
+            scorer_type: ScorerType::LlmJudge.to_string(),
             description: Some("LLM-based faithfulness scoring".to_string()),
             produces_score_config_id: Some("scfg-entity-1".to_string()),
             produces_score_config_version: Some(1),
@@ -378,7 +402,7 @@ mod tests {
     #[test]
     fn test_scorer_from_model_llm_judge() {
         let model = make_llm_judge_model();
-        let s = Scorer::from(model);
+        let s = Scorer::try_from(model).unwrap();
         assert_eq!(s.id, "scorer-1");
         assert_eq!(s.scorer_type, "llm_judge");
         assert_eq!(
@@ -395,7 +419,7 @@ mod tests {
         let mut model = make_llm_judge_model();
         model.id = "scorer-2".to_string();
         model.name = "compliance_remote".to_string();
-        model.scorer_type = ScorerType::Remote;
+        model.scorer_type = ScorerType::Remote.to_string();
         model.produces_score_config_id = None;
         model.produces_score_config_version = None;
         model.params = serde_json::json!({
@@ -403,8 +427,24 @@ mod tests {
             "http_method": "POST",
             "timeout_ms": 5000
         });
-        let s = Scorer::from(model);
+        let s = Scorer::try_from(model).unwrap();
         assert_eq!(s.scorer_type, "remote");
         assert!(s.produces_score_config_id.is_none());
+    }
+
+    #[test]
+    fn test_list_skips_rows_of_an_unknown_scorer_type() {
+        let mut code = make_llm_judge_model();
+        code.entity_id = "scorer-entity-code".to_string();
+        code.scorer_type = "code".to_string();
+        let mut future = make_llm_judge_model();
+        future.entity_id = "scorer-entity-future".to_string();
+        future.scorer_type = "python".to_string();
+
+        let list = latest_per_entity(vec![future.clone(), code, make_llm_judge_model()]);
+
+        let types: Vec<ScorerType> = list.iter().map(|s| s.scorer_type).collect();
+        assert_eq!(types, vec![ScorerType::Code, ScorerType::LlmJudge]);
+        assert!(known(future).is_err());
     }
 }

@@ -19,7 +19,9 @@ const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn() }));
 
 vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
-vi.mock("@/services/http", () => ({ default: () => ({ post: mockPost }) }));
+vi.mock("@/services/http", () => ({
+  default: () => ({ post: mockPost, defaults: { baseURL: "http://o2" } }),
+}));
 
 import llmAnnotationsService, { type AnnotatePayload } from "./llm-annotations.service";
 import analytics from "./product_analytics";
@@ -49,5 +51,29 @@ describe("annotate() analytics", () => {
     mockPost.mockRejectedValue(new Error("boom"));
     await expect(llmAnnotationsService.annotate("acme", payload)).rejects.toThrow("boom");
     expect(analytics.track).not.toHaveBeenCalled();
+  });
+});
+
+describe("sendTestFeedbackVote()", () => {
+  beforeEach(() => {
+    mockPost.mockResolvedValue({ data: { token: "fbt_t" } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+  });
+
+  it("mints a test token for the org's trace stream, then votes with it", async () => {
+    await llmAnnotationsService.sendTestFeedbackVote("team3", "user_feedback", "u@x", "llm");
+    expect(mockPost).toHaveBeenCalledWith(
+      "/api/team3/annotations/token",
+      expect.objectContaining({ stream: "llm", scoreConfig: "user_feedback", test: true }),
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "http://o2/api/v2/team3/annotations/public?token=fbt_t",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("leaves the stream to the server when the org has none", async () => {
+    await llmAnnotationsService.sendTestFeedbackVote("team1", "user_feedback", "u@x", "");
+    expect(mockPost.mock.calls[0][1].stream).toBeUndefined();
   });
 });

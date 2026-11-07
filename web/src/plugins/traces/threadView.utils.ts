@@ -113,7 +113,7 @@ export function hasLLMPayload(span: any): boolean {
  * Deliberately broader than `classify`'s `llm_turn` set — an `embeddings`
  * span is a real LLM call even though it carries no chat transcript.
  */
-const LLM_CALL_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
+export const LLM_CALL_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
 
 export function classify(span: any): SpanKind {
   const obs = getOp(span);
@@ -222,7 +222,12 @@ export function extractContent(content: unknown): string {
       .map((part: unknown) => {
         if (typeof part === "string") return part;
         if (!isRecord(part)) return "";
+        // OpenInference list content: `contents[].message_content.{type,text,image}`.
+        if (isRecord(part.message_content)) return extractContent([part.message_content]);
         if (part.text) return String(part.text);
+        // The Thread view draws tool calls as cards (see toolCallParts), not as
+        // "Called name(...)" text inside the assistant bubble.
+        if (isToolCallRecord(part) || part.type === "server_tool_call") return "";
 
         const genAiText = extractGenAiPartText(part);
         if (genAiText != null) return genAiText;
@@ -282,12 +287,35 @@ function anyValueToText(value: unknown): string {
   }
 }
 
+/** OpenInference wraps each message as `{message: {role, content, tool_calls}}`. */
+function unwrapMessage(value: unknown): unknown {
+  return isRecord(value) && isRecord(value.message) && !("role" in value) ? value.message : value;
+}
+
+/**
+ * A record that is itself one tool call: a semconv `tool_call` part, an
+ * Anthropic `tool_use` block or a Vercel AI SDK `{toolCallId, toolName}` entry.
+ */
+function isToolCallRecord(value: UnknownRecord): boolean {
+  return (
+    value.type === "tool_call" || value.type === "tool_use" || typeof value.toolName === "string"
+  );
+}
+
 function messageFromAnyValue(value: unknown, defaultRole: Role): Message | null {
-  const record = isRecord(value) ? value : null;
+  const unwrapped = unwrapMessage(value);
+  const record = isRecord(unwrapped) ? unwrapped : null;
   const role = normalizeRole(record?.role ?? defaultRole);
   const hasMessageContent =
-    record !== null && ("content" in record || "text" in record || "parts" in record);
-  const rawContent = hasMessageContent ? (record.content ?? record.text ?? record.parts) : value;
+    record !== null &&
+    ("content" in record || "text" in record || "parts" in record || "contents" in record);
+  // A tool call, or a message carrying only tool calls, is drawn as a tool card.
+  if (record && !hasMessageContent && (isToolCallRecord(record) || "tool_calls" in record)) {
+    return null;
+  }
+  const rawContent = hasMessageContent
+    ? (record.content ?? record.text ?? record.parts ?? record.contents)
+    : unwrapped;
   const content = hasMessageContent ? extractContent(rawContent) : anyValueToText(rawContent);
 
   if (!content.trim()) return null;
@@ -401,6 +429,83 @@ export function looksLikeAgentInjection(text: string): boolean {
 // ---------------------------------------------------------------------------
 // Turn / trace-group construction
 // ---------------------------------------------------------------------------
+
+export interface ToolCallPart {
+  id: string;
+  name: string;
+  arguments: unknown;
+}
+
+/**
+ * One tool call in any of the shapes SDKs write: OpenAI `{id, function: {name,
+ * arguments}}`, OpenInference's `{tool_call: {…}}` wrapper around it, flat
+ * `{id, name, arguments}` (semconv parts, Traceloop/OpenLLMetry), Anthropic
+ * `{type: "tool_use", id, name, input}` and Vercel AI SDK `{toolCallId,
+ * toolName, args | input}`.
+ */
+function toolCallFrom(value: UnknownRecord): ToolCallPart {
+  const call = isRecord(value.tool_call) ? value.tool_call : value;
+  const fn = isRecord(call.function) ? call.function : null;
+  return {
+    id: String(call.id ?? call.toolCallId ?? ""),
+    name: String(fn?.name ?? call.name ?? call.toolName ?? ""),
+    arguments: fn ? fn.arguments : (call.arguments ?? call.args ?? call.input),
+  };
+}
+
+/**
+ * The tool calls an LLM turn asked for, in order: tool-call parts of its output
+ * messages, their `tool_calls` entries, and output entries that are themselves
+ * tool calls (Vercel AI SDK `ai.response.toolCalls`). See `toolCallFrom`.
+ *
+ * @example toolCallParts('[{"role":"assistant","parts":[{"type":"tool_call","id":"c1","name":"grep","arguments":{"q":"x"}}]}]')
+ *   // [{ id: "c1", name: "grep", arguments: { q: "x" } }]
+ */
+export function toolCallParts(raw: unknown): ToolCallPart[] {
+  const parsed = decodeAnyValue(raw);
+  if (parsed == null) return [];
+  const messages = resolveMessageArray(parsed);
+  const out: ToolCallPart[] = [];
+  for (const value of messages.length ? messages : [parsed]) {
+    const m = unwrapMessage(value);
+    if (!isRecord(m)) continue;
+    if (isToolCallRecord(m)) {
+      out.push(toolCallFrom(m));
+      continue;
+    }
+    const parts = Array.isArray(m.parts) ? m.parts : Array.isArray(m.content) ? m.content : [];
+    for (const p of parts) {
+      if (isRecord(p) && isToolCallRecord(p)) out.push(toolCallFrom(p));
+    }
+    for (const c of Array.isArray(m.tool_calls) ? m.tool_calls : []) {
+      if (isRecord(c)) out.push(toolCallFrom(c));
+    }
+  }
+  return out;
+}
+
+/**
+ * A turn's tool calls (AIO-21): its execute_tool spans, plus a placeholder for
+ * each `tool_call` part no span carries by `gen_ai_tool_call_id`, so a call is
+ * shown even when the SDK records no tool span (it then has no duration).
+ */
+function withUnmatchedToolCalls(turnSpan: any, spans: any[]): any[] {
+  const ids = new Set(spans.map((t) => String(t.gen_ai_tool_call_id ?? "")).filter(Boolean));
+  // Spans without call ids cannot be matched to parts: trust the spans.
+  if (spans.length && !ids.size) return spans;
+  const extra = toolCallParts(getOutputRaw(turnSpan))
+    // A call without a name has nothing to show on a card.
+    .filter((c) => c.name && !ids.has(c.id) && (c.id || !spans.length))
+    .map((c, i) => ({
+      span_id: `tool-call:${turnSpan.span_id}:${c.id || i}`,
+      gen_ai_tool_name: c.name,
+      gen_ai_tool_call_id: c.id,
+      gen_ai_tool_call_arguments: c.arguments,
+      start_time: turnSpan.end_time,
+      synthetic: true,
+    }));
+  return [...spans, ...extra];
+}
 
 /** Earliest start and latest end in ns, skipping missing or negative times; null without both. */
 export function spanTimeBounds(
@@ -535,7 +640,9 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
 
     return {
       span: turnSpan,
-      toolCalls: attached.sort((a, b) => Number(a.start_time) - Number(b.start_time)),
+      toolCalls: withUnmatchedToolCalls(turnSpan, attached).sort(
+        (a, b) => Number(a.start_time) - Number(b.start_time),
+      ),
       assistant: messagesFromOutput(getOutputRaw(turnSpan)),
       followupUsers,
     };

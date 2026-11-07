@@ -198,8 +198,28 @@ describe("traces/constants", () => {
 
       it("should leave an unknown label value unchanged", () => {
         const result = parseSpanKindWhereClause("span_kind='Unknown'", parser);
-        // sqlify normalises spacing but preserves the unrecognised value
-        expect(result).toBe("span_kind = 'Unknown'");
+        // Nothing converted, so the clause is returned as written.
+        expect(result).toBe("span_kind='Unknown'");
+      });
+
+      // A deep link's trace-level filter quotes the stream; re-serialising it
+      // turned "default" into `default`, which the backend rejects.
+      it("should return a clause with no span_kind label exactly as written", () => {
+        const clause =
+          `trace_id IN (SELECT trace_id FROM "default" WHERE (tenant_id = 'globex')) AND ` +
+          `gen_ai_tool_name = 'web_search' AND span_status = 'ERROR'`;
+        expect(parseSpanKindWhereClause(clause, parser, "default")).toBe(clause);
+      });
+
+      it("should keep double-quoted identifiers when a span_kind label is converted", () => {
+        const result = parseSpanKindWhereClause(
+          `trace_id IN (SELECT trace_id FROM "default" WHERE (tenant_id = 'globex')) AND span_kind = 'Server'`,
+          parser,
+          "default",
+        );
+        expect(result).toContain(`FROM "default"`);
+        expect(result).not.toContain("`");
+        expect(result).toContain("span_kind = '2'");
       });
 
       it("should return an empty string unchanged", () => {

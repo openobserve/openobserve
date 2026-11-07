@@ -74,6 +74,7 @@ const WINDOWS = {
 function mountView(
   versionList: GenAiAgentListItem[] = [AGENT_A, AGENT_B],
   windows: unknown = null,
+  initialPair: { a: string; b: string } | null = null,
 ) {
   return mount(VersionCompareView, {
     props: {
@@ -83,6 +84,7 @@ function mountView(
       result: null,
       sparklinesA: null,
       sparklinesB: null,
+      initialPair,
     },
     global: {
       stubs: {
@@ -150,10 +152,17 @@ describe("VersionCompareView — default version seeding", () => {
     const runEvents = w.emitted("run");
     expect(runEvents).toBeTruthy();
     const payload = runEvents!.at(-1)![0] as any;
-    // A = latest (2.1.0), B = previous (2.0.0) — NOT two copies of 2.1.0.
-    expect(payload.a.version).toBe("2.1.0");
-    expect(payload.b.version).toBe("2.0.0");
+    // A = previous (2.0.0, the baseline), B = latest (2.1.0) — NOT two copies of 2.1.0.
+    expect(payload.a.version).toBe("2.0.0");
+    expect(payload.b.version).toBe("2.1.0");
     expect(payload.a.version).not.toBe(payload.b.version);
+  });
+
+  it("opens on the given pair instead of latest vs previous", () => {
+    const w = mountView([AGENT_A, AGENT_B], null, { a: "1.4.0", b: "1.5.0" });
+    const payload = w.emitted("run")!.at(-1)![0] as any;
+    expect(payload.a.version).toBe("1.4.0");
+    expect(payload.b.version).toBe("1.5.0");
   });
 });
 

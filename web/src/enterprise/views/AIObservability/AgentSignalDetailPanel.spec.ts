@@ -1,9 +1,23 @@
+// @vitest-environment jsdom
 import { afterEach, describe, it, expect, vi } from "vitest";
+import { defineComponent, h } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
-import { buildAgentClimbFilter } from "./agentClimbFilter";
+import {
+  buildAgentClimbFilter,
+  errorDetailExpr,
+  failureErrorsSql,
+  failureTracesSql,
+} from "./agentClimbFilter";
+import { explainSignalPrompt } from "./agentSignalPrompt";
+
+const mockSearch = vi.fn();
+vi.mock("@/services/search", () => ({
+  default: { search: (...args: unknown[]) => mockSearch(...args) },
+}));
+vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStream: vi.fn() }) }));
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 
 const CALLER_EXPR = "COALESCE(c.gen_ai_agent_name, c.service_name)";
@@ -90,5 +104,123 @@ describe("buildAgentClimbFilter", () => {
     });
     expect(sql).toContain("c.gen_ai_agent_env = 'o''reilly'");
     expect(sql).toContain("c.gen_ai_agent_version = '1''0'");
+  });
+});
+
+describe("errorDetailExpr", () => {
+  it("coalesces only the error-detail columns the stream has", () => {
+    const expr = errorDetailExpr(new Set(["status_message", "exception_message", "span_id"]));
+    expect(expr).toBe("COALESCE(NULLIF(c.status_message, ''), NULLIF(c.exception_message, ''))");
+    expect(expr).not.toContain("error_message");
+  });
+
+  it("is null when the stream has none, so no query names a missing column", () => {
+    expect(errorDetailExpr(new Set(["span_id"]))).toBeNull();
+  });
+});
+
+describe("failure drill-down SQL", () => {
+  const joins = 'LEFT JOIN "s" AS p1 ON c.reference_parent_span_id = p1.span_id';
+  const detail = "COALESCE(NULLIF(c.status_message, ''))";
+
+  // A child span joined to N duplicate parent copies yields N rows; COUNT(*)
+  // inflated the counts, distinct span ids do not.
+  it("counts distinct error spans per message, not joined rows", () => {
+    const sql = failureErrorsSql("s", joins, "1=1", detail);
+    expect(sql).toContain("COUNT(DISTINCT c.span_id) AS occurrences");
+    expect(sql).not.toContain("COUNT(*)");
+  });
+
+  it("counts distinct error spans per trace, not joined rows", () => {
+    const sql = failureTracesSql("s", joins, "1=1");
+    expect(sql).toContain("COUNT(DISTINCT c.span_id) AS spans");
+    expect(sql).not.toContain("COUNT(*)");
+  });
+});
+
+describe("explainSignalPrompt failure evidence", () => {
+  const evidence = {
+    stream: "s",
+    errors: [{ message: "boom", occurrences: 3 }],
+    traces: [{ trace_id: "t1", measure: "2 error spans" }],
+  };
+
+  it("says a failure signal's evidence covers all of the agent's failure classes", () => {
+    const prompt = explainSignalPrompt(
+      { signalType: "failure", agent: "a", failClass: "unclassified", count: 9 },
+      evidence,
+    );
+    const errorsLine = prompt.split("\n").find((l) => l.includes('"boom"'))!;
+    const tracesLine = prompt.split("\n").find((l) => l.includes("t1"))!;
+    expect(errorsLine).toMatch(/all of this agent's failure classes/);
+    expect(tracesLine).toMatch(/all of this agent's failure classes/);
+  });
+
+  it("does not add the all-classes qualifier to other signals", () => {
+    const prompt = explainSignalPrompt({ signalType: "cost", agent: "a" }, evidence);
+    expect(prompt).not.toMatch(/all of this agent's failure classes/);
+  });
+});
+
+describe("AgentSignalDetailPanel — late responses", () => {
+  const ODrawer = defineComponent({
+    setup:
+      (_, { slots }) =>
+      () =>
+        h("div", slots.default?.()),
+  });
+  const OButton = defineComponent({
+    setup:
+      (_, { slots }) =>
+      () =>
+        h("button", slots.default?.()),
+  });
+  const loopRow = (agent: string, tool: string) => ({
+    signalType: "loop" as const,
+    agent,
+    agentRaw: agent,
+    tool,
+  });
+  const hits = (traceId: string) => ({ data: { hits: [{ trace_id: traceId, repeats: 12 }] } });
+
+  it("explains the row it shows when the previous row's traces answer last", async () => {
+    const previous = Promise.withResolvers<unknown>();
+    const current = Promise.withResolvers<unknown>();
+    mockSearch.mockReturnValueOnce(previous.promise).mockReturnValueOnce(current.promise);
+    const wrapper = mount(AgentSignalDetailPanel, {
+      props: { open: false, row: null, sourceStream: "default", explainable: true },
+      global: {
+        plugins: [
+          i18n,
+          createRouter({ history: createMemoryHistory(), routes: [] }),
+          createStore({ state: { selectedOrganization: { identifier: "test-org" } } }),
+        ],
+        stubs: {
+          ODrawer,
+          OButton,
+          OIcon: true,
+          OTable: true,
+          OAgentBadges: true,
+          OTruncatedText: true,
+        },
+      },
+    });
+    await wrapper.setProps({ open: true, row: loopRow("research-agent", "web_search") });
+    await wrapper.setProps({ row: loopRow("support-bot", "lookup_order") });
+    const explainButton = () => wrapper.find('[data-test="agent-signal-detail-explain"]');
+
+    previous.resolve(hits("research-trace"));
+    await flushPromises();
+    // The current row is still loading: Explain waits for its evidence.
+    expect(explainButton().attributes("disabled")).toBeDefined();
+
+    current.resolve(hits("support-trace"));
+    await flushPromises();
+    expect(explainButton().attributes("disabled")).toBeUndefined();
+    await explainButton().trigger("click");
+
+    const sent = JSON.stringify(wrapper.emitted("sendToAiChat"));
+    expect(sent).toContain("support-trace");
+    expect(sent).not.toContain("research-trace");
   });
 });

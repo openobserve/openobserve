@@ -107,6 +107,7 @@ pub struct RemoteScorerHeader {
 pub enum ScorerCreateConfig {
     LlmJudge(LlmJudgeScorerRequest),
     Remote(RemoteScorerRequest),
+    Code(CodeScorerRequest),
 }
 
 // Not derived: utoipa's allOf keeps additionalProperties:false and so forbids the tag.
@@ -115,6 +116,7 @@ impl PartialSchema for ScorerCreateConfig {
         OneOfBuilder::new()
             .item(tagged_variant("llm_judge", LlmJudgeScorerRequest::schema()))
             .item(tagged_variant("remote", RemoteScorerRequest::schema()))
+            .item(tagged_variant("code", CodeScorerRequest::schema()))
             .into()
     }
 }
@@ -123,6 +125,7 @@ impl ToSchema for ScorerCreateConfig {
     fn schemas(schemas: &mut Vec<(String, RefOr<Schema>)>) {
         LlmJudgeScorerRequest::schemas(schemas);
         RemoteScorerRequest::schemas(schemas);
+        CodeScorerRequest::schemas(schemas);
     }
 }
 
@@ -150,11 +153,25 @@ pub struct RemoteScorerRequest {
     pub params: RemoteScorerParams,
 }
 
+/// A Code scorer: `template` holds the JavaScript `function score(...)`, whose
+/// parameter names are the scorer's variables. It needs no provider or params.
+/// The same body creates and updates one.
+#[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CodeScorerRequest {
+    #[serde(default)]
+    pub produces_score_config_id: Option<String>,
+    #[serde(default)]
+    pub produces_score_config_version: Option<i32>,
+    pub template: String,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ScorerUpdateConfig {
     LlmJudge(LlmJudgeScorerUpdateRequest),
     Remote(RemoteScorerUpdateRequest),
+    Code(CodeScorerRequest),
 }
 
 // Not derived for the same reason as `ScorerCreateConfig`.
@@ -169,6 +186,7 @@ impl PartialSchema for ScorerUpdateConfig {
                 "remote",
                 RemoteScorerUpdateRequest::schema(),
             ))
+            .item(tagged_variant("code", CodeScorerRequest::schema()))
             .into()
     }
 }
@@ -177,6 +195,7 @@ impl ToSchema for ScorerUpdateConfig {
     fn schemas(schemas: &mut Vec<(String, RefOr<Schema>)>) {
         LlmJudgeScorerUpdateRequest::schemas(schemas);
         RemoteScorerUpdateRequest::schemas(schemas);
+        CodeScorerRequest::schemas(schemas);
     }
 }
 
@@ -222,6 +241,26 @@ fn tagged_variant(tag: &str, variant: RefOr<Schema>) -> RefOr<Schema> {
     );
     object.required.push("type".to_string());
     RefOr::T(Schema::Object(object))
+}
+
+type ScorerFields = (
+    ScorerType,
+    Option<String>,
+    Option<i32>,
+    String,
+    Option<Value>,
+    Value,
+);
+
+fn code_scorer_fields(scorer: CodeScorerRequest) -> ScorerFields {
+    (
+        ScorerType::Code,
+        scorer.produces_score_config_id,
+        scorer.produces_score_config_version,
+        scorer.template,
+        None,
+        serde_json::json!({}),
+    )
 }
 
 /// HTTP request body for creating a Scorer.
@@ -419,6 +458,7 @@ impl From<ScorerRequestBody> for infra::table::scorers::Scorer {
                 None,
                 params_to_value(scorer.params),
             ),
+            ScorerCreateConfig::Code(scorer) => code_scorer_fields(scorer),
         };
 
         Self {
@@ -467,6 +507,7 @@ impl From<ScorerUpdateRequestBody> for infra::table::scorers::Scorer {
                 None,
                 params_to_value(scorer.params),
             ),
+            ScorerUpdateConfig::Code(scorer) => code_scorer_fields(scorer),
         };
 
         Self {
@@ -495,6 +536,15 @@ impl From<infra::table::scorers::Scorer> for ScorerResponseBody {
             o2_enterprise::enterprise::llm_evaluations::scorers::reference_requirement(&value),
             o2_enterprise::enterprise::llm_evaluations::scorers::ScorerReferenceRequirement::ExpectedOutput
         );
+        let variables = match value.scorer_type {
+            ScorerType::Code => {
+                o2_enterprise::enterprise::llm_evaluations::scorers::code::score_params(
+                    &value.template,
+                )
+                .unwrap_or_default()
+            }
+            _ => template_variables(&value.template),
+        };
         Self {
             id: value.id,
             entity_id: value.entity_id,
@@ -506,7 +556,7 @@ impl From<infra::table::scorers::Scorer> for ScorerResponseBody {
             produces_score_config_id: value.produces_score_config_id,
             produces_score_config_version: value.produces_score_config_version,
             template: value.template.clone(),
-            variables: template_variables(&value.template),
+            variables,
             reference_based,
             output_schema: value.output_schema,
             params: value.params,
@@ -595,7 +645,11 @@ mod tests {
             "template": "{{output}}",
             "params": {"endpoint": "https://eval.example.com", "timeout_ms": null}
         });
-        for (body, variant) in [(&judge, 0), (&remote, 1)] {
+        let code = serde_json::json!({
+            "type": "code",
+            "template": "function score(output) { return 1; }"
+        });
+        for (body, variant) in [(&judge, 0), (&remote, 1), (&code, 2)] {
             serde_json::from_value::<ScorerCreateConfig>(body.clone()).unwrap();
             serde_json::from_value::<ScorerUpdateConfig>(body.clone()).unwrap();
             assert_eq!(
@@ -709,7 +763,7 @@ mod tests {
                 assert_eq!(scorer.produces_score_config_version, Some(2));
                 assert_eq!(scorer.params.provider_id, "p1");
             }
-            ScorerCreateConfig::Remote(_) => panic!("expected llm_judge scorer"),
+            _ => panic!("expected llm_judge scorer"),
         }
     }
 
@@ -866,7 +920,7 @@ mod tests {
                 assert_eq!(remote.params.endpoint, "http://localhost:8000/evaluate");
                 assert_eq!(remote.params.http_method.as_deref(), Some("POST"));
             }
-            ScorerCreateConfig::LlmJudge(_) => panic!("expected remote scorer"),
+            _ => panic!("expected remote scorer"),
         }
     }
 
@@ -899,6 +953,39 @@ mod tests {
             Some("scfg-entity-1".to_string())
         );
         assert_eq!(scorer.produces_score_config_version, Some(2));
+    }
+
+    #[test]
+    fn test_code_scorer_request_round_trips_with_its_parameters_as_variables() {
+        let source =
+            "function score(output, expected_output) { return output === expected_output; }";
+        let body: ScorerRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "exact_match",
+            "scorer": {
+                "type": "code",
+                "producesScoreConfigId": "scfg-entity-1",
+                "template": source
+            }
+        }))
+        .unwrap();
+
+        let scorer = infra::table::scorers::Scorer::from(body);
+        assert_eq!(scorer.scorer_type, "code");
+        assert_eq!(scorer.template, source);
+        assert_eq!(scorer.params, serde_json::json!({}));
+
+        let response = ScorerResponseBody::from(scorer);
+        assert_eq!(response.variables, vec!["output", "expected_output"]);
+        assert!(response.reference_based);
+
+        let update: ScorerUpdateRequestBody = serde_json::from_value(serde_json::json!({
+            "scorer": {"type": "code", "template": source}
+        }))
+        .unwrap();
+        assert_eq!(
+            infra::table::scorers::Scorer::from(update).scorer_type,
+            ScorerType::Code
+        );
     }
 
     #[test]

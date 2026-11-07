@@ -33,6 +33,8 @@ pub struct Model {
     pub span_selector_bindings: Option<Json>,
     pub trace_config: Option<Json>,
     pub session_config: Option<Json>,
+    /// `EvalJobBudget`; NULL on jobs saved before budgets.
+    pub budget: Option<Json>,
     pub sampling_mode: String,
     pub sampling_value: Json,
     pub status: String,
@@ -73,6 +75,7 @@ mod tests {
             span_selector_bindings: None,
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: "rate".to_string(),
             sampling_value: serde_json::json!({"rate": 0.1}),
             status: "draft".to_string(),

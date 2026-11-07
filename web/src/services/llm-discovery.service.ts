@@ -49,6 +49,10 @@ export interface LlmDiscoveryItem {
   sourceStream: string | null;
   quality: DiscoveryQuality;
   issueCount: number;
+  /** The newest end-user vote on the target is Not helpful (AIO-40). */
+  notHelpful: boolean;
+  /** That vote's comment, when the user left one. */
+  feedbackComment: string | null;
   /** Business input, flattened to text (the raw field can be a JSON payload). */
   input: string;
   /** span + trace */
@@ -151,6 +155,8 @@ function normalize(d: any): LlmDiscoveryItem {
     sourceStream: stringOrNull(d.sourceStream),
     quality: (d.quality ?? "issue") as DiscoveryQuality,
     issueCount: numberOrNull(d.issueCount) ?? 1,
+    notHelpful: d.notHelpful === true,
+    feedbackComment: stringOrNull(d.feedbackComment),
     input: inputText(ctx.input),
     operationName: stringOrNull(ctx.operationName) ?? "",
     genAiOperationName: stringOrNull(ctx.genAiOperationName) ?? "",

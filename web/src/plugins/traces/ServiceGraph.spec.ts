@@ -2227,6 +2227,18 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const panel = wrapper.findComponent({ name: "ServiceGraphSidePanel" });
       expect(panel.props("timeRange")).toEqual({ startTime: 1000, endTime: 2000 });
     });
+
+    it("uses the embedding page's timeRange over the traces datetime", async () => {
+      const pageRange = { startTime: 5000000, endTime: 9000000 };
+      wrapper = createWrapper({}, { timeRange: pageRange });
+      await flushPromises();
+
+      wrapper.vm.handleNodeClick({ dataType: "node", data: wrapper.vm.graphData.nodes[0] });
+      await flushPromises();
+
+      const panel = wrapper.findComponent({ name: "ServiceGraphSidePanel" });
+      expect(panel.props("timeRange")).toEqual(pageRange);
+    });
   });
 
   describe("node side panel after a reload", () => {

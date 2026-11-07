@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   dimensions and types, so there is no single scalar score — this is the
   health-threshold rollup: `issue` (one unhealthy dimension) or `multiple`.
   The per-dimension breakdown needs dimension detail on the row (TODO(BE)).
+  An end user's Not helpful vote (AIO-40) is one such dimension, and the only
+  one the row names, with the user's comment.
 -->
 <template>
   <span
@@ -30,11 +32,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     {{
       isMultiple
         ? t("aiObservability.discovery.quality.multiple")
-        : t("aiObservability.discovery.quality.issue")
+        : notHelpful
+          ? t("endUserFeedback.notHelpful")
+          : t("aiObservability.discovery.quality.issue")
     }}
     <span v-if="issueCount > 1" class="text-text-secondary text-2xs tabular-nums">
       {{ t("aiObservability.discovery.quality.issueCount", { count: issueCount }) }}
     </span>
+    <span
+      v-if="notHelpful && feedbackComment"
+      class="text-text-secondary max-w-60 truncate font-normal"
+      :title="feedbackComment"
+      data-test="discovery-quality-feedback-comment"
+      >{{ t("endUserFeedback.quoted", { comment: feedbackComment }) }}</span
+    >
   </span>
 </template>
 
@@ -46,9 +57,15 @@ import type { DiscoveryQuality } from "@/services/llm-discovery.service";
 
 defineOptions({ name: "DiscoveryQualityCell" });
 
-const props = withDefaults(defineProps<{ quality: DiscoveryQuality; issueCount?: number }>(), {
-  issueCount: 1,
-});
+const props = withDefaults(
+  defineProps<{
+    quality: DiscoveryQuality;
+    issueCount?: number;
+    notHelpful?: boolean;
+    feedbackComment?: string | null;
+  }>(),
+  { issueCount: 1, notHelpful: false, feedbackComment: null },
+);
 
 const { t } = useI18nTyped();
 

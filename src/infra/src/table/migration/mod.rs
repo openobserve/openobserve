@@ -247,6 +247,7 @@ mod m20261026_000003_create_workflow_http_trigger_requests;
 mod m20261027_000001_alter_query_history;
 mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261028_000001_add_llm_dataset_item_write_version;
+mod m20261029_000001_add_budget_to_online_eval_jobs;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
 mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
@@ -842,6 +843,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261214_000001_templates_columns_to_text::Migration),
             Box::new(m20261215_000001_add_alert_incident_title_template::Migration),
             Box::new(m20261216_000001_rename_user_default_folders::Migration),
+            Box::new(m20261029_000001_add_budget_to_online_eval_jobs::Migration),
         ]
     }
 }
@@ -962,6 +964,7 @@ mod tests {
         (144, "m20261214_000001_templates_columns_to_text"),
         (145, "m20261215_000001_add_alert_incident_title_template"),
         (146, "m20261216_000001_rename_user_default_folders"),
+        (147, "m20261029_000001_add_budget_to_online_eval_jobs"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

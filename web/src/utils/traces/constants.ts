@@ -58,12 +58,14 @@ export const parseSpanKindWhereClause = (
       const fullSql = `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
       const ast = parser.astify(fullSql);
 
+      let rewritten = false;
       const replaceSpanKindStringNode = (strNode: any) => {
         if (strNode?.type === "single_quote_string" || strNode?.type === "string") {
           const label = String(strNode.value).trim().toLowerCase();
           const key = SPAN_KIND_LABEL_TO_KEY[label];
           if (key !== undefined) {
             strNode.value = key;
+            rewritten = true;
           }
         }
       };
@@ -88,9 +90,15 @@ export const parseSpanKindWhereClause = (
 
       processNode(ast.where);
 
+      // Nothing to convert: keep the clause as written. Re-serialising would
+      // rewrite quoted identifiers ("default" → `default`), which the backend
+      // rejects.
+      if (!rewritten) return whereClause;
+
+      // sqlify quotes identifiers with backticks; the backend expects double quotes.
       const resultSql: string = parser.sqlify(ast);
       const whereMatch = resultSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
-      return whereMatch ? whereMatch[1].trim() : whereClause;
+      return whereMatch ? whereMatch[1].trim().replace(/`/g, '"') : whereClause;
     } catch {
       // fall through to regex fallback
     }

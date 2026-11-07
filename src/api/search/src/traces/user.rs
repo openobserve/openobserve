@@ -516,8 +516,7 @@ fn build_user_trace_usage_sql(
 ) -> String {
     let stream_ident = quote_identifier(stream_name);
     if layout.has_gen_ai {
-        let usage =
-            |column: &str| super::schema_compat::usage_sum_expr(column, layout.has_operation_name);
+        let usage = |column: &str| super::session::usage_rule(column, layout.has_operation_name);
         let total_tokens_expr = usage("gen_ai_usage_total_tokens");
         let cost_expr = usage("gen_ai_usage_cost");
         format!(
@@ -826,7 +825,7 @@ mod tests {
     }
 
     #[test]
-    fn user_trace_usage_sql_sums_only_llm_call_spans() {
+    fn user_trace_usage_sql_uses_the_per_trace_usage_rule() {
         let sql = build_user_trace_usage_sql(
             "default",
             "abc-1",
@@ -837,12 +836,17 @@ mod tests {
         );
         let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
                         ('chat', 'text_completion', 'generate_content', 'embeddings'))";
-        assert!(sql.contains(&format!(
-            "sum(CASE WHEN {llm_call} THEN gen_ai_usage_total_tokens ELSE 0 END) \
-             as gen_ai_usage_details_total"
-        )));
-        assert!(sql.contains(&format!(
-            "sum(CASE WHEN {llm_call} THEN gen_ai_usage_cost ELSE 0 END) as gen_ai_usage_cost_details"
-        )));
+        // LLM-call usage, else the agent span's: a trace with usage only on its
+        // invoke_agent span counts, a rollup repeating its chat child counts once.
+        for (column, alias) in [
+            ("gen_ai_usage_total_tokens", "gen_ai_usage_details_total"),
+            ("gen_ai_usage_cost", "gen_ai_usage_cost_details"),
+        ] {
+            assert!(sql.contains(&format!(
+                "COALESCE(NULLIF(sum(CASE WHEN {llm_call} THEN {column} ELSE 0 END), 0), \
+                 max(CASE WHEN gen_ai_operation_name = 'invoke_agent' THEN {column} END), 0) \
+                 as {alias}"
+            )));
+        }
     }
 }

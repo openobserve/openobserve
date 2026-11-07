@@ -149,6 +149,68 @@ pub fn is_valid_transition(from: &str, to: &str) -> bool {
     )
 }
 
+const DAY_US: i64 = 24 * 60 * 60 * 1_000_000;
+
+/// 00:00 UTC of the day `at_us` falls in; Unix time has no leap seconds, so days are exact.
+pub fn utc_day_start_us(at_us: i64) -> i64 {
+    at_us - at_us.rem_euclid(DAY_US)
+}
+
+/// What the health pass does once a job's judge spend for the day reaches its budget.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BudgetAction {
+    /// Pause until 00:00 UTC; the first health pass of the next day resumes the job.
+    #[default]
+    Pause,
+    /// Keep scoring; the job only reads as over budget.
+    KeepRunning,
+}
+
+/// A job's daily judge spend limit (AIO-24). One budget covers all regions.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvalJobBudget {
+    /// Judge spend allowed per UTC day, in USD.
+    pub daily_usd: f64,
+    #[serde(default)]
+    pub on_reach: BudgetAction,
+    /// When the health pass paused the job for this budget, in microseconds. Server-owned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_at: Option<i64>,
+    /// "Resume until 00:00 UTC": the budget does not apply before this time, in microseconds.
+    /// Server-owned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lifted_until: Option<i64>,
+}
+
+impl EvalJobBudget {
+    /// A request sets the limit and action only; the pause state stays the stored job's.
+    pub fn with_server_state_of(mut self, stored: Option<&EvalJobBudget>) -> Self {
+        self.paused_at = stored.and_then(|b| b.paused_at);
+        self.lifted_until = stored.and_then(|b| b.lifted_until);
+        self
+    }
+
+    /// The budget once the job moves to `new_status`. Only a budget pause records `paused_at`,
+    /// so a job the user paused never resumes on its own. Resuming a job the same UTC day its
+    /// budget paused it lifts the budget until 00:00 UTC; the next day's resume does not.
+    pub fn after_transition(mut self, new_status: &str, for_budget: bool, now_us: i64) -> Self {
+        match new_status {
+            "paused" => self.paused_at = for_budget.then_some(now_us),
+            "active" => {
+                let today = utc_day_start_us(now_us);
+                if self.paused_at.is_some_and(|at| at >= today) {
+                    self.lifted_until = Some(today + DAY_US);
+                }
+                self.paused_at = None;
+            }
+            _ => {}
+        }
+        self
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OnlineEvalJob {
     pub id: String,
@@ -170,6 +232,8 @@ pub struct OnlineEvalJob {
     pub trace_config: Option<TraceEvalConfig>,
     #[serde(default)]
     pub session_config: Option<SessionEvalConfig>,
+    #[serde(default)]
+    pub budget: Option<EvalJobBudget>,
     pub sampling_mode: SamplingMode,
     pub sampling_value: serde_json::Value,
     pub status: String,
@@ -223,6 +287,13 @@ impl OnlineEvalJob {
         self.validate_target_scope()?;
         self.validate_span_selectors()?;
         self.sampling_rate()?;
+        if self
+            .budget
+            .as_ref()
+            .is_some_and(|b| !(b.daily_usd.is_finite() && b.daily_usd > 0.0))
+        {
+            return Err("Daily budget must be a positive amount");
+        }
         Ok(())
     }
 
@@ -382,6 +453,9 @@ impl From<Model> for OnlineEvalJob {
             session_config: model
                 .session_config
                 .and_then(|config| serde_json::from_value(config).ok()),
+            budget: model
+                .budget
+                .and_then(|budget| serde_json::from_value(budget).ok()),
             sampling_mode: model.sampling_mode.parse().unwrap_or_default(),
             sampling_value: model.sampling_value,
             status: model.status,
@@ -435,6 +509,7 @@ pub async fn add(job: &OnlineEvalJob) -> Result<(), errors::Error> {
             .session_config
             .as_ref()
             .map(|config| serde_json::json!(config))),
+        budget: Set(budget_json(job.budget.as_ref())),
         sampling_mode: Set(job.sampling_mode.to_string()),
         sampling_value: Set(job.sampling_value.clone()),
         status: Set(job.status.clone()),
@@ -475,6 +550,7 @@ pub async fn update(job: &OnlineEvalJob) -> Result<(), errors::Error> {
             .session_config
             .as_ref()
             .map(|config| serde_json::json!(config))),
+        budget: Set(budget_json(job.budget.as_ref())),
         sampling_mode: Set(job.sampling_mode.to_string()),
         sampling_value: Set(job.sampling_value.clone()),
         status: Set(job.status.clone()),
@@ -665,11 +741,17 @@ pub async fn exists(id: &str) -> Result<bool, errors::Error> {
     Ok(record.is_some())
 }
 
-/// Update only the status and pipeline_id fields of a job.
+fn budget_json(budget: Option<&EvalJobBudget>) -> Option<serde_json::Value> {
+    budget.map(|budget| serde_json::json!(budget))
+}
+
+/// Update only the status, pipeline_id and budget fields of a job; the budget carries the
+/// pause state a transition sets.
 pub async fn update_status(
     id: &str,
     status: &str,
     pipeline_id: Option<&str>,
+    budget: Option<&EvalJobBudget>,
     updated_at: i64,
 ) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
@@ -682,6 +764,7 @@ pub async fn update_status(
     let update = ActiveModel {
         status: Set(status.to_string()),
         pipeline_id: Set(pipeline_id.map(|pid| pid.to_string())),
+        budget: Set(budget_json(budget)),
         updated_at: Set(updated_at),
         ..model.into()
     };
@@ -727,6 +810,7 @@ mod tests {
             span_selector_bindings: None,
             trace_config: None,
             session_config: None,
+            budget: None,
             sampling_mode: "rate".to_string(),
             sampling_value: serde_json::json!({"rate": 0.1}),
             status: "draft".to_string(),
@@ -914,6 +998,7 @@ mod tests {
                 max_age_secs: 5,
                 end_signal: None,
             }),
+            budget: None,
             sampling_mode: SamplingMode::All,
             sampling_value: serde_json::json!(null),
             status: "draft".to_string(),
@@ -1090,6 +1175,82 @@ mod tests {
             job.validate(),
             Err("Span Selectors are supported only for trace eval jobs")
         );
+    }
+
+    fn budget(paused_at: Option<i64>) -> EvalJobBudget {
+        EvalJobBudget {
+            daily_usd: 5.0,
+            on_reach: BudgetAction::Pause,
+            paused_at,
+            lifted_until: None,
+        }
+    }
+
+    const DAY: i64 = 24 * 60 * 60 * 1_000_000;
+
+    #[test]
+    fn test_utc_day_start() {
+        assert_eq!(utc_day_start_us(3 * DAY + 17), 3 * DAY);
+        assert_eq!(utc_day_start_us(3 * DAY), 3 * DAY);
+    }
+
+    #[test]
+    fn test_budget_pause_state_follows_transitions() {
+        let now = 10 * DAY + 5;
+        // Only the budget pause records when it paused, so only it resumes on its own.
+        assert_eq!(
+            budget(None).after_transition("paused", true, now).paused_at,
+            Some(now)
+        );
+        assert_eq!(
+            budget(Some(1))
+                .after_transition("paused", false, now)
+                .paused_at,
+            None
+        );
+
+        // Resumed the day it paused: the budget is lifted until 00:00 UTC.
+        let same_day = budget(Some(10 * DAY + 1)).after_transition("active", false, now);
+        assert_eq!(same_day.paused_at, None);
+        assert_eq!(same_day.lifted_until, Some(11 * DAY));
+
+        // The next day's resume starts a fresh day under the budget.
+        let next_day = budget(Some(9 * DAY + 1)).after_transition("active", false, now);
+        assert_eq!(next_day.paused_at, None);
+        assert_eq!(next_day.lifted_until, None);
+    }
+
+    #[test]
+    fn test_request_budget_keeps_the_stored_pause_state() {
+        let mut stored = budget(Some(7));
+        stored.lifted_until = Some(9);
+        let mut incoming = budget(Some(1));
+        incoming.daily_usd = 10.0;
+        let merged = incoming.with_server_state_of(Some(&stored));
+        assert_eq!(merged.daily_usd, 10.0);
+        assert_eq!((merged.paused_at, merged.lifted_until), (Some(7), Some(9)));
+        assert_eq!(budget(Some(1)).with_server_state_of(None).paused_at, None);
+    }
+
+    #[test]
+    fn test_budget_must_be_positive_and_old_rows_have_none() {
+        let mut job = OnlineEvalJob::from(make_model());
+        assert!(job.budget.is_none());
+        job.budget = Some(EvalJobBudget {
+            daily_usd: 0.0,
+            ..budget(None)
+        });
+        assert_eq!(
+            job.validate(),
+            Err("Daily budget must be a positive amount")
+        );
+
+        let mut model = make_model();
+        model.budget = Some(serde_json::json!({"dailyUsd": 5, "onReach": "keep_running"}));
+        let job = OnlineEvalJob::from(model);
+        let budget = job.budget.as_ref().unwrap();
+        assert_eq!(budget.on_reach, BudgetAction::KeepRunning);
+        assert!(job.validate().is_ok());
     }
 
     #[test]

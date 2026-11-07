@@ -95,6 +95,7 @@ export const parseDurationWhereClause = (
     const ast = parser.astify(fullSql);
 
     let unknownUnit: string | null = null;
+    let rewritten = false;
 
     const processNode = (node: any) => {
       if (!node || node.type !== "binary_expr" || unknownUnit) return;
@@ -117,6 +118,7 @@ export const parseDurationWhereClause = (
           const us = Math.round(num * (DURATION_UNIT_MULTIPLIERS[canonicalUnit] ?? 1));
           // Mutate the AST node in place — replace quoted string with a numeric literal.
           node.right = { type: "number", value: us };
+          rewritten = true;
         }
       }
 
@@ -130,10 +132,16 @@ export const parseDurationWhereClause = (
       return { error: `Unknown duration unit: "${unknownUnit}"` };
     }
 
-    // Re-serialise the mutated AST and extract only the WHERE clause.
+    // Nothing to convert: keep the clause as written. Re-serialising would
+    // rewrite quoted identifiers ("default" → `default`), which the backend
+    // rejects.
+    if (!rewritten) return whereClause;
+
+    // Re-serialise the mutated AST and extract only the WHERE clause; sqlify
+    // quotes identifiers with backticks, the backend expects double quotes.
     const resultSql: string = parser.sqlify(ast);
     const whereMatch = resultSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
-    return whereMatch ? whereMatch[1].trim() : whereClause;
+    return whereMatch ? whereMatch[1].trim().replace(/`/g, '"') : whereClause;
   } catch {
     return whereClause;
   }

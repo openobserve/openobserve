@@ -60,7 +60,6 @@ const {
   applyRelative,
   onDateChange: onDateStateChange,
   writeToUrl,
-  mountResolve,
   DEFAULT_RELATIVE,
 } = useAiDateController();
 
@@ -119,9 +118,4 @@ async function onDateChange(value: any) {
     userPicked,
   );
 }
-
-// Precedence: URL > shared state (cross-page persisted) > default relative. Resolved in
-// setup, not onMounted: the date picker seeds from dateState in its own onMounted, which
-// runs first and replays that window into the URL.
-mountResolve();
 </script>

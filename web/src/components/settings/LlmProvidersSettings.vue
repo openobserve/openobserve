@@ -12,7 +12,7 @@
     <OPageLayout
       v-else
       icon="smart-toy"
-      :subtitle="t('settings.llmProvidersSettings.subtitle')"
+      :subtitle="t('llmProviders.subtitle')"
       bleed
       :scroll="false"
     >
