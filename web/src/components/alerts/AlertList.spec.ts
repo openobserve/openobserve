@@ -1035,6 +1035,61 @@ describe("AlertList - row actions", () => {
     expect(wrapper.vm.alertsToExport[0]).not.toHaveProperty("id");
   });
 
+  // Destination names are per org: the JSON file drops them, Terraform re-applies them to this org.
+  it.each([
+    [
+      "an alert",
+      { destinations: ["slack"], recovery_destinations: ["pager"] },
+      { destinations: [], recovery_destinations: [] },
+    ],
+    ["an alert without destinations", {}, { destinations: [], recovery_destinations: [] }],
+    [
+      "an anomaly config",
+      { alert_type: "anomaly_detection", alert_destinations: ["slack"] },
+      { alert_destinations: [] },
+    ],
+  ])("exports %s to JSON with its destinations cleared", async (_case, fields, expected) => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    vi.mocked(alertsSvc.export_by_id).mockResolvedValueOnce({
+      data: { name: "exported", ...fields },
+    } as any);
+
+    await wrapper.vm.exportAlert(wrapper.vm.filteredResults[0]);
+    await flushPromises();
+
+    const dialog = wrapper.findComponent({ name: "ExportResourceDialog" });
+    const exported = dialog.props("items")[0];
+    expect(exported).toMatchObject(expected);
+    if (!("destinations" in expected)) {
+      expect(exported).not.toHaveProperty("destinations");
+      expect(exported).not.toHaveProperty("recovery_destinations");
+    }
+  });
+
+  it("keeps the destinations in the Terraform export", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    vi.mocked(alertsSvc.export_by_id).mockResolvedValueOnce({
+      data: {
+        name: "exported",
+        stream_type: "logs",
+        stream_name: "app_logs",
+        query_condition: { type: "sql", sql: "SELECT count(*) FROM app_logs" },
+        trigger_condition: { period: 15, operator: ">=", threshold: 1, frequency: 5 },
+        destinations: ["slack-ops"],
+      },
+    } as any);
+
+    await wrapper.vm.exportAlert(row);
+    await flushPromises();
+
+    const dialog = wrapper.findComponent({ name: "ExportResourceDialog" });
+    expect(dialog.props("terraform").hcl).toContain("slack-ops");
+    expect(dialog.props("items")[0].destinations).toEqual([]);
+  });
+
   it("opens the export dialog with every selected alert", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1047,12 +1102,19 @@ describe("AlertList - row actions", () => {
     ];
     await flushPromises();
     expect(wrapper.vm.selectedAlerts).toHaveLength(2);
+    vi.mocked(alertsSvc.export_by_id).mockResolvedValue({
+      data: { name: "exported", destinations: ["slack"], recovery_destinations: ["pager"] },
+    } as any);
 
     await wrapper.vm.multipleExportAlert();
     await flushPromises();
 
     expect(wrapper.vm.showExportDialog).toBe(true);
     expect(wrapper.vm.alertsToExport).toHaveLength(2);
+    const dialog = wrapper.findComponent({ name: "ExportResourceDialog" });
+    for (const alert of dialog.props("items")) {
+      expect(alert).toMatchObject({ destinations: [], recovery_destinations: [] });
+    }
 
     // The selection clears once the download actually happens.
     expect(wrapper.vm.selectedAlerts.length).toBe(2);
