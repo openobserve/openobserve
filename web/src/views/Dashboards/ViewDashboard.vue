@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("dashboard.kiosk.tvMode") }}
                 </ODropdownItem>
                 <ODropdownItem
-                  data-test="dashboard-print-btn"
+                  data-test="dashboard-print-menu-item"
                   icon-left="print"
                   @select="printDashboard"
                 >

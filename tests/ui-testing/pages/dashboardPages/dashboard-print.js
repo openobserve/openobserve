@@ -7,7 +7,6 @@ const { SELECTORS, clickDashboardMenuItem } = require("./dashboard-selectors.js"
 export default class DashboardPrintPage {
   constructor(page) {
     this.page = page;
-    // Outside print mode Print is a More-menu item; in print mode this is the standalone exit button.
     this.printBtn = page.locator('[data-test="dashboard-print-btn"]');
     this.printModeContainer = page.locator(".print-mode-container");
     this.backBtn = page.locator('[data-test="dashboard-back-btn"]');
@@ -40,7 +39,7 @@ export default class DashboardPrintPage {
     await this.page
       .locator(SELECTORS.MORE_OPTIONS_BTN)
       .waitFor({ state: "visible", timeout: 30000 });
-    await clickDashboardMenuItem(this.page, '[data-test="dashboard-print-btn"]');
+    await clickDashboardMenuItem(this.page, '[data-test="dashboard-print-menu-item"]');
   }
 
   // Wait for the first panel to mount (grid is laid out with a real width).
