@@ -1,9 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// The expectations here were taken from a live instance: the fixtures were
-// ingested through the real ingest path and the resulting schema read back, so
-// these are the column names OpenObserve actually produces rather than the ones
-// this file assumes it produces.
+
+// Expected column names were read back from a live instance's schema after real ingestion.
 
 import { describe, expect, it } from "vitest";
 

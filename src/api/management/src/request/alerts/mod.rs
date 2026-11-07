@@ -80,6 +80,7 @@ pub mod deduplication;
 pub mod destinations;
 pub mod external_events;
 pub mod history;
+#[cfg(feature = "enterprise")]
 pub mod history_summary;
 pub mod incident_integrations;
 pub mod incidents;

@@ -1,11 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// recordNav.ts — prev/next through the rows the analyst actually sees.
-//
-// OTable sorts and paginates client-side inside TanStack, so the page's own
-// array is in neither the displayed order nor on the displayed page. Stepping
-// reads the table's sorted row model and moves the table's page when a step
-// crosses a page boundary, so the highlighted row never slides out of view.
+
+// OTable sorts and pages inside TanStack, so the page's own array is in neither display order nor page.
 
 /** The slice of a TanStack table this needs (OTable exposes `table`). */
 export interface NavTable<T> {
@@ -29,10 +24,7 @@ export function positionOf<T>(rows: T[], isCurrent: (row: T) => boolean): number
   return i === -1 ? null : i;
 }
 
-/**
- * The neighbour `delta` rows away in display order, with the table's page
- * moved to show it. Null at either end of the list.
- */
+/** The neighbour `delta` rows away in display order, paging the table to show it; null at either end. */
 export function stepRow<T>(
   table: NavTable<T> | null | undefined,
   fallback: T[],

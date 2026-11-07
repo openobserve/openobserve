@@ -1,24 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// sourceTypes.ts — what a log stream actually is, decided from its fields.
-//
-// A SIEM cannot ask the operator to label every stream, and it must not guess
-// from stream names: "prod-logs-3" says nothing, and a stream called "security"
-// is often nginx. What a source cannot hide is its SHAPE. CloudTrail always
-// carries eventName and userIdentity; Sysmon process creation always carries
-// Image, CommandLine and ParentImage; a webserver always carries a method and a
-// status. Those field sets are fingerprints, and they are what this file holds.
-//
-// Each entry ties three things together:
-//   • the fingerprint, so a stream can be recognised
-//   • the Sigma logsource, so detection rules written for that source apply
-//     (https://sigmahq.io — the public corpus is ~3,100 rules keyed on exactly
-//     this category/product/service triple)
-//   • the OCSF class and a field map, so events from it can be shown in the same
-//     columns as every other source
-//
-// Field names use `a|b` to mean "either spelling", because the same log arrives
-// with different casing and nesting depending on the shipper.
+
+// Classified by field shape, never by stream name: a stream called "security" is often nginx.
 
 import type { NormalizedEvent } from "./ocsf";
 
@@ -33,16 +15,9 @@ export interface SourceType {
   id: string;
   label: string;
   vendor: string;
-  /**
-   * The Sigma logsource this stream satisfies. Rules declare the same triple, so
-   * this is what decides which of the corpus can run against the stream.
-   */
+  /** Rules declare the same triple, so this decides which of the corpus can run against the stream. */
   sigma: { category?: string; product?: string; service?: string };
-  /**
-   * Other logsources this source also satisfies. SigmaHQ files sshd rules under
-   * `service: sshd` and Kubernetes audit rules under `category: application`,
-   * so one triple per source would leave those rules unreachable.
-   */
+  /** SigmaHQ files e.g. sshd rules under `service: sshd`, so one triple per source leaves rules unreachable. */
   sigmaAliases?: { category?: string; product?: string; service?: string }[];
   /** OCSF class events from this source are mapped onto. */
   ocsfClass: number;
@@ -54,27 +29,15 @@ export interface SourceType {
   absent?: string[];
   /** Values the sample must carry, for sources only distinguishable by content. */
   valueSignals?: ValueSignal[];
-  /**
-   * Ranking nudge for sources that are strict subsets of another. Generic
-   * catch-alls sit below the specific sources they would otherwise tie with.
-   */
+  /** Ranking nudge: generic catch-alls sit below the specific sources they would otherwise tie with. */
   weight?: number;
   /** Raw field(s) per normalized column; the first non-empty one wins. */
   map: Partial<Record<keyof NormalizedEvent, string[]>>;
   /** Fixed values for this source, used where the log carries no field for it. */
   constants?: Partial<Record<keyof NormalizedEvent, string>>;
-  /**
-   * Fields whose mere PRESENCE means the event failed, for sources that report
-   * failure by attaching an error rather than by carrying an outcome field.
-   * CloudTrail is the archetype: an errorCode appears only on a denied call, and
-   * its value ("AccessDenied") is a reason, not a verdict.
-   */
+  /** Fields whose presence means failure, e.g. CloudTrail's errorCode, which appears only on a denied call. */
   failureWhenPresent?: string[];
-  /**
-   * Fields that already hold an OCSF status_id (1 Success, 2 Failure, 99 Other).
-   * They are read as that enum, never as a word or an HTTP code: to the generic
-   * reader a bare 2 is neither, so OCSF failures would otherwise vanish.
-   */
+  /** Fields holding an OCSF status_id, read as that enum: a bare 2 is neither a word nor an HTTP code. */
   ocsfStatusFields?: string[];
   /** True for sources that carry no security semantics of their own. */
   telemetryOnly?: boolean;
@@ -83,7 +46,6 @@ export interface SourceType {
 const TIME = ["_timestamp", "@timestamp", "timestamp", "time", "eventTime", "published"];
 
 export const SOURCE_TYPES: SourceType[] = [
-  // ── Already normalized ────────────────────────────────────────────────────
   {
     id: "ocsf_native",
     label: "OCSF (native)",
@@ -137,7 +99,6 @@ export const SOURCE_TYPES: SourceType[] = [
     },
   },
 
-  // ── Cloud control planes ──────────────────────────────────────────────────
   {
     id: "aws_cloudtrail",
     label: "AWS CloudTrail",
@@ -160,8 +121,7 @@ export const SOURCE_TYPES: SourceType[] = [
       actor: ["userIdentity.userName", "userIdentity.arn", "userIdentity.principalId"],
       actorId: ["userIdentity.arn", "userIdentity.accountId"],
       srcIp: ["sourceIPAddress"],
-      // No host: recipientAccountId is the AWS account, not a machine, and CloudTrail
-      // carries no hostname of its own.
+      // No host: recipientAccountId is the AWS account, and CloudTrail carries no hostname.
       operation: ["eventName"],
       resource: ["eventSource", "requestParameters.bucketName"],
       message: ["errorMessage", "eventName"],
@@ -324,7 +284,6 @@ export const SOURCE_TYPES: SourceType[] = [
     constants: { product: "GitHub", vendor: "GitHub" },
   },
 
-  // ── Identity providers ────────────────────────────────────────────────────
   {
     id: "okta_system_log",
     label: "Okta System Log",
@@ -354,7 +313,6 @@ export const SOURCE_TYPES: SourceType[] = [
     constants: { product: "Okta", vendor: "Okta" },
   },
 
-  // ── Endpoint ──────────────────────────────────────────────────────────────
   {
     id: "windows_sysmon_process",
     label: "Sysmon process creation",
@@ -471,7 +429,6 @@ export const SOURCE_TYPES: SourceType[] = [
     constants: { product: "syslog", vendor: "Linux" },
   },
 
-  // ── Network ───────────────────────────────────────────────────────────────
   {
     id: "webserver_access",
     label: "Web server access log",
@@ -661,7 +618,6 @@ export const SOURCE_TYPES: SourceType[] = [
     constants: { product: "IDS", vendor: "IDS" },
   },
 
-  // ── Generic fallbacks ─────────────────────────────────────────────────────
   {
     id: "kubernetes_container",
     label: "Kubernetes container logs",

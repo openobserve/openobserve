@@ -25,7 +25,7 @@ import {
 } from "@/utils/security/ocsfPipeline";
 import type { StreamWithSecurity } from "@/utils/security/sourceSelection";
 
-// Columns the packs guarantee (SDD §2.1); used by the user-defined-schema pre-attach check.
+// Columns the packs guarantee; used by the user-defined-schema pre-attach check.
 const GUARANTEED_COLUMNS = [
   "class_uid",
   "class_name",
@@ -49,7 +49,7 @@ interface SourceRow {
   setting: SecuritySetting | null;
   pack: OcsfPack | null;
   streamSettings: StreamWithSecurity["settings"] | undefined;
-  // Non-null when the pipeline carries our node but no setting records it: detach can still remove it (F18).
+  // Non-null when the pipeline carries our node but no setting records it: detach can still remove it.
   detachSetting: SecuritySetting | null;
 }
 
@@ -59,7 +59,7 @@ const secSources = useSecuritySources();
 const attachFlow = useOcsfAttach();
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
-// Only admins can write stream settings, so only they migrate local include/exclude choices (R15).
+// Only admins can write stream settings, so only they migrate local include/exclude choices.
 const canWrite = computed(() =>
   ["admin", "root"].includes(
     String(store.state.userInfo?.role ?? store.state.currentuser?.role ?? "").toLowerCase(),
@@ -89,13 +89,13 @@ function realtimePipelineFor(stream: string): Pipeline | null {
   return realtimePipelinesFor(allPipelines.value, stream)[0] ?? null;
 }
 
-/** A pseudo-setting so detach can remove an unrecorded OCSF node (SDD §5.7 attached_without_record / F18). */
+/** A pseudo-setting so detach can remove an unrecorded OCSF node. */
 function orphanDetachSetting(
   stream: string,
   sourceType: string,
   included: boolean,
 ): SecuritySetting | null {
-  // Never read a stale pipeline list: an old org's pipeline_id would drive a wrong-org Detach (F21).
+  // Never read a stale pipeline list: an old org's pipeline_id would drive a wrong-org Detach.
   if (!pipelinesLoaded.value) return null;
   const pipeline = realtimePipelineFor(stream);
   const node = pipeline ? findOurNode(pipeline) : null;
@@ -186,7 +186,7 @@ function consistencyText(state: string, stream: string): string | null {
   return null;
 }
 
-// Consistency states (R14 / SDD §5.7) computed from the one listPipelines call, with no per-stream GET.
+// Consistency states computed from the one listPipelines call, with no per-stream GET.
 const consistencyNotices = computed<SecurityNotice[]>(() => {
   if (!pipelinesLoaded.value) return [];
   const out: SecurityNotice[] = [];
@@ -198,7 +198,7 @@ const consistencyNotices = computed<SecurityNotice[]>(() => {
       if (text) out.push({ key: `cons-${row.name}`, tone: "warning", text });
     }
   }
-  // A realtime pipeline carrying our node on a stream with no recorded pack (SDD §5.7 attached_without_record).
+  // A realtime pipeline carrying our node on a stream with no recorded pack.
   const mapped = new Set(rows.value.filter((r) => r.state === "mapped").map((r) => r.name));
   for (const p of allPipelines.value) {
     const stream = p.source?.stream_name;
@@ -228,7 +228,7 @@ async function loadPipelines() {
   pipelinesLoaded.value = false;
   try {
     const res = await ocsfPacks.listPipelines(org);
-    // Drop a late response from a previous org so its pipelines never drive another org's rows (F17).
+    // Drop a late response from a previous org so its pipelines never drive another org's rows.
     if (org !== orgId.value) return;
     allPipelines.value = (res.data?.list ?? res.data ?? []) as Pipeline[];
     pipelinesLoaded.value = true;
@@ -239,7 +239,7 @@ async function loadPipelines() {
 
 async function reload() {
   if (!orgId.value) return;
-  // Stale pre-attach warnings must not survive a reload or an org switch (F22).
+  // Stale pre-attach warnings must not survive a reload or an org switch.
   blockNotices.value = [];
   await Promise.all([secSources.load(orgId.value, { fetchSchema: false }), loadPipelines()]);
   await secSources.migrateIncludes(canWrite.value);
@@ -283,8 +283,7 @@ async function onAttach(row: SourceRow) {
   if (!row.pack) return;
   actionNotice.value = null;
   blockNotices.value = [];
-  // Run the R10 pre-attach checks first, so a blocked stream is never recorded as mapped (F3).
-  // Skip the stale pipeline snapshot while the list is reloading; extendPipeline re-checks live (F21).
+  // Pre-attach checks run first, so a blocked stream is never recorded as mapped.
   const blocks = preAttachChecks(
     { name: row.name, settings: row.streamSettings ?? undefined },
     pipelinesLoaded.value ? realtimePipelineFor(row.name) : null,
@@ -313,7 +312,7 @@ async function onDetach(row: SourceRow) {
   if (!row.detachSetting) return;
   actionNotice.value = null;
   blockNotices.value = [];
-  // Only persist a cleared setting when the stream already had one; an undecided orphan stays undecided (F20).
+  // Only persist a cleared setting when the stream already had one; an undecided orphan stays undecided.
   const res = await attachFlow.detach(
     orgId.value,
     row.name,
@@ -329,7 +328,7 @@ async function onDetach(row: SourceRow) {
 async function setIncluded(row: SourceRow, included: boolean) {
   blockNotices.value = [];
   if (row.setting) {
-    // Routed through run() so a 403 surfaces in the notices and the row only reloads on success (F9).
+    // Routed through run() so a 403 surfaces in the notices and the row only reloads on success.
     const setting = { ...row.setting, included };
     const res = await attachFlow.run(() => ocsfPacks.saveSetting(orgId.value, row.name, setting));
     if (res !== null) await reload();
@@ -364,7 +363,7 @@ onMounted(async () => {
       :columns="columns"
       row-key="name"
       :loading="secSources.loading.value && !rows.length"
-      pagination="auto"
+      pagination="client"
       :show-global-filter="true"
       class="min-h-0 flex-1"
       data-test="security-sources-table"

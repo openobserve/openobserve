@@ -1,16 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// entities.ts — who and what appears across the security streams.
-//
-// An entity is a user, a source IP or a host. Each stream names them
-// differently (CloudTrail's `useridentity_username`, an auth log's `user`), so
-// every stream gets a plan first: which of its columns holds each kind of
-// entity, and how a failed event is recognised. The detected source's field
-// map wins; a short list of common column names is the fallback, because
-// generic sources (syslog, application logs) map no actor at all.
-//
-// All counting is a server-side GROUP BY per stream; streams are merged here by
-// entity value. Nothing is sampled from the rows on screen.
+
+// Counts are a server-side GROUP BY per stream, merged here by entity value; nothing is sampled on screen.
 
 import type { SourceType } from "./sourceTypes";
 import { FieldIndex } from "./fields";
@@ -50,8 +40,7 @@ export const ENTITY_FALLBACKS: Record<EntityKind, string[]> = {
   host: ["host", "hostname", "device_hostname", "computer", "computer_name", "host_name"],
 };
 
-// Outcome columns tried when the source maps none; each is only trusted after
-// sampling shows its values are readable (words or HTTP-style codes).
+// Each fallback outcome column is trusted only after sampling shows its values are readable.
 const OUTCOME_FALLBACKS = ["outcome", "status", "result", "event_outcome", "action_result"];
 
 export interface StreamPlan {
@@ -91,8 +80,7 @@ function resolveFirst(index: FieldIndex, paths: string[] | undefined): string | 
   return null;
 }
 
-// Which columns hold entities and outcome. A presence-style failure (errorCode) is
-// final; a value-style outcome column waits for `acceptOutcome` to see its values.
+// A presence-style failure (errorCode) is final; a value-style column waits for `acceptOutcome`.
 export function planStream(
   stream: string,
   fields: string[],
@@ -255,7 +243,6 @@ export interface EntityRow {
   streams: string[];
   /** Distinct counterparts, as the largest count in any one stream (a lower bound). */
   peers: number;
-  /** Whether any contributing stream can report failures at all. */
   failureKnown: boolean;
 }
 

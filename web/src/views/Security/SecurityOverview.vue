@@ -1,8 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- SOC Overview — what needs a human now: SIEM firings (history joined to detections),
-     open cases, and whether security sources are still reporting. -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -61,7 +59,6 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-// ── Window ───────────────────────────────────────────────────────────────────
 const RANGES = [
   { value: "1h", minutes: 60 },
   { value: "24h", minutes: 1440 },
@@ -84,7 +81,6 @@ function onRangeChange(value: unknown) {
   void refresh();
 }
 
-// ── Data ─────────────────────────────────────────────────────────────────────
 const {
   siemRows,
   byName,
@@ -127,8 +123,7 @@ const loading = computed(
 
 const openCasesTotal = ref(0);
 
-// Case management is an enterprise/cloud feature; OSS answers an empty 200,
-// which would read as "no open cases" rather than "not available".
+// OSS answers case requests with an empty 200, which would read as "no open cases".
 const casesAvailable = config.isEnterprise === "true" || config.isCloud === "true";
 
 async function fetchCases(seq: number) {
@@ -139,8 +134,7 @@ async function fetchCases(seq: number) {
   casesLoading.value = true;
   casesUnsupported.value = false;
   try {
-    // Asked for by status so resolved cases never crowd the open ones out of
-    // the page, and the count comes from the server's total, not the page.
+    // Asked for by status so resolved cases never crowd the open ones off the page.
     const [open, investigating] = await Promise.all(
       ["open", "acknowledged"].map((status) =>
         incidentsService.list(orgId.value, status, 50, 0, undefined, true),
@@ -243,7 +237,6 @@ onMounted(() => {
 });
 watch(orgId, reloadAll);
 
-// ── Auto-refresh ─────────────────────────────────────────────────────────────
 const autoRefresh = ref(true);
 let timer: ReturnType<typeof setInterval> | null = null;
 function onTick() {
@@ -262,7 +255,6 @@ onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
-// ── Firings ──────────────────────────────────────────────────────────────────
 interface Firing {
   row: HistoryRow;
   detection: DetectionRow;
@@ -347,7 +339,6 @@ const topDetections = computed(() =>
 );
 const topMax = computed(() => topDetections.value[0]?.count ?? 0);
 
-// ── Triage queue ─────────────────────────────────────────────────────────────
 const TRIAGE_ROWS = 50;
 const triageRows = computed(() =>
   firings.value.slice(0, TRIAGE_ROWS).map((f, index) => ({
@@ -382,7 +373,6 @@ const triageColumns = computed<OTableColumnDef<TriageRow>[]>(() => [
   { id: "timestamp", header: t("siem.overview.fired"), accessorKey: "timestamp", size: 110 },
 ]);
 
-// ── Cases ────────────────────────────────────────────────────────────────────
 const PRIORITY_RANK: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
 const openCases = computed(() =>
   [...incidents.value].sort(
@@ -392,7 +382,6 @@ const openCases = computed(() =>
   ),
 );
 
-// ── Sources ──────────────────────────────────────────────────────────────────
 interface SourceRow {
   name: string;
   health: SourceHealth;
@@ -426,7 +415,6 @@ const HEALTH_DOT: Record<SourceHealth, string> = {
   never: "bg-border-default",
 };
 
-// ── MITRE coverage ───────────────────────────────────────────────────────────
 const coverage = computed(() => {
   const fired = new Map<AttackTactic, number>();
   for (const d of firedDetections.value) {
@@ -447,7 +435,6 @@ function tacticClass(entry: { rules: number; firings: number }) {
   return "border-dashed border-border-default text-text-secondary";
 }
 
-// ── Summary strip ────────────────────────────────────────────────────────────
 const enabledRules = computed(() => siemRows.value.filter((r) => r.alert.enabled).length);
 const firingDetections = computed(() => firedDetections.value.length);
 
@@ -586,7 +573,6 @@ const notices = computed<SecurityNotice[]>(() => {
   return out;
 });
 
-// ── Navigation ───────────────────────────────────────────────────────────────
 function nav(path: string, query: Record<string, string> = {}) {
   router.push({ path, query: { org_identifier: orgId.value, ...query } });
 }
@@ -654,7 +640,6 @@ function nav(path: string, query: Record<string, string> = {}) {
         @select="onStat"
       />
 
-      <!-- Row 1: what fired, and the cases it rolled up into -->
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <SecurityPanel
           :title="t('siem.overview.activity')"
@@ -757,7 +742,6 @@ function nav(path: string, query: Record<string, string> = {}) {
         </SecurityPanel>
       </div>
 
-      <!-- Row 2: triage queue and the rules doing the firing -->
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <SecurityPanel
           :title="t('siem.overview.triage')"
@@ -898,7 +882,6 @@ function nav(path: string, query: Record<string, string> = {}) {
         </SecurityPanel>
       </div>
 
-      <!-- Row 3: where coverage is, and whether the sources feeding it are alive -->
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <SecurityPanel
           :title="t('siem.overview.mitre')"

@@ -216,7 +216,6 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
 ];
 
 export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
-  // ── Security — any open SIEM record drawer ──────────────────────────────
   {
     pageKey: "shortcuts.pages.securityRecord",
     scope: "security-record",

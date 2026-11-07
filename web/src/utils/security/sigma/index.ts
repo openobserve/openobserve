@@ -1,17 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// index.ts — the one call the UI makes into the Sigma engine.
-//
-// Everything above this line is deliberately unaware of OpenObserve: the parser,
-// the condition grammar and the compiler take a rule and a field list and give
-// back SQL. This file is where that meets a classified stream, and it answers
-// the only question the Events page actually has: given this stream, which of
-// the shipped detections can run against it right now, and for the ones that
-// cannot, why not.
-//
-// That last part is the point. A rule that cannot run is shown with its reason
-// rather than hidden, because "we have 40 detections and 31 of them apply to
-// your data" is a useful sentence and "we have 31 detections" is not.
+
+// A rule that cannot run is shown with its reason rather than hidden.
 
 import type { SourceType } from "../sourceTypes";
 import type { CompiledSigma } from "./compile";
@@ -41,14 +30,7 @@ export function blockedReason(compiled: CompiledSigma): I18nText {
   return gt("siem.sigma.compiledEmpty");
 }
 
-/**
- * What a runnable rule had to assume to run, or empty when it assumed nothing.
- *
- * This is a caveat, not a refusal. The rule is running and can fire; it is just
- * doing so with some of its fields known to be absent, which usually means an
- * optional filter is inert and the rule is broader here than where it was
- * written.
- */
+/** Fields a runnable rule assumed absent; an optional filter is then inert and the rule is broader here. */
 export function caveat(compiled: CompiledSigma): I18nText {
   if (!compiled.runnable || !compiled.assumedAbsent.length) return raw("");
   return gt("siem.sigma.assumedAbsent", { fields: compiled.assumedAbsent.join(", ") });
@@ -57,12 +39,7 @@ export function caveat(compiled: CompiledSigma): I18nText {
 const levelRank = (rule: SigmaRule) =>
   rule.level ? SIGMA_LEVELS.indexOf(rule.level) : SIGMA_LEVELS.indexOf("medium");
 
-/**
- * Every shipped rule written for this source, compiled against its real columns.
- *
- * Ordered the way a triage list should be: what can run before what cannot, and
- * within that, the severe before the routine.
- */
+/** Shipped rules for this source: runnable before blocked, then severe before routine. */
 export function applicableRules(source: SourceType, fields: string[]): ApplicableRule[] {
   return sigmaCatalog()
     .filter((rule) => ruleAppliesTo(rule, source))
@@ -73,23 +50,14 @@ export function applicableRules(source: SourceType, fields: string[]): Applicabl
     });
 }
 
-/**
- * Whether a rule was written for what this source records: its own logsource,
- * an alias the source also answers to, or, for OCSF-native data, an OCSF class
- * that carries the rule's logsource.
- */
+/** Own logsource, a source alias, or for OCSF-native data an OCSF class carrying the rule's logsource. */
 export function ruleAppliesTo(rule: Pick<SigmaRule, "logsource">, source: SourceType): boolean {
   if (matchesLogsource(rule, source.sigma)) return true;
   if ((source.sigmaAliases ?? []).some((alias) => matchesLogsource(rule, alias))) return true;
   return source.id === "ocsf_native" && ocsfProfileFor(rule) !== null;
 }
 
-/**
- * A rule compiled against one stream of a known source: the source's field map
- * and keyword columns, or for OCSF-native data, the OCSF profile for the rule's
- * logsource with its class guard AND-ed on. This is the one compile path, so
- * the catalog, the Content page and a pasted rule all agree on what runs.
- */
+/** The one compile path, so the catalog, the Content page and a pasted rule all agree on what runs. */
 export function compileForSource(
   rule: SigmaRule,
   source: SourceType | null,
@@ -123,8 +91,7 @@ export function compileForSource(
     },
     { availableFields: fields },
   );
-  // Without the guard columns the rule cannot be kept to its class, and running
-  // it unguarded on a mixed stream would match the wrong events.
+  // Unguarded on a mixed stream the rule would match the wrong events.
   if (!guard.runnable) {
     return {
       ...compiled,
@@ -140,12 +107,7 @@ export function compileForSource(
   };
 }
 
-/**
- * The columns a keyword search falls back to when the source has no declared
- * full-text field. Only columns the stream actually has are returned, so a
- * keyword rule is refused honestly rather than compiled against a column that
- * is not there.
- */
+/** Only columns the stream has, so a keyword rule is refused rather than compiled against a missing column. */
 function defaultKeywordFields(fields: string[]): string[] {
   const candidates = ["message", "log", "msg", "body", "raw", "_raw"];
   const present = new Set(fields.map((field) => field.toLowerCase()));

@@ -1,11 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Alerts — every time a detection fired.
-     Rows are alert history (an immutable evaluation record) joined to the SIEM
-     detection that produced them. Triage state lives on the case, not here:
-     a firing is a fact about one evaluation, so this page reads it, explains
-     it, and hands off to the evidence (Events) and the rule (Detections). -->
+<!-- Triage state lives on the case, not here: a firing is a fact about one evaluation. -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -78,7 +74,6 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-// ── View state, mirrored in the URL so Overview links and shared links land here ─
 const RANGES = [
   { value: "1h", minutes: 60 },
   { value: "6h", minutes: 360 },
@@ -102,8 +97,7 @@ const q = route.query as Record<string, string | undefined>;
 const range = ref<RangeKey>(
   RANGES.some((r) => r.value === q.period) ? (q.period as RangeKey) : "24h",
 );
-// A fixed window (µs) from a link, e.g. a case's first..last alert. It does not
-// slide on refresh; picking a range from the toggle replaces it.
+// A fixed window (µs) from a link does not slide on refresh; picking a range replaces it.
 const parsedFrom = Number(q.from);
 const parsedTo = Number(q.to);
 const customWindow = ref<{ startMs: number; endMs: number } | null>(
@@ -148,7 +142,6 @@ function onRange(value: unknown) {
   void fetchAll();
 }
 
-// ── Data ─────────────────────────────────────────────────────────────────────
 const {
   byName,
   byId,
@@ -158,8 +151,6 @@ const {
   loadFull: loadFullDetection,
 } = useSiemDetections();
 
-// Paging, the newest-rows cap, row dedupe and the server's max_query_range
-// narrowing are handled by the shared history window.
 const historyWindow = useAlertHistoryWindow();
 const summary = useAlertHistorySummary();
 const history = computed(() => historyWindow.rows.value as FiringRow[]);
@@ -219,7 +210,6 @@ const cappedFromMs = computed(() => {
   return last ? Math.floor(last.timestamp / 1000) : windowStartMs.value;
 });
 
-// ── Rows ─────────────────────────────────────────────────────────────────────
 interface Firing {
   id: string;
   row: FiringRow;
@@ -253,11 +243,7 @@ const isSignal = (f: Firing) =>
   f.status === "firing" || f.status === "notify_failed" || f.status === "error";
 
 const siemScoped = computed(() => joined.value.filter((f) => f.detection));
-/**
- * Everything the facet tiles count over — the facet itself is not applied.
- * Silenced runs are usually "normal", so the Silenced facet brings them in
- * even while evaluations are hidden.
- */
+// What the facet tiles count over, so the facet itself is not applied.
 const base = computed(() =>
   siemScoped.value.filter(
     (f) =>
@@ -375,7 +361,6 @@ const chartBuckets = computed(() => {
 });
 const chartLoading = computed(() => rulesLoading.value || summary.loading.value);
 
-// ── Table ────────────────────────────────────────────────────────────────────
 const SEVERITY_RANK: Record<SeverityTone, number> = {
   critical: 5,
   high: 4,
@@ -452,9 +437,7 @@ function onEmptyAction(id?: string) {
   }
 }
 
-// ── Drawer ───────────────────────────────────────────────────────────────────
-// The open record is pinned: a refresh can slide it out of the window or past
-// the newest-rows cap, and the drawer must not vanish mid-read.
+// Pinned, so a refresh that slides it out of the window or past the cap cannot close the drawer.
 const pinned = ref<Firing | null>(null);
 const selected = computed<Firing | null>(() => {
   // A link or pinned drawer must not surface an ordinary alert.
@@ -541,7 +524,6 @@ const isFiringStatus = computed(
   () => selected.value?.status === "firing" || selected.value?.status === "notify_failed",
 );
 // Prev/next follows the table as the analyst sees it: its sort, across pages.
-// Only the TanStack instance OTable exposes is read here.
 const tableRef = ref<{ table?: NavTable<Firing> } | null>(null);
 const sortTick = ref(0);
 function sortedRows(): Firing[] {
@@ -572,12 +554,7 @@ function step(delta: number) {
   if (next) selectedKey.value = next.row.id;
 }
 
-// Resolved from the route (reactive), not window.location, which lags router.replace.
-/**
- * A fixed window around the record, not the sliding `period`, so the link
- * still opens this firing tomorrow. History is filtered on the evaluation
- * time, so the window must contain `timestamp`, not just the evaluated span.
- */
+// A fixed window, not the sliding `period`, so the link still opens this firing tomorrow.
 const shareUrl = computed(() => {
   const f = selected.value;
   if (!f || typeof window === "undefined") return "";
@@ -737,7 +714,6 @@ const tactics = computed(() =>
     .filter((x): x is NonNullable<typeof x> => !!x),
 );
 
-// ── Evidence: the events this firing matched, over its own window ────────────
 const evidence = ref<ReturnType<typeof normalizeEvents>>([]);
 const evidenceCount = ref<number | null>(null);
 const evidenceLoading = ref(false);
@@ -745,8 +721,7 @@ const evidenceError = ref("");
 let evidenceSeq = 0;
 
 async function loadEvidence() {
-  // Bumped before any early return, so a response for the previous firing can
-  // never land in this one.
+  // Bumped before any early return, so a previous firing's response never lands in this one.
   const mine = ++evidenceSeq;
   const f = selected.value;
   evidence.value = [];
@@ -791,8 +766,7 @@ async function loadEvidence() {
     if (mine === evidenceSeq) evidenceLoading.value = false;
   }
 }
-// The SQL only exists once rules are identified, so a deep link opened before
-// that must load when it arrives.
+// The SQL exists only once rules are identified, so a deep link must load when it arrives.
 watch(
   () => [selected.value?.id, evidenceSql.value] as const,
   () => void loadEvidence(),
@@ -828,7 +802,6 @@ function openDetection() {
   });
 }
 
-// ── Lifecycle ────────────────────────────────────────────────────────────────
 function refresh() {
   void fetchAll();
 }
@@ -880,7 +853,6 @@ onUnmounted(() => {
         data-test="security-alerts-notices"
       />
 
-      <!-- Firings by severity (facets) and when they happened -->
       <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
         <OStatStrip
           compact-values

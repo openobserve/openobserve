@@ -1,12 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// attackMatrix.ts — the ATT&CK matrix as this org can actually see it.
-//
-// Rows are the techniques the shipped Sigma catalog and the org's own SIEM
-// detections carry; columns are the tactics those same rules tag them with.
-// Nothing is looked up from a separate ATT&CK dataset, so a technique appears
-// under a tactic only because a rule says so, and names are not invented: the
-// matrix shows technique ids and links out for the rest.
+
+// Rows and tactics come only from rule tags, never a separate ATT&CK dataset, so no names are invented.
 
 import { ATTACK_TACTICS, normalizeTactic, type AttackTactic } from "./mitre";
 
@@ -39,7 +33,6 @@ export type TechniqueState = "firing" | "covered" | "available";
 export interface TechniqueCell<R extends MatrixRule = MatrixRule> {
   id: string;
   tactics: AttackTactic[];
-  /** Catalog rules written for this technique. */
   catalogRules: R[];
   /** The org's SIEM detections tagged with it, enabled or not. */
   detections: MatrixDetection[];
@@ -168,7 +161,6 @@ export function summarizeMatrix<R extends MatrixRule>(matrix: AttackMatrix<R>): 
   };
 }
 
-/** Heat step for a firing count, so the matrix reads hot-to-cold at a glance. */
 export function heatLevel(firings: number): 0 | 1 | 2 | 3 {
   if (firings <= 0) return 0;
   if (firings < 5) return 1;

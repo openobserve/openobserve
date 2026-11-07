@@ -1,8 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// The samples below are shaped like the real thing, because the whole point of
-// the classifier is that it works on logs as they actually arrive rather than on
-// tidied-up examples.
+
+// Fixtures mirror real log shapes: the classifier must work on logs as they actually arrive.
 
 import { describe, expect, it } from "vitest";
 
@@ -138,8 +136,7 @@ describe("classifyStream", () => {
     expect(match.confidence).toBeGreaterThan(0.6);
   });
 
-  // Sysmon and the Security log share Computer and a Windows shape; only the
-  // process fields separate them, which is what `absent` is for.
+  // Sysmon and the Security log share a Windows shape; only process fields (via `absent`) split them.
   it("keeps Sysmon and the Windows Security log apart", () => {
     expect(bestMatch(fieldsOf(SYSMON), { sample: SYSMON })?.source.id).toBe(
       "windows_sysmon_process",
@@ -159,8 +156,7 @@ describe("classifyStream", () => {
     expect(ids).not.toContain("firewall");
   });
 
-  // A syslog stream is only sshd because of what the program field SAYS, which
-  // is the one case a schema alone cannot settle.
+  // Only the program field value makes a syslog stream sshd; a schema alone cannot settle it.
   it("uses values, not just fields, where the shape is identical", () => {
     const cron = { ...SSHD, program: "CRON", message: "session opened for user root" };
 
@@ -188,8 +184,7 @@ describe("classifyStream", () => {
 
   it("separates security sources from plain telemetry", () => {
     expect(isSecuritySource(bestMatch(fieldsOf(CLOUDTRAIL), { sample: CLOUDTRAIL }))).toBe(true);
-    // Container stdout still classifies, so its events are readable, but it is
-    // not presented as a security source.
+    // Container stdout still classifies so its events are readable, but is not a security source.
     const k8s = bestMatch(fieldsOf(K8S_CONTAINER), { sample: K8S_CONTAINER });
     expect(k8s?.source.id).toBe("kubernetes_container");
     expect(isSecuritySource(k8s)).toBe(false);

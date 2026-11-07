@@ -1,7 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Label/value rows for a record drawer; every value copies, and pivots when `pivotable`. -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";

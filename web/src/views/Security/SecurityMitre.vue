@@ -1,8 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- MITRE ATT&CK — tactic columns × techniques carried by the Sigma catalog and the
-     org's detections; green = enabled detection, hot = fired in window, dashed = not enabled. -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -59,7 +57,6 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-// ── Window ───────────────────────────────────────────────────────────────────
 const RANGES = [
   { value: "1h", minutes: 60 },
   { value: "24h", minutes: 1440 },
@@ -77,7 +74,6 @@ function onRangeChange(value: unknown) {
   void loadHistory();
 }
 
-// ── Data ─────────────────────────────────────────────────────────────────────
 const {
   siemRows,
   byId,
@@ -212,7 +208,6 @@ const matrix = computed(() =>
 );
 const summary = computed(() => summarizeMatrix(matrix.value));
 
-// ── Filters ──────────────────────────────────────────────────────────────────
 type View = "all" | "covered" | "gaps" | "firing";
 const view = ref<View>("all");
 const search = ref("");
@@ -256,7 +251,6 @@ const order = computed(() => {
   return out;
 });
 
-// ── Summary strip ────────────────────────────────────────────────────────────
 const stats = computed<StatItem[]>(() => [
   {
     key: "firing",
@@ -299,7 +293,6 @@ function onStat(key: string) {
   view.value = view.value === key ? "all" : (key as View);
 }
 
-// ── Cells ────────────────────────────────────────────────────────────────────
 const HEAT_CLASS = [
   "",
   "bg-badge-orange-soft-bg text-badge-orange-soft-text border-transparent",
@@ -313,7 +306,6 @@ function cellClass(cell: TechniqueCell): string {
   return "bg-surface-base text-text-secondary border-border-default border-dashed";
 }
 
-// ── Drawer ───────────────────────────────────────────────────────────────────
 const selectedId = ref<string | null>(null);
 const selected = computed(() =>
   selectedId.value ? (matrix.value.cells.get(selectedId.value) ?? null) : null,
@@ -492,7 +484,6 @@ function openDetections() {
         </div>
       </div>
 
-      <!-- The matrix: one column per tactic, scrolls sideways on narrow screens -->
       <div
         class="bg-card-glass-bg border-border-default rounded-surface overflow-x-auto border"
         data-test="security-mitre-matrix"

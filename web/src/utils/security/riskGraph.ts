@@ -1,7 +1,4 @@
-// Prototype risk-graph builder for the Entities view. Mirrors the model in
-// design doc 19 (base risk -> propagation -> attack-path to crown jewels), run
-// over synthesized relationships until the `_o2_entity_edges` stream and the
-// scheduled graph job exist. Pure and deterministic so the view is stable.
+// Prototype over synthesized relationships until the `_o2_entity_edges` stream and graph job exist.
 
 export type RiskKind = "user" | "ip" | "host";
 export type RiskTier = "critical" | "high" | "medium" | "low";
@@ -67,9 +64,7 @@ function clamp(n: number, lo = 0, hi = 100): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-// Intrinsic risk from the signals the Entities view already carries: failure
-// rate dominates, breadth of peers and raw activity contribute. Stands in for
-// doc 19's b(v) (findings + intel + UEBA) until those feeds are wired.
+// Stands in for doc 19's b(v) (findings + intel + UEBA) until those feeds are wired.
 function baseRisk(row: RiskRowInput): number {
   const failureRate = row.failureEvents > 0 ? row.failures / row.failureEvents : 0;
   const peerSpread = Math.log10(1 + row.peers) / Math.log10(1 + 200); // 0..~1
@@ -83,9 +78,7 @@ const CROWN_JEWELS: { id: string; label: string }[] = [
 ];
 const HUB = { id: "asset:jump-host", label: "jump-host" };
 
-// Synthesize a small, deterministic topology so the graph shows multi-hop paths
-// toward crown jewels. The riskiest entities get stronger edges; a shared hub
-// node creates entity -> hub -> crown-jewel paths.
+// Synthetic deterministic topology; a shared hub creates entity -> hub -> crown-jewel paths.
 function buildTopology(entities: RiskNode[]): RiskEdge[] {
   const edges: RiskEdge[] = [];
   const ranked = [...entities].sort((a, b) => b.base - a.base);
@@ -126,8 +119,7 @@ function buildTopology(entities: RiskNode[]): RiskEdge[] {
   return edges;
 }
 
-// One-sided personalized-PageRank-style diffusion (doc 19 §3.1), simplified to a
-// fixed round count. Risk flows along edge direction from predecessors.
+// Personalized-PageRank-style diffusion (doc 19 §3.1), simplified to a fixed round count.
 function propagate(
   nodes: RiskNode[],
   edges: RiskEdge[],
@@ -150,8 +142,7 @@ function propagate(
   return r;
 }
 
-// Max-product shortest path (doc 19 §3.2): Dijkstra on -log p from the exposed
-// entries to any crown jewel; returns the single best path and its edge set.
+// Max-product path (doc 19 §3.2): Dijkstra on -log p from exposed entries to any crown jewel.
 function bestAttackPath(
   nodes: RiskNode[],
   edges: RiskEdge[],

@@ -1,9 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Paste indicators straight from a report. Defanged values (evil[.]com,
-     hxxp://) are accepted, types are detected, and anything that is not an
-     indicator is named back rather than silently dropped. -->
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -43,8 +40,7 @@ const store = useStore();
 const FORM_ID = "security-intel-add-form";
 
 const schema = makeIntelAddSchema(t);
-// The first hand-maintained list is the natural default; feeds are refreshed by
-// the server and cannot take pasted rows.
+// Feeds are refreshed by the server and cannot take pasted rows, so default to a hand-kept list.
 const defaults = computed(() =>
   intelAddDefaults(props.tables.find((tb) => !tb.feed)?.name ?? "ioc_manual"),
 );
@@ -95,8 +91,7 @@ async function onSubmit(value: IntelAddForm) {
         addedAt: now.toISOString(),
         expiresAt,
       })),
-      // Always append: appending to a missing list creates it, and a list
-      // created after this page loaded must never be replaced by an add.
+      // Always append: a list created after this page loaded must never be replaced by an add.
       true,
       props.tableColumns[table] ?? [],
     );

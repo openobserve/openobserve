@@ -1,12 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Cases — where triage lives.
-     A case is an OpenObserve incident: related firings rolled up by the
-     correlation engine, with a status an analyst moves along, a timeline, and
-     comments. Firings are facts (Alerts page); a case is the decision made
-     about them. Incident correlation is an enterprise/cloud feature, so an OSS
-     build says so instead of showing an empty queue. -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -68,13 +62,11 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-// Incident correlation ships with enterprise and cloud; OSS answers an empty
-// 200, which would otherwise read as "no cases".
+// OSS answers an empty 200 for incidents, which would otherwise read as "no cases".
 const available = config.isEnterprise === "true" || config.isCloud === "true";
 
 const { byName, byId, load: loadDetections } = useSiemDetections();
 
-// ── View state ───────────────────────────────────────────────────────────────
 const q = route.query as Record<string, string | undefined>;
 const statusFilter = ref<CaseStatus | null>(
   CASE_STATUSES.includes(q.status as CaseStatus) ? (q.status as CaseStatus) : null,
@@ -93,7 +85,6 @@ function syncUrl() {
 }
 watch([statusFilter, search, selectedId], syncUrl);
 
-// ── List (server-paginated; the server filters by status only) ───────────────
 const cases = ref<Incident[]>([]);
 const total = ref(0);
 const totals = ref<Record<CaseStatus, number | null>>({
@@ -235,7 +226,6 @@ const columns = computed<OTableColumnDef<Incident>[]>(() => [
 const rowRail = (c: Incident) => severityRailColor(toneOfPriority(c.severity));
 const rowClass = (c: Incident) => {
   if (c.id === selectedId.value) return "!bg-table-row-selected-bg";
-  // Closed cases recede; open ones keep the full-strength row.
   return c.status === "resolved" ? "!bg-surface-panel" : "";
 };
 
@@ -247,7 +237,6 @@ function onEmptyAction(id?: string) {
   }
 }
 
-// ── One case ─────────────────────────────────────────────────────────────────
 const detail = ref<IncidentWithAlerts | null>(null);
 const detailLoading = ref(false);
 const detailError = ref("");
@@ -389,9 +378,6 @@ const facts = computed<RecordFact[]>(() => {
   ];
 });
 
-/** Distinct detections behind the case, with their SIEM metadata where known. */
-// Firings are `triggers`; the response's `alerts` are alert definitions.
-// `alertName` joins to the detection; `name` is what is shown.
 // A case can group security firings with operational alerts on the same host; only the former belong here.
 const siemTriggers = computed(() =>
   (detail.value?.triggers ?? []).filter((trigger) =>
@@ -452,7 +438,7 @@ const TIMELINE_VARIANT: Record<
   other: "muted",
 };
 
-// ── Actions (server-confirmed; the row only changes after the server agrees) ─
+// Server-confirmed: the row only changes after the server agrees.
 const updating = ref(false);
 
 async function setStatus(status: CaseStatus) {
@@ -466,8 +452,7 @@ async function setStatus(status: CaseStatus) {
       variant: "success",
       message: t("siem.cases.statusChanged", { status: t(`siem.caseStatus.${status}`) }),
     });
-    // The list is filtered by status on the server, so re-ask rather than patch:
-    // a case just closed must leave the "New" list and its count.
+    // The server filters by status, so re-ask rather than patch: a closed case must leave "New".
     void fetchCases();
     void fetchTotals();
     if (stillOpen(id)) void loadDetail(id);
@@ -504,8 +489,7 @@ async function setPriority(value: unknown) {
   }
 }
 
-// Drafts are kept per case, so a half-written note never follows the analyst
-// to the next case, and a post in flight clears only its own case's draft.
+// Drafts are per case, so a half-written note never follows the analyst to the next case.
 const drafts = ref<Record<string, string>>({});
 const postingId = ref<string | null>(null);
 const comment = computed({
@@ -539,7 +523,7 @@ async function postComment() {
   }
 }
 
-// ── Analysis (runs in the background; poll the incident until the run ends) ──
+// Analysis runs in the background, so the incident is polled until the run ends.
 const RCA_POLL_MS = 5_000;
 const { requestRca } = useRcaTrigger();
 /** Report of the incident's newest completed run. */
@@ -627,11 +611,7 @@ function openDetection(name: string) {
     query: { org_identifier: orgId.value, ...(id ? { detection: String(id) } : {}) },
   });
 }
-/**
- * Firings of the case's busiest detection over the case's own lifetime. The
- * search is the raw alert name (what history rows carry), and the window is
- * first..last alert with a little slack either side.
- */
+// Searched by raw alert name, which is what history rows carry.
 function openAlerts() {
   const c = selectedId.value ? summary.value : null;
   const top = c ? detections.value[0]?.alertName : undefined;

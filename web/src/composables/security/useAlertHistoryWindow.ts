@@ -1,7 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// useAlertHistoryWindow.ts — paged alert history for a window (1000 rows/page, deduped);
-// `effectiveStartMs` flags a start narrowed by the triggers stream's own max_query_range.
 
 import { computed, ref, shallowRef } from "vue";
 
@@ -75,8 +72,7 @@ export async function fetchHistoryWindow(
   return {
     rows: dedupeHistory([first, ...rest].flatMap((res) => res.data?.hits ?? [])),
     total,
-    // Judged by pages, not rows: the server counts rows it later drops and
-    // dedupe can remove a repeat, so rows < total does not mean rows are missing.
+    // Judged by pages: the server counts rows it later drops, so rows < total is not missing rows.
     complete: isComplete(total, Math.max(1, pages)),
   };
 }

@@ -1,8 +1,0 @@
-{
-  "message": "login ok",
-  "user": "alice",
-  "src_ip": "10.0.0.1",
-  "host": "web-1",
-  "level": "info",
-  "outcome": "success"
-}

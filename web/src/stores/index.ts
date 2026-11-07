@@ -27,6 +27,7 @@ import { clearPanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
 import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
+import config from "@/aws-exports";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -173,9 +174,8 @@ const store = createStore({
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
     pendingShortURL: null,
-    // SIEM solution mode — switches nav and entry point between Observability and Security
-    solutionMode: (localStorage.getItem("solutionMode") || "observability") as
-      "observability" | "security",
+    solutionMode: ((config.isEnterprise == "true" && localStorage.getItem("solutionMode")) ||
+      "observability") as "observability" | "security",
   },
   mutations: {
     login(state, payload) {

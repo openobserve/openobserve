@@ -1,8 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// content.ts — what ships with the SIEM (the Sigma pack and the source types it
-// understands) set against what this org actually has: which rules are
-// installed as detections, and which of its streams each source type matches.
 
 import { bestMatch } from "./classify";
 import type { DetectionRow } from "@/composables/security/useSiemDetections";
@@ -31,11 +27,7 @@ export interface StreamSchema {
   fields: string[];
 }
 
-/**
- * Which of the org's streams each source type matches, identified from schema
- * alone. A stream counts once, under its best match, so a CloudTrail stream is
- * not also claimed by the generic catch-all.
- */
+/** A stream counts once, under its best match, so the generic catch-all does not also claim it. */
 export function streamsBySource(streams: StreamSchema[]): Map<string, string[]> {
   const map = new Map<string, string[]>();
   for (const stream of streams) {
@@ -55,7 +47,6 @@ export function sourcesForRule(
   return sources.filter((source) => ruleAppliesTo(rule, source));
 }
 
-/** Rules written for a source type. */
 export function rulesForSource(source: SourceType, rules: SigmaRule[]): SigmaRule[] {
   return rules.filter((rule) => ruleAppliesTo(rule, source));
 }
@@ -71,11 +62,7 @@ export interface StreamCheck {
   compiled: CompiledSigma;
 }
 
-/**
- * For every rule, how it compiles on each of the org's streams it applies to.
- * Each (source, stream) is compiled once for all of its rules, so this stays
- * one pass over the pack rather than one per rule.
- */
+/** Each (source, stream) compiles once for all its rules, keeping this one pass over the pack. */
 export function checksByRule(
   bySource: Map<string, string[]>,
   fieldsByStream: Map<string, string[]>,
@@ -114,10 +101,8 @@ export function groupByLogsource(rules: SigmaRule[]): LogsourceGroup[] {
 export const logsourceKey = (rule: SigmaRule) =>
   sigmaLogsourceLabel(rule.logsource) || "unspecified";
 
-/** Row rail for a log source the org actually ingests (OTable getRowStatusColor). */
 export const DETECTED_RAIL = "var(--color-status-positive)";
 
-/** Detection states, as the Detections list facets them. */
 export type DetectionState = "erroring" | "disabled" | "enabled";
 
 /** `*_at` fields are microseconds on the v2 list; older rows may carry ms. */
@@ -127,11 +112,7 @@ export function toMicros(value: unknown): number | null {
   return n > 1e14 ? n : n * 1000;
 }
 
-/**
- * The rule's current state. Erroring is read from `last_outcome`, which the
- * scheduler overwrites on every run — so it clears itself once a run succeeds,
- * unlike `last_error`, which may linger.
- */
+/** `last_outcome` is overwritten every run, so erroring clears on success, unlike a lingering `last_error`. */
 export function detectionState(alert: Record<string, any>): DetectionState {
   if (!alert.enabled) return "disabled";
   if (isErrorOutcome(alert.last_outcome)) return "erroring";

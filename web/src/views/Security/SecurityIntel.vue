@@ -1,8 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Threat Intel — known-bad indicators (rows of `ioc_*`/`threat_intel*`
-     enrichment tables) and where an exact, server-side sweep found them. -->
 <script setup lang="ts">
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { computed, onMounted, ref, watch } from "vue";
@@ -76,7 +74,6 @@ const router = useRouter();
 const { confirm } = useConfirmDialog();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-// ── Window ───────────────────────────────────────────────────────────────────
 const RANGES = [
   { value: "24h", minutes: 1440 },
   { value: "7d", minutes: 10080 },
@@ -86,15 +83,13 @@ type RangeKey = (typeof RANGES)[number]["value"];
 const range = ref<RangeKey>(
   RANGES.some((r) => r.value === route.query.period) ? (route.query.period as RangeKey) : "7d",
 );
-// Pinned when a sweep starts, so the sweep, the counts and the drawer timeline
-// all describe the same window — and a later sweep moves it forward.
+// Pinned at sweep start so the sweep, the counts and the drawer timeline describe the same window.
 const windowEndUs = ref(Date.now() * 1000);
 const windowUs = computed(() => ({
   start: windowEndUs.value - RANGES.find((r) => r.value === range.value)!.minutes * 60_000_000,
   end: windowEndUs.value,
 }));
 
-// ── Indicators ───────────────────────────────────────────────────────────────
 const tables = ref<IntelTable[]>([]);
 const indicators = ref<Indicator[]>([]);
 const loading = ref(false);
@@ -179,7 +174,6 @@ const existingKeys = computed(() => {
 const now = ref(Date.now());
 const liveIndicators = computed(() => indicators.value.filter((i) => !isExpired(i, now.value)));
 
-// ── Sweep ────────────────────────────────────────────────────────────────────
 const sweep = useIntelSweep();
 
 async function runSweep() {
@@ -208,7 +202,6 @@ const matchByKey = computed(
   () => new Map(sweep.matches.value.map((m) => [indicatorKey(m.indicator), m])),
 );
 
-// ── Summary ──────────────────────────────────────────────────────────────────
 const expiring = computed(
   () => indicators.value.filter((i) => isExpired(i, now.value) || expiresSoon(i, now.value)).length,
 );
@@ -331,7 +324,6 @@ function onStat(key: string) {
   if (key === "expiring") expiryFilter.value = true;
 }
 
-// ── Tabs + filters ───────────────────────────────────────────────────────────
 const tab = ref<"matches" | "indicators" | "coverage">(
   ["indicators", "coverage"].includes(String(route.query.tab))
     ? (route.query.tab as "indicators" | "coverage")
@@ -534,7 +526,6 @@ const indicatorColumns = computed<OTableColumnDef<IndicatorRow>[]>(() => [
 
 const toneOf = (i: Indicator) => toneOfSigmaLevel(i.severity);
 
-// ── Coverage ─────────────────────────────────────────────────────────────────
 /** Why "nothing was seen" may not mean "nothing is there". */
 const sweepCaveats = computed(() => {
   const out: string[] = [];
@@ -558,10 +549,7 @@ const blindTypes = computed(() =>
   sweep.coverage.value.filter((c) => c.indicators > 0 && (!c.columns.length || c.skipped.length)),
 );
 
-// ── Drawer ───────────────────────────────────────────────────────────────────
-// The drawer steps through the table's rows in the order the analyst sees
-// them — after its sort — and turns the page when it crosses a boundary.
-/** The part of OTable's exposed TanStack instance the drawer needs. */
+// The drawer steps in the analyst's sorted order and turns the page at a boundary.
 interface TableHandle {
   table?: NavTable<MatchRow | IndicatorRow>;
 }
@@ -765,13 +753,7 @@ const selectedTable = computed(
   () => tables.value.find((tb) => tb.name === selected.value?.table) ?? null,
 );
 
-/**
- * Enrichment tables have no row delete, so the list is rewritten without the
- * indicator, every other row and column kept exactly as stored (see
- * threatIntel.removeIndicator). A feed-fed list would be overwritten on its
- * next fetch, so removal is refused there and the analyst is told to fix the
- * feed.
- */
+/** Enrichment tables have no row delete, so the whole list is rewritten without the indicator. */
 async function removeIndicator() {
   const i = selected.value;
   if (!i || selectedTable.value?.feed) return;
@@ -800,7 +782,6 @@ async function removeIndicator() {
   }
 }
 
-// ── URL ──────────────────────────────────────────────────────────────────────
 function urlQuery(): Record<string, string> {
   const query: Record<string, string> = {
     org_identifier: orgId.value,
@@ -814,8 +795,7 @@ function syncUrl() {
   const query = urlQuery();
   router.replace({ query });
 }
-// A link pins the drawer's indicator and the window it was seen in.
-// Built from the intended query, not route.fullPath (which lags router.replace).
+// Built from the intended query, not route.fullPath, which lags router.replace.
 const shareUrl = computed(() =>
   typeof window === "undefined"
     ? ""
@@ -830,7 +810,6 @@ watch(indicators, (list) => {
   if (found) openIndicator(found);
 });
 
-// ── Dialogs ──────────────────────────────────────────────────────────────────
 const showAdd = ref(false);
 const importMode = ref<"file" | "url" | null>(null);
 async function onSaved() {
@@ -907,7 +886,6 @@ async function onSaved() {
       </div>
     </template>
 
-    <!-- First run: nothing to hunt for yet -->
     <div
       v-if="!loading && !tables.length && !loadError"
       class="flex min-h-0 flex-1 items-center justify-center"
@@ -991,7 +969,6 @@ async function onSaved() {
         </OTab>
       </OTabs>
 
-      <!-- ── Matches ─────────────────────────────────────────────────────── -->
       <OTable
         v-if="tab === 'matches'"
         ref="matchTable"
@@ -1126,7 +1103,6 @@ async function onSaved() {
         </template>
       </OTable>
 
-      <!-- ── Indicators ──────────────────────────────────────────────────── -->
       <OTable
         v-else-if="tab === 'indicators'"
         ref="indicatorTable"
@@ -1267,7 +1243,6 @@ async function onSaved() {
         </template>
       </OTable>
 
-      <!-- ── Coverage: what a sweep could and could not see ──────────────── -->
       <div v-else class="min-h-0 flex-1 overflow-y-auto" data-test="security-intel-coverage">
         <OContent class="flex flex-col gap-3 py-4">
           <OBanner
@@ -1348,7 +1323,6 @@ async function onSaved() {
       </div>
     </div>
 
-    <!-- ── Indicator drawer ──────────────────────────────────────────────── -->
     <SecurityRecordDrawer
       v-if="selected"
       :open="!!selected"

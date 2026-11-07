@@ -1,10 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Validation for SecurityIntelAddDialog.vue (paste indicators into a list).
-//   • list        — required; stored as an `ioc_` enrichment table.
-//   • indicators  — at least one recognised indicator, and no unrecognised
-//                   tokens (they are named, so the analyst can fix them).
-//   • confidence  — 0–100; a number input emits a string, coerced at submit.
+
+// Confidence arrives as a string from the number input; it is coerced at submit.
 
 import { z } from "zod";
 import {

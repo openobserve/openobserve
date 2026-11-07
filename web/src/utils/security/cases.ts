@@ -1,10 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// cases.ts — incidents as the SIEM Cases page reads them.
-//
-// A case is an OpenObserve incident: correlated firings with a status an
-// analyst moves along. The timeline arrives as serde-tagged events
-// ({ timestamp, type, data }); this file turns each into one readable line.
+
+// Timeline events arrive serde-tagged ({ timestamp, type, data }); each becomes one readable line.
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -14,7 +10,6 @@ export type CaseStatus = "open" | "acknowledged" | "resolved";
 
 export const CASE_STATUSES: CaseStatus[] = ["open", "acknowledged", "resolved"];
 
-/** P1–P4 → tone, so a P1 case reads with the same red as a critical detection. */
 export function toneOfPriority(priority: string | null | undefined): SeverityTone {
   switch (String(priority ?? "").toUpperCase()) {
     case "P1":
@@ -200,11 +195,7 @@ export interface CaseTrigger {
   alert_fired_at: number;
 }
 
-/**
- * Distinct detections behind a case, busiest first. Counted from `triggers`
- * (one entry per firing); the response's `alerts` are alert definitions and
- * carry no firing time, so they are not a firing count.
- */
+/** Counted from `triggers`; the response's `alerts` are definitions with no firing time. */
 export function caseDetections(
   triggers: CaseTrigger[] | null | undefined,
 ): { alertName: string; count: number; last: number }[] {

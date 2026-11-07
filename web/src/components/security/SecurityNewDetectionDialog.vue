@@ -1,11 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- New detection: pick a rule from the shipped Sigma library (or write one),
-     choose the stream it runs on, and see — before anything is saved — whether
-     it compiles against that stream's real columns. A rule that cannot run is
-     refused with the reason, never saved as a detection that silently never
-     fires. -->
+<!-- A rule that cannot compile against the stream is refused, never saved to silently never fire. -->
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -135,15 +131,11 @@ const draftSource = computed(() => {
 const draftCompiled = computed(() => {
   const rule = draftRule.value;
   if (!rule || !streamFields.value.length || fieldsStream.value !== pickedStream.value) return null;
-  // The same compile the catalog uses, so a pasted SigmaHQ rule gets the
-  // source's field map, and on OCSF data the OCSF bridge and its class guard.
+  // The catalog's compile, so a pasted rule gets the source's field map and the OCSF bridge.
   return compileForSource(rule, draftSource.value, streamFields.value);
 });
 
-/**
- * A rule written for a different kind of log than the picked stream. It may
- * still compile on shared field names, so this warns rather than blocks.
- */
+/** A rule for another log kind may still compile on shared field names, so this warns, not blocks. */
 const logsourceMismatch = computed(() => {
   const rule = draftRule.value;
   const source = draftSource.value;
@@ -176,11 +168,7 @@ const ocsfBridgeText = computed(() => {
   return t("siem.detections.ocsfBridge", { stream: pickedStream.value, guard: guard.join(", ") });
 });
 
-/**
- * The payload as it would be sent, so the name can be checked before saving.
- * History joins firings to rules by name, so a reused name would merge two
- * detections' firings into one.
- */
+/** History joins firings to rules by name, so the name is checked before saving. */
 const draftPayload = computed(() => {
   const rule = draftRule.value;
   const compiled = draftCompiled.value;
@@ -201,8 +189,7 @@ const nameTaken = computed(
   () => !!draftPayload.value && (props.existingNames ?? []).includes(draftPayload.value.name),
 );
 
-// A run looks back `period` minutes every `frequency` minutes; a period shorter
-// than the frequency leaves minutes no run ever looks at.
+// A period shorter than the frequency leaves minutes no run ever looks at.
 const periodError = computed(() =>
   !(period.value > 0)
     ? t("siem.detections.validation.positive")
@@ -239,8 +226,7 @@ async function loadStreams() {
 
 let destinationsSeq = 0;
 async function loadDestinations() {
-  // Focus and the Refresh button can overlap; only the latest answer lands, and
-  // a failed refresh keeps the list that last loaded.
+  // Focus and Refresh can overlap; only the latest answer lands, and a failure keeps the last list.
   const seq = ++destinationsSeq;
   try {
     const res = await destinationService.list({
@@ -254,8 +240,6 @@ async function loadDestinations() {
     if (seq !== destinationsSeq) return;
     const list = res.data?.list ?? res.data ?? [];
     destinations.value = (Array.isArray(list) ? list : []).map((d: any) => String(d.name));
-    // One destination is the common case; pre-picking it saves a click without
-    // hiding the choice.
     if (destinations.value.length === 1 && !pickedDestinations.value.length) {
       pickedDestinations.value = [...destinations.value];
     }
@@ -291,9 +275,7 @@ watch(pickedStream, (name) => {
   void loadStreamFields(name);
 });
 
-// A fresh install has no destination, and the alerts API will not save a
-// detection without one. The analyst creates it in a new tab; coming back to
-// this one re-reads the list, so the dialog never has to be closed and redone.
+// The alerts API needs a destination; one made in a new tab is re-read on focus, keeping the dialog open.
 const router = useRouter();
 function createDestination() {
   const { href } = router.resolve({
@@ -320,8 +302,7 @@ watch(
       mode.value = "library";
       pickedRuleId.value = preset.sigmaId;
       catalogFilter.value = "";
-      // The rule picked from Content may sit below the fold of the list.
-      // The dialog may still be rendering, so look for a few frames.
+      // The dialog may still be rendering, so look for the picked rule's row for a few frames.
       const id = preset.sigmaId;
       const selector = `[data-test="security-detections-new-rule-${CSS.escape(id)}"]`;
       const reveal = (tries: number) => {
@@ -576,7 +557,6 @@ const toNumber = (v: string | number) => {
         {{ ocsfBridgeText }}
       </OBanner>
 
-      <!-- Whether it will run, decided before anything is saved -->
       <OBanner
         v-if="draftRule && pickedStream && draftCompiled"
         :variant="draftCompiled.runnable ? 'success' : 'warning'"

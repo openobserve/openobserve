@@ -4,7 +4,6 @@ import { getUUID } from "@/utils/uuid";
 
 const STREAM_PLACEHOLDER = "__O2_STREAM__";
 
-/** Vertical gap below the source node so our node does not overlap it on the canvas. */
 const NODE_Y_OFFSET = 120;
 
 const NEW_PIPELINE_DESCRIPTION =
@@ -87,7 +86,7 @@ const edge = (source: string, target: string): PipelineEdge => ({
   target,
 });
 
-// Lowercased for one stable name per stream (R2); two streams differing only in case would collide here.
+// Lowercased for one stable name per stream; two streams differing only in case would collide here.
 export const entityFunctionName = (version: number, stream: string): string =>
   `ocsf_entity_v${version}_${stream}`.toLowerCase();
 
@@ -194,7 +193,6 @@ export function removeNode(pipeline: Pipeline): Pipeline {
   return { ...pipeline, nodes, edges };
 }
 
-/** Whether any leaf stream node writes back to the pipeline's own source stream (SDD §5.2 / §5.7). */
 function writesToSourceStream(pipeline: Pipeline): boolean {
   const source = pipeline.nodes[0];
   const streamName = source?.data?.stream_name;

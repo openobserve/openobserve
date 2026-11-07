@@ -1,7 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Counts over time stacked by severity (worst on top); `zoomable` emits a dragged range. -->
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";

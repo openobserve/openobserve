@@ -1,14 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// outcome.ts — "did this event fail?", as SQL and as a check on real values.
-//
-// The word lists mirror `toOcsfStatus` in ocsf.ts (a spec keeps them in step),
-// so a row counted as failed here is the row the Events table shows as
-// "Failure". Numeric HTTP-style codes follow the same rule: 4xx/5xx failed.
-//
-// A column is only trusted as an outcome once its actual values have been
-// looked at: a gRPC code, a k8s status object or a free-text phrase would
-// otherwise produce "0 failures" that is not a fact but a failure to read.
+
+// Word lists mirror `toOcsfStatus` in ocsf.ts, so a row failed here shows as "Failure" in Events.
 
 import { toOcsfStatus } from "./ocsf";
 import { quoteString } from "./sql";
@@ -47,7 +39,6 @@ export function classifyOutcome(value: unknown): number {
 
 const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
-/** SQL predicate: the outcome column says this event failed. */
 export function failurePredicate(column: string): string {
   const text = `LOWER(TRIM(CAST(${quoteIdent(column)} AS VARCHAR)))`;
   const words = [...OUTCOME_FAILURE_WORDS, ...EXTRA_FAILURE_PHRASES].map(quoteString).join(", ");
@@ -57,7 +48,6 @@ export function failurePredicate(column: string): string {
   );
 }
 
-/** Values → counts for the top values of a candidate outcome column. */
 export function outcomeSampleSql(stream: string, column: string, limit = 50): string {
   return (
     `SELECT CAST(${quoteIdent(column)} AS VARCHAR) AS zo_value, COUNT(*) AS zo_n ` +
@@ -85,8 +75,7 @@ export function outcomeFallbackWindow(startUs: number, endUs: number): [number, 
 /** Share of sampled rows that must read as success or failure to trust the column. */
 export const OUTCOME_MIN_INTERPRETED = 0.98;
 
-// Whether a column's values read as success/failure words or HTTP codes; anything
-// mostly else (gRPC codes, phrases) leaves failures "unknown".
+// Only success/failure words or HTTP codes count; mostly-other values (gRPC codes, phrases) stay "unknown".
 export function outcomeInterpretable(sample: { value: unknown; n: number }[]): boolean {
   let total = 0;
   let read = 0;

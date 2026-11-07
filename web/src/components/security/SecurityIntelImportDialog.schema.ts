@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Validation for SecurityIntelImportDialog.vue. `mode` is a prop, not a field:
-// a file import needs a file, a feed import needs an http(s) URL.
+
+// `mode` is a prop, not a field: a file import needs a file, a feed import an http(s) URL.
 
 import { z } from "zod";
 import { INTEL_SEVERITIES, intelTableName } from "@/utils/security/intel";

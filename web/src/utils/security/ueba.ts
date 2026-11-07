@@ -1,18 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// ueba.ts — per-user behaviour against that user's own recent past.
-//
-// Every user is compared with themselves, not with the org: a service account
-// that logs in 5,000 times a day is normal, a person who does it once is not.
-// The current window is set against a baseline window just before it, and a
-// user is flagged only on concrete, explainable differences, each carrying the
-// numbers that triggered it. These are heuristics over the chosen windows —
-// the page says so — not a trained model.
-//
-// Input is two GROUP BYs per stream and window — (user, hour of day) and
-// (user, source IP) — folded here into profiles; totals come from the hours
-// aggregate (at most 24 rows a user). When either is truncated, the signals
-// that need every row are withheld rather than guessed. Pure functions only.
+
+// Each user is compared with their own baseline, not the org's: a service account's volume is normal for it.
 
 import type { SeverityTone } from "./severity";
 import { isExternalIp, quoteIdent, type StreamPlan } from "./entities";
@@ -187,8 +175,7 @@ export interface UebaWindows {
   baselineStart: number;
 }
 
-// Which baseline aggregates came back whole: a truncated one lacks the rare rows
-// "never seen before" depends on, so its signals are withheld, not guessed.
+// A truncated baseline aggregate lacks the rare rows novelty depends on, so its signals are withheld.
 export interface BaselineCompleteness {
   hours: boolean;
   ips: boolean;
@@ -223,8 +210,7 @@ export function toneOfRisk(score: number): SeverityTone {
   return "info";
 }
 
-// The baseline a user really has: from their first event in it, not the window
-// start — else a young source makes everyone look like a spike.
+// From the user's first baseline event, not the window start, else a young source makes everyone spike.
 export function baselineSpanUs(baseline: UserProfile | null, w: UebaWindows): number {
   if (!baseline || !Number.isFinite(baseline.firstSeen)) return 0;
   return w.currentStart - Math.max(w.baselineStart, baseline.firstSeen);
@@ -247,8 +233,7 @@ export function hourCoverage(startUs: number, endUs: number): Map<number, number
   return cover;
 }
 
-// Expected events now. A day or longer scales the whole baseline; a shorter window
-// uses the same hours of day (a worker's busy hour is no spike) and needs a day of history.
+// Sub-day windows compare the same hours of day (a worker's busy hour is no spike) and need a day of history.
 export function expectedVolume(
   baseline: UserProfile | null,
   w: UebaWindows,
@@ -270,7 +255,6 @@ export function expectedVolume(
 }
 const COMPLETE: BaselineCompleteness = { hours: true, ips: true };
 
-/** Scores one user against their own baseline. */
 export function scoreUser(
   current: UserProfile,
   baseline: UserProfile | null,
@@ -290,8 +274,7 @@ export function scoreUser(
     baseline.events >= T.hoursMinBaseline &&
     span >= T.hoursMinSpanShare * baselineLen;
 
-  // Totals and hours come from the hours aggregate; if it was cut short,
-  // "absent from the baseline" and volume are not facts.
+  // Totals and hours come from the hours aggregate; if it was cut short, absence and volume are not facts.
   if (!complete.hours) withheld.push("first_seen", "volume", "new_hours", "failure_jump");
   if (!complete.ips) withheld.push("new_ip");
 
@@ -308,8 +291,7 @@ export function scoreUser(
       });
     }
   } else {
-    // Volume against the user's own scaled baseline, with a Poisson z-score so a
-    // jump from 1 to 4 is not treated like a jump from 100 to 400.
+    // Poisson z-score so a jump from 1 to 4 is not treated like a jump from 100 to 400.
     const floor = Math.max(expected, 1);
     const z = (current.events - floor) / Math.sqrt(floor);
     if (

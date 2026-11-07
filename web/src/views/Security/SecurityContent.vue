@@ -1,13 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Content — what ships with the SIEM, set against what this org has.
-     Two catalogs: the Sigma rule pack, and the log source types the SIEM can
-     identify and normalise. Each is read against the org itself: a rule is
-     "installed" when a SIEM detection runs it, and "applies to your data" when
-     one of your streams is identified as a source the rule was written for.
-     That last pair is the useful one — a rule that applies but is not
-     installed is coverage you already paid for in ingestion and are not using. -->
+<!-- A rule that applies to your data but is not installed is coverage already paid for in ingestion. -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -73,7 +67,6 @@ type ContentTab = "rules" | "sources";
 const tab = ref<ContentTab>(route.query.tab === "sources" ? "sources" : "rules");
 watch(tab, (value) => router.replace({ query: { ...route.query, tab: value } }));
 
-// ── Data ─────────────────────────────────────────────────────────────────────
 const {
   siemRows,
   loading: rulesLoading,
@@ -138,7 +131,6 @@ const fieldsByStream = computed(() => new Map(streams.value.map((s) => [s.name, 
 /** Installed state is only trustworthy once the alert list has loaded. */
 const installPending = computed(() => rulesLoading.value || !!rulesError.value);
 
-// ── Rules ────────────────────────────────────────────────────────────────────
 interface RuleRow {
   id: string;
   title: string;
@@ -306,7 +298,6 @@ const ruleColumns = computed<OTableColumnDef<RuleRow>[]>(() => [
   },
 ]);
 
-// ── Sources ──────────────────────────────────────────────────────────────────
 interface SourceRow {
   id: string;
   label: string;
@@ -414,7 +405,6 @@ const sourceColumns = computed<OTableColumnDef<SourceRow>[]>(() => [
   },
 ]);
 
-// ── Drawers ──────────────────────────────────────────────────────────────────
 const openRuleId = ref<string | null>(route.query.rule ? String(route.query.rule) : null);
 const openSourceId = ref<string | null>(route.query.source ? String(route.query.source) : null);
 const ruleTab = ref("overview");
@@ -424,9 +414,7 @@ const openRule = computed(() => ruleRows.value.find((r) => r.id === openRuleId.v
 const openSource = computed(
   () => sourceRows.value.find((r) => r.id === openSourceId.value) ?? null,
 );
-// Prev/next walk the list the drawer was opened from, in the order it is
-// displayed: the rules table (sorted, paged), the sources table, or — for a rule
-// opened from a source drawer — that source's rule list.
+// Prev/next walk the list the drawer was opened from, in the order it is displayed.
 const rulesTable = ref<{ table: NavTable<RuleRow> } | null>(null);
 const sourcesTable = ref<{ table: NavTable<SourceRow> } | null>(null);
 /** Set when a rule was opened from a source drawer; its rules are the list. */
@@ -505,7 +493,6 @@ function shareFor(key: "rule" | "source", id: string | undefined) {
   return url.toString();
 }
 
-// Rule drawer: how the rule compiles against each of your matching streams.
 const ruleStreamChecks = computed<StreamCheck[]>(() => openRule.value?.checks ?? []);
 
 const ruleTabs = computed<RecordTab[]>(() => [
@@ -589,7 +576,6 @@ function viewDetection() {
   });
 }
 
-// Source drawer
 const sourceRulesList = computed(() =>
   openSource.value ? rulesForSource(openSource.value.source, catalog.value) : [],
 );
@@ -770,7 +756,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         data-test="security-content-notices"
       />
 
-      <!-- ── Rules ──────────────────────────────────────────────────────── -->
       <OTable
         v-if="tab === 'rules'"
         :data="filteredRules"
@@ -893,7 +878,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         </template>
       </OTable>
 
-      <!-- ── Sources ────────────────────────────────────────────────────── -->
       <OTable
         v-else
         :data="filteredSources"
@@ -991,7 +975,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
       </OTable>
     </div>
 
-    <!-- ── Rule drawer ────────────────────────────────────────────────────── -->
     <SecurityRecordDrawer
       v-if="openRule"
       :open="!!openRule"
@@ -1189,7 +1172,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
       </template>
     </SecurityRecordDrawer>
 
-    <!-- ── Source drawer ──────────────────────────────────────────────────── -->
     <SecurityRecordDrawer
       v-if="openSource"
       :open="!!openSource"

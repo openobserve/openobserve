@@ -166,8 +166,7 @@ describe("populatedColumns", () => {
     expect(columns).toContain("actor");
     expect(columns).toContain("srcIp");
     expect(columns).toContain("operation");
-    // CloudTrail carries no destination or process, so those columns stay off
-    // rather than rendering a wall of empty cells.
+    // CloudTrail has no destination or process, so those columns stay off instead of rendering empty.
     expect(columns).not.toContain("dstIp");
     expect(columns).not.toContain("process");
   });

@@ -714,7 +714,7 @@ pub async fn get_alert_history(
             return empty();
         }
         where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(&ids)));
-    } else if query.siem == Some(true) {
+    } else if cfg!(feature = "enterprise") && query.siem == Some(true) {
         let ids = restrict_to_permitted(
             db::alerts::alert::resolve_siem_alert_ids(&org_id).await,
             permitted_alert_ids.as_deref(),

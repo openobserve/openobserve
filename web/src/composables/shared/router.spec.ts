@@ -1071,6 +1071,21 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("homeChildRoutes — Security enterprise gate", () => {
+    it("does not register any Security route on an OSS build", () => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes.some((r: any) => r.path?.startsWith("security"))).toBe(false);
+    });
+
+    it("registers the Security routes on an enterprise build", () => {
+      config.isEnterprise = "true";
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, "securityOverview")).toBeDefined();
+      expect(findRoute(homeChildRoutes, "securityContent")).toBeDefined();
+    });
+  });
+
   // =========================================================================
   // 9. homeChildRoutes — dashboards routes
   // =========================================================================

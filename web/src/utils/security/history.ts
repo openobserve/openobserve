@@ -1,9 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// history.ts — alert history rows as the SIEM reads them.
-//
-// Every scheduled evaluation writes a history row, so most rows are a rule
-// saying "nothing here". A firing is the subset worth an analyst's attention.
 
 import { isFiringOutcome } from "@/utils/alerts/runOutcome";
 
@@ -24,12 +19,7 @@ export interface HistoryRow {
   evaluation_took_in_secs: number | null;
 }
 
-/**
- * A firing, as opposed to an evaluation that found nothing. Read off the
- * server's normalised status (which counts `notify_failed` — matched, but the
- * notification did not go out — as a firing); `level` and `actual_value` are
- * not a verdict (a run that saw 3 rows against a threshold of 100 is normal).
- */
+/** Reads the server-normalised status (`notify_failed` counts); `level`/`actual_value` are not a verdict. */
 export const isFiring = (row: HistoryRow): boolean => isFiringOutcome(row.status);
 
 /** Bucket width for a window, picked so a chart shows roughly 24–60 bars. */
@@ -42,10 +32,7 @@ export function bucketMsFor(windowMs: number): number {
   return 24 * HOUR;
 }
 
-/**
- * Counts items into fixed buckets across [startMs, endMs), per key. Buckets
- * with nothing in them are kept as zeros so the time axis has no gaps.
- */
+/** Empty buckets are kept as zeros so the time axis has no gaps. */
 export function bucketize<K extends string>(
   items: { timeMs: number; key: K }[],
   startMs: number,

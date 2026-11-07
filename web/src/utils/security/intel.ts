@@ -1,15 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// intel.ts — indicators of compromise, and how they are matched against events.
-//
-// Indicators live in OpenObserve enrichment tables (the platform's own lookup
-// tables), one row per indicator. A table is treated as threat intel when its
-// name starts with `ioc_` or `threat_intel`, so intel never mixes with the
-// org's other lookup tables and needs no separate store.
-//
-// Matching is exact and server-side: each indicator type is swept against the
-// columns that can carry it, with batched IN lists. No fuzzy or suffix match —
-// a sighting shown here is a value that literally appeared in an event.
+
+// Intel tables are enrichment tables named `ioc_*` or `threat_intel*`; matching is exact, never fuzzy.
 
 import { quoteString } from "./sql";
 
@@ -47,8 +38,6 @@ export interface Indicator {
   table: string;
 }
 
-// ── Recognising indicators ───────────────────────────────────────────────────
-
 const IPV4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 const HEX = /^[0-9a-f]+$/;
 const DOMAIN = /^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,63}$/;
@@ -56,12 +45,7 @@ const EMAIL = /^[^\s@]+@([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/;
 /** SHA-512, SHA-256, SHA-1, MD5. */
 const HASH_LENGTHS = [32, 40, 64, 128];
 
-/**
- * Last labels that make "cmd.exe" or "invoice.pdf" look like a domain. Real
- * TLDs that collide (.zip, .mov) are also file types; a file name is the far
- * likelier reading in a threat report, so those are refused too. Extensions
- * that are mostly real domains in practice (.com, .sh, .py) are not listed.
- */
+/** File-type labels that make "cmd.exe" look like a domain; colliding TLDs (.zip, .mov) are refused too. */
 const FILE_EXTENSIONS = new Set(
   (
     "exe dll sys drv bat cmd ps1 psm1 vbs vbe js jse wsf hta scr cpl msi msp lnk " +
@@ -71,12 +55,7 @@ const FILE_EXTENSIONS = new Set(
   ).split(" "),
 );
 
-/**
- * RFC 5952 canonical text for an IPv6 address — lower case, no leading zeros,
- * the longest run of two or more zero groups compressed — or null when the
- * text is not a valid address. `2001:0DB8:0:0::1` and `2001:db8::1` are the
- * same indicator and must compare equal.
- */
+/** RFC 5952 canonical IPv6 so `2001:0DB8:0:0::1` and `2001:db8::1` compare equal; null when invalid. */
 export function canonicalIpv6(raw: string): string | null {
   const value = raw.trim().toLowerCase();
   if (!value.includes(":") || !/^[0-9a-f:.]+$/.test(value)) return null;
@@ -133,10 +112,7 @@ function isIp(value: string): boolean {
   return IPV4.test(value) || canonicalIpv6(value) !== null;
 }
 
-/**
- * Undoes the usual defanging (`hxxp://`, `evil[.]com`, `1.2.3[.]4`) that
- * threat reports use so an indicator can be pasted without becoming a link.
- */
+/** Undoes threat-report defanging (`hxxp://`, `evil[.]com`) so pasted indicators match. */
 export function refang(value: string): string {
   return value
     .trim()
@@ -147,7 +123,6 @@ export function refang(value: string): string {
     .replace(/\[\/\]/g, "/");
 }
 
-/** Best guess at an indicator's type, or null when it is not one. */
 export function detectIndicatorType(raw: string): IndicatorType | null {
   const value = refang(raw).toLowerCase();
   if (!value) return null;
@@ -192,11 +167,7 @@ export interface ParsedIndicators {
   duplicates: number;
 }
 
-/**
- * Reads a pasted list: one indicator per line, or separated by commas,
- * semicolons or whitespace. `forcedType` rejects values of any other type
- * rather than silently re-typing them.
- */
+/** `forcedType` rejects values of any other type rather than silently re-typing them. */
 export function parseIndicatorList(
   text: string,
   forcedType?: IndicatorType | null,
@@ -232,8 +203,6 @@ export function parseIndicatorList(
   return out;
 }
 
-// ── Tables ───────────────────────────────────────────────────────────────────
-
 /** Mirrors the backend's stream-name formatting so the name we show is the one stored. */
 export function intelTableName(raw: string): string {
   const name = raw
@@ -247,8 +216,6 @@ export function intelTableName(raw: string): string {
 export function isIntelTable(name: string): boolean {
   return /^(ioc_|threat_intel)/i.test(name);
 }
-
-// ── CSV ──────────────────────────────────────────────────────────────────────
 
 /** RFC 4180 reader: quoted fields, doubled quotes, CRLF, embedded newlines. */
 export function parseCsv(text: string): string[][] {
@@ -325,11 +292,7 @@ const asConfidence = (value: unknown, fallback = 50): number => {
     : fallback;
 };
 
-/**
- * A stored row as an Indicator. Rows written by other tools may lack our
- * columns, so the type is re-detected when missing and bad rows are dropped
- * (returned as null) rather than shown as if they were indicators.
- */
+/** Rows from other tools may lack our columns, so type is re-detected and bad rows return null. */
 export function rowToIndicator(row: Record<string, unknown>, table: string): Indicator | null {
   const raw = String(row.indicator ?? row.ioc ?? row.value ?? "").trim();
   if (!raw) return null;
@@ -429,8 +392,6 @@ export function expiresSoon(
   return Number.isFinite(at) && at > nowMs && at - nowMs <= days * 86_400_000;
 }
 
-// ── Sweeping ─────────────────────────────────────────────────────────────────
-
 /** Types that can be matched with an exact IN list. CIDR ranges are not. */
 export type SweepType = Exclude<IndicatorType, "cidr">;
 
@@ -442,11 +403,7 @@ const COLUMN_PATTERNS: Record<SweepType, RegExp> = {
   email: /(^|_)(email|mail|sender|recipient|from|to|user_email|username|user_name|principal)$/,
 };
 
-/**
- * Stream columns an indicator type is swept against: whatever the detected
- * source maps to the matching normalized field, plus columns whose name says
- * they hold that kind of value. Returned sorted, without duplicates.
- */
+/** Source-mapped columns plus columns whose name says they hold that kind of value. */
 export function candidateColumns(
   type: SweepType,
   fields: string[],
@@ -457,10 +414,7 @@ export function candidateColumns(
   return [...new Set([...mapped.filter((m) => fields.includes(m)), ...byName])].sort();
 }
 
-/**
- * Types compared lower-cased on both sides, matching normalizeIndicator; `ip`
- * because IPv6 hex may be stored in either case (a no-op for IPv4).
- */
+/** Folded like normalizeIndicator; `ip` too because IPv6 hex may be stored in either case. */
 const CASE_FOLDED: SweepType[] = ["ip", "domain", "hash", "email"];
 
 const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
@@ -474,12 +428,7 @@ export function batches<T>(items: T[], size = SWEEP_BATCH): T[][] {
   return out;
 }
 
-/**
- * Counts, first and last sighting of each listed value in one column. The
- * column is cast so a numeric or mistyped column cannot fail the whole sweep;
- * `zo_raw` keeps one value as stored, so a pivot on a case-folded match
- * filters on the spelling that is actually in the events.
- */
+/** The column is cast so a mistyped column cannot fail the sweep; `zo_raw` keeps the stored spelling. */
 export function sweepSql(
   stream: string,
   column: string,
@@ -567,8 +516,6 @@ export function foldMatches(
     .sort((a, b) => b.hits - a.hits || b.last - a.last);
 }
 
-// ── Raw rows (for rewriting a list without touching other rows) ─────────────
-
 /** Column a stored row keeps its indicator in; `ioc` and `value` are accepted too. */
 export function indicatorColumnOf(row: Record<string, unknown>): string | null {
   for (const col of ["indicator", "ioc", "value"]) {
@@ -599,11 +546,7 @@ export function rowsToCsv(columns: string[], rows: Record<string, unknown>[]): s
   return `${lines.join("\n")}\n`;
 }
 
-/**
- * The stored rows with one indicator removed, everything else byte-for-byte:
- * other rows, extra columns, unparseable rows and original spellings are all
- * kept. Blank rows (left by an emptied list) are dropped.
- */
+/** Removes one indicator and keeps everything else byte-for-byte; blank rows are dropped. */
 export function rowsWithout(
   rows: Record<string, unknown>[],
   target: Pick<Indicator, "type" | "indicator">,
@@ -625,11 +568,7 @@ export function rowsWithout(
   return { kept, removed };
 }
 
-/**
- * An indicator as a row in a table with its own column set, so an append
- * matches the stored schema (the backend refuses a different one). Returns
- * null when the table has no column to hold the indicator itself.
- */
+/** Matches the table's own column set, as the backend refuses a different one on append. */
 export function indicatorToRow(
   i: Omit<Indicator, "table">,
   columns: string[],

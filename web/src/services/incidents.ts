@@ -695,11 +695,7 @@ export interface IncidentAlert {
   detected_source?: string | null;
 }
 
-/**
- * One alert DEFINITION attached to an incident (the server's full `Alert`,
- * deduplicated). Only the fields the UI reads are typed; firings are in
- * `IncidentWithAlerts.triggers`, not here.
- */
+/** One deduplicated alert definition on an incident; firings live in `IncidentWithAlerts.triggers`. */
 export interface IncidentAlertDefinition {
   id?: string | null;
   name: string;

@@ -46,8 +46,8 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, sample_data, security, service_accounts, service_streams,
-    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    query_history, rum_analytics, sample_data, service_accounts, service_streams, short_url, slack,
+    slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -80,7 +80,8 @@ use {
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
         discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
-        playground, prompts, providers, quality, remote_tasks, score_configs, scorers, workflows,
+        playground, prompts, providers, quality, remote_tasks, score_configs, scorers, security,
+        workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1350,9 +1351,6 @@ fn service_route_table() -> Router {
         .route("/{org_id}/announcements", get(announcements::get_announcements))
         .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
 
-        // Built-in OCSF packs: read-only, no org data
-        .route("/{org_id}/security/ocsf/packs", get(security::list_ocsf_packs))
-
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
         .route("/{org_id}/overview", get(organization::org::org_overview))
@@ -1539,7 +1537,6 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
         .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
-        .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary))
         .route("/v2/{org_id}/alerts/auto_investigate/decisions", get(alerts::auto_investigate::list_auto_investigate_decisions))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
@@ -1604,7 +1601,11 @@ fn service_route_table() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
             .route("/{org_id}/anomaly_detection/{config_id}/train", delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
-            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
+            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
+
+            // Security (SIEM); the OCSF packs are built-in and hold no org data
+            .route("/{org_id}/security/ocsf/packs", get(security::list_ocsf_packs))
+            .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary));
         router = alert_calibration_routes(router);
     }
 

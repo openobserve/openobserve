@@ -161,8 +161,6 @@ const KIND_ICON: Record<string, string> = {
 
 // Cap the entity nodes so a large org does not render a wall of cards.
 const ENTITY_CAP = 24;
-// Entities render in a compact grid on the left; hub then crown jewels to the
-// right, so the attack path reads left-to-right without a single tall column.
 const ENTITY_COLS = 3;
 const CELL_W = 236;
 const CELL_H = 124;

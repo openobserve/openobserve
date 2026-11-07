@@ -1,31 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// catalog.ts — the detection content that ships with the product.
-//
-// These rules are written in the Sigma format and carried in the bundle rather
-// than fetched. Fetching the public corpus at runtime would put a network
-// dependency between an analyst and their detections, which is wrong twice over:
-// a SIEM is frequently the thing you reach for when the network is having a bad
-// day, and a large share of the installs that need one most are air-gapped.
-// Content that ships is content that works on day one, offline.
-//
-// Coverage is deliberately breadth-first. Every source type the classifier can
-// recognise has rules that apply to it, so a stream that gets identified
-// immediately has detections to run, rather than the pack being deep on Windows
-// and empty everywhere else. The public SigmaHQ corpus is roughly a thousand
-// Windows process-creation rules out of three thousand; importing that shape
-// would leave a cloud-first install with nothing.
-//
-// Each rule is the plain, well-understood logic for its behaviour, tagged with
-// the MITRE ATT&CK technique it covers. They are meant to be read, edited and
-// argued with: a rule promoted to a detection carries this YAML with it, so what
-// runs in production is the text an analyst can see.
+
+// Rules ship in the bundle, not fetched at runtime: detections must work offline and air-gapped.
 
 import type { SigmaRule } from "./types";
 import { matchesLogsource, parseSigmaRule } from "./parse";
 
 const RULES: string[] = [
-  // ── AWS CloudTrail ────────────────────────────────────────────────────────
   `title: AWS Root Account Activity
 id: 2b1a2a3d-6b41-4e58-91f0-31b7e4b8b7a1
 status: stable
@@ -200,7 +180,6 @@ tags:
   - attack.discovery
   - attack.t1580`,
 
-  // ── Okta ──────────────────────────────────────────────────────────────────
   `title: Okta MFA Factor Reset Or Deactivated
 id: 6c1d9f24-8b53-4e07-a2f6-3d95c7e1b048
 status: stable
@@ -293,7 +272,6 @@ tags:
   - attack.persistence
   - attack.t1098.001`,
 
-  // ── Azure ─────────────────────────────────────────────────────────────────
   `title: Azure Sign-In Using Legacy Authentication
 id: 7d3e8c14-6b09-4f25-a8d7-2e1c5b9f0463
 status: stable
@@ -369,7 +347,6 @@ tags:
   - attack.defense_evasion
   - attack.t1562.007`,
 
-  // ── GCP ───────────────────────────────────────────────────────────────────
   `title: GCP Service Account Key Created
 id: 8c4a1b70-3d59-4e26-b0f8-6a2d9e7c1543
 status: test
@@ -392,7 +369,6 @@ tags:
   - attack.persistence
   - attack.t1098.001`,
 
-  // ── Kubernetes audit ──────────────────────────────────────────────────────
   `title: Kubernetes Secrets Enumerated
 id: 2a7e5c91-4f08-4b63-9d15-8c0b3e6a2f47
 status: test
@@ -475,7 +451,6 @@ tags:
   - attack.privilege_escalation
   - attack.t1078`,
 
-  // ── GitHub ────────────────────────────────────────────────────────────────
   `title: GitHub Repository Visibility Or Protection Weakened
 id: 9e1c6b40-2d87-4a35-8f09-5b3d7e2c1064
 status: test
@@ -502,7 +477,6 @@ tags:
   - attack.exfiltration
   - attack.t1567`,
 
-  // ── Windows process creation ──────────────────────────────────────────────
   `title: Encoded PowerShell Command
 id: 3b6f9d17-4c25-4e80-a1d3-7f0b8e5c2946
 status: stable
@@ -673,7 +647,6 @@ tags:
   - attack.initial_access
   - attack.t1566.001`,
 
-  // ── Windows Security log ──────────────────────────────────────────────────
   `title: Windows Failed Logon
 id: 2d8f5b13-4c76-4e09-a3b8-1f6d0c9e2745
 status: stable
@@ -768,7 +741,6 @@ tags:
   - attack.persistence
   - attack.t1543.003`,
 
-  // ── Linux ─────────────────────────────────────────────────────────────────
   `title: SSH Authentication Failure
 id: 7f1a6c30-2e85-4b47-90d3-5c8f2a1e6b09
 status: stable
@@ -861,7 +833,6 @@ tags:
   - attack.privilege_escalation
   - attack.t1548.003`,
 
-  // ── Web ───────────────────────────────────────────────────────────────────
   `title: SQL Injection Attempt In Request Path
 id: 1b8e4f63-9c07-4d52-8a16-3e7d5b0c2f94
 status: test
@@ -965,7 +936,6 @@ tags:
   - attack.command_and_control
   - attack.t1105`,
 
-  // ── DNS ───────────────────────────────────────────────────────────────────
   `title: DNS Query To A Dynamic DNS Or Tunnelling Provider
 id: 2f7d0b46-5a83-4c19-9e05-1d6c3b8a4e72
 status: test
@@ -1014,7 +984,6 @@ tags:
   - attack.exfiltration
   - attack.t1048.003`,
 
-  // ── Flow and network telemetry ────────────────────────────────────────────
   `title: VPC Flow Rejected To A Remote Administration Port
 id: 3e8a5d29-7c14-4b60-95f2-0d4c6b1a8e37
 status: test
@@ -1088,7 +1057,6 @@ tags:
   - attack.command_and_control
   - attack.t1071`,
 
-  // ── Already-normalised OCSF ───────────────────────────────────────────────
   `title: OCSF Failed Authentication
 id: 5d0b7e14-8c36-4f92-a715-2b6e4d9c0f38
 status: stable
@@ -1130,7 +1098,6 @@ tags:
   - attack.execution
   - attack.t1204`,
 
-  // ── Firewall ──────────────────────────────────────────────────────────────
   `title: Inbound Connection To A File Sharing Or Database Port
 id: 4a9e7b25-1c60-4f38-b842-0e7d5a3c9f16
 status: test
@@ -1163,23 +1130,9 @@ tags:
   - attack.t1021`,
 ];
 
-/**
- * Sigma field names onto stream columns, per source type.
- *
- * Rules are written against Sigma's taxonomy, which is the vendor's own naming
- * for products (CloudTrail's `eventName`) but a normalised one for categories
- * (`c-uri` for any web server). Streams follow neither reliably, so the gap is
- * bridged here rather than by rewriting rules per customer. Only genuine
- * differences are listed; a field the stream already spells the Sigma way needs
- * no entry, and the compiler falls back to a case-insensitive column match.
- */
+/** Sigma field names to stream columns; a field already spelled the Sigma way needs no entry. */
 export const SIGMA_FIELD_MAPS: Record<string, Record<string, string>> = {
-  // Targets offer `a|b`: whichever column the access log really has. The full
-  // request line (`GET /x HTTP/1.1`) is not a URI, so it is never a target:
-  // equality and endswith would silently never match it. The query fields try
-  // the columns that carry the query string first and fall back to the path,
-  // which in most shippers' JSON nginx/Apache formats is $request_uri, query
-  // string included.
+  // The full request line (`GET /x HTTP/1.1`) is never a target: equality and endswith would never match it.
   webserver_access: {
     "c-uri": "path|uri|request_uri|url",
     "cs-uri": "path|uri|request_uri|url",
@@ -1220,13 +1173,7 @@ export const KEYWORD_FIELDS: Record<string, string[]> = {
 let parsed: SigmaRule[] | null = null;
 let failures: { message: string; yaml: string }[] = [];
 
-/**
- * The pack, parsed once.
- *
- * A rule that fails to parse is kept in `catalogErrors` rather than dropped, so
- * a mistake in shipped content shows up as a visible problem instead of a rule
- * that quietly never fires.
- */
+/** Parsed once; parse failures go to `catalogErrors` so broken shipped content is visible, not silent. */
 export function sigmaCatalog(): SigmaRule[] {
   if (parsed) return parsed;
   const rules: SigmaRule[] = [];
@@ -1246,7 +1193,6 @@ export function catalogErrors() {
   return failures;
 }
 
-/** Rules written for a stream's logsource triple. */
 export function rulesForLogsource(stream: {
   category?: string;
   product?: string;
@@ -1255,7 +1201,6 @@ export function rulesForLogsource(stream: {
   return sigmaCatalog().filter((rule) => matchesLogsource(rule, stream));
 }
 
-/** Every ATT&CK technique the pack covers, for the coverage view. */
 export function catalogTechniques(): string[] {
   const techniques = new Set<string>();
   for (const rule of sigmaCatalog()) rule.techniques.forEach((id) => techniques.add(id));

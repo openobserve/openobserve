@@ -1,16 +1,10 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// firings.ts — how one alert-history row reads on the SIEM Alerts page.
-//
-// The history API normalises `status`; everything here only decides how that
-// verdict is labelled and coloured, and how the evidence window is described.
 
 import { isErrorOutcome, isFiringOutcome } from "@/utils/alerts/runOutcome";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { SeverityTone } from "./severity";
 import type { HistoryRow } from "./history";
 
-/** A history row with the optional fields the Alerts page reads. */
 export interface FiringRow extends HistoryRow {
   threshold_value?: number | null;
   group_label?: string | null;
@@ -32,7 +26,6 @@ export function firingStatus(status: string | null | undefined): FiringStatus {
   return "other";
 }
 
-/** OTag variant per status: a firing is the loud one, a normal run the calm one. */
 export const STATUS_VARIANT: Record<FiringStatus, BadgeVariant> = {
   firing: "error-soft",
   notify_failed: "orange-soft",
@@ -42,11 +35,7 @@ export const STATUS_VARIANT: Record<FiringStatus, BadgeVariant> = {
   other: "default-soft",
 };
 
-/**
- * Tone for a row with no SIEM detection behind it. The row's own `level` is
- * the threshold that matched ("critical" | "warning" | "ok"), which is the
- * closest thing an ordinary alert has to a severity.
- */
+/** A row's `level` is the threshold that matched, the closest an ordinary alert has to a severity. */
 export function toneOfHistoryLevel(level: string | null | undefined): SeverityTone {
   switch (String(level ?? "").toLowerCase()) {
     case "critical":
@@ -100,11 +89,7 @@ export function firingKey(row: Pick<HistoryRow, "alert_name" | "timestamp">): st
   return `${row.timestamp}:${row.alert_name}`;
 }
 
-/**
- * A readable one-paragraph version of a scheduler error. Notification failures
- * embed the destination's whole HTML error page; the tags and whitespace are
- * noise, and the full text stays available in the raw history row.
- */
+/** Notification failures embed a whole HTML error page; its tags and whitespace are noise. */
 export function summarizeError(text: string | null | undefined, max = 280): string {
   const plain = String(text ?? "")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")

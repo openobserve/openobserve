@@ -1,11 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// mitre.ts — the ATT&CK Enterprise tactics, in kill-chain order.
-//
-// Sigma tags carry tactics as free-form words (`attack.defense_evasion`, and in
-// older rules `attack.defense-evasion`), so they are normalised to one spelling
-// before they are counted. The order is the matrix's own left-to-right order,
-// which is what an analyst expects a coverage row to read as.
+
+// Sigma tags spell tactics inconsistently (`defense_evasion` / `defense-evasion`), so they are normalised.
 
 export const ATTACK_TACTICS = [
   "reconnaissance",
@@ -49,14 +44,10 @@ export interface TacticCoverage {
   tactic: AttackTactic;
   /** Enabled rules that cover this tactic. */
   rules: number;
-  /** Firings in the window from rules that cover this tactic. */
   firings: number;
 }
 
-/**
- * Rules and firings per tactic. A rule tagged with two tactics counts toward
- * both, which is how the matrix itself reads a multi-tactic technique.
- */
+/** A rule tagged with two tactics counts toward both, as the matrix reads a multi-tactic technique. */
 export function tacticCoverage(
   rules: { tactics: string[]; enabled: boolean }[],
   firings: { tactics: string[] }[],

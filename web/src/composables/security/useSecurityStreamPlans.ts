@@ -1,13 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// useSecurityStreamPlans.ts — for every security stream, which columns hold
-// users, IPs and hosts and how a failure is spelled.
-//
-// Entities and UEBA both query every security source at once, and both need
-// the same answer per stream before they can write a single GROUP BY. Plans are
-// rebuilt on every refresh, so a new stream or column shows up without a page
-// reload; a stream whose schema cannot be read is reported, never skipped
-// silently.
+
+// Plans are rebuilt on every refresh, so a new stream or column shows up without a page reload.
 
 import { ref, shallowRef } from "vue";
 

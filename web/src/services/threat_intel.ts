@@ -1,12 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// threat_intel.ts — the indicator store, on top of enrichment tables.
-//
-// Intel tables are ordinary enrichment tables (see utils/security/intel.ts for
-// the naming rule), so this is a thin domain layer over the existing
-// enrichment-table, stream and search endpoints: nothing here needs a backend
-// change, and a table added through the Enrichment Tables page shows up here
-// as long as its name marks it as intel.
+
+// Intel tables are ordinary enrichment tables, so one added elsewhere shows up when its name marks it as intel.
 
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
@@ -63,11 +57,7 @@ const threatIntel = {
       });
   },
 
-  /**
-   * Every row, raw and parsed, uncached (the result cache is not invalidated
-   * when a table is replaced). `rowCount` is COUNT(*); the response `total` is
-   * only what was returned. The window starts at 1µs: 0 is rejected.
-   */
+  /** Uncached, since the result cache is not invalidated when a table is replaced. */
   async readTable(orgId: string, table: string): Promise<IntelTableRead> {
     const end = Date.now() * 1000 + 3_600_000_000;
     const name = `"${table.replace(/"/g, '""')}"`;
@@ -110,11 +100,7 @@ const threatIntel = {
     };
   },
 
-  /**
-   * Writes indicators. Appending uses the table's existing columns, since the
-   * backend refuses an append whose columns differ; `append: false` replaces
-   * the table (rows and schema) with the standard intel columns.
-   */
+  /** Appends must reuse the table's existing columns: the backend refuses an append whose columns differ. */
   upload(
     orgId: string,
     table: string,
@@ -140,11 +126,7 @@ const threatIntel = {
     return jsTransformService.create_enrichment_table_from_url(orgId, table, url, append);
   },
 
-  /**
-   * Rewrites a list without one indicator, all other rows kept as stored.
-   * Refused unless the read matches COUNT(*) exactly. An emptied list stays as
-   * a header-only table: deleting it would also drop attached pipelines/alerts.
-   */
+  /** An emptied list stays a header-only table: deleting it would also drop attached pipelines/alerts. */
   async removeIndicator(
     orgId: string,
     target: Pick<Indicator, "type" | "indicator" | "table">,

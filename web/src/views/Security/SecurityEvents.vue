@@ -1,8 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Security Events — hunt one stream at a time, normalised onto OCSF; every value is a
-     pivot, and the URL carries the whole view. -->
 <script setup lang="ts">
 import {
   computed,
@@ -107,7 +105,7 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-// ── View state: the URL is the source of truth; localStorage restores a bare URL ──
+// The URL is the source of truth; localStorage only restores a bare URL.
 interface DateState {
   type: "relative" | "absolute";
   period: string;
@@ -236,7 +234,6 @@ const timeRange = ref(rangeFor(initialState.date));
 // Bumped to remount the picker when the range is set from outside it (chart zoom).
 const dateKey = ref(0);
 
-// ── Preferences (per viewer) ─────────────────────────────────────────────────
 function loadPrefs(): { timeline: boolean; raw: boolean; sidebar: number } {
   try {
     return {
@@ -277,7 +274,6 @@ function toggleSidebar() {
   }
 }
 
-// ── Streams ──────────────────────────────────────────────────────────────────
 const secSources = useSecuritySources();
 const {
   streams: streamList,
@@ -327,7 +323,7 @@ const streamOptions = computed(() => {
       label: t("siem.events.securityStreams"),
       value: "__h_sec__",
       header: true,
-      headerCount: String(secStreamNames.value.length),
+      headerCount: raw(String(secStreamNames.value.length)),
     });
     secStreamNames.value.forEach((n) => opts.push({ label: raw(n), value: n, icon: "shield" }));
   }
@@ -336,7 +332,7 @@ const streamOptions = computed(() => {
       label: t("siem.events.otherStreams"),
       value: "__h_other__",
       header: true,
-      headerCount: String(otherStreamNames.value.length),
+      headerCount: raw(String(otherStreamNames.value.length)),
     });
     otherStreamNames.value.forEach((n) => opts.push({ label: raw(n), value: n, icon: "database" }));
   }
@@ -362,7 +358,6 @@ const HEALTH_DOT: Record<SourceHealth, string> = {
   never: "bg-border-default",
 };
 
-// ── Schema ───────────────────────────────────────────────────────────────────
 interface StreamField {
   name: string;
   ftype: string;
@@ -413,7 +408,6 @@ const fieldItems = computed<FieldItem[]>(() => {
   ]);
 });
 
-// ── Columns (raw mode) ───────────────────────────────────────────────────────
 const PREFERRED = [
   "_timestamp",
   "severity_id",
@@ -473,7 +467,6 @@ function toggleCol(name: string) {
   showRaw.value = true;
 }
 
-// ── Query state ──────────────────────────────────────────────────────────────
 const sqlQuery = ref(initialState.query);
 const sqlMode = ref(initialState.sqlMode);
 const severityFilter = ref<SeverityValue[]>([]);
@@ -492,8 +485,7 @@ const notices = computed<SecurityNotice[]>(() =>
     : [],
 );
 
-// Severity column: the detected source's, else a common name. Numeric fallbacks are
-// skipped — syslog counts the other way (0 is worst) and would invert the tiles.
+// Numeric fallbacks are skipped: syslog counts the other way (0 is worst) and would invert the tiles.
 const SEVERITY_FIELDS = [
   "severity_id",
   "severity",
@@ -511,8 +503,7 @@ const severityField = computed(() => {
     }
   }
   const fallback = SEVERITY_FIELDS.find((c) => fieldNames.value.includes(c)) ?? null;
-  // A numeric "level"/"severity" from an unknown producer has no known scale
-  // (syslog runs 0=worst, pino 10..60), so it is not read as severity at all.
+  // A numeric level/severity from an unknown producer has no known scale, so it is not read as severity.
   const type = schemaFields.value.find((f) => f.name === fallback)?.ftype ?? "";
   if (fallback && fallback !== "severity_id" && /int|float|double|decimal/i.test(type)) return null;
   return fallback;
@@ -582,7 +573,6 @@ const filters = computed(() => ({
   filters: fieldFilters.value,
 }));
 
-// ── Filter builder ───────────────────────────────────────────────────────────
 const builderField = ref("");
 const builderOp = ref("=");
 const builderValue = ref("");
@@ -674,7 +664,6 @@ function clearFilters() {
   else void runSearch();
 }
 
-// ── Results ──────────────────────────────────────────────────────────────────
 const PAGE_ROWS = 250;
 const events = ref<Record<string, any>[]>([]);
 const loading = ref(false);
@@ -778,7 +767,6 @@ const detectedSummary = computed(() => {
   };
 });
 
-// ── Table ────────────────────────────────────────────────────────────────────
 type Row = NormalizedEvent & { _key: string; _tone: SeverityTone };
 const rows = computed<Row[]>(() =>
   normalizedEvents.value.map((ev, i) => ({
@@ -892,12 +880,10 @@ function fmtTs(ms: number | null): string {
   });
 }
 
-// ── Timeline + severity tiles (server-side, whole window) ────────────────────
 const histogram = ref<HistogramResult | null>(null);
 const histogramLoading = ref(false);
 
-// Each search bumps this; a response from an older search is dropped, so a slow
-// query can never overwrite the results of the one the analyst ran after it.
+// A response from an older search is dropped, so a slow query never overwrites a newer one.
 let searchSeq = 0;
 
 async function runHistogram(seq: number, run: SearchRun) {
@@ -946,8 +932,7 @@ async function runHistogram(seq: number, run: SearchRun) {
 /** Whether `histogram` describes the search currently on screen. */
 const histogramFresh = ref(false);
 
-// Exact window total from the histogram (the search total is capped at the page);
-// null in SQL mode or before the histogram lands.
+// Exact window total from the histogram (the search total is capped at the page).
 const windowTotal = computed<number | null>(() => {
   const h = histogram.value;
   // No exact total to offer: the response total is capped at the page size.
@@ -979,8 +964,7 @@ function valuesForTone(tone: SeverityTone): SeverityValue[] {
 
 const severityStats = computed<StatItem[]>(() => {
   const h = histogram.value;
-  // No "All" tile: the count sits in the table toolbar, and re-clicking the
-  // active tile clears the facet.
+  // No "All" tile: re-clicking the active tile clears the facet.
   return shownTones.value.map((tone) => ({
     key: tone,
     label: t(toneLabelKey(tone)),
@@ -1023,7 +1007,6 @@ function onChartZoom({ start, end }: { start: number; end: number }) {
   void runSearch();
 }
 
-// ── Field sidebar: top values per field ──────────────────────────────────────
 const expandedField = ref<string | null>(null);
 const topValues = ref<{ value: string; count: number }[]>([]);
 const topValuesLoading = ref(false);
@@ -1084,7 +1067,6 @@ async function loadTopValues(field: string) {
 }
 const topValuesTotal = computed(() => topValues.value.reduce((sum, v) => sum + v.count, 0));
 
-// ── Sigma rules for this source ──────────────────────────────────────────────
 const {
   ranked: sigmaRules,
   counting: rulesCounting,
@@ -1124,7 +1106,6 @@ function filterByRule(where: string) {
   void runSearch();
 }
 
-// ── Drawer ───────────────────────────────────────────────────────────────────
 function openDrawer(row: Row) {
   drawerEvent.value = row.raw;
   syncUrl();
@@ -1136,8 +1117,7 @@ function closeDrawer() {
   pendingEventKey.value = null;
   syncUrl();
 }
-// A shared link pins the absolute window — a relative one would resolve against
-// the viewer's clock and show different events.
+// A shared link pins the absolute window; a relative one resolves against the viewer's clock.
 const shareUrl = computed(() => {
   if (!drawerEvent.value || typeof window === "undefined") return "";
   const url = new URL(window.location.href);
@@ -1146,7 +1126,6 @@ const shareUrl = computed(() => {
   return url.toString();
 });
 
-// ── SQL ──────────────────────────────────────────────────────────────────────
 function buildSQL(): string {
   const stream = selectedStream.value;
   if (!stream) return "";
@@ -1166,7 +1145,6 @@ function switchToSql(value: unknown) {
   void runSearch();
 }
 
-// ── URL sync ─────────────────────────────────────────────────────────────────
 function buildQuery(pinTime = false): Record<string, string> {
   const q: Record<string, string> = { org_identifier: orgId.value };
   if (selectedStream.value) q.stream = selectedStream.value;
@@ -1207,7 +1185,6 @@ function syncUrl() {
   }
 }
 
-// ── Loading ──────────────────────────────────────────────────────────────────
 let streamsSeq = 0;
 async function loadStreams() {
   const seq = ++streamsSeq;
@@ -1219,8 +1196,7 @@ async function loadStreams() {
   if (wanted && allStreamNames.value.includes(wanted)) selectedStream.value = wanted;
   else if (secStreamNames.value.length) selectedStream.value = secStreamNames.value[0];
   else if (allStreamNames.value.length) selectedStream.value = allStreamNames.value[0];
-  // In the background: the sidebar's health dots and counts, from the data
-  // itself where the stream stats lag ingestion.
+  // In the background, from the data itself where the stream stats lag ingestion.
   withRecentActivity(orgId.value, streamList.value, secStreamNames.value)
     .then((fresh) => {
       if (seq !== streamsSeq) return;
@@ -1240,8 +1216,7 @@ async function loadSchema(streamName: string) {
       ftype: f.type ?? f.field_type ?? "",
     }));
     initColumns(schemaFields.value);
-    // Identify from the schema alone so the severity column is known before
-    // the first search; the search re-identifies with a real row.
+    // Identify from the schema alone so the severity column is known before the first search.
     detectSource(null);
     void loadClassMix(streamName);
   } catch {
@@ -1342,8 +1317,7 @@ async function runSearch() {
 async function restoreDrawerFromUrl() {
   const ts = pendingEventTs.value;
   if (!ts || drawerEvent.value) return;
-  // With a content key only that exact event will do (others share its timestamp);
-  // not in the page → the server lookup below.
+  // With a content key only that exact event will do: others share its timestamp.
   const inPage = pendingEventKey.value
     ? events.value.find((e) => eventKey(e) === pendingEventKey.value)
     : events.value.find((e) => String(e._timestamp) === ts);
@@ -1390,7 +1364,6 @@ async function restoreDrawerFromUrl() {
   if (!drawerEvent.value) syncUrl();
 }
 
-// ── Watchers ─────────────────────────────────────────────────────────────────
 let suppressSeverityWatch = false;
 function applySeverity(values: SeverityValue[]) {
   suppressSeverityWatch = true;
@@ -1420,8 +1393,7 @@ watch(selectedStream, async (v) => {
   switchingStream = false;
   void runSearch();
 });
-// Re-identification can move severity to another column; the facet follows it,
-// except a URL severity, which is re-applied once on the first move.
+// Re-identification can move severity to another column; a URL severity is re-applied once.
 let severityRestorePending = initialState.severity.length > 0;
 watch(severityField, (next, prev) => {
   if (!mountComplete || switchingStream || next === prev) return;
@@ -1493,14 +1465,12 @@ function onEmptyAction(id?: string) {
   else if (widerPeriod.value) widenTo(widerPeriod.value);
 }
 
-// An empty result over a window the stream has simply not reported in yet is
-// not "no events": say when it last reported and offer the window that reaches it.
+// An empty window the stream has not reported in yet is not "no events": offer one that reaches it.
 const lastReportedUs = computed(() =>
   Number(streamStats.value.get(selectedStream.value ?? "")?.doc_time_max ?? 0),
 );
 const widerPeriod = computed(() =>
-  // A filter or a hand-written query can empty the page on its own; the stream's
-  // last event says nothing about either.
+  // A filter or hand-written query can empty the page on its own; the last event says nothing of it.
   filtersActive.value || (sqlMode.value && sqlQuery.value.trim())
     ? null
     : widerPeriodFor(lastReportedUs.value, timeRange.value.start),
@@ -1569,7 +1539,6 @@ function widenTo(period: string) {
       </div>
     </template>
 
-    <!-- ── Query bar ─────────────────────────────────────────────────────── -->
     <template #subnav>
       <div class="px-page-edge flex flex-col gap-2 py-2" data-test="security-events-query-bar">
         <div class="flex flex-wrap items-center gap-2">
@@ -1675,7 +1644,6 @@ function widenTo(period: string) {
           </template>
         </div>
 
-        <!-- Active filters: flip include/exclude, or remove -->
         <div v-if="!sqlMode && fieldFilters.length" class="flex flex-wrap items-center gap-1.5">
           <OTag
             v-for="(f, i) in fieldFilters"
@@ -1738,7 +1706,6 @@ function widenTo(period: string) {
       </div>
     </template>
 
-    <!-- ── Sidebar: sources + fields ─────────────────────────────────────── -->
     <template #sidebar>
       <OFieldList
         :fields="fieldItems"
@@ -1968,9 +1935,7 @@ function widenTo(period: string) {
       </OFieldList>
     </template>
 
-    <!-- ── Body ──────────────────────────────────────────────────────────── -->
     <div class="flex min-h-0 flex-1 flex-col">
-      <!-- What the stream was identified as, and on what evidence -->
       <div
         v-if="detectedSummary"
         class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-1.5 text-xs"
@@ -2059,7 +2024,6 @@ function widenTo(period: string) {
         </OButton>
       </div>
 
-      <!-- Sigma rules written for this source, counted over the window -->
       <div
         v-if="showRules && sigmaRules.length"
         class="border-border-default bg-surface-panel flex max-h-72 shrink-0 flex-col overflow-y-auto border-b"
@@ -2139,7 +2103,6 @@ function widenTo(period: string) {
         </div>
       </div>
 
-      <!-- Timeline: severity tiles (facet) + stacked volume, whole window -->
       <div
         v-if="selectedStream && !sqlMode && showTimeline"
         class="px-page-edge border-border-default flex shrink-0 flex-col gap-2 border-b py-2"
@@ -2176,7 +2139,6 @@ function widenTo(period: string) {
         data-test="security-events-notices"
       />
 
-      <!-- ── Results ─────────────────────────────────────────────────────── -->
       <OEmptyState
         v-if="!selectedStream && !streamsLoading"
         size="hero"
@@ -2287,7 +2249,6 @@ function widenTo(period: string) {
           <span class="truncate font-mono text-xs">{{ row.dstIp || "—" }}</span>
         </template>
 
-        <!-- Every value is a pivot: include or exclude it without leaving the row -->
         <template #cell-hover-actions="{ row, column, active }">
           <div
             v-if="active && pivotFor(row, column.id)"

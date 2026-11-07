@@ -139,8 +139,7 @@ describe("summarizeError", () => {
 });
 
 describe("case detections from a real incident payload", () => {
-  // Shape of GET /api/v2/{org}/alerts/incidents/{id}: `alerts` are alert
-  // DEFINITIONS (no alert_name / alert_fired_at); firings are `triggers`.
+  // `alerts` here are definitions (no alert_name / alert_fired_at); firings are `triggers`.
   const payload: IncidentWithAlerts = {
     id: "inc-1",
     org_id: "default",

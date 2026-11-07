@@ -1,13 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// useIntelSweep.ts — find which indicators appeared in the security streams.
-//
-// For every security stream the schema is read and the source identified; each
-// indicator type is then matched against the columns that can hold it (what
-// the source maps to that entity, plus columns named for it). One query per
-// (stream, column, batch of ≤400 values), a few in flight at a time. What was
-// searched is returned alongside the matches, so an empty result can be told
-// apart from "nothing could have matched".
+
+// Coverage is returned with matches, so an empty result is told apart from "nothing could have matched".
 
 import { ref, shallowRef } from "vue";
 import searchService from "@/services/search";
@@ -29,12 +22,7 @@ import { securitySourceNames } from "@/utils/security/sourceSelection";
 export const MAX_SWEEP_QUERIES = 200;
 const CONCURRENCY = 4;
 
-/**
- * Normalized fields whose mapped columns carry each indicator type. Only the
- * unambiguous ones: a source's `host` or `resource` can be an account id or a
- * service name (CloudTrail maps them that way), so domains and URLs are found
- * by column name alone.
- */
+/** Unambiguous fields only: `host`/`resource` may hold account ids, so domains and URLs match by column name. */
 const MAPPED_FIELDS: Record<
   SweepType,
   ("srcIp" | "dstIp" | "host" | "actor" | "actorId" | "resource")[]
@@ -134,8 +122,7 @@ export function useIntelSweep() {
       if (mySeq !== seq) return;
       unreadStreams.value = unread;
 
-      // One task list per type, then interleaved, so the query cap cuts every
-      // type a little rather than dropping the last type entirely.
+      // Interleaved per type, so the query cap trims every type rather than dropping the last one.
       const perType: Task[][] = [];
       for (const [type, values] of valuesByType) {
         const list: Task[] = [];
@@ -199,8 +186,7 @@ export function useIntelSweep() {
       };
       await Promise.all(Array.from({ length: CONCURRENCY }, worker));
       if (mySeq !== seq) return;
-      // Coverage describes what actually ran: a column counts as searched only
-      // when none of its batches was dropped by the cap or failed.
+      // A column counts as searched only when none of its batches was dropped by the cap or failed.
       const key = (t: Task) => `${t.type}|${t.stream}|${t.column}`;
       const incomplete = new Set([...dropped, ...failedTasks, ...partialTasks].map(key));
       coverage.value = [...valuesByType].map(([type, values]) => {

@@ -1,23 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// types.ts — the Sigma rule model, as this codebase understands it.
-//
-// Sigma (https://sigmahq.io) is the portable detection format: a rule states
-// what to look for in vendor-neutral terms, and a backend compiles it to
-// whatever query language the data actually lives in. That indirection is the
-// whole point, and it is why a SIEM can ship thousands of detections without
-// knowing anything about the customer's log pipeline.
-//
-// The model here is the v2 specification's structure, not a superset. Fields
-// that exist in the spec but change nothing about how a rule runs (`author`,
-// `references`, `date`) are carried through untouched so the UI can show them,
-// while everything that affects matching is typed.
 
-/**
- * The logsource triple. A rule declares which kind of log it was written
- * against, and it may set any subset: a rule with only `category:
- * process_creation` runs against process telemetry from any product.
- */
+/** Any subset may be set: `category: process_creation` alone runs on process telemetry from any product. */
 export interface SigmaLogsource {
   category?: string;
   product?: string;
@@ -29,17 +12,10 @@ export interface SigmaLogsource {
 export const SIGMA_LEVELS = ["informational", "low", "medium", "high", "critical"] as const;
 export type SigmaLevel = (typeof SIGMA_LEVELS)[number];
 
-/**
- * Rule lifecycle. `stable` and `test` are safe to run; `experimental` is
- * expected to be noisy, and `deprecated`/`unsupported` should not run at all.
- */
+/** `stable`/`test` are safe to run; `experimental` is noisy; `deprecated`/`unsupported` should not run. */
 export type SigmaStatus = "stable" | "test" | "experimental" | "deprecated" | "unsupported";
 
-/**
- * One search identifier's body: a map of field-to-value, a list of such maps
- * (any of which may match), or a list of bare strings to look for anywhere in
- * the event.
- */
+/** A field-to-value map, a list of such maps (any may match), or bare strings to find anywhere in the event. */
 export type SigmaSearch = Record<string, unknown> | Record<string, unknown>[] | (string | number)[];
 
 export interface SigmaRule {
@@ -54,10 +30,7 @@ export interface SigmaRule {
   logsource: SigmaLogsource;
   /** Search identifiers, keyed by the names the condition refers to. */
   searches: Record<string, SigmaSearch>;
-  /**
-   * The condition expression(s). Sigma allows a list here, which means "any of
-   * these", so it is always stored as a list even when the YAML had one string.
-   */
+  /** Always a list: Sigma allows several conditions, meaning "any of these". */
   condition: string[];
   /** Field names to group by when reporting, informational only. */
   fields?: string[];

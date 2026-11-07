@@ -106,10 +106,10 @@ export function useSecuritySources() {
           .map((s) => s.name),
       ),
   );
-  // Streams carrying a setting are governed by it, not by the local classification (R13).
+  // Streams carrying a setting are governed by it, not by the local classification.
   const legacyNames = computed(() => names.value.filter((n) => !settingNames.value.has(n)));
   const sources = computed(() => resolveSources(legacyNames.value, prefs.value));
-  // An excluded setting (included === false) is not a source, even when a pack is mapped (F11).
+  // An excluded setting (included === false) is not a source, even when a pack is mapped.
   const sourceNames = computed(() => [
     ...new Set([
       ...settingSources.value.filter((s) => s.included).map((s) => s.name),
@@ -217,11 +217,11 @@ export function useSecuritySources() {
     persist();
   }
 
-  /** Moves local include/exclude choices into stream settings once, for a user who can write them (R15). */
+  /** Moves local include/exclude choices into stream settings once, for a user who can write them. */
   async function migrateIncludes(canWrite: boolean) {
     const org = orgId.value;
     if (!canWrite || !org || isLocalPrefsMigrated(org)) return;
-    // A failed stream load leaves streams empty; marking migrated now would silently drop every choice (F6).
+    // A failed stream load leaves streams empty; marking migrated now would silently drop every choice.
     if (error.value || !streams.value.length) return;
     const live = new Set(names.value);
     const byName = new Map(asSecurityStreams().map((s) => [s.name, s.settings?.security]));

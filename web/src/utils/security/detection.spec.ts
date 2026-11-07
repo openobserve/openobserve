@@ -102,8 +102,7 @@ describe("buildDetectionAlert", () => {
 });
 
 describe("detectionName", () => {
-  // The backend rejects these outright, so a title carrying one cannot be saved
-  // as written. Every rule in the shipped pack has spaces in its title.
+  // The backend rejects these characters outright, so a title carrying one cannot be saved as is.
   it("replaces every character the alerts API rejects", () => {
     expect(detectionName("Encoded PowerShell Command")).toBe("Encoded_PowerShell_Command");
     expect(detectionName("Web Shell / Admin Probing")).toBe("Web_Shell_Admin_Probing");
@@ -158,8 +157,7 @@ describe("detectionMetaOf", () => {
     const meta = detectionMetaOf({
       context_attributes: { siem: "true", sigma_level: "SEVERE", mitre_techniques: "" },
     });
-    // An unrecognised level falls back to medium rather than throwing away the
-    // detection or inventing a severity at either extreme.
+    // An unknown level falls back to medium rather than dropping the detection or picking an extreme.
     expect(meta.level).toBe("medium");
     expect(meta.techniques).toEqual([]);
   });

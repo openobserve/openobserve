@@ -1,16 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// ocsf.ts — the slice of the Open Cybersecurity Schema Framework the SIEM speaks.
-//
-// OCSF is the vocabulary that lets one Events page show CloudTrail, Okta, Sysmon
-// and nginx side by side: every source is mapped onto the same class, severity,
-// actor, endpoint and outcome, so a column means the same thing whatever
-// produced the row. https://schema.ocsf.io
-//
-// This is deliberately a subset. OCSF 1.x defines eight categories and well over
-// a hundred classes; carrying all of them would be dead weight, because a class
-// only earns its place here once something can actually map a log source onto
-// it. Every class listed is referenced by an entry in sourceTypes.ts.
+
+// Deliberately an OCSF subset: a class is listed only once a source type in sourceTypes.ts maps onto it.
 
 /** OCSF category uids, which are also the first digit of every class uid. */
 export const OCSF_CATEGORIES = [
@@ -34,28 +24,23 @@ export interface OcsfClass {
 
 /** Classes reachable from at least one source type. */
 export const OCSF_CLASSES: OcsfClass[] = [
-  // System Activity
   { uid: 1001, name: "File System Activity", category: 1 },
   { uid: 1007, name: "Process Activity", category: 1 },
   { uid: 1008, name: "Event Log Activity", category: 1 },
   { uid: 1009, name: "Script Activity", category: 1 },
   { uid: 201001, name: "Registry Key Activity", category: 1 },
   { uid: 201002, name: "Registry Value Activity", category: 1 },
-  // Findings
   { uid: 2001, name: "Security Finding", category: 2 },
   { uid: 2004, name: "Detection Finding", category: 2 },
-  // Identity & Access Management
   { uid: 3001, name: "Account Change", category: 3 },
   { uid: 3002, name: "Authentication", category: 3 },
   { uid: 3003, name: "Authorize Session", category: 3 },
   { uid: 3005, name: "User Access Management", category: 3 },
-  // Network Activity
   { uid: 4001, name: "Network Activity", category: 4 },
   { uid: 4002, name: "HTTP Activity", category: 4 },
   { uid: 4003, name: "DNS Activity", category: 4 },
   { uid: 4007, name: "SSH Activity", category: 4 },
   { uid: 4009, name: "Email Activity", category: 4 },
-  // Application Activity
   { uid: 6003, name: "API Activity", category: 6 },
   { uid: 6004, name: "Web Resource Access Activity", category: 6 },
 ];
@@ -67,27 +52,19 @@ export function ocsfClass(uid: number | undefined | null): OcsfClass | undefined
   return uid == null ? undefined : CLASS_BY_UID.get(Number(uid));
 }
 
-/**
- * The category of a class uid. Derived from the uid's leading digits rather than
- * a lookup, so a class this file has not enumerated still lands in the right
- * bucket: 4002 is Network whether or not HTTP Activity is listed above.
- */
+/** Derived from the uid's leading digits, so an unlisted class still lands in the right category. */
 export function ocsfCategoryOf(classUid: number | undefined | null) {
   if (classUid == null) return undefined;
   const uid = Number(classUid);
   if (!Number.isFinite(uid)) return undefined;
   const known = CLASS_BY_UID.get(uid);
   if (known) return CATEGORY_BY_UID.get(known.category);
-  // Extension classes are prefixed (201001 is a Windows extension of System),
-  // so the category is the leading digit of the last four.
+  // Extension classes are prefixed (201001 extends System), so the category is the last four's lead digit.
   const base = uid > 100000 ? uid % 100000 : uid;
   return CATEGORY_BY_UID.get(Math.floor(base / 1000) as OcsfCategoryUid);
 }
 
-/**
- * OCSF's severity scale. Not the same as a log level: 0 and 99 both mean "we do
- * not know", which is why they render as Unknown rather than collapsing to Info.
- */
+/** 0 and 99 both mean unknown, so they render as Unknown rather than collapsing to Info. */
 export const OCSF_SEVERITY = [
   { id: 0, name: "Unknown", tone: "muted" },
   { id: 1, name: "Informational", tone: "info" },
@@ -107,11 +84,7 @@ export function ocsfSeverity(id: number | undefined | null) {
   return SEVERITY_BY_ID.get(Number(id ?? 0)) ?? SEVERITY_BY_ID.get(0)!;
 }
 
-/**
- * Log levels and vendor severity words, mapped onto the OCSF scale. Sources
- * disagree wildly here (syslog counts up as things get better, most products
- * count the other way), so the mapping is by word, never by number.
- */
+/** Mapped by word, never by number: sources disagree on which direction severity counts. */
 const SEVERITY_WORDS: Record<string, number> = {
   emerg: 6,
   emergency: 6,
@@ -222,11 +195,7 @@ export function ocsfStatusName(id: number | undefined | null): string {
   return OCSF_STATUS.find((s) => s.id === Number(id ?? 0))?.name ?? "Unknown";
 }
 
-/**
- * The normalized event every source is mapped onto. These are the columns the
- * Events page can always show, whatever the underlying stream looks like.
- * `raw` is kept so the detail view can show what actually arrived.
- */
+/** `raw` is kept so the detail view can show what actually arrived. */
 export interface NormalizedEvent {
   time: number | null;
   classUid: number | null;

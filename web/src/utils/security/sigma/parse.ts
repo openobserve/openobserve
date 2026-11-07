@@ -1,15 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// parse.ts — Sigma YAML into the rule model.
-//
-// Parsing is strict about the parts that decide whether a rule can run (a
-// logsource, a detection block, a condition) and permissive about everything
-// else, because rules come from a public corpus written by hundreds of people
-// and half of the optional metadata is inconsistent in practice.
-//
-// A rule that cannot be parsed is returned as an error rather than thrown away.
-// Silently dropping rules is how a SIEM ends up quietly running 900 detections
-// when the operator believes it is running 1,000.
+
+// Unparseable rules are returned as errors, never dropped, so the running-rule count stays honest.
 
 import yaml from "js-yaml";
 
@@ -35,14 +26,7 @@ const asStringList = (value: unknown): string[] | undefined => {
   return [String(value)];
 };
 
-/**
- * Pulls ATT&CK ids out of the free-form `tags` list.
- *
- * The convention is `attack.<something>`: a technique looks like `attack.t1059`
- * or `attack.t1078.004`, anything else under that prefix is a tactic name
- * (`attack.defense_evasion`) or a group id (`attack.g0016`), which are not
- * techniques and must not be presented as such.
- */
+/** Tactics (`attack.defense_evasion`) and groups (`attack.g0016`) under `attack.` are not techniques. */
 function parseAttackTags(tags: string[] | undefined) {
   const techniques: string[] = [];
   const tactics: string[] = [];
@@ -62,13 +46,7 @@ function parseAttackTags(tags: string[] | undefined) {
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/**
- * Parses one Sigma rule.
- *
- * `js-yaml`'s default schema is used deliberately: it has no type resolution for
- * arbitrary JS objects, so a rule fetched from anywhere cannot construct
- * something unexpected during load.
- */
+/** js-yaml's default schema on purpose: it cannot construct arbitrary JS objects from a fetched rule. */
 export function parseSigmaRule(text: string): SigmaParseResult {
   const fail = (message: string): SigmaParseResult => ({
     ok: false,
@@ -82,9 +60,7 @@ export function parseSigmaRule(text: string): SigmaParseResult {
     return fail(error instanceof Error ? error.message : "Rule is not valid YAML");
   }
 
-  // Correlation rules are written as several documents in one file. The
-  // correlation half is not supported yet, so the base rule is taken and the
-  // caller is not told it got something it did not ask for.
+  // Correlation rules span several documents; correlation is unsupported, so the base rule is taken.
   const document = documents.find(isPlainObject);
   if (!document) return fail("Rule is empty or is not a YAML mapping");
 
@@ -102,8 +78,7 @@ export function parseSigmaRule(text: string): SigmaParseResult {
   const condition = asStringList(rawCondition)!.filter((entry) => entry.trim());
   if (!condition.length) return fail("Detection block has an empty condition");
 
-  // Everything in the detection block except `condition` and `timeframe` is a
-  // search identifier, whatever it is named.
+  // Everything in detection except `condition` and `timeframe` is a search identifier, whatever its name.
   const searches: Record<string, SigmaSearch> = {};
   for (const [name, value] of Object.entries(detection)) {
     if (name === "condition" || name === "timeframe") continue;
@@ -146,14 +121,7 @@ export function parseSigmaRule(text: string): SigmaParseResult {
   return { ok: true, rule };
 }
 
-/**
- * Whether a rule was written for this stream.
- *
- * A rule constrains the triple only as far as it needs to: one that names just
- * `category: process_creation` applies to process telemetry from any product,
- * while one that also names `product: windows` does not apply to Linux. So every
- * part the RULE states must match, and every part it leaves open is free.
- */
+/** Every logsource part the rule states must match; every part it leaves open is free. */
 export function matchesLogsource(
   rule: Pick<SigmaRule, "logsource">,
   stream: { category?: string; product?: string; service?: string },

@@ -1,16 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// sql.ts — a value as an OpenObserve SQL string literal.
-//
-// The search SQL tokenizer keeps backslashes as written, but a backslash in
-// front of a quote still pairs with it. `'C:\Windows'` reaches the engine
-// intact; a value with a quote right after a backslash (a regex's `\'`, which
-// is written `\''` once the quote is doubled) leaves the literal unterminated.
-// A trailing backslash is accepted by today's tokenizer, but it is the same
-// pairing one character away, so it is not relied on either.
-//
-// Those backslashes are written as chr(92) and concatenated, a spelling no
-// escape rule can misread. Every other value is a plain literal.
+
+// A backslash before a quote pairs with it in the tokenizer, so such runs are written as chr(92).
 
 const literal = (text: string) => `'${text.replace(/'/g, "''")}'`;
 

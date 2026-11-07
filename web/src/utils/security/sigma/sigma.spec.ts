@@ -1,8 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// The compiler's job is to preserve meaning, so these tests are mostly about
-// meaning rather than string shape: what a rule matches, what it must not
-// match, and what it refuses to guess at.
 
 import { describe, expect, it } from "vitest";
 
@@ -105,8 +101,7 @@ tags:
   it("maps the level onto the OCSF severity scale", () => {
     expect(sigmaLevelToSeverity("critical")).toBe(5);
     expect(sigmaLevelToSeverity("low")).toBe(2);
-    // An untagged rule is treated as medium rather than as unknown, because a
-    // detection with no severity still has to sort somewhere sensible.
+    // Medium, not unknown: an untagged detection still has to sort somewhere sensible.
     expect(sigmaLevelToSeverity(undefined)).toBe(3);
   });
 });
@@ -124,8 +119,6 @@ describe("matchesLogsource", () => {
 
   it("does not match when the rule states a part the stream contradicts", () => {
     expect(matchesLogsource({ logsource: { product: "linux" } }, stream)).toBe(false);
-    // The rule asks for a service; this stream has none, so the rule was not
-    // written for it.
     expect(matchesLogsource({ logsource: { service: "security" } }, stream)).toBe(false);
   });
 });
@@ -212,8 +205,7 @@ describe("compileSigmaRule", () => {
   });
 
   it("does not wrap a numeric comparison in a string function", () => {
-    // lower() on an integer column is a type error in DataFusion, so a rule
-    // that compares a number must not go anywhere near it.
+    // lower() on an integer column is a type error in DataFusion.
     const { where } = compile(RULE("  s: {LogonType: 3}\n  condition: s"));
     expect(where).not.toContain("lower");
   });
@@ -252,9 +244,7 @@ describe("compileSigmaRule", () => {
     const contains = compile(RULE("  s: {CommandLine|contains: enc}\n  condition: s"));
     expect(contains.where).toBe(`lower("CommandLine") LIKE '%enc%'`);
 
-    // A literal backslash has to be doubled: arrow's LIKE kernel treats `\` as
-    // the escape character and drops it before a non-wildcard, so a single `\U`
-    // would match a bare "U" and the Windows path rules would all silently miss.
+    // arrow's LIKE kernel drops a lone `\` before a non-wildcard, so `\U` would match a bare "U".
     const starts = compile(RULE("  s: {Image|startswith: 'C:\\Users'}\n  condition: s"));
     expect(starts.where).toBe(`lower("Image") LIKE 'c:\\\\users%'`);
 
@@ -431,9 +421,7 @@ describe("compileSigmaRule", () => {
   });
 
   it("targets the column ingest produced, not the one the rule was written against", () => {
-    // Nested keys are flattened and lower-cased on the way in, so a rule that
-    // says userIdentity.type has to compile to useridentity_type. Getting this
-    // wrong is not a miss, it is a query error against a column that is not there.
+    // Nested keys are flattened and lower-cased at ingest, so userIdentity.type must become useridentity_type.
     const { where, runnable } = compile(RULE("  s: {userIdentity.type: Root}\n  condition: s"), {
       availableFields: ["eventname", "useridentity_type"],
     });
@@ -442,9 +430,7 @@ describe("compileSigmaRule", () => {
   });
 
   it("reports a rule that cannot fire here rather than running a query that errors", () => {
-    // An unknown column is a query error in DataFusion, not a row that fails to
-    // match. The whole selection folds to false, so the rule is incapable of
-    // firing against this stream and says so.
+    // An unknown column is a query error in DataFusion, not a non-match, so the selection folds to false.
     const compiled = compile(RULE("  s: {CommandLine|contains: enc}\n  condition: s"), {
       availableFields: ["EventID", "Computer"],
     });
@@ -454,9 +440,7 @@ describe("compileSigmaRule", () => {
   });
 
   it("keeps a rule whose optional filter names a field the stream never emits", () => {
-    // The filter exists to suppress SSO logins. A stream with no SSO has no such
-    // column, which means the filter excludes nothing, which means the rule is
-    // still exactly right. Discarding it here would lose a real detection.
+    // No SSO column means the filter excludes nothing, so the rule is still exactly right.
     const compiled = compile(
       RULE(
         "  s: {eventName: ConsoleLogin}\n  f: {SamlProviderArn|exists: true}\n  condition: s and not f",
@@ -473,8 +457,7 @@ describe("compileSigmaRule", () => {
     const present = compile(RULE("  s: {a: 1, gone|exists: false}\n  condition: s"), {
       availableFields: ["a"],
     });
-    // exists:false on a column that does not exist is true for every row, so it
-    // drops out of the AND rather than killing it.
+    // exists:false on an absent column is true for every row, so it drops out of the AND.
     expect(present.where).toBe(`TRY_CAST("a" AS DOUBLE) = 1`);
     expect(present.runnable).toBe(true);
 
@@ -495,8 +478,7 @@ describe("compileSigmaRule", () => {
     const compiled = compile(
       RULE("  s: {EventID: 4625}\n  condition: s | count() by TargetUserName > 5"),
     );
-    // The predicate is still there for a caller that wants to build the
-    // aggregate itself, but the rule is not runnable as a plain search.
+    // The predicate stays for callers building the aggregate, but is not runnable as a plain search.
     expect(compiled.where).toBe(`TRY_CAST("EventID" AS DOUBLE) = 4625`);
     expect(compiled.runnable).toBe(false);
     expect(compiled.unsupported[0]).toMatch(/aggregation/);
@@ -534,8 +516,7 @@ describe("the shipped catalog", () => {
   });
 
   it("covers every security source the classifier can recognise", () => {
-    // A source that classifies but has no content is a dead end for the analyst:
-    // the page says it knows what the stream is and then offers nothing.
+    // A source that classifies but has no content is a dead end for the analyst.
     const uncovered = [...SOURCE_TYPE_BY_ID.values()]
       .filter((source) => !source.telemetryOnly)
       .filter((source) => !rulesForLogsource(source.sigma).length)
@@ -581,8 +562,7 @@ describe("applicableRules", () => {
 
   it("marks a rule unrunnable when the stream is missing what it needs", () => {
     const source = SOURCE_TYPE_BY_ID.get("aws_cloudtrail")!;
-    // A stream with only the two required CloudTrail fields cannot run the rules
-    // that look at the identity or the response.
+    // With only the two required CloudTrail fields, rules on identity or response cannot run.
     const applicable = applicableRules(source, ["eventName", "eventSource"]);
     const blocked = applicable.filter((entry) => !entry.compiled.runnable);
 

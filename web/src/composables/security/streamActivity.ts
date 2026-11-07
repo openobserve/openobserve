@@ -1,15 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// streamActivity.ts — whether a security stream is reporting, from the data
-// itself when the stream stats have not caught up.
-//
-// Stream stats are written when ingested data is flushed to storage, minutes
-// after it arrives, so a stream that is plainly receiving events can still
-// report zero documents. Telling an analyst that source "never reported" while
-// the Events page shows its rows is the kind of contradiction that makes every
-// other number on the page suspect. Only streams the stats call quiet or empty
-// are re-checked, with one bounded count each, so a healthy deployment pays
-// nothing.
+
+// Stream stats lag ingestion by minutes, so streams they call quiet are re-checked with one count each.
 
 import { runPool, runSql } from "./useSecurityStreamPlans";
 import { QUIET_AFTER_US, sourceHealth } from "@/utils/security/streams";
@@ -17,11 +8,7 @@ import { quoteIdent } from "@/utils/security/sql";
 
 type StreamRow = { name: string; stats?: Record<string, any> } & Record<string, any>;
 
-/**
- * The stream list with stats patched from a count over the last day, for the
- * named streams whose stats say they are not live. A stream the count cannot
- * read keeps its stats as they were.
- */
+/** Patches not-live streams' stats from a last-day count; a stream the count cannot read keeps its stats. */
 export async function withRecentActivity<T extends StreamRow>(
   orgId: string,
   list: T[],

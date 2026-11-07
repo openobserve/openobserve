@@ -1,7 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- A SIEM dashboard card: tone chip + title header over a body that fills the card. -->
 <script setup lang="ts">
 import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -13,7 +12,6 @@ const props = withDefaults(
     hint?: string;
     icon?: IconName;
     tone?: "primary" | "error" | "warning" | "orange" | "neutral";
-    /** Optional count shown beside the title. */
     count?: number | string | null;
     dataTest?: string;
   }>(),

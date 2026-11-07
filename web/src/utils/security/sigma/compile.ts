@@ -1,31 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// compile.ts — a Sigma rule into an OpenObserve SQL predicate.
-//
-// This is the backend, in Sigma's sense of the word: the piece that turns a
-// portable rule into a query this system can actually run. The contract it holds
-// to is that a rule either compiles to a predicate that means exactly what the
-// rule means, or it does not compile and says why. There is no third outcome
-// where a rule half-runs, because a detection that silently matches less than it
-// claims is worse than no detection at all: it produces a green dashboard.
-//
-// Two things drive whether a rule is runnable at all:
-//
-//   * Unsupported constructs. Aggregation and temporal correlation need a GROUP
-//     BY or a sequence join, not a WHERE clause, so they are refused by name.
-//   * Missing fields. A Sigma rule names fields in its taxonomy's spelling, not
-//     the stream's. Where a mapping exists it is applied; where a field is
-//     genuinely absent it is folded to a constant, since an unknown column in
-//     DataFusion is a query error rather than a row that fails to match, and a
-//     field no row carries has a decided truth value rather than an unknown one.
-//     A rule that folds away to constant false is reported as unrunnable: it
-//     cannot fire, and saying so is the difference between a detection that
-//     found nothing and one that was never capable of finding anything.
-//
-// Matching is case-insensitive, which is Sigma's default and what analysts
-// expect: a rule looking for `cmd.exe` must catch `CMD.EXE`. That costs the
-// column index on string comparisons, and it is the right trade for a detection
-// engine, where a miss is expensive and a scan is merely slow.
+
+// A rule compiles to an exact predicate or refuses with a reason; a half-running detection is worse than none.
 
 import type { SigmaRule, SigmaSearch } from "./types";
 import type { ConditionNode } from "./condition";
@@ -40,43 +15,24 @@ export interface CompileOptions {
   availableFields?: string[];
   /** Columns a bare-string (keyword) search looks in. */
   keywordFields?: string[];
-  /**
-   * Only fields the map names exist. Set when a rule runs on data in another
-   * schema (OCSF): a Sigma name that happens to equal one of its columns
-   * (`status`, `type`, `message`) means something else there.
-   */
+  /** Only mapped fields exist; in another schema (OCSF) a same-named column means something else. */
   strictFieldMap?: boolean;
 }
 
 export interface CompiledSigma {
   /** The predicate, suitable for a WHERE clause. Empty when not runnable. */
   where: string;
-  /** Whether the predicate is safe to run against this stream. */
   runnable: boolean;
   /** Constructs this backend refuses, named so the UI can explain the refusal. */
   unsupported: string[];
-  /**
-   * Fields the rule names that the stream does not have, and which were
-   * therefore folded away as never-present. The rule still ran; this is what it
-   * assumed in order to do so.
-   */
+  /** Fields the stream lacks, folded away as never-present; the rule still ran under that assumption. */
   assumedAbsent: string[];
-  /** Stream columns the predicate touches. */
   fields: string[];
   /** Set when the rule is malformed rather than merely unsupported. */
   error?: string;
 }
 
-/**
- * Folded truth values.
- *
- * A comparison against a column the stream does not have is not unknown, it is
- * decided: no row can carry a value in a field that does not exist, so a
- * positive test is false everywhere and a null test is true everywhere.
- * Substituting the constant is exact rather than approximate, which is what lets
- * a rule survive an optional filter naming a field this stream never emits,
- * instead of being discarded whole.
- */
+// Absent-field tests fold to exact constants, so an optional filter on a missing field does not sink the rule.
 const TRUE = "TRUE";
 const FALSE = "FALSE";
 
@@ -105,13 +61,7 @@ const quoteIdent = (field: string) => `"${field.replace(/"/g, '""')}"`;
 const escapeLikeLiteral = (char: string) =>
   char === "%" || char === "_" || char === "\\" ? `\\${char}` : char;
 
-/**
- * Sigma's escape rules onto SQL LIKE.
- *
- * In Sigma, `*` and `?` are the wildcards and a backslash escapes them; a
- * backslash before anything else is just a backslash, which is what makes
- * Windows paths tolerable to write.
- */
+/** Sigma `*`/`?` wildcards onto LIKE; a backslash before anything else stays literal (Windows paths). */
 function toLikePattern(value: string): { pattern: string; hasWildcard: boolean } {
   let pattern = "";
   let hasWildcard = false;
@@ -147,19 +97,10 @@ function unescapeSigma(value: string): string {
   return value.replace(/\\([*?\\])/g, "$1");
 }
 
-/**
- * `windash` expands a command-line switch into the forms Windows accepts.
- *
- * `-Enc` and `/Enc` are the same flag to PowerShell, and the Unicode dashes are
- * there because attackers use them precisely to dodge rules that only check the
- * ASCII one.
- */
+/** `-Enc` and `/Enc` are one PowerShell flag; Unicode dashes are added because attackers use them to dodge rules. */
 function windashVariants(value: string): string[] {
   const dashes = ["-", "/", "–", "—", "―"];
-  // The dash that introduces a parameter, which is at the start of the value or
-  // after a space. Rules are usually written as ' -enc ' with the surrounding
-  // spaces that make the match precise, so anchoring at position zero would
-  // expand almost nothing.
+  // Not anchored at position zero: rules are usually written as ' -enc ' with surrounding spaces.
   const match = /(^|\s)([-/–—―])(?=\S)/.exec(value);
   if (!match) return [value];
   const at = match.index + match[1].length;
@@ -168,14 +109,7 @@ function windashVariants(value: string): string[] {
   return dashes.map((dash) => `${head}${dash}${tail}`);
 }
 
-/**
- * An IPv4 CIDR block as a predicate on the address text.
- *
- * The whole octets the mask keeps are a string prefix; a mask that ends inside
- * an octet adds a numeric range on that octet, so /17 or /22 is exact rather
- * than rounded to the nearest byte. IPv6 is refused: its text form can be
- * compressed several ways, so no prefix of the text is a prefix of the address.
- */
+/** Octet prefix plus a numeric range so /17 is exact; IPv6 is refused since its text form is not unique. */
 function cidrPredicate(identifier: string, value: string): string | null {
   const [address, bitsText, extra] = value.split("/");
   const bits = Number(bitsText);
@@ -185,8 +119,7 @@ function cidrPredicate(identifier: string, value: string): string | null {
   if (octets.length !== 4 || octets.some((o) => !(o >= 0 && o <= 255))) return null;
   if (bits < 0 || bits > 32) return null;
 
-  // Dotted-quad shape, so `10.example.com` is not in 10.0.0.0/8 and an IPv6
-  // address is in no IPv4 block.
+  // Dotted-quad shape, so `10.example.com` is not in 10.0.0.0/8 and IPv6 is in no IPv4 block.
   const shape = `re_match(CAST(${identifier} AS VARCHAR), '^[0-9]{1,3}(\\.[0-9]{1,3}){3}$')`;
   if (bits === 0) return shape;
   const whole = Math.floor(bits / 8);
@@ -204,11 +137,7 @@ function cidrPredicate(identifier: string, value: string): string | null {
   return `(${parts.join(" AND ")})`;
 }
 
-/**
- * The three base64 encodings of a value, one per byte offset it could start at
- * inside a longer encoded string, trimmed to the characters that do not depend
- * on the neighbouring bytes. Same derivation as pySigma's base64offset.
- */
+/** The three base64 encodings by byte offset, trimmed to stable characters, as in pySigma's base64offset. */
 function base64OffsetVariants(value: string): string[] {
   const bytes = Array.from(new TextEncoder().encode(value));
   const encode = (data: number[]) => btoa(String.fromCharCode(...data));
@@ -225,7 +154,6 @@ function base64OffsetVariants(value: string): string[] {
 const asNumber = (identifier: string) => `TRY_CAST(${identifier} AS DOUBLE)`;
 
 interface FieldResolution {
-  /** The stream column the value is read from. */
   column: string;
   known: boolean;
   /** The SQL that reads the value: the column, or a JSON read into it. */
@@ -250,14 +178,7 @@ class Compiler {
     this.available = options.availableFields ? new FieldIndex(options.availableFields) : null;
   }
 
-  /**
-   * A Sigma field name onto a real column.
-   *
-   * The explicit map wins, and then the stream's own index takes over, which
-   * covers both the capitalisation Sigma and the stream disagree about and the
-   * rewriting ingest applied: a rule that says `userIdentity.type` has to end up
-   * querying `useridentity_type`, or it queries a column that does not exist.
-   */
+  /** The map wins, then the stream index, so `userIdentity.type` ends up querying `useridentity_type`. */
   resolveField(name: string): FieldResolution {
     const mapped = this.fieldMap[name] ?? this.fieldMap[name.toLowerCase()];
     const plain = (column: string, known: boolean) => ({ column, known, sql: quoteIdent(column) });
@@ -288,7 +209,6 @@ class Compiler {
     return plain(candidates[0], false);
   }
 
-  /** One `field|modifiers: value` entry. */
   private comparison(key: string, value: unknown): string | null {
     const [name, ...modifierList] = key.split("|");
     const modifiers = new Set(modifierList.map((modifier) => modifier.toLowerCase()));
@@ -326,8 +246,7 @@ class Compiler {
       return joinClauses(refs, "OR");
     }
 
-    // A list is OR by default; `all` is the modifier that makes it AND, which is
-    // how a rule says "the command line contains every one of these".
+    // A list is OR by default; the `all` modifier makes it AND.
     if (Array.isArray(value)) {
       const parts = value
         .map((entry) => this.scalarComparison(identifier, modifiers, entry))
@@ -339,14 +258,7 @@ class Compiler {
     return this.scalarComparison(identifier, modifiers, value);
   }
 
-  /**
-   * The truth value of a comparison against a field the stream does not have.
-   *
-   * Positive tests are false for every row. A null or `exists: false` test is
-   * true for every row, which is the case that matters: it is how a rule's
-   * optional filters keep working on a stream that never emits the field they
-   * exclude on.
-   */
+  /** A null or `exists: false` test on an absent field is true everywhere, so optional filters keep working. */
   private absentField(modifiers: Set<string>, value: unknown): string {
     if (modifiers.has("exists")) return value === false || value === "false" ? TRUE : FALSE;
     if (value === null || value === undefined) return TRUE;
@@ -406,17 +318,12 @@ class Compiler {
     }
 
     if (typeof value === "boolean") return `${identifier} = ${value}`;
-    // A bare number compares numerically, through TRY_CAST because the column
-    // may hold it as text (an EventID or port shipped as a string). A bare
-    // `col = 2` on a text column is a cast error, and lower() on an integer
-    // column is a function error, so neither spelling is safe on its own.
-    // A string modifier means the number is text to look for: `contains: 1337`.
+    // TRY_CAST: `col = 2` on a text column is a cast error and lower() on an integer column a function error.
     const textual = ["contains", "startswith", "endswith", "windash"].some((m) => modifiers.has(m));
     if (typeof value === "number" && !textual) return `${asNumber(identifier)} = ${value}`;
 
     const text = String(value);
-    // A number under a string modifier is text to find; lower() on an integer
-    // column is a function error, so the column is read as text first.
+    // lower() on an integer column is a function error, so the column is read as text first.
     if (typeof value === "number") identifier = `CAST(${identifier} AS VARCHAR)`;
     if (modifiers.has("windash")) {
       const parts = windashVariants(text).map((variant) =>
@@ -448,10 +355,7 @@ class Compiler {
       return null;
     }
     const { pattern } = toLikePattern(String(value));
-    // Keyword columns are the stream's own free text, not Sigma fields: they are
-    // looked up directly (never through a field map, so the OCSF bridge does not
-    // refuse them), and a candidate the stream lacks is skipped, not reported as
-    // an assumption, because the list is a set of guesses by design.
+    // Keyword columns bypass the field map, and a missing one is skipped: the list is a set of guesses.
     const columns = this.keywordFields
       .map((field) => (this.available ? this.available.resolve(field) : field))
       .filter((column, i, all): column is string => !!column && all.indexOf(column) === i);
@@ -466,7 +370,6 @@ class Compiler {
     return joinClauses(parts, "OR");
   }
 
-  /** One search identifier's body. */
   search(name: string, body: SigmaSearch): string | null {
     if (body === null || body === undefined) {
       this.error ??= `Search '${name}' is empty`;
@@ -481,8 +384,7 @@ class Compiler {
             : this.keyword(entry as string | number),
         )
         .filter((part): part is string => part !== null);
-      // A list of alternatives where every alternative was refused leaves
-      // nothing to run; the refusals are already recorded by name.
+      // Every alternative refused leaves nothing to run; the refusals are already recorded.
       if (!parts.length) return null;
       return joinClauses(parts, "OR");
     }
@@ -497,8 +399,7 @@ class Compiler {
     const parts: string[] = [];
     for (const [key, value] of Object.entries(entries)) {
       const part = this.comparison(key, value);
-      // Every entry in a map is required, so losing one changes what the rule
-      // means. The map is refused rather than narrowed.
+      // Every map entry is required, so the map is refused rather than narrowed.
       if (part === null) return null;
       parts.push(part);
     }
@@ -549,14 +450,7 @@ class Compiler {
   }
 }
 
-/**
- * Combines clauses, folding the constants away as it goes.
- *
- * The folding is not a tidiness measure. It is how the compiler can tell the
- * difference between a rule that merely mentions an absent field and one that
- * can never fire at all: only real folding collapses the second case to FALSE
- * where it can be seen and reported.
- */
+/** Folding lets a rule that can never fire collapse to FALSE, where it can be seen and reported. */
 function joinClauses(parts: string[], operator: "AND" | "OR"): string {
   const dominant = operator === "AND" ? FALSE : TRUE;
   const neutral = operator === "AND" ? TRUE : FALSE;
@@ -571,20 +465,11 @@ function joinClauses(parts: string[], operator: "AND" | "OR"): string {
 function negate(clause: string): string {
   if (clause === TRUE) return FALSE;
   if (clause === FALSE) return TRUE;
-  // A NULL column makes a comparison NULL rather than false, so a plain NOT
-  // would drop rows the rule expects to keep. COALESCE restores the two-valued
-  // logic the rule was written in.
+  // A NULL comparison is NULL, not false, so a plain NOT would drop rows; COALESCE restores two-valued logic.
   return `NOT COALESCE(${clause}, false)`;
 }
 
-/**
- * Compiles a rule into a predicate for one stream.
- *
- * The result is always inspectable: even when nothing can run, the caller gets
- * the reason in `unsupported`, `assumedAbsent` or `error`, which is what lets
- * the Events page say "this rule needs CommandLine, which this stream does not
- * carry" instead of pretending the rule found nothing.
- */
+/** When nothing can run, the reason is in `unsupported`, `assumedAbsent` or `error`, never a silent no-match. */
 export function compileSigmaRule(rule: SigmaRule, options: CompileOptions = {}): CompiledSigma {
   const compiler = new Compiler(options);
   const names = Object.keys(rule.searches);

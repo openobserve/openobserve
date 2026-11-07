@@ -1,11 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// severity.ts — one severity vocabulary for every SIEM surface.
-//
-// Events carry an OCSF severity_id and detections carry a Sigma level. They are
-// two spellings of the same question, so both are folded onto five tones here and every chip, rail, tile and chart series reads
-// its colour from the tone. A "high" is then the same orange on the Overview,
-// in the event table and in the drawer.
+
+// OCSF severity_id and Sigma level fold onto five tones so a "high" reads the same on every surface.
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -66,11 +61,7 @@ export const TONE_ICON: Record<SeverityTone, IconName> = {
   unknown: "help",
 };
 
-/**
- * Solid token per tone, for marks that need a resolved colour: the table row
- * rail and chart series (ECharts), which take a colour string rather than a
- * class. The solid shade of each severity chip's colour family.
- */
+/** Solid token per tone for the row rail and ECharts series, which take a colour string, not a class. */
 export const TONE_TOKEN: Record<SeverityTone, `--color-${string}`> = {
   critical: "--color-badge-error-solid-bg",
   high: "--color-badge-orange-solid-bg",
@@ -85,7 +76,6 @@ export function severityRailColor(tone: SeverityTone): string {
   return `var(${TONE_TOKEN[tone]})`;
 }
 
-/** i18n key for a tone's display name. */
 export function toneLabelKey(tone: SeverityTone): string {
   return `siem.severity.${tone}`;
 }

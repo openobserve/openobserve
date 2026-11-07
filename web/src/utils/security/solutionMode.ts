@@ -1,13 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// solutionMode.ts — which product the left nav shows, decided by the URL.
-//
-// The mode is remembered in localStorage so a reload lands where the analyst
-// left off, but the URL is the source of truth: a shared /security/... link
-// must open with the SIEM nav even for someone last in Observability, and a
-// jump from a detection into /logs must bring the Observability nav back.
-// Pages both products use (settings, IAM, destinations) keep whichever nav
-// the user arrived with.
+
+// The URL, not the remembered mode, is the source of truth, so a shared /security link opens the SIEM nav.
 
 export type SolutionMode = "observability" | "security";
 

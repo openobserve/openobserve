@@ -1,13 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Detections — the rules the SOC runs.
-     A detection IS an OpenObserve scheduled alert: same scheduler, same firing
-     history, same incident rollup. What makes it a detection is the Sigma rule
-     stored in its context_attributes (see utils/security/detection.ts). The
-     list is the org's alerts, hydrated and identified by useSiemDetections;
-     the drawer reads one rule end to end — what it looks for, the SQL it runs,
-     and every recent evaluation from alert history. -->
+<!-- A detection is a scheduled alert carrying a Sigma rule in its context_attributes. -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -71,7 +65,6 @@ const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 const { confirm } = useConfirmDialog();
 
-// ── Rules ────────────────────────────────────────────────────────────────────
 const {
   rows,
   siemRows,
@@ -82,8 +75,7 @@ const {
   patch: patchRule,
   remove: removeRule,
 } = useSiemDetections();
-// Firings in the last day, from alert history: the alert's own
-// `last_triggered_at` is its last evaluation, not its last firing.
+// last_triggered_at is the alert's last evaluation, not its last firing, so firings come from history.
 const summary24h = useAlertHistorySummary();
 const firings = computed(() => countsByAlert(summary24h.rows.value));
 const firingsPartial = summary24h.partial;
@@ -138,7 +130,6 @@ async function refresh() {
   await loadFirings();
 }
 
-// ── Filters ──────────────────────────────────────────────────────────────────
 const search = ref("");
 const severity = ref<string | null>(null);
 type Facet = "fired" | DetectionState;
@@ -284,7 +275,6 @@ const severityOptions = computed(() =>
   SEVERITY_TONES.map((tone) => ({ label: t(toneLabelKey(tone)), value: tone })),
 );
 
-// ── Table ────────────────────────────────────────────────────────────────────
 const columns = computed<OTableColumnDef<Row>[]>(() => [
   { id: "severity", header: t("siem.common.severity"), accessorKey: "tone", size: 110 },
   {
@@ -345,14 +335,9 @@ const rowClass = (row: Row) =>
         ? "!bg-surface-panel"
         : "";
 
-// ── Toggle / delete ──────────────────────────────────────────────────────────
 const toggling = ref<string | null>(null);
 
-/**
- * Asks the server first and only then updates the row: an optimistic flip on
- * the control that decides whether a detection runs could leave a UI that says
- * "enabled" over a rule that is off.
- */
+/** Waits for the server before flipping the row so the UI never shows "enabled" over a rule that is off. */
 async function toggleRule(row: Row) {
   const alert = row.entry.alert;
   if (!alert.id) {
@@ -403,12 +388,10 @@ async function deleteRule(row: Row) {
   }
 }
 
-// ── Drawer ───────────────────────────────────────────────────────────────────
 const selectedId = ref<string | null>(null);
 const drawerTab = ref("overview");
 const selected = computed(() => scoped.value.find((r) => r.id === selectedId.value) ?? null);
-// Position in the table's own (sorted) order; refreshed on open, step, sort
-// and data changes, since the table's sort state is not Vue-reactive here.
+// Drawer position is resynced on open, step, sort and data changes: table sort state is not reactive.
 const tableRef = ref<{ table: NavTable<Row> } | null>(null);
 const selectedIndex = ref<number | null>(null);
 function syncIndex() {
@@ -455,9 +438,7 @@ function openFromDetectionParam() {
 }
 watch(() => [rows.value, loading.value, route.query.detection] as const, openFromDetectionParam);
 
-// Keep drawer and URL in step: the param leaving (back navigation) closes the
-// drawer, and a record that leaves the list (deletion) closes it
-// and drops the param.
+// Keep drawer and URL in step: back navigation closes the drawer; a deleted record drops the param.
 watch(
   () => route.query.detection,
   (param) => {
@@ -468,7 +449,6 @@ watch(selected, (row) => {
   if (!row && selectedId.value && !loading.value) closeDrawer();
 });
 
-// History: every evaluation of this rule over the last 7 days.
 const HISTORY_DAYS = 7;
 const HISTORY_SIZE = 200;
 const history = ref<HistoryRow[]>([]);
@@ -610,12 +590,7 @@ const tactics = computed(() =>
     .filter((x): x is NonNullable<typeof x> => !!x),
 );
 
-/**
- * The rule's predicate, for SIEM detections only: their SQL is always
- * `SELECT … FROM … WHERE <predicate>` (detectionSql). An arbitrary alert's
- * SQL can carry GROUP BY / ORDER BY / LIMIT after WHERE, which would not survive
- * being spliced into another query.
- */
+/** SIEM detections only: their SQL is always `SELECT … WHERE <predicate>`, so the predicate splices safely. */
 function matchPredicate(row: Row): string {
   return row.isSiem ? whereOfDetectionSql(row.entry.alert.query_condition?.sql) : "";
 }
@@ -640,14 +615,12 @@ function viewMatches(row: Row) {
   });
 }
 
-/** The server's run outcome, including skipped and unrecognised runs. */
 const outcomeKey = (status: string): FiringStatus => firingStatus(status);
 const outcomeVariant = (status: string): BadgeVariant => STATUS_VARIANT[firingStatus(status)];
 
 /** Every alert name in the org — the create dialog refuses to reuse one. */
 const existingNames = computed(() => rows.value.map((r) => String(r.alert.name ?? "")));
 
-// ── New detection ────────────────────────────────────────────────────────────
 const showNew = ref(false);
 const preset = ref<NewDetectionPreset | null>(null);
 

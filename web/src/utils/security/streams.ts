@@ -1,11 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// streams.ts — which log streams the SIEM treats as security sources, and
-// whether each one is still reporting.
-//
-// A stream is a security source if its name looks like one or an analyst added
-// it by hand. The hand-added list is kept per org in localStorage; it is a
-// viewing preference, not configuration, so it does not need a backend store.
+
+// The hand-added list lives in localStorage: it is a viewing preference, not configuration.
 
 export const SECURITY_STREAM_RE =
   /security|audit|siem|event|login|auth|access|cloudtrail|okta|firewall|vpc|cdc|ocsf|sysmon|edr|waf|guardduty/i;
@@ -29,11 +24,7 @@ export function saveTaggedStreams(orgId: string, names: string[]) {
   }
 }
 
-/**
- * live  — reported within the quiet threshold.
- * quiet — reported before, has since gone silent (the case worth a look).
- * never — no data at all; usually a stream that was just created.
- */
+/** `quiet` reported before but has gone silent; `never` has no data, usually a just-created stream. */
 export type SourceHealth = "live" | "quiet" | "never";
 
 /** A day of silence from a security source is the point it deserves attention. */
@@ -57,11 +48,7 @@ const WIDER_PERIODS: [string, number][] = [
   ["30d", 30 * 24 * 3_600_000_000],
 ];
 
-/**
- * The smallest relative window that reaches a stream's last event, when the
- * window being searched does not. An empty page then says "this source last
- * reported 3h ago" with a one-click way there, instead of looking broken.
- */
+/** Smallest relative window reaching the last event, so an empty page offers a one-click way there. */
 export function widerPeriodFor(
   lastUs: number | null | undefined,
   windowStartUs: number,

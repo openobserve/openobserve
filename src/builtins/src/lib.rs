@@ -15,4 +15,3 @@
 
 pub mod github;
 pub mod model_pricing;
-pub mod ocsf;

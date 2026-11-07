@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// eventQuery.ts — the Events page SQL, built in one place so the rows, the
-// timeline and the top values always describe the same filters.
+
+// Built in one place so the rows, timeline and top values always describe the same filters.
 
 import { toOcsfSeverity } from "./ocsf";
 import { toneOfSeverityId, type SeverityTone } from "./severity";
@@ -31,8 +30,7 @@ const likePattern = (value: string) => quoteString(`%${value.replace(/[\\%_]/g, 
 export function filterClause(filter: FieldFilter): string {
   const field = quoteIdent(filter.field);
   switch (filter.op) {
-    // Negations keep rows where the field is absent: `NULL != 'x'` is not true,
-    // so without the IS NULL arm "exclude x" would also hide every row lacking it.
+    // `NULL != 'x'` is not true, so without the IS NULL arm excluding x would also hide rows lacking it.
     case "!=":
       return `(${field} != ${quoteString(filter.value)} OR ${field} IS NULL)`;
     // Cast so "contains" also works on numeric columns (LIKE on Int64 is a type error).
@@ -70,11 +68,7 @@ export function eventsSql(stream: string, parts: string[]): string {
   return `SELECT * FROM ${quoteIdent(stream)}${whereOf(parts)} ORDER BY _timestamp DESC`;
 }
 
-/**
- * Counts per time bucket, split by the raw severity value when there is one.
- * The severity facet is left out of `parts` by the caller so the chart shows
- * the whole distribution the severity tiles select from.
- */
+/** Callers omit the severity facet from `parts` so the chart shows the distribution the tiles select from. */
 export function histogramSql(
   stream: string,
   parts: string[],
@@ -136,10 +130,7 @@ export interface HistogramResult {
   total: number;
 }
 
-/**
- * Folds histogram rows onto severity tones. With no severity field every row
- * lands in "info", which reads as neutral volume rather than as a severity.
- */
+/** With no severity field every row lands in "info", read as neutral volume rather than a severity. */
 export function foldHistogram(
   hits: Record<string, unknown>[],
   hasSeverity: boolean,
@@ -186,11 +177,7 @@ export function foldHistogram(
   };
 }
 
-/**
- * WHERE that pins one stored row. `_timestamp` alone is not an identity —
- * sources with second-precision clocks put many events on one timestamp — so
- * the row's scalar fields are matched too.
- */
+/** `_timestamp` alone is not unique (second-precision sources), so the row's scalar fields are matched too. */
 export function eventMatchWhere(row: Record<string, unknown>, maxFields = 24): string {
   const parts = [`_timestamp = ${Number(row._timestamp)}`];
   for (const [field, value] of Object.entries(row)) {
@@ -219,12 +206,7 @@ export function eventKey(row: Record<string, unknown> | null | undefined): strin
   return `${row._timestamp ?? ""}:${(hash >>> 0).toString(36)}`;
 }
 
-/**
- * Adds a condition to a hand-written query, keeping its WHERE and ORDER BY.
- * Keywords are found outside string literals and quoted names only, so a value
- * like 'a ORDER BY b' is never mistaken for a clause. Returns null for any
- * shape this cannot edit safely (aggregates, joins, limits, sub-queries).
- */
+/** Keywords are found outside literals and quoted names; returns null for shapes it cannot edit safely. */
 export function addToSqlWhere(sql: string, clause: string): string | null {
   const text = sql.trim();
   // Uppercase copy with every quoted span blanked, so keyword search skips them.

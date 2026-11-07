@@ -1,8 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- One event: its entities (each a pivot) and the Sigma rules this exact row matches,
-     evaluated server-side. -->
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -56,7 +54,6 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-// ── Header ───────────────────────────────────────────────────────────────────
 const tone = computed(() => toneOfSeverityId(props.normalized.severityId));
 const title = computed(
   () =>
@@ -79,7 +76,6 @@ function fmtFact(ms: number | null): string {
   });
 }
 
-// ── Entities ─────────────────────────────────────────────────────────────────
 interface Entity {
   key: keyof NormalizedEvent;
   label: string;
@@ -163,7 +159,6 @@ const outcome = computed(() => ({
   name: ocsfStatusName(props.normalized.statusId),
 }));
 
-// ── Detections for this event ────────────────────────────────────────────────
 const runnable = computed(() => props.rules.filter((r) => r.compiled.runnable));
 const matched = ref<RuleHit[]>([]);
 const matching = ref(false);
@@ -175,8 +170,7 @@ async function evaluateRules() {
   const ts = Number(props.event._timestamp);
   // Identity by content: several events can share one timestamp.
   const key = eventKey(props.event);
-  // Snapshot: the parent's list re-sorts as rule counts arrive, and `r<i>` in
-  // the response refers to the order the query was built in.
+  // Snapshot: `r<i>` in the response refers to the order the query was built in.
   const rules = [...runnable.value];
   if (!rules.length || !Number.isFinite(ts) || !props.stream) return;
   matching.value = true;
@@ -225,7 +219,6 @@ const techniques = computed(() => {
   }));
 });
 
-// ── Fields ───────────────────────────────────────────────────────────────────
 const fieldRows = computed<KeyValueRow[]>(() => {
   const flat: KeyValueRow[] = [];
   const walk = (obj: Record<string, any>, prefix: string) => {
@@ -330,7 +323,6 @@ function copy(text: string) {
       </p>
     </template>
 
-    <!-- ── Overview: the entities, each one a pivot ─────────────────────── -->
     <template #tab-overview>
       <div v-if="entities.length" class="grid grid-cols-1 gap-2 md:grid-cols-2">
         <div
@@ -410,7 +402,6 @@ function copy(text: string) {
       </div>
     </template>
 
-    <!-- ── Detections: rules that match this exact row ──────────────────── -->
     <template #tab-detections>
       <div v-if="matching" class="flex items-center justify-center gap-2 py-10">
         <OSpinner size="sm" />

@@ -76,7 +76,6 @@ describe("planStream", () => {
       { value: "7", n: 50 },
     ]);
     expect(grpc.failure).toBeNull();
-    // HTTP codes are readable.
     expect(
       acceptOutcome(plan, [
         { value: "200", n: 9 },
@@ -214,7 +213,6 @@ describe("stream volume", () => {
   });
 
   it("scales the row count to the window by the stream's ingest rate", () => {
-    // 7 days of history at 25.9B a day.
     const volume = { docNum: 7 * 25.9e9, timeMinUs: 0, timeMaxUs: 7 * DAY };
     expect(estimateRowsInWindow(volume, 6 * DAY, 7 * DAY)).toBeCloseTo(25.9e9);
     expect(estimateRowsInWindow(volume, 7 * DAY - HOUR, 7 * DAY)).toBeCloseTo(25.9e9 / 24);

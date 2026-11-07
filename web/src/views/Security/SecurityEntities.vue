@@ -1,12 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Entities — every user, source IP and host the security streams mention.
-     Each stream is planned first (which column is the user, which the IP, how
-     a failure is spelled), then counted with one GROUP BY per stream and kind;
-     the same value in two streams is one entity. The drawer answers "what has
-     this thing been doing": activity over time, who and what it touched, and
-     a jump into the raw events. -->
+<!-- Counted with one GROUP BY per stream and kind; the same value in two streams is one entity. -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -76,7 +71,6 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-// ── View state (URL-synced) ──────────────────────────────────────────────────
 const RANGES = [
   { value: "1h", minutes: 60 },
   { value: "24h", minutes: 1440 },
@@ -117,7 +111,6 @@ function syncUrl() {
   router.replace({ query });
 }
 
-// ── Data ─────────────────────────────────────────────────────────────────────
 const {
   plans,
   names: streamNames,
@@ -382,7 +375,6 @@ function onKind(value: string | number) {
 }
 watch(search, () => syncUrl());
 
-// ── Table ────────────────────────────────────────────────────────────────────
 interface Row extends EntityRow {
   signals: EntitySignal[];
   tone: SeverityTone;
@@ -472,7 +464,6 @@ const columns = computed<OTableColumnDef<Row>[]>(() => [
   },
 ]);
 
-// ── Summary strip (over every entity of this kind, not the page) ─────────────
 const counts = computed(() => {
   const c = { failures: 0, spread: 0, external: 0 };
   for (const r of allRows.value) for (const s of r.signals) c[s] += 1;
@@ -542,7 +533,6 @@ function signalHint(sig: EntitySignal): I18nText {
 
 const pct = (r: EntityRow) => Math.round(failureRate(r) * 100);
 
-// ── Drawer ───────────────────────────────────────────────────────────────────
 const selected = ref<Row | null>(null);
 const drawerTab = ref("activity");
 // OTable is generic, so its instance type is taken structurally: only `table` is used.
@@ -597,8 +587,7 @@ function pivotTo(otherKind: EntityKind, value: string) {
   }
 }
 
-// Built from the intended query, not window.location: router.replace has not
-// necessarily landed by the time this is read.
+// Built from the intended query: window.location may lag router.replace.
 const shareUrl = computed(() => {
   if (!selected.value || typeof window === "undefined") return "";
   const query: Record<string, string> = {
@@ -613,7 +602,6 @@ const shareUrl = computed(() => {
   ).toString();
 });
 
-// Detail: timeline + related, fetched per open entity.
 const timeline = ref<{ ts: number; counts: Record<string, number> }[]>([]);
 const related = ref<Record<EntityKind, { value: string; n: number; fail: number }[]>>({
   user: [],

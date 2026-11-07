@@ -76,7 +76,6 @@ const toPipeline = (raw: any): Pipeline => ({
   org: raw?.org,
 });
 
-/** Realtime pipelines in the list that feed the given logs stream (SDD §5.4 step 2). */
 export function realtimePipelinesFor(list: any[], stream: string): Pipeline[] {
   return (list ?? [])
     .map(toPipeline)
@@ -88,7 +87,7 @@ export function realtimePipelinesFor(list: any[], stream: string): Pipeline[] {
     );
 }
 
-/** A pipeline we can delete on detach: exactly source → ours → the same stream (SDD §5.5 step 2). */
+/** A pipeline we can delete on detach: exactly source → ours → the same stream. */
 function isSoleOcsfPipeline(pipeline: Pipeline, stream: string): boolean {
   if (pipeline.nodes.length !== 3) return false;
   const our = findOurNode(pipeline);
@@ -101,7 +100,7 @@ function isSoleOcsfPipeline(pipeline: Pipeline, stream: string): boolean {
   return want.size === have.size && [...want].every((p) => have.has(p));
 }
 
-/** Reuse the stored function when its text equals the registry's, else refuse (SDD §5.4 step 1). */
+/** Reuse the stored function when its text equals the registry's, else refuse. */
 async function ensureFunction(org: string, name: string, program: string): Promise<void> {
   const find = async (): Promise<string | null> => {
     const res = await ocsfPacks.listFunctions(org);
@@ -133,7 +132,7 @@ async function ensureFunction(org: string, name: string, program: string): Promi
   }
 }
 
-/** Locate the stream's realtime pipeline id, distinguishing "none" from "no access" (SDD §5.4 step 2). */
+/** Locate the stream's realtime pipeline id, distinguishing "none" from "no access". */
 async function findPipelineId(org: string, stream: string): Promise<string | null> {
   const [streamsRes, listRes] = await Promise.all([
     ocsfPacks.streamPipelines(org),
@@ -203,7 +202,7 @@ async function extendPipeline(
 ): Promise<void> {
   const res = await ocsfPacks.getPipeline(org, id);
   const pipeline = toPipeline(res.data);
-  // Re-check the live pipeline (disabled / rerouted since the page snapshot) before reusing or editing it (F16, F25).
+  // Re-check the live pipeline (disabled / rerouted since the page snapshot) before reusing or editing it.
   if (cfg && preAttachChecks({ name: stream }, pipeline, cfg).length) {
     throw new OcsfAttachError(
       "pipeline_conflict",
@@ -231,7 +230,7 @@ async function extendPipeline(
   try {
     await ocsfPacks.updatePipeline(org, next);
   } catch (err) {
-    // The recursive call re-fetches and re-runs the live re-check above, so no second guard is needed (F23).
+    // The recursive call re-fetches and re-runs the live re-check above, so no second guard is needed.
     if (httpStatus(err) === 409 && retry) {
       await extendPipeline(org, id, pack, stream, cfg, false);
       return;
@@ -265,7 +264,7 @@ export async function attach(
     pipelineId = created.id || null;
     pipelineCreated = created.created;
   }
-  // Never record a mapped setting without a pipeline that actually runs the pack (R11 / F2).
+  // Never record a mapped setting without a pipeline that actually runs the pack.
   if (!pipelineId) {
     throw new OcsfAttachError(
       "pipeline_conflict",
@@ -308,12 +307,12 @@ export async function detach(
         }
       }
     } catch (err) {
-      // The pipeline was removed outside the SIEM (R14 pack_removed_outside); clear the record anyway.
+      // The pipeline was removed outside the SIEM; clear the record anyway.
       if (httpStatus(err) !== 404) throw err;
     }
   }
 
-  // An undecided stream (an unrecorded node, no prior setting) must not gain an explicit included:false (F20).
+  // An undecided stream (an unrecorded node, no prior setting) must not gain an explicit included:false.
   if (persistSetting) {
     const cleared: SecuritySetting = {
       source_type: setting.source_type,

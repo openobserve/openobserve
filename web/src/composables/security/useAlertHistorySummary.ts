@@ -32,7 +32,6 @@ export interface AlertCounts {
   lastFiringMs: number | null;
 }
 
-/** Per-alert firing, error and evaluation totals. */
 export function countsByAlert(rows: SummaryRow[]): Map<string, AlertCounts> {
   const out = new Map<string, AlertCounts>();
   for (const row of rows) {

@@ -1,8 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Header toggle: Observability ↔ Security (SIEM).
-     Sets store.state.solutionMode and routes to the correct entry point. -->
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";

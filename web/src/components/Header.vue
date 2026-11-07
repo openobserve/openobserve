@@ -144,8 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
-    <!-- SOLUTION SWITCHER: Observability ↔ Security toggle -->
-    <div class="ms-3 flex shrink-0 items-center">
+    <div v-if="config.isEnterprise == 'true'" class="ms-3 flex shrink-0 items-center">
       <SolutionSwitcher />
     </div>
 

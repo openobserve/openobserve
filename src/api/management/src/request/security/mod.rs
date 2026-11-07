@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::Json;
-use openobserve_builtins::ocsf::{self, OcsfPack};
+use o2_enterprise::enterprise::security::ocsf::{self, OcsfPack};
 use serde::Serialize;
 use utoipa::ToSchema;
 

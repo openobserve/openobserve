@@ -1,9 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Bulk indicators: a CSV file (read and normalised here, so bad rows are
-     counted before anything is stored) or a CSV feed URL (fetched and kept
-     fresh by the server; its rows must carry an `indicator` column). -->
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";

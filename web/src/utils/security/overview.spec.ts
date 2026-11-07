@@ -1,7 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// The small helpers behind the SOC Overview and the Events page: severity
-// tones, ATT&CK tactic coverage, source health and history bucketing.
 
 import { describe, expect, it } from "vitest";
 

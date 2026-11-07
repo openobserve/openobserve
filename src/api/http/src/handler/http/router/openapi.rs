@@ -108,7 +108,6 @@ use crate::{
         rum::ingest::data,
         rum::ingest::sessionreplay,
         openobserve_api_management::request::ingest_rejections::recent_rejections,
-        openobserve_api_management::request::security::list_ocsf_packs,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
         openobserve_api_search::search::query_functions::list,
@@ -188,7 +187,6 @@ use crate::{
         openobserve_api_management::request::alerts::move_alerts,
         openobserve_api_management::request::alerts::list_alert_tags,
         openobserve_api_management::request::alerts::history::get_alert_history,
-        openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
         openobserve_api_management::request::alerts::auto_investigate::list_auto_investigate_decisions,
         openobserve_api_management::request::alerts::incidents::list_incidents,
         openobserve_api_management::request::alerts::incidents::get_incident,
@@ -1069,7 +1067,7 @@ use crate::{
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
-        (name = "Security", description = "Built-in OCSF mapping packs for security sources"),
+        (name = "Security", description = "Built-in OCSF mapping packs for security sources (enterprise)"),
         (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
         (name = "AnnotationQueues", description = "Annotation queues for human review of LLM traces (enterprise)"),
         (name = "Annotations", description = "Annotations on traces and spans (enterprise)"),
@@ -1202,6 +1200,8 @@ pub struct ApiDoc;
     openobserve_api_management::request::anomaly_detection::detect_anomalies,
     openobserve_api_management::request::anomaly_detection::get_detection_history,
     openobserve_api_management::request::alerts::history::get_all_anomaly_history,
+    openobserve_api_management::request::security::list_ocsf_packs,
+    openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
     openobserve_api_management::request::workflows::save_workflow,
     openobserve_api_management::request::workflows::list_workflows,
     openobserve_api_management::request::workflows::move_workflows,
@@ -2280,6 +2280,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn ocsf_packs_path_and_schemas_are_registered() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();

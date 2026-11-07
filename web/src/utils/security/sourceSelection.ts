@@ -41,7 +41,11 @@ export interface SourceEntry {
 
 export interface StreamWithSecurity {
   name: string;
-  settings?: { security?: SecuritySetting | null } | null;
+  settings?: {
+    security?: SecuritySetting | null;
+    flatten_level?: number | null;
+    defined_schema_fields?: string[] | null;
+  } | null;
   [key: string]: unknown;
 }
 
@@ -258,7 +262,7 @@ export function markLocalPrefsMigrated(orgId: string) {
   }
 }
 
-/** One-time move of local include/exclude choices into each stream's setting (SDD §2.5 / R15). */
+/** One-time move of local include/exclude choices into each stream's setting (SDD §2.5). */
 export function pendingIncludeMigrations(
   orgId: string,
   alreadySet: Set<string>,

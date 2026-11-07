@@ -1,24 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// condition.ts — the little language in `detection.condition`.
-//
-// A Sigma condition is boolean logic over the search identifiers defined beside
-// it, plus the quantifiers that let a rule say "any one of these twenty
-// selections". It is small enough to parse properly, and parsing it properly is
-// worth doing: a regex approximation gets `selection and not filter_a and not
-// filter_b` right and then quietly inverts the meaning of
-// `selection and not (filter_a or filter_b)`.
-//
-//   condition   := or
-//   or          := and ( 'or' and )*
-//   and         := unary ( 'and' unary )*
-//   unary       := 'not' unary | primary
-//   primary     := '(' or ')' | quantifier | identifier
-//   quantifier  := ( number | 'any' | 'all' ) 'of' ( pattern | 'them' )
-//
-// Aggregation (`| count() by User > 5`) is a different kind of thing: it needs a
-// GROUP BY and a threshold, not a WHERE clause. It is rejected here rather than
-// half-implemented, and the caller reports the rule as needing aggregation.
+
+// Parsed properly: a regex approximation inverts `selection and not (filter_a or filter_b)`.
 
 export type ConditionNode =
   | { type: "identifier"; name: string }
@@ -56,8 +38,7 @@ function tokenize(text: string): Token[] | null {
       index += 1;
       continue;
     }
-    // Identifiers may carry a trailing `*`, which is what makes `1 of
-    // selection*` work, and Sigma names commonly use underscores and digits.
+    // The trailing `*` is what makes `1 of selection*` work.
     const match = /^[A-Za-z0-9_*.-]+/.exec(text.slice(index));
     if (!match) return null;
     tokens.push({ value: match[0], keyword: match[0].toLowerCase() });
@@ -66,10 +47,7 @@ function tokenize(text: string): Token[] | null {
   return tokens;
 }
 
-/**
- * Recursive descent over the token list. Errors are returned, not thrown: a
- * malformed condition in one rule of a pack must not take the pack down.
- */
+/** Errors are returned, not thrown: a malformed condition in one rule must not take the pack down. */
 export function parseCondition(text: string): ConditionParseResult {
   const unsupported: string[] = [];
 
@@ -79,8 +57,7 @@ export function parseCondition(text: string): ConditionParseResult {
     unsupported.push(`aggregation: ${expression.slice(pipe + 1).trim()}`);
     expression = expression.slice(0, pipe).trim();
   }
-  // `near` correlates two searches within a timeframe, which is a sequence
-  // problem rather than a filter.
+  // `near` correlates two searches within a timeframe: a sequence problem, not a filter.
   if (/\bnear\b/i.test(expression)) {
     return { node: null, unsupported: ["temporal correlation (near)"], error: undefined };
   }
@@ -150,8 +127,7 @@ export function parseCondition(text: string): ConditionParseResult {
     if (token.keyword === ")") return fail("Unbalanced parentheses in condition");
     if (KEYWORDS.has(token.keyword)) return fail(`Unexpected '${token.value}' in condition`);
 
-    // A quantifier is only a quantifier when `of` follows; a search identifier
-    // is genuinely allowed to be called `all`.
+    // Only a quantifier when `of` follows; a search identifier may legitimately be called `all`.
     if (peek()?.keyword === "of") {
       const count = quantifierCount(token.keyword);
       if (count === null) return fail(`Unexpected '${token.value}' before 'of'`);
@@ -187,13 +163,7 @@ export function parseCondition(text: string): ConditionParseResult {
   return { node, unsupported };
 }
 
-/**
- * Expands a quantifier's target into the identifiers it covers.
- *
- * `them` is every identifier, `selection*` is every identifier with that prefix.
- * The pattern is a Sigma glob, not a regex, and in practice it is always either
- * a bare name or a name with a trailing star.
- */
+/** `them` is every identifier, `selection*` every identifier with that prefix (a Sigma glob, not a regex). */
 export function expandPattern(pattern: string, names: string[]): string[] {
   if (pattern === "*") return [...names];
   if (!pattern.includes("*")) return names.filter((name) => name === pattern);
@@ -205,7 +175,6 @@ function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Every search identifier a condition refers to, quantifiers expanded. */
 export function referencedIdentifiers(node: ConditionNode, names: string[]): string[] {
   const found = new Set<string>();
   const walk = (current: ConditionNode) => {

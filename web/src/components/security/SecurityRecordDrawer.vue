@@ -1,8 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- The record drawer every SIEM page opens: half the screen and non-modal, so the list
-     beside it stays live; j/k step through that list without closing. -->
+<!-- Non-modal so the list beside it stays live; j/k step through that list without closing. -->
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -171,7 +170,6 @@ const shownFacts = computed(() =>
     @update:open="(v: boolean) => !v && close()"
   >
     <div class="bg-surface-base flex h-full min-h-0 flex-col">
-      <!-- Severity accent: the first thing the eye reads -->
       <div class="h-1 shrink-0" :class="TONE_BAR[tone]" />
 
       <header
@@ -261,7 +259,6 @@ const shownFacts = computed(() =>
       </header>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
-        <!-- Key facts: the answers to the first three questions, no click needed -->
         <div
           v-if="shownFacts.length"
           class="px-page-edge grid grid-cols-2 gap-2 pt-4 lg:grid-cols-4"

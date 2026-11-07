@@ -1,7 +1,0 @@
-{
-  "level": "verbose",
-  "log_level": 3,
-  "severity_text": "critical",
-  "outcome": "pending",
-  "result": "denied"
-}

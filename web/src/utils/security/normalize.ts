@@ -1,16 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// normalize.ts — maps a raw event onto the OCSF columns the Events page shows.
-//
-// Normalization happens on the rows that were fetched, not in the query. That is
-// a deliberate trade: projecting in SQL would bake one source's field names into
-// every request and break the moment a stream carries two shapes, while mapping
-// after the fact costs nothing on the server, works identically in filter mode
-// and raw SQL mode, and leaves the original row intact for the detail view.
-//
-// Nothing is invented here. A column with no source field stays empty rather
-// than being filled with a plausible-looking value, because a SIEM that guesses
-// at an actor or a source IP is worse than one that admits it does not know.
+
+// Normalized on fetched rows, not in SQL, so a request never bakes in one source's field names.
 
 import type { NormalizedEvent } from "./ocsf";
 import { fromOcsfStatusId, ocsfClass, toOcsfSeverity, toOcsfStatus } from "./ocsf";
@@ -21,7 +11,6 @@ import { FieldIndex } from "./fields";
 const isPresent = (value: unknown) =>
   value !== undefined && value !== null && value !== "" && !(Array.isArray(value) && !value.length);
 
-/** First present value among the candidate paths. */
 function firstOf(row: Record<string, unknown>, paths: string[] | undefined): unknown {
   if (!paths) return undefined;
   for (const path of paths) {
@@ -40,11 +29,7 @@ function asText(value: unknown): string {
   return String(value);
 }
 
-/**
- * OpenObserve stores `_timestamp` in microseconds, but a mapped source may hand
- * back an ISO string or seconds. Everything is brought to milliseconds so the
- * column can be formatted once.
- */
+/** Mapped sources may return ISO strings or seconds, so everything is brought to milliseconds. */
 function asMillis(value: unknown): number | null {
   if (!isPresent(value)) return null;
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -57,13 +42,7 @@ function asMillis(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/**
- * Severity when the source carries none of its own.
- *
- * A failed authentication is not the same as a successful one, and a 5xx is not
- * a 200, so outcome informs severity where the log itself is silent. This is the
- * only derived value in the file, and it never overrides a real one.
- */
+/** Derived only where the source is silent; it never overrides a real severity. */
 function severityFromOutcome(statusId: number, classUid: number | null): number {
   if (statusId !== 2) return 1;
   return classUid === 3002 ? 3 : 2;
@@ -83,8 +62,7 @@ export function normalizeEvent(
   const known = ocsfClass(classUid ?? undefined);
 
   const rawSeverity = firstOf(raw, map.severityId as string[]);
-  // A source that reports failure by attaching an error says nothing at all on
-  // the happy path, so absence is the success signal.
+  // Sources that attach an error on failure say nothing on success, so absence is the success signal.
   const failureFields = source?.failureWhenPresent;
   const ocsfStatus = firstOf(raw, source?.ocsfStatusFields);
   const statusId = failureFields
@@ -129,14 +107,7 @@ export function normalizeEvents(
   return rows.map((row) => normalizeEvent(row, source));
 }
 
-/**
- * Which normalized columns this source can actually fill.
- *
- * The Events page shows these and hides the rest: a column of empty cells is
- * worse than no column, and it is what made the page look like it had nothing
- * in it. Computed from the mapping and confirmed against the rows in hand, so a
- * mapped-but-always-empty field does not earn a column either.
- */
+/** Confirmed against the rows in hand, so a mapped-but-always-empty field earns no column. */
 export function populatedColumns(
   events: NormalizedEvent[],
   columns: readonly (keyof NormalizedEvent)[],
@@ -150,11 +121,7 @@ export function populatedColumns(
   });
 }
 
-/**
- * The stored column a normalized value was read from on this row, so a click on
- * "Actor" can filter on the real field (`useridentity_arn`), not the label.
- * Null when the value was a constant or derived, which cannot be filtered on.
- */
+/** The stored column behind a value so a click filters on the real field; null when constant or derived. */
 export function sourceColumnFor(
   raw: Record<string, unknown>,
   source: SourceType | null,
@@ -170,11 +137,7 @@ export function sourceColumnFor(
   return null;
 }
 
-/**
- * Counts by category for the facet strip: severity, outcome, and the busiest
- * actors, hosts and source IPs. Computed over the rows on screen, which is what
- * the analyst is actually looking at.
- */
+/** Computed over the rows on screen, which is what the analyst is actually looking at. */
 export interface EventFacets {
   severity: { id: number; count: number }[];
   status: { id: number; count: number }[];

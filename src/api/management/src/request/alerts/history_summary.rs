@@ -233,16 +233,6 @@ async fn clamped_range(
 }
 
 /// Alert ids the user may read; `None` means all of them.
-#[cfg(not(feature = "enterprise"))]
-async fn permitted_alert_ids(
-    _org_id: &str,
-    _user_id: &str,
-) -> Result<Option<Vec<String>>, Response> {
-    Ok(None)
-}
-
-/// Alert ids the user may read; `None` means all of them.
-#[cfg(feature = "enterprise")]
 async fn permitted_alert_ids(org_id: &str, user_id: &str) -> Result<Option<Vec<String>>, Response> {
     if db::user::is_root_user(user_id) || !o2_openfga::config::get_config().enabled {
         return Ok(None);

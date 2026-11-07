@@ -134,7 +134,7 @@ pub async fn list_incidents(
     Path(org_id): Path<String>,
     Query(query): Query<ListIncidentsQuery>,
 ) -> Response {
-    let siem_ids = if query.siem {
+    let siem_ids = if cfg!(feature = "enterprise") && query.siem {
         Some(db::alerts::alert::resolve_siem_alert_ids(&org_id).await)
     } else {
         None

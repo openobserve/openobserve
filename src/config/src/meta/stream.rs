@@ -2749,16 +2749,6 @@ mod tests {
     }
 
     #[test]
-    fn test_update_stream_settings_dynamic_merge_null_is_unchanged() {
-        let missing: UpdateStreamSettings = json::from_str("{}").unwrap();
-        assert_eq!(missing.dynamic_merge, None);
-        let null: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": null}"#).unwrap();
-        assert_eq!(null.dynamic_merge, None);
-        let set: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": false}"#).unwrap();
-        assert_eq!(set.dynamic_merge, Some(false));
-    }
-
-    #[test]
     fn test_level_at_is_the_last_change_of_the_day() {
         use PartitionTimeLevel::{Daily, Hourly};
         let history = level_history(&[(1, Daily), (3, Hourly)]);

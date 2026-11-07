@@ -1,7 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// useTableRowNavigation.ts — record-drawer next/previous over an OTable ref,
-// in the table's displayed order (see utils/security/recordNav.ts).
 
 import { ref, type Ref } from "vue";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";

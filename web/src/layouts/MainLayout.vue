@@ -685,9 +685,6 @@ export default defineComponent({
         store.state.zoConfig.version != ""
       ),
     );
-    // ── SIEM nav links (shown when solutionMode === "security") ─────────────
-
-    // Snapshot of observability links — restored when switching back from security mode
     let _obsLinksSnapshot: NavItem[] = [];
     const securityNavLinks = buildSecurityNavLinks(t);
 
@@ -695,13 +692,11 @@ export default defineComponent({
       () => store.state.solutionMode,
       (mode: string) => {
         if (mode === "security") {
-          // Save observability links before swapping (skip if already in security mode)
           if (linksList.value !== securityNavLinks) {
             _obsLinksSnapshot = [...linksList.value];
           }
           linksList.value = securityNavLinks;
         } else {
-          // Restore observability nav; if no snapshot (cold load as observability), leave as-is
           if (_obsLinksSnapshot.length > 0) {
             linksList.value = _obsLinksSnapshot;
             _obsLinksSnapshot = [];
@@ -712,17 +707,18 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // The URL decides the mode, so a shared /security link or a jump into
-    // /logs from a detection shows the matching nav.
+    // The URL decides the mode, so a shared /security link or a /logs jump shows the matching nav.
     const route = useRoute();
-    watch(
-      () => route.path,
-      (path: string) => {
-        const mode = solutionModeForPath(path, store.state.solutionMode);
-        if (mode !== store.state.solutionMode) store.commit("setSolutionMode", mode);
-      },
-      { immediate: true },
-    );
+    if (config.isEnterprise == "true") {
+      watch(
+        () => route.path,
+        (path: string) => {
+          const mode = solutionModeForPath(path, store.state.solutionMode);
+          if (mode !== store.state.solutionMode) store.commit("setSolutionMode", mode);
+        },
+        { immediate: true },
+      );
+    }
 
     const navLinks = computed(() => (menuReady.value ? linksList.value : []));
 
@@ -1288,8 +1284,7 @@ export default defineComponent({
     // A separate top-level rail item here would be a second gate to keep in
     // sync.
     const filterMenus = () => {
-      // Security mode owns a fixed nav set — observability feature-flag items
-      // (AI, Synthetics, SLOs, Actions, Workflows) must not be spliced into it.
+      // Security mode owns a fixed nav; observability feature-flag items must not be spliced into it.
       if (store.state.solutionMode === "security") return;
       updateAutoObserveMenu();
       updateIncidentsMenu();

@@ -1,29 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// sigma/ocsf.ts — Sigma rules running on OCSF-normalized data.
-//
-// A Sigma rule names fields the way its logsource writes them: a Windows
-// process-creation rule says `Image` and `CommandLine`, a web rule says `c-uri`.
-// Data that was normalized to OCSF before it arrived (AWS Security Lake, an
-// OCSF pipeline, an EDR's OCSF export) carries the same facts under OCSF's
-// paths instead: `process.file.path`, `process.cmd_line`, `http_request.url.path`.
-// Without a bridge, none of the public corpus can run on such a stream, which
-// defeats the reason to normalize in the first place.
-//
-// Each profile says which Sigma logsources an OCSF class answers for, which
-// OCSF path each Sigma field becomes, and the guard that keeps the rule on the
-// right events, since one OCSF stream usually mixes classes. The guard is
-// AND-ed onto the rule rather than spliced into it, so a condition such as
-// `1 of them` still means what the rule's author wrote.
-//
-// Targets use `a|b` for "whichever the stream has", because OCSF has moved some
-// attributes between versions (a parent process is `process.parent_process` in
-// 1.x and `actor.process` in some producers). A Sigma field with no OCSF home is
-// simply not listed, and the compiler treats it as absent (strictFieldMap), even
-// when an OCSF column happens to share its name: `status` or `type` in a Sigma
-// rule does not mean OCSF's `status` or `type`.
-//
-// Field paths follow the OCSF 1.x schema, https://schema.ocsf.io.
+
+// The class guard is AND-ed onto the rule, not spliced in, so `1 of them` keeps its meaning.
 
 import type { SigmaLogsource, SigmaRule } from "./types";
 
@@ -37,7 +14,6 @@ export interface OcsfSigmaProfile {
   activityId?: number;
   /** Extra guard, for logsources only one product's events can satisfy. */
   product?: string;
-  /** Sigma field → OCSF path(s). */
   fieldMap: Record<string, string>;
 }
 
@@ -180,8 +156,7 @@ function servedBy(rule: SigmaLogsource, served: SigmaLogsource): boolean {
   return (["category", "product", "service"] as const).every((part) => {
     const want = rule[part]?.toLowerCase();
     const have = served[part]?.toLowerCase();
-    // A served logsource that leaves a part open accepts any value of it, so
-    // one process profile answers for Windows, Linux and macOS alike.
+    // An open part accepts any value, so one process profile answers for Windows, Linux and macOS.
     if (!have) return true;
     return want === have;
   });

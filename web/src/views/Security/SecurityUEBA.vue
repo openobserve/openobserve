@@ -1,12 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- UEBA — each user measured against their own recent past.
-     Two server-side profiles per security stream (user × source IP × hour of
-     day): one for the chosen window, one for the baseline window just before
-     it. Scoring is in utils/security/ueba.ts: a handful of explainable signals,
-     each shown with the numbers that raised it. The page says plainly that
-     these are heuristics over the chosen windows. -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -77,7 +71,6 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-// ── Windows ──────────────────────────────────────────────────────────────────
 const HOUR_US = 3_600_000_000;
 const WINDOWS = [
   { value: "1h", current: 1, baseline: 24, baselineLabel: "24h" },
@@ -105,7 +98,6 @@ function syncUrl() {
   router.replace({ query });
 }
 
-// ── Data ─────────────────────────────────────────────────────────────────────
 const {
   plans,
   names: streamNames,
@@ -115,8 +107,7 @@ const {
   load: loadPlans,
 } = useSecurityStreamPlans();
 
-// Row caps per stream, window and aggregate; hitting one (~2,000 users for hours)
-// withholds the signals that need every row, and the page says so.
+// Hitting a row cap (~2,000 users for hours) withholds the signals that need every row.
 const HOURS_LIMIT = 50000;
 const IPS_LIMIT = 20000;
 type StreamStatus = "loading" | "done" | "failed";
@@ -395,7 +386,6 @@ const STATUS_TAG: Record<StreamStatus, { variant: BadgeVariant; icon: string }> 
 const statusOf = (stream: string): StreamStatus => streamStatus.value[stream] ?? "loading";
 const tableLoading = computed(() => loading.value && !lastRunAt.value && !answered.value);
 
-// ── Table ────────────────────────────────────────────────────────────────────
 const filtered = computed(() => {
   const needle = search.value.trim().toLowerCase();
   return risks.value.filter(
@@ -462,7 +452,6 @@ const SIGNAL_ICON: Record<UebaSignalKind, string> = {
   first_seen: "person-add",
 };
 
-/** The reason text for a signal, built from the numbers that raised it. */
 function reason(sig: UebaSignal): I18nText {
   const e = sig.evidence;
   switch (sig.kind) {
@@ -509,7 +498,6 @@ const RISK_TEXT: Record<SeverityTone, string> = {
   unknown: "text-text-secondary",
 };
 
-// ── Summary strip ────────────────────────────────────────────────────────────
 const stats = computed<StatItem[]>(() => {
   const count = (tone: SeverityTone) => risks.value.filter((r) => r.tone === tone).length;
   const n = risks.value.length || undefined;
@@ -624,7 +612,6 @@ const notices = computed<SecurityNotice[]>(() => {
   return out;
 });
 
-// ── Drawer ───────────────────────────────────────────────────────────────────
 const selected = ref<UserRisk | null>(null);
 const drawerTab = ref("signals");
 // OTable is generic, so its instance type is taken structurally: only `table` is used.
@@ -652,8 +639,7 @@ function step(delta: number) {
   const next = nav.neighbour(selected.value, delta);
   if (next) openUser(next);
 }
-// Built from the intended query, not window.location, which may not have
-// caught up with router.replace yet.
+// Built from the intended query: window.location may not have caught up with router.replace.
 const shareUrl = computed(() => {
   if (!selected.value || typeof window === "undefined") return "";
   const query = { org_identifier: orgId.value, period: win.value, user: selected.value.user };
