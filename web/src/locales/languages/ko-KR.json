@@ -2329,6 +2329,8 @@
     "translatingStackTrace": "소스 맵으로 스택 트레이스 변환 중...",
     "translatingStackTraceHint": "몇 분 정도 걸릴 수 있습니다",
     "sourceMapsNotAvailable": "소스 맵을 사용할 수 없음",
+    "mobileSourceMapsNotApplicable": "소스 맵은 iOS 및 Android 오류에 적용되지 않습니다",
+    "mobileSourceMapsNotApplicableBody": "업로드한 JavaScript 소스 맵으로는 네이티브 모바일 스택 프레임을 확인할 수 없습니다. {tab} 탭에서 원본 스택을 확인하세요.",
     "sourceMapsNotAvailableBody": "원본 소스 코드와 줄 번호가 포함된 상세 스택 트레이스를 보려면 이 애플리케이션의 소스 맵을 업로드하세요.",
     "serviceBadge": "서비스:",
     "versionBadge": "버전:",
