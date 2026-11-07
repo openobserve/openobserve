@@ -37,18 +37,6 @@ describe("RoleTable member count columns", () => {
     wrapper.unmount();
   });
 
-  it("does not mute the users count of a role held only by service accounts", async () => {
-    const wrapper = mountTable([
-      { role_name: "bots", user_count: 0, service_account_count: 2 },
-      { role_name: "empty", user_count: 0, service_account_count: 0 },
-    ]);
-    await flushPromises();
-    const link = (name: string) => wrapper.find(`[data-test="iam-roles-${name}-users-link"]`);
-    expect(link("bots").classes()).toContain("text-text-body");
-    expect(link("empty").classes()).toContain("text-text-muted");
-    wrapper.unmount();
-  });
-
   it("labels each count button with its role and column", async () => {
     const wrapper = mountTable([{ role_name: "ops", user_count: 3, service_account_count: 2 }]);
     await flushPromises();

@@ -139,12 +139,6 @@ const columns = computed<OTableColumnDef[]>(() => {
   return cols;
 });
 
-// A role nobody holds reads muted in the Users column — a cleanup candidate, not a
-// fault. No summary strip: the count is already in the footer and "unused" is just
-// this column sorted ascending, so a strip would restate what the rows already say.
-const isUnusedRole = (row: any): boolean =>
-  row?.user_count === 0 && !(row?.service_account_count > 0);
-
 const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includes(row?.role_name);
 </script>
 
@@ -201,7 +195,6 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
       </span>
     </template>
 
-    <!-- An empty role is muted, not coloured: a cleanup candidate, not an error. -->
     <template #cell-user_count="{ row }">
       <OButton
         v-if="typeof row.user_count === 'number'"
