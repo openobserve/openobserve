@@ -66,6 +66,18 @@ async function deleteStream(request, stream, { type = 'traces', org = orgId() } 
     .catch(() => {});
 }
 
+/** Types without user-defined schema need the empty field list. */
+async function createEmptyStream(request, stream, type, { org = orgId() } = {}) {
+  const response = await request.post(`${ingestionBaseUrl()}/api/${org}/streams/${stream}?type=${type}`, {
+    headers: getAuthHeaders(),
+    data: {
+      fields: [],
+      settings: { partition_keys: [], index_fields: [], full_text_search_keys: [], bloom_filter_fields: [], defined_schema_fields: [] },
+    },
+  });
+  expect(response.status(), `Precondition: the ${type} stream must be created`).toBe(200);
+}
+
 /** Create a saved view, assert it returned 200, and resolve to its view_id. */
 async function createSavedView(request, view, { message = 'Precondition: saved view must be created', org = orgId() } = {}) {
   const response = await request.post(`${apiBaseUrl()}/api/${org}/savedviews`, {
@@ -94,6 +106,7 @@ module.exports = {
   waitForSearch,
   streamFieldNames,
   deleteStream,
+  createEmptyStream,
   createSavedView,
   deleteSavedView,
 };
