@@ -138,7 +138,8 @@ const router = useRouter();
 const store = useStore();
 const org = useOrgId();
 
-const initialFolder = (route.query.folder as string) || "default";
+const initialFolder =
+  typeof route.query.folder === "string" && route.query.folder ? route.query.folder : "default";
 const selectedFolder = ref(initialFolder);
 const results = ref<ImportResult[]>([]);
 const importing = ref(false);
@@ -162,8 +163,8 @@ if (!store.state.organizationData?.foldersByType?.alerts?.length) {
 // The picker shows "default" for a folder that no longer exists, so the import must target that too.
 watch(
   () => store.state.organizationData?.foldersByType?.alerts,
-  (folders) => {
-    if (folders?.length && !folders.some((f: any) => f.folderId === selectedFolder.value)) {
+  (folders: { folderId: string }[] | undefined) => {
+    if (folders?.length && !folders.some((f) => f.folderId === selectedFolder.value)) {
       selectedFolder.value = "default";
     }
   },
@@ -189,16 +190,20 @@ function goToList(folder: string) {
   });
 }
 
-function toCreatePayload(item: unknown, folderId: string): Record<string, unknown> | null {
+function toCreatePayload(
+  item: unknown,
+  folderId: string,
+): { payload: Record<string, unknown>; name: string } | null {
   if (!item || typeof item !== "object" || Array.isArray(item)) return null;
-  const payload: Record<string, unknown> = { ...(item as Record<string, unknown>) };
-  if (typeof payload.name !== "string" || !payload.name.trim()) return null;
+  const payload: Record<string, unknown> = { ...item };
+  const name = payload.name;
+  if (typeof name !== "string" || !name.trim()) return null;
   for (const field of STRIPPED_FIELDS) delete payload[field];
   payload.folder_id = folderId;
   // Create rejects a null `tags`; an absent `group_by` is how an ungrouped SLO is written.
   payload.tags ??= [];
   if (payload.group_by === null) delete payload.group_by;
-  return payload;
+  return { payload, name };
 }
 
 function skipReason(item: unknown, index: number): I18nText {
@@ -208,14 +213,15 @@ function skipReason(item: unknown, index: number): I18nText {
     : t("slos.import.notAnObject", { index });
 }
 
-function serverReason(e: any): string {
-  const body = e?.response?.data;
-  return (
-    body?.message ||
-    (typeof body === "string" && body.trim()) ||
-    e?.message ||
-    t("slos.import.unknownError")
-  );
+function serverReason(e: unknown): string {
+  const response = e && typeof e === "object" && "response" in e ? e.response : undefined;
+  const body =
+    response && typeof response === "object" && "data" in response ? response.data : undefined;
+  if (typeof body === "string" && body.trim()) return body.trim();
+  if (body && typeof body === "object" && "message" in body && typeof body.message === "string") {
+    if (body.message) return body.message;
+  }
+  return (e instanceof Error && e.message) || t("slos.import.unknownError");
 }
 
 function parseItems(jsonStr: string): unknown[] | null {
@@ -229,13 +235,13 @@ function parseItems(jsonStr: string): unknown[] | null {
 }
 
 async function importItem(item: unknown, index: number, folderId: string): Promise<ImportResult> {
-  const payload = toCreatePayload(item, folderId);
-  if (!payload) return { success: false, message: skipReason(item, index) };
-  const name = payload.name as string;
+  const prepared = toCreatePayload(item, folderId);
+  if (!prepared) return { success: false, message: skipReason(item, index) };
+  const { payload, name } = prepared;
   try {
     await createSlo.mutateAsync(payload);
     return { success: true, message: t("slos.import.created", { index, name }) };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return {
       success: false,
       message: t("slos.import.failed", { index, name, reason: serverReason(e) }),
