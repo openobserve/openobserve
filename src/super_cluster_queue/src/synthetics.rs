@@ -345,12 +345,18 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
             down_runs,
             up_runs,
             run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
         } => {
             let streaks = table::synthetics_checks::StatusStreaks {
                 last_check_status: status,
                 down_runs,
                 up_runs,
                 run_ts,
+                run_class,
+                run_class_at,
+                tested_at,
             };
             apply_last_check_status(conn, &org_id, &id, &streaks).await?;
         }
@@ -653,6 +659,13 @@ mod tests {
             status_down_runs: 0,
             status_up_runs: 0,
             status_run_ts: 0,
+            last_run_class: 0,
+            last_run_class_at: 0,
+            last_tested_at: 0,
+            gap_since: 0,
+            gap_runs: 0,
+            gap_notified_at: 0,
+            gap_resumed_at: 0,
             owner: None,
             created_at: 0,
             updated_at: 0,
@@ -704,6 +717,9 @@ mod tests {
                 run_ts: 0,
                 down_runs: 0,
                 up_runs: 0,
+                run_class: 0,
+                run_class_at: 0,
+                tested_at: 0,
                 ..
             }
         ));
@@ -717,6 +733,9 @@ mod tests {
             down_runs: 2,
             up_runs: 0,
             run_ts: 200,
+            run_class: 3,
+            run_class_at: 200,
+            tested_at: 200,
         };
         apply_last_check_status(&db, "org1", "check-1", &newer)
             .await
@@ -728,6 +747,9 @@ mod tests {
             down_runs: 0,
             up_runs: 1,
             run_ts: 100,
+            run_class: 1,
+            run_class_at: 100,
+            tested_at: 100,
         };
         apply_last_check_status(&db, "org1", "check-1", &older)
             .await
@@ -805,6 +827,9 @@ mod tests {
             down_runs: 0,
             up_runs: 0,
             run_ts: 0,
+            run_class: 0,
+            run_class_at: 0,
+            tested_at: 0,
         })
         .unwrap();
         let msg = Message::new(
@@ -877,6 +902,13 @@ mod tests {
                 status_down_runs INTEGER NOT NULL DEFAULT 0,
                 status_up_runs INTEGER NOT NULL DEFAULT 0,
                 status_run_ts BIGINT NOT NULL DEFAULT 0,
+                last_run_class INTEGER NOT NULL DEFAULT 0,
+                last_run_class_at BIGINT NOT NULL DEFAULT 0,
+                last_tested_at BIGINT NOT NULL DEFAULT 0,
+                gap_since BIGINT NOT NULL DEFAULT 0,
+                gap_runs INTEGER NOT NULL DEFAULT 0,
+                gap_notified_at BIGINT NOT NULL DEFAULT 0,
+                gap_resumed_at BIGINT NOT NULL DEFAULT 0,
                 owner TEXT NULL,
                 created_at BIGINT NOT NULL,
                 updated_at BIGINT NOT NULL

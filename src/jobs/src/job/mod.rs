@@ -957,6 +957,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             openobserve_core::synthetics::downtime_may_mute,
         );
     }
+    // A run a confirm job kept open can finalize in the reaper or the dispatcher, where no ack
+    // sends its alert.
+    #[cfg(feature = "enterprise")]
+    openobserve_synthetics::job_api::register_run_notifier(
+        openobserve_core::synthetics::notify_finalized_run,
+    );
     // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
     // processing node so that get_coverage_deficit returns accurate data from startup
     // rather than always returning (0, 0) until files happen to be processed.

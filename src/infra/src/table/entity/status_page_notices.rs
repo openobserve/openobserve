@@ -37,6 +37,10 @@ pub struct Model {
     pub auto_check_id: Option<String>,
     pub auto_recovery_streak: i32,
     pub owner: Option<String>,
+    /// Who marked this auto-incident as a false alarm. All three are None when it is not one.
+    pub false_alarm_by: Option<String>,
+    pub false_alarm_at: Option<i64>,
+    pub false_alarm_reason: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }

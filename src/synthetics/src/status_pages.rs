@@ -397,6 +397,11 @@ async fn apply_engine_actions(
         let Some(check_id) = n.auto_check_id.clone() else {
             continue;
         };
+        // A false alarm stays hidden: a new failure opens a new incident, it never reopens this
+        // one.
+        if n.false_alarm_at.is_some() {
+            continue;
+        }
         if n.state == 1 {
             open_by_check.insert(
                 check_id.clone(),
@@ -420,11 +425,13 @@ async fn apply_engine_actions(
     }
 
     let th_by_check = thresholds_by_check(data);
+    let mut held = false_alarm_holds(&data.notices, &data.states);
+    held.extend(data.snoozed.iter().cloned());
     let actions = engine::incident_actions_with(
         &checks,
         &open_by_check,
         &recently_resolved,
-        &data.snoozed,
+        &held,
         |id| th_by_check.get(id).copied().unwrap_or_default(),
         now,
     );
@@ -432,6 +439,34 @@ async fn apply_engine_actions(
         apply_one(conn, data, action, now).await?;
     }
     Ok(())
+}
+
+/// Checks whose newest auto-incident was marked a false alarm during the failure that is still
+/// going on: the mark closed the incident, and the run class has not changed since. A new failure
+/// after a recovery changes the class, so it opens a new incident. Marking an incident that was
+/// already over holds nothing. This replaces the old six-hour snooze.
+fn false_alarm_holds(
+    notices: &[status_page_notices::Model],
+    states: &[table::CheckStateRow],
+) -> HashSet<String> {
+    let mut marked: HashMap<&str, i64> = HashMap::new();
+    for n in notices {
+        if let (Some(check_id), Some(at)) = (n.auto_check_id.as_deref(), n.false_alarm_at)
+            && n.resolved_at == Some(at)
+        {
+            let e = marked.entry(check_id).or_insert(at);
+            *e = (*e).max(at);
+        }
+    }
+    states
+        .iter()
+        .filter(|s| {
+            marked
+                .get(s.id.as_str())
+                .is_some_and(|at| s.last_run_class_at > 0 && s.last_run_class_at <= *at)
+        })
+        .map(|s| s.id.clone())
+        .collect()
 }
 
 async fn apply_one(
@@ -533,6 +568,9 @@ async fn open_notice(
             auto_check_id: Some(check_id.to_string()),
             auto_recovery_streak: 0,
             owner: None,
+            false_alarm_by: None,
+            false_alarm_at: None,
+            false_alarm_reason: None,
             created_at: now,
             updated_at: now,
         },
@@ -659,6 +697,10 @@ fn build_page_snapshot(
         let mut incident_segments = Vec::new();
         let mut maint_segments = Vec::new();
         for n in &notices {
+            // A false alarm leaves the public page: no history entry, no downtime.
+            if n.excluded_from_uptime {
+                continue;
+            }
             page_notice_ids.insert(n.id.clone());
             let impact = engine::Impact::from_i16(n.impact as i16);
             if n.state == 1 {
@@ -693,10 +735,13 @@ fn build_page_snapshot(
             // service is up, so show "no data" rather than plain Operational.
             status = engine::ComponentStatus::NoData;
         }
+        let (last_checked_at, stale_after_secs) = last_checked(&mapped, &data.states);
         current_components.push(engine::CurrentComponent {
             key: key.clone(),
             name: component.name.clone(),
             status,
+            last_checked_at,
+            stale_after_secs,
         });
         history_components.push(engine::HistoryComponent {
             key,
@@ -742,6 +787,45 @@ fn all_checks_in_error(mapped: &[&str], states: &[table::CheckStateRow]) -> bool
             // data.
             .is_some_and(|s| s.last_check_status == engine::CHECK_STATUS_ERROR && s.up_runs == 0)
     })
+}
+
+/// When a check last tested the site: `last_tested_at`, the newest finalized run that tested it.
+fn tested_at(s: &table::CheckStateRow) -> Option<i64> {
+    use config::meta::synthetics::RunClass;
+    if s.last_tested_at > 0 {
+        return Some(s.last_tested_at);
+    }
+    // A row from before the run class existed: trust the badge.
+    let legacy = RunClass::from_db(s.last_run_class) == RunClass::Unknown
+        && s.last_check_status != engine::CHECK_STATUS_ERROR;
+    let ts = if legacy {
+        s.status_run_ts.max(s.last_triggered_at)
+    } else {
+        0
+    };
+    (ts > 0).then_some(ts)
+}
+
+/// A component's "Last checked" time, floored to the minute, and its stale threshold: three
+/// intervals of its slowest mapped check.
+fn last_checked(mapped: &[&str], states: &[table::CheckStateRow]) -> (Option<i64>, Option<i64>) {
+    const MINUTE_US: i64 = 60_000_000;
+    let rows: Vec<&table::CheckStateRow> = states
+        .iter()
+        .filter(|s| mapped.contains(&s.id.as_str()))
+        .collect();
+    let last = rows
+        .iter()
+        .filter_map(|s| tested_at(s))
+        .max()
+        .map(|ts| ts - ts.rem_euclid(MINUTE_US));
+    let stale_after = rows
+        .iter()
+        .map(|s| s.interval_secs)
+        .max()
+        .filter(|secs| *secs > 0)
+        .map(|secs| secs * 3);
+    (last, stale_after)
 }
 
 fn public_notice(
@@ -824,7 +908,103 @@ mod fast_pass_tests {
             down_runs: 0,
             up_runs: 0,
             last_triggered_at: 0,
+            status_run_ts: 0,
+            last_run_class: 0,
+            last_run_class_at: 0,
+            last_tested_at: 0,
+            interval_secs: 60,
+            created_at: 0,
         }
+    }
+
+    #[test]
+    fn a_false_alarm_holds_only_the_failure_it_was_marked_on() {
+        let notice = |check: &str, at: Option<i64>| status_page_notices::Model {
+            id: check.into(),
+            org_id: "org".into(),
+            kind: 0,
+            impact: 0,
+            source: 0,
+            title: String::new(),
+            body: String::new(),
+            state: 2,
+            starts_at: 0,
+            resolved_at: at,
+            segments: "[]".into(),
+            excluded_from_uptime: at.is_some(),
+            deleted_at: None,
+            auto_check_id: Some(check.into()),
+            auto_recovery_streak: 0,
+            owner: None,
+            false_alarm_by: None,
+            false_alarm_at: at,
+            false_alarm_reason: None,
+            created_at: 0,
+            updated_at: 0,
+        };
+        let notices = vec![
+            notice("same", Some(500)),
+            notice("new", Some(500)),
+            notice("real", None),
+        ];
+        // Down since 400, marked at 500: the same failure, held.
+        let mut same = row("same", 3);
+        same.last_run_class_at = 400;
+        // Recovered and failed again at 600: a new failure, not held.
+        let mut new = row("new", 3);
+        new.last_run_class_at = 600;
+        // Not a false alarm: never held.
+        let mut real = row("real", 3);
+        real.last_run_class_at = 400;
+        // An incident over at 300, marked at 500, while a new failure began at 400: not held.
+        let mut old_notice = notice("old", Some(500));
+        old_notice.resolved_at = Some(300);
+        let notices = [notices, vec![old_notice]].concat();
+        let mut old = row("old", 3);
+        old.last_run_class_at = 400;
+        let held = false_alarm_holds(&notices, &[same, new, real, old]);
+        assert_eq!(held, HashSet::from(["same".to_string()]));
+    }
+
+    #[test]
+    fn last_checked_is_the_newest_run_that_tested_the_site() {
+        const MIN: i64 = 60_000_000;
+        let mut up = row("a", 1);
+        up.last_run_class = 1;
+        up.status_run_ts = 10 * MIN + 42_000_000;
+        up.last_tested_at = 10 * MIN + 42_000_000;
+        // Not measured since minute 20; the stored test time is used, not one worked out from the
+        // interval.
+        let mut gap = row("b", 4);
+        gap.last_run_class = 4;
+        gap.status_run_ts = 25 * MIN;
+        gap.last_run_class_at = 20 * MIN;
+        gap.last_tested_at = 13 * MIN + 5_000_000;
+        gap.interval_secs = 120;
+        let states = vec![up.clone(), gap.clone()];
+        assert_eq!(last_checked(&["a"], &states), (Some(10 * MIN), Some(180)));
+        assert_eq!(
+            last_checked(&["a", "b"], &states),
+            (Some(13 * MIN), Some(360))
+        );
+        // A check whose runs were all Not measured was never tested.
+        let mut first = gap.clone();
+        first.last_tested_at = 0;
+        assert_eq!(tested_at(&first), None);
+    }
+
+    #[test]
+    fn last_checked_is_absent_without_a_tested_run() {
+        let mut fresh = row("a", 0);
+        fresh.interval_secs = 0;
+        assert_eq!(last_checked(&["a"], &[fresh.clone()]), (None, None));
+        // A legacy row with an error badge has no known test time.
+        let legacy = row("b", engine::CHECK_STATUS_ERROR);
+        assert_eq!(tested_at(&legacy), None);
+        let mut legacy_ok = row("c", 1);
+        legacy_ok.last_triggered_at = 7;
+        assert_eq!(tested_at(&legacy_ok), Some(7));
+        assert_eq!(last_checked(&["missing"], &[fresh]), (None, None));
     }
 
     #[test]

@@ -99,6 +99,8 @@
   .crow { display:flex; justify-content:space-between; align-items:center; gap:.8rem;
           flex-wrap:wrap; margin-bottom:.15rem; }
   .crow h3 { margin:0; font-size:1rem; font-weight:600; }
+  .lastchk { margin:0 0 .35rem; font-size:.76rem; color:var(--ink2); font-variant-numeric:tabular-nums; }
+  .lastchk.stale { color:var(--warn); font-weight:600; }
   .chip { display:inline-flex; align-items:center; gap:.4rem; font-size:.74rem; font-weight:700;
           padding:.15rem .65rem; border-radius:1rem; white-space:nowrap; }
   .chip::before { content:""; width:.5rem; height:.5rem; border-radius:50%; background:currentColor; }
@@ -390,6 +392,23 @@
     return new Date(us / 1000).toLocaleString(undefined,
       { dateStyle: "medium", timeStyle: "short", timeZone: tzState.current });
   }
+  function fmtClock(us) {
+    return new Date(us / 1000).toLocaleTimeString(undefined,
+      { hour: "2-digit", minute: "2-digit", timeZoneName: "short", timeZone: tzState.current });
+  }
+  /* "Last checked HH:MM" under a component, amber once it is older than three
+     check intervals: the status is only as fresh as the newest real test. */
+  function lastChecked(c) {
+    if (!c.last_checked_at) return null;
+    var p = el("p", "lastchk", "Last checked " + fmtClock(c.last_checked_at));
+    p.setAttribute("data-test", "status-page-last-checked");
+    var age = Date.now() - c.last_checked_at / 1000;
+    if (c.stale_after_secs && age > c.stale_after_secs * 1000) {
+      p.classList.add("stale");
+      p.title = "No test result since then";
+    }
+    return p;
+  }
   function fmtDay(iso) {
     var p = String(iso || "").split("-");
     if (p.length !== 3) return String(iso || "");
@@ -647,6 +666,8 @@
     row.appendChild(el("h3", null, c.name));
     row.appendChild(chip(c.status));
     card.appendChild(row);
+    var checked = lastChecked(c);
+    if (checked) card.appendChild(checked);
     if (!h || !h.daily || !h.daily.length) return card;
 
     card.appendChild(ui.table[c.id] ? tableView(c, h) : barsView(c, h));

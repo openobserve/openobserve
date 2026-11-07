@@ -144,7 +144,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 144: turn a json templates column from an earlier 141 or 142 into text.
 // 145: add alerts.incident_title_template.
 // 146: rename user folders named default so the built-in default folder can be created.
-pub const DB_SCHEMA_VERSION: u64 = 146;
+// 147: add last_run_class, last_run_class_at and last_tested_at to synthetics.
+// 148: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
+// 149: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
+pub const DB_SCHEMA_VERSION: u64 = 149;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

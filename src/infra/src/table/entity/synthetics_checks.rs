@@ -56,6 +56,19 @@ pub struct Model {
     pub status_up_runs: i32,
     /// `scheduled_ts` of the last run applied to the streaks, in microseconds.
     pub status_run_ts: i64,
+    /// `RunClass` DB integer of the newest finalized run. 0 = no run yet.
+    pub last_run_class: i32,
+    /// `scheduled_ts` of the first run in the current `last_run_class`, in microseconds.
+    pub last_run_class_at: i64,
+    /// `scheduled_ts` of the newest finalized run that tested the site, in microseconds. 0 = none.
+    pub last_tested_at: i64,
+    /// When the current run of Not measured results started, in microseconds. 0 = no gap.
+    pub gap_since: i64,
+    /// Not measured runs in a row in the current gap.
+    pub gap_runs: i32,
+    /// When the "Monitoring gap" notice of the current gap was sent. 0 = not sent.
+    pub gap_notified_at: i64,
+    pub gap_resumed_at: i64,
     pub owner: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -100,6 +113,13 @@ mod tests {
             status_down_runs: 0,
             status_up_runs: 0,
             status_run_ts: 0,
+            last_run_class: 0,
+            last_run_class_at: 0,
+            last_tested_at: 0,
+            gap_since: 0,
+            gap_runs: 0,
+            gap_notified_at: 0,
+            gap_resumed_at: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
