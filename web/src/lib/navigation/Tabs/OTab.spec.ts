@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, provide, computed } from "vue";
 import { TabsRoot, TabsList } from "reka-ui";
@@ -299,6 +299,14 @@ describe("OTab", () => {
     it("should not be draggable until the grip is pressed", () => {
       const wrapper = mountTab({ reorderable: true });
       expect(wrapper.find('[role="tab"]').attributes("draggable")).toBeUndefined();
+    });
+
+    it("should keep a grip press from reaching the trigger, which selects on press", async () => {
+      const wrapper = mountTab({ reorderable: true });
+      const pressed = vi.fn();
+      wrapper.find('[role="tab"]').element.addEventListener("mousedown", pressed);
+      await wrapper.find("[data-otab-grip]").trigger("mousedown");
+      expect(pressed).not.toHaveBeenCalled();
     });
 
     it("should arm dragging on grip mousedown and disarm on mouseup", async () => {

@@ -33,6 +33,13 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
 });
 
 // Mock services before importing component (follow reference style)
+// Monaco's real stylesheet makes every jsdom getComputedStyle match hundreds of rules, and a tooltip calls it per mount.
+vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
+  editor: { colorize: vi.fn().mockResolvedValue("") },
+  languages: {},
+}));
+vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
 vi.mock("@/services/oncall", () => ({
   default: { listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }) },
 }));
@@ -974,7 +981,10 @@ describe("AlertList - row actions", () => {
     ).toBeUndefined();
     // No refetch: reloading the folder would blank the table behind its skeleton
     // and a loading toast for a row the server already confirmed gone.
-    expect(alertsSvc.listByFolderId).not.toHaveBeenCalled();
+    const folderReads = (alertsSvc.listByFolderId as any).mock.calls.filter(
+      (call: unknown[]) => call[6] !== undefined,
+    );
+    expect(folderReads).toHaveLength(0);
     // The store cache backs a folder revisit, so the row must leave it too or it
     // reappears the moment the user navigates away and back.
     const cached = store.state.organizationData.allAlertsListByFolderId[wrapper.vm.activeFolderId];
@@ -1287,7 +1297,8 @@ describe("AlertList - folder and state interactions", () => {
     await wrapper.vm.updateAcrossFolders("default", "default");
     await flushPromises();
 
-    expect(spy).toHaveBeenCalledTimes(2);
+    // The section tabs' Firing badge reads every folder on its own schedule.
+    expect(spy.mock.calls.filter((call) => call[6] === "default")).toHaveLength(2);
     expect(wrapper.vm.selectedAlerts.length).toBe(0);
   });
 });
@@ -1403,6 +1414,21 @@ describe("AlertList - micro validations", () => {
     await flushPromises();
     expect(wrapper.vm.alertStateLoadingMap[uuid]).toBe(false);
     expect(before === undefined || before === false).toBe(true);
+  });
+
+  it("toggleAlertState marks the folder-keyed detail entry stale", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    const org = store.state.selectedOrganization.identifier;
+    const key = [...alertKeys.detail(org, row.alert_id), "folder-1"];
+    queryClient.setQueryData(key, { name: row.name });
+
+    await wrapper.vm.toggleAlertState(row);
+    await flushPromises();
+
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: key, exact: true });
   });
 });
 
@@ -1787,7 +1813,11 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     // A failed stream-list load must not skip fetching the alert being
     // cloned — otherwise Save would silently copy whatever alert was
     // cloned previously instead of this one.
-    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(expect.anything(), row.alert_id);
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(
+      expect.anything(),
+      row.alert_id,
+      undefined,
+    );
   });
 
   it("clone dialog emits click:primary -> invokes submitForm", async () => {
@@ -2440,6 +2470,59 @@ describe("AlertList - editor drafts", () => {
     expect(readEditorDraft(scope("alert-1"))).toBeNull();
     expect(readEditorDraft(scope("alert-1", "teammate@example.com"))).toBeNull();
     expect(readEditorDraft(scope("alert-2"))).not.toBeNull();
+  });
+
+  it("drops the deleted alert's folder-keyed detail and refreshes the Firing read", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    const key = [...alertKeys.detail(org, "alert-1"), "folder-1"];
+    const otherKey = alertKeys.detail(org, "alert-2");
+    queryClient.setQueryData(key, { name: "Scheduled Alert A" });
+    queryClient.setQueryData(otherKey, { name: "Scheduled Alert B" });
+    queryClient.setQueryData(alertKeys.firing(org), { list: [] });
+    const { vm } = await mountDraftList();
+
+    await vm.showDeleteDialogFn({
+      row: { alert_id: "alert-1", name: "Scheduled Alert A" },
+    });
+    await vm.deleteAlertByAlertId();
+    await flushPromises();
+
+    expect(queryClient.getQueryData(key)).toBeUndefined();
+    expect(queryClient.getQueryData(otherKey)).toBeDefined();
+    expect(queryClient.getQueryState(alertKeys.firing(org))?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: otherKey, exact: true });
+    queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
+  });
+
+  it("refreshes the Firing read after a bulk pause", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.setQueryData(alertKeys.firing(org), { list: [] });
+    const { wrapper } = await mountDraftList();
+    wrapper.vm.filteredResults[0].selected = true;
+    wrapper.vm.filteredResults[0].enabled = true;
+    await wrapper.vm.$nextTick();
+
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+
+    expect(alertsSvc.bulkToggleState).toHaveBeenCalled();
+    expect(queryClient.getQueryState(alertKeys.firing(org))?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
+  });
+
+  it("refreshes the Firing read when a bulk delete answers in an unknown shape", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.setQueryData(alertKeys.firing(org), { list: [] });
+    const { wrapper, vm } = await mountDraftList();
+    wrapper.vm.filteredResults[0].selected = true;
+    await wrapper.vm.$nextTick();
+    alertsSvc.bulkDelete.mockResolvedValueOnce({ data: {} });
+
+    await vm.bulkDeleteAlerts();
+    await flushPromises();
+
+    expect(queryClient.getQueryState(alertKeys.firing(org))?.isInvalidated).toBe(true);
+    queryClient.removeQueries({ queryKey: alertKeys.firing(org), exact: true });
   });
 
   it("keeps the draft when the delete fails", async () => {

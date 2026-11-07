@@ -799,6 +799,57 @@ pub async fn find_open_incident_containing_alert(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// The incidents among `ids` in this org, by id, read in one query.
+pub async fn get_many(
+    org_id: &str,
+    ids: &[String],
+) -> Result<HashMap<String, alert_incidents::Model>, errors::Error> {
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let client = get_orm_client_ro().await;
+    Ok(alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Id.is_in(ids.to_vec()))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .map(|incident| (incident.id.clone(), incident))
+        .collect())
+}
+
+/// [`find_open_incident_containing_alert`] for many alerts in two queries, by alert id.
+pub async fn find_open_incidents_containing_alerts(
+    org_id: &str,
+    alert_ids: &[String],
+) -> Result<HashMap<String, alert_incidents::Model>, errors::Error> {
+    if alert_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let client = get_orm_client_ro().await;
+    let links = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.is_in(alert_ids.to_vec()))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let incident_ids: Vec<String> = links.iter().map(|l| l.incident_id.clone()).collect();
+    let open: HashMap<String, alert_incidents::Model> = alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .map(|incident| (incident.id.clone(), incident))
+        .collect();
+    Ok(links
+        .into_iter()
+        .filter_map(|l| open.get(&l.incident_id).cloned().map(|m| (l.alert_id, m)))
+        .collect())
+}
+
 /// The resolved incidents among the alert's `limit` latest firings, newest first.
 pub async fn resolved_incidents_for_alert(
     org_id: &str,

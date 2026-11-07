@@ -1696,10 +1696,27 @@ pub async fn list_v2<C: ConnectionTrait>(
 /// Whether an individual grant in `permissions` covers `alert`, by its old or new OpenFGA id.
 pub(crate) fn is_alert_permitted(folder: &Folder, alert: &Alert, permissions: &[String]) -> bool {
     permissions.contains(&format!("alert:{}", alert.name))
+        || permissions.contains(&format!("afolder:{}", folder.folder_id))
         || alert.id.is_some_and(|id| {
             permissions.contains(&format!("alert:{}/{id}", folder.folder_id))
                 || permissions.contains(&format!("alert:{id}"))
         })
+}
+
+/// The grants a folder adds to a no-folder read: folders the user can both open and read.
+#[cfg(any(feature = "enterprise", test))]
+fn readable_folder_grants(
+    org_id: &str,
+    mut readable: Vec<String>,
+    listable: &[String],
+) -> Vec<String> {
+    let all_folders = format!("afolder:_all_{org_id}");
+    let lists_all = listable.contains(&all_folders);
+    readable.retain(|folder| lists_all || listable.contains(folder));
+    if readable.contains(&all_folders) {
+        readable.push(format!("alert:_all_{org_id}"));
+    }
+    readable
 }
 
 /// Deletes an alert by its KSUID primary key, unconditionally.
@@ -4646,7 +4663,7 @@ pub async fn permitted_alerts(
     // to see the dashboard. This is used to check if the user has permission to see a specific
     // dashboard.
 
-    let permitted_objects = crate::authz::list_objects_for_user(
+    let mut permitted_objects = crate::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",
@@ -4654,6 +4671,29 @@ pub async fn permitted_alerts(
     )
     .await
     .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
+
+    // GET_INDIVIDUAL_FROM_ROLE ignores parents, so a read across folders must add folder grants.
+    if folder_id.is_none()
+        && let Some(objects) = permitted_objects.as_mut()
+    {
+        let folder_objects = |permission| {
+            crate::authz::list_objects_for_user(
+                org_id,
+                user_id,
+                permission,
+                OFGA_MODELS.get("alert_folders").unwrap().key,
+            )
+        };
+        let readable = folder_objects("GET")
+            .await
+            .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?
+            .unwrap_or_default();
+        let listable = folder_objects("LIST")
+            .await
+            .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?
+            .unwrap_or_default();
+        objects.extend(readable_folder_grants(org_id, readable, &listable));
+    }
 
     Ok(permitted_objects)
 }
@@ -5533,6 +5573,51 @@ mod send_path_tests {
                 "{outcome:?} notifies, so its destinations must be skipped"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod folder_grant_tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|v| v.to_string()).collect()
+    }
+
+    #[test]
+    fn test_folder_grant_needs_both_get_and_list() {
+        let granted = readable_folder_grants(
+            "o",
+            strings(&["afolder:a", "afolder:b"]),
+            &strings(&["afolder:b", "afolder:c"]),
+        );
+        assert_eq!(granted, strings(&["afolder:b"]));
+    }
+
+    #[test]
+    fn test_org_wide_folder_grant_becomes_the_all_alerts_grant() {
+        let all = strings(&["afolder:_all_o"]);
+        let granted = readable_folder_grants("o", all.clone(), &all);
+        assert!(granted.contains(&"alert:_all_o".to_string()));
+    }
+
+    #[test]
+    fn test_folder_grant_passes_only_that_folders_alerts() {
+        let folder = |folder_id: &str| Folder {
+            folder_id: folder_id.to_string(),
+            ..Default::default()
+        };
+        let permissions = strings(&["afolder:mine"]);
+        assert!(is_alert_permitted(
+            &folder("mine"),
+            &Alert::default(),
+            &permissions
+        ));
+        assert!(!is_alert_permitted(
+            &folder("other"),
+            &Alert::default(),
+            &permissions
+        ));
     }
 }
 

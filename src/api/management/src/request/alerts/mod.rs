@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use std::{collections::HashMap as StdHashMap, str::FromStr};
 
 use axum::{
     Json,
@@ -23,7 +23,10 @@ use axum::{
 };
 use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
-    alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
+    alerts::{
+        alert::{Alert as MetaAlert, AlertTypeFilter},
+        state::AlertState,
+    },
     triggers::{ScheduledTriggerData, Trigger, TriggerModule},
 };
 use db::scheduler;
@@ -110,6 +113,9 @@ const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
     "last_alert_fired_at",
     "last_recovery_notified_at",
 ];
+
+/// The caller's visible object set: `None` means no filtering, else (org-wide grant, objects).
+type AlertVisibility = Option<(bool, hashbrown::HashSet<String>)>;
 
 #[derive(serde::Serialize, utoipa::ToSchema)]
 #[serde(untagged)]
@@ -2904,7 +2910,10 @@ pub async fn list_alert_tags(
     // regular-alert `visible_ids` path, rather than a per-composite
     // `check_permissions` call.
     #[cfg(feature = "enterprise")]
-    let visibility = permitted_alert_visibility(&org_id, user_email.user_id.as_str()).await;
+    let visibility = match permitted_alert_visibility(&org_id, user_email.user_id.as_str()).await {
+        Ok(visibility) => visibility,
+        Err(e) => return e.into(),
+    };
 
     let mut composite_counts = std::collections::BTreeMap::<String, u64>::new();
     if let Ok(composites) = infra::table::alert_composites::list_by_org(client, &org_id).await {
@@ -3005,7 +3014,10 @@ pub async fn list_alerts(
     // the composite merge below and the `referenced_by_composite_count`
     // enrichment, so we don't run per-row or duplicate permission lookups.
     let visibility = match user_id {
-        Some(user_id) => permitted_alert_visibility(&org_id, user_id).await,
+        Some(user_id) => match permitted_alert_visibility(&org_id, user_id).await {
+            Ok(visibility) => visibility,
+            Err(e) => return e.into(),
+        },
         None => None,
     };
 
@@ -3227,6 +3239,7 @@ pub async fn list_alerts(
             anomaly_list_items(&org_id, &configs)
                 .await
                 .into_iter()
+                .filter(|item| anomaly_row_visible(&visibility, item))
                 .filter(|item| enabled_filter.is_none_or(|enabled| item.enabled == enabled))
                 .filter(|item| match &priority_filter {
                     None => true,
@@ -3272,7 +3285,7 @@ pub async fn list_alerts(
     // Enrich with durable run state (Part IV of alerts.md). One batched query
     // over the page that is actually being returned — not per alert.
     let mut list = list;
-    enrich_with_run_state(&org_id, &mut list).await;
+    let status_unavailable = enrich_with_run_state(&org_id, &mut list).await;
     enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
     crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
 
@@ -3285,7 +3298,22 @@ pub async fn list_alerts(
         }
     }
 
-    MetaHttpResponse::json(ListAlertsResponseBody { list })
+    MetaHttpResponse::json(ListAlertsResponseBody {
+        list,
+        status_unavailable,
+    })
+}
+
+// The anomaly merge has no permission filter of its own, unlike the SQL path.
+#[cfg(any(feature = "enterprise", test))]
+fn anomaly_row_visible(visibility: &AlertVisibility, item: &ListAlertsResponseBodyItem) -> bool {
+    item.alert_type != "anomaly_detection"
+        || visible_alert(
+            visibility,
+            &item.alert_id.to_string(),
+            &item.folder_id,
+            &item.name,
+        )
 }
 
 /// Resolve the caller's visible alert/composite object set in one bulk query,
@@ -3295,15 +3323,14 @@ pub async fn list_alerts(
 async fn permitted_alert_visibility(
     org_id: &str,
     user_id: &str,
-) -> Option<(bool, hashbrown::HashSet<String>)> {
-    let permitted = alert::permitted_alerts(org_id, Some(user_id), None)
-        .await
-        .ok()
-        .flatten()?;
+) -> Result<AlertVisibility, AlertError> {
+    let Some(permitted) = alert::permitted_alerts(org_id, Some(user_id), None).await? else {
+        return Ok(None);
+    };
     let is_all_permitted = permitted
         .iter()
         .any(|object| object == &format!("alert:_all_{org_id}"));
-    Some((is_all_permitted, permitted.into_iter().collect()))
+    Ok(Some((is_all_permitted, permitted.into_iter().collect())))
 }
 
 /// Render a stored `{id}` expression with child IDs replaced by names; `None`
@@ -3334,17 +3361,13 @@ fn name_resolved_expression(
     Some(spaced.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 
-fn visible_alert(
-    visibility: &Option<(bool, hashbrown::HashSet<String>)>,
-    id: &str,
-    folder_id: &str,
-    name: &str,
-) -> bool {
+fn visible_alert(visibility: &AlertVisibility, id: &str, folder_id: &str, name: &str) -> bool {
     match visibility {
         None => true,
         Some((is_all_permitted, permitted)) => {
             *is_all_permitted
                 || permitted.contains(&format!("alert:{}", name))
+                || permitted.contains(&format!("afolder:{}", folder_id))
                 || permitted.contains(&format!("alert:{}/{}", folder_id, id))
                 || permitted.contains(&format!("alert:{}", id))
         }
@@ -3353,7 +3376,7 @@ fn visible_alert(
 
 async fn enrich_with_composite_metadata(
     org_id: &str,
-    visibility: &Option<(bool, hashbrown::HashSet<String>)>,
+    visibility: &AlertVisibility,
     list: &mut [ListAlertsResponseBodyItem],
 ) {
     let db = get_orm_client_ro().await;
@@ -3555,22 +3578,43 @@ async fn group_acks(
         .collect()
 }
 
-async fn enrich_with_run_state(org_id: &str, list: &mut [ListAlertsResponseBodyItem]) {
-    if list.is_empty() {
-        return;
-    }
-    let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
-    let states = match infra::table::alert_states::get_rollups(&ids).await {
-        Ok(s) => s,
+/// Whether any live read failed, leaving the rows' live fields blank or incomplete.
+async fn enrich_with_run_state(org_id: &str, list: &mut [ListAlertsResponseBodyItem]) -> bool {
+    match read_live_fields(org_id, list).await {
+        Ok(()) => false,
         Err(e) => {
             log::warn!("failed to load alert run state for list: {e}");
-            return;
+            true
         }
-    };
-    if states.is_empty() {
-        return;
     }
-    let by_id: std::collections::HashMap<_, _> = states
+}
+
+/// Run state, acks and incidents onto every row.
+async fn read_live_fields(
+    org_id: &str,
+    list: &mut [ListAlertsResponseBodyItem],
+) -> Result<(), infra::errors::Error> {
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+    let rollups = load_run_state(org_id, list).await?;
+    #[cfg(feature = "enterprise")]
+    enrich_with_incidents(org_id, list, &rollups).await?;
+    Ok(())
+}
+
+/// Run state and acks onto every row, returning the rollups by alert id.
+async fn load_run_state(
+    org_id: &str,
+    list: &mut [ListAlertsResponseBodyItem],
+) -> Result<StdHashMap<String, AlertState>, infra::errors::Error> {
+    if list.is_empty() {
+        return Ok(StdHashMap::new());
+    }
+    let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
+    let states = infra::table::alert_states::get_rollups(&ids).await?;
+    if states.is_empty() {
+        return Ok(StdHashMap::new());
+    }
+    let by_id: StdHashMap<_, _> = states
         .into_iter()
         .map(|s| (s.alert_id.clone(), s))
         .collect();
@@ -3594,25 +3638,18 @@ async fn enrich_with_run_state(org_id: &str, list: &mut [ListAlertsResponseBodyI
             item.firing_started_at = state.firing_started_at;
         }
     }
-    enrich_with_acks(org_id, list, &by_id).await;
-    #[cfg(feature = "enterprise")]
-    enrich_with_incidents(org_id, list, &by_id).await;
+    enrich_with_acks(org_id, list, &by_id).await?;
+    Ok(by_id)
 }
 
 /// The list's ack chips: one read of every listed alert's acks, matched to each firing.
 async fn enrich_with_acks(
     org_id: &str,
     list: &mut [ListAlertsResponseBodyItem],
-    rollups: &std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
-) {
+    rollups: &StdHashMap<String, AlertState>,
+) -> Result<(), infra::errors::Error> {
     let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
-    let acks = match infra::table::alert_acks::list_for_alerts(org_id, &ids).await {
-        Ok(a) => a,
-        Err(e) => {
-            log::warn!("failed to load alert acks for list: {e}");
-            return;
-        }
-    };
+    let acks = infra::table::alert_acks::list_for_alerts(org_id, &ids).await?;
     let mut by_alert: std::collections::HashMap<String, Vec<config::meta::alerts::ack::AlertAck>> =
         Default::default();
     for a in acks {
@@ -3632,12 +3669,11 @@ async fn enrich_with_acks(
         }
         if acks.iter().any(|a| !a.group_key.is_empty()) {
             let keys: Vec<String> = acks.iter().map(|a| a.group_key.clone()).collect();
-            if let Ok(rows) = infra::table::alert_states::firing_groups(&id, Some(&keys)).await {
-                firing.extend(rows);
-            }
+            firing.extend(infra::table::alert_states::firing_groups(&id, Some(&keys)).await?);
         }
         item.ack = openobserve_core::alerts::ack::summary(acks, &firing);
     }
+    Ok(())
 }
 
 /// The incident each firing alert's current episode belongs to (MK-1's Incident tile).
@@ -3645,30 +3681,51 @@ async fn enrich_with_acks(
 async fn enrich_with_incidents(
     org_id: &str,
     list: &mut [ListAlertsResponseBodyItem],
-    rollups: &std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
-) {
+    rollups: &StdHashMap<String, AlertState>,
+) -> Result<(), infra::errors::Error> {
     use crate::models::alerts::responses::AlertIncidentLink;
 
+    let firing: Vec<_> = list
+        .iter()
+        .filter_map(|item| {
+            let id = item.alert_id.to_string();
+            let rollup = rollups.get(&id).filter(|r| r.is_firing())?;
+            Some((id, rollup.episode_incident_id.clone()))
+        })
+        .collect();
+    let episodes: Vec<String> = firing.iter().filter_map(|(_, e)| e.clone()).collect();
+    let unlinked: Vec<String> = firing
+        .iter()
+        .filter(|(_, e)| e.is_none())
+        .map(|(id, _)| id.clone())
+        .collect();
+    let by_episode = infra::table::alert_incidents::get_many(org_id, &episodes).await?;
+    let by_alert =
+        infra::table::alert_incidents::find_open_incidents_containing_alerts(org_id, &unlinked)
+            .await?;
+    let links: StdHashMap<String, AlertIncidentLink> = firing
+        .into_iter()
+        .filter_map(|(id, episode)| {
+            let model = match episode {
+                Some(incident_id) => by_episode.get(&incident_id),
+                None => by_alert.get(&id),
+            }?;
+            Some((
+                id,
+                AlertIncidentLink {
+                    id: model.id.clone(),
+                    title: model.title.clone(),
+                    status: model.status.parse().unwrap_or_default(),
+                },
+            ))
+        })
+        .collect();
     for item in list.iter_mut() {
-        let id = item.alert_id.to_string();
-        let Some(rollup) = rollups.get(&id).filter(|r| r.is_firing()) else {
-            continue;
-        };
-        let model = match rollup.episode_incident_id.as_deref() {
-            Some(incident_id) => infra::table::alert_incidents::get(org_id, incident_id).await,
-            None => {
-                infra::table::alert_incidents::find_open_incident_containing_alert(org_id, &id)
-                    .await
-            }
-        };
-        if let Ok(Some(m)) = model {
-            item.incident = Some(AlertIncidentLink {
-                id: m.id,
-                title: m.title,
-                status: m.status.parse().unwrap_or_default(),
-            });
+        if let Some(link) = links.get(&item.alert_id.to_string()) {
+            item.incident = Some(link.clone());
         }
     }
+    Ok(())
 }
 
 /// EnableAlert
@@ -4502,12 +4559,46 @@ mod tests {
     use svix_ksuid::KsuidLike;
 
     use super::{
-        BulkDeleteRequest, GetAlertResponseBody, HashMap, Headers, Json, Ksuid, MetaAlert,
-        ONCALL_LOCKED_WARNING, Path, Query, UserEmail, WORKFLOWS_LOCKED_WARNING,
-        composite_created_response, composite_save_warnings, composite_updated_response,
-        delete_alert_bulk, known_target_names, locked_target_ids, locked_target_warnings,
-        resolve_generate_sql, save_warnings,
+        BulkDeleteRequest, GetAlertResponseBody, HashMap, Headers, Json, Ksuid,
+        ListAlertsResponseBodyItem, MetaAlert, ONCALL_LOCKED_WARNING, Path, Query, UserEmail,
+        WORKFLOWS_LOCKED_WARNING, anomaly_row_visible, composite_created_response,
+        composite_save_warnings, composite_updated_response, delete_alert_bulk, known_target_names,
+        locked_target_ids, locked_target_warnings, resolve_generate_sql, save_warnings,
+        visible_alert,
     };
+
+    fn row(name: &str, extra: serde_json::Value) -> ListAlertsResponseBodyItem {
+        let mut value = serde_json::json!({
+            "alert_id": Ksuid::new(None, None).to_string(),
+            "folder_id": "default",
+            "folder_name": "default",
+            "name": name,
+            "alert_type": "scheduled",
+            "enabled": true,
+            "is_real_time": false,
+        });
+        value
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn test_anomaly_rows_obey_the_callers_permissions() {
+        let anomaly = row("a", serde_json::json!({"alert_type": "anomaly_detection"}));
+        let regular = row("r", serde_json::json!({}));
+        let grant = format!("alert:{}", anomaly.alert_id);
+        let denied = Some((false, hashbrown::HashSet::new()));
+        let allowed = Some((false, [grant].into_iter().collect()));
+        let org_wide = Some((true, hashbrown::HashSet::new()));
+
+        assert!(!anomaly_row_visible(&denied, &anomaly));
+        assert!(anomaly_row_visible(&allowed, &anomaly));
+        assert!(anomaly_row_visible(&org_wide, &anomaly));
+        assert!(anomaly_row_visible(&None, &anomaly));
+        assert!(anomaly_row_visible(&denied, &regular), "SQL path filtered");
+    }
 
     /// Exporting `last_failed_at` hands an importer a backoff anchor for a model it never ran.
     #[cfg(feature = "enterprise")]
@@ -4869,6 +4960,13 @@ mod tests {
             status(AlertError::CreateAlreadyExists),
             StatusCode::CONFLICT
         );
+    }
+
+    #[test]
+    fn test_folder_grant_makes_a_folders_rows_visible() {
+        let visibility = Some((false, ["afolder:mine".to_string()].into_iter().collect()));
+        assert!(visible_alert(&visibility, "a1", "mine", "n"));
+        assert!(!visible_alert(&visibility, "a1", "other", "n"));
     }
 
     // 403 Forbidden
