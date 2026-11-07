@@ -11509,6 +11509,7 @@
         "historyFailed": "Geçmiş yüklenemedi.",
         "barFiring": "{span} tetiklenmiş",
         "barOk": "{span} sorunsuz",
+        "barUnknown": "{span} okunmadı",
         "eventStarted": "Tetiklenmeye başladı",
         "eventRecovered": "Düzeldi",
         "eventNotified": "Bildirildi",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} onaylandı, {skipped} atlandı",
+        "bulkResultFailed": "{acked} kabul edildi, {skipped} atlandı, {failed} başarısız",
         "bulkAllAcked": "{acked} onaylandı"
       },
       "failedToNavigateToAlert": "Uyarıya gidilemedi",

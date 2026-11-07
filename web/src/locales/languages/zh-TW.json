@@ -11504,6 +11504,7 @@
         "historyFailed": "無法載入歷史記錄。",
         "barFiring": "{span} 觸發中",
         "barOk": "{span} 正常",
+        "barUnknown": "{span} 未讀取",
         "eventStarted": "開始觸發",
         "eventRecovered": "已恢復",
         "eventNotified": "已通知",
@@ -23340,6 +23341,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} 已認領，{skipped} 已略過",
+        "bulkResultFailed": "{acked} 已確認，{skipped} 已略過，{failed} 失敗",
         "bulkAllAcked": "{acked} 已認領"
       },
       "failedToNavigateToAlert": "無法導覽至警示",

@@ -11509,6 +11509,7 @@
         "historyFailed": "기록을 불러올 수 없습니다.",
         "barFiring": "{span} 발생",
         "barOk": "{span} 정상",
+        "barUnknown": "{span} 읽지 않음",
         "eventStarted": "발생 시작",
         "eventRecovered": "복구됨",
         "eventNotified": "알림 전송됨",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked}건 확인됨, {skipped}건 건너뜀",
+        "bulkResultFailed": "{acked}개 확인, {skipped}개 건너뜀, {failed}개 실패",
         "bulkAllAcked": "{acked}건 확인됨"
       },
       "failedToNavigateToAlert": "알림으로 이동하지 못했습니다",

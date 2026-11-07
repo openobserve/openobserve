@@ -11509,6 +11509,7 @@
         "historyFailed": "Impossible de charger l'historique.",
         "barFiring": "{span} en cours",
         "barOk": "{span} OK",
+        "barUnknown": "{span} non lu",
         "eventStarted": "Début du déclenchement",
         "eventRecovered": "Rétablie",
         "eventNotified": "Notifié",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} acquittées, {skipped} ignorées",
+        "bulkResultFailed": "{acked} acquittés, {skipped} ignorés, {failed} échoués",
         "bulkAllAcked": "{acked} acquittées"
       },
       "failedToNavigateToAlert": "Échec de la navigation vers l'alerte",

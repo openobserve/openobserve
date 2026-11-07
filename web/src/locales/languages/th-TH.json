@@ -11507,6 +11507,7 @@
         "historyFailed": "ไม่สามารถโหลดประวัติได้.",
         "barFiring": "{span} กำลังแจ้งเตือน",
         "barOk": "{span} ปกติ",
+        "barUnknown": "ไม่ได้อ่าน {span}",
         "eventStarted": "เริ่มแจ้งเตือน",
         "eventRecovered": "กลับสู่ปกติ",
         "eventNotified": "แจ้งเตือนแล้ว",
@@ -23343,6 +23344,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "รับทราบ {acked} รายการ, ข้าม {skipped} รายการ",
+        "bulkResultFailed": "รับทราบ {acked} รายการ, ข้าม {skipped} รายการ, ล้มเหลว {failed} รายการ",
         "bulkAllAcked": "รับทราบ {acked} รายการ"
       },
       "failedToNavigateToAlert": "Failed to navigate to alert",

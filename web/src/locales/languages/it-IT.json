@@ -11509,6 +11509,7 @@
         "historyFailed": "Impossibile caricare la cronologia.",
         "barFiring": "{span} attivo",
         "barOk": "{span} ok",
+        "barUnknown": "{span} non letto",
         "eventStarted": "Attivazione iniziata",
         "eventRecovered": "Ripristinato",
         "eventNotified": "Notificato",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} presi in carico, {skipped} saltati",
+        "bulkResultFailed": "{acked} presi in carico, {skipped} saltati, {failed} non riusciti",
         "bulkAllAcked": "{acked} presi in carico"
       },
       "failedToNavigateToAlert": "Impossibile passare all'avviso",

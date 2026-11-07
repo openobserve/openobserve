@@ -11509,6 +11509,7 @@
         "historyFailed": "Не удалось загрузить историю.",
         "barFiring": "{span} срабатывает",
         "barOk": "{span} в норме",
+        "barUnknown": "{span} не прочитан",
         "eventStarted": "Начало срабатывания",
         "eventRecovered": "Восстановлено",
         "eventNotified": "Уведомление отправлено",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} подтверждено, {skipped} пропущено",
+        "bulkResultFailed": "{acked} подтверждено, {skipped} пропущено, {failed} не удалось",
         "bulkAllAcked": "{acked} подтверждено"
       },
       "failedToNavigateToAlert": "Не удалось перейти к оповещению",

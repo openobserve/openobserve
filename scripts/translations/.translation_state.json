@@ -4606,6 +4606,7 @@
       "drawer": {
         "barFiring": "ca420fa5bd962d4e",
         "barOk": "9331ae53ba1a76d2",
+        "barUnknown": "e274943d948c140d",
         "eventFailed": "f498742c19d9bbdb",
         "eventFailedTo": "1e122d2e53b44aaa",
         "eventNotified": "3a623a728b2d53e7",
@@ -29100,7 +29101,8 @@
       "failedToSaveChanges": "650940a9a53530c0",
       "firing": {
         "bulkAllAcked": "ce104a56bc96d8c4",
-        "bulkResult": "ed231f30d55a5f74"
+        "bulkResult": "ed231f30d55a5f74",
+        "bulkResultFailed": "3e4fe4d692c9f999"
       },
       "incidentSeverityUpdatedTo": "dd41b9f4404eca40",
       "incidentsRefreshed": "d154f9499bcd0ad9",

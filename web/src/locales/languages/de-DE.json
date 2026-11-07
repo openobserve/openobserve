@@ -11509,6 +11509,7 @@
         "historyFailed": "Verlauf konnte nicht geladen werden.",
         "barFiring": "{span} ausgelöst",
         "barOk": "{span} ok",
+        "barUnknown": "{span} nicht gelesen",
         "eventStarted": "Auslösung gestartet",
         "eventRecovered": "Wiederhergestellt",
         "eventNotified": "Benachrichtigt",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} quittiert, {skipped} übersprungen",
+        "bulkResultFailed": "{acked} bestätigt, {skipped} übersprungen, {failed} fehlgeschlagen",
         "bulkAllAcked": "{acked} quittiert"
       },
       "failedToNavigateToAlert": "Navigation zum Alarm fehlgeschlagen",

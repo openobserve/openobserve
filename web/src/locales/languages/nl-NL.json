@@ -11509,6 +11509,7 @@
         "historyFailed": "Geschiedenis kon niet worden geladen.",
         "barFiring": "{span} afgaan",
         "barOk": "{span} ok",
+        "barUnknown": "{span} niet gelezen",
         "eventStarted": "Afgaan gestart",
         "eventRecovered": "Hersteld",
         "eventNotified": "Genotificeerd",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} bevestigd, {skipped} overgeslagen",
+        "bulkResultFailed": "{acked} bevestigd, {skipped} overgeslagen, {failed} mislukt",
         "bulkAllAcked": "{acked} bevestigd"
       },
       "failedToNavigateToAlert": "Navigeren naar alarm mislukt",

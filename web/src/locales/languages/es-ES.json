@@ -11509,6 +11509,7 @@
         "historyFailed": "No se pudo cargar el historial.",
         "barFiring": "{span} disparada",
         "barOk": "{span} correcto",
+        "barUnknown": "{span} sin leer",
         "eventStarted": "Comenzó a dispararse",
         "eventRecovered": "Recuperada",
         "eventNotified": "Notificado",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} confirmadas, {skipped} omitidas",
+        "bulkResultFailed": "{acked} reconocidas, {skipped} omitidas, {failed} fallidas",
         "bulkAllAcked": "{acked} confirmadas"
       },
       "failedToNavigateToAlert": "Error al navegar a la alerta",

@@ -11509,6 +11509,7 @@
         "historyFailed": "Não foi possível carregar o histórico.",
         "barFiring": "{span} disparado",
         "barOk": "{span} ok",
+        "barUnknown": "{span} não lido",
         "eventStarted": "Começou a disparar",
         "eventRecovered": "Recuperado",
         "eventNotified": "Notificado",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} reconhecidos, {skipped} ignorados",
+        "bulkResultFailed": "{acked} reconhecidos, {skipped} ignorados, {failed} falhados",
         "bulkAllAcked": "{acked} reconhecidos"
       },
       "failedToNavigateToAlert": "Falha ao navegar para o alerta",

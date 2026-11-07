@@ -11509,6 +11509,7 @@
         "historyFailed": "تعذّر تحميل السجل.",
         "barFiring": "{span} قيد الإطلاق",
         "barOk": "{span} سليم",
+        "barUnknown": "{span} غير مقروء",
         "eventStarted": "بدأ الإطلاق",
         "eventRecovered": "تم التعافي",
         "eventNotified": "تم الإشعار",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} تم إقراره، {skipped} تم تخطيه",
+        "bulkResultFailed": "{acked} تم الإقرار، {skipped} تم التخطي، {failed} فشل",
         "bulkAllAcked": "{acked} تم إقراره"
       },
       "failedToNavigateToAlert": "فشل في التنقل إلى تنبيه",

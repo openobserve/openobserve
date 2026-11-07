@@ -11509,6 +11509,7 @@
         "historyFailed": "Nie udało się załadować historii.",
         "barFiring": "{span} wyzwolony",
         "barOk": "{span} ok",
+        "barUnknown": "{span} nieodczytany",
         "eventStarted": "Rozpoczęto wyzwalanie",
         "eventRecovered": "Wrócił do normy",
         "eventNotified": "Powiadomiono",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} potwierdzono, {skipped} pominięto",
+        "bulkResultFailed": "{acked} potwierdzono, {skipped} pominięto, {failed} nie powiodło się",
         "bulkAllAcked": "Potwierdzono {acked}"
       },
       "failedToNavigateToAlert": "Nie udało się przejść do alertu",

@@ -11509,6 +11509,7 @@
         "historyFailed": "履歴を読み込めませんでした。",
         "barFiring": "{span} 発火",
         "barOk": "{span} 正常",
+        "barUnknown": "{span} は未読み取り",
         "eventStarted": "発火開始",
         "eventRecovered": "復旧",
         "eventNotified": "通知済み",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} 件を担当し、{skipped} 件をスキップしました",
+        "bulkResultFailed": "{acked} 件確認済み、{skipped} 件スキップ、{failed} 件失敗",
         "bulkAllAcked": "{acked} 件を担当しました"
       },
       "failedToNavigateToAlert": "アラートへの移動に失敗しました",

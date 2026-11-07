@@ -11509,6 +11509,7 @@
         "historyFailed": "Không thể tải lịch sử.",
         "barFiring": "{span} đang kích hoạt",
         "barOk": "{span} bình thường",
+        "barUnknown": "{span} chưa đọc",
         "eventStarted": "Bắt đầu kích hoạt",
         "eventRecovered": "Đã phục hồi",
         "eventNotified": "Đã thông báo",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} đã tiếp nhận, {skipped} đã bỏ qua",
+        "bulkResultFailed": "{acked} đã xác nhận, {skipped} bỏ qua, {failed} thất bại",
         "bulkAllAcked": "{acked} đã tiếp nhận"
       },
       "failedToNavigateToAlert": "Không thể điều hướng đến cảnh báo",

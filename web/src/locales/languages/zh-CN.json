@@ -11509,6 +11509,7 @@
         "historyFailed": "无法加载历史记录。",
         "barFiring": "{span} 触发中",
         "barOk": "{span} 正常",
+        "barUnknown": "{span} 未读取",
         "eventStarted": "开始触发",
         "eventRecovered": "已恢复",
         "eventNotified": "已通知",
@@ -23345,6 +23346,7 @@
     "alerts": {
       "firing": {
         "bulkResult": "{acked} 条已确认，{skipped} 条已跳过",
+        "bulkResultFailed": "{acked} 已确认，{skipped} 已跳过，{failed} 失败",
         "bulkAllAcked": "{acked} 条已确认"
       },
       "failedToNavigateToAlert": "导航到告警失败",
