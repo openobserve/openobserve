@@ -221,6 +221,7 @@ const flyoutBlocks = computed<Block[]>(() => {
 // (zero-width) seam between tile and flyout doesn't flicker it.
 const OPEN_DELAY = 120;
 const CLOSE_DELAY = 220;
+const VIEWPORT_MARGIN = 8;
 let openTimer: ReturnType<typeof setTimeout> | null = null;
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -387,19 +388,22 @@ async function positionFlyout() {
   const horizontalPosition: Record<string, string> = isRtl
     ? { right: `${document.documentElement.clientWidth - rect.left + GAP}px` }
     : { left: `${rect.right + GAP}px` };
+  const maxHeight = window.innerHeight - VIEWPORT_MARGIN * 2;
   flyoutStyle.value = {
     position: "fixed",
     ...horizontalPosition,
     top: `${rect.top}px`,
+    maxHeight: `${maxHeight}px`,
     zIndex: "6000",
   };
   await nextTick();
   const flyoutH = flyoutRef.value?.offsetHeight ?? 0;
-  const maxTop = window.innerHeight - flyoutH - 8;
+  const maxTop = window.innerHeight - flyoutH - VIEWPORT_MARGIN;
   flyoutStyle.value = {
     ...flyoutStyle.value,
-    top: `${Math.max(8, Math.min(rect.top, maxTop))}px`,
+    top: `${Math.max(VIEWPORT_MARGIN, Math.min(rect.top, maxTop))}px`,
   };
+  flyoutRef.value?.querySelector("[aria-current]")?.scrollIntoView?.({ block: "nearest" });
 }
 
 /**
@@ -658,7 +662,7 @@ function onChildClick(event: MouseEvent, child: SubnavChild) {
 // focus away from an input the user is typing in.
 function onChildMouseenter(event: MouseEvent) {
   if (isInputFocused()) return;
-  (event.currentTarget as HTMLElement)?.focus();
+  (event.currentTarget as HTMLElement)?.focus({ preventScroll: true });
 }
 </script>
 
@@ -854,7 +858,7 @@ function onChildMouseenter(event: MouseEvent) {
         role="menu"
         :aria-label="title"
         :aria-describedby="showTrialNote ? trialNoteId : undefined"
-        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay min-w-52 border border-transparent p-1"
+        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay min-w-52 overflow-y-auto overscroll-contain border border-transparent p-1"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
