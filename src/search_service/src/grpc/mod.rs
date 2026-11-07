@@ -52,7 +52,7 @@ pub async fn create_tables_from_files(
         schema_ref
             .as_ref()
             .clone()
-            .with_metadata(Default::default()),
+            .with_metadata(arrow_schema::Metadata::default()),
     );
 
     // Helper to create table with common configuration

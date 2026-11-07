@@ -7,6 +7,7 @@ license.workspace = true
 [features]
 default = []
 enterprise = []
+vortex = ["dep:vortex", "config/vortex"]
 
 [dependencies]
 anyhow.workspace = true
@@ -29,7 +30,7 @@ serde_json.workspace = true
 tantivy.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
-vortex = { workspace = true }
+vortex = { workspace = true, optional = true }
 zstd.workspace = true
 
 [dev-dependencies]

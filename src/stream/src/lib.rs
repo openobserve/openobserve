@@ -1961,9 +1961,7 @@ mod tests {
                     config::meta::promql::METADATA_LABEL.to_string(),
                     r#"{"metric_type":"Histogram","metric_family_name":"\"http_requests\"","help":"h","unit":"s"}"#
                         .to_string(),
-                )]
-                .into_iter()
-                .collect(),
+                )],
             );
 
         let stream = stream_res("org1", "http_requests", StreamType::Metrics, schema, None);

@@ -51,7 +51,7 @@ impl TableProvider for NewUnionTable {
     async fn scan(
         &self,
         state: &dyn Session,
-        projection: Option<&Vec<usize>>,
+        projection: Option<&[usize]>,
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
@@ -114,7 +114,7 @@ mod tests {
         let ctx = SessionContext::new();
         for projection in [None, Some(vec![3, 1]), Some(vec![])] {
             let plan = table
-                .scan(&ctx.state(), projection.as_ref(), &[], None)
+                .scan(&ctx.state(), projection.as_deref(), &[], None)
                 .await?;
             let expected = match projection {
                 Some(indices) => Arc::new(schema.project(&indices)?),

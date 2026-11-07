@@ -1906,11 +1906,7 @@ mod tests {
     }
 
     fn schema_with_metadata(blob: &str) -> Schema {
-        Schema::empty().with_metadata(
-            [(METADATA_LABEL.to_string(), blob.to_string())]
-                .into_iter()
-                .collect(),
-        )
+        Schema::empty().with_metadata([(METADATA_LABEL.to_string(), blob.to_string())])
     }
 
     /// Note `MetadataObject` carries only type/help/unit -- the family name is dropped on the

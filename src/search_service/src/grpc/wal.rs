@@ -518,7 +518,12 @@ async fn create_tables_from_batch_groups(
     source: &str,
 ) -> Result<Vec<Arc<dyn TableProvider>>, Error> {
     // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+    let latest_schema = Arc::new(
+        schema
+            .as_ref()
+            .clone()
+            .with_metadata(arrow_schema::Metadata::default()),
+    );
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
