@@ -57,6 +57,7 @@ import { OnCallResponseDetailPage } from "./oncallPages/oncallResponseDetailPage
 import { OnCallCoveragePage } from "./oncallPages/oncallCoveragePage.js";
 import { OnCallPolicyEditorPage } from "./oncallPages/oncallPolicyEditorPage.js";
 import { OnCallMinePage } from "./oncallPages/oncallMinePage.js";
+import { TelephonySettingsPage } from "./oncallPages/telephonySettingsPage.js";
 import { SyntheticsListPage } from "./syntheticsPages/syntheticsListPage.js";
 import { SyntheticsCreatePage } from "./syntheticsPages/syntheticsCreatePage.js";
 import { SyntheticsResultsPage } from "./syntheticsPages/syntheticsResultsPage.js";
@@ -253,6 +254,7 @@ class PageManager {
     this.oncallCoveragePage = new OnCallCoveragePage(page);
     this.oncallPolicyEditorPage = new OnCallPolicyEditorPage(page);
     this.oncallMinePage = new OnCallMinePage(page);
+    this.telephonySettingsPage = new TelephonySettingsPage(page);
 
     // ===== SYNTHETICS PAGE OBJECTS =====
     this.syntheticsListPage = new SyntheticsListPage(page);
