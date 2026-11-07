@@ -32,7 +32,7 @@ use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
 use search::{
-    datafusion::distributed_plan::profile,
+    datafusion::distributed::analyze::profile,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 use search_service::{grpc::flight as grpcFlight, work_group::DeferredLock};

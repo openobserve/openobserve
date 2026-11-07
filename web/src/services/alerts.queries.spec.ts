@@ -18,7 +18,11 @@ import {
   promRulePreviewQuery,
   alertHistoryQuery,
   alertAcksQuery,
+  alertDetailQuery,
   ackAlertMutation,
+  ackAlertsMutation,
+  toggleAlertStateMutation,
+  toggleAnomalyAlertStateMutation,
   unackAlertMutation,
   muteAlertMutation,
   extendAlertMuteMutation,
@@ -148,6 +152,16 @@ describe("ack and mute queries", () => {
     expect(alerts.listAlertAcks).toHaveBeenCalledWith(ORG, "a1", undefined);
   });
 
+  it("re-reads an alert once its folder is known, since the folder decides the route check", () => {
+    expect(alertAcksQuery(ORG, "a1", "f1").queryKey).not.toEqual(
+      alertAcksQuery(ORG, "a1").queryKey,
+    );
+    expect(alertDetailQuery(ORG, "a1", "f1").queryKey).not.toEqual(
+      alertDetailQuery(ORG, "a1").queryKey,
+    );
+    expect(alertDetailQuery(ORG, "a1").queryKey).toEqual(alertKeys.detail(ORG, "a1"));
+  });
+
   it("returns the server's ack answer and refreshes every alert read", async () => {
     vi.mocked(alerts.ackAlert).mockResolvedValue({ data: { changed: true, acks: [ACK] } } as never);
     const options = ackAlertMutation(ORG);
@@ -176,6 +190,42 @@ describe("ack and mute queries", () => {
     ]) {
       expect(scopes).toContainEqual(key);
     }
+  });
+
+  it("counts every row of an incident one bulk ack wrote", async () => {
+    const answer = (changed: boolean, id?: string) => ({
+      data: { changed, acks: [], incident: id ? { id, status: "acknowledged" } : undefined },
+    });
+    vi.mocked(alerts.ackAlert)
+      .mockResolvedValueOnce(answer(false, "inc") as any)
+      .mockResolvedValueOnce(answer(true, "inc") as any)
+      .mockResolvedValueOnce(answer(false, "inc") as any)
+      .mockResolvedValueOnce(answer(false, "held-elsewhere") as any)
+      .mockResolvedValueOnce(answer(false) as any);
+    const targets = ["1", "2", "3", "4", "5"].map((alertId) => ({ alertId, body: {} }));
+
+    const result = await (ackAlertsMutation(ORG).mutationFn as any)(targets);
+
+    expect(result).toEqual({ acked: 3, failures: [] });
+  });
+
+  it("reports a rejected bulk ack as a failure with its reason", async () => {
+    const reason = { response: { status: 409, data: { code: "firing_changed" } } };
+    vi.mocked(alerts.ackAlert)
+      .mockResolvedValueOnce({ data: { changed: true, acks: [] } } as any)
+      .mockRejectedValueOnce(reason);
+    const targets = ["1", "2"].map((alertId) => ({ alertId, body: {} }));
+
+    const result = await (ackAlertsMutation(ORG).mutationFn as any)(targets);
+
+    expect(result).toEqual({ acked: 1, failures: [{ alertId: "2", error: reason }] });
+  });
+
+  it("refreshes the Firing read after a pause or resume", () => {
+    expect(toggleAlertStateMutation(ORG).meta?.invalidates).toContainEqual(alertKeys.firing(ORG));
+    expect(toggleAnomalyAlertStateMutation(ORG).meta?.invalidates).toContainEqual(
+      alertKeys.firing(ORG),
+    );
   });
 
   it("refreshes alerts and downtimes after a mute, and the banner after extend or cancel", async () => {

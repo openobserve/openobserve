@@ -29,6 +29,7 @@ use config::{
     meta::{
         dashboards::usage_report::DashboardInfo,
         function::RESULT_ARRAY_SKIP_VRL,
+        histogram_origin::histogram_bucket_offset,
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, resolve_stream_names},
@@ -143,7 +144,7 @@ pub async fn search(
     let cfg = get_config();
     // result cache can be enable only when its from the start
     let use_cache = if in_req.query.from == 0 {
-        in_req.use_cache
+        in_req.use_cache && is_result_cache_allowed(stream_type)
     } else {
         false
     };
@@ -1039,24 +1040,14 @@ pub async fn write_results(
     }
 
     // 1. alignment time range for incomplete records for histogram
-    let mut accept_start_time = req_query_start_time;
-    let mut accept_end_time = req_query_end_time;
-    let mut need_adjust_end_time = false;
-    if is_aggregate
-        && let Some(interval) = res.histogram_interval
-        && interval > 0
-    {
-        let interval = interval * 1000 * 1000; // convert to microseconds
-        // next interval of start_time
-        if (accept_start_time % interval) != 0 {
-            accept_start_time = accept_start_time - (accept_start_time % interval) + interval;
-        }
-        // previous interval of end_time
-        if (accept_end_time % interval) != 0 {
-            need_adjust_end_time = true;
-            accept_end_time = accept_end_time - (accept_end_time % interval) - interval;
-        }
-    }
+    let (accept_start_time, accept_end_time, need_adjust_end_time) = match res.histogram_interval {
+        Some(interval) if is_aggregate && interval > 0 => histogram_cacheable_range(
+            req_query_start_time,
+            req_query_end_time,
+            interval * 1000 * 1000,
+        ),
+        _ => (req_query_start_time, req_query_end_time, false),
+    };
 
     // 2. check if need to remove records with discard_duration
     let delay_ts = second_micros(get_config().limit.cache_delay_secs);
@@ -1178,6 +1169,22 @@ async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &Result
         cacher::remove_stale_cache_meta(file_path, &file_name, query_key, &m).await;
     }
     false
+}
+
+/// Shrinks `[start, end]` to whole `histogram()` buckets; the flag says whether the end moved.
+fn histogram_cacheable_range(start: i64, end: i64, interval: i64) -> (i64, i64, bool) {
+    let start_offset = histogram_bucket_offset(start, interval);
+    let start = if start_offset == 0 {
+        start
+    } else {
+        start - start_offset + interval
+    };
+    let end_offset = histogram_bucket_offset(end, interval);
+    if end_offset == 0 {
+        (start, end, false)
+    } else {
+        (start, end - end_offset - interval, true)
+    }
 }
 
 pub fn apply_vrl_to_response(
@@ -1305,6 +1312,11 @@ pub fn is_result_array_skip_vrl(vrl_fn: &str) -> bool {
     RESULT_ARRAY_SKIP_VRL.is_match(vrl_fn)
 }
 
+pub fn is_result_cache_allowed(stream_type: StreamType) -> bool {
+    // Enrichment tables ignore the time range, so a cached result plus its delta repeats rows.
+    stream_type != StreamType::EnrichmentTables
+}
+
 // Helper function to create a deep copy of a Response
 fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::search::Response {
     let serialized = serde_json::to_string(res).expect("Failed to serialize response");
@@ -1388,7 +1400,8 @@ pub async fn apply_regex_to_response(
     };
 
     let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
-        crate::datafusion::plan::regex_projections::get_columns_from_projections(sql).await?;
+        crate::datafusion::logical_plan::regex_projections::get_columns_from_projections(sql)
+            .await?;
     if projections.is_empty() {
         return Ok(());
     }
@@ -1460,6 +1473,48 @@ fn redaction_error(all_streams: &str, reason: &str) -> infra::errors::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_histogram_cacheable_range_snaps_to_histogram_grid() {
+        const HOUR: i64 = 3_600_000_000;
+        const DAY: i64 = 24 * HOUR;
+        // 2025-08-23 is a 30-day edge on the 2001 grid; 2025-09-09 is one on the epoch grid
+        let thirty_day_edge = 1_755_907_200_000_000;
+        let epoch_edge = 1_757_376_000_000_000;
+        let cases = [
+            (
+                epoch_edge,
+                epoch_edge + 60 * DAY,
+                30 * DAY,
+                (thirty_day_edge + 30 * DAY, thirty_day_edge + 30 * DAY, true),
+            ),
+            (
+                thirty_day_edge,
+                thirty_day_edge + 60 * DAY,
+                30 * DAY,
+                (thirty_day_edge, thirty_day_edge + 60 * DAY, false),
+            ),
+            (
+                epoch_edge + HOUR,
+                epoch_edge + 3 * DAY,
+                DAY,
+                (epoch_edge + DAY, epoch_edge + 3 * DAY, false),
+            ),
+        ];
+        for (start, end, interval, expected) in cases {
+            assert_eq!(
+                histogram_cacheable_range(start, end, interval),
+                expected,
+                "start={start}, end={end}, interval={interval}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_result_cache_skips_enrichment_tables() {
+        assert!(!is_result_cache_allowed(StreamType::EnrichmentTables));
+        assert!(is_result_cache_allowed(StreamType::Logs));
+    }
 
     #[test]
     fn test_any_stream_checks_every_joined_stream() {

@@ -1356,10 +1356,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_training_reporter(
-            |org_id, anomaly_id, anomaly_name, success, error_msg, start_us, end_us| {
+            |org_id, anomaly_id, anomaly_name, outcome, message, start_us, end_us| {
                 Box::pin(async move {
                     use config::meta::self_reporting::usage::{
                         RunOutcome, TriggerData, TriggerDataType,
+                    };
+                    // A data-readiness skip carries a reason, which must not read as an error.
+                    let (error, success_response) = if outcome == RunOutcome::Error {
+                        (message, None)
+                    } else {
+                        (None, message)
                     };
                     usage_reporting::publish_triggers_usage(TriggerData {
                         _timestamp: start_us,
@@ -1369,15 +1375,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         next_run_at: 0,
                         is_realtime: false,
                         is_silenced: false,
-                        status: if success {
-                            RunOutcome::Succeeded
-                        } else {
-                            RunOutcome::Error
-                        },
+                        status: outcome,
                         start_time: start_us,
                         end_time: end_us,
                         retries: 0,
-                        error: error_msg,
+                        error,
+                        success_response,
                         evaluation_took_in_secs: Some((end_us - start_us) as f64 / 1_000_000.0),
                         ..Default::default()
                     });

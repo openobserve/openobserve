@@ -683,7 +683,7 @@ function mapMonitor(m: ApiMonitor) {
     status: statusFromRunClass(m.last_run_class, normalizeMonitorStatus(m.status)),
     // When the current run class began: drives "Not measured since 10:36 UTC".
     statusSince: m.last_run_class_at || null,
-    responseTime: m.last_response_ms !== null ? `${m.last_response_ms}ms` : null,
+    responseTime: m.last_response_ms,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
     // Raw microsecond epoch — drives the relative Last Check cell.

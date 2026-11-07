@@ -36,6 +36,7 @@ use config::{
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
         slack::DisabledReason,
+        stream::DataRetentionDefaults,
         user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
@@ -160,8 +161,11 @@ struct ConfigResponse<'a> {
     sql_base64_enabled: bool,
     timestamp_column: String,
     data_retention_days: i64,
+    data_retention_defaults: DataRetentionDefaults,
+    resolved_data_retention: DataRetentionDefaults,
     extended_data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
+    sample_data_onboarding_enabled: bool,
     sso_enabled: bool,
     native_login_enabled: bool,
     service_account_enabled: bool,
@@ -694,8 +698,13 @@ pub async fn zo_config(
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         data_retention_days: cfg.compact.data_retention_days,
+        data_retention_defaults: db::organization::resolved_retention_defaults(
+            &DataRetentionDefaults::default(),
+        ),
+        resolved_data_retention: org_resolved_retention(&org_id).await,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
+        sample_data_onboarding_enabled: cfg.common.sample_data_onboarding_enabled,
         sso_enabled,
         native_login_enabled,
         service_account_enabled,
@@ -810,6 +819,17 @@ async fn license_config(license_server_url: String) -> LicenseConfig {
             now_micros(),
         ),
     }
+}
+
+// Every org member reads this response, unlike org settings, so stream pages can rely on it.
+async fn org_resolved_retention(org_id: &str) -> DataRetentionDefaults {
+    let org = db::organization::org_retention_defaults(org_id)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[RETENTION] org {org_id} settings unreadable for config: {e}");
+            DataRetentionDefaults::default()
+        });
+    db::organization::resolved_retention_defaults(&org)
 }
 
 /// The route check of `GET /{org}/search/profile`, so the UI hides what the caller may not use.
@@ -2651,6 +2671,44 @@ mod tests {
             json["ingest_allowed_in_future"],
             cfg.limit.ingest_allowed_in_future
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_global_and_merged_retention() {
+        let org_id = "zo_config_retention_org";
+        #[cfg(feature = "enterprise")]
+        crate::common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(
+                format!("{}/{org_id}", db::organization::ORG_SETTINGS_KEY_PREFIX),
+                crate::common::meta::organization::OrganizationSetting {
+                    data_retention: DataRetentionDefaults {
+                        default: 50,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            );
+        let response = zo_config(Path(org_id.to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let global = db::organization::resolved_retention_defaults(&Default::default());
+        assert_eq!(
+            json["data_retention_defaults"],
+            serde_json::to_value(global).unwrap()
+        );
+        #[cfg(not(feature = "enterprise"))]
+        assert_eq!(
+            json["resolved_data_retention"],
+            serde_json::to_value(global).unwrap()
+        );
+        #[cfg(feature = "enterprise")]
+        assert_eq!(json["resolved_data_retention"]["logs"], 50);
     }
 
     #[tokio::test]

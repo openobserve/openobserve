@@ -1948,6 +1948,7 @@
     "billings": "账单",
     "rum": "RUM",
     "settings": "设置",
+    "allSettings": "所有设置",
     "iam": "IAM",
     "report": "报表",
     "pipeline": "流水线",
@@ -2190,12 +2191,12 @@
       "fileTypeZip": "仅允许 ZIP 文件"
     },
     "emptyState": {
-      "title": "使用真实用户监控监控您的用户",
-      "description": "RUM 跟踪真实的用户交互——页面加载、错误、API 调用和会话重播——因此您可以确切地了解用户对应用程序的体验。",
       "webApp": "对 Web 应用程序进行检测",
       "webAppDesc": "将 OpenObserve RUM SDK 添加到任何 {product} 应用",
       "sessionReplay": "启用会话重播",
       "sessionReplayDesc": "记录和重播用户会话以调试 UX 问题",
+      "title": "使用真实用户监控监控您的用户",
+      "description": "RUM 跟踪真实的用户交互——页面加载、错误、API 调用和会话重播——因此您可以确切地了解用户对应用程序的体验。",
       "learnMore": "了解更多：",
       "quickImpl": "快速实施指南",
       "blogPost": "前端监控基础知识"
@@ -3556,7 +3557,6 @@
     "licenseAndUsage": "许可证与使用",
     "copyLicenseId": "复制许可证 ID",
     "editionLbl": "版本",
-    "limitPrefix": "· 限制",
     "gbPerDay": "GB / 天",
     "ofDailyLimitUsedToday": "今日已使用的每日限额",
     "gbToday": "今日 GB",
@@ -3580,6 +3580,7 @@
     "usage_limits": "使用限制",
     "feature_comparison_lbl": "功能对比",
     "feature_comparision_ent_msg": "你正在使用 OpenObserve 企业版，可以访问下面列出的所有高级功能。",
+    "feature_comparision_ent_partial_msg": "您正在使用 OpenObserve 企业版。部分功能不在您的许可证范围内；请参阅上方列表。",
     "feature_comparision_plan_detail": "您的套餐：企业版可免费写入高达 50 GB /天（约 1.5 TB/月）的数据。",
     "feature_comparision_os_msg": "你目前正在使用 OpenObserve 开源版。升级到企业版可解锁下表中列出的高级功能。",
     "feature_comparision_good_news": "好消息：OpenObserve 企业版完全免费，每天写入高达 50 GB（约 1.5 TB/月）的数据。",
@@ -3660,6 +3661,7 @@
     "features_no_match": "没有功能与您的搜索匹配",
     "features_none": "此组中没有功能",
     "features_free_heading": "免费，所有许可证均包含",
+    "features_free_not_included": "免费，不包含在您的许可证中",
     "features_new": "许可证之后新增",
     "features_filter_new": "新增",
     "request_new_license": "申请新许可证",
@@ -3840,6 +3842,13 @@
     "license_already_active_msg": "您的许可证仍然有效。你想用新的许可证密钥对其进行更新吗？",
     "yes_update_license": "是的，更新许可证",
     "no_keep_current": "不，保持最新状态",
+    "license_downgrade_title": "应用此许可证密钥？",
+    "license_downgrade_intro": "此密钥将替换您当前的许可证。",
+    "license_downgrade_expired": "此密钥已于 {date} 过期。将适用每天 50 GB 的免费额度。",
+    "license_downgrade_lose": "您将失去：{names}",
+    "license_downgrade_limit": "每日限额从 {old} 变为 {new}",
+    "license_downgrade_expiry": "到期时间从 {old} 变为 {new}",
+    "license_limit_per_day": "{gb} GB/天",
     "header_button": {
       "cloud_features": "{product} 功能",
       "enterprise_edition": "版本：企业版",
@@ -4052,13 +4061,9 @@
     "getStartedBannerMessage": "立即试用 OpenObserve，获得更高效、更高性能的可观测性。",
     "getStartedBannerAlt": "开始使用横幅",
     "getStartedHeading": "开始前最后一件事",
-    "hearAboutUsLabel": "您是如何了解到我们的？",
     "hearAboutUsPlaceholder": "例如：朋友介绍",
-    "whereDoYouWorkLabel": "您在哪里工作？",
     "whereDoYouWorkPlaceholder": "公司名称",
-    "agreeToTermsPrefix": "我已阅读并同意",
     "termsOfUse": "使用条款",
-    "and": "和",
     "privacyPolicyStar": "隐私政策*",
     "startTrialButton": "开始您的 14 天试用",
     "copyrightNotice": "© OpenObserve",
@@ -4069,19 +4074,28 @@
     "emailRequired": "邮箱为必填",
     "emailInvalid": "请输入有效的邮箱",
     "passwordRequired": "密码为必填",
-    "mustAcceptTerms": "您必须接受条款才能继续",
     "getStarted": {
       "title": "欢迎使用 OpenObserve",
-      "subtitle": "您的 14 天试用已开始。两个小问题，然后我们将带您进入设置。",
-      "sourceLabel": "您想先发送什么？",
-      "optional": "（可选）",
-      "skip": "跳过问题",
-      "continue": "继续",
-      "hearAboutUsPlaceholder": "例如，同事或博客文章",
-      "whereDoYouWorkPlaceholder": "公司或团队",
-      "termsOfService": "服务条款",
-      "privacyPolicy": "隐私政策",
-      "agreeHint": "继续所必需，即使您跳过问题。",
+      "skipForNow": "暂时跳过",
+      "heard": {
+        "label": "您是如何得知我们的？",
+        "placeholder": "选择一个选项",
+        "thanks": "谢谢！"
+      },
+      "connect": {
+        "title": "连接您的数据",
+        "point1": "为每个数据源提供分步设置",
+        "point2": "日志、指标和追踪集中一处",
+        "point3": "几分钟内即可看到首批事件",
+        "cta": "探索其他数据源"
+      },
+      "sample": {
+        "title": "使用示例数据探索",
+        "point1": "来自示例服务的日志、追踪和指标",
+        "point2": "仪表盘、告警、流水线和 VRL 函数",
+        "point3": "提供引导式导览，一键即可全部移除",
+        "cta": "使用示例数据探索"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Linux 或虚拟机主机",
@@ -4094,7 +4108,28 @@
         "llm": "LLM 或 AI 应用",
         "agent": "让人工智能代理来设置",
         "unsure": "还不确定"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / 虚拟机",
+        "windows": "Windows",
+        "webserver": "Web 服务器",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "浏览器 (RUM)",
+        "llm": "LLM 或 AI 应用",
+        "agent": "AI 智能体"
       }
+    },
+    "heardFrom": {
+      "question": "您是如何找到我们的？",
+      "quickQuestion": "快速问一下：您是如何找到我们的？",
+      "skip": "跳过",
+      "searchEngine": "搜索引擎",
+      "friendOrColleague": "朋友或同事",
+      "aiAssistant": "人工智能助手",
+      "other": "其他",
+      "thanks": "感谢告知！"
     }
   },
   "user": {
@@ -5034,8 +5069,8 @@
     "otherFieldsSchemaTooltip": "其他字段仅显示流配置为使用用户定义 Schema 之前存在的 Schema 字段。",
     "addFieldsTitle": "添加字段",
     "dataRetentionDaysLabel": "数据保留（天）",
-    "globalRetentionDays": "全局保留期为 {days} 天",
-    "retentionMinOneDay": "保留期必须至少为 1 天",
+    "retentionDefaultDays": "留空以使用此数据流类型的默认值：{days} 天",
+    "retentionDefaultForever": "留空以使用此数据流类型的默认值：永久保留",
     "maxQueryRangeHoursLabel": "最大查询范围（小时）",
     "maxQueryRangeHelp": "允许查询的最大时间范围。设置为 0 表示无限制。",
     "globalFlattenLevel": "全局为 {level}",
@@ -6476,12 +6511,6 @@
     "joinSlack": "加入 Slack",
     "maybeLater": "也许以后再说"
   },
-  "connectDataSourcePopup": {
-    "title": "首先，让我们连接您的第一个数据源。",
-    "description": "我们有很多内容想向您展示，但首先需要连接您的数据。大多数团队大约一分钟内就能看到第一批日志。",
-    "connectButton": "连接数据源",
-    "slackLink": "也欢迎加入我们的 Slack 社区"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "从暂停处继续",
     "startFromNow": "从现在开始",
@@ -7062,6 +7091,9 @@
       "k8sNetworkFlowsTitle": "查看哪些工作负载在相互通信：eBPF 网络流",
       "k8sInstallerNote": "这会自动安装 cert-manager、OpenTelemetry operator 和 OpenObserve collector。",
       "k8sInternalEndpointNote": "当 OpenObserve 运行在同一集群中使用此项 — 流量永远不会离开它。",
+      "k8sTraceAppsTitle": "追踪您的应用",
+      "k8sTraceEbpfDesc": "在采集器中开启 eBPF 追踪，然后按端口、可执行文件路径或命令行选择要追踪的应用。",
+      "k8sTraceLibraryDesc": "为每种语言所在的命名空间添加注解，使 Operator 将对应的库注入到该命名空间的 Pod 中。然后重启这些应用一次。",
       "k8sTroubleAnnotationA": "注入发生在 pod 创建时，因此现有 pod 在重启前不受影响 — 运行 `kubectl rollout restart deployment -n my-namespace`。使用 `kubectl get ns my-namespace -o yaml` 确认注解已生效，并检查值是否与 `openobserve-collector/openobserve-<language>` 匹配。",
       "k8sTroubleAnnotationQ": "我注解了命名空间但没有出现 trace",
       "k8sTroubleEndpointA": "仅当 OpenObserve 本身运行在此集群中时才使用**内部端点**；这样流量会留在集群内部，不会跨越网络。URL 为 `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — 默认假定发布名为 `o2`、命名空间为 `openobserve`，如果你的不同请自行修改。其他所有情况都使用外部端点。",
@@ -7334,6 +7366,7 @@
       "androidTroubleScreenNamesQ": "会话出现，但屏幕名称都相同",
       "androidTroubleScreenNamesA": "视图跟踪未接入。在构建 `RumConfiguration` 时传入 `useViewTrackingStrategy(...)` — 例如 Activity 使用 `ActivityViewTrackingStrategy(trackExtras = true)`，如果使用 AndroidX Navigation 则使用 `NavigationViewTrackingStrategy(...)`。",
       "setupTime5Min": "~5 分钟",
+      "showStepInstructions": "显示说明",
       "snowflakeCollectorVersionNote": "Snowflake 需要 collector v0.92.0 — 较新的构建存在已知错误。",
       "snowflakeTagline": "使用 OpenTelemetry Collector 采集 Snowflake 账户指标并将其发送到 OpenObserve。",
       "sqlClientGuiVariant": "SQL 客户端 (GUI)",
@@ -7377,6 +7410,7 @@
       "verifyCassandraMetricsDesc": "数据到达后下方检查项会变为绿色，也可在数据流中查看 `cassandra_*` 指标。",
       "verifyDatabricksLogsDesc": "数据到达后下方检查项会变为绿色，也可打开日志并搜索 `source:databricks`。",
       "verifyDataTitle": "在 OpenObserve 中验证数据",
+      "checkYourDataTitle": "检查您的数据",
       "verifyDynamodbLogsDesc": "数据到达后下方检查项会变为绿色，也可在条目发生变化后打开 `dynamodb` 数据流的日志。",
       "verifyGcpLogsDesc": "在项目中产生一些活动（或等待日志接收器匹配到日志）；数据到达后下方检查项会变为绿色。",
       "verifyK8sDataDesc": "给采集器几秒钟启动时间；数据到达后下方检查项会变为绿色 —— 集群日志会进入 `default` 数据流。",
@@ -10791,7 +10825,10 @@
     "contractManagedMessage": "计费通过您的合同处理 — 如需更改请联系您的客户经理",
     "upgradeToPlanMessage": "升级套餐以继续享受 OpenObserve 服务。",
     "creditsUsedLabel": "已用积分",
-    "licenseExpiryContactAdmin": "请通过联系您的管理员来更新许可证。",
+    "licenseExpiredOn": "您的许可证已于 {date} 过期。您的功能保持可用。",
+    "licenseExpiredLimit": "现在适用 {limit} GB/天的免费额度：一个月内超过该额度 {allowed} 天以上将暂停搜索，直到您续订。",
+    "licenseAskAdminToRenew": "请联系您的许可证管理员续订。",
+    "renewLicense": "续订许可证",
     "subscribed": "已订阅",
     "invoiceHistory": "发票历史记录",
     "amount": "金额",
@@ -10935,7 +10972,6 @@
     "failedToLinkAwsSubscription": "关联 AWS 订阅失败",
     "failedToLinkAzureSubscription": "关联 Azure 订阅失败",
     "last15Minutes": "最近 15 分钟",
-    "licenseHasExpired": "您的许可证已过期",
     "numberOfPipelines": "流水线数量",
     "oneDayUntilLicenseExpires": "您的许可证还有 1 天到期",
     "pleaseWaitProcessingRequest": "请稍候，我们正在处理您的请求...",
@@ -11451,6 +11487,68 @@
     }
   },
   "alerts": {
+    "firing": {
+      "title": "触发中",
+      "drawer": {
+        "openInLogs": "在日志中打开",
+        "partOfIncident": "所属事件：",
+        "incidentAck": "在此确认将确认整个事件。",
+        "incidentTakeOver": "在此接管将接管整个事件。",
+        "now": "现在",
+        "threshold": "阈值 {value}",
+        "since": "自 {time} 起",
+        "flaps": "状态波动，最近 6 小时",
+        "flapsUnit": "状态变更",
+        "notified": "已通知",
+        "notDeliveredTo": "{name}：未送达",
+        "history": "历史",
+        "last2h": "最近 2 小时",
+        "lastSpan": "最近 {span}",
+        "viewAll": "查看全部",
+        "historyEmpty": "此时间窗口内没有运行记录。",
+        "historyFailed": "无法加载历史记录。",
+        "barFiring": "{span} 触发中",
+        "barOk": "{span} 正常",
+        "barUnknown": "{span} 未读取",
+        "eventStarted": "开始触发",
+        "eventRecovered": "已恢复",
+        "eventNotified": "已通知",
+        "eventNotifiedTo": "已通知 {names}",
+        "eventFailed": "未送达",
+        "eventFailedTo": "未送达至 {names}",
+        "soFar": "至今 {span}",
+        "lasted": "持续 {span}",
+        "okFor": "正常持续 {span}"
+      },
+      "chipCount": "{label} {count}",
+      "chipFiring": "触发中",
+      "chipAcked": "已确认",
+      "chipMuted": "已静默",
+      "chipFailed": "未送达",
+      "searchPlaceholder": "搜索告警",
+      "priorityAll": "优先级",
+      "priorityLabel": "优先级",
+      "priorityUnset": "无优先级",
+      "folderAll": "文件夹：全部",
+      "folderLabel": "文件夹",
+      "stale": "数据已过期",
+      "refreshFailed": "无法刷新触发中的告警（{reason}）。正在显示 {time} 的数据。",
+      "refreshFailedReason": "请求失败",
+      "statusUnavailable": "告警状态当前不可用，因此无法显示触发中的告警。",
+      "retry": "重试",
+      "columnPriority": "优先级",
+      "columnState": "状态",
+      "columnAlert": "告警",
+      "columnFolder": "文件夹",
+      "columnFiringFor": "已触发时长",
+      "acknowledgeCount": "确认 {count}",
+      "mute": "静音",
+      "clear": "清除",
+      "emptyFiring": "没有触发中的告警",
+      "emptyAcked": "没有已确认的告警",
+      "emptyMuted": "没有已静音的告警",
+      "emptyFailed": "没有未送达的告警"
+    },
     "moreActions": "更多操作",
     "promRuleMode": "规则模式",
     "promRulePreview": "{count} 个返回的序列当前匹配。每个序列必须在触发前完成待处理期。",
@@ -12660,6 +12758,8 @@
       "noDestinationNote": "可选。告警仍会运行并记录其历史，但不会通知任何目标。",
       "sendsToStatus": "每次告警触发时发送到 {targets}。",
       "oncallTeamTarget": "一个值班团队",
+      "lockedWorkflowFallback": "已锁定的工作流",
+      "lockedTargetBadge": "已锁定",
       "createsIncident": "创建事件",
       "createsIncidentTooltip": "如果告警可以创建事件，则不会发送专门的通知。相反，当创建新事件或新告警类型加入现有事件时，会发送有关该事件的通知。",
       "incidentTitleTemplate": "事件标题",
@@ -12901,6 +13001,9 @@
       "lastTrained": "上次训练",
       "level": "级别",
       "lookBackWindow": "向后看窗口",
+      "scheduleIntervalFloor": "检查间隔必须至少为 {min}。",
+      "lookBackWindowCap": "在此检测精度下，回看窗口最多为 {max}：更长的窗口将包含超过 100,000 个时间桶。请缩短窗口或使用更长的检测精度。",
+      "retrainOnEditNote": "更改查询、函数或检测精度将重新训练此检测器。检测将暂停，直到训练结束。",
       "lookBackWindowFloor": "回溯窗口必须至少为 {min} — 即检查间隔加上一个检测分辨率。窗口更短时，首次运行触发时无法容纳一个完整的桶，因此该次运行会跳过桶。",
       "lookBackWindowLegacy": "此已保存的窗口低于 {min} 的最小值（检查间隔加上一个检测分辨率）。它将按原样保存，但在窗口提高之前，首次运行可能会跳过桶。",
       "lookBackWindowMinimum": "至少 {min}；按当前设置建议 {recommended} 或更长。",
@@ -12913,6 +13016,9 @@
       "noDestinationsFound": "未找到目标",
       "noDetectionResults": "此范围内暂无检测结果",
       "noFieldsFound": "未找到字段",
+      "checkDataNow": "立即检查",
+      "checkDataNowTooltip": "立即重新评估当前数据，而不是等待下一次自动检查。",
+      "dataReadinessReason": "原因",
       "noticeRetrain": "自动重新训练",
       "noticeRetrainTooltip": "升级后无法读取已保存的模型，因此该模型已被丢弃，配置已自动排队等待重新训练。无需任何操作；训练完成后检测即会恢复。",
       "noticeSkipAbsence": "缺失评分落后于回看窗口；已无法再获取的时间区间被跳过并记录。",
@@ -12947,6 +13053,8 @@
       "autoUntrainedHelp": "自动模式将根据您的历史数据学习级别。",
       "autoTrainingHelp": "训练完成后将显示级别。",
       "autoFailedHelp": "训练失败。尚无已学习的级别。请查看上方的训练错误。",
+      "autoWaitingForDataHelp": "合适的训练数据尚不足。在此之前没有学习到的水平。检测器保持启用并会自动重新检查。",
+      "autoNotApplicableHelp": "当前数据无法支持异常模型。这不是失败。检测器保持启用并会自动重新检查。",
       "autoRetrainingHelp": "正在重新训练。显示的是上次学习的级别；模型可用性尚未确认。",
       "autoRetrainFailedHelp": "重新训练失败。显示的是上次学习的级别；模型可用性尚未确认。请查看上方的训练错误。",
       "autoUnconfirmedHelp": "显示的是上次学习的级别；尚未确认存在活跃模型。",
@@ -13184,6 +13292,7 @@
     "oncallTeamPlaceholder": "按归属规则路由",
     "oncallTeamTooltip": "此告警要呼叫哪个团队。通常留空，根据告警的身份维度自动识别团队；仅当这些维度无法表达负责人时才需要设置。",
     "oncallTeamNoTeams": "暂无值班团队。请在“值班团队”中创建一个。",
+    "lockedTeamFallback": "已锁定的团队",
     "oncallTeamAtFireTime": "根据归属规则",
     "oncallTeamFromRules": "由于此告警未设置团队，因此负责人会根据触发行的标识维度来推算，这些维度在触发前无法获知。",
     "tags": "标签",
@@ -14549,6 +14658,7 @@
     "separator_placeholder": "输入分隔符 (例如 {'|'}, \\n, \\t, 空格)",
     "separator_hint": "在记录之间使用的分隔字符串（允许空格）",
     "templateDefaultOption": "Default ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one.",
     "loadingData": "正在加载目标数据...",
     "noEmailTemplates": "您似乎还没有创建任何电子邮件模板。",
@@ -15485,6 +15595,20 @@
       "azureCredentials": "Azure 凭据",
       "awsRoleArn": "AWS 角色 ARN"
     },
+    "dataRetentionDefaults": {
+      "title": "数据保留默认值",
+      "about": "适用于没有自身保留设置的数据流。留空或填 0 则使用全局值；否则至少为 3 天。",
+      "defaultDays": "默认（天）",
+      "streamType": "数据流类型",
+      "days": "天",
+      "addType": "添加数据流类型",
+      "removeType": "移除此数据流类型",
+      "globalDefault": "全局：{value}",
+      "globalType": "全局 {type}：{value}",
+      "daysValue": "{days} 天",
+      "forever": "永久保留",
+      "invalid": "请填 0 或至少 3 天"
+    },
     "organizationSettings": {
       "fieldNameHelp": "仅使用字母数字和 '+=,.{'@'}-_' 字符，不要空格。",
       "settingsUpdated": "组织设置更新成功",
@@ -15514,9 +15638,7 @@
     },
     "licensePage": {
       "unexpectedError": "意外错误",
-      "daysRemaining": "距离许可证过期还有 {days} 天",
-      "oneDayRemaining": "距离许可证过期还有 1 天",
-      "licenseExpired": "您的许可证已过期"
+      "daysRemaining": "距离许可证过期还有 {days} 天"
     },
     "nodesPage": {
       "subtitle": "集群节点及其健康状态",
@@ -23025,7 +23147,9 @@
         "ready": "就绪",
         "running": "运行中",
         "training": "训练中",
-        "waiting": "等待中"
+        "waiting": "等待中",
+        "waitingForData": "等待数据",
+        "notApplicable": "不适用"
       },
       "anomalyStatus": {
         "active": "活跃",
@@ -23033,7 +23157,9 @@
         "training": "训练中",
         "failed": "失败",
         "waiting": "等待中",
-        "disabled": "已禁用"
+        "disabled": "已禁用",
+        "waitingForData": "等待数据",
+        "notApplicable": "不适用"
       },
       "aiToolsetKind": {
         "skill": "技能",
@@ -23218,6 +23344,11 @@
       "failedToLoadToolset": "加载工具集失败"
     },
     "alerts": {
+      "firing": {
+        "bulkResult": "{acked} 条已确认，{skipped} 条已跳过",
+        "bulkResultFailed": "{acked} 已确认，{skipped} 已跳过，{failed} 失败",
+        "bulkAllAcked": "{acked} 条已确认"
+      },
       "failedToNavigateToAlert": "导航到告警失败",
       "alertNotFound": "未找到告警",
       "failedToLoadAlerts": "加载告警失败",
@@ -23396,7 +23527,6 @@
     },
     "login": {
       "somethingWentWrong": "出了点问题",
-      "thankYouForYourFeedback": "感谢您的反馈",
       "selectedSuggestion": "已选择建议“{suggestion}”",
       "pleaseFillAllTheFieldsAnd": "请填写所有字段，然后重试。",
       "invalidUsernameOrPassword": "用户名或密码无效",
@@ -24130,6 +24260,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "开始使用",
     "reportDetail": "报告",
     "sharedChat": "共享对话",
     "passwordPolicy": "密码策略",
@@ -26855,10 +26986,6 @@
     "saveScheduleFailed": "无法保存排班",
     "policy": "升级策略",
     "policyIfNoAck": "如果无人确认，则在",
-    "policyRepeatTimes": "升级阶梯运行一次 | 升级阶梯运行 {count} 次",
-    "policyFinalStop": "然后停止",
-    "policyFinalNotifyDefault": "然后通知兜底团队",
-    "policyNoDefaultTeam": "未指定默认团队，因此这与停止相同。请在“路由”标签页中指定一个。",
     "policyPrioritySilent": "{priority} 不通知任何人。添加一个层级即可改变这一点——这里的静默是有意为之，而非遗漏。",
     "policyDoneEditing": "完成编辑",
     "policyHint": "各优先级会通知谁，以及多久后通知。这些是默认值，可以逐项修改。",
@@ -27338,9 +27465,6 @@
     "policyP1ParallelHint": "没人愿意等五分钟才发现网站已宕机。",
     "policyP4Pages": "也为此优先级发送寻呼",
     "policyP4PagesHint": "默认关闭——若 P4 会吵醒人，说明严重性设置有误。",
-    "policyFinalAction": "如果无人确认",
-    "policyFinal_notifyDefaultTeam": "通知默认团队",
-    "policyFinal_stop": "停止",
     "policySummaryTitle": "此策略当前的作用",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "全部同时",
@@ -27593,7 +27717,6 @@
     "ladderL0Off": "无 AI SRE",
     "ladderStaleDefaultTag": "升级阶梯未识别到轮班",
     "ladderStaleDefaultHint": "每一级都会通知整个团队，但这个团队已有轮班——该升级阶梯是在这些轮班出现之前创建的。添加或移除成员会重新运行默认配置，也可以手动编辑一次该升级阶梯。",
-    "ladderEndsHandsOff": "通知将转交他人",
     "reachShortNoSmtp": "仅电子邮件 · 未配置 SMTP 传输",
     "reachShortNoFromAddress": "仅电子邮件 · 无发件人地址",
     "reachShortNoAddress": "未记录地址",
@@ -27719,7 +27842,6 @@
     "ladderEvery": "· 每 {duration}",
     "ladderEnd": "结束",
     "ladderEndUnknown": "没有待执行的后续操作。",
-    "ladderEndsDefaultTeam": "升级步骤已用尽——已通知默认团队。",
     "rungLost": "失败",
     "rungLostTimes": "失败 ×{count}",
     "routingDetails": "路由详情",
@@ -27734,7 +27856,6 @@
     "policyStepsSection": "升级步骤",
     "policyChipSteps": "{count} 个步骤 | {count} 个步骤",
     "policyAddStep": "添加步骤",
-    "policyWhenStepsRunOut": "当步骤用尽时",
     "policyAppliesToNewPages": "更改仅适用于新的呼叫。",
     "policySave": "保存",
     "policyFix": "修复",
@@ -27744,9 +27865,6 @@
     "policyEmailLockedBySlack": "使用 Slack 时邮件保持开启：未关联 Slack 账户的人员仍会收到邮件。",
     "policyNoProvider": "未连接电话服务提供商，因此会跳过短信和语音，这些通知将通过电子邮件发送。",
     "policyNoProviderLink": "在 设置 → 电话 中连接一个",
-    "policyEndOptionStop": "运行一次，然后停止 | 运行 {count} 次，然后停止",
-    "policyEndOptionHandOff": "运行一次，然后移交给兜底团队 | 运行 {count} 次，然后移交给兜底团队",
-    "policyEndOptionHandOffTo": "运行一次后交接给 {team} | 运行 {count} 次后交接给 {team}",
     "policyDeliveryTitle": "通知投递",
     "policyTodayIs": "今天：{who}",
     "policyPeopleCount": "{count} 人 | {count} 人",
@@ -27868,6 +27986,12 @@
     "ruleEditorTakesFrom": "从 {team} 接管告警",
     "ruleEditorKeptBy": "{team} 保留这些告警：其规则更具体",
     "ruleEditorContends": "与 {team} 的规则竞争：更具体的规则优先",
+    "ruleEditorFieldSourcesMore": "{fields} 等另外 {count} 个",
+    "ruleEditorFieldsHelp": "字段来自您的关联字段组。{link}",
+    "ruleEditorFieldsSource": "字段来自您的关联字段组。",
+    "ruleEditorManageFieldGroups": "管理字段组",
+    "ruleEditorDuplicatePath": "{team} 已有完全相同条件的规则。请改为编辑该规则。",
+    "ruleEditorDuplicatePathSameTeam": "该团队已有完全相同条件的规则。",
     "routingTestRouting": "测试路由",
     "routingTabNeedsOwnerPlain": "需要负责人",
     "simulatorStartFrom": "起始于",
@@ -29650,6 +29774,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "来自任意 Linux 服务器的日志、指标和追踪。",
+      "windows": "来自 Windows 服务器的事件日志和指标。",
+      "macos": "来自 Mac 机器的日志和指标。",
+      "aws": "来自您的 AWS 服务的日志和指标。",
+      "googleCloud": "通过 {pubSub} 推送订阅，从您的 {gcp} 项目获取日志。",
+      "azure": "通过 {eventHub}，从您的 {azure} 订阅获取活动日志。",
+      "postgresql": "查询、连接和复制指标。",
+      "mysql": "查询、连接和 InnoDB 指标。",
+      "mongodb": "操作、连接和缓存指标。",
+      "redis": "内存、命令和键空间指标。",
+      "sqlServer": "查询、等待和缓冲区指标。",
+      "oracle": "会话、表空间和资源限制指标。",
+      "mariadb": "查询、连接和 InnoDB 指标。",
+      "elasticsearch": "集群、索引和节点健康状况。",
+      "cassandra": "读、写和压缩指标。",
+      "dynamodb": "通过 {kinesisFirehose} 将条目变更（插入、更新、删除）作为日志发送。",
+      "snowflake": "仓库、查询和信用额度使用情况。",
+      "databricks": "笔记本日志，通过日志 API 发送。",
+      "couchdb": "请求、数据库和复制指标。",
+      "aerospike": "命名空间、节点、内存和连接指标。",
+      "sapHana": "内存、CPU 和服务指标。",
+      "zookeeper": "延迟、连接和节点指标。",
+      "nginx": "由 {fluentBit} 跟踪的访问日志和错误日志。",
+      "apache": "由 {fluentBit} 跟踪的访问日志和错误日志。",
+      "iis": "由 {fluentBit} 跟踪的请求日志。",
+      "kafka": "Broker、主题和消费者滞后指标。",
+      "rabbitmq": "队列深度、消息速率和节点指标。",
+      "nats": "连接、消息和数据流指标。",
+      "prometheus": "通过远程写入发送您已在抓取的指标。",
+      "telegraf": "从您已在运行的代理发送指标。",
+      "opentelemetryCollector": "将您已在运行的收集器指向此处。",
+      "cloudwatch": "从您的 AWS 账户流式输出指标。",
+      "gpu": "每块 {nvidia} GPU 的使用率、内存和温度。",
+      "networkFlows": "主机和网络之间的流量。",
+      "fluentBit": "适用于主机和 Kubernetes 的轻量级日志转发器。",
+      "fluentd": "拥有丰富插件的日志收集器。",
+      "vector": "用于日志和指标的快速流水线。",
+      "filebeat": "使用轻量代理发送日志文件。",
+      "logstash": "从现有流水线发送日志。",
+      "syslogNg": "从您的服务器转发 syslog。",
+      "loongcollector": "用于主机和容器的日志与指标代理。",
+      "splunkHec": "让您的 HTTP Event Collector 发送端保持原样。",
+      "cribl": "从您已在运行的流水线路由数据。",
+      "kinesisFirehose": "从 AWS 中的传输流流式传输日志。",
+      "googleCloudLogs": "通过日志接收器从您的项目导出日志。",
+      "okta": "登录和管理审计事件。",
+      "office365": "邮件、文件和管理审计日志。",
+      "googleWorkspace": "登录和管理审计日志。",
+      "falco": "来自容器的运行时安全告警。",
+      "osquery": "以可查询日志形式呈现的端点状态。",
+      "jumpcloud": "目录和登录事件。",
+      "openvpn": "VPN 连接和会话日志。",
+      "githubActions": "工作流运行和作业日志。",
+      "jenkins": "构建日志和流水线事件。",
+      "terraform": "来自运行的计划和 apply 日志。",
+      "ansible": "Playbook 运行日志和结果。",
+      "vercel": "部署和函数日志。",
+      "heroku": "来自日志 drain 的应用和路由器日志。",
+      "airflow": "DAG 运行日志和任务指标。",
+      "airbyte": "同步作业日志和状态。",
+      "languageTile": "使用 {otel} SDK 生成追踪，在您的语言支持的情况下自动插桩。",
+      "aiIntegration": "您 AI 应用调用的追踪，包含模型调用的 token 和费用。"
+    },
+    "skipToApp": "跳至应用",
+    "chooseTitle": "您想先监控什么？",
+    "back": "返回",
+    "searchGuides": "搜索 {count} 个指南 | 搜索 {count} 个指南",
+    "showMore": "再显示 {count} 个 | 再显示 {count} 个",
+    "noMatch": "此处没有与“{query}”匹配的指南。",
+    "foundElsewhere": "在其他选项中找到：",
+    "inChoice": "在 {choice} 中",
+    "tryShorter": "试试更短的名称。任何工具还可以{link}。",
+    "sendOverHttp": "通过 HTTP 发送日志",
+    "clearSearch": "清除搜索",
+    "othersTitle": "其他开始方式",
+    "whatYouGet": "您将获得",
+    "signals": {
+      "metrics": "指标",
+      "logs": "日志",
+      "traces": "追踪",
+      "profiles": "性能分析",
+      "sessions": "会话",
+      "errors": "错误",
+      "webVitals": "Web 指标（Web）",
+      "replays": "会话回放",
+      "tokens": "Token 数",
+      "cost": "成本",
+      "latency": "延迟",
+      "uptime": "正常运行时间",
+      "certificates": "证书"
+    },
+    "example": {
+      "caption": {
+        "row": "示例屏幕：{product} 为 {name} 显示的内容。",
+        "infrastructure": "示例屏幕：{k8s} 集群概览，包含 CPU、内存和 Pod 健康状况。",
+        "backend": "示例屏幕：一次失败结账追踪的瀑布图，包含跨 9 个服务的 21 个 Span。",
+        "frontend": "示例屏幕：来自真实用户会话的 {rum} Web 指标。",
+        "logs": "示例屏幕：包含直方图和匹配日志行的日志搜索。",
+        "llm": "示例屏幕：{insights}，按模型展示成本、Token 数和延迟，并包含随时间变化的追踪和错误。",
+        "agent": "示例屏幕：您的编码代理所连接的 {mcp} 服务器页面。",
+        "synthetics": "示例屏幕：一个 {http} 检查在 3 个位置的结果。"
+      }
+    },
+    "guide": {
+      "agentTitle": "想改用编码代理？",
+      "agentSteps": "在终端中运行此命令，然后将提示词或文件交给 {claudeCode}、{cursor} 或 {codex}。",
+      "copyPrompt": "复制提示词",
+      "downloadFile": "下载 .md",
+      "inviteTitle": "没有访问权限？",
+      "inviteText": "邀请一位可以运行该命令的队友。",
+      "inviteAction": "邀请队友",
+      "loadFailed": "此指南未能加载。",
+      "openInApp": "在数据源中打开",
+      "languageText": "对于 {language}，添加 {otelSdk}，在 {language} 支持的情况下启用自动插桩，然后使用下方设置将其指向 {product}。",
+      "languageLink": "{otel} {language} 指南"
+    },
+    "rail": {
+      "label": "设置进度",
+      "check": "检查您的数据",
+      "received": "已接收数据",
+      "attention": "需要注意",
+      "waitingShort": "等待数据",
+      "title": "设置 {name}",
+      "run": "运行设置命令",
+      "explore": "探索您的数据"
+    },
+    "firstData": {
+      "title": "您的数据正在到达",
+      "count": "{count} 条记录已到达 {stream} | {count} 条记录已到达 {stream}",
+      "exploreLogs": "探索您的日志",
+      "exploreMetrics": "探索您的指标",
+      "exploreTraces": "探索您的追踪",
+      "exploreProfiles": "探索您的性能分析",
+      "addAnother": "添加另一个数据源"
+    },
+    "others": {
+      "synthetics": {
+        "name": "合成检查",
+        "description": "检查网站、API、端口或证书。无需安装。",
+        "gets": "从您的网络外部按计划运行检查。"
+      },
+      "invite": {
+        "name": "邀请队友进行设置",
+        "description": "他们会收到加入您组织的邀请。"
+      },
+      "agent": {
+        "name": "使用编码代理进行设置",
+        "description": "给 {claudeCode}、{cursor} 或 {codex} 一条提示词。",
+        "gets": "您的编码代理会完成设置，并检查数据是否到达。"
+      }
+    },
+    "agentLink": "或者让您的编码代理来完成",
+    "stepDone": "（完成）",
+    "agent": {
+      "crumb": "编码代理",
+      "title": "使用编码代理进行设置",
+      "lead": "{claudeCode}、{cursor}、{codex} 或任何编码代理会读取您的项目，完成设置并检查数据是否已到达。在安装任何内容或更改部署文件之前，它会先征得您的同意。",
+      "tokenTitle": "保存您的令牌",
+      "tokenText": "在启动编码代理之前，请在您将要启动它的终端中运行此命令。",
+      "powerShell": "在 {powerShell} 中：",
+      "copyPowerShell": "复制 {powerShell} 命令",
+      "promptTitle": "复制提示词",
+      "focusLabel": "设置",
+      "focus": {
+        "kubernetes": "{k8s} 集群",
+        "host": "{linux}、{macos} 或 {windows} 主机",
+        "backend": "后端服务（{otel}）",
+        "llm": "LLM 应用",
+        "frontend": "Web 前端",
+        "logs": "仅日志"
+      },
+      "copyPrompt": "复制提示词",
+      "promptCopied": "提示词已复制",
+      "download": "下载 .md",
+      "preview": "预览提示词",
+      "previewLines": "{count} 行 | {count} 行",
+      "pasteTitle": "将其粘贴到您的编码代理中",
+      "other": "其他",
+      "hint": {
+        "claudeCode": "在同一终端中，于您的项目文件夹内运行 {command}，然后粘贴提示词。",
+        "cursor": "使用 {command} 从同一终端启动 {product}，以便它能够读取令牌。然后将提示词粘贴到其聊天中。",
+        "codex": "在同一终端中，于您的项目文件夹内运行 {command}，然后粘贴提示词。",
+        "other": "从同一终端启动您的编码代理，以便它能够读取令牌。然后粘贴提示词，或向它提供 {file}。"
+      },
+      "mcp": "连接 {mcp} 服务器，以便您的编码代理可以读取您的数据",
+      "aside": {
+        "eyebrow": "提示词会告诉您的编码代理什么",
+        "title": "小而安全的更改",
+        "line1": "查明项目运行的内容",
+        "line2": "进行能起作用的最小更改",
+        "line3": "将令牌保存在环境变量中",
+        "line4": "向数据流 {stream} 发送一个测试事件",
+        "line5": "报告哪些文件发生了更改"
+      }
+    },
+    "collect": {
+      "continueToSetup": "继续设置",
+      "languages": "语言",
+      "languagesRequired": "至少选择一种语言。",
+      "kubernetesCluster": {
+        "question": "选择要从集群中采集的内容",
+        "off": {
+          "name": "日志和指标",
+          "description": "集群健康状况和容器日志。一条命令。",
+          "about": "通过一条安装命令，获取容器日志、每个节点和 Pod 的 CPU 与内存，以及以日志形式采集的 {k8s} 事件。"
+        },
+        "ebpf": {
+          "name": "使用 eBPF 添加追踪",
+          "description": "无需更改代码，支持任何语言。需要节点上的 Linux 内核为 5.8+。",
+          "about": "相同的安装方式，额外添加追踪。采集器从 Linux 内核查看请求，因此你的应用无需更改。它仅能通过普通 HTTP 将请求跨服务关联起来。"
+        },
+        "library": {
+          "name": "使用语言库添加追踪",
+          "description": "每个应用可获得更多细节。选择你的语言，然后重启一次应用。",
+          "about": "相同的安装方式，额外添加追踪。{otelOperator} 会将每种语言对应的 {otelLibrary} 添加到你所选命名空间中的 Pod。你的代码无需更改。"
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Web 服务器",
+      "messageQueues": "消息队列",
+      "metricsYouCollect": "你已采集的指标",
+      "gpuAndNetwork": "GPU 和网络流",
+      "movingFromAnotherTool": "从其他工具迁移",
+      "cloudLogs": "云日志",
+      "securityTools": "安全工具",
+      "cicdAndPlatforms": "CI/CD 和平台"
+    },
+    "infrastructure": {
+      "name": "基础设施",
+      "description": "服务器、{k8s}、云账户和数据库",
+      "gets": "在一个地方查看每台主机、每个 Pod 和每项云服务。",
+      "question": "你想如何监控基础设施？",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "{k8s} 集群",
+          "description": "一次安装即可获取日志、指标和 {k8s} 事件。再加一条命令即可获取追踪。",
+          "about": "通过一条命令在你的集群中安装 {productCollector}。你将获得容器日志、{k8s} 事件和集群指标。"
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "{linux}、{windows} 或 {macos} 主机",
+          "description": "将 {productAgent} 作为服务安装",
+          "about": "一个代理即可从主机采集日志和指标。在 {linux} 上，它还能在无需更改代码的情况下追踪程序。",
+          "question": "你的主机使用哪种操作系统？"
+        },
+        "cloudAccount": {
+          "name": "云账户",
+          "description": "{aws}、{gcp} 或 {azure}",
+          "about": "从你的云账户采集日志，并从 {aws} 采集指标。你的服务器上无需运行任何东西。",
+          "question": "你的账户位于哪个云平台？"
+        },
+        "databases": {
+          "name": "数据库",
+          "description": "{examples} 以及另外 {count} 个",
+          "about": "采集数据库指标，主要通过 {otelCollector}。",
+          "question": "你想监控哪个数据库？"
+        },
+        "somethingElse": {
+          "name": "其他",
+          "description": "Web 服务器、消息队列、{prometheus}、GPU 和网络流",
+          "about": "Web 服务器、消息队列、你已采集的指标、GPU 使用情况和网络流。",
+          "question": "你还想监控什么？"
+        }
+      }
+    },
+    "backend": {
+      "name": "后端应用",
+      "description": "来自你服务的追踪，以及由 SDK 发送的日志",
+      "gets": "查看每个请求如何在你的服务间流转。",
+      "question": "您希望如何追踪您的服务？",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "在代码中添加库",
+          "description": "{nodejs}、{python}、{java}、{go}、{dotnet}、{rust} 或 {fastapi}",
+          "about": "为您的语言添加 {otelLibrary}。追踪数据将发送到 {product}。",
+          "question": "您的服务使用哪种语言编写？"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "{k8s} 工作负载，无需更改代码",
+          "description": "在集群内自动插桩",
+          "about": "{otelOperator} 会为一个命名空间中的 Pod 添加插桩。无需更改代码或镜像。"
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "任何使用 {otel} 的语言",
+          "description": "从您自己的环境发送 OTLP",
+          "about": "将任何 {otelSdk} 或收集器指向您的 {product} 端点。"
+        },
+        "continuousProfiling": {
+          "name": "持续性能分析",
+          "description": "CPU 和内存性能分析数据",
+          "about": "通过 {otelCollector} 转发来自您的性能分析器（{go}、{java}、{rust} 或 eBPF 性能分析器）的性能分析数据。"
+        }
+      }
+    },
+    "frontend": {
+      "name": "前端和移动应用",
+      "description": "面向 Web 和移动端的真实用户监控",
+      "gets": "了解真实用户在您的 Web 和移动应用中的体验。",
+      "question": "您的应用在哪里运行？",
+      "rows": {
+        "browser": {
+          "name": "浏览器",
+          "description": "网站和 Web 应用",
+          "about": "将 {sdk} 添加到您的 Web 应用。您将获得来自真实浏览器的页面加载、错误和会话数据。"
+        },
+        "reactNative": {
+          "description": "通过一个代码库支持 {ios} 和 {android}",
+          "about": "将 {sdk} 添加到您的 {platform} 应用。"
+        },
+        "android": {
+          "description": "原生 {android} 应用",
+          "about": "将 {sdk} 添加到您的 {platform} 应用。您将获得会话、屏幕浏览、错误和崩溃数据。"
+        },
+        "ios": {
+          "description": "原生 {ios} 应用",
+          "about": "将 {sdk} 添加到您的 {platform} 应用。您将获得会话、屏幕浏览、错误和崩溃数据。"
+        }
+      }
+    },
+    "logs": {
+      "name": "来自任意来源的日志",
+      "description": "从任意日志转发器、服务或工具发送日志",
+      "gets": "搜索并过滤每一行日志，无论其来源。",
+      "question": "您希望如何发送日志？",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "从您运行的日志转发器发送",
+          "description": "{examples} 以及另外 {count} 个",
+          "about": "将您现有的日志转发器指向 {product}。无需部署新代理。",
+          "question": "您运行的是哪种日志转发器？"
+        },
+        "overHttpWithCurl": {
+          "name": "通过 HTTP 使用 {curl}",
+          "description": "从任意脚本发起一个请求。无需安装。",
+          "about": "通过一个 HTTP 请求从任意脚本或服务发送 JSON 日志。"
+        },
+        "fromOpentelemetry": {
+          "name": "来自 {otel}",
+          "description": "来自 SDK 或收集器的 OTLP 日志",
+          "about": "通过 OTLP 从 {otelSdk} 或收集器发送日志。"
+        },
+        "somethingElse": {
+          "name": "其他方式",
+          "description": "{splunk} 或 {cribl}、云日志、安全工具和 CI/CD",
+          "about": "从 {splunk} 或 {cribl} 迁移，或从云、安全工具和 CI/CD 收集日志。",
+          "question": "您的日志还来自哪些来源？"
+        }
+      }
+    },
+    "llm": {
+      "name": "LLM 和 AI 应用",
+      "description": "追踪 LLM 调用、智能体和工具",
+      "gets": "查看每一次 LLM 调用、工具调用和智能体步骤。",
+      "question": "您的 AI 应用使用什么？",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}、Agents 或 {assistantsApi}",
+          "about": "追踪通过 {openaiSdk} 发起的每次调用，包含 Token 数、成本和延迟。",
+          "question": "您使用哪个 {openai} 库？"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} 或 {claudeAgentSdk}",
+          "about": "追踪通过 {anthropicSdk} 发起的每次调用，包含 Token 数、成本和延迟。",
+          "question": "您使用哪个 {anthropic} 库？"
+        },
+        "langchainOrLanggraph": {
+          "description": "链、智能体和图",
+          "about": "追踪每条链、每个智能体步骤和每次工具调用。",
+          "question": "您使用哪个 {langchain} 库？"
+        },
+        "somethingElse": {
+          "name": "其他",
+          "description": "其他框架、模型提供商、网关和工具",
+          "about": "框架、模型提供商、网关、无代码工具、分析平台和工具。",
+          "question": "您的 AI 应用使用什么？"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "机群管理",
     "subtitle": "注册 OpenTelemetry Collector，对其配置进行版本管理，并安全地推送变更",
@@ -30312,6 +30817,171 @@
       "receiverEvidence": "被 {receiver} 接收器拒绝",
       "legend": "流水线状态",
       "legendToggle": "在地图上显示或隐藏此状态"
+    }
+  },
+  "sampleData": {
+    "delete": "删除示例数据",
+    "loadForbidden": "您需要此组织的写入权限才能加载示例数据。",
+    "steps": {
+      "functions": "创建函数",
+      "pipeline": "创建实时流水线",
+      "telemetry": "生成并发送日志、追踪和指标",
+      "dashboards": "创建仪表盘",
+      "alerts": "创建告警",
+      "enrichment": "上传服务负责人表"
+    },
+    "progress": {
+      "loading": "正在加载示例数据…",
+      "done": "示例数据已加载",
+      "counts": "{logs} 条日志记录 · {spans} 个 Span · {metrics} 个指标数据点",
+      "skipped": "已跳过",
+      "logs": "日志",
+      "spans": "Span",
+      "metrics": "指标数据点"
+    },
+    "removeSteps": {
+      "alerts": "告警",
+      "alertDelivery": "告警模板和 Webhook",
+      "dashboards": "仪表盘",
+      "pipeline": "流水线",
+      "functions": "函数",
+      "streams": "数据流"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "正在移除示例数据",
+        "body": "这需要几秒钟。您可以关闭此对话框，但在完成前请保持此标签页打开。",
+        "label": "正在移除示例数据…"
+      },
+      "done": {
+        "title": "示例数据已移除",
+        "body": "服务器将在几分钟内完成已存储数据的删除。之后您可以再次加载示例数据。",
+        "label": "移除完成",
+        "done": "完成",
+        "keptLabel": "已保留，因为还有其他内容在使用它们："
+      },
+      "failed": {
+        "title": "无法移除所有示例数据",
+        "body": "请重试：已不存在的项目将被跳过。",
+        "label": "移除已停止",
+        "close": "关闭",
+        "tryAgain": "重试"
+      }
+    },
+    "removeConfirm": {
+      "title": "删除示例数据？",
+      "message": "这会删除示例数据流、仪表盘、告警、函数和富化表。您自己的数据不会受到影响。"
+    },
+    "toast": {
+      "loaded": "示例数据已加载。祝您探索愉快！",
+      "loadFailed": "无法加载示例数据",
+      "removed": "示例数据已删除",
+      "removedWithKept": "示例数据已删除。{count} 个示例项因被其他内容使用而保留。 | 示例数据已删除。{count} 个示例项因被其他内容使用而保留。",
+      "removeFailed": "无法删除全部示例数据",
+      "removeWhileLoading": "请等待示例数据加载完成。"
+    },
+    "entry": {
+      "onboardingSource": "探索示例数据"
+    },
+    "callout": {
+      "title": "还没准备好发送数据？",
+      "body": "先用一个示例在线商店来探索 {product}：一个正在处理中的事件，以及贯穿仪表盘、告警、日志、追踪、指标和流水线的引导式导览。",
+      "cta": "使用示例数据探索"
+    },
+    "header": {
+      "label": "示例数据",
+      "try": "试用示例数据",
+      "finish": "完成加载"
+    },
+    "dock": {
+      "details": "显示详情"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "您自己的数据正在到达。请删除示例数据，以免它混入您的仪表盘、告警和搜索中。",
+        "keep": "暂时保留",
+        "remove": "删除示例数据"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "在后台继续",
+      "progress": {
+        "title": "正在构建您的示例商店",
+        "body": "大约需要一分钟。您可以关闭此对话框，但在加载结束前请保持此标签页打开。"
+      },
+      "ready": {
+        "title": "您的示例商店已上线",
+        "startTour": "开始引导式导览",
+        "ownWay": "自行探索"
+      },
+      "errorBody": "加载时出错。请重试：已存在的仪表盘和告警会被复用，不会重复创建。"
+    },
+    "tour": {
+      "label": "引导式导览",
+      "position": "引导式导览 · 第 {current} 步，共 {total} 步",
+      "pill": "导览 {current}/{total}",
+      "done": "导览完成",
+      "stepFailed": "无法打开此步骤。请重试。",
+      "minimize": "最小化导览",
+      "close": "结束导览",
+      "next": "下一步",
+      "capabilities": {
+        "dashboards": "仪表盘",
+        "alerts": "告警",
+        "logs": "日志搜索",
+        "traces": "追踪",
+        "metrics": "指标与 PromQL",
+        "pipelines": "流水线"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "发现问题",
+          "body": "这是商店前台的服务概览。错误率和结账延迟在过去 35 分钟内都出现了飙升。",
+          "look": "每个面板都是一条 SQL 查询。将鼠标悬停在图表上可对比各序列，横向拖动可缩放，或打开面板菜单以编辑其查询。"
+        },
+        "alert": {
+          "title": "告警已触发",
+          "body": "一条针对支付错误的告警会按计划对日志执行 SQL 查询，并在错误数超过阈值时立即触发。",
+          "look": "打开一条告警可查看其查询、阈值和计划。示例目标是占位 Webhook，因此投递会显示为失败：将其指向 Slack、邮件或 PagerDuty 即可收到真实通知。"
+        },
+        "logs": {
+          "title": "搜索错误",
+          "body": "已筛选出支付错误的日志。几乎所有日志都显示同样的内容：从连接池获取连接超时。",
+          "look": "展开一条记录可查看所有字段。点击字段值即可按其过滤，或切换到 SQL 模式进行分组和聚合。"
+        },
+        "deploy": {
+          "title": "找出变更所在",
+          "body": "Payment v2.15.0 在错误开始前一分钟发布，其发布说明将连接池缩减到 20。",
+          "look": "这就是根本原因，只用一次针对同一批日志的搜索就找到了。全文搜索和 SQL 搜索运行在同一份数据上。"
+        },
+        "traces": {
+          "title": "跟踪一个失败的请求",
+          "body": "每个追踪都记录一次结账在各项服务之间的路径。打开一个：瀑布图显示支付服务等待数据库连接 3 秒。",
+          "look": "日志携带相同的追踪 ID，因此您可以在 Span 与其日志之间双向跳转。"
+        },
+        "metrics": {
+          "title": "使用 PromQL 确认",
+          "body": "每个服务的 p95 延迟，均使用 PromQL 查询。支付和结账同步攀升。",
+          "look": "指标与日志、追踪位于同一引擎，因此基础设施仪表盘完全基于 PromQL 构建。"
+        },
+        "pipeline": {
+          "title": "数据到达即处理",
+          "body": "实时流水线会对每条访问日志运行 VRL 函数，在记录存储前添加 client_os 和 is_mobile。",
+          "look": "打开流水线查看其图形。流水线可以过滤、丰富、路由和脱敏数据，而无需改动您的应用。"
+        },
+        "business": {
+          "title": "衡量业务影响",
+          "body": "相同的日志可驱动业务仪表盘：失败的结账、收入以及按支付方式统计的订单。",
+          "look": "无需单独的分析工具。日志中的任何内容都可以成为 KPI。"
+        }
+      },
+      "finale": {
+        "title": "您已找到根本原因",
+        "body": "短短几分钟，您就从仪表盘上的峰值追溯到引发它的部署，所有信号尽在一处。",
+        "connect": "连接您自己的数据",
+        "restart": "重新开始导览",
+        "finish": "结束导览"
+      }
     }
   },
   "recentSearches": {

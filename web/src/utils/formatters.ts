@@ -202,6 +202,11 @@ export const formatTimeWithSuffix = (us: number) => {
   return `${us.toFixed(2)}us`;
 };
 
+export function formatMs(ms: number | null): string {
+  if (ms == null) return "—";
+  return ms >= 1000 ? (ms / 1000).toFixed(2) + " s" : ms + " ms";
+}
+
 export function formatDuration(ms: number) {
   if (!ms || ms === 0) return gt("common.secShort", { count: 0 });
   const seconds = (ms / 1000).toFixed(2);

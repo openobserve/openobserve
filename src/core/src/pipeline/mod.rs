@@ -92,6 +92,21 @@ fn refuse_cross_org_node(pipeline: &Pipeline) -> Result<(), PipelineError> {
     }
 }
 
+/// Without enterprise there is no remote writer, so a remote node would drop every record.
+#[cfg(not(feature = "enterprise"))]
+fn refuse_remote_node(pipeline: &Pipeline) -> Result<(), PipelineError> {
+    let has_remote = pipeline
+        .nodes
+        .iter()
+        .any(|node| matches!(node.data, NodeData::RemoteStream(_)));
+    if has_remote {
+        return Err(PipelineError::InvalidPipeline(
+            "Remote destinations are not supported in the open source version".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// The scheduled source to save; a run searches its org, so it is the pipeline's org.
 fn bind_scheduled_source(pipeline: &mut Pipeline) -> Option<DerivedStream> {
     let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source else {
@@ -306,6 +321,8 @@ pub async fn save_pipeline_checked(
         return Err(PipelineError::InvalidPipeline(e.to_string()));
     }
     refuse_cross_org_node(&pipeline)?;
+    #[cfg(not(feature = "enterprise"))]
+    refuse_remote_node(&pipeline)?;
 
     // Runs after validate(), which rebuilds source from the first node: checking
     // pipeline.source before that compares a value which is never persisted.
@@ -411,6 +428,8 @@ pub async fn update_pipeline_checked(
         .validate()
         .map_err(|e| PipelineError::InvalidPipeline(e.to_string()))?;
     refuse_cross_org_node(&pipeline)?;
+    #[cfg(not(feature = "enterprise"))]
+    refuse_remote_node(&pipeline)?;
 
     // validate no JavaScript functions in pipeline
     validate_no_javascript_functions(&pipeline).await?;
@@ -549,6 +568,8 @@ pub async fn enable_pipeline(
     };
     if enable {
         refuse_cross_org_node(&pipeline)?;
+        #[cfg(not(feature = "enterprise"))]
+        refuse_remote_node(&pipeline)?;
     }
 
     pipeline.enabled = enable;
@@ -938,5 +959,72 @@ mod tests {
             };
             assert_eq!(node_org, "a", "{}", node.id);
         }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    fn remote_pipeline(id: &str, org: &str) -> Pipeline {
+        use config::meta::stream::RemoteStreamParams;
+
+        let mut pipeline = scheduled_pipeline(id, org, "", "");
+        pipeline.nodes[1].data = NodeData::RemoteStream(RemoteStreamParams {
+            org_id: org.to_string().into(),
+            destination_name: "remote_dest".into(),
+        });
+        pipeline
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn only_a_pipeline_with_a_remote_node_is_refused() {
+        let local = scheduled_pipeline("local_pl", "a", "", "");
+        assert!(super::refuse_remote_node(&local).is_ok());
+        let remote = remote_pipeline("remote_pl", "a");
+        assert!(super::refuse_remote_node(&remote).is_err());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn save_refuses_a_remote_node() {
+        use super::{PipelineError, save_pipeline_checked};
+
+        let saved =
+            save_pipeline_checked(remote_pipeline("save_remote_pl", "a"), Some(&Unreached)).await;
+        assert!(
+            matches!(&saved, Err(PipelineError::InvalidPipeline(msg)) if msg.contains("Remote destinations")),
+            "{saved:?}"
+        );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn update_and_enable_refuse_a_stored_remote_node() {
+        use super::{PipelineError, update_pipeline_checked};
+
+        if !meta_store().await {
+            return;
+        }
+        let mut stored = scheduled_pipeline("stored_remote_pl", "remote_org", "", "");
+        stored.enabled = false;
+        super::db::set(&stored).await.unwrap();
+        let updated =
+            update_pipeline_checked(remote_pipeline(&stored.id, "remote_org"), Some(&Unreached))
+                .await;
+
+        let mut stored_remote = remote_pipeline(&stored.id, "remote_org");
+        stored_remote.enabled = false;
+        super::db::set(&stored_remote).await.unwrap();
+        let enabled = super::enable_pipeline("remote_org", &stored.id, true, false).await;
+        let still_disabled = !super::db::get_by_id(&stored.id).await.unwrap().enabled;
+        super::delete_pipeline(&stored.id).await.unwrap();
+
+        assert!(
+            matches!(&updated, Err(PipelineError::InvalidPipeline(_))),
+            "{updated:?}"
+        );
+        assert!(
+            matches!(&enabled, Err(PipelineError::InvalidPipeline(_))),
+            "{enabled:?}"
+        );
+        assert!(still_disabled);
     }
 }

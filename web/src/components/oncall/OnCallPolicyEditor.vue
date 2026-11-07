@@ -336,38 +336,6 @@
                       />
                     </div>
                   </template>
-
-                  <!-- What the ladder does when it runs out is part of its shape, so
-                 it is edited here rather than described here. Both halves are
-                 one control because "runs twice" and "then stops" are one
-                 decision read as one sentence. -->
-                  <div class="border-border-default flex flex-col gap-1 border-t px-3 py-2">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <OText variant="label">{{ t("oncall.policyWhenStepsRunOut") }}</OText>
-                      <span class="w-80 max-md:w-full">
-                        <OSelect
-                          :model-value="ladderEnd"
-                          :options="ladderEndOptions"
-                          :searchable="false"
-                          size="sm"
-                          data-test="oncall-policy-ladder-end-select"
-                          @update:model-value="(v: unknown) => setLadderEnd(String(v))"
-                        />
-                      </span>
-                    </div>
-                    <!-- §G.9 #9: notify_default_team with nobody nominated is
-                   indistinguishable from stop — the ladder ends silently while
-                   the policy reads as having a safety net. Said HERE, where the
-                   policy is being written, not on a routing screen the author
-                   may never open. -->
-                    <span
-                      v-if="defaultTeamMissing"
-                      class="text-status-warning-text text-xs"
-                      data-test="oncall-policy-no-default-warning"
-                    >
-                      {{ t("oncall.policyNoDefaultTeam") }}
-                    </span>
-                  </div>
                 </div>
 
                 <OText variant="body" v-else data-test="oncall-policy-silent">
@@ -650,7 +618,6 @@ import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.v
 import { isSlackAppDestination } from "@/utils/slackAppDestination";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
-import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import { queryClient } from "@/composables/query/queryClient";
 import oncallService from "@/services/oncall";
 import {
@@ -670,7 +637,6 @@ import type {
   LadderStep,
   OnCallPolicy,
   OnCallPosition,
-  PolicyFinalAction,
   PriorityRung,
   Rotation,
   RotationMode,
@@ -727,8 +693,6 @@ interface PolicyDraftData {
   rungs: PriorityRung[];
   destinations: string[];
   template?: string | null;
-  repeatCount: number;
-  finalAction: PolicyFinalAction;
   l0: L0Policy | null;
 }
 
@@ -787,10 +751,6 @@ const dismissMailBanner = () => {
     // The banner shows again next time; nothing else depends on it.
   }
 };
-/// Both are part of the ladder's shape, so both are draft state — reading them
-/// off `props.policy` is what made them read-only.
-const repeatCount = ref(1);
-const finalAction = ref<PolicyFinalAction>("stop");
 const availableDestinations = ref<string[]>([]);
 const saving = ref(false);
 
@@ -942,56 +902,6 @@ async function saveTeamSlack(slack: Omit<SetTeamChannelBody, "destinations">) {
   } finally {
     savingSlack.value = false;
   }
-}
-
-/// Only read to answer one question: does the final action's safety net
-/// exist. A failure leaves the warning off — a false "no default team" on a
-/// transient error would send somebody to fix a setting that is fine.
-/// Shared, not fetched here. This is a pure reader — it only needs to know
-/// whether a catch-all exists so the ladder's end can warn when it does not —
-/// and its own copy went stale the moment somebody nominated one on the
-/// Routing screen.
-const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
-async function fetchRoutingConfig() {
-  const denied = await loadRoutingConfig(orgId.value);
-  if (denied) emit("licenseDenied", denied);
-}
-
-const defaultTeamMissing = computed(
-  () =>
-    finalAction.value === "notify_default_team" &&
-    routingConfig.value !== null &&
-    !routingConfig.value.default_team_id,
-);
-
-/// The two halves of the ladder's end as one value, because they are one
-/// decision: how many passes, and what happens after the last one.
-const ladderEnd = computed(() => `${repeatCount.value}:${finalAction.value}`);
-
-/// One to five passes. More than five is a ladder somebody should shorten
-/// rather than repeat, and there is no zero — a policy that runs its ladder no
-/// times is a policy that pages nobody, which is what an empty step list says.
-const ladderEndOptions = computed(() => [
-  ...[1, 2, 3, 4, 5].map((n) => ({
-    label: t("oncall.policyEndOptionStop", { count: n }, n),
-    value: `${n}:stop`,
-  })),
-  ...[1, 2, 3, 4, 5].map((n) => ({
-    label: routingConfig.value?.default_team_name
-      ? t(
-          "oncall.policyEndOptionHandOffTo",
-          { count: n, team: raw(routingConfig.value.default_team_name) },
-          n,
-        )
-      : t("oncall.policyEndOptionHandOff", { count: n }, n),
-    value: `${n}:notify_default_team`,
-  })),
-]);
-
-function setLadderEnd(value: string) {
-  const [repeats, action] = value.split(":");
-  repeatCount.value = Number(repeats);
-  finalAction.value = action as PolicyFinalAction;
 }
 
 const deliveryProblems = computed(() =>
@@ -1170,9 +1080,6 @@ function reset() {
   destinations.value = [...(props.policy?.destinations ?? [])];
   templateOverride.value = props.policy?.template ?? null;
   readMailBanner();
-  // `repeat_count` 1 means the ladder runs once; there is no zero.
-  repeatCount.value = props.policy?.repeat_count ?? 1;
-  finalAction.value = props.policy?.final_action ?? "stop";
   l0Draft.value = null;
   l0Touched.value = false;
 }
@@ -1182,8 +1089,6 @@ const policyContent = (): PolicyDraftData => ({
   rungs: draft.value,
   destinations: destinations.value,
   template: templateOverride.value,
-  repeatCount: repeatCount.value,
-  finalAction: finalAction.value,
   l0: l0Touched.value ? l0Draft.value : null,
 });
 
@@ -1197,8 +1102,6 @@ function applyPolicyDraft(data: PolicyDraftData) {
   draft.value = data.rungs;
   destinations.value = data.destinations;
   templateOverride.value = data.template ?? null;
-  repeatCount.value = data.repeatCount;
-  finalAction.value = data.finalAction;
   l0Draft.value = data.l0;
   l0Touched.value = data.l0 !== null;
   pendingUserStep.value = null;
@@ -1218,8 +1121,6 @@ const policyDraft = useEditorDraft<PolicyDraftData>({
   base: () => ({
     rungs: props.policy?.rungs ?? [],
     destinations: props.policy?.destinations ?? [],
-    repeat_count: props.policy?.repeat_count ?? 1,
-    final_action: props.policy?.final_action ?? "stop",
     l0: props.policy?.l0 ?? null,
     template: props.policy?.template ?? null,
   }),
@@ -1259,7 +1160,6 @@ watch(
       ? wanted
       : (draft.value[0]?.priority ?? selected.value);
     fetchDestinations();
-    fetchRoutingConfig();
     fetchTeamChannel();
     fetchMembers();
     fetchOnCallNow();
@@ -1388,8 +1288,6 @@ async function save(): Promise<boolean> {
       rungs: draft.value,
       destinations: destinations.value,
       template: templateOverride.value,
-      repeat_count: repeatCount.value,
-      final_action: finalAction.value,
       ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
     });
     if (!(await saveChannelAfterPolicy())) {

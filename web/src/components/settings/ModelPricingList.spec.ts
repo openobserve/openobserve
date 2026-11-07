@@ -855,26 +855,53 @@ describe("ModelPricingList.vue", () => {
     });
   });
 
-  describe("getVisiblePrices / getOverflowCount", () => {
-    it("reports overflow count for prices beyond the first 2", async () => {
+  describe("pricing cell", () => {
+    let widthSpies: { mockRestore(): void }[] = [];
+    const mockCellWidths = () => {
+      widthSpies = [
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(60),
+      ];
+    };
+
+    afterEach(() => widthSpies.forEach((spy) => spy.mockRestore()));
+
+    const waitForRow = (name: string) =>
+      vi.waitFor(() => {
+        const row = wrapper
+          .findAll('[data-test^="o2-table-row-"]')
+          .find((r: any) => r.text().includes(name));
+        expect(row).toBeTruthy();
+        return row!;
+      });
+
+    const mountWithPrices = async () => {
+      vi.mocked(modelPricingService.list).mockResolvedValue({
+        data: [
+          orgModel({
+            tiers: [{ condition: null, prices: { input: 0.1, output: 0.2, audio: 0.3 } }],
+          }),
+        ],
+      } as any);
       wrapper = mountComponent();
       await flushPromises();
-      const model = {
-        tiers: [
-          {
-            condition: null,
-            prices: { input: 0.1, output: 0.2, audio: 0.3, image: 0.4 },
-          },
-        ],
-      };
-      expect(wrapper.vm.getOverflowCount(model)).toBe(2);
+      return waitForRow("GPT-4o (org)");
+    };
+
+    it("collapses prices that do not fit into a +N chip that opens the dialog", async () => {
+      mockCellWidths();
+      const row = await mountWithPrices();
+      await flushPromises();
+      const more = row.find('[data-test="fit-items-more"]');
+      expect(more.text()).toContain("+2");
+      await more.find("button, [tabindex]").trigger("click");
+      expect(wrapper.vm.showPricingDialog).toBe(true);
     });
 
-    it("returns overflow 0 when there are no prices", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const model = { tiers: [{ condition: null, prices: {} }] };
-      expect(wrapper.vm.getOverflowCount(model)).toBe(0);
+    it("shows every price with no +N when they fit", async () => {
+      const row = await mountWithPrices();
+      expect(row.findAll("[data-fit-item]")).toHaveLength(3);
+      expect(row.find('[data-test="fit-items-more"]').exists()).toBe(false);
     });
   });
 

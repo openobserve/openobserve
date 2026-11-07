@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :current-time="currentTime"
         :start-time="sessionState.data.selectedSession?.start_time || 0"
         :end-time="sessionState.data.selectedSession?.end_time || 0"
-        :rum-window-us="eventsOnlyRumWindowUs"
+        :rum-window-us="rumWindowUs"
         :marked-timestamps="markedTimestamps"
         :loading="eventsLoading"
         @event-emitted="handleSidebarEvent"
@@ -267,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :current-time="currentTime"
             :start-time="sessionState.data.selectedSession?.start_time || 0"
             :end-time="sessionState.data.selectedSession?.end_time || 0"
+            :rum-window-us="rumWindowUs"
             :marked-timestamps="markedTimestamps"
             :loading="eventsLoading"
             @event-emitted="handleSidebarEvent"
@@ -538,7 +539,8 @@ const serverStatusByTrace = new Map<string, ServerStatusEntry>();
 // When this viewer first saw each trace id; it caps a trace's age against a staff clock that runs fast.
 const serverFirstSeen = new Map<string, number>();
 const eventsOnly = ref(false);
-const eventsOnlyRumWindowUs = ref<QueryWindow | null>(null);
+// The Traces tab searches _rumdata by arrival time: a batch uploaded after the last device-clock event is still found.
+const rumWindowUs = ref<QueryWindow | null>(null);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -883,11 +885,13 @@ async function openSession(): Promise<void> {
       return;
     }
     sessionNotFound.value = false;
-    eventsOnlyRumWindowUs.value = routeRangeUs();
+    rumWindowUs.value = routeRangeUs();
     eventsOnly.value = true;
     getSessionEvents();
     return;
   }
+  // The events' window, so the Traces tab lists the calls the breadcrumbs show.
+  rumWindowUs.value = serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US);
   openEventSeek();
   getSessionSegments();
   getSessionEvents();

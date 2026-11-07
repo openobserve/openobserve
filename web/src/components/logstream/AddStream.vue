@@ -59,9 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-stream-data-retention"
             name="dataRetentionDays"
             :label="t('logStream.dataRetention')"
-            required
             class="showLabelOnTop"
             type="number"
+            :help-text="retentionHelp"
           />
         </div>
 
@@ -106,9 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-stream-data-retention"
           name="dataRetentionDays"
           :label="t('logStream.dataRetention')"
-          required
           class="showLabelOnTop"
           type="number"
+          :help-text="retentionHelp"
         />
       </div>
 
@@ -120,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { watch, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import { inheritedRetentionDays } from "@/utils/dataRetention";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
@@ -157,13 +158,7 @@ const createStream = useMutation(() => createStreamMutation(orgId.value));
 
 const store = useStore();
 
-// The retention rule is conditional on org config (`data_retention_days`),
-// captured here; the stream-type half of the condition is read from the form in
-// superRefine.
-const addStreamSchema = makeAddStreamSchema(
-  !!(store.state.zoConfig.data_retention_days || false),
-  t,
-);
+const addStreamSchema = makeAddStreamSchema(t);
 
 // This component owns <OForm> and reads form state (stream_type) to drive the
 // parent-side `v-if="showDataRetention"`, so the form is created here with
@@ -178,8 +173,7 @@ const addStreamForm = useOForm<AddStreamForm>({
 
 const { track } = useReo();
 
-// Read the form-owned stream_type so `showDataRetention` — which also depends on
-// org config the schema can't read — re-evaluates when the user changes the type.
+// Read reactively so `showDataRetention` and the inherited default follow the chosen type.
 // Must use form.useStore; a `form.state.values` read inside a computed would not
 // track changes.
 const formStreamType = addStreamForm.useStore((s: any) => (s.values.stream_type as string) ?? "");
@@ -204,10 +198,15 @@ const filteredStreamTypes = computed(() => {
   return streamTypes;
 });
 
-const showDataRetention = computed(
-  () =>
-    !!(store.state.zoConfig.data_retention_days || false) &&
-    formStreamType.value !== "enrichment_tables",
+const showDataRetention = computed(() => formStreamType.value !== "enrichment_tables");
+
+const inheritedRetention = computed(() =>
+  inheritedRetentionDays(store.state, formStreamType.value),
+);
+const retentionHelp = computed(() =>
+  inheritedRetention.value > 0
+    ? t("logStream.retentionDefaultDays", { days: inheritedRetention.value })
+    : t("logStream.retentionDefaultForever"),
 );
 
 // `value` is the fully-validated submit payload — scalars and the `fields`
@@ -286,15 +285,8 @@ const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
     },
   };
 
-  if (showDataRetention.value && dataRetentionDays < 1) {
-    toast({
-      message: t("toastMessages.logstream.invalidDataRetentionPeriodRetentionPeriod"),
-      variant: "error",
-    });
-    return;
-  }
-
-  if (showDataRetention.value) {
+  // Left out when empty, so the stream inherits its default instead of pinning today's value.
+  if (showDataRetention.value && dataRetentionDays > 0) {
     stream.settings["data_retention"] = Number(dataRetentionDays);
   }
 

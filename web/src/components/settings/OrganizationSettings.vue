@@ -126,6 +126,11 @@
         >
       </div>
     </OForm>
+
+    <template v-if="showDataRetentionDefaults">
+      <OSeparator class="mt-6 mb-4" />
+      <DataRetentionDefaults />
+    </template>
   </div>
 </template>
 
@@ -137,6 +142,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
+import DataRetentionDefaults from "@/components/settings/DataRetentionDefaults.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -166,6 +172,7 @@ const crossLinks = ref(store.state?.organizationData?.organizationSettings?.cros
 const formDirty = ref(false);
 
 const showRedInsights = config.isEnterprise == "true";
+const showDataRetentionDefaults = config.isEnterprise == "true";
 
 // Dynamic defaults (edit-prefill from the store) → a typed computed. The trace/
 // span/toggle values are form-owned (OFormInput / OFormSwitch).

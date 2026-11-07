@@ -75,6 +75,7 @@ import {
   ANOMALY_DIRECTION_KEYS,
   anomalySensitivityModel,
   anomalyWindowShareEffective,
+  isAnomalyDataReadinessStatus,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -416,7 +417,11 @@ const anomalyModelFields = computed(() => {
   ];
   // A permanent empty row implies an error slot worth watching on a healthy model.
   if (a?.last_error) {
-    fields.push({ key: "last-error", label: t("alerts.anomaly.lastError"), value: a.last_error });
+    // A data-readiness row carries an expected state here, which must not read as an error.
+    const label = isAnomalyDataReadinessStatus(a.status)
+      ? t("alerts.anomaly.dataReadinessReason")
+      : t("alerts.anomaly.lastError");
+    fields.push({ key: "last-error", label, value: a.last_error });
   }
   return fields;
 });

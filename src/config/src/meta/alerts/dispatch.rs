@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     TriggerCondition,
-    grouping::{GroupClassification, group_key},
+    grouping::{GroupClassification, group_key, render_labels},
     level::{AlertLevel, DeliveryDecision, delivery_decision},
     state::{AlertState, StateTransition, StateUpdate},
 };
@@ -44,6 +44,9 @@ use crate::{
 
 /// How long after its claim an evaluation may start a group send; each send can take its timeout.
 pub const GROUP_FIRING_DEADLINE_SECS: i64 = 1_800;
+
+/// Named per cause in a trigger record, which every group past the cap would otherwise bloat.
+const MAX_UNDELIVERED_GROUPS_NAMED: usize = 5;
 
 /// The version a delayed delivery carries — the group's **level-episode** at
 /// enqueue time (§5.5 round-6): `level_since` advances only when the level
@@ -106,17 +109,47 @@ pub struct DispatchPlan {
     /// Groups in pending state
     pub pending: usize,
     /// Qualifying groups dropped by the MN-8 knob — reported so the caller
-    /// can log them; silent truncation is not acceptable here either.
+    /// can log and record them; silent truncation is not acceptable here either.
     pub dropped_by_knob: Vec<String>,
     /// Retained firing groups with **no state row** after the plan committed,
-    /// and duplicate group keys within one evaluation. Both are consistency
-    /// failures rather than routine outcomes: reported for logging, and
-    /// deliberately NOT dispatched — see [`plan_dispatch`].
+    /// or whose key is duplicated within one evaluation. Both are consistency
+    /// failures rather than routine outcomes: reported for logging and the
+    /// trigger record, and deliberately NOT dispatched — see [`plan_dispatch`].
     pub inconsistent: Vec<String>,
     /// Groups that would deliver but a downtime mutes; also counted in `suppressed`.
     pub muted: Vec<String>,
     /// Groups withheld because they repeat their last delivery; also counted in `suppressed`.
     pub repeats: usize,
+}
+
+impl DispatchPlan {
+    /// Firing groups nothing chose to withhold, whether or not a send went out.
+    pub fn not_withheld(&self) -> usize {
+        self.items.len() + self.dropped_by_knob.len() + self.inconsistent.len()
+    }
+
+    /// One line per cause of a firing group getting no send, named by labels as keys are hashes.
+    pub fn undelivered_notes(
+        &self,
+        classification: &GroupClassification,
+        max_sends: usize,
+    ) -> Vec<String> {
+        let over_cap = format!(
+            "over the limit of {max_sends} per evaluation \
+             (ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL)"
+        );
+        [
+            undelivered_note(&self.dropped_by_knob, &over_cap, classification),
+            undelivered_note(
+                &self.inconsistent,
+                "missing state or payload row or a duplicate key",
+                classification,
+            ),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
 }
 
 /// Decide which groups this evaluation notifies (MN-1, MN-8).
@@ -176,18 +209,18 @@ pub fn plan_dispatch(
     // iterating it IS worst-first — the knob therefore always keeps the most
     // severe groups, and ties break deterministically.
     for (group, key) in classification.groups.iter().zip(&keys) {
+        // Healthy groups are not candidates, and are not "suppressed" either —
+        // nothing was withheld from them.
+        let Some(level) = group.level.filter(|l| l.is_firing()) else {
+            continue;
+        };
+
         if occurrences[key.as_str()] > 1 {
             if !inconsistent.contains(key) {
                 inconsistent.push(key.clone());
             }
             continue;
         }
-
-        // Healthy groups are not candidates, and are not "suppressed" either —
-        // nothing was withheld from them.
-        let Some(level) = group.level.filter(|l| l.is_firing()) else {
-            continue;
-        };
 
         // Both of these are consistency failures, not routine outcomes: the
         // plan committed a row for every retained group before dispatch ran,
@@ -548,6 +581,36 @@ impl DeliveryEpisode {
 /// Whether a firing claimed at `started_at` must stop sending; a claim with no start never does.
 pub fn group_firing_deadline_passed(started_at: i64, now: i64) -> bool {
     started_at > 0 && now.saturating_sub(started_at) > GROUP_FIRING_DEADLINE_SECS * 1_000_000
+}
+
+fn undelivered_note(
+    keys: &[String],
+    cause: &str,
+    classification: &GroupClassification,
+) -> Option<String> {
+    if keys.is_empty() {
+        return None;
+    }
+    let named = keys
+        .iter()
+        .take(MAX_UNDELIVERED_GROUPS_NAMED)
+        .filter_map(|key| {
+            classification
+                .groups
+                .iter()
+                .find(|group| group_key(&group.labels) == *key)
+        })
+        .map(|group| render_labels(&group.labels))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let rest = match keys.len().saturating_sub(MAX_UNDELIVERED_GROUPS_NAMED) {
+        0 => String::new(),
+        rest => format!(" and {rest} more"),
+    };
+    Some(format!(
+        "{} firing group(s) not notified, {cause}: {named}{rest}",
+        keys.len()
+    ))
 }
 
 #[cfg(test)]
@@ -1412,6 +1475,105 @@ mod tests {
         );
         assert_eq!(plan.items.len(), 3);
         assert!(plan.dropped_by_knob.is_empty());
+    }
+
+    #[test]
+    fn capped_groups_are_noted_by_their_labels_and_still_count_as_not_withheld() {
+        let c = classified(&[("crit", 150.0), ("warn", 75.0)], 500);
+        let now = 1_000 * SEC;
+        let states = states_for(&c, now, None, None);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            1,
+            false,
+            |_, _, _| false,
+        );
+
+        assert_eq!(plan.not_withheld(), 2);
+        assert_eq!(
+            plan.undelivered_notes(&c, 1),
+            vec![
+                "1 firing group(s) not notified, over the limit of 1 per evaluation \
+                 (ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL): host=warn"
+            ]
+        );
+    }
+
+    #[test]
+    fn inconsistent_groups_are_noted_and_still_count_as_not_withheld() {
+        let c = classified(&[("a", 150.0)], 500);
+        let now = 1_000 * SEC;
+        let states = states_for(&c, now, None, None);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &HashMap::new(),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
+
+        assert_eq!(plan.not_withheld(), 1);
+        assert_eq!(
+            plan.undelivered_notes(&c, 0),
+            vec![
+                "1 firing group(s) not notified, missing state or payload row or a duplicate \
+                 key: host=a"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_note_names_a_few_groups_and_counts_the_rest() {
+        let c = classified(
+            &["a", "b", "c", "d", "e", "f", "g", "h"].map(|h| (h, 150.0)),
+            500,
+        );
+        let now = 1_000 * SEC;
+        let states = states_for(&c, now, None, None);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            1,
+            false,
+            |_, _, _| false,
+        );
+
+        let notes = plan.undelivered_notes(&c, 1);
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].starts_with("7 firing group(s) not notified, over the limit of 1"));
+        assert_eq!(notes[0].matches("host=").count(), 5);
+        assert!(notes[0].ends_with(" and 2 more"));
+    }
+
+    #[test]
+    fn a_healthy_duplicate_is_not_a_group_that_went_unpaged() {
+        let c = classified(&[("ok", 1.0), ("ok", 1.0)], 500);
+        let now = 1_000 * SEC;
+        let states = states_for(&c, now, None, None);
+        let plan = plan_dispatch(
+            &c,
+            &states,
+            &rows_for(&c),
+            &tc(None),
+            now,
+            0,
+            false,
+            |_, _, _| false,
+        );
+
+        assert!(plan.inconsistent.is_empty());
+        assert_eq!(plan.not_withheld(), 0);
+        assert!(plan.undelivered_notes(&c, 0).is_empty());
     }
 
     #[test]

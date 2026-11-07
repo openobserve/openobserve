@@ -162,7 +162,7 @@ impl Search for Searcher {
         req: Request<GetTableRequest>,
     ) -> Result<Response<GetTableResponse>, Status> {
         let path = req.into_inner().path;
-        if !::search::datafusion::distributed_plan::codec::is_join_result_path(&path) {
+        if !::search::datafusion::distributed::codec::is_join_result_path(&path) {
             return Err(Status::invalid_argument("invalid table path"));
         }
         let res = infra::storage::get_bytes("", &path)

@@ -499,10 +499,23 @@ describe("Schema Component Tests", () => {
     });
 
     // Test 25: calculateDateRange function
-    it("should leave minDate null when data retention is unset (0)", () => {
-      wrapper.vm.dataRetentionDays = 0;
+    it("should leave minDate null when the stream inherits keep forever", () => {
+      const before = store.state.zoConfig.data_retention_days;
+      store.state.zoConfig.data_retention_days = 0;
+      wrapper.vm.dataRetentionDays = "";
       wrapper.vm.calculateDateRange();
       expect(wrapper.vm.minDate).toBeNull();
+      store.state.zoConfig.data_retention_days = before;
+    });
+
+    it("should prefer the backend's inherited retention over the type default", () => {
+      wrapper.vm.dataRetentionDays = "";
+      wrapper.vm.serverInheritedRetention = 90;
+      expect(wrapper.vm.inheritedRetention).toBe(90);
+      wrapper.vm.serverInheritedRetention = 0;
+      wrapper.vm.calculateDateRange();
+      expect(wrapper.vm.minDate).toBeNull();
+      wrapper.vm.serverInheritedRetention = undefined;
     });
 
     // Test 26: openPatternAssociationDialog function
@@ -2071,8 +2084,8 @@ describe("Schema Component Tests", () => {
       expect(wrapper.vm.loadingState).toBe(false);
     });
 
-    it("should show error when dataRetentionDays < 1 during onSubmit", async () => {
-      wrapper.vm.dataRetentionDays = 0;
+    it("should show error when dataRetentionDays is negative during onSubmit", async () => {
+      wrapper.vm.dataRetentionDays = -1;
       mockToast.mockClear();
 
       await wrapper.vm.onSubmit();
@@ -2176,13 +2189,13 @@ describe("Schema Component Tests", () => {
       expect(mockToast).toHaveBeenCalled();
     });
 
-    it("should deal with dataRetentionDays empty string error in onSubmit", async () => {
+    it("should not treat an empty dataRetentionDays as an error in onSubmit", async () => {
       wrapper.vm.dataRetentionDays = "";
       mockToast.mockClear();
 
       await wrapper.vm.onSubmit();
 
-      expect(mockToast).toHaveBeenCalledWith(
+      expect(mockToast).not.toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringContaining("Retention period must be at least 1 day"),
         }),

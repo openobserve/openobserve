@@ -1,0 +1,542 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::sync::Arc;
+
+use arrow_schema::SchemaRef;
+use config::{
+    meta::{inverted_index::IndexOptimizeMode, search::SearchEventType},
+    utils::rand::generate_random_string,
+};
+use datafusion::{
+    common::{DataFusionError, Result, tree_node::TreeNodeRecursion},
+    execution::{SendableRecordBatchStream, TaskContext},
+    physical_expr::{AcrossPartitions, EquivalenceProperties, Partitioning, PhysicalExpr},
+    physical_plan::{
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
+        metrics::{ExecutionPlanMetricsSet, MetricsSet},
+        stream::RecordBatchStreamAdapter,
+    },
+};
+use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
+use flight::common::{RemoteScanMetrics, RemoteScanState};
+use futures::{StreamExt, TryStreamExt};
+use futures_util::pin_mut;
+use opentelemetry::context::FutureExt as _;
+use rand::prelude::SliceRandom;
+
+use super::node::RemoteScanNode;
+use crate::datafusion::{
+    distributed::{
+        analyze::profile::NodeProfileRecorder,
+        codec::get_physical_extension_codec,
+        remote_scan::{
+            decoder_stream::FlightDecoderStream,
+            flight_client::make_flight_client,
+            query_context::{EmptyStream, QueryContext, get_empty_stream, process_partial_err},
+        },
+    },
+    physical_plan::shared_subplan_exec::strip_shared_subplan_markers,
+};
+
+/// Execution plan for empty relation with produce_one_row=false
+#[derive(Debug, Clone)]
+pub struct RemoteScanExec {
+    input: Arc<dyn ExecutionPlan>,
+    remote_scan_node: RemoteScanNode,
+    partitions: usize,
+    cache: Arc<PlanProperties>,
+    pub state: RemoteScanState,
+    pub enrich_mode_node_idx: usize,
+    pub metrics: ExecutionPlanMetricsSet,
+}
+
+impl RemoteScanExec {
+    /// Create a new RemoteScanExec
+    pub fn new(
+        input: Arc<dyn ExecutionPlan>,
+        mut remote_scan_node: RemoteScanNode,
+    ) -> Result<Self> {
+        // Sharing happens on the leader only, a follower must never see a marker.
+        let input = strip_shared_subplan_markers(input)?;
+        let output_partitions = remote_scan_node.nodes.len();
+        let cache = Self::compute_properties(&input, output_partitions)?;
+
+        // serialize the input plan and set it as the plan for the remote scan node
+        let proto = get_physical_extension_codec();
+        let physical_plan_bytes =
+            physical_plan_to_bytes_with_extension_codec(input.clone(), &proto)?;
+        remote_scan_node.set_plan(physical_plan_bytes.to_vec());
+
+        // get the node ids for enrich mode
+        let mut node_ids = remote_scan_node
+            .nodes
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, n)| if n.is_querier() { Some(idx) } else { None })
+            .collect::<Vec<_>>();
+        // random shuffle the node ids
+        node_ids.shuffle(&mut rand::rng());
+        let enrich_mode_node_idx = node_ids.pop().unwrap_or_default();
+
+        Ok(RemoteScanExec {
+            input,
+            remote_scan_node,
+            partitions: output_partitions,
+            cache,
+            state: RemoteScanState::default(),
+            enrich_mode_node_idx,
+            metrics: ExecutionPlanMetricsSet::new(),
+        })
+    }
+
+    /// The input plan bytes exactly as every follower receives them.
+    pub fn encoded_plan(&self) -> &[u8] {
+        &self.remote_scan_node.search_infos.plan
+    }
+
+    pub fn with_state(mut self, state: RemoteScanState) -> Self {
+        self.state = state;
+        self
+    }
+
+    pub fn with_metrics(mut self, metrics: ExecutionPlanMetricsSet) -> Self {
+        self.metrics = metrics;
+        self
+    }
+
+    fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
+        Partitioning::UnknownPartitioning(n_partitions)
+    }
+
+    /// This function creates the cache object that stores the plan properties such as schema,
+    /// equivalence properties, ordering, partitioning, etc.
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        n_partitions: usize,
+    ) -> Result<Arc<PlanProperties>> {
+        let mut eq_properties = EquivalenceProperties::new(input.schema());
+        // Followers each run their own copy of the input; only literal constants hold on all.
+        eq_properties.add_constants(
+            input
+                .properties()
+                .eq_properties
+                .constants()
+                .into_iter()
+                .filter(|c| matches!(c.across_partitions, AcrossPartitions::Uniform(Some(_)))),
+        )?;
+        let output_partitioning = Self::output_partitioning_helper(n_partitions);
+        Ok(Arc::new(PlanProperties::new(
+            eq_properties,
+            // Output Partitioning
+            output_partitioning,
+            // Execution Mode
+            EmissionType::Incremental,
+            Boundedness::Bounded,
+        )))
+    }
+
+    pub fn set_analyze(mut self) -> Self {
+        self.remote_scan_node.search_infos.is_analyze = true;
+        self
+    }
+
+    pub fn set_index_optimize_mode(mut self, index_optimize_mode: IndexOptimizeMode) -> Self {
+        self.remote_scan_node.index_info.index_optimize_mode = Some(index_optimize_mode.into());
+        self
+    }
+
+    #[cfg(test)]
+    pub fn analyze(&self) -> bool {
+        self.remote_scan_node.search_infos.is_analyze
+    }
+
+    #[cfg(test)]
+    pub fn index_optimize_mode(&self) -> Option<IndexOptimizeMode> {
+        self.remote_scan_node
+            .index_info
+            .index_optimize_mode
+            .clone()
+            .map(|x| x.into())
+    }
+}
+
+impl DisplayAs for RemoteScanExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "RemoteScanExec: input_partitions=output_partitions={}",
+            self.partitions,
+        )
+    }
+}
+
+impl ExecutionPlan for RemoteScanExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
+    fn name(&self) -> &'static str {
+        "RemoteScanExec"
+    }
+
+    fn schema(&self) -> SchemaRef {
+        Arc::clone(&self.input.schema())
+    }
+
+    fn properties(&self) -> &Arc<PlanProperties> {
+        &self.cache
+    }
+
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
+    }
+
+    fn with_new_children(
+        self: Arc<Self>,
+        children: Vec<Arc<dyn ExecutionPlan>>,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        if children.is_empty() {
+            return Ok(self);
+        }
+        let remote_scan = Self::new(children[0].clone(), self.remote_scan_node.clone())?
+            .with_state(self.state.clone())
+            .with_metrics(self.metrics.clone());
+        Ok(Arc::new(remote_scan))
+    }
+
+    fn execute(
+        &self,
+        partition: usize,
+        _context: Arc<TaskContext>,
+    ) -> Result<SendableRecordBatchStream> {
+        let baseline_metrics = RemoteScanMetrics::new(partition, &self.metrics);
+        let fut = get_remote_batch(
+            self.remote_scan_node.clone(),
+            partition,
+            partition == self.enrich_mode_node_idx,
+            self.input.schema().clone(),
+            self.state.clone(),
+            baseline_metrics,
+        );
+        let stream = futures::stream::once(fut).try_flatten();
+        Ok(Box::pin(RecordBatchStreamAdapter::new(
+            self.schema().clone(),
+            stream,
+        )))
+    }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn get_remote_batch(
+    remote_scan_node: RemoteScanNode,
+    partition: usize,
+    enrich_mode: bool,
+    schema: SchemaRef,
+    state: RemoteScanState,
+    metrics: RemoteScanMetrics,
+) -> Result<SendableRecordBatchStream> {
+    let RemoteScanState {
+        scan_stats,
+        peak_memory,
+        partial_err,
+        node_profiles,
+    } = state;
+    let start = std::time::Instant::now();
+    let cfg = config::get_config();
+    let trace_id = remote_scan_node.query_identifier.trace_id.clone();
+    let org_id = remote_scan_node.query_identifier.org_id.clone();
+    let context = remote_scan_node.opentelemetry_context.clone();
+    let node = remote_scan_node.nodes[partition].clone();
+    let is_super = remote_scan_node.super_cluster_info.is_super_cluster;
+    let is_querier = node.is_querier();
+    let is_ingester = node.is_ingester();
+    let grpc_addr = node.get_grpc_addr();
+    let node_name = node.get_name();
+    let search_type = remote_scan_node
+        .super_cluster_info
+        .search_event_type
+        .as_ref()
+        .and_then(|s| s.parse().ok());
+
+    // check timeout
+    let mut timeout = remote_scan_node.search_infos.timeout;
+    if timeout == 0 {
+        timeout = cfg.limit.query_timeout;
+    }
+    // check grpc timeout
+    let mut grpc_timeout = timeout;
+    if matches!(search_type, Some(SearchEventType::UI)) {
+        if is_querier {
+            grpc_timeout = std::cmp::min(grpc_timeout, cfg.limit.query_querier_timeout);
+        } else if is_ingester {
+            grpc_timeout = std::cmp::min(grpc_timeout, cfg.limit.query_ingester_timeout);
+        }
+    }
+
+    let mut recorder = if remote_scan_node.search_infos.is_analyze {
+        NodeProfileRecorder::start(node_profiles, partition, node.as_ref())
+    } else {
+        NodeProfileRecorder::default()
+    };
+
+    let empty_stream = EmptyStream::new(
+        &trace_id,
+        schema.clone(),
+        &grpc_addr,
+        is_querier,
+        partial_err.clone(),
+        start,
+    );
+
+    // fast return for empty file list querier node
+    if !is_super
+        && is_querier
+        && !is_ingester
+        && !enrich_mode
+        && remote_scan_node.is_file_list_empty(partition)
+    {
+        recorder.mark_skipped();
+        return Ok(get_empty_stream(empty_stream));
+    }
+
+    let mut request = remote_scan_node.get_flight_search_request(partition);
+    request.set_job_id(generate_random_string(7));
+    request.set_partition(partition);
+    request.search_info.timeout = timeout as i64;
+    request.query_identifier.enrich_mode = enrich_mode;
+
+    log::info!(
+        "[trace_id {trace_id}] flight->search: request node: {grpc_addr}, name: {node_name}, query_type: {}, is_super: {is_super}, is_querier: {is_querier}, timeout: {timeout}, files: {}",
+        search_type.unwrap_or(SearchEventType::UI),
+        request.search_info.file_id_list.len(),
+    );
+
+    let (mut client, request) = match make_flight_client(
+        trace_id.clone(),
+        &org_id,
+        node.clone(),
+        request,
+        &context,
+        grpc_timeout,
+    )
+    .await
+    {
+        Ok((client, request)) => (client, request),
+        Err(e) => {
+            return Ok(get_empty_stream(empty_stream.with_error(e)));
+        }
+    };
+
+    log::info!(
+        "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
+    );
+
+    // runs outside the planner span, so the gRPC CLIENT span takes its parent from this context
+    let stream = match client.do_get(request).with_context(context.clone()).await {
+        Ok(stream) => stream,
+        Err(e) => {
+            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {
+                return Ok(get_empty_stream(empty_stream.with_error(e)));
+            }
+            log::error!(
+                "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
+                start.elapsed().as_millis(),
+            );
+            return Err(DataFusionError::Execution(e.to_string()));
+        }
+    }
+    .into_inner();
+
+    log::info!(
+        "[trace_id {trace_id}] flight->search: prepare to response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
+    );
+
+    let query_context = QueryContext::new(node)
+        .with_trace_id(&trace_id)
+        .with_is_super(is_super)
+        .with_is_querier(is_querier)
+        .with_scan_stats(scan_stats)
+        .with_partial_err(partial_err.clone())
+        .with_peak_memory(peak_memory)
+        .with_start_time(start)
+        .with_node_profile(recorder);
+
+    let mut stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
+    let stream = async_stream::stream! {
+        let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
+        pin_mut!(timeout);
+        loop {
+            tokio::select! {
+                batch = stream.next() => {
+                    if let Some(batch) = batch {
+                        yield batch.map_err(|e| DataFusionError::Internal(format!("{e}")))
+                    } else {
+                        break;
+                    }
+                }
+                _ = &mut timeout => {
+                    let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
+                    log::error!(
+                        "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
+                        start.elapsed().as_millis(),
+                    );
+                    process_partial_err(partial_err, e);
+                    break;
+                }
+            }
+        }
+    };
+
+    Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
+}
+
+pub fn is_parquet_file_not_found(e: &tonic::Status) -> bool {
+    e.code() == tonic::Code::Internal && {
+        let msg = e.message();
+        msg.find('{')
+            .and_then(|start| msg.rfind('}').map(|end| &msg[start..=end]))
+            .and_then(|json_part| infra::errors::ErrorCodes::from_json(json_part).ok())
+            .map(|err_code| {
+                err_code.get_code()
+                    == infra::errors::ErrorCodes::SearchParquetFileNotFound.get_code()
+            })
+            .unwrap_or(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::physical_plan::empty::EmptyExec;
+
+    use super::*;
+    use crate::datafusion::distributed::remote_scan::node::RemoteScanNode;
+
+    #[derive(Debug)]
+    struct TestNode;
+
+    impl config::meta::cluster::NodeInfo for TestNode {
+        fn get_grpc_addr(&self) -> String {
+            "localhost:9090".to_string()
+        }
+        fn get_auth_token(&self) -> String {
+            "token".to_string()
+        }
+        fn get_name(&self) -> String {
+            "test-node".to_string()
+        }
+        fn is_local(&self) -> bool {
+            true
+        }
+    }
+
+    fn make_remote_exec() -> RemoteScanExec {
+        let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
+        let node = RemoteScanNode {
+            nodes: vec![Arc::new(TestNode)],
+            opentelemetry_context: opentelemetry::Context::current(),
+            query_identifier: Default::default(),
+            search_infos: Default::default(),
+            index_info: Default::default(),
+            super_cluster_info: Default::default(),
+        };
+        RemoteScanExec::new(input, node).unwrap()
+    }
+
+    #[test]
+    fn test_remote_scan_exec_name() {
+        let exec = make_remote_exec();
+        assert_eq!(ExecutionPlan::name(&exec), "RemoteScanExec");
+    }
+
+    #[test]
+    fn test_remote_scan_exec_children_len() {
+        let exec = make_remote_exec();
+        assert_eq!(exec.children().len(), 1);
+    }
+
+    #[test]
+    fn test_remote_scan_exec_as_any() {
+        let exec = make_remote_exec();
+        let exec_plan: &dyn ExecutionPlan = &exec;
+        assert!(exec_plan.downcast_ref::<RemoteScanExec>().is_some());
+    }
+
+    #[test]
+    fn test_remote_scan_exec_metrics_some() {
+        let exec = make_remote_exec();
+        assert!(exec.metrics().is_some());
+    }
+
+    #[test]
+    fn test_remote_scan_exec_partial_err_empty() {
+        let exec = make_remote_exec();
+        assert!(exec.state.partial_err.lock().is_empty());
+    }
+
+    #[test]
+    fn test_remote_scan_exec_set_analyze() {
+        let exec = make_remote_exec();
+        assert!(!exec.analyze());
+        let exec = exec.set_analyze();
+        assert!(exec.analyze());
+    }
+
+    #[test]
+    fn test_remote_scan_exec_with_state() {
+        let state = RemoteScanState::default();
+        *state.partial_err.lock() = "pre-set".to_string();
+        let exec = make_remote_exec().with_state(state);
+        assert_eq!(*exec.state.partial_err.lock(), "pre-set");
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_true() {
+        let msg = r#"prefix text {"code":20006,"inner":""}"#;
+        let status = tonic::Status::new(tonic::Code::Internal, msg);
+        assert!(is_parquet_file_not_found(&status));
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_wrong_code() {
+        let msg = r#"{"code":20001,"inner":"bad sql"}"#;
+        let status = tonic::Status::new(tonic::Code::Internal, msg);
+        assert!(!is_parquet_file_not_found(&status));
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_non_internal_status() {
+        let status = tonic::Status::new(tonic::Code::NotFound, "not found");
+        assert!(!is_parquet_file_not_found(&status));
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_no_json() {
+        let status = tonic::Status::new(tonic::Code::Internal, "no json here");
+        assert!(!is_parquet_file_not_found(&status));
+    }
+}

@@ -39,6 +39,9 @@ pub struct GetAlertResponseBody {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListAlertsResponseBody {
     pub list: Vec<ListAlertsResponseBodyItem>,
+    /// A live read failed, so the rows' live fields may be blank or incomplete.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub status_unavailable: bool,
 }
 
 /// An item in the list returned by the `ListAlerts` endpoint.
@@ -78,7 +81,8 @@ pub struct ListAlertsResponseBodyItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_trained_at: Option<i64>,
     /// Scheduler status string. Only present for `anomaly_detection` items.
-    /// Values: "waiting" | "ready" | "training" | "failed" | "disabled"
+    /// Values: "waiting" | "ready" | "training" | "failed" | "disabled" | "waiting_for_data" |
+    /// "not_applicable"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     /// Last error message from training or detection. Only present for `anomaly_detection` items.
@@ -483,7 +487,10 @@ impl TryFrom<Vec<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>>
             .into_iter()
             .map(ListAlertsResponseBodyItem::try_from)
             .collect();
-        Ok(Self { list: rslt? })
+        Ok(Self {
+            list: rslt?,
+            status_unavailable: false,
+        })
     }
 }
 
@@ -878,6 +885,22 @@ mod tests {
         let v = serde_json::json!({ "anomaly_id": id, "name": "x" });
         let item = anomaly_config_to_list_item(&v).expect("should parse");
         assert_eq!(item.folder_id, "default");
+    }
+
+    #[test]
+    fn test_list_body_flags_unavailable_status_only_when_true() {
+        let body = |status_unavailable| ListAlertsResponseBody {
+            list: vec![],
+            status_unavailable,
+        };
+        assert_eq!(
+            serde_json::to_string(&body(false)).unwrap(),
+            r#"{"list":[]}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&body(true)).unwrap(),
+            r#"{"list":[],"status_unavailable":true}"#
+        );
     }
 
     #[test]

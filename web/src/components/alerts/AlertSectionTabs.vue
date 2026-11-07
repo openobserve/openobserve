@@ -15,10 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  AlertSectionTabs — the section switcher across the four alerting siblings
-  (All Alerts / Destinations / Templates / Library), rendered in an
-  OPageLayout's #header-tabs slot on each of them. Same order as the rail's
-  Reliability flyout.
+  AlertSectionTabs — the section switcher across the alerting siblings
+  (Firing / All Alerts / Destinations / Templates / Library), rendered in an
+  OPageLayout's #header-tabs slot on each of them.
 
   The routes stay FLAT top-level siblings (see shared/router.ts) — this is
   presentation, not nesting. Modelled on PipelineSectionTabs, which already
@@ -30,11 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTabs
       :model-value="activeSectionKey"
       align="left"
+      reorderable
       data-test="alert-section-tabs"
       @change="navigateToSection"
+      @reorder="onReorder"
     >
       <OTab
-        v-for="section in sections"
+        v-for="section in orderedSections"
         :key="section.key"
         :name="section.key"
         :data-test="`alert-section-tab-${section.key}`"
@@ -43,6 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span :class="section.key === activeSectionKey ? '' : 'max-md:hidden'">{{
           section.label
         }}</span>
+        <OTag
+          v-if="section.key === 'alertFiring' && firingCount !== null"
+          :variant="firingCount > 0 ? 'error-soft' : 'default-soft'"
+          size="sm"
+          data-test="alert-section-tab-alertFiring-badge"
+          :label="raw(String(firingCount))"
+        />
         <OIcon
           v-if="section.licenseLocked"
           name="lock"
@@ -57,23 +65,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
+import { useQuery } from "@tanstack/vue-query";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { firingAlertsQuery } from "@/services/alerts.queries";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { countStates } from "@/utils/alerts/firingAlerts";
 import { featureState } from "@/utils/featureGate";
+
+const TAB_ORDER_KEY = "o2_alert_section_tab_order";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
+
+const loadTabOrder = (): string[] => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TAB_ORDER_KEY) ?? "[]");
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+};
+
+const tabOrder = ref<string[]>(loadTabOrder());
 
 interface Section {
   /** Also the sibling route name — the two are deliberately the same string. */
@@ -101,6 +126,13 @@ const sections = computed<Section[]>(() => {
       ? []
       : [
           {
+            key: "alertFiring",
+            label: t("alerts.firing.title"),
+            icon: "notifications-active" as IconName,
+            to: { name: "alertFiring", query },
+            licenseLocked,
+          },
+          {
             key: "alertList",
             label: t("alerts.allAlerts"),
             icon: "shield-alert-outline" as IconName,
@@ -122,8 +154,7 @@ const sections = computed<Section[]>(() => {
       to: { name: "alertTemplates", query },
       licenseLocked,
     },
-    // Last: the catalog is where you go once to fetch an alert, not where you
-    // work. The rail's Reliability flyout lists these four in this same order.
+    // Last: the catalog is where you go once to fetch an alert, not where you work.
     ...(hideLibrary || alertsHidden
       ? []
       : [
@@ -138,7 +169,45 @@ const sections = computed<Section[]>(() => {
   ];
 });
 
-// Empty on any other route, so a page that renders this strip outside the four
+// A saved key with no section is dropped, and a section the save never knew is appended.
+const orderedSections = computed<Section[]>(() => {
+  const saved = tabOrder.value
+    .map((key) => sections.value.find((section) => section.key === key))
+    .filter((section): section is Section => !!section);
+  return [...saved, ...sections.value.filter((section) => !saved.includes(section))];
+});
+
+const onReorder = (move: { from: string | number; to: string | number; before: boolean }) => {
+  const [from, to] = [String(move.from), String(move.to)];
+  const order = orderedSections.value.map((section) => section.key);
+  if (!order.includes(from) || !order.includes(to) || from === to) return;
+  order.splice(order.indexOf(from), 1);
+  order.splice(order.indexOf(to) + (move.before ? 0 : 1), 0, from);
+  // A section hidden today keeps its saved slot, so unhiding it does not lose the user's order.
+  const unplaced = [...order];
+  const merged = tabOrder.value.map((key) => (order.includes(key) ? unplaced.shift()! : key));
+  merged.push(...unplaced);
+  tabOrder.value = merged;
+  try {
+    localStorage.setItem(TAB_ORDER_KEY, JSON.stringify(merged));
+  } catch {
+    // Storage unavailable: the order holds for this session only.
+  }
+};
+
+const firingList = useQuery(() =>
+  Object.assign(firingAlertsQuery(orgIdentifier.value), {
+    enabled:
+      !!orgIdentifier.value && featureState(store.state.zoConfig?.features, "alerts") === "enabled",
+  }),
+);
+// Blank run state would read as a confident zero, so the badge hides instead.
+const firingCount = computed(() => {
+  const page = firingList.data.value;
+  return page && !page.status_unavailable ? countStates(page.list).firing : null;
+});
+
+// Empty on any other route, so a page that renders this strip outside the
 // siblings highlights nothing rather than lying about where you are.
 const activeSectionKey = computed(() => {
   const name = router.currentRoute?.value?.name as string | undefined;

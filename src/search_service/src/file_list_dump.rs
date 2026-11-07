@@ -33,8 +33,8 @@ use itertools::Itertools;
 use rayon::slice::ParallelSliceMut;
 
 use crate::datafusion::{
+    datasource::uniontable::NewUnionTable,
     exec::{DataFusionContextBuilder, TableBuilder},
-    table_provider::uniontable::NewUnionTable,
 };
 
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {

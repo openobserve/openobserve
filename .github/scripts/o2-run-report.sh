@@ -11,6 +11,7 @@
 # Optional EXTRA_JSON (env): a JSON OBJECT the caller can pass to fold extra fields into the run
 # doc (e.g. test-case counts). Shallow-merged via jq `*` (EXTRA_JSON keys win on conflict). On any
 # parse/merge error the base payload is kept unchanged.
+# Optional MIRROR_STREAM (env): also post the run doc and shard rows there, same as the UI regression dual-write.
 #
 # Never fails the workflow: missing secrets or any API/ingest error only warns.
 set -uo pipefail
@@ -137,6 +138,7 @@ if [ -n "${EXTRA_JSON:-}" ] && printf '%s' "$EXTRA_JSON" | jq -e . >/dev/null 2>
 fi
 
 bash "$(dirname "$0")/o2-report.sh" "$STREAM" "$PAYLOAD_FILE"
+[ -n "${MIRROR_STREAM:-}" ] && bash "$(dirname "$0")/o2-report.sh" "$MIRROR_STREAM" "$PAYLOAD_FILE"
 
 # For runs with e2e shard jobs (UI), also emit one row per shard to <STREAM>_shards so dashboards
 # can break down per-shard duration / slowest shard / per-module health (mirrors ci_regression_shards).
@@ -154,5 +156,6 @@ shard_rows=$(printf '%s' "$THIS_JOBS" | jq -c --arg repo "$GITHUB_REPOSITORY" --
    }]' 2>/dev/null) && printf '%s' "$shard_rows" > "$SHARD_FILE" || { echo '[]' > "$SHARD_FILE"; echo "::warning::shard-row extraction failed — skipping ${STREAM}_shards"; }
 if [ "$(jq 'length' "$SHARD_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
   bash "$(dirname "$0")/o2-report.sh" "${STREAM}_shards" "$SHARD_FILE"
+  [ -n "${MIRROR_STREAM:-}" ] && bash "$(dirname "$0")/o2-report.sh" "${MIRROR_STREAM}_shards" "$SHARD_FILE"
 fi
 rm -f "$SHARD_FILE"
