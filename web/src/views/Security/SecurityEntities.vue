@@ -20,6 +20,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import SecurityRiskGraph from "@/components/security/SecurityRiskGraph.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -97,6 +98,12 @@ const pendingEntity = ref<string | null>(q.entity ? String(q.entity) : null);
 
 const windowEndUs = ref(Date.now() * 1000);
 const windowUs = computed(() => RANGES.find((r) => r.value === range.value)!.minutes * 60_000_000);
+
+const view = ref<"table" | "graph">("table");
+const VIEWS = [
+  { value: "table" as const, icon: "list" },
+  { value: "graph" as const, icon: "share" },
+];
 const windowStartUs = computed(() => windowEndUs.value - windowUs.value);
 
 function syncUrl() {
@@ -564,6 +571,10 @@ function step(delta: number) {
   const next = nav.neighbour(selected.value, delta);
   if (next) openEntity(next);
 }
+function onGraphNodeSelect(value: string) {
+  const row = filteredRows.value.find((r) => r.value === value);
+  if (row) openEntity(row);
+}
 /** Opens the entity named in the URL once rows are in. */
 function restorePending() {
   if (!pendingEntity.value) return;
@@ -816,6 +827,16 @@ const noSources = computed(
             {{ t(`siem.range.${r.value}`) }}
           </OToggleGroupItem>
         </OToggleGroup>
+        <OToggleGroup
+          :model-value="view"
+          data-test="security-entities-view"
+          @update:model-value="view = $event as 'table' | 'graph'"
+        >
+          <OToggleGroupItem v-for="v in VIEWS" :key="v.value" :value="v.value" size="sm">
+            <OIcon :name="v.icon" size="sm" />
+            {{ t(`siem.entities.view.${v.value}`) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
         <ORefreshButton
           :last-run-at="lastRunAt"
           :loading="loading"
@@ -876,6 +897,13 @@ const noSources = computed(
         icon="database"
         :title="t('siem.entities.noSources')"
         :description="t('siem.entities.noSourcesHint')"
+      />
+      <SecurityRiskGraph
+        v-else-if="view === 'graph'"
+        :rows="filteredRows"
+        :kind="kind"
+        data-test="security-entities-risk-graph"
+        @node-select="onGraphNodeSelect"
       />
       <OTable
         v-else
