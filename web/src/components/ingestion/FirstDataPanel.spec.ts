@@ -101,7 +101,11 @@ const makeStore = (
         isDataIngested: opts.ingested ?? false,
         organizationPasscode: opts.passcode ?? PASSCODE,
         organizationPasscodeForbidden: false,
-        orgTokens: [{ name: "default", token: PASSCODE, enabled: true }],
+        orgTokens: [
+          { name: "default", token: PASSCODE, enabled: true },
+          // A second token, so the snippet names the one it carries.
+          { name: "ci", token: "other", enabled: true },
+        ],
       },
     },
     mutations: {
@@ -199,7 +203,12 @@ const watchedSignal = () => (watchArgs.mock.calls[0]?.[1] as { value?: string })
 
 beforeEach(() => {
   credentialApi.list_org_ingestion_tokens.mockResolvedValue({
-    data: { data: [{ name: "default", token: PASSCODE, enabled: true }] },
+    data: {
+      data: [
+        { name: "default", token: PASSCODE, enabled: true },
+        { name: "ci", token: "other", enabled: true },
+      ],
+    },
   });
   credentialApi.get_organization_passcode.mockResolvedValue({
     data: { data: { passcode: USER_PASSCODE, user: "dev@acme.io" } },

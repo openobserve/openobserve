@@ -41,9 +41,9 @@ struct Sealed {
     from_number: String,
 }
 
-/// Upserts the account; needs a master key. [weak: may leave the org DEK row; a retry reuses it]
+/// Upserts the account; needs on-call secrets on. [weak: may leave the DEK row; retry reuses it]
 pub async fn put(org_id: &str, account: &StoredAccount, now: i64) -> Result<(), errors::Error> {
-    require_encryption(cipher::is_encrypting())?;
+    require_encryption(cipher::oncall_secrets_on())?;
     let dek = cipher::get_dek(org_id).await?;
     put_in(get_orm_client_rw().await, org_id, account, &dek, now).await
 }
@@ -61,13 +61,13 @@ pub async fn delete(org_id: &str) -> Result<bool, errors::Error> {
     delete_in(get_orm_client_rw().await, org_id).await
 }
 
-/// Refuses unless the DEKs are wrapped under a master key: a DEK alone exists in None mode too.
+/// Refuses unless `cipher::oncall_secrets_on`: a DEK alone exists without either key too.
 fn require_encryption(is_encrypting: bool) -> Result<(), errors::Error> {
     if is_encrypting {
         return Ok(());
     }
     Err(errors::Error::Message(
-        "org telephony accounts need O2_MASTER_ENCRYPTION_KEY set and stored secrets on"
+        "org telephony accounts need O2_MASTER_ENCRYPTION_KEY or O2_ONCALL_MASTER_KEY set and stored secrets on"
             .to_string(),
     ))
 }

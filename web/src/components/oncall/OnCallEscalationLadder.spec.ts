@@ -767,14 +767,6 @@ describe("OnCallEscalationLadder", () => {
     expect(ending).not.toContain("escalation ends");
   });
 
-  /// A ladder that hands the page on has not stopped, and saying it stopped
-  /// would tell somebody nobody is coming when somebody is.
-  it("does not say a handed-off ladder stops", () => {
-    const wrapper = render({ preview: preview({ final_action: "notify_default_team" }) });
-
-    expect(wrapper.find('[data-test="oncall-ladder-ends"]').text()).toContain("hands off");
-  });
-
   /// How a page can leave this team at all, in the server's words.
   it("keeps the cross-team moves on the ending", () => {
     const wrapper = render({

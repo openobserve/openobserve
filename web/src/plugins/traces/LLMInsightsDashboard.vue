@@ -1005,8 +1005,8 @@ const isEmpty = computed<boolean>(
 );
 
 // The integration guide the user most likely needs: the one whose docs page
-// they came from — the signup docs referrer (kept for the Get started dialog
-// until it is answered), else this page load's own referrer.
+// they came from — the signup docs referrer (kept for onboarding until the
+// first login ends), else this page load's own referrer.
 const suggestedIntegration = referredAiIntegration([readPrefill()?.referrer, document.referrer]);
 // The guides AI-docs visitors read most, as one-click chips (minus the suggested one).
 const popularIntegrations = POPULAR_AI_INTEGRATION_ROUTES.map(aiIntegrationByRoute).filter(

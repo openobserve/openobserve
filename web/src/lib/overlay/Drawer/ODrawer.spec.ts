@@ -345,6 +345,26 @@ describe("ODrawer", () => {
       await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       expect(wrapper.emitted("update:open")).toBeFalsy();
     });
+
+    it("stays open on an outside interaction when modal=false", async () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test", modal: false, seamless: true },
+      });
+      const panel = findDrawerPanel(wrapper);
+      const event = new CustomEvent("interactOutside", { cancelable: true });
+      await panel.vm.$emit("interactOutside", event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+
+    it("still closes on Escape when modal=false", async () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test", modal: false },
+      });
+      const panel = findDrawerPanel(wrapper);
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
+      expect(wrapper.emitted("update:open")?.[0]).toEqual([false]);
+    });
   });
   describe("close focus (returnFocusTo / after-close)", () => {
     const closeEvent = () => new Event("closeAutoFocus", { cancelable: true });

@@ -57,7 +57,7 @@
       </OToggleGroup>
     </div>
 
-    <div class="h-62.5 w-full">
+    <div :class="compact ? 'h-52' : 'h-62.5'" class="w-full">
       <PanelSchemaRenderer
         v-if="chartData"
         :height="5"
@@ -90,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import { toZonedTime } from "date-fns-tz";
 import { cloneDeep } from "lodash-es";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -108,9 +109,16 @@ import {
   withCompositeGroupLabel,
 } from "@/utils/alerts/aggregationPreviewQuery";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
+import { chartColor } from "@/utils/chartTheme";
 import { parseSearchError } from "@/utils/query/searchError";
 
-const props = defineProps<{ alert: any }>();
+const props = defineProps<{
+  alert: any;
+  /** Shades from this moment to now as the firing window. */
+  firingSinceUs?: number;
+  /** Shorter plot for a side panel. */
+  compact?: boolean;
+}>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -187,6 +195,7 @@ const build = async () => {
       queryCondition.value?.promql_warning_value,
     );
     Object.assign(panel.data.config, thresholdAxisBounds(panel.data.config.mark_line));
+    addFiringBand(panel.data.config);
     chartData.value = panel.data;
     return;
   }
@@ -321,8 +330,24 @@ const build = async () => {
   Object.assign(panel.data.config, thresholdAxisBounds(panel.data.config.mark_line));
 
   setTimeRange();
+  addFiringBand(panel.data.config);
   chartData.value = panel.data;
 };
+
+// Starts at the range to stay on the axis; zoned here because the renderer zones only the series.
+function addFiringBand(config: any) {
+  if (!props.firingSinceUs) return;
+  const { start_time, end_time } = selectedTimeObj.value;
+  const zoned = (ms: number) => toZonedTime(ms, store.state.timezone).getTime();
+  config.mark_area = [
+    {
+      axis: "x",
+      from: zoned(Math.max(props.firingSinceUs / 1000, start_time.getTime() / 1000)),
+      to: zoned(end_time.getTime() / 1000),
+      color: chartColor("--color-status-error-text"),
+    },
+  ];
+}
 
 /// MICROSECONDS into `new Date(...)`, deliberately: that is the convention
 /// `PanelSchemaRenderer` is fed everywhere else in the alert UI (see
@@ -337,6 +362,6 @@ function setTimeRange() {
   };
 }
 
-watch(() => props.alert, build);
+watch(() => [props.alert, props.firingSinceUs], build);
 onMounted(build);
 </script>

@@ -48,7 +48,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         ("table_name" = String, Path, description = "Table name"),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Saved enrichment table", body = ()),
+        (status = StatusCode::CREATED, description = "Saved enrichment table", body = MetaHttpResponse),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = ()),
     ),
     extensions(

@@ -257,10 +257,11 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     await assertPanelTimeInURL(page, panelIds[0], "1d");
 
     // Step 7: Test quick successive changes
-    await pm.dashboardPanelTime.clickPanelTimePicker(panelIds[0]);
-    await pm.dashboardPanelTime.timeRangeBtn('1-h').click();
-    await pm.dashboardPanelTime.timeRangeBtn('6-d').click();
-    await pm.dashboardPanelTime.timeRangeBtn('1-m').click();
+    // The panel picker auto-applies and closes on each pick, so each change reopens it
+    for (const range of ['1-h', '6-d', '1-m']) {
+      await pm.dashboardPanelTime.clickPanelTimePicker(panelIds[0]);
+      await pm.dashboardPanelTime.timeRangeBtn(range).click();
+    }
     await pm.dashboardPanelTime.clickDateTimeApply();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 

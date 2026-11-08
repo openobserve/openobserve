@@ -1534,7 +1534,9 @@ pub enum HavingNode {
 pub struct ResultSchemaResponse {
     pub projections: Vec<String>,
     pub group_by: Vec<String>,
+    // HavingNode nests itself, and a self-referencing schema hangs the OpenAPI walk.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
     pub having: Option<HavingNode>,
     pub timeseries_field: Option<String>,
     #[serde(default)]

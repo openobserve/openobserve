@@ -30,7 +30,7 @@ use datafusion::{
 
 use crate::datafusion::udf::fulltext::str_match;
 
-// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
+// TODO: duplication with datafusion/physical_optimizer/utils.rs
 pub(super) fn is_physical_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
     if expr.downcast_ref::<Column>().is_some() {
         true
@@ -41,7 +41,7 @@ pub(super) fn is_physical_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
     }
 }
 
-// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
+// TODO: duplication with datafusion/physical_optimizer/utils.rs
 pub(super) fn get_physical_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
     if let Some(expr) = expr.downcast_ref::<Column>() {
         expr.name()

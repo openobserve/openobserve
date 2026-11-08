@@ -220,12 +220,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-exemplars-toggle"
           @toggle="setExemplarOverride(!exemplarsOn)"
         />
-        <OIcon
+        <OButton
           v-if="!viewOnly && !simplifiedPanelView && props.data.description != ''"
-          name="info-outline"
-          size="sm"
-          class="cursor-pointer"
           :class="hoverRevealClass"
+          variant="ghost"
+          size="icon"
+          icon-left="info-outline"
+          :aria-label="t('dashboard.description')"
           data-test="dashboard-panel-description-info"
         >
           <OTooltip side="bottom" align="end" max-width="13.75rem">
@@ -233,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ><div class="whitespace-pre-wrap">{{ props.data.description }}</div></template
             >
           </OTooltip>
-        </OIcon>
+        </OButton>
         <OButton
           :class="hoverRevealClass"
           v-if="!viewOnly && !simplifiedPanelView"
@@ -269,13 +270,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :content="t('dashboard.panelContainer.dependentAdhocVariableWarning')"
           />
         </OButton>
-        <OIcon
+        <OButton
           v-if="PanleSchemaRendererRef?.failedAnnotationSources?.length"
-          name="error-outline"
-          size="sm"
-          class="text-text-secondary shrink-0"
+          variant="ghost"
+          size="icon"
+          icon-left="error-outline"
+          class="shrink-0"
           data-test="dashboard-panel-annotation-source-error"
-          :label="failedAnnotationSourcesLabel"
+          :aria-label="failedAnnotationSourcesLabel"
         >
           <OTooltip
             side="bottom"
@@ -283,14 +285,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             max-width="15rem"
             :content="failedAnnotationSourcesLabel"
           />
-        </OIcon>
-        <OIcon
+        </OButton>
+        <OButton
           v-if="PanleSchemaRendererRef?.truncatedAnnotationSources?.length"
-          name="info-outline"
-          size="sm"
-          class="text-text-secondary shrink-0"
+          variant="ghost"
+          size="icon"
+          icon-left="info-outline"
+          class="shrink-0"
           data-test="dashboard-panel-annotation-source-truncated"
-          :label="truncatedAnnotationSourcesLabel"
+          :aria-label="truncatedAnnotationSourcesLabel"
         >
           <OTooltip
             side="bottom"
@@ -298,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             max-width="15rem"
             :content="truncatedAnnotationSourcesLabel"
           />
-        </OIcon>
+        </OButton>
         <!-- show error here -->
         <!-- The title gives way first; this clips only past the title's floor, so refresh and the menu always stay in the panel. -->
         <!-- On a wall screen only a failure may draw the eye; the failed panel says so in its body. -->
@@ -329,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="variablesDataUpdated || isTimeRangeWaiting ? 'ghost-warning' : 'ghost'"
           size="icon"
           @click="() => onRefreshPanel(false)"
-          :title="t('panel.refreshPanel')"
+          :aria-label="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
           :disabled="isPanelLoading"
           icon-left="refresh"
@@ -342,10 +345,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon"
           @click="deletePanelDialog"
-          :title="t('panel.deletePanel')"
+          :aria-label="t('panel.deletePanel')"
           :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
           icon-left="close"
         >
+          <OTooltip side="bottom" :content="t('panel.deletePanel')" />
         </OButton>
 
         <!-- Only in viewOnly, so it can never sit beside the panel's own Create alert. -->

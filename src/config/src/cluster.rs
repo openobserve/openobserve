@@ -15,7 +15,7 @@
 
 use std::sync::{
     LazyLock as Lazy,
-    atomic::{AtomicI32, Ordering},
+    atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
 use crate::{
@@ -26,6 +26,7 @@ use crate::{
 pub static LOCAL_NODE_ID: AtomicI32 = AtomicI32::new(0);
 pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 pub static LOCAL_NODE_STATUS: AtomicI32 = AtomicI32::new(NodeStatus::Prepare as _);
+pub static LOCAL_NODE_SCHEDULED: AtomicBool = AtomicBool::new(false);
 pub static LOCAL_NODE: Lazy<Node> = Lazy::new(load_local_node);
 /// Random per process so a client cannot forge the MCP loopback marker.
 pub static MCP_LOOPBACK_SECRET: Lazy<String> =

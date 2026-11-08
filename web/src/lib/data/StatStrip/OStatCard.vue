@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { I18nText } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OStatCard — the reusable KPI / stat tile. The ONE stat primitive across the
@@ -15,8 +15,8 @@ import type { I18nText } from "@/types/i18n";
 //
 // Colour comes only from `tone` (token-backed, both themes). `clickable` makes it
 // a button (e.g. a filter tile); `selected` marks the active filter with an
-// accent BORDER (no fills). Value is shown verbatim — pass "—" for "no data";
-// a real 0 renders as "0".
+// accent BORDER (no fills), or in a tray strip a tone top bar. Value is shown verbatim unless
+// `compactValue` — pass "—" for "no data"; a real 0 renders as "0".
 
 import { computed, useSlots } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -25,6 +25,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { StatTone, StatTrend } from "./OStatStrip.types";
+import { formatCompactCount } from "@/utils/formatters";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 const { lgUp } = useBreakpoint();
@@ -48,50 +49,67 @@ const props = withDefaults(
     trend?: StatTrend;
     /** Denominator for the proportion bar (this stat's share of the whole). */
     max?: number;
+    /** Show a numeric value as "819.5K"; the exact number moves to the tooltip. */
+    compactValue?: boolean;
     /** Render as a button with hover feedback (e.g. a filter tile). */
     clickable?: boolean;
-    /** Active-filter state — accent border. */
+    /** Active-filter state. */
     selected?: boolean;
+    /** Set by a tray strip so the tile renders as a tab. */
+    tray?: boolean;
     /** Placeholder for the value until it first arrives; a 0 shown meanwhile reads as a real count. */
     loading?: boolean;
     dataTest?: string;
   }>(),
-  { tone: "neutral", clickable: false, selected: false, loading: false },
+  {
+    tone: "neutral",
+    clickable: false,
+    selected: false,
+    tray: false,
+    loading: false,
+    compactValue: false,
+  },
 );
 
 const slots = useSlots();
 
-// tone → { icon-chip, value-text, proportion-bar } classes. All token-backed.
-const TONES: Record<StatTone, { chip: string; value: string; bar: string }> = {
+// tone → { icon-chip, value-text, proportion-bar, tray top-bar } classes. All token-backed.
+const TONES: Record<StatTone, { chip: string; value: string; bar: string; top: string }> = {
   success: {
     chip: "bg-icon-chip-success-bg text-icon-chip-success-text",
     value: "text-icon-chip-success-text",
     bar: "bg-success-500",
+    top: "border-t-success-500",
   },
   warning: {
     chip: "bg-icon-chip-warning-bg text-icon-chip-warning-text",
     value: "text-icon-chip-warning-text",
     bar: "bg-warning-500",
+    top: "border-t-warning-500",
   },
   error: {
     chip: "bg-icon-chip-error-bg text-icon-chip-error-text",
     value: "text-icon-chip-error-text",
     bar: "bg-error-500",
+    top: "border-t-error-500",
   },
   primary: {
     chip: "bg-icon-chip-primary-bg text-icon-chip-primary-text",
     value: "text-icon-chip-primary-text",
     bar: "bg-accent",
+    top: "border-t-accent",
   },
   info: {
     chip: "bg-icon-chip-info-bg text-icon-chip-info-text",
     value: "text-icon-chip-info-text",
     bar: "bg-icon-chip-info-text",
+    top: "border-t-icon-chip-info-text",
   },
   orange: {
     chip: "bg-icon-chip-orange-bg text-icon-chip-orange-text",
     value: "text-icon-chip-orange-text",
     bar: "bg-icon-chip-orange-text",
+    top: "border-t-icon-chip-orange-text",
   },
   // Decorative tones — reuse the OTag badge-soft tokens so a stat tile matches
   // the chip colour of the same value (scorerType, evalDataType, …) exactly.
@@ -99,21 +117,25 @@ const TONES: Record<StatTone, { chip: string; value: string; bar: string }> = {
     chip: "bg-badge-blue-soft-bg text-badge-blue-soft-text",
     value: "text-badge-blue-soft-text",
     bar: "bg-badge-blue-soft-text",
+    top: "border-t-badge-blue-soft-text",
   },
   teal: {
     chip: "bg-badge-teal-soft-bg text-badge-teal-soft-text",
     value: "text-badge-teal-soft-text",
     bar: "bg-badge-teal-soft-text",
+    top: "border-t-badge-teal-soft-text",
   },
   purple: {
     chip: "bg-badge-purple-soft-bg text-badge-purple-soft-text",
     value: "text-badge-purple-soft-text",
     bar: "bg-badge-purple-soft-text",
+    top: "border-t-badge-purple-soft-text",
   },
   neutral: {
     chip: "bg-surface-subtle text-text-secondary",
     value: "text-text-heading",
     bar: "bg-text-muted",
+    top: "border-t-accent",
   },
 };
 
@@ -122,7 +144,14 @@ const tc = computed(() => TONES[props.tone ?? "neutral"] ?? TONES.neutral);
 // (nothing to draw attention to) — only a positive value gets the tone colour.
 const displayValue = computed(() => {
   const v = props.value;
-  return v === "" || v == null || v === "—" ? "—" : v;
+  if (v === "" || v == null || v === "—") return "—";
+  return props.compactValue && typeof v === "number" ? formatCompactCount(v) : v;
+});
+const exactTitle = computed(() => {
+  const v = props.value;
+  return props.compactValue && typeof v === "number" && String(v) !== displayValue.value
+    ? raw(v.toLocaleString())
+    : undefined;
 });
 const isMuted = computed(() => {
   const v = props.value;
@@ -154,11 +183,24 @@ const trendClass = computed(() =>
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
     :aria-pressed="clickable ? String(selected) : undefined"
-    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors max-lg:px-1.5"
+    class="flex min-w-0 flex-col justify-center gap-1 overflow-hidden px-2.5 py-1 text-left transition-colors max-lg:px-1.5"
     :class="[
-      selected ? 'border-accent' : 'border-border-default',
+      tray
+        ? 'focus-visible:outline-accent focus-visible:outline-2 focus-visible:-outline-offset-2'
+        : '',
+      tray
+        ? selected
+          ? ['bg-table-header-bg rounded-t-default relative z-10 border-t-2 py-2', tc.top]
+          : [
+              'rounded-default border-t-2 border-transparent py-2',
+              clickable ? 'hover:bg-surface-base/60' : '',
+            ]
+        : [
+            'rounded-default bg-surface-base border',
+            selected ? 'border-accent' : 'border-border-default',
+            clickable && !selected ? 'hover:border-accent' : '',
+          ],
       clickable ? 'cursor-pointer' : '',
-      clickable && !selected ? 'hover:border-accent' : '',
     ]"
     :title="label && !lgUp ? String(label) : undefined"
     :data-test="dataTest"
@@ -180,6 +222,7 @@ const trendClass = computed(() =>
             data-test="o-stat-card-value-skeleton"
           />
           <slot v-else name="value">{{ displayValue }}</slot>
+          <OTooltip v-if="exactTitle" :content="exactTitle" />
         </span>
         <OTruncatedText v-if="label" class="text-text-secondary text-xs font-medium">{{
           label
@@ -208,7 +251,9 @@ const trendClass = computed(() =>
       <span
         v-if="icon || slots.icon"
         class="rounded-default grid h-7 w-7 shrink-0 place-items-center max-lg:h-6 max-lg:w-6"
-        :class="tc.chip"
+        :class="
+          tray && !selected && tone === 'neutral' ? 'bg-surface-base text-text-secondary' : tc.chip
+        "
       >
         <slot name="icon">
           <!-- 20px glyph: the step between OIcon's sm (16px) and md (24px), so the
@@ -219,7 +264,10 @@ const trendClass = computed(() =>
     </div>
     <!-- Track is always rendered so the card height never shifts as data loads;
          only the fill width changes. -->
-    <div class="bg-surface-subtle h-1 overflow-hidden rounded-full">
+    <div
+      class="h-1 overflow-hidden rounded-full"
+      :class="tray && !selected ? 'bg-surface-base' : 'bg-surface-subtle'"
+    >
       <div
         class="h-full rounded-full transition-all duration-300"
         :class="tc.bar"

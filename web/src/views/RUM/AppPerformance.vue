@@ -63,7 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @trigger="refreshData"
         />
         <OButtonGroup>
-          <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
           <OTooltip
             :content="
               isAutoRunOn

@@ -63,13 +63,14 @@ pub struct ServiceGraphQuery {
         ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph topology"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::service_graph::ServiceGraphData),
         (status = 400, description = "Invalid time window (negative start_time, end_time not after start_time, end_time more than a day ahead, or longer than the data retention, at least 3650 days) or a stream name the metrics query cannot quote", content_type = "application/json", body = String),
         (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_topology"}))
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
 #[cfg(feature = "enterprise")]
@@ -164,7 +165,7 @@ pub struct EdgeHistoryQuery {
         ("stream_name" = Option<String>, Query, description = "Trace stream filter"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::service_graph::EdgeTrendResponse),
         (status = 400, description = "Invalid time window (negative start_time, end_time not after start_time, end_time more than a day ahead, or longer than the data retention, at least 3650 days), or a service or stream name the metrics query cannot quote", content_type = "application/json", body = String),
         (status = 403, description = "Forbidden - Enterprise feature"),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
@@ -239,6 +240,10 @@ pub async fn get_edge_history(
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
+    )
 )]
 #[cfg(not(feature = "enterprise"))]
 pub async fn get_current_topology(

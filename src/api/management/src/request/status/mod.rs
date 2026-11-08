@@ -36,6 +36,7 @@ use config::{
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
         slack::DisabledReason,
+        stream::DataRetentionDefaults,
         user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
@@ -145,7 +146,7 @@ pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
 }
 
 /// Authenticated full UI configuration (`GET /api/{org_id}/config`).
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct ConfigResponse<'a> {
     version: String,
     commit_hash: String,
@@ -160,8 +161,11 @@ struct ConfigResponse<'a> {
     sql_base64_enabled: bool,
     timestamp_column: String,
     data_retention_days: i64,
+    data_retention_defaults: DataRetentionDefaults,
+    resolved_data_retention: DataRetentionDefaults,
     extended_data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
+    sample_data_onboarding_enabled: bool,
     sso_enabled: bool,
     native_login_enabled: bool,
     service_account_enabled: bool,
@@ -279,7 +283,7 @@ struct ConfigResponse<'a> {
 }
 
 #[cfg(feature = "enterprise")]
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct LicenseConfig {
     license_expiry: i64,
     license_server_url: String,
@@ -292,7 +296,7 @@ struct LicenseConfig {
 
 /// Cloud never shows the license search banner, so it does not serve these fields.
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct LicenseSearchConfig {
     license_search_allowed: bool,
     license_waiver_until: Option<i64>,
@@ -332,7 +336,8 @@ struct ConfigBootstrapResponse {
     editor_suggest_mode: String,
 }
 
-#[derive(Serialize, serde::Deserialize)]
+#[derive(Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[schema(as = RumConfig)]
 struct Rum {
     pub enabled: bool,
     pub client_token: String,
@@ -377,6 +382,7 @@ impl Rum {
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
     ),
+    security(),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -488,7 +494,7 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = ConfigResponse<'static>),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
@@ -692,8 +698,13 @@ pub async fn zo_config(
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         data_retention_days: cfg.compact.data_retention_days,
+        data_retention_defaults: db::organization::resolved_retention_defaults(
+            &DataRetentionDefaults::default(),
+        ),
+        resolved_data_retention: org_resolved_retention(&org_id).await,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
+        sample_data_onboarding_enabled: cfg.common.sample_data_onboarding_enabled,
         sso_enabled,
         native_login_enabled,
         service_account_enabled,
@@ -808,6 +819,17 @@ async fn license_config(license_server_url: String) -> LicenseConfig {
             now_micros(),
         ),
     }
+}
+
+// Every org member reads this response, unlike org settings, so stream pages can rely on it.
+async fn org_resolved_retention(org_id: &str) -> DataRetentionDefaults {
+    let org = db::organization::org_retention_defaults(org_id)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[RETENTION] org {org_id} settings unreadable for config: {e}");
+            DataRetentionDefaults::default()
+        });
+    db::organization::resolved_retention_defaults(&org)
 }
 
 /// The route check of `GET /{org}/search/profile`, so the UI hides what the caller may not use.
@@ -2652,6 +2674,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_zo_config_serves_the_global_and_merged_retention() {
+        let org_id = "zo_config_retention_org";
+        #[cfg(feature = "enterprise")]
+        crate::common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(
+                format!("{}/{org_id}", db::organization::ORG_SETTINGS_KEY_PREFIX),
+                crate::common::meta::organization::OrganizationSetting {
+                    data_retention: DataRetentionDefaults {
+                        default: 50,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            );
+        let response = zo_config(Path(org_id.to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let global = db::organization::resolved_retention_defaults(&Default::default());
+        assert_eq!(
+            json["data_retention_defaults"],
+            serde_json::to_value(global).unwrap()
+        );
+        #[cfg(not(feature = "enterprise"))]
+        assert_eq!(
+            json["resolved_data_retention"],
+            serde_json::to_value(global).unwrap()
+        );
+        #[cfg(feature = "enterprise")]
+        assert_eq!(json["resolved_data_retention"]["logs"], 50);
+    }
+
+    #[tokio::test]
     async fn test_zo_config_serves_the_public_dashboard_refresh_floor() {
         let response = zo_config(Path("default".to_string()), None)
             .await
@@ -2740,6 +2800,14 @@ mod tests {
             assert_eq!(
                 json["feature_names"][key].as_str(),
                 gate.display_name.as_deref(),
+                "{key}"
+            );
+        }
+        for feature in Feature::all() {
+            let key: &str = feature.into();
+            assert_eq!(
+                runtime_definition().features[key].display_name.as_deref(),
+                Some(feature.display_name()),
                 "{key}"
             );
         }

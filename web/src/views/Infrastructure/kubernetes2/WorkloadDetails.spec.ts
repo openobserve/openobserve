@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import i18n from "@/locales";
 import store from "@/stores";
@@ -309,5 +309,96 @@ describe("WorkloadDetails: CronJob, Job, PVC, HPA, Namespace", () => {
 
   it("shows a namespace's status", () => {
     expect(value(mountRow(inventory.namespaces[0]), "status")).toBe("Active");
+  });
+});
+
+describe("WorkloadDetails: Age and Pods sort by value, not text", () => {
+  const END = 1_800_000_000_000_000;
+  const SEC = 1_000_000;
+  const AGES = [
+    { name: "rs-2h", secs: 7200, ready: 1 },
+    { name: "rs-30s", secs: 30, ready: 10 },
+    { name: "rs-5m", secs: 300, ready: 2 },
+    { name: "rs-2m", secs: 120, ready: 3 },
+  ];
+
+  const mountReal = (row: AnyRow, inv: Inventory) =>
+    mount(WorkloadDetails, {
+      props: { row, inventory: inv, end: END },
+      global: { plugins: [i18n, store], stubs: { RelatedPodsTable: true } },
+    });
+
+  const names = (section: ReturnType<typeof mountReal>, testId: string) =>
+    section
+      .find(`[data-test="${testId}"]`)
+      .findAll('[data-test="o2-table-cell-name"]')
+      .map((c) => c.text());
+
+  const sortBy = async (wrapper: ReturnType<typeof mountReal>, testId: string, col: string) => {
+    await wrapper
+      .find(
+        `[data-test="${testId}"] [data-test="o2-table-th-${col}"] [data-test="o2-table-th-sort-trigger"]`,
+      )
+      .trigger("click");
+    await flushPromises();
+  };
+
+  it("sorts Revisions by creation time and by ready then desired pods", async () => {
+    const deployment = find(inventory.deployments, "web");
+    const template = find(inventory.replicasets, "web-abc");
+    const inv: Inventory = {
+      ...inventory,
+      replicasets: AGES.map((a) => ({
+        ...template,
+        key: a.name,
+        name: a.name,
+        createdAt: END - a.secs * SEC,
+        ready: a.ready,
+        desired: 12,
+      })),
+    };
+    const wrapper = mountReal(deployment, inv);
+    await flushPromises();
+    const table = wrapper.find('[data-test="k8s2-wl-revisions"]');
+    expect(
+      table.findAll('[data-test="o2-table-th-warn"] [data-test="o2-table-th-sort-trigger"]'),
+    ).toHaveLength(0);
+    await sortBy(wrapper, "k8s2-wl-revisions", "age");
+    expect(names(wrapper, "k8s2-wl-revisions")).toEqual(["rs-30s", "rs-2m", "rs-5m", "rs-2h"]);
+    await sortBy(wrapper, "k8s2-wl-revisions", "age");
+    expect(names(wrapper, "k8s2-wl-revisions")).toEqual(["rs-2h", "rs-5m", "rs-2m", "rs-30s"]);
+    await sortBy(wrapper, "k8s2-wl-revisions", "pods");
+    expect(names(wrapper, "k8s2-wl-revisions")).toEqual(["rs-30s", "rs-2m", "rs-5m", "rs-2h"]);
+    expect(table.find('[data-test="o2-table-cell-age"]').text()).toMatch(/^\d+[smhd]$/);
+  });
+
+  it("sorts a CronJob's Jobs by creation time and caps and resizes both tables", async () => {
+    const cronjob = {
+      ...find(inventory.cronjobs, "nightly-report"),
+      jobs: AGES.map((a) => a.name),
+    };
+    const template = find(inventory.jobs, "nightly-report-1");
+    const inv: Inventory = {
+      ...inventory,
+      jobs: AGES.map((a) => ({
+        ...template,
+        key: a.name,
+        name: a.name,
+        createdAt: END - a.secs * SEC,
+      })),
+    };
+    const wrapper = mountReal(cronjob, inv);
+    await flushPromises();
+    await sortBy(wrapper, "k8s2-wl-jobs", "age");
+    expect(names(wrapper, "k8s2-wl-jobs")).toEqual(["rs-30s", "rs-2m", "rs-5m", "rs-2h"]);
+    expect(wrapper.findComponent({ name: "OTable" }).props()).toMatchObject({
+      enableColumnResize: true,
+      maxHeight: "70vh",
+    });
+    const deployment = mountReal(find(inventory.deployments, "web"), inventory);
+    expect(deployment.findAllComponents({ name: "OTable" })[0].props()).toMatchObject({
+      enableColumnResize: true,
+      maxHeight: "70vh",
+    });
   });
 });

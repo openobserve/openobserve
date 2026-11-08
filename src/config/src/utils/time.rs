@@ -123,6 +123,18 @@ pub fn try_parse_i64_to_timestamp_micros(v: i64) -> Option<i64> {
 }
 
 #[inline(always)]
+pub fn parse_f64_to_timestamp_micros(v: f64) -> i64 {
+    let whole = v as i64;
+    let micros = parse_i64_to_timestamp_micros(whole);
+    match micros.checked_div(whole) {
+        Some(unit) if micros != i64::MIN => {
+            micros.saturating_add((v.fract() * unit as f64).round() as i64)
+        }
+        _ => micros,
+    }
+}
+
+#[inline(always)]
 pub fn parse_str_to_timestamp_micros(v: &str) -> Result<i64, anyhow::Error> {
     match v.parse() {
         Ok(i) => Ok(parse_i64_to_timestamp_micros(i)),
@@ -136,8 +148,8 @@ pub fn parse_str_to_timestamp_micros(v: &str) -> Result<i64, anyhow::Error> {
 #[inline(always)]
 pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
     if let Ok(v) = s.parse::<f64>() {
-        let v = parse_i64_to_timestamp_micros(v as i64);
-        return Ok(Utc.timestamp_nanos(v * 1000));
+        return DateTime::from_timestamp_micros(parse_f64_to_timestamp_micros(v))
+            .ok_or_else(|| anyhow::anyhow!("invalid time format [string]"));
     }
 
     let s = s.trim_matches('"');
@@ -189,10 +201,7 @@ pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<(i64, bool), 
             } else if let Some(n) = n.as_u64() {
                 Ok(parse_timestamp_micro_from_integer(n as i64))
             } else if n.is_f64() {
-                Ok((
-                    parse_i64_to_timestamp_micros(n.as_f64().unwrap() as i64),
-                    false,
-                ))
+                Ok((parse_f64_to_timestamp_micros(n.as_f64().unwrap()), false))
             } else {
                 Err(anyhow::anyhow!("Invalid time format [timestamp]"))
             }
@@ -213,6 +222,33 @@ pub fn parse_timestamp_micro_from_str(s: &str) -> Result<(i64, bool), anyhow::Er
 pub fn parse_timestamp_micro_from_integer(ts: i64) -> (i64, bool) {
     let new_ts = parse_i64_to_timestamp_micros(ts);
     (new_ts, ts > 0 && new_ts == ts)
+}
+
+/// The shortest anomaly detection schedule; a stored row below it runs at this cadence.
+pub const MIN_ANOMALY_SCHEDULE_SECONDS: i64 = 60;
+
+/// Parse "90s" / "30m" / "1h" / "1d" into seconds — §4.5's one grammar with the UI form.
+pub fn parse_interval(interval: &str) -> Result<i64, anyhow::Error> {
+    let (value, unit_seconds) = if let Some(stripped) = interval.strip_suffix('s') {
+        (stripped, 1)
+    } else if let Some(stripped) = interval.strip_suffix('m') {
+        (stripped, 60)
+    } else if let Some(stripped) = interval.strip_suffix('h') {
+        (stripped, 3600)
+    } else if let Some(stripped) = interval.strip_suffix('d') {
+        (stripped, 86400)
+    } else {
+        anyhow::bail!("Invalid interval format. Use a number plus 's', 'm', 'h' or 'd'");
+    };
+    let value: i64 = value.parse().map_err(|_| {
+        anyhow::anyhow!(
+            "Invalid interval format ('{interval}'). Use a number plus 's', 'm', 'h' or 'd'"
+        )
+    })?;
+    // A positive wrap lands on a plausible schedule that clears every downstream guard.
+    value
+        .checked_mul(unit_seconds)
+        .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
 }
 
 pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
@@ -777,6 +813,45 @@ mod tests {
         let (ts, is_valid) = result.unwrap();
         assert!(ts > 0);
         assert!(!is_valid); // f64 sets is_i64=false → is_valid=false
+    }
+
+    #[test]
+    fn test_parse_timestamp_micro_from_value_keeps_fractional_epoch() {
+        let v_exp_arr = [
+            (json::json!(1762596925.123456f64), 1762596925123456),
+            (json::json!(1762596925.9f64), 1762596925900000),
+            (json::json!(1762596925123.456f64), 1762596925123456),
+            (json::json!(1762596925123456.0f64), 1762596925123456),
+            (json::json!(-1.5f64), -1500000),
+            (json::json!("1762596925.123456"), 1762596925123456),
+            (json::json!("1762596925.9"), 1762596925900000),
+        ];
+        for (input, v_exp) in v_exp_arr {
+            let got = parse_timestamp_micro_from_value(&input)
+                .ok()
+                .map(|(ts, _)| ts);
+            assert_eq!(got, Some(v_exp), "{input}");
+        }
+        assert_eq!(
+            parse_str_to_timestamp_micros("1762596925.123456").ok(),
+            Some(1762596925123456)
+        );
+    }
+
+    #[test]
+    fn test_fractional_epoch_at_i64_boundaries() {
+        let got = parse_timestamp_micro_from_value(&json::json!(-9223372036854.9f64))
+            .ok()
+            .map(|(ts, _)| ts);
+        assert_eq!(got, Some(i64::MIN));
+        assert_eq!(
+            parse_str_to_timestamp_micros("9223372036.9").ok(),
+            Some(9223372036900000)
+        );
+        assert_eq!(
+            parse_str_to_timestamp_micros("-9223372036.9").ok(),
+            Some(-9223372036900000)
+        );
     }
 
     #[test]

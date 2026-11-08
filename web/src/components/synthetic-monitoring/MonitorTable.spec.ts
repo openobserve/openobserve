@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import MonitorTable from "./MonitorTable.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -605,6 +605,93 @@ describe("MonitorTable", () => {
     });
   });
 
+  describe("response time colour", () => {
+    const STATUS_CLASSES = [
+      "text-status-success-text",
+      "text-status-warning-text",
+      "text-status-error-text",
+    ];
+
+    function responseCell(
+      type: string,
+      responseTime: number,
+      text: string,
+      mode: "all" | "browser",
+    ) {
+      wrapper = mountMonitorTable({
+        mode,
+        data: [{ ...mockMonitorList[0], type, responseTime }],
+      });
+      const cell = wrapper.findAll("span.font-mono").find((s) => s.text() === text);
+      if (!cell) throw new Error(`no cell showing ${text}`);
+      return cell;
+    }
+
+    it.each(["all", "browser"] as const)("leaves a browser check neutral in %s mode", (mode) => {
+      const classes = responseCell("BROWSER", 62579, "62.58 s", mode).classes();
+      STATUS_CLASSES.forEach((c) => expect(classes).not.toContain(c));
+      expect(classes).toEqual(expect.arrayContaining(["font-mono", "text-sm", "font-semibold"]));
+    });
+
+    it.each([
+      ["HTTP", 85, "85 ms", "text-status-success-text"],
+      ["HTTP", 500, "500 ms", "text-status-warning-text"],
+      ["HTTP", 1296, "1.30 s", "text-status-error-text"],
+      ["TCP", 85, "85 ms", "text-status-success-text"],
+      ["TLS", 500, "500 ms", "text-status-warning-text"],
+      ["SSH", 1296, "1.30 s", "text-status-error-text"],
+    ])("colours a %s check at %d by the latency limits", (type, ms, text, expected) => {
+      const classes = responseCell(type, ms, text, "all").classes();
+      STATUS_CLASSES.forEach((c) => {
+        if (c === expected) expect(classes).toContain(c);
+        else expect(classes).not.toContain(c);
+      });
+    });
+  });
+
+  describe("response time value", () => {
+    it("shows 0 ms for a zero and a dash for no value", () => {
+      wrapper = mountMonitorTable({
+        data: [
+          { ...mockMonitorList[0], id: "a", responseTime: 0 },
+          { ...mockMonitorList[0], id: "b", responseTime: null },
+        ],
+      });
+      expect(wrapper.findAll("span.font-mono").some((s) => s.text() === "0 ms")).toBe(true);
+      expect(wrapper.findAll("span.text-sm").some((s) => s.text() === "—")).toBe(true);
+    });
+
+    it("sorts by duration through the real table, with no value last in both directions", async () => {
+      const data = [85, null, 62579, 1296].map((responseTime, i) => ({
+        ...mockMonitorList[0],
+        id: `m${i}`,
+        name: `check-${responseTime}`,
+        responseTime,
+      }));
+      wrapper = mount(MonitorTable, {
+        props: { mode: "all", data },
+        global: { plugins: [i18n, store], stubs: { Teleport: true } },
+      });
+      const order = () =>
+        wrapper
+          .findAll("tbody span.font-mono.font-semibold")
+          .map((s) => s.text())
+          .filter((text) => text.endsWith("s"));
+      const header = wrapper.find('[data-test="o2-table-th-responseTime"]');
+      const sort = header.find('[data-test="o2-table-th-sort-trigger"]');
+      await sort.trigger("click");
+      await flushPromises();
+      expect(order()).toEqual(["62.58 s", "1.30 s", "85 ms"]);
+      const rows = wrapper.findAll("tbody tr").map((r) => r.text());
+      expect(rows.findIndex((r) => r.includes("check-null"))).toBe(rows.length - 1);
+      await sort.trigger("click");
+      await flushPromises();
+      expect(order()).toEqual(["85 ms", "1.30 s", "62.58 s"]);
+      const ascending = wrapper.findAll("tbody tr").map((r) => r.text());
+      expect(ascending.findIndex((r) => r.includes("check-null"))).toBe(ascending.length - 1);
+    });
+  });
+
   // `steps` is the server's expanded count; `referencedBy` counts checks using this one.
   describe("steps and used-by cells", () => {
     it("renders the expanded step count and the used-by count in browser mode", () => {
@@ -772,13 +859,19 @@ describe("MonitorTable", () => {
         expect(locTooltip.find(".cursor-pointer").exists()).toBe(true);
       });
 
-      it("shows +N badge when more than one location", () => {
+      it("shows +N badge when more than one location", async () => {
+        const widths = [
+          vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100),
+          vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(60),
+        ];
         wrapper = mountMonitorTable();
+        await flushPromises();
         // Row 0 (mockMonitorHttp): 2 locations => "+1"
         // Row 2 (mockMonitorBrowser): 3 locations => "+2"
         const text = wrapper.text();
         expect(text).toContain("+1");
         expect(text).toContain("+2");
+        widths.forEach((spy) => spy.mockRestore());
       });
 
       it("does not show count badge when only one location", () => {

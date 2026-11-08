@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="
                           (val) => {
                             userSelectedAlertName[index] = val as string;
-                            updateAlertName(val as string, index);
+                            updateAlertName(val as string, alertErrorItems[index]);
                           }
                         "
                       />
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="
                           (val) => {
                             userSelectedStreamName[index] = val as string;
-                            updateStreamFields(val as string, index);
+                            updateStreamFields(val as string, alertErrorItems[index]);
                           }
                         "
                       />
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="
                           (val) => {
                             userSelectedDestinations[index] = val as string[];
-                            updateUserSelectedDestinations(val as string[], index);
+                            updateUserSelectedDestinations(val as string[], alertErrorItems[index]);
                           }
                         "
                       />
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="
                           (val) => {
                             userSelectedStreamType[index] = val as string;
-                            updateStreams(val as string, index);
+                            updateStreams(val as string, alertErrorItems[index]);
                           }
                         "
                       />
@@ -230,32 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="
                           (val) => {
                             userSelectedTimezone[index] = val as string;
-                            updateTimezone(val as string, index);
-                          }
-                        "
-                      />
-                    </div>
-                  </span>
-                  <span
-                    class="text-status-negative"
-                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'org_id'"
-                  >
-                    {{ errorMessage.message }}
-                    <div class="w-75">
-                      <OSelect
-                        data-test="alert-import-org-id-input"
-                        :model-value="userSelectedOrgId[index] || null"
-                        :options="organizationDataList"
-                        :label="t('alerts.organizationIdLabel')"
-                        labelKey="label"
-                        valueKey="value"
-                        @update:model-value="
-                          (val) => {
-                            userSelectedOrgId[index] = val;
-                            updateOrgId(
-                              ((val as unknown as { value?: string })?.value || val) as string,
-                              index,
-                            );
+                            updateTimezone(val as string, alertErrorItems[index]);
                           }
                         "
                       />
@@ -373,6 +348,8 @@ export default defineComponent({
 
     const baseImportRef = ref<any>(null);
     const alertErrorsToDisplay = ref<AlertErrors>([]);
+    // The JSON item each error group belongs to; groups skip the items that passed.
+    const alertErrorItems = ref<number[]>([]);
     const templateErrorsToDisplay = ref<any>([]);
     const destinationErrorsToDisplay = ref<any>([]);
     const userSelectedDestinations = ref<string[][]>([]);
@@ -412,17 +389,6 @@ export default defineComponent({
     );
     const activeFolderAlerts = ref<any>([]);
     const isAlertImporting = ref(false);
-    const userSelectedOrgId = ref<any[]>([]);
-    const organizationDataList = computed(() => {
-      return store.state.organizations.map((org: any) => {
-        return {
-          label: raw(org.identifier),
-          value: org.identifier,
-          disabled:
-            !org.identifier || org.identifier !== store.state.selectedOrganization.identifier,
-        };
-      });
-    });
 
     const getFormattedDestinations: any = computed(() => {
       return props.destinations.map((destination: any) => {
@@ -492,6 +458,7 @@ export default defineComponent({
 
     const importJson = async ({ jsonStr: jsonString }: any) => {
       alertErrorsToDisplay.value = [];
+      alertErrorItems.value = [];
       templateErrorsToDisplay.value = [];
       destinationErrorsToDisplay.value = [];
       alertCreators.value = [];
@@ -642,22 +609,6 @@ export default defineComponent({
         alertErrors.push({
           message: t("alerts.import.nameRequired", { index }),
           field: "alert_name",
-        });
-      }
-
-      // 2. Validate 'org_id' field
-      if (
-        !input.org_id ||
-        typeof input.org_id !== "string" ||
-        input.org_id.trim() === "" ||
-        input.org_id != store.state.selectedOrganization.identifier
-      ) {
-        alertErrors.push({
-          message: t("alerts.import.orgIdInvalid", {
-            index,
-            orgId: store.state.selectedOrganization.identifier,
-          }),
-          field: "org_id",
         });
       }
 
@@ -911,8 +862,8 @@ export default defineComponent({
         alertErrors.push(t("alerts.import.cronExpressionInvalid", { index }));
       }
 
-      // Absent or empty is valid; null is not, since the server reads it as a wrong type.
-      if (input.destinations !== undefined && !Array.isArray(input.destinations)) {
+      // Absent, empty or null is valid; createAlert sends null as an empty list.
+      if (input.destinations != null && !Array.isArray(input.destinations)) {
         alertErrors.push({
           message: t("alerts.import.destinationsArray", { index }),
           field: "destination_name",
@@ -966,6 +917,7 @@ export default defineComponent({
           updateUserSelectedDestinations(known, index - 1);
         }
         alertErrorsToDisplay.value.push(alertErrors);
+        alertErrorItems.value.push(index - 1);
         return false;
       }
 
@@ -990,6 +942,9 @@ export default defineComponent({
       input.folder_id = folderId;
       input.owner = store.state.userInfo.email;
       input.last_edited_by = store.state.userInfo.email;
+      // The server reads null as a wrong type.
+      if (input.destinations === null) input.destinations = [];
+      if (input.recovery_destinations === null) input.recovery_destinations = [];
       if (Object.prototype.hasOwnProperty.call(input, "id")) delete input.id;
 
       // VERSION DETECTION AND CONVERSION
@@ -1147,14 +1102,6 @@ export default defineComponent({
       activeFolderAlerts.value = store.state.organizationData.allAlertsListByNames[folderId];
     };
 
-    const updateOrgId = (orgId: string, index: number) => {
-      if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].org_id = orgId;
-        // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
-      }
-    };
-
     // Additional helper functions for testing
     const checkAlertsInList = (alerts: string[], alertName: string) => {
       return alerts.includes(alertName);
@@ -1173,6 +1120,7 @@ export default defineComponent({
       router,
       baseImportRef,
       alertErrorsToDisplay,
+      alertErrorItems,
       templateErrorsToDisplay,
       destinationErrorsToDisplay,
       alertCreators,
@@ -1205,9 +1153,6 @@ export default defineComponent({
       activeFolderAlerts,
       store,
       isAlertImporting,
-      organizationDataList,
-      userSelectedOrgId,
-      updateOrgId,
       // Exposed validation functions for testing
       validateAlertInputs,
       checkDestinationInList,

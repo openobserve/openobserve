@@ -48,15 +48,17 @@ use {
     responses(
         (
             status = 200,
-            description = "Empty response",
-            body = (),
+            description = "Success",
+            body = MetaHttpResponse,
             content_type = "application/json",
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Key",
+    tag = "Keys",
+    security(("Authorization" = [])),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Cipher Keys", "operation": "create"}))
     )
 )]
 pub async fn save(
@@ -130,8 +132,10 @@ pub async fn save(
         (status = 403, description = "Feature not supported", content_type = "application/json")
     ),
     tag = "Keys",
+    security(("Authorization" = [])),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Cipher Keys", "operation": "create"}))
     )
 )]
 pub async fn save(Path(_org_id): Path<String>) -> Response {
@@ -161,9 +165,11 @@ pub async fn save(Path(_org_id): Path<String>) -> Response {
         ),
         (status = 404, description = "Key not found", content_type = "text/plain")
     ),
-    tag = "Key",
+    tag = "Keys",
+    security(("Authorization" = [])),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Cipher Keys", "operation": "get"}))
     )
 )]
 pub async fn get(Path(path): Path<(String, String)>) -> Response {
@@ -226,9 +232,11 @@ pub async fn get(Path(path): Path<(String, String)>) -> Response {
             content_type = "application/json",
         ),
     ),
-    tag = "Key",
+    tag = "Keys",
+    security(("Authorization" = [])),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Cipher Keys", "operation": "list"}))
     )
 )]
 pub async fn list(Path(org_id): Path<String>) -> Response {
@@ -290,14 +298,16 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
     responses(
         (
             status = 200,
-            description = "Empty response",
-            body = (),
+            description = "Success",
+            body = MetaHttpResponse,
             content_type = "application/json",
         ),
     ),
     tag = "Keys",
+    security(("Authorization" = [])),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Cipher Keys", "operation": "delete"}))
     )
 )]
 pub async fn delete(Path(path): Path<(String, String)>) -> Response {
@@ -434,15 +444,17 @@ pub async fn delete_bulk(
     responses(
         (
             status = 200,
-            description = "Empty response",
-            body = (),
+            description = "Success",
+            body = MetaHttpResponse,
             content_type = "application/json",
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Key",
+    tag = "Keys",
+    security(("Authorization" = [])),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Cipher Keys", "operation": "update"}))
     )
 )]
 pub async fn update(
@@ -541,8 +553,10 @@ pub async fn update(
         (status = 403, description = "Feature not supported", content_type = "application/json")
     ),
     tag = "Keys",
+    security(("Authorization" = [])),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Cipher Keys", "operation": "update"}))
     )
 )]
 pub async fn update(Path(_path): Path<(String, String)>) -> Response {
