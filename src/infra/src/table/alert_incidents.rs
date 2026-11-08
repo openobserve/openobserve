@@ -1309,6 +1309,14 @@ pub async fn auto_resolve_stale(
     auto_resolve_stale_with(get_orm_client_rw().await, now - stale_threshold_micros, now).await
 }
 
+/// Built apart from the call so its shape is testable without a database.
+fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity> {
+    // Inlined, not bound: PostgreSQL's generic plan cannot match a bind to the partial index.
+    alert_incidents::Entity::find()
+        .filter(Expr::col(alert_incidents::Column::Status).ne(Expr::cust("'resolved'")))
+        .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+}
+
 /// [auto_resolve_stale] on a given connection, for incidents with no alert since `cutoff`.
 pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
     client: &C,
@@ -1319,10 +1327,7 @@ pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
 
     let mut resolved_ids = Vec::new();
     loop {
-        // Find open/acknowledged incidents with last_alert_at older than threshold
-        let stale_incidents = alert_incidents::Entity::find()
-            .filter(alert_incidents::Column::Status.ne("resolved"))
-            .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+        let stale_incidents = stale_incidents_query(cutoff)
             .limit(PAGE_SIZE)
             .all(client)
             .await
@@ -1412,6 +1417,48 @@ mod tests {
         assert!(
             sql.contains("GROUP BY \"alert_incident_alerts\".\"alert_id\""),
             "{sql}"
+        );
+    }
+
+    // A bound status would let PostgreSQL's generic plan skip the partial index.
+    #[test]
+    fn stale_incidents_query_inlines_the_resolved_status() {
+        use sea_orm::{DbBackend, QueryTrait};
+
+        let stmt = stale_incidents_query(100).build(DbBackend::Postgres);
+
+        assert!(stmt.sql.contains(r#""status" <> 'resolved'"#), "{}", stmt.sql);
+    }
+
+    #[tokio::test]
+    async fn stale_incidents_query_uses_the_unresolved_index() {
+        use sea_orm::{QueryTrait, Statement};
+
+        let db = incidents_db().await;
+        crate::table::migration::create_alert_incidents_unresolved_index_for_test(&db)
+            .await
+            .unwrap();
+        let backend = db.get_database_backend();
+        let stmt = stale_incidents_query(100)
+            .limit(500)
+            .build(backend);
+
+        let plan = db
+            .query_all(Statement::from_sql_and_values(
+                backend,
+                format!("EXPLAIN QUERY PLAN {}", stmt.sql),
+                stmt.values.unwrap_or_default(),
+            ))
+            .await
+            .unwrap()
+            .iter()
+            .map(|row| row.try_get::<String>("", "detail").unwrap())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(
+            plan.contains("USING INDEX alert_incidents_unresolved_last_alert_idx"),
+            "{plan}"
         );
     }
 
