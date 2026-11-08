@@ -90,12 +90,12 @@ pub async fn prepare_streaming_aggregate(
         );
 
         let cache_interval_mins = cache_interval.get_duration_minutes();
-        if cache_interval_mins == 0 {
-            // this query can't use streaming_agg cache, return None
-            None
-        } else {
+        // Histograms with different offsets have no single cache identity.
+        if cache_interval_mins > 0
+            && let Some(ts_offset) = ctx.sql.histogram_offset
+        {
             let streaming_id = ider::uuid();
-            let hashed_query = get_aggregation_cache_key_from_request(req);
+            let hashed_query = get_aggregation_cache_key_from_request(req, ts_offset);
             let cache_file_path = create_aggregation_cache_file_path(
                 org_id,
                 &stream_type.to_string(),
@@ -163,6 +163,8 @@ pub async fn prepare_streaming_aggregate(
                 "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
             );
             Some(streaming_id)
+        } else {
+            None
         }
     } else {
         None

@@ -1301,8 +1301,6 @@ pub struct MultiSearchPartitionRequest {
     pub streaming_output: bool,
     #[serde(default)]
     pub histogram_interval: i64,
-    #[serde(default)]
-    pub timezone: Option<String>,
 }
 
 impl MultiSearchPartitionRequest {
@@ -2118,9 +2116,6 @@ mod tests {
         let value = serde_json::json!({"sql": "SELECT histogram(_timestamp) FROM t", "start_time": 1, "end_time": 2, "timezone": "+05:30"});
         let request: super::SearchPartitionRequest = serde_json::from_value(value).unwrap();
         assert_eq!(serde_json::to_value(request).unwrap()["timezone"], "+05:30");
-        let value = serde_json::json!({"sql": ["SELECT histogram(_timestamp) FROM t"], "start_time": 1, "end_time": 2, "timezone": "-08:00"});
-        let request: super::MultiSearchPartitionRequest = serde_json::from_value(value).unwrap();
-        assert_eq!(serde_json::to_value(request).unwrap()["timezone"], "-08:00");
         let mut request = super::Request::default();
         request.query.timezone = Some("+05:30".to_string());
         let partition = super::SearchPartitionRequest::from(&request);
@@ -3097,7 +3092,6 @@ mod tests {
             query_fn: Some("test_fn".to_string()),
             streaming_output: true,
             histogram_interval: 3600,
-            timezone: None,
         };
         assert_eq!(request.sql.len(), 2);
         assert_eq!(request.start_time, 100);

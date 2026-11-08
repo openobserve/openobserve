@@ -504,10 +504,15 @@ pub fn get_cache_file_path(file_path: &str, file_name: &str) -> String {
     format!("{STREAMING_AGGS_CACHE_DIR}/{file_path}/{file_name}")
 }
 
-pub fn get_aggregation_cache_key_from_request(req: &SearchPartitionRequest) -> u64 {
+/// `ts_offset` is the shared `histogram()` offset, which a request-level timezone sets outside the
+/// SQL.
+pub fn get_aggregation_cache_key_from_request(req: &SearchPartitionRequest, ts_offset: i64) -> u64 {
     let origin_sql = req.sql.clone();
 
     let mut hash_body = vec![origin_sql];
+    if ts_offset != 0 {
+        hash_body.push(format!("ts_offset={ts_offset}"));
+    }
     if let Some(vrl_function) = &req.query_fn {
         hash_body.push(vrl_function.to_string());
     }
@@ -525,6 +530,26 @@ mod tests {
     use arrow::array::StringArray;
 
     use super::*;
+
+    #[test]
+    fn timezone_aggregation_cache_key_includes_offset() {
+        let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
+            "sql": "SELECT count(*) AS cnt FROM t GROUP BY histogram(_timestamp, '1 day')",
+            "start_time": 1,
+            "end_time": 2,
+        }))
+        .unwrap();
+        let utc = get_aggregation_cache_key_from_request(&req, 0);
+        assert_eq!(utc, get_aggregation_cache_key_from_request(&req, 0));
+        assert_ne!(
+            utc,
+            get_aggregation_cache_key_from_request(&req, 19_800_000_000)
+        );
+        assert_ne!(
+            get_aggregation_cache_key_from_request(&req, 19_800_000_000),
+            get_aggregation_cache_key_from_request(&req, -28_800_000_000)
+        );
+    }
 
     #[test]
     fn test_get_record_batches_rejects_invalid_ipc() {

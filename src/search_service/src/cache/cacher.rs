@@ -210,11 +210,11 @@ pub async fn check_cache(
         trace_id: trace_id.to_string(),
         is_aggregate,
         is_descending,
+        ts_offset,
         ..Default::default()
     };
     if histogram_interval > 0 {
         multi_resp.histogram_interval = histogram_interval / 1000 / 1000;
-        multi_resp.ts_offset = ts_offset;
     }
     log::info!(
         "[trace_id {trace_id}] check_cache: result_ts_col: {}, histogram_interval: {}, time range: {} - {}",

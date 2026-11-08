@@ -2190,6 +2190,83 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn timezone_non_aggregate_histogram_column_keeps_offset() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        const HOUR: i64 = 3_600_000_000;
+        const DAY: i64 = 24 * HOUR;
+        const START: i64 = 1_767_225_600_000_000;
+        const OFFSET: i64 = 19_800_000_000;
+        let org = "timezone_non_aggregate_histogram";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(Schema::new(vec![
+                Field::new("_timestamp", DataType::Int64, false),
+                Field::new("event_ts", DataType::Int64, false),
+                Field::new("msg", DataType::Utf8, true),
+            ])),
+        );
+        let mut request = search::Request::default();
+        request.query.sql =
+            "SELECT histogram(event_ts, '1 hour', '+05:30') AS ts, msg FROM t ORDER BY ts"
+                .to_string();
+        request.query.start_time = START;
+        request.query.end_time = START + DAY;
+        let mut uncached_req = request.clone();
+        let (uncached, _) =
+            prepare_cache_response("nonagg", org, StreamType::Logs, &mut uncached_req, false)
+                .await
+                .unwrap();
+        let (warm, _) = prepare_cache_response("nonagg", org, StreamType::Logs, &mut request, true)
+            .await
+            .unwrap();
+        assert!(!warm.is_aggregate);
+        assert_eq!(warm.ts_column, "ts");
+        assert_eq!(uncached.file_path, warm.file_path);
+        assert_eq!((uncached.ts_offset, warm.ts_offset), (OFFSET, OFFSET));
+        let cold = [6, 12, 20, 28]
+            .map(|h| json::json!({"ts": START + h * HOUR, "msg": "m"}))
+            .to_vec();
+        let response = search::Response {
+            hits: cold.clone(),
+            total: cold.len(),
+            ..Default::default()
+        };
+        write_results(
+            "nonagg",
+            &warm.ts_column,
+            START,
+            START + DAY,
+            &response,
+            warm.file_path.clone(),
+            warm.is_aggregate,
+            warm.is_descending,
+            true,
+            false,
+            warm.ts_offset,
+        )
+        .await;
+        let query_key = warm.file_path.replace('/', "_");
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while !QUERY_RESULT_CACHE.read().await.contains_key(&query_key) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let (hit, _) = prepare_cache_response("nonagg", org, StreamType::Logs, &mut request, true)
+            .await
+            .unwrap();
+        let hits = hit
+            .cached_response
+            .iter()
+            .flat_map(|c| c.cached_response.hits.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(hits, cold);
+    }
+
+    #[tokio::test]
     async fn timezone_raw_timestamp_cache_matches_cold_query() {
         use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
