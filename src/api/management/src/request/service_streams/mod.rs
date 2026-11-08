@@ -265,8 +265,6 @@ pub async fn correlate_streams(
     Headers(user_email): Headers<UserEmail>, // Require authentication
     #[allow(unused_variables)] Json(req): Json<CorrelationRequest>,
 ) -> Response {
-    // Note: No stream-specific permissions needed - user already has access to source stream
-
     #[cfg(feature = "enterprise")]
     {
         if !check_permissions(
@@ -329,6 +327,16 @@ pub async fn correlate_streams(
                 // guess which resolved stream (and field aliases) the source maps to.
                 response.source_stream = Some(req.source_stream.clone());
                 response.source_type = Some(req.source_type.clone());
+                let checker = openobserve_core::authz::active_checker();
+                response.related_streams = openobserve_core::authz::readable_related_streams(
+                    checker.as_ref(),
+                    &user_email.user_id,
+                    &org_id,
+                    response.related_streams,
+                )
+                .await;
+                // all_streams is a flattened copy, so it would still list the dropped streams
+                response.build_all_streams();
                 MetaHttpResponse::json(response)
             }
             Ok(None) => {

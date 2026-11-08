@@ -24,9 +24,12 @@ use std::sync::{Arc, LazyLock};
 use axum::response::Response;
 #[cfg(feature = "enterprise")]
 use common::meta::http::HttpResponse as MetaHttpResponse;
-#[cfg(any(feature = "enterprise", test))]
-use config::meta::stream::StreamType;
 use config::meta::user::UserRole;
+#[cfg(any(feature = "enterprise", test))]
+use config::meta::{
+    service_streams::{RelatedStreams, StreamInfo},
+    stream::StreamType,
+};
 #[cfg(feature = "enterprise")]
 use db::user::is_root_user;
 
@@ -755,6 +758,61 @@ pub async fn authorize_with(
     }
 }
 
+/// Keeps, in order, the streams of `org_id` the user can read; an errored check denies. [no-fail]
+#[cfg(any(feature = "enterprise", test))]
+pub async fn readable_related_streams(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    streams: RelatedStreams,
+) -> RelatedStreams {
+    use futures::stream::StreamExt;
+
+    if !checker.enforces_rbac().await
+        || checker.is_root(user_id).await
+        || checker.is_root_or_admin(org_id, user_id).await
+    {
+        return streams;
+    }
+    let lists = [
+        (StreamType::Logs, &streams.logs),
+        (StreamType::Traces, &streams.traces),
+        (StreamType::Metrics, &streams.metrics),
+        (StreamType::Profiles, &streams.profiles),
+    ];
+    let checks = lists.into_iter().flat_map(|(stream_type, list)| {
+        list.iter().map(move |info| TypedStream {
+            org_id: org_id.to_string(),
+            stream_type,
+            name: info.stream_name.clone(),
+        })
+    });
+    let readable: Vec<bool> = futures::stream::iter(checks)
+        .map(|stream| async move { checker.can_read_stream(user_id, &stream).await })
+        .buffered(16)
+        .collect()
+        .await;
+    // flags follow the logs, traces, metrics, profiles order the checks were built in
+    let mut flags = readable.into_iter();
+    let mut keep = |list: Vec<StreamInfo>| -> Vec<StreamInfo> {
+        list.into_iter()
+            .filter(|_| flags.next().unwrap_or(false))
+            .collect()
+    };
+    let RelatedStreams {
+        logs,
+        traces,
+        metrics,
+        profiles,
+    } = streams;
+    RelatedStreams {
+        logs: keep(logs),
+        traces: keep(traces),
+        metrics: keep(metrics),
+        profiles: keep(profiles),
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn authorize_query_sources(
     user_id: &str,
@@ -1350,6 +1408,129 @@ mod tests {
         ] {
             assert!(!code.contains(needle), "authz.rs calls {needle}");
         }
+    }
+
+    fn related(logs: &[&str], traces: &[&str], metrics: &[&str]) -> RelatedStreams {
+        let infos = |names: &[&str]| -> Vec<StreamInfo> {
+            names
+                .iter()
+                .map(|n| StreamInfo::new(n.to_string()))
+                .collect()
+        };
+        RelatedStreams {
+            logs: infos(logs),
+            traces: infos(traces),
+            metrics: infos(metrics),
+            profiles: infos(&["profile_a"]),
+        }
+    }
+
+    fn related_names(streams: &RelatedStreams) -> [Vec<&str>; 4] {
+        fn names(list: &[StreamInfo]) -> Vec<&str> {
+            list.iter().map(|s| s.stream_name.as_str()).collect()
+        }
+        [
+            names(&streams.logs),
+            names(&streams.traces),
+            names(&streams.metrics),
+            names(&streams.profiles),
+        ]
+    }
+
+    #[tokio::test]
+    async fn related_streams_keep_only_what_the_user_reads_by_list_type() {
+        let all = || related(&["prod_data", "prod_data_uk"], &["prod_data_uk"], &["cpu"]);
+        let mut root = FakeChecker::default();
+        root.roots.insert("u1".to_string());
+        let rbac_off = FakeChecker {
+            rbac_off: true,
+            ..FakeChecker::default()
+        };
+        let cases: [(&str, FakeChecker, [Vec<&str>; 4]); 6] = [
+            (
+                "mixed access",
+                FakeChecker::default()
+                    .reads("u1", "o1/logs/prod_data_uk")
+                    .reads("u1", "o1/logs/cpu")
+                    .reads("u1", "o2/traces/prod_data_uk"),
+                [vec!["prod_data_uk"], vec![], vec![], vec![]],
+            ),
+            (
+                "no access",
+                FakeChecker::default(),
+                [vec![], vec![], vec![], vec![]],
+            ),
+            (
+                "rbac off",
+                rbac_off,
+                [
+                    vec!["prod_data", "prod_data_uk"],
+                    vec!["prod_data_uk"],
+                    vec!["cpu"],
+                    vec!["profile_a"],
+                ],
+            ),
+            (
+                "root",
+                root,
+                [
+                    vec!["prod_data", "prod_data_uk"],
+                    vec!["prod_data_uk"],
+                    vec!["cpu"],
+                    vec!["profile_a"],
+                ],
+            ),
+            (
+                "org admin",
+                FakeChecker::default().admin("u1", "o1"),
+                [
+                    vec!["prod_data", "prod_data_uk"],
+                    vec!["prod_data_uk"],
+                    vec!["cpu"],
+                    vec!["profile_a"],
+                ],
+            ),
+            (
+                "admin of another org",
+                FakeChecker::default().admin("u1", "o2"),
+                [vec![], vec![], vec![], vec![]],
+            ),
+        ];
+        for (case, checker, expected) in cases {
+            let kept = readable_related_streams(&checker, "u1", "o1", all()).await;
+            assert_eq!(related_names(&kept), expected, "{case}");
+        }
+    }
+
+    #[tokio::test]
+    async fn related_streams_keep_their_order_past_the_concurrency_limit() {
+        let names: Vec<String> = (0..40).map(|i| format!("s{i:02}")).collect();
+        let checker = names
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| i % 3 != 0)
+            .fold(FakeChecker::default(), |c, (_, n)| {
+                c.reads("u1", &format!("o1/logs/{n}"))
+            });
+        let streams = RelatedStreams {
+            logs: names
+                .iter()
+                .rev()
+                .map(|n| StreamInfo::new(n.clone()))
+                .collect(),
+            traces: vec![],
+            metrics: vec![],
+            profiles: vec![],
+        };
+        let kept = readable_related_streams(&checker, "u1", "o1", streams).await;
+        let expected: Vec<&str> = names
+            .iter()
+            .enumerate()
+            .rev()
+            .filter(|(i, _)| i % 3 != 0)
+            .map(|(_, n)| n.as_str())
+            .collect();
+        assert_eq!(related_names(&kept)[0], expected);
     }
 
     #[cfg(feature = "enterprise")]
