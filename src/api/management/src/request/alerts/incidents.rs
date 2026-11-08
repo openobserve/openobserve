@@ -170,8 +170,16 @@ pub async fn list_incidents(
         ("x-o2-mcp" = json!({"description": "Get an incident's details", "category": "alerts", "pinned": true}))
     )
 )]
-pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
-    match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id).await
+pub async fn get_incident(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    match openobserve_core::alerts::incidents::get_incident_with_alerts(
+        &org_id,
+        &incident_id,
+        &user_email.user_id,
+    )
+    .await
     {
         Ok(Some(incident)) => MetaHttpResponse::json(incident),
         Ok(None) => MetaHttpResponse::not_found("Incident not found"),
