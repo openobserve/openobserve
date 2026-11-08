@@ -17,20 +17,12 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ingestRows, waitForSearchable } = require('../utils/auto-run-helpers.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { deleteStream } = require('../utils/traces-api.js');
 
 const ORG = getOrgIdentifier() || 'default';
 const STREAM = `explain_e2e_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 const ROWS = 30;
-
-async function runQueryAndOpenExplain(pm, sql, { expectRows = true } = {}) {
-  await pm.logsPage.openLogsWithSqlQuery(STREAM, sql);
-  await pm.logsPage.runQueryAndWaitForStreamSearch(STREAM);
-  if (expectRows) {
-    await pm.logsPage.waitForSearchResultRows(60000);
-  }
-  await pm.logsPage.openExplainQueryDialog();
-}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -50,12 +42,8 @@ test.describe('Logs Explain query: Plan and Analyze', () => {
   });
 
   test.afterAll(async ({ request }) => {
-    const base = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
-    const response = await request.delete(`${base}/api/${ORG}/streams/${STREAM}?type=logs`, {
-      headers: getAuthHeaders(),
-    });
-    testLogger.info('Deleted the stream this file created', { stream: STREAM, status: response.status() });
-    expect(response.ok(), `stream delete returned ${response.status()}`).toBe(true);
+    await deleteStream(request, STREAM, { type: 'logs', org: ORG });
+    testLogger.info('Deleted the stream this file created', { stream: STREAM });
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -71,7 +59,7 @@ test.describe('Logs Explain query: Plan and Analyze', () => {
   test('Plan tab renders operators, Analyze runs on the server and shows the profile', {
     tag: ['@explainAnalyze', '@logs', '@P1', '@all'],
   }, async () => {
-    await runQueryAndOpenExplain(pm, `SELECT n, log FROM "${STREAM}" LIMIT 5`);
+    await pm.logsPage.openExplainForQuery(STREAM, `SELECT n, log FROM "${STREAM}" LIMIT 5`);
     await pm.logsPage.expectQueryPlanOperatorsRendered();
 
     await pm.logsPage.switchQueryPlanToAnalyze();
@@ -85,7 +73,7 @@ test.describe('Logs Explain query: Plan and Analyze', () => {
   test('Analyze of a query that fails at run time does not show success', {
     tag: ['@explainAnalyze', '@logs', '@P1', '@all'],
   }, async () => {
-    await runQueryAndOpenExplain(pm, `SELECT CAST(log AS INT) x FROM "${STREAM}" LIMIT 5`, { expectRows: false });
+    await pm.logsPage.openExplainForQuery(STREAM, `SELECT CAST(log AS INT) x FROM "${STREAM}" LIMIT 5`, { expectRows: false });
     await pm.logsPage.switchQueryPlanToAnalyze();
     const { state } = await pm.logsPage.runQueryPlanAnalyze();
     // Marked only after setup has settled, so a broken setup fails red instead of passing as the known bug.

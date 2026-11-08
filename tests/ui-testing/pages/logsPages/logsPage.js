@@ -11426,6 +11426,16 @@ export class LogsPage {
         await this.expectQueryPlanDialogVisible();
     }
 
+    /** Run a SQL query on a stream, optionally wait for result rows, then open the Explain query dialog. */
+    async openExplainForQuery(stream, sql, { expectRows = true } = {}) {
+        await this.openLogsWithSqlQuery(stream, sql);
+        await this.runQueryAndWaitForStreamSearch(stream);
+        if (expectRows) {
+            await this.waitForSearchResultRows(60000);
+        }
+        await this.openExplainQueryDialog();
+    }
+
     async expectQueryPlanOperatorCardsRendered() {
         await expect.poll(() => this.page.locator(this.queryPlanOperatorCards).count(), { timeout: 15000 })
             .toBeGreaterThan(0);
