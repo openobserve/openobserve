@@ -1309,16 +1309,6 @@ pub async fn auto_resolve_stale(
     auto_resolve_stale_with(get_orm_client_rw().await, now - stale_threshold_micros, now).await
 }
 
-/// Built apart from the call so its shape is testable without a database.
-fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity> {
-    // Inlined, not bound: PostgreSQL's generic plan cannot match a bind to the partial index.
-    alert_incidents::Entity::find()
-        .filter(
-            Expr::col(alert_incidents::Column::Status).ne(SimpleExpr::Constant("resolved".into())),
-        )
-        .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
-}
-
 /// [auto_resolve_stale] on a given connection, for incidents with no alert since `cutoff`.
 pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
     client: &C,
@@ -1390,6 +1380,16 @@ fn containing_alerts(alert_ids: &[String]) -> sea_orm::Condition {
                 .to_owned(),
         ),
     )
+}
+
+/// Built apart from the call so tests can check its SQL and its plan.
+fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity> {
+    // Inlined, not bound: PostgreSQL's generic plan cannot match a bind to the partial index.
+    alert_incidents::Entity::find()
+        .filter(
+            Expr::col(alert_incidents::Column::Status).ne(SimpleExpr::Constant("resolved".into())),
+        )
+        .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
 }
 
 #[cfg(test)]
