@@ -694,7 +694,7 @@ pub async fn prepare_cache_response(
 
     // Only a histogram() output is in shifted time; a raw `_timestamp` column stays UTC.
     let ts_offset = ts_offset.map(|offset| {
-        if is_histogram_column(&sql, &ts_column) {
+        if is_histogram_column(&sql.aliases, &ts_column, 0) {
             offset
         } else {
             0
@@ -1214,10 +1214,23 @@ async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &Result
     false
 }
 
-fn is_histogram_column(sql: &crate::Sql, ts_column: &str) -> bool {
-    sql.aliases
-        .iter()
-        .any(|(original, alias)| alias == ts_column && original.contains("histogram"))
+/// Whether `column` resolves, through aliases at any query level, to a `histogram()` output.
+fn is_histogram_column(aliases: &[(String, String)], column: &str, depth: usize) -> bool {
+    // A chain longer than the alias list can only be a cycle.
+    depth <= aliases.len()
+        && aliases
+            .iter()
+            .filter(|(_, alias)| alias == column)
+            .any(|(original, _)| {
+                original.to_lowercase().contains("histogram")
+                    || is_histogram_column(
+                        aliases,
+                        &::search::utils::trim_quotes(
+                            original.rsplit('.').next().unwrap_or(original),
+                        ),
+                        depth + 1,
+                    )
+            })
 }
 
 /// Shrinks `[start, end]` to whole `histogram()` buckets; the flag says whether the end moved.
@@ -2111,6 +2124,69 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(request.query.timezone.as_deref(), Some("-07:00"));
+    }
+
+    #[tokio::test]
+    async fn timezone_histogram_column_follows_case_and_aliases() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org = "timezone_histogram_column";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                "_timestamp",
+                DataType::Int64,
+                false,
+            )])),
+        );
+        for (sql, column, expected) in [
+            (
+                "SELECT HISTOGRAM(_timestamp, '1 day', '+05:30') AS ts, count(*) AS cnt FROM t GROUP BY ts ORDER BY ts",
+                "ts",
+                true,
+            ),
+            (
+                "SELECT ts AS bucket, cnt FROM (SELECT histogram(_timestamp, '1 day', '+05:30') AS ts, count(*) AS cnt FROM t GROUP BY ts) ORDER BY bucket",
+                "bucket",
+                true,
+            ),
+            (
+                "SELECT \"ts\" AS bucket FROM (SELECT histogram(_timestamp, '1 day', '+05:30') AS ts FROM t)",
+                "bucket",
+                true,
+            ),
+            (
+                "SELECT _timestamp FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0)",
+                "_timestamp",
+                false,
+            ),
+            (
+                "SELECT _timestamp AS ts FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0)",
+                "ts",
+                false,
+            ),
+        ] {
+            let query = SearchQuery {
+                sql: sql.to_string(),
+                start_time: 1_767_225_600_000_000,
+                end_time: 1_767_484_800_000_000,
+                ..Default::default()
+            };
+            let parsed = crate::Sql::new(&query, org, StreamType::Logs, None)
+                .await
+                .unwrap();
+            assert_eq!(
+                is_histogram_column(&parsed.aliases, column, 0),
+                expected,
+                "{sql}"
+            );
+        }
+        let cycle = [
+            ("b".to_string(), "a".to_string()),
+            ("a".to_string(), "b".to_string()),
+        ];
+        assert!(!is_histogram_column(&cycle, "a", 0));
     }
 
     #[tokio::test]
