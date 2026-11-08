@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <DbmSubheaderBand data-test="dbm-queries-summary">
+          <div data-test="dbm-queries-summary">
             <OStatStrip
               :items="visibleSummaryStats"
               :loading="loading"
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               default-key="queries"
               @select="onStatSelect"
             />
-          </DbmSubheaderBand>
+          </div>
           <DbmInsightStrip
             v-if="!insightsHidden && stripInsights.length"
             :insights="stripInsights"

@@ -172,10 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      search/tabs and above the rows. Always rendered (skeleton
                      while loading) so data arriving never shifts the layout. -->
               <template #subheader>
-                <div
-                  class="px-page-edge border-table-row-divider border-b py-1.5"
-                  data-test="alert-list-summary"
-                >
+                <div data-test="alert-list-summary">
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
