@@ -26,7 +26,7 @@ use config::meta::alerts::{
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
-    sea_query::{Expr, JoinType, LockType, Query},
+    sea_query::{Expr, JoinType, LockType, Query, SimpleExpr},
 };
 use svix_ksuid::KsuidLike;
 
@@ -1313,7 +1313,7 @@ pub async fn auto_resolve_stale(
 fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity> {
     // Inlined, not bound: PostgreSQL's generic plan cannot match a bind to the partial index.
     alert_incidents::Entity::find()
-        .filter(Expr::col(alert_incidents::Column::Status).ne(Expr::cust("'resolved'")))
+        .filter(Expr::col(alert_incidents::Column::Status).ne(SimpleExpr::Constant("resolved".into())))
         .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
 }
 
@@ -1427,7 +1427,11 @@ mod tests {
 
         let stmt = stale_incidents_query(100).build(DbBackend::Postgres);
 
-        assert!(stmt.sql.contains(r#""status" <> 'resolved'"#), "{}", stmt.sql);
+        assert!(
+            stmt.sql.contains(r#""status" <> 'resolved'"#),
+            "{}",
+            stmt.sql
+        );
     }
 
     #[tokio::test]
