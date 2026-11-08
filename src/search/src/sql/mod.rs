@@ -87,6 +87,8 @@ pub struct Sql {
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
     pub timezone: Option<String>,
+    /// Shifted-time offset of every `histogram()` in microseconds; `None` when they disagree.
+    pub histogram_offset: Option<i64>,
     pub sorted_by_time: bool, // if a plain scan only orders by _timestamp
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
 }
@@ -143,9 +145,6 @@ impl Sql {
         extract_patterns: bool,
         marked_chat_history_reader: bool,
     ) -> Result<Sql, Error> {
-        let mut query = query.clone();
-        histogram::pin_histogram_timezone(&mut query.sql, &mut query.timezone, query.end_time)?;
-        let query = &query;
         let cfg = get_config();
         let sql = query.sql.clone();
         let offset = query.from as i64;
@@ -198,6 +197,13 @@ impl Sql {
                 "only SELECT queries are supported".to_string(),
             )));
         }
+
+        let pin_time = histogram::pin_reference_time(query.end_time);
+        let mut timezone = query.timezone.clone();
+        histogram::pin_request_timezone(&mut timezone, pin_time);
+        let histogram_offset =
+            histogram::pin_statement_timezones(&mut statement, timezone.as_deref(), pin_time)?
+                .offset;
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
@@ -313,7 +319,6 @@ impl Sql {
                 }
             })
             .flatten();
-        let timezone = query.timezone.clone();
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
@@ -348,6 +353,7 @@ impl Sql {
             order_by,
             histogram_interval,
             timezone,
+            histogram_offset,
             sorted_by_time: need_sort_by_time,
             sampling_config: parse_sampling_config(
                 query,

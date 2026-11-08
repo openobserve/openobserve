@@ -64,10 +64,7 @@ use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    sql::{
-        RE_SELECT_FROM,
-        histogram::{histogram_cache_offset_micros, pin_histogram_timezone},
-    },
+    sql::{RE_SELECT_FROM, histogram::pin_histogram_timezone},
 };
 
 pub mod cacher;
@@ -634,11 +631,7 @@ pub async fn prepare_cache_response(
     }
 
     let ts_offset = if sql.histogram_interval.is_some() {
-        histogram_cache_offset_micros(
-            &origin_sql,
-            req.query.timezone.as_deref(),
-            req.query.end_time,
-        )?
+        sql.histogram_offset
     } else {
         Some(0)
     };

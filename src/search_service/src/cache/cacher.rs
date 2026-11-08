@@ -1206,6 +1206,7 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,
             timezone: None,
+            histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
         };
@@ -1253,6 +1254,7 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Asc)],
             histogram_interval: None,
             timezone: None,
+            histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
         };

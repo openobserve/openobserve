@@ -29,7 +29,7 @@ use proto::cluster_rpc;
 use crate::{
     cache::{cacher::get_ts_col_order_by, result_utils::is_ts_order_field},
     partition::aggregate::is_streaming_aggregate,
-    sql::{Sql, histogram::histogram_offset_micros},
+    sql::Sql,
 };
 
 /// SQL-derived context for a search partition request.
@@ -44,7 +44,6 @@ pub struct PartitionSqlContext {
     pub use_single_partition: bool,
     pub is_histogram_eligible: bool,
     pub sql_order_by: OrderBy,
-    pub histogram_offset: i64,
 }
 
 impl PartitionSqlContext {
@@ -62,11 +61,6 @@ impl PartitionSqlContext {
             ..Default::default()
         };
         let sql = Sql::new(&query, org_id, stream_type, None).await?;
-        let histogram_offset = if sql.histogram_interval.is_some() {
-            histogram_offset_micros(&sql.sql, sql.timezone.as_deref(), req.end_time)?
-        } else {
-            0
-        };
 
         let is_explain = is_explain_query(&req.sql);
         let is_complex = is_complex_query(&req.sql).unwrap_or(false);
@@ -108,7 +102,6 @@ impl PartitionSqlContext {
             use_single_partition,
             is_histogram_eligible,
             sql_order_by,
-            histogram_offset,
         })
     }
 
@@ -170,6 +163,7 @@ mod tests {
                 order_by,
                 histogram_interval,
                 timezone: None,
+                histogram_offset: Some(0),
                 sorted_by_time: false,
                 sampling_config: None,
             },
@@ -179,7 +173,6 @@ mod tests {
             use_single_partition: false,
             is_histogram_eligible: false,
             sql_order_by: OrderBy::Desc,
-            histogram_offset: 0,
         }
     }
 
@@ -232,13 +225,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn timezone_constant_expression_matches_execution_and_partitions() {
+    async fn timezone_non_literal_argument_is_rejected() {
         use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
-        const DAY: i64 = 86_400_000_000;
-        const OFFSET: i64 = 19_800_000_000;
-        const START: i64 = 1_757_376_000_000_000;
-        let org = "timezone_constant_expression";
+        let org = "timezone_non_literal";
         STREAM_SCHEMAS_LATEST.write().await.insert(
             format!("{org}/logs/t"),
             SchemaCache::new(Schema::new(vec![Field::new(
@@ -250,61 +240,31 @@ mod tests {
         for expression in [
             "CASE WHEN true THEN '+05:30' ELSE '-08:00' END",
             "CAST('+05:30' AS VARCHAR)",
+            "concat('+05', ':30')",
+            "NULL",
+            "_timestamp",
         ] {
             let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
-            "sql": format!("SELECT histogram(_timestamp, '1 day', {expression}) AS ts, count(*) FROM t GROUP BY ts ORDER BY ts"),
-            "start_time": START, "end_time": START + 3 * DAY, "timezone": "UTC", "histogram_interval": 86400
-        })).unwrap();
-            let ctx = PartitionSqlContext::new(&req, org, StreamType::Logs)
-                .await
-                .unwrap();
-            let timestamp = START + DAY + 67_500_000_000;
-            assert_eq!(
-                execute_timezone_query(&ctx.sql, timestamp).await,
-                vec![START + 2 * DAY]
-            );
-            assert_eq!(ctx.histogram_offset, OFFSET);
-            let settings = crate::partition::settings::PartitionSettings {
-                min_step: DAY,
-                step: DAY,
-            };
-            let mut partitions = crate::partition::generate_partitions(&ctx, &settings);
-            partitions.sort();
-            for pair in partitions.windows(2) {
-                assert_eq!(pair[0][1], pair[1][0]);
-                assert_eq!(
-                    config::meta::histogram_origin::histogram_bucket_offset(
-                        pair[0][1] + OFFSET,
-                        DAY
-                    ),
-                    0
-                );
-            }
-            let mut request = config::meta::search::Request::default();
-            request.query.sql = req.sql;
-            request.query.start_time = req.start_time;
-            request.query.end_time = req.end_time;
-            request.query.timezone = req.timezone;
-            request.query.histogram_interval = req.histogram_interval;
-            let (cache, _) = crate::cache::prepare_cache_response(
-                "constant",
-                org,
-                StreamType::Logs,
-                &mut request,
-                true,
-            )
-            .await
+                "sql": format!("SELECT histogram(_timestamp, '1 day', {expression}) AS ts, count(*) FROM t GROUP BY ts"),
+                "start_time": 1, "end_time": 2, "timezone": "UTC"
+            }))
             .unwrap();
-            assert_eq!(cache.ts_offset, OFFSET);
+            assert!(
+                PartitionSqlContext::new(&req, org, StreamType::Logs)
+                    .await
+                    .is_err(),
+                "{expression}"
+            );
         }
     }
 
     #[tokio::test]
-    async fn timezone_typed_null_constant_preserves_utc() {
+    async fn timezone_mixed_offsets_use_one_partition() {
         use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+        const DAY: i64 = 86_400_000_000;
         const START: i64 = 1_757_376_000_000_000;
-        let org = "timezone_typed_null";
+        let org = "timezone_mixed_partitions";
         STREAM_SCHEMAS_LATEST.write().await.insert(
             format!("{org}/logs/t"),
             SchemaCache::new(Schema::new(vec![Field::new(
@@ -313,23 +273,22 @@ mod tests {
                 false,
             )])),
         );
-        let query = "SELECT histogram(_timestamp, '1 day', CASE WHEN false THEN '+05:30' ELSE NULL END) AS ts FROM t";
-        let mut raw = mk(vec![], true, Some(86400), Some("ts")).sql;
-        raw.sql = query.to_string();
-        raw.time_range = (START, START + 86_400_000_000);
-        raw.timezone = Some("+05:30".to_string());
-        assert_eq!(
-            execute_timezone_query(&raw, START + 67_500_000_000).await,
-            vec![START]
-        );
-        let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({"sql": query, "start_time": raw.time_range.0, "end_time": raw.time_range.1, "timezone": "+05:30", "histogram_interval": 86400})).unwrap();
+        let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
+            "sql": "SELECT histogram(_timestamp, '1 day', 'UTC') AS a, histogram(_timestamp, '1 day', '+05:30') AS b, count(*) FROM t GROUP BY a, b",
+            "start_time": START, "end_time": START + 3 * DAY, "histogram_interval": 86400
+        }))
+        .unwrap();
         let ctx = PartitionSqlContext::new(&req, org, StreamType::Logs)
             .await
             .unwrap();
-        assert_eq!(ctx.histogram_offset, 0);
+        assert_eq!(ctx.sql.histogram_offset, None);
+        let settings = crate::partition::settings::PartitionSettings {
+            min_step: DAY,
+            step: DAY,
+        };
         assert_eq!(
-            execute_timezone_query(&ctx.sql, START + 67_500_000_000).await,
-            vec![START]
+            crate::partition::generate_partitions(&ctx, &settings),
+            vec![[START, START + 3 * DAY]]
         );
     }
 
@@ -386,8 +345,9 @@ mod tests {
             PartitionSqlContext::new(&plain, "timezone_partition", StreamType::Logs)
                 .await
                 .unwrap()
+                .sql
                 .histogram_offset,
-            0
+            Some(0)
         );
         const HOUR: i64 = 3_600_000_000;
         const DAY: i64 = 24 * HOUR;
@@ -403,7 +363,7 @@ mod tests {
             let ctx = PartitionSqlContext::new(&req, "timezone_partition", StreamType::Logs)
                 .await
                 .unwrap();
-            assert_eq!(ctx.histogram_offset, offset);
+            assert_eq!(ctx.sql.histogram_offset, Some(offset));
             assert_eq!(ctx.sql.timezone.as_deref(), Some(zone));
             let settings = crate::partition::settings::PartitionSettings {
                 min_step: DAY,
