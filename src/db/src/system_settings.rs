@@ -803,6 +803,8 @@ async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>
                     }
                     Ok(None) => {
                         log::warn!("System setting not found in db: {}", cache_k);
+                        // A lagging read replica must not leave a cached miss standing for good.
+                        SYSTEM_SETTINGS.write().await.remove(cache_k);
                     }
                     Err(e) => {
                         log::error!("Error fetching system setting from db: {}", e);
