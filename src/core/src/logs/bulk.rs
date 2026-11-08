@@ -74,8 +74,12 @@ pub async fn ingest(
     let stream_type = StreamType::Logs;
 
     let mut stream_key_cache: HashMap<String, String> = HashMap::new();
-    let mut streams_data: HashMap<String, Vec<json::Value>> = HashMap::new();
+    // each stream's records, with the request position of each
+    let mut streams_data: HashMap<String, (Vec<json::Value>, Vec<usize>)> = HashMap::new();
     let mut plans: HashMap<String, Option<BulkPlan>> = HashMap::new();
+    // streams are written after the whole request is read, so each item keeps its action's position
+    let mut item_positions = Vec::new();
+    let mut position = 0;
     let mut next_line_is_data = false;
     // Read lines as bytes to handle potential invalid UTF-8 characters
     let mut line_buffer = Vec::new();
@@ -100,7 +104,7 @@ pub async fn ingest(
         if is_data
             && stream_columnar(&mut plans, org_id, &stream_name, (min_ts, max_ts))
                 .await
-                .is_some_and(|c| c.parse_bulk_line(&line_buffer, doc_id.as_deref()))
+                .is_some_and(|c| c.parse_bulk_line(&line_buffer, doc_id.as_deref(), position))
         {
             tokio::task::coop::consume_budget().await;
             continue;
@@ -117,6 +121,7 @@ pub async fn ingest(
             else {
                 continue;
             };
+            position += 1;
             if line_action != action {
                 action = line_action.to_string();
             }
@@ -153,6 +158,7 @@ pub async fn ingest(
                     ),
                 );
                 bulk_res.items.push(item);
+                item_positions.push(position);
                 continue; // skip
             }
 
@@ -184,6 +190,7 @@ pub async fn ingest(
                     ),
                 );
                 bulk_res.items.push(item);
+                item_positions.push(position);
                 continue; // skip
             }
 
@@ -228,14 +235,18 @@ pub async fn ingest(
                     Some(TS_PARSE_FAILED.to_string()),
                     Some(failure_reason),
                 );
+                item_positions.push(position);
                 continue;
             }
 
             let val = json::Value::Object(local_val);
             match streams_data.get_mut(&stream_name) {
-                Some(v) => v.push(val),
+                Some((records, positions)) => {
+                    records.push(val);
+                    positions.push(position);
+                }
                 None => {
-                    streams_data.insert(stream_name.clone(), vec![val]);
+                    streams_data.insert(stream_name.clone(), (vec![val], vec![position]));
                 }
             }
         }
@@ -252,7 +263,7 @@ pub async fn ingest(
     {
         let streams: Vec<(&str, u64)> = streams_data
             .iter()
-            .map(|(stream, records)| (stream.as_str(), records.len() as u64))
+            .map(|(stream, (records, _))| (stream.as_str(), records.len() as u64))
             .collect();
         let streams =
             crate::ingestion::with_pipeline_destinations(org_id, stream_type, &streams).await;
@@ -268,10 +279,16 @@ pub async fn ingest(
     // process data by stream
     #[cfg(feature = "vectorscan")]
     let mut written_any = false;
-    for (stream_name, records) in streams_data {
+    for (stream_name, (records, mut positions)) in streams_data {
         #[cfg(feature = "vectorscan")]
         let record_count = records.len();
-        let plan = plans.remove(&stream_name).flatten();
+        let mut plan = plans.remove(&stream_name).flatten();
+        // the write returns the records' items, then the columnar rows'
+        if let Some(plan) = plan.as_mut() {
+            positions.extend(plan.columnar.take_bulk_positions());
+        }
+        // items that cannot be matched to the stream's rows one to one stay together here
+        let first_position = positions.iter().min().copied().unwrap_or_default();
         match super::ingest::ingest_bulk(
             thread_id,
             org_id,
@@ -287,14 +304,21 @@ pub async fn ingest(
                 {
                     written_any = true;
                 }
-                for status in v.status {
-                    // the stream status keeps the items but not the write's errors flag
-                    bulk_res.errors |= status
-                        .items
-                        .iter()
-                        .flat_map(|item| item.values())
-                        .any(|item| item.error.is_some());
-                    bulk_res.items.extend(status.items);
+                let first_item = bulk_res.items.len();
+                bulk_res
+                    .items
+                    .extend(v.status.into_iter().flat_map(|s| s.items));
+                let items = &bulk_res.items[first_item..];
+                // the stream status keeps the items but not the write's errors flag
+                bulk_res.errors |= items
+                    .iter()
+                    .flat_map(|item| item.values())
+                    .any(|item| item.error.is_some());
+                // a dropped or added item leaves the stream's items unmatched
+                if items.len() == positions.len() {
+                    item_positions.extend(positions);
+                } else {
+                    item_positions.extend(std::iter::repeat_n(first_position, items.len()));
                 }
             }
             Err(e) => {
@@ -324,6 +348,7 @@ pub async fn ingest(
                             item.status = 503;
                         }
                     }
+                    item_positions.extend(&positions[..record_count]);
                     continue;
                 }
                 bulk_res.errors = true;
@@ -344,8 +369,18 @@ pub async fn ingest(
                     Some(PIPELINE_EXEC_FAILED.to_string()),
                     Some(PIPELINE_EXEC_FAILED.to_string()),
                 );
+                item_positions.push(first_position);
             }
         }
+    }
+    if item_positions.len() == bulk_res.items.len() && !item_positions.is_sorted() {
+        let mut items: Vec<_> = item_positions
+            .into_iter()
+            .zip(std::mem::take(&mut bulk_res.items))
+            .collect();
+        // stable, so items sharing a position keep their order
+        items.sort_by_key(|(position, _)| *position);
+        bulk_res.items = items.into_iter().map(|(_, item)| item).collect();
     }
 
     // metric + data usage
@@ -635,6 +670,50 @@ mod tests {
             infra::schema::exists("test_org_id", StreamType::Logs, &long_name).await,
             !bounded
         );
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_returns_items_in_request_order() {
+        let request = |docs: &[(&str, &str, String)]| {
+            let body: String = docs
+                .iter()
+                .map(|(stream, id, record)| {
+                    let action = json::json!({"index": {"_index": stream, "_id": id}});
+                    format!("{action}\n{record}\n")
+                })
+                .collect();
+            let user = IngestUser::from_user_email("a@a.com");
+            ingest(1, "test_org_id", Bytes::from(body), user)
+        };
+        let ids = |resp: BulkResponse| -> Vec<String> {
+            let items = resp.items.into_iter().flat_map(|item| item.into_values());
+            items.map(|item| item._id).collect()
+        };
+        let doc = |message: &str| format!(r#"{{"message": "{message}"}}"#);
+        let too_old = now_micros() - get_config().limit.ingest_allowed_upto_micro - 60_000_000;
+        let too_old = format!(r#"{{"message": "x", "_timestamp": {too_old}}}"#);
+        let s = "test_bulk_item_order";
+        // a schema with an `_id` column, so the next requests plan the columnar path for `s`
+        request(&[(s, "seed", doc("seed"))]).await.unwrap();
+        // b and d have a field the schema lacks, and x is refused before the write
+        let resp = request(&[
+            (s, "a", doc("a")),
+            (s, "b", r#"{"message": "b", "new_field": 1}"#.to_string()),
+            (s, "c", doc("c")),
+            (s, "x", too_old),
+            (s, "d", r#"{"message": "d", "new_field": 2}"#.to_string()),
+            (s, "e", doc("e")),
+        ])
+        .await
+        .unwrap();
+        assert_eq!(ids(resp), ["a", "b", "c", "x", "d", "e"]);
+        let t = "test_bulk_item_order_2";
+        let resp = request(&[(t, "p", doc("p")), (s, "q", doc("q")), (t, "r", doc("r"))])
+            .await
+            .unwrap();
+        assert_eq!(ids(resp), ["p", "q", "r"]);
     }
 
     #[test]
