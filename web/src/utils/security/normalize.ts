@@ -3,10 +3,10 @@
 // Normalized on fetched rows, not in SQL, so a request never bakes in one source's field names.
 
 import type { NormalizedEvent } from "./ocsf";
-import { fromOcsfStatusId, ocsfClass, toOcsfSeverity, toOcsfStatus } from "./ocsf";
-import type { SourceType } from "./sourceTypes";
-import { readPath } from "./classify";
-import { FieldIndex } from "./fields";
+import { fromOcsfStatusId, ocsfClass, toOcsfSeverity } from "./ocsf";
+import type { SourceType } from "@/services/securitySources";
+import { FieldIndex, readPath } from "./fields";
+import { classifyOutcome } from "./outcome";
 
 const isPresent = (value: unknown) =>
   value !== undefined && value !== null && value !== "" && !(Array.isArray(value) && !value.length);
@@ -48,10 +48,27 @@ function severityFromOutcome(statusId: number, classUid: number | null): number 
   return classUid === 3002 ? 3 : 2;
 }
 
-/** Maps one raw row onto the normalized columns using its source's field map. */
+/** The server's event-code failure rule (`failureWhen`), so a row's outcome agrees with the counts and the severity. */
+function eventCodeFailed(raw: Record<string, unknown>, when: SourceType["failureWhen"]): boolean {
+  if (!when) return false;
+  const code = Number(firstOf(raw, [when.field]));
+  if (Number.isFinite(code) && when.codes.includes(code)) return true;
+  if (when.status && when.statusCodes?.includes(code)) {
+    if (classifyOutcome(firstOf(raw, [when.status])) === 2) return true;
+  }
+  if (!when.keywords) return false;
+  return (
+    String(firstOf(raw, [when.keywords]) ?? "")
+      .trim()
+      .toLowerCase() === "audit failure"
+  );
+}
+
+/** Maps one raw row onto the normalized columns; `severityId` is the server's, when it sent one. */
 export function normalizeEvent(
   raw: Record<string, unknown>,
   source: SourceType | null,
+  severityId: number | null = null,
 ): NormalizedEvent {
   const map = source?.map ?? {};
   const constants = source?.constants ?? {};
@@ -69,19 +86,23 @@ export function normalizeEvent(
     ? isPresent(firstOf(raw, failureFields))
       ? 2
       : 1
-    : isPresent(ocsfStatus)
-      ? fromOcsfStatusId(ocsfStatus)
-      : toOcsfStatus(firstOf(raw, map.statusId as string[]));
-  const severityId = isPresent(rawSeverity)
-    ? toOcsfSeverity(rawSeverity)
-    : severityFromOutcome(statusId, classUid);
+    : eventCodeFailed(raw, source?.failureWhen)
+      ? 2
+      : isPresent(ocsfStatus)
+        ? fromOcsfStatusId(ocsfStatus)
+        : classifyOutcome(firstOf(raw, map.statusId as string[]));
+  const severity =
+    severityId ??
+    (isPresent(rawSeverity)
+      ? toOcsfSeverity(rawSeverity)
+      : severityFromOutcome(statusId, classUid));
 
   return {
     time: asMillis(firstOf(raw, map.time as string[]) ?? raw._timestamp),
     classUid,
     className: asText(firstOf(raw, map.className as string[])) || known?.name || "",
     activity: asText(firstOf(raw, map.activity as string[])),
-    severityId,
+    severityId: severity,
     statusId,
     actor: asText(firstOf(raw, map.actor as string[])),
     actorId: asText(firstOf(raw, map.actorId as string[])),
@@ -103,8 +124,9 @@ export function normalizeEvent(
 export function normalizeEvents(
   rows: Record<string, unknown>[],
   source: SourceType | null,
+  severity: (number | null)[] = [],
 ): NormalizedEvent[] {
-  return rows.map((row) => normalizeEvent(row, source));
+  return rows.map((row, i) => normalizeEvent(row, source, severity[i] ?? null));
 }
 
 /** Confirmed against the rows in hand, so a mapped-but-always-empty field earns no column. */

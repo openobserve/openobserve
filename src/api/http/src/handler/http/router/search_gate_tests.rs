@@ -276,7 +276,7 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 68] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 73] = [
     ("api/management/src/request/alert_calibration/digests.rs", "read", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -286,6 +286,11 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 68] = [
     ("api/management/src/request/db_monitoring/service/common.rs", "stats_search_once", Caller::Routed("db_monitoring::handler::")),
     ("api/management/src/request/db_monitoring/service/instance_metrics.rs", "run_metrics_search", Caller::Routed("db_monitoring::handler::")),
     ("api/management/src/request/gen_ai_health.rs", "run_sql", Caller::InHandler),
+    ("api/management/src/request/security/audit.rs", "search_audit", Caller::Exempt("Security audit trail from the meta org audit stream; its route stays open")),
+    ("api/management/src/request/security/intel.rs", "run_search", Caller::InHandler),
+    ("api/management/src/request/security/investigate.rs", "run_sql", Caller::InHandler),
+    ("api/management/src/request/security/sigma.rs", "search_rows", Caller::InHandler),
+    ("api/management/src/request/security/sources.rs", "search_rows", Caller::InHandler),
     ("api/management/src/request/synthetics/last_check.rs", "latest_result_per_check", Caller::Exempt("last check on the synthetics list; its route stays open")),
     ("api/management/src/request/workflows/mod.rs", "get_workflow_history", Caller::Exempt("the org's own workflow run history; its route stays open")),
     ("api/pipelines/src/request/pipelines/history.rs", "get_pipeline_history", Caller::Exempt("the org's own pipeline run history; its route stays open")),

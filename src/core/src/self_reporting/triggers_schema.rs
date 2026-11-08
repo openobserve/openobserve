@@ -200,7 +200,13 @@ mod tests {
         // Verify count matches struct fields
         // 44: 21 original + 2 grouping + 6 value + 2 synthetics + downtime + delivery + rule_value
         // + 6 report + 4 ack
-        assert_eq!(field_names.len(), 44);
+        let enterprise_only = if cfg!(feature = "enterprise") { 1 } else { 0 };
+        assert_eq!(field_names.len(), 44 + enterprise_only);
+        assert_eq!(
+            field_names.contains(&"siem".to_string()),
+            cfg!(feature = "enterprise"),
+            "history hides a deleted detection's rows by this column"
+        );
 
         // Verify no duplicate fields
         let unique_count = field_names

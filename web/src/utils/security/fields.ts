@@ -57,3 +57,40 @@ export class FieldIndex {
     return column ? { column, keys: parts.slice(INGEST_FLATTEN_LEVEL) } : null;
   }
 }
+
+/**
+ * Reads a field out of a row by its producer's path: as written, as the column
+ * ingest rewrote it into, or down the nested objects of a row never flattened.
+ */
+export function readPath(row: Record<string, unknown> | null | undefined, path: string): unknown {
+  if (!row) return undefined;
+  if (Object.prototype.hasOwnProperty.call(row, path)) return row[path];
+
+  const column = toColumnName(path);
+  if (column !== path && Object.prototype.hasOwnProperty.call(row, column)) return row[column];
+
+  let node: unknown = row;
+  for (const part of path.split(".")) {
+    if (node == null || typeof node !== "object") return readFlattenedJson(row, path);
+    node = (node as Record<string, unknown>)[part];
+  }
+  return node === undefined ? readFlattenedJson(row, path) : node;
+}
+
+/** A path deeper than ingest flattened: the remainder sits as JSON text in the deepest column. */
+function readFlattenedJson(row: Record<string, unknown>, path: string): unknown {
+  const parts = path.split(".");
+  if (parts.length <= INGEST_FLATTEN_LEVEL) return undefined;
+  const text = row[toColumnName(parts.slice(0, INGEST_FLATTEN_LEVEL).join("."))];
+  if (typeof text !== "string" || !text.startsWith("{")) return undefined;
+  try {
+    let node: unknown = JSON.parse(text);
+    for (const key of parts.slice(INGEST_FLATTEN_LEVEL)) {
+      if (node == null || typeof node !== "object") return undefined;
+      node = (node as Record<string, unknown>)[key];
+    }
+    return node;
+  } catch {
+    return undefined;
+  }
+}

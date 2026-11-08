@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </OPageLayout>
-  <AddRole v-model:open="showAddGroup" @added:role="onRoleAdded" />
+  <AddRole v-model:open="showAddGroup" :start-from="deepLinkStartFrom" @added:role="onRoleAdded" />
   <ConfirmDialog
     :title="t('iam.appRoles.deleteRole')"
     message-keypath="iam.appRoles.deleteConfirm"
@@ -204,6 +204,23 @@ const loadAssignedRoleNames = async () => {
 };
 
 watch(assignTarget, loadAssignedRoleNames, { immediate: true });
+
+// ?startFrom=<preset> from an access lock's "Start a role from …" link opens Add role with it chosen.
+const deepLinkStartFrom = ref("");
+watch(
+  () => route.query.startFrom,
+  (startFrom) => {
+    if (typeof startFrom !== "string" || !startFrom) return;
+    deepLinkStartFrom.value = startFrom;
+    showAddGroup.value = true;
+    const { startFrom: _startFrom, ...rest } = route.query;
+    router.replace({ name: "roles", query: rest });
+  },
+  { immediate: true },
+);
+watch(showAddGroup, (open) => {
+  if (!open) deepLinkStartFrom.value = "";
+});
 
 const clearAssignTarget = () => {
   const { member: _member, ...rest } = route.query;

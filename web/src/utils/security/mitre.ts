@@ -72,3 +72,16 @@ export function tacticCoverage(
     firings: firingCount.get(tactic) ?? 0,
   }));
 }
+
+/** `T1078.004` → `T1078`; a base technique is its own parent. */
+export function parentTechnique(id: string): string {
+  return id.trim().toUpperCase().split(".")[0];
+}
+
+/** Heat step for a firing count, so the matrix reads hot-to-cold at a glance. */
+export function heatLevel(firings: number): 0 | 1 | 2 | 3 {
+  if (firings <= 0) return 0;
+  if (firings < 5) return 1;
+  if (firings < 20) return 2;
+  return 3;
+}

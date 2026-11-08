@@ -323,7 +323,7 @@ impl LicenseSearchConfig {
 struct ConfigBootstrapResponse {
     /// `enterprise` / `cloud` / `opensource`; the o2 CLI and o2-operator read it here.
     build_type: String,
-    /// The UI's stale-build checker compares it across deploys.
+    /// [`config::build_fingerprint`], not the commit: the UI's stale-build checker compares it.
     commit_hash: String,
     telemetry_enabled: bool,
     sso_enabled: bool,
@@ -469,7 +469,7 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
 
     axum::Json(ConfigBootstrapResponse {
         build_type: build_type.to_string(),
-        commit_hash: config::COMMIT_HASH.to_string(),
+        commit_hash: config::build_fingerprint(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         sso_enabled,
         native_login_enabled,

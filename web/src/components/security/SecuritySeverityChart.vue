@@ -58,7 +58,21 @@ const options = computed(() => {
       type: "time",
       min: props.min,
       max: props.max,
-      axisLabel: { color: text, fontSize: 10, hideOverlap: true },
+      axisLabel: {
+        color: text,
+        fontSize: 10,
+        hideOverlap: true,
+        // A day boundary otherwise prints a bare day number ("7") with no month.
+        formatter: {
+          year: "{yyyy}",
+          month: "{MMM} {yyyy}",
+          day: "{MMM} {d}",
+          hour: "{HH}:{mm}",
+          minute: "{HH}:{mm}",
+          second: "{HH}:{mm}:{ss}",
+          millisecond: "{HH}:{mm}:{ss}",
+        },
+      },
       axisLine: { lineStyle: { color: grid } },
       axisTick: { show: false },
       splitLine: { show: false },
