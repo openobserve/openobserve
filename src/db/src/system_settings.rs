@@ -920,6 +920,39 @@ mod tests {
         assert!(apply_replicated_put(&user).await.is_err());
     }
 
+    #[tokio::test]
+    async fn the_identity_config_is_read_from_the_cache_that_set_keeps_current() {
+        use config::meta::correlation::{IdentitySet, ServiceIdentityConfig};
+
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let org = "b16575-identity-config";
+        let _ = delete(&SettingScope::Org, Some(org), None, "service_identity").await;
+
+        let saved = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "b16575".to_string(),
+                label: "B16575".to_string(),
+                distinguish_by: vec!["k8s-namespace".to_string()],
+            }],
+            tracked_alias_ids: vec!["k8s-namespace".to_string()],
+            service_optional: false,
+        };
+        let row = SystemSetting::new_org(org, "service_identity", json!(saved));
+
+        // Written behind the cache's back: still seeing the defaults proves no database read.
+        db::set(&row).await.unwrap();
+        assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
+
+        set(&row).await.unwrap();
+        assert_eq!(get_service_identity_config(org).await.sets, saved.sets);
+
+        delete(&SettingScope::Org, Some(org), None, "service_identity")
+            .await
+            .unwrap();
+        assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn only_org_scope_writes_produce_a_replication_message() {
