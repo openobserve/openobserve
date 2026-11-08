@@ -50,6 +50,13 @@ fn row_cache_key((scope, org_id, user_id, key): &db::SettingRowKey) -> String {
     cache_key(&scope, org_id.as_deref(), user_id.as_deref(), key)
 }
 
+/// Whether settings reads go to a Postgres read replica other than the primary.
+fn has_separate_read_replica(meta_store: &str, dsn: &str, ro_dsn: &str) -> bool {
+    use config::meta::meta_store::MetaStore;
+
+    MetaStore::from(meta_store) == MetaStore::PostgreSQL && !ro_dsn.is_empty() && ro_dsn != dsn
+}
+
 /// Caches the stored row on this node and tells this region's other nodes to reload it.
 async fn cache_and_announce(stored: &SystemSetting) {
     let cache_k = cache_key(
@@ -593,17 +600,16 @@ pub async fn get_service_identity_config(
 ) -> config::meta::correlation::ServiceIdentityConfig {
     use config::meta::{
         correlation::{IdentitySet, ServiceIdentityConfig},
-        meta_store::MetaStore,
         system_settings::SettingScope,
     };
 
     let cfg = config::get_config();
-    let replica = &cfg.common.meta_postgres_ro_dsn;
     // The watcher reloads from a separate read replica, which can lag a save and pin a stale row.
-    let stored = if MetaStore::from(cfg.common.meta_store.as_str()) == MetaStore::PostgreSQL
-        && !replica.is_empty()
-        && *replica != cfg.common.meta_postgres_dsn
-    {
+    let stored = if has_separate_read_replica(
+        &cfg.common.meta_store,
+        &cfg.common.meta_postgres_dsn,
+        &cfg.common.meta_postgres_ro_dsn,
+    ) {
         db::get(&SettingScope::Org, Some(org_id), None, "service_identity")
             .await
             .ok()
@@ -735,15 +741,15 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
 
 /// Caches what an org's semantic-groups miss means and returns it; `None` when left uncached.
 async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting> {
-    use config::meta::{meta_store::MetaStore, system_settings::keys::SEMANTIC_FIELD_GROUPS};
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
 
     let cfg = config::get_config();
-    let replica = &cfg.common.meta_postgres_ro_dsn;
     // A replica can lag a save past its watch event, and a cached miss would outlive that lag.
-    if MetaStore::from(cfg.common.meta_store.as_str()) == MetaStore::PostgreSQL
-        && !replica.is_empty()
-        && *replica != cfg.common.meta_postgres_dsn
-    {
+    if has_separate_read_replica(
+        &cfg.common.meta_store,
+        &cfg.common.meta_postgres_dsn,
+        &cfg.common.meta_postgres_ro_dsn,
+    ) {
         return None;
     }
     let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
@@ -1032,6 +1038,16 @@ mod tests {
 
         let user = SystemSetting::new_user(org, "dana@acme.com", key, json!({"mode": "p1"}));
         assert!(apply_replicated_put(&user).await.is_err());
+    }
+
+    #[test]
+    fn only_a_distinct_postgres_read_dsn_is_a_separate_replica() {
+        let (dsn, ro) = ("postgres://primary/o2", "postgres://replica/o2");
+        assert!(!has_separate_read_replica("sqlite", dsn, ro));
+        assert!(!has_separate_read_replica("postgres", dsn, ""));
+        assert!(!has_separate_read_replica("postgres", dsn, dsn));
+        assert!(has_separate_read_replica("postgres", dsn, ro));
+        assert!(has_separate_read_replica("postgresql", dsn, ro));
     }
 
     #[tokio::test]
