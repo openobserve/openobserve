@@ -4609,8 +4609,13 @@ mod tests {
         let _db = db().await;
         let (org, repeat) = new_incident(None).await;
         let unlinked = add_incident(&org, None).await;
-        for (alert, fired_at) in [("a", 1), ("b", 2), ("a", 3), ("a", 4)] {
-            add_alert_to_incident(
+        for (alert, fired_at, new_type) in [
+            ("a", 1, true),
+            ("b", 2, true),
+            ("a", 3, false),
+            ("a", 4, false),
+        ] {
+            let joined = add_alert_to_incident(
                 &repeat,
                 alert,
                 &format!("{alert}-name"),
@@ -4620,6 +4625,7 @@ mod tests {
             )
             .await
             .unwrap();
+            assert_eq!(joined, new_type, "{alert} at {fired_at}");
         }
 
         let (incidents, _) = list_incidents(&org, None, 50, 0).await.unwrap();
