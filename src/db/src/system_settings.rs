@@ -398,17 +398,17 @@ pub async fn invalidate_all_cache() {
 pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correlation::FieldAlias> {
     use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
 
-    match get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await {
-        Ok(Some(setting)) => {
-            if let Ok(groups) = serde_json::from_value::<Vec<FieldAlias>>(setting.setting_value)
-                && !groups.is_empty()
-            {
-                return groups;
-            }
-        }
+    let setting = match get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await {
+        Ok(Some(setting)) => Some(setting),
         // Empty means "use the defaults" here, and caching it spares every later read two misses.
-        Ok(None) => cache_absent_semantic_field_groups(org_id).await,
-        Err(_) => {}
+        Ok(None) => cache_semantic_field_groups_miss(org_id).await,
+        Err(_) => None,
+    };
+    if let Some(setting) = setting
+        && let Ok(groups) = serde_json::from_value::<Vec<FieldAlias>>(setting.setting_value)
+        && !groups.is_empty()
+    {
+        return groups;
     }
 
     // Fall back to enterprise defaults
@@ -710,24 +710,33 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
     }
 }
 
-async fn cache_absent_semantic_field_groups(org_id: &str) {
+/// Caches what an org's semantic-groups miss means and returns it, `None` if unconfirmed.
+async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting> {
     use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
 
-    let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
-    // Zero timestamps mark the stand-in, and keep `get_semantic_field_groups_updated_at` at 0.
-    absent.created_at = 0;
-    absent.updated_at = 0;
+    // A read replica can lag a save, and a cached miss outlives the lag, so the primary decides.
+    let entry = match db::get_from_primary(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS)
+        .await
+    {
+        Ok(Some(saved)) => saved,
+        Ok(None) => {
+            let mut absent =
+                SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
+            // Zero timestamps mark the stand-in, and keep `get_semantic_field_groups_updated_at` at 0.
+            absent.created_at = 0;
+            absent.updated_at = 0;
+            absent
+        }
+        Err(_) => return None,
+    };
     // A row cached since the database miss is newer than the miss, so it must win.
-    SYSTEM_SETTINGS
+    let cached = SYSTEM_SETTINGS
         .write()
         .await
-        .entry(cache_key(
-            &SettingScope::Org,
-            Some(org_id),
-            None,
-            SEMANTIC_FIELD_GROUPS,
-        ))
-        .or_insert(absent);
+        .entry(cache_key(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS))
+        .or_insert(entry)
+        .clone();
+    Some(cached)
 }
 
 async fn evict_settings(keys: &[String]) -> Result<()> {
@@ -919,12 +928,18 @@ mod tests {
         assert!(get_semantic_field_groups_updated_at(org).await > 0);
 
         // A miss that lost the race to a save must not replace the saved row.
-        cache_absent_semantic_field_groups(org).await;
+        cache_semantic_field_groups_miss(org).await;
         assert_eq!(get_semantic_field_groups(org).await, groups);
         let saved = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
             .await
             .unwrap();
         assert!(!is_absent_semantic_field_groups(&saved));
+
+        // A miss on an empty cache whose row is on the primary caches that row, not the stand-in.
+        SYSTEM_SETTINGS.write().await.clear();
+        let confirmed = cache_semantic_field_groups_miss(org).await.unwrap();
+        assert_eq!(confirmed.setting_value, json!(groups));
+        assert_eq!(get_semantic_field_groups(org).await, groups);
 
         let _ = delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
     }
