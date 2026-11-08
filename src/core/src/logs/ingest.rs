@@ -58,8 +58,10 @@ use prost::Message;
 use transform::TRANSFORM_FAILED;
 
 use super::{
-    IngestJsonData, bulk::TS_PARSE_FAILED, columnar::JsonColumnar, ingestion_log_enabled,
-    log_failed_record,
+    IngestJsonData,
+    bulk::{BulkResponseOrder, TS_PARSE_FAILED},
+    columnar::JsonColumnar,
+    ingestion_log_enabled, log_failed_record,
 };
 use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
@@ -90,6 +92,7 @@ struct FinalizeRecordContext<'a> {
     dbm_enabled: bool,
     stream_status: &'a mut StreamStatus,
     json_data_by_stream: &'a mut LogDataByStream,
+    bulk_position: Option<(&'a mut BulkResponseOrder, usize)>,
 }
 
 /// Why a record could not be prepared for writing.
@@ -203,18 +206,20 @@ pub async fn ingest(
         extend_json,
         is_derived,
         None,
+        None,
     )
     .await
 }
 
 /// Ingests one stream's `_bulk` records beside the rows its data lines already built.
-pub async fn ingest_bulk(
+pub(super) async fn ingest_bulk(
     thread_id: usize,
     org_id: &str,
     stream_name: &str,
     records: Vec<json::Value>,
     plan: Option<BulkPlan>,
     user: IngestUser,
+    response_order: &mut BulkResponseOrder,
 ) -> Result<IngestionResponse> {
     ingest_inner(
         thread_id,
@@ -225,6 +230,7 @@ pub async fn ingest_bulk(
         None,
         false,
         plan,
+        Some(response_order),
     )
     .await
 }
@@ -278,6 +284,7 @@ async fn ingest_inner(
     extend_json: Option<&HashMap<String, serde_json::Value>>,
     is_derived: bool,
     bulk_plan: Option<BulkPlan>,
+    mut response_order: Option<&mut BulkResponseOrder>,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
@@ -377,6 +384,14 @@ async fn ingest_inner(
         mut streams_need_original_map,
         mut streams_need_all_values_map,
     } = needs;
+    if !executable_pipelines.is_empty()
+        && let Some(order) = response_order.take()
+    {
+        order.pipeline = true;
+    }
+    let mut input_positions = response_order
+        .as_mut()
+        .map(|order| std::mem::take(&mut order.json).into_iter());
     let mut pipeline_inputs = Vec::new();
     let mut original_options = Vec::new();
     // with pipeline, we need to store original if any of the destinations requires original
@@ -462,6 +477,7 @@ async fn ingest_inner(
     let mut json_data_by_stream: LogDataByStream = HashMap::new();
     let mut size_by_stream = HashMap::new();
     for ret in data.iter() {
+        let input_position = input_positions.as_mut().and_then(Iterator::next);
         let mut item = match ret {
             Ok(item) => item,
             Err(IngestionError::PayloadTooLarge(e)) => {
@@ -528,6 +544,7 @@ async fn ingest_inner(
                 dbm_enabled: dbm_gate,
                 stream_status: &mut stream_status,
                 json_data_by_stream: &mut json_data_by_stream,
+                bulk_position: response_order.as_deref_mut().zip(input_position),
             },
         ) {
             continue;
@@ -799,6 +816,7 @@ async fn ingest_inner(
                         dbm_enabled: dbm_gate,
                         stream_status: &mut stream_status,
                         json_data_by_stream: &mut json_data_by_stream,
+                        bulk_position: None,
                     },
                 );
             }
@@ -904,6 +922,7 @@ async fn ingest_inner(
             size_by_stream,
             derived_streams,
             columnar,
+            response_order,
         )
         .await;
         match status {
@@ -1191,6 +1210,9 @@ fn finalize_and_buffer_record(
             );
         }
     };
+    if let Some((order, position)) = ctx.bulk_position.as_mut() {
+        order.json.push_back(*position);
+    }
     true
 }
 
@@ -2258,5 +2280,46 @@ mod tests {
         let (needs, columnar) = request_needs(stream.clone(), None).await;
         assert!(columnar.is_none());
         assert!(needs.executable_pipelines.is_empty());
+    }
+    #[test]
+    fn test_bulk_response_positions_exclude_rejected_finalized_records() {
+        let mut order = BulkResponseOrder::default();
+        let mut stream_status = StreamStatus::new("s");
+        let mut buffered = LogDataByStream::new();
+        let schema_map = HashMap::new();
+        let settings = HashMap::new();
+        for (position, record, accepted) in [
+            (0, json::json!({"_timestamp": 1000000000000000_i64}), true),
+            (1, json::json!({"_timestamp": "invalid"}), false),
+            (2, json::json!({"_timestamp": 1000000000000001_i64}), true),
+        ] {
+            assert_eq!(
+                finalize_and_buffer_record(
+                    record,
+                    None,
+                    &mut FinalizeRecordContext {
+                        stream_name: "s",
+                        org_id: "o",
+                        flatten_level: 0,
+                        min_ts: 1,
+                        max_ts: i64::MAX,
+                        index_all_max_value_length: 0,
+                        user_defined_schema_map: &schema_map,
+                        streams_need_original_map: &settings,
+                        streams_need_all_values_map: &settings,
+                        need_usage_report: false,
+                        log_ingestion_errors: false,
+                        dbm_enabled: false,
+                        stream_status: &mut stream_status,
+                        json_data_by_stream: &mut buffered,
+                        bulk_position: Some((&mut order, position)),
+                    }
+                ),
+                accepted,
+            );
+        }
+        assert_eq!(order.json, [0, 2]);
+        assert_eq!(buffered["s"].0.len(), 2);
+        assert_eq!(stream_status.status.failed, 1);
     }
 }

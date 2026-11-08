@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     io::{BufRead, BufReader},
 };
 
@@ -36,12 +36,27 @@ use transform::TRANSFORM_FAILED;
 
 use crate::{
     ingestion::check_ingestion_allowed,
-    logs::{columnar::JsonColumnar, ingest::BulkPlan, ingestion_log_enabled, log_failed_record},
+    logs::{ingest::BulkPlan, ingestion_log_enabled, log_failed_record},
 };
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
 pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
+
+const UNKNOWN_REQUEST_POSITION: usize = usize::MAX;
+
+#[derive(Default)]
+pub(super) struct BulkResponseOrder {
+    pub json: VecDeque<usize>,
+    pub columnar: Vec<usize>,
+    pub emitted: Vec<usize>,
+    pub pipeline: bool,
+}
+
+struct BulkStream {
+    plan: Option<BulkPlan>,
+    order: BulkResponseOrder,
+}
 
 pub async fn ingest(
     thread_id: usize,
@@ -74,12 +89,11 @@ pub async fn ingest(
     let stream_type = StreamType::Logs;
 
     let mut stream_key_cache: HashMap<String, String> = HashMap::new();
-    // each stream's records, with the request position of each
-    let mut streams_data: HashMap<String, (Vec<json::Value>, Vec<usize>)> = HashMap::new();
-    let mut plans: HashMap<String, Option<BulkPlan>> = HashMap::new();
-    // streams are written after the whole request is read, so each item keeps its action's position
-    let mut item_positions = Vec::new();
-    let mut position = 0;
+    let mut streams_data: HashMap<String, Vec<json::Value>> = HashMap::new();
+    let mut plans: HashMap<String, BulkStream> = HashMap::new();
+    let mut action_position = 0;
+    let mut action_count = 0;
+    let mut response_positions = Vec::new();
     let mut next_line_is_data = false;
     // Read lines as bytes to handle potential invalid UTF-8 characters
     let mut line_buffer = Vec::new();
@@ -101,13 +115,17 @@ pub async fn ingest(
         }
 
         let is_data = std::mem::take(&mut next_line_is_data);
-        if is_data
-            && stream_columnar(&mut plans, org_id, &stream_name, (min_ts, max_ts))
-                .await
-                .is_some_and(|c| c.parse_bulk_line(&line_buffer, doc_id.as_deref(), position))
-        {
-            tokio::task::coop::consume_budget().await;
-            continue;
+        if is_data {
+            let stream = stream_plan(&mut plans, org_id, &stream_name, (min_ts, max_ts)).await;
+            if stream
+                .plan
+                .as_mut()
+                .is_some_and(|p| p.columnar.parse_bulk_line(&line_buffer, doc_id.as_deref()))
+            {
+                stream.order.columnar.push(action_position);
+                tokio::task::coop::consume_budget().await;
+                continue;
+            }
         }
         // Use from_utf8_lossy to handle potential invalid UTF-8 characters
         // Invalid UTF-8 sequences will be replaced with the replacement character (�)
@@ -121,7 +139,8 @@ pub async fn ingest(
             else {
                 continue;
             };
-            position += 1;
+            action_position = action_count;
+            action_count += 1;
             if line_action != action {
                 action = line_action.to_string();
             }
@@ -158,7 +177,7 @@ pub async fn ingest(
                     ),
                 );
                 bulk_res.items.push(item);
-                item_positions.push(position);
+                response_positions.push(action_position);
                 continue; // skip
             }
 
@@ -190,7 +209,7 @@ pub async fn ingest(
                     ),
                 );
                 bulk_res.items.push(item);
-                item_positions.push(position);
+                response_positions.push(action_position);
                 continue; // skip
             }
 
@@ -235,27 +254,32 @@ pub async fn ingest(
                     Some(TS_PARSE_FAILED.to_string()),
                     Some(failure_reason),
                 );
-                item_positions.push(position);
+                response_positions.push(action_position);
                 continue;
             }
 
+            // A data line has already initialized its stream plan.
+            plans
+                .get_mut(&stream_name)
+                .unwrap()
+                .order
+                .json
+                .push_back(action_position);
             let val = json::Value::Object(local_val);
             match streams_data.get_mut(&stream_name) {
-                Some((records, positions)) => {
-                    records.push(val);
-                    positions.push(position);
-                }
+                Some(v) => v.push(val),
                 None => {
-                    streams_data.insert(stream_name.clone(), (vec![val], vec![position]));
+                    streams_data.insert(stream_name.clone(), vec![val]);
                 }
             }
         }
         tokio::task::coop::consume_budget().await;
     }
 
-    plans.retain(|_, plan| plan.as_ref().is_some_and(|p| p.columnar.rows() > 0));
-    for stream in plans.keys() {
-        streams_data.entry(stream.clone()).or_default();
+    for (stream, state) in &plans {
+        if state.plan.as_ref().is_some_and(|p| p.columnar.rows() > 0) {
+            streams_data.entry(stream.clone()).or_default();
+        }
     }
 
     // Checked up front, pipeline destinations included: a whole-request 503 is retried safely.
@@ -263,7 +287,7 @@ pub async fn ingest(
     {
         let streams: Vec<(&str, u64)> = streams_data
             .iter()
-            .map(|(stream, (records, _))| (stream.as_str(), records.len() as u64))
+            .map(|(stream, records)| (stream.as_str(), records.len() as u64))
             .collect();
         let streams =
             crate::ingestion::with_pipeline_destinations(org_id, stream_type, &streams).await;
@@ -279,16 +303,14 @@ pub async fn ingest(
     // process data by stream
     #[cfg(feature = "vectorscan")]
     let mut written_any = false;
-    for (stream_name, (records, mut positions)) in streams_data {
+    for (stream_name, records) in streams_data {
         #[cfg(feature = "vectorscan")]
         let record_count = records.len();
-        let mut plan = plans.remove(&stream_name).flatten();
-        // the write returns the records' items, then the columnar rows'
-        if let Some(plan) = plan.as_mut() {
-            positions.extend(plan.columnar.take_bulk_positions());
-        }
-        // items that cannot be matched to the stream's rows one to one stay together here
-        let first_position = positions.iter().min().copied().unwrap_or_default();
+        // Every buffered row initialized its stream plan before parsing.
+        let mut stream = plans.remove(&stream_name).unwrap();
+        let plan = stream.plan.filter(|p| p.columnar.rows() > 0);
+        #[cfg(feature = "vectorscan")]
+        let record_positions: Vec<usize> = stream.order.json.iter().copied().collect();
         match super::ingest::ingest_bulk(
             thread_id,
             org_id,
@@ -296,6 +318,7 @@ pub async fn ingest(
             records,
             plan,
             user.clone(),
+            &mut stream.order,
         )
         .await
         {
@@ -304,21 +327,19 @@ pub async fn ingest(
                 {
                     written_any = true;
                 }
-                let first_item = bulk_res.items.len();
-                bulk_res
-                    .items
-                    .extend(v.status.into_iter().flat_map(|s| s.items));
-                let items = &bulk_res.items[first_item..];
-                // the stream status keeps the items but not the write's errors flag
-                bulk_res.errors |= items
-                    .iter()
-                    .flat_map(|item| item.values())
-                    .any(|item| item.error.is_some());
-                // a dropped or added item leaves the stream's items unmatched
-                if items.len() == positions.len() {
-                    item_positions.extend(positions);
+                for status in v.status {
+                    // the stream status keeps the items but not the write's errors flag
+                    bulk_res.errors |= status
+                        .items
+                        .iter()
+                        .flat_map(|item| item.values())
+                        .any(|item| item.error.is_some());
+                    bulk_res.items.extend(status.items);
+                }
+                if stream.order.pipeline {
+                    response_positions.resize(bulk_res.items.len(), UNKNOWN_REQUEST_POSITION);
                 } else {
-                    item_positions.extend(std::iter::repeat_n(first_position, items.len()));
+                    response_positions.extend(stream.order.emitted);
                 }
             }
             Err(e) => {
@@ -330,7 +351,7 @@ pub async fn ingest(
                         return Err(e);
                     }
                     bulk_res.errors = true;
-                    for _ in 0..record_count {
+                    for position in record_positions.into_iter().take(record_count) {
                         add_record_status(
                             stream_name.to_string(),
                             None,
@@ -347,8 +368,8 @@ pub async fn ingest(
                         {
                             item.status = 503;
                         }
+                        response_positions.push(position);
                     }
-                    item_positions.extend(&positions[..record_count]);
                     continue;
                 }
                 bulk_res.errors = true;
@@ -369,19 +390,11 @@ pub async fn ingest(
                     Some(PIPELINE_EXEC_FAILED.to_string()),
                     Some(PIPELINE_EXEC_FAILED.to_string()),
                 );
-                item_positions.push(first_position);
+                response_positions.push(UNKNOWN_REQUEST_POSITION);
             }
         }
     }
-    if item_positions.len() == bulk_res.items.len() && !item_positions.is_sorted() {
-        let mut items: Vec<_> = item_positions
-            .into_iter()
-            .zip(std::mem::take(&mut bulk_res.items))
-            .collect();
-        // stable, so items sharing a position keep their order
-        items.sort_by_key(|(position, _)| *position);
-        bulk_res.items = items.into_iter().map(|(_, item)| item).collect();
-    }
+    restore_response_order(&mut bulk_res.items, &mut response_positions, action_count);
 
     // metric + data usage
     let status_code = if bulk_res.errors { "500" } else { "200" };
@@ -552,18 +565,63 @@ pub(super) fn resolve_bulk_timestamp(
     Ok((timestamp, has_valid_timestamp))
 }
 
-/// The stream's columnar rows, planned on its first data line of the request.
-async fn stream_columnar<'a>(
-    plans: &'a mut HashMap<String, Option<BulkPlan>>,
+pub(super) fn restore_response_order(
+    items: &mut [HashMap<String, BulkResponseItem>],
+    positions: &mut [usize],
+    action_count: usize,
+) {
+    debug_assert_eq!(items.len(), positions.len());
+    if positions.is_sorted() {
+        return;
+    }
+    // Ordinary results retain unique action positions across omitted inputs.
+    let mut by_action = vec![usize::MAX; action_count];
+    for (response, &position) in positions.iter().enumerate() {
+        if position != UNKNOWN_REQUEST_POSITION {
+            by_action[position] = response;
+        }
+    }
+    let mut rank = 0;
+    for response in by_action {
+        if response != usize::MAX {
+            positions[response] = rank;
+            rank += 1;
+        }
+    }
+    // Pipeline outputs and stream-level failures have no individual input provenance.
+    for position in positions.iter_mut() {
+        if *position == UNKNOWN_REQUEST_POSITION {
+            *position = rank;
+            rank += 1;
+        }
+    }
+    for index in 0..positions.len() {
+        while positions[index] != index {
+            let destination = positions[index];
+            items.swap(index, destination);
+            positions.swap(index, destination);
+        }
+    }
+}
+
+async fn stream_plan<'a>(
+    plans: &'a mut HashMap<String, BulkStream>,
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-) -> Option<&'a mut JsonColumnar> {
+) -> &'a mut BulkStream {
     if !plans.contains_key(stream_name) {
         let plan = super::ingest::plan_bulk_columnar(org_id, stream_name, time_range).await;
-        plans.insert(stream_name.to_string(), plan);
+        plans.insert(
+            stream_name.to_string(),
+            BulkStream {
+                plan,
+                order: BulkResponseOrder::default(),
+            },
+        );
     }
-    Some(&mut plans.get_mut(stream_name)?.as_mut()?.columnar)
+    // The stream was present or inserted above.
+    plans.get_mut(stream_name).unwrap()
 }
 
 #[cfg(test)]
@@ -571,6 +629,37 @@ mod tests {
     use ingestion_common::IngestUser;
 
     use super::*;
+
+    #[test]
+    fn test_restore_response_order_preserves_sparse_and_unknown_positions() {
+        for (mut positions, action_count, expected) in [
+            (vec![2, 0, 1], 3, vec![1, 2, 0]),
+            (vec![8, 1, 5], 10, vec![1, 2, 0]),
+            (
+                vec![UNKNOWN_REQUEST_POSITION, 3, UNKNOWN_REQUEST_POSITION, 0, 2],
+                5,
+                vec![3, 4, 1, 0, 2],
+            ),
+            (vec![1, 4, 9], 10, vec![0, 1, 2]),
+            (vec![], 0, vec![]),
+        ] {
+            let mut items: Vec<_> = (0..positions.len())
+                .map(|index| {
+                    success_item(
+                        "index".to_string(),
+                        &index.to_string(),
+                        if index % 2 == 0 { "" } else { "same" }.to_string(),
+                    )
+                })
+                .collect();
+            restore_response_order(&mut items, &mut positions, action_count);
+            let sources: Vec<usize> = items
+                .iter()
+                .map(|item| item["index"]._index.parse().unwrap())
+                .collect();
+            assert_eq!(sources, expected);
+        }
+    }
 
     #[test]
     fn test_add_record_status() {
@@ -670,50 +759,6 @@ mod tests {
             infra::schema::exists("test_org_id", StreamType::Logs, &long_name).await,
             !bounded
         );
-    }
-
-    // cloud builds reject the unknown test org at the trial check
-    #[cfg(not(feature = "cloud"))]
-    #[tokio::test]
-    async fn test_ingest_returns_items_in_request_order() {
-        let request = |docs: &[(&str, &str, String)]| {
-            let body: String = docs
-                .iter()
-                .map(|(stream, id, record)| {
-                    let action = json::json!({"index": {"_index": stream, "_id": id}});
-                    format!("{action}\n{record}\n")
-                })
-                .collect();
-            let user = IngestUser::from_user_email("a@a.com");
-            ingest(1, "test_org_id", Bytes::from(body), user)
-        };
-        let ids = |resp: BulkResponse| -> Vec<String> {
-            let items = resp.items.into_iter().flat_map(|item| item.into_values());
-            items.map(|item| item._id).collect()
-        };
-        let doc = |message: &str| format!(r#"{{"message": "{message}"}}"#);
-        let too_old = now_micros() - get_config().limit.ingest_allowed_upto_micro - 60_000_000;
-        let too_old = format!(r#"{{"message": "x", "_timestamp": {too_old}}}"#);
-        let s = "test_bulk_item_order";
-        // a schema with an `_id` column, so the next requests plan the columnar path for `s`
-        request(&[(s, "seed", doc("seed"))]).await.unwrap();
-        // b and d have a field the schema lacks, and x is refused before the write
-        let resp = request(&[
-            (s, "a", doc("a")),
-            (s, "b", r#"{"message": "b", "new_field": 1}"#.to_string()),
-            (s, "c", doc("c")),
-            (s, "x", too_old),
-            (s, "d", r#"{"message": "d", "new_field": 2}"#.to_string()),
-            (s, "e", doc("e")),
-        ])
-        .await
-        .unwrap();
-        assert_eq!(ids(resp), ["a", "b", "c", "x", "d", "e"]);
-        let t = "test_bulk_item_order_2";
-        let resp = request(&[(t, "p", doc("p")), (s, "q", doc("q")), (t, "r", doc("r"))])
-            .await
-            .unwrap();
-        assert_eq!(ids(resp), ["p", "q", "r"]);
     }
 
     #[test]

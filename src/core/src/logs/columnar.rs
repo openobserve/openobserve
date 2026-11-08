@@ -63,8 +63,6 @@ pub struct JsonColumnar {
     input_bytes: usize,
     /// The action `_id` of each accepted `_bulk` record, for its response item.
     bulk_ids: Vec<Option<String>>,
-    /// The request position of each accepted `_bulk` record, to return its item in order.
-    bulk_positions: Vec<usize>,
     bulk_id_col: Option<usize>,
 }
 
@@ -165,7 +163,7 @@ impl JsonColumnar {
     }
 
     /// Takes one `_bulk` data line under its action's `_id`; `false` leaves it to the JSON path.
-    pub fn parse_bulk_line(&mut self, line: &[u8], doc_id: Option<&str>, position: usize) -> bool {
+    pub fn parse_bulk_line(&mut self, line: &[u8], doc_id: Option<&str>) -> bool {
         if doc_id.is_some() && self.bulk_id_col.is_none() {
             return false;
         }
@@ -177,17 +175,12 @@ impl JsonColumnar {
         };
         if accepted {
             self.bulk_ids.push(doc_id.map(str::to_string));
-            self.bulk_positions.push(position);
         }
         accepted
     }
 
     pub fn take_bulk_ids(&mut self) -> Vec<Option<String>> {
         std::mem::take(&mut self.bulk_ids)
-    }
-
-    pub fn take_bulk_positions(&mut self) -> Vec<usize> {
-        std::mem::take(&mut self.bulk_positions)
     }
 
     pub fn into_entries(self, org_id: &str) -> Result<Vec<ingester::Entry>> {
@@ -230,7 +223,6 @@ impl JsonColumnar {
             dbm_enabled,
             input_bytes: 0,
             bulk_ids: Vec::new(),
-            bulk_positions: Vec::new(),
             bulk_id_col,
         })
     }
@@ -1183,7 +1175,7 @@ mod tests {
         let (expected, json_size, input_bytes) = bulk_json_path(schema, line, doc_id, range);
         let mut columnar = JsonColumnar::for_schema("logs", schema, 3, range, true).unwrap();
         assert!(
-            columnar.parse_bulk_line(line.as_bytes(), doc_id, 0),
+            columnar.parse_bulk_line(line.as_bytes(), doc_id),
             "{line} fell back"
         );
         assert_eq!(columnar.input_bytes(), input_bytes, "input bytes of {line}");
@@ -1271,26 +1263,22 @@ mod tests {
             for doc_id in [None, Some("doc-1")] {
                 let mut columnar =
                     JsonColumnar::for_schema("logs", &schema, 3, RANGE, true).unwrap();
-                assert!(
-                    !columnar.parse_bulk_line(line.as_bytes(), doc_id, 0),
-                    "{line}"
-                );
+                assert!(!columnar.parse_bulk_line(line.as_bytes(), doc_id), "{line}");
                 assert_eq!(columnar.rows(), 0, "{line}");
                 assert!(columnar.take_bulk_ids().is_empty(), "{line}");
-                assert!(columnar.take_bulk_positions().is_empty(), "{line}");
                 assert_eq!(columnar.input_bytes(), 0, "{line}");
             }
         }
         // invalid UTF-8 is left to the JSON path, which repairs it
         let mut columnar = JsonColumnar::for_schema("logs", &schema, 3, RANGE, true).unwrap();
         let line = [br#"{"_timestamp":1,"level":""#.as_slice(), b"\xff\"}"].concat();
-        assert!(!columnar.parse_bulk_line(&line, None, 0));
+        assert!(!columnar.parse_bulk_line(&line, None));
         // an action `_id` needs a string `_id` column to land in
         let mut columnar =
             JsonColumnar::for_schema("logs", &logs_schema(), 3, RANGE, true).unwrap();
         let line = format!(r#"{{"_timestamp":{TS},"level":"a"}}"#);
-        assert!(!columnar.parse_bulk_line(line.as_bytes(), Some("doc-1"), 0));
-        assert!(columnar.parse_bulk_line(line.as_bytes(), None, 0));
+        assert!(!columnar.parse_bulk_line(line.as_bytes(), Some("doc-1")));
+        assert!(columnar.parse_bulk_line(line.as_bytes(), None));
     }
 
     #[test]
@@ -1299,16 +1287,15 @@ mod tests {
         let mut columnar = JsonColumnar::for_schema("logs", &schema, 3, RANGE, true).unwrap();
         let ok = format!(r#"{{"_timestamp":{TS},"level":"a"}}"#);
         let new_field = format!(r#"{{"_timestamp":{TS},"nope":1}}"#);
-        assert!(columnar.parse_bulk_line(ok.as_bytes(), Some("1"), 1));
-        assert!(!columnar.parse_bulk_line(new_field.as_bytes(), Some("2"), 2));
-        assert!(columnar.parse_bulk_line(ok.as_bytes(), None, 3));
-        assert!(columnar.parse_bulk_line(ok.as_bytes(), Some("3"), 4));
+        assert!(columnar.parse_bulk_line(ok.as_bytes(), Some("1")));
+        assert!(!columnar.parse_bulk_line(new_field.as_bytes(), Some("2")));
+        assert!(columnar.parse_bulk_line(ok.as_bytes(), None));
+        assert!(columnar.parse_bulk_line(ok.as_bytes(), Some("3")));
         assert_eq!(columnar.rows(), 3);
         assert_eq!(
             columnar.take_bulk_ids(),
             vec![Some("1".to_string()), None, Some("3".to_string())]
         );
-        assert_eq!(columnar.take_bulk_positions(), [1, 3, 4]);
     }
 
     #[test]
