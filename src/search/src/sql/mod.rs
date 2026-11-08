@@ -64,11 +64,6 @@ pub mod visitor;
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 
-// Quotes are optional so a `"histogram"(...)` call normalizes like the unquoted one DataFusion
-// runs.
-pub static RE_HISTOGRAM: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?i)"?histogram"?\(([^\)]*)\)"#).unwrap());
-
 #[derive(Clone, Debug)]
 pub struct Sql {
     pub sql: String,
@@ -593,18 +588,6 @@ mod tests {
         if let Some(caps) = RE_SELECT_FROM.captures(sql) {
             assert_eq!(caps.get(1).map(|m| m.as_str()), Some("a, b"));
         }
-    }
-
-    #[test]
-    fn test_re_histogram_matches() {
-        assert!(RE_HISTOGRAM.is_match("histogram(_timestamp, '1 hour')"));
-        assert!(RE_HISTOGRAM.is_match("HISTOGRAM(ts,'5 minute')"));
-        assert!(RE_HISTOGRAM.is_match("\"histogram\"(_timestamp, '1 day', '+05:30')"));
-    }
-
-    #[test]
-    fn test_re_histogram_no_match() {
-        assert!(!RE_HISTOGRAM.is_match("count(_timestamp)"));
     }
 
     #[test]

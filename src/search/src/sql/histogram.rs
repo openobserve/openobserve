@@ -34,7 +34,7 @@ use sqlparser::{
     parser::Parser,
 };
 
-use super::{RE_HISTOGRAM, visitor::histogram_interval::generate_histogram_interval};
+use super::visitor::histogram_interval::generate_histogram_interval;
 
 /// Most query levels and relations walked to resolve one output column.
 const OUTPUT_RESOLVE_BUDGET: usize = 256;
@@ -84,46 +84,32 @@ pub struct PinnedHistograms {
     pub offset: Option<i64>,
 }
 
+/// Sets every `histogram()` interval from the request, so execution buckets like the partitions.
 pub fn handle_histogram(
     origin_sql: &mut String,
     q_time_range: (i64, i64),
     histogram_interval: i64,
 ) {
-    let Some(captures) = RE_HISTOGRAM.captures(origin_sql.as_str()) else {
+    if !origin_sql.to_ascii_lowercase().contains("histogram") {
+        return;
+    }
+    let Ok(mut statements) = Parser::parse_sql(&PostgreSqlDialect {}, origin_sql) else {
         return;
     };
-
-    let args = match captures.get(1) {
-        Some(args) => args
-            .as_str()
-            .split(',')
-            .map(|value| {
-                value
-                    .trim()
-                    .trim_matches(|value| value == '\'' || value == '"')
-            })
-            .collect::<Vec<_>>(),
-        None => return,
-    };
-
-    let interval = if histogram_interval > 0 {
-        format!("{histogram_interval} second")
-    } else {
-        args.get(1)
-            .map_or_else(|| generate_histogram_interval(q_time_range), |value| *value)
-            .to_string()
-    };
-    let field = args.first().unwrap_or(&"_timestamp");
-
-    let timezone = captures
-        .get(1)
-        .and_then(|args| args.as_str().split(',').nth(2))
-        .map_or_else(String::new, |value| format!(",{}", value.trim()));
-
-    *origin_sql = origin_sql.replace(
-        captures.get(0).unwrap().as_str(),
-        &format!("histogram({field},'{interval}'{timezone})"),
-    );
+    let mut changed = false;
+    for statement in &mut statements {
+        let _ = visit_expressions_mut(statement, |expr| {
+            changed |= set_histogram_interval(expr, q_time_range, histogram_interval);
+            ControlFlow::<()>::Continue(())
+        });
+    }
+    if changed {
+        *origin_sql = statements
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("; ");
+    }
 }
 
 /// Replaces named zones by their offset at the request end, so partitions and deltas agree.
@@ -390,6 +376,46 @@ fn timezone_offset_micros(timezone: Option<&str>, end_time: i64) -> Result<i64, 
         .ok_or_else(|| Error::Message(format!("Invalid timezone in histogram(): '{tz}'")))
 }
 
+fn set_histogram_interval(
+    expr: &mut Expr,
+    q_time_range: (i64, i64),
+    histogram_interval: i64,
+) -> bool {
+    let Expr::Function(func) = expr else {
+        return false;
+    };
+    if !is_histogram_function(&func.name) {
+        return false;
+    }
+    let FunctionArguments::List(list) = &mut func.args else {
+        return false;
+    };
+    if list.args.is_empty() {
+        return false;
+    }
+    let interval = if histogram_interval > 0 {
+        format!("{histogram_interval} second")
+    } else if list.args.len() > 1 {
+        return false;
+    } else {
+        generate_histogram_interval(q_time_range).to_string()
+    };
+    let literal = FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::value(
+        Value::SingleQuotedString(interval.clone()),
+    )));
+    let Some(arg) = list.args.get_mut(1) else {
+        list.args.insert(1, literal);
+        return true;
+    };
+    let same = string_literal(arg)
+        .is_some_and(|value| value.clone().into_string().as_deref() == Some(interval.as_str()));
+    if same {
+        return false;
+    }
+    *arg = literal;
+    true
+}
+
 fn pin_histogram_call(
     expr: &mut Expr,
     timezone: Option<&str>,
@@ -407,7 +433,7 @@ fn pin_histogram_call(
     let Some(arg) = list.args.get_mut(2) else {
         return timezone_offset_micros(timezone, end_time).map(|offset| Some((false, offset)));
     };
-    let value = timezone_literal(arg).ok_or_else(|| {
+    let value = string_literal(arg).ok_or_else(|| {
         Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
             "histogram() timezone must be a constant string".to_string(),
         ))
@@ -422,7 +448,7 @@ fn pin_histogram_call(
     Ok(Some((changed, offset)))
 }
 
-fn timezone_literal(arg: &mut FunctionArg) -> Option<&mut Value> {
+fn string_literal(arg: &mut FunctionArg) -> Option<&mut Value> {
     let FunctionArg::Unnamed(FunctionArgExpr::Expr(expr)) = arg else {
         return None;
     };
@@ -1090,20 +1116,71 @@ mod tests {
             super::handle_histogram(&mut sql, (0, 0), 3600);
             assert_eq!(
                 sql,
-                format!("SELECT histogram(_timestamp,'3600 second','{timezone}') FROM t")
+                format!("SELECT histogram(_timestamp, '3600 second', '{timezone}') FROM t")
             );
         }
     }
 
     #[test]
-    fn timezone_quoted_histogram_interval_is_normalized() {
-        let mut sql =
-            "SELECT \"histogram\"(_timestamp, '1 day', '+05:30') AS ts, count(*) FROM t GROUP BY ts"
-                .to_string();
-        handle_histogram(&mut sql, (0, 0), 3600);
+    fn timezone_interval_normalization_follows_the_ast() {
+        let cases = [
+            (
+                "SELECT \"histogram\"(_timestamp, '1 day', '+05:30') AS ts, count(*) FROM t GROUP BY ts",
+                "SELECT \"histogram\"(_timestamp, '3600 second', '+05:30') AS ts, count(*) FROM t GROUP BY ts",
+            ),
+            (
+                "SELECT \"histogram\" (_timestamp, '1 day', '+05:30') AS ts, count(*) FROM t GROUP BY ts",
+                "SELECT \"histogram\"(_timestamp, '3600 second', '+05:30') AS ts, count(*) FROM t GROUP BY ts",
+            ),
+            (
+                "SELECT HISTOGRAM /* bucket */ (_timestamp, '1 day') AS ts, count(*) FROM t GROUP BY ts",
+                "SELECT HISTOGRAM(_timestamp, '3600 second') AS ts, count(*) FROM t GROUP BY ts",
+            ),
+            (
+                "SELECT histogram(_timestamp) AS ts, count(*) FROM t GROUP BY ts",
+                "SELECT histogram(_timestamp, '3600 second') AS ts, count(*) FROM t GROUP BY ts",
+            ),
+            (
+                "SELECT ts, n FROM (SELECT histogram(_timestamp, (('1 day'))) AS ts, count(*) AS n FROM t GROUP BY ts) WHERE n > 0",
+                "SELECT ts, n FROM (SELECT histogram(_timestamp, '3600 second') AS ts, count(*) AS n FROM t GROUP BY ts) WHERE n > 0",
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 day') AS a, histogram(_timestamp, '2 day') AS b FROM t GROUP BY a, b",
+                "SELECT histogram(_timestamp, '3600 second') AS a, histogram(_timestamp, '3600 second') AS b FROM t GROUP BY a, b",
+            ),
+        ];
+        for (input, expected) in cases {
+            let mut sql = input.to_string();
+            handle_histogram(&mut sql, (0, 0), 3600);
+            assert_eq!(sql, expected, "{input}");
+        }
+    }
+
+    #[test]
+    fn timezone_interval_normalization_keeps_untouched_sql_verbatim() {
+        let untouched = [
+            "SELECT   histogram(_timestamp, '3600 second')  FROM t",
+            "SELECT   histogram(_timestamp, '1 day')  FROM t",
+            "SELECT   count(*) FROM t WHERE kind = 'histogram'",
+            "SELECT histogram(_timestamp, '1 day') FROM",
+        ];
+        for input in untouched {
+            let mut sql = input.to_string();
+            handle_histogram(
+                &mut sql,
+                (0, 0),
+                if input.contains("3600") { 3600 } else { 0 },
+            );
+            assert_eq!(sql, input, "{input}");
+        }
+        let mut sql = "SELECT histogram(_timestamp) FROM t".to_string();
+        handle_histogram(&mut sql, (0, 3_600_000_000), 0);
         assert_eq!(
             sql,
-            "SELECT histogram(_timestamp,'3600 second','+05:30') AS ts, count(*) FROM t GROUP BY ts"
+            format!(
+                "SELECT histogram(_timestamp, '{}') FROM t",
+                super::generate_histogram_interval((0, 3_600_000_000))
+            )
         );
     }
 
