@@ -50,7 +50,6 @@ fn row_cache_key((scope, org_id, user_id, key): &db::SettingRowKey) -> String {
     cache_key(&scope, org_id.as_deref(), user_id.as_deref(), key)
 }
 
-/// Whether settings reads go to a Postgres read replica other than the primary.
 fn has_separate_read_replica(meta_store: &str, dsn: &str, ro_dsn: &str) -> bool {
     use config::meta::meta_store::MetaStore;
 
