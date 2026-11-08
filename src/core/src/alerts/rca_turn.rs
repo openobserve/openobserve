@@ -1956,30 +1956,27 @@ pub async fn sweep_rca_runs() -> anyhow::Result<usize> {
     Ok(ended)
 }
 
-/// The running runs swept with `sweep`, [SWEEP_CONCURRENCY] at a time; returns how many ended.
 async fn sweep_running<S, F>(runs: Vec<RunRow>, sweep: S) -> usize
 where
     S: Fn(RunRow) -> F,
     F: Future<Output = anyhow::Result<bool>>,
 {
-    futures::stream::iter(runs)
+    let mut swept_runs = futures::stream::iter(runs)
         .map(|run| {
             let run_id = run.run_id.clone();
             let swept = sweep(run);
             async move { (run_id, swept.await) }
         })
-        .buffer_unordered(SWEEP_CONCURRENCY)
-        .fold(0, |ended, (run_id, swept)| async move {
-            match swept {
-                Ok(true) => ended + 1,
-                Ok(false) => ended,
-                Err(e) => {
-                    log::warn!("[RCA_TURN] could not sweep run {run_id}: {e:#}");
-                    ended
-                }
-            }
-        })
-        .await
+        .buffer_unordered(SWEEP_CONCURRENCY);
+    let mut ended = 0;
+    while let Some((run_id, swept)) = swept_runs.next().await {
+        match swept {
+            Ok(true) => ended += 1,
+            Ok(false) => {}
+            Err(e) => log::warn!("[RCA_TURN] could not sweep run {run_id}: {e:#}"),
+        }
+    }
+    ended
 }
 
 async fn close_deadline(run: RunRow) -> anyhow::Result<bool> {
