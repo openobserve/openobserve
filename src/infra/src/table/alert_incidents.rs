@@ -238,6 +238,19 @@ pub async fn create_and_attach_to_oncall_response(
     Ok(Some(incident))
 }
 
+fn prior_firing_query(
+    incident_id: &str,
+    alert_id: &str,
+) -> sea_orm::Select<alert_incident_alerts::Entity> {
+    // Stops at the first match on the primary key prefix, so a long-firing alert costs one probe.
+    alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::AlertId)
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .limit(1)
+}
+
 /// Add an alert to an existing incident (updates last_alert_at and alert_count)
 /// Add an alert to an incident and return whether this is the first time this
 /// `alert_id` appears in the incident (`true` = new alert type, `false` = repeat).
@@ -262,8 +275,8 @@ pub async fn add_alert_to_incident(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     // Lock the incident row first so that concurrent transactions serialise on
-    // it. Without this lock, two READ COMMITTED transactions can both read
-    // prior_count == 0 before either commits (the PK includes alert_fired_at,
+    // it. Without this lock, two READ COMMITTED transactions can both see
+    // no prior firing before either commits (the PK includes alert_fired_at,
     // so both inserts succeed), resulting in duplicate NewAlertTypeJoined
     // notifications. FOR UPDATE is a no-op on SQLite (file-level locking
     // already serialises writes there).
@@ -276,14 +289,13 @@ pub async fn add_alert_to_incident(
 
     // With the incident row locked, check whether this alert_id already
     // appears in the incident. Only one transaction can hold the lock at a
-    // time, so this count is stable until we commit.
-    let prior_count = alert_incident_alerts::Entity::find()
-        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
-        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
-        .count(&txn)
+    // time, so this check is stable until we commit.
+    let is_new_alert_type = prior_firing_query(incident_id, alert_id)
+        .into_tuple::<String>()
+        .one(&txn)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    let is_new_alert_type = prior_count == 0;
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .is_none();
 
     // Insert alert link
     let alert_link = alert_incident_alerts::ActiveModel {
@@ -1413,6 +1425,61 @@ mod tests {
             sql.contains("GROUP BY \"alert_incident_alerts\".\"alert_id\""),
             "{sql}"
         );
+    }
+
+    #[test]
+    fn prior_firing_query_probes_one_row_instead_of_counting() {
+        use sea_orm::{DbBackend, QueryTrait};
+
+        for backend in [DbBackend::Postgres, DbBackend::Sqlite] {
+            let sql = prior_firing_query("inc-1", "a1").build(backend).to_string();
+            assert!(sql.contains("LIMIT 1"), "{sql}");
+            assert!(!sql.to_uppercase().contains("COUNT("), "{sql}");
+            assert!(
+                sql.contains("\"incident_id\" = 'inc-1'") && sql.contains("\"alert_id\" = 'a1'"),
+                "{sql}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn prior_firing_query_finds_only_the_same_alert_in_the_same_incident() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let incident = fired_into(&db, "open", 100).await;
+        let other = alert_fired_into(&db, "a2", "open", 200).await;
+        alert_incident_alerts::ActiveModel {
+            incident_id: Set(incident.clone()),
+            alert_id: Set("a1".to_string()),
+            alert_fired_at: Set(300),
+            alert_name: Set("a1".to_string()),
+            alert_kind: Set("alert".to_string()),
+            correlation_reason: Set(None),
+            created_at: Set(300),
+            resolved_at: Set(None),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let exists = |incident_id: String, alert_id: &'static str| {
+            let db = &db;
+            async move {
+                prior_firing_query(&incident_id, alert_id)
+                    .into_tuple::<String>()
+                    .one(db)
+                    .await
+                    .unwrap()
+                    .is_some()
+            }
+        };
+        assert!(exists(incident.clone(), "a1").await);
+        assert!(exists(other.clone(), "a2").await);
+        assert!(!exists(other, "a1").await);
+        assert!(!exists(incident, "a2").await);
+        assert!(!exists("missing".to_string(), "a1").await);
     }
 
     async fn incidents_db() -> DatabaseConnection {
