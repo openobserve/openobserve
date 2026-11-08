@@ -612,6 +612,7 @@ use crate::{
             config::meta::stream::StreamPartitionType,
             config::meta::stream::StreamStats,
             config::meta::stream::UpdateStreamSettings,
+            config::meta::stream::SecuritySourceSetting,
             config::meta::gen_ai::GenAiAgentMappingConfig,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
@@ -1066,6 +1067,7 @@ use crate::{
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
+        (name = "Security", description = "Built-in OCSF mapping packs for security sources (enterprise)"),
         (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
         (name = "AnnotationQueues", description = "Annotation queues for human review of LLM traces (enterprise)"),
         (name = "Annotations", description = "Annotations on traces and spans (enterprise)"),
@@ -1198,6 +1200,8 @@ pub struct ApiDoc;
     openobserve_api_management::request::anomaly_detection::detect_anomalies,
     openobserve_api_management::request::anomaly_detection::get_detection_history,
     openobserve_api_management::request::alerts::history::get_all_anomaly_history,
+    openobserve_api_management::request::security::list_ocsf_packs,
+    openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
     openobserve_api_management::request::workflows::save_workflow,
     openobserve_api_management::request::workflows::list_workflows,
     openobserve_api_management::request::workflows::move_workflows,
@@ -1483,6 +1487,17 @@ impl Modify for SecurityAddon {
         overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
         overlay_doc(openapi, CloudQuotaApiDoc::openapi());
+        // The hand-written history params cannot be cfg-gated, and `siem` is enterprise-only.
+        #[cfg(not(feature = "enterprise"))]
+        if let Some(params) = openapi
+            .paths
+            .paths
+            .get_mut("/api/v2/{org_id}/alerts/history")
+            .and_then(|path| path.get.as_mut())
+            .and_then(|op| op.parameters.as_mut())
+        {
+            params.retain(|param| param.name != "siem");
+        }
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
             openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);
@@ -2272,6 +2287,41 @@ mod tests {
         );
         let schemas = spec["components"]["schemas"].as_object().unwrap();
         for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn siem_filters_are_not_advertised_in_oss() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/v2/{org_id}/alerts/history",
+            "/api/v2/{org_id}/alerts/incidents",
+        ] {
+            let params = spec["paths"][path]["get"]["parameters"].as_array().unwrap();
+            assert!(!params.is_empty(), "{path}");
+            assert!(params.iter().all(|p| p["name"] != "siem"), "{path}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn ocsf_packs_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/ocsf/packs"]["get"];
+        assert_eq!(op["operationId"], "ListOcsfPacks", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/OcsfPacksResponse"
+        );
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "OcsfPacksResponse",
+            "OcsfPack",
+            "OcsfPackManifest",
+            "OcsfPackKind",
+        ] {
             assert!(schemas.contains_key(name), "schema {name} missing");
         }
     }

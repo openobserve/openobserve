@@ -18,6 +18,7 @@ import {
   convertToTitleCase,
   truncateText,
   formatLargeNumber,
+  formatCompactCount,
   formatEventCount,
   formatSizeFromMB,
   addCommasToNumber,
@@ -345,6 +346,32 @@ describe("formatEventCount", () => {
 
   it("stays on T past the largest unit", () => {
     expect(formatEventCount(1e15)).toBe("1000T");
+  });
+});
+
+describe("formatCompactCount", () => {
+  it("keeps counts below 1000 exact", () => {
+    expect(formatCompactCount(0)).toBe("0");
+    expect(formatCompactCount(999)).toBe("999");
+  });
+
+  it("abbreviates from 1000 and drops a trailing .0", () => {
+    expect(formatCompactCount(1000)).toBe("1K");
+    expect(formatCompactCount(23000)).toBe("23K");
+    expect(formatCompactCount(819525)).toBe("819.5K");
+    expect(formatCompactCount(225552388)).toBe("225.6M");
+    expect(formatCompactCount(25_900_000_000)).toBe("25.9B");
+  });
+
+  it("promotes a value that rounds up to the next unit", () => {
+    expect(formatCompactCount(999_950)).toBe("1M");
+    expect(formatCompactCount(999_999_999)).toBe("1B");
+  });
+
+  it("handles negatives and non-finite input", () => {
+    expect(formatCompactCount(-23000)).toBe("-23K");
+    expect(formatCompactCount(Number.NaN)).toBe("");
+    expect(formatCompactCount(Number.POSITIVE_INFINITY)).toBe("");
   });
 });
 

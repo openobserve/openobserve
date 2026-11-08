@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.printMode !== true && !focusMode && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
+        :flat="store.state.solutionMode === 'security'"
         :loading="!menuReady"
         :mini-mode="miniMode"
         @menu-hover="handleMenuHover"
@@ -132,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ONavbar
             class="min-h-0 flex-1 overflow-y-auto"
             :links-list="navLinks"
+            :flat="store.state.solutionMode === 'security'"
             :visible="true"
             @menu-hover="handleMenuHover"
           />
@@ -283,6 +285,7 @@ import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import { ENTER_FADE } from "@/lib/styles/motion";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
 import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
@@ -316,7 +319,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter, RouterView } from "vue-router";
+import { useRoute, useRouter, RouterView } from "vue-router";
+import { solutionModeForPath } from "@/utils/security/solutionMode";
 import config from "../aws-exports";
 
 import { setLanguage } from "../utils/cookies";
@@ -681,7 +685,29 @@ export default defineComponent({
         store.state.zoConfig.version != ""
       ),
     );
-    const navLinks = computed(() => (menuReady.value ? linksList.value : []));
+    const securityNavLinks = buildSecurityNavLinks(t);
+
+    // The URL decides the mode, so a shared /security link or a /logs jump shows the matching nav.
+    const route = useRoute();
+    if (config.isEnterprise == "true") {
+      watch(
+        () => route.path,
+        (path: string) => {
+          const mode = solutionModeForPath(path, store.state.solutionMode);
+          if (mode !== store.state.solutionMode) store.commit("setSolutionMode", mode);
+        },
+        { immediate: true },
+      );
+    }
+
+    // Security links never enter linksList, so the observability list keeps its flag and license edits.
+    const navLinks = computed(() =>
+      !menuReady.value
+        ? []
+        : store.state.solutionMode === "security"
+          ? securityNavLinks
+          : linksList.value,
+    );
 
     const langList = [
       {

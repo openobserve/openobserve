@@ -79,7 +79,6 @@ const ariaRole = computed(
 
 const hasDefaultSlot = computed(() => !!slots.default);
 const hasIconSlot = computed(() => !!slots.icon);
-const hasActionsSlot = computed(() => !!slots.actions);
 const hasMetaSlot = computed(() => !!slots.meta);
 const hasFooterSlot = computed(() => !!slots.footer);
 const showContentProp = computed(() => !hasDefaultSlot.value && !!props.content);
@@ -205,7 +204,7 @@ const barVariantClass = computed(() => {
 
     <!-- A phone keeps the message at least 12rem wide; past that the actions wrap under it, end-aligned. -->
     <div
-      v-if="hasActionsSlot"
+      v-if="$slots.actions"
       :class="[
         'flex flex-wrap items-center gap-2',
         bar ? 'shrink-0' : inlineActions ? 'max-md:ms-auto' : '',

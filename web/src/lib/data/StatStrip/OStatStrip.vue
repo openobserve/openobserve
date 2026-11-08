@@ -42,6 +42,8 @@ const props = withDefaults(
      * buckets), so five to seven fit one row. Leave off for long labels.
      */
     compact?: boolean;
+    /** Default for every item's `compactValue` (an item's own setting wins). */
+    compactValues?: boolean;
   }>(),
   {
     items: () => [],
@@ -51,6 +53,7 @@ const props = withDefaults(
     selectedKey: null,
     defaultKey: null,
     compact: false,
+    compactValues: false,
   },
 );
 
@@ -115,6 +118,7 @@ const onCardClick = (item: StatItem) => {
       :trend="item.trend"
       :max="item.max"
       :loading="showSkeleton"
+      :compact-value="item.compactValue ?? compactValues"
       :clickable="selectable && item.selectable !== false"
       :tray="trayed"
       :selected="item.selectable !== false && activeKey === item.key"
