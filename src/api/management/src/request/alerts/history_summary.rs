@@ -96,6 +96,10 @@ pub struct AlertHistorySummaryResponse {
         (status = 403, description = "Forbidden", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
 )]
 pub async fn get_alert_history_summary(
     Path(org_id): Path<String>,

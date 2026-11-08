@@ -42,6 +42,10 @@ pub struct OcsfPacksResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = OcsfPacksResponse),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"}))
+    )
 )]
 pub async fn list_ocsf_packs() -> Json<OcsfPacksResponse> {
     Json(OcsfPacksResponse {
