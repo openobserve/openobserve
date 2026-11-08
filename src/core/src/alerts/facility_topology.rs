@@ -39,9 +39,12 @@ pub const RACK_DIMENSION: &str = "rack";
 pub const OBJECT_ID_FIELD: &str = "object_id";
 
 const STREAM: &str = "bms_metadata";
-/// A BMS republishes every point's metadata every 100 s. Each object's latest
-/// record counts, so a day reaches back past a feed paused for hours.
-const LOOKBACK: Duration = Duration::from_secs(24 * 3600);
+/// A BMS republishes every point's metadata every 100 s, so a routine refresh
+/// reads the last hour; a read that finds nothing keeps the previous topology.
+const REFRESH_LOOKBACK: Duration = Duration::from_secs(3600);
+/// With no topology yet, a first read reaches back a day, past a feed paused for
+/// hours. Each object's latest record counts.
+const FIRST_LOOKBACK: Duration = Duration::from_secs(24 * 3600);
 /// How long a read topology is used before it is read again.
 const TTL: Duration = Duration::from_secs(300);
 /// How long after a failed read it is tried again.
@@ -49,14 +52,21 @@ const RETRY: Duration = Duration::from_secs(30);
 const MAX_ROWS: i64 = 10_000;
 
 /// An org's topology, when it was last read, and when to retry a failed read.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Cached {
     topology: Arc<Topology>,
     read_at: Option<Instant>,
     retry_at: Option<Instant>,
 }
 
-type Slot = Arc<Mutex<Option<Cached>>>;
+/// An org's cached topology, and the lock one read holds while it runs.
+#[derive(Default)]
+struct OrgSlot {
+    cached: std::sync::Mutex<Option<Cached>>,
+    reading: Mutex<()>,
+}
+
+type Slot = Arc<OrgSlot>;
 
 static CACHE: LazyLock<RwLock<HashMap<String, Slot>>> = LazyLock::new(Default::default);
 
@@ -164,10 +174,11 @@ impl Reach<'_> {
     }
 }
 
-/// The org's facility topology, read at most once per [`TTL`]; concurrent
-/// callers wait for one read. Empty when the org has no `bms_metadata` stream.
-/// A failed read, or one that finds no object, keeps the topology read before
-/// it; a failed read is tried again after [`RETRY`].
+/// The org's facility topology, read at most once per [`TTL`] by one caller at a
+/// time; while it reads, others get the previous topology, and wait only when
+/// there is none. Empty when the org has no `bms_metadata` stream. A failed
+/// read, or one that finds no object, keeps the topology read before it; a
+/// failed read is tried again after [`RETRY`].
 pub async fn get(org_id: &str) -> Arc<Topology> {
     let slot = {
         let existing = CACHE.read().await.get(org_id).cloned();
@@ -181,15 +192,47 @@ pub async fn get(org_id: &str) -> Arc<Topology> {
                 .clone(),
         }
     };
-    let mut cached = slot.lock().await;
-    let now = Instant::now();
-    if let Some(c) = cached.as_ref()
-        && (c.read_at.is_some_and(|at| at.elapsed() < TTL) || c.retry_at.is_some_and(|at| now < at))
-    {
-        return c.topology.clone();
+    // The topology to use without reading, and whether one is cached at all.
+    let fresh = |slot: &OrgSlot| -> (Option<Arc<Topology>>, Option<Arc<Topology>>) {
+        let cached = slot.cached.lock().unwrap_or_else(|e| e.into_inner());
+        let now = Instant::now();
+        match cached.as_ref() {
+            Some(c)
+                if c.read_at.is_some_and(|at| at.elapsed() < TTL)
+                    || c.retry_at.is_some_and(|at| now < at) =>
+            {
+                (Some(c.topology.clone()), Some(c.topology.clone()))
+            }
+            Some(c) => (None, Some(c.topology.clone())),
+            None => (None, None),
+        }
+    };
+    let (use_now, previous) = fresh(&slot);
+    if let Some(topology) = use_now {
+        return topology;
     }
-    let previous = cached.take().unwrap_or_default();
-    let next = match load(org_id).await {
+    let _reading = match (slot.reading.try_lock(), previous) {
+        (Ok(guard), _) => guard,
+        (Err(_), Some(previous)) => return previous,
+        (Err(_), None) => slot.reading.lock().await,
+    };
+    // Another caller may have read it while this one waited.
+    if let (Some(topology), _) = fresh(&slot) {
+        return topology;
+    }
+    let previous = slot
+        .cached
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()
+        .unwrap_or_default();
+    let lookback = if previous.topology.is_empty() {
+        FIRST_LOOKBACK
+    } else {
+        REFRESH_LOOKBACK
+    };
+    let now = Instant::now();
+    let next = match load(org_id, lookback).await {
         Ok(topology) if topology.is_empty() && !previous.topology.is_empty() => Cached {
             read_at: Some(now),
             retry_at: None,
@@ -209,11 +252,11 @@ pub async fn get(org_id: &str) -> Arc<Topology> {
         }
     };
     let topology = next.topology.clone();
-    *cached = Some(next);
+    *slot.cached.lock().unwrap_or_else(|e| e.into_inner()) = Some(next);
     topology
 }
 
-async fn load(org_id: &str) -> Result<Topology, anyhow::Error> {
+async fn load(org_id: &str, lookback: Duration) -> Result<Topology, anyhow::Error> {
     if !infra::schema::exists(org_id, StreamType::Logs, STREAM).await {
         return Ok(Topology::default());
     }
@@ -225,7 +268,7 @@ async fn load(org_id: &str) -> Result<Topology, anyhow::Error> {
             ),
             from: 0,
             size: MAX_ROWS,
-            start_time: end_time - LOOKBACK.as_micros() as i64,
+            start_time: end_time - lookback.as_micros() as i64,
             end_time,
             ..Default::default()
         },
@@ -255,7 +298,7 @@ async fn load(org_id: &str) -> Result<Topology, anyhow::Error> {
     if topology.serves.is_empty() {
         log::warn!(
             "[incidents] {org_id}/{STREAM} has no object with serves_id in the last {} s; the topology read before, if any, stays in use",
-            LOOKBACK.as_secs()
+            lookback.as_secs()
         );
     }
     Ok(topology)
