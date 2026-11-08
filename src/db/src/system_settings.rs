@@ -50,6 +50,12 @@ fn row_cache_key((scope, org_id, user_id, key): &db::SettingRowKey) -> String {
     cache_key(&scope, org_id.as_deref(), user_id.as_deref(), key)
 }
 
+fn has_separate_read_replica(meta_store: &str, dsn: &str, ro_dsn: &str) -> bool {
+    use config::meta::meta_store::MetaStore;
+
+    MetaStore::from(meta_store) == MetaStore::PostgreSQL && !ro_dsn.is_empty() && ro_dsn != dsn
+}
+
 /// Caches the stored row on this node and tells this region's other nodes to reload it.
 async fn cache_and_announce(stored: &SystemSetting) {
     let cache_k = cache_key(
@@ -596,14 +602,27 @@ pub async fn get_service_identity_config(
         system_settings::SettingScope,
     };
 
+    let cfg = config::get_config();
+    // The watcher reloads from a separate read replica, which can lag a save and pin a stale row.
+    let stored = if has_separate_read_replica(
+        &cfg.common.meta_store,
+        &cfg.common.meta_postgres_dsn,
+        &cfg.common.meta_postgres_ro_dsn,
+    ) {
+        db::get(&SettingScope::Org, Some(org_id), None, "service_identity")
+            .await
+            .ok()
+            .flatten()
+    } else {
+        get_cached(&SettingScope::Org, Some(org_id), None, "service_identity").await
+    };
     // Intentionally kept here since there's no way to satisfy non-enterprise path
     // TODO: move the entire module to enterprise so that there's no access restrictions
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
-    let mut config = match db::get(&SettingScope::Org, Some(org_id), None, "service_identity").await
-    {
-        Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
+    let mut config = match stored {
+        Some(s) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
             .unwrap_or_else(|_| ServiceIdentityConfig::new_default()),
-        _ => ServiceIdentityConfig::new_default(),
+        None => ServiceIdentityConfig::new_default(),
     };
 
     // If tracked_alias_ids is empty (old stored config or default), populate from env default
@@ -691,6 +710,15 @@ pub async fn get_service_identity_config(
     config
 }
 
+/// Save an org's identity config in this region only, where its service-stream cleanup runs.
+pub async fn set_service_identity_config(setting: &SystemSetting) -> Result<SystemSetting> {
+    let stored = db::set(setting)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    cache_and_announce(&stored).await;
+    Ok(stored)
+}
+
 /// Get the updated_at timestamp for semantic_field_groups setting
 ///
 /// Returns the timestamp (in microseconds since epoch) when the semantic field groups
@@ -712,15 +740,15 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
 
 /// Caches what an org's semantic-groups miss means and returns it; `None` when left uncached.
 async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting> {
-    use config::meta::{meta_store::MetaStore, system_settings::keys::SEMANTIC_FIELD_GROUPS};
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
 
     let cfg = config::get_config();
-    let replica = &cfg.common.meta_postgres_ro_dsn;
     // A replica can lag a save past its watch event, and a cached miss would outlive that lag.
-    if MetaStore::from(cfg.common.meta_store.as_str()) == MetaStore::PostgreSQL
-        && !replica.is_empty()
-        && *replica != cfg.common.meta_postgres_dsn
-    {
+    if has_separate_read_replica(
+        &cfg.common.meta_store,
+        &cfg.common.meta_postgres_dsn,
+        &cfg.common.meta_postgres_ro_dsn,
+    ) {
         return None;
     }
     let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
@@ -1009,6 +1037,54 @@ mod tests {
 
         let user = SystemSetting::new_user(org, "dana@acme.com", key, json!({"mode": "p1"}));
         assert!(apply_replicated_put(&user).await.is_err());
+    }
+
+    #[test]
+    fn only_a_distinct_postgres_read_dsn_is_a_separate_replica() {
+        let (dsn, ro) = ("postgres://primary/o2", "postgres://replica/o2");
+        assert!(!has_separate_read_replica("sqlite", dsn, ro));
+        assert!(!has_separate_read_replica("postgres", dsn, ""));
+        assert!(!has_separate_read_replica("postgres", dsn, dsn));
+        assert!(has_separate_read_replica("postgres", dsn, ro));
+        assert!(has_separate_read_replica("postgresql", dsn, ro));
+    }
+
+    #[tokio::test]
+    async fn the_identity_config_is_read_from_the_cache_its_save_keeps_current() {
+        use config::meta::correlation::{IdentitySet, ServiceIdentityConfig};
+
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let org = "b16575-identity-config";
+        let _ = delete(&SettingScope::Org, Some(org), None, "service_identity").await;
+
+        let saved = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "b16575".to_string(),
+                label: "B16575".to_string(),
+                distinguish_by: vec!["k8s-namespace".to_string()],
+            }],
+            tracked_alias_ids: vec!["k8s-namespace".to_string()],
+            service_optional: false,
+        };
+        let row = SystemSetting::new_org(org, "service_identity", json!(saved));
+
+        // Written behind the cache's back: still seeing the defaults proves no database read.
+        db::set(&row).await.unwrap();
+        assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
+
+        set_service_identity_config(&row).await.unwrap();
+        assert_eq!(get_service_identity_config(org).await.sets, saved.sets);
+        let cache_k = cache_key(&SettingScope::Org, Some(org), None, "service_identity");
+        assert!(
+            announced(&format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{cache_k}")).await,
+            "the other nodes reload the saved config"
+        );
+
+        delete(&SettingScope::Org, Some(org), None, "service_identity")
+            .await
+            .unwrap();
+        assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
     }
 
     #[cfg(feature = "enterprise")]
