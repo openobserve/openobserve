@@ -792,8 +792,8 @@ async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>
                 };
                 let key = parts[3];
 
-                // Fetch from database and update cache
-                match db::get(&scope, org_id, user_id, key).await {
+                // The primary, since a lagging replica would leave a cached miss standing for good.
+                match db::get_from_primary(&scope, org_id, user_id, key).await {
                     Ok(Some(setting)) => {
                         SYSTEM_SETTINGS
                             .write()
@@ -803,8 +803,6 @@ async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>
                     }
                     Ok(None) => {
                         log::warn!("System setting not found in db: {}", cache_k);
-                        // A lagging read replica must not leave a cached miss standing for good.
-                        SYSTEM_SETTINGS.write().await.remove(cache_k);
                     }
                     Err(e) => {
                         log::error!("Error fetching system setting from db: {}", e);
