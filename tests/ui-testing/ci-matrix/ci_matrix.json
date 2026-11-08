@@ -368,7 +368,8 @@
       "logs-search-around-multistream.spec.js",
       "logs-default-columns.spec.js",
       "logsResultsToolbar.spec.js",
-      "logsSavedFunctionOverwrite.spec.js"
+      "logsSavedFunctionOverwrite.spec.js",
+      "logs-explain-analyze.spec.js"
     ],
     "disabled": [
       {
