@@ -50,19 +50,8 @@ fn row_cache_key((scope, org_id, user_id, key): &db::SettingRowKey) -> String {
     cache_key(&scope, org_id.as_deref(), user_id.as_deref(), key)
 }
 
-/// Whether a cache miss means no row: a read replica the watcher reloads from can lag a save.
-fn cache_miss_is_authoritative() -> bool {
-    use config::meta::meta_store::MetaStore;
-
-    let cfg = config::get_config();
-    let replica = &cfg.common.meta_postgres_ro_dsn;
-    MetaStore::from(cfg.common.meta_store.as_str()) != MetaStore::PostgreSQL
-        || replica.is_empty()
-        || *replica == cfg.common.meta_postgres_dsn
-}
-
 /// Caches the stored row on this node and tells this region's other nodes to reload it.
-pub async fn cache_and_announce(stored: &SystemSetting) {
+async fn cache_and_announce(stored: &SystemSetting) {
     let cache_k = cache_key(
         &stored.scope,
         stored.org_id.as_deref(),
@@ -593,14 +582,7 @@ pub async fn get_service_identity_config(
         system_settings::SettingScope,
     };
 
-    let stored = if cache_miss_is_authoritative() {
-        get_cached(&SettingScope::Org, Some(org_id), None, "service_identity").await
-    } else {
-        get(&SettingScope::Org, Some(org_id), None, "service_identity")
-            .await
-            .ok()
-            .flatten()
-    };
+    let stored = get_cached(&SettingScope::Org, Some(org_id), None, "service_identity").await;
     // Intentionally kept here since there's no way to satisfy non-enterprise path
     // TODO: move the entire module to enterprise so that there's no access restrictions
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
@@ -693,6 +675,15 @@ pub async fn get_service_identity_config(
     }
 
     config
+}
+
+/// Save an org's service identity config to this region only: its service-stream cleanup runs here alone.
+pub async fn set_service_identity_config(setting: &SystemSetting) -> Result<SystemSetting> {
+    let stored = db::set(setting)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    cache_and_announce(&stored).await;
+    Ok(stored)
 }
 
 /// Get the updated_at timestamp for semantic_field_groups setting
@@ -959,11 +950,10 @@ mod tests {
         let row = SystemSetting::new_org(org, "service_identity", json!(saved));
 
         // Written behind the cache's back: still seeing the defaults proves no database read.
-        let stored = db::set(&row).await.unwrap();
+        db::set(&row).await.unwrap();
         assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
 
-        // As the identity-config endpoint saves it.
-        cache_and_announce(&stored).await;
+        set_service_identity_config(&row).await.unwrap();
         assert_eq!(get_service_identity_config(org).await.sets, saved.sets);
         let cache_k = cache_key(&SettingScope::Org, Some(org), None, "service_identity");
         assert!(
