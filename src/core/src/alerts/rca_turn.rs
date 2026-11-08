@@ -49,6 +49,7 @@ use config::{
     },
     utils::time::now_micros,
 };
+use futures::StreamExt;
 use infra::table::{
     ai_chat_sessions, ai_chat_turns,
     rca_runs::{self as runs_table, Model as RunRow, RunSummaryPatch, RunUpdate},
@@ -117,6 +118,8 @@ const CONTINUATION_RETRY_BACKOFF: [Duration; 4] = [
 ];
 /// Running runs one sweep looks at; the next pass picks up the rest.
 const SWEEP_BATCH: u64 = 500;
+/// Running runs swept at once; a healthy turn's lease probe waits about a second in a cluster.
+const SWEEP_CONCURRENCY: usize = 16;
 /// A run pauses for at most this many questions; a third one closes the deadline.
 const MAX_QUESTIONS: i32 = 2;
 /// `rca_questions_total{result}` of a wait the deadline ended.
@@ -1940,15 +1943,8 @@ async fn stop_turn(org_id: &str, session_id: &str) {
 pub async fn sweep_rca_runs() -> anyhow::Result<usize> {
     let timeout = get_o2_config().incidents.rca_timeout_secs;
     let now = now_micros();
-    let mut ended = 0;
-    for run in runs_table::list_running(SWEEP_BATCH).await? {
-        let run_id = run.run_id.clone();
-        match sweep_run(run, now, timeout).await {
-            Ok(true) => ended += 1,
-            Ok(false) => {}
-            Err(e) => log::warn!("[RCA_TURN] could not sweep run {run_id}: {e:#}"),
-        }
-    }
+    let running = runs_table::list_running(SWEEP_BATCH).await?;
+    let mut ended = sweep_running(running, |run| sweep_run(run, now, timeout)).await;
     for run in runs_table::list_waiting_past_deadline(now, SWEEP_BATCH).await? {
         let run_id = run.run_id.clone();
         match close_deadline(run).await {
@@ -1958,6 +1954,32 @@ pub async fn sweep_rca_runs() -> anyhow::Result<usize> {
         }
     }
     Ok(ended)
+}
+
+/// The running runs swept with `sweep`, [SWEEP_CONCURRENCY] at a time; returns how many ended.
+async fn sweep_running<S, F>(runs: Vec<RunRow>, sweep: S) -> usize
+where
+    S: Fn(RunRow) -> F,
+    F: Future<Output = anyhow::Result<bool>>,
+{
+    futures::stream::iter(runs)
+        .map(|run| {
+            let run_id = run.run_id.clone();
+            let swept = sweep(run);
+            async move { (run_id, swept.await) }
+        })
+        .buffer_unordered(SWEEP_CONCURRENCY)
+        .fold(0, |ended, (run_id, swept)| async move {
+            match swept {
+                Ok(true) => ended + 1,
+                Ok(false) => ended,
+                Err(e) => {
+                    log::warn!("[RCA_TURN] could not sweep run {run_id}: {e:#}");
+                    ended
+                }
+            }
+        })
+        .await
 }
 
 async fn close_deadline(run: RunRow) -> anyhow::Result<bool> {
@@ -4301,6 +4323,41 @@ mod tests {
         let run = stored(&org, &run_id).await;
         assert_eq!(run.state, RunState::Failed);
         assert_eq!(run.error.unwrap().code, ERROR_INTERRUPTED);
+    }
+
+    /// Runs whose lease probe waits out its second are swept side by side, and every outcome
+    /// is counted.
+    #[tokio::test]
+    async fn the_sweep_probes_running_runs_concurrently() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        let row = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
+        let runs = vec![row; 2 * SWEEP_CONCURRENCY];
+        let swept = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+
+        tokio::time::pause();
+        let begun = Instant::now();
+        let ended = sweep_running(runs, |_run| {
+            let n = swept.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async move {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                match n % 3 {
+                    0 => Ok(true),
+                    1 => Ok(false),
+                    _ => Err(anyhow::anyhow!("probe failed")),
+                }
+            }
+        })
+        .await;
+
+        assert_eq!(swept.load(std::sync::atomic::Ordering::SeqCst), 2 * SWEEP_CONCURRENCY);
+        assert_eq!(ended, (2 * SWEEP_CONCURRENCY).div_ceil(3));
+        assert!(
+            begun.elapsed() < Duration::from_secs(3),
+            "{SWEEP_CONCURRENCY} probes wait at once, not one after another: {:?}",
+            begun.elapsed()
+        );
     }
 
     /// The superseded-turn guard: a turn followed by a continuation no longer ends the run.
