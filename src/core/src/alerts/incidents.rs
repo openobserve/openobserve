@@ -689,7 +689,8 @@ pub async fn correlate_alert_to_incident(
     downtime: Option<&config::meta::downtimes::ActiveDowntime>,
 ) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
-    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+    let semantic_groups =
+        crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
 
     // Enrich with alert condition dimensions (deterministic baseline)
     // Handles SQL WHERE, GUI conditions, and PromQL label matchers

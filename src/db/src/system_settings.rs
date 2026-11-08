@@ -408,7 +408,8 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
         }
         // Empty means "use the defaults" here, and caching it spares every later read two misses.
         Ok(None) => {
-            let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
+            let mut absent =
+                SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
             // No row was ever saved, so `get_semantic_field_groups_updated_at` must stay 0.
             absent.created_at = 0;
             absent.updated_at = 0;
@@ -863,18 +864,18 @@ mod tests {
 
     #[tokio::test]
     async fn a_missing_semantic_field_groups_row_is_cached_until_a_real_one_is_saved() {
-        use config::meta::{
-            correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS,
-        };
+        use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
 
         infra::db::create_table().await.unwrap();
         db::create_table().await.unwrap();
         let org = "b16560-no-semantic-groups";
         let _ = db::delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
-        SYSTEM_SETTINGS
-            .write()
-            .await
-            .remove(&cache_key(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS));
+        SYSTEM_SETTINGS.write().await.remove(&cache_key(
+            &SettingScope::Org,
+            Some(org),
+            None,
+            SEMANTIC_FIELD_GROUPS,
+        ));
 
         let defaults = get_default_semantic_field_groups();
         assert_eq!(get_semantic_field_groups(org).await, defaults);
