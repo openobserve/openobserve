@@ -2168,12 +2168,7 @@ mod tests {
         let dims = sea_orm::Value::Json(Some(Box::new(serde_json::json!({"ns": "prod"}))));
         assert_eq!(
             stmt.values.unwrap().0,
-            [
-                "acme".into(),
-                "resolved".into(),
-                dims.clone(),
-                dims
-            ]
+            ["acme".into(), "resolved".into(), dims.clone(), dims]
         );
     }
 }
