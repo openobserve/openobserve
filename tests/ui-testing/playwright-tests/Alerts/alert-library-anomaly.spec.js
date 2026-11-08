@@ -9,19 +9,13 @@ const {
   routeLibrary,
 } = require('../fixtures/alertLibraryFixture.js');
 
-// Anomaly-alert coverage for the Alert Library. On OSS `useAnomalyLibraryAccess()`
-// resolves to "locked", so anomaly alerts are listed (stamped alert_type
-// "anomaly_detection" from the manifest's anomaly_alerts array) but every
-// interaction routes to the enterprise upgrade dialog. The manifest + files are
-// mocked; selectors and assertions live in alertLibraryPage — never inline here.
+// No stream is created: with nothing ready the gallery opens unfiltered, so every card stays on screen.
 test.describe('Alert Library Anomaly Alerts testcases', () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
   let lib;
-  let anomalyStream;
-  let anomalyStreamMissing;
   let scheduled;
-  let anomalyReady;
+  let anomalyAlert;
   let anomalyMissing;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -30,54 +24,35 @@ test.describe('Alert Library Anomaly Alerts testcases', () => {
     lib = pm.alertLibraryPage;
 
     const rand = pm.alertsPage.generateRandomString().toLowerCase();
-    anomalyStream = `pw_lib_anom_${rand}`.toLowerCase();
-    anomalyStreamMissing = `pw_lib_anom_missing_${rand}`.toLowerCase(); // never created → "not ingested"
+    const stream = `pw_lib_absent_${rand}`;
+    const streamMissing = `pw_lib_absent_anom_${rand}`;
 
-    // A logs stream that EXISTS so the anomaly card reads "ready".
-    await pm.commonActions.initializeAlertTestStream(anomalyStream);
-    await pm.commonActions.queryStream(anomalyStream).catch(() => {}); // let it become searchable
-
-    // One scheduled (unlocked) entry + two anomaly (locked on OSS) entries: one
-    // on the ready stream, one on a stream we deliberately never create.
     scheduled = makeEntry(1, {
       name: `pw_lib_sched_${rand}`, title: 'PW Scheduled Alert', severity: 'critical',
-      pack: 'observability', category: 'scheduled-signals', stream: anomalyStream,
-      required_streams: [anomalyStream],
+      pack: 'observability', category: 'scheduled-signals', stream,
+      required_streams: [stream],
     });
-    anomalyReady = makeEntry(2, {
+    anomalyAlert = makeEntry(2, {
       name: `pw_lib_anom_${rand}`, title: 'PW Anomaly Alert', severity: 'warning',
-      pack: 'observability', category: 'anomaly-signals', stream: anomalyStream,
-      required_streams: [anomalyStream],
-    }); // no alert_type field — the page stamps "anomaly_detection" from the array it came from
+      pack: 'observability', category: 'anomaly-signals', stream,
+      required_streams: [stream],
+    });
     anomalyMissing = makeEntry(3, {
       name: `pw_lib_anom_missing_${rand}`, title: 'PW Anomaly Missing Alert', severity: 'info',
-      pack: 'observability', category: 'anomaly-signals', stream: anomalyStreamMissing,
-      required_streams: [anomalyStreamMissing],
-    }); // no alert_type field
+      pack: 'observability', category: 'anomaly-signals', stream: streamMissing,
+      required_streams: [streamMissing],
+    });
 
-    // Anomaly entries live in `anomaly_alerts` (NOT `alerts`); `packs`/`alert_count`
-    // are derived from the scheduled entries only, and format_version stays major 1.
+    // The page stamps alert_type from the array an entry came from, so anomaly entries carry none.
     const manifest = {
       ...buildManifest([scheduled]),
       format_version: '1.1.0',
       anomaly_alert_count: 2,
-      anomaly_alerts: [anomalyReady, anomalyMissing],
+      anomaly_alerts: [anomalyAlert, anomalyMissing],
     };
 
-    await routeLibrary(page, { manifest, entries: [scheduled, anomalyReady, anomalyMissing] });
+    await routeLibrary(page, { manifest, entries: [scheduled, anomalyAlert, anomalyMissing] });
   });
-
-  test.fixme(
-    'anomaly alerts render locked with Anomaly + Enterprise tags; scheduled cards stay unlocked — locked branch unreachable on this anomaly-enabled enterprise build (useAlertLibrary.ts:333-336)',
-    { tag: ['@alert-library-anomaly', '@alerts', '@P0', '@all'] },
-    async () => {
-      await lib.openViaUrl();
-      await lib.expectCardVisible(anomalyReady.id);
-      await lib.expectCardAnomalyTag(anomalyReady.id);
-      await lib.expectCardEnterpriseTag(anomalyReady.id);
-      await lib.expectNoEnterpriseTag(scheduled.id);
-    },
-  );
 
   test(
     'the alert-type facet appears and filtering to Anomaly narrows to anomaly cards only',
@@ -86,56 +61,10 @@ test.describe('Alert Library Anomaly Alerts testcases', () => {
       await lib.openViaUrl();
       await lib.expectAlertTypeToggleVisible();
       await lib.pickAlertType('anomaly');
-      await lib.expectCardVisible(anomalyReady.id);
+      await lib.expectCardVisible(anomalyAlert.id);
       await lib.expectCardAbsent(scheduled.id);
       await lib.pickAlertType('all');
       await lib.expectCardVisible(scheduled.id);
-    },
-  );
-
-  test.fixme(
-    'clicking a locked anomaly card opens the upgrade dialog, not the drawer — card opens the drawer instead, anomaly-enabled enterprise build (useAlertLibrary.ts:333-336)',
-    { tag: ['@alert-library-anomaly', '@alerts', '@P0', '@all'] },
-    async () => {
-      await lib.openViaUrl();
-      await lib.clickCardTitle(anomalyReady.id);
-      await lib.expectUpgradeDialogVisible();
-      await lib.expectDrawerClosed();
-    },
-  );
-
-  test.fixme(
-    'ticking a locked anomaly card opens the upgrade dialog and never selects it — card is selectable with no dialog on anomaly-enabled enterprise build (useAlertLibrary.ts:333-336)',
-    { tag: ['@alert-library-anomaly', '@alerts', '@P1', '@all'] },
-    async () => {
-      await lib.openViaUrl();
-      await lib.selectCard(anomalyReady.id);
-      await lib.expectUpgradeDialogVisible();
-      await lib.closeUpgradeDialog();
-      await lib.expectCardNotSelected(anomalyReady.id);
-      expect(await lib.selectedCountInBar()).toBe(0);
-    },
-  );
-
-  test.fixme(
-    'select-all-in-view selects only the scheduled cards and leaves the anomaly card unselected — anomaly cards are selectable on anomaly-enabled enterprise build (useAlertLibrary.ts:333-336)',
-    { tag: ['@alert-library-anomaly', '@alerts', '@P1', '@all'] },
-    async () => {
-      await lib.openViaUrl();
-      await lib.selectAllInViewToggle();
-      expect(await lib.selectedCountInBar()).toBe(1);
-      await lib.expectCardNotSelected(anomalyReady.id);
-    },
-  );
-
-  test.fixme(
-    'select-all-in-view is disabled when only locked anomaly cards are visible — stays enabled because anomaly cards are selectable on anomaly-enabled enterprise build (useAlertLibrary.ts:333-336)',
-    { tag: ['@alert-library-anomaly', '@alerts', '@P1', '@all'] },
-    async () => {
-      await lib.openViaUrl();
-      await lib.pickAlertType('anomaly');
-      await lib.expectSelectAllDisabled();
-      expect(await lib.selectedCountInBar()).toBe(0);
     },
   );
 
@@ -147,50 +76,101 @@ test.describe('Alert Library Anomaly Alerts testcases', () => {
       await page.unroute(FILE_GLOB);
       await routeLibrary(page, { manifest: buildManifest([scheduled]), entries: [scheduled] });
       await lib.openViaUrl();
+      await lib.expectCardVisible(scheduled.id);
       await lib.expectAlertTypeToggleAbsent();
       await lib.expectNoAnomalyCard();
     },
   );
 
-  test.fixme(
-    'a locked anomaly card on a missing stream shows both needs-data and the enterprise lock — enterprise lock absent on anomaly-enabled enterprise build (useAlertLibrary.ts:333-336)',
-    { tag: ['@alert-library-anomaly', '@alerts', '@P2', '@all'] },
-    async () => {
-      await lib.openViaUrl();
-      await lib.expectCardNeedsData(anomalyMissing.id);
-      await lib.expectCardEnterpriseTag(anomalyMissing.id);
-    },
-  );
+  test.describe('locked anomaly cards on an OSS build', () => {
+    // The UI also locks an enterprise bundle on an OSS backend; CI never pairs them, so build_type alone decides.
+    test.beforeEach(async () => {
+      const buildType = await lib.detectBuildType();
+      test.skip(buildType !== 'opensource', `Anomaly access is "locked" only on OSS (build_type=${buildType})`);
+    });
 
-  // ── enterprise-gated / UNWIRED in OSS — parked so the pipeline surfaces them
-  // as a feature gap, not a red run. Bodies stay intact for when they wire up.
+    test(
+      'anomaly alerts render locked with Anomaly + Enterprise tags; scheduled cards stay unlocked',
+      { tag: ['@alert-library-anomaly', '@alerts', '@P0', '@all'] },
+      async () => {
+        await lib.openViaUrl();
+        await lib.expectCardVisible(anomalyAlert.id);
+        await lib.expectCardAnomalyTag(anomalyAlert.id);
+        await lib.expectCardEnterpriseTag(anomalyAlert.id);
+        await lib.expectNoEnterpriseTag(scheduled.id);
+      },
+    );
+
+    test(
+      'clicking a locked anomaly card opens the upgrade dialog, not the drawer',
+      { tag: ['@alert-library-anomaly', '@alerts', '@P0', '@all'] },
+      async () => {
+        await lib.openViaUrl();
+        await lib.clickCardTitle(anomalyAlert.id);
+        await lib.expectUpgradeDialogVisible();
+        await lib.expectDrawerClosed();
+      },
+    );
+
+    test(
+      'ticking a locked anomaly card opens the upgrade dialog and never selects it',
+      { tag: ['@alert-library-anomaly', '@alerts', '@P1', '@all'] },
+      async () => {
+        await lib.openViaUrl();
+        await lib.selectCard(anomalyAlert.id);
+        await lib.expectUpgradeDialogVisible();
+        await lib.closeUpgradeDialog();
+        await lib.expectCardNotSelected(anomalyAlert.id);
+        expect(await lib.selectedCountInBar()).toBe(0);
+      },
+    );
+
+    test(
+      'select-all-in-view selects only the scheduled cards and leaves the anomaly card unselected',
+      { tag: ['@alert-library-anomaly', '@alerts', '@P1', '@all'] },
+      async () => {
+        await lib.openViaUrl();
+        await lib.selectAllInViewToggle();
+        expect(await lib.selectedCountInBar()).toBe(1);
+        await lib.expectCardNotSelected(anomalyAlert.id);
+      },
+    );
+
+    test(
+      'select-all-in-view is disabled when only locked anomaly cards are visible',
+      { tag: ['@alert-library-anomaly', '@alerts', '@P1', '@all'] },
+      async () => {
+        await lib.openViaUrl();
+        await lib.pickAlertType('anomaly');
+        await lib.expectSelectAllDisabled();
+        expect(await lib.selectedCountInBar()).toBe(0);
+      },
+    );
+
+    test(
+      'a locked anomaly card on a missing stream shows both needs-data and the enterprise lock',
+      { tag: ['@alert-library-anomaly', '@alerts', '@P2', '@all'] },
+      async () => {
+        await lib.openViaUrl();
+        await lib.expectCardNeedsData(anomalyMissing.id);
+        await lib.expectCardEnterpriseTag(anomalyMissing.id);
+      },
+    );
+  });
 
   test.fixme(
-    'anomaly drawer shows the training note and detection KV — not wired: LibraryDrawer.vue:99-135',
+    'anomaly drawer shows the training note and detection KV — needs an entitled build with anomaly_detection_enabled',
     { tag: ['@alert-library-anomaly', '@alerts', '@all'] },
     async () => {
-      // Requires anomalyAccess === "enabled"; openEntry then opens the drawer
-      // instead of routing locked cards to the upgrade dialog.
       await lib.openViaUrl();
-      await lib.clickCardTitle(anomalyReady.id);
+      await lib.clickCardTitle(anomalyAlert.id);
       await lib.expectDrawerAnomalyNote();
       await lib.expectDrawerDetection();
     },
   );
 
   test.fixme(
-    'anomaly install runs the anomaly config and surfaces the review note — not wired: LibraryInstallDialog.vue:548-549',
-    { tag: ['@alert-library-anomaly', '@alerts', '@all'] },
-    async () => {
-      // Requires an entitled build; an anomaly batch then installs via
-      // saveAnomalyConfigMutation and the review step shows the anomaly note.
-      await lib.openViaUrl();
-      await lib.expectAnomalyInstallNote();
-    },
-  );
-
-  test.fixme(
-    'anomaly alerts are omitted from the catalog when hidden — not wired: useAlertLibrary.ts:336',
+    'anomaly alerts are omitted from the catalog — needs an entitled build with anomaly_detection_enabled off',
     { tag: ['@alert-library-anomaly', '@alerts', '@all'] },
     async () => {
       await lib.openViaUrl();

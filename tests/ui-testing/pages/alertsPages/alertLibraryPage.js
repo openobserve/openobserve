@@ -60,20 +60,14 @@ export class AlertLibraryPage {
       cancel: '[data-test="alert-library-install-cancel"]',
       // alert editor (the Customize hand-off target)
       editorAlertName: '[data-test="add-alert-name-input-value"]',
-      // alert-type facet (present only when the manifest ships anomaly alerts)
+      // Rendered only when the manifest ships anomaly alerts.
       alertType: '[data-test="alert-library-alert-type"]',
-      alertTypeAll: '[data-test="alert-library-alert-type-all"]',
-      alertTypeScheduled: '[data-test="alert-library-alert-type-scheduled"]',
-      alertTypeAnomaly: '[data-test="alert-library-alert-type-anomaly"]',
-      // anomaly (locked) card tags + the global upgrade dialog
       cardAnomalyTag: '[data-test="alert-library-card-anomaly"]',
       cardEnterpriseTag: '[data-test="alert-library-card-enterprise"]',
       upgradeDialog: '[data-test="enterprise-upgrade-dialog"]',
       selectAllCheckbox: '[data-test="alert-library-select-all-in-view"] [role="checkbox"]',
-      // enterprise-gated anomaly content (fixme only, see the anomaly spec)
       drawerAnomalyNote: '[data-test="alert-library-drawer-anomaly-note"]',
       drawerDetection: '[data-test="alert-library-drawer-detection"]',
-      installAnomalyNote: '[data-test="alert-library-install-anomaly-note"]',
     };
   }
 
@@ -318,11 +312,16 @@ export class AlertLibraryPage {
     await expect(this.page.locator(this.l.drawer)).toBeHidden();
   }
 
-  // Enterprise-gated anomaly content — called only from the anomaly spec's
-  // test.fixme placeholders (unreachable on OSS; enabled with an entitled build).
   async expectDrawerAnomalyNote() { await expect(this.page.locator(this.l.drawerAnomalyNote)).toBeVisible(); }
   async expectDrawerDetection() { await expect(this.page.locator(this.l.drawerDetection)).toBeVisible(); }
-  async expectAnomalyInstallNote() { await expect(this.page.locator(this.l.installAnomalyNote)).toBeVisible(); }
+
+  // The unauthenticated /config is what the store's zoConfig.build_type is loaded from.
+  async detectBuildType() {
+    const base = (process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
+    const response = await this.page.request.get(`${base}/config`);
+    expect(response.ok(), `GET /config returned ${response.status()}`).toBeTruthy();
+    return (await response.json()).build_type;
+  }
 
   async expectEditorAlertName(name) {
     await expect(this.page.locator(this.l.editorAlertName).first()).toHaveText(name, { timeout: 15000 });
