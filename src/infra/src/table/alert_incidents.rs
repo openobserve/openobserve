@@ -1239,7 +1239,7 @@ fn correlation_candidates_query(
             r#"("alert_incidents"."group_values" @> $1::jsonb OR "alert_incidents"."group_values" <@ $2::jsonb)"#,
             [dims.clone(), dims],
         ),
-        // SQLite has no JSON containment: each side's pairs must all appear in the other.
+        // SQLite has no JSON containment operator, so containment is checked pair by pair both ways.
         _ => Expr::cust_with_values(
             r#"(NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE n.key = e.key AND n.value = e.value)) OR NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE e.key = n.key AND e.value = n.value)))"#,
             [dims.clone(), dims],
