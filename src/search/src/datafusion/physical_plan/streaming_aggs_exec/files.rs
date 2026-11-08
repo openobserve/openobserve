@@ -504,7 +504,7 @@ pub fn get_cache_file_path(file_path: &str, file_name: &str) -> String {
     format!("{STREAMING_AGGS_CACHE_DIR}/{file_path}/{file_name}")
 }
 
-/// `ts_offset` is the shared `histogram()` offset, which a request-level timezone sets outside the
+/// `ts_offset` is the shared `histogram()` offset; a request-level timezone sets it outside the
 /// SQL.
 pub fn get_aggregation_cache_key_from_request(req: &SearchPartitionRequest, ts_offset: i64) -> u64 {
     let origin_sql = req.sql.clone();

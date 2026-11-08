@@ -215,8 +215,7 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
         .map_err(|e| e.into())
 }
 
-/// Parses the job request with named zones pinned at the job end, so every partition shares one
-/// offset.
+/// Parses the job request with named zones pinned at the job end, so partitions share one offset.
 fn job_request(job: &Job) -> Result<search::Request, anyhow::Error> {
     let mut req: search::Request = json::from_str(&job.payload)?;
     crate::sql::histogram::pin_histogram_timezone(

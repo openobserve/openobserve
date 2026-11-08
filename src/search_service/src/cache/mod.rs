@@ -75,7 +75,8 @@ pub mod multi;
 pub mod result_utils;
 
 // Define cache version
-const CACHE_VERSION: &str = "v4";
+// v5: entries written before histogram offsets entered the hash may hold shifted labels.
+const CACHE_VERSION: &str = "v5";
 
 /// The hits a search was about to return when redaction could not run on them.
 #[cfg(any(feature = "vectorscan", test))]

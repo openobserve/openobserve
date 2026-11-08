@@ -26,9 +26,9 @@ use config::{
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
     ast::{
-        Cte, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, Ident, Query, Select,
-        SelectItem, SelectItemQualifiedWildcardKind, SetExpr, Statement, TableAlias, TableFactor,
-        Value, visit_expressions, visit_expressions_mut,
+        Cte, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, Ident, ObjectName, Query,
+        Select, SelectItem, SelectItemQualifiedWildcardKind, SetExpr, Statement, TableAlias,
+        TableFactor, Value, visit_expressions, visit_expressions_mut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -40,10 +40,41 @@ use super::{RE_HISTOGRAM, visitor::histogram_interval::generate_histogram_interv
 const OUTPUT_RESOLVE_BUDGET: usize = 256;
 
 /// A result column looked up by output name or, through an alias column list, by position.
-#[derive(Clone, Copy)]
-enum OutputColumn<'a> {
-    Name(&'a str),
+#[derive(Clone)]
+enum OutputColumn {
+    Name(ColumnName),
     Index(usize),
+}
+
+/// An output name: the raw value the cache picker read, or an identifier folded by dialect rules.
+#[derive(Clone)]
+struct ColumnName {
+    name: String,
+    folded: bool,
+}
+
+impl ColumnName {
+    fn raw(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            folded: false,
+        }
+    }
+
+    fn from_ident(ident: &Ident) -> Self {
+        Self {
+            name: fold_ident(ident),
+            folded: true,
+        }
+    }
+
+    fn matches(&self, ident: &Ident) -> bool {
+        if self.folded {
+            fold_ident(ident) == self.name
+        } else {
+            ident.value == self.name
+        }
+    }
 }
 
 /// What pinning found in a statement's `histogram()` calls.
@@ -174,7 +205,13 @@ pub fn is_histogram_output(sql: &str, column: &str) -> Option<bool> {
         return None;
     };
     let mut budget = OUTPUT_RESOLVE_BUDGET;
-    query_output(&query, &[], OutputColumn::Name(column), &mut budget)
+    let column = OutputColumn::Name(ColumnName::raw(column));
+    query_output(&query, &[], &column, &mut budget)
+}
+
+/// DataFusion resolves `"histogram"` and `HISTOGRAM` to the same UDF, so every caller must agree.
+pub fn is_histogram_function(name: &ObjectName) -> bool {
+    matches!(name.0.as_slice(), [part] if part.as_ident().is_some_and(|i| i.value.eq_ignore_ascii_case("histogram")))
 }
 
 /// Converts an original query to a histogram query
@@ -361,7 +398,7 @@ fn pin_histogram_call(
     let Expr::Function(func) = expr else {
         return Ok(None);
     };
-    if !func.name.to_string().eq_ignore_ascii_case("histogram") {
+    if !is_histogram_function(&func.name) {
         return Ok(None);
     }
     let FunctionArguments::List(list) = &mut func.args else {
@@ -419,7 +456,7 @@ fn fixed_offset_of_named_zone(tz: &str, end_time: i64) -> Option<String> {
 fn query_output<'a>(
     query: &'a Query,
     outer_ctes: &[&'a Cte],
-    column: OutputColumn<'_>,
+    column: &OutputColumn,
     budget: &mut usize,
 ) -> Option<bool> {
     *budget = budget.checked_sub(1)?;
@@ -433,7 +470,7 @@ fn query_output<'a>(
 fn set_expr_output<'a>(
     body: &'a SetExpr,
     ctes: &[&'a Cte],
-    column: OutputColumn<'_>,
+    column: &OutputColumn,
     budget: &mut usize,
 ) -> Option<bool> {
     match body {
@@ -442,12 +479,12 @@ fn set_expr_output<'a>(
         // A set operation names its columns after the left side; every branch must agree.
         SetExpr::SetOperation { left, right, .. } => {
             let column = match column {
-                OutputColumn::Index(_) => column,
+                OutputColumn::Index(_) => column.clone(),
                 OutputColumn::Name(name) => OutputColumn::Index(output_index(left, name)?),
             };
             merge_outputs([
-                set_expr_output(left, ctes, column, budget),
-                set_expr_output(right, ctes, column, budget),
+                set_expr_output(left, ctes, &column, budget),
+                set_expr_output(right, ctes, &column, budget),
             ])
         }
         _ => None,
@@ -457,7 +494,7 @@ fn set_expr_output<'a>(
 fn select_output<'a>(
     select: &'a Select,
     ctes: &[&'a Cte],
-    column: OutputColumn<'_>,
+    column: &OutputColumn,
     budget: &mut usize,
 ) -> Option<bool> {
     let is_wildcard = |item: &SelectItem| {
@@ -471,7 +508,7 @@ fn select_output<'a>(
             if select.projection.iter().any(is_wildcard) {
                 return None;
             }
-            return match select.projection.get(index)? {
+            return match select.projection.get(*index)? {
                 SelectItem::UnnamedExpr(expr)
                 | SelectItem::ExprWithAlias { expr, .. }
                 | SelectItem::ExprWithAliases { expr, .. } => {
@@ -482,29 +519,40 @@ fn select_output<'a>(
         }
         OutputColumn::Name(name) => name,
     };
+    let mut matched = None;
     let mut wildcard_qualifiers = Vec::new();
     for item in &select.projection {
-        match item {
-            SelectItem::ExprWithAlias { expr, alias } if ident_is(alias, name) => {
-                return projected_expr_output(select, expr, ctes, budget);
-            }
+        let expr = match item {
+            SelectItem::ExprWithAlias { expr, alias } if name.matches(alias) => expr,
             SelectItem::UnnamedExpr(expr)
-                if column_ref(expr).is_some_and(|(_, ident)| ident_is(ident, name)) =>
+                if column_ref(expr).is_some_and(|(_, ident)| name.matches(ident)) =>
             {
-                return projected_expr_output(select, expr, ctes, budget);
+                expr
             }
             SelectItem::ExprWithAliases { expr, aliases }
-                if aliases.iter().any(|alias| ident_is(alias, name)) =>
+                if aliases.iter().any(|alias| name.matches(alias)) =>
             {
-                return projected_expr_output(select, expr, ctes, budget);
+                expr
             }
-            SelectItem::Wildcard(_) => wildcard_qualifiers.push(None),
+            SelectItem::Wildcard(_) => {
+                wildcard_qualifiers.push(None);
+                continue;
+            }
             SelectItem::QualifiedWildcard(SelectItemQualifiedWildcardKind::ObjectName(q), _) => {
                 wildcard_qualifiers.push(Some(q.0.last()?.as_ident()?));
+                continue;
             }
             SelectItem::QualifiedWildcard(..) => return None,
-            _ => {}
+            _ => continue,
+        };
+        // Two outputs with the same name make the column ambiguous.
+        if matched.is_some() {
+            return None;
         }
+        matched = Some(expr);
+    }
+    if let Some(expr) = matched {
+        return projected_expr_output(select, expr, ctes, budget);
     }
     if wildcard_qualifiers.is_empty() {
         return None;
@@ -527,11 +575,18 @@ fn projected_expr_output<'a>(
         return Some(true);
     }
     if let Some((qualifier, name)) = column_ref(expr) {
-        return relation_output(select, qualifier, &name.value, ctes, budget);
+        return relation_output(
+            select,
+            qualifier,
+            &ColumnName::from_ident(name),
+            ctes,
+            budget,
+        );
     }
     // Any other expression stays UTC only when every column it reads is UTC.
     for (qualifier, name) in expr_inputs(expr)? {
-        if relation_output(select, qualifier.as_ref(), &name.value, ctes, budget)? {
+        let column = ColumnName::from_ident(&name);
+        if relation_output(select, qualifier.as_ref(), &column, ctes, budget)? {
             return None;
         }
     }
@@ -539,7 +594,7 @@ fn projected_expr_output<'a>(
 }
 
 /// Position of output `name` in the leftmost select of `body`; wildcards make it unknown.
-fn output_index(body: &SetExpr, name: &str) -> Option<usize> {
+fn output_index(body: &SetExpr, name: &ColumnName) -> Option<usize> {
     let select = match body {
         SetExpr::Select(select) => select,
         SetExpr::Query(query) => return output_index(&query.body, name),
@@ -549,12 +604,12 @@ fn output_index(body: &SetExpr, name: &str) -> Option<usize> {
     let mut index = None;
     for (i, item) in select.projection.iter().enumerate() {
         let found = match item {
-            SelectItem::ExprWithAlias { alias, .. } => ident_is(alias, name),
+            SelectItem::ExprWithAlias { alias, .. } => name.matches(alias),
             SelectItem::UnnamedExpr(expr) => {
-                column_ref(expr).is_some_and(|(_, ident)| ident_is(ident, name))
+                column_ref(expr).is_some_and(|(_, ident)| name.matches(ident))
             }
             SelectItem::ExprWithAliases { aliases, .. } => {
-                aliases.iter().any(|alias| ident_is(alias, name))
+                aliases.iter().any(|alias| name.matches(alias))
             }
             _ => return None,
         };
@@ -572,7 +627,7 @@ fn output_index(body: &SetExpr, name: &str) -> Option<usize> {
 fn relation_output<'a>(
     select: &'a Select,
     qualifier: Option<&Ident>,
-    column: &str,
+    column: &ColumnName,
     ctes: &[&'a Cte],
     budget: &mut usize,
 ) -> Option<bool> {
@@ -589,23 +644,21 @@ fn relation_output<'a>(
             _ => return None,
         };
         let visible = alias.map(|alias| &alias.name).or(name);
-        if qualifier.is_some_and(|q| visible.is_none_or(|v| !ident_is(v, &q.value))) {
+        if qualifier.is_some_and(|q| visible.is_none_or(|v| !same_ident(v, q))) {
             continue;
         }
         let Some(target) = aliased_column(alias, column) else {
             continue;
         };
         results.push(match factor {
-            TableFactor::Derived { subquery, .. } => query_output(subquery, ctes, target, budget),
-            _ => match name.and_then(|n| {
-                ctes.iter()
-                    .rposition(|cte| ident_is(&cte.alias.name, &n.value))
-            }) {
+            TableFactor::Derived { subquery, .. } => query_output(subquery, ctes, &target, budget),
+            // A qualified name such as `logs.t` names the stream, never a CTE.
+            _ => match cte_index(factor, name, ctes) {
                 Some(i) => {
                     let Some(target) = cte_column(&ctes[i].alias, target) else {
                         continue;
                     };
-                    query_output(&ctes[i].query, &ctes[..i], target, budget)
+                    query_output(&ctes[i].query, &ctes[..i], &target, budget)
                 }
                 None => Some(false),
             },
@@ -614,20 +667,32 @@ fn relation_output<'a>(
     merge_outputs(results)
 }
 
+fn cte_index(factor: &TableFactor, name: Option<&Ident>, ctes: &[&Cte]) -> Option<usize> {
+    let TableFactor::Table { name: full, .. } = factor else {
+        return None;
+    };
+    if full.0.len() != 1 {
+        return None;
+    }
+    let name = name?;
+    ctes.iter()
+        .rposition(|cte| same_ident(&cte.alias.name, name))
+}
+
 /// Maps `column` through a relation's alias column list, when it has one.
-fn aliased_column<'a>(alias: Option<&TableAlias>, column: &'a str) -> Option<OutputColumn<'a>> {
+fn aliased_column(alias: Option<&TableAlias>, column: &ColumnName) -> Option<OutputColumn> {
     match alias.filter(|alias| !alias.columns.is_empty()) {
         Some(alias) => alias
             .columns
             .iter()
-            .position(|c| ident_is(&c.name, column))
+            .position(|c| column.matches(&c.name))
             .map(OutputColumn::Index),
-        None => Some(OutputColumn::Name(column)),
+        None => Some(OutputColumn::Name(column.clone())),
     }
 }
 
-fn cte_column<'a>(alias: &TableAlias, column: OutputColumn<'a>) -> Option<OutputColumn<'a>> {
-    match column {
+fn cte_column(alias: &TableAlias, column: OutputColumn) -> Option<OutputColumn> {
+    match &column {
         OutputColumn::Name(name) => aliased_column(Some(alias), name),
         OutputColumn::Index(_) => Some(column),
     }
@@ -660,7 +725,7 @@ fn column_ref(expr: &Expr) -> Option<(Option<&Ident>, &Ident)> {
 }
 
 fn is_histogram_call(expr: &Expr) -> bool {
-    matches!(expr, Expr::Function(f) if f.name.to_string().trim_matches('"').eq_ignore_ascii_case("histogram"))
+    matches!(expr, Expr::Function(f) if is_histogram_function(&f.name))
 }
 
 fn without_nesting(expr: &Expr) -> &Expr {
@@ -670,8 +735,7 @@ fn without_nesting(expr: &Expr) -> &Expr {
     }
 }
 
-/// Columns an expression reads; `None` when a `histogram()` call or a subquery makes them
-/// unknowable.
+/// Columns an expression reads; a `histogram()` call or a subquery inside makes them unknown.
 fn expr_inputs(expr: &Expr) -> Option<Vec<(Option<Ident>, Ident)>> {
     let mut inputs = Vec::new();
     let result = visit_expressions(expr, |expr| {
@@ -691,8 +755,17 @@ fn expr_inputs(expr: &Expr) -> Option<Vec<(Option<Ident>, Ident)>> {
     result.is_continue().then_some(inputs)
 }
 
-fn ident_is(ident: &Ident, name: &str) -> bool {
-    ident.value.eq_ignore_ascii_case(name)
+/// An unquoted identifier folds to lower case; a quoted one keeps its case.
+fn fold_ident(ident: &Ident) -> String {
+    if ident.quote_style.is_some() {
+        ident.value.clone()
+    } else {
+        ident.value.to_lowercase()
+    }
+}
+
+fn same_ident(a: &Ident, b: &Ident) -> bool {
+    fold_ident(a) == fold_ident(b)
 }
 
 #[cfg(test)]
@@ -820,6 +893,56 @@ mod tests {
                 "_timestamp",
                 Some(false),
             ),
+            (
+                "SELECT \"TS\" AS _timestamp FROM (SELECT histogram(_timestamp, '1 hour', '+05:30') AS ts, _timestamp AS \"TS\" FROM t) AS q ORDER BY _timestamp".to_string(),
+                "_timestamp",
+                Some(false),
+            ),
+            (
+                "SELECT ts AS _timestamp FROM (SELECT histogram(_timestamp, '1 hour', '+05:30') AS \"TS\", _timestamp AS ts FROM t) AS q".to_string(),
+                "_timestamp",
+                Some(false),
+            ),
+            (
+                "SELECT \"TS\" AS _timestamp FROM (SELECT histogram(_timestamp, '1 hour', '+05:30') AS \"TS\", _timestamp AS ts FROM t) AS q".to_string(),
+                "_timestamp",
+                Some(true),
+            ),
+            (
+                "SELECT TS AS _timestamp FROM (SELECT histogram(_timestamp, '1 hour', '+05:30') AS \"ts\" FROM t) AS q".to_string(),
+                "_timestamp",
+                Some(true),
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour', '+05:30') AS ts, _timestamp AS \"TS\" FROM t".to_string(),
+                "TS",
+                Some(false),
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour', '+05:30') AS ts, _timestamp AS \"TS\" FROM t".to_string(),
+                "ts",
+                Some(true),
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour', '+05:30') AS ts, _timestamp AS ts FROM t".to_string(),
+                "ts",
+                None,
+            ),
+            (
+                "WITH t AS (SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t) SELECT _timestamp FROM logs.t".to_string(),
+                "_timestamp",
+                Some(false),
+            ),
+            (
+                "WITH t AS (SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t) SELECT _timestamp FROM t".to_string(),
+                "_timestamp",
+                Some(true),
+            ),
+            (
+                "SELECT \"histogram\"(_timestamp, '1 hour', '+05:30') AS ts FROM t".to_string(),
+                "ts",
+                Some(true),
+            ),
         ] {
             assert_eq!(is_histogram_output(&sql, column), expected, "{sql}");
         }
@@ -862,6 +985,18 @@ mod tests {
         let mut timezone = timezone.map(str::to_string);
         pin_request_timezone(&mut timezone, end_time);
         Ok(pin_statement_timezones(&mut statement, timezone.as_deref(), end_time)?.offset)
+    }
+
+    #[test]
+    fn timezone_quoted_histogram_name_is_pinned() {
+        let end = 1_752_000_000_000_000;
+        let sql = "SELECT \"histogram\"(_timestamp, '1 hour', 'Asia/Kolkata') AS ts FROM t";
+        assert_eq!(pin_offset(sql, None, end).unwrap(), Some(19_800_000_000));
+        let sql = "SELECT HISTOGRAM(_timestamp, '1 hour') AS ts FROM t";
+        assert_eq!(
+            pin_offset(sql, Some("-08:00"), end).unwrap(),
+            Some(-28_800_000_000)
+        );
     }
 
     #[test]
