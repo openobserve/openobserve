@@ -439,8 +439,17 @@ fn set_expr_output<'a>(
     match body {
         SetExpr::Select(select) => select_output(select, ctes, column, budget),
         SetExpr::Query(query) => query_output(query, ctes, column, budget),
-        // A set operation takes its column names from the left side.
-        SetExpr::SetOperation { left, .. } => set_expr_output(left, ctes, column, budget),
+        // A set operation names its columns after the left side; every branch must agree.
+        SetExpr::SetOperation { left, right, .. } => {
+            let column = match column {
+                OutputColumn::Index(_) => column,
+                OutputColumn::Name(name) => OutputColumn::Index(output_index(left, name)?),
+            };
+            merge_outputs([
+                set_expr_output(left, ctes, column, budget),
+                set_expr_output(right, ctes, column, budget),
+            ])
+        }
         _ => None,
     }
 }
@@ -463,7 +472,9 @@ fn select_output<'a>(
                 return None;
             }
             return match select.projection.get(index)? {
-                SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
+                SelectItem::UnnamedExpr(expr)
+                | SelectItem::ExprWithAlias { expr, .. }
+                | SelectItem::ExprWithAliases { expr, .. } => {
                     projected_expr_output(select, expr, ctes, budget)
                 }
                 _ => None,
@@ -482,6 +493,11 @@ fn select_output<'a>(
             {
                 return projected_expr_output(select, expr, ctes, budget);
             }
+            SelectItem::ExprWithAliases { expr, aliases }
+                if aliases.iter().any(|alias| ident_is(alias, name)) =>
+            {
+                return projected_expr_output(select, expr, ctes, budget);
+            }
             SelectItem::Wildcard(_) => wildcard_qualifiers.push(None),
             SelectItem::QualifiedWildcard(SelectItemQualifiedWildcardKind::ObjectName(q), _) => {
                 wildcard_qualifiers.push(Some(q.0.last()?.as_ident()?));
@@ -491,7 +507,7 @@ fn select_output<'a>(
         }
     }
     if wildcard_qualifiers.is_empty() {
-        return Some(false);
+        return None;
     }
     merge_outputs(
         wildcard_qualifiers
@@ -506,13 +522,51 @@ fn projected_expr_output<'a>(
     ctes: &[&'a Cte],
     budget: &mut usize,
 ) -> Option<bool> {
-    if has_histogram_call(expr) {
+    let expr = without_nesting(expr);
+    if is_histogram_call(expr) {
         return Some(true);
     }
-    match column_ref(expr) {
-        Some((qualifier, name)) => relation_output(select, qualifier, &name.value, ctes, budget),
-        None => Some(false),
+    if let Some((qualifier, name)) = column_ref(expr) {
+        return relation_output(select, qualifier, &name.value, ctes, budget);
     }
+    // Any other expression stays UTC only when every column it reads is UTC.
+    for (qualifier, name) in expr_inputs(expr)? {
+        if relation_output(select, qualifier.as_ref(), &name.value, ctes, budget)? {
+            return None;
+        }
+    }
+    Some(false)
+}
+
+/// Position of output `name` in the leftmost select of `body`; wildcards make it unknown.
+fn output_index(body: &SetExpr, name: &str) -> Option<usize> {
+    let select = match body {
+        SetExpr::Select(select) => select,
+        SetExpr::Query(query) => return output_index(&query.body, name),
+        SetExpr::SetOperation { left, .. } => return output_index(left, name),
+        _ => return None,
+    };
+    let mut index = None;
+    for (i, item) in select.projection.iter().enumerate() {
+        let found = match item {
+            SelectItem::ExprWithAlias { alias, .. } => ident_is(alias, name),
+            SelectItem::UnnamedExpr(expr) => {
+                column_ref(expr).is_some_and(|(_, ident)| ident_is(ident, name))
+            }
+            SelectItem::ExprWithAliases { aliases, .. } => {
+                aliases.iter().any(|alias| ident_is(alias, name))
+            }
+            _ => return None,
+        };
+        if found {
+            // Two outputs with the same name make the column ambiguous.
+            if index.is_some() {
+                return None;
+            }
+            index = Some(i);
+        }
+    }
+    index
 }
 
 fn relation_output<'a>(
@@ -605,19 +659,36 @@ fn column_ref(expr: &Expr) -> Option<(Option<&Ident>, &Ident)> {
     }
 }
 
-fn has_histogram_call(expr: &Expr) -> bool {
-    visit_expressions(expr, |expr| match expr {
-        Expr::Function(f)
-            if f.name
-                .to_string()
-                .trim_matches('"')
-                .eq_ignore_ascii_case("histogram") =>
+fn is_histogram_call(expr: &Expr) -> bool {
+    matches!(expr, Expr::Function(f) if f.name.to_string().trim_matches('"').eq_ignore_ascii_case("histogram"))
+}
+
+fn without_nesting(expr: &Expr) -> &Expr {
+    match expr {
+        Expr::Nested(inner) => without_nesting(inner),
+        other => other,
+    }
+}
+
+/// Columns an expression reads; `None` when a `histogram()` call or a subquery makes them
+/// unknowable.
+fn expr_inputs(expr: &Expr) -> Option<Vec<(Option<Ident>, Ident)>> {
+    let mut inputs = Vec::new();
+    let result = visit_expressions(expr, |expr| {
+        if is_histogram_call(expr)
+            || matches!(
+                expr,
+                Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. }
+            )
         {
-            ControlFlow::Break(())
+            return ControlFlow::Break(());
         }
-        _ => ControlFlow::Continue(()),
-    })
-    .is_break()
+        if let Some((qualifier, name)) = column_ref(expr) {
+            inputs.push((qualifier.cloned(), name.clone()));
+        }
+        ControlFlow::Continue(())
+    });
+    result.is_continue().then_some(inputs)
 }
 
 fn ident_is(ident: &Ident, name: &str) -> bool {
@@ -631,8 +702,8 @@ mod tests {
     #[test]
     fn timezone_histogram_output_resolves_per_query_level() {
         let inner = "SELECT _timestamp, histogram(_timestamp, '1 hour', '+05:30') AS ts FROM t";
-        let shifted =
-            "SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t LIMIT 1";
+        let bucket = "SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t";
+        let shifted = format!("{bucket} LIMIT 1");
         for (sql, column, expected) in [
             (
                 "SELECT HISTOGRAM(_timestamp, '1 day', '+05:30') AS ts, count(*) FROM t GROUP BY ts".to_string(),
@@ -696,6 +767,57 @@ mod tests {
             (
                 "SELECT _timestamp AS ts FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0)".to_string(),
                 "ts",
+                Some(false),
+            ),
+            (
+                "SELECT (histogram(_timestamp, '1 hour', '+05:30')) AS ts FROM t".to_string(),
+                "ts",
+                Some(true),
+            ),
+            (
+                "SELECT max(_timestamp) AS _timestamp FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') > to_timestamp_micros(0)".to_string(),
+                "_timestamp",
+                Some(false),
+            ),
+            (
+                "SELECT to_timestamp_micros(_timestamp) AS ts FROM t".to_string(),
+                "ts",
+                Some(false),
+            ),
+            (
+                "SELECT CASE WHEN histogram(_timestamp, '1 hour', '+05:30') IS NULL THEN _timestamp ELSE _timestamp END AS _timestamp FROM t ORDER BY _timestamp".to_string(),
+                "_timestamp",
+                None,
+            ),
+            (
+                "SELECT to_timestamp_micros(histogram(_timestamp, '1 hour', '+05:30')) AS ts FROM t".to_string(),
+                "ts",
+                None,
+            ),
+            (format!("SELECT ts + 1 AS ts FROM ({inner}) AS q"), "ts", None),
+            (
+                "SELECT (SELECT max(_timestamp) FROM t) AS ts FROM t".to_string(),
+                "ts",
+                None,
+            ),
+            (
+                "SELECT name FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') > to_timestamp_micros(0)".to_string(),
+                "_timestamp",
+                None,
+            ),
+            (
+                format!("SELECT _timestamp FROM ({bucket} UNION ALL SELECT to_timestamp_micros(_timestamp) AS _timestamp FROM t) AS q"),
+                "_timestamp",
+                None,
+            ),
+            (
+                format!("SELECT _timestamp FROM ({bucket} UNION ALL {bucket}) AS q"),
+                "_timestamp",
+                Some(true),
+            ),
+            (
+                "SELECT _timestamp FROM (SELECT _timestamp FROM t UNION ALL SELECT _timestamp FROM t) AS q".to_string(),
+                "_timestamp",
                 Some(false),
             ),
         ] {

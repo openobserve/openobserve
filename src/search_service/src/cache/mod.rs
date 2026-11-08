@@ -2186,6 +2186,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn timezone_unprovable_column_skips_cache() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org = "timezone_unprovable_column";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                "_timestamp",
+                DataType::Int64,
+                false,
+            )])),
+        );
+        let mut request = search::Request::default();
+        request.query.sql = "SELECT CASE WHEN histogram(_timestamp, '1 hour', '+05:30') IS NULL THEN _timestamp ELSE _timestamp END AS _timestamp FROM t ORDER BY _timestamp".to_string();
+        request.query.start_time = 1_767_225_600_000_000;
+        request.query.end_time = 1_767_312_000_000_000;
+        for use_cache in [false, true] {
+            let (resp, execute) = prepare_cache_response(
+                "unprovable",
+                org,
+                StreamType::Logs,
+                &mut request,
+                use_cache,
+            )
+            .await
+            .unwrap();
+            assert!(execute, "use_cache={use_cache}");
+            assert!(resp.file_path.is_empty(), "use_cache={use_cache}");
+            assert!(!resp.has_cached_data && !resp.cache_query_response);
+        }
+    }
+
+    #[tokio::test]
     async fn timezone_raw_timestamp_cache_matches_cold_query() {
         use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
