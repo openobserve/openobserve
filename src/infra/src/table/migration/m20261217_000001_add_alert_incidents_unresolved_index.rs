@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Indexes `alert_incidents.last_alert_at` over unresolved incidents only, for the stale sweep.
-
 use sea_orm_migration::prelude::*;
 
 const UNRESOLVED_LAST_ALERT_IDX: &str = "alert_incidents_unresolved_last_alert_idx";

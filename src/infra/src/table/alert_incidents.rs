@@ -1382,7 +1382,6 @@ fn containing_alerts(alert_ids: &[String]) -> sea_orm::Condition {
     )
 }
 
-/// Built apart from the call so tests can check its SQL and its plan.
 fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity> {
     // Inlined, not bound: PostgreSQL's generic plan cannot match a bind to the partial index.
     alert_incidents::Entity::find()
