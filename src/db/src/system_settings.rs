@@ -579,10 +579,24 @@ pub async fn get_service_identity_config(
 ) -> config::meta::correlation::ServiceIdentityConfig {
     use config::meta::{
         correlation::{IdentitySet, ServiceIdentityConfig},
+        meta_store::MetaStore,
         system_settings::SettingScope,
     };
 
-    let stored = get_cached(&SettingScope::Org, Some(org_id), None, "service_identity").await;
+    let cfg = config::get_config();
+    let replica = &cfg.common.meta_postgres_ro_dsn;
+    // The watcher reloads from a separate read replica, which can lag a save and pin a stale row.
+    let stored = if MetaStore::from(cfg.common.meta_store.as_str()) == MetaStore::PostgreSQL
+        && !replica.is_empty()
+        && *replica != cfg.common.meta_postgres_dsn
+    {
+        db::get(&SettingScope::Org, Some(org_id), None, "service_identity")
+            .await
+            .ok()
+            .flatten()
+    } else {
+        get_cached(&SettingScope::Org, Some(org_id), None, "service_identity").await
+    };
     // Intentionally kept here since there's no way to satisfy non-enterprise path
     // TODO: move the entire module to enterprise so that there's no access restrictions
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
