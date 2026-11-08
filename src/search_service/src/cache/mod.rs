@@ -692,6 +692,15 @@ pub async fn prepare_cache_response(
         }
     }
 
+    // Only a histogram() output is in shifted time; a raw `_timestamp` column stays UTC.
+    let ts_offset = ts_offset.map(|offset| {
+        if is_histogram_column(&sql, &ts_column) {
+            offset
+        } else {
+            0
+        }
+    });
+
     // #16175: sort, trim and cache checks compare ORDER BY with the column the hits carry
     if ts_offset.is_some() {
         sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
@@ -1203,6 +1212,12 @@ async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &Result
         cacher::remove_stale_cache_meta(file_path, &file_name, query_key, &m).await;
     }
     false
+}
+
+fn is_histogram_column(sql: &crate::Sql, ts_column: &str) -> bool {
+    sql.aliases
+        .iter()
+        .any(|(original, alias)| alias == ts_column && original.contains("histogram"))
 }
 
 /// Shrinks `[start, end]` to whole `histogram()` buckets; the flag says whether the end moved.
@@ -2096,6 +2111,82 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(request.query.timezone.as_deref(), Some("-07:00"));
+    }
+
+    #[tokio::test]
+    async fn timezone_raw_timestamp_cache_matches_cold_query() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        const HOUR: i64 = 3_600_000_000;
+        const DAY: i64 = 24 * HOUR;
+        const START: i64 = 1_767_225_600_000_000;
+        let org = "timezone_raw_timestamp_cache";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/t"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                "_timestamp",
+                DataType::Int64,
+                false,
+            )])),
+        );
+        let cold = [1, 5, 10, 20]
+            .map(|h| json::json!({"_timestamp": START + h * HOUR}))
+            .to_vec();
+        let mut request = search::Request::default();
+        request.query.sql = "SELECT _timestamp FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0) ORDER BY _timestamp".to_string();
+        request.query.start_time = START;
+        request.query.end_time = START + DAY;
+        let (warm, _) = prepare_cache_response("raw", org, StreamType::Logs, &mut request, true)
+            .await
+            .unwrap();
+        assert_eq!(warm.ts_column, "_timestamp");
+        assert_eq!(warm.ts_offset, 0);
+        let response = search::Response {
+            hits: cold.clone(),
+            total: cold.len(),
+            ..Default::default()
+        };
+        write_results(
+            "raw",
+            &warm.ts_column,
+            START,
+            START + DAY,
+            &response,
+            warm.file_path.clone(),
+            warm.is_aggregate,
+            warm.is_descending,
+            true,
+            false,
+            warm.ts_offset,
+        )
+        .await;
+        let query_key = warm.file_path.replace('/', "_");
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while !QUERY_RESULT_CACHE.read().await.contains_key(&query_key) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        for (start, end, expected) in [
+            (START, START + DAY, cold.clone()),
+            (START + 3 * HOUR, START + 15 * HOUR, cold[1..3].to_vec()),
+        ] {
+            let mut req = request.clone();
+            req.query.start_time = start;
+            req.query.end_time = end;
+            let (hit, _) = prepare_cache_response("raw", org, StreamType::Logs, &mut req, true)
+                .await
+                .unwrap();
+            assert!(hit.has_cached_data, "no cache hit for {start} - {end}");
+            let hits = hit
+                .cached_response
+                .iter()
+                .flat_map(|c| c.cached_response.hits.clone())
+                .collect::<Vec<_>>();
+            assert_eq!(hits, expected, "range {start} - {end}");
+        }
     }
 
     #[tokio::test]
