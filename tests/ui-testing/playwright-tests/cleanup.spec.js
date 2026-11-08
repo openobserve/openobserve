@@ -93,7 +93,7 @@ test.describe("Pre-Test Cleanup", () => {
 
     // The logs coverage specs for #15086 each seed their own log stream, suffixed per run
     // so parallel workers cannot collide — which also means nothing ever reuses them.
-    // logs-highlighting, logs-default-columns and logs-search-around-multistream.
+    // logs-highlighting, logs-default-columns, logs-search-around-multistream and logs-explain-analyze.
     await pm.apiCleanup.cleanupStreams(
       [
         /^e2e_hl_filters_/,
@@ -101,6 +101,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_svc_none_/,
         /^e2e_sa_one_/,
         /^e2e_sa_two_/,
+        /^explain_e2e_/,
       ],
       ['default'],
     );
