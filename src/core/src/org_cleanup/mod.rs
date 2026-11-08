@@ -4788,6 +4788,7 @@ mod tests {
 
     #[test]
     fn test_pipeline_teardown_deletes_the_listed_pipeline_without_a_re_read() {
+        position_of("delete_org_pipelines(org_id)");
         assert!(
             fn_body(SOURCE, "delete_org_pipelines")
                 .contains("crate::pipeline::delete_listed_pipeline(p)"),
