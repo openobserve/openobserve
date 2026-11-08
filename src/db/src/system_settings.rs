@@ -717,7 +717,7 @@ async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting>
     // A read replica can lag a save, and a cached miss outlives the lag, so the primary decides.
     match db::get_from_primary(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS).await
     {
-        // Not cached: only the watcher may cache a real row, or a racing delete could be undone.
+        // Left uncached, so a delete racing this read cannot be undone by the insert.
         Ok(Some(saved)) => return Some(saved),
         Ok(None) => {}
         Err(_) => return None,
