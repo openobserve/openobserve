@@ -1432,23 +1432,19 @@ mod tests {
 
     #[tokio::test]
     async fn stale_incidents_query_uses_the_unresolved_index() {
-        use sea_orm::{QueryTrait, Statement};
+        use sea_orm::QueryTrait;
 
         let db = incidents_db().await;
         crate::table::migration::create_alert_incidents_unresolved_index_for_test(&db)
             .await
             .unwrap();
-        let backend = db.get_database_backend();
-        let stmt = stale_incidents_query(100)
+        let mut stmt = stale_incidents_query(100)
             .limit(500)
-            .build(backend);
+            .build(db.get_database_backend());
+        stmt.sql = format!("EXPLAIN QUERY PLAN {}", stmt.sql);
 
         let plan = db
-            .query_all(Statement::from_sql_and_values(
-                backend,
-                format!("EXPLAIN QUERY PLAN {}", stmt.sql),
-                stmt.values.unwrap_or_default(),
-            ))
+            .query_all(stmt)
             .await
             .unwrap()
             .iter()
