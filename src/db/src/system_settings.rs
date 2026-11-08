@@ -398,8 +398,13 @@ pub async fn invalidate_all_cache() {
 pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correlation::FieldAlias> {
     use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
 
-    // Try to get from settings v2 (org level)
-    if let Ok(Some(setting)) = get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await
+    let setting = match get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await {
+        Ok(Some(setting)) => Some(setting),
+        // Empty means "use the defaults" here, and caching it spares every later read two misses.
+        Ok(None) => cache_semantic_field_groups_miss(org_id).await,
+        Err(_) => None,
+    };
+    if let Some(setting) = setting
         && let Ok(groups) = serde_json::from_value::<Vec<FieldAlias>>(setting.setting_value)
         && !groups.is_empty()
     {
@@ -408,6 +413,15 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
 
     // Fall back to enterprise defaults
     get_default_semantic_field_groups()
+}
+
+/// Whether this is the stand-in cached for an org with no saved semantic field groups.
+pub fn is_absent_semantic_field_groups(setting: &SystemSetting) -> bool {
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
+
+    setting.setting_key == SEMANTIC_FIELD_GROUPS
+        && setting.created_at == 0
+        && setting.updated_at == 0
 }
 
 /// Get the Gen-AI agent fallback mapping config for an organization.
@@ -696,6 +710,38 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
     }
 }
 
+/// Caches what an org's semantic-groups miss means and returns it; `None` when left uncached.
+async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting> {
+    use config::meta::{meta_store::MetaStore, system_settings::keys::SEMANTIC_FIELD_GROUPS};
+
+    let cfg = config::get_config();
+    let replica = &cfg.common.meta_postgres_ro_dsn;
+    // A replica can lag a save past its watch event, and a cached miss would outlive that lag.
+    if MetaStore::from(cfg.common.meta_store.as_str()) == MetaStore::PostgreSQL
+        && !replica.is_empty()
+        && *replica != cfg.common.meta_postgres_dsn
+    {
+        return None;
+    }
+    let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
+    // Zero timestamps mark the stand-in, and keep `get_semantic_field_groups_updated_at` at 0.
+    absent.created_at = 0;
+    absent.updated_at = 0;
+    // A row cached since the database miss is newer than the miss, so it must win.
+    let cached = SYSTEM_SETTINGS
+        .write()
+        .await
+        .entry(cache_key(
+            &SettingScope::Org,
+            Some(org_id),
+            None,
+            SEMANTIC_FIELD_GROUPS,
+        ))
+        .or_insert(absent)
+        .clone();
+    Some(cached)
+}
+
 async fn evict_settings(keys: &[String]) -> Result<()> {
     let local = async {
         let mut cache = SYSTEM_SETTINGS.write().await;
@@ -848,6 +894,51 @@ mod tests {
             .await
             .unwrap();
         !keys.is_empty()
+    }
+
+    #[tokio::test]
+    async fn a_missing_semantic_field_groups_row_is_cached_until_a_real_one_is_saved() {
+        use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
+
+        infra::db::create_table().await.unwrap();
+        db::create_table().await.unwrap();
+        let org = "b16560-no-semantic-groups";
+        let _ = db::delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
+        SYSTEM_SETTINGS.write().await.remove(&cache_key(
+            &SettingScope::Org,
+            Some(org),
+            None,
+            SEMANTIC_FIELD_GROUPS,
+        ));
+
+        let defaults = get_default_semantic_field_groups();
+        assert_eq!(get_semantic_field_groups(org).await, defaults);
+        let cached = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .expect("the miss is cached");
+        assert_eq!(cached.setting_value, json!([]));
+        assert!(is_absent_semantic_field_groups(&cached));
+        assert_eq!(get_semantic_field_groups_updated_at(org).await, 0);
+
+        // Written behind the cache's back: still seeing the defaults proves no database read.
+        let groups = vec![FieldAlias::new("b16560-host", "Host", &["host"])];
+        let row = SystemSetting::new_org(org, SEMANTIC_FIELD_GROUPS, json!(groups));
+        db::set(&row).await.unwrap();
+        assert_eq!(get_semantic_field_groups(org).await, defaults);
+
+        set(&row).await.unwrap();
+        assert_eq!(get_semantic_field_groups(org).await, groups);
+        assert!(get_semantic_field_groups_updated_at(org).await > 0);
+
+        // A miss that lost the race to a save must not replace the saved row.
+        cache_semantic_field_groups_miss(org).await;
+        assert_eq!(get_semantic_field_groups(org).await, groups);
+        let saved = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .unwrap();
+        assert!(!is_absent_semantic_field_groups(&saved));
+
+        let _ = delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
     }
 
     #[tokio::test]
