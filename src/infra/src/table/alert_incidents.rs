@@ -1203,53 +1203,18 @@ pub async fn update_incident_metadata(
     Ok(())
 }
 
-/// Open incidents, newest first, whose group values contain or are contained in `group_values`.
+/// The newest open incident whose group values contain or are contained in `group_values`.
 pub async fn find_correlation_candidates(
     org_id: &str,
     group_values: &HashMap<String, String>,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    find_correlation_candidates_with(get_orm_client_ro().await, org_id, group_values).await
-}
-
-async fn find_correlation_candidates_with<C: ConnectionTrait>(
-    conn: &C,
-    org_id: &str,
-    group_values: &HashMap<String, String>,
-) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    correlation_candidates_query(conn.get_database_backend(), org_id, group_values)
-        .all(conn)
+    let client = get_orm_client_ro().await;
+    // Every row the filter keeps is joinable and correlation joins the first, so one is enough.
+    correlation_candidates_query(client.get_database_backend(), org_id, group_values)
+        .limit(1)
+        .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
-}
-
-/// Built apart from the call so its Postgres shape is testable without a database.
-fn correlation_candidates_query(
-    backend: sea_orm::DbBackend,
-    org_id: &str,
-    group_values: &HashMap<String, String>,
-) -> sea_orm::Select<alert_incidents::Entity> {
-    let dims = serde_json::Value::Object(
-        group_values
-            .iter()
-            .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-            .collect(),
-    );
-    let nested = match backend {
-        sea_orm::DbBackend::Postgres => Expr::cust_with_values(
-            r#"("alert_incidents"."group_values" @> $1::jsonb OR "alert_incidents"."group_values" <@ $2::jsonb)"#,
-            [dims.clone(), dims],
-        ),
-        // SQLite has no JSON containment operator, so it is checked pair by pair both ways.
-        _ => Expr::cust_with_values(
-            r#"(NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE n.key = e.key AND n.value = e.value)) OR NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE e.key = n.key AND e.value = n.value)))"#,
-            [dims.clone(), dims],
-        ),
-    };
-    alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::OrgId.eq(org_id))
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(nested)
-        .order_by_desc(alert_incidents::Column::CreatedAt)
 }
 
 /// Upgrade incident group_values and key_type during hierarchical upgrade
@@ -1381,6 +1346,36 @@ fn containing_alerts(alert_ids: &[String]) -> sea_orm::Condition {
                 .to_owned(),
         ),
     )
+}
+
+/// Built apart from the call so its Postgres shape is testable without a database.
+fn correlation_candidates_query(
+    backend: sea_orm::DbBackend,
+    org_id: &str,
+    group_values: &HashMap<String, String>,
+) -> sea_orm::Select<alert_incidents::Entity> {
+    let dims = serde_json::Value::Object(
+        group_values
+            .iter()
+            .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+            .collect(),
+    );
+    let nested = match backend {
+        sea_orm::DbBackend::Postgres => Expr::cust_with_values(
+            r#"("alert_incidents"."group_values" @> $1::jsonb OR "alert_incidents"."group_values" <@ $2::jsonb)"#,
+            [dims.clone(), dims],
+        ),
+        // SQLite has no JSON containment operator, so it is checked pair by pair both ways.
+        _ => Expr::cust_with_values(
+            r#"(NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE n.key = e.key AND n.value = e.value)) OR NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE e.key = n.key AND e.value = n.value)))"#,
+            [dims.clone(), dims],
+        ),
+    };
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(nested)
+        .order_by_desc(alert_incidents::Column::CreatedAt)
 }
 
 #[cfg(test)]
@@ -2071,6 +2066,7 @@ mod tests {
     #[tokio::test]
     async fn correlation_candidates_are_exactly_the_open_incidents_a_firing_can_join() {
         use config::meta::alerts::incidents::DimensionRelationship;
+        use sea_orm::DbBackend;
 
         let db = incidents_db().await;
         let dims = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
@@ -2139,12 +2135,14 @@ mod tests {
                 })
                 .map(|incident| incident.id.clone())
                 .collect();
-            let found: Vec<String> = find_correlation_candidates_with(&db, "acme", &firing)
-                .await
-                .unwrap()
-                .into_iter()
-                .map(|incident| incident.id)
-                .collect();
+            let found: Vec<String> =
+                correlation_candidates_query(DbBackend::Sqlite, "acme", &firing)
+                    .all(&db)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|incident| incident.id)
+                    .collect();
             assert_eq!(found, expected, "firing {firing:?}");
         }
     }

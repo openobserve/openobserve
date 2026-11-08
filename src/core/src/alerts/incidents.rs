@@ -1886,9 +1886,8 @@ async fn find_or_create_incident(
         }
     }
 
-    // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
+    // STEP 2: Venn diagram match against open incidents (for Primary/Secondary key types)
     //
-    // Load the open incidents whose dimensions nest with these and check each one's relationship.
     // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
     // PartialOverlap or Incompatible → skip (create new incident).
     if key_type != KeyType::AlertId {
