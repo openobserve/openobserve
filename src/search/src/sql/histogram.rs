@@ -27,8 +27,8 @@ use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
     ast::{
         Cte, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, Ident, Query, Select,
-        SelectItem, SetExpr, Statement, TableFactor, Value, visit_expressions,
-        visit_expressions_mut,
+        SelectItem, SelectItemQualifiedWildcardKind, SetExpr, Statement, TableAlias, TableFactor,
+        Value, visit_expressions, visit_expressions_mut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -38,6 +38,13 @@ use super::{RE_HISTOGRAM, visitor::histogram_interval::generate_histogram_interv
 
 /// Most query levels and relations walked to resolve one output column.
 const OUTPUT_RESOLVE_BUDGET: usize = 256;
+
+/// A result column looked up by output name or, through an alias column list, by position.
+#[derive(Clone, Copy)]
+enum OutputColumn<'a> {
+    Name(&'a str),
+    Index(usize),
+}
 
 /// What pinning found in a statement's `histogram()` calls.
 pub struct PinnedHistograms {
@@ -160,16 +167,14 @@ pub fn pin_statement_timezones(
     })
 }
 
-/// Whether result column `column` of `sql` is a `histogram()` output, resolved level by level.
-pub fn is_histogram_output(sql: &str, column: &str) -> bool {
-    let Ok(mut statements) = Parser::parse_sql(&PostgreSqlDialect {}, sql) else {
-        return false;
-    };
-    let Some(Statement::Query(query)) = statements.pop() else {
-        return false;
+/// Whether result column `column` of `sql` is a `histogram()` output; `None` when unresolvable.
+pub fn is_histogram_output(sql: &str, column: &str) -> Option<bool> {
+    let mut statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).ok()?;
+    let Statement::Query(query) = statements.pop()? else {
+        return None;
     };
     let mut budget = OUTPUT_RESOLVE_BUDGET;
-    query_output_is_histogram(&query, &[], column, &mut budget)
+    query_output(&query, &[], OutputColumn::Name(column), &mut budget)
 }
 
 /// Converts an original query to a histogram query
@@ -411,115 +416,180 @@ fn fixed_offset_of_named_zone(tz: &str, end_time: i64) -> Option<String> {
     Some(format!("{sign}{:02}:{:02}", secs / 3600, secs % 3600 / 60))
 }
 
-fn query_output_is_histogram<'a>(
+fn query_output<'a>(
     query: &'a Query,
     outer_ctes: &[&'a Cte],
-    column: &str,
+    column: OutputColumn<'_>,
     budget: &mut usize,
-) -> bool {
-    if *budget == 0 {
-        return false;
-    }
-    *budget -= 1;
+) -> Option<bool> {
+    *budget = budget.checked_sub(1)?;
     let mut ctes = outer_ctes.to_vec();
     if let Some(with) = &query.with {
         ctes.extend(with.cte_tables.iter());
     }
-    set_expr_output_is_histogram(&query.body, &ctes, column, budget)
+    set_expr_output(&query.body, &ctes, column, budget)
 }
 
-fn set_expr_output_is_histogram<'a>(
+fn set_expr_output<'a>(
     body: &'a SetExpr,
     ctes: &[&'a Cte],
-    column: &str,
+    column: OutputColumn<'_>,
     budget: &mut usize,
-) -> bool {
+) -> Option<bool> {
     match body {
-        SetExpr::Select(select) => select_output_is_histogram(select, ctes, column, budget),
-        SetExpr::Query(query) => query_output_is_histogram(query, ctes, column, budget),
+        SetExpr::Select(select) => select_output(select, ctes, column, budget),
+        SetExpr::Query(query) => query_output(query, ctes, column, budget),
         // A set operation takes its column names from the left side.
-        SetExpr::SetOperation { left, .. } => {
-            set_expr_output_is_histogram(left, ctes, column, budget)
-        }
-        _ => false,
+        SetExpr::SetOperation { left, .. } => set_expr_output(left, ctes, column, budget),
+        _ => None,
     }
 }
 
-fn select_output_is_histogram<'a>(
+fn select_output<'a>(
     select: &'a Select,
     ctes: &[&'a Cte],
-    column: &str,
+    column: OutputColumn<'_>,
     budget: &mut usize,
-) -> bool {
-    let mut wildcard = false;
-    for item in &select.projection {
-        let expr = match item {
-            SelectItem::ExprWithAlias { expr, alias } if ident_is(alias, column) => expr,
-            SelectItem::UnnamedExpr(expr)
-                if column_ref(expr).is_some_and(|(_, name)| ident_is(name, column)) =>
-            {
-                expr
+) -> Option<bool> {
+    let is_wildcard = |item: &SelectItem| {
+        matches!(
+            item,
+            SelectItem::Wildcard(_) | SelectItem::QualifiedWildcard(..)
+        )
+    };
+    let name = match column {
+        OutputColumn::Index(index) => {
+            if select.projection.iter().any(is_wildcard) {
+                return None;
             }
-            SelectItem::Wildcard(_) | SelectItem::QualifiedWildcard(..) => {
-                wildcard = true;
-                continue;
-            }
-            _ => continue,
-        };
-        if has_histogram_call(expr) {
-            return true;
+            return match select.projection.get(index)? {
+                SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
+                    projected_expr_output(select, expr, ctes, budget)
+                }
+                _ => None,
+            };
         }
-        return column_ref(expr).is_some_and(|(qualifier, name)| {
-            relation_output_is_histogram(select, qualifier, &name.value, ctes, budget)
-        });
+        OutputColumn::Name(name) => name,
+    };
+    let mut wildcard_qualifiers = Vec::new();
+    for item in &select.projection {
+        match item {
+            SelectItem::ExprWithAlias { expr, alias } if ident_is(alias, name) => {
+                return projected_expr_output(select, expr, ctes, budget);
+            }
+            SelectItem::UnnamedExpr(expr)
+                if column_ref(expr).is_some_and(|(_, ident)| ident_is(ident, name)) =>
+            {
+                return projected_expr_output(select, expr, ctes, budget);
+            }
+            SelectItem::Wildcard(_) => wildcard_qualifiers.push(None),
+            SelectItem::QualifiedWildcard(SelectItemQualifiedWildcardKind::ObjectName(q), _) => {
+                wildcard_qualifiers.push(Some(q.0.last()?.as_ident()?));
+            }
+            SelectItem::QualifiedWildcard(..) => return None,
+            _ => {}
+        }
     }
-    wildcard && relation_output_is_histogram(select, None, column, ctes, budget)
+    if wildcard_qualifiers.is_empty() {
+        return Some(false);
+    }
+    merge_outputs(
+        wildcard_qualifiers
+            .into_iter()
+            .map(|qualifier| relation_output(select, qualifier, name, ctes, budget)),
+    )
 }
 
-fn relation_output_is_histogram<'a>(
+fn projected_expr_output<'a>(
+    select: &'a Select,
+    expr: &Expr,
+    ctes: &[&'a Cte],
+    budget: &mut usize,
+) -> Option<bool> {
+    if has_histogram_call(expr) {
+        return Some(true);
+    }
+    match column_ref(expr) {
+        Some((qualifier, name)) => relation_output(select, qualifier, &name.value, ctes, budget),
+        None => Some(false),
+    }
+}
+
+fn relation_output<'a>(
     select: &'a Select,
     qualifier: Option<&Ident>,
     column: &str,
     ctes: &[&'a Cte],
     budget: &mut usize,
-) -> bool {
+) -> Option<bool> {
     let factors = select.from.iter().flat_map(|from| {
         std::iter::once(&from.relation).chain(from.joins.iter().map(|j| &j.relation))
     });
+    let mut results = Vec::new();
     for factor in factors {
         let (alias, name) = match factor {
             TableFactor::Derived { alias, .. } => (alias.as_ref(), None),
             TableFactor::Table { alias, name, .. } => {
                 (alias.as_ref(), name.0.last().and_then(|p| p.as_ident()))
             }
-            _ => continue,
+            _ => return None,
         };
-        // Renamed alias columns hide the inner names; such a relation is treated as raw.
-        if alias.is_some_and(|alias| !alias.columns.is_empty()) {
-            continue;
-        }
         let visible = alias.map(|alias| &alias.name).or(name);
         if qualifier.is_some_and(|q| visible.is_none_or(|v| !ident_is(v, &q.value))) {
             continue;
         }
-        let found = match factor {
-            TableFactor::Derived { subquery, .. } => {
-                query_output_is_histogram(subquery, ctes, column, budget)
-            }
-            _ => name
-                .and_then(|name| {
-                    ctes.iter()
-                        .rposition(|cte| ident_is(&cte.alias.name, &name.value))
-                })
-                .is_some_and(|i| {
-                    query_output_is_histogram(&ctes[i].query, &ctes[..i], column, budget)
-                }),
+        let Some(target) = aliased_column(alias, column) else {
+            continue;
         };
-        if found {
-            return true;
-        }
+        results.push(match factor {
+            TableFactor::Derived { subquery, .. } => query_output(subquery, ctes, target, budget),
+            _ => match name.and_then(|n| {
+                ctes.iter()
+                    .rposition(|cte| ident_is(&cte.alias.name, &n.value))
+            }) {
+                Some(i) => {
+                    let Some(target) = cte_column(&ctes[i].alias, target) else {
+                        continue;
+                    };
+                    query_output(&ctes[i].query, &ctes[..i], target, budget)
+                }
+                None => Some(false),
+            },
+        });
     }
-    false
+    merge_outputs(results)
+}
+
+/// Maps `column` through a relation's alias column list, when it has one.
+fn aliased_column<'a>(alias: Option<&TableAlias>, column: &'a str) -> Option<OutputColumn<'a>> {
+    match alias.filter(|alias| !alias.columns.is_empty()) {
+        Some(alias) => alias
+            .columns
+            .iter()
+            .position(|c| ident_is(&c.name, column))
+            .map(OutputColumn::Index),
+        None => Some(OutputColumn::Name(column)),
+    }
+}
+
+fn cte_column<'a>(alias: &TableAlias, column: OutputColumn<'a>) -> Option<OutputColumn<'a>> {
+    match column {
+        OutputColumn::Name(name) => aliased_column(Some(alias), name),
+        OutputColumn::Index(_) => Some(column),
+    }
+}
+
+/// Agreeing relations decide; a disagreement or an unresolved relation is unknown.
+fn merge_outputs(results: impl IntoIterator<Item = Option<bool>>) -> Option<bool> {
+    let mut merged = None;
+    for result in results {
+        let value = result?;
+        if merged.is_some_and(|m| m != value) {
+            return None;
+        }
+        merged = Some(value);
+    }
+    merged
 }
 
 fn column_ref(expr: &Expr) -> Option<(Option<&Ident>, &Ident)> {
@@ -561,34 +631,72 @@ mod tests {
     #[test]
     fn timezone_histogram_output_resolves_per_query_level() {
         let inner = "SELECT _timestamp, histogram(_timestamp, '1 hour', '+05:30') AS ts FROM t";
+        let shifted =
+            "SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t LIMIT 1";
         for (sql, column, expected) in [
             (
                 "SELECT HISTOGRAM(_timestamp, '1 day', '+05:30') AS ts, count(*) FROM t GROUP BY ts".to_string(),
                 "ts",
-                true,
+                Some(true),
             ),
-            (format!("SELECT ts AS bucket FROM ({inner}) AS q"), "bucket", true),
-            (format!("SELECT \"ts\" AS bucket FROM ({inner}) AS q"), "bucket", true),
-            (format!("SELECT q.ts AS bucket FROM ({inner}) AS q"), "bucket", true),
-            (format!("SELECT * FROM ({inner}) AS q"), "ts", true),
-            (format!("WITH h AS ({inner}) SELECT ts FROM h"), "ts", true),
+            (format!("SELECT ts AS bucket FROM ({inner}) AS q"), "bucket", Some(true)),
+            (format!("SELECT \"ts\" AS bucket FROM ({inner}) AS q"), "bucket", Some(true)),
+            (format!("SELECT q.ts AS bucket FROM ({inner}) AS q"), "bucket", Some(true)),
+            (format!("SELECT * FROM ({inner}) AS q"), "ts", Some(true)),
+            (format!("SELECT q.* FROM ({inner}) AS q"), "ts", Some(true)),
+            (format!("WITH h AS ({inner}) SELECT ts FROM h"), "ts", Some(true)),
             (
                 "WITH t AS (SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t) SELECT _timestamp FROM t".to_string(),
                 "_timestamp",
-                true,
+                Some(true),
             ),
-            (format!("SELECT _timestamp AS ts FROM ({inner}) AS q ORDER BY ts"), "ts", false),
-            (format!("SELECT q._timestamp AS ts FROM ({inner}) AS q"), "ts", false),
-            (format!("SELECT _timestamp FROM ({inner}) AS q"), "_timestamp", false),
+            (
+                "WITH h(bucket) AS (SELECT histogram(_timestamp, '1 day', '+05:30') AS ts FROM t) SELECT bucket AS _timestamp FROM h".to_string(),
+                "_timestamp",
+                Some(true),
+            ),
+            (
+                format!("SELECT bucket AS _timestamp FROM ({inner}) AS h(raw, bucket)"),
+                "_timestamp",
+                Some(true),
+            ),
+            (
+                format!("SELECT raw AS _timestamp FROM ({inner}) AS h(raw, bucket)"),
+                "_timestamp",
+                Some(false),
+            ),
+            (
+                format!("SELECT raw.* FROM t AS raw CROSS JOIN ({shifted}) AS h"),
+                "_timestamp",
+                Some(false),
+            ),
+            (
+                format!("SELECT h.* FROM t AS raw CROSS JOIN ({shifted}) AS h"),
+                "_timestamp",
+                Some(true),
+            ),
+            (
+                format!("SELECT * FROM t AS raw CROSS JOIN ({shifted}) AS h"),
+                "_timestamp",
+                None,
+            ),
+            (
+                format!("SELECT bucket FROM (SELECT * FROM ({inner}) AS q) AS h(raw, bucket)"),
+                "bucket",
+                None,
+            ),
+            (format!("SELECT _timestamp AS ts FROM ({inner}) AS q ORDER BY ts"), "ts", Some(false)),
+            (format!("SELECT q._timestamp AS ts FROM ({inner}) AS q"), "ts", Some(false)),
+            (format!("SELECT _timestamp FROM ({inner}) AS q"), "_timestamp", Some(false)),
             (
                 "SELECT _timestamp FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0)".to_string(),
                 "_timestamp",
-                false,
+                Some(false),
             ),
             (
                 "SELECT _timestamp AS ts FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0)".to_string(),
                 "ts",
-                false,
+                Some(false),
             ),
         ] {
             assert_eq!(is_histogram_output(&sql, column), expected, "{sql}");
@@ -601,8 +709,16 @@ mod tests {
         let mut nested = "SELECT _timestamp AS a, _timestamp AS b FROM t".to_string();
         for _ in 0..40 {
             nested = format!("SELECT a AS a, a AS b FROM ({nested}) AS q");
+            match is_histogram_output(&nested, "a") {
+                Some(false) => {}
+                // Deeper nesting than the parser accepts is unknown; the parser sets the depth.
+                None => {
+                    assert!(Parser::parse_sql(&PostgreSqlDialect {}, &nested).is_err());
+                    break;
+                }
+                Some(true) => panic!("{nested}"),
+            }
         }
-        assert!(!is_histogram_output(&nested, "a"));
         let mut ctes = vec!["c0 AS (SELECT _timestamp AS a FROM t)".to_string()];
         for i in 1..30 {
             let prev = i - 1;
@@ -611,7 +727,8 @@ mod tests {
             ));
         }
         let joined = format!("WITH {} SELECT a FROM c29", ctes.join(", "));
-        assert!(!is_histogram_output(&joined, "a"));
+        // 2^30 resolution paths exhaust the step budget, so the column is unknown, not UTC.
+        assert_eq!(is_histogram_output(&joined, "a"), None);
         assert!(started.elapsed() < std::time::Duration::from_secs(1));
     }
 

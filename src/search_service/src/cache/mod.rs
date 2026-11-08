@@ -638,15 +638,6 @@ pub async fn prepare_cache_response(
     } else {
         Some(0)
     };
-    if !use_cache && ts_offset.is_none() {
-        return Ok((
-            MultiCachedQueryResponse {
-                order_by: sql.order_by,
-                ..Default::default()
-            },
-            true,
-        ));
-    }
 
     // calculate hash for the query with version (after normalizing histogram interval)
     let mut hash_body = vec![
@@ -695,14 +686,21 @@ pub async fn prepare_cache_response(
         }
     }
 
-    // Only a histogram() output is in shifted time; a raw `_timestamp` column stays UTC.
-    let ts_offset = ts_offset.map(|offset| {
-        if offset != 0 && is_histogram_output(&sql.sql, &ts_column) {
-            offset
-        } else {
-            0
-        }
+    // Only a histogram() output is in shifted time; an unresolvable column skips the cache.
+    let ts_offset = ts_offset.and_then(|offset| match offset {
+        0 => Some(0),
+        _ => is_histogram_output(&sql.sql, &ts_column)
+            .map(|shifted| if shifted { offset } else { 0 }),
     });
+    if !use_cache && ts_offset.is_none() {
+        return Ok((
+            MultiCachedQueryResponse {
+                order_by: sql.order_by,
+                ..Default::default()
+            },
+            true,
+        ));
+    }
 
     // #16175: sort, trim and cache checks compare ORDER BY with the column the hits carry
     if ts_offset.is_some() {
@@ -2209,6 +2207,10 @@ mod tests {
             (
                 "SELECT _timestamp AS ts FROM (SELECT _timestamp, histogram(_timestamp, '1 hour', '+05:30') AS ts FROM t) AS q ORDER BY ts",
                 "ts",
+            ),
+            (
+                "SELECT raw.* FROM t AS raw CROSS JOIN (SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t LIMIT 1) AS h ORDER BY _timestamp",
+                "_timestamp",
             ),
         ] {
             raw_timestamp_round_trip(org, sql, column).await;
