@@ -29,7 +29,7 @@ use std::{
 
 use config::meta::stream::StreamType;
 use serde_json::Value;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 /// The dimension an incident stores a firing's facility object under.
 pub const FACILITY_OBJECT_DIMENSION: &str = "facility-object";
@@ -39,21 +39,29 @@ pub const RACK_DIMENSION: &str = "rack";
 pub const OBJECT_ID_FIELD: &str = "object_id";
 
 const STREAM: &str = "bms_metadata";
-/// A BMS re-sends its metadata rarely, so the window reaches well back.
-const LOOKBACK: Duration = Duration::from_secs(24 * 3600);
+/// A BMS republishes every point's metadata every 100 s, so an hour holds every
+/// object many times over, and a feed that replays a 15-minute pass four times.
+const LOOKBACK: Duration = Duration::from_secs(3600);
 /// How long a loaded topology is used before it is read again.
 const TTL: Duration = Duration::from_secs(300);
 const MAX_ROWS: i64 = 10_000;
 
-/// Each org's topology and when it was read.
-type Cached = (Instant, Arc<Topology>);
+/// An org's topology and when it was read; `None` until the first read.
+type Slot = Arc<Mutex<Option<(Instant, Arc<Topology>)>>>;
 
-static CACHE: LazyLock<RwLock<HashMap<String, Cached>>> = LazyLock::new(Default::default);
+static CACHE: LazyLock<RwLock<HashMap<String, Slot>>> = LazyLock::new(Default::default);
 
 /// Which ids each facility object serves.
 #[derive(Debug, Default)]
 pub struct Topology {
     serves: HashMap<String, Vec<String>>,
+}
+
+/// The racks and plant a firing reaches through the topology, computed once per
+/// firing and checked against each open incident.
+pub struct Reach<'a> {
+    ids: HashSet<&'a str>,
+    plant: bool,
 }
 
 impl Topology {
@@ -62,7 +70,12 @@ impl Topology {
     pub fn from_rows(rows: &[Value]) -> Self {
         let mut serves: HashMap<String, Vec<String>> = HashMap::new();
         for row in rows {
-            let Some(object) = row.get("object_id").and_then(Value::as_str) else {
+            let Some(object) = row
+                .get("object_id")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|o| !o.is_empty())
+            else {
                 continue;
             };
             let served: Vec<String> = match row.get("serves_id") {
@@ -77,8 +90,9 @@ impl Topology {
             };
             let entry = serves.entry(object.to_string()).or_default();
             for id in served {
-                if !id.is_empty() && !entry.contains(&id) {
-                    entry.push(id);
+                let id = id.trim();
+                if !id.is_empty() && !entry.iter().any(|e| e == id) {
+                    entry.push(id.to_string());
                 }
             }
         }
@@ -95,6 +109,9 @@ impl Topology {
     /// directly or through other plant.
     fn scope<'a>(&'a self, dims: &'a HashMap<String, String>) -> HashSet<&'a str> {
         let mut reached = HashSet::new();
+        if self.serves.is_empty() {
+            return reached;
+        }
         let mut pending: Vec<&str> = [RACK_DIMENSION, FACILITY_OBJECT_DIMENSION]
             .iter()
             .filter_map(|k| dims.get(*k).map(String::as_str))
@@ -109,33 +126,63 @@ impl Topology {
         reached
     }
 
-    /// Whether one side is facility plant that serves, directly or through other
-    /// plant, a rack or object of the other side.
-    pub fn linked(&self, a: &HashMap<String, String>, b: &HashMap<String, String>) -> bool {
-        if !a.contains_key(FACILITY_OBJECT_DIMENSION) && !b.contains_key(FACILITY_OBJECT_DIMENSION)
-        {
-            return false;
+    /// What a firing with `dims` reaches.
+    pub fn reach<'a>(&'a self, dims: &'a HashMap<String, String>) -> Reach<'a> {
+        Reach {
+            ids: self.scope(dims),
+            plant: dims.contains_key(FACILITY_OBJECT_DIMENSION),
         }
-        !self.scope(a).is_disjoint(&self.scope(b))
     }
 }
 
-/// The org's facility topology, read at most once per [`TTL`]. Empty when the
-/// org has no `bms_metadata` stream or the read fails.
+impl Reach<'_> {
+    /// Whether one side is facility plant that serves, directly or through other
+    /// plant, a rack or object of the other side.
+    pub fn links(&self, topology: &Topology, incident: &HashMap<String, String>) -> bool {
+        if self.ids.is_empty() || (!self.plant && !incident.contains_key(FACILITY_OBJECT_DIMENSION))
+        {
+            return false;
+        }
+        topology
+            .scope(incident)
+            .iter()
+            .any(|id| self.ids.contains(id))
+    }
+}
+
+/// The org's facility topology, read at most once per [`TTL`]; concurrent
+/// callers wait for one read. Empty when the org has no `bms_metadata` stream.
+/// A failed read keeps the topology read before it.
 pub async fn get(org_id: &str) -> Arc<Topology> {
-    if let Some((at, topology)) = CACHE.read().await.get(org_id)
+    let slot = {
+        let existing = CACHE.read().await.get(org_id).cloned();
+        match existing {
+            Some(slot) => slot,
+            None => CACHE
+                .write()
+                .await
+                .entry(org_id.to_string())
+                .or_default()
+                .clone(),
+        }
+    };
+    let mut cached = slot.lock().await;
+    if let Some((at, topology)) = cached.as_ref()
         && at.elapsed() < TTL
     {
         return topology.clone();
     }
-    let topology = Arc::new(load(org_id).await.unwrap_or_else(|e| {
-        log::warn!("[incidents] facility topology for {org_id} unreadable: {e}");
-        Topology::default()
-    }));
-    CACHE
-        .write()
-        .await
-        .insert(org_id.to_string(), (Instant::now(), topology.clone()));
+    let topology = match load(org_id).await {
+        Ok(topology) => Arc::new(topology),
+        Err(e) => {
+            log::warn!("[incidents] facility topology for {org_id} unreadable: {e}");
+            cached
+                .as_ref()
+                .map(|(_, previous)| previous.clone())
+                .unwrap_or_default()
+        }
+    };
+    *cached = Some((Instant::now(), topology.clone()));
     topology
 }
 
@@ -169,6 +216,12 @@ async fn load(org_id: &str) -> Result<Topology, anyhow::Error> {
     };
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
+    if resp.hits.is_empty() {
+        log::warn!(
+            "[incidents] {org_id}/{STREAM} has no object with serves_id in the last {} s; facility plant correlates with no rack",
+            LOOKBACK.as_secs()
+        );
+    }
     Ok(Topology::from_rows(&resp.hits))
 }
 
@@ -185,8 +238,12 @@ mod tests {
             .collect()
     }
 
-    /// The plant `bms_metadata` describes in the DSX dummy-bms scenario.
-    fn dsx_plant() -> Topology {
+    fn linked(plant: &Topology, a: &HashMap<String, String>, b: &HashMap<String, String>) -> bool {
+        plant.reach(a).links(plant, b)
+    }
+
+    /// A cooling plant: tower → chiller → CDU → racks, and a second CDU.
+    fn cooling_plant() -> Topology {
         Topology::from_rows(&[
             json!({"object_id": "C-F00-CDU-05", "serves_id": "[\"Pod1C-E02\",\"Pod1C-E03\",\"Pod1C-E04\"]"}),
             json!({"object_id": "CUB-CH-01", "serves_id": "[\"C-F00-CDU-05\"]"}),
@@ -198,7 +255,7 @@ mod tests {
 
     #[test]
     fn serves_id_is_read_as_json_text_or_array() {
-        let plant = dsx_plant();
+        let plant = cooling_plant();
         assert!(plant.serves_anything("C-F00-CDU-05"));
         assert!(plant.serves_anything("CUB-CT-01"));
         assert!(!plant.serves_anything("EnvSensorsPod1C"));
@@ -206,33 +263,48 @@ mod tests {
     }
 
     #[test]
+    fn ids_are_trimmed() {
+        let plant = Topology::from_rows(&[
+            json!({"object_id": " CDU-1 ", "serves_id": "[\" R1 \", \"\"]"}),
+            json!({"object_id": "  ", "serves_id": "[\"R2\"]"}),
+        ]);
+        assert!(plant.serves_anything("CDU-1"));
+        assert!(!plant.serves_anything(""));
+        assert!(linked(
+            &plant,
+            &dims(&[("facility-object", "CDU-1")]),
+            &dims(&[("rack", "R1")])
+        ));
+    }
+
+    #[test]
     fn plant_links_to_the_racks_it_serves_through_any_number_of_hops() {
-        let plant = dsx_plant();
+        let plant = cooling_plant();
         let rack = dims(&[("rack", "Pod1C-E03")]);
         for object in ["C-F00-CDU-05", "CUB-CH-01", "CUB-CT-01"] {
             let fault = dims(&[("facility-object", object)]);
-            assert!(plant.linked(&fault, &rack), "{object}");
-            assert!(plant.linked(&rack, &fault), "{object}");
+            assert!(linked(&plant, &fault, &rack), "{object}");
+            assert!(linked(&plant, &rack, &fault), "{object}");
         }
         let other_cdu = dims(&[("facility-object", "C-F01-CDU-06")]);
-        assert!(!plant.linked(&other_cdu, &rack));
+        assert!(!linked(&plant, &other_cdu, &rack));
     }
 
     #[test]
     fn racks_alone_never_link() {
-        let plant = dsx_plant();
+        let plant = cooling_plant();
         let e02 = dims(&[("rack", "Pod1C-E02")]);
         let e03 = dims(&[("rack", "Pod1C-E03")]);
-        assert!(!plant.linked(&e02, &e03));
-        assert!(!plant.linked(&e02, &e02));
+        assert!(!linked(&plant, &e02, &e03));
+        assert!(!linked(&plant, &e02, &e02));
     }
 
     #[test]
     fn an_incident_holding_plant_links_every_rack_that_plant_serves() {
-        let plant = dsx_plant();
+        let plant = cooling_plant();
         let incident = dims(&[("rack", "Pod1C-E02"), ("facility-object", "C-F00-CDU-05")]);
-        assert!(plant.linked(&incident, &dims(&[("rack", "Pod1C-E04")])));
-        assert!(!plant.linked(&incident, &dims(&[("rack", "Pod1C-F02")])));
+        assert!(linked(&plant, &dims(&[("rack", "Pod1C-E04")]), &incident));
+        assert!(!linked(&plant, &dims(&[("rack", "Pod1C-F02")]), &incident));
     }
 
     #[test]
@@ -242,6 +314,6 @@ mod tests {
             json!({"object_id": "B", "serves_id": "[\"A\"]"}),
         ]);
         let a = dims(&[("facility-object", "A")]);
-        assert!(!plant.linked(&a, &dims(&[("rack", "R")])));
+        assert!(!linked(&plant, &a, &dims(&[("rack", "R")])));
     }
 }
