@@ -710,31 +710,28 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
     }
 }
 
-/// Caches what an org's semantic-groups miss means and returns it, `None` if unconfirmed.
+/// Caches an org's semantic-groups miss once the primary confirms it, returning what it means.
 async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting> {
     use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
 
     // A read replica can lag a save, and a cached miss outlives the lag, so the primary decides.
-    let entry = match db::get_from_primary(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS)
-        .await
+    match db::get_from_primary(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS).await
     {
-        Ok(Some(saved)) => saved,
-        Ok(None) => {
-            let mut absent =
-                SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
-            // Zero timestamps mark the stand-in, and keep `get_semantic_field_groups_updated_at` at 0.
-            absent.created_at = 0;
-            absent.updated_at = 0;
-            absent
-        }
+        // Not cached: only the watcher may cache a real row, or a racing delete could be undone.
+        Ok(Some(saved)) => return Some(saved),
+        Ok(None) => {}
         Err(_) => return None,
-    };
+    }
+    let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
+    // Zero timestamps mark the stand-in, and keep `get_semantic_field_groups_updated_at` at 0.
+    absent.created_at = 0;
+    absent.updated_at = 0;
     // A row cached since the database miss is newer than the miss, so it must win.
     let cached = SYSTEM_SETTINGS
         .write()
         .await
         .entry(cache_key(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS))
-        .or_insert(entry)
+        .or_insert(absent)
         .clone();
     Some(cached)
 }
@@ -935,11 +932,15 @@ mod tests {
             .unwrap();
         assert!(!is_absent_semantic_field_groups(&saved));
 
-        // A miss on an empty cache whose row is on the primary caches that row, not the stand-in.
+        // A replica miss the primary contradicts returns the saved row and caches nothing.
         SYSTEM_SETTINGS.write().await.clear();
         let confirmed = cache_semantic_field_groups_miss(org).await.unwrap();
         assert_eq!(confirmed.setting_value, json!(groups));
-        assert_eq!(get_semantic_field_groups(org).await, groups);
+        assert!(
+            get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+                .await
+                .is_none()
+        );
 
         let _ = delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
     }
