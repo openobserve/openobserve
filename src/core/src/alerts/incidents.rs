@@ -2095,8 +2095,7 @@ async fn find_or_create_incident(
     })
 }
 
-/// Get incident with its alerts and RCA runs for the detail view, with only the alert definitions
-/// `user_id` may read.
+/// The detail view: the incident, its RCA runs and the alert definitions `user_id` may read.
 pub async fn get_incident_with_alerts(
     org_id: &str,
     incident_id: &str,
@@ -2144,8 +2143,7 @@ async fn can_read_alert(_org_id: &str, _user_id: &str, _alert_id: &str, _folder_
     true
 }
 
-/// The alert and composite definitions `can_read(alert_id, folder_id)` allows; alerts come as
-/// `(alert_id, folder_id, alert)`.
+/// The alerts, given as `(alert_id, folder_id, alert)`, and composites that `can_read` allows.
 async fn readable_definitions<F>(
     alerts: Vec<(String, String, Alert)>,
     composites: Vec<CompositeAlertSummary>,
