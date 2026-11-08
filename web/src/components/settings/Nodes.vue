@@ -452,10 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Health strip: node counts by status, doubling as the status facet.
                  Attention-first — offline, then starting, then online, Total last. -->
             <template #subheader>
-              <div
-                class="px-page-edge border-table-row-divider border-b py-1.5"
-                data-test="nodes-summary"
-              >
+              <div data-test="nodes-summary">
                 <OStatStrip
                   :items="summaryStats"
                   :loading="loading"

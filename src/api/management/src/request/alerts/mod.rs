@@ -83,6 +83,8 @@ pub mod deduplication;
 pub mod destinations;
 pub mod external_events;
 pub mod history;
+#[cfg(feature = "enterprise")]
+pub mod history_summary;
 pub mod incident_integrations;
 pub mod incidents;
 pub mod mute;
@@ -927,6 +929,7 @@ fn composite_list_item(
         ack: None,
         incident: None,
         downtime_dimensions: Default::default(),
+        context_attributes: None,
     })
 }
 

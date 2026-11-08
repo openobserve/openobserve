@@ -1024,6 +1024,8 @@ pub struct UpdateStreamSettings {
     pub storage_type: Option<StorageType>,
     #[serde(default)]
     pub is_llm_stream: Option<bool>,
+    #[serde(default)]
+    pub security: Option<SecuritySourceSetting>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -1211,6 +1213,8 @@ pub struct StreamSettings {
     pub index_updated_at: i64,
     #[serde(default)]
     pub index_fields_updated_at: HashMap<String, i64>,
+    #[serde(default)]
+    pub security: Option<SecuritySourceSetting>,
 }
 
 impl Default for StreamSettings {
@@ -1238,6 +1242,7 @@ impl Default for StreamSettings {
             is_llm_stream: false,
             cross_links: Vec::new(),
             storage_type: StorageType::Normal,
+            security: None,
         }
     }
 }
@@ -1333,6 +1338,10 @@ impl Serialize for StreamSettings {
             state.skip_field("cross_links")?;
         }
         state.serialize_field("storage_type", &self.storage_type)?;
+        match self.security.as_ref() {
+            Some(security) => state.serialize_field("security", security)?,
+            None => state.skip_field("security")?,
+        }
         state.end()
     }
 }
@@ -1504,6 +1513,11 @@ impl From<&str> for StreamSettings {
             .and_then(Value::as_str)
             .and_then(|s| s.parse::<StorageType>().ok())
             .unwrap_or_default();
+        let security = settings.get("security").and_then(|value| {
+            json::from_value::<SecuritySourceSetting>(value.clone())
+                .inspect_err(|e| log::warn!("ignoring unreadable stream security setting: {e}"))
+                .ok()
+        });
         Self {
             partition_keys,
             full_text_search_keys,
@@ -1527,6 +1541,7 @@ impl From<&str> for StreamSettings {
             is_llm_stream,
             cross_links,
             storage_type,
+            security,
         }
     }
 }
@@ -1548,6 +1563,32 @@ impl MemorySize for StreamSettings {
                 .iter()
                 .map(|(k, v)| k.mem_size() + v.mem_size())
                 .sum::<usize>()
+            + self.security.mem_size()
+    }
+}
+
+/// The stream's SIEM source type and attached OCSF pack.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct SecuritySourceSetting {
+    pub source_type: String,
+    /// Empty when no pack is attached.
+    pub pack_id: String,
+    /// 0 when no pack is attached.
+    pub pack_version: u32,
+    /// Microseconds; the attach or the last upgrade.
+    pub attached_at: i64,
+    pub pipeline_id: String,
+    pub pipeline_created: bool,
+    /// `None` leaves inclusion to the classifier.
+    pub included: Option<bool>,
+}
+
+impl MemorySize for SecuritySourceSetting {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<SecuritySourceSetting>()
+            + self.source_type.mem_size()
+            + self.pack_id.mem_size()
+            + self.pipeline_id.mem_size()
     }
 }
 
@@ -2669,6 +2710,42 @@ mod tests {
             dynamic: None,
             changes: changes.iter().map(|&(d, l)| level_change(d, l)).collect(),
         }
+    }
+
+    #[test]
+    fn test_stream_settings_security_round_trip() {
+        let unset = StreamSettings::default();
+        assert_eq!(unset.security, None);
+        let text = json::to_string(&unset).unwrap();
+        assert!(!text.contains("security"), "{text}");
+        assert_eq!(StreamSettings::from(text.as_str()).security, None);
+
+        let security = SecuritySourceSetting {
+            source_type: "aws_cloudtrail".to_string(),
+            pack_id: "aws_cloudtrail".to_string(),
+            pack_version: 2,
+            attached_at: 1_700_000_000_000_000,
+            pipeline_id: "pipe-1".to_string(),
+            pipeline_created: true,
+            included: Some(false),
+        };
+        let settings = StreamSettings {
+            security: Some(security.clone()),
+            ..Default::default()
+        };
+        let text = json::to_string(&settings).unwrap();
+        assert!(text.contains("\"security\""), "{text}");
+        assert_eq!(StreamSettings::from(text.as_str()).security, Some(security));
+    }
+
+    #[test]
+    fn test_update_stream_settings_reads_security() {
+        let missing: UpdateStreamSettings = json::from_str("{}").unwrap();
+        assert_eq!(missing.security, None);
+        let body = r#"{"security": {"source_type": "entity", "pack_id": "entity", "pack_version": 1,
+            "attached_at": 5, "pipeline_id": "p", "pipeline_created": false, "included": true}}"#;
+        let set: UpdateStreamSettings = json::from_str(body).unwrap();
+        assert_eq!(set.security.unwrap().included, Some(true));
     }
 
     #[test]

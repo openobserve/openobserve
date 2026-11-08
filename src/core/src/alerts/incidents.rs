@@ -2357,10 +2357,23 @@ pub async fn list_incidents(
     limit: u64,
     offset: u64,
 ) -> Result<(Vec<Incident>, u64), anyhow::Error> {
-    // Get total count before pagination
-    let total = infra::table::alert_incidents::count(org_id, status).await?;
+    list_incidents_filtered(org_id, status, None, limit, offset).await
+}
 
-    let incidents = infra::table::alert_incidents::list(org_id, status, limit, offset).await?;
+/// List incidents, optionally only those containing at least one of `alert_ids`.
+pub async fn list_incidents_filtered(
+    org_id: &str,
+    status: Option<&str>,
+    alert_ids: Option<&[String]>,
+    limit: u64,
+    offset: u64,
+) -> Result<(Vec<Incident>, u64), anyhow::Error> {
+    // Get total count before pagination
+    let total = infra::table::alert_incidents::count_filtered(org_id, status, alert_ids).await?;
+
+    let incidents =
+        infra::table::alert_incidents::list_filtered(org_id, status, alert_ids, limit, offset)
+            .await?;
 
     // Get actual alert counts from junction table (source of truth)
     let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();
@@ -4596,8 +4609,13 @@ mod tests {
         let _db = db().await;
         let (org, repeat) = new_incident(None).await;
         let unlinked = add_incident(&org, None).await;
-        for (alert, fired_at) in [("a", 1), ("b", 2), ("a", 3), ("a", 4)] {
-            add_alert_to_incident(
+        for (alert, fired_at, new_type) in [
+            ("a", 1, true),
+            ("b", 2, true),
+            ("a", 3, false),
+            ("a", 4, false),
+        ] {
+            let joined = add_alert_to_incident(
                 &repeat,
                 alert,
                 &format!("{alert}-name"),
@@ -4607,6 +4625,7 @@ mod tests {
             )
             .await
             .unwrap();
+            assert_eq!(joined, new_type, "{alert} at {fired_at}");
         }
 
         let (incidents, _) = list_incidents(&org, None, 50, 0).await.unwrap();
