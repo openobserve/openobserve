@@ -50,6 +50,10 @@ const TTL: Duration = Duration::from_secs(300);
 /// How long after a failed read it is tried again.
 const RETRY: Duration = Duration::from_secs(30);
 const MAX_ROWS: i64 = 10_000;
+/// Longer object or served ids are dropped.
+const MAX_ID_LEN: usize = 256;
+/// Served ids kept per object; the rest are dropped.
+const MAX_SERVED: usize = 1024;
 
 /// An org's topology, when it was last read, and when to retry a failed read.
 #[derive(Clone, Default)]
@@ -86,9 +90,12 @@ pub struct Reach<'a> {
 impl Topology {
     /// Builds the topology from each object's latest `object_id`, `serves_id` row.
     /// `serves_id` is a list, stored as a JSON array or as the JSON text of one;
-    /// an empty or missing one gives the object no links.
+    /// an empty or missing one gives the object no links. Ids longer than
+    /// [`MAX_ID_LEN`] and served ids past [`MAX_SERVED`] per object are dropped.
     pub fn from_rows(rows: &[Value]) -> Self {
         let mut serves: HashMap<String, Vec<String>> = HashMap::new();
+        let mut seen: HashMap<String, HashSet<String>> = HashMap::new();
+        let mut dropped = 0usize;
         for row in rows {
             let Some(object) = row
                 .get("object_id")
@@ -98,6 +105,10 @@ impl Topology {
             else {
                 continue;
             };
+            if object.len() > MAX_ID_LEN {
+                dropped += 1;
+                continue;
+            }
             let served: Vec<String> = match row.get("serves_id") {
                 Some(Value::Array(ids)) => ids
                     .iter()
@@ -109,12 +120,24 @@ impl Topology {
                 _ => continue,
             };
             let entry = serves.entry(object.to_string()).or_default();
+            let entry_seen = seen.entry(object.to_string()).or_default();
             for id in served {
                 let id = id.trim();
-                if !id.is_empty() && !entry.iter().any(|e| e == id) {
-                    entry.push(id.to_string());
+                if id.is_empty() || entry_seen.contains(id) {
+                    continue;
                 }
+                if id.len() > MAX_ID_LEN || entry.len() >= MAX_SERVED {
+                    dropped += 1;
+                    continue;
+                }
+                entry_seen.insert(id.to_string());
+                entry.push(id.to_string());
             }
+        }
+        if dropped > 0 {
+            log::warn!(
+                "[incidents] facility topology dropped {dropped} ids longer than {MAX_ID_LEN} bytes or past {MAX_SERVED} served ids per object"
+            );
         }
         serves.retain(|_, ids| !ids.is_empty());
         Self { serves }
@@ -351,6 +374,30 @@ mod tests {
         for object in ["CDU-1", "CDU-2", "CDU-3"] {
             assert!(!plant.serves_anything(object), "{object}");
         }
+    }
+
+    #[test]
+    fn ids_longer_than_the_cap_are_dropped() {
+        let long = "x".repeat(MAX_ID_LEN + 1);
+        let plant = Topology::from_rows(&[
+            json!({"object_id": "CDU-1", "serves_id": [long.clone(), "R1"]}),
+            json!({"object_id": long.clone(), "serves_id": ["R2"]}),
+        ]);
+        assert!(plant.serves_anything("CDU-1"));
+        assert!(!plant.serves_anything(&long));
+        assert_eq!(plant.serves["CDU-1"], vec!["R1".to_string()]);
+    }
+
+    #[test]
+    fn served_ids_past_the_cap_are_dropped_and_duplicates_kept_once() {
+        let ids: Vec<String> = (0..MAX_SERVED + 10)
+            .flat_map(|i| [format!("R{i}"), format!("R{i}")])
+            .collect();
+        let plant = Topology::from_rows(&[json!({"object_id": "CDU-1", "serves_id": ids})]);
+        let served = &plant.serves["CDU-1"];
+        assert_eq!(served.len(), MAX_SERVED);
+        assert_eq!(served[0], "R0");
+        assert_eq!(served[MAX_SERVED - 1], format!("R{}", MAX_SERVED - 1));
     }
 
     #[test]
