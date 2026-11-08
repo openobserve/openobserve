@@ -22850,6 +22850,8 @@
       "noResults": "Nessuna icona corrisponde alla tua ricerca",
       "groups": {
         "results": "Risultati",
+        "icons": "Icone",
+        "monoLogos": "Loghi",
         "status": "Stato",
         "services": "Servizi",
         "ai": "AI",

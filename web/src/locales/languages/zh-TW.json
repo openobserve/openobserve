@@ -22845,6 +22845,8 @@
       "noResults": "沒有符合您搜尋的圖示",
       "groups": {
         "results": "結果",
+        "icons": "圖示",
+        "monoLogos": "標誌",
         "status": "狀態",
         "services": "服務",
         "ai": "AI",

@@ -22850,6 +22850,8 @@
       "noResults": "Aramanızla eşleşen simge yok",
       "groups": {
         "results": "Sonuçlar",
+        "icons": "Simgeler",
+        "monoLogos": "Logolar",
         "status": "Durum",
         "services": "Hizmetler",
         "ai": "AI",

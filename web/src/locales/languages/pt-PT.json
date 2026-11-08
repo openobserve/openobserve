@@ -22850,6 +22850,8 @@
       "noResults": "Nenhum ícone corresponde à sua pesquisa",
       "groups": {
         "results": "Resultados",
+        "icons": "Ícones",
+        "monoLogos": "Logótipos",
         "status": "Estado",
         "services": "Serviços",
         "ai": "IA",

@@ -22850,6 +22850,8 @@
       "noResults": "Geen pictogrammen gevonden voor uw zoekopdracht",
       "groups": {
         "results": "Resultaten",
+        "icons": "Pictogrammen",
+        "monoLogos": "Logo's",
         "status": "Status",
         "services": "Diensten",
         "ai": "AI",
