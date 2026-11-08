@@ -509,10 +509,8 @@ pub fn get_cache_file_path(file_path: &str, file_name: &str) -> String {
 pub fn get_aggregation_cache_key_from_request(req: &SearchPartitionRequest, ts_offset: i64) -> u64 {
     let origin_sql = req.sql.clone();
 
-    let mut hash_body = vec![origin_sql];
-    if ts_offset != 0 {
-        hash_body.push(format!("ts_offset={ts_offset}"));
-    }
+    // Always present, so entries written before offsets were keyed are never read back.
+    let mut hash_body = vec![origin_sql, format!("ts_offset={ts_offset}")];
     if let Some(vrl_function) = &req.query_fn {
         hash_body.push(vrl_function.to_string());
     }
@@ -541,6 +539,11 @@ mod tests {
         .unwrap();
         let utc = get_aggregation_cache_key_from_request(&req, 0);
         assert_eq!(utc, get_aggregation_cache_key_from_request(&req, 0));
+        assert_ne!(
+            utc,
+            config::utils::hash::sum64(&req.sql),
+            "legacy key must not match"
+        );
         assert_ne!(
             utc,
             get_aggregation_cache_key_from_request(&req, 19_800_000_000)

@@ -755,12 +755,12 @@ fn expr_inputs(expr: &Expr) -> Option<Vec<(Option<Ident>, Ident)>> {
     result.is_continue().then_some(inputs)
 }
 
-/// An unquoted identifier folds to lower case; a quoted one keeps its case.
+/// An unquoted identifier folds like DataFusion does, ASCII only; a quoted one keeps its case.
 fn fold_ident(ident: &Ident) -> String {
     if ident.quote_style.is_some() {
         ident.value.clone()
     } else {
-        ident.value.to_lowercase()
+        ident.value.to_ascii_lowercase()
     }
 }
 
@@ -942,6 +942,16 @@ mod tests {
                 "SELECT \"histogram\"(_timestamp, '1 hour', '+05:30') AS ts FROM t".to_string(),
                 "ts",
                 Some(true),
+            ),
+            (
+                "WITH \"ω\" AS (SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t), Ω AS (SELECT _timestamp FROM t) SELECT _timestamp FROM \"ω\"".to_string(),
+                "_timestamp",
+                Some(true),
+            ),
+            (
+                "WITH \"ω\" AS (SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t), Ω AS (SELECT _timestamp FROM t) SELECT _timestamp FROM Ω".to_string(),
+                "_timestamp",
+                Some(false),
             ),
         ] {
             assert_eq!(is_histogram_output(&sql, column), expected, "{sql}");
