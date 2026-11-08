@@ -20,13 +20,16 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::alerts::{
-        alert::Alert,
-        incidents::{
-            AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason, EdgeType,
-            Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent, IncidentTopology,
-            IncidentWithAlerts,
+    meta::{
+        alerts::{
+            alert::Alert,
+            incidents::{
+                AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason,
+                EdgeType, Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent,
+                IncidentTopology, IncidentWithAlerts,
+            },
         },
+        correlation::{FieldAlias, ServiceIdentityConfig},
     },
     utils::json::{Map, Value},
 };
@@ -119,11 +122,10 @@ enum MuteChange<'a> {
 async fn extract_filtered_semantic_dimensions(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     use config::meta::alerts::incidents::KeyType;
-
-    // Load ServiceIdentityConfig with auto-configuration applied
-    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
 
     // No identity sets configured AND service is opted out — nothing to extract.
     // Otherwise fall through: "service" alone is a viable dimension even with zero sets.
@@ -134,9 +136,6 @@ async fn extract_filtered_semantic_dimensions(
         );
         return None;
     }
-
-    // Load semantic groups for field mapping
-    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
 
     // Collect all distinguish_by group IDs from ALL identity sets (flattened)
     // Don't require a specific set to "match" - extract whatever we can
@@ -200,6 +199,8 @@ async fn extract_filtered_semantic_dimensions(
 async fn extract_filtered_semantic_dimensions(
     _org_id: &str,
     _labels: &HashMap<String, String>,
+    _identity_config: &ServiceIdentityConfig,
+    _semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     None
 }
@@ -208,11 +209,13 @@ async fn extract_filtered_semantic_dimensions(
 async fn correlate_parallel(
     org_id: &str,
     labels: &HashMap<String, String>,
+    semantic_groups: &[FieldAlias],
 ) -> ParallelCorrelationResult {
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
     // Execute both approaches in parallel
     let (sd_result, semantic_result) = tokio::join!(
-        query_service_discovery_key(org_id, labels),
-        extract_filtered_semantic_dimensions(org_id, labels)
+        query_service_discovery_key(org_id, labels, &identity_config, semantic_groups),
+        extract_filtered_semantic_dimensions(org_id, labels, &identity_config, semantic_groups)
     );
 
     log::debug!(
@@ -686,13 +689,12 @@ pub async fn correlate_alert_to_incident(
     downtime: Option<&config::meta::downtimes::ActiveDowntime>,
 ) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
 
     // Enrich with alert condition dimensions (deterministic baseline)
     // Handles SQL WHERE, GUI conditions, and PromQL label matchers
     #[cfg(feature = "enterprise")]
     {
-        let semantic_groups =
-            crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
         let condition_dims =
             o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
                 &alert.query_condition,
@@ -723,7 +725,7 @@ pub async fn correlate_alert_to_incident(
     );
 
     // Execute Service Discovery and semantic extraction in parallel (non-blocking)
-    let parallel_result = correlate_parallel(&alert.org_id, &labels).await;
+    let parallel_result = correlate_parallel(&alert.org_id, &labels, &semantic_groups).await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -826,7 +828,7 @@ pub async fn correlate_alert_to_incident(
     {
         // Single-sourced with `scheduler::handlers`: the row, then the alert's own conditions.
         let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
-            &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
+            &semantic_groups,
             &alert.query_condition,
             result_row,
         );
@@ -1011,7 +1013,8 @@ pub async fn correlate_external_event(
     );
 
     // Same parallel correlation the internal path uses.
-    let parallel_result = correlate_parallel(org_id, &labels).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let parallel_result = correlate_parallel(org_id, &labels, &semantic_groups).await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -1277,7 +1280,15 @@ pub(crate) async fn correlated_service_for_routing(
     org_id: &str,
     row: &Map<String, Value>,
 ) -> Option<String> {
-    let found = query_service_discovery_key(org_id, &labels_from_row(row)).await?;
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let found = query_service_discovery_key(
+        org_id,
+        &labels_from_row(row),
+        &identity_config,
+        &semantic_groups,
+    )
+    .await?;
     if found.service_name_from_stream || found.service_name.trim().is_empty() {
         return None;
     }
@@ -1291,18 +1302,16 @@ pub(crate) async fn correlated_service_for_routing(
 async fn query_service_discovery_key(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<ServiceDiscoveryResult> {
     #[cfg(feature = "enterprise")]
     {
-        let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
-
-        let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
-
         match o2_enterprise::enterprise::service_streams::storage::correlate(
             org_id,
             labels,
-            &identity_config,
-            &semantic_groups,
+            identity_config,
+            semantic_groups,
         )
         .await
         {
@@ -3775,6 +3784,50 @@ mod tests {
         assert!(dims.is_empty());
         assert!(matches!(key_type, KeyType::AlertId));
         assert_eq!(reason, "alert_id_fallback");
+    }
+
+    #[tokio::test]
+    async fn semantic_extraction_uses_the_settings_it_is_given() {
+        use config::meta::correlation::IdentitySet;
+        let identity = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "k8s".to_string(),
+                label: "Kubernetes".to_string(),
+                distinguish_by: vec!["k8s-namespace".to_string()],
+            }],
+            ..Default::default()
+        };
+        let groups = vec![
+            FieldAlias::new("k8s-namespace", "Namespace", &["k8s_namespace_name"]),
+            FieldAlias::new("service", "Service", &["service_name"]),
+        ];
+        let labels: HashMap<String, String> = [
+            ("k8s_namespace_name".to_string(), "prod".to_string()),
+            ("service_name".to_string(), "checkout".to_string()),
+            ("host".to_string(), "node-1".to_string()),
+        ]
+        .into();
+
+        let found = extract_filtered_semantic_dimensions("org-16560", &labels, &identity, &groups)
+            .await
+            .expect("the configured groups resolve");
+        assert_eq!(
+            found.group_values,
+            HashMap::from([
+                ("k8s-namespace".to_string(), "prod".to_string()),
+                ("service".to_string(), "checkout".to_string()),
+            ])
+        );
+
+        let opted_out = ServiceIdentityConfig {
+            service_optional: true,
+            ..Default::default()
+        };
+        assert!(
+            extract_filtered_semantic_dimensions("org-16560", &labels, &opted_out, &groups)
+                .await
+                .is_none()
+        );
     }
 
     #[test]
