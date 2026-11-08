@@ -4322,7 +4322,6 @@ mod tests {
         assert_eq!(run.error.unwrap().code, ERROR_INTERRUPTED);
     }
 
-    /// Runs whose lease probe waits out its second are swept side by side; every outcome counts.
     #[tokio::test]
     async fn the_sweep_probes_running_runs_concurrently() {
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -4351,11 +4350,8 @@ mod tests {
 
         assert_eq!(swept.load(Ordering::SeqCst), 2 * SWEEP_CONCURRENCY);
         assert_eq!(ended, (2 * SWEEP_CONCURRENCY).div_ceil(3));
-        assert!(
-            begun.elapsed() < Duration::from_secs(3),
-            "{SWEEP_CONCURRENCY} probes wait at once, not one after another: {:?}",
-            begun.elapsed()
-        );
+        // Serial probes take 32 s and unbounded ones 1 s; 16 at a time take 2 s.
+        assert_eq!(begun.elapsed().as_secs(), 2, "{:?}", begun.elapsed());
     }
 
     /// The superseded-turn guard: a turn followed by a continuation no longer ends the run.
