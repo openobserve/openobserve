@@ -1096,6 +1096,18 @@ mod tests {
     }
 
     #[test]
+    fn timezone_quoted_histogram_interval_is_normalized() {
+        let mut sql =
+            "SELECT \"histogram\"(_timestamp, '1 day', '+05:30') AS ts, count(*) FROM t GROUP BY ts"
+                .to_string();
+        handle_histogram(&mut sql, (0, 0), 3600);
+        assert_eq!(
+            sql,
+            "SELECT histogram(_timestamp,'3600 second','+05:30') AS ts, count(*) FROM t GROUP BY ts"
+        );
+    }
+
+    #[test]
     fn test_handle_histogram() {
         // Test case 1: Basic histogram with numeric interval
         let mut sql = "SELECT histogram(_timestamp, '10 seconds') FROM logs".to_string();
