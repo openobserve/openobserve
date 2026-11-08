@@ -64,7 +64,10 @@ use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    sql::{RE_SELECT_FROM, histogram::pin_histogram_timezone},
+    sql::{
+        RE_SELECT_FROM,
+        histogram::{is_histogram_output, pin_histogram_timezone},
+    },
 };
 
 pub mod cacher;
@@ -694,7 +697,7 @@ pub async fn prepare_cache_response(
 
     // Only a histogram() output is in shifted time; a raw `_timestamp` column stays UTC.
     let ts_offset = ts_offset.map(|offset| {
-        if is_histogram_column(&sql.aliases, &ts_column, 0) {
+        if offset != 0 && is_histogram_output(&sql.sql, &ts_column) {
             offset
         } else {
             0
@@ -1212,25 +1215,6 @@ async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &Result
         cacher::remove_stale_cache_meta(file_path, &file_name, query_key, &m).await;
     }
     false
-}
-
-/// Whether `column` resolves, through aliases at any query level, to a `histogram()` output.
-fn is_histogram_column(aliases: &[(String, String)], column: &str, depth: usize) -> bool {
-    // A chain longer than the alias list can only be a cycle.
-    depth <= aliases.len()
-        && aliases
-            .iter()
-            .filter(|(_, alias)| alias == column)
-            .any(|(original, _)| {
-                original.to_lowercase().contains("histogram")
-                    || is_histogram_column(
-                        aliases,
-                        &::search::utils::trim_quotes(
-                            original.rsplit('.').next().unwrap_or(original),
-                        ),
-                        depth + 1,
-                    )
-            })
 }
 
 /// Shrinks `[start, end]` to whole `histogram()` buckets; the flag says whether the end moved.
@@ -2127,69 +2111,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn timezone_histogram_column_follows_case_and_aliases() {
-        use arrow_schema::{DataType, Field, Schema};
-        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
-
-        let org = "timezone_histogram_column";
-        STREAM_SCHEMAS_LATEST.write().await.insert(
-            format!("{org}/logs/t"),
-            SchemaCache::new(Schema::new(vec![Field::new(
-                "_timestamp",
-                DataType::Int64,
-                false,
-            )])),
-        );
-        for (sql, column, expected) in [
-            (
-                "SELECT HISTOGRAM(_timestamp, '1 day', '+05:30') AS ts, count(*) AS cnt FROM t GROUP BY ts ORDER BY ts",
-                "ts",
-                true,
-            ),
-            (
-                "SELECT ts AS bucket, cnt FROM (SELECT histogram(_timestamp, '1 day', '+05:30') AS ts, count(*) AS cnt FROM t GROUP BY ts) ORDER BY bucket",
-                "bucket",
-                true,
-            ),
-            (
-                "SELECT \"ts\" AS bucket FROM (SELECT histogram(_timestamp, '1 day', '+05:30') AS ts FROM t)",
-                "bucket",
-                true,
-            ),
-            (
-                "SELECT _timestamp FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0)",
-                "_timestamp",
-                false,
-            ),
-            (
-                "SELECT _timestamp AS ts FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0)",
-                "ts",
-                false,
-            ),
-        ] {
-            let query = SearchQuery {
-                sql: sql.to_string(),
-                start_time: 1_767_225_600_000_000,
-                end_time: 1_767_484_800_000_000,
-                ..Default::default()
-            };
-            let parsed = crate::Sql::new(&query, org, StreamType::Logs, None)
-                .await
-                .unwrap();
-            assert_eq!(
-                is_histogram_column(&parsed.aliases, column, 0),
-                expected,
-                "{sql}"
-            );
-        }
-        let cycle = [
-            ("b".to_string(), "a".to_string()),
-            ("a".to_string(), "b".to_string()),
-        ];
-        assert!(!is_histogram_column(&cycle, "a", 0));
-    }
-
-    #[tokio::test]
     async fn timezone_non_aggregate_histogram_column_keeps_offset() {
         use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
@@ -2271,9 +2192,6 @@ mod tests {
         use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
-        const HOUR: i64 = 3_600_000_000;
-        const DAY: i64 = 24 * HOUR;
-        const START: i64 = 1_767_225_600_000_000;
         let org = "timezone_raw_timestamp_cache";
         STREAM_SCHEMAS_LATEST.write().await.insert(
             format!("{org}/logs/t"),
@@ -2283,18 +2201,36 @@ mod tests {
                 false,
             )])),
         );
+        for (sql, column) in [
+            (
+                "SELECT _timestamp FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0) ORDER BY _timestamp",
+                "_timestamp",
+            ),
+            (
+                "SELECT _timestamp AS ts FROM (SELECT _timestamp, histogram(_timestamp, '1 hour', '+05:30') AS ts FROM t) AS q ORDER BY ts",
+                "ts",
+            ),
+        ] {
+            raw_timestamp_round_trip(org, sql, column).await;
+        }
+    }
+
+    async fn raw_timestamp_round_trip(org: &str, sql: &str, column: &str) {
+        const HOUR: i64 = 3_600_000_000;
+        const DAY: i64 = 24 * HOUR;
+        const START: i64 = 1_767_225_600_000_000;
         let cold = [1, 5, 10, 20]
-            .map(|h| json::json!({"_timestamp": START + h * HOUR}))
+            .map(|h| json::json!({ column: START + h * HOUR }))
             .to_vec();
         let mut request = search::Request::default();
-        request.query.sql = "SELECT _timestamp FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0) ORDER BY _timestamp".to_string();
+        request.query.sql = sql.to_string();
         request.query.start_time = START;
         request.query.end_time = START + DAY;
         let (warm, _) = prepare_cache_response("raw", org, StreamType::Logs, &mut request, true)
             .await
             .unwrap();
-        assert_eq!(warm.ts_column, "_timestamp");
-        assert_eq!(warm.ts_offset, 0);
+        assert_eq!(warm.ts_column, column, "{sql}");
+        assert_eq!(warm.ts_offset, 0, "{sql}");
         let response = search::Response {
             hits: cold.clone(),
             total: cold.len(),
@@ -2338,7 +2274,7 @@ mod tests {
                 .iter()
                 .flat_map(|c| c.cached_response.hits.clone())
                 .collect::<Vec<_>>();
-            assert_eq!(hits, expected, "range {start} - {end}");
+            assert_eq!(hits, expected, "{sql}, range {start} - {end}");
         }
     }
 

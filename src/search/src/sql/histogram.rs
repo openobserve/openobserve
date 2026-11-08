@@ -26,7 +26,8 @@ use config::{
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
     ast::{
-        Expr, FunctionArg, FunctionArgExpr, FunctionArguments, SetExpr, Statement, Value,
+        Cte, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, Ident, Query, Select,
+        SelectItem, SetExpr, Statement, TableFactor, Value, visit_expressions,
         visit_expressions_mut,
     },
     dialect::PostgreSqlDialect,
@@ -34,6 +35,9 @@ use sqlparser::{
 };
 
 use super::{RE_HISTOGRAM, visitor::histogram_interval::generate_histogram_interval};
+
+/// Most query levels and relations walked to resolve one output column.
+const OUTPUT_RESOLVE_BUDGET: usize = 256;
 
 /// What pinning found in a statement's `histogram()` calls.
 pub struct PinnedHistograms {
@@ -154,6 +158,18 @@ pub fn pin_statement_timezones(
             .all(|offset| *offset == first)
             .then_some(first),
     })
+}
+
+/// Whether result column `column` of `sql` is a `histogram()` output, resolved level by level.
+pub fn is_histogram_output(sql: &str, column: &str) -> bool {
+    let Ok(mut statements) = Parser::parse_sql(&PostgreSqlDialect {}, sql) else {
+        return false;
+    };
+    let Some(Statement::Query(query)) = statements.pop() else {
+        return false;
+    };
+    let mut budget = OUTPUT_RESOLVE_BUDGET;
+    query_output_is_histogram(&query, &[], column, &mut budget)
 }
 
 /// Converts an original query to a histogram query
@@ -395,9 +411,209 @@ fn fixed_offset_of_named_zone(tz: &str, end_time: i64) -> Option<String> {
     Some(format!("{sign}{:02}:{:02}", secs / 3600, secs % 3600 / 60))
 }
 
+fn query_output_is_histogram<'a>(
+    query: &'a Query,
+    outer_ctes: &[&'a Cte],
+    column: &str,
+    budget: &mut usize,
+) -> bool {
+    if *budget == 0 {
+        return false;
+    }
+    *budget -= 1;
+    let mut ctes = outer_ctes.to_vec();
+    if let Some(with) = &query.with {
+        ctes.extend(with.cte_tables.iter());
+    }
+    set_expr_output_is_histogram(&query.body, &ctes, column, budget)
+}
+
+fn set_expr_output_is_histogram<'a>(
+    body: &'a SetExpr,
+    ctes: &[&'a Cte],
+    column: &str,
+    budget: &mut usize,
+) -> bool {
+    match body {
+        SetExpr::Select(select) => select_output_is_histogram(select, ctes, column, budget),
+        SetExpr::Query(query) => query_output_is_histogram(query, ctes, column, budget),
+        // A set operation takes its column names from the left side.
+        SetExpr::SetOperation { left, .. } => {
+            set_expr_output_is_histogram(left, ctes, column, budget)
+        }
+        _ => false,
+    }
+}
+
+fn select_output_is_histogram<'a>(
+    select: &'a Select,
+    ctes: &[&'a Cte],
+    column: &str,
+    budget: &mut usize,
+) -> bool {
+    let mut wildcard = false;
+    for item in &select.projection {
+        let expr = match item {
+            SelectItem::ExprWithAlias { expr, alias } if ident_is(alias, column) => expr,
+            SelectItem::UnnamedExpr(expr)
+                if column_ref(expr).is_some_and(|(_, name)| ident_is(name, column)) =>
+            {
+                expr
+            }
+            SelectItem::Wildcard(_) | SelectItem::QualifiedWildcard(..) => {
+                wildcard = true;
+                continue;
+            }
+            _ => continue,
+        };
+        if has_histogram_call(expr) {
+            return true;
+        }
+        return column_ref(expr).is_some_and(|(qualifier, name)| {
+            relation_output_is_histogram(select, qualifier, &name.value, ctes, budget)
+        });
+    }
+    wildcard && relation_output_is_histogram(select, None, column, ctes, budget)
+}
+
+fn relation_output_is_histogram<'a>(
+    select: &'a Select,
+    qualifier: Option<&Ident>,
+    column: &str,
+    ctes: &[&'a Cte],
+    budget: &mut usize,
+) -> bool {
+    let factors = select.from.iter().flat_map(|from| {
+        std::iter::once(&from.relation).chain(from.joins.iter().map(|j| &j.relation))
+    });
+    for factor in factors {
+        let (alias, name) = match factor {
+            TableFactor::Derived { alias, .. } => (alias.as_ref(), None),
+            TableFactor::Table { alias, name, .. } => {
+                (alias.as_ref(), name.0.last().and_then(|p| p.as_ident()))
+            }
+            _ => continue,
+        };
+        // Renamed alias columns hide the inner names; such a relation is treated as raw.
+        if alias.is_some_and(|alias| !alias.columns.is_empty()) {
+            continue;
+        }
+        let visible = alias.map(|alias| &alias.name).or(name);
+        if qualifier.is_some_and(|q| visible.is_none_or(|v| !ident_is(v, &q.value))) {
+            continue;
+        }
+        let found = match factor {
+            TableFactor::Derived { subquery, .. } => {
+                query_output_is_histogram(subquery, ctes, column, budget)
+            }
+            _ => name
+                .and_then(|name| {
+                    ctes.iter()
+                        .rposition(|cte| ident_is(&cte.alias.name, &name.value))
+                })
+                .is_some_and(|i| {
+                    query_output_is_histogram(&ctes[i].query, &ctes[..i], column, budget)
+                }),
+        };
+        if found {
+            return true;
+        }
+    }
+    false
+}
+
+fn column_ref(expr: &Expr) -> Option<(Option<&Ident>, &Ident)> {
+    match expr {
+        Expr::Identifier(name) => Some((None, name)),
+        Expr::CompoundIdentifier(parts) => match parts.as_slice() {
+            [.., qualifier, name] => Some((Some(qualifier), name)),
+            [name] => Some((None, name)),
+            [] => None,
+        },
+        Expr::Nested(inner) => column_ref(inner),
+        _ => None,
+    }
+}
+
+fn has_histogram_call(expr: &Expr) -> bool {
+    visit_expressions(expr, |expr| match expr {
+        Expr::Function(f)
+            if f.name
+                .to_string()
+                .trim_matches('"')
+                .eq_ignore_ascii_case("histogram") =>
+        {
+            ControlFlow::Break(())
+        }
+        _ => ControlFlow::Continue(()),
+    })
+    .is_break()
+}
+
+fn ident_is(ident: &Ident, name: &str) -> bool {
+    ident.value.eq_ignore_ascii_case(name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn timezone_histogram_output_resolves_per_query_level() {
+        let inner = "SELECT _timestamp, histogram(_timestamp, '1 hour', '+05:30') AS ts FROM t";
+        for (sql, column, expected) in [
+            (
+                "SELECT HISTOGRAM(_timestamp, '1 day', '+05:30') AS ts, count(*) FROM t GROUP BY ts".to_string(),
+                "ts",
+                true,
+            ),
+            (format!("SELECT ts AS bucket FROM ({inner}) AS q"), "bucket", true),
+            (format!("SELECT \"ts\" AS bucket FROM ({inner}) AS q"), "bucket", true),
+            (format!("SELECT q.ts AS bucket FROM ({inner}) AS q"), "bucket", true),
+            (format!("SELECT * FROM ({inner}) AS q"), "ts", true),
+            (format!("WITH h AS ({inner}) SELECT ts FROM h"), "ts", true),
+            (
+                "WITH t AS (SELECT histogram(_timestamp, '1 hour', '+05:30') AS _timestamp FROM t) SELECT _timestamp FROM t".to_string(),
+                "_timestamp",
+                true,
+            ),
+            (format!("SELECT _timestamp AS ts FROM ({inner}) AS q ORDER BY ts"), "ts", false),
+            (format!("SELECT q._timestamp AS ts FROM ({inner}) AS q"), "ts", false),
+            (format!("SELECT _timestamp FROM ({inner}) AS q"), "_timestamp", false),
+            (
+                "SELECT _timestamp FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0)".to_string(),
+                "_timestamp",
+                false,
+            ),
+            (
+                "SELECT _timestamp AS ts FROM t WHERE histogram(_timestamp, '1 hour', '+05:30') >= to_timestamp_micros(0)".to_string(),
+                "ts",
+                false,
+            ),
+        ] {
+            assert_eq!(is_histogram_output(&sql, column), expected, "{sql}");
+        }
+    }
+
+    #[test]
+    fn timezone_histogram_output_cost_is_bounded() {
+        let started = std::time::Instant::now();
+        let mut nested = "SELECT _timestamp AS a, _timestamp AS b FROM t".to_string();
+        for _ in 0..40 {
+            nested = format!("SELECT a AS a, a AS b FROM ({nested}) AS q");
+        }
+        assert!(!is_histogram_output(&nested, "a"));
+        let mut ctes = vec!["c0 AS (SELECT _timestamp AS a FROM t)".to_string()];
+        for i in 1..30 {
+            let prev = i - 1;
+            ctes.push(format!(
+                "c{i} AS (SELECT a FROM c{prev} x JOIN c{prev} y ON x.a = y.a)"
+            ));
+        }
+        let joined = format!("WITH {} SELECT a FROM c29", ctes.join(", "));
+        assert!(!is_histogram_output(&joined, "a"));
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    }
 
     fn pin_offset(sql: &str, timezone: Option<&str>, end_time: i64) -> Result<Option<i64>, Error> {
         let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
