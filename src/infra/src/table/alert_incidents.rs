@@ -1348,7 +1348,6 @@ fn containing_alerts(alert_ids: &[String]) -> sea_orm::Condition {
     )
 }
 
-/// Built apart from the call so its Postgres shape is testable without a database.
 fn correlation_candidates_query(
     backend: sea_orm::DbBackend,
     org_id: &str,
@@ -2147,7 +2146,6 @@ mod tests {
         }
     }
 
-    // Postgres is not exercised by the SQLite tests, so pin how the containment binds.
     #[test]
     fn correlation_candidates_bind_the_firing_dims_to_both_containment_operators() {
         use sea_orm::{DbBackend, QueryTrait};
