@@ -1203,53 +1203,42 @@ pub async fn update_incident_metadata(
     Ok(())
 }
 
-/// Find open incidents with optional filters (general-purpose function)
-///
-/// A flexible function for finding open incidents with various filters.
-/// Used for both hierarchical upgrade matching and RCA processing.
-///
-/// # Parameters
-/// - `org_id`: Organization ID (REQUIRED for multi-tenancy security)
-/// - `created_after`: Optional timestamp filter - only incidents created after this time (for
-///   time-window queries)
-/// - `limit`: Optional result limit (None = return all, Some(n) = limit to n results)
-///
-/// # Returns
-/// Open (non-resolved) incidents ordered by most recent first (by created_at)
-///
-/// # Examples
-/// ```
-/// // Hierarchical upgrade: Find incidents created in last 5 minutes
-/// let threshold = now - (5 * 60 * 1_000_000);
-/// let candidates = find_open_incidents_filtered(org_id, Some(threshold), Some(100)).await?;
-///
-/// // RCA: Get all open incidents for an org
-/// let all_open = find_open_incidents_filtered(org_id, None, None).await?;
-/// ```
-pub async fn find_open_incidents_filtered(
+/// Open incidents, newest first, whose group values contain or are contained in `group_values`.
+pub async fn find_correlation_candidates(
     org_id: &str,
-    created_after: Option<i64>,
-    limit: Option<u64>,
+    group_values: &HashMap<String, String>,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    find_correlation_candidates_with(get_orm_client_ro().await, org_id, group_values).await
+}
 
-    let mut query = alert_incidents::Entity::find()
+async fn find_correlation_candidates_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    group_values: &HashMap<String, String>,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    let dims = serde_json::Value::Object(
+        group_values
+            .iter()
+            .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+            .collect(),
+    );
+    let nested = match conn.get_database_backend() {
+        sea_orm::DbBackend::Postgres => Expr::cust_with_values(
+            r#"("alert_incidents"."group_values" @> $1::jsonb OR "alert_incidents"."group_values" <@ $2::jsonb)"#,
+            [dims.clone(), dims],
+        ),
+        // SQLite has no JSON containment: each side's pairs must all appear in the other.
+        _ => Expr::cust_with_values(
+            r#"(NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE n.key = e.key AND n.value = e.value)) OR NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE e.key = n.key AND e.value = n.value)))"#,
+            [dims.clone(), dims],
+        ),
+    };
+    alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Status.ne("resolved"))
-        .order_by_desc(alert_incidents::Column::CreatedAt);
-
-    // Apply time filter if provided (for hierarchical upgrade time window)
-    if let Some(threshold) = created_after {
-        query = query.filter(alert_incidents::Column::CreatedAt.gte(threshold));
-    }
-
-    // Apply limit if provided (for performance)
-    if let Some(lim) = limit {
-        query = query.limit(lim);
-    }
-
-    query
-        .all(client)
+        .filter(nested)
+        .order_by_desc(alert_incidents::Column::CreatedAt)
+        .all(conn)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
@@ -2068,5 +2057,81 @@ mod tests {
             .unwrap();
         assert_eq!(row.status, "resolved");
         assert_eq!(row.muted_by_downtime_id, None);
+    }
+
+    #[tokio::test]
+    async fn correlation_candidates_are_exactly_the_open_incidents_a_firing_can_join() {
+        use config::meta::alerts::incidents::DimensionRelationship;
+
+        let db = incidents_db().await;
+        let dims = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        let stored = [
+            dims(&[]),
+            dims(&[("ns", "prod")]),
+            dims(&[("ns", "prod"), ("cluster", "a")]),
+            dims(&[("ns", "prod"), ("cluster", "a"), ("pod", "p1")]),
+            dims(&[("ns", "dev")]),
+            dims(&[("ns", "prod"), ("db", "redis")]),
+            dims(&[("cluster", "a")]),
+            dims(&[("k.e\"y", "v\"1")]),
+        ];
+        let mut open = Vec::new();
+        for (i, group_values) in stored.iter().enumerate() {
+            for (org, status) in [("acme", "open"), ("acme", "resolved"), ("other", "open")] {
+                let mut incident = new_incident(
+                    org,
+                    "P2",
+                    serde_json::to_value(group_values).unwrap(),
+                    "service",
+                    1,
+                    None,
+                    None,
+                );
+                incident.status = Set(status.to_string());
+                incident.created_at = Set(i as i64);
+                let incident = incident.insert(&db).await.unwrap();
+                if (org, status) == ("acme", "open") {
+                    open.push(incident);
+                }
+            }
+        }
+
+        let firings = [
+            dims(&[("ns", "prod")]),
+            dims(&[("ns", "prod"), ("cluster", "a")]),
+            dims(&[("cluster", "a"), ("pod", "p1")]),
+            dims(&[("ns", "staging")]),
+            dims(&[("k.e\"y", "v\"1"), ("ns", "prod")]),
+            dims(&[("ns", "prod"), ("cluster", "a"), ("pod", "p1"), ("db", "redis")]),
+        ];
+        for firing in firings {
+            let expected: Vec<String> = open
+                .iter()
+                .rev()
+                .filter(|incident| {
+                    let existing: HashMap<String, String> =
+                        serde_json::from_value(incident.group_values.clone()).unwrap();
+                    matches!(
+                        DimensionRelationship::check(&existing, &firing),
+                        DimensionRelationship::Equal
+                            | DimensionRelationship::NewIsSubset
+                            | DimensionRelationship::NewIsSuperset
+                    )
+                })
+                .map(|incident| incident.id.clone())
+                .collect();
+            let found: Vec<String> = find_correlation_candidates_with(&db, "acme", &firing)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|incident| incident.id)
+                .collect();
+            assert_eq!(found, expected, "firing {firing:?}");
+        }
     }
 }

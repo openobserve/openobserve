@@ -1888,12 +1888,13 @@ async fn find_or_create_incident(
 
     // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
     //
-    // Load all open incidents and check for dimension compatibility.
+    // Load the open incidents whose dimensions nest with these and check each one's relationship.
     // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
     // PartialOverlap or Incompatible → skip (create new incident).
     if key_type != KeyType::AlertId {
         let open_incidents =
-            infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
+            infra::table::alert_incidents::find_correlation_candidates(org_id, group_values)
+                .await?;
 
         for existing in open_incidents {
             let existing_key_type = KeyType::from_stored(&existing.key_type);
