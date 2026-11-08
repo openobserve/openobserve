@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         variant="ghost"
                         size="xs"
-                        @click="setRelativeDate(period.value, item)"
+                        @click="pickRelativeChip(period.value, item)"
                         :key="'period_' + item_index"
                       >
                         {{ item }}
@@ -1008,6 +1008,11 @@ export default defineComponent({
       relativePeriod.value = period;
       relativeValue.value = value;
       if (props.autoApply) saveDate("relative");
+    };
+
+    const pickRelativeChip = (period: string, value: number) => {
+      setRelativeDate(period, value);
+      if (props.autoApply) closeMenu();
     };
 
     const isValidCustomValue = (value: unknown) =>
@@ -2055,7 +2060,7 @@ export default defineComponent({
       firstItem.focus();
     };
 
-    // A rail pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
+    // A pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
     const closeMenu = () => {
       if (!menuOpen.value) return;
       menuOpen.value = false;
@@ -2148,6 +2153,7 @@ export default defineComponent({
       onCustomValueFocus,
       onCustomValueBlur,
       setRelativeDate,
+      pickRelativeChip,
       relativePeriods,
       relativeDates,
       showRail,

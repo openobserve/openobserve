@@ -16,7 +16,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import KioskSetupPopover from "./KioskSetupPopover.vue";
 
 const body = (selector: string) => document.body.querySelector<HTMLElement>(selector);
@@ -26,7 +25,11 @@ describe("KioskSetupPopover", () => {
 
   const mountPopover = (props: Record<string, unknown> = {}) => {
     wrapper = mount(KioskSetupPopover, {
-      props,
+      props: {
+        open: false,
+        "onUpdate:open": (open: boolean) => wrapper!.setProps({ open }),
+        ...props,
+      },
       attachTo: document.body,
       global: { plugins: [i18n] },
     });
@@ -34,7 +37,7 @@ describe("KioskSetupPopover", () => {
   };
 
   const openPopover = async () => {
-    await wrapper!.find('[data-test="dashboard-kiosk-btn"]').trigger("click");
+    await wrapper!.setProps({ open: true });
     await flushPromises();
   };
 
@@ -49,14 +52,6 @@ describe("KioskSetupPopover", () => {
     wrapper?.unmount();
     wrapper = null;
     document.body.innerHTML = "";
-  });
-
-  it("is an icon-only toolbar button with a TV mode tooltip", () => {
-    mountPopover();
-    const button = wrapper!.find('[data-test="dashboard-kiosk-btn"]');
-    expect(button.text()).toBe("");
-    expect(button.attributes("aria-label")).toBe("TV mode");
-    expect(wrapper!.findComponent(OTooltip).props("content")).toBe("TV mode");
   });
 
   it("holds only the fields and the open action, with no copy link or summary", async () => {
@@ -117,7 +112,7 @@ describe("KioskSetupPopover", () => {
     await openPopover();
     body('[data-test="dashboard-kiosk-theme-dark"]')!.click();
     await flushPromises();
-    wrapper!.vm.$.setupState.open = false;
+    await wrapper!.setProps({ open: false });
     await flushPromises();
     await openPopover();
     await clickOpen();

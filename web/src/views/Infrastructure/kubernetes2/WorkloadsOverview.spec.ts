@@ -25,8 +25,8 @@ import WorkloadsOverview from "./WorkloadsOverview.vue";
 const tooltipStub = defineComponent({
   name: "OTooltip",
   props: ["content"],
-  setup(props) {
-    return () => h("span", { "data-test": "tooltip" }, props.content);
+  setup(props, { slots }) {
+    return () => h("span", { "data-test": "tooltip" }, [props.content, slots.default?.()]);
   },
 });
 
@@ -283,6 +283,31 @@ describe("WorkloadsOverview", () => {
       expect(find("k8s2-workloads-event-message-e1").classes()).toContain("text-status-error-text");
       expect(find("k8s2-workloads-event-age-e1").text()).toBe("11m");
       expect(find("k8s2-workloads-event-last-seen-e1").text()).toBe("1m");
+    });
+
+    it("resizes and caps both tables, and sorts Count numerically", async () => {
+      const counts = [9, 100, 10];
+      const results = {
+        ...RESULTS,
+        P4: [...RESULTS.P4!, owned("shop", "web-3", "ReplicaSet", "web-abc")],
+      };
+      await mountView({
+        inventory: buildInventory(new Map(Object.entries(results) as [QueryId, Series[]][])),
+        events: EVENTS.map((e, i) => (i < 3 ? { ...e, count: counts[i] } : e)),
+      });
+      const tables = wrapper.findAllComponents({ name: "OTable" });
+      expect(tables).toHaveLength(2);
+      for (const table of tables) {
+        expect(table.props()).toMatchObject({ enableColumnResize: true, maxHeight: "70vh" });
+      }
+      await find("k8s2-workloads-events-table")
+        .find('[data-test="o2-table-th-count"] [data-test="o2-table-th-sort-trigger"]')
+        .trigger("click");
+      await flushPromises();
+      const shown = find("k8s2-workloads-events-table")
+        .findAll('[data-test="o2-table-cell-count"]')
+        .map((c) => c.text());
+      expect(shown.slice(0, 3)).toEqual(["100", "10", "9"]);
     });
 
     it("opens the involved object's drawer when the kind has one", async () => {

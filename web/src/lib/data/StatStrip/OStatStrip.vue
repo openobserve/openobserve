@@ -9,7 +9,7 @@
 //      <OStatCard> children.
 //
 // Set `selectable` to turn the tiles into filter toggles: each becomes a button,
-// the one whose key === `selectedKey` shows the active ring, and clicking emits
+// the one whose key === `selectedKey` shows as active, and clicking emits
 // `select` with the item key.
 //
 // It always occupies its space (fixed tile height + skeleton while `loading`) so
@@ -26,7 +26,9 @@ const props = withDefaults(
     loading?: boolean;
     /** Make the tiles clickable filter toggles. */
     selectable?: boolean;
-    /** Key of the currently-selected tile (draws the ring). */
+    /** Tray look, on by default for `selectable`; opt out when nothing below the strip joins it. */
+    tray?: boolean;
+    /** Key of the currently-selected tile. */
     selectedKey?: string | null;
     /**
      * Tile that reads as active when nothing is filtered — the "All"/"Total"
@@ -36,21 +38,26 @@ const props = withDefaults(
      */
     defaultKey?: string | null;
     /**
-     * Narrows the wrap threshold for strips of short-labelled tiles (filter
-     * counts, buckets), so five or six fit one row instead of wrapping to two.
-     * Leave off for the standard strip — long labels need the wider basis.
+     * Narrows the tile width for strips of short-labelled tiles (filter counts,
+     * buckets), so five to seven fit one row. Leave off for long labels.
      */
     compact?: boolean;
+    /** Default for every item's `compactValue` (an item's own setting wins). */
+    compactValues?: boolean;
   }>(),
   {
     items: () => [],
     loading: false,
     selectable: false,
+    tray: undefined,
     selectedKey: null,
     defaultKey: null,
     compact: false,
+    compactValues: false,
   },
 );
+
+const trayed = computed(() => props.tray ?? props.selectable);
 
 const emit = defineEmits<{ select: [key: string] }>();
 
@@ -77,15 +84,30 @@ const onCardClick = (item: StatItem) => {
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-2 max-lg:gap-1.5" data-test="o-stat-strip">
-    <!-- The basis is the wrap threshold, not a fixed width: tiles still grow to
-         fill a wide strip. The default suits long labels; `compact` is for short
-         ones, where basis-52 would wrap a five-tile strip onto two rows. -->
+  <div
+    class="flex"
+    :class="
+      trayed
+        ? 'bg-surface-subtle px-page-edge relative gap-1 overflow-x-auto overflow-y-hidden pt-2'
+        : 'flex-wrap gap-2 max-lg:gap-1.5'
+    "
+    data-test="o-stat-strip"
+  >
+    <!-- Drawn here, not as a border, so the lifted tile can paint over it and join the table. -->
+    <div
+      v-if="trayed"
+      class="bg-border-default pointer-events-none absolute inset-x-0 bottom-0 h-px"
+      aria-hidden="true"
+    />
+    <!-- Non-tray: the basis is the wrap threshold and tiles grow to fill the strip. Tray: tiles keep content width. -->
     <OStatCard
       v-for="item in items"
       :key="item.key"
-      class="grow max-lg:shrink-0 max-lg:basis-auto"
-      :class="compact ? 'basis-36' : 'basis-52'"
+      :class="
+        trayed
+          ? ['max-w-56 shrink grow-0 basis-auto', compact ? 'min-w-32' : 'min-w-40']
+          : ['grow max-lg:shrink-0 max-lg:basis-auto', compact ? 'basis-36' : 'basis-52']
+      "
       :label="item.label"
       :value="item.value"
       :sub="item.sub"
@@ -96,7 +118,9 @@ const onCardClick = (item: StatItem) => {
       :trend="item.trend"
       :max="item.max"
       :loading="showSkeleton"
+      :compact-value="item.compactValue ?? compactValues"
       :clickable="selectable && item.selectable !== false"
+      :tray="trayed"
       :selected="item.selectable !== false && activeKey === item.key"
       :data-test="item.dataTest"
       @click="onCardClick(item)"

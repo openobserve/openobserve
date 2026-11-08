@@ -60,6 +60,9 @@ const WEB: End = ["frontend", "Deployment", "web"];
 const API: End = ["backend", "Deployment", "api"];
 const DNS: End = ["kube-system", "Deployment", "coredns"];
 
+const WEB_ID = "prod/frontend/Deployment/web";
+const API_ID = "prod/backend/Deployment/api";
+
 const FLOWS = [
   row(WEB, API, "request", 2048),
   row(API, WEB, "response", 4096),
@@ -97,6 +100,10 @@ describe("DependenciesView", () => {
   const edges = () => chart().props("edges");
   const nodes = () => chart().props("nodes");
   const testId = (id: string) => wrapper.find(`[data-test="${id}"]`);
+  const setMode = async (mode: string) => {
+    await testId(`k8s2-deps-collapse-${mode}`).trigger("click");
+    await flushPromises();
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -424,6 +431,7 @@ describe("DependenciesView", () => {
     );
     metricsQuery.mockResolvedValue({ data: { data: { result: many } } } as any);
     await mountView();
+    await setMode("expanded");
     expect(nodes()).toHaveLength(80);
     expect(testId("k8s2-list-count").text()).toContain("79 connections");
     expect(testId("k8s2-deps-capped").text()).toContain("Showing the 79 busiest of 90 connections");
@@ -511,6 +519,7 @@ describe("DependenciesView", () => {
     );
     metricsQuery.mockResolvedValue({ data: { data: { result: many } } } as any);
     await mountView();
+    await setMode("expanded");
     expect(wrapper.findAll('[data-test="k8s2-deps-link"]')).toHaveLength(60);
   });
 
@@ -544,5 +553,183 @@ describe("DependenciesView", () => {
     await wrapper.setProps({ refreshNonce: 1 });
     await flushPromises();
     expect(metricsQuery).toHaveBeenCalledTimes(4);
+  });
+
+  describe("namespace grouping", () => {
+    const BOUNDARY_API = "__ns__prod/backend";
+    const BOUNDARY_WEB = "__ns__prod/frontend";
+
+    it("starts in auto mode and draws workloads while the graph is small", async () => {
+      await mountView();
+      expect(nodes().map((n: any) => n.id)).toEqual([WEB_ID, API_ID]);
+      expect(testId("k8s2-deps-group-hint").exists()).toBe(false);
+    });
+
+    it("folds workloads into namespace cards once the graph passes the threshold", async () => {
+      const many = Array.from({ length: 45 }, (_, i) =>
+        row(["shop", "Deployment", `w${i}`], API, "request", 100),
+      );
+      metricsQuery.mockResolvedValue({ data: { data: { result: many } } } as any);
+      await mountView();
+      expect(
+        nodes()
+          .map((n: any) => n.id)
+          .sort(),
+      ).toEqual([BOUNDARY_API, "__ns__prod/shop"]);
+      expect(edges()).toHaveLength(1);
+      expect(testId("k8s2-deps-group-hint").exists()).toBe(true);
+    });
+
+    it("collapses on demand and draws namespace cards", async () => {
+      await mountView();
+      await setMode("collapsed");
+      const card = nodes().find((n: any) => n.id === BOUNDARY_API);
+      expect(card).toMatchObject({
+        label: "backend",
+        detail: "1 workload",
+        icon: "folder-outline",
+        clickable: true,
+      });
+      expect(card.color).toBe(
+        chart()
+          .props("legend")
+          .find((l: any) => l.label === "backend").color,
+      );
+      expect(edges()).toHaveLength(1);
+      expect(
+        chart()
+          .props("legend")
+          .map((l: any) => l.label),
+      ).toEqual(["backend", "frontend"]);
+    });
+
+    it("expands only the clicked namespace and collapses it again", async () => {
+      await mountView();
+      await setMode("collapsed");
+      chart().vm.$emit("open", BOUNDARY_API);
+      await flushPromises();
+      expect(
+        nodes()
+          .map((n: any) => n.id)
+          .sort(),
+      ).toEqual([API_ID, BOUNDARY_WEB].sort());
+      expect(testId("k8s2-deps-group-collapse").text()).toContain("backend");
+      await testId("k8s2-deps-group-collapse").trigger("click");
+      expect(
+        nodes()
+          .map((n: any) => n.id)
+          .sort(),
+      ).toEqual([BOUNDARY_API, BOUNDARY_WEB]);
+    });
+
+    it("drops the collapse chips once grouping is off", async () => {
+      await mountView();
+      await setMode("collapsed");
+      chart().vm.$emit("open", BOUNDARY_API);
+      await flushPromises();
+      expect(testId("k8s2-deps-group-collapse").exists()).toBe(true);
+      await setMode("expanded");
+      expect(testId("k8s2-deps-group-collapse").exists()).toBe(false);
+    });
+
+    it("does not open the details drawer for a namespace card", async () => {
+      await mountView();
+      await setMode("collapsed");
+      chart().vm.$emit("open", BOUNDARY_API);
+      await flushPromises();
+      expect(wrapper.emitted("open")).toBeUndefined();
+    });
+
+    it("does not fold workloads while a search is set", async () => {
+      await mountView({ state: parseUrlState({ view: "dependencies", search: "web" }) });
+      await setMode("collapsed");
+      expect(nodes().some((n: any) => n.group === true)).toBe(false);
+    });
+
+    it("disables the grouping control and says why while a search is set", async () => {
+      await mountView({ state: parseUrlState({ view: "dependencies", search: "web" }) });
+      expect(wrapper.findComponent({ name: "OToggleGroup" }).props("disabled")).toBe(true);
+      expect(wrapper.find('[data-test="k8s2-deps-collapse-off"]').exists()).toBe(true);
+    });
+
+    it("keeps the grouping control enabled with no filter", async () => {
+      await mountView();
+      expect(wrapper.findComponent({ name: "OToggleGroup" }).props("disabled")).toBe(false);
+      expect(wrapper.find('[data-test="k8s2-deps-collapse-off"]').exists()).toBe(false);
+    });
+
+    it("counts the header total over grouped connections too", async () => {
+      await mountView();
+      await setMode("collapsed");
+      const header = wrapper.findComponent({ name: "K8sListHeader" });
+      expect(header.props("total")).toBe(header.props("count"));
+    });
+
+    it("marks a namespace card as a group so it reads as expandable, not openable", async () => {
+      await mountView();
+      await setMode("collapsed");
+      const group = nodes().find((n: any) => n.id === BOUNDARY_API);
+      expect(group.group).toBe(true);
+    });
+
+    it("expands from the edge panel's namespace button instead of opening a drawer", async () => {
+      await mountView();
+      await setMode("collapsed");
+      chart().vm.$emit("select", edges()[0].id);
+      await flushPromises();
+      const target = testId("k8s2-deps-edge-target");
+      expect(target.attributes("disabled")).toBeUndefined();
+      await target.trigger("click");
+      expect(wrapper.emitted("open")).toBeUndefined();
+      expect(nodes().some((n: any) => n.id === API_ID)).toBe(true);
+    });
+
+    it("moves focus to the expanded namespace's collapse chip, then onward on collapse", async () => {
+      await mountView({}, document.body);
+      await setMode("collapsed");
+      chart().vm.$emit("select", edges()[0].id);
+      await flushPromises();
+      await testId("k8s2-deps-edge-target").trigger("click");
+      await flushPromises();
+      const chip = testId("k8s2-deps-group-collapse");
+      expect(chip.attributes("data-ns-id")).toBe("prod/backend");
+      expect(document.activeElement).toBe(chip.element);
+      await chip.trigger("click");
+      await flushPromises();
+      expect(testId("k8s2-deps-group-collapse").exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="k8s2-deps-collapse-mode"]')
+          .element.contains(document.activeElement),
+      ).toBe(true);
+    });
+
+    it("shows the grouping control as Expanded while a filter disables it", async () => {
+      await mountView({ state: parseUrlState({ view: "dependencies", search: "web" }) });
+      await setMode("collapsed");
+      expect(wrapper.findComponent({ name: "OToggleGroup" }).props("modelValue")).toBe("expanded");
+    });
+
+    it("clears the selected edge when expanding removes it", async () => {
+      await mountView();
+      await setMode("collapsed");
+      const id = edges()[0].id;
+      chart().vm.$emit("select", id);
+      await flushPromises();
+      expect(testId("k8s2-deps-edge").exists()).toBe(true);
+      chart().vm.$emit("open", BOUNDARY_API);
+      await flushPromises();
+      expect(chart().props("selectedEdgeId")).toBeNull();
+      expect(testId("k8s2-deps-edge").exists()).toBe(false);
+    });
+
+    it("keeps the capped message counting the collapsed edges", async () => {
+      const many = Array.from({ length: 90 }, (_, i) =>
+        row([`ns${i}`, "Deployment", "w"], API, "request", 1000 - i),
+      );
+      metricsQuery.mockResolvedValue({ data: { data: { result: many } } } as any);
+      await mountView();
+      expect(testId("k8s2-deps-capped").text()).toContain("Showing the 79 busiest of 90");
+    });
   });
 });

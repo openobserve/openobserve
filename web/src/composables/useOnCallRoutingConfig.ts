@@ -20,26 +20,7 @@ import { routingConfigQuery } from "@/services/oncall.queries";
 import type { RoutingConfig } from "@/ts/interfaces/oncall";
 import { licenseDeniedFeatures } from "@/utils/featureGate";
 
-/**
- * The org's catch-all team, read once and shared.
- *
- * Three components asked for it independently — the card that SETS it, the
- * ownership table that shows it as the last row, and the policy editor, which
- * warns when a ladder ends in `notify_default_team` and nobody is nominated.
- * Two of them render on the Routing screen at the same time, so the same tiny
- * request went out twice and the two copies could disagree the moment one was
- * written: nominating a catch-all left the warning in the drawer still saying
- * there was none, because nothing told it.
- *
- * Sharing is now the query cache's job — org-rooted keys, one in-flight request
- * per key, and a purge on org switch, all of which this file used to hand-roll.
- * The refs below only mirror the entry for templates that read it synchronously.
- *
- * @example
- * const { config, load, refresh } = useOnCallRoutingConfig();
- * onMounted(() => load(orgId.value));      // cache-first
- * await refresh(orgId.value);              // after a write
- */
+/** One shared read of the org's catch-all team, so every screen that shows it sees the same value. */
 const config = ref<RoutingConfig | null>(null);
 /** True while a read is in flight, so a caller can tell "unset" from "not loaded yet". */
 const loading = ref(false);

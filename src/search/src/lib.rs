@@ -14,11 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod bloom_pruner;
-pub mod cache;
 pub mod datafusion;
 pub mod file_cache;
 pub mod index;
 pub mod inspector;
+pub mod merge;
 pub mod sql;
 pub mod tantivy;
 pub mod types;

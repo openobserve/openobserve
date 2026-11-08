@@ -53,14 +53,14 @@ use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::Vort
 use vortex_datafusion::{VortexFormat, VortexTableOptions};
 
 use super::{
-    peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
-    storage::file_list, udf::transform_udf::get_all_transform,
+    memory_pool::PeakMemoryPool, planner::OpenobserveQueryPlanner, storage::file_list,
+    udf::transform_udf::get_all_transform,
 };
 use crate::{
     datafusion::{
+        datasource::{listing_adapter::ListingTableAdapter, uniontable::NewUnionTable},
         sort_order::FileSortOrder,
         storage::file_statistics_cache,
-        table_provider::{listing_adapter::ListingTableAdapter, uniontable::NewUnionTable},
     },
     index::IndexCondition,
 };

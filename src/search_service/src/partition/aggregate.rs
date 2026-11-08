@@ -14,12 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::search::{
-    cache::streaming_agg::{
-        self, StreamingAggsPartitionStrategy, create_aggregation_cache_file_path,
-        discover_cache_for_query, generate_optimal_partitions,
-        get_aggregation_cache_key_from_request,
+    datafusion::physical_plan::streaming_aggs_exec::{
+        files::{create_aggregation_cache_file_path, get_aggregation_cache_key_from_request},
+        partition::{
+            discovery::{CacheDiscoveryResult, discover_cache_for_query},
+            partition_optimizer::{StreamingAggsPartitionStrategy, generate_optimal_partitions},
+        },
+        registry,
     },
-    datafusion::distributed_plan::streaming_aggs_exec,
     sql::visitor::streaming_aggregate,
 };
 use config::{
@@ -103,7 +105,7 @@ pub async fn prepare_streaming_aggregate(
 
             // Discover existing cache files for this query
             let cache_discovery_result = if !use_cache {
-                streaming_agg::CacheDiscoveryResult::empty(req.start_time, req.end_time)
+                CacheDiscoveryResult::empty(req.start_time, req.end_time)
             } else {
                 match discover_cache_for_query(
                     &cache_file_path,
@@ -119,7 +121,7 @@ pub async fn prepare_streaming_aggregate(
                             "[trace_id {trace_id}] [streaming_id: {streaming_id}] Failed to discover cache: {e}, proceeding without cache optimization"
                         );
                         // Create empty discovery result to proceed without cache
-                        streaming_agg::CacheDiscoveryResult::empty(req.start_time, req.end_time)
+                        CacheDiscoveryResult::empty(req.start_time, req.end_time)
                     }
                 }
             };
@@ -146,7 +148,7 @@ pub async fn prepare_streaming_aggregate(
                 partition_strategy.execution_partition_count()
             );
 
-            streaming_aggs_exec::init_cache(
+            registry::init_cache(
                 &streaming_id,
                 req.start_time,
                 req.end_time,
@@ -155,7 +157,7 @@ pub async fn prepare_streaming_aggregate(
             );
 
             // Store partition strategy for use in do_partitioned_search
-            streaming_aggs_exec::set_partition_strategy(&streaming_id, partition_strategy);
+            registry::set_partition_strategy(&streaming_id, partition_strategy);
 
             log::info!(
                 "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
@@ -168,7 +170,7 @@ pub async fn prepare_streaming_aggregate(
 
     // Get cache strategy for streaming aggregates
     let streaming_aggs_cache_strategy = if let Some(streaming_id_ref) = streaming_id.as_deref() {
-        match streaming_aggs_exec::get_partition_strategy(streaming_id_ref) {
+        match registry::get_partition_strategy(streaming_id_ref) {
             Some(strategy) => {
                 log::info!(
                     "[trace_id {trace_id}] [streaming_id: {streaming_id_ref}] Using cache-aware partition strategy"

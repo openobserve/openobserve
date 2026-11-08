@@ -10,7 +10,7 @@ path = "src/lib.rs"
 
 [features]
 default = []
-enterprise = ["dep:o2_enterprise", "tantivy_utils/enterprise"]
+enterprise = ["dep:o2_enterprise", "tantivy_utils/enterprise", "db/enterprise"]
 
 [dependencies]
 anyhow.workspace = true

@@ -223,6 +223,9 @@ pub async fn process_search_stream_request(
     let started_at = chrono::Utc::now().timestamp_micros();
     let start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
+    if !search_cache::is_result_cache_allowed(stream_type) {
+        req.use_cache = false;
+    }
     // Disable caching when pattern extraction is requested since patterns are generated
     // dynamically from search results and cannot be cached
     let use_cache = req.use_cache && !extract_patterns;

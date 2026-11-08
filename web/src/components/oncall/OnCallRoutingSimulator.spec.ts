@@ -114,6 +114,23 @@ type Wrapper = ReturnType<typeof render>;
 const select = (w: Wrapper, test: string) =>
   w.findAllComponents({ name: "OSelect" }).find((c) => c.attributes("data-test") === test)!;
 
+describe("OnCallRoutingSimulator field picker", () => {
+  it("captions each field with the telemetry fields its group is made of, like the rule editor", () => {
+    const wrapper = render({
+      aliases: [
+        { id: "service", display: "Service", fields: ["service", "service_name", "svc", "app"] },
+      ],
+    });
+    const options = select(wrapper, "oncall-simulator-field-0").props("options") as {
+      value: string;
+      subLabel?: string;
+    }[];
+    expect(options.find((option) => option.value === "service")?.subLabel).toBe(
+      "service, service_name, svc +1 more",
+    );
+  });
+});
+
 describe("OnCallRoutingSimulator", () => {
   beforeEach(() => {
     vi.useFakeTimers();

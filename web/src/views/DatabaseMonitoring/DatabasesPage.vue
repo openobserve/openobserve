@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <DbmSubheaderBand data-test="dbm-databases-summary">
+          <div data-test="dbm-databases-summary">
             <OStatStrip
               :items="summaryStats"
               :loading="loading"
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               default-key="databases"
               @select="onStatSelect"
             />
-          </DbmSubheaderBand>
+          </div>
         </template>
 
         <!-- One name column at three grains: a database, a schema or service
@@ -468,7 +468,6 @@ import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
-import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";

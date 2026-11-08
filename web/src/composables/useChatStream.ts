@@ -34,6 +34,7 @@ import {
 } from "@/components/O2AIChat.reducer";
 import { isChatPersistenceEnabled } from "@/components/ai-assistant/share/chatShare";
 import useAiChat from "@/composables/useAiChat";
+import { isNetworkFailure } from "@/utils/networkFailure";
 import {
   isPaidOverageConsentError,
   usePaidOverageConsent,
@@ -572,7 +573,9 @@ export function useChatStream(options: UseChatStreamOptions) {
         }
         return;
       } else {
-        console.error("Error reading stream:", error);
+        // A dropped connection is not an app defect, and RUM records console.error.
+        if (isNetworkFailure(error)) console.warn("Error reading stream:", error);
+        else console.error("Error reading stream:", error);
         trackAnswerOutcome(turn, "ai_assistant_answer_failed", { stage: "stream" });
       }
     }

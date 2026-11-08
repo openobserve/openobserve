@@ -47,8 +47,8 @@ use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::organization::is_org_in_free_trial_period;
 use search::{
-    datafusion::plan::projections::get_result_schema, sql::visitor::pickup_where::pickup_where,
-    utils::is_permissable_function_error,
+    datafusion::logical_plan::projections::get_result_schema,
+    sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
 };
 use search_service as SearchService;
 use search_service::query_range::get_settings_max_query_range;

@@ -30,6 +30,7 @@
                 :items="bucketStats"
                 compact
                 selectable
+                :tray="false"
                 :selected-key="bucketFilter"
                 @select="selectBucket"
               />

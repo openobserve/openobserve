@@ -1380,6 +1380,7 @@
     "autoRefreshRelativeOnly": "S'applique uniquement aux plages de temps relatives",
     "turnOffLiveMode": "Désactiver le mode Live",
     "autoRefreshWithValue": "Actualisation automatique : {value}",
+    "autoRefreshTrigger": "Auto : {interval}",
     "searchHistory": "Historique des recherches",
     "usageCostHistory": "Historique d'utilisation et de coûts",
     "createScheduledSearch": "Créer une recherche planifiée",
@@ -2191,12 +2192,12 @@
       "fileTypeZip": "Seuls les fichiers ZIP sont autorisés"
     },
     "emptyState": {
-      "title": "Surveillez vos utilisateurs grâce à Real User Monitoring",
-      "description": "RUM suit les interactions réelles des utilisateurs (chargements de pages, erreurs, appels d'API et rediffusions de session) afin que vous puissiez voir exactement comment les utilisateurs utilisent votre application.",
       "webApp": "Instrument une application Web",
       "webAppDesc": "Ajoutez le SDK RUM OpenObserve à toute application {product}",
       "sessionReplay": "Activer la rediffusion de session",
       "sessionReplayDesc": "Enregistrez et rejouez les sessions utilisateur pour résoudre les problèmes d'expérience utilisateur",
+      "title": "Surveillez vos utilisateurs grâce à Real User Monitoring",
+      "description": "RUM suit les interactions réelles des utilisateurs (chargements de pages, erreurs, appels d'API et rediffusions de session) afin que vous puissiez voir exactement comment les utilisateurs utilisent votre application.",
       "learnMore": "Pour en savoir plus :",
       "quickImpl": "Guide de mise en œuvre rapide",
       "blogPost": "Principes de base de la surveillance frontale"
@@ -2328,6 +2329,8 @@
     "translatingStackTrace": "Traduction de la trace de pile avec les source maps...",
     "translatingStackTraceHint": "Cela peut prendre quelques instants",
     "sourceMapsNotAvailable": "Source Maps non disponibles",
+    "mobileSourceMapsNotApplicable": "Les source maps ne s'appliquent pas aux erreurs iOS et Android",
+    "mobileSourceMapsNotApplicableBody": "Les source maps JavaScript importées ne peuvent pas résoudre les frames de pile natives mobiles. Consultez la pile d'origine dans l'onglet {tab}.",
     "sourceMapsNotAvailableBody": "Pour afficher des traces de pile détaillées avec le code source original et les numéros de ligne, veuillez télécharger les source maps pour cette application.",
     "serviceBadge": "Service :",
     "versionBadge": "Version :",
@@ -4061,13 +4064,9 @@
     "getStartedBannerMessage": "Essayez OpenObserve dès aujourd'hui pour une observabilité plus efficace et performante.",
     "getStartedBannerAlt": "Bannière de démarrage",
     "getStartedHeading": "Une dernière chose avant de commencer",
-    "hearAboutUsLabel": "Comment avez-vous entendu parler de nous ?",
     "hearAboutUsPlaceholder": "Ex. D'un ami",
-    "whereDoYouWorkLabel": "Où travaillez-vous ?",
     "whereDoYouWorkPlaceholder": "Nom de l'entreprise",
-    "agreeToTermsPrefix": "J'ai lu et j'accepte les",
     "termsOfUse": "Conditions d'utilisation",
-    "and": "et",
     "privacyPolicyStar": "Politique de confidentialité*",
     "startTrialButton": "Commencez votre essai de 14 jours",
     "copyrightNotice": "© OpenObserve",
@@ -4078,19 +4077,28 @@
     "emailRequired": "L'email est requis",
     "emailInvalid": "Veuillez saisir un email valide",
     "passwordRequired": "Le mot de passe est requis",
-    "mustAcceptTerms": "Vous devez accepter les conditions pour continuer",
     "getStarted": {
       "title": "Bienvenue dans OpenObserve",
-      "subtitle": "Votre essai de 14 jours a commencé. Deux questions rapides, puis nous vous emmènerons vers la configuration.",
-      "sourceLabel": "Que voulez-vous envoyer en premier ?",
-      "optional": "(facultatif)",
-      "skip": "Ignorer les questions",
-      "continue": "Continuer",
-      "hearAboutUsPlaceholder": "Par exemple, un collègue ou un article de blog",
-      "whereDoYouWorkPlaceholder": "Entreprise ou équipe",
-      "termsOfService": "Conditions d'utilisation",
-      "privacyPolicy": "Politique de confidentialité",
-      "agreeHint": "Nécessaire pour continuer, même si vous ignorez les questions.",
+      "skipForNow": "Ignorer pour l'instant",
+      "heard": {
+        "label": "Comment avez-vous entendu parler de nous ?",
+        "placeholder": "Sélectionnez une option",
+        "thanks": "Merci !"
+      },
+      "connect": {
+        "title": "Connectez vos données",
+        "point1": "Configuration pas à pas pour chaque source",
+        "point2": "Logs, métriques et traces au même endroit",
+        "point3": "Voyez vos premiers événements en quelques minutes",
+        "cta": "Explorer d'autres sources de données"
+      },
+      "sample": {
+        "title": "Explorer avec des données d'exemple",
+        "point1": "Logs, traces et métriques de services d'exemple",
+        "point2": "Tableaux de bord, alertes, un pipeline et des fonctions VRL",
+        "point3": "Une visite guidée, et un clic pour tout supprimer",
+        "cta": "Explorer avec des données d'exemple"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Hôte Linux ou VM",
@@ -4103,7 +4111,28 @@
         "llm": "Application LLM ou IA",
         "agent": "Laisser un agent IA le configurer",
         "unsure": "Pas encore sûr"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "Serveur web",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "Navigateur (RUM)",
+        "llm": "LLM ou application IA",
+        "agent": "Agent IA"
       }
+    },
+    "heardFrom": {
+      "question": "Comment nous avez-vous trouvés ?",
+      "quickQuestion": "Une question rapide : comment nous avez-vous trouvés ?",
+      "skip": "Ignorer",
+      "searchEngine": "Moteur de recherche",
+      "friendOrColleague": "Un ami ou un collègue",
+      "aiAssistant": "Assistant IA",
+      "other": "Autre",
+      "thanks": "Merci de nous l'avoir dit !"
     }
   },
   "user": {
@@ -5043,8 +5072,8 @@
     "otherFieldsSchemaTooltip": "Les autres champs affichent uniquement les champs de schéma qui existaient avant que le flux soit configuré pour utiliser un schéma défini par l'utilisateur.",
     "addFieldsTitle": "Ajouter des champs",
     "dataRetentionDaysLabel": "Rétention des données (jours)",
-    "globalRetentionDays": "La rétention globale est de {days} jours",
-    "retentionMinOneDay": "La période de rétention doit être d'au moins 1 jour",
+    "retentionDefaultDays": "Laissez vide pour utiliser la valeur par défaut de ce type de flux : {days} jours",
+    "retentionDefaultForever": "Laissez vide pour utiliser la valeur par défaut de ce type de flux : conserver indéfiniment",
     "maxQueryRangeHoursLabel": "Plage de requête maximale (heures)",
     "maxQueryRangeHelp": "Plage de temps maximale autorisée pour les requêtes. Mettez 0 pour une plage illimitée.",
     "globalFlattenLevel": "Le niveau global est {level}",
@@ -6485,12 +6514,6 @@
     "joinSlack": "Rejoignez le Slack",
     "maybeLater": "Peut-être plus tard"
   },
-  "connectDataSourcePopup": {
-    "title": "Pour commencer, connectons votre première source de données.",
-    "description": "Nous avons beaucoup à vous montrer, mais nous devons d'abord connecter vos données. La plupart des équipes voient leurs premiers logs en environ une minute.",
-    "connectButton": "Connecter une source de données",
-    "slackLink": "Rejoignez aussi notre communauté Slack"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Reprendre là où il s'est arrêté",
     "startFromNow": "Commencer maintenant.",
@@ -7071,6 +7094,9 @@
       "k8sNetworkFlowsTitle": "Voir quelles charges de travail communiquent entre elles : flux réseau eBPF",
       "k8sInstallerNote": "Cela installe cert-manager, l'opérateur OpenTelemetry et le collecteur OpenObserve automatiquement.",
       "k8sInternalEndpointNote": "Utilisez ceci lorsque OpenObserve s'exécute dans ce même cluster — le trafic ne le quitte jamais.",
+      "k8sTraceAppsTitle": "Tracez vos applications",
+      "k8sTraceEbpfDesc": "Activez le tracing eBPF dans le collecteur, puis choisissez les applications à tracer par port, chemin d'exécutable ou ligne de commande.",
+      "k8sTraceLibraryDesc": "Annotez le namespace de chaque langage, afin que l'opérateur ajoute sa bibliothèque aux pods correspondants. Redémarrez ensuite ces applications une fois.",
       "k8sTroubleAnnotationA": "L'injection a lieu à la création du pod, donc les pods existants ne sont pas affectés jusqu'à leur redémarrage — exécutez `kubectl rollout restart deployment -n my-namespace`. Confirmez que l'annotation a été posée avec `kubectl get ns my-namespace -o yaml`, et vérifiez que la valeur correspond à `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "J'ai annoté un namespace mais aucune trace n'apparaît",
       "k8sTroubleEndpointA": "N'utilisez le **point de terminaison interne** que lorsque OpenObserve s'exécute lui-même dans ce cluster ; le trafic reste alors à l'intérieur et ne traverse jamais le réseau. L'URL est `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — la valeur par défaut suppose la release `o2` dans l'espace de noms `openobserve`, modifiez-la si les vôtres diffèrent. Tous les autres utilisent le point de terminaison externe.",
@@ -7343,6 +7369,7 @@
       "androidTroubleScreenNamesQ": "Les sessions apparaissent mais les écrans ont tous le même nom.",
       "androidTroubleScreenNamesA": "Le suivi des vues n'est pas configuré. Passez un `useViewTrackingStrategy(...)` — par exemple `ActivityViewTrackingStrategy(trackExtras = true)` pour les Activities, ou `NavigationViewTrackingStrategy(...)` si vous utilisez AndroidX Navigation — lors de la construction de la `RumConfiguration`.",
       "setupTime5Min": "~5 min",
+      "showStepInstructions": "Afficher les instructions",
       "snowflakeCollectorVersionNote": "Snowflake nécessite le collecteur v0.92.0 — les versions plus récentes ont un bug connu.",
       "snowflakeTagline": "Collectez les métriques de compte Snowflake avec le collecteur OpenTelemetry et envoyez-les à OpenObserve.",
       "sqlClientGuiVariant": "Client SQL (GUI)",
@@ -7386,6 +7413,7 @@
       "verifyCassandraMetricsDesc": "La vérification ci-dessous passe au vert à l'arrivée des données, ou consultez Flux pour les métriques `cassandra_*`.",
       "verifyDatabricksLogsDesc": "La vérification ci-dessous passe au vert à l'arrivée des données, ou ouvrez Logs et recherchez `source:databricks`.",
       "verifyDataTitle": "Vérifier les données dans OpenObserve",
+      "checkYourDataTitle": "Vérifiez vos données",
       "verifyDynamodbLogsDesc": "La vérification ci-dessous passe au vert à l'arrivée des données, ou ouvrez Logs pour le flux `dynamodb` dès que des éléments changent.",
       "verifyGcpLogsDesc": "Générez de l'activité dans le projet (ou attendez que le sink corresponde à un log) ; la vérification ci-dessous passe au vert à l'arrivée des données.",
       "verifyK8sDataDesc": "Laissez quelques secondes au collector pour démarrer ; la vérification ci-dessous passe au vert à l'arrivée des données — les logs du cluster arrivent dans le flux `default`.",
@@ -7935,6 +7963,7 @@
     "homeDashboardSetFailed": "Impossible de définir le tableau de bord d'accueil",
     "homeDashboardRemoveFailed": "Impossible de supprimer le tableau de bord d'accueil",
     "setAsHomeDesc": "Afficher ce tableau de bord sur la page d'accueil pour tous les membres de l'organisation",
+    "moreOptionsSettingsDraft": "Plus d'options, brouillon de paramètres non enregistré",
     "favorites": "Favoris",
     "addToFavorites": "Ajouter aux favoris",
     "removeFromFavorites": "Retirer des favoris",
@@ -9320,6 +9349,7 @@
       "refresh": "Actualiser",
       "refreshCacheReload": "Actualiser le cache et recharger",
       "moreRefreshOptions": "Plus d'options d'actualisation",
+      "moreShareOptions": "Plus d'options de partage",
       "autoRunDescription": "Exécute les requêtes à l'ouverture et lors des modifications de filtre ou de plage horaire",
       "autoRunScope": "S'applique à tous les tableaux de bord, Logs et Traces",
       "dashboard": "Tableau de bord",
@@ -11462,6 +11492,68 @@
     }
   },
   "alerts": {
+    "firing": {
+      "title": "Déclenchées",
+      "drawer": {
+        "openInLogs": "Ouvrir dans Logs",
+        "partOfIncident": "Fait partie de l'incident :",
+        "incidentAck": "La prise en charge ici vaut pour tout l'incident.",
+        "incidentTakeOver": "Prendre le relais ici vaut pour tout l'incident.",
+        "now": "Maintenant",
+        "threshold": "seuil {value}",
+        "since": "depuis {time}",
+        "flaps": "Basculements, 6 dernières heures",
+        "flapsUnit": "changements d'état",
+        "notified": "Notifié",
+        "notDeliveredTo": "{name} : non délivré",
+        "history": "Historique",
+        "last2h": "2 dernières heures",
+        "lastSpan": "dernières {span}",
+        "viewAll": "Voir tout",
+        "historyEmpty": "Aucune exécution dans cette fenêtre.",
+        "historyFailed": "Impossible de charger l'historique.",
+        "barFiring": "{span} en cours",
+        "barOk": "{span} OK",
+        "barUnknown": "{span} non lu",
+        "eventStarted": "Début du déclenchement",
+        "eventRecovered": "Rétablie",
+        "eventNotified": "Notifié",
+        "eventNotifiedTo": "Notification envoyée à {names}",
+        "eventFailed": "Non délivré",
+        "eventFailedTo": "Non délivré à {names}",
+        "soFar": "{span} jusqu'ici",
+        "lasted": "a duré {span}",
+        "okFor": "OK depuis {span}"
+      },
+      "chipCount": "{label} {count}",
+      "chipFiring": "Déclenchée",
+      "chipAcked": "Prise en charge",
+      "chipMuted": "Mise en sourdine",
+      "chipFailed": "Non délivré",
+      "searchPlaceholder": "Rechercher des alertes",
+      "priorityAll": "Priorité",
+      "priorityLabel": "Priorité",
+      "priorityUnset": "Aucune priorité",
+      "folderAll": "Dossier : tous",
+      "folderLabel": "Dossier",
+      "stale": "obsolète",
+      "refreshFailed": "Impossible d'actualiser les alertes déclenchées ({reason}). Affichage des données de {time}.",
+      "refreshFailedReason": "échec de la requête",
+      "statusUnavailable": "L'état des alertes est indisponible pour le moment ; les alertes déclenchées ne peuvent donc pas être affichées.",
+      "retry": "Réessayer",
+      "columnPriority": "Priorité",
+      "columnState": "État",
+      "columnAlert": "Alerte",
+      "columnFolder": "Dossier",
+      "columnFiringFor": "Déclenchée depuis",
+      "acknowledgeCount": "Acquitter {count}",
+      "mute": "Mettre en sourdine",
+      "clear": "Effacer",
+      "emptyFiring": "Aucune alerte déclenchée",
+      "emptyAcked": "Aucune alerte acquittée",
+      "emptyMuted": "Aucune alerte en sourdine",
+      "emptyFailed": "Aucune alerte non délivrée"
+    },
     "moreActions": "Plus d'actions",
     "promRuleMode": "Mode de règle",
     "promRulePreview": "{count} séries retournées correspondent maintenant. Chaque série doit atteindre la fin de la période d'attente avant de se déclencher.",
@@ -11474,7 +11566,6 @@
       "anomalyImportSuccess": "Détection d'anomalies - {index} : \"{name}\" importé avec succès",
       "anomalyImportFailed": "Détection d'anomalies - {index} : \"{name}\" a échoué à l'importation — {reason}",
       "nameRequired": "Alerte - {index} : le nom est obligatoire et doit être une chaîne valide.",
-      "orgIdInvalid": "Alerte - {index} : l'ID d'organisation est obligatoire, doit exister dans la liste des organisations et doit être égal à {orgId}.",
       "streamTypeInvalid": "Alerte - {index} : le type de flux est obligatoire et doit être l'un de : 'logs', 'metrics', 'traces'.",
       "streamNameInvalid": "Alerte - {index} : le nom du flux est obligatoire, doit exister dans la liste des flux et doit être une chaîne valide.",
       "destinationsArray": "Alerte - {index} : Les destinations doivent être un tableau.",
@@ -11623,7 +11714,6 @@
     "jsonFilesOnlyHint": "Fichiers .json uniquement",
     "outputMessages": "Messages de sortie",
     "timezoneRequiredLabel": "Fuseau horaire *",
-    "organizationIdLabel": "ID de l'organisation",
     "alertCreationTitle": "Création d'alerte",
     "noAlertsFound": "Aucune alerte trouvée",
     "groupedNotification": "Notification groupée",
@@ -12929,6 +13019,9 @@
       "noDestinationsFound": "Aucune destination trouvée",
       "noDetectionResults": "Aucun résultat de détection sur cette période pour l'instant",
       "noFieldsFound": "Aucun champ n'a été trouvé",
+      "checkDataNow": "Vérifier maintenant",
+      "checkDataNowTooltip": "Réévaluer les données actuelles maintenant au lieu d'attendre la prochaine vérification automatique.",
+      "dataReadinessReason": "Raison",
       "noticeRetrain": "Réentraînement automatique",
       "noticeRetrainTooltip": "Le modèle enregistré n'a pas pu être lu après une mise à niveau ; il a donc été écarté et la configuration a été mise en file d'attente pour un réentraînement automatique. Aucune action n'est requise ; la détection reprend une fois l'entraînement terminé.",
       "noticeSkipAbsence": "L'évaluation des absences a pris du retard sur la Fenêtre d'analyse rétrospective ; le span qui ne pouvait plus être récupéré a été ignoré et enregistré.",
@@ -12963,6 +13056,8 @@
       "autoUntrainedHelp": "Le mode automatique apprendra un niveau à partir de votre historique.",
       "autoTrainingHelp": "Le niveau apparaîtra une fois l'entraînement terminé.",
       "autoFailedHelp": "Échec de l'entraînement. Aucun niveau appris pour l'instant. Examinez l'erreur d'entraînement ci-dessus.",
+      "autoWaitingForDataHelp": "Pas encore assez de données d'entraînement adaptées. Aucun niveau appris d'ici là. Le détecteur reste activé et est revérifié automatiquement.",
+      "autoNotApplicableHelp": "Les données actuelles ne permettent pas de créer un modèle d'anomalies. Ce n'est pas un échec. Le détecteur reste activé et est revérifié automatiquement.",
       "autoRetrainingHelp": "Réentraînement en cours. Le dernier niveau appris est affiché ; la disponibilité du modèle n'est pas confirmée.",
       "autoRetrainFailedHelp": "Échec du réentraînement. Le dernier niveau appris est affiché ; la disponibilité du modèle n'est pas confirmée. Examinez l'erreur d'entraînement ci-dessus.",
       "autoUnconfirmedHelp": "Le dernier niveau appris est affiché ; aucun modèle actif n'a été confirmé.",
@@ -14566,6 +14661,7 @@
     "separator_placeholder": "Saisissez un séparateur (ex. : {'|'}, \\n, \\t, espace)",
     "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)",
     "templateDefaultOption": "Par défaut ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Laissez la valeur par défaut pour utiliser le modèle {type} standard ({name}), ou choisissez un modèle personnalisé.",
     "loadingData": "Chargement des données de destination...",
     "noEmailTemplates": "Il semble que vous n'ayez pas encore créé de modèles d'e-mail.",
@@ -15501,6 +15597,20 @@
       "awsCredentials": "Identifiants AWS",
       "azureCredentials": "Identifiants Azure",
       "awsRoleArn": "ARN du rôle AWS"
+    },
+    "dataRetentionDefaults": {
+      "title": "Valeurs par défaut de conservation des données",
+      "about": "Pour les flux sans rétention propre. Vide ou 0 utilise la valeur globale ; sinon au moins 3 jours.",
+      "defaultDays": "Par défaut (jours)",
+      "streamType": "Type de flux",
+      "days": "Jours",
+      "addType": "Ajouter un type de flux",
+      "removeType": "Supprimer ce type de flux",
+      "globalDefault": "Global : {value}",
+      "globalType": "Global {type} : {value}",
+      "daysValue": "{days} jours",
+      "forever": "conserver indéfiniment",
+      "invalid": "Utilisez 0 ou au moins 3 jours"
     },
     "organizationSettings": {
       "fieldNameHelp": "Utilisez uniquement des caractères alphanumériques et '+=,.{'@'}-_', sans espaces.",
@@ -22506,6 +22616,7 @@
       "actions": "Actions",
       "rum": "RHUM",
       "runningQueries": "Exécution de requêtes",
+      "security": "Sécurité",
       "oncall": "Astreinte",
       "synthetics": "Synthétiques",
       "fleet": "Flotte",
@@ -22567,7 +22678,8 @@
       "syntheticsJourney": "Parcours synthétique",
       "downtimes": "Périodes de maintenance",
       "fleetConfigEditor": "Éditeur de configuration",
-      "fleetOverview": "Pipelines de flotte"
+      "fleetOverview": "Pipelines de flotte",
+      "securityRecord": "Sécurité — ouvrir l'enregistrement"
     },
     "actions": {
       "openCheatsheet": "Ouvrir un aide-mémoire sur les raccourcis clavier",
@@ -22700,7 +22812,9 @@
       "traceNextVisibleSpan": "Span visible suivant",
       "tracePrevVisibleSpan": "Span visible précédent",
       "fleetEditorDeleteNode": "Supprimer le composant sélectionné",
-      "fleetFlowCloseDetails": "Fermer les détails du chemin ou réduire la carte"
+      "fleetFlowCloseDetails": "Fermer les détails du chemin ou réduire la carte",
+      "securityRecordNext": "Enregistrement suivant",
+      "securityRecordPrev": "Enregistrement précédent"
     }
   },
   "components": {
@@ -23040,7 +23154,9 @@
         "ready": "Prêt",
         "running": "En cours",
         "training": "Entraînement",
-        "waiting": "En attente"
+        "waiting": "En attente",
+        "waitingForData": "En attente de données",
+        "notApplicable": "Non applicable"
       },
       "anomalyStatus": {
         "active": "Actif",
@@ -23048,7 +23164,9 @@
         "training": "Entraînement",
         "failed": "Échoué",
         "waiting": "En attente",
-        "disabled": "Désactivé"
+        "disabled": "Désactivé",
+        "waitingForData": "En attente de données",
+        "notApplicable": "Non applicable"
       },
       "aiToolsetKind": {
         "skill": "Compétence",
@@ -23233,6 +23351,11 @@
       "failedToLoadToolset": "Échec du chargement de l'ensemble d'outils"
     },
     "alerts": {
+      "firing": {
+        "bulkResult": "{acked} acquittées, {skipped} ignorées",
+        "bulkResultFailed": "{acked} acquittés, {skipped} ignorés, {failed} échoués",
+        "bulkAllAcked": "{acked} acquittées"
+      },
       "failedToNavigateToAlert": "Échec de la navigation vers l'alerte",
       "alertNotFound": "Alerte introuvable",
       "failedToLoadAlerts": "Échec du chargement des alertes",
@@ -23411,7 +23534,6 @@
     },
     "login": {
       "somethingWentWrong": "Une erreur s'est produite",
-      "thankYouForYourFeedback": "Merci pour votre retour",
       "selectedSuggestion": "Suggestion sélectionnée \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Veuillez remplir tous les champs et réessayer.",
       "invalidUsernameOrPassword": "Nom d'utilisateur ou mot de passe invalide",
@@ -23878,6 +24000,19 @@
     "exportSucceeded": "Exporté {count} SLO | Exportés {count} SLOs",
     "moved": "Déplacé {count} SLO(s) vers {folder}",
     "moveFailed": "Échec du déplacement",
+    "import": {
+      "title": "Importer des SLO",
+      "results": "Résultats de l'importation",
+      "noResults": "Le résultat de chaque SLO apparaît ici après l'importation.",
+      "jsonEmpty": "Ajoutez du JSON de SLO depuis un fichier, une URL ou l'éditeur avant l'importation.",
+      "invalidJson": "Le JSON du SLO n'a pas pu être analysé.",
+      "notAnObject": "Le SLO #{index} n'est pas un objet JSON et a été ignoré.",
+      "nameRequired": "Le SLO #{index} n'a pas de nom et a été ignoré.",
+      "created": "SLO #{index} « {name} » importé.",
+      "failed": "Le SLO #{index} « {name} » n'a pas été importé : {reason}",
+      "unknownError": "Erreur inconnue",
+      "succeeded": "{count} SLO importé | {count} SLO importés"
+    },
     "preview": {
       "goodEvents": "Bons événements",
       "badEvents": "Mauvais événements",
@@ -23968,6 +24103,1179 @@
       "minutes": "{count} minute | {count} minutes",
       "hours": "{count} heure | {count} heures",
       "days": "{count} jour | {count} jours"
+    }
+  },
+  "solutionSwitcher": {
+    "title": "Solution",
+    "hint": "Changez de produit sans perdre votre contexte",
+    "observability": {
+      "label": "Observabilité",
+      "description": "Logs, métriques, traces, tableaux de bord"
+    },
+    "security": {
+      "label": "Sécurité",
+      "description": "SIEM · OCSF · Règles Sigma"
+    }
+  },
+  "siem": {
+    "severity": {
+      "critical": "Critique",
+      "high": "Élevé",
+      "medium": "Moyen",
+      "low": "Faible",
+      "info": "Info",
+      "unknown": "Inconnu",
+      "fatal": "Fatal",
+      "other": "Autre"
+    },
+    "range": {
+      "1h": "1 h",
+      "24h": "24 h",
+      "7d": "7 j",
+      "30d": "30 j"
+    },
+    "common": {
+      "close": "Fermer",
+      "mitre": "MITRE ATT&CK",
+      "severity": "Sévérité",
+      "viewAll": "Voir tout"
+    },
+    "caseStatus": {
+      "open": "Nouveau",
+      "acknowledged": "Investigation en cours",
+      "resolved": "Clôturé"
+    },
+    "health": {
+      "live": "Remonte des données",
+      "quiet": "Silencieux depuis plus de 24 heures",
+      "never": "Aucune donnée pour l'instant"
+    },
+    "outcome": {
+      "success": "Succès",
+      "failure": "Échec"
+    },
+    "op": {
+      "eq": "égal à",
+      "neq": "différent de",
+      "contains": "contient",
+      "notContains": "ne contient pas"
+    },
+    "pivot": {
+      "include": "Filtrer sur la valeur",
+      "exclude": "Exclure la valeur",
+      "copy": "Copier la valeur"
+    },
+    "entity": {
+      "actor": "Acteur",
+      "source": "Source",
+      "destination": "Destination",
+      "host": "Hôte",
+      "process": "Processus",
+      "operation": "Opération",
+      "resource": "Ressource"
+    },
+    "notices": {
+      "more": "{n} de plus",
+      "less": "Afficher moins",
+      "readMore": "Lire la suite",
+      "tone": {
+        "error": "Erreur",
+        "warning": "Avertissement",
+        "info": "Information"
+      }
+    },
+    "fieldGroup": {
+      "event": "Événement",
+      "actor": "Acteur",
+      "src": "Point de terminaison source",
+      "dst": "Point de terminaison de destination",
+      "network": "Connexion",
+      "http": "HTTP",
+      "process": "Processus et fichier",
+      "cloud": "Cloud et API",
+      "finding": "Constat",
+      "device": "Appareil",
+      "metadata": "Métadonnées",
+      "other": "Autres champs"
+    },
+    "column": {
+      "time": "Heure",
+      "severityId": "Gravité",
+      "className": "Classe",
+      "activity": "Activité",
+      "statusId": "Résultat",
+      "actor": "Acteur",
+      "srcIp": "IP source",
+      "dstIp": "IP de destination",
+      "host": "Hôte",
+      "process": "Processus",
+      "operation": "Opération",
+      "resource": "Ressource",
+      "product": "Produit",
+      "message": "Message"
+    },
+    "mitre": {
+      "tactics": {
+        "reconnaissance": "Reconnaissance",
+        "resource_development": "Développement de ressources",
+        "initial_access": "Accès initial",
+        "execution": "Exécution",
+        "persistence": "Persistance",
+        "privilege_escalation": "Élévation de privilèges",
+        "defense_evasion": "Contournement des défenses",
+        "credential_access": "Accès aux identifiants",
+        "discovery": "Découverte",
+        "lateral_movement": "Mouvement latéral",
+        "collection": "Collecte",
+        "command_and_control": "Commande et contrôle",
+        "exfiltration": "Exfiltration",
+        "impact": "Impact"
+      }
+    },
+    "overview": {
+      "title": "Vue d'ensemble du SOC",
+      "subtitle": "Ce qui s'est déclenché, ce qui est ouvert, et si vos sources remontent toujours des données",
+      "autoRefreshOn": "L'actualisation automatique toutes les minutes est activée",
+      "autoRefreshOff": "L'actualisation automatique est désactivée",
+      "historyError": "Impossible de charger l'historique des détections : {reason}",
+      "rulesError": "Impossible de charger les détections : {reason}",
+      "noDetections": "Aucune détection SIEM n'est encore activée, donc rien ici ne peut se déclencher. Activez des détections depuis le catalogue Sigma pour commencer la surveillance.",
+      "browseDetections": "Parcourir les détections",
+      "stat": {
+        "critical": "Déclenchements critiques",
+        "high": "Déclenchements de gravité élevée",
+        "openCases": "Cas ouverts",
+        "firingDetections": "Détections en cours de déclenchement",
+        "quietSources": "Sources silencieuses",
+        "activeRules": "Détections actives"
+      },
+      "activity": "Activité des détections",
+      "activityHint": "Aucun déclenchement dans cette fenêtre | {n} déclenchement dans cette fenêtre, empilé par gravité | {n} déclenchements dans cette fenêtre, empilés par gravité",
+      "quiet": "Rien ne s'est déclenché",
+      "quietHint": "Aucune détection ne s'est déclenchée dans cette fenêtre temporelle.",
+      "openCases": "Cas ouverts",
+      "casesUnsupported": "La gestion des cas n'est pas disponible sur ce déploiement",
+      "noOpenCases": "Aucun cas ouvert",
+      "untitledCase": "Cas sans titre",
+      "caseAlerts": "{n} alerte | {n} alertes",
+      "triage": "File de triage",
+      "triageHint": "Derniers déclenchements, les plus récents en premier",
+      "fullQueue": "File complète",
+      "detection": "Détection",
+      "matches": "Correspondances",
+      "fired": "Déclenché",
+      "queueClear": "La file de triage est vide",
+      "topDetections": "Détections les plus bruyantes",
+      "topDetectionsHint": "Où l'optimisation porte ses fruits en premier",
+      "mitre": "Couverture MITRE ATT&CK",
+      "mitreHint": "{covered} sur {total} tactiques couvertes par les détections activées",
+      "rulesCount": "{n} règle | {n} règles",
+      "firingsCount": "{n} déclenchement | {n} déclenchements",
+      "legendFiring": "Déclenchements dans la fenêtre",
+      "legendCovered": "Couvertes",
+      "legendGap": "Aucune couverture",
+      "sources": "État des sources de logs",
+      "sourcesHint": "{live} sources de sécurité sur {total} remontent des données",
+      "explore": "Explorer",
+      "noSources": "Aucune source de sécurité pour l'instant",
+      "noSourcesHint": "Ingérez CloudTrail, Okta, VPC Flow ou syslog. Les flux dont le nom contient security, audit, auth ou firewall apparaissent ici automatiquement.",
+      "summaryPartial": "Cette fenêtre contient plus d'historique d'alertes qu'un résumé ne peut en contenir ; les décomptes et les graphiques constituent donc une borne inférieure. Choisissez une fenêtre plus courte pour obtenir des chiffres complets."
+    },
+    "events": {
+      "title": "Événements de sécurité",
+      "subtitle": "Chassez dans la télémétrie de sécurité normalisée",
+      "run": "Exécuter",
+      "hideSidebar": "Masquer les champs",
+      "showSidebar": "Afficher les champs",
+      "selectStream": "Sélectionner un flux",
+      "securityStreams": "Flux de sécurité",
+      "otherStreams": "Autres flux",
+      "builder": "Générateur",
+      "allSeverities": "Toutes les gravités",
+      "field": "Champ",
+      "value": "Valeur",
+      "addFilter": "Ajouter un filtre",
+      "clearFilters": "Tout effacer",
+      "sources": "Sources",
+      "addSource": "Ajouter un flux comme source",
+      "removeSource": "Retirer des sources",
+      "autoSource": "Sélectionné automatiquement : {label}, {n}% de correspondance",
+      "nameSource": "Sélectionné car son nom ressemble à une source de sécurité",
+      "autoTag": "auto",
+      "suggested": "Suggéré",
+      "suggestedSource": "Ressemble à {label} ({n}% de correspondance)",
+      "addSuggested": "Ajouter comme source",
+      "dismissSuggestion": "Ignorer",
+      "showMore": "Afficher {n} de plus",
+      "showFewer": "Afficher moins",
+      "classShare": "{uid} {pct}%",
+      "classifying": "Vérification des flux à la recherche de données de sécurité",
+      "searchFields": "Rechercher des champs",
+      "addColumn": "Afficher comme colonne",
+      "removeColumn": "Masquer la colonne",
+      "noValues": "Aucune valeur dans cette fenêtre",
+      "noFields": "Aucun champ correspondant",
+      "selectStreamFirst": "Sélectionnez un flux pour voir ses champs",
+      "confidence": "{n}% de correspondance",
+      "telemetryOnly": "Télémétrie uniquement",
+      "matchedOn": "correspondance sur {fields}",
+      "ocsfCategory": "Catégorie OCSF : {name}",
+      "ocsfClass": "Classe OCSF : {name} ({uid})",
+      "rulesMatch": "Les règles correspondent à {logsource}",
+      "rulesMatchHint": "La source de log Sigma sur laquelle les détections sont mises en correspondance, et non la catégorie OCSF",
+      "product": "Produit : {name}",
+      "classMix": "Classes dans la dernière heure : {mix}",
+      "objects": "Objets OCSF",
+      "missingSignals": "Non observés : {fields}",
+      "detections": "{n} détection | {n} détections",
+      "firing": "{n} en déclenchement | {n} en déclenchement",
+      "rulesFor": "Règles Sigma pour {source}",
+      "hits": "{n} résultat | {n} résultats",
+      "viewHits": "Voir les résultats",
+      "createDetection": "Créer une détection",
+      "events": "Événements",
+      "sqlTimelineNote": "La chronologie et la répartition par gravité suivent les filtres du constructeur. Revenez au constructeur pour les voir pour cette recherche.",
+      "noStreamTitle": "Aucun flux à rechercher",
+      "noStreamHint": "Ingérez des logs de sécurité pour commencer la chasse. Les flux apparaissent ici dès que les données arrivent.",
+      "showingOf": "Affichage des {shown} derniers événements sur {total}",
+      "count": "{n} événement | {n} événements",
+      "hideTimeline": "Masquer la chronologie",
+      "showTimeline": "Afficher la chronologie",
+      "normalized": "Normalisé",
+      "normalizedHint": "Chaque source mappée sur les colonnes OCSF",
+      "raw": "Brut",
+      "refresh": "Actualiser les résultats",
+      "noEvents": "Aucun événement trouvé",
+      "noEventsHint": "Élargissez la plage temporelle ou assouplissez les filtres.",
+      "noEventsLastReported": "{stream} ne contient rien sur cette plage temporelle. Dernier signalement : {ago}.",
+      "searchWider": "Rechercher sur la dernière période de {period}",
+      "searchFailed": "Échec de la recherche",
+      "cancel": "Annuler",
+      "cancelled": "Recherche annulée",
+      "latestCount": "{n} événement correspondant le plus récent | {n} événements correspondants les plus récents",
+      "sql": "SQL",
+      "invertFilter": "Basculer entre l’inclusion et l’exclusion",
+      "removeFilter": "Supprimer le filtre",
+      "pivotSqlUnsupported": "Cette requête SQL n’est pas un simple SELECT … WHERE, le filtre n’a donc pas pu y être ajouté. Modifiez la requête manuellement ou passez en mode Builder.",
+      "topValuesWholeStream": "Mode SQL : les valeurs sont comptées sur l’ensemble du flux, et non sur votre requête."
+    },
+    "drawer": {
+      "event": "Événement de sécurité",
+      "overview": "Vue d’ensemble",
+      "detections": "Détections",
+      "fields": "Champs",
+      "json": "JSON",
+      "noEntities": "Aucune entité reconnue",
+      "noEntitiesHint": "Cette source n’a pas de mappage pour les champs acteur, réseau ou hôte. Consultez l’onglet Champs pour tout ce qui est arrivé.",
+      "classifiedAs": "Classé comme",
+      "evaluating": "Évaluation des détections pour cet événement",
+      "noRules": "Aucune détection ne s’applique à cette source",
+      "noRulesHint": "Aucune des règles Sigma fournies n’est écrite pour cette source de logs.",
+      "matchError": "Impossible d’évaluer les détections",
+      "noMatches": "Aucune détection ne correspond",
+      "noMatchesHint": "{n} règle évaluée sur cet événement ; elle ne correspond pas. | {n} règles évaluées sur cet événement ; aucune ne correspond.",
+      "attack": "Techniques ATT&CK",
+      "classUid": "class_uid {n}",
+      "eyebrow": "Événement de sécurité",
+      "source": "Source",
+      "matchedRules": "{n} détection correspondante | {n} détections correspondantes"
+    },
+    "record": {
+      "prev": "Enregistrement précédent",
+      "next": "Enregistrement suivant",
+      "position": "{n} sur {total}",
+      "copyLink": "Copier le lien vers cet enregistrement",
+      "linkCopied": "Lien copié",
+      "searchFields": "Rechercher des champs et des valeurs",
+      "noFields": "Aucun champ ne correspond",
+      "copyFailed": "Impossible de copier dans le presse-papiers"
+    },
+    "alerts": {
+      "title": "Alertes",
+      "subtitle": "Chaque déclenchement de détection, et les preuves associées",
+      "eyebrow": "Déclenchement de détection",
+      "range": {
+        "1h": "1 h",
+        "6h": "6 h",
+        "24h": "24 h",
+        "7d": "7 j",
+        "30d": "30 j"
+      },
+      "stat": {
+        "firings": "Déclenchements {severity}",
+        "error": "Évaluations échouées",
+        "silenced": "Silencées",
+        "low": "Déclenchements faibles / info"
+      },
+      "status": {
+        "firing": "Déclenché",
+        "notify_failed": "Déclenché · échec de notification",
+        "error": "Évaluation échouée",
+        "normal": "Normal",
+        "skipped": "Ignoré",
+        "other": "Inconnu"
+      },
+      "column": {
+        "detection": "Détection",
+        "status": "Résultat",
+        "value": "Correspondance",
+        "window": "Fenêtre",
+        "fired": "Déclenché",
+        "evaluated": "Évalué"
+      },
+      "fact": {
+        "firedAt": "Déclenché à",
+        "value": "Correspondance vs seuil",
+        "window": "Fenêtre",
+        "evaluation": "Durée de l'évaluation",
+        "windowRange": "Fenêtre évaluée",
+        "group": "Groupe",
+        "error": "Erreur",
+        "evaluatedAt": "Évalué à"
+      },
+      "tab": {
+        "overview": "Vue d'ensemble",
+        "evidence": "Preuves",
+        "detection": "Détection",
+        "raw": "Brut"
+      },
+      "rule": {
+        "name": "Nom",
+        "state": "État",
+        "enabled": "Activé",
+        "disabled": "Désactivé",
+        "stream": "Flux",
+        "frequency": "S'exécute toutes les",
+        "logsource": "Source de logs",
+        "sigmaId": "ID de règle Sigma"
+      },
+      "minutes": "{n} minute | {n} minutes",
+      "seconds": "{n}s",
+      "yes": "Oui",
+      "search": "Rechercher des détections ou techniques",
+      "showEvaluations": "Afficher toutes les évaluations",
+      "count": "{n} ligne | {n} lignes",
+      "refresh": "Actualiser",
+      "cappedRows": "Le tableau liste les {n} exécutions correspondantes les plus récentes sur {total}, jusqu'à {from}. Les décomptes de sévérité couvrent toute la fenêtre.",
+      "summaryPartial": "Les décomptes de sévérité ont atteint la limite de lignes du serveur et peuvent être sous-estimés ; choisissez une fenêtre plus courte pour obtenir des chiffres complets.",
+      "notSiem": "Pas une règle SIEM",
+      "notSiemTitle": "Pas une détection SIEM",
+      "notSiemHint": "Cette alerte n'a pas de métadonnées Sigma, donc aucune règle à afficher. Elle est listée car le mode SIEM uniquement est désactivé.",
+      "empty": "Rien n'a été déclenché",
+      "emptyHint": "Aucune détection n'a été déclenchée dans cette fenêtre.",
+      "noDetections": "Aucune détection SIEM pour l'instant",
+      "noDetectionsHint": "Activez des détections depuis le catalogue Sigma sur la page Détections ; leurs déclenchements apparaissent ici.",
+      "whatItDetects": "Ce qu'elle détecte",
+      "whyItFired": "Pourquoi elle s'est déclenchée",
+      "falsePositives": "Faux positifs connus",
+      "noEvidence": "Aucune requête de preuve",
+      "noEvidenceHint": "Cette détection n'a ni flux ni clause WHERE à rejouer.",
+      "evidenceCount": "{n} événement correspondant dans la fenêtre évaluée | {n} événements correspondants dans la fenêtre évaluée",
+      "evidenceError": "Impossible de charger les événements correspondants",
+      "evidenceAgedOut": "Aucun événement correspondant ne reste dans cette fenêtre ; ils ont peut-être dépassé la durée de rétention.",
+      "query": "Requête de détection",
+      "investigate": "Enquêter dans Événements",
+      "openDetection": "Ouvrir la détection",
+      "evaluation": "Évaluation",
+      "eyebrowEvaluation": "Évaluation de la détection",
+      "evidenceNone": "Rien ne correspond à cette détection dans la fenêtre évaluée.",
+      "customWindow": "Fenêtre fixe affichée : {from} → {to}",
+      "backToRange": "Revenir à la plage {range}",
+      "missing": "L'alerte vers laquelle ce lien pointe ne figure pas dans la fenêtre chargée. Elle est peut-être plus ancienne que cette plage ou au-delà de la limite des lignes les plus récentes.",
+      "dismiss": "Fermer"
+    },
+    "cases": {
+      "title": "Cas",
+      "subtitle": "Déclenchements corrélés, qualifiés jusqu'à un verdict",
+      "eyebrow": "Cas",
+      "search": "Filtrer cette page par titre, id, assigné ou entité",
+      "refresh": "Actualiser",
+      "loadError": "Impossible de charger les cas",
+      "openError": "Impossible d'ouvrir le cas",
+      "hiddenAlerts": "{n} déclenchement d'alertes non liées à la sécurité dans ce cas est masqué | {n} déclenchements d'alertes non liées à la sécurité dans ce cas sont masqués",
+      "noSecurityAlerts": "Ce cas a été ouvert par des alertes qui ne sont pas des détections de sécurité ; elles ne sont donc pas affichées ici",
+      "updateError": "Impossible de mettre à jour le cas",
+      "commentError": "Impossible de publier le commentaire",
+      "analysisError": "L'analyse des causes racines a échoué",
+      "empty": "Aucun cas",
+      "emptyHint": "Les cas s'ouvrent automatiquement lorsque des détections liées se déclenchent ensemble.",
+      "unassigned": "Non assigné",
+      "column": {
+        "priority": "Priorité",
+        "title": "Cas",
+        "status": "Statut",
+        "alerts": "Alertes",
+        "assignee": "Assigné",
+        "firstSeen": "Première apparition",
+        "lastSeen": "Dernière apparition"
+      },
+      "fact": {
+        "duration": "Durée"
+      },
+      "durationMinutes": "{n} min",
+      "durationHours": "{n} h",
+      "durationDays": "{n} j",
+      "tab": {
+        "overview": "Vue d'ensemble",
+        "alerts": "Alertes",
+        "timeline": "Chronologie",
+        "analysis": "Analyse"
+      },
+      "detections": "Détections dans ce cas",
+      "noDetections": "Aucune détection enregistrée pour l'instant",
+      "firedTimes": "déclenchée {n} fois | déclenchée {n} fois",
+      "entities": "Entités concernées",
+      "noEntities": "Le moteur de corrélation n'a enregistré aucune dimension de regroupement pour ce cas.",
+      "noAlerts": "Aucune alerte enregistrée",
+      "external": "Externe",
+      "reason": {
+        "service_discovery": "Corrélé via la découverte de services",
+        "primary_match": "Corrélé sur les dimensions primaires",
+        "secondary_match": "Corrélé sur les dimensions secondaires",
+        "alert_id": "Même détection"
+      },
+      "commentPlaceholder": "Ajouter une note pour l'équipe",
+      "postComment": "Publier la note",
+      "noEvents": "Aucune activité pour l'instant",
+      "event": {
+        "created": "Cas ouvert",
+        "alert": "{name} déclenchée ({n})",
+        "severityUpgrade": "Priorité relevée {from} → {to} : {reason}",
+        "severityOverride": "Priorité définie {from} → {to}",
+        "acknowledged": "Marqué en cours d'investigation",
+        "resolved": "Clos",
+        "autoResolved": "Clos automatiquement",
+        "reopened": "Réouvert : {reason}",
+        "titleChanged": "Renommé en {to}",
+        "assigned": "Assigné à {to}",
+        "unassigned": "Non assigné",
+        "comment": "Note",
+        "analysisBegin": "Analyse des causes racines démarrée",
+        "analysisComplete": "Analyse des causes racines terminée",
+        "analysisFailed": "Échec de l'analyse des causes racines : {reason}",
+        "analysisCancelled": "Analyse des causes racines annulée",
+        "other": "{type}"
+      },
+      "analysisHint": "Un résumé IA de ce qui relie les déclenchements de ce cas.",
+      "runAnalysis": "Analyser",
+      "rerunAnalysis": "Réanalyser",
+      "noAnalysis": "Aucune analyse pour l'instant",
+      "priorityOption": "{p} · {level}",
+      "priorityChanged": "Priorité définie sur {p}",
+      "statusChanged": "Cas marqué {status}",
+      "viewFirings": "Voir les déclenchements",
+      "transition": {
+        "open": "Réouvrir",
+        "acknowledged": "Commencer l'investigation",
+        "resolved": "Clore le cas"
+      },
+      "notFound": "Cas introuvable",
+      "timelinePartial": "Cette chronologie a été reconstruite à partir de l'enregistrement du cas ; les notes, les prises en charge et les activités d'analyse antérieures à la reconstruction peuvent donc manquer."
+    },
+    "mitrePage": {
+      "title": "MITRE ATT&CK",
+      "subtitle": "Quelles techniques vos détections activées couvrent, et lesquelles se sont déclenchées",
+      "summaryPartial": "Cette fenêtre contient plus d'historique d'alertes qu'un résumé ne peut en contenir ; les décomptes de déclenchements sont donc une borne inférieure. Choisissez une fenêtre plus courte pour obtenir des chiffres complets.",
+      "stat": {
+        "firing": "Techniques déclenchées",
+        "gaps": "Lacunes de couverture",
+        "techniques": "Techniques couvertes sur {total}",
+        "tactics": "Tactiques couvertes sur {total}"
+      },
+      "view": {
+        "all": "Toutes",
+        "covered": "Couvertes",
+        "gaps": "Lacunes",
+        "firing": "Déclenchées"
+      },
+      "search": "Rechercher une technique ou une règle",
+      "legend": {
+        "firing": "Déclenchements sur la période (plus foncé = plus)",
+        "covered": "Couvertes par une détection activée",
+        "available": "Règle disponible, non activée"
+      },
+      "columnCount": "{covered} sur {total} couvertes",
+      "cellEnabled": "{n} détection active | {n} détections actives",
+      "cellAvailable": "{n} règle disponible | {n} règles disponibles",
+      "noMatch": "Aucune technique ne correspond",
+      "unmapped": "Techniques sans tactique connue",
+      "footnote": "Les techniques proviennent des {n} règles Sigma fournies et de vos propres détections ; leur placement suit les tactiques associées à chaque règle.",
+      "drawerEyebrow": "Technique ATT&CK",
+      "state": {
+        "firing": "Déclenchée",
+        "covered": "Couverte",
+        "available": "Non couverte"
+      },
+      "fact": {
+        "state": "Couverture",
+        "enabled": "Détections actives",
+        "catalog": "Règles du catalogue",
+        "firings": "Déclenchements ({range})"
+      },
+      "tab": {
+        "detections": "Détections",
+        "firings": "Déclenchements",
+        "reference": "Référence"
+      },
+      "subOf": "Sous-technique de {id}",
+      "yourDetections": "Vos détections",
+      "noDetections": "Aucune de vos détections ne couvre encore cette technique",
+      "enabled": "Activée",
+      "disabled": "Désactivée",
+      "inCatalog": "Disponible dans le catalogue",
+      "enable": "Activer",
+      "noFirings": "Aucun déclenchement pour cette technique sur la période {range}",
+      "referenceHint": "Les noms des techniques, les procédures et les mesures d'atténuation sont maintenus par MITRE. Cette page affiche l'identifiant porté par vos règles et renvoie à l'entrée de référence.",
+      "openTechnique": "Ouvrir {id} sur attack.mitre.org",
+      "viewOnAttack": "Voir sur ATT&CK",
+      "manageDetections": "Gérer les détections",
+      "historyNarrowed": "La plage de requête maximale de l'historique des alertes limite les déclenchements à ceux depuis {from} ; les déclenchements antérieurs dans cette fenêtre ne sont pas comptés."
+    },
+    "detections": {
+      "title": "Détections",
+      "subtitle": "Règles Sigma exécutées comme détections planifiées sur vos flux de sécurité",
+      "new": "Nouvelle détection",
+      "eyebrow": "Règle de détection",
+      "refresh": "Actualiser les détections",
+      "search": "Rechercher par nom, flux ou technique",
+      "anySeverity": "Toutes les gravités",
+      "notSiem": "Alerte",
+      "scheduleValue": "Toutes les {every}m sur {over}m",
+      "minutes": "{n} minute | {n} minutes",
+      "stat": {
+        "fired": "Déclenchements sur 24 h",
+        "erroring": "En erreur",
+        "enabled": "Activées",
+        "disabled": "Désactivées",
+        "all": "Toutes les détections"
+      },
+      "column": {
+        "name": "Détection",
+        "stream": "Flux",
+        "schedule": "Planification",
+        "enabled": "Activée",
+        "fired24h": "Déclenchements (24 h)",
+        "lastRun": "Dernière exécution"
+      },
+      "state": {
+        "enabled": "Activée",
+        "disabled": "Désactivée",
+        "erroring": "En erreur"
+      },
+      "tab": {
+        "overview": "Vue d'ensemble",
+        "history": "Historique",
+        "sigma": "Règle Sigma",
+        "sql": "Requête"
+      },
+      "field": {
+        "logsource": "Source de logs",
+        "sourceType": "Type de source",
+        "sigmaId": "ID de règle Sigma",
+        "destinations": "Notifications",
+        "silence": "Silence après déclenchement",
+        "owner": "Propriétaire",
+        "lastError": "Dernière erreur"
+      },
+      "erroringHint": "La dernière évaluation de cette règle a échoué. Elle ne détecte rien tant que la prochaine exécution n'a pas réussi.",
+      "historyLoading": "Chargement de l'historique d'évaluation…",
+      "historyError": "Impossible de charger l'historique de cette règle",
+      "historyEmpty": "Aucune évaluation enregistrée",
+      "historyEmptyHint": "Cette règle n'a pas été évaluée au cours des {days} derniers jours.",
+      "historySummary": "{firings} déclenchement sur les {runs} dernières évaluations au cours des {days} derniers jours. | {firings} déclenchements sur les {runs} dernières évaluations au cours des {days} derniers jours.",
+      "historyCapped": "{total} évaluations au total ; les plus anciennes ne sont pas affichées.",
+      "outcome": {
+        "firing": "Déclenchée",
+        "error": "Erreur",
+        "normal": "Rien trouvé",
+        "notify_failed": "Déclenchée · échec de notification",
+        "skipped": "Ignorée",
+        "other": "Résultat inconnu"
+      },
+      "matched": "{n} lignes correspondantes",
+      "took": "{s} s",
+      "noSigma": "Aucune règle Sigma sur cette alerte",
+      "noSigmaHint": "Les alertes créées en dehors du SIEM s'exécutent de la même manière, mais n'ont pas été écrites en tant que détections.",
+      "noSql": "-- Cette règle n'a pas de requête SQL",
+      "delete": "Supprimer",
+      "deleteTitle": "Supprimer la détection",
+      "deleteMessage": "Supprimer « {name} » ? Elle cesse de s'exécuter immédiatement. Ses déclenchements passés restent dans l'historique des alertes.",
+      "deleted": "{name} supprimée",
+      "deleteFailed": "Impossible de supprimer la détection",
+      "enable": "Activer",
+      "disable": "Désactiver",
+      "enabledToast": "{name} activée",
+      "disabledToast": "{name} désactivée",
+      "toggleFailed": "Impossible de modifier l'état de la règle",
+      "noId": "{name} n'a pas d'identifiant et ne peut pas être modifiée",
+      "viewMatches": "Voir les correspondances dans Événements",
+      "emptyTitle": "Aucune détection pour le moment",
+      "emptyHint": "Une détection est une règle Sigma exécutée comme alerte planifiée. Chaque déclenchement arrive dans Alertes et est consolidé dans Cas.",
+      "createFirst": "Créer une détection",
+      "newTitle": "Nouvelle détection",
+      "newSubtitle": "Une règle Sigma compilée en SQL sur votre flux et planifiée comme alerte",
+      "create": "Créer la détection",
+      "cancel": "Annuler",
+      "library": "Bibliothèque de règles ({n})",
+      "writeSigma": "Écrire du Sigma",
+      "librarySearch": "Filtrer par titre, technique ou source de journal",
+      "libraryEmpty": "Aucune règle ne correspond à ce filtre",
+      "stream": "Flux",
+      "streamPlaceholder": "Choisissez le flux sur lequel exécuter",
+      "notify": "Notifier",
+      "notifyPlaceholder": "Choisissez une destination",
+      "noDestinations": "Aucune destination d'alerte n'existe encore. Une détection en a besoin pour notifier ; créez-la dans un nouvel onglet puis revenez ; cette liste s'actualise automatiquement.",
+      "createDestination": "Créer une destination",
+      "reloadDestinations": "Actualiser",
+      "lookBack": "Période d'analyse (minutes)",
+      "runEvery": "Intervalle d'exécution (minutes)",
+      "silence": "Rester silencieux pendant (minutes)",
+      "compiles": "Se compile sur {stream}",
+      "compilesAs": "Se compile sur {stream}, identifié comme {source}",
+      "logsourceMismatch": "Cette règle est écrite pour {rule}, mais {stream} est identifié comme {source}. Elle ne peut correspondre que là où les deux partagent les mêmes noms de champs.",
+      "ocsfBridge": "{stream} est OCSF, donc les champs de la règle sont mappés vers les chemins OCSF et elle ne s'exécute que sur les événements avec {guard}.",
+      "ocsfGuard": {
+        "class": "class_uid {uid}",
+        "activity": "activity_id {id}",
+        "product": "un nom de produit contenant \"{name}\""
+      },
+      "createDestinationAria": "Créer une destination (s'ouvre dans un nouvel onglet)",
+      "wontRun": "Ne s'exécutera pas sur {stream}",
+      "created": "Détection {name} créée",
+      "createFailed": "Impossible de créer la détection",
+      "neverRun": "Pas encore exécutée",
+      "notFired": "Ne s'est pas déclenchée",
+      "firedTimes": "Une fois, {when} | {n} fois, la dernière fois {when}",
+      "firedCount": "Déclenchée une fois en 24 h | Déclenchée {n} fois en 24 h",
+      "firingsPartial": "Trop d'évaluations sur les dernières 24 heures pour les compter toutes ; les compteurs de déclenchements sont des minima.",
+      "firingsNarrowed": "Les compteurs de déclenchements commencent à {from} : le stockage de l'historique limite la période qu'une requête peut couvrir.",
+      "ago": {
+        "now": "à l'instant",
+        "minutes": "il y a {n} min",
+        "hours": "il y a {n} h",
+        "days": "il y a {n} j"
+      },
+      "firingsError": "Impossible de charger l'historique des déclenchements",
+      "firingsErrorBanner": "Les compteurs de déclenchements sont indisponibles : {reason}",
+      "validation": {
+        "positive": "Doit être d'au moins 1 minute",
+        "nonNegative": "Ne peut pas être négatif",
+        "periodGap": "Plus court que l’intervalle d’exécution : les minutes entre deux exécutions ne seraient jamais vérifiées"
+      },
+      "nameTaken": "Une détection ou une alerte nommée « {name} » existe déjà. Son historique fusionnerait avec le sien ; choisissez un autre flux ou supprimez d’abord l’élément existant.",
+      "loadError": "Échec du chargement des règles de détection"
+    },
+    "content": {
+      "title": "Contenu",
+      "subtitle": "Les règles de détection et sources de logs fournies avec le SIEM, confrontées à vos données",
+      "refresh": "Actualiser",
+      "streamsError": "Impossible de charger vos flux ; les correspondances avec vos données sont donc inconnues",
+      "tab": {
+        "rules": "Règles de détection",
+        "sources": "Sources de logs",
+        "overview": "Vue d’ensemble",
+        "yourData": "Vos données",
+        "yaml": "Sigma YAML",
+        "yourStreams": "Vos flux",
+        "mapping": "Mappage des champs"
+      },
+      "logsources": "Sources de logs",
+      "allLogsources": "Toutes les règles",
+      "anyLevel": "Tous les niveaux",
+      "searchRules": "Rechercher des règles par titre, technique ou source de logs",
+      "searchSources": "Rechercher des sources par nom, fournisseur ou source de logs",
+      "stat": {
+        "ready": "Prêt à installer",
+        "installed": "Installé",
+        "applies": "Applicables à vos données",
+        "allRules": "Toutes les règles",
+        "detected": "Trouvés dans vos données",
+        "supported": "Sources prises en charge"
+      },
+      "column": {
+        "rule": "Règle",
+        "logsource": "Source de logs",
+        "status": "Statut",
+        "yourData": "Vos données",
+        "installed": "Installé",
+        "source": "Source",
+        "vendor": "Fournisseur",
+        "ocsf": "Classe OCSF",
+        "rules": "Règles",
+        "yourStreams": "Vos flux"
+      },
+      "status": {
+        "stable": "Stable",
+        "test": "Test",
+        "experimental": "Expérimental",
+        "deprecated": "Obsolète",
+        "unsupported": "Non pris en charge"
+      },
+      "streamCount": "{n} flux | {n} flux",
+      "noMatchingData": "Aucune source correspondante",
+      "installed": "Installé",
+      "readyToInstall": "Prêt à installer",
+      "noRules": "Aucune règle ne correspond",
+      "noSources": "Aucune source ne correspond",
+      "telemetryOnly": "Télémétrie uniquement",
+      "notDetected": "Absent de vos données",
+      "detectedInData": "Trouvé dans vos données",
+      "ruleEyebrow": "Règle Sigma",
+      "sourceEyebrow": "Source de logs",
+      "field": {
+        "author": "Auteur",
+        "modified": "Mis à jour",
+        "required": "Identifié par",
+        "signals": "Champs complémentaires"
+      },
+      "falsePositives": "Faux positifs connus",
+      "references": "Références",
+      "noStreamsForRule": "Aucun de vos flux ne correspond à cette règle",
+      "noStreamsForRuleHint": "Elle a été écrite pour {logsource}. Ingérez cette source et elle apparaîtra ici.",
+      "runnable": "S'exécute sur ce flux",
+      "notRunnable": "Ne peut pas s'exécuter ici",
+      "openInEvents": "Ouvrir dans Événements",
+      "installHere": "Installer sur ce flux",
+      "install": "Installer comme détection",
+      "installAgain": "Installer sur un autre flux",
+      "viewDetection": "Voir la détection",
+      "noStreamsForSource": "Introuvable dans vos données",
+      "noStreamsForSourceHint": "Un flux est identifié comme cette source lorsqu'il contient {fields}.",
+      "noRulesForSource": "Aucune règle n'est encore écrite pour cette source",
+      "mappingHint": "Comment les champs de cette source sont mappés sur les colonnes normalisées que lit chaque page SIEM. Le premier champ présent sur une ligne l'emporte.",
+      "detectionCount": "Oui, comme {n} détection | Oui, comme {n} détections",
+      "notInstalled": "Non installé",
+      "mapColumn": {
+        "actorId": "ID de l'acteur",
+        "srcPort": "Port source",
+        "dstPort": "Port de destination",
+        "vendor": "Fournisseur",
+        "classUid": "ID de classe OCSF",
+        "className": "Classe",
+        "severityId": "Gravité",
+        "statusId": "Résultat"
+      },
+      "cannotRun": "Impossible de l'exécuter sur vos données"
+    },
+    "entities": {
+      "title": "Entités",
+      "subtitle": "Tous les utilisateurs, adresses IP sources et hôtes mentionnés par vos sources de sécurité",
+      "view": {
+        "table": "Tableau",
+        "graph": "Graphe des risques"
+      },
+      "riskGraph": {
+        "empty": "Aucune entité à représenter",
+        "emptyHint": "Ajoutez des sources de sécurité ou élargissez la plage temporelle pour voir le graphe des risques.",
+        "showingTop": "Affichage des {n} premiers sur {total} par risque",
+        "illustrative": "Illustratif : les relations sont déduites du classement des risques, et non observées.",
+        "baseScore": "base {n}",
+        "propagatedScore": "propagé {n}",
+        "tier": {
+          "critical": "Critique",
+          "high": "Élevé",
+          "medium": "Moyen",
+          "low": "Faible"
+        }
+      },
+      "kinds": {
+        "user": "Utilisateurs",
+        "ip": "Adresses IP",
+        "host": "Hôtes"
+      },
+      "kind": {
+        "user": "Utilisateur",
+        "ip": "Adresse IP",
+        "host": "Hôte"
+      },
+      "all": {
+        "user": "Tous les utilisateurs",
+        "ip": "Toutes les adresses IP",
+        "host": "Tous les hôtes"
+      },
+      "search": {
+        "user": "Rechercher des utilisateurs",
+        "ip": "Rechercher des adresses IP",
+        "host": "Rechercher des hôtes"
+      },
+      "col": {
+        "signals": "Signaux",
+        "events": "Événements",
+        "failures": "Échecs",
+        "peers": {
+          "ips": "Nombre max. d'IP dans une source",
+          "users": "Nombre max. d'utilisateurs dans une source"
+        },
+        "streams": "Sources",
+        "firstSeen": "Première vue",
+        "lastSeen": "Dernière vue"
+      },
+      "signal": {
+        "failures": "Taux d'échec élevé",
+        "spread": {
+          "user": "Nombreuses IP sources",
+          "ip": "Nombreux utilisateurs",
+          "host": "Nombreux utilisateurs"
+        },
+        "external": "Adresse publique"
+      },
+      "signalHint": {
+        "failures": "Au moins {rate} % des événements de cette entité ont échoué, avec au moins {n} échecs, en ne comptant que les sources qui rapportent un résultat.",
+        "spread": {
+          "user": "Vu depuis {n} adresses IP sources ou plus dans une même source pendant la fenêtre.",
+          "ip": "Utilisée par {n} utilisateurs ou plus dans une même source pendant la fenêtre. Les sorties NAT et VPN produisent le même motif, tout comme le password spraying.",
+          "host": "Accédé par {n} utilisateurs ou plus dans une même source pendant la fenêtre."
+        },
+        "external": "Ne fait pas partie d'une plage privée, de bouclage ou link-local."
+      },
+      "peersChip": {
+        "ips": "Jusqu'à {n} IP source dans une source | Jusqu'à {n} IP sources dans une source",
+        "users": "Jusqu'à {n} utilisateur dans une source | Jusqu'à {n} utilisateurs dans une source"
+      },
+      "noSignals": "Aucun signal",
+      "windowNote": "Les décomptes couvrent la fenêtre sélectionnée sur toutes les sources de sécurité.",
+      "capped": "Chaque source a renvoyé ses {n} entités les plus actives ; les moins actives ne sont pas listées, et les décomptes des entités proches de ce seuil peuvent être partiels. Les décomptes d'onglets marqués + sont tronqués.",
+      "failedStreams": "Lecture impossible : {streams}",
+      "noSources": "Aucune source de sécurité à lire",
+      "noSourcesHint": "Les entités sont trouvées dans les flux dont le nom les désigne comme données de sécurité, ou que vous avez ajoutés comme source sur la page Événements.",
+      "empty": "Aucune entité dans cette fenêtre",
+      "emptyHint": "Élargissez la plage temporelle ou vérifiez que vos sources contiennent des champs utilisateur, IP ou hôte.",
+      "refresh": "Actualiser",
+      "drawerSubtitle": "Activité sur la période : {window}",
+      "tab": {
+        "activity": "Activité",
+        "related": "Liés",
+        "sources": "Sources"
+      },
+      "activity": "Événements au fil du temps",
+      "chart": {
+        "ok": "Réussis ou inconnus",
+        "failed": "Échoués"
+      },
+      "topN": "top {n} par événements",
+      "noRelated": "Aucun élément associé dans cette fenêtre.",
+      "failedCount": "{n} échec | {n} échecs",
+      "openEvents": "Ouvrir dans Événements",
+      "huntInEvents": "Enquêter dans Événements",
+      "partialStreams": "Résultats partiels de : {streams}",
+      "limited": "{stream} : ~{rows} lignes dans {window}. Affichage limité à {slice}.",
+      "runFull": "Exécuter sur toute la fenêtre",
+      "limitedMany": "{n} sources volumineuses n’affichent que la dernière {slice} de {window} : {streams}",
+      "sourcesLoading": "Lecture des sources :",
+      "sourceStatus": {
+        "loading": "Chargement",
+        "done": "Chargée",
+        "failed": "Lecture impossible"
+      },
+      "loadError": "Impossible de charger les sources de sécurité",
+      "detailFailed": "Certaines données de cette entité n’ont pas pu être lues : {streams}."
+    },
+    "ueba": {
+      "title": "Analyse du comportement des utilisateurs",
+      "subtitle": "Chaque utilisateur est comparé à son propre passé récent",
+      "windowHint": "Derniers {current}, comparés aux {baseline} précédents",
+      "method": "Les scores de risque sont des heuristiques : les derniers {current} de chaque utilisateur sont comparés à ses propres {baseline} précédents. Chaque indicateur affiche les chiffres qui l’ont déclenché.",
+      "noSources": "Aucune source ne désigne un utilisateur",
+      "noSourcesHint": "UEBA nécessite une source de sécurité avec un champ utilisateur (CloudTrail, Okta, un journal d’authentification avec une colonne utilisateur).",
+      "search": "Rechercher des utilisateurs",
+      "empty": "Aucune activité utilisateur dans cette fenêtre",
+      "emptyHint": "Élargissez la fenêtre ou vérifiez que vos sources comportent un champ utilisateur.",
+      "eyebrow": "Comportement utilisateur",
+      "riskChip": "Risque {tone} · {score}",
+      "expected": "vs ~{n} habituel",
+      "new": "Nouveau",
+      "newIp": "Nouvelle",
+      "noIps": "Aucune adresse IP source enregistrée pour cet utilisateur.",
+      "col": {
+        "user": "Utilisateur",
+        "risk": "Risque",
+        "signals": "Signaux",
+        "events": "Événements",
+        "failures": "Échecs",
+        "ips": "IP sources"
+      },
+      "stat": {
+        "critical": "Risque critique",
+        "high": "Risque élevé",
+        "medium": "Risque moyen",
+        "all": "Utilisateurs analysés"
+      },
+      "signal": {
+        "volume": "Pic de volume",
+        "new_ip": "Nouvelle IP source",
+        "failure_jump": "Pic d’échecs",
+        "new_hours": "Heures inhabituelles",
+        "first_seen": "Première apparition"
+      },
+      "reason": {
+        "volume": "{n} événements, soit environ {ratio}× les ~{expected} attendus sur les {baseline} précédents.",
+        "newIp": "{n} événements depuis {ip}, jamais vue au cours des {baseline} précédents. | {n} événements depuis {ip}, jamais vue au cours des {baseline} précédents ({count} nouvelles adresses au total).",
+        "newIpExternal": "{n} événements depuis l’adresse publique {ip}, jamais vue au cours des {baseline} précédents. | {n} événements depuis l’adresse publique {ip}, jamais vue au cours des {baseline} précédents ({count} nouvelles adresses au total).",
+        "failureJump": "{n} échecs — {rate} % des événements, contre {baseline} % dans la période de référence.",
+        "newHours": "{n} événements à {hours} UTC, des heures auxquelles cet utilisateur n’a jamais été actif pendant les {baseline} précédents.",
+        "firstSeen": "{n} événements d’un utilisateur sans aucune activité lors des {baseline} précédents."
+      },
+      "fact": {
+        "events": "Événements",
+        "eventsValue": "{n} vs ~{expected}",
+        "failureRate": "Taux d’échec",
+        "failureValue": "{now} % vs {base} %",
+        "history": "Historique de référence",
+        "historyValue": "{span} sur {window}",
+        "noHistory": "Aucun — première détection",
+        "scoreValue": "{n} sur 100"
+      },
+      "tab": {
+        "signals": "Signaux",
+        "hours": "Heures d'activité",
+        "ips": "IP sources"
+      },
+      "noSignals": "Rien d'inhabituel",
+      "noSignalsHint": "L'activité de cet utilisateur sur la fenêtre correspond à sa référence.",
+      "scoring": "Score = somme des poids des signaux, plafonné à 100. Le volume attendu est mis à l'échelle de l'historique dont dispose réellement l'utilisateur ; un pic de volume nécessite au moins {min} événements et {ratio}× ce volume. La détection des heures inhabituelles nécessite un historique couvrant {share}% des {baseline} précédents.",
+      "hoursTitle": "Quand cet utilisateur est actif",
+      "hoursUtc": "Heure de la journée, UTC",
+      "baselineRow": "Période précédente : {w}",
+      "nowRow": "Dernière période : {w}",
+      "hourCell": "{h}:00 UTC — {n} événements",
+      "legendUsual": "Activité",
+      "legendNew": "Heure jamais utilisée dans la référence",
+      "openEntity": "Ouvrir l'entité",
+      "withheld": "Certaines données de référence sont revenues incomplètes ; ces signaux n'ont donc pas été évalués : {signals}.",
+      "currentPartial": "La fenêtre actuelle a renvoyé des données partielles ; les comptages peuvent être sous-estimés.",
+      "limited": "{stream} : ~{rows} lignes dans {window} et sa référence de {baseline}. Seuls les {slice} derniers et les {slice} précédant la fenêtre sont lus ; les signaux de première détection, de nouvelle IP et d'heures inhabituelles ne sont donc pas évalués, pas plus que les signaux de volume et de taux d'échec pour ses utilisateurs.",
+      "limitedMany": "{n} grandes sources ne sont lues que sur les {slice} derniers de {window} et les {slice} qui le précèdent, et non sur l'intégralité de la référence de {baseline} ; les signaux de première détection, de nouvelle IP et d'heures inhabituelles ne sont donc pas évalués pour elles, pas plus que les signaux de volume et de taux d'échec pour leurs utilisateurs : {streams}",
+      "provisional": "Lecture des sources en cours : les signaux de première détection, de nouvelle IP et d'heures inhabituelles apparaîtront une fois que toutes les sources auront répondu.",
+      "limitedTag": "Derniers {slice}",
+      "limitedTagHint": "Certains événements de cet utilisateur proviennent d'une source trop volumineuse pour la fenêtre complète ; ceux-ci ne sont comptés que sur les {slice} derniers.",
+      "excluded": "Exclus (leurs données n'ont pas pu être lues dans les deux fenêtres) : {streams}.",
+      "loadError": "Impossible de charger les sources de sécurité",
+      "spanHours": "{n} heure | {n} heures",
+      "spanDays": "{n} jour | {n} jours",
+      "notEvaluated": "Non évalués pour cet utilisateur car les données de référence étaient incomplètes : {signals}.",
+      "hoursNotJudged": "Les heures inhabituelles ne sont évaluées qu'avec au moins {min} événements de référence couvrant {share}% des {baseline} précédents. L'historique de cet utilisateur est plus court, aucune heure n'est donc signalée.",
+      "noHistory": "Aucune donnée dans les {baseline} précédents pour {streams} ; personne n'y est donc considéré comme vu pour la première fois.",
+      "volumeNotJudged": "Le volume n'est pas évalué pour cet utilisateur : les fenêtres de moins d'un jour sont comparées aux mêmes heures de la journée dans la référence, ce qui nécessite au moins un jour d'historique."
+    },
+    "intel": {
+      "title": "Renseignement sur les menaces",
+      "subtitle": "Indicateurs malveillants connus et tous les endroits où ils sont apparus dans vos données de sécurité",
+      "loadFailed": "Impossible de charger les listes d'indicateurs",
+      "add": "Ajouter des indicateurs",
+      "import": "Importer",
+      "importFile": "Fichier CSV",
+      "importFeed": "URL du flux",
+      "runSweep": "Lancer le balayage",
+      "refresh": "Recharger les listes et relancer le balayage",
+      "search": "Rechercher des indicateurs, sources, listes",
+      "allTypes": "Tous les types",
+      "expiringOnly": "Expirant bientôt",
+      "expired": "Expiré",
+      "never": "Jamais",
+      "notSighted": "Non observé",
+      "notSightedIn": "Non observé dans {range}",
+      "sighted": "Vu une fois | Vu {n} fois",
+      "sweeping": "Balayage… {done} sur {total} requêtes",
+      "sweptAcross": "{n} source de sécurité balayée | {n} sources de sécurité balayées",
+      "partial": "Cette analyse s'est arrêtée à sa limite de {n} requêtes, donc certaines colonnes n'ont pas été recherchées. Le nombre de requêtes augmente avec les listes × colonnes : supprimez les listes obsolètes ou les indicateurs expirés, ou répartissez les listes par type, pour une analyse complète.",
+      "failedQueries": "{n} colonne n'a pas pu être recherchée et a été ignorée. | {n} colonnes n'ont pas pu être recherchées et ont été ignorées.",
+      "truncated": "Seules les {n} premières lignes de {lists} ont été lues ; le reste n'a pas été analysé.",
+      "noIndicators": "Aucun indicateur",
+      "noCoverage": "Lancez une analyse pour voir quelles colonnes sont recherchées",
+      "coverageHint": "Ce qu'une analyse a recherché dans {n} sources de sécurité. La correspondance est exacte, sur les colonnes indiquées ; un type sans colonne ne peut pas du tout être repéré.",
+      "indicatorCount": "{n} indicateur | {n} indicateurs",
+      "columnsSearched": "{n} colonne | {n} colonnes",
+      "blind": "Non recherchable",
+      "blindHint": "Aucun flux de sécurité n'a de colonne contenant ce type de valeur, donc ces indicateurs ne peuvent encore correspondre à rien.",
+      "cidrNote": "{n} plage CIDR est conservée dans la liste mais n'est pas analysée : la correspondance exacte ne peut pas tester l'appartenance à une plage. | {n} plages CIDR sont conservées dans la liste mais ne sont pas analysées : la correspondance exacte ne peut pas tester l'appartenance à une plage.",
+      "stat": {
+        "matched": "Indicateurs observés",
+        "hits": "Observations",
+        "indicators": "Indicateurs",
+        "expiring": "Expirés ou en cours d'expiration",
+        "lists": "Listes"
+      },
+      "tab": {
+        "matches": "Correspondances",
+        "indicators": "Indicateurs",
+        "coverage": "Couverture"
+      },
+      "col": {
+        "indicator": "Indicateur",
+        "type": "Type",
+        "hits": "Observations",
+        "seenIn": "Observé dans",
+        "firstSeen": "Première observation",
+        "lastSeen": "Dernière observation",
+        "source": "Source",
+        "confidence": "Confiance",
+        "list": "Liste",
+        "added": "Ajouté",
+        "expires": "Expire",
+        "description": "Description"
+      },
+      "type": {
+        "auto": "Détecter automatiquement",
+        "ip": "Adresse IP",
+        "cidr": "Plage CIDR",
+        "domain": "Domaine",
+        "url": "URL",
+        "hash": "Empreinte de fichier",
+        "email": "Adresse e-mail"
+      },
+      "empty": {
+        "title": "Aucun renseignement sur les menaces pour l'instant",
+        "description": "Ajoutez des indicateurs depuis un rapport, importez un CSV ou abonnez-vous à un flux de renseignements. Chaque indicateur est ensuite comparé à vos sources de sécurité."
+      },
+      "noMatches": {
+        "title": "Aucun indicateur n'a été observé",
+        "description": "Aucun des {n} indicateurs actifs n'est apparu dans {streams} sources de sécurité sur {range}."
+      },
+      "drawer": {
+        "eyebrow": "Indicateur · {type}",
+        "sightings": "Observations",
+        "details": "Détails",
+        "overTime": "Observations dans le temps",
+        "hunt": "Rechercher",
+        "huntTop": "Rechercher dans les événements",
+        "notSeenTitle": "Non observé dans cette fenêtre",
+        "notSeen": "Cet indicateur n'est pas apparu dans {streams} sources de sécurité sur {range}.",
+        "cidrNotSwept": "Les plages CIDR ne sont pas balayées : la correspondance exacte ne peut pas tester l’appartenance à une plage."
+      },
+      "remove": {
+        "action": "Supprimer",
+        "title": "Supprimer l’indicateur",
+        "message": "Supprimer {indicator} de {table} ? La liste est lue puis réécrite sans cet indicateur, en conservant chaque autre ligne telle qu’elle est stockée. Cette opération n’est pas atomique : les indicateurs ajoutés à {table} par quiconque pendant son exécution seraient perdus.",
+        "confirm": "Supprimer",
+        "done": "Indicateur {indicator} supprimé | {n} lignes contenant {indicator} supprimées",
+        "failed": "Impossible de supprimer l’indicateur",
+        "tooLarge": "{table} contient {n} lignes, soit plus que ce que cette page peut lire ; elle ne peut donc pas être réécrite en toute sécurité. Modifiez-la dans la page Tables d’enrichissement.",
+        "feedHint": "Cette liste est actualisée depuis un flux ; supprimez l’indicateur à la source du flux.",
+        "notFound": "{indicator} n’est plus présent dans {table} ; il a peut-être déjà été supprimé."
+      },
+      "form": {
+        "addTitle": "Ajouter des indicateurs",
+        "addSubtitle": "Collez depuis un rapport. Les valeurs neutralisées telles que evil[.]com et hxxp:// sont acceptées.",
+        "addSubmit": "Ajouter",
+        "cancel": "Annuler",
+        "indicators": "Indicateurs",
+        "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
+        "indicatorsHelp": "Un par ligne, ou séparés par des virgules ou des espaces. Les doublons sont ignorés.",
+        "indicatorsRequired": "Saisissez au moins un indicateur",
+        "invalid": "Éléments non reconnus comme indicateurs ({n}) : {sample}",
+        "line": "ligne {n}",
+        "list": "Liste",
+        "listHelp": "Stockée en tant que table d’enrichissement ; un préfixe ioc_ est ajouté aux noms.",
+        "listRequired": "Nommez la liste",
+        "type": "Type",
+        "confidence": "Confiance (0–100)",
+        "confidenceRange": "La confiance doit être comprise entre 0 et 100",
+        "source": "Source",
+        "sourcePlaceholder": "Nom du rapport, du fournisseur ou du flux",
+        "description": "Description",
+        "expiry": "Expiration",
+        "never": "Jamais",
+        "days": "Dans {n} jour | Dans {n} jours",
+        "added": "{n} indicateur ajouté à {table} | {n} indicateurs ajoutés à {table}",
+        "importedSkipped": "{n} indicateurs ajoutés à {table} ; {skipped} ligne qui n’était pas un indicateur a été ignorée | {n} indicateurs ajoutés à {table} ; {skipped} lignes qui n’étaient pas des indicateurs ont été ignorées",
+        "saveFailed": "Impossible d’enregistrer les indicateurs",
+        "feedReadOnly": "{table} est actualisée depuis un flux et ne peut pas accepter de nouvelles lignes. Choisissez une autre liste.",
+        "importTitle": "Importer des indicateurs depuis un CSV",
+        "importSubtitle": "Nécessite une colonne d’indicateur ; le type, la sévérité, la source et l’expiration sont facultatifs.",
+        "importSubmit": "Importer",
+        "file": "Fichier CSV",
+        "fileHelp": "Les lignes qui ne sont pas des indicateurs sont ignorées et comptabilisées.",
+        "fileRequired": "Choisissez un fichier CSV",
+        "defaultSeverity": "Sévérité par défaut des lignes sans sévérité",
+        "append": "Ajouter à la liste au lieu de la remplacer",
+        "noIndicatorColumn": "Le fichier n’a pas de colonne d’indicateur",
+        "noValidRows": "Aucune ligne du fichier n’est un indicateur reconnu",
+        "feedTitle": "S’abonner à un flux",
+        "feedSubtitle": "Le serveur récupère le CSV en arrière-plan et maintient la liste synchronisée avec ce dernier.",
+        "feedSubmit": "S’abonner",
+        "url": "URL du flux",
+        "urlHelp": "Un fichier CSV public avec une colonne d'indicateur.",
+        "urlInvalid": "Saisissez une URL http:// ou https://",
+        "feedQueued": "Récupération de {table}. Les indicateurs apparaîtront une fois le téléchargement terminé.",
+        "allPresent": "Tous les indicateurs sont déjà dans {table}",
+        "addedSkippedDupes": "{n} indicateur ajouté à {table} ; {dupes} déjà présent | {n} indicateurs ajoutés à {table} ; {dupes} déjà présents",
+        "urlPlaceholder": "https://feeds.example/indicators.csv",
+        "noIndicatorColumnIn": "{table} n'a pas de colonne indicator, ioc ou value, il est donc impossible d'y ajouter des indicateurs. Choisissez une autre liste.",
+        "replaceTitle": "Remplacer la liste",
+        "replaceMessage": "Un import avec l'ajout désactivé remplace entièrement {table} : toutes les lignes existantes ainsi que ses colonnes et ses paramètres sont supprimés, et seuls les indicateurs de ce fichier restent.",
+        "replaceConfirm": "Remplacer"
+      },
+      "importCsv": "Importer un CSV",
+      "unreadTables": "Impossible de lire {lists} ; ses indicateurs ne sont ni affichés ni analysés. | Impossible de lire {lists} ; leurs indicateurs ne sont ni affichés ni analysés.",
+      "noIndicatorColumn": "{lists} n'a pas de colonne d'indicateur, donc aucune de ses lignes n'est utilisée. | {lists} n'ont pas de colonne d'indicateur, donc aucune de leurs lignes n'est utilisée.",
+      "skippedRows": "Les lignes qui ne sont pas des indicateurs reconnaissables ont été ignorées : {detail}.",
+      "unreadStreams": "Le schéma de {streams} n'a pas pu être lu, donc il n'a pas été analysé. | Les schémas de {streams} n'ont pas pu être lus, donc ils n'ont pas été analysés.",
+      "columnsSkipped": "{n} colonne non analysée | {n} colonnes non analysées",
+      "skippedHint": "Analyse incomplète — le balayage a atteint sa limite de requêtes ou la requête a échoué :",
+      "caveat": {
+        "capped": "Le balayage a atteint sa limite de requêtes, donc certaines colonnes n'ont pas été analysées.",
+        "failed": "{n} colonne n'a pas pu être analysée. | {n} colonnes n'ont pas pu être analysées.",
+        "partial": "{n} requête n'a renvoyé que des résultats partiels, donc ces colonnes n'ont pas été entièrement analysées. | {n} requêtes n'ont renvoyé que des résultats partiels, donc ces colonnes n'ont pas été entièrement analysées.",
+        "unsearched": "Aucun flux n'a de colonne pour : {types}.",
+        "cidr": "{n} plage CIDR n'a pas été analysée. | {n} plages CIDR n'ont pas été analysées."
+      }
+    },
+    "sources": {
+      "title": "Sources de données",
+      "comingSoon": "L'intégration guidée avec des modèles de normalisation OCSF arrive bientôt. En attendant, ingérez les logs de sécurité comme n'importe quel flux ; la page Événements les identifie et les normalise automatiquement.",
+      "subtitle": "Attachez un pack OCSF pour normaliser un flux lors de l'ingestion, ou incluez-le tel quel comme source de sécurité.",
+      "colStream": "Flux",
+      "colSourceType": "Type de source",
+      "colMapping": "Mappage",
+      "colActions": "Actions",
+      "stateMapped": "Mappé : {pack}",
+      "stateIncluded": "Inclus (non mappé)",
+      "stateNotMapped": "Non mappé",
+      "stateSuggested": "Suggéré : {label}",
+      "attach": "Attacher le pack",
+      "detach": "Détacher",
+      "include": "Inclure",
+      "exclude": "Exclure",
+      "attached": "Pack {pack} attaché.",
+      "detached": "Pack détaché.",
+      "detachedPipelineSkipped": "Pack détaché. Le pipeline enregistré ne correspond plus à ce flux ni à ce pack ; il a donc été laissé inchangé.",
+      "empty": "Aucun flux de logs pour l'instant. Ingérez les logs de sécurité comme n'importe quel flux ; ils apparaîtront ici.",
+      "noticePackRemoved": "{stream} : pack supprimé en dehors du SIEM. Rattachez-le ou effacez-le.",
+      "noticeNoRecord": "{stream} : un pack est attaché sans enregistrement. Enregistrez-le ou détachez-le.",
+      "noticeNotWriting": "{stream} : le pipeline n'écrit plus dans ce flux.",
+      "noticeDisabled": "{stream} : le pipeline est désactivé ; rien n'est mappé.",
+      "blockStreamNotWritten": "{stream} : le pipeline existant n'achemine les lignes que vers {streams}, et non vers ce flux.",
+      "blockFlattenLevel": "{stream} : le niveau d'aplatissement du flux diffère du niveau global ; l'attachement renommerait donc ses colonnes.",
+      "blockGlobalFlatten": "{stream} : le niveau d'aplatissement global ({level}) ne conserverait pas les colonnes OCSF à plat.",
+      "blockSchemaMissing": "{stream} : le schéma défini par l'utilisateur ne contient pas les colonnes OCSF : {columns}.",
+      "blockPipelineDisabled": "{stream} : le pipeline existant est désactivé ; activez-le avant de l'attacher.",
+      "attachErrors": {
+        "functionEditedOutside": "La fonction {name} a été modifiée en dehors du SIEM.",
+        "pipelineNoAccess": "Ce flux possède un pipeline auquel vous n'avez pas accès.",
+        "permissionDenied": "Vous avez besoin d'une autorisation pour modifier les fonctions et les pipelines de ce flux.",
+        "pipelineChanged": "Le pipeline de ce flux a changé et bloque désormais l'attachement ; actualisez et vérifiez à nouveau.",
+        "packConflict": "Ce flux possède déjà le pack {pack} ; détachez-le d'abord.",
+        "noPipeline": "Impossible de créer ou de trouver un pipeline en temps réel pour ce flux.",
+        "failed": "Échec de l'attachement."
+      }
+    },
+    "nav": {
+      "overview": "Vue d'ensemble",
+      "events": "Événements",
+      "detections": "Détections",
+      "alerts": "Alertes",
+      "cases": "Cas",
+      "entities": "Entités",
+      "intel": "Renseignement sur les menaces",
+      "ueba": "UEBA",
+      "mitre": "MITRE ATT&CK",
+      "content": "Contenu"
+    },
+    "sigma": {
+      "notSupported": "Non pris en charge : {fields}",
+      "cannotMatch": "Correspondance impossible : ce flux ne contient pas {fields}",
+      "compiledEmpty": "La compilation de la règle ne produit rien",
+      "assumedAbsent": "En supposant que ce flux ne contient jamais {fields}"
     }
   },
   "promql": {
@@ -24145,6 +25453,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "Premiers pas",
     "reportDetail": "Rapport",
     "sharedChat": "Chat partagé",
     "passwordPolicy": "Politique de mot de passe",
@@ -24728,16 +26037,17 @@
       "groupStorage": "Stockage",
       "groupAutoscaling": "Mise à l'échelle automatique",
       "subtitle": "Surveillez les clusters, les charges de travail et les ressources",
-      "hotbarAll": "Tous les clusters",
+      "clusterPickerLabel": "Cluster",
+      "clusterPickerTrigger": "Cluster : {name}",
+      "clusterPickerSearch": "Rechercher un cluster",
+      "clusterPickerEmpty": "Aucun cluster ne correspond",
       "healthHealthy": "Sain",
       "healthWarning": "Avertissement",
       "healthCritical": "Critique",
       "healthSilent": "Aucune remontée",
       "treeWorkloadsOverview": "Vue d'ensemble des charges de travail",
       "viewSelect": "Vue",
-      "hotbarLabel": "Clusters",
       "hotbarTileLabel": "{name}, {health}",
-      "hotbarTitle": "Clusters",
       "treeFilter": "Filtrer les ressources",
       "treeOverview": "Vue d'ensemble",
       "treeNodesReady": "{ready} nœud prêt sur {total} | {ready} nœuds prêts sur {total}",
@@ -25028,6 +26338,13 @@
       "depsCaption": "Débit approximatif en octets par seconde, moyenné sur {window} jusqu’à la fin de la plage temporelle",
       "depsCaptionMore": "La largeur des liens suit le débit en octets par seconde. Les flèches pointent du client vers le serveur lorsque la direction est connue ; le client d’une ligne grise est inconnu, ou les deux extrémités agissent comme client. La couleur d’une carte correspond à son espace de noms. Les connexions inférieures à 1 B/s sont masquées, sauf si les connexions à faible trafic sont activées.",
       "depsCapped": "Affichage des {shown} connexions les plus actives sur {total}. Filtrez par espace de noms pour voir le reste.",
+      "depsCollapseMode": "Regroupement",
+      "depsCollapseAuto": "Auto",
+      "depsCollapseExpanded": "Développé",
+      "depsCollapseCollapsed": "Réduit",
+      "depsGroupDetail": "{count} charge de travail | {count} charges de travail",
+      "depsGroupHint": "Cliquez sur un namespace pour afficher ses charges de travail.",
+      "depsGroupCollapse": "Réduire {namespace}",
       "depsNoStreamTitle": "Aucune donnée de flux réseau",
       "depsNoStreamDescription": "La carte des dépendances est établie à partir des métriques de flux réseau eBPF ({stream}). Elles proviennent du chart Helm openobserve-collector 0.8.0 ou ultérieur avec ebpf.enabled=true et ebpf.network.enabled=true.",
       "depsNoFlowsTitle": "Aucun flux réseau dans cette plage temporelle",
@@ -25045,6 +26362,9 @@
       "depsTypeIn": "{type} dans {namespace}",
       "depsKindNode": "Nœud",
       "depsKindExternal": "Autres adresses",
+      "depsCollapseFiltering": "Le regroupement est désactivé lorsqu'un filtre ou une recherche est actif",
+      "depsCollapseHint": "Auto regroupe les charges de travail par namespace dès que la carte compte plus de {count} points de terminaison. Réduit regroupe toujours, Développé jamais.",
+      "depsExpandEnd": "Afficher les charges de travail dans {name} : {detail}, {summary}",
       "depsOpenEnd": "Ouvrir les détails de {name} : {detail}, {summary}",
       "depsEndSummary": "{count} connexion · {rate} | {count} connexions · {rate}",
       "depsApprox": "~{rate}",
@@ -26870,10 +28190,6 @@
     "saveScheduleFailed": "Impossible d'enregistrer le planning",
     "policy": "Politique d'escalade",
     "policyIfNoAck": "Si personne ne confirme, après",
-    "policyRepeatTimes": "Exécuter l'échelle une fois | Exécuter l'échelle {count} fois",
-    "policyFinalStop": "puis arrêter",
-    "policyFinalNotifyDefault": "puis notifier l'équipe fourre-tout",
-    "policyNoDefaultTeam": "Aucune équipe par défaut n'est désignée, cela équivaut donc à un arrêt. Désignez-en une dans l'onglet Routage.",
     "policyPrioritySilent": "{priority} ne contacte personne. Ajoutez un échelon pour changer cela — le silence ici est une décision, pas une omission.",
     "policyDoneEditing": "Terminer l'édition",
     "policyHint": "Qui est contacté à chaque priorité, et après combien de temps. Ce sont des valeurs par défaut — modifiez-les.",
@@ -27353,9 +28669,6 @@
     "policyP1ParallelHint": "Personne n'attend cinq minutes pour apprendre que le site est en panne.",
     "policyP4Pages": "Alerter aussi pour cette priorité",
     "policyP4PagesHint": "Désactivé par défaut — une P4 qui réveille quelqu'un est une erreur de classification de la sévérité.",
-    "policyFinalAction": "Si personne ne prend l'alerte en charge",
-    "policyFinal_notifyDefaultTeam": "Notifier l'équipe par défaut",
-    "policyFinal_stop": "Arrêter",
     "policySummaryTitle": "Ce que fait cette politique en ce moment",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "tous en même temps",
@@ -27608,7 +28921,6 @@
     "ladderL0Off": "Aucun SRE IA",
     "ladderStaleDefaultTag": "L'échelle n'a jamais pris en compte les rotations",
     "ladderStaleDefaultHint": "Chaque niveau prévient toute l'équipe, mais cette équipe a des rotations — l'échelle a été créée avant leur apparition. Ajouter ou supprimer un membre relance la configuration par défaut, ou modifiez l'échelle manuellement une fois.",
-    "ladderEndsHandsOff": "La notification est transmise",
     "reachShortNoSmtp": "e-mail uniquement · pas de transport SMTP",
     "reachShortNoFromAddress": "e-mail uniquement · aucune adresse From",
     "reachShortNoAddress": "aucune adresse enregistrée",
@@ -27734,7 +29046,6 @@
     "ladderEvery": "· toutes les {duration}",
     "ladderEnd": "fin",
     "ladderEndUnknown": "Aucune autre action n'est prévue.",
-    "ladderEndsDefaultTeam": "Les échelons sont épuisés — l'équipe par défaut a été notifiée.",
     "rungLost": "échec",
     "rungLostTimes": "échec ×{count}",
     "routingDetails": "Détails de routage",
@@ -27749,7 +29060,6 @@
     "policyStepsSection": "Étapes d'escalade",
     "policyChipSteps": "{count} étape | {count} étapes",
     "policyAddStep": "Ajouter une étape",
-    "policyWhenStepsRunOut": "Quand les étapes sont épuisées",
     "policyAppliesToNewPages": "Les modifications s'appliquent uniquement aux nouvelles notifications.",
     "policySave": "Enregistrer",
     "policyFix": "Corriger",
@@ -27759,9 +29069,6 @@
     "policyEmailLockedBySlack": "L'e-mail reste activé avec Slack : les personnes sans compte Slack lié reçoivent quand même l'e-mail.",
     "policyNoProvider": "Aucun fournisseur téléphonique n'est connecté, donc SMS et Voix sont ignorés et ces notifications sont envoyées par e-mail.",
     "policyNoProviderLink": "Connectez-en un dans Réglages → Téléphonie",
-    "policyEndOptionStop": "Exécuter une fois, puis s'arrêter | Exécuter {count} fois, puis s'arrêter",
-    "policyEndOptionHandOff": "Exécuter une fois, puis passer la main à l'équipe de dernier recours | Exécuter {count} fois, puis passer la main à l'équipe de dernier recours",
-    "policyEndOptionHandOffTo": "Exécuter une fois, puis transmettre à {team} | Exécuter {count} fois, puis transmettre à {team}",
     "policyDeliveryTitle": "Livraison",
     "policyTodayIs": "aujourd'hui : {who}",
     "policyPeopleCount": "{count} personne | {count} personnes",
@@ -27883,6 +29190,12 @@
     "ruleEditorTakesFrom": "Reprend les alertes de {team}",
     "ruleEditorKeptBy": "{team} conserve ces alertes : sa règle est plus spécifique",
     "ruleEditorContends": "En concurrence avec une règle de {team} : la plus spécifique l'emporte",
+    "ruleEditorFieldSourcesMore": "{fields} +{count} de plus",
+    "ruleEditorFieldsHelp": "Les champs proviennent de vos groupes de champs de corrélation. {link}",
+    "ruleEditorFieldsSource": "Les champs proviennent de vos groupes de champs de corrélation.",
+    "ruleEditorManageFieldGroups": "Gérer les groupes de champs",
+    "ruleEditorDuplicatePath": "{team} a déjà une règle pour exactement ces conditions. Modifiez plutôt cette règle.",
+    "ruleEditorDuplicatePathSameTeam": "Cette équipe a déjà une règle pour exactement ces conditions.",
     "routingTestRouting": "Tester le routage",
     "routingTabNeedsOwnerPlain": "Nécessite un responsable",
     "simulatorStartFrom": "Partir de",
@@ -29665,6 +30978,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "Logs, métriques et traces de n'importe quel serveur Linux.",
+      "windows": "Journaux d'événements et métriques des serveurs Windows.",
+      "macos": "Logs et métriques des machines Mac.",
+      "aws": "Logs et métriques de vos services AWS.",
+      "googleCloud": "Logs de vos projets {gcp}, via un abonnement push {pubSub}.",
+      "azure": "Journaux d'activité de votre abonnement {azure}, via {eventHub}.",
+      "postgresql": "Métriques de requêtes, de connexions et de réplication.",
+      "mysql": "Métriques de requêtes, de connexions et InnoDB.",
+      "mongodb": "Métriques d'opérations, de connexions et de cache.",
+      "redis": "Métriques de mémoire, de commandes et d'espaces de clés.",
+      "sqlServer": "Métriques de requêtes, d'attentes et de tampons.",
+      "oracle": "Métriques de sessions, d'espaces de tables et de limites de ressources.",
+      "mariadb": "Métriques de requêtes, de connexions et InnoDB.",
+      "elasticsearch": "Santé du cluster, des index et des nœuds.",
+      "cassandra": "Métriques de lecture, d'écriture et de compaction.",
+      "dynamodb": "Modifications d'éléments (insertions, mises à jour, suppressions) sous forme de logs, via {kinesisFirehose}.",
+      "snowflake": "Utilisation de l'entrepôt, des requêtes et des crédits.",
+      "databricks": "Logs de notebook, envoyés via l'API de logs.",
+      "couchdb": "Métriques de requêtes, de base de données et de réplication.",
+      "aerospike": "Métriques de namespace, de nœuds, de mémoire et de connexions.",
+      "sapHana": "Métriques de mémoire, de CPU et de services.",
+      "zookeeper": "Métriques de latence, de connexions et de nœuds.",
+      "nginx": "Logs d'accès et d'erreurs, suivis par {fluentBit}.",
+      "apache": "Logs d'accès et d'erreurs, suivis par {fluentBit}.",
+      "iis": "Logs de requêtes, suivis par {fluentBit}.",
+      "kafka": "Métriques de broker, de topics et de retard des consommateurs.",
+      "rabbitmq": "Profondeur de file, débit de messages et métriques de nœuds.",
+      "nats": "Métriques de connexions, de messages et de flux.",
+      "prometheus": "Envoyez les métriques que vous collectez déjà, par remote write.",
+      "telegraf": "Envoyez les métriques d'un agent que vous exécutez déjà.",
+      "opentelemetryCollector": "Dirigez vers ici un collecteur que vous exécutez déjà.",
+      "cloudwatch": "Ingérez en flux les métriques de votre compte AWS.",
+      "gpu": "Utilisation, mémoire et température par GPU {nvidia}.",
+      "networkFlows": "Flux de trafic entre vos hôtes et vos réseaux.",
+      "fluentBit": "Collecteur de logs léger pour hôtes et Kubernetes.",
+      "fluentd": "Collecteur de logs avec un large jeu de plugins.",
+      "vector": "Pipeline rapide pour les logs et les métriques.",
+      "filebeat": "Transférez des fichiers de logs avec un agent léger.",
+      "logstash": "Envoyez des logs depuis un pipeline existant.",
+      "syslogNg": "Transférez le syslog de vos serveurs.",
+      "loongcollector": "Agent de logs et de métriques pour hôtes et conteneurs.",
+      "splunkHec": "Conservez vos émetteurs HTTP Event Collector tels quels.",
+      "cribl": "Acheminez les données des pipelines que vous exécutez déjà.",
+      "kinesisFirehose": "Ingérez en flux les logs d'un flux de livraison dans AWS.",
+      "googleCloudLogs": "Exportez les logs de vos projets via un log sink.",
+      "okta": "Événements de connexion et d'audit administrateur.",
+      "office365": "Logs d'audit des e-mails, des fichiers et de l'administration.",
+      "googleWorkspace": "Logs d'audit des connexions et de l'administration.",
+      "falco": "Alertes de sécurité d'exécution des conteneurs.",
+      "osquery": "État des endpoints sous forme de logs interrogeables.",
+      "jumpcloud": "Événements d'annuaire et de connexion.",
+      "openvpn": "Logs de connexion et de session VPN.",
+      "githubActions": "Logs d'exécution de workflows et de jobs.",
+      "jenkins": "Logs de build et événements de pipeline.",
+      "terraform": "Logs de plan et d'apply de vos exécutions.",
+      "ansible": "Logs et résultats d'exécution de playbooks.",
+      "vercel": "Logs de déploiement et de fonctions.",
+      "heroku": "Logs d'application et de routeur depuis un log drain.",
+      "airflow": "Logs d'exécution de DAG et métriques de tâches.",
+      "airbyte": "Logs et statut des jobs de synchronisation.",
+      "languageTile": "Traces avec le SDK {otel}, avec instrumentation automatique lorsque votre langage le permet.",
+      "aiIntegration": "Traces des appels de votre application IA, avec tokens et coût des appels aux modèles."
+    },
+    "skipToApp": "Passer à l'application",
+    "chooseTitle": "Que voulez-vous surveiller en premier ?",
+    "back": "Retour",
+    "searchGuides": "Rechercher {count} guide | Rechercher {count} guides",
+    "showMore": "Afficher {count} de plus | Afficher {count} de plus",
+    "noMatch": "Aucun guide ne correspond à « {query} » ici.",
+    "foundElsewhere": "Trouvé dans d'autres choix :",
+    "inChoice": "dans {choice}",
+    "tryShorter": "Essayez un nom plus court. Tout outil peut aussi {link}.",
+    "sendOverHttp": "envoyer des logs via HTTP",
+    "clearSearch": "Effacer la recherche",
+    "othersTitle": "Autres façons de commencer",
+    "whatYouGet": "Ce que vous obtenez",
+    "signals": {
+      "metrics": "Métriques",
+      "logs": "Logs",
+      "traces": "Traces",
+      "profiles": "Profils",
+      "sessions": "Sessions",
+      "errors": "Erreurs",
+      "webVitals": "Web vitals (web)",
+      "replays": "Relectures de sessions",
+      "tokens": "Tokens",
+      "cost": "Coût",
+      "latency": "Latence",
+      "uptime": "Disponibilité",
+      "certificates": "Certificats"
+    },
+    "example": {
+      "caption": {
+        "row": "Écran d'exemple : ce que {product} affiche pour {name}.",
+        "infrastructure": "Écran d'exemple : vue d'ensemble d'un cluster {k8s} avec CPU, mémoire et état des pods.",
+        "backend": "Écran d'exemple : la cascade d'une trace de paiement échouée, avec 21 spans sur 9 services.",
+        "frontend": "Écran d'exemple : web vitals {rum} issus de sessions d'utilisateurs réels.",
+        "logs": "Écran d'exemple : une recherche de logs avec un histogramme et les lignes de logs correspondantes.",
+        "llm": "Écran d'exemple : {insights} avec coût, tokens et latence par modèle, ainsi que les traces et erreurs dans le temps.",
+        "agent": "Écran d'exemple : la page du serveur {mcp} auquel votre agent de codage se connecte.",
+        "synthetics": "Écran d'exemple : résultats d'une vérification {http} sur 3 emplacements."
+      }
+    },
+    "guide": {
+      "agentTitle": "Vous préférez un agent de codage ?",
+      "agentSteps": "Exécutez ceci dans votre terminal, puis donnez à {claudeCode}, {cursor} ou {codex} le prompt ou le fichier.",
+      "copyPrompt": "Copier le prompt",
+      "downloadFile": "Télécharger le .md",
+      "inviteTitle": "Pas d'accès ?",
+      "inviteText": "Invitez un coéquipier qui peut exécuter la commande.",
+      "inviteAction": "Inviter un coéquipier",
+      "loadFailed": "Ce guide n'a pas pu être chargé.",
+      "openInApp": "L'ouvrir dans Sources de données",
+      "languageText": "Pour {language}, ajoutez le {otelSdk}, avec l'instrumentation automatique lorsque {language} la propose, puis pointez-le vers {product} avec les paramètres ci-dessous.",
+      "languageLink": "Guide {otel} pour {language}"
+    },
+    "rail": {
+      "label": "Progression de la configuration",
+      "check": "Vérifiez vos données",
+      "received": "Données reçues",
+      "attention": "Nécessite une attention",
+      "waitingShort": "En attente de données",
+      "title": "Configurer {name}",
+      "run": "Exécuter la commande d'installation",
+      "explore": "Explorez vos données"
+    },
+    "firstData": {
+      "title": "Vos données arrivent",
+      "count": "{count} enregistrement reçu dans {stream} | {count} enregistrements reçus dans {stream}",
+      "exploreLogs": "Explorez vos Logs",
+      "exploreMetrics": "Explorez vos Métriques",
+      "exploreTraces": "Explorez vos Traces",
+      "exploreProfiles": "Explorez vos Profils",
+      "addAnother": "Ajouter une autre source"
+    },
+    "others": {
+      "synthetics": {
+        "name": "Vérifications synthétiques",
+        "description": "Vérifiez un site web, une API, un port ou un certificat. Aucune installation.",
+        "gets": "Exécutez des vérifications planifiées depuis l'extérieur de votre réseau."
+      },
+      "invite": {
+        "name": "Inviter un coéquipier à configurer",
+        "description": "La personne reçoit une invitation à rejoindre votre organisation."
+      },
+      "agent": {
+        "name": "Configurer avec votre agent de codage",
+        "description": "Donnez un prompt à {claudeCode}, {cursor} ou {codex}.",
+        "gets": "Votre agent de codage ajoute la configuration et vérifie que les données arrivent."
+      }
+    },
+    "agentLink": "Ou laissez votre agent de codage le faire",
+    "stepDone": "(terminé)",
+    "agent": {
+      "crumb": "Agent de codage",
+      "title": "Configurer avec votre agent de codage",
+      "lead": "{claudeCode}, {cursor}, {codex} ou tout agent de codage lit votre projet, ajoute la configuration et vérifie que les données sont arrivées. Il vous demande votre accord avant d'installer quoi que ce soit ou de modifier des fichiers de déploiement.",
+      "tokenTitle": "Enregistrez votre jeton",
+      "tokenText": "Exécutez ceci dans le terminal où vous démarrerez votre agent de codage, avant de le lancer.",
+      "powerShell": "Dans {powerShell} :",
+      "copyPowerShell": "Copier la commande {powerShell}",
+      "promptTitle": "Copier le prompt",
+      "focusLabel": "Configurer",
+      "focus": {
+        "kubernetes": "Cluster {k8s}",
+        "host": "Hôte {linux}, {macos} ou {windows}",
+        "backend": "Service backend ({otel})",
+        "llm": "Application LLM",
+        "frontend": "Frontend web",
+        "logs": "Logs uniquement"
+      },
+      "copyPrompt": "Copier le prompt",
+      "promptCopied": "Prompt copié",
+      "download": "Télécharger .md",
+      "preview": "Prévisualiser le prompt",
+      "previewLines": "{count} ligne | {count} lignes",
+      "pasteTitle": "Collez-le dans votre agent de codage",
+      "other": "Autre",
+      "hint": {
+        "claudeCode": "Dans le même terminal, exécutez {command} dans le dossier de votre projet, puis collez le prompt.",
+        "cursor": "Lancez {product} depuis le même terminal avec {command}, afin qu'il puisse lire le jeton. Collez ensuite le prompt dans son chat.",
+        "codex": "Dans le même terminal, exécutez {command} dans le dossier de votre projet, puis collez le prompt.",
+        "other": "Lancez votre agent de codage depuis le même terminal, afin qu'il puisse lire le jeton. Collez ensuite le prompt, ou donnez-lui {file}."
+      },
+      "mcp": "Connectez le serveur {mcp} afin que votre agent de codage puisse lire vos données",
+      "aside": {
+        "eyebrow": "Ce que le prompt indique à votre agent de codage",
+        "title": "De petits changements sans risque",
+        "line1": "Identifier ce que le projet exécute",
+        "line2": "Apporter la plus petite modification qui fonctionne",
+        "line3": "Conservez le token dans l'environnement",
+        "line4": "Envoyez un événement de test vers le flux {stream}",
+        "line5": "Indiquez les fichiers qui ont changé"
+      }
+    },
+    "collect": {
+      "continueToSetup": "Continuer vers la configuration",
+      "languages": "Langues",
+      "languagesRequired": "Choisissez au moins une langue.",
+      "kubernetesCluster": {
+        "question": "Choisissez ce qu'il faut collecter depuis votre cluster",
+        "off": {
+          "name": "Logs et métriques",
+          "description": "Santé du cluster et logs des conteneurs. Une seule commande.",
+          "about": "Logs des conteneurs, CPU et mémoire de chaque nœud et pod, et événements {k8s} sous forme de logs, avec une seule commande d'installation."
+        },
+        "ebpf": {
+          "name": "Ajouter des traces avec eBPF",
+          "description": "Aucune modification de code, quel que soit le langage. Nécessite le noyau Linux 5.8+ sur vos nœuds.",
+          "about": "La même installation, plus les traces. Le collector observe les requêtes depuis le noyau Linux, vos applications ne changent donc pas. Il relie une requête entre les services uniquement via HTTP simple."
+        },
+        "library": {
+          "name": "Ajouter des traces avec les bibliothèques de langage",
+          "description": "Plus de détails par application. Choisissez vos langages, puis redémarrez vos applications une fois.",
+          "about": "La même installation, plus les traces. L'opérateur {otelOperator} ajoute la bibliothèque {otelLibrary} pour chaque langage aux pods des namespaces que vous choisissez. Votre code ne change pas."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Serveurs web",
+      "messageQueues": "Files d'attente de messages",
+      "metricsYouCollect": "Métriques que vous collectez déjà",
+      "gpuAndNetwork": "Flux GPU et réseau",
+      "movingFromAnotherTool": "Migration depuis un autre outil",
+      "cloudLogs": "Logs cloud",
+      "securityTools": "Outils de sécurité",
+      "cicdAndPlatforms": "CI/CD et plateformes"
+    },
+    "infrastructure": {
+      "name": "Infrastructure",
+      "description": "Serveurs, {k8s}, comptes cloud et bases de données",
+      "gets": "Visualisez chaque hôte, pod et service cloud au même endroit.",
+      "question": "Comment souhaitez-vous surveiller votre infrastructure ?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "Cluster {k8s}",
+          "description": "Logs, métriques et événements {k8s} avec une seule installation. Traces avec une commande supplémentaire.",
+          "about": "Installe {productCollector} dans votre cluster avec une seule commande. Vous obtenez les logs des conteneurs, les événements {k8s} et les métriques du cluster."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "Hôte {linux}, {windows} ou {macos}",
+          "description": "Installez {productAgent} en tant que service",
+          "about": "Un seul agent collecte les logs et les métriques de l'hôte. Sur {linux}, il peut aussi tracer les programmes sans modification du code.",
+          "question": "Quel système d'exploitation utilise votre hôte ?"
+        },
+        "cloudAccount": {
+          "name": "Compte cloud",
+          "description": "{aws}, {gcp} ou {azure}",
+          "about": "Transmet les logs de votre compte cloud et les métriques de {aws}. Rien ne s'exécute sur vos serveurs.",
+          "question": "Sur quel cloud se trouve votre compte ?"
+        },
+        "databases": {
+          "name": "Bases de données",
+          "description": "{examples} et {count} de plus",
+          "about": "Collecte les métriques des bases de données, principalement via {otelCollector}.",
+          "question": "Quelle base de données souhaitez-vous surveiller ?"
+        },
+        "somethingElse": {
+          "name": "Autre chose",
+          "description": "Serveurs web, files d'attente de messages, {prometheus}, flux GPU et réseau",
+          "about": "Serveurs web, files d'attente de messages, métriques que vous collectez déjà, utilisation du GPU et flux réseau.",
+          "question": "Que souhaitez-vous surveiller d'autre ?"
+        }
+      }
+    },
+    "backend": {
+      "name": "Applications backend",
+      "description": "Traces de vos services et logs là où votre SDK les envoie",
+      "gets": "Visualisez le parcours de chaque requête dans vos services.",
+      "question": "Comment souhaitez-vous tracer vos services ?",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "Ajouter une bibliothèque à votre code",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} ou {fastapi}",
+          "about": "Ajoute la {otelLibrary} pour votre langage. Les traces vont vers {product}.",
+          "question": "Dans quel langage votre service est-il écrit ?"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "Charges de travail {k8s}, aucune modification de code",
+          "description": "Auto-instrumentation dans votre cluster",
+          "about": "L'{otelOperator} ajoute l'instrumentation aux pods d'un namespace. Aucune modification de code ni d'image."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "Tout langage avec {otel}",
+          "description": "Envoyez OTLP depuis votre propre configuration",
+          "about": "Pointez n'importe quel {otelSdk} ou collecteur vers votre point de terminaison {product}."
+        },
+        "continuousProfiling": {
+          "name": "Profilage continu",
+          "description": "Profils CPU et mémoire",
+          "about": "Transmet les profils de vos profileurs ({go}, {java}, {rust} ou le profileur eBPF) via l'{otelCollector}."
+        }
+      }
+    },
+    "frontend": {
+      "name": "Applications frontend et mobiles",
+      "description": "Monitoring des utilisateurs réels pour le web et le mobile",
+      "gets": "Voyez ce que vivent les utilisateurs réels dans vos applications web et mobiles.",
+      "question": "Où s'exécute votre application ?",
+      "rows": {
+        "browser": {
+          "name": "Navigateur",
+          "description": "Sites web et applications web",
+          "about": "Ajoute le {sdk} à votre application web. Vous obtenez les chargements de page, les erreurs et les sessions de navigateurs réels."
+        },
+        "reactNative": {
+          "description": "{ios} et {android} à partir d'une seule base de code",
+          "about": "Ajoute le {sdk} à votre application {platform}."
+        },
+        "android": {
+          "description": "Applications {android} natives",
+          "about": "Ajoute le {sdk} à votre application {platform}. Vous obtenez les sessions, les vues d'écran, les erreurs et les plantages."
+        },
+        "ios": {
+          "description": "Applications {ios} natives",
+          "about": "Ajoute le {sdk} à votre application {platform}. Vous obtenez les sessions, les vues d'écran, les erreurs et les plantages."
+        }
+      }
+    },
+    "logs": {
+      "name": "Logs de n'importe quelle source",
+      "description": "Envoyez des logs depuis n'importe quel expéditeur, service ou outil",
+      "gets": "Recherchez et filtrez chaque ligne de log, peu importe qui l'envoie.",
+      "question": "Comment souhaitez-vous envoyer vos logs ?",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "Depuis un expéditeur de logs que vous exécutez",
+          "description": "{examples} et {count} de plus",
+          "about": "Pointez l'expéditeur que vous exécutez déjà vers {product}. Aucun nouvel agent.",
+          "question": "Quel expéditeur de logs exécutez-vous ?"
+        },
+        "overHttpWithCurl": {
+          "name": "Via HTTP avec {curl}",
+          "description": "Une requête depuis n'importe quel script. Aucune installation.",
+          "about": "Envoyez des logs JSON depuis n'importe quel script ou service avec une seule requête HTTP."
+        },
+        "fromOpentelemetry": {
+          "name": "Depuis {otel}",
+          "description": "Logs OTLP depuis un SDK ou un collecteur",
+          "about": "Envoyez des logs via OTLP depuis un {otelSdk} ou un collecteur."
+        },
+        "somethingElse": {
+          "name": "Autre chose",
+          "description": "{splunk} ou {cribl}, logs cloud, outils de sécurité et CI/CD",
+          "about": "Migrez depuis {splunk} ou {cribl}, ou collectez des logs depuis votre cloud, vos outils de sécurité et votre CI/CD.",
+          "question": "D'où viennent vos autres logs ?"
+        }
+      }
+    },
+    "llm": {
+      "name": "Applications LLM et IA",
+      "description": "Tracez les appels LLM, les agents et les outils",
+      "gets": "Voyez chaque appel LLM, appel d'outil et étape d'agent.",
+      "question": "Qu'utilise votre application IA ?",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, Agents ou {assistantsApi}",
+          "about": "Trace chaque appel effectué via le {openaiSdk}, avec les tokens, le coût et la latence.",
+          "question": "Quelle bibliothèque {openai} utilisez-vous ?"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} ou {claudeAgentSdk}",
+          "about": "Trace chaque appel effectué via le {anthropicSdk}, avec les tokens, le coût et la latence.",
+          "question": "Quelle bibliothèque {anthropic} utilisez-vous ?"
+        },
+        "langchainOrLanggraph": {
+          "description": "Chaînes, agents et graphes",
+          "about": "Trace chaque chaîne, étape d'agent et appel d'outil.",
+          "question": "Quelle bibliothèque {langchain} utilisez-vous ?"
+        },
+        "somethingElse": {
+          "name": "Autre chose",
+          "description": "Autres frameworks, fournisseurs de modèles, passerelles et outils",
+          "about": "Frameworks, fournisseurs de modèles, passerelles, outils no-code, analytique et outils.",
+          "question": "Qu'utilise votre application IA ?"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "Gestion de la flotte",
     "subtitle": "Enregistrez des collecteurs OpenTelemetry, versionnez leurs configurations et déployez les changements en toute sécurité",
@@ -30327,6 +32021,171 @@
       "receiverEvidence": "Refusé par le récepteur {receiver}",
       "legend": "Statut des pipelines",
       "legendToggle": "Afficher ou masquer ce statut sur la carte"
+    }
+  },
+  "sampleData": {
+    "delete": "Supprimer les données d'exemple",
+    "loadForbidden": "Vous devez disposer d'un accès en écriture à cette organisation pour charger des données d'exemple.",
+    "steps": {
+      "functions": "Création de fonctions",
+      "pipeline": "Création d'un pipeline en temps réel",
+      "telemetry": "Génération et envoi de logs, traces et métriques",
+      "dashboards": "Création de tableaux de bord",
+      "alerts": "Création d'alertes",
+      "enrichment": "Téléversement de la table des propriétaires de services"
+    },
+    "progress": {
+      "loading": "Chargement des données d'exemple…",
+      "done": "Données d'exemple chargées",
+      "counts": "{logs} enregistrements de logs · {spans} spans · {metrics} points de métriques",
+      "skipped": "Ignoré",
+      "logs": "Logs",
+      "spans": "Spans",
+      "metrics": "Points de métriques"
+    },
+    "removeSteps": {
+      "alerts": "Alertes",
+      "alertDelivery": "Modèle d'alerte et webhook",
+      "dashboards": "Tableaux de bord",
+      "pipeline": "Pipeline",
+      "functions": "Fonctions",
+      "streams": "Flux"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "Suppression des données d'exemple",
+        "body": "Cela prend quelques secondes. Vous pouvez fermer ce dialogue, mais gardez cet onglet ouvert jusqu'à la fin.",
+        "label": "Suppression des données d'exemple…"
+      },
+      "done": {
+        "title": "Données d'exemple supprimées",
+        "body": "Le serveur termine la suppression des données stockées dans quelques minutes. Vous pourrez recharger des données d'exemple ensuite.",
+        "label": "Suppression terminée",
+        "done": "Terminé",
+        "keptLabel": "Conservés, car d'autres éléments les utilisent :"
+      },
+      "failed": {
+        "title": "Impossible de supprimer toutes les données d'exemple",
+        "body": "Réessayez : les éléments déjà supprimés sont ignorés.",
+        "label": "Suppression interrompue",
+        "close": "Fermer",
+        "tryAgain": "Réessayer"
+      }
+    },
+    "removeConfirm": {
+      "title": "Supprimer les données d'exemple ?",
+      "message": "Cela supprime les flux, tableaux de bord, alertes, fonctions et la table d'enrichissement d'exemple. Vos propres données ne sont pas modifiées."
+    },
+    "toast": {
+      "loaded": "Données d'exemple chargées. Bonne exploration !",
+      "loadFailed": "Impossible de charger les données d'exemple",
+      "removed": "Données d'exemple supprimées",
+      "removedWithKept": "Données d'exemple supprimées. {count} élément d'exemple est conservé car un autre élément l'utilise. | Données d'exemple supprimées. {count} éléments d'exemple sont conservés car d'autres éléments les utilisent.",
+      "removeFailed": "Impossible de supprimer toutes les données d'exemple",
+      "removeWhileLoading": "Attendez la fin du chargement des données d'exemple."
+    },
+    "entry": {
+      "onboardingSource": "Explorer les données d'exemple"
+    },
+    "callout": {
+      "title": "Pas encore prêt à envoyer des données ?",
+      "body": "Découvrez {product} avec une boutique en ligne d'exemple : un incident en cours et une visite guidée des tableaux de bord, alertes, logs, traces, métriques et pipelines.",
+      "cta": "Explorer avec des données d'exemple"
+    },
+    "header": {
+      "label": "Données d'exemple",
+      "try": "Essayer les données d'exemple",
+      "finish": "Terminer le chargement"
+    },
+    "dock": {
+      "details": "Afficher les détails"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "Vos propres données arrivent. Supprimez les données d'exemple pour éviter qu'elles ne se mélangent à vos tableaux de bord, alertes et recherches.",
+        "keep": "Conserver pour l'instant",
+        "remove": "Supprimer les données d'exemple"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "Continuer en arrière-plan",
+      "progress": {
+        "title": "Création de votre boutique d'exemple",
+        "body": "Cela prend environ une minute. Vous pouvez fermer cette boîte de dialogue, mais gardez cet onglet ouvert jusqu'à la fin du chargement."
+      },
+      "ready": {
+        "title": "Votre boutique d'exemple est en ligne",
+        "startTour": "Démarrer la visite guidée",
+        "ownWay": "Explorer par moi-même"
+      },
+      "errorBody": "Une erreur s'est produite pendant le chargement. Réessayez : les tableaux de bord et les alertes qui existent déjà sont réutilisés, pas dupliqués."
+    },
+    "tour": {
+      "label": "Visite guidée",
+      "position": "Visite guidée · étape {current} sur {total}",
+      "pill": "Visite {current}/{total}",
+      "done": "Visite terminée",
+      "stepFailed": "Impossible d'ouvrir cette étape. Réessayez.",
+      "minimize": "Réduire la visite",
+      "close": "Terminer la visite",
+      "next": "Suivant",
+      "capabilities": {
+        "dashboards": "Tableaux de bord",
+        "alerts": "Alertes",
+        "logs": "Recherche de logs",
+        "traces": "Traçage",
+        "metrics": "Métriques et PromQL",
+        "pipelines": "Pipelines"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Repérez le problème",
+          "body": "Voici la vue d'ensemble des services de la boutique. Le taux d'erreur et la latence de validation de commande ont tous deux bondi au cours des 35 dernières minutes.",
+          "look": "Chaque panneau est une requête SQL. Survolez un graphique pour comparer les séries, faites glisser dessus pour zoomer ou ouvrez le menu d'un panneau pour modifier sa requête."
+        },
+        "alert": {
+          "title": "L'alerte s'est déjà déclenchée",
+          "body": "Une alerte sur les erreurs de paiement exécute périodiquement une requête SQL sur les logs et s'est déclenchée dès que les erreurs ont franchi son seuil.",
+          "look": "Ouvrez une alerte pour voir sa requête, son seuil et sa planification. La destination d'exemple est un webhook factice, donc les envois apparaissent comme ayant échoué : dirigez-la vers Slack, l'e-mail ou PagerDuty pour recevoir de vraies notifications."
+        },
+        "logs": {
+          "title": "Recherchez les erreurs",
+          "body": "Logs filtrés sur les erreurs de paiement. Presque tous indiquent la même chose : expiration du délai d'attente lors de l'acquisition d'une connexion dans le pool.",
+          "look": "Développez un enregistrement pour voir tous les champs. Cliquez sur la valeur d'un champ pour filtrer dessus, ou passez en mode SQL pour regrouper et agréger."
+        },
+        "deploy": {
+          "title": "Trouvez ce qui a changé",
+          "body": "La version Payment v2.15.0 a été déployée une minute avant le début des erreurs, et ses notes de version ont réduit le pool de connexions à 20.",
+          "look": "C'est la cause racine, trouvée avec une seule recherche dans les mêmes logs. La recherche plein texte et la recherche SQL s'exécutent sur les mêmes données."
+        },
+        "traces": {
+          "title": "Suivez une requête en échec",
+          "body": "Chaque trace suit une validation de commande à travers les services. Ouvrez-en une : le diagramme en cascade montre le service de paiement en attente d'une connexion à la base de données pendant 3 secondes.",
+          "look": "Les logs portent le même ID de trace, ce qui vous permet de passer d'un span à ses logs dans les deux sens."
+        },
+        "metrics": {
+          "title": "Confirmer avec PromQL",
+          "body": "La latence p95 de chaque service, interrogée avec PromQL. Payment et checkout augmentent ensemble.",
+          "look": "Les métriques résident dans le même moteur que les logs et les traces, le tableau de bord Infrastructure est donc entièrement construit à partir de PromQL."
+        },
+        "pipeline": {
+          "title": "Traiter les données à leur arrivée",
+          "body": "Un pipeline en temps réel exécute une fonction VRL sur chaque log d'accès, ajoutant client_os et is_mobile avant l'enregistrement de l'enregistrement.",
+          "look": "Ouvrez le pipeline pour voir son graphe. Les pipelines peuvent filtrer, enrichir, router et masquer les données sans toucher à vos applications."
+        },
+        "business": {
+          "title": "Mesurer l'impact métier",
+          "body": "Les mêmes logs alimentent les tableaux de bord métier : échecs de paiement, revenus et commandes par moyen de paiement.",
+          "look": "Aucun outil d'analyse distinct n'est nécessaire. Tout ce qui figure dans vos logs peut devenir un KPI."
+        }
+      },
+      "finale": {
+        "title": "Vous avez trouvé la cause racine",
+        "body": "En quelques minutes, vous êtes passé d'un pic sur un tableau de bord au déploiement qui l'a causé, tous les signaux au même endroit.",
+        "connect": "Connectez vos propres données",
+        "restart": "Redémarrer la visite",
+        "finish": "Terminer la visite"
+      }
     }
   },
   "recentSearches": {

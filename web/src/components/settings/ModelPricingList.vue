@@ -250,67 +250,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #cell-pricing="{ row }">
-            <div class="flex flex-wrap gap-1">
+            <div class="flex items-center gap-1">
               <template
                 v-if="getDefaultTier(row) && Object.keys(getDefaultTier(row).prices || {}).length"
               >
-                <ODimensionChip
-                  v-for="(price, key) in getVisiblePrices(row)"
-                  :key="key"
-                  :dim-key="key as string"
-                  :key-label="formatPriceKey(key as string)"
-                  :value="formatPerMillion(price as number)"
-                />
-                <OTag
-                  v-if="getOverflowCount(row) > 0"
-                  type="countChip"
-                  value="neutral"
-                  clickable
-                  @click.stop="openPricingDialog(row)"
-                >
-                  +{{ getOverflowCount(row) }}
-                  {{ t("modelPricing.overflowMore") }}
-                  <OTooltip>
-                    <template #content>
-                      <div class="min-w-60">
-                        <div class="text-compact mb-0.75 font-bold">
-                          {{ row.name }}
-                        </div>
-                        <table class="w-full border-collapse">
-                          <thead>
-                            <tr>
-                              <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-4 pt-0 pb-1 text-left font-semibold"
-                              >
-                                {{ t("modelPricing.usageType") }}
-                              </th>
-                              <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-0 pt-0 pb-1 text-right font-semibold"
-                              >
-                                {{ t("modelPricing.colPricingSimple") }}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr
-                              v-for="[key, price] in sortedPriceEntries(
-                                getDefaultTier(row)?.prices || {},
-                              )"
-                              :key="key"
-                            >
-                              <td class="py-0.5 ps-0 pe-4 text-xs">{{ formatPriceKey(key) }}</td>
-                              <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
-                                {{ formatPerMillion(price) }}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </template>
-                  </OTooltip>
-                </OTag>
+                <FitItems :items="sortedPriceEntries(getDefaultTier(row).prices)">
+                  <template #default="{ item }">
+                    <ODimensionChip
+                      :dim-key="item[0]"
+                      :key-label="formatPriceKey(item[0])"
+                      :value="formatPerMillion(item[1])"
+                    />
+                  </template>
+                  <template #more="{ count }">
+                    <OTag
+                      type="countChip"
+                      value="neutral"
+                      clickable
+                      @click.stop="openPricingDialog(row)"
+                    >
+                      +{{ count }}
+                      {{ t("modelPricing.overflowMore") }}
+                      <OTooltip>
+                        <template #content>
+                          <div class="min-w-60">
+                            <div class="text-compact mb-0.75 font-bold">
+                              {{ row.name }}
+                            </div>
+                            <table class="w-full border-collapse">
+                              <thead>
+                                <tr>
+                                  <th
+                                    class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-4 pt-0 pb-1 text-left font-semibold"
+                                  >
+                                    {{ t("modelPricing.usageType") }}
+                                  </th>
+                                  <th
+                                    class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-0 pt-0 pb-1 text-right font-semibold"
+                                  >
+                                    {{ t("modelPricing.colPricingSimple") }}
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr
+                                  v-for="[key, price] in sortedPriceEntries(
+                                    getDefaultTier(row)?.prices || {},
+                                  )"
+                                  :key="key"
+                                >
+                                  <td class="py-0.5 ps-0 pe-4 text-xs">
+                                    {{ formatPriceKey(key) }}
+                                  </td>
+                                  <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
+                                    {{ formatPerMillion(price) }}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </template>
+                      </OTooltip>
+                    </OTag>
+                  </template>
+                </FitItems>
                 <OTag
                   v-if="hasTimeBasedTiers(row)"
+                  class="shrink-0"
                   type="countChip"
                   value="neutral"
                   clickable
@@ -739,6 +745,7 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
@@ -1103,22 +1110,6 @@ function sortedPriceEntries(prices: Record<string, number>): [string, number][] 
     if (bi !== -1) return 1;
     return a.localeCompare(b);
   });
-}
-
-/** Return the first N prices to display inline as chips. */
-const MAX_VISIBLE_PRICES = 2;
-function getVisiblePrices(model: any): Record<string, number> {
-  const tier = getDefaultTier(model);
-  if (!tier?.prices) return {};
-  return Object.fromEntries(sortedPriceEntries(tier.prices).slice(0, MAX_VISIBLE_PRICES));
-}
-
-/** How many prices are hidden behind the overflow "+N" chip. */
-function getOverflowCount(model: any): number {
-  const tier = getDefaultTier(model);
-  if (!tier?.prices) return 0;
-  const total = Object.keys(tier.prices).length;
-  return Math.max(0, total - MAX_VISIBLE_PRICES);
 }
 
 const ooLogo = computed(() =>

@@ -2899,12 +2899,13 @@ mod tests {
 
     #[tokio::test]
     async fn sg33_guidance_of_a_run_that_never_starts_is_not_read() {
+        let _db = db().await;
+        crate::alerts::rca_runs::tests::rca_off();
         let cfg = o2_enterprise::enterprise::common::config::get_config();
         assert!(
             !(cfg.incidents.enabled && cfg.incidents.rca_enabled),
-            "the test relies on the default: RCA off"
+            "rca_off() turned RCA off"
         );
-        let _db = db().await;
         let (org, inc) = new_incident(None).await;
         let StartOutcome::Started { run_id } = start_run(StartRun {
             guidance: Some("Check the deploy".to_string()),

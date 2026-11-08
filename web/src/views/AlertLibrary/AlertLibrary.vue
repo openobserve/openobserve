@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="px-page-edge shrink-0 py-2">
+            <div class="shrink-0">
               <OStatStrip
                 :items="statItems"
                 selectable

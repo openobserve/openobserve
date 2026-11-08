@@ -261,6 +261,44 @@ describe("Login", () => {
     expect(window.location.href).toBe("https://sso.example.com");
   });
 
+  describe("index.html SSO fast path", () => {
+    afterEach(() => {
+      delete (window as any).__o2SsoFastPath;
+    });
+
+    it("does not request dex_login again when the fast path already redirected", async () => {
+      const authService = await import("@/services/auth");
+      (window as any).__o2SsoFastPath = Promise.resolve(true);
+      wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+
+      await wrapper.vm.loginWithSSo();
+
+      expect(authService.default.get_dex_login).not.toHaveBeenCalled();
+    });
+
+    it("lets a later SSO click start a fresh request after the fast path was used", async () => {
+      const authService = await import("@/services/auth");
+      (window as any).__o2SsoFastPath = Promise.resolve(true);
+      wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+
+      await wrapper.vm.loginWithSSo();
+      await wrapper.vm.loginWithSSo();
+
+      expect(authService.default.get_dex_login).toHaveBeenCalledTimes(1);
+    });
+
+    it("falls back to its own dex_login request when the fast path failed", async () => {
+      const authService = await import("@/services/auth");
+      (window as any).__o2SsoFastPath = Promise.resolve(false);
+      wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+
+      await wrapper.vm.loginWithSSo();
+
+      expect(authService.default.get_dex_login).toHaveBeenCalledTimes(1);
+      expect(window.location.href).toBe("https://sso.example.com");
+    });
+  });
+
   it("should not log a dex login request the browser aborted", async () => {
     const authService = await import("@/services/auth");
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});

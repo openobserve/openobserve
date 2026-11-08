@@ -145,16 +145,12 @@ pub async fn create(
 )]
 pub async fn get(Path(org_id): Path<String>) -> Response {
     match get_org_setting(&org_id).await {
-        Ok(data) => (StatusCode::OK, Json(OrganizationSettingResponse { data })).into_response(),
+        Ok(data) => settings_response(data),
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();
                 if let Ok(()) = set_org_setting(&org_id, &setting).await {
-                    return (
-                        StatusCode::OK,
-                        Json(OrganizationSettingResponse { data: setting }),
-                    )
-                        .into_response();
+                    return settings_response(setting);
                 }
             };
             MetaHttpResponse::bad_request(&err)
@@ -406,6 +402,20 @@ pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
+fn settings_response(data: OrganizationSetting) -> Response {
+    let resolved_data_retention = db::organization::resolved_retention_defaults(
+        &db::organization::org_setting_retention_defaults(&data),
+    );
+    (
+        StatusCode::OK,
+        Json(OrganizationSettingResponse {
+            data,
+            resolved_data_retention,
+        }),
+    )
+        .into_response()
+}
+
 fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<(), &'static str> {
     if settings.scrape_interval == Some(0) {
         return Err("scrape_interval should be a positive value");
@@ -414,6 +424,12 @@ fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<()
         && !(1_000..=1_000_000).contains(&max_series_per_query)
     {
         return Err("max_series_per_query must be between 1,000 and 1,000,000");
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(data_retention) = &settings.data_retention
+        && data_retention.validate().is_err()
+    {
+        return Err("data_retention values must be 0 or at least 3 days");
     }
     for link in settings.cross_links.iter().flatten() {
         if link.name.is_empty() {
@@ -662,6 +678,11 @@ fn apply_settings_payload(
         field_found = true;
         data.claim_parser_function = claim_parser_function;
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(data_retention) = settings.data_retention {
+        field_found = true;
+        data.data_retention = data_retention;
+    }
     if let Some(usage_stream_enabled) = settings.usage_stream_enabled {
         field_found = true;
         data.usage_stream_enabled = usage_stream_enabled;
@@ -713,6 +734,35 @@ fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_data_retention_payload_is_validated_and_replaces_as_a_whole() {
+        let payload = |json: serde_json::Value| -> OrganizationSettingPayload {
+            serde_json::from_value(json).unwrap()
+        };
+        let metrics = |days: i64| payload(serde_json::json!({"data_retention": {"metrics": days}}));
+        assert!(validate_settings_payload(&metrics(2)).is_err());
+        assert!(validate_settings_payload(&metrics(0)).is_ok());
+        assert!(validate_settings_payload(&metrics(3)).is_ok());
+
+        let mut data = OrganizationSetting::default();
+        let both = payload(serde_json::json!({"data_retention": {"default": 40, "logs": 21}}));
+        assert!(apply_settings_payload(&mut data, both));
+        assert_eq!(data.data_retention.default, 40);
+        assert_eq!(data.data_retention.logs, 21);
+
+        // a request carrying the field replaces the object: what it leaves out is removed
+        assert!(apply_settings_payload(&mut data, metrics(180)));
+        assert_eq!(data.data_retention.metrics, 180);
+        assert_eq!(data.data_retention.default, 0);
+        assert_eq!(data.data_retention.logs, 0);
+
+        // a request without it leaves the stored values alone
+        let other = payload(serde_json::json!({"scrape_interval": 30}));
+        assert!(apply_settings_payload(&mut data, other));
+        assert_eq!(data.data_retention.metrics, 180);
+    }
 
     #[test]
     fn test_merge_red_insights_enabled_sets_and_leaves() {

@@ -185,7 +185,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import { useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -208,7 +208,8 @@ export default defineComponent({
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
-    const router = useRouter();
+    // useRoute, not router.currentRoute: inside onboarding the page is given its own route.
+    const route = useRoute();
     // Cloud endpoints carry valid certificates, so -k there only teaches users to skip TLS checks.
     const insecureFlag = config.isCloud === "true" ? "" : " -k";
     // The collector is registered like every other route, so a ZO_BASE_URI
@@ -264,7 +265,7 @@ export default defineComponent({
 
     const content = ref<InstanceType<typeof IngestionContent> | null>(null);
     const onSnippetCopy = ({ partial }: CodeBlockCopyPayload) => {
-      analytics.track("snippet_copied", { route: router?.currentRoute.value.name, partial });
+      analytics.track("snippet_copied", { route: route?.name, partial });
       content.value?.snippetCopied();
     };
 

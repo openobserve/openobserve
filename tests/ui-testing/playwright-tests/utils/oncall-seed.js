@@ -467,14 +467,10 @@ function rungEscalatingToTeam(priority, rotationId, { channels = ['email'] } = {
 async function setTeamPolicy(page, teamId, {
   rungs,
   destinations = undefined,
-  repeatCount = undefined,
-  finalAction = undefined,
   l0 = undefined,
 } = {}) {
   const payload = { rungs };
   if (destinations !== undefined) payload.destinations = destinations;
-  if (repeatCount !== undefined) payload.repeat_count = repeatCount;
-  if (finalAction !== undefined) payload.final_action = finalAction;
   if (l0 !== undefined) payload.l0 = l0;
 
   const res = await api(

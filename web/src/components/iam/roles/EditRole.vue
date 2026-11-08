@@ -376,9 +376,17 @@ const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEdi
 // Monaco is not an O2 primitive, so the page lock cannot disable it on its own.
 const { locked: pageLocked } = useFeatureLock();
 
+let tabRequested = false;
+
 onBeforeMount(() => {
   permissionsState.permissions = [];
   editingRole.value = router.currentRoute.value.params.role_name as string;
+  const requestedTab = router.currentRoute.value.query.tab;
+  const serviceAccountsOn = store.state.zoConfig?.service_account_enabled;
+  if (requestedTab === "users" || (requestedTab === "serviceAccounts" && serviceAccountsOn)) {
+    activeTab.value = requestedTab;
+    tabRequested = true;
+  }
   getRoleDetails();
 });
 
@@ -1009,7 +1017,7 @@ const applyRoleDraft = (data: RoleDraftData) => {
   removedServiceAccounts.value = new Set(
     data.removedServiceAccounts.filter((user) => members.has(user)),
   );
-  if (tabs.value.some((tab) => tab.value === data.tab)) activeTab.value = data.tab;
+  if (!tabRequested && tabs.value.some((tab) => tab.value === data.tab)) activeTab.value = data.tab;
   membersKey.value += 1;
 };
 

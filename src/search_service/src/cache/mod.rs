@@ -144,7 +144,7 @@ pub async fn search(
     let cfg = get_config();
     // result cache can be enable only when its from the start
     let use_cache = if in_req.query.from == 0 {
-        in_req.use_cache
+        in_req.use_cache && is_result_cache_allowed(stream_type)
     } else {
         false
     };
@@ -1312,6 +1312,11 @@ pub fn is_result_array_skip_vrl(vrl_fn: &str) -> bool {
     RESULT_ARRAY_SKIP_VRL.is_match(vrl_fn)
 }
 
+pub fn is_result_cache_allowed(stream_type: StreamType) -> bool {
+    // Enrichment tables ignore the time range, so a cached result plus its delta repeats rows.
+    stream_type != StreamType::EnrichmentTables
+}
+
 // Helper function to create a deep copy of a Response
 fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::search::Response {
     let serialized = serde_json::to_string(res).expect("Failed to serialize response");
@@ -1395,7 +1400,8 @@ pub async fn apply_regex_to_response(
     };
 
     let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
-        crate::datafusion::plan::regex_projections::get_columns_from_projections(sql).await?;
+        crate::datafusion::logical_plan::regex_projections::get_columns_from_projections(sql)
+            .await?;
     if projections.is_empty() {
         return Ok(());
     }
@@ -1502,6 +1508,12 @@ mod tests {
                 "start={start}, end={end}, interval={interval}"
             );
         }
+    }
+
+    #[test]
+    fn test_result_cache_skips_enrichment_tables() {
+        assert!(!is_result_cache_allowed(StreamType::EnrichmentTables));
+        assert!(is_result_cache_allowed(StreamType::Logs));
     }
 
     #[test]

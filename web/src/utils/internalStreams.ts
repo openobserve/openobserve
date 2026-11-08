@@ -36,6 +36,9 @@ export interface StreamOwnership {
 
 const USER_SOURCED_NAMES: ReadonlySet<string> = new Set(USER_SOURCED_STREAM_NAMES);
 
+// the service graph derives traces_service_graph_* metrics from any traces, sample ones included
+const DERIVED_STREAM_PREFIX = "traces_service_graph_";
+
 export function isUserDataStreamType(streamType: string): streamType is UserDataStreamType {
   return (USER_DATA_STREAM_TYPES as readonly string[]).includes(streamType);
 }
@@ -47,7 +50,8 @@ export function isUserDataStream(
 ): boolean {
   return (
     isUserDataStreamType(stream?.stream_type ?? fallbackType) &&
-    (stream?.is_internal !== true || USER_SOURCED_NAMES.has(stream?.name ?? ""))
+    (stream?.is_internal !== true || USER_SOURCED_NAMES.has(stream?.name ?? "")) &&
+    !(stream?.name ?? "").startsWith(DERIVED_STREAM_PREFIX)
   );
 }
 

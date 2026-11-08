@@ -14,8 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { CancelledError } from "@tanstack/vue-query";
+import { CancelledError, VueQueryPlugin } from "@tanstack/vue-query";
+import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
 import useStreams from "@/composables/useStreams";
+import { orgHasUserData, useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import StreamService from "@/services/stream";
 import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -283,6 +286,38 @@ describe("useStreams Composable", () => {
         "streams/updateStreamsFetched",
         expect.anything(),
       );
+    });
+
+    // the org-data probe reads the same endpoint at sign-in and on Home, before the stream exists
+    it.each([
+      ["a stream created after Home's probe read", ["a"], ["a", "b"]],
+      ["the first stream, sent after the sign-in probe read none", [], ["a"]],
+    ])("lists %s", async (_, before, after) => {
+      queryClient.clear();
+      const answer = (names: string[]) =>
+        ({
+          data: {
+            list: names.map((name) => ({ name, stream_type: "logs", stats: { doc_num: 1 } })),
+          },
+        }) as any;
+      vi.mocked(StreamService.nameList).mockResolvedValue(answer(before));
+      const probe = mount(
+        defineComponent({
+          setup() {
+            useOrgHasUserData("test-org");
+            return () => h("div");
+          },
+        }),
+        { global: { plugins: [[VueQueryPlugin, { queryClient }]] } },
+      );
+      await flushPromises();
+      await orgHasUserData("test-org");
+      vi.mocked(StreamService.nameList).mockResolvedValue(answer(after));
+
+      const result: any = await streamsInstance.getStreams("logs", false, false);
+
+      expect(result.list.map((s: any) => s.name)).toEqual(after);
+      probe.unmount();
     });
 
     it("rejects with the CancelledError itself when the fetch is cancelled", async () => {

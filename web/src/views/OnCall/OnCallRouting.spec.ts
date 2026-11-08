@@ -55,7 +55,7 @@ const routeQuery = vi.hoisted(() => ({ value: {} as Record<string, string> }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, resolve: () => ({ href: "" }) }),
   useRoute: () => ({ query: routeQuery.value }),
 }));
 
