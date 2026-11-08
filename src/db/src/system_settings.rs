@@ -677,7 +677,7 @@ pub async fn get_service_identity_config(
     config
 }
 
-/// Save an org's service identity config to this region only: its service-stream cleanup runs here alone.
+/// Save an org's identity config in this region only, where its service-stream cleanup runs.
 pub async fn set_service_identity_config(setting: &SystemSetting) -> Result<SystemSetting> {
     let stored = db::set(setting)
         .await
