@@ -483,116 +483,142 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'drilldown'"
-            class="border-border-default h-full overflow-hidden border-t"
+            class="border-border-default flex h-full flex-col overflow-hidden border-t"
             data-test="logs-drill-down-page"
           >
-            <!-- Same no-stream / error / no-events states as the results pane. -->
-            <OEmptyState
-              v-if="searchObj.meta.sqlMode"
-              size="hero"
-              :title="t('search.drillDownUnavailableInSqlMode')"
-              data-test="logs-drill-down-sql-mode-text"
-            />
-            <LogsNoDataState
-              v-else-if="
-                !searchObj.loadingStream &&
-                searchObj.data.stream.streamLists.length == 0 &&
-                searchObj.loading == false
-              "
-              :ai-enabled="isAiEnabled"
-              data-test="logs-drill-down-no-streams-in-org-text"
-              @ask-ai="onAskAiFixQuery"
-            />
-            <LogsNoStreamState
-              v-else-if="
-                searchObj.data.stream.streamLists.length > 0 &&
-                searchObj.data.stream.selectedStream.length == 0 &&
-                searchObj.data.filterErrMsg === ''
-              "
-              :org-id="store.state.selectedOrganization.identifier"
-              :stream-type="searchObj.data.stream.streamType"
-              :auto-run="isAutoRunOn"
-              data-test="logs-drill-down-no-stream-selected-text"
-              @select-stream="onSelectStream"
-              @pick-stream="onPickStream"
-            />
-            <LogsErrorState
-              v-else-if="searchObj.data.filterErrMsg !== '' && searchObj.loading == false"
-              data-test="logs-drill-down-filter-error-message"
-              :error-code="0"
-              :error-msg="searchObj.data.filterErrMsg"
-              :ai-enabled="isAiEnabled"
-              @ask-ai="onAskAiFixQuery"
-              @fix-query="onFixQuery"
-              @configure-stream="onConfigureStream"
-              @widen-range="onWidenRange"
-            />
-            <LogsErrorState
-              v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
-              data-test="logs-drill-down-error-state"
-              :error-code="parseInt(searchObj.data.errorCode) || 0"
-              :error-msg="searchObj.data.errorMsg"
-              :error-detail="searchObj.data.errorDetail"
-              :ai-enabled="isAiEnabled"
-              :stream-name="searchObj.data.stream.selectedStream[0]"
-              @ask-ai="onAskAiFixQuery"
-              @fix-query="onFixQuery"
-              @configure-stream="onConfigureStream"
-              @widen-range="onWidenRange"
-            />
-            <div v-else-if="searchObj.loading" class="flex h-full items-center justify-center">
-              <OSpinner size="lg" />
+            <div
+              v-if="!drillDownShowsDashboard"
+              class="border-card-glass-border px-page-edge flex shrink-0 items-center border-b py-1.5"
+              data-test="logs-drill-down-stream-row"
+            >
+              <LogsDrillDownStreamSelect
+                ref="drillDownStreamSelectRef"
+                :streams="drillDownPickerStreams"
+                :model-value="searchObj.data.stream.selectedStream[0] ?? null"
+                @update:model-value="onDrillDownStreamChange"
+              />
             </div>
-            <LogsAutoRunGuard
-              v-else-if="searchObj.meta.autoRunBlocked && !searchObj.data.queryResults.hits?.length"
-              :blocked="searchObj.meta.autoRunBlocked"
-              :auto-run-on="isAutoRunOn"
-              :show-search-job="showGuardSearchJob"
-              @run="onGuardRunAnyway"
-              @narrow="onGuardNarrow"
-              @search-job="onGuardSearchJob"
-              @select-stream="onSelectStream"
-            />
-            <!-- Mounted only once a search settles, so each search rebuilds it from the new results. -->
-            <TracesAnalysisDashboard
-              v-else-if="searchObj.data.queryResults.hits?.length > 0"
-              embedded
-              :streamName="searchObj.data.stream.selectedStream[0]"
-              streamType="logs"
-              :timeRange="drillDownTimeRange"
-              :rateFilter="drillDownRateFilter"
-              :baseFilter="drillDownBaseFilter"
-              :streamFields="
-                searchObj.data.stream.userDefinedSchema?.length > 0
-                  ? searchObj.data.stream.userDefinedSchema
-                  : searchObj.data.stream.selectedStreamFields
-              "
-              :logSamples="searchObj.data.queryResults.hits"
-              analysisType="volume"
-            />
-            <LogsNoEventsState
-              v-else-if="searchObj.meta.searchApplied == true"
-              data-test="logs-drill-down-no-events-found-text"
-              :sql-mode="searchObj.meta.sqlMode"
-              :query="searchObj.data.query"
-              :editor-value="searchObj.data.editorValue"
-              :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
-              :date-type="searchObj.data.datetime.type || 'relative'"
-              :ai-enabled="isAiEnabled"
-              :stream-doc-time-range="streamDocTimeRange"
-              :query-window-us="queryWindowUs"
-              :timezone="store.state.timezone"
-              @jump-to-stream-data="onJumpToStreamData"
-              @open-history="openSearchHistory"
-              @ask-ai="onAskAiFixQuery"
-            />
-            <OEmptyState
-              v-else
-              preset="no-query-applied"
-              size="hero"
-              data-test="logs-drill-down-apply-search-text"
-              @action="() => searchBarRef?.handleRunQueryFn?.()"
-            />
+            <div class="min-h-0 flex-1">
+              <!-- Same no-stream / error / no-events states as the results pane. -->
+              <OEmptyState
+                v-if="searchObj.meta.sqlMode"
+                size="hero"
+                :title="t('search.drillDownUnavailableInSqlMode')"
+                data-test="logs-drill-down-sql-mode-text"
+              />
+              <LogsNoDataState
+                v-else-if="
+                  !searchObj.loadingStream &&
+                  searchObj.data.stream.streamLists.length == 0 &&
+                  searchObj.loading == false
+                "
+                :ai-enabled="isAiEnabled"
+                data-test="logs-drill-down-no-streams-in-org-text"
+                @ask-ai="onAskAiFixQuery"
+              />
+              <LogsNoStreamState
+                v-else-if="
+                  searchObj.data.stream.streamLists.length > 0 &&
+                  searchObj.data.stream.selectedStream.length == 0 &&
+                  searchObj.data.filterErrMsg === ''
+                "
+                :org-id="store.state.selectedOrganization.identifier"
+                :stream-type="searchObj.data.stream.streamType"
+                :auto-run="isAutoRunOn"
+                data-test="logs-drill-down-no-stream-selected-text"
+                @select-stream="onSelectStream"
+                @pick-stream="onPickStream"
+              />
+              <LogsErrorState
+                v-else-if="searchObj.data.filterErrMsg !== '' && searchObj.loading == false"
+                data-test="logs-drill-down-filter-error-message"
+                :error-code="0"
+                :error-msg="searchObj.data.filterErrMsg"
+                :ai-enabled="isAiEnabled"
+                @ask-ai="onAskAiFixQuery"
+                @fix-query="onFixQuery"
+                @configure-stream="onConfigureStream"
+                @widen-range="onWidenRange"
+              />
+              <LogsErrorState
+                v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
+                data-test="logs-drill-down-error-state"
+                :error-code="parseInt(searchObj.data.errorCode) || 0"
+                :error-msg="searchObj.data.errorMsg"
+                :error-detail="searchObj.data.errorDetail"
+                :ai-enabled="isAiEnabled"
+                :stream-name="searchObj.data.stream.selectedStream[0]"
+                @ask-ai="onAskAiFixQuery"
+                @fix-query="onFixQuery"
+                @configure-stream="onConfigureStream"
+                @widen-range="onWidenRange"
+              />
+              <div v-else-if="searchObj.loading" class="flex h-full items-center justify-center">
+                <OSpinner size="lg" />
+              </div>
+              <LogsAutoRunGuard
+                v-else-if="
+                  searchObj.meta.autoRunBlocked && !searchObj.data.queryResults.hits?.length
+                "
+                :blocked="searchObj.meta.autoRunBlocked"
+                :auto-run-on="isAutoRunOn"
+                :show-search-job="showGuardSearchJob"
+                @run="onGuardRunAnyway"
+                @narrow="onGuardNarrow"
+                @search-job="onGuardSearchJob"
+                @select-stream="onSelectStream"
+              />
+              <!-- Mounted only once a search settles, so each search rebuilds it from the new results. -->
+              <TracesAnalysisDashboard
+                v-else-if="drillDownShowsDashboard"
+                embedded
+                :streamName="searchObj.data.stream.selectedStream[0]"
+                streamType="logs"
+                :timeRange="drillDownTimeRange"
+                :rateFilter="drillDownRateFilter"
+                :baseFilter="drillDownBaseFilter"
+                :streamFields="
+                  searchObj.data.stream.userDefinedSchema?.length > 0
+                    ? searchObj.data.stream.userDefinedSchema
+                    : searchObj.data.stream.selectedStreamFields
+                "
+                :logSamples="searchObj.data.queryResults.hits"
+                analysisType="volume"
+              >
+                <template #header-start>
+                  <LogsDrillDownStreamSelect
+                    ref="drillDownStreamSelectRef"
+                    class="me-3"
+                    :streams="drillDownPickerStreams"
+                    :model-value="searchObj.data.stream.selectedStream[0] ?? null"
+                    @update:model-value="onDrillDownStreamChange"
+                  />
+                </template>
+              </TracesAnalysisDashboard>
+              <LogsNoEventsState
+                v-else-if="searchObj.meta.searchApplied == true"
+                data-test="logs-drill-down-no-events-found-text"
+                :sql-mode="searchObj.meta.sqlMode"
+                :query="searchObj.data.query"
+                :editor-value="searchObj.data.editorValue"
+                :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
+                :date-type="searchObj.data.datetime.type || 'relative'"
+                :ai-enabled="isAiEnabled"
+                :stream-doc-time-range="streamDocTimeRange"
+                :query-window-us="queryWindowUs"
+                :timezone="store.state.timezone"
+                @jump-to-stream-data="onJumpToStreamData"
+                @open-history="openSearchHistory"
+                @ask-ai="onAskAiFixQuery"
+              />
+              <OEmptyState
+                v-else
+                preset="no-query-applied"
+                size="hero"
+                data-test="logs-drill-down-apply-search-text"
+                @action="() => searchBarRef?.handleRunQueryFn?.()"
+              />
+            </div>
           </div>
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'build'"
@@ -735,6 +761,8 @@ import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
 import LogsNoFtsPanel from "@/plugins/logs/LogsNoFtsPanel.vue";
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import LogsAutoRunGuard from "@/plugins/logs/LogsAutoRunGuard.vue";
+import LogsDrillDownStreamSelect from "@/plugins/logs/LogsDrillDownStreamSelect.vue";
+import type { PickerStream } from "@/composables/useStreamPickerOptions";
 import LogsPermalinkBanner from "@/plugins/logs/LogsPermalinkBanner.vue";
 import LogsPermalinkDrawer from "@/plugins/logs/LogsPermalinkDrawer.vue";
 import SearchResultSkeleton from "@/plugins/logs/SearchResultSkeleton.vue";
@@ -828,6 +856,7 @@ export default defineComponent({
     LogsNoDataState,
     FirstDataPanel,
     LogsNoStreamState,
+    LogsDrillDownStreamSelect,
     LogsErrorState,
     LogsAutoRunGuard,
     OBadge,
@@ -2056,7 +2085,47 @@ export default defineComponent({
       });
     };
 
+    const drillDownStreamSelectRef = ref<InstanceType<typeof LogsDrillDownStreamSelect> | null>(
+      null,
+    );
+
+    const drillDownPickerStreams = computed<PickerStream[]>(() =>
+      (searchObj.data.stream.streamLists || []).map(
+        (option: { value: string; internal?: boolean }) => ({
+          name: option.value,
+          is_internal: option.internal === true,
+        }),
+      ),
+    );
+
+    // Mirrors the drill-down template's state chain, so the stream select sits in the dashboard header only while it is mounted.
+    const drillDownShowsDashboard = computed(() => {
+      const stream = searchObj.data.stream;
+      const noStreamsInOrg = !searchObj.loadingStream && stream.streamLists.length == 0;
+      const noStreamSelected = stream.streamLists.length > 0 && stream.selectedStream.length == 0;
+      return (
+        !searchObj.meta.sqlMode &&
+        !searchObj.loading &&
+        !noStreamsInOrg &&
+        !noStreamSelected &&
+        searchObj.data.filterErrMsg === "" &&
+        searchObj.data.errorMsg === "" &&
+        searchObj.data.queryResults.hits?.length > 0
+      );
+    });
+
+    const onDrillDownStreamChange = (stream: string) => {
+      searchObj.data.stream.selectedStream = [stream];
+      searchObj.data.filterErrMsg = "";
+      onStreamChange("", { origin: "selector" });
+    };
+
     const onSelectStream = () => {
+      // The fields panel holding the IndexList selector is hidden in drill down.
+      if (searchObj.meta.logsVisualizeToggle === "drilldown") {
+        drillDownStreamSelectRef.value?.open();
+        return;
+      }
       // < md the stream selector lives in the fields drawer, so it must open before the trigger can focus.
       if (isMobile.value) {
         mobileFieldsOpen.value = true;
@@ -4192,6 +4261,10 @@ export default defineComponent({
       isAiEnabled,
       onSelectStream,
       onPickStream,
+      drillDownStreamSelectRef,
+      drillDownPickerStreams,
+      drillDownShowsDashboard,
+      onDrillDownStreamChange,
       onWidenRange,
       onRemoveFilter,
       onAskAiFixQuery,
