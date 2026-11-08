@@ -431,6 +431,10 @@ fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<()
     {
         return Err("data_retention values must be 0 or at least 3 days");
     }
+    #[cfg(not(feature = "enterprise"))]
+    if settings.data_retention.is_some() {
+        return Err("data_retention requires an enterprise build");
+    }
     for link in settings.cross_links.iter().flatten() {
         if link.name.is_empty() {
             return Err("Cross-link name is required");
@@ -762,6 +766,28 @@ mod tests {
         let other = payload(serde_json::json!({"scrape_interval": 30}));
         assert!(apply_settings_payload(&mut data, other));
         assert_eq!(data.data_retention.metrics, 180);
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn test_data_retention_payload_is_rejected_on_oss() {
+        let payload = |json: serde_json::Value| -> OrganizationSettingPayload {
+            serde_json::from_value(json).unwrap()
+        };
+        let mixed =
+            payload(serde_json::json!({"data_retention": {"logs": 30}, "scrape_interval": 30}));
+        assert_eq!(
+            validate_settings_payload(&mixed),
+            Err("data_retention requires an enterprise build")
+        );
+        let only = payload(serde_json::json!({"data_retention": {"logs": 30}}));
+        assert_eq!(
+            validate_settings_payload(&only),
+            Err("data_retention requires an enterprise build")
+        );
+        let without = payload(serde_json::json!({"scrape_interval": 30}));
+        assert!(without.data_retention.is_none());
+        assert_eq!(validate_settings_payload(&without), Ok(()));
     }
 
     #[test]

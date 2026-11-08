@@ -553,6 +553,11 @@ pub struct OrganizationSettingPayload {
         deserialize_with = "DataRetentionDefaults::deserialize_strict"
     )]
     pub data_retention: Option<DataRetentionDefaults>,
+    /// Captured only so an OSS build can reject it instead of silently dropping it.
+    #[cfg(not(feature = "enterprise"))]
+    #[serde(default, skip_serializing)]
+    #[schema(ignore)]
+    pub data_retention: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
     #[cfg(feature = "cloud")]
@@ -1515,7 +1520,6 @@ mod tests {
             ai_rca_thread_tool_output: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
-            #[cfg(feature = "enterprise")]
             data_retention: None,
             cross_links: None,
             #[cfg(feature = "cloud")]
