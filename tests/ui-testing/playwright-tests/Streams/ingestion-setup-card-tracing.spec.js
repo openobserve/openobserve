@@ -24,13 +24,11 @@ test.describe("Ingestion Setup Cards — eBPF Tracing testcases", () => {
     await pm.ingestionConfigPage.navigateToIntegration('/ingestion/recommended/linux', orgId);
     await pm.ingestionConfigPage.expectStepVisible('install');
 
-    // Default "Logs & metrics" variant: no trace inputs and no --trace- flags.
     await pm.ingestionConfigPage.expectVariantInputAbsent('ports');
     let code = await pm.ingestionConfigPage.getStepCodeText('install');
     expect(code).toContain('install.sh');
     expect(code).not.toContain('--trace-');
 
-    // Switch to "Logs, metrics & eBPF traces": four inputs appear, ports defaults to 8080.
     await pm.ingestionConfigPage.selectStepVariant('install', 'traces');
     expect(await pm.ingestionConfigPage.getVariantInputValue('ports')).toBe('8080');
     expect(await pm.ingestionConfigPage.getVariantInputValue('exe')).toBe('');
@@ -51,7 +49,6 @@ test.describe("Ingestion Setup Cards — eBPF Tracing testcases", () => {
       "--trace-ports '80,443' --trace-exe '/opt/app*' --trace-cmd '*reports.py*' --service-name 'checkout'"
     );
 
-    // Reverting to the default variant drops the inputs and flags.
     await pm.ingestionConfigPage.selectStepVariant('install', 'logs-metrics');
     await pm.ingestionConfigPage.expectVariantInputAbsent('ports');
     code = await pm.ingestionConfigPage.getStepCodeText('install');
@@ -67,12 +64,10 @@ test.describe("Ingestion Setup Cards — eBPF Tracing testcases", () => {
     await pm.ingestionConfigPage.navigateToIntegration('/ingestion/recommended/kubernetes', orgId);
     await pm.ingestionConfigPage.expectStepVisible('instrument');
 
-    // Default: "Language libraries" top-level with the nested java/dotnet/nodejs/python toggle.
     await pm.ingestionConfigPage.expectSubvariantTabsVisible('instrument');
     let code = await pm.ingestionConfigPage.getStepCodeText('instrument');
     expect(code).toContain('kubectl annotate');
 
-    // Select "eBPF": nested toggle hidden, three blank inputs, warning visible, code hidden.
     await pm.ingestionConfigPage.selectStepVariant('instrument', 'ebpf');
     await pm.ingestionConfigPage.expectSubvariantTabsHidden('instrument');
     expect(await pm.ingestionConfigPage.getVariantInputValue('ebpfPorts')).toBe('');
@@ -123,7 +118,6 @@ test.describe("Ingestion Setup Cards — eBPF Tracing testcases", () => {
     await pm.ingestionConfigPage.navigateToIntegration('/ingestion/recommended/kubernetes', orgId);
     await pm.ingestionConfigPage.selectStepVariant('instrument', 'ebpf');
 
-    // All blank → warning visible and code hidden.
     await pm.ingestionConfigPage.expectVariantWarning('instrument', true);
     await pm.ingestionConfigPage.expectStepCodePresent('instrument', false);
 
@@ -134,7 +128,6 @@ test.describe("Ingestion Setup Cards — eBPF Tracing testcases", () => {
     expect(code).toContain('--set ebpf.trace.ports=null');
     expect(code).toContain("--set-string 'ebpf.trace.exePaths={/opt/app*}'");
     expect(code).toContain("--set-string 'ebpf.trace.cmdLines={*worker.py*}'");
-    // Deterministic order: ports (null) → exe → cmd.
     expect(code.indexOf('ebpf.trace.ports')).toBeLessThan(code.indexOf('ebpf.trace.exePaths'));
     expect(code.indexOf('ebpf.trace.exePaths')).toBeLessThan(code.indexOf('ebpf.trace.cmdLines'));
 

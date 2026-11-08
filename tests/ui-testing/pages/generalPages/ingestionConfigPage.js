@@ -128,7 +128,6 @@ export class IngestionConfigPage {
         return await this.page.locator(`[data-test="ai-step-${stepId}"] [data-test="ingestion-setup-code-block"]`).first().textContent();
     }
 
-    // ==================== eBPF Tracing Setup Card Variants ====================
     // eBPF inputs use the -field suffix; requireOneOf gates the warning and code block, so assert their absence.
 
     async expectStepVisible(stepId) {
