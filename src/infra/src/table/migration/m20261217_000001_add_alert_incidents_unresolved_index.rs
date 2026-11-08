@@ -50,7 +50,7 @@ enum AlertIncidents {
     LastAlertAt,
 }
 
-// The predicate must stay textually identical to the sweep's filter, or neither planner uses it.
+// Must match the status filter in `stale_incidents_query`, or the planner cannot use this index.
 fn create_unresolved_last_alert_index() -> IndexCreateStatement {
     Index::create()
         .if_not_exists()
@@ -81,7 +81,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn down_then_up_is_idempotent() {
+    async fn up_and_down_are_idempotent() {
         let mut opts = sea_orm::ConnectOptions::new("sqlite::memory:".to_string());
         opts.max_connections(1);
         let db = sea_orm::Database::connect(opts).await.unwrap();
