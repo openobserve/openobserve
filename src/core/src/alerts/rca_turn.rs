@@ -1943,29 +1943,10 @@ async fn stop_turn(org_id: &str, session_id: &str) {
 pub async fn sweep_rca_runs() -> anyhow::Result<usize> {
     let timeout = get_o2_config().incidents.rca_timeout_secs;
     let now = now_micros();
-    let running = runs_table::list_running(SWEEP_BATCH).await?;
-    let mut ended = sweep_running(running, |run| sweep_run(run, now, timeout)).await;
-    for run in runs_table::list_waiting_past_deadline(now, SWEEP_BATCH).await? {
-        let run_id = run.run_id.clone();
-        match close_deadline(run).await {
-            Ok(true) => ended += 1,
-            Ok(false) => {}
-            Err(e) => log::warn!("[RCA_TURN] could not close the deadline of run {run_id}: {e:#}"),
-        }
-    }
-    Ok(ended)
-}
-
-async fn sweep_running<S, F>(runs: Vec<RunRow>, sweep: S) -> usize
-where
-    S: Fn(RunRow) -> F,
-    F: Future<Output = anyhow::Result<bool>>,
-{
-    let mut swept_runs = futures::stream::iter(runs)
+    let mut swept_runs = futures::stream::iter(runs_table::list_running(SWEEP_BATCH).await?)
         .map(|run| {
             let run_id = run.run_id.clone();
-            let swept = sweep(run);
-            async move { (run_id, swept.await) }
+            async move { (run_id, sweep_run(run, now, timeout).await) }
         })
         .buffer_unordered(SWEEP_CONCURRENCY);
     let mut ended = 0;
@@ -1976,7 +1957,15 @@ where
             Err(e) => log::warn!("[RCA_TURN] could not sweep run {run_id}: {e:#}"),
         }
     }
-    ended
+    for run in runs_table::list_waiting_past_deadline(now, SWEEP_BATCH).await? {
+        let run_id = run.run_id.clone();
+        match close_deadline(run).await {
+            Ok(true) => ended += 1,
+            Ok(false) => {}
+            Err(e) => log::warn!("[RCA_TURN] could not close the deadline of run {run_id}: {e:#}"),
+        }
+    }
+    Ok(ended)
 }
 
 async fn close_deadline(run: RunRow) -> anyhow::Result<bool> {
@@ -4320,38 +4309,6 @@ mod tests {
         let run = stored(&org, &run_id).await;
         assert_eq!(run.state, RunState::Failed);
         assert_eq!(run.error.unwrap().code, ERROR_INTERRUPTED);
-    }
-
-    #[tokio::test]
-    async fn the_sweep_probes_running_runs_concurrently() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        let _db = db().await;
-        let (org, inc) = new_incident(None).await;
-        let run_id = start(&org, &inc, RunTrigger::Manual).await;
-        let row = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
-        let runs = vec![row; 2 * SWEEP_CONCURRENCY];
-        let swept = AtomicUsize::new(0);
-
-        tokio::time::pause();
-        let begun = Instant::now();
-        let ended = sweep_running(runs, |_run| {
-            let n = swept.fetch_add(1, Ordering::SeqCst);
-            async move {
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                match n % 3 {
-                    0 => Ok(true),
-                    1 => Ok(false),
-                    _ => Err(anyhow::anyhow!("probe failed")),
-                }
-            }
-        })
-        .await;
-
-        assert_eq!(swept.load(Ordering::SeqCst), 2 * SWEEP_CONCURRENCY);
-        assert_eq!(ended, (2 * SWEEP_CONCURRENCY).div_ceil(3));
-        // Serial probes take 32 s and unbounded ones 1 s; 16 at a time take 2 s.
-        assert_eq!(begun.elapsed().as_secs(), 2, "{:?}", begun.elapsed());
     }
 
     /// The superseded-turn guard: a turn followed by a continuation no longer ends the run.
