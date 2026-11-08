@@ -407,19 +407,19 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
             }
         }
         // Empty means "use the defaults" here, and caching it spares every later read two misses.
-        Ok(None) => {
-            let mut absent =
-                SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
-            // No row was ever saved, so `get_semantic_field_groups_updated_at` must stay 0.
-            absent.created_at = 0;
-            absent.updated_at = 0;
-            set_only_cached(&absent).await;
-        }
+        Ok(None) => cache_absent_semantic_field_groups(org_id).await,
         Err(_) => {}
     }
 
     // Fall back to enterprise defaults
     get_default_semantic_field_groups()
+}
+
+/// Whether this is the stand-in cached for an org with no saved semantic field groups.
+pub fn is_absent_semantic_field_groups(setting: &SystemSetting) -> bool {
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
+
+    setting.setting_key == SEMANTIC_FIELD_GROUPS && setting.created_at == 0 && setting.updated_at == 0
 }
 
 /// Get the Gen-AI agent fallback mapping config for an organization.
@@ -708,6 +708,21 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
     }
 }
 
+async fn cache_absent_semantic_field_groups(org_id: &str) {
+    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
+
+    let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
+    // Zero timestamps mark the stand-in, and keep `get_semantic_field_groups_updated_at` at 0.
+    absent.created_at = 0;
+    absent.updated_at = 0;
+    // A row cached since the database miss is newer than the miss, so it must win.
+    SYSTEM_SETTINGS
+        .write()
+        .await
+        .entry(cache_key(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS))
+        .or_insert(absent);
+}
+
 async fn evict_settings(keys: &[String]) -> Result<()> {
     let local = async {
         let mut cache = SYSTEM_SETTINGS.write().await;
@@ -879,8 +894,11 @@ mod tests {
 
         let defaults = get_default_semantic_field_groups();
         assert_eq!(get_semantic_field_groups(org).await, defaults);
-        let cached = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
-        assert_eq!(cached.map(|s| s.setting_value), Some(json!([])));
+        let cached = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .expect("the miss is cached");
+        assert_eq!(cached.setting_value, json!([]));
+        assert!(is_absent_semantic_field_groups(&cached));
         assert_eq!(get_semantic_field_groups_updated_at(org).await, 0);
 
         // Written behind the cache's back: still seeing the defaults proves no database read.
@@ -892,6 +910,14 @@ mod tests {
         set(&row).await.unwrap();
         assert_eq!(get_semantic_field_groups(org).await, groups);
         assert!(get_semantic_field_groups_updated_at(org).await > 0);
+
+        // A miss that lost the race to a save must not replace the saved row.
+        cache_absent_semantic_field_groups(org).await;
+        assert_eq!(get_semantic_field_groups(org).await, groups);
+        let saved = get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
+            .await
+            .unwrap();
+        assert!(!is_absent_semantic_field_groups(&saved));
 
         let _ = delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
     }
