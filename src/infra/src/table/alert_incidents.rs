@@ -1216,13 +1216,25 @@ async fn find_correlation_candidates_with<C: ConnectionTrait>(
     org_id: &str,
     group_values: &HashMap<String, String>,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    correlation_candidates_query(conn.get_database_backend(), org_id, group_values)
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Built apart from the call so its Postgres shape is testable without a database.
+fn correlation_candidates_query(
+    backend: sea_orm::DbBackend,
+    org_id: &str,
+    group_values: &HashMap<String, String>,
+) -> sea_orm::Select<alert_incidents::Entity> {
     let dims = serde_json::Value::Object(
         group_values
             .iter()
             .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
             .collect(),
     );
-    let nested = match conn.get_database_backend() {
+    let nested = match backend {
         sea_orm::DbBackend::Postgres => Expr::cust_with_values(
             r#"("alert_incidents"."group_values" @> $1::jsonb OR "alert_incidents"."group_values" <@ $2::jsonb)"#,
             [dims.clone(), dims],
@@ -1238,9 +1250,6 @@ async fn find_correlation_candidates_with<C: ConnectionTrait>(
         .filter(alert_incidents::Column::Status.ne("resolved"))
         .filter(nested)
         .order_by_desc(alert_incidents::Column::CreatedAt)
-        .all(conn)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
 /// Upgrade incident group_values and key_type during hierarchical upgrade
@@ -2133,5 +2142,33 @@ mod tests {
                 .collect();
             assert_eq!(found, expected, "firing {firing:?}");
         }
+    }
+
+    // Postgres is not exercised by the SQLite tests, so pin how the containment binds.
+    #[test]
+    fn correlation_candidates_bind_the_firing_dims_to_both_containment_operators() {
+        use sea_orm::{DbBackend, QueryTrait};
+
+        let firing = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let stmt = correlation_candidates_query(DbBackend::Postgres, "acme", &firing)
+            .build(DbBackend::Postgres);
+
+        assert!(
+            stmt.sql.contains(
+                r#"("alert_incidents"."group_values" @> $3::jsonb OR "alert_incidents"."group_values" <@ $4::jsonb)"#
+            ),
+            "{}",
+            stmt.sql
+        );
+        let dims = sea_orm::Value::Json(Some(Box::new(serde_json::json!({"ns": "prod"}))));
+        assert_eq!(
+            stmt.values.unwrap().0,
+            [
+                "acme".into(),
+                "resolved".into(),
+                dims.clone(),
+                dims
+            ]
+        );
     }
 }
