@@ -279,17 +279,16 @@ pub async fn flush_all() -> Result<()> {
     Ok(())
 }
 
-// get the max seq id of all writers
-pub async fn get_max_writer_seq_id() -> u64 {
-    let mut max_seq_id = 0;
+/// Max id of the writers' active memtables, comparable with `check_persist_done`.
+pub async fn get_max_memtable_id() -> u64 {
+    let mut max_id = 0;
     for w in WRITERS.iter() {
         let w = w.read().await;
         for r in w.values() {
-            // next_seq is the next seq id to be used, so we need to subtract 1
-            max_seq_id = max_seq_id.max(r.next_seq.load(Ordering::Relaxed) - 1);
+            max_id = max_id.max(r.memtable.read().await.id());
         }
     }
-    max_seq_id
+    max_id
 }
 
 impl Writer {
@@ -788,5 +787,53 @@ mod tests {
         let new_wal = writer.wal.read().await.path().clone();
         let _ = std::fs::remove_file(old_wal);
         let _ = std::fs::remove_file(new_wal);
+    }
+
+    #[tokio::test]
+    async fn test_rotate_all_preserves_writers_and_waits_for_old_memtables() {
+        let first = Writer::new(0, WriterKey::new_replay("rotate_barrier_first", "logs"));
+        let second = Writer::new(0, WriterKey::new_replay("rotate_barrier_second", "logs"));
+        let old_ids = [
+            first.memtable.read().await.id(),
+            second.memtable.read().await.id(),
+        ];
+        let old_paths = [
+            first.wal.read().await.path().clone(),
+            second.wal.read().await.path().clone(),
+        ];
+        {
+            let mut writers = WRITERS[0].write().await;
+            writers.insert(first.key.clone(), first.clone());
+            writers.insert(second.key.clone(), second.clone());
+        }
+        let cutoff = get_max_memtable_id().await;
+        assert_eq!(cutoff, old_ids[0].max(old_ids[1]));
+
+        rotate_all().await.unwrap();
+
+        for writer in [&first, &second] {
+            let writers = WRITERS[0].read().await;
+            assert!(Arc::ptr_eq(writers.get(&writer.key).unwrap(), writer));
+            assert!(!writer.write_queue.is_closed());
+            assert!(writer.memtable.read().await.id() > cutoff);
+        }
+        assert!(!crate::check_persist_done(cutoff).await);
+        {
+            let mut immutables = IMMUTABLES.write().await;
+            for path in &old_paths {
+                assert!(immutables.swap_remove(path).is_some());
+            }
+        }
+        {
+            let mut writers = WRITERS[0].write().await;
+            writers.remove(&first.key);
+            writers.remove(&second.key);
+        }
+        for writer in [&first, &second] {
+            std::fs::remove_file(writer.wal.read().await.path()).unwrap();
+        }
+        for path in old_paths {
+            std::fs::remove_file(path).unwrap();
+        }
     }
 }
