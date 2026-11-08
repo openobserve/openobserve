@@ -65,8 +65,9 @@ pub struct Reach<'a> {
 }
 
 impl Topology {
-    /// Builds the topology from `object_id`, `serves_id` rows. `serves_id` is a
-    /// list, stored as a JSON array or as the JSON text of one.
+    /// Builds the topology from each object's latest `object_id`, `serves_id` row.
+    /// `serves_id` is a list, stored as a JSON array or as the JSON text of one;
+    /// an empty or missing one gives the object no links.
     pub fn from_rows(rows: &[Value]) -> Self {
         let mut serves: HashMap<String, Vec<String>> = HashMap::new();
         for row in rows {
@@ -194,7 +195,7 @@ async fn load(org_id: &str) -> Result<Topology, anyhow::Error> {
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: format!(
-                r#"SELECT object_id, serves_id FROM "{STREAM}" WHERE serves_id IS NOT NULL GROUP BY object_id, serves_id"#
+                r#"SELECT object_id, last_value(serves_id ORDER BY _timestamp) AS serves_id FROM "{STREAM}" WHERE object_id IS NOT NULL GROUP BY object_id"#
             ),
             from: 0,
             size: MAX_ROWS,
@@ -216,13 +217,19 @@ async fn load(org_id: &str) -> Result<Topology, anyhow::Error> {
     };
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
-    if resp.hits.is_empty() {
+    if resp.hits.len() as i64 >= MAX_ROWS {
+        log::warn!(
+            "[incidents] {org_id}/{STREAM} has more than {MAX_ROWS} objects; the facility topology holds only the first {MAX_ROWS}"
+        );
+    }
+    let topology = Topology::from_rows(&resp.hits);
+    if topology.serves.is_empty() {
         log::warn!(
             "[incidents] {org_id}/{STREAM} has no object with serves_id in the last {} s; facility plant correlates with no rack",
             LOOKBACK.as_secs()
         );
     }
-    Ok(Topology::from_rows(&resp.hits))
+    Ok(topology)
 }
 
 #[cfg(test)]
@@ -260,6 +267,18 @@ mod tests {
         assert!(plant.serves_anything("CUB-CT-01"));
         assert!(!plant.serves_anything("EnvSensorsPod1C"));
         assert!(!plant.serves_anything("Pod1C-E02"));
+    }
+
+    #[test]
+    fn a_cleared_serves_id_gives_no_links() {
+        let plant = Topology::from_rows(&[
+            json!({"object_id": "CDU-1", "serves_id": null}),
+            json!({"object_id": "CDU-2", "serves_id": "[]"}),
+            json!({"object_id": "CDU-3", "serves_id": ""}),
+        ]);
+        for object in ["CDU-1", "CDU-2", "CDU-3"] {
+            assert!(!plant.serves_anything(object), "{object}");
+        }
     }
 
     #[test]

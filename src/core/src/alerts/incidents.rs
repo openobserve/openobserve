@@ -1791,8 +1791,17 @@ impl Correlation {
     }
 }
 
-/// Which of the open incidents, newest first, a firing with `dims` joins: the
-/// newest whose dimensions it matches, else the newest facility plant links it to.
+/// Which of the open incidents, newest first, a firing with `dims` joins.
+///
+/// A rack or host firing joins the newest incident whose dimensions it matches,
+/// else the newest facility plant links it to, so a rack's alerts stay in its own
+/// incident. A plant firing joins the newest incident linked through the racks
+/// and plant it serves first, so a dimension it shares by chance (a service, a
+/// cluster) does not pull it elsewhere.
+///
+/// A firing joins one incident: when several racks a plant serves already have
+/// their own incidents, the plant joins only the newest, and the others stay
+/// separate. There is no mechanism to merge incidents.
 ///
 /// A plant-linked join merges the firing's dimensions into the incident, keeping
 /// the incident's value on a conflict, so which plant or rack an incident names
@@ -1804,8 +1813,8 @@ fn incident_to_join<T>(
 ) -> Option<usize> {
     use config::meta::alerts::incidents::DimensionRelationship;
 
-    open.iter()
-        .position(|(_, existing)| {
+    let matched = || {
+        open.iter().position(|(_, existing)| {
             matches!(
                 DimensionRelationship::check(existing, dims),
                 DimensionRelationship::Equal
@@ -1813,11 +1822,17 @@ fn incident_to_join<T>(
                     | DimensionRelationship::NewIsSuperset
             )
         })
-        .or_else(|| {
-            let reach = topology.reach(dims);
-            open.iter()
-                .position(|(_, existing)| reach.links(topology, existing))
-        })
+    };
+    let linked = || {
+        let reach = topology.reach(dims);
+        open.iter()
+            .position(|(_, existing)| reach.links(topology, existing))
+    };
+    if dims.contains_key(super::facility_topology::FACILITY_OBJECT_DIMENSION) {
+        linked().or_else(matched)
+    } else {
+        matched().or_else(linked)
+    }
 }
 
 /// Facility plant names no rack, so a firing on plant that serves something
@@ -1846,7 +1861,7 @@ fn apply_facility_object(
     topology: &super::facility_topology::Topology,
     result: &mut ParallelCorrelationResult,
 ) {
-    use super::facility_topology::{FACILITY_OBJECT_DIMENSION, OBJECT_ID_FIELD};
+    use super::facility_topology::{FACILITY_OBJECT_DIMENSION, OBJECT_ID_FIELD, RACK_DIMENSION};
 
     let Some(object) = labels.get(OBJECT_ID_FIELD).map(|o| o.trim()) else {
         return;
@@ -1854,6 +1869,8 @@ fn apply_facility_object(
     if !topology.serves_anything(object) {
         return;
     }
+    // Plant relates to racks only through what it serves, not the rack it stands in.
+    result.final_group_values.remove(RACK_DIMENSION);
     if result.final_group_values.is_empty() {
         result.final_key_type = config::meta::alerts::incidents::KeyType::Secondary;
         result.correlation_reason = "facility_topology".to_string();
@@ -4974,21 +4991,33 @@ mod tests {
         open.into_iter().map(|(_, dims)| dims).collect()
     }
 
+    /// An org's auto-configured identity sets with a rack set added, as an
+    /// operator adds it, and the shipped default semantic groups.
     fn rack_identity() -> (ServiceIdentityConfig, Vec<FieldAlias>) {
         use config::meta::correlation::IdentitySet;
+        let set = |id: &str, distinguish_by: &[&str]| IdentitySet {
+            id: id.to_string(),
+            label: id.to_string(),
+            distinguish_by: distinguish_by.iter().map(|g| g.to_string()).collect(),
+        };
         let identity = ServiceIdentityConfig {
-            sets: vec![IdentitySet {
-                id: "racks".to_string(),
-                label: "Racks".to_string(),
-                distinguish_by: vec!["rack".to_string()],
-            }],
+            sets: vec![
+                set(
+                    "aws",
+                    &["aws-ecs-cluster", "availability-zone", "faas-name"],
+                ),
+                set("azure", &["azure-resource-group", "azure-cloud-role"]),
+                set(
+                    "kubernetes",
+                    &["k8s-cluster", "k8s-namespace", "k8s-deployment"],
+                ),
+                set("racks", &["rack"]),
+            ],
             ..Default::default()
         };
-        let groups = vec![
-            FieldAlias::new("rack", "Rack", &["rack", "rack_location_id"]),
-            FieldAlias::new("host", "Host", &["host", "hostname", "host_name"]),
-            FieldAlias::new("service", "Service", &["service", "service_name"]),
-        ];
+        let groups = crate::db::system_settings::get_default_semantic_field_groups();
+        assert!(groups.iter().any(|g| g.id == "rack"));
+        assert!(groups.iter().any(|g| g.id == "host"));
         (identity, groups)
     }
 
@@ -5004,9 +5033,10 @@ mod tests {
             .unwrap_or_default()
     }
 
-    /// Guards the rack identity-set configuration: with `rack` in `distinguish_by`,
-    /// the existing dimension match puts every host of a rack in one incident.
-    /// Not a regression test for the facility topology.
+    /// Guards the rack identity-set configuration: with a `rack` set added to the
+    /// default sets, host fields are not a dimension, so the existing dimension
+    /// match puts every host of a rack in one incident. Not a regression test for
+    /// the facility topology.
     #[tokio::test]
     async fn alerts_on_many_hosts_of_one_rack_open_one_incident() {
         let mut firings = Vec::new();
@@ -5015,6 +5045,14 @@ mod tests {
             firings
                 .push(row_dims(&[("hostname", &host), ("gpu", "0"), ("rack", "Pod1C-E02")]).await);
             firings.push(row_dims(&[("host_name", &host), ("rack", "Pod1C-E02")]).await);
+            firings.push(
+                row_dims(&[
+                    ("hostname", &host),
+                    ("rack", "Pod1C-E02"),
+                    ("name", "Inlet Temp"),
+                ])
+                .await,
+            );
         }
         // The rack's facility alerts name it by its BMS id.
         firings.push(row_dims(&[("rack_location_id", "Pod1C-E02"), ("min_lpm", "12.5")]).await);
@@ -5111,6 +5149,24 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_plant_firing_prefers_the_racks_it_serves_over_a_shared_dimension() {
+        let shared = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        let open = [
+            ((), shared(&[("service", "cooling")])),
+            ((), shared(&[("rack", "Pod1C-E03"), ("service", "cooling")])),
+        ];
+        let cdu = shared(&[("facility-object", "C-F00-CDU-05"), ("service", "cooling")]);
+        assert_eq!(incident_to_join(&open, &cdu, &cooling_plant()), Some(1));
+        // Without a topology it falls back to the dimension match.
+        assert_eq!(incident_to_join(&open, &cdu, &Default::default()), Some(0));
+    }
+
     fn correlation_result(dims: HashMap<String, String>) -> ParallelCorrelationResult {
         use config::meta::alerts::incidents::KeyType;
         let (final_key_type, correlation_reason) = if dims.is_empty() {
@@ -5143,10 +5199,20 @@ mod tests {
         assert!(matches!(cdu.final_key_type, KeyType::Secondary));
         assert_eq!(cdu.correlation_reason, "facility_topology");
 
-        let mut both = correlation_result(rack("Pod1C-E02"));
-        apply_facility_object(&labels("CUB-CH-01"), &cooling_plant(), &mut both);
-        assert_eq!(both.final_group_values.len(), 2);
-        assert_eq!(both.correlation_reason, "semantic_extraction");
+        // Plant standing in a rack keeps no rack dimension of its own.
+        let mut located = correlation_result(rack("Pod1C-F02"));
+        apply_facility_object(&labels("C-F00-CDU-05"), &cooling_plant(), &mut located);
+        assert_eq!(located.final_group_values, plant("C-F00-CDU-05"));
+        assert!(matches!(located.final_key_type, KeyType::Secondary));
+        assert_eq!(located.correlation_reason, "facility_topology");
+
+        let mut service = correlation_result(HashMap::from([(
+            "service".to_string(),
+            "cooling".to_string(),
+        )]));
+        apply_facility_object(&labels("CUB-CH-01"), &cooling_plant(), &mut service);
+        assert_eq!(service.final_group_values.len(), 2);
+        assert_eq!(service.correlation_reason, "semantic_extraction");
 
         // An object that serves nothing, or no topology at all, adds nothing.
         for (object, topology) in [
