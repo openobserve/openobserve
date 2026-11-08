@@ -4325,21 +4325,22 @@ mod tests {
         assert_eq!(run.error.unwrap().code, ERROR_INTERRUPTED);
     }
 
-    /// Runs whose lease probe waits out its second are swept side by side, and every outcome
-    /// is counted.
+    /// Runs whose lease probe waits out its second are swept side by side; every outcome counts.
     #[tokio::test]
     async fn the_sweep_probes_running_runs_concurrently() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
         let _db = db().await;
         let (org, inc) = new_incident(None).await;
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
         let row = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
         let runs = vec![row; 2 * SWEEP_CONCURRENCY];
-        let swept = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let swept = AtomicUsize::new(0);
 
         tokio::time::pause();
         let begun = Instant::now();
         let ended = sweep_running(runs, |_run| {
-            let n = swept.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let n = swept.fetch_add(1, Ordering::SeqCst);
             async move {
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 match n % 3 {
@@ -4351,7 +4352,7 @@ mod tests {
         })
         .await;
 
-        assert_eq!(swept.load(std::sync::atomic::Ordering::SeqCst), 2 * SWEEP_CONCURRENCY);
+        assert_eq!(swept.load(Ordering::SeqCst), 2 * SWEEP_CONCURRENCY);
         assert_eq!(ended, (2 * SWEEP_CONCURRENCY).div_ceil(3));
         assert!(
             begun.elapsed() < Duration::from_secs(3),
