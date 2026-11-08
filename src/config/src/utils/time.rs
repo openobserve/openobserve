@@ -127,7 +127,9 @@ pub fn parse_f64_to_timestamp_micros(v: f64) -> i64 {
     let whole = v as i64;
     let micros = parse_i64_to_timestamp_micros(whole);
     match micros.checked_div(whole) {
-        Some(unit) if micros != i64::MIN => micros + (v.fract() * unit as f64).round() as i64,
+        Some(unit) if micros != i64::MIN => {
+            micros.saturating_add((v.fract() * unit as f64).round() as i64)
+        }
         _ => micros,
     }
 }
@@ -146,8 +148,8 @@ pub fn parse_str_to_timestamp_micros(v: &str) -> Result<i64, anyhow::Error> {
 #[inline(always)]
 pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
     if let Ok(v) = s.parse::<f64>() {
-        let v = parse_f64_to_timestamp_micros(v);
-        return Ok(Utc.timestamp_nanos(v * 1000));
+        return DateTime::from_timestamp_micros(parse_f64_to_timestamp_micros(v))
+            .ok_or_else(|| anyhow::anyhow!("invalid time format [string]"));
     }
 
     let s = s.trim_matches('"');
@@ -833,6 +835,22 @@ mod tests {
         assert_eq!(
             parse_str_to_timestamp_micros("1762596925.123456").ok(),
             Some(1762596925123456)
+        );
+    }
+
+    #[test]
+    fn test_fractional_epoch_at_i64_boundaries() {
+        let got = parse_timestamp_micro_from_value(&json::json!(-9223372036854.9f64))
+            .ok()
+            .map(|(ts, _)| ts);
+        assert_eq!(got, Some(i64::MIN));
+        assert_eq!(
+            parse_str_to_timestamp_micros("9223372036.9").ok(),
+            Some(9223372036900000)
+        );
+        assert_eq!(
+            parse_str_to_timestamp_micros("-9223372036.9").ok(),
+            Some(-9223372036900000)
         );
     }
 
