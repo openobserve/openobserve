@@ -715,7 +715,13 @@ async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting>
     use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
 
     // A read replica can lag a save, and a cached miss outlives the lag, so the primary decides.
-    match db::get_from_primary(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS).await
+    match db::get_from_primary(
+        &SettingScope::Org,
+        Some(org_id),
+        None,
+        SEMANTIC_FIELD_GROUPS,
+    )
+    .await
     {
         // Left uncached, so a delete racing this read cannot be undone by the insert.
         Ok(Some(saved)) => return Some(saved),
@@ -730,7 +736,12 @@ async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting>
     let cached = SYSTEM_SETTINGS
         .write()
         .await
-        .entry(cache_key(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS))
+        .entry(cache_key(
+            &SettingScope::Org,
+            Some(org_id),
+            None,
+            SEMANTIC_FIELD_GROUPS,
+        ))
         .or_insert(absent)
         .clone();
     Some(cached)
