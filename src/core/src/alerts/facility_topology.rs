@@ -39,15 +39,24 @@ pub const RACK_DIMENSION: &str = "rack";
 pub const OBJECT_ID_FIELD: &str = "object_id";
 
 const STREAM: &str = "bms_metadata";
-/// A BMS republishes every point's metadata every 100 s, so an hour holds every
-/// object many times over, and a feed that replays a 15-minute pass four times.
-const LOOKBACK: Duration = Duration::from_secs(3600);
-/// How long a loaded topology is used before it is read again.
+/// A BMS republishes every point's metadata every 100 s. Each object's latest
+/// record counts, so a day reaches back past a feed paused for hours.
+const LOOKBACK: Duration = Duration::from_secs(24 * 3600);
+/// How long a read topology is used before it is read again.
 const TTL: Duration = Duration::from_secs(300);
+/// How long after a failed read it is tried again.
+const RETRY: Duration = Duration::from_secs(30);
 const MAX_ROWS: i64 = 10_000;
 
-/// An org's topology and when it was read; `None` until the first read.
-type Slot = Arc<Mutex<Option<(Instant, Arc<Topology>)>>>;
+/// An org's topology, when it was last read, and when to retry a failed read.
+#[derive(Default)]
+struct Cached {
+    topology: Arc<Topology>,
+    read_at: Option<Instant>,
+    retry_at: Option<Instant>,
+}
+
+type Slot = Arc<Mutex<Option<Cached>>>;
 
 static CACHE: LazyLock<RwLock<HashMap<String, Slot>>> = LazyLock::new(Default::default);
 
@@ -99,6 +108,10 @@ impl Topology {
         }
         serves.retain(|_, ids| !ids.is_empty());
         Self { serves }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.serves.is_empty()
     }
 
     /// Whether `id` is plant that serves something.
@@ -153,7 +166,8 @@ impl Reach<'_> {
 
 /// The org's facility topology, read at most once per [`TTL`]; concurrent
 /// callers wait for one read. Empty when the org has no `bms_metadata` stream.
-/// A failed read keeps the topology read before it.
+/// A failed read, or one that finds no object, keeps the topology read before
+/// it; a failed read is tried again after [`RETRY`].
 pub async fn get(org_id: &str) -> Arc<Topology> {
     let slot = {
         let existing = CACHE.read().await.get(org_id).cloned();
@@ -168,22 +182,34 @@ pub async fn get(org_id: &str) -> Arc<Topology> {
         }
     };
     let mut cached = slot.lock().await;
-    if let Some((at, topology)) = cached.as_ref()
-        && at.elapsed() < TTL
+    let now = Instant::now();
+    if let Some(c) = cached.as_ref()
+        && (c.read_at.is_some_and(|at| at.elapsed() < TTL) || c.retry_at.is_some_and(|at| now < at))
     {
-        return topology.clone();
+        return c.topology.clone();
     }
-    let topology = match load(org_id).await {
-        Ok(topology) => Arc::new(topology),
+    let previous = cached.take().unwrap_or_default();
+    let next = match load(org_id).await {
+        Ok(topology) if topology.is_empty() && !previous.topology.is_empty() => Cached {
+            read_at: Some(now),
+            retry_at: None,
+            ..previous
+        },
+        Ok(topology) => Cached {
+            topology: Arc::new(topology),
+            read_at: Some(now),
+            retry_at: None,
+        },
         Err(e) => {
             log::warn!("[incidents] facility topology for {org_id} unreadable: {e}");
-            cached
-                .as_ref()
-                .map(|(_, previous)| previous.clone())
-                .unwrap_or_default()
+            Cached {
+                retry_at: Some(now + RETRY),
+                ..previous
+            }
         }
     };
-    *cached = Some((Instant::now(), topology.clone()));
+    let topology = next.topology.clone();
+    *cached = Some(next);
     topology
 }
 
@@ -217,6 +243,9 @@ async fn load(org_id: &str) -> Result<Topology, anyhow::Error> {
     };
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
+    if resp.is_partial {
+        anyhow::bail!("{STREAM} search returned a partial result");
+    }
     if resp.hits.len() as i64 >= MAX_ROWS {
         log::warn!(
             "[incidents] {org_id}/{STREAM} has more than {MAX_ROWS} objects; the facility topology holds only the first {MAX_ROWS}"
@@ -225,7 +254,7 @@ async fn load(org_id: &str) -> Result<Topology, anyhow::Error> {
     let topology = Topology::from_rows(&resp.hits);
     if topology.serves.is_empty() {
         log::warn!(
-            "[incidents] {org_id}/{STREAM} has no object with serves_id in the last {} s; facility plant correlates with no rack",
+            "[incidents] {org_id}/{STREAM} has no object with serves_id in the last {} s; the topology read before, if any, stays in use",
             LOOKBACK.as_secs()
         );
     }

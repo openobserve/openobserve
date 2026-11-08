@@ -727,7 +727,13 @@ pub async fn correlate_alert_to_incident(
 
     // Execute Service Discovery and semantic extraction in parallel (non-blocking)
     let mut parallel_result = correlate_parallel(&alert.org_id, &labels, &semantic_groups).await;
-    let topology = add_facility_object(&alert.org_id, &labels, &mut parallel_result).await;
+    let facility = add_facility_object(
+        &alert.org_id,
+        &labels,
+        &semantic_groups,
+        &mut parallel_result,
+    )
+    .await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -803,7 +809,7 @@ pub async fn correlate_alert_to_incident(
         &service_name,
         eval_level,
         downtime.map(|d| d.id.as_str()),
-        &topology,
+        &facility,
     )
     .await?;
     let outcome = correlation.outcome;
@@ -1018,7 +1024,8 @@ pub async fn correlate_external_event(
     // Same parallel correlation the internal path uses.
     let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
     let mut parallel_result = correlate_parallel(org_id, &labels, &semantic_groups).await;
-    let topology = add_facility_object(org_id, &labels, &mut parallel_result).await;
+    let facility =
+        add_facility_object(org_id, &labels, &semantic_groups, &mut parallel_result).await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -1071,7 +1078,7 @@ pub async fn correlate_external_event(
         &service_name,
         None, // external events carry no evaluated alert level
         None,
-        &topology,
+        &facility,
     )
     .await?;
 
@@ -1218,6 +1225,15 @@ pub async fn recover_muted_resolves(org_id: &str, alert_id: &str) -> Result<(), 
 /// other `External`-kind alert already linked to that incident is also resolved
 /// in `external_alerts` — a single source clearing shouldn't close an incident
 /// that other still-firing sources are correlated into.
+/// Whether an internal alert of the incident has a firing that has not recovered.
+fn internal_alert_still_firing(
+    links: &[infra::table::entity::alert_incident_alerts::Model],
+) -> bool {
+    links
+        .iter()
+        .any(|l| l.alert_kind != "external" && l.resolved_at.is_none())
+}
+
 pub async fn try_auto_resolve_incident_for_external_alert(
     org_id: &str,
     external_alert_id: &str,
@@ -1232,6 +1248,9 @@ pub async fn try_auto_resolve_incident_for_external_alert(
     };
 
     let links = infra::table::alert_incidents::get_incident_alerts(&incident.id).await?;
+    if internal_alert_still_firing(&links) {
+        return Ok(());
+    }
     let external_alert_ids: Vec<String> = links
         .into_iter()
         .filter(|l| l.alert_kind == "external")
@@ -1791,13 +1810,18 @@ impl Correlation {
     }
 }
 
-/// Which of the open incidents, newest first, a firing with `dims` joins.
+/// Which of the open incidents, newest first, a firing with `dims` and rack
+/// `rack` joins.
 ///
-/// A rack or host firing joins the newest incident whose dimensions it matches,
-/// else the newest facility plant links it to, so a rack's alerts stay in its own
-/// incident. A plant firing joins the newest incident linked through the racks
-/// and plant it serves first, so a dimension it shares by chance (a service, a
-/// cluster) does not pull it elsewhere.
+/// A plant firing joins the newest incident linked through the racks and plant
+/// it serves first, so a dimension it shares by chance (a service, a cluster)
+/// does not pull it elsewhere, then the newest whose dimensions it matches. In an
+/// org with a facility topology, a rack firing joins the newest incident of its
+/// rack, then the newest facility plant links it to, then the newest whose
+/// dimensions it matches. Any other firing joins the newest whose dimensions it
+/// matches, then the newest facility plant links it to.
+///
+/// `rack` is the firing's rack even when correlation chose dimensions without it.
 ///
 /// A firing joins one incident: when several racks a plant serves already have
 /// their own incidents, the plant joins only the newest, and the others stay
@@ -1809,10 +1833,25 @@ impl Correlation {
 fn incident_to_join<T>(
     open: &[(T, HashMap<String, String>)],
     dims: &HashMap<String, String>,
+    rack: Option<&str>,
     topology: &super::facility_topology::Topology,
 ) -> Option<usize> {
     use config::meta::alerts::incidents::DimensionRelationship;
 
+    use super::facility_topology::{FACILITY_OBJECT_DIMENSION, RACK_DIMENSION};
+
+    let with_rack;
+    let reach_dims = match rack {
+        Some(rack) if dims.get(RACK_DIMENSION).map(String::as_str) != Some(rack) => {
+            with_rack = {
+                let mut d = dims.clone();
+                d.insert(RACK_DIMENSION.to_string(), rack.to_string());
+                d
+            };
+            &with_rack
+        }
+        _ => dims,
+    };
     let matched = || {
         open.iter().position(|(_, existing)| {
             matches!(
@@ -1824,36 +1863,77 @@ fn incident_to_join<T>(
         })
     };
     let linked = || {
-        let reach = topology.reach(dims);
+        let reach = topology.reach(reach_dims);
         open.iter()
             .position(|(_, existing)| reach.links(topology, existing))
     };
-    if dims.contains_key(super::facility_topology::FACILITY_OBJECT_DIMENSION) {
-        linked().or_else(matched)
-    } else {
-        matched().or_else(linked)
+    if dims.contains_key(FACILITY_OBJECT_DIMENSION) {
+        return linked().or_else(matched);
     }
+    match rack {
+        Some(rack) if !topology.is_empty() => open
+            .iter()
+            .position(|(_, existing)| {
+                existing.get(RACK_DIMENSION).map(String::as_str) == Some(rack)
+            })
+            .or_else(linked)
+            .or_else(matched),
+        _ => matched().or_else(linked),
+    }
+}
+
+/// The firing's rack: its rack dimension, else the first rack field in its row,
+/// since Service Discovery may have chosen dimensions without the rack.
+fn firing_rack(
+    labels: &HashMap<String, String>,
+    semantic_groups: &[FieldAlias],
+    dims: &HashMap<String, String>,
+) -> Option<String> {
+    use super::facility_topology::RACK_DIMENSION;
+
+    dims.get(RACK_DIMENSION).cloned().or_else(|| {
+        semantic_groups
+            .iter()
+            .find(|g| g.id == RACK_DIMENSION)?
+            .fields
+            .iter()
+            .find_map(|f| labels.get(f).filter(|v| !v.is_empty()).cloned())
+    })
+}
+
+/// The org's facility topology and the firing's rack, for the join.
+#[derive(Default)]
+struct Facility {
+    topology: std::sync::Arc<super::facility_topology::Topology>,
+    /// The firing's rack, from its dimensions or its row; `None` for plant.
+    rack: Option<String>,
 }
 
 /// Facility plant names no rack, so a firing on plant that serves something
 /// carries its `object_id` as the facility-object dimension and correlates
-/// through the racks the plant serves. Returns the org's topology for the join,
-/// empty when the firing names neither plant nor rack.
+/// through the racks the plant serves. Returns the org's topology and the
+/// firing's rack for the join; the topology is empty when the firing names
+/// neither plant nor rack.
 async fn add_facility_object(
     org_id: &str,
     labels: &HashMap<String, String>,
+    semantic_groups: &[FieldAlias],
     result: &mut ParallelCorrelationResult,
-) -> std::sync::Arc<super::facility_topology::Topology> {
-    use super::facility_topology::{OBJECT_ID_FIELD, RACK_DIMENSION};
+) -> Facility {
+    use super::facility_topology::{FACILITY_OBJECT_DIMENSION, OBJECT_ID_FIELD};
 
-    if !labels.contains_key(OBJECT_ID_FIELD)
-        && !result.final_group_values.contains_key(RACK_DIMENSION)
-    {
-        return Default::default();
+    let rack = firing_rack(labels, semantic_groups, &result.final_group_values);
+    if !labels.contains_key(OBJECT_ID_FIELD) && rack.is_none() {
+        return Facility::default();
     }
     let topology = super::facility_topology::get(org_id).await;
     apply_facility_object(labels, &topology, result);
-    topology
+    let rack = rack.filter(|_| {
+        !result
+            .final_group_values
+            .contains_key(FACILITY_OBJECT_DIMENSION)
+    });
+    Facility { topology, rack }
 }
 
 fn apply_facility_object(
@@ -1892,7 +1972,7 @@ async fn find_or_create_incident(
     service_name: &str,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     muted_by: Option<&str>,
-    topology: &super::facility_topology::Topology,
+    facility: &Facility,
 ) -> Result<Correlation, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
@@ -2007,7 +2087,12 @@ async fn find_or_create_incident(
                     (incident, dims)
                 })
                 .collect();
-        if let Some(index) = incident_to_join(&open_incidents, group_values, topology) {
+        if let Some(index) = incident_to_join(
+            &open_incidents,
+            group_values,
+            facility.rack.as_deref(),
+            &facility.topology,
+        ) {
             let (existing, existing_dims) = open_incidents.swap_remove(index);
             let existing_key_type = KeyType::from_stored(&existing.key_type);
 
@@ -4981,7 +5066,7 @@ mod tests {
         // Newest first, as the open incidents are loaded.
         let mut open: Vec<((), HashMap<String, String>)> = Vec::new();
         for dims in firings {
-            match incident_to_join(&open, dims, topology) {
+            match incident_to_join(&open, dims, dims.get("rack").map(String::as_str), topology) {
                 Some(i) => {
                     merge_dimensions(&mut open[i].1, dims, "test");
                 }
@@ -5132,19 +5217,39 @@ mod tests {
     fn a_racks_own_incident_wins_over_a_newer_one_plant_links() {
         let open = [((), plant("C-F00-CDU-05")), ((), rack("Pod1C-E02"))];
         assert_eq!(
-            incident_to_join(&open, &rack("Pod1C-E02"), &cooling_plant()),
+            incident_to_join(
+                &open,
+                &rack("Pod1C-E02"),
+                Some("Pod1C-E02"),
+                &cooling_plant()
+            ),
             Some(1)
         );
         assert_eq!(
-            incident_to_join(&open, &rack("Pod1C-E03"), &cooling_plant()),
+            incident_to_join(
+                &open,
+                &rack("Pod1C-E03"),
+                Some("Pod1C-E03"),
+                &cooling_plant()
+            ),
             Some(0)
         );
         assert_eq!(
-            incident_to_join(&open, &rack("Pod1C-E03"), &Default::default()),
+            incident_to_join(
+                &open,
+                &rack("Pod1C-E03"),
+                Some("Pod1C-E03"),
+                &Default::default()
+            ),
             None
         );
         assert_eq!(
-            incident_to_join(&open, &rack("Pod1C-F02"), &cooling_plant()),
+            incident_to_join(
+                &open,
+                &rack("Pod1C-F02"),
+                Some("Pod1C-F02"),
+                &cooling_plant()
+            ),
             None
         );
     }
@@ -5162,9 +5267,104 @@ mod tests {
             ((), shared(&[("rack", "Pod1C-E03"), ("service", "cooling")])),
         ];
         let cdu = shared(&[("facility-object", "C-F00-CDU-05"), ("service", "cooling")]);
-        assert_eq!(incident_to_join(&open, &cdu, &cooling_plant()), Some(1));
+        assert_eq!(
+            incident_to_join(&open, &cdu, None, &cooling_plant()),
+            Some(1)
+        );
         // Without a topology it falls back to the dimension match.
-        assert_eq!(incident_to_join(&open, &cdu, &Default::default()), Some(0));
+        assert_eq!(
+            incident_to_join(&open, &cdu, None, &Default::default()),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn a_rack_firing_prefers_its_rack_then_plant_then_a_shared_dimension() {
+        let with = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        let firing = with(&[("rack", "Pod1C-E02"), ("service", "cooling")]);
+        let open = [
+            ((), with(&[("service", "cooling")])),
+            ((), plant("C-F00-CDU-05")),
+            ((), with(&[("rack", "Pod1C-E02"), ("service", "pumps")])),
+        ];
+        let rack = Some("Pod1C-E02");
+        assert_eq!(
+            incident_to_join(&open, &firing, rack, &cooling_plant()),
+            Some(2)
+        );
+        assert_eq!(
+            incident_to_join(&open[..2], &firing, rack, &cooling_plant()),
+            Some(1)
+        );
+        assert_eq!(
+            incident_to_join(&open[..1], &firing, rack, &cooling_plant()),
+            Some(0)
+        );
+        // An org without a facility topology keeps the dimension match.
+        assert_eq!(
+            incident_to_join(&open, &firing, rack, &Default::default()),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn a_rack_outside_the_chosen_dimensions_still_reaches_the_plant() {
+        let cluster = HashMap::from([("k8s-cluster".to_string(), "a".to_string())]);
+        let open = [((), plant("C-F00-CDU-05"))];
+        assert_eq!(
+            incident_to_join(&open, &cluster, Some("Pod1C-E03"), &cooling_plant()),
+            Some(0)
+        );
+        assert_eq!(
+            incident_to_join(&open, &cluster, None, &cooling_plant()),
+            None
+        );
+
+        let groups = vec![FieldAlias::new(
+            "rack",
+            "Rack",
+            &["rack", "rack_location_id"],
+        )];
+        let labels = HashMap::from([("rack_location_id".to_string(), "Pod1C-E03".to_string())]);
+        assert_eq!(
+            firing_rack(&labels, &groups, &cluster).as_deref(),
+            Some("Pod1C-E03")
+        );
+        assert_eq!(
+            firing_rack(&labels, &groups, &rack("Pod1C-E02")).as_deref(),
+            Some("Pod1C-E02")
+        );
+        assert_eq!(firing_rack(&HashMap::new(), &groups, &cluster), None);
+    }
+
+    #[test]
+    fn an_external_recovery_waits_for_the_internal_alerts_of_its_incident() {
+        let link = |kind: &str, resolved_at: Option<i64>| {
+            infra::table::entity::alert_incident_alerts::Model {
+                incident_id: "inc".to_string(),
+                alert_id: format!("{kind}-{resolved_at:?}"),
+                alert_fired_at: 1,
+                alert_name: "a".to_string(),
+                alert_kind: kind.to_string(),
+                correlation_reason: None,
+                created_at: 1,
+                resolved_at,
+            }
+        };
+        assert!(internal_alert_still_firing(&[
+            link("external", None),
+            link("internal", None),
+        ]));
+        assert!(!internal_alert_still_firing(&[
+            link("external", None),
+            link("internal", Some(2)),
+        ]));
+        assert!(!internal_alert_still_firing(&[link("external", None)]));
     }
 
     fn correlation_result(dims: HashMap<String, String>) -> ParallelCorrelationResult {
