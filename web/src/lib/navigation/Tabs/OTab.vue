@@ -32,10 +32,7 @@ const isVertical = computed<boolean>(() => context?.value.isVertical ?? false);
 const isReorderable = computed<boolean>(() => context?.value.reorderable ?? false);
 /** Reorderable, and this tab hasn't opted out (e.g. while its label is edited). */
 const isDraggable = computed<boolean>(() => isReorderable.value && !props.disableDrag);
-// Drag starts only from the grip: mousedown on the grip arms the tab's
-// `draggable` attribute for the duration of that press (useDragHandle disarms
-// on mouseup/dragend), so grabbing the tab body just clicks/selects — text on
-// the label stays selectable-feeling and accidental drags can't happen.
+// Only a grip press arms a drag; it stops mousedown because the trigger selects on press, which would navigate away.
 const { arm: armDrag, isArmed: isDragArmed } = useDragHandle();
 /** This tab is the one being dragged → dim it. */
 const isDragging = computed<boolean>(
@@ -206,7 +203,7 @@ const heightClasses = computed<string>(() => {
             ? 'cursor-grab opacity-0 group-hover/otab:opacity-50 hover:!opacity-100 active:cursor-grabbing'
             : 'pointer-events-none opacity-0'
         "
-        @mousedown="isDraggable && armDrag()"
+        @mousedown.stop="isDraggable && armDrag()"
       >
         <OIcon name="drag-indicator" size="sm" />
       </span>

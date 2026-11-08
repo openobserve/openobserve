@@ -102,6 +102,24 @@ export default function (store: any) {
       return;
     }
 
+    // A signed-in user has no use for the login page; /signup lands here via its redirect.
+    if (to.path === "/login") {
+      let hasSession = isAuthenticated;
+      if (!hasSession) {
+        const savedSession = getDecodedUserInfo();
+        const savedUserInfo = savedSession ? JSON.parse(String(savedSession)) : null;
+        // An expired saved session would bounce through the 401 reload and lose ?mode=signup.
+        if (savedUserInfo && !(savedUserInfo.exp && savedUserInfo.exp * 1000 < Date.now())) {
+          store.dispatch("login", { loginState: true, userInfo: savedUserInfo });
+          hasSession = true;
+        }
+      }
+      if (hasSession) {
+        next({ path: "/", replace: true });
+        return;
+      }
+    }
+
     if (
       !isAuthenticated &&
       (to.meta?.public === true ||

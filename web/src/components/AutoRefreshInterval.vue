@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="triggerAriaLabel"
         >
           <OIcon
-            :name="isOn ? 'update' : 'sync-disabled'"
+            name="update"
             :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
@@ -47,10 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="triggerAriaLabel"
         >
           <div class="flex flex-nowrap items-center">
-            <OIcon :name="isOn ? 'update' : 'sync-disabled'" size="sm" class="me-1" />
-            <div class="text-compact text-center leading-4">{{ triggerLabel }}</div>
+            <OIcon name="update" size="sm" class="me-1" />
+            <div class="text-compact text-center leading-4">
+              {{ t("search.autoRefreshTrigger", { interval: triggerLabel }) }}
+            </div>
             <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
           </div>
+          <OTooltip :content="t('search.autoRefreshTitle')" />
         </OButton>
       </template>
       <div data-test="auto-refresh-panel">

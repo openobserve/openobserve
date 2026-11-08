@@ -480,8 +480,8 @@ test.describe("Dashboard AddSettingVariable form validation", () => {
         pm = new PageManager(page);
         dashName = await createOwnedDashboard(page, pm, 'e2e_fv_variable_settings');
         // Navigate to Settings > Variables tab > Add Variable
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
+        await pm.dashboardsFormValidation.getMoreOptionsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
+        await pm.dashboardsFormValidation.clickDashboardSettingsBtn();
         await pm.dashboardsFormValidation.getSettingsVariablesTabLocator().waitFor({ state: 'visible', timeout: 10000 });
         await pm.dashboardsFormValidation.getSettingsVariablesTabLocator().click();
         await pm.dashboardsFormValidation.getVariableAddBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
@@ -615,7 +615,7 @@ test.describe("Dashboard GeneralSettings form validation", () => {
         pm = new PageManager(page);
         dashName = await createOwnedDashboard(page, pm, 'e2e_fv_general_settings');
         cleanupCandidates = [dashName];
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
+        await pm.dashboardsFormValidation.getMoreOptionsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('Dashboard opened for GeneralSettings tests');
     });
 
@@ -628,7 +628,7 @@ test.describe("Dashboard GeneralSettings form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-GS-001: Empty name → required error in GeneralSettings');
 
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
+        await pm.dashboardsFormValidation.clickDashboardSettingsBtn();
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
@@ -648,7 +648,7 @@ test.describe("Dashboard GeneralSettings form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-GS-002: Cancel closes GeneralSettings');
 
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
+        await pm.dashboardsFormValidation.clickDashboardSettingsBtn();
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
@@ -662,7 +662,7 @@ test.describe("Dashboard GeneralSettings form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-GS-003: Valid name → save succeeds in GeneralSettings');
 
-        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
+        await pm.dashboardsFormValidation.clickDashboardSettingsBtn();
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 

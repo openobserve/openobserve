@@ -109,9 +109,11 @@ describe("RelatedPodsTable", () => {
     ]);
   });
 
-  it("is a dense, virtualized table capped at 41.25rem", () => {
+  it("is a dense, virtualized, sortable, resizable table capped at 70vh", () => {
     const table = mountTable().findComponent(OTableStub);
-    expect(table.props("maxHeight")).toBe("41.25rem");
+    expect(table.props("maxHeight")).toBe("70vh");
+    expect(table.attributes("sorting")).toBe("client");
+    expect(table.attributes("enable-column-resize")).toBeDefined();
     expect(table.props("virtualScroll")).toBe(true);
     expect(table.props("dense")).toBe(true);
     expect((table.props("columns") as any[]).map((c) => c.id)).toEqual([

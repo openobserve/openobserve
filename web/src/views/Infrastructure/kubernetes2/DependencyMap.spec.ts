@@ -217,13 +217,13 @@ describe("DependencyMap", () => {
       [edge("a", "b", 10), edge("b", "c", 10)],
     );
     await flow().vm.$emit("node-mouse-enter", { node: { id: "a" } });
-    expect(card("c").classes()).toContain("opacity-30");
-    expect(card("b").classes()).not.toContain("opacity-30");
+    expect(card("c").classes()).toContain("opacity-55");
+    expect(card("b").classes()).not.toContain("opacity-55");
     expect(baseEdge("b-c").props("style").opacity).toBeLessThan(0.2);
     expect(pill("b-c").exists()).toBe(false);
     expect(pill("a-b").exists()).toBe(true);
     await flow().vm.$emit("node-mouse-leave");
-    expect(card("c").classes()).not.toContain("opacity-30");
+    expect(card("c").classes()).not.toContain("opacity-55");
   });
 
   it("draws an edge with no known client as a grey line, still as wide as its rate", async () => {

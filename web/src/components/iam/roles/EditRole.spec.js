@@ -664,6 +664,30 @@ describe("EditRole - tabs behavior", () => {
     await wrapper.find(".tab-serviceAccounts").trigger("click");
     expect(wrapper.vm.activeTab).toBe("serviceAccounts");
   });
+
+  it.each(["users", "serviceAccounts"])("opens on the %s tab named in ?tab=", async (tab) => {
+    router.currentRoute.value.query = { tab };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+    expect(wrapper.vm.activeTab).toBe(tab);
+  });
+
+  it("ignores ?tab=serviceAccounts when service accounts are off", async () => {
+    const original = store.state.zoConfig;
+    store.state.zoConfig = { ...original, service_account_enabled: false };
+    router.currentRoute.value.query = { tab: "serviceAccounts" };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+    store.state.zoConfig = original;
+    expect(wrapper.vm.activeTab).toBe("permissions");
+  });
+
+  it("ignores an unknown ?tab= value", async () => {
+    router.currentRoute.value.query = { tab: "bogus" };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+    expect(wrapper.vm.activeTab).toBe("permissions");
+  });
 });
 
 // 4. Permission mapping helpers

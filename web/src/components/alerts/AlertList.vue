@@ -1197,7 +1197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ExportResourceDialog
       v-model:open="showExportDialog"
-      :items="alertsToExport"
+      :items="alertsJsonExport"
       :terraform="alertsTerraform"
       :title="
         t('alerts.exportDialogTitle', { count: alertsToExport.length }, alertsToExport.length)
@@ -3399,7 +3399,6 @@ export default defineComponent({
       // The editor reads the detail entry cache-first and a row patch cannot reach it; invalidated rather than removed so an in-flight editor read is not cancelled.
       void queryClient.invalidateQueries({
         queryKey: alertKeys.detail(org, id),
-        exact: true,
         refetchType: "none",
       });
     };
@@ -3450,8 +3449,9 @@ export default defineComponent({
         return next.length === cached.length ? undefined : next;
       });
       gone.forEach((id: string) =>
-        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id), exact: true }),
+        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id) }),
       );
+      queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
 
       // The deletes that call this are direct service calls, so the anomaly scope has no mutation to drop it from.
       if (droppedAnomaly) queryClient.invalidateQueries({ queryKey: anomalyKeys.all(org) });
@@ -3664,6 +3664,14 @@ export default defineComponent({
     // own exporter, and the dialog only renders what it is handed.
     const alertsTerraform = computed(() =>
       alertsToTerraform(alertsToExport.value, { folderId: activeFolderId.value }),
+    );
+    // Destination names only exist in the source org; Terraform keeps them for re-applying to it.
+    const alertsJsonExport = computed(() =>
+      alertsToExport.value.map((alert) =>
+        alert.alert_type === "anomaly_detection"
+          ? { ...alert, alert_destinations: [] }
+          : { ...alert, destinations: [], recovery_destinations: [] },
+      ),
     );
     const exportLoading = ref(false);
 
@@ -4183,6 +4191,9 @@ export default defineComponent({
                 : t("toastMessages.alerts.alertsPausedSuccessfully"),
           });
         }
+        queryClient.invalidateQueries({
+          queryKey: alertKeys.firing(store.state.selectedOrganization.identifier),
+        });
         // Refresh alerts
         await getAlertsFn(store, activeFolderId.value, "", true, "", true);
 
@@ -4297,6 +4308,7 @@ export default defineComponent({
           const org = String(store.state.selectedOrganization.identifier);
           const requested = selectedAlerts.value.map((row: AlertRowRef) => String(row?.alert_id));
           selectedAlerts.value = [];
+          queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
           // Forced: the point of this branch is to hear it from the server, and an
           // unforced read inside staleTime answers from cache without asking.
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
@@ -4490,6 +4502,7 @@ export default defineComponent({
       exportAlert,
       showExportDialog,
       alertsToExport,
+      alertsJsonExport,
       alertsTerraform,
       onExportDownloaded,
       triggerAlert,
