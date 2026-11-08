@@ -545,7 +545,8 @@ pub async fn save_identity_config(
     };
 
     match infra::table::system_settings::set(&setting).await {
-        Ok(_) => {
+        Ok(stored) => {
+            db::system_settings::cache_and_announce(&stored).await;
             #[cfg(feature = "enterprise")]
             {
                 // F10: rows filed under removed/changed sets would otherwise match every

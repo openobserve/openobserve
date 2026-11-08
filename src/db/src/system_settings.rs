@@ -50,8 +50,19 @@ fn row_cache_key((scope, org_id, user_id, key): &db::SettingRowKey) -> String {
     cache_key(&scope, org_id.as_deref(), user_id.as_deref(), key)
 }
 
+/// Whether a cache miss means no row: a read replica the watcher reloads from can lag a save.
+fn cache_miss_is_authoritative() -> bool {
+    use config::meta::meta_store::MetaStore;
+
+    let cfg = config::get_config();
+    let replica = &cfg.common.meta_postgres_ro_dsn;
+    MetaStore::from(cfg.common.meta_store.as_str()) != MetaStore::PostgreSQL
+        || replica.is_empty()
+        || *replica == cfg.common.meta_postgres_dsn
+}
+
 /// Caches the stored row on this node and tells this region's other nodes to reload it.
-async fn cache_and_announce(stored: &SystemSetting) {
+pub async fn cache_and_announce(stored: &SystemSetting) {
     let cache_k = cache_key(
         &stored.scope,
         stored.org_id.as_deref(),
@@ -582,14 +593,21 @@ pub async fn get_service_identity_config(
         system_settings::SettingScope,
     };
 
+    let stored = if cache_miss_is_authoritative() {
+        get_cached(&SettingScope::Org, Some(org_id), None, "service_identity").await
+    } else {
+        get(&SettingScope::Org, Some(org_id), None, "service_identity")
+            .await
+            .ok()
+            .flatten()
+    };
     // Intentionally kept here since there's no way to satisfy non-enterprise path
     // TODO: move the entire module to enterprise so that there's no access restrictions
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
-    let mut config = match db::get(&SettingScope::Org, Some(org_id), None, "service_identity").await
-    {
-        Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
+    let mut config = match stored {
+        Some(s) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
             .unwrap_or_else(|_| ServiceIdentityConfig::new_default()),
-        _ => ServiceIdentityConfig::new_default(),
+        None => ServiceIdentityConfig::new_default(),
     };
 
     // If tracked_alias_ids is empty (old stored config or default), populate from env default
@@ -921,7 +939,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_identity_config_is_read_from_the_cache_that_set_keeps_current() {
+    async fn the_identity_config_is_read_from_the_cache_its_save_keeps_current() {
         use config::meta::correlation::{IdentitySet, ServiceIdentityConfig};
 
         infra::db::create_table().await.unwrap();
@@ -941,11 +959,17 @@ mod tests {
         let row = SystemSetting::new_org(org, "service_identity", json!(saved));
 
         // Written behind the cache's back: still seeing the defaults proves no database read.
-        db::set(&row).await.unwrap();
+        let stored = db::set(&row).await.unwrap();
         assert_ne!(get_service_identity_config(org).await.sets, saved.sets);
 
-        set(&row).await.unwrap();
+        // As the identity-config endpoint saves it.
+        cache_and_announce(&stored).await;
         assert_eq!(get_service_identity_config(org).await.sets, saved.sets);
+        let cache_k = cache_key(&SettingScope::Org, Some(org), None, "service_identity");
+        assert!(
+            announced(&format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{cache_k}")).await,
+            "the other nodes reload the saved config"
+        );
 
         delete(&SettingScope::Org, Some(org), None, "service_identity")
             .await
