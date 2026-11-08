@@ -710,23 +710,18 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
     }
 }
 
-/// Caches an org's semantic-groups miss once the primary confirms it, returning what it means.
+/// Caches what an org's semantic-groups miss means and returns it; `None` when left uncached.
 async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting> {
-    use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
+    use config::meta::{meta_store::MetaStore, system_settings::keys::SEMANTIC_FIELD_GROUPS};
 
-    // A read replica can lag a save, and a cached miss outlives the lag, so the primary decides.
-    match db::get_from_primary(
-        &SettingScope::Org,
-        Some(org_id),
-        None,
-        SEMANTIC_FIELD_GROUPS,
-    )
-    .await
+    let cfg = config::get_config();
+    let replica = &cfg.common.meta_postgres_ro_dsn;
+    // A replica can lag a save past its watch event, and a cached miss would outlive that lag.
+    if MetaStore::from(cfg.common.meta_store.as_str()) == MetaStore::PostgreSQL
+        && !replica.is_empty()
+        && *replica != cfg.common.meta_postgres_dsn
     {
-        // Left uncached, so a delete racing this read cannot be undone by the insert.
-        Ok(Some(saved)) => return Some(saved),
-        Ok(None) => {}
-        Err(_) => return None,
+        return None;
     }
     let mut absent = SystemSetting::new_org(org_id, SEMANTIC_FIELD_GROUPS, serde_json::json!([]));
     // Zero timestamps mark the stand-in, and keep `get_semantic_field_groups_updated_at` at 0.
@@ -736,12 +731,7 @@ async fn cache_semantic_field_groups_miss(org_id: &str) -> Option<SystemSetting>
     let cached = SYSTEM_SETTINGS
         .write()
         .await
-        .entry(cache_key(
-            &SettingScope::Org,
-            Some(org_id),
-            None,
-            SEMANTIC_FIELD_GROUPS,
-        ))
+        .entry(cache_key(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS))
         .or_insert(absent)
         .clone();
     Some(cached)
@@ -809,8 +799,8 @@ async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>
                 };
                 let key = parts[3];
 
-                // The primary, since a lagging replica would leave a cached miss standing for good.
-                match db::get_from_primary(&scope, org_id, user_id, key).await {
+                // Fetch from database and update cache
+                match db::get(&scope, org_id, user_id, key).await {
                     Ok(Some(setting)) => {
                         SYSTEM_SETTINGS
                             .write()
@@ -942,16 +932,6 @@ mod tests {
             .await
             .unwrap();
         assert!(!is_absent_semantic_field_groups(&saved));
-
-        // A replica miss the primary contradicts returns the saved row and caches nothing.
-        SYSTEM_SETTINGS.write().await.clear();
-        let confirmed = cache_semantic_field_groups_miss(org).await.unwrap();
-        assert_eq!(confirmed.setting_value, json!(groups));
-        assert!(
-            get_cached(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS)
-                .await
-                .is_none()
-        );
 
         let _ = delete(&SettingScope::Org, Some(org), None, SEMANTIC_FIELD_GROUPS).await;
     }

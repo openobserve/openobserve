@@ -26,7 +26,7 @@ use config::meta::system_settings::{SettingScope, SystemSetting};
 use sea_orm::{
     ActiveModelTrait,
     ActiveValue::{NotSet, Set},
-    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Schema,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Schema,
 };
 
 use crate::{
@@ -69,17 +69,46 @@ pub async fn get(
     user_id: Option<&str>,
     key: &str,
 ) -> Result<Option<SystemSetting>, anyhow::Error> {
-    find(get_orm_client_ro().await, scope, org_id, user_id, key).await
-}
+    let client = get_orm_client_ro().await;
 
-/// [`get`] from the primary, for a reader told of a write a read replica may not have yet.
-pub async fn get_from_primary(
-    scope: &SettingScope,
-    org_id: Option<&str>,
-    user_id: Option<&str>,
-    key: &str,
-) -> Result<Option<SystemSetting>, anyhow::Error> {
-    find(get_orm_client_rw().await, scope, org_id, user_id, key).await
+    let mut query = Entity::find()
+        .filter(Column::Scope.eq(scope.as_str()))
+        .filter(Column::SettingKey.eq(key));
+
+    match scope {
+        SettingScope::System => {
+            query = query
+                .filter(Column::OrgId.is_null())
+                .filter(Column::UserId.is_null());
+        }
+        SettingScope::Org => {
+            if let Some(org) = org_id {
+                query = query.filter(Column::OrgId.eq(org));
+            } else {
+                return Err(anyhow!("org_id required for org scope"));
+            }
+            query = query.filter(Column::UserId.is_null());
+        }
+        SettingScope::User => {
+            if let Some(org) = org_id {
+                query = query.filter(Column::OrgId.eq(org));
+            } else {
+                return Err(anyhow!("org_id required for user scope"));
+            }
+            if let Some(user) = user_id {
+                query = query.filter(Column::UserId.eq(user));
+            } else {
+                return Err(anyhow!("user_id required for user scope"));
+            }
+        }
+    }
+
+    let result = query
+        .one(client)
+        .await
+        .map_err(|e| anyhow!("DbError# {e}"))?;
+
+    Ok(result.map(model_to_setting))
 }
 
 /// Get a resolved setting value by checking all levels (user -> org -> system)
@@ -387,53 +416,6 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64, an
     Ok(result.rows_affected)
 }
 
-async fn find(
-    client: &DatabaseConnection,
-    scope: &SettingScope,
-    org_id: Option<&str>,
-    user_id: Option<&str>,
-    key: &str,
-) -> Result<Option<SystemSetting>, anyhow::Error> {
-    let mut query = Entity::find()
-        .filter(Column::Scope.eq(scope.as_str()))
-        .filter(Column::SettingKey.eq(key));
-
-    match scope {
-        SettingScope::System => {
-            query = query
-                .filter(Column::OrgId.is_null())
-                .filter(Column::UserId.is_null());
-        }
-        SettingScope::Org => {
-            if let Some(org) = org_id {
-                query = query.filter(Column::OrgId.eq(org));
-            } else {
-                return Err(anyhow!("org_id required for org scope"));
-            }
-            query = query.filter(Column::UserId.is_null());
-        }
-        SettingScope::User => {
-            if let Some(org) = org_id {
-                query = query.filter(Column::OrgId.eq(org));
-            } else {
-                return Err(anyhow!("org_id required for user scope"));
-            }
-            if let Some(user) = user_id {
-                query = query.filter(Column::UserId.eq(user));
-            } else {
-                return Err(anyhow!("user_id required for user scope"));
-            }
-        }
-    }
-
-    let result = query
-        .one(client)
-        .await
-        .map_err(|e| anyhow!("DbError# {e}"))?;
-
-    Ok(result.map(model_to_setting))
-}
-
 /// Convert DB model to domain type
 fn model_to_setting(model: Model) -> SystemSetting {
     SystemSetting {
@@ -481,38 +463,6 @@ mod tests {
         assert_eq!(setting.user_id, None);
         assert_eq!(setting.setting_key, "test_key");
         assert_eq!(setting.setting_value, serde_json::json!(["a", "b", "c"]));
-    }
-
-    #[tokio::test]
-    async fn a_primary_read_finds_the_same_row_and_misses_as_get() {
-        if !crate::table::testing::meta_store().await {
-            return;
-        }
-        let org = crate::table::testing::unique("t_settings_primary");
-        set(&SystemSetting::new_org(
-            org.as_str(),
-            "k",
-            serde_json::json!(1),
-        ))
-        .await
-        .unwrap();
-
-        let primary = get_from_primary(&SettingScope::Org, Some(&org), None, "k")
-            .await
-            .unwrap();
-        assert_eq!(primary.map(|s| s.setting_value), Some(serde_json::json!(1)));
-        assert!(
-            get_from_primary(&SettingScope::Org, Some(&org), None, "missing")
-                .await
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            get_from_primary(&SettingScope::Org, None, None, "k")
-                .await
-                .is_err()
-        );
-        delete_org_settings(&org).await.unwrap();
     }
 
     #[tokio::test]
