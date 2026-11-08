@@ -73,10 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                highlighted. Deliberately no green/amber/red — a role is a category,
                not a severity. -->
           <template #subheader>
-            <div
-              class="px-page-edge border-table-row-divider border-b py-1.5"
-              data-test="user-list-summary"
-            >
+            <div data-test="user-list-summary">
               <OStatStrip
                 :items="summaryStats"
                 :loading="loading"

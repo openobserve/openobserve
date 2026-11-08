@@ -40,16 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="openCollector"
     >
       <template #subheader>
-        <div class="px-page-edge border-table-row-divider border-b py-1.5">
-          <OStatStrip
-            :items="statusStats"
-            compact
-            selectable
-            :selected-key="statusFilter"
-            default-key="all"
-            @select="onStatSelect"
-          />
-        </div>
+        <OStatStrip
+          :items="statusStats"
+          compact
+          selectable
+          :selected-key="statusFilter"
+          default-key="all"
+          @select="onStatSelect"
+        />
       </template>
 
       <template #toolbar>

@@ -190,6 +190,7 @@
           <OStatStrip
             :items="firingTiles"
             selectable
+            :tray="false"
             data-test="alerts-alertdetail-tiles"
             @select="openIncident"
           />

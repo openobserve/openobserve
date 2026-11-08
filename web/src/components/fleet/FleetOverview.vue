@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :items="stats"
       compact
       selectable
+      :tray="false"
       :selected-key="null"
       @select="onStatSelect"
     />
