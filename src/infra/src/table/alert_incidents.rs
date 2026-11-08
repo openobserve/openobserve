@@ -262,8 +262,8 @@ pub async fn add_alert_to_incident(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     // Lock the incident row first so that concurrent transactions serialise on
-    // it. Without this lock, two READ COMMITTED transactions can both read
-    // prior_count == 0 before either commits (the PK includes alert_fired_at,
+    // it. Without this lock, two READ COMMITTED transactions can both see
+    // no prior firing before either commits (the PK includes alert_fired_at,
     // so both inserts succeed), resulting in duplicate NewAlertTypeJoined
     // notifications. FOR UPDATE is a no-op on SQLite (file-level locking
     // already serialises writes there).
@@ -276,14 +276,18 @@ pub async fn add_alert_to_incident(
 
     // With the incident row locked, check whether this alert_id already
     // appears in the incident. Only one transaction can hold the lock at a
-    // time, so this count is stable until we commit.
-    let prior_count = alert_incident_alerts::Entity::find()
+    // time, so this check is stable until we commit.
+    let is_new_alert_type = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::AlertId)
         .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
         .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
-        .count(&txn)
+        .into_tuple::<String>()
+        // LIMIT 1: a long-firing alert links tens of thousands of rows to one incident.
+        .one(&txn)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    let is_new_alert_type = prior_count == 0;
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .is_none();
 
     // Insert alert link
     let alert_link = alert_incident_alerts::ActiveModel {
