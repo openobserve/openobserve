@@ -419,7 +419,9 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
 pub fn is_absent_semantic_field_groups(setting: &SystemSetting) -> bool {
     use config::meta::system_settings::keys::SEMANTIC_FIELD_GROUPS;
 
-    setting.setting_key == SEMANTIC_FIELD_GROUPS && setting.created_at == 0 && setting.updated_at == 0
+    setting.setting_key == SEMANTIC_FIELD_GROUPS
+        && setting.created_at == 0
+        && setting.updated_at == 0
 }
 
 /// Get the Gen-AI agent fallback mapping config for an organization.
@@ -719,7 +721,12 @@ async fn cache_absent_semantic_field_groups(org_id: &str) {
     SYSTEM_SETTINGS
         .write()
         .await
-        .entry(cache_key(&SettingScope::Org, Some(org_id), None, SEMANTIC_FIELD_GROUPS))
+        .entry(cache_key(
+            &SettingScope::Org,
+            Some(org_id),
+            None,
+            SEMANTIC_FIELD_GROUPS,
+        ))
         .or_insert(absent);
 }
 
