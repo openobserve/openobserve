@@ -17,7 +17,6 @@ export class ModelPricingPage {
         // Navigation
         // ============================================================
         this.settingsMenuLink = page.locator('[data-test="menu-link-settings-item"]');
-        this.modelPricingTab   = page.locator('[data-test="model-pricing-tab"]');
 
         // ============================================================
         // List page — header controls

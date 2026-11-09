@@ -33,8 +33,9 @@ pub struct Model {
     pub span_selector_bindings: Option<Json>,
     pub trace_config: Option<Json>,
     pub session_config: Option<Json>,
-    /// `EvalJobBudget`; NULL on jobs saved before budgets.
-    pub budget: Option<Json>,
+    /// `EvalJobBudget` serialized as JSON text; NULL on jobs saved before budgets.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub budget: Option<String>,
     pub sampling_mode: String,
     pub sampling_value: Json,
     pub status: String,

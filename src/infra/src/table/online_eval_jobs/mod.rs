@@ -533,7 +533,7 @@ impl From<Model> for OnlineEvalJob {
                 .and_then(|config| serde_json::from_value(config).ok()),
             budget: model
                 .budget
-                .and_then(|budget| serde_json::from_value(budget).ok()),
+                .and_then(|budget| serde_json::from_str(&budget).ok()),
             sampling_mode: model.sampling_mode.parse().unwrap_or_default(),
             sampling_value: model.sampling_value,
             status: model.status,
@@ -846,8 +846,8 @@ pub async fn exists(id: &str) -> Result<bool, errors::Error> {
     Ok(record.is_some())
 }
 
-fn budget_json(budget: Option<&EvalJobBudget>) -> Option<serde_json::Value> {
-    budget.map(|budget| serde_json::json!(budget))
+fn budget_json(budget: Option<&EvalJobBudget>) -> Option<String> {
+    budget.and_then(|budget| serde_json::to_string(budget).ok())
 }
 
 /// Update only the status, pipeline_id and budget fields of a job; the budget carries the
@@ -1532,7 +1532,7 @@ mod tests {
         );
 
         let mut model = make_model();
-        model.budget = Some(serde_json::json!({"dailyUsd": 5, "onReach": "keep_running"}));
+        model.budget = Some(r#"{"dailyUsd": 5, "onReach": "keep_running"}"#.to_string());
         let job = OnlineEvalJob::from(model);
         let budget = job.budget.as_ref().unwrap();
         assert_eq!(budget.on_reach, BudgetAction::KeepRunning);

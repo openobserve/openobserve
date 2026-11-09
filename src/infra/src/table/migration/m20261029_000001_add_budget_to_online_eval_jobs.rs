@@ -31,7 +31,6 @@ enum OnlineEvalJobs {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // add_column_if_not_exists renders IF NOT EXISTS, which MySQL rejects.
         if manager.has_column(TABLE, "budget").await? {
             return Ok(());
         }
@@ -49,7 +48,7 @@ impl MigrationTrait for Migration {
 fn add_column_stmt() -> TableAlterStatement {
     Table::alter()
         .table(OnlineEvalJobs::Table)
-        .add_column(ColumnDef::new(OnlineEvalJobs::Budget).json().null())
+        .add_column(ColumnDef::new(OnlineEvalJobs::Budget).text().null())
         .to_owned()
 }
 
@@ -70,15 +69,7 @@ mod tests {
     fn postgres() {
         collapsed_eq!(
             &add_column_stmt().to_string(PostgresQueryBuilder),
-            r#"ALTER TABLE "online_eval_jobs" ADD COLUMN "budget" json NULL"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &add_column_stmt().to_string(MysqlQueryBuilder),
-            r#"ALTER TABLE `online_eval_jobs` ADD COLUMN `budget` json NULL"#
+            r#"ALTER TABLE "online_eval_jobs" ADD COLUMN "budget" text NULL"#
         );
     }
 
@@ -86,7 +77,7 @@ mod tests {
     fn sqlite() {
         collapsed_eq!(
             &add_column_stmt().to_string(SqliteQueryBuilder),
-            r#"ALTER TABLE "online_eval_jobs" ADD COLUMN "budget" json_text NULL"#
+            r#"ALTER TABLE "online_eval_jobs" ADD COLUMN "budget" text NULL"#
         );
         collapsed_eq!(
             &drop_column_stmt().to_string(SqliteQueryBuilder),

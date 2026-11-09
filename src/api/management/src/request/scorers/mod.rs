@@ -667,7 +667,7 @@ async fn run_scorer_test(
                 })?;
 
             // Runs in the sandbox, so it calls no provider and costs nothing.
-            let result = prepared.run(&attrs);
+            let result = prepared.run(&attrs).await;
             let latency_ms = start.elapsed().as_millis() as i64;
             Ok(match result {
                 Ok(output) => ScorerTestResponseBody {
