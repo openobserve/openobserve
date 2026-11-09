@@ -468,7 +468,7 @@ mod tests {
 
     use arrow::array::{Int32Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::{cluster::NodeInfo, search::ScanStats};
+    use config::meta::search::ScanStats;
     use datafusion::physical_plan::{
         ExecutionPlan, empty::EmptyExec, stream::RecordBatchStreamAdapter,
     };
@@ -482,25 +482,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::handler::grpc::flight::report_registry::ReportRegistry;
-
-    #[derive(Debug)]
-    struct ClusterNode;
-
-    impl NodeInfo for ClusterNode {
-        fn get_grpc_addr(&self) -> String {
-            "http://127.0.0.1:1".to_string()
-        }
-        fn get_auth_token(&self) -> String {
-            "token".to_string()
-        }
-        fn get_name(&self) -> String {
-            "q-0".to_string()
-        }
-        fn is_local(&self) -> bool {
-            false
-        }
-    }
+    use crate::handler::grpc::flight::{report_registry::ReportRegistry, tests::LoopbackNode};
 
     fn make_builder() -> FlightEncoderStreamBuilder {
         FlightEncoderStreamBuilder::new(
@@ -655,15 +637,8 @@ mod tests {
         let scan = RemoteScanExec::new(
             Arc::new(EmptyExec::new(schema.clone())),
             RemoteScanNode {
-                nodes: vec![Arc::new(ClusterNode)],
-                opentelemetry_context: opentelemetry::Context::current(),
-                query_identifier: Default::default(),
-                search_infos: Default::default(),
-                index_info: Default::default(),
-                super_cluster_info: proto::cluster_rpc::SuperClusterInfo {
-                    is_super_cluster: true,
-                    ..Default::default()
-                },
+                nodes: vec![Arc::new(LoopbackNode("http://127.0.0.1:1".to_string()))],
+                ..Default::default()
             },
         )
         .unwrap();

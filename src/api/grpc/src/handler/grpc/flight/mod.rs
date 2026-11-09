@@ -385,7 +385,7 @@ mod tests {
     use super::*;
 
     #[derive(Debug)]
-    struct LoopbackNode(String);
+    pub(super) struct LoopbackNode(pub(super) String);
 
     impl NodeInfo for LoopbackNode {
         fn get_grpc_addr(&self) -> String {
@@ -425,21 +425,18 @@ mod tests {
         let remote = RemoteScanExec::new(
             Arc::new(EmptyExec::new(schema)),
             RemoteScanNode {
-                nodes: vec![Arc::clone(&node); 4],
-                opentelemetry_context: opentelemetry::Context::current(),
+                nodes: vec![Arc::clone(&node); 5],
                 query_identifier: QueryIdentifier {
                     trace_id: trace_id.to_string(),
                     org_id: "default".to_string(),
                     ..Default::default()
                 },
-                search_infos: Default::default(),
-                index_info: Default::default(),
-                super_cluster_info: Default::default(),
+                ..Default::default()
             },
         )
         .unwrap();
-        // 0 stopped early, 1 hit the caller's deadline, 2 has no report held, 3 never started.
-        for (partition, job) in ["j0", "j1", "j2"].into_iter().enumerate() {
+        // 0 stopped early, 1 hit the caller's deadline, 2 has no report held, 3 never reports.
+        for (partition, job) in ["j0", "j1", "j2", "j3"].into_iter().enumerate() {
             let recorder =
                 NodeProfileRecorder::start(remote.state.node_profiles.clone(), partition, &*node);
             recorder.mark_sent(job.to_string());
@@ -459,11 +456,13 @@ mod tests {
                 });
         }
 
+        let _still_running = REPORTS.open(&job_trace_id(trace_id, "j3"));
+
         let start = Instant::now();
-        complete_remote_profiles(&remote, Duration::from_secs(5)).await;
+        complete_remote_profiles(&remote, Duration::from_millis(300)).await;
         assert!(
             start.elapsed() < Duration::from_secs(2),
-            "a missing report must not stall"
+            "neither a missing report nor a run that never reports may stall"
         );
         let outcomes = remote
             .state
@@ -478,6 +477,7 @@ mod tests {
                 (NodeStatus::EarlyStopped, Some("j0".to_string())),
                 (NodeStatus::TimedOut, Some("j1".to_string())),
                 (NodeStatus::EarlyStopped, None),
+                (NodeStatus::Unavailable, None),
                 (NodeStatus::NotExecuted, None),
             ]
         );

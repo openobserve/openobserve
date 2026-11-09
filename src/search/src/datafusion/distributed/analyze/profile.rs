@@ -576,11 +576,7 @@ mod tests {
     fn test_build_profile_stops_at_remote() {
         let node = RemoteScanNode {
             nodes: vec![Arc::new(TestNode)],
-            opentelemetry_context: opentelemetry::Context::current(),
-            query_identifier: Default::default(),
-            search_infos: Default::default(),
-            index_info: Default::default(),
-            super_cluster_info: Default::default(),
+            ..Default::default()
         };
         let remote = RemoteScanExec::new(empty(), node).unwrap();
         drop(NodeProfileRecorder::start(
@@ -600,11 +596,7 @@ mod tests {
     async fn test_profile_reads_a_stream_the_runtime_has_not_dropped() {
         let node = RemoteScanNode {
             nodes: vec![Arc::new(TestNode), Arc::new(TestNode)],
-            opentelemetry_context: opentelemetry::Context::current(),
-            query_identifier: Default::default(),
-            search_infos: Default::default(),
-            index_info: Default::default(),
-            super_cluster_info: Default::default(),
+            ..Default::default()
         };
         let remote = RemoteScanExec::new(empty(), node).unwrap();
         let recorders = [(0, 3), (1, 5)].map(|(partition, rows)| {
