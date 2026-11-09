@@ -24716,7 +24716,7 @@
       "cellAvailable": "{n} regel beschikbaar | {n} regels beschikbaar",
       "noMatch": "Geen overeenkomende technieken",
       "unmapped": "Technieken zonder bekende tactiek",
-      "footnote": "Dekking wordt gemeten aan de {total} technieken van MITRE ATT&CK Enterprise v{version}, waarbij subtechnieken meetellen voor hun bovenliggende techniek; {n} Sigma-regels worden met het product meegeleverd.",
+      "footnote": "Dekking wordt gemeten tegen de {total} technieken van MITRE ATT&CK Enterprise v{version}, waarbij subtechnieken meetellen voor hun bovenliggende techniek; {n} Sigma-regels worden meegeleverd met het product.",
       "drawerEyebrow": "ATT&CK-techniek",
       "state": {
         "firing": "Afgaan",
@@ -24845,8 +24845,8 @@
       "stream": "Stream",
       "streamPlaceholder": "Kies de stream waarop de regel draait",
       "notify": "Melden (optioneel)",
-      "notifyPlaceholder": "Geen: activeringen openen nog steeds cases",
-      "noDestinations": "Er zijn nog geen alertbestemmingen. Detecties leveren ook zonder bestemming bevindingen op en openen cases; voeg alleen een bestemming toe als u ook meldingen wilt.",
+      "notifyPlaceholder": "Geen: afgaande detecties openen nog steeds cases",
+      "noDestinations": "Er bestaan nog geen alarmbestemmingen. Detecties genereren nog steeds bevindingen en openen cases zonder bestemming; voeg alleen een bestemming toe als je ook meldingen wilt.",
       "createDestination": "Bestemming aanmaken",
       "reloadDestinations": "Vernieuwen",
       "lookBack": "Terugkijken (minuten)",
@@ -25036,9 +25036,9 @@
         "graph": "Risicografiek"
       },
       "riskGraph": {
-        "empty": "Geen entiteiten om weer te geven",
-        "emptyHint": "Voeg beveiligingsbronnen toe of vergroot het tijdbereik om de risicograaf te zien.",
-        "showingTop": "Top {n} van {total} op risico",
+        "empty": "Niets gekoppeld in dit venster",
+        "emptyHint": "De grafiek koppelt gebruikers, IP-adressen en hosts die in dezelfde gebeurtenis of dezelfde case voorkomen. In dit venster gebeurde dat niet; verruim het tijdsbereik.",
+        "showingTop": "Toont de top {n} van {total} op risico",
         "legend": "Doorgetrokken lijn: gezien in dezelfde gebeurtenis. Gestreepte lijn: genoemd door dezelfde case.",
         "edgeEvents": "{n} gebeurtenis | {n} gebeurtenissen",
         "edgeCases": "{n} case | {n} cases",
@@ -25092,9 +25092,9 @@
       "signalHint": {
         "failures": "Minstens {rate}% van de gebeurtenissen van deze entiteit is mislukt, met minstens {n} mislukkingen; alleen bronnen die een uitkomst melden worden meegeteld.",
         "spread": {
-          "user": "Gezien vanaf {n} of meer bron-IP's in één bron tijdens het venster.",
-          "ip": "Gebruikt door {n} of meer gebruikers in één bron tijdens het venster. NAT- en VPN-uitgang zien er ook zo uit; password spraying ook.",
-          "host": "Geopend door {n} of meer gebruikers in één bron tijdens het venster."
+          "user": "Gezien vanaf {n} of meer bron-IP's in één bron, ruim boven wat andere gebruikers in dit venster laten zien.",
+          "ip": "Gebruikt door {n} of meer gebruikers in één bron, ruim boven andere adressen in dit venster. NAT- en VPN-uitgaand verkeer ziet er ook zo uit; net als password spraying.",
+          "host": "Benaderd door {n} of meer gebruikers in één bron, ruim boven andere hosts in dit venster."
         },
         "external": "Niet in een privé-, loopback- of link-local-bereik.",
         "fail_then_success": "Minstens {n} mislukte gebeurtenissen, daarna een geslaagde na de eerste mislukking: een gok die mogelijk is gelukt.",
@@ -25271,7 +25271,7 @@
       "truncated": "Alleen de eerste {n} rijen van {lists} zijn gelezen; de rest is niet gescand.",
       "noIndicators": "Geen indicatoren",
       "noCoverage": "Voer een scan uit om te zien welke kolommen worden gescand",
-      "coverageHint": "Wat een sweep heeft doorzocht in {n} beveiligingsbronnen. Elke kolom wordt vergeleken op de volledige waarde en op hele tokens daarin, zoals arrays, logtekst en SHA256=-hashes; een type zonder kolom kan helemaal niet worden gezien.",
+      "coverageHint": "Wat een sweep heeft doorzocht in {n} beveiligingsbronnen. Elke kolom wordt vergeleken op de volledige waarde en op volledige tokens daarin, zoals arrays, logtekst en SHA256=-hashes; een type zonder kolom kan helemaal niet worden gesignaleerd.",
       "indicatorCount": "{n} indicator | {n} indicatoren",
       "columnsSearched": "{n} kolom | {n} kolommen",
       "blind": "Niet doorzoekbaar",
@@ -25373,7 +25373,7 @@
         "importSubtitle": "Vereist een indicator-kolom; type, ernst, bron en vervaldatum zijn optioneel.",
         "importSubmit": "Importeren",
         "file": "CSV-bestand",
-        "fileHelp": "Rijen die geen indicator zijn, worden overgeslagen en geteld. Een lijst bevat maximaal {max} indicatoren; bestanden tot {mb} MB.",
+        "fileHelp": "Rijen die geen indicatoren zijn, worden overgeslagen en geteld. Een lijst bevat maximaal {max} indicatoren; bestanden tot {mb} MB.",
         "fileRequired": "Kies een CSV-bestand",
         "defaultSeverity": "Standaardernst voor rijen zonder ernst",
         "append": "Aan de lijst toevoegen in plaats van deze te vervangen",
@@ -25433,7 +25433,7 @@
       "exclude": "Uitsluiten",
       "attached": "Gekoppeld: {pack}.",
       "detached": "Pack ontkoppeld.",
-      "empty": "Nog geen logstreams. Neem beveiligingslogs op in een willekeurige stream en ze verschijnen hier.",
+      "empty": "Nog geen logstreams. Ingereer beveiligingslogs als een gewone stream en ze verschijnen hier.",
       "noticePackRemoved": "{stream}: pack buiten de SIEM verwijderd. Koppel het opnieuw of wis het.",
       "noticeNoRecord": "{stream}: er is een pack gekoppeld zonder registratie. Registreer het of ontkoppel.",
       "noticeNotWriting": "{stream}: de pipeline schrijft niet meer naar deze stream.",
