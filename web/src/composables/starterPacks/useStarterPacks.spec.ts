@@ -703,6 +703,81 @@ describe("useStarterPacks", () => {
     });
   });
 
+  describe("appendToInstall and undoItems", () => {
+    it("appends new items to the install's own record", async () => {
+      const api = packs();
+      const first = await api.installPack(PACK, { exclude: ["k8s/one"] });
+      const record = await api.appendToInstall(PACK, first.installId, ["k8s/one"]);
+      expect(record.installId).toBe(first.installId);
+      expect(record.status).toBe("complete");
+      expect(record.items.find(({ itemId }) => itemId === "k8s/one")?.status).toBe("created");
+      expect(fake.state.alerts).toHaveLength(2);
+      expect(fake.state.alerts.every((alert) => alert.enabled === false)).toBe(true);
+      expect([...fake.state.kv.keys()]).toHaveLength(1);
+    });
+
+    it("leaves an item the record already holds alone", async () => {
+      const api = packs();
+      const first = await api.installPack(PACK);
+      const record = await api.appendToInstall(PACK, first.installId, ["k8s/one"]);
+      expect(record.items.filter(({ itemId }) => itemId === "k8s/one")).toHaveLength(1);
+      expect(fake.state.alerts).toHaveLength(2);
+    });
+
+    it("creates the folder a first Add left out when a later Add needs it", async () => {
+      const api = packs();
+      const first = await api.installPack(PACK, {
+        exclude: ["overview", "events", "dashboards"],
+      });
+      expect(fake.state.folders.dashboards).toHaveLength(0);
+      const record = await api.appendToInstall(PACK, first.installId, ["overview"]);
+      expect(fake.state.folders.dashboards).toHaveLength(1);
+      expect(fake.state.dashboards).toHaveLength(1);
+      expect(record.items.find(({ itemId }) => itemId === "overview")?.status).toBe("created");
+    });
+
+    it("runs an append after a running install of the pack, not instead of it", async () => {
+      const api = packs();
+      const first = await api.installPack(PACK, { exclude: ["k8s/one"] });
+      const again = api.installPack(PACK);
+      const appended = api.appendToInstall(PACK, first.installId, ["k8s/one"]);
+      await again;
+      const record = await appended;
+      expect(record.installId).toBe(first.installId);
+      expect(record.items.some(({ itemId }) => itemId === "k8s/one")).toBe(true);
+      expect(fake.state.alerts).toHaveLength(2);
+    });
+
+    it("makes again an item the record holds but someone deleted", async () => {
+      const api = packs();
+      const first = await api.installPack(PACK, { exclude: ["overview", "events"] });
+      fake.state.alerts = fake.state.alerts.filter(
+        (alert) => !alert.tags.includes("library:k8s/one"),
+      );
+      const record = await api.appendToInstall(PACK, first.installId, ["k8s/one"]);
+      expect(fake.state.alerts).toHaveLength(2);
+      expect(record.items.filter(({ itemId }) => itemId === "k8s/one")).toHaveLength(1);
+      expect(record.items.find(({ itemId }) => itemId === "k8s/one")?.status).toBe("created");
+    });
+
+    it("undoes only the appended items", async () => {
+      const api = packs();
+      const first = await api.installPack(PACK, { exclude: ["k8s/one"] });
+      await api.appendToInstall(PACK, first.installId, ["k8s/one"]);
+      const { removed, kept } = await api.undoItems(PACK, first.installId, ["k8s/one"]);
+      expect(removed.map(({ itemId }) => itemId)).toEqual(["k8s/one"]);
+      expect(kept).toEqual([]);
+      expect(fake.state.alerts).toHaveLength(1);
+      const stored = JSON.parse(fake.state.kv.values().next().value!);
+      expect(stored.items.some(({ itemId }: { itemId: string }) => itemId === "k8s/one")).toBe(
+        false,
+      );
+      expect(stored.items.some(({ itemId }: { itemId: string }) => itemId === "k8s/two")).toBe(
+        true,
+      );
+    });
+  });
+
   describe("undoPack and removePack", () => {
     it("removes exactly the unchanged items and lists the rest", async () => {
       const api = packs();

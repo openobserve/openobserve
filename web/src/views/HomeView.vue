@@ -112,6 +112,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="store.state.selectedOrganization?.identifier"
           :org="store.state.selectedOrganization?.identifier"
         />
+        <StarterPackFindMore
+          v-if="packsEnabled && activeHomeTab === 'overview'"
+          :key="`find-more-${store.state.selectedOrganization?.identifier}`"
+          variant="row"
+          :org="store.state.selectedOrganization?.identifier"
+        />
         <SampleDataHomeBanner v-if="activeHomeTab === 'overview'" class="mt-2.5 mb-1" />
         <FirstDataPanel
           v-if="flagOn && isDataTab && arrived"
@@ -300,6 +306,7 @@ import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import analytics from "@/services/product_analytics";
 import StarterPackHomeCard from "@/components/starterPacks/StarterPackHomeCard.vue";
+import StarterPackFindMore from "@/components/starterPacks/StarterPackFindMore.vue";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 
 export default defineComponent({
@@ -669,6 +676,7 @@ export default defineComponent({
   },
   components: {
     StarterPackHomeCard,
+    StarterPackFindMore,
     OverviewTab,
     UsageTab,
     O2AIChat,
