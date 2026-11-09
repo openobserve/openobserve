@@ -1,0 +1,48 @@
+# Secret scan on every PR / merge-queue batch. Required by the org ruleset
+# "gitleaks required (openobserve)". Public repos cannot use workflows from the
+# private openobserve/o2-security repo, so this is a per-repo copy of
+# o2-security/.github/workflows/gitleaks.yml. Keep the two in sync.
+name: gitleaks
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: gitleaks scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine commit range
+        id: range
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          MQ_BASE: ${{ github.event.merge_group.base_sha }}
+          MQ_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          case "$EVENT" in
+            pull_request) echo "log_opts=--no-merges $PR_BASE..$PR_HEAD" >> "$GITHUB_OUTPUT" ;;
+            merge_group)  echo "log_opts=--no-merges $MQ_BASE..$MQ_HEAD" >> "$GITHUB_OUTPUT" ;;
+            *)            echo "log_opts=-1" >> "$GITHUB_OUTPUT" ;;   # manual run: latest commit only
+          esac
+
+      - name: Run gitleaks
+        env:
+          LOG_OPTS: ${{ steps.range.outputs.log_opts }}
+        run: |
+          echo "Scanning: $LOG_OPTS"
+          docker run --rm -v "$PWD:/repo" -w /repo "$GITLEAKS_IMAGE" \
+            git --redact --verbose --no-banner --exit-code 1 \
+            --log-opts="$LOG_OPTS" .
