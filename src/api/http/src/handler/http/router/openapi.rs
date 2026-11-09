@@ -1313,6 +1313,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::ai::activity::list_activity,
     openobserve_api_management::request::ai::activity::undo_action,
     openobserve_api_management::request::ai::branch::branch,
+    openobserve_api_management::request::ai::seeded::create_seeded,
     openobserve_api_management::request::ai::capabilities::get_capabilities,
     openobserve_api_management::request::ai::capabilities::test_capabilities,
     openobserve_api_management::request::ai::chat::cancel,

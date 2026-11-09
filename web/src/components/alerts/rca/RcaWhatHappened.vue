@@ -82,7 +82,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <template #meta>
             <span
-              v-if="statusOf(idx) !== 'confirmed'"
+              class="min-w-0 text-sm wrap-anywhere"
+              data-test="rca-timeline-text"
+              :class="
+                entry.status === 'refuted'
+                  ? 'text-text-secondary line-through'
+                  : 'text-text-heading'
+              "
+            >
+              <RcaInlineText :text="entry.text" />
+            </span>
+            <span
+              v-if="entry.status !== 'confirmed'"
               data-test="rca-timeline-marker"
               class="text-3xs shrink-0 font-bold"
               :class="MARKER[statusOf(idx)].tag"

@@ -17,9 +17,10 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
+import { raw } from "@/types/i18n";
+
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantDecisionNotice from "./AssistantDecisionNotice.vue";
-import { setDrawerInsetEnd } from "@/lib/overlay/Drawer/drawerInset";
 
 import { fakeRuns, runRow } from "./runsTestKit";
 
@@ -229,52 +230,80 @@ describe("AssistantDecisionNotice", () => {
     expect(notice()).toBeNull();
   });
 
-  describe("placement", () => {
-    afterEach(() => setDrawerInsetEnd(0));
-
-    it("ends at the open sidebar, so it never covers the composer and Send", async () => {
-      setDrawerInsetEnd(384);
-      setup();
-      await nextTick();
-      expect(notice()?.dataset.side).toBe("end");
-      expect(notice()?.style.getPropertyValue("--o-notice-end")).toBe("384");
-      expect(notice()?.className).toContain("end-[calc(var(--o-notice-end,0)*0.0625rem+1rem)]");
-    });
-
-    it("takes the start corner in the full view", async () => {
-      fake.current = fakeAssistant();
-      fake.runs = fakeRuns();
-      fake.runs.decisions.value = [decision("a")];
-      const router = fakeRouter();
-      await router.push({ name: "home", query: { tab: "ai", thread: "" } });
-      mount(AssistantDecisionNotice, {
-        attachTo: document.body,
-        global: { plugins: [router, fakeVuex()] },
+  it("sits in the header's flow, never fixed or teleported over the page (BRIEF-R7 rule 3)", async () => {
+    const { wrapper } = setup();
+    await nextTick();
+    const region = notice();
+    expect(wrapper.element.contains(region)).toBe(true);
+    expect(region?.className).not.toMatch(/\b(fixed|absolute)\b/);
+    expect(region?.className).not.toMatch(/\bz-/);
+  });
+  it("is the one header item that shrinks, and steps aside when Review would no longer fit (B-shell2-1)", async () => {
+    const observers: ResizeObserverCallback[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          observers.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const widths = new Map<string, number>([
+      ["assistant-decision-notice-review", 60],
+      ["assistant-decision-notice-hide", 44],
+    ]);
+    const offset = vi
+      .spyOn(HTMLElement.prototype, "offsetWidth", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        return widths.get(this.dataset.test ?? "") ?? 8;
       });
-      await nextTick();
-      expect(notice()?.dataset.side).toBe("start");
-      expect(notice()?.className).toContain("start-4");
-    });
+    let width = 416;
+    const client = vi
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockImplementation(() => width);
+    setup();
+    await nextTick();
+    await nextTick();
+    const region = notice()!;
+    expect(region.className).toMatch(/\bmin-w-0\b/);
+    expect(region.className).toMatch(/\bshrink!/);
+    expect(region.className).not.toMatch(/\binvisible\b/);
+    expect(
+      document.querySelector('[data-test="assistant-decision-notice-chat-shown"]')?.className,
+    ).toMatch(/\btruncate\b/);
+    width = 160;
+    observers.forEach((callback) => callback([], {} as ResizeObserver));
+    await nextTick();
+    expect(region.dataset.fits).toBe("false");
+    expect(region.className).toMatch(/\binvisible\b/);
+    width = 260;
+    observers.forEach((callback) => callback([], {} as ResizeObserver));
+    await nextTick();
+    expect(region.dataset.fits).toBe("true");
+    offset.mockRestore();
+    client.mockRestore();
+    vi.unstubAllGlobals();
+  });
 
-    it("yields the end corner to a focused window holding it, and takes it back after", async () => {
-      const win = document.createElement("div");
-      win.dataset.assistantWindow = "w1";
-      win.getBoundingClientRect = () =>
-        ({ left: 600, right: 1010, top: 300, bottom: 750 }) as DOMRect;
-      document.body.appendChild(win);
-      const size = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(320);
-      const tall = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(120);
-      const { store } = setup();
-      store.state.shell.lastFocusedContainer = { window: "w1" };
-      vi.advanceTimersByTime(1_000);
-      await nextTick();
-      expect(notice()?.dataset.side).toBe("start");
-      store.state.shell.lastFocusedContainer = "sidebar";
-      vi.advanceTimersByTime(1_000);
-      await nextTick();
-      expect(notice()?.dataset.side).toBe("end");
-      size.mockRestore();
-      tall.mockRestore();
-    });
+  it("cuts the chat's title at a word, keeping the whole title for assistive tech", async () => {
+    const context = { font: "", measureText: (s: string) => ({ width: s.length * 10 }) };
+    const canvas = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    const client = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(160);
+    const title = raw("Pause the alert ta_approvals_rca_latency_high");
+    setup([decision("a", { title })]);
+    await flushPromises();
+    const chat = document.querySelector<HTMLElement>(
+      '[data-test="assistant-decision-notice-chat"]',
+    )!;
+    const shown = chat.querySelector('[data-test="assistant-decision-notice-chat-shown"]')!;
+    expect(shown.textContent).toBe("Pause the alert…");
+    expect(shown.getAttribute("aria-hidden")).toBe("true");
+    expect(chat.firstChild?.textContent).toBe(String(title));
+    canvas.mockRestore();
+    client.mockRestore();
   });
 });

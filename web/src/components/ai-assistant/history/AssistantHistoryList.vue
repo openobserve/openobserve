@@ -297,6 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @float="floatRow"
                 @stop="stopRow"
                 @share="shareRow"
+                @export="(sid) => exporter.exportChat(sid, 'markdown')"
                 @delete="askDelete"
                 @delete-draft="deleteDraft"
               />
@@ -334,6 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @float="floatRow"
                   @stop="stopRow"
                   @share="shareRow"
+                  @export="(sid) => exporter.exportChat(sid, 'markdown')"
                   @delete="askDelete"
                   @delete-draft="deleteDraft"
                 />
@@ -576,26 +578,30 @@ const listState = computed(() => history.listState.value);
 const errorWithRows = computed(
   () => listState.value.status === "error" && history.rows.value.length > 0,
 );
-// Read only while the Shared filter is on, so opening the list costs no extra request.
+// Every row shows its visibility glyph (v7 IMPL-PLAN Threads), so the owner's links are read with the list.
 const shares = useQuery(
   computed(() => ({
     ...mySharesQuery(org.value),
-    enabled:
-      history.mode.value === "server" && history.filter.value.kind === "shared" && !!org.value,
+    enabled: history.mode.value === "server" && !!org.value,
   })),
   queryClient,
 );
-watch(
-  () => shares.data.value,
-  // The server lists live links only, but a cached list can outlive a link's expiry (micros).
-  (list) =>
-    history.noteShared(
-      (list ?? [])
-        .filter((share) => share.expires_at == null || share.expires_at > Date.now() * 1_000)
-        .map((share) => share.session_id as Sid),
-    ),
-  { immediate: true },
+// The server lists live links only, but a cached list can outlive a link's expiry (micros).
+const liveShares = computed(() =>
+  (shares.data.value ?? []).filter(
+    (share) => share.expires_at == null || share.expires_at > Date.now() * 1_000,
+  ),
 );
+const shareVisibility = computed(() => {
+  const bySid = new Map<string, "org" | "public">();
+  // A public link says more than an org one, so it wins on a chat that has both.
+  for (const share of liveShares.value)
+    if (bySid.get(share.session_id) !== "public") bySid.set(share.session_id, share.visibility);
+  return bySid;
+});
+watch(liveShares, (list) => history.noteShared(list.map((share) => share.session_id as Sid)), {
+  immediate: true,
+});
 
 const narrow = computed(() => {
   if (props.mode !== "panel") return false;
@@ -792,6 +798,7 @@ function rowProps(row: HistoryRow) {
     now: now.value,
     org: run?.otherOrg ? orgLabel(run.org) : null,
     agentIcon: agentIcon(row),
+    sharedAs: row.share?.visibility ?? shareVisibility.value.get(row.sid) ?? null,
     floatBlocked: floatBlocked.value,
     current: row.sid === props.currentSid,
     mode: props.mode,

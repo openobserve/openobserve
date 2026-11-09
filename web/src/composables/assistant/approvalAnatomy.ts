@@ -60,7 +60,8 @@ const PLACEMENT_FIELDS: ReadonlySet<string> = new Set([
 
 const ENABLED_FIELDS = ["value", "enabled", "enable"] as const;
 
-const MUTE_TOOL = /mutealert$/;
+// A downtime mutes the alerts it names, so it reads as a pause.
+const MUTE_TOOL = /(mutealert|createdowntime)$/;
 
 // Entity types with an in-app editor that opens one object by id.
 const EDITOR_ROUTES: Readonly<
@@ -159,6 +160,10 @@ export function approvalUntil(card: Pick<Card, "args">, from = Date.now()): numb
     if (typeof ends === "number" && ends > 0) return epochMsOfWire(ends);
     const minutes = source?.minutes;
     if (typeof minutes === "number" && minutes > 0) return from + minutes * 60_000;
+    const starts = source?.starts_at;
+    const secs = source?.duration_secs;
+    if (typeof starts === "number" && starts > 0 && typeof secs === "number" && secs > 0)
+      return epochMsOfWire(starts) + secs * 1000;
   }
   return null;
 }

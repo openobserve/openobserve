@@ -176,6 +176,70 @@ describe("AssistantContextTray", () => {
     expect(trayChipLimit({ narrow: false, wide: true })).toBe(3);
   });
 
+  it("scrolls the expanded row instead of squashing its chips (B-composer-10)", async () => {
+    const { wrapper, store, sid } = await setup();
+    for (const n of [1, 2, 3, 4]) store.addChip(sid, { ...ROW, id: `row-${n}` });
+    await flushPromises();
+    const items = () => wrapper.findAll('[data-test="assistant-context-tray-list"] > li');
+    expect(items()[0].classes()).toContain("min-w-0");
+    await wrapper.get('[data-test="assistant-context-more"]').trigger("click");
+    expect(wrapper.get('[data-test="assistant-context-tray-scroller"]').classes()).toContain(
+      "overflow-x-auto",
+    );
+    expect(wrapper.get('[data-test="assistant-context-tray-list"]').classes()).toContain(
+      "shrink-0",
+    );
+    const tray = wrapper.get('[data-test="assistant-context-tray"]');
+    expect(tray.classes()).not.toContain("overflow-x-auto");
+    expect(tray.element.lastElementChild?.getAttribute("data-test")).toBe("assistant-context-more");
+    expect(items()).toHaveLength(4);
+    for (const item of items()) {
+      expect(item.classes()).toContain("shrink-0");
+      expect(item.classes()).not.toContain("min-w-0");
+    }
+  });
+
+  it("fades the hidden edge and maps a vertical wheel onto the expanded row (B-composer-15)", async () => {
+    const { wrapper, store, sid } = await setup();
+    for (const n of [1, 2, 3, 4]) store.addChip(sid, { ...ROW, id: `row-${n}` });
+    await flushPromises();
+    const scroller = wrapper.get('[data-test="assistant-context-tray-scroller"]');
+    const el = scroller.element as HTMLElement;
+    let left = 0;
+    Object.defineProperties(el, {
+      scrollWidth: { configurable: true, get: () => 743 },
+      clientWidth: { configurable: true, get: () => 258 },
+      scrollLeft: {
+        configurable: true,
+        get: () => left,
+        set: (v: number) => {
+          left = v;
+        },
+      },
+    });
+    const wheel = (deltaY: number) => {
+      const event = new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true });
+      el.dispatchEvent(event);
+      return event;
+    };
+    expect(wheel(400).defaultPrevented).toBe(false);
+    await wrapper.get('[data-test="assistant-context-more"]').trigger("click");
+    await flushPromises();
+    expect(scroller.attributes("data-fade-end")).toBe("");
+    expect(scroller.attributes("data-fade-start")).toBeUndefined();
+    expect(el.style.maskImage).toContain("transparent 100%");
+    expect(wheel(400).defaultPrevented).toBe(true);
+    expect(left).toBe(400);
+    await flushPromises();
+    expect(scroller.attributes("data-fade-start")).toBe("");
+    expect(wheel(400).defaultPrevented).toBe(true);
+    expect(left).toBe(485);
+    await flushPromises();
+    expect(scroller.attributes("data-fade-end")).toBeUndefined();
+    expect(wheel(400).defaultPrevented).toBe(false);
+    expect(scroller.classes()).toContain("scroll-px-6");
+  });
+
   it("carries images as chips, removed like any other (U1)", async () => {
     const { store, sid, labels, wrapper } = await setup();
     store.addImage(sid, { data: "aGk=", mimeType: "image/png", filename: "shot.png", size: 2 });

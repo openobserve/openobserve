@@ -472,7 +472,12 @@ pub fn normalize_error_frame(frame: &mut Map<String, Value>) {
         frame.get(key).and_then(Value::as_str).map(str::to_string)
     };
     let given = text(frame, "code");
-    let code = match given.as_deref().and_then(AiErrorCode::from_ledger) {
+    // A frame's `agent_unreachable` is the turn's own failure; only an HTTP refusal is per agent.
+    let ledger = given
+        .as_deref()
+        .and_then(AiErrorCode::from_ledger)
+        .filter(|code| *code != AiErrorCode::AgentUnreachable);
+    let code = match ledger {
         Some(code) => code,
         None => {
             let stored = given
@@ -586,6 +591,9 @@ mod tests {
                 "changed_since",
                 "undo_expired",
                 "below_usage",
+                "run_limit_member",
+                "run_limit_org",
+                "agent_unreachable",
             ]
         );
         for code in AiErrorCode::ALL {

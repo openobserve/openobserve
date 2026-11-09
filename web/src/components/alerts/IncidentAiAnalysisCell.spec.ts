@@ -297,6 +297,16 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
       },
     );
 
+    it("wraps the door below the state instead of spilling into the next column, and keeps the table's run-together tooltip off", () => {
+      const wrapper = mountWith(rcaSummary({ run_id: "run-7", state: "running" }));
+      const cell = wrapper.get('[data-test="incident-ai-analysis-cell"]');
+
+      expect(cell.classes()).toContain("flex-wrap");
+      expect(cell.attributes()).toHaveProperty("data-o-tooltip-off");
+      const detail = wrapper.find('[data-test="incident-ai-analysis-detail"]');
+      if (detail.exists()) expect(detail.attributes("title")).toMatch(/\S( · \S|$)/);
+    });
+
     it("an incident with no run keeps Analyze and has no Follow in thread", () => {
       const wrapper = mountWith(null);
 

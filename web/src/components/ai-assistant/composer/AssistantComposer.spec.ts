@@ -36,7 +36,7 @@ import AssistantComposer, {
   type AssistantComposerProps,
 } from "./AssistantComposer.vue";
 import { composerUi, noteCap, noteDraftCleared, resetComposerUiForTests } from "./composerUi";
-import { resetComposerQueueForTests } from "./useComposerQueue";
+import { queuedOf, resetComposerQueueForTests } from "./useComposerQueue";
 import { HOLD_MS, SILENCE_MS, resetVoiceForTests, setVoiceOptIn } from "./useAssistantVoice";
 import AssistantDictateButton from "./AssistantDictateButton.vue";
 
@@ -234,6 +234,10 @@ describe("rows (§1, S1)", () => {
     expect([bar().element, strip().element]).toEqual(before);
     expect([bar().classes().join(" "), strip().classes().join(" ")]).toEqual(classes);
     expect(strip().classes()).toEqual(expect.arrayContaining(["h-7", "overflow-hidden"]));
+    // B-composer-11: on touch the strip is as tall as a chip's hit area, so nothing it holds is clipped.
+    expect(strip().classes()).toEqual(
+      expect.arrayContaining(["max-md:h-11", "pointer-coarse:h-11"]),
+    );
   });
 
   it("keeps the agent pill alone on the left and image, mic, Send on the right, with no @ button", async () => {
@@ -255,7 +259,6 @@ describe("rows (§1, S1)", () => {
   });
 
   it("ends the strip with the ⓘ only beside chips, and nothing of the composer sits outside the frame", async () => {
-    localStorage.setItem("o2.assistant.hints:k1", JSON.stringify({ attachSaved: true }));
     const { wrapper, store, sid } = setup();
     const sees = () => wrapper.find('[data-test="assistant-context-sees"]');
     expect(sees().exists()).toBe(false);
@@ -274,7 +277,6 @@ describe("rows (§1, S1)", () => {
   });
 
   it("puts the ⓘ after the tray in the strip", async () => {
-    localStorage.setItem("o2.assistant.hints:k1", JSON.stringify({ attachSaved: true }));
     const wrapper = mount(AssistantComposer, {
       props: { sid: null },
       slots: { chips: '<div data-test="tray-stub">tray</div>' },
@@ -417,15 +419,24 @@ describe("refused sends (§1)", () => {
     expect(wrapper.get(NOTICE).attributes("title")).toBe("You're offline. Draft kept.");
   });
 
-  it("states the first attachment once; OK remembers it", async () => {
+  it("keeps the first chip and the ⓘ in the strip; the ⓘ says it is saved with the chat (B-composer-6)", async () => {
     const { wrapper, store, sid } = setup();
+    localStorage.removeItem("o2.assistant.hints:k1");
     store.addChip(sid, ROW);
     await flushPromises();
-    const notice = '[data-notice="attach"]';
-    expect(wrapper.get(notice).attributes("title")).toBe("Attachments are saved with this chat.");
-    await wrapper.get('[data-test="assistant-composer-notice-attachOk"]').trigger("click");
-    expect(wrapper.find(notice).exists()).toBe(false);
-    expect(JSON.parse(localStorage.getItem("o2.assistant.hints:k1")!).attachSaved).toBe(true);
+    expect(wrapper.find(NOTICE).exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-composer-strip"]').text()).not.toContain(
+      "Attachments are saved",
+    );
+    const strip = wrapper.get('[data-test="assistant-composer-strip"]');
+    expect(strip.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
+    await strip.get('[data-test="assistant-context-sees"]').trigger("click");
+    await flushPromises();
+    expect(
+      document.body
+        .querySelector('[data-test="assistant-context-sees-disclosure"]')
+        ?.textContent?.trim(),
+    ).toBe("Sent to the assistant and saved with this chat.");
   });
 });
 
@@ -518,6 +529,16 @@ describe("states (`40` §1.3)", () => {
     expect(wrapper.find('[data-test="assistant-composer-notice-goToRequest"]').exists()).toBe(
       false,
     );
+  });
+
+  it("shows a disabled Send, not Stop, while the inert turn waits on the card (K7)", async () => {
+    const { wrapper, store, sid } = setup();
+    const session = store.state.sessions[sid];
+    session.pendingApproval = { id: "c1" } as PendingApproval;
+    session.turn = { state: "awaiting_approval", callId: "c1" };
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-stop"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBe("true");
   });
 
   it("states the decline above the frame in reply mode, with no context controls (CT-07 AC 4)", async () => {
@@ -657,7 +678,6 @@ describe("states (`40` §1.3)", () => {
   });
 
   it("says once that drafts will not survive a reload when storage is blocked (ERR-14)", async () => {
-    localStorage.setItem("o2.assistant.hints:k1", JSON.stringify({ attachSaved: true }));
     const { wrapper, store, sid } = setup();
     store.drafts.storageBlocked.value = true;
     await flushPromises();
@@ -698,7 +718,7 @@ describe("keys (`40` §1.4, CT-09)", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it("queues one message on Enter while answering, then holds a second and says why (CT-09 AC 4)", async () => {
+  it("queues one message on Enter while answering, then refuses a second with both kept (CT-09 AC 4, B-composer-12)", async () => {
     const { wrapper, send, store, sid, textarea, status } = setup();
     store.state.sessions[sid].turn = { state: "responding" } as never;
     await type(textarea(), "next");
@@ -715,8 +735,44 @@ describe("keys (`40` §1.4, CT-09)", () => {
     await textarea().trigger("keydown", { key: "Enter" });
     await flushPromises();
     expect(send).not.toHaveBeenCalled();
-    expect(status()).toBe("Wait for this answer to finish, or stop it.");
+    expect(store.state.sessions[sid].composer.text).toBe("and another");
+    const notice = wrapper.get(NOTICE);
+    expect(notice.attributes("data-notice")).toBe("queued");
+    expect(wrapper.get('[data-test="assistant-composer-notice-title"]').text()).toBe("1 queued");
+    expect(notice.attributes("title")).toMatch(/already queued|queuedAlreadySentence/);
+    expect(wrapper.find('[data-test="assistant-composer-notice-editQueued"]').exists()).toBe(true);
+    expect(wrapper.find('[data-notice="blocked"]').exists()).toBe(false);
+    expect(status()).toMatch(/already queued|queuedAlreadySentence/);
     expect(trackAssistant).toHaveBeenCalledWith("ai_composer_enter_blocked", { reason: "running" });
+  });
+
+  it("Edit with text in the field swaps it with the queued message, never joining them (B-composer-12)", async () => {
+    const { wrapper, store, sid, textarea, send } = setup();
+    store.state.sessions[sid].turn = { state: "responding" } as never;
+    await type(textarea(), "AAA first queued");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await type(textarea(), "BBB second");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    await wrapper.get('[data-test="assistant-composer-notice-editQueued"]').trigger("click");
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.text).toBe("AAA first queued");
+    expect(queuedOf(sid)?.text).toBe("BBB second");
+    expect(wrapper.get('[data-notice="queued"]').attributes("title")).not.toMatch(/already/);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("the queue stays one message: a refused Enter with an empty field changes nothing (B-composer-12)", async () => {
+    const { wrapper, store, sid, textarea } = setup();
+    store.state.sessions[sid].turn = { state: "responding" } as never;
+    await type(textarea(), "only one");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(queuedOf(sid)?.text).toBe("only one");
+    expect(store.state.sessions[sid].composer.text).toBe("");
+    expect(wrapper.find('[data-notice="blocked"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-composer-notice-editQueued"]').exists()).toBe(true);
   });
 
   it("recalls with ↑ from the first line, announces it, and ↓ brings the draft back (CT-11 AC 1)", async () => {
@@ -1250,15 +1306,17 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
   });
 
   it("sends the queued message when the answer ends, and drops the held reason (U8)", async () => {
-    const { wrapper, store, sid, textarea, send } = setup();
+    const { wrapper, store, sid, textarea } = setup();
+    const resend = vi.spyOn(store, "resend").mockResolvedValue(undefined as never);
     store.state.sessions[sid].turn = { state: "responding" } as never;
     await type(textarea(), "next");
     await textarea().trigger("keydown", { key: "Enter" });
     await textarea().trigger("keydown", { key: "Enter" });
     store.state.sessions[sid].turn = { state: "done", saved: "server" };
     await flushPromises();
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(store.state.sessions[sid].composer.text).toBe("next");
+    expect(resend).toHaveBeenCalledTimes(1);
+    expect(resend).toHaveBeenCalledWith(sid, expect.objectContaining({ text: "next" }), "typed");
+    expect(store.state.sessions[sid].composer.text).toBe("");
     expect(wrapper.find('[data-notice="queued"]').exists()).toBe(false);
     expect(wrapper.find('[data-notice="blocked"]').exists()).toBe(false);
   });

@@ -450,16 +450,19 @@ function draftRow(session: AssistantSession, ctx: HistoryCtx): HistoryRow {
 
 function liveRow(session: AssistantSession, ctx: HistoryCtx): HistoryRow {
   const first = session.messages.find((message) => message.role === "user");
+  // A branch's carried turns are its source's, so they never date the branch.
   const sent = session.messages
+    .filter((message) => !message.carried)
     .map((message) => message.sentAt)
     .filter((at): at is number => typeof at === "number");
-  const at = sent.length ? Math.max(...sent) : ctx.deps.now();
+  const born = sidTime(session.sid) ?? ctx.deps.now();
+  const at = sent.length ? Math.max(...sent) : born;
   return {
     sid: session.sid,
     chatId: session.chatId,
     title: session.title ?? raw(first ? String(first.content).slice(0, MAX_TITLE) : ""),
     titleSource: session.titleSource,
-    createdAt: sent[0] ?? at,
+    createdAt: sent[0] ?? born,
     updatedAt: at,
     origin: originOf(session.origin),
     originContainer: session.origin.container,

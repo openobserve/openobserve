@@ -30,6 +30,13 @@ export const COMPOSER_TIGHT_REM = 20;
 /** Chips shown before `+N` by width: none when narrow, one at 27 rem, three in a full view. */
 export const COMPOSER_WIDE_REM = 40;
 
+/** A strip chip stays 1.5 rem tall but takes 2.75 rem taps on touch and below md; its ✕ stays on top. */
+export const CHIP_HIT_AREA_CLASS = [
+  "max-md:relative max-md:after:absolute max-md:after:inset-x-0 max-md:after:-inset-y-2.5",
+  "pointer-coarse:relative pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2.5",
+  "[&>button]:relative [&>button]:z-1",
+].join(" ");
+
 /** Refused sends the composer counts down on its error row. */
 export const BUSY_CODES: ReadonlySet<string> = new Set(["turn_limit", "rate_limited"]);
 

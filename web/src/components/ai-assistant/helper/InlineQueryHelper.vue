@@ -384,6 +384,7 @@ import type {
   EditorProposal,
   ProposalChecks,
   ProposalChoice,
+  StoredTurn,
 } from "@/composables/assistant/pure";
 import {
   PROPOSAL_LANGUAGE_NAMES,
@@ -398,7 +399,9 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { doorChip, queryChip } from "@/utils/assistant/prompts/format";
 import { formatOrgDay } from "@/utils/formatters";
+import { getUUIDv7 } from "@/utils/uuid";
 
+import { proposalSeedTurn } from "./handoffSeed";
 import { readsAsPlainLanguage } from "./helperText";
 import { useInlineHelperSession, type HelperState } from "./useInlineHelperSession";
 
@@ -1005,8 +1008,10 @@ function resolveConsent(acceptedConsent: boolean): void {
 }
 
 async function handoff(): Promise<void> {
-  const answer = answerOf(view.value);
-  const chips = handoffChips();
+  const proposal = controller.value?.pending.value?.after?.trim() || null;
+  const answer = proposal ? null : answerOf(view.value);
+  const chips = handoffChips(proposal);
+  const prompt = text.value.trim();
   const result = await openAssistant({
     entryKind: "nl_toggle",
     entryVerb: "ask",
@@ -1014,10 +1019,12 @@ async function handoff(): Promise<void> {
     intent: "stage",
     thread: "new",
     container: "auto",
+    ...(proposal && { agent: "generate-query" as const, seed: [proposalSeed(prompt, proposal)] }),
     ...(isDockHostId(hostKey.value) && { dockHost: hostKey.value }),
     invoker: root.value,
     payload: {
-      text: text.value.trim(),
+      // The proposal already answers the prompt, so it titles the chat instead of waiting as a draft.
+      ...(proposal ? { title: raw(prompt) } : { text: prompt }),
       chips,
       ...(answer && { transcript: [{ role: "assistant" as const, text: answer }] }),
     },
@@ -1048,18 +1055,37 @@ function streamChipOf(stream: string): ContextChip {
   });
 }
 
-// The request carries the same Time and Stream the chips show, never the page's own.
+// The page's streams are suppressed, and the wire only adds a stream chip that names its stream as a mention.
 function requestChips(): ContextChip[] {
-  return streams.value.map(streamChipOf);
+  const streamType = inline.value.streamType || "logs";
+  return streams.value.map((stream) => ({
+    ...streamChipOf(stream),
+    ref: { type: "stream", id: stream, org: org.value, stream, streamType },
+    provenance: "mention" as const,
+  }));
 }
 
-function handoffChips(): ContextChip[] {
+function proposalSeed(prompt: string, query: string): StoredTurn {
+  const range = pickerWindow.value;
+  return proposalSeedTurn({
+    turnId: getUUIDv7(),
+    now: Date.now(),
+    prompt,
+    query,
+    language: language.value,
+    ...(streams.value.length === 1 && { stream: streams.value[0] }),
+    range: range && { from: range.from, to: range.to },
+    ...(validated !== "skipped" && { validated: validated === "ok" }),
+  });
+}
+
+function handoffChips(proposal: string | null): ContextChip[] {
   const chips: ContextChip[] = [];
   if (pickerWindow.value) chips.push(timeChipOf(pickerWindow.value, org.value, t));
   chips.push(...streams.value.map(streamChipOf));
-  const current = props.host.getBuffer().trim();
+  const current = proposal ?? props.host.getBuffer().trim();
   const stream = streams.value.length === 1 ? streams.value[0] : undefined;
-  if (current && (accepted.value || modeOf(current) === "edit"))
+  if (current && (proposal || accepted.value || modeOf(current) === "edit"))
     chips.push(
       queryChip(
         {

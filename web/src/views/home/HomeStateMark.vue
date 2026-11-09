@@ -19,20 +19,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="inline-flex size-4 shrink-0 items-center justify-center"
     data-test="home-state-mark"
     :data-bucket="bucket"
+    :data-flapping="flapping ? 'true' : undefined"
   >
-    <span aria-hidden="true" :class="['size-2 rounded-full forced-colors:border', DOT[bucket]]" />
+    <span
+      aria-hidden="true"
+      :class="['size-2 rounded-full forced-colors:border', flapping ? FLAPPING : DOT[bucket]]"
+    />
   </span>
 </template>
 
 <script setup lang="ts">
 import type { OverviewBucket } from "@/composables/contextProviders/types";
 
-defineProps<{ bucket: OverviewBucket }>();
+defineProps<{ bucket: OverviewBucket; flapping?: boolean }>();
 
+// Home lists what needs a look, so a recovered row is a neutral ring and never reads as healthy green (FIX-R7B H4).
 const DOT: Record<OverviewBucket, string> = {
   critical: "bg-service-health-critical",
   degraded: "bg-service-health-warning",
   anomaly: "bg-status-info-text",
-  recovered: "bg-service-health-healthy",
+  recovered: "border-text-secondary border bg-transparent",
 };
+
+const FLAPPING = "bg-service-health-warning";
 </script>

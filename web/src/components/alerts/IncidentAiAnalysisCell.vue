@@ -17,8 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- "AI analysis" cell of the incidents list. A click anywhere in the
      cell opens the incident on its Analysis tab; "Analyze" starts a run instead. -->
 <template>
+  <!-- Wraps instead of spilling into the next column; the table's cut-text tooltip would run its parts together -->
   <div
-    class="group flex min-w-0 cursor-pointer items-center gap-1.5"
+    class="group flex min-w-0 cursor-pointer flex-wrap items-center gap-x-1.5 gap-y-0.5"
+    data-o-tooltip-off
     data-test="incident-ai-analysis-cell"
     @click.stop="emit('open')"
   >
@@ -55,7 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-if="model.detail || model.rerunNote"
         :id="detailId"
-        class="text-text-secondary flex min-w-0 gap-1 truncate text-xs"
+        class="text-text-secondary flex max-w-full min-w-0 gap-1 truncate text-xs"
+        :title="detailTitle"
         data-test="incident-ai-analysis-detail"
       >
         <OTruncatedText v-if="model.detail">{{ model.detail }}</OTruncatedText>
@@ -146,6 +149,11 @@ const model = computed(() =>
     now: props.now,
     timezone: timezone.value,
   }),
+);
+
+// The detail truncates in a narrow column; its full words, spaced, stay one hover away.
+const detailTitle = computed(
+  () => [model.value.detail, model.value.rerunNote].filter(Boolean).join(" · ") || undefined,
 );
 
 const starting = ref(false);

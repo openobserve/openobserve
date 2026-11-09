@@ -176,6 +176,8 @@ export interface ChatDetail extends ChatSummaryWire {
   has_more?: boolean;
   /** Each approval card the chat raised and the server's record of its decision. */
   approvals?: ChatApproval[];
+  /** A fork's or branch's carried turns, which come before the chat's own; `as_of` is microseconds. */
+  seed?: { turns: StoredTurn[]; owner_name?: string; title?: string; as_of?: number };
 }
 
 export interface ChatApproval {
@@ -187,6 +189,33 @@ export interface ChatApproval {
   /** The expiry the server holds now, so a returning tab never counts down a stale one. */
   expires_at?: number;
   user_extends_left?: number;
+  /** The stored `confirmation_required` frame; the turns never hold it, so a reload rebuilds the card from here. */
+  card?: Record<string, unknown>;
+  /** What the stored `confirmation_resolved` says the approve came to; the turn's own copy of that frame lacks it. */
+  resolved?: {
+    outcome?: string;
+    code?: string;
+    detail?: string;
+    scope?: "once" | "chat" | "always";
+    /** Per-target results, when the server stores them; the reducer bounds each one. */
+    items?: unknown[];
+  };
+}
+
+/** One row of the action ledger (`GET /ai/activity`), as far as a chat's records read it. */
+export interface ChatActivityRow {
+  id: string;
+  /** Microseconds. */
+  at: number;
+  target: { type?: string; id?: string | null; name?: string | null };
+  result: { state: string; message?: string };
+  undo: { available: boolean; until?: number; reason?: string };
+  chat_id?: string;
+  undo_of?: string;
+  /** The tool that made the change, e.g. `MuteAlert`. */
+  tool?: string;
+  /** `standing` rows ran under a grant; `grant_id` is absent once that grant was revoked, and `id` is the approval a granted write's live frame names. */
+  approval?: { kind: string; by?: string; id?: string; scope?: string; grant_id?: string };
 }
 
 export interface ChatImportItem {
@@ -287,6 +316,8 @@ const MAX_CHATS_PER_PAGE = 200;
 const MAX_TURNS = 2_000;
 const MAX_FRAMES_PER_TURN = 5_000;
 const MAX_APPROVALS = 500;
+const CHAT_ACTIVITY_PAGE = 200;
+const CHAT_ACTIVITY_PAGES = 5;
 
 const chatSummarySchema = z.object({
   session_id: z.string().min(1).max(128),
@@ -327,11 +358,17 @@ const chatApprovalSchema = z.object({
   status: z.enum(["pending", "approved", "denied", "expired"]),
   expires_at: z.number().optional().catch(undefined),
   user_extends_left: z.number().optional().catch(undefined),
+  card: z.record(z.string(), z.unknown()).nullable().optional().catch(undefined),
   resolved: z
     .object({
       at: z.number().optional().catch(undefined),
       withdrawn: z.boolean().optional().catch(undefined),
       expired: z.boolean().optional().catch(undefined),
+      outcome: z.string().max(32).optional().catch(undefined),
+      code: z.string().max(64).optional().catch(undefined),
+      detail: z.string().max(2_000).optional().catch(undefined),
+      scope: z.enum(["once", "chat", "always"]).optional().catch(undefined),
+      items: z.array(z.unknown()).max(50).optional().catch(undefined),
     })
     .nullable()
     .optional()
@@ -350,6 +387,15 @@ const storedTurnSchema = z.object({
         .max(16)
         .optional()
         .catch(undefined),
+      window: z
+        .object({
+          from: z.number().finite(),
+          to: z.number().finite(),
+          relative: z.string().max(16).optional().catch(undefined),
+        })
+        .optional()
+        .catch(undefined),
+      entry_kind: z.string().max(32).optional().catch(undefined),
     })
     .nullable()
     .catch(null),
@@ -360,6 +406,7 @@ const storedTurnSchema = z.object({
     .optional()
     .catch(undefined),
   error_code: z.string().max(64).nullable().optional().catch(undefined),
+  version_of: z.string().max(128).nullable().optional().catch(undefined),
 });
 
 /** One page of the list, keeping only rows that parse. */
@@ -396,6 +443,7 @@ export function parseChatDetail(data: unknown): ChatDetail {
   const approvals = Array.isArray(body.approvals)
     ? body.approvals.slice(0, MAX_APPROVALS).flatMap(chatApprovalOf)
     : undefined;
+  const seed = seedOf(body.seed);
   return {
     ...(summary as ChatSummaryWire),
     ...(body.not_modified === true && { not_modified: true }),
@@ -406,14 +454,56 @@ export function parseChatDetail(data: unknown): ChatDetail {
     ...(typeof body.partial_from_seq === "number" && { partial_from_seq: body.partial_from_seq }),
     ...(typeof body.has_more === "boolean" && { has_more: body.has_more }),
     ...(approvals && { approvals }),
+    ...(seed && { seed }),
   };
+}
+
+function seedOf(value: unknown): ChatDetail["seed"] | undefined {
+  const body = value as
+    { turns?: unknown; owner_name?: unknown; title?: unknown; as_of?: unknown } | null | undefined;
+  if (!Array.isArray(body?.turns)) return undefined;
+  return {
+    turns: body.turns.slice(-MAX_TURNS).flatMap((turn) => {
+      const parsed = storedTurnSchema.safeParse(turn);
+      return parsed.success ? [parsed.data as StoredTurn] : [];
+    }),
+    ...(typeof body.owner_name === "string" && { owner_name: body.owner_name.slice(0, 256) }),
+    ...(typeof body.title === "string" && body.title && { title: body.title.slice(0, 512) }),
+    ...(typeof body.as_of === "number" && Number.isFinite(body.as_of) && { as_of: body.as_of }),
+  };
+}
+
+// A ledger row of this chat with the fields a record reads; an undo's own row is never one.
+function activityRowOf(row: unknown, sid: string): boolean {
+  if (!row || typeof row !== "object") return false;
+  const value = row as Record<string, unknown>;
+  return (
+    value.chat_id === sid &&
+    !value.undo_of &&
+    typeof value.id === "string" &&
+    typeof value.at === "number" &&
+    !!value.target &&
+    typeof value.target === "object" &&
+    !!value.result &&
+    typeof value.result === "object" &&
+    !!value.undo &&
+    typeof value.undo === "object"
+  );
 }
 
 function chatApprovalOf(value: unknown): ChatApproval[] {
   const parsed = chatApprovalSchema.safeParse(value);
   if (!parsed.success) return [];
-  const { id, resolved, expires_at, user_extends_left } = parsed.data;
+  const { id, resolved, expires_at, user_extends_left, card } = parsed.data;
   const at = resolved?.at;
+  const { outcome, code, detail, scope, items } = resolved ?? {};
+  const decided = {
+    ...(outcome && { outcome }),
+    ...(code && { code }),
+    ...(detail && { detail }),
+    ...(scope && { scope }),
+    ...(items?.length && { items }),
+  };
   const status =
     parsed.data.status !== "denied"
       ? parsed.data.status
@@ -429,6 +519,8 @@ function chatApprovalOf(value: unknown): ChatApproval[] {
       ...(typeof at === "number" && at > 0 && { at }),
       ...(expires_at !== undefined && { expires_at }),
       ...(user_extends_left !== undefined && { user_extends_left }),
+      ...(card?.type === "confirmation_required" && card.id === id && { card }),
+      ...(Object.keys(decided).length && { resolved: decided }),
     },
   ];
 }
@@ -526,6 +618,34 @@ const assistant = {
       { ...KEEPALIVE_REQUEST, timeout },
     );
     return res.data ?? {};
+  },
+
+  /** The ledger rows one chat wrote since `fromMicros`, newest first; the ledger has no chat filter, so pages are read and filtered here. */
+  chatActivity: async (
+    org: string,
+    sid: string,
+    fromMicros: number,
+  ): Promise<ChatActivityRow[]> => {
+    const rows: ChatActivityRow[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < CHAT_ACTIVITY_PAGES; page += 1) {
+      const res = await http().get<{ rows?: unknown; next_cursor?: unknown }>(
+        `/api/${enc(org)}/ai/activity`,
+        {
+          ...ASSISTANT_REQUEST,
+          params: {
+            from: String(fromMicros),
+            limit: String(CHAT_ACTIVITY_PAGE),
+            ...(cursor && { cursor }),
+          },
+        },
+      );
+      const page = Array.isArray(res.data?.rows) ? res.data.rows : [];
+      rows.push(...page.filter((row): row is ChatActivityRow => activityRowOf(row, sid)));
+      cursor = typeof res.data?.next_cursor === "string" ? res.data.next_cursor : undefined;
+      if (!cursor) break;
+    }
+    return rows;
   },
 
   /** Undoes one entry of the server's action ledger. */

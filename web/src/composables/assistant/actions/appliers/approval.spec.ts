@@ -367,6 +367,32 @@ describe("approval applier", () => {
       expect(session.ledger).toEqual([]);
     });
 
+    it("reads the server's real answer, which sends the legacy `results` beside `items`, as skipped", async () => {
+      const { sid, env, session, dispatcher } = withCard(UPDATE);
+      const message = CHANGED.items[0].message;
+      env.confirm.mockResolvedValueOnce({
+        approved: true,
+        kind: "mcp_write",
+        results: [
+          { resource: "High error rate", resource_type: "alert", success: false, detail: message },
+        ],
+        ...CHANGED,
+      });
+      await dispatcher.approvals(sid, {
+        kind: "approval",
+        approvalId: UPDATE.id,
+        decision: { approved: true, scope: "once" },
+      });
+
+      const kept = session.annotations[approvalAnnotationKey(UPDATE.id)];
+      expect(kept.approvalOutcome?.state).toBe("skipped");
+      expect(kept.approvalResult?.items[0]).toMatchObject({
+        status: "skipped",
+        code: "changed_since",
+        before: { threshold: 2.5 },
+      });
+    });
+
     it("reads recheck_failed as skipped with no fresh object", async () => {
       const { sid, env, session, dispatcher } = withCard(UPDATE);
       const message = "Could not check the alert is unchanged before writing. Nothing was changed.";

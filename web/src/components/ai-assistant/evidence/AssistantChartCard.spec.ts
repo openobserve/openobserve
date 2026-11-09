@@ -78,10 +78,7 @@ describe("AssistantChartCard", () => {
     expect(wrapper.get('[data-test="assistant-chart-title"]').text()).toBe("p95");
     expect(wrapper.get('[data-test="assistant-chart-meta"]').text()).toContain("2 series");
     const items = wrapper.findAll('[data-test="assistant-chart-legend-item"]');
-    expect(items.map((item) => item.text())).toEqual([
-      'p95{service="checkout"}1,240',
-      'p95{service="inventory"}412',
-    ]);
+    expect(items.map((item) => item.text())).toEqual(["checkout1,240", "inventory412"]);
     expect(items[0].attributes("data-lead")).toBe("");
     await vi.dynamicImportSettled();
     await flushPromises();

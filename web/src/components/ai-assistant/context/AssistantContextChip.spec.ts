@@ -127,6 +127,18 @@ describe("AssistantContextChip", () => {
     expect(time.find('[data-test="assistant-context-chip-remove"]').exists()).toBe(false);
   });
 
+  it("stays a compact pill on touch, with a 2.75 rem hit area that never grows its box (B-composer-11)", () => {
+    const button = mountChip().get('[data-test="assistant-context-chip-button"]');
+    expect(button.classes()).not.toContain("max-md:min-h-11");
+    expect(button.classes()).not.toContain("pointer-coarse:min-h-11");
+    expect(button.classes()).toEqual(
+      expect.arrayContaining(["pointer-coarse:after:-inset-y-2.5", "max-md:after:-inset-y-2.5"]),
+    );
+    expect(button.classes()).toContain("[&>button]:z-1");
+    const inert = mountChip({ inert: true }).get('[data-test="assistant-context-chip-button"]');
+    expect(inert.classes()).not.toContain("pointer-coarse:after:-inset-y-2.5");
+  });
+
   it("cuts a long label with OTruncatedText, never a title (CT-02 AC 13)", () => {
     const wrapper = mountChip();
     expect(wrapper.find("[title]").exists()).toBe(false);

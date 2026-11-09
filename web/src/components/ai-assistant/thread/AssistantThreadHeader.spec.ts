@@ -39,6 +39,13 @@ const { fake, exporter, track, toast } = vi.hoisted(() => ({
   track: vi.fn(),
   toast: vi.fn(),
 }));
+const { md } = vi.hoisted(() => ({ md: { value: true } }));
+
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const { computed } = await import("vue");
+  const real = (await importOriginal<typeof import("@/composables/useBreakpoint")>()).default;
+  return { default: () => ({ ...real(), mdUp: computed(() => md.value) }) };
+});
 
 vi.mock("@/composables/assistant", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant")>()),
@@ -245,6 +252,15 @@ describe("AssistantThreadHeader", () => {
     expect(newChat).toHaveBeenCalledTimes(1);
   });
 
+  it("moves New chat into the title menu on a phone's Full page, so the title keeps the bar (B-shell3-7)", async () => {
+    md.value = false;
+    const { wrapper, newChat } = await setup({ placement: "full" });
+    expect(wrapper.find('[data-test="assistant-thread-new"]').exists()).toBe(false);
+    await wrapper.get('[data-test="assistant-title-menu-new"]').trigger("click");
+    expect(newChat).toHaveBeenCalledTimes(1);
+    md.value = true;
+  });
+
   it("keeps only the chat's actions in the full view, whose rail is the list", async () => {
     const { wrapper, runs } = await setup({ placement: "full" });
     runs.rows.value = [runRow("a")];
@@ -313,6 +329,8 @@ describe("AssistantThreadHeader", () => {
     expect(wrapper.get(title).attributes("aria-label")).toBe(
       "Checkout 5xx spike, chats and chat actions, 1 other chat needs you",
     );
+    // A phone shows the count on the header button; the title's name still says it (B-shell3-7).
+    expect(mark().classes()).toContain("max-md:hidden");
   });
 
   it("never marks a failed chat", async () => {

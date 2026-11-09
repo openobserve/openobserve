@@ -13,10 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 
+import { shownTurns } from "@/composables/assistant/historyRecords";
+import { projectRecord, type StoredTurn } from "@/composables/assistant/record";
+import { parseChatDetail } from "@/services/assistant";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
 
@@ -147,7 +153,7 @@ describe("AssistantMessage", () => {
     expect(bubble.classes()).toEqual(
       expect.arrayContaining([
         "bg-assistant-user-bg",
-        "rounded-surface",
+        "rounded-[1.125rem]",
         "rounded-ee-default",
         "max-w-[80%]",
         "text-text-body",
@@ -310,6 +316,93 @@ describe("AssistantMessage", () => {
     );
   });
 
+  it("gives a JSON fence the padded chrome and upper-case label the query cards have", () => {
+    const wrapper = mountMessage(answer([{ type: "text", text: '```json\n{"a": 1}\n```' }]));
+    const block = wrapper.get('[data-test="assistant-code-block"]');
+    expect(block.text()).toContain("JSON");
+    expect(block.find("pre").classes().join(" ")).toMatch(/\bp[xs]?-/);
+  });
+
+  it("sets only the opening paragraph as the lead, not the prose after a code fence", () => {
+    const wrapper = mountMessage(
+      answer([{ type: "text", text: "Lead line.\n\n```json\n{}\n```\n\nClosing paragraph." }]),
+    );
+    const parts = wrapper.findAll(
+      '[data-test="assistant-block-text"] > :not([data-test="assistant-code-block"])',
+    );
+    const html = parts.map((part) => part.html());
+    expect(html.filter((h) => h.includes("font-semibold"))).toHaveLength(1);
+    expect(html.find((h) => h.includes("Closing paragraph."))).not.toContain("font-semibold");
+  });
+
+  it("B-conversation-17: sets only the lead sentence semibold, never a callout's paragraph or the rest of the lead paragraph", () => {
+    const text = [
+      "Checkout fails because **inventory** resets connections. The db pool is full at **5xx** peaks.",
+      "",
+      "> **Root cause:** the db pool is exhausted.",
+      "",
+      "> **Next step:** raise the pool size.",
+    ].join("\n");
+    const wrapper = mountMessage(answer([{ type: "text", text }]));
+    const leads = wrapper.findAll('[data-test="assistant-lead"]');
+    expect(leads).toHaveLength(1);
+    expect(leads[0].text()).toBe("Checkout fails because inventory resets connections.");
+    expect(leads[0].classes()).toEqual(expect.arrayContaining(["font-semibold"]));
+    const html = wrapper.get('[data-test="assistant-block-text"]').html();
+    expect(html).not.toMatch(/p:first-child\]:font-semibold/);
+    const callouts = wrapper.findAll("blockquote, [class*='assistant-callout']");
+    for (const callout of callouts)
+      expect(callout.find('[data-test="assistant-lead"]').exists()).toBe(false);
+  });
+
+  it("B-conversation-19: renders same-origin app links as entity links with their type glyph, first mention only", () => {
+    const o = window.location.origin;
+    const text = [
+      `Errors start in [checkout](${o}/web/traces?org_identifier=default&tab=services-catalog&service=checkout), `,
+      `logged to [ta_logs](/web/logs?org_identifier=default&stream_type=logs&stream=ta_logs). `,
+      `See [Checkout board](/web/dashboards/view?org_identifier=default&dashboard=d1) and `,
+      `[checkout_5xx](/web/alerts/detail/a1?org_identifier=default). [checkout](${o}/web/traces?org_identifier=default&tab=services-catalog&service=checkout) again; `,
+      `[settings](/web/settings) is no entity.`,
+    ].join("");
+    const wrapper = mountMessage(answer([{ type: "text", text }]));
+    const links = wrapper.findAll("a[data-entity]");
+    expect(links.map((a) => [a.text(), a.attributes("data-entity")])).toEqual([
+      ["checkout", "service"],
+      ["ta_logs", "stream"],
+      ["Checkout board", "dashboard"],
+      ["checkout_5xx", "alert"],
+    ]);
+    expect(links[1].attributes("href")).toBe(
+      "/web/logs?org_identifier=default&stream_type=logs&stream=ta_logs",
+    );
+    expect(links[0].attributes("target")).toBeUndefined();
+    for (const link of links) expect(link.find("span").classes()).toContain("bg-current");
+    expect(wrapper.findAll("a").map((a) => a.text())).not.toContain("settings");
+  });
+
+  it("drops the navigation link line for a query the answer already shows as a card", () => {
+    const sql = "SELECT service FROM logs WHERE code >= 500 ORDER BY service";
+    const wrapper = mountMessage(
+      answer([
+        {
+          type: "link",
+          link: {
+            resourceType: "logs",
+            action: "load_query",
+            label: "Open in Logs",
+            target: { query: sql, sql_mode: true, stream: "logs", from: 1, to: 2 },
+          },
+        } as never,
+        {
+          type: "text",
+          text: "```sql\nSELECT service\nFROM logs\nWHERE code >= 500\nORDER BY service\n```",
+        },
+      ]),
+    );
+    expect(wrapper.find('[data-test="assistant-query-block"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-link-card"]').exists()).toBe(false);
+  });
+
   it("is aria-busy and streams only its last text block while live (HT-10 AC 3, EB-01 AC 4)", async () => {
     const blocks = [
       { type: "text" as const, text: "first part" },
@@ -363,6 +456,33 @@ describe("AssistantMessage", () => {
     expect(mountMessage(answer(blocks)).get('[data-test="query-stub"]').text()).toBe("SELECT 1");
   });
 
+  it('B-approvals-rca-16: the decided record follows the model\'s "I proposed …" text, as a reloaded chat stores it', () => {
+    const detail = parseChatDetail(
+      JSON.parse(
+        readFileSync(
+          join(
+            __dirname,
+            "../../../composables/assistant/__fixtures__/history/decided-approval.json",
+          ),
+          "utf8",
+        ),
+      ),
+    );
+    const messages = projectRecord(shownTurns(detail, detail.turns as StoredTurn[]), "owner", {
+      timezone: "UTC",
+      approvals: detail.approvals,
+    });
+    registerBlockRenderer(
+      "approval_result",
+      defineComponent({ setup: () => () => h("p", { "data-test": "record-stub" }, "record") }),
+    );
+    const wrapper = mountMessage(messages.find((m) => m.role === "assistant")!);
+    const html = wrapper.html();
+    expect(html.indexOf("I proposed")).toBeGreaterThan(-1);
+    expect(html.indexOf('data-test="record-stub"')).toBeGreaterThan(html.indexOf("I proposed"));
+    expect(wrapper.text()).toContain('tester description v6".');
+  });
+
   it("renders nothing for an outcome block; the transcript places it after the message", () => {
     const wrapper = mountMessage(answer([{ type: "turn_outcome", outcome: { kind: "stopped" } }]));
     expect(wrapper.find('[data-test="assistant-mark"]').exists()).toBe(false);
@@ -380,6 +500,7 @@ describe("AssistantMessage", () => {
     const routes = [
       { path: "/dashboards/view", name: "viewDashboard", component: { render: () => null } },
       { path: "/logout", name: "logout", component: { render: () => null } },
+      { path: "/incidents", name: "incidentList", component: { render: () => null } },
     ];
     const steps: NonNullable<ChatMessage["contentBlocks"]> = [
       { type: "tool_call", tool: "StreamList", call_id: "call_1", stepState: "done" },
@@ -402,6 +523,39 @@ describe("AssistantMessage", () => {
         global: { plugins: [fakeRouter(routes)], provide: evidence.provide },
       });
     };
+
+    it("B-shell3-6: a reloaded door follow-up's stored query card keeps the window its step ran on", async () => {
+      const detail = parseChatDetail(
+        JSON.parse(
+          readFileSync(
+            join(
+              __dirname,
+              "../../../composables/assistant/__fixtures__/history/door-followup.json",
+            ),
+            "utf8",
+          ),
+        ),
+      );
+      const messages = projectRecord(shownTurns(detail, detail.turns as StoredTurn[]), "owner", {
+        timezone: "UTC",
+      });
+      const prompt = messages.findLast((m) => m.role === "user")!;
+      const reply = messages.at(-1)!;
+      expect(prompt.sentWindow).toEqual({ from: 1_794_240_205_000, to: 1_794_241_105_000 });
+      const evidence = fakeEvidence();
+      const wrapper = mount(AssistantMessage, {
+        props: { message: reply, turnId: "t1", turn: evidence.turn({ prompt }) },
+        attachTo: document.body,
+        global: { plugins: [fakeRouter(routes)], provide: evidence.provide },
+      });
+      await flushPromises();
+      const cards = wrapper.findAll('[data-test="assistant-query-block"]');
+      expect(cards).toHaveLength(2);
+      for (const card of cards) {
+        expect(card.text()).not.toContain("range: unknown");
+        expect(card.attributes("aria-label")).not.toContain("range: unknown");
+      }
+    });
 
     it("runs no trail: the steps are rows of the queries line, after the text", () => {
       const wrapper = mountLive([
@@ -500,7 +654,7 @@ describe("AssistantMessage", () => {
 
     it("offers an allowlisted Markdown link as a captioned card and the rest as text", () => {
       const wrapper = mountLive([
-        { type: "text", text: "See [it](/dashboards/view?dashboard=checkout) and [out](/logout)." },
+        { type: "text", text: "See [it](/incidents) and [out](/logout)." },
       ]);
       const card = wrapper.get('[data-test="assistant-link-card"]');
       expect(card.attributes("data-source")).toBe("markdown");

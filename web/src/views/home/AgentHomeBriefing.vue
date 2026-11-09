@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :icon="assistantGlyph.sparkle"
     :label="t('home.agent.briefMe')"
     :sublabel="t('home.agent.briefMeHint')"
-    class="max-w-none! basis-auto"
+    class="max-w-none! flex-none! basis-auto"
     data-test="agent-home-brief-me"
     @click="briefMe"
   />

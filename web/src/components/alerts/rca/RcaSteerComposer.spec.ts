@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
+import { CHIP_HIT_AREA_CLASS } from "@/components/ai-assistant/composer/composerUi";
 import RcaSteerComposer from "./RcaSteerComposer.vue";
 import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
 import { rcaSteeringPaused } from "@/test/unit/fixtures/rcaThread";
@@ -71,6 +72,55 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
         byTest(wrapper, `rca-steer-chip-${id}`).text(),
       ),
     ).toEqual(["Check …", "Ignore …", "Focus on service …", "We changed …"]);
+  });
+
+  it("draws the suggestion chips at full strength, never the dimmed ghost-subtle look of a disabled control", () => {
+    wrapper = mountComposer();
+    const chip = byTest(wrapper, "rca-steer-chip-check");
+
+    expect(chip.classes()).not.toContain("opacity-60");
+    expect(chip.classes()).toEqual(
+      expect.arrayContaining(["bg-surface-subtle!", "text-text-heading!"]),
+    );
+  });
+
+  it("B-composer-9: a chip that does not fit on the one row is hidden whole, never cut under ⓘ", async () => {
+    const top = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.dataset.chip === "changed" ? 32 : 0;
+    });
+    const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(24);
+    wrapper = mountComposer();
+    await flushPromises();
+
+    const row = byTest(wrapper, "rca-steer-chips");
+    expect(row.classes()).toEqual(expect.arrayContaining(["flex-wrap", "h-6", "overflow-hidden"]));
+    expect(byTest(wrapper, "rca-steer-chip-changed").classes()).toContain("invisible");
+    expect(byTest(wrapper, "rca-steer-chip-focus").classes()).not.toContain("invisible");
+    top.mockRestore();
+    height.mockRestore();
+  });
+
+  it("B-composer-16: on touch each chip takes the composer chips' 44 px hit area, inside the row's clip", async () => {
+    const top = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.dataset.chip === "changed" ? 50 : 10;
+    });
+    const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(24);
+    wrapper = mountComposer();
+    await flushPromises();
+
+    for (const part of CHIP_HIT_AREA_CLASS.split(" "))
+      expect(byTest(wrapper, "rca-steer-chip-ignore").classes()).toContain(part);
+    expect(byTest(wrapper, "rca-steer-chips").classes()).toEqual(
+      expect.arrayContaining(["max-md:h-11", "max-md:py-2.5", "pointer-coarse:py-2.5"]),
+    );
+    expect(byTest(wrapper, "rca-steer-chip-ignore").classes()).not.toContain("invisible");
+    expect(byTest(wrapper, "rca-steer-chip-changed").classes()).toContain("invisible");
+    top.mockRestore();
+    height.mockRestore();
   });
 
   it("puts 'Sending as … visible to everyone' in the ⓘ popover, not under the field", async () => {

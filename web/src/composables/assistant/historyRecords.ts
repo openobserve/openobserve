@@ -15,12 +15,13 @@
 
 import { toRaw } from "vue";
 
-import type {
-  ChatApproval,
-  ChatDetail,
-  ChatsPage,
-  ChatSummaryWire,
-  ConfirmResponse,
+import assistant, {
+  type ChatActivityRow,
+  type ChatApproval,
+  type ChatDetail,
+  type ChatsPage,
+  type ChatSummaryWire,
+  type ConfirmResponse,
 } from "@/services/assistant";
 import {
   assistantChatQuery,
@@ -30,14 +31,20 @@ import {
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
 
-import { approvalAnnotationKey } from "./actions/appliers/approval";
+import { approvalAnnotationKey, MAX_LEDGER } from "./actions/appliers/approval";
+import { approvalVerb } from "./approvalAnatomy";
 import { toAssistantError } from "./assistantErrors";
+import { periodMs } from "./context/contextChips";
+import { turnAnnotationKey } from "./evidence";
 import type { AdoptInit } from "./assistantStore";
 import type {
+  ActionLedgerEntry,
   ApprovalOutcome,
+  ApprovalResultItem,
   BlockAnnotation,
   BranchedFromRef,
   EntryOrigin,
+  ForkSeed,
   SessionOrigin,
   Sid,
 } from "./assistantStore.types";
@@ -68,6 +75,24 @@ const RECORDED_STATUS: Partial<
   expired: "expired",
   withdrawn: "withdrawn",
 };
+
+const CLOSING_FRAMES: ReadonlySet<unknown> = new Set(["follow_ups", "usage", "complete"]);
+
+const LEDGER_OPS: ReadonlySet<string> = new Set(["create", "update", "delete", "run_command"]);
+
+const LEDGER_STATES: ReadonlySet<string> = new Set(["done", "failed", "undone"]);
+
+// The relative windows Home asks over, so a reopened Home chat keeps "Last 24 h" rather than a fixed span.
+const HOME_PERIODS = ["15m", "1h", "6h", "24h", "7d"] as const;
+
+// A ledger row is written after the approve it follows; this covers a server clock a little behind the browser's.
+const DECISION_SLACK_MS = 60_000;
+
+// A step that may have written; a reopened chat reads its ledger only then, since a standing grant leaves no card.
+const WRITE_STEP =
+  /^(o2_)?(create|update|delete|set|enable|disable|mute|unmute|cancel|pause|resume|snooze|silence)/i;
+
+const GRANT_SCOPES: ReadonlySet<string> = new Set(["chat", "always"]);
 
 export type HistoryRecords = ReturnType<typeof createHistoryRecords>;
 
@@ -103,8 +128,9 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
     const cached = await readLocal(sid, ctx);
     guard();
     if (cached && browserOnly(cached, sid, org, ctx)) return openLocal(sid);
+    // A `not_modified` answer carries no turns, so only a copy that holds them may claim to be current.
     const known =
-      cached?.cachedLastSeq !== undefined
+      cached?.cachedLastSeq !== undefined && cached.turns
         ? { seq: cached.cachedLastSeq, version: cached.cachedStateVersion }
         : undefined;
     const chatQuery = assistantChatQuery(org, sid, known);
@@ -115,7 +141,15 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
     try {
       detail = await deps.queryClient.fetchQuery({ ...chatQuery, staleTime: 0 });
       if (fromBrowser && cached?.turns) {
-        detail = mergeChatDetail({ ...detail, turns: cached.turns }, detail);
+        detail = mergeChatDetail(
+          {
+            ...detail,
+            turns: cached.turns,
+            ...(cached.cachedSeed && { seed: cached.cachedSeed }),
+            ...(cached.cachedApprovals && { approvals: cached.cachedApprovals }),
+          },
+          detail,
+        );
         deps.queryClient.setQueryData(chatQuery.queryKey, detail);
       }
     } catch (err) {
@@ -139,7 +173,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
       ? cached.messages
       : withRecordedApprovals(
           withCachedCards(
-            projectRecord(patchCards(turns, cached?.turns), "owner", {
+            projectRecord(shownTurns(detail, patchCards(turns, cached?.turns)), "owner", {
               ...ownerOptions(ctx),
               ...(detail.approvals && { approvals: detail.approvals }),
             }),
@@ -149,6 +183,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
           ),
           annotations,
         );
+    markCarried(messages, detail);
     const turnId = detail.active_turn
       ? runningTurnOf(detail, cached?.messages)
       : detail.pending_approval
@@ -171,13 +206,18 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
         forkedFromShare: detail.forked_from_share ?? null,
         branchedFrom: branchedFromOf(detail.branched_from),
         pinned: detail.pinned ?? cached?.pinned ?? false,
+        ...forkSeedField(detail, cached),
       },
     });
     ctx.turnsBySid.set(sid, turns);
+    keepHomeWindow(sid, detail, messages, annotations, ctx);
+    void restoreLedger(sid, org, detail.created_at, guard, ctx);
     void writeCache(sid, ctx, {
       ...(settled && { cachedLastSeq: detail.last_committed_seq }),
       ...(detail.state_version && { cachedStateVersion: detail.state_version }),
       turns,
+      ...(detail.seed && { cachedSeed: detail.seed }),
+      ...(detail.approvals && { cachedApprovals: detail.approvals }),
     });
     if (detail.active_turn)
       elsewhereHooks.mark?.(sid, {
@@ -231,6 +271,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
     async save(sid: Sid): Promise<"server" | "local" | "not_saved"> {
       return saveSession(sid, ctx);
     },
+    joinGrantedLedger: (sid: Sid) => joinGrantedLedger(sid, ctx),
     notSaved: (sid: Sid | null) => !!sid && ctx.notSavedSids.has(sid),
     deletedNotice: ctx.deletedNotice,
     clearDeletedNotice: () => {
@@ -260,6 +301,134 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
   };
 
   return { api, hooks: elsewhereHooks, openServer, openLocal };
+}
+
+/** The ledger entries a reopened chat's approved writes made, matched to their cards by chat, target and time, with the server's id so Undo works again. */
+export function ledgerFromActivity(
+  messages: readonly ChatMessage[],
+  rows: readonly ChatActivityRow[],
+): ActionLedgerEntry[] {
+  const used = new Set<string>();
+  const byTime = [...rows].sort((a, b) => a.at - b.at);
+  return approvedWrites(messages).flatMap(({ card, at, turnId }) =>
+    (card.targets ?? []).flatMap((target) => {
+      const row = byTime.find(
+        (candidate) =>
+          !used.has(candidate.id) &&
+          candidate.at / 1000 >= at - DECISION_SLACK_MS &&
+          (target.id ? candidate.target.id === target.id : candidate.target.name === target.name),
+      );
+      if (!row || !LEDGER_STATES.has(row.result.state)) return [];
+      used.add(row.id);
+      return [ledgerEntryOf(row, card, turnId, target)];
+    }),
+  );
+}
+
+/** The records of writes a standing grant let run, rebuilt from their ledger rows after the gated step, since the live frame is never stored; returns their ledger entries. */
+export function withGrantedRecords(
+  messages: ChatMessage[],
+  rows: readonly ChatActivityRow[],
+): ActionLedgerEntry[] {
+  const shown = new Set(
+    messages.flatMap((m) => (m.contentBlocks ?? []).map((block) => block.resolved?.id)),
+  );
+  const taken = new Set<ContentBlock>();
+  const byTime = [...rows].sort((a, b) => a.at - b.at);
+  return byTime.flatMap((row) => {
+    const id = `grant_${row.id}`;
+    if (row.approval?.kind !== "standing" || !row.tool || shown.has(id)) return [];
+    const place = grantedStepOf(messages, row, taken);
+    if (!place) return [];
+    taken.add(place.step);
+    const card = grantedCardOf(row, id);
+    const target = card.targets[0];
+    const blocks = place.answer.contentBlocks!;
+    blocks.splice(blocks.indexOf(place.step) + 1, 0, {
+      type: "approval_result",
+      resolved: {
+        id,
+        approved: true,
+        by: "grant",
+        at: Math.floor(row.at / 1000),
+        ...(GRANT_SCOPES.has(row.approval.scope ?? "") && {
+          scope: row.approval.scope as "chat" | "always",
+        }),
+        ...(row.result.state === "failed" && {
+          outcome: "failed" as const,
+          ...(row.result.message && { detail: row.result.message }),
+        }),
+        grant: {
+          tool: card.tool,
+          operation: card.kind,
+          targets: card.targets,
+          ...(row.approval.grant_id && { id: row.approval.grant_id }),
+        },
+      },
+    });
+    return LEDGER_STATES.has(row.result.state)
+      ? [ledgerEntryOf(row, card, place.turnId, target)]
+      : [];
+  });
+}
+
+/** The ledger entries of writes a standing grant let run in this tab, by the approval id their frame and ledger row share. */
+export function grantedLedger(
+  messages: readonly ChatMessage[],
+  rows: readonly ChatActivityRow[],
+): ActionLedgerEntry[] {
+  let turnId = "";
+  return messages.flatMap((message) => {
+    if (message.role === "user") turnId = message.turnId ?? "";
+    if (message.role !== "assistant") return [];
+    return (message.contentBlocks ?? []).flatMap((block) => {
+      const resolved = block.resolved;
+      if (resolved?.by !== "grant" || !resolved.approved || !resolved.grant) return [];
+      const row = rows.find(
+        (candidate) =>
+          candidate.approval?.kind === "standing" && candidate.approval.id === resolved.id,
+      );
+      if (!row || !LEDGER_STATES.has(row.result.state)) return [];
+      const card = grantedCardOf(row, resolved.id);
+      return [ledgerEntryOf(row, card, turnId, card.targets[0])];
+    });
+  });
+}
+
+// A granted write's frame comes before the call runs, so its ledger row is read once the answer ends.
+export async function joinGrantedLedger(sid: Sid, ctx: HistoryCtx): Promise<void> {
+  const shown = ctx.session(sid);
+  if (!shown?.org) return;
+  const joined = new Set(shown.ledger.map((entry) => entry.approvalId));
+  const since = grantedSince(shown.messages, joined);
+  if (since === null) return;
+  try {
+    const rows = await assistant.chatActivity(shown.org, sid, since);
+    const session = ctx.session(sid);
+    if (!session) return;
+    const kept = new Set(session.ledger.map(ledgerTargetKey));
+    const added = grantedLedger(session.messages, rows).filter(
+      (entry) => !kept.has(ledgerTargetKey(entry)),
+    );
+    if (!added.length) return;
+    session.ledger = [...session.ledger, ...added].sort((a, b) => a.at - b.at).slice(-MAX_LEDGER);
+  } catch {
+    // Without its ledger row the record still reads right; only Undo stays away.
+  }
+}
+
+/** The stored resolution names no target, so a reopened record reads each target's result from its ledger row. */
+export function withTargetResults(
+  messages: ChatMessage[],
+  entries: readonly ActionLedgerEntry[],
+): void {
+  for (const message of messages)
+    for (const block of message.contentBlocks ?? []) {
+      const resolved = block.resolved;
+      if (!resolved || resolved.items?.length) continue;
+      const items = entries.filter((entry) => entry.approvalId === resolved.id).map(resultItemOf);
+      if (items.length) block.resolved = { ...resolved, items };
+    }
 }
 
 /** C1 `branched_from` of a stored chat; null on any other chat or a malformed value. */
@@ -299,6 +468,17 @@ export function patchCards(turns: StoredTurn[], cached: LocalTurn[] | undefined)
     });
     return { ...turn, frames };
   });
+}
+
+/** The turns a chat read shows: a branch's carried turns first, then its own with each pending card the turns never stored. */
+export function shownTurns(
+  detail: Pick<ChatDetail, "turns" | "seed" | "branched_from" | "approvals" | "active_turn_id">,
+  turns: StoredTurn[] = detail.turns ?? [],
+): StoredTurn[] {
+  const own = withPendingCards(withDecidedCards(turns, detail.approvals), detail);
+  // A share fork shows its seed above the divider instead; a branch continues it as its own turns.
+  const carried = detail.branched_from ? (detail.seed?.turns ?? []) : [];
+  return carried.length ? [...carried, ...own] : own;
 }
 
 /** The running turn's id: the server's marker when it sends one, else its running stored turn, else this browser's last prompt. */
@@ -417,6 +597,299 @@ export function withCachedCards(
     }
   }
   return messages;
+}
+
+// `forked_from_share` is the share's id, not its token, and a server-held seed outlives the share, so it carries no token to probe.
+function forkSeedField(
+  detail: Pick<ChatDetail, "seed" | "forked_from_share" | "title">,
+  cached: LocalRecord | null | undefined,
+): { seed?: ForkSeed } {
+  if (!detail.forked_from_share || !detail.seed) return cached?.seed ? { seed: cached.seed } : {};
+  return {
+    seed: {
+      title: detail.seed.title ?? cached?.seed?.title ?? detail.title,
+      ownerName: detail.seed.owner_name ?? cached?.seed?.ownerName ?? "",
+      asOf: detail.seed.as_of ? detail.seed.as_of / 1000 : (cached?.seed?.asOf ?? 0),
+      turns: detail.seed.turns,
+      ...(cached?.seed?.redacted && { redacted: true }),
+      ...(cached?.seed?.hidden && { hidden: cached.seed.hidden }),
+    },
+  };
+}
+
+function markCarried(messages: ChatMessage[], detail: Pick<ChatDetail, "seed" | "branched_from">) {
+  if (!detail.branched_from) return;
+  const carried = new Set(detail.seed?.turns.map((turn) => turn.turn_id) ?? []);
+  for (const message of messages)
+    if (message.role === "user" && message.turnId && carried.has(message.turnId))
+      message.carried = true;
+}
+
+// Today's server keeps a card only in its approval row, so the turn waiting on it gets the card back before its closing frames.
+function withPendingCards(
+  turns: StoredTurn[],
+  detail: Pick<ChatDetail, "approvals" | "active_turn_id">,
+): StoredTurn[] {
+  const target = detail.active_turn_id ?? turns.at(-1)?.turn_id;
+  if (!target) return turns;
+  const stored = new Set(
+    turns.flatMap((turn) => turn.frames.filter(isCardFrame).map((frame) => frame?.id)),
+  );
+  const cards = (detail.approvals ?? []).flatMap((row) =>
+    row.status === "pending" && row.card && !stored.has(row.id) ? [row.card] : [],
+  );
+  if (!cards.length) return turns;
+  return turns.map((turn) => {
+    if (turn.turn_id !== target) return turn;
+    let at = turn.frames.length;
+    while (at > 0 && CLOSING_FRAMES.has(turn.frames[at - 1]?.type)) at -= 1;
+    return { ...turn, frames: [...turn.frames.slice(0, at), ...cards, ...turn.frames.slice(at)] };
+  });
+}
+
+// A decided row's card goes back before the call it gated, its resolution right after it with what the approve came to, as the live stream showed them.
+function withDecidedCards(
+  turns: StoredTurn[],
+  approvals: readonly ChatApproval[] | undefined,
+): StoredTurn[] {
+  const decided = (approvals ?? []).filter((row) => row.status !== "pending" && row.card);
+  if (!decided.length) return turns;
+  return turns.map((turn) => {
+    let frames = turn.frames;
+    for (const row of decided) frames = placeDecided(frames, row);
+    return frames === turn.frames ? turn : { ...turn, frames };
+  });
+}
+
+function placeDecided(frames: any[], row: ChatApproval): any[] {
+  const isResolution = (f: any) => f?.type === "confirmation_resolved" && f.id === row.id;
+  const resolvedAt = frames.findIndex(isResolution);
+  const gatedAt = frames.findIndex((f) => f?.type === "tool_result" && f.approval_id === row.id);
+  if (resolvedAt < 0 && gatedAt < 0) return frames;
+  const resolution = Object.assign({}, ...frames.filter(isResolution), resolutionOf(row));
+  const rest = frames.filter((f) => !isResolution(f));
+  const cardAt = rest.findIndex((f) => f?.type === "confirmation_required" && f.id === row.id);
+  if (cardAt >= 0) {
+    rest.splice(cardAt + 1, 0, resolution);
+    return rest;
+  }
+  const gated = (f: any) => f?.type === "tool_result" && f.approval_id === row.id;
+  const at = rest.findIndex(gated);
+  const last = rest.findLastIndex(gated);
+  // A gathered card gates one call per target; its record goes after them all, so the proposal text follows it.
+  const anchor = at < 0 ? resolvedAt : last > at ? last + 1 : at;
+  rest.splice(anchor, 0, row.card, resolution);
+  return rest;
+}
+
+// The row's decision as a `confirmation_resolved` frame; the turn's own copy only says approved or not.
+function resolutionOf(row: ChatApproval): Record<string, unknown> {
+  const status = row.status;
+  return {
+    type: "confirmation_resolved",
+    id: row.id,
+    approved: status === "approved",
+    ...(row.at !== undefined && { at: row.at }),
+    ...(status === "expired" && { expired: true }),
+    ...(status === "withdrawn" && { withdrawn: true }),
+    ...row.resolved,
+  };
+}
+
+// Reads the chat's ledger rows after the chat shows, so a slow or refused read never holds the record back.
+async function restoreLedger(
+  sid: Sid,
+  org: string,
+  createdAt: number,
+  guard: () => void,
+  ctx: HistoryCtx,
+): Promise<void> {
+  const shown = ctx.session(sid);
+  if (!shown || !(approvedWrites(shown.messages).length || hasWriteStep(shown.messages))) return;
+  try {
+    const rows = await assistant.chatActivity(org, sid, Math.max(0, createdAt));
+    guard();
+    const session = ctx.session(sid);
+    if (!session) return;
+    const found = [
+      ...ledgerFromActivity(session.messages, rows),
+      ...withGrantedRecords(session.messages, rows),
+    ];
+    withTargetResults(session.messages, found);
+    const kept = new Set(session.ledger.map(ledgerTargetKey));
+    const added = found.filter((entry) => !kept.has(ledgerTargetKey(entry)));
+    if (!added.length) return;
+    session.ledger = [...session.ledger, ...added].sort((a, b) => a.at - b.at).slice(-MAX_LEDGER);
+  } catch {
+    // Without the ledger the records still read right; only Undo stays away.
+  }
+}
+
+// A Home chat asks over Home's relative window, which no page supplies once the chat is reopened.
+function keepHomeWindow(
+  sid: Sid,
+  detail: Pick<ChatDetail, "origin" | "turns">,
+  messages: readonly ChatMessage[],
+  annotations: Record<string, BlockAnnotation>,
+  ctx: HistoryCtx,
+): void {
+  const session = ctx.session(sid);
+  if (!session || session.composer.timeOverride) return;
+  const prompts = messages.filter((m) => m.role === "user" && !m.carried && m.turnId);
+  const first = prompts[0];
+  const last = prompts.at(-1);
+  if (!first || !last) return;
+  const windowOf = (m: ChatMessage) => annotations[turnAnnotationKey(m.turnId!, "window")];
+  // A `not_modified` read carries no `origin`, but the cached first turn still says where it was asked.
+  const firstEntry = detail.turns?.find((turn) => turn.turn_id === first.turnId)?.user?.entry_kind;
+  const fromHome = detail.origin === "home" || firstEntry === "home_launcher";
+  if (!fromHome && !windowOf(first)?.homeDefaultWindow) return;
+  const asked = windowOf(last)?.window ?? last.sentWindow;
+  if (!asked || !(asked.to > asked.from)) return;
+  const period =
+    HOME_PERIODS.find((p) => p === last.sentWindow?.period) ??
+    HOME_PERIODS.find((p) => periodMs(p) === asked.to - asked.from);
+  ctx.deps.store().setTimeOverride(sid, { ...asked, ...(period && { period }) });
+}
+
+// One entry per approval and target, so a reload adds each target this browser has no entry for.
+function ledgerTargetKey(entry: ActionLedgerEntry): string {
+  return `${entry.approvalId}\u0000${entry.resource.id ?? entry.resource.name}`;
+}
+
+function resultItemOf(entry: ActionLedgerEntry): ApprovalResultItem {
+  const failed = entry.status === "failed";
+  return {
+    type: entry.resource.type,
+    name: entry.resource.name,
+    ...(entry.resource.id && { id: entry.resource.id }),
+    status: failed ? "failed" : "done",
+    ...(failed && entry.reason && { message: entry.reason }),
+    ledgerId: entry.id,
+    ...(entry.undoable && { undoable: true }),
+  };
+}
+
+// Each approved write card with its decision time and turn, in transcript order.
+function approvedWrites(
+  messages: readonly ChatMessage[],
+): { card: ApprovalBlockData; at: number; turnId: string }[] {
+  let turnId = "";
+  return messages.flatMap((message) => {
+    if (message.role === "user") turnId = message.turnId ?? "";
+    const blocks = message.role === "assistant" ? (message.contentBlocks ?? []) : [];
+    return blocks.flatMap((block) => {
+      const card = block.approval;
+      const resolved = card && blocks.find((b) => b.resolved?.id === card.id)?.resolved;
+      if (!card || !resolved?.approved || !LEDGER_OPS.has(card.kind)) return [];
+      return [{ card, at: resolved.at ?? 0, turnId }];
+    });
+  });
+}
+
+// Microseconds to read the ledger from: the earliest granted record with no entry yet, else null.
+function grantedSince(
+  messages: readonly ChatMessage[],
+  joined: ReadonlySet<string>,
+): number | null {
+  const times = messages.flatMap((message) =>
+    (message.contentBlocks ?? []).flatMap((block) => {
+      const resolved = block.resolved;
+      const open = resolved?.by === "grant" && resolved.approved && !joined.has(resolved.id);
+      return open ? [resolved.at ?? Date.now()] : [];
+    }),
+  );
+  return times.length ? Math.max(0, Math.min(...times) - DECISION_SLACK_MS) * 1000 : null;
+}
+
+function hasWriteStep(messages: readonly ChatMessage[]): boolean {
+  return messages.some((m) =>
+    (m.contentBlocks ?? []).some(
+      (block) => block.type === "tool_call" && WRITE_STEP.test(String(block.tool ?? "")),
+    ),
+  );
+}
+
+// The step a standing write ran in: its tool's first unclaimed step in the latest turn asked before the write.
+function grantedStepOf(
+  messages: ChatMessage[],
+  row: ChatActivityRow,
+  taken: ReadonlySet<ContentBlock>,
+): { answer: ChatMessage; step: ContentBlock; turnId: string } | null {
+  const tool = normalTool(row.tool ?? "");
+  const writtenAt = row.at / 1000 + DECISION_SLACK_MS;
+  let found: { answer: ChatMessage; step: ContentBlock; turnId: string } | null = null;
+  let asker: ChatMessage | null = null;
+  for (const message of messages) {
+    if (message.role === "user") {
+      asker = message;
+      continue;
+    }
+    const turnId = asker?.turnId ?? "";
+    if ((asker?.sentAt ?? 0) > writtenAt) continue;
+    const step = (message.contentBlocks ?? []).find(
+      (block) =>
+        block.type === "tool_call" && !taken.has(block) && normalTool(String(block.tool)) === tool,
+    );
+    if (step) found = { answer: message, step, turnId };
+  }
+  return found;
+}
+
+function normalTool(tool: string): string {
+  return tool.replace(/^o2_/i, "").toLowerCase();
+}
+
+// The card a granted write would have had; its kind comes from the tool, as the ledger row names no operation.
+function grantedCardOf(row: ChatActivityRow, id: string): ApprovalBlockData {
+  const tool = (row.tool ?? "").replace(/^o2_/i, "");
+  const kind = /^create/i.test(tool) ? "create" : /^delete/i.test(tool) ? "delete" : "update";
+  const name = row.target.name || row.target.id || tool;
+  return {
+    id,
+    kind,
+    destructive: kind === "delete",
+    operation: kind,
+    tool,
+    targets: [
+      {
+        type: (row.target.type || "object").toLowerCase(),
+        name,
+        ...(row.target.id && { id: row.target.id }),
+      },
+    ],
+    grantable: false,
+    editable: false,
+    question: "",
+    typed: true,
+  };
+}
+
+function ledgerEntryOf(
+  row: ChatActivityRow,
+  card: ApprovalBlockData,
+  turnId: string,
+  target: ApprovalBlockData["targets"][number],
+): ActionLedgerEntry {
+  const status = row.result.state as ActionLedgerEntry["status"];
+  const verb = approvalVerb(card);
+  return {
+    id: row.id,
+    approvalId: card.id,
+    turnId,
+    tool: card.tool,
+    op: card.kind as ActionLedgerEntry["op"],
+    ...(verb && { verb }),
+    resource: {
+      type: row.target.type || target.type,
+      name: row.target.name || target.name,
+      ...((row.target.id || target.id) && { id: (row.target.id || target.id)! }),
+    },
+    status,
+    undoable: status === "done" && row.undo.available,
+    at: Math.floor(row.at / 1000),
+    ...(status === "failed" && row.result.message && { reason: row.result.message }),
+  };
 }
 
 function isCardFrame(frame: any): boolean {

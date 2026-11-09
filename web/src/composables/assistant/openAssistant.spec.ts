@@ -15,6 +15,7 @@
 
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
+import { proposalSeedTurn } from "@/components/ai-assistant/helper/handoffSeed";
 import { raw } from "@/types/i18n";
 
 import { createAssistantStore, inertAssistantDeps } from "./assistantStore";
@@ -28,6 +29,7 @@ import type {
   OpenAssistantResult,
   PendingApproval,
 } from "./assistantStore.types";
+import { agentRequestOf, currentAgent, nextAgent } from "./agents";
 import { wireContextOf } from "./context/serialize";
 import type { ContextChip } from "./context/types";
 import { createDraftStore } from "./drafts";
@@ -40,6 +42,7 @@ import {
   type OpenAssistantEnv,
 } from "./openAssistant";
 import { resetPrefsForTests } from "./prefs";
+import { projectRecord } from "./record";
 import type { TurnTerminal } from "./turnStates";
 
 const DONE: TurnTerminal = { state: "done", saved: "server" };
@@ -778,6 +781,45 @@ describe("openAssistant: door default agent (MULTI-AGENT-06)", () => {
     expect(h.store.state.sessions[sid].agentId).toBe("sre");
   });
 
+  it("gives a helper hand-off its agent even though the door seeds the answer into the new chat", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const { sid } = ok(
+      await h.open({
+        ...headerOpen,
+        entryKind: "nl_toggle",
+        intent: "stage",
+        thread: "new",
+        agent: "generate-query",
+        payload: { chips: [], transcript: [{ role: "assistant", text: "```sql\nSELECT 1\n```" }] },
+      }),
+    );
+    expect(h.store.state.sessions[sid].messages).toHaveLength(1);
+    expect(nextAgent(h.store.state.sessions[sid])).toBe("generate-query");
+  });
+
+  it("stamps a seeded answer with its agent, so the chat holds that agent and no switch is pending", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const { sid } = ok(
+      await h.open({
+        ...headerOpen,
+        entryKind: "nl_toggle",
+        intent: "stage",
+        thread: "new",
+        agent: "generate-query",
+        payload: {
+          chips: [],
+          transcript: [{ role: "assistant", text: "SELECT 1", agent: "generate-query" }],
+        },
+      }),
+    );
+    const session = h.store.state.sessions[sid];
+    expect(session.messages[0].agentId).toBe("generate-query");
+    expect(currentAgent(session)).toBe("generate-query");
+    expect(session.nextAgentId).toBeUndefined();
+  });
+
   it("opens an editor door in its dock with the query builder agent", async () => {
     const h = setup({ mounted: ["alert_query"] });
     h.store.syncCapability({ ...capability, agents: ROSTER });
@@ -848,5 +890,96 @@ describe("openAssistant: door default agent (MULTI-AGENT-06)", () => {
     const h = setup();
     const { sid } = ok(await h.open(explain({ intent: "stage", agent: "sre" })));
     expect(h.store.state.sessions[sid].agentId).toBeUndefined();
+  });
+});
+
+describe("openAssistant: a door's seeded answer is stored on the server (B-shell2-2)", () => {
+  const ROSTER: CapabilityAgent[] = [
+    { id: "o2-ai", pickable: true, available: true },
+    { id: "generate-query", pickable: true, available: true },
+  ];
+  const seedTurn = proposalSeedTurn({
+    turnId: "0190f3a0-0000-7000-8000-00000000abcd",
+    now: 1_700_000_000_000,
+    prompt: "count the logs per service",
+    query: "SELECT service, count(*) FROM logs GROUP BY service",
+    language: "sql",
+    stream: "logs",
+    range: { from: 1_700_000_000_000, to: 1_700_000_900_000 },
+    validated: true,
+  });
+  const handoff = (seed = [seedTurn]): OpenAssistantCall => ({
+    ...headerOpen,
+    entryKind: "nl_toggle",
+    intent: "stage",
+    thread: "new",
+    agent: "generate-query",
+    seed,
+    payload: { chips: [], title: raw("count the logs per service") },
+  });
+
+  it("posts the new chat's id, title, agent and seed turn so a reload keeps them", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const seedChat = vi.fn().mockResolvedValue({});
+    const open = createOpenAssistant({ ...h.env, seedChat });
+    const { sid } = ok(await open(handoff()));
+    expect(seedChat).toHaveBeenCalledTimes(1);
+    expect(seedChat).toHaveBeenCalledWith("org1", {
+      session_id: sid,
+      title: "count the logs per service",
+      agent_type: "generate-query",
+      origin: "nl_toggle",
+      turns: [seedTurn],
+    });
+  });
+
+  it("shows the seed as the server's copy reads back: the question, then a Query builder SQL card with its range", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const open = createOpenAssistant({ ...h.env, seedChat: vi.fn().mockResolvedValue({}) });
+    const { sid } = ok(await open(handoff()));
+    const messages = h.store.state.sessions[sid].messages;
+    expect(messages).toEqual(
+      projectRecord([seedTurn], "owner", { timezone: "", scrubModels: false }),
+    );
+    expect(messages[0]).toMatchObject({ role: "user", turnId: seedTurn.turn_id });
+    expect(String(messages[0].content)).toBe("count the logs per service");
+    const query = messages[1].contentBlocks?.find((block) => block.type === "query")?.query;
+    expect(query).toMatchObject({
+      stream: "logs",
+      from: 1_700_000_000_000,
+      to: 1_700_000_900_000,
+      validated: true,
+    });
+    expect(currentAgent(h.store.state.sessions[sid])).toBe("generate-query");
+  });
+
+  it("sends its first turn to the seeded chat's agent, since the server routes a turn without one to the default", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const open = createOpenAssistant({ ...h.env, seedChat: vi.fn().mockResolvedValue({}) });
+    const { sid } = ok(await open(handoff()));
+    expect(agentRequestOf(h.store.state.sessions[sid], ROSTER)).toEqual({
+      agent: "generate-query",
+    });
+  });
+
+  it("keeps the seeded chat in this tab when the server cannot store it", async () => {
+    const h = setup();
+    const seedChat = vi.fn().mockRejectedValue(new Error("404"));
+    const open = createOpenAssistant({ ...h.env, seedChat });
+    const { sid } = ok(await open(handoff()));
+    await Promise.resolve();
+    expect(h.store.state.sessions[sid].messages).toHaveLength(2);
+  });
+
+  it("posts nothing for a door without a seed or into a chat that already existed", async () => {
+    const h = setup();
+    const seedChat = vi.fn().mockResolvedValue({});
+    const open = createOpenAssistant({ ...h.env, seedChat });
+    ok(await open({ ...handoff(), seed: undefined }));
+    ok(await open({ ...handoff([]), thread: "current" }));
+    expect(seedChat).not.toHaveBeenCalled();
   });
 });

@@ -208,18 +208,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </article>
       <slot name="cards" />
     </section>
-    <OButton
+    <div
       v-if="jumpShown"
-      variant="outline"
-      size="sm"
-      :icon-left="assistantGlyph.jumpToLatest"
-      :aria-label="jumpName"
-      class="bg-surface-base absolute bottom-3 left-1/2 -translate-x-1/2 shadow-md max-md:min-h-11 pointer-coarse:min-h-11"
-      data-test="assistant-transcript-jump-latest"
-      @click="jumpToLatest"
+      class="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center"
+      data-test="assistant-transcript-jump-row"
     >
-      {{ jumpLabel }}
-    </OButton>
+      <OButton
+        variant="outline"
+        size="sm"
+        :icon-left="assistantGlyph.jumpToLatest"
+        :aria-label="jumpName"
+        class="bg-surface-base! pointer-events-auto shadow-md max-md:min-h-11 pointer-coarse:min-h-11"
+        data-test="assistant-transcript-jump-latest"
+        @click="jumpToLatest"
+      >
+        {{ jumpLabel }}
+      </OButton>
+    </div>
   </div>
 </template>
 
@@ -562,10 +567,12 @@ function turnName(turn: TranscriptTurn): I18nText {
 
 // An answer with no text has nothing to copy, and a failed one acts only through its outcome block (`30` §8.3).
 function answerActionsFor(turn: TranscriptTurn): boolean {
-  const text = turn.answer?.contentBlocks?.some(
-    (block) => block.type === "text" && !!block.text?.trim(),
+  const said = turn.answer?.contentBlocks?.some(
+    (block) =>
+      (block.type === "text" && !!block.text?.trim()) ||
+      (block.type === "findings" && !!block.findings),
   );
-  return !!props.sid && !!live && !props.readonly && !running.value && !!text && !turn.live;
+  return !!props.sid && !!live && !props.readonly && !running.value && !!said && !turn.live;
 }
 
 // A sent message's Copy and Edit act on the composer, so a readonly page and a running turn offer none.

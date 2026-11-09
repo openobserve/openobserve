@@ -68,6 +68,8 @@ pub const X_O2_TRACE_ID: &str = "x-o2-trace-id";
 
 pub(super) const MAX_TITLE_CHARS: usize = 200;
 const DEFAULT_PAGE: u64 = 50;
+const ENTRY_HOME_LAUNCHER: &str = "home_launcher";
+const ORIGIN_HOME: &str = "home";
 const MAX_PAGE: u64 = 200;
 const MAX_TURNS_PAGE: usize = 1000;
 /// A turn still marked running this long past the longest allowed turn died with its node.
@@ -280,6 +282,9 @@ pub struct ChatDetailResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Vec<Object>>)]
     pub approvals: Option<Vec<serde_json::Value>>,
+    /// `home` when the first turn came from the Home launcher; only on a read that reaches it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
 }
 
 /// `PATCH` body: a new title, a pin, the seen marker, or several.
@@ -1124,6 +1129,7 @@ pub async fn get(
             turns: None,
             seed: None,
             approvals: None,
+            origin: None,
         })
         .into_response();
     }
@@ -1173,6 +1179,9 @@ pub async fn get(
         .seed
         .as_deref()
         .and_then(|s| serde_json::from_str(s).ok());
+    let origin = (history.partial_from_seq.is_none() && !history.has_more)
+        .then(|| chat_origin(&turns))
+        .flatten();
     Json(ChatDetailResponse {
         chat: ChatSummary::from(row).with_markers(active.as_ref(), pending.as_ref()),
         state_version: version.to_string(),
@@ -1182,6 +1191,7 @@ pub async fn get(
         turns: Some(turns),
         seed,
         approvals,
+        origin,
     })
     .into_response()
 }
@@ -1699,8 +1709,12 @@ fn annotate_turns(turns: &mut [Value], records: &[TurnRecord], feedback: &HashMa
     }
 }
 
-/// Puts an imported chat's recorded turns before the turns it has stored since.
+/// Puts a chat's carried turns (a door's seed, or an import's) before the ones stored since.
 async fn prepend_imported(row: &Model, turns: &mut Vec<Value>) {
+    if let Some(seeded) = door_seed(row) {
+        turns.splice(0..0, seeded);
+        return;
+    }
     match ai_chat_imports::turns_for_session(&row.org_id, &row.session_id).await {
         Ok(Some(Value::Array(imported))) => {
             turns.splice(0..0, imported);
@@ -1711,6 +1725,14 @@ async fn prepend_imported(row: &Model, turns: &mut Vec<Value>) {
             row.session_id
         ),
     }
+}
+
+/// A door's seeded chat's turns; a fork or a branch shows its seed itself, from `seed`.
+fn door_seed(row: &Model) -> Option<Vec<Value>> {
+    if row.forked_from_share.is_some() || row.branched_from.is_some() {
+        return None;
+    }
+    super::shares::stored_seed(row)
 }
 
 /// Votes and imported turns are content of the chat: they go when it is deleted.
@@ -1794,7 +1816,7 @@ fn prepare_import(chat: &mut ImportChat) -> Result<Value, &'static str> {
 }
 
 /// A recorded turn reduced to the stored-turn keys and bounded; `None` when it is malformed.
-fn imported_turn(turn: Value) -> Option<Value> {
+pub(super) fn imported_turn(turn: Value) -> Option<Value> {
     let Value::Object(source) = turn else {
         return None;
     };
@@ -1881,7 +1903,7 @@ fn raw_client_id(text: &str) -> String {
 }
 
 /// The chat's own title, else its first prompt's first line.
-fn imported_title(title: &str, turns: &Value) -> String {
+pub(super) fn imported_title(title: &str, turns: &Value) -> String {
     let title = title.trim();
     if !title.is_empty() {
         return title.chars().take(MAX_TITLE_CHARS).collect();
@@ -1905,6 +1927,13 @@ fn imported_search_text(turns: &Value) -> String {
         .map(|text| openobserve_core::ai_chat::projection::split_attachment_blocks(text).0)
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// `home` when the chat's first turn was asked from the Home launcher (its stored
+/// `user.entry_kind`).
+fn chat_origin(turns: &[Value]) -> Option<String> {
+    let entry = turns.first()?["user"]["entry_kind"].as_str()?;
+    (entry == ENTRY_HOME_LAUNCHER).then(|| ORIGIN_HOME.to_string())
 }
 
 /// An incident chat ran the RCA agent; every other origin is the default assistant.
@@ -2814,6 +2843,25 @@ mod tests {
     }
 
     #[test]
+    fn only_a_chat_first_asked_from_home_reads_as_home() {
+        let turn = |entry: Option<&str>| match entry {
+            Some(entry) => serde_json::json!({"user": {"text": "q", "entry_kind": entry}}),
+            None => serde_json::json!({"user": {"text": "q"}}),
+        };
+        let home = [turn(Some("home_launcher")), turn(Some("door"))];
+        assert_eq!(chat_origin(&home).as_deref(), Some("home"));
+        assert_eq!(
+            chat_origin(&[turn(Some("door")), turn(Some("home_launcher"))]),
+            None
+        );
+        assert_eq!(
+            chat_origin(&[turn(None), turn(Some("home_launcher"))]),
+            None
+        );
+        assert_eq!(chat_origin(&[]), None);
+    }
+
+    #[test]
     fn cursors_round_trip_and_reject_garbage() {
         let sid = "01234567-89ab-7def-8123-456789abcdef";
         let cursor = decode_cursor(&format!("1700_{sid}")).unwrap();
@@ -3044,6 +3092,30 @@ mod tests {
             search_text: None,
             branched_from: None,
         }
+    }
+
+    #[test]
+    fn only_a_door_chat_reads_its_seed_turns_as_its_own() {
+        let seed = serde_json::json!({"as_of": 1, "turns": [{"turn_id": "t1"}]}).to_string();
+        let door = Model {
+            seed: Some(seed.clone()),
+            ..chat_row()
+        };
+        assert_eq!(
+            door_seed(&door),
+            Some(vec![serde_json::json!({"turn_id": "t1"})])
+        );
+        let branch = Model {
+            branched_from: Some("{}".into()),
+            ..door.clone()
+        };
+        let fork = Model {
+            forked_from_share: Some("sh1".into()),
+            ..door
+        };
+        assert_eq!(door_seed(&branch), None);
+        assert_eq!(door_seed(&fork), None);
+        assert_eq!(door_seed(&chat_row()), None);
     }
 
     #[test]
@@ -3589,6 +3661,7 @@ mod tests {
             turns: None,
             seed: None,
             approvals: None,
+            origin: None,
         };
         let text = serde_json::to_string(&detail).unwrap();
         assert_eq!(text.matches("\"active_turn\"").count(), 1, "{text}");

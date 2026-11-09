@@ -126,7 +126,7 @@ describe("composerNotice: the strip's one line (K5)", () => {
   it("links a blocked mic to the browser's own help, and nothing for an unknown browser", () => {
     expect(micHelpUrl("chrome")).toMatch(/^https:\/\/support\.google\.com\//);
     expect(micHelpUrl("safari")).toMatch(/^https:\/\/support\.apple\.com\//);
-    expect(micHelpUrl("edge")).toBeNull();
+    expect(micHelpUrl("edge")).toMatch(/^https:\/\/support\.microsoft\.com\//);
     expect(micHelpUrl(null)).toBeNull();
   });
 

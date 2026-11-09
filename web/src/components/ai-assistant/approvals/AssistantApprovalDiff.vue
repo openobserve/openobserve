@@ -21,7 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-for="row in rows" :key="row.field">
       <dt class="text-text-secondary text-xs">{{ row.field }}</dt>
-      <dd class="m-0 flex min-w-0 flex-wrap items-baseline gap-x-1.5 font-mono text-xs break-all">
+      <dd
+        class="m-0 flex min-w-0 flex-wrap items-baseline gap-x-1.5 font-mono text-xs wrap-anywhere"
+      >
         <template v-if="row.before !== null">
           <s class="text-text-secondary" data-test="assistant-approval-diff-before">{{
             row.before

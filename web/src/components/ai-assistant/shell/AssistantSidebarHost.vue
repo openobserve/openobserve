@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :incident-id="followed.incidentId"
           :run-id="followed.runId"
           @close="stopFollowingRca"
+          @reanalyze="({ runId }) => followNewRun(runId)"
         />
         <AssistantShell v-show="!followed" placement="sidebar" />
       </div>
@@ -96,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :incident-id="followed.incidentId"
         :run-id="followed.runId"
         @close="stopFollowingRca"
+        @reanalyze="({ runId }) => followNewRun(runId)"
       />
       <AssistantShell v-show="!followed" placement="sidebar" sheet :sid="sheetWindowSid" />
     </OSheet>
@@ -189,7 +191,7 @@ import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { readFromAnswerStart } from "./answerStart";
 import { tearOffRequest } from "./assistantWindowHost";
 import { closeLockedPanel, lockedPanelMoved, useLockedPanel } from "./lockedPanel";
-import { followedRcaRun, stopFollowingRca } from "./rcaFollow";
+import { followedRcaRun, followNewRun, stopFollowingRca } from "./rcaFollow";
 import { useOpeningMotion } from "./useOpeningMotion";
 
 // The run view carries the whole RCA thread, so it loads only when a run is followed.

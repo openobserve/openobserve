@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   runRows: [] as { group: string; otherOrg?: boolean }[],
   incidentsOn: { value: false },
   listOrgRcaRuns: vi.fn(),
+  shell: { placement: { kind: "none" } as { kind: string } },
 }));
 
 vi.mock("./useAgentHomeState", async () => {
@@ -106,7 +107,7 @@ vi.mock("@/composables/assistant", () => ({
     mocks.history();
     return { recent: () => ({ value: mocks.historyRows }) };
   },
-  useAssistantStore: () => ({ state: { sessions: mocks.sessions } }),
+  useAssistantStore: () => ({ state: { sessions: mocks.sessions, shell: mocks.shell } }),
   useAssistantRuns: () => ({ rows: { value: mocks.runRows } }),
   openAssistant: vi.fn(),
 }));
@@ -225,6 +226,34 @@ describe("AssistantHomeTab", () => {
     expect(wrapper.find('[data-test="dashboards-stub"]').exists()).toBe(true);
     expect(mocks.load).toHaveBeenCalledTimes(1);
     expect(mocks.provider).toHaveBeenCalledTimes(1);
+  });
+
+  it("pins the Ask box to the bottom on a phone and leaves its suggestions to wider screens (B-shell-8)", async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+    const ask = wrapper.get('[data-test="launcher-stub"][data-layout="overview"]').classes();
+    expect(ask).toEqual(
+      expect.arrayContaining([
+        "max-md:sticky",
+        "max-md:bottom-0",
+        "max-md:bg-surface-base",
+        "max-md:[&_[data-test=assistant-launcher-suggestions]]:hidden",
+      ]),
+    );
+  });
+
+  it("pins Ask on the scroll edge with no padding under it, and unpins it while the sheet is open (B-shell3-3, B-shell3-4)", async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-home-tab"]').classes()).toContain("max-md:pb-0");
+    const ask = (w: typeof wrapper) => w.get('[data-test="launcher-stub"][data-layout="overview"]');
+    expect(ask(wrapper).attributes("data-pinned")).toBe("yes");
+    mocks.shell.placement = { kind: "sidebar" };
+    const sheet = mountTab();
+    await flushPromises();
+    expect(ask(sheet).attributes("data-pinned")).toBe("no");
+    expect(ask(sheet).classes()).not.toContain("max-md:sticky");
+    mocks.shell.placement = { kind: "none" };
   });
 
   it("with credits used up, turns the Ask box into Go to with the reason and drops Brief me", async () => {

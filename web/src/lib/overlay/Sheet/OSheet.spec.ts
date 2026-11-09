@@ -140,7 +140,7 @@ describe("OSheet", () => {
       expect(sheet()!.dataset.snap).toBe(snap);
       expect(sheet()!.classList).toContain(cls);
       expect(sheet()!.classList).toContain("pb-[env(safe-area-inset-bottom)]");
-      expect(sheet()!.classList).toContain("z-6000");
+      expect(sheet()!.style.zIndex).toBe("6000");
       expect(sheet()!.className).not.toMatch(/100vh/);
       wrapper.unmount();
     }

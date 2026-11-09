@@ -239,6 +239,18 @@ describe("AssistantMessageActions", () => {
       expect(track).toHaveBeenCalledWith("ai_read_aloud", { action: "stop" });
     });
 
+    it("B-conversation-24: the progress bar takes no row space, so starting playback moves nothing", async () => {
+      const wrapper = mountActions({ message: answer, turnId: "t1" });
+      await wrapper.get('[data-test="assistant-msg-read-aloud"]').trigger("click");
+      await flushPromises();
+      const slot = wrapper.get('[data-test="assistant-msg-read-progress-slot"]');
+      const group = wrapper.get('[data-test="assistant-msg-actions"]');
+      expect(slot.element.parentElement).toBe(group.element);
+      expect(slot.find('[data-test="assistant-msg-read-progress"]').exists()).toBe(true);
+      expect(slot.classes()).toEqual(expect.arrayContaining(["absolute", "inset-x-0", "top-full"]));
+      expect(group.classes()).toContain("relative");
+    });
+
     it("copies the answer's link and says Link copied in place for 2 s", async () => {
       vi.useFakeTimers();
       const wrapper = mountActions({ message: answer, turnId: "t1" });

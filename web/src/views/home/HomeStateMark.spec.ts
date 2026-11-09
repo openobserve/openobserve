@@ -23,11 +23,25 @@ describe("HomeStateMark", () => {
     ["critical", "bg-service-health-critical"],
     ["degraded", "bg-service-health-warning"],
     ["anomaly", "bg-status-info-text"],
-    ["recovered", "bg-service-health-healthy"],
+    ["recovered", "border-text-secondary"],
   ] as const)("draws a round %s dot", (bucket, tone) => {
     const wrapper = mount(HomeStateMark, { props: { bucket } });
     const dot = wrapper.get('[aria-hidden="true"]');
     expect(dot.classes()).toEqual(expect.arrayContaining(["rounded-full", "size-2", tone]));
     expect(wrapper.attributes("data-bucket")).toBe(bucket);
+  });
+
+  it("draws a recovered row as a neutral ring, never healthy green (B-shell2-3)", () => {
+    const dot = mount(HomeStateMark, { props: { bucket: "recovered" } }).get(
+      '[aria-hidden="true"]',
+    );
+    expect(dot.classes()).toEqual(expect.arrayContaining(["border", "bg-transparent"]));
+    expect(dot.html()).not.toMatch(/healthy/);
+  });
+
+  it("draws a flapping row amber whatever its bucket says", () => {
+    const wrapper = mount(HomeStateMark, { props: { bucket: "recovered", flapping: true } });
+    expect(wrapper.get('[aria-hidden="true"]').classes()).toContain("bg-service-health-warning");
+    expect(wrapper.attributes("data-flapping")).toBe("true");
   });
 });

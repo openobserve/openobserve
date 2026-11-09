@@ -15,6 +15,7 @@
 
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 import { queryClient } from "@/composables/query/queryClient";
 
@@ -182,6 +183,29 @@ describe("AssistantForkSource: a branched chat", () => {
     await wrapper.get('[data-test="assistant-branch-source-open"]').trigger("click");
     await flushPromises();
     expect(open).toHaveBeenCalledWith({ sid: "src-1" }, { focus: true });
+  });
+
+  it("moves the Full view's `?thread=` to the source, so a reload and Back land on it (B-conversation-16)", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", name: "home", component: { render: () => null } }],
+    });
+    await router.push({ name: "home", query: { tab: "ai", thread: "branch-1" } });
+    const sid = session({ seed: false });
+    fake.current.store.state.sessions[sid].record.branchedFrom = {
+      sessionId: "src-1",
+      turnId: "t2",
+      title: "Checkout failures",
+    };
+    vi.spyOn(fake.current.store, "openSession").mockResolvedValue("src-1");
+    const wrapper = mount(AssistantForkSource, {
+      props: { sid },
+      attachTo: document.body,
+      global: { plugins: [router] },
+    });
+    await wrapper.get('[data-test="assistant-branch-source-open"]').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.query).toMatchObject({ tab: "ai", thread: "src-1" });
   });
 
   it("renders nothing for a chat that is neither a fork nor a branch", () => {

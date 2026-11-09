@@ -143,6 +143,15 @@ export function detectBrand(nav: BrandNavigator): VoiceBrand {
   return /Version\/.*Safari\//.test(agent) ? "safari" : null;
 }
 
+/** The brand whose help page matches this browser's settings: unbranded Chromium shares Chrome's. */
+export function helpBrand(nav: BrandNavigator = navigator as BrandNavigator): VoiceBrand {
+  const exact = detectBrand(nav);
+  if (exact) return exact;
+  const brands = nav.userAgentData?.brands?.map((entry) => entry.brand);
+  if (brands?.length) return brands.includes("Chromium") ? "chrome" : null;
+  return /Chrome\//.test(nav.userAgent) ? "chrome" : null;
+}
+
 /** The one engine this build ships: the browser's own Web Speech recogniser. */
 export function createBrowserEngine(): VoiceEngine {
   return {

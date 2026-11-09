@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="@container/home h-full min-h-0 min-w-0 overflow-y-auto px-4 py-4"
+    class="@container/home h-full min-h-0 min-w-0 overflow-y-auto px-4 py-4 max-md:pb-0"
     data-test="assistant-home-tab"
     :data-state="state"
   >
@@ -47,10 +47,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @analysis="openAnalysis"
           @open-incident="(id) => go(incidentLocation(id))"
         />
+        <!-- A phone pins Ask on the scroll edge while the list scrolls under it (HomePhone board); an open sheet unpins it -->
         <AssistantLauncher
           layout="overview"
           :page-range="pageRange"
           :go-to-only="offReason !== null"
+          :class="[
+            'max-md:bg-surface-base max-md:pt-2 max-md:pb-3 max-md:[&_[data-test=assistant-launcher-suggestions]]:hidden',
+            !sheetOpen && 'max-md:sticky max-md:bottom-0 max-md:z-10',
+          ]"
+          :data-pinned="sheetOpen ? 'no' : 'yes'"
           @update:page-range="onPageRange"
         >
           <template #note>
@@ -146,7 +152,13 @@ import HomeNowList from "./HomeNowList.vue";
 import type { NowRowMeta } from "./HomeNowRow.vue";
 import { canCreateAlerts, serviceAlertPrefill } from "./homeAlertPrefill";
 import { homeUserKey, readLastVisit, writeLastVisit } from "./homeStorage";
-import { homeReturnState, readHomeUrl, writeHomeUrl, type HomeRange } from "./homeUrl";
+import {
+  homePeriodOf,
+  homeReturnState,
+  readHomeUrl,
+  writeHomeUrl,
+  type HomeRange,
+} from "./homeUrl";
 import {
   briefingCounts,
   groupNowRows,
@@ -270,7 +282,11 @@ const drawnSnapshot = computed<OverviewNowSnapshot>(() => ({
   ...data.nowList.snapshot.value,
   rows: [...split.value.now, ...split.value.problems].map((item) => item.row),
 }));
-useHomeContextProvider(() => drawnSnapshot.value, store);
+useHomeContextProvider(
+  () => drawnSnapshot.value,
+  store,
+  () => homePeriodOf(data.range.value),
+);
 const canCreateAlert = computed(
   () => !data.alertsLocked.value && canCreateAlerts(store.state.currentuser?.role),
 );
@@ -279,6 +295,8 @@ const canCreateAlert = computed(
 const history = state.value === "oss" ? null : useAssistantHistory();
 const assistantStore = history ? useAssistantStore() : null;
 const assistantRuns = history ? useAssistantRuns() : null;
+// On a phone the panel is a bottom sheet over Home; a pinned Ask would ride up above it.
+const sheetOpen = computed(() => assistantStore?.state.shell?.placement?.kind === "sidebar");
 const answersReady = computed(
   () =>
     assistantRuns?.rows.value.filter((row) => row.group === "ready" && !row.otherOrg).length ?? 0,

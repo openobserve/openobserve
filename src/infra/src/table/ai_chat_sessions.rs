@@ -132,8 +132,8 @@ pub struct NewBranch<'a> {
     pub title: &'a str,
     /// `{owner_name, as_of, turns}`: the source turns through the answer, read like a fork's seed.
     pub seed: &'a serde_json::Value,
-    /// `{session_id, turn_id, title}` of the source.
-    pub branched_from: &'a serde_json::Value,
+    /// `{session_id, turn_id, title}` of the source; `None` for a chat seeded by a door.
+    pub branched_from: Option<&'a serde_json::Value>,
 }
 
 /// A new chat holding imported browser turns (see [`insert_import_with`]).
@@ -344,7 +344,7 @@ pub async fn insert_branch_with<C: ConnectionTrait>(
         pinned_at: Set(None),
         seed: Set(Some(branch.seed.to_string())),
         search_text: Set(None),
-        branched_from: Set(Some(branch.branched_from.to_string())),
+        branched_from: Set(branch.branched_from.map(|v| v.to_string())),
     };
     Entity::insert(record).exec(conn).await.map_err(db_err)?;
     get_with(conn, branch.org_id, branch.session_id)
@@ -1304,7 +1304,7 @@ pub async fn set_refreshed_range_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
-/// A page of a user's active chats, newest first; an empty chat only while a turn runs.
+/// A page of a user's active chats, newest first; an empty one only if seeded or while a turn runs.
 pub async fn list_for_user(
     org_id: &str,
     user_id: &str,
@@ -1350,6 +1350,7 @@ pub async fn list_for_user_with<C: ConnectionTrait>(
             Condition::any()
                 .add(Column::LastCommittedSeq.ne(NO_SEQ))
                 .add(Column::ForkedFromShare.is_not_null())
+                .add(Column::Seed.is_not_null())
                 .add(Column::SessionId.in_subquery(running))
                 .add(Column::SessionId.in_subquery(imported)),
         )
@@ -1477,7 +1478,7 @@ mod tests {
             agent_type: "o2-ai",
             title: "Branch of p99",
             seed: &seed,
-            branched_from: &source,
+            branched_from: Some(&source),
         };
         let row = insert_branch_with(&db, &branch, 10).await.unwrap();
         assert_eq!(row.user_id, ALICE);
@@ -1851,6 +1852,29 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn an_untouched_branch_or_seeded_chat_is_listed() {
+        let db = db().await;
+        let seed = serde_json::json!({"as_of": 9, "turns": [{"turn_id": "t1"}]});
+        let source = serde_json::json!({"session_id": "src", "turn_id": "t1", "title": "p99"});
+        for (sid, from, now) in [("branch", Some(&source), 30), ("seeded", None, 40)] {
+            let new = NewBranch {
+                org_id: ORG,
+                session_id: sid,
+                user_id: ALICE,
+                user_email: "a@x",
+                agent_type: "o2-ai",
+                title: sid,
+                seed: &seed,
+                branched_from: from,
+            };
+            insert_branch_with(&db, &new, now).await.unwrap();
+        }
+        chat(&db, "empty", ALICE, 50).await;
+
+        assert_eq!(listed(&db, 0).await, vec!["seeded", "branch"]);
     }
 
     async fn listed(db: &sea_orm::DatabaseConnection, running_since: i64) -> Vec<String> {

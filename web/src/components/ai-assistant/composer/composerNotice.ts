@@ -42,7 +42,6 @@ export const NOTICE_PRIORITY = [
   "entry",
   "paste",
   "dropped",
-  "attach",
   "answering",
   "pending",
   "thread",
@@ -53,6 +52,7 @@ export const NOTICE_PRIORITY = [
 const MIC_HELP_URLS: Partial<Record<NonNullable<VoiceBrand>, string>> = {
   chrome: "https://support.google.com/chrome/answer/2693767",
   safari: "https://support.apple.com/guide/safari/websites-ibrwe2159f50/mac",
+  edge: "https://support.microsoft.com/en-us/windows/windows-camera-microphone-and-privacy-a83257bc-e990-d54a-d212-b5e41beba857",
 };
 
 export type NoticeId = (typeof NOTICE_PRIORITY)[number];
@@ -77,7 +77,6 @@ export type NoticeAction =
   | "bringDraft"
   | "editQueued"
   | "pasteInline"
-  | "attachOk"
   | "startNew";
 
 export interface NoticeLink {

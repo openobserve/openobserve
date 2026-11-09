@@ -24,6 +24,8 @@ import {
   latestValues,
   leadSeries,
   metricOf,
+  promqlMetric,
+  seriesLabel,
   valueText,
   type ChartSeries,
 } from "./chartSeries";
@@ -101,5 +103,21 @@ describe("chartSeries", () => {
     ) as { series: { color: string; data: number[][] }[] };
     expect(option.series.map((line) => line.color)).toEqual(["grey", "blue"]);
     expect(option.series[1].data[0]).toEqual([1000, 310]);
+  });
+});
+
+describe("chart names a reader can read", () => {
+  it("names a series by its one label's value, or by its labels", () => {
+    expect(seriesLabel('{service="cart"}')).toBe("cart");
+    expect(seriesLabel('latency{service="cart",pod="p-1"}')).toBe("service=cart, pod=p-1");
+    expect(seriesLabel("value")).toBe("value");
+  });
+
+  it("titles a label-only chart with the metric its PromQL reads", () => {
+    expect(promqlMetric("avg by (service) (ta_conversation_p95_latency_ms)")).toBe(
+      "ta_conversation_p95_latency_ms",
+    );
+    expect(promqlMetric('rate(http_requests_total{job="api"}[5m])')).toBe("http_requests_total");
+    expect(promqlMetric("a_total / b_total")).toBeNull();
   });
 });

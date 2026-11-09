@@ -1,0 +1,160 @@
+{
+  "detail": {
+    "session_id": "574a928a-bc74-4ba6-b090-d676b7d02ccc",
+    "title": "Pause the alert ta_approvals_rca_latency_high for 5 minutes.",
+    "agent_type": "o2-ai",
+    "created_at": 1794234921311758,
+    "updated_at": 1794234948570113,
+    "last_committed_seq": 105,
+    "branched_from": null,
+    "active_turn": false,
+    "pending_approval": false,
+    "pinned": false,
+    "state_version": "105.1794234948570651.0.0.cbf29ce484222325",
+    "not_modified": false,
+    "has_more": false,
+    "turns": [
+      {
+        "user_message_id": "msg_1c0bc316c001HUzEeB3mqL5CLC",
+        "created": 1794234921324,
+        "user": {
+          "text": "Pause the alert ta_approvals_rca_latency_high for 5 minutes.",
+          "images": []
+        },
+        "frames": [
+          {
+            "type": "tool_call",
+            "tool": "ListAlerts",
+            "message": "Listing alerts",
+            "context": {
+              "alert_name_substring": "ta_approvals_rca_latency_high",
+              "page_size": 10,
+              "page_idx": 0
+            },
+            "call_id": "call_00_lLvcg8WlRhpKS6kxuwS42430"
+          },
+          {
+            "type": "tool_result",
+            "tool": "ListAlerts",
+            "success": true,
+            "message": "ListAlerts completed successfully",
+            "call_args": {
+              "tool": "ListAlerts",
+              "args": {
+                "alert_name_substring": "ta_approvals_rca_latency_high",
+                "page_size": 10,
+                "page_idx": 0
+              }
+            },
+            "call_id": "call_00_lLvcg8WlRhpKS6kxuwS42430"
+          },
+          {
+            "type": "tool_call",
+            "tool": "ListAlerts",
+            "message": "Listing alerts",
+            "context": {
+              "alert_name_substring": "ta_approvals_rca_latency_high",
+              "page_size": 10,
+              "page_idx": 0
+            },
+            "call_id": "call_00_AlUC69R0Nb0l8b3mBWcQ4171"
+          },
+          {
+            "type": "tool_result",
+            "tool": "ListAlerts",
+            "success": true,
+            "message": "ListAlerts completed successfully",
+            "call_args": {
+              "tool": "ListAlerts",
+              "args": {
+                "alert_name_substring": "ta_approvals_rca_latency_high",
+                "page_size": 10,
+                "page_idx": 0
+              },
+              "detail": "full"
+            },
+            "call_id": "call_00_AlUC69R0Nb0l8b3mBWcQ4171"
+          },
+          {
+            "type": "tool_call",
+            "tool": "MuteAlert",
+            "message": "Executing MuteAlert",
+            "context": {
+              "alert_id": "3LrpP6aNCNvoXFqPf6yNtzimvPx",
+              "folder": "default",
+              "request_body": {
+                "minutes": 5,
+                "all_groups": true,
+                "until_clear": false,
+                "reason": "Paused for 5 minutes by user request"
+              }
+            },
+            "call_id": "call_00_nXi0eDh9kHiSlfCGjipI0944"
+          },
+          {
+            "type": "tool_result",
+            "tool": "MuteAlert",
+            "success": false,
+            "error_type": "error",
+            "message": "Error 409: {\"code\":\"already_muted\",\"downtime_id\":\"3LsEVEUZTOwVfCsmhA7hGdyzSq3\",\"version\":1,\"ends_at\":1794235596615111}",
+            "call_id": "call_00_nXi0eDh9kHiSlfCGjipI0944"
+          },
+          {
+            "type": "message_delta",
+            "content": "The alert is already muted: a quick mute is in force until 14:46:36 UTC, which covers the 5 minutes requested [^call_00_AlUC69R0Nb0l8b3mBWcQ4171]. My mute call was refused because the alert already has an "
+          },
+          {
+            "type": "message_delta",
+            "content": "active mute [^call_00_nXi0eDh9kHiSlfCGjipI0944].\n\n"
+          },
+          {
+            "type": "follow_ups",
+            "items": [
+              "Extend the mute on ta_approvals_rca_latency_high",
+              "Cancel the mute now",
+              "Show me the alert definition"
+            ]
+          },
+          {
+            "type": "complete"
+          }
+        ],
+        "error": null,
+        "first_seq": 2,
+        "last_seq": 105,
+        "turn_id": "3LsFZAVTqQQd1gHLgaOPFFxjxPr",
+        "status": "completed",
+        "error_code": null,
+        "agent_type": "o2-ai"
+      }
+    ],
+    "approvals": []
+  },
+  "rows": [
+    {
+      "id": "3LsFac7YRobQ1zuQ0Pz4M5RbpZC",
+      "at": 1794234932204207,
+      "action": "Paused alert",
+      "tool": "MuteAlert",
+      "target": {
+        "type": "alert",
+        "id": "3LrpP6aNCNvoXFqPf6yNtzimvPx",
+        "name": null,
+        "deleted": false
+      },
+      "on_behalf_of": "root@example.com",
+      "approval": {
+        "kind": "standing"
+      },
+      "result": {
+        "state": "failed",
+        "message": "The call answered 409"
+      },
+      "undo": {
+        "available": false,
+        "reason": "failed"
+      },
+      "chat_id": "574a928a-bc74-4ba6-b090-d676b7d02ccc"
+    }
+  ]
+}

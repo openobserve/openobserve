@@ -203,6 +203,7 @@ export type {
   ConsentNoteData,
   PolicyBlockData,
   ResolvedBlockData,
+  ResolvedGrant,
 } from "./reducer";
 export type { TurnStatusText } from "./turnStateMachine";
 export type { AttachmentBlock } from "./record";

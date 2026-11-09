@@ -75,6 +75,11 @@ describe("AssistantHistoryRow", () => {
     );
   });
 
+  it("lets the title wrap to its two-line clamp inside the nowrap row button", () => {
+    const title = setup().get('[data-test="assistant-history-row"] [data-test="o-truncated-text"]');
+    expect(title.classes()).toEqual(expect.arrayContaining(["line-clamp-2", "whitespace-normal"]));
+  });
+
   it("drops the title bubble once the row is chosen, and brings it back after the pointer leaves (X1)", async () => {
     const wrapper = setup();
     const title = () => wrapper.get('[data-test="o-truncated-text"]');
@@ -101,11 +106,13 @@ describe("AssistantHistoryRow", () => {
     expect(other.get('[data-test="assistant-history-row"]').attributes("tabindex")).toBe("-1");
   });
 
-  it("shows the status word instead of the time, with no dot", () => {
+  it("shows the status word instead of the time, beside the row's leading light (v7 IMPL-PLAN Threads)", () => {
     const answering = setup({ activeTurn: true });
     expect(answering.get('[data-test="assistant-history-row-state"]').text()).toBe("Answering");
     expect(answering.find('[data-test="assistant-history-row-time"]').exists()).toBe(false);
-    expect(answering.find('[data-test="assistant-status-dot"]').exists()).toBe(false);
+    expect(answering.find('[data-test="assistant-status-dot"]').attributes("data-state")).toBe(
+      "working",
+    );
     document.body.innerHTML = "";
     const needs = setup(
       { activeTurn: true, pendingApproval: true },
@@ -156,14 +163,27 @@ describe("AssistantHistoryRow", () => {
       "assistant-history-row-rename",
       "assistant-history-row-pin",
       "assistant-history-row-share",
+      "assistant-history-row-export",
       "assistant-history-row-delete",
     ]);
     document.body.innerHTML = "";
     expect(menuIds(await armed({ activeTurn: true }))).toContain("assistant-history-row-stop");
     document.body.innerHTML = "";
-    expect(menuIds(await armed({ local: true }))).toEqual(["assistant-history-row-delete"]);
+    expect(menuIds(await armed({ local: true }))).toEqual([
+      "assistant-history-row-export",
+      "assistant-history-row-delete",
+    ]);
     document.body.innerHTML = "";
-    expect(menuIds(await armed({}, { readonly: true }))).toEqual(["assistant-history-row-float"]);
+    expect(menuIds(await armed({}, { readonly: true }))).toEqual([
+      "assistant-history-row-float",
+      "assistant-history-row-export",
+    ]);
+  });
+
+  it("exports the row's chat as Markdown from its menu", async () => {
+    const wrapper = await armed();
+    await wrapper.get('[data-test="assistant-history-row-export"]').trigger("click");
+    expect(wrapper.emitted("export")).toEqual([[historyRow().sid]]);
   });
 
   it("names the browser pin when the server does not keep pins", async () => {
@@ -235,5 +255,54 @@ describe("AssistantHistoryRow", () => {
     await button.trigger("keydown", { key: "ArrowDown" });
     expect(wrapper.emitted("open")).toEqual([[historyRow().sid]]);
     expect(wrapper.emitted("navigate")).toHaveLength(1);
+  });
+
+  it.each([
+    [{ pendingApproval: true }, "attention"],
+    [{ activeTurn: true }, "working"],
+  ] as const)("leads %o with the board's %s light (B-shell2-5)", (row, signal) => {
+    const wrapper = setup(row);
+    const light = wrapper.get('[data-test="assistant-history-row-light"]');
+    expect(light.attributes("data-signal")).toBe(signal);
+    expect(light.find('[data-test="assistant-status-dot"]').attributes("data-state")).toBe(signal);
+  });
+
+  it("keeps the light's slot empty on a chat at rest, so titles stay on one edge", () => {
+    const light = setup().get('[data-test="assistant-history-row-light"]');
+    expect(light.attributes("data-signal")).toBeUndefined();
+    expect(light.find('[data-test="assistant-status-dot"]').exists()).toBe(false);
+    expect(light.classes()).toEqual(expect.arrayContaining(["w-4", "shrink-0"]));
+  });
+
+  it("marks a chat failed by this tab with the failed light", () => {
+    const wrapper = setup({}, { status: "failed" });
+    expect(wrapper.get('[data-test="assistant-history-row-light"]').attributes("data-signal")).toBe(
+      "failed",
+    );
+  });
+
+  it("shows the organization glyph on an org-shared chat and says so to assistive tech", () => {
+    const share = {
+      id: "s1",
+      visibility: "org" as const,
+      mode: "snapshot" as const,
+      expiresAt: null,
+      outOfDate: false,
+      count: 1,
+    };
+    const wrapper = setup({ share });
+    const glyph = wrapper.get('[data-test="assistant-history-row-shared"]');
+    expect(glyph.attributes("data-visibility")).toBe("org");
+    expect(wrapper.get('[data-test="assistant-history-row"]').text()).toContain(
+      "Shared with your organization",
+    );
+    expect(setup().find('[data-test="assistant-history-row-shared"]').exists()).toBe(false);
+  });
+
+  it("shows the public-link glyph from the list's share read when the row itself carries none", () => {
+    const glyph = setup({}, { sharedAs: "public" }).get(
+      '[data-test="assistant-history-row-shared"]',
+    );
+    expect(glyph.attributes("data-visibility")).toBe("public");
   });
 });

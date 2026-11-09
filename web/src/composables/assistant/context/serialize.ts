@@ -115,6 +115,7 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
     ...(turn?.replyToApproval && { replyToApproval: turn.replyToApproval }),
   };
   if (turn?.persisted) {
+    if (turn.replacesTurnId) request.replacesTurnId = turn.replacesTurnId;
     const seq = session.record.cachedLastSeq;
     return typeof seq === "number" ? { ...request, knownSeq: seq } : request;
   }

@@ -232,6 +232,21 @@ describe("AssistantRcaThread (C5)", () => {
     });
   });
 
+  it("Re-analyze follows the new run and names it to the host, never snapping back to the old one", async () => {
+    streamParts([]);
+    await mountThread(COMPLETED, "run-1");
+    service.triggerRca.mockResolvedValue({ data: { run_id: "run-2" } } as never);
+    service.get.mockResolvedValue({ data: incident(LIVE) } as never);
+
+    wrapper!
+      .findComponent({ name: "IncidentRCAAnalysis" })
+      .vm.$emit("trigger-rca", { buildOnPrevious: true });
+    await flushPromises();
+
+    expect(wrapper!.emitted("reanalyze")).toEqual([[{ runId: "run-2" }]]);
+    expect(byTest("rca-thread-final-note").exists()).toBe(false);
+  });
+
   it("as a phone sheet snaps between half and full", async () => {
     streamParts([]);
     await mountThread(COMPLETED, "run-1", "half");

@@ -217,7 +217,8 @@ const confirmationResolvedFrameSchema = z.looseObject({
   by: z.string().optional(),
   at: z.number().optional(),
   scope: z.string().optional(),
-  items: z.array(z.string()).optional(),
+  /** Per-target result objects once the write ran; a deny keeps the decided ids. */
+  items: z.array(z.unknown()).optional(),
   expired: z.boolean().optional(),
   withdrawn: z.boolean().optional(),
   /** `approved` · `denied` · `failed` · `partial` · `skipped` (C3). */

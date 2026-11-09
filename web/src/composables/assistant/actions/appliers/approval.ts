@@ -19,7 +19,7 @@ import { CONFIRM_TIMEOUT_MS, type ConfirmBody, type ConfirmResponse } from "@/se
 
 import type { ChatMessage } from "@/ts/interfaces/chat";
 
-import { approvalName, approvalToolEntity } from "../../approvalAnatomy";
+import { approvalName, approvalToolEntity, approvalVerb } from "../../approvalAnatomy";
 import { ERROR_LEDGER } from "../../assistantErrors";
 import type {
   ActionLedgerEntry,
@@ -337,13 +337,12 @@ function detailOf(
   return { outcome: { state, at, decision, ...(reason && { reason }) }, ...(result && { result }) };
 }
 
-// The per-item rows, under `results` from older servers and `items` from newer ones; both carry the ledger id.
+// Newer servers send both lists; only `items` carries a skip's status and code, so it wins when present.
 function rowsOf(response: ConfirmResponse): unknown[] | undefined {
-  if (Array.isArray(response.results)) return response.results;
   const items = Array.isArray(response.items) ? response.items : [];
-  return items.length && items.every((item) => typeof item === "object" && item !== null)
-    ? items
-    : undefined;
+  if (items.length && items.every((item) => typeof item === "object" && item !== null))
+    return items;
+  return Array.isArray(response.results) ? response.results : undefined;
 }
 
 function itemOf(raw: unknown, card: Pick<ApprovalBlockData, "targets">): ApprovalResultItem {
@@ -370,7 +369,9 @@ function itemOf(raw: unknown, card: Pick<ApprovalBlockData, "targets">): Approva
     ...(target?.id && { id: target.id }),
     ...(!done && status !== undefined && { code: String(status) }),
     ...(!done &&
-      item.detail !== undefined && { message: text(item.detail).slice(0, MAX_MESSAGE_CHARS) }),
+      (item.detail ?? item.message) !== undefined && {
+        message: text(item.detail ?? item.message).slice(0, MAX_MESSAGE_CHARS),
+      }),
     // Only the server's own ledger can restore an object, so Undo needs the id it issued.
     ...(item.undoable === true && ledgerId && { undoable: true, ledgerId }),
   };
@@ -383,12 +384,14 @@ function appendLedger(
 ): ActionLedgerEntry[] {
   // A skipped item wrote nothing, so the activity timeline has nothing to list for it.
   const written = result.items.filter((item) => item.status !== "skipped");
+  const verb = approvalVerb(card);
   const entries = written.map<ActionLedgerEntry>((item, index) => ({
     id: item.ledgerId ?? `${card.id}:${index}`,
     approvalId: card.id,
     turnId: card.turnId ?? session.turnMeta.turnId ?? "",
     tool: card.tool,
     op: OP_OF_KIND[card.kind],
+    ...(verb && { verb }),
     resource: { type: item.type, name: item.name, ...(item.id && { id: item.id }) },
     status: item.status === "done" ? "done" : "failed",
     undoable: item.status === "done" && item.undoable === true,

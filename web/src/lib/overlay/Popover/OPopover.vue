@@ -50,6 +50,7 @@ import {
 } from "reka-ui";
 import { inject, nextTick, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
 import { useOverlayScope } from "@/lib/overlay/overlayScope";
+import { injectOverlayDepth, overlayLayerZIndex } from "@/lib/overlay/Dialog/dialogStacking";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -79,7 +80,7 @@ const props = withDefaults(
     /** Close when an ancestor of the trigger scrolls; false keeps it open, following the trigger and hidden while detached. */
     closeOnScroll?: boolean;
     ariaLabel?: I18nText;
-    /** Content stacking order. Default sits above the app header/drawer (2000/3000). */
+    /** Content stacking order. Default: the top layer of the dialog, drawer or sheet it opens in (6000 on the page). */
     zIndex?: number;
     /** Extra classes merged onto the content surface. */
     contentClass?: string;
@@ -97,7 +98,7 @@ const props = withDefaults(
     sideOffset: 4,
     hideWhenDetached: true,
     closeOnScroll: true,
-    zIndex: 6000,
+    zIndex: undefined,
     autoFocus: true,
   },
 );
@@ -331,6 +332,8 @@ onBeforeUnmount(() => {
 
 // A scope that provides attributes (the assistant surface) keeps them on content teleported out of it.
 const overlayScope = useOverlayScope();
+
+const layerZIndex = overlayLayerZIndex(injectOverlayDepth()).contentZIndex;
 </script>
 
 <template>
@@ -355,7 +358,7 @@ const overlayScope = useOverlayScope();
         :hide-when-detached="hideWhenDetached"
         :collision-padding="collisionPadding ?? (lgUp ? 0 : 8)"
         :aria-label="ariaLabel"
-        :style="{ zIndex }"
+        :style="{ zIndex: zIndex ?? layerZIndex }"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         @open-auto-focus="onOpenAutoFocus"

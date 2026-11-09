@@ -164,7 +164,14 @@ import { explorerOf } from "@/utils/assistant/explorerRoutes";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatOrgTime } from "@/utils/formatters";
 
-import { chartOption, latestValues, leadSeries, metricOf, valueText } from "./chartSeries";
+import {
+  chartOption,
+  latestValues,
+  leadSeries,
+  metricOf,
+  promqlMetric,
+  valueText,
+} from "./chartSeries";
 import { explorerLabel, languageLabel, rangeText } from "./evidenceText";
 
 const ChartRenderer = defineAsyncComponent(
@@ -196,7 +203,11 @@ const legend = computed(() =>
     : [],
 );
 const title = computed<I18nText | null>(() => {
-  const name = props.query?.stream ?? (props.chart ? metricOf(props.chart) : null);
+  const query = props.query;
+  const name =
+    query?.stream ??
+    (props.chart ? metricOf(props.chart) : null) ??
+    (query?.language === "promql" ? promqlMetric(query.text) : null);
   return name ? raw(name) : null;
 });
 const count = computed(() => props.chart?.series.length ?? 0);

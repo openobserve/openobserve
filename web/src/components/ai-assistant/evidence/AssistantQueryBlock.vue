@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :meta="metaLine"
       data-test="assistant-query-text"
     >
-      <template v-if="run?.status !== 'running'" #foot>
+      <template v-if="run?.status !== 'running' && footActions" #foot>
         <div
           class="flex min-w-0 flex-1 flex-wrap items-center gap-1"
           data-test="assistant-query-actions"
@@ -379,13 +379,24 @@ const openLabel = computed(() =>
   t("assistant.query.open", { explorer: explorerLabel(explorer.value, t) }),
 );
 
-// The card head names where and when; the language label sits beside it.
-const metaLine = computed<I18nText>(() => {
+// The card head names where and when; a VRL or regex block runs on no window, so it names neither.
+const metaLine = computed<I18nText | undefined>(() => {
+  if (!runnable.value) return undefined;
   const stream = props.block.query.stream;
   return stream
     ? t("assistant.message.fenceSource", { stream: raw(stream), range: rangeLine.value })
     : rangeLine.value;
 });
+
+// The head already offers Copy, so a foot that would hold only Copy is left out.
+const footActions = computed(
+  () =>
+    (canRun.value && mdUp.value) ||
+    canOpen.value ||
+    (!!props.sourceStep && !!props.block.sourceCallId) ||
+    (canInsert.value && mdUp.value) ||
+    menuItems.value.length > 0,
+);
 
 const previewRows = computed(() => (run.value?.rows ?? []).slice(0, PREVIEW_ROWS));
 const hiddenRows = computed(() => {

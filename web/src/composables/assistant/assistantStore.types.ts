@@ -20,6 +20,7 @@ import type { ChatMessage, ImageAttachment, TurnSpan } from "@/ts/interfaces/cha
 import type { I18nKey, I18nText } from "@/types/i18n";
 
 import type { ActionResult, AssistantAction } from "./actions/types";
+import type { ApprovalVerb } from "./approvalAnatomy";
 import type { ClientContext, ContextChip, PageContext } from "./context/types";
 import type { ConfirmationRequiredFrame, ConfirmationResolvedFrame } from "./frames";
 import type { TurnState, TurnTerminal } from "./turnStates";
@@ -186,7 +187,8 @@ export interface TurnMeta {
 
 /** The fork seed kept with a continued shared chat (`50` §9). */
 export interface ForkSeed {
-  token: string;
+  /** The share token, kept only while the server holds no copy of the source, for the liveness probe. */
+  token?: string;
   title: string;
   ownerName: string;
   asOf: number;
@@ -308,7 +310,7 @@ export interface OpenAssistantArgs {
     text?: string;
     title?: I18nText;
     /** The helper hand-off's first message (`60` §4.6). */
-    transcript?: { role: "assistant"; text: string }[];
+    transcript?: { role: "assistant"; text: string; agent?: AgentId }[];
     homeStarter?: boolean;
     /** Page-context field keys the user removed before sending; written to the new chat's composer. */
     removedPageKeys?: string[];
@@ -349,6 +351,11 @@ export interface ApprovalTarget {
   name: string;
   /** In-app route. */
   link?: string;
+  /** A multi-target card's own change for this target, redacted and bounded. */
+  after?: unknown;
+  /** The target as it was when asked, for its diff (C3). */
+  before?: unknown;
+  beforeDigest?: string;
 }
 
 export interface PendingApproval {
@@ -464,6 +471,8 @@ export interface ActionLedgerEntry {
   turnId: string;
   tool: string;
   op: "create" | "update" | "delete" | "run_command";
+  /** What the write did as the card names it, e.g. `pause` for a mute that the op calls an update. */
+  verb?: ApprovalVerb;
   resource: { type: string; id?: string; name: string; link?: string };
   status: "done" | "failed" | "undone";
   undoable: boolean;
@@ -1001,6 +1010,8 @@ export interface SendRequest {
   attachments?: WireAttachment[];
   /** The approval card a Reply or Ask again answers. */
   replyToApproval?: string;
+  /** Regenerate: the stored turn this attempt is a new version of. */
+  replacesTurnId?: string;
   /** Omitted while `capability.agents` offers no choice; overrides the incident routing only when given. */
   agent?: AgentId;
   /** Stored on the turn as `handoff_from`. */
@@ -1029,6 +1040,7 @@ export interface RequestTurn {
   rcaChatMode?: boolean;
   now: number;
   replyToApproval?: string;
+  replacesTurnId?: string;
 }
 
 export type RequestBuilder = (
@@ -1088,6 +1100,8 @@ export interface HistoryService {
   create(): Sid;
   recent(n: number): ComputedRef<HistoryRow[]>;
   save(sid: Sid): Promise<"server" | "local" | "not_saved">;
+  /** Gives the writes a standing grant let run in this chat their ledger entry, so Undo shows. */
+  joinGrantedLedger?(sid: Sid): Promise<void>;
   rename(sid: Sid, title: string): Promise<MutationResult>;
   pin(sid: Sid, pinned: boolean): Promise<MutationResult>;
   remove(sid: Sid): Promise<MutationResult>;

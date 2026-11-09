@@ -27,10 +27,11 @@ import { raw } from "@/types/i18n";
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantLauncher, { launcherState } from "./AssistantLauncher.vue";
 
-const { fake, open, loading } = vi.hoisted(() => ({
+const { fake, open, loading, mentionPick } = vi.hoisted(() => ({
   fake: { current: null as any },
   open: vi.fn(),
   loading: { value: false },
+  mentionPick: { current: null as any },
 }));
 
 const STARTERS: Starter[] = [0, 1, 2, 3].map((i) => ({
@@ -57,6 +58,26 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
 vi.mock("@/components/ai-assistant/context/AssistantContextSeesPopover.vue", () => ({
   default: { name: "SeesStub", template: "<div><slot name='trigger' /></div>" },
 }));
+vi.mock("@/components/ai-assistant/context/AssistantMentionMenu.vue", async () => {
+  const { defineComponent, h } = await import("vue");
+  return {
+    default: defineComponent({
+      name: "AssistantMentionMenu",
+      props: ["open", "query", "org", "listboxId", "sid"],
+      setup(props, { expose }) {
+        expose({
+          current: () => mentionPick.current,
+          move: () => undefined,
+          choose: () => undefined,
+        });
+        return () =>
+          props.open
+            ? h("div", { "data-test": "assistant-mention-panel", "data-query": props.query })
+            : null;
+      },
+    }),
+  };
+});
 vi.mock("@/components/ai-assistant/gate/AssistantGateState.vue", () => ({
   default: {
     name: "GateStub",
@@ -152,6 +173,57 @@ describe("AssistantLauncher", () => {
     expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
   });
 
+  it("opens the composer's @ menu on Home and sends the picked stream as a chip, not as text", async () => {
+    const chip = {
+      id: "mention:stream:logs|ta_composer_logs",
+      kind: "stream",
+      label: raw("ta_composer_logs"),
+      ref: { type: "stream", id: "ta_composer_logs", org: "default", streamType: "logs" },
+      sizeBytes: 16,
+      provenance: "mention",
+      sent: "whitelist",
+    };
+    mentionPick.current = { id: chip.id, kind: "stream", label: chip.label, chip };
+    const { wrapper } = setupOn({ layout: "overview" });
+    await flushPromises();
+    await input(wrapper).setValue("@ta_comp");
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-mention-panel"]').attributes("data-query")).toBe(
+      "ta_comp",
+    );
+    expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(false);
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(open).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="assistant-mention-panel"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="assistant-launcher-mention-chip"]')).toHaveLength(1);
+    expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("");
+    await input(wrapper).setValue("count errors");
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open.mock.calls[0][0].payload).toMatchObject({ text: "count errors", chips: [chip] });
+    expect(wrapper.findAll('[data-test="assistant-launcher-mention-chip"]')).toHaveLength(0);
+  });
+
+  it("keeps an unmatched @query as text and picks an agent from the @ menu for the new chat", async () => {
+    mentionPick.current = null;
+    const { wrapper } = setupOn({ layout: "overview" });
+    await flushPromises();
+    await input(wrapper).setValue("@nothing");
+    await flushPromises();
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open).not.toHaveBeenCalled();
+    expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("@nothing");
+    mentionPick.current = { id: "agent:sre", kind: "field", label: raw("SRE"), agent: "sre" };
+    await input(wrapper).setValue("@inv");
+    await flushPromises();
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-agent-pill"]').attributes("data-agent")).toBe("sre");
+    await input(wrapper).setValue("why did checkout fail?");
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open.mock.calls[0][0]).toMatchObject({ agent: "sre" });
+  });
+
   it("sends the typed line on Enter as a new chat in the full view (HOME-01)", async () => {
     const { wrapper } = setup();
     await input(wrapper).setValue("why 5xx?");
@@ -229,6 +301,7 @@ describe("AssistantLauncher", () => {
     const row = wrapper.get('[data-test="assistant-launcher-recent-0"]');
     expect(row.attributes("data-status")).toBe("answering");
     expect(row.get('[data-test="assistant-launcher-recent-status"]').text()).toBe("Answering");
+    expect(wrapper.get('[data-test="assistant-launcher-all-chats"]').text()).toBe("All threads");
   });
 
   it("puts a chat that needs the user first in Your chats, with its state in words", async () => {
@@ -326,14 +399,16 @@ describe("AssistantLauncher", () => {
   it("shows at most three suggestions and no other suggestion group (PO A34)", () => {
     const { wrapper } = setup();
     expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
-    expect(wrapper.findAll("h3").map((heading) => heading.text())).toEqual(["Recent"]);
+    expect(wrapper.findAll("h3").map((heading) => heading.text())).toEqual(["Recent threads"]);
   });
 
-  it("shows skeleton rows while the starters load", () => {
+  it("shows skeleton rows while the starters load, and keeps the field typable unless the gate loads", () => {
     loading.value = true;
     const { wrapper } = setup();
     expect(wrapper.find('[data-test="assistant-launcher-loading"]').exists()).toBe(true);
-    expect(input(wrapper).attributes("disabled")).toBeDefined();
+    expect(input(wrapper).attributes("disabled")).toBeUndefined();
+    const gated = setup("loading");
+    expect(input(gated.wrapper).attributes("disabled")).toBeDefined();
   });
 
   it("tags used-up credits next to the title", () => {
@@ -401,7 +476,7 @@ describe("AssistantLauncher", () => {
       contextRegistry.setActive("home");
       const { wrapper } = setupOn({ layout: "overview" });
       await flushPromises();
-      const chips = () => wrapper.find('[data-test="assistant-launcher-page-chips"]');
+      const chips = () => wrapper.find('[data-test="assistant-launcher-chips"]');
       expect(chips().text()).toContain("Incidents on Home (1)");
       await chips().get('[data-test="assistant-context-chip-remove"]').trigger("click");
       expect(chips().find('[data-state="ghost"]').exists()).toBe(true);
@@ -412,6 +487,62 @@ describe("AssistantLauncher", () => {
       await input(wrapper).setValue("and now?");
       await input(wrapper).trigger("keydown", { key: "Enter" });
       expect(open.mock.calls[1][0].payload.removedPageKeys).toBeUndefined();
+    });
+
+    it("B-verify-1: at phone width an @ pick and the page chips fold into +N, as the composer's tray does", async () => {
+      contextRegistry.register("home", {
+        getContext: () =>
+          ({
+            ...HOME_PAGE,
+            overviewAlerts: [{ id: "a-1", name: "High 5xx", state: "firing" }],
+          }) as never,
+      });
+      contextRegistry.setActive("home");
+      const width = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+        width: 358,
+      } as DOMRect);
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(private readonly callback: () => void) {}
+          observe() {
+            this.callback();
+          }
+          disconnect() {}
+        },
+      );
+      try {
+        mentionPick.current = {
+          id: "mention:stream:logs|ta_composer_logs",
+          kind: "stream",
+          label: raw("ta_composer_logs"),
+          chip: {
+            id: "mention:stream:logs|ta_composer_logs",
+            kind: "stream",
+            label: raw("ta_composer_logs"),
+            ref: { type: "stream", id: "ta_composer_logs", org: "default", streamType: "logs" },
+            sizeBytes: 16,
+            provenance: "mention",
+            sent: "whitelist",
+          },
+        };
+        const { wrapper } = setupOn({ layout: "overview" });
+        await flushPromises();
+        await input(wrapper).setValue("@ta_comp");
+        await flushPromises();
+        await input(wrapper).trigger("keydown", { key: "Enter" });
+        await flushPromises();
+        const tray = wrapper.get('[data-test="assistant-launcher-chips"]');
+        const more = tray.get('[data-test="assistant-context-more"]');
+        expect(tray.findAll('[data-test="assistant-context-chip-button"]')).toHaveLength(0);
+        expect(more.text()).toBe("+3");
+        await more.trigger("click");
+        expect(tray.findAll('[data-test="assistant-launcher-mention-chip"]')).toHaveLength(1);
+        expect(tray.findAll('[data-test="assistant-launcher-page-chip"]')).toHaveLength(2);
+      } finally {
+        width.mockRestore();
+        vi.unstubAllGlobals();
+      }
     });
 
     it("takes a page chip's click to the Now section and still removes on its x", async () => {
@@ -425,8 +556,12 @@ describe("AssistantLauncher", () => {
       try {
         const { wrapper } = setupOn({ layout: "overview" });
         await flushPromises();
-        const chips = () => wrapper.find('[data-test="assistant-launcher-page-chips"]');
-        await chips().get('[data-test="assistant-context-chip-button"]').trigger("click");
+        const chips = () => wrapper.find('[data-test="assistant-launcher-chips"]');
+        await chips()
+          .get(
+            '[data-test="assistant-launcher-page-chip"] [data-test="assistant-context-chip-button"]',
+          )
+          .trigger("click");
         expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ block: "start" }));
         expect(document.activeElement).toBe(section);
         await chips().get('[data-test="assistant-context-chip-remove"]').trigger("click");

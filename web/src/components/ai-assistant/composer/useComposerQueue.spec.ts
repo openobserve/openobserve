@@ -13,42 +13,61 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, nextTick, ref } from "vue";
+import { defineComponent, nextTick, reactive, ref } from "vue";
+
+import type { TurnState } from "@/composables/assistant";
 
 import {
-  mergeQueued,
   queuedOf,
   resetComposerQueueForTests,
   useComposerQueue,
   type ComposerQueue,
 } from "./useComposerQueue";
 
-function harness(sid = "s1") {
-  const running = ref(true);
-  const state = ref<"done" | "failed">("done");
-  const drafts = ref<Record<string, string>>({ [sid]: "" });
-  const send = vi.fn();
-  const restore = vi.fn((id: string, text: string) => (drafts.value[id] = text));
+// The store's own shape for two chats: the turn state and the draft are all the drain reads.
+function fakeStore() {
+  const store = reactive({
+    state: {
+      sessions: {
+        s1: { turn: { state: "responding.writing" } as TurnState, composer: { text: "" } },
+        s2: { turn: { state: "idle" } as TurnState, composer: { text: "" } },
+      } as Record<string, { turn: TurnState; composer: { text: string } }>,
+    },
+    setDraft: vi.fn((sid: string, patch: { text: string }) => {
+      store.state.sessions[sid]!.composer.text = patch.text;
+    }),
+    resend: vi.fn(async () => undefined),
+  });
+  return store;
+}
+
+const DONE = { state: "done", saved: "server" } as TurnState;
+const STOPPED = { state: "stopped", steps: 1, partial: true } as TurnState;
+
+function harness(sid = "s1", store = fakeStore()) {
+  const restore = vi.fn((id: string, text: string) => store.setDraft(id, { text }));
   let queue!: ComposerQueue;
-  const wrapper = mount(
+  const shown = ref(sid);
+  mount(
     defineComponent({
       setup() {
         queue = useComposerQueue({
-          sid: () => sid,
-          running: () => running.value,
-          endedDone: () => state.value === "done",
-          draft: (id) => drafts.value[id] ?? "",
-          send,
+          sid: () => shown.value,
+          draft: (id) => store.state.sessions[id]?.composer.text ?? "",
           restore,
+          store,
         });
         return () => null;
       },
     }),
   );
-  return { wrapper, running, state, drafts, send, restore, queue: () => queue };
+  return { store, shown, restore, queue: () => queue };
 }
+
+const sentText = (store: ReturnType<typeof fakeStore>) =>
+  store.resend.mock.calls.map((call) => (call as unknown as [string, { text: string }])[1].text);
 
 afterEach(() => resetComposerQueueForTests());
 
@@ -61,57 +80,107 @@ describe("useComposerQueue: Enter while answering queues one message", () => {
     expect(queue().queued.value?.text).toBe("first");
   });
 
-  it("sends the queued message when the answer ends well and nothing new was typed", async () => {
-    const { queue, running, send } = harness();
+  it("sends the queued message as its own prompt when the answer ends well", async () => {
+    const { queue, store } = harness();
     queue().enqueue("and the p95?");
-    running.value = false;
-    await nextTick();
-    expect(send).toHaveBeenCalledWith("s1", "and the p95?");
+    store.state.sessions.s1!.turn = DONE;
+    await flushPromises();
+    expect(store.resend).toHaveBeenCalledWith(
+      "s1",
+      expect.objectContaining({ text: "and the p95?" }),
+      "typed",
+    );
     expect(queuedOf("s1")).toBeNull();
   });
 
-  it("hands the message back instead of sending after a failed answer", async () => {
-    const { queue, running, state, send, restore } = harness();
+  it("B-composer-12: sends the queued text alone and leaves the draft typed since in the field", async () => {
+    const { queue, store } = harness();
+    queue().enqueue("AAA first queued");
+    store.state.sessions.s1!.composer.text = "BBB second";
+    store.state.sessions.s1!.turn = DONE;
+    await flushPromises();
+    expect(sentText(store)).toEqual(["AAA first queued"]);
+    expect(store.state.sessions.s1!.composer.text).toBe("BBB second");
+  });
+
+  it("hands the message back into an empty field after an answer that did not finish", async () => {
+    const { queue, store } = harness();
     queue().enqueue("and the p95?");
-    state.value = "failed";
-    running.value = false;
-    await nextTick();
-    expect(send).not.toHaveBeenCalled();
-    expect(restore).toHaveBeenCalledWith("s1", "and the p95?");
+    store.state.sessions.s1!.turn = STOPPED;
+    await flushPromises();
+    expect(store.resend).not.toHaveBeenCalled();
+    expect(store.state.sessions.s1!.composer.text).toBe("and the p95?");
+    expect(queuedOf("s1")).toBeNull();
   });
 
-  it("puts the queued text ahead of what was typed since, and sends neither on its own", async () => {
-    const { queue, running, drafts, send, restore } = harness();
+  it("B-composer-12: keeps the message queued, never joined, when the field holds a draft after a stop", async () => {
+    const { queue, store } = harness();
     queue().enqueue("first");
-    drafts.value.s1 = "second";
-    running.value = false;
-    await nextTick();
-    expect(send).not.toHaveBeenCalled();
-    expect(restore).toHaveBeenCalledWith("s1", "first\nsecond");
+    store.state.sessions.s1!.composer.text = "second";
+    store.state.sessions.s1!.turn = STOPPED;
+    await flushPromises();
+    expect(store.resend).not.toHaveBeenCalled();
+    expect(store.state.sessions.s1!.composer.text).toBe("second");
+    expect(queuedOf("s1")?.text).toBe("first");
   });
 
-  it("Edit takes the message out of the queue and back into the draft", () => {
-    const { queue, drafts, restore } = harness();
+  it("Edit swaps the queued message and the draft, never joining them", () => {
+    const { queue, store } = harness();
     queue().enqueue("first");
-    drafts.value.s1 = "more";
+    store.state.sessions.s1!.composer.text = "more";
     queue().edit();
-    expect(restore).toHaveBeenCalledWith("s1", "first\nmore");
+    expect(store.state.sessions.s1!.composer.text).toBe("first");
+    expect(queuedOf("s1")?.text).toBe("more");
+  });
+
+  it("Edit with an empty field takes the message out of the queue", () => {
+    const { queue, store } = harness();
+    queue().enqueue("first");
+    queue().edit();
+    expect(store.state.sessions.s1!.composer.text).toBe("first");
     expect(queue().queued.value).toBeNull();
   });
 
   it("shares one queue per chat, so a second composer on it never sends twice", async () => {
-    const one = harness();
-    const two = harness();
+    const store = fakeStore();
+    const one = harness("s1", store);
+    const two = harness("s1", store);
     one.queue().enqueue("only once");
     expect(two.queue().queued.value?.text).toBe("only once");
-    one.running.value = false;
-    two.running.value = false;
-    await nextTick();
-    expect(one.send.mock.calls.length + two.send.mock.calls.length).toBe(1);
+    store.state.sessions.s1!.turn = DONE;
+    await flushPromises();
+    expect(store.resend).toHaveBeenCalledTimes(1);
   });
 
-  it("merges without a stray newline when nothing was typed", () => {
-    expect(mergeQueued("a", "  ")).toBe("a");
-    expect(mergeQueued("a", "b")).toBe("a\nb");
+  it("B-composer-8: sends a chat's queued message when its turn ends while another chat is shown", async () => {
+    const { queue, store, shown } = harness();
+    queue().enqueue("Now say only: QUEUED-SWITCH");
+    shown.value = "s2";
+    await nextTick();
+    store.state.sessions.s1!.turn = DONE;
+    await flushPromises();
+    expect(sentText(store)).toEqual(["Now say only: QUEUED-SWITCH"]);
+    expect(queuedOf("s1")).toBeNull();
+  });
+
+  it("B-composer-8: off screen, a stopped turn hands the message back into the empty field", async () => {
+    const { queue, store, shown } = harness();
+    queue().enqueue("follow-up");
+    shown.value = "s2";
+    store.state.sessions.s1!.turn = STOPPED;
+    await flushPromises();
+    expect(store.resend).not.toHaveBeenCalled();
+    expect(store.state.sessions.s1!.composer.text).toBe("follow-up");
+  });
+
+  it("B-composer-8: off screen, a draft typed since stays and the queued text still goes", async () => {
+    const { queue, store, shown } = harness();
+    queue().enqueue("queued");
+    store.state.sessions.s1!.composer.text = "typed later";
+    shown.value = "s2";
+    store.state.sessions.s1!.turn = DONE;
+    await flushPromises();
+    expect(sentText(store)).toEqual(["queued"]);
+    expect(store.state.sessions.s1!.composer.text).toBe("typed later");
   });
 });

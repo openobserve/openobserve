@@ -99,7 +99,7 @@ use crate::common::meta::{
 /// Macro to conditionally select a value based on the "enterprise" feature flag.
 ///
 /// # Usage
-/// ```rust
+/// ```ignore
 /// let value = enterprise_value!(default_expr, enterprise_expr);
 /// ```
 ///

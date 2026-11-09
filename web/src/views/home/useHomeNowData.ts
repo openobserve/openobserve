@@ -35,7 +35,7 @@ import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
 import { resolveBrowserTimezone } from "@/utils/timezone";
 
 import type { BuiltFromSource } from "./HomeBuiltFrom.vue";
-import type { HomeRange } from "./homeUrl";
+import { DEFAULT_HOME_RANGE, periodToMs, type HomeRange } from "./homeUrl";
 import {
   useHomeNow,
   type OverviewAlertHit,
@@ -45,11 +45,10 @@ import {
   type UseHomeNow,
 } from "./useHomeNow";
 
+export { DEFAULT_HOME_RANGE, periodToMs };
+
 /** The trend endpoint refuses a window over this; the list then shows the topology figures. */
 export const MAX_TREND_WINDOW_US = 7 * 24 * 3_600_000_000;
-
-/** Home opens on the window its baselines are read against. */
-export const DEFAULT_HOME_RANGE: HomeRange = { type: "relative", period: "24h" };
 
 const NOW_LIST_LIMIT = 12;
 const INCIDENT_LIST_SIZE = 20;
@@ -57,15 +56,6 @@ const ALERT_HISTORY_SIZE = 500;
 const ANOMALY_HISTORY_LIMIT = 20;
 // The per-config fallback reads at most this many history rows in all.
 const PER_CONFIG_BUDGET = 500;
-
-const PERIOD_UNIT_MS: Record<string, number> = {
-  s: 1_000,
-  m: 60_000,
-  h: 3_600_000,
-  d: 86_400_000,
-  w: 604_800_000,
-  M: 2_592_000_000,
-};
 
 type SourceKey = "incidents" | "services" | "anomalies" | "recentEvents";
 
@@ -107,12 +97,6 @@ export function homeRunsOf(runs: readonly OrgRcaRun[]): HomeRuns {
     (run) => run.trigger === "auto" && (run.state === "failed" || run.state === "refused"),
   );
   return { byIncident, failedAuto };
-}
-
-/** Milliseconds of a relative period such as `15m` or `24h`; an unreadable one is 15 minutes. */
-export function periodToMs(period: string): number {
-  const match = /^(\d+)([smhdwM])$/.exec(period);
-  return match ? Number(match[1]) * PERIOD_UNIT_MS[match[2]] : 15 * 60_000;
 }
 
 /** The range's window in microseconds; a relative one is anchored to `nowMs`. */

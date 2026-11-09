@@ -15,12 +15,15 @@
 
 import {
   approvalDiff,
+  approvalDuration,
   approvalNotifies,
   approvalNoun,
+  approvalUntil,
   approvalVerb,
   type ApprovalBlockData,
 } from "@/composables/assistant/pure";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { formatOrgTime } from "@/utils/formatters";
 
 import type { ApprovalDiffRow } from "./approvals.types";
 
@@ -28,6 +31,23 @@ type NamedCard = Pick<ApprovalBlockData, "tool" | "targets" | "args">;
 
 // o2-ai words a refused call as "Error {status}: {body}".
 const HTTP_ERROR = /^\s*Error (\d{3}):\s*([\s\S]*)$/;
+
+// A nested setting reads as its own rows down to this depth; deeper values stay as JSON.
+const MAX_FLAT_DEPTH = 3;
+
+// A field named `…_at` holds a time and `…_secs` a length of time; both read in words, never as raw numbers.
+const TIME_FIELD = /_at$/;
+
+const SECONDS_FIELD = /_secs$/;
+
+// A pause card's duration already reads in its "Until …" line.
+const PAUSE_TIME_FIELDS = new Set(["minutes", "ends_at"]);
+
+interface LeafChange {
+  path: string[];
+  after: unknown;
+  before?: unknown;
+}
 
 /** A heading as the tail of a sentence: "Pause alert x" reads "Denied: pause alert x". */
 export function lowerFirst(text: string): string {
@@ -124,9 +144,82 @@ function recordOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function valueText(value: unknown): string {
+function valueText(value: unknown, t: TranslateFn): string {
   if (value === undefined) return "—";
+  if (typeof value === "boolean") return String(t(value ? "common.yes" : "common.no"));
+  if (Array.isArray(value) && value.every((entry) => typeof entry !== "object" || entry === null))
+    return value.map(String).join(", ");
   return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+// A time, a duration or a list of `{ids}` (a downtime's targets) in the reader's words.
+function leafText(
+  field: string,
+  value: unknown,
+  card: Pick<ApprovalBlockData, "targets">,
+  t: TranslateFn,
+): string {
+  if (typeof value === "number" && value > 0) {
+    if (TIME_FIELD.test(field)) return formatOrgTime(epochMsOf(value));
+    if (SECONDS_FIELD.test(field)) return String(approvalDuration(value * 1000, t));
+  }
+  const ids = idsOf(value);
+  if (ids) {
+    const names = new Map(card.targets.map((target) => [target.id, target.name]));
+    return ids.map((id) => names.get(id) ?? id).join(", ");
+  }
+  return valueText(value, t);
+}
+
+// Wire times are microseconds, sometimes seconds.
+function epochMsOf(value: number): number {
+  if (value > 1e14) return Math.round(value / 1000);
+  return value < 1e12 ? value * 1000 : value;
+}
+
+function idsOf(value: unknown): string[] | null {
+  if (!Array.isArray(value) || !value.length) return null;
+  const ids: string[] = [];
+  for (const entry of value) {
+    const list = recordOf(entry)?.ids;
+    if (!Array.isArray(list)) return null;
+    ids.push(...list.filter((id): id is string => typeof id === "string"));
+  }
+  return ids.length ? ids : null;
+}
+
+// `trigger_condition` → "Trigger condition"; `duration_secs` → "Duration".
+function fieldLabel(key: string): string {
+  const words = key.replace(SECONDS_FIELD, "").replace(/[_.]+/g, " ").trim();
+  return words.charAt(0).toLocaleUpperCase() + words.slice(1);
+}
+
+// A nested object reads as one row per changed setting, never as one block of JSON.
+function leafChanges(
+  path: string[],
+  after: unknown,
+  before: unknown,
+  known: boolean,
+): LeafChange[] {
+  const own = recordOf(after);
+  const old = recordOf(before);
+  if (!own || path.length >= MAX_FLAT_DEPTH || (known && before !== undefined && !old))
+    return [{ path, after, ...(known && { before }) }];
+  return Object.entries(own).flatMap(([key, value]) => {
+    const has = !!old && key in old;
+    if (has && JSON.stringify(old[key]) === JSON.stringify(value)) return [];
+    return leafChanges([...path, key], value, old?.[key], has);
+  });
+}
+
+// The leaf's own name, with its parent's when two leaves share it.
+function leafLabels(changes: LeafChange[]): string[] {
+  const leaf = changes.map((change) => change.path.at(-1) ?? "");
+  return changes.map((change, index) =>
+    leaf.indexOf(leaf[index]) === leaf.lastIndexOf(leaf[index]) || change.path.length < 2
+      ? fieldLabel(leaf[index])
+      : `${fieldLabel(change.path.at(-2) ?? "")} · ${fieldLabel(leaf[index])}`,
+  );
 }
 
 /** The card's changed fields; `before` replaces the card's own old side, as a `changed_since` record does. */
@@ -137,16 +230,45 @@ export function approvalDiffRows(
 ): ApprovalDiffRow[] {
   const changed = approvalDiff({ ...card, before });
   const unknown = t("assistant.approval.currentUnknown");
-  const rows = (changed?.rows ?? []).map((row) => {
-    const value = raw(valueText(row.after));
-    if (card.kind === "create") return { field: raw(row.field), value, before: null };
-    const old = "before" in row ? valueText(row.before) : changed?.oneSided ? unknown : null;
-    return { field: raw(row.field), value, before: old === null ? null : raw(old) };
+  const verb = approvalVerb(card);
+  // A pause or resume sets a downtime, not the alert's fields, so its values have no old side.
+  const stateVerb = verb === "pause" || verb === "resume";
+  const pause = verb === "pause" && pauseUntil(card) !== null;
+  const changes = (changed?.rows ?? [])
+    .filter((row) => !(pause && PAUSE_TIME_FIELDS.has(row.field)))
+    .flatMap((row) => leafChanges([row.field], row.after, row.before, "before" in row));
+  const labels = leafLabels(changes);
+  const rows = changes.map((change, index) => {
+    const field = raw(labels[index]);
+    const leaf = change.path.at(-1) ?? "";
+    const value = raw(leafText(leaf, change.after, card, t));
+    if (card.kind === "create" || stateVerb) return { field, value, before: null };
+    const old =
+      "before" in change
+        ? leafText(leaf, change.before, card, t)
+        : changed?.oneSided
+          ? unknown
+          : null;
+    return { field, value, before: old === null ? null : raw(old) };
   });
   const notifies = approvalNotifies(card);
   return notifies
     ? [...rows, { field: t("assistant.approval.notifies"), value: raw(notifies), before: null }]
     : rows;
+}
+
+/** When a pause ends: the call's own arguments, else the shared change, else a gathered card's first call. */
+export function pauseUntil(
+  card: Pick<ApprovalBlockData, "args" | "after">,
+  from?: number,
+): number | null {
+  const calls = card.args?.calls;
+  const first = Array.isArray(calls) ? recordOf(calls[0]) : null;
+  for (const args of [card.args, recordOf(card.after), first]) {
+    const until = args ? approvalUntil({ args }, from) : null;
+    if (until !== null) return until;
+  }
+  return null;
 }
 
 /** "pausing alerts": what an always grant covers, in the reader's words; the tool name when the card has no verb. */

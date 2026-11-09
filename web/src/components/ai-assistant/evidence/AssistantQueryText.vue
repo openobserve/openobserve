@@ -47,11 +47,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :toolbar="false"
       wrap
       padded
-      :max-lines="MAX_LINES"
+      :max-lines="cap"
       contrast="aa"
       :scroll-label="label"
       :data-test="dataTest"
     />
+    <button
+      v-if="long"
+      type="button"
+      class="text-text-link hover:bg-surface-hover focus-visible:outline-border-focus flex min-h-8 w-full items-center justify-center gap-1 text-xs font-medium focus-visible:outline-2"
+      :class="chrome ? 'border-border-subtle bg-surface-base border-t' : 'rounded-default'"
+      :aria-expanded="expanded"
+      :data-test="`${dataTest}-expand`"
+      @click="expanded = !expanded"
+    >
+      {{
+        expanded
+          ? t("assistant.query.showFewerLines")
+          : t("assistant.query.showAllLines", { count: lineCount })
+      }}
+    </button>
     <div
       v-if="$slots.foot"
       class="border-border-subtle bg-surface-base flex min-w-0 items-center gap-1 border-t px-2 py-1.5"
@@ -70,11 +85,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :copyable="false"
       :toolbar="false"
       wrap
-      :max-lines="MAX_LINES"
+      :max-lines="cap"
       contrast="aa"
       :scroll-label="label"
       :data-test="dataTest"
     />
+    <button
+      v-if="long"
+      type="button"
+      class="text-text-link hover:bg-surface-hover focus-visible:outline-border-focus flex min-h-8 w-full items-center justify-center gap-1 text-xs font-medium focus-visible:outline-2"
+      :class="chrome ? 'border-border-subtle bg-surface-base border-t' : 'rounded-default'"
+      :aria-expanded="expanded"
+      :data-test="`${dataTest}-expand`"
+      @click="expanded = !expanded"
+    >
+      {{
+        expanded
+          ? t("assistant.query.showFewerLines")
+          : t("assistant.query.showAllLines", { count: lineCount })
+      }}
+    </button>
   </div>
 </template>
 
@@ -123,6 +153,12 @@ const lang = computed(() => (props.language === "regex" ? "plaintext" : props.la
 const highlighted = computed(() => highlightCode(props.text, lang.value));
 
 const copied = ref(false);
+
+// Code past the cap is reachable only through a nested scroller, so the block says how much is hidden and opens in place.
+const expanded = ref(false);
+const lineCount = computed(() => props.text.split("\n").length);
+const long = computed(() => lineCount.value > MAX_LINES);
+const cap = computed(() => (expanded.value ? undefined : MAX_LINES));
 
 let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 

@@ -144,6 +144,12 @@ pub fn enforced() -> bool {
     KEY.get().is_some()
 }
 
+/// The grant a `grant_<id>~<nonce>` approval names; o2-ai adds the nonce so each call is unique.
+pub fn grant_of(approval_id: &str) -> Option<&str> {
+    let rest = approval_id.strip_prefix(GRANT_PREFIX)?;
+    Some(rest.split_once('~').map_or(rest, |(grant, _)| grant))
+}
+
 /// Installs the lookup that decides whether a `grant_<id>` approval is still live.
 pub fn set_grant_check(check: GrantCheck) {
     if GRANT_CHECK.set(check).is_err() {
@@ -312,12 +318,6 @@ pub fn derive_key(secret: &str) -> [u8; 32] {
     expand.update(KEY_LABEL);
     expand.update(&[1u8]);
     expand.finalize().into_bytes().into()
-}
-
-/// The grant a `grant_<id>~<nonce>` approval names; o2-ai adds the nonce so each call is unique.
-fn grant_of(approval_id: &str) -> Option<&str> {
-    let rest = approval_id.strip_prefix(GRANT_PREFIX)?;
-    Some(rest.split_once('~').map_or(rest, |(grant, _)| grant))
 }
 
 /// Spends `verified` on this node, then in the shared store when `claim` is registered.

@@ -16,9 +16,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
+import { parseChatDetail } from "@/services/assistant";
 import { raw } from "@/types/i18n";
 
 import {
+  boundedQuery,
   answerQueriesAllEmpty,
   boundedFindings,
   boundedResult,
@@ -35,6 +37,7 @@ import {
   turnAnnotationKey,
   windowsOf,
 } from "./evidence";
+import { projectRecord } from "./record";
 
 const US = 1000;
 const FROM = 1_760_000_000_000;
@@ -344,5 +347,129 @@ describe("toolLinksOf / chipOpenQuery", () => {
       "acme",
     );
     expect(query).toMatchObject({ stream: "default", from: FROM - 60_000, to: FROM + 60_000 });
+  });
+});
+
+describe("a reloaded answer's query cards keep the window the agent ran", () => {
+  const SQL =
+    "SELECT _timestamp, service FROM ta_logs WHERE http_status >= 500 ORDER BY _timestamp DESC LIMIT 10";
+  const search = (id: string, start: number, end: number) => [
+    {
+      type: "tool_call",
+      tool: "SearchSQL",
+      message: "Querying logs",
+      context: {
+        type: "logs",
+        request_body: { query: { sql: SQL, start_time: start, end_time: end, size: 10 } },
+        sql: SQL,
+      },
+      call_id: id,
+    },
+    { type: "tool_result", tool: "SearchSQL", success: true, message: "ok", call_id: id },
+  ];
+  // Stored turns as `GET /ai/chats/{sid}` returned them for chat 01a1c000 (times shifted).
+  const answerOf = (frames: unknown[]) => {
+    const detail = parseChatDetail({
+      session_id: "s1",
+      title: "t",
+      created_at: 1,
+      updated_at: 1,
+      last_committed_seq: 9,
+      turns: [
+        {
+          turn_id: "t1",
+          user: { text: "q" },
+          frames: [...frames, { type: "complete" }],
+          status: "completed",
+        },
+      ],
+    });
+    return projectRecord(detail.turns ?? [], "owner", { timezone: "UTC", scrubModels: false })[1];
+  };
+
+  it("reads a PrometheusRangeQuery step's ISO window, so the PromQL card and its chart come back", () => {
+    const promql = "avg by (service) (ta_p95_ms)";
+    const answer = answerOf([
+      {
+        type: "tool_call",
+        tool: "PrometheusRangeQuery",
+        message: "Analyzing metrics",
+        context: {
+          query: promql,
+          start: "2026-11-09T10:10:51.794Z",
+          end: "2026-11-09T11:10:51.794Z",
+          step: "1m",
+        },
+        call_id: "p1",
+      },
+      {
+        type: "tool_result",
+        tool: "PrometheusRangeQuery",
+        success: true,
+        message: "ok",
+        call_id: "p1",
+      },
+    ]);
+    const steps = stepsOf(answer, "default");
+    expect(steps[0]).toMatchObject({ kind: "promql", state: "done" });
+    const from = Date.parse("2026-11-09T10:10:51.794Z");
+    const to = Date.parse("2026-11-09T11:10:51.794Z");
+    expect(fenceQuery(promql, "promql", steps, "default", null)?.query).toMatchObject({ from, to });
+  });
+
+  it.each([
+    ["strings", "1794236722.638", "1794240322.638"],
+    ["numbers", 1_794_236_722.638, 1_794_240_322.638],
+    ["ms", 1_794_236_722_638, 1_794_240_322_638],
+    ["µs", 1_794_236_722_638_000, 1_794_240_322_638_000],
+    ["µs strings", "1794236722638000", "1794240322638000"],
+    ["ns", 1_794_236_722_638_000_000, 1_794_240_322_638_000_000],
+    ["ISO", "2026-11-09T15:05:22.638Z", "2026-11-09T16:05:22.638Z"],
+  ])(
+    "reads a PrometheusRangeQuery window the model sent as %s as the same instant",
+    (_, start, end) => {
+      const promql = "avg by (service) (ta_conversation3_p95_latency_ms)";
+      const args = { query: promql, start, end, step: "1m" };
+      const answer = answerOf([
+        {
+          type: "tool_call",
+          tool: "PrometheusRangeQuery",
+          message: "Analyzing metrics",
+          context: args,
+          call_id: "p1",
+        },
+        {
+          type: "tool_result",
+          tool: "PrometheusRangeQuery",
+          success: true,
+          message: "PrometheusRangeQuery completed successfully",
+          call_args: args,
+          call_id: "p1",
+        },
+      ]);
+      const steps = stepsOf(answer, "default");
+      expect(steps[0].range).toEqual({ from: 1_794_236_722_638, to: 1_794_240_322_638 });
+      expect(fenceQuery(promql, "promql", steps, "default", null)?.query).toMatchObject({
+        from: 1_794_236_722_638,
+        to: 1_794_240_322_638,
+      });
+    },
+  );
+
+  it("keeps a typed query frame's time_range as sent, since that contract is already ms", () => {
+    const frame = { type: "query", language: "promql", text: "up", time_range: { from: 1, to: 2 } };
+    expect(boundedQuery(frame)).toMatchObject({ from: 1, to: 2 });
+    const door = { from: 1_794_240_205_000, to: 1_794_241_105_000 };
+    expect(boundedQuery({ ...frame, time_range: door })).toMatchObject(door);
+  });
+
+  it("takes the agent's last run of a query, which its answer reports, over an earlier narrower one", () => {
+    const answer = answerOf([
+      ...search("c1", 1_794_221_721_614_000, 1_794_222_621_614_000),
+      ...search("c2", 1_794_136_221_614_000, 1_794_222_621_614_000),
+    ]);
+    const fence = fenceQuery(SQL, "sql", stepsOf(answer, "default"), "default", null);
+    expect(fence?.query).toMatchObject({ from: 1_794_136_221_614, to: 1_794_222_621_614 });
+    expect(fence?.rangeSource).toBe("step");
   });
 });

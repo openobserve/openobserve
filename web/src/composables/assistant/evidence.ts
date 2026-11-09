@@ -166,6 +166,8 @@ const STREAM_CHIPS: ReadonlySet<string> = new Set([
 
 const ROW_WINDOW_MS = 60_000;
 
+const NUMERIC_TIME = /^\d+(\.\d+)?$/;
+
 export const MAX_CHART_SERIES = 10;
 
 export const MAX_CHART_POINTS = 120;
@@ -180,6 +182,8 @@ const ARG_KEYS = [
   "query",
   "start_time",
   "end_time",
+  "start",
+  "end",
   "command",
   "name",
 ] as const;
@@ -440,10 +444,14 @@ export function fenceQuery(
   if (!language || !code.trim()) return null;
   const text = code.trim().slice(0, MAX_TEXT_CHARS);
   const normal = normalise(text);
-  const exact = steps.find((step) => step.query && normalise(step.query.text) === normal) ?? null;
+  // The agent's last run of a query is the one its answer reports, so a retry over a wider window wins.
+  const exact =
+    steps.findLast((step) => step.query && normalise(step.query.text) === normal) ?? null;
   const named = language === "sql" ? sqlStreamOf(text) : undefined;
   const sameStream =
-    exact ?? steps.find((step) => step.range && !!named && step.query?.stream === named) ?? null;
+    exact ??
+    steps.findLast((step) => step.range && !!named && step.query?.stream === named) ??
+    null;
   const stream = exact?.query?.stream ?? named;
   const streamType =
     exact?.query?.streamType ?? (language === "promql" ? "metrics" : sameStream?.query?.streamType);
@@ -592,8 +600,8 @@ function stepQuery(
     text(args.stream_name) ??
     text(args.stream) ??
     (kind === "promql" ? undefined : sqlStreamOf(sql));
-  const from = epochMs(args.start_time);
-  const to = epochMs(args.end_time);
+  const from = timeArg(args.start_time ?? args.start);
+  const to = timeArg(args.end_time ?? args.end);
   const streamType =
     streamTypeOf(args.stream_type) ??
     (kind === "promql" ? "metrics" : kind === "traces" ? "traces" : undefined);
@@ -607,6 +615,22 @@ function stepQuery(
   };
 }
 
+// The model picks the unit of a window it sends, so seconds, ms, µs, ns and ISO all arrive; magnitude tells them apart after 1973.
+function timeArg(value: unknown): number | null {
+  const raw = typeof value === "string" ? value.trim() : value;
+  const n =
+    typeof raw === "string" && raw !== ""
+      ? NUMERIC_TIME.test(raw)
+        ? Number(raw)
+        : Date.parse(raw)
+      : raw;
+  if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) return null;
+  if (n > 1e17) return Math.round(n / 1e6);
+  if (n > 1e14) return Math.round(n / 1000);
+  if (n < 1e11) return Math.round(n * 1000);
+  return Math.round(n);
+}
+
 // The `tool_call` context nests the search under `request_body.query` in some shapes.
 function flatContext(context: Record<string, any> | undefined): Record<string, unknown> {
   const query = context?.request_body?.query;
@@ -617,7 +641,7 @@ function flatContext(context: Record<string, any> | undefined): Record<string, u
 function kindOf(tool: string, args: Record<string, unknown>): StepKind {
   const name = tool.replace(/^o2_/, "");
   if (/^searchsql$/i.test(name)) return "query";
-  if (/promql/i.test(name)) return "promql";
+  if (/promql|prometheus/i.test(name)) return "promql";
   if (/trace/i.test(name) && /search/i.test(name)) return "traces";
   if (/^streamlist$/i.test(name)) return "stream_list";
   if (/^streamschema$/i.test(name)) return "schema";

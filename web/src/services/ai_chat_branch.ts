@@ -15,6 +15,7 @@
 
 import { mutationOptions } from "@tanstack/vue-query";
 
+import { assistantKeys } from "./assistant.querykeys";
 import http from "./http";
 
 /** Body of `POST /api/{org}/ai/chats/{session_id}/branch`; `version` is the 1-based answer shown, the active one when absent. */
@@ -63,7 +64,7 @@ export const branchChatMutation = (org: string) =>
           ...(vars.version !== undefined && { version: vars.version }),
         })
       ).data,
-    meta: { silentError: true },
+    meta: { invalidates: [assistantKeys.chats(org)], silentError: true },
   });
 
 export default aiChatBranch;

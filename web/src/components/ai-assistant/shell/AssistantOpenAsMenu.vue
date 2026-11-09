@@ -40,11 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="xs"
         :icon-left="assistantGlyph.openFull"
-        :icon-right="assistantGlyph.expand"
-        class="max-md:min-h-11 pointer-coarse:min-h-11"
+        :icon-right="mdUp ? assistantGlyph.expand : undefined"
+        class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11"
+        :aria-label="t('assistant.shell.openAs')"
         data-test="assistant-open-as-button"
       >
-        {{ t("assistant.shell.openAs") }}
+        <!-- A phone keeps the header's room for the chat title: icon only, its name still read aloud -->
+        <span class="max-md:sr-only">{{ t("assistant.shell.openAs") }}</span>
       </OButton>
       <AssistantIconButton
         v-else
@@ -112,6 +114,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 
 import { useAssistantPlaces } from "./useAssistantPlaces";
@@ -124,6 +127,7 @@ const props = withDefaults(defineProps<AssistantOpenAsMenuProps>(), {
 });
 
 const { t } = useI18nTyped();
+const { mdUp } = useBreakpoint();
 const { places } = useAssistantPlaces(() => ({
   placement: props.placement,
   sid: props.sid,

@@ -32,6 +32,10 @@ import type { AgentId } from "@/composables/assistant";
 export const AGENT_PILL_CLASS =
   "bg-surface-subtle text-text-heading inline-flex h-7 max-w-48 min-w-0 items-center gap-1.5 rounded-full ps-1.5 pe-2 text-xs leading-none font-medium";
 
+// OButton has no class merge, so the pill's fill and text must outrank the ghost variant's transparent ones.
+export const AGENT_PICKER_CLASS =
+  "bg-surface-subtle! text-text-heading! enabled:hover:bg-button-ghost-subtle-hover-bg! enabled:active:bg-button-ghost-subtle-active-bg! aria-expanded:bg-button-ghost-subtle-hover-bg! disabled:opacity-45";
+
 export interface AssistantAgentPillProps {
   agent: AgentId;
   disabled?: boolean;

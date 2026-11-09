@@ -375,24 +375,32 @@ describe("AssistantHistoryList", () => {
   it("offers Auto-runs and Shared only where the server keeps them", async () => {
     const ids = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
       wrapper.findAll('[data-test^="assistant-history-view-"]').map((el) => el.text());
+    vi.mocked(aiChatShare.listMine).mockClear();
     const local = await setup();
     expect(ids(local.wrapper)).not.toContain("Shared");
     expect(ids(local.wrapper)).not.toContain("Auto-runs");
     local.wrapper.unmount();
+    expect(aiChatShare.listMine).not.toHaveBeenCalled();
+    vi.mocked(aiChatShare.listMine).mockResolvedValue({
+      data: { shares: [{ session_id: SEED[0].sessionId, visibility: "org" }] },
+    } as never);
     const server = await setup({}, { persistence: true });
     expect(server.history.mode.value).toBe("server");
     expect(ids(server.wrapper)).toEqual(expect.arrayContaining(["Auto-runs", "Shared"]));
-    expect(aiChatShare.listMine).not.toHaveBeenCalled();
-    vi.mocked(aiChatShare.listMine).mockResolvedValueOnce({
-      data: { shares: [{ session_id: SEED[0].sessionId }] },
-    } as never);
-    const noted = vi.spyOn(server.history, "noteShared");
+    // Every row shows whether it is shared, so the owner's links are read with the list.
+    expect(aiChatShare.listMine).toHaveBeenCalled();
+    const shared = server.wrapper.get(
+      `[data-sid="${SEED[0].sessionId}"] [data-test="assistant-history-row-shared"]`,
+    );
+    expect(shared.attributes("data-visibility")).toBe("org");
     await server.wrapper.get('[data-test="assistant-history-view-shared"]').trigger("click");
     await flushPromises();
     expect(server.history.filter.value.kind).toBe("shared");
-    expect(aiChatShare.listMine).toHaveBeenCalledTimes(1);
-    expect(noted).toHaveBeenLastCalledWith([SEED[0].sessionId]);
+    expect(server.wrapper.findAll("[data-sid]").map((el) => el.attributes("data-sid"))).toEqual([
+      SEED[0].sessionId,
+    ]);
     server.history.setFilter({ kind: "all" });
+    vi.mocked(aiChatShare.listMine).mockReset();
   });
 
   it("lists the org's auto-runs from the server and follows one in the side panel", async () => {
@@ -446,9 +454,8 @@ describe("AssistantHistoryList", () => {
   });
 
   it("lists as shared only chats whose link has not expired", async () => {
-    const server = await setup({}, { persistence: true });
     const micros = Date.now() * 1_000;
-    vi.mocked(aiChatShare.listMine).mockResolvedValueOnce({
+    vi.mocked(aiChatShare.listMine).mockResolvedValue({
       data: {
         shares: [
           { session_id: SEED[0].sessionId, expires_at: micros - 1_000_000 },
@@ -457,11 +464,14 @@ describe("AssistantHistoryList", () => {
         ],
       },
     } as never);
-    const noted = vi.spyOn(server.history, "noteShared");
+    const server = await setup({}, { persistence: true });
     server.history.setFilter({ kind: "shared" });
     await flushPromises();
-    expect(noted).toHaveBeenLastCalledWith([SEED[1].sessionId, SEED[2].sessionId]);
+    const sids = server.wrapper.findAll("[data-sid]").map((el) => el.attributes("data-sid"));
+    expect(sids).toEqual(expect.arrayContaining([SEED[1].sessionId, SEED[2].sessionId]));
+    expect(sids).not.toContain(SEED[0].sessionId);
     server.history.setFilter({ kind: "all" });
+    vi.mocked(aiChatShare.listMine).mockReset();
   });
 
   it("windows the rows past the virtual threshold and keeps them a list", async () => {

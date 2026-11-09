@@ -209,6 +209,49 @@ describe("Header Component", () => {
     wrapper = createWrapper();
   });
 
+  describe("Phone width", () => {
+    it("lets the solution switcher give way and the logo narrow, so the right cluster stays on a 390px screen", async () => {
+      const phone = createWrapper({ configOverrides: { isEnterprise: "true" } });
+      await phone.vm.$nextTick();
+      const slot = phone.get('[data-test="header-solution-switcher-slot"]');
+      expect(slot.classes()).toEqual(
+        expect.arrayContaining(["max-md:min-w-0", "max-md:shrink", "max-md:overflow-hidden"]),
+      );
+      expect(phone.get('[data-test="header-openobserve-logo"]').classes()).toContain(
+        "max-md:max-w-24",
+      );
+      phone.unmount();
+    });
+  });
+
+  describe("decision strip room (B-shell2-1)", () => {
+    it("from md up lets only the utility row shrink, and holds every other control at its size", async () => {
+      const header = createWrapper({ configOverrides: { isEnterprise: "true" } });
+      await header.vm.$nextTick();
+      const right = header.get('[data-test="header-right"]').classes();
+      expect(right).toEqual(expect.arrayContaining(["*:shrink-0", "md:min-w-0", "md:shrink"]));
+      expect(right).not.toContain("min-w-0");
+      const menu = header.get(".header-menu").classes();
+      expect(menu).toEqual(expect.arrayContaining(["*:shrink-0", "md:min-w-0", "md:shrink!"]));
+      const icons = header.get('[data-test="header-utility-icons"]').classes();
+      expect(icons).toEqual(expect.arrayContaining(["*:shrink-0", "md:min-w-0", "md:shrink!"]));
+      expect(header.get('[data-test="upgrade-to-enterprise-btn"]').classes()).toContain(
+        "max-lg:hidden",
+      );
+      header.unmount();
+    });
+
+    it("below xl hides the Edition badge while the right group holds a waiting chat's strip (B-shell3-2)", async () => {
+      const header = createWrapper({ configOverrides: { isEnterprise: "true" } });
+      await header.vm.$nextTick();
+      expect(header.get('[data-test="header-right"]').classes()).toContain("group/header-right");
+      expect(header.get('[data-test="upgrade-to-enterprise-btn"]').classes()).toContain(
+        "max-xl:group-has-[[data-test=assistant-decision-notice]]/header-right:hidden",
+      );
+      header.unmount();
+    });
+  });
+
   describe("Logo Rendering", () => {
     it("should display OpenObserve logo by default", async () => {
       const logoWrapper = createWrapper({

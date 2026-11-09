@@ -1180,6 +1180,75 @@ describe("reduce: typed phases (live)", () => {
     expect(odd.resolved?.outcome).toBeUndefined();
   });
 
+  // FX-BE pass 3: an approve that ran stores one object per target; a deny keeps the decided ids.
+  const ranItems = [
+    {
+      id: "3Lrp9Mt5h7UGo5tNt6sEKkxWzRX",
+      type: "alert",
+      name: "ta_approvals_rca_latency_high",
+      status: "done",
+      ledger_id: "3Ls8LHD41Ey9cHB2aTMc11YXwMj",
+      undoable: true,
+      undo_until: 1794235596615111,
+    },
+    {
+      id: "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+      type: "alert",
+      name: "ta_approvals_rca_update_target",
+      status: "failed",
+      code: "conflict",
+      message: "The call answered 409",
+    },
+  ];
+
+  it("reads resolved items as per-target objects live and as decided ids on a deny", () => {
+    const state = makeState({ messages: [assistant()] });
+    const approved = {
+      type: "confirmation_resolved",
+      id: "apr_multi",
+      approved: true,
+      by: "root@example.com",
+      at: 1794231270050,
+      scope: "always",
+      tool: "MuteAlert",
+      operation: "update",
+      outcome: "partial",
+      items: ranItems,
+    };
+    const denied = {
+      type: "confirmation_resolved",
+      id: "apr_denied",
+      approved: false,
+      at: 1794231270050,
+      items: ["3Lrp9Mt5h7UGo5tNt6sEKkxWzRX"],
+    };
+    for (const frame of [approved, denied]) {
+      const parsed = parseFrame(JSON.stringify(frame));
+      expect(parsed.type).toBe("confirmation_resolved");
+      reduce(state, parsed, live());
+    }
+    const [ran, declined] = blocksOf(state).filter((b) => b.type === "approval_result");
+    expect(ran.resolved?.items).toEqual([
+      {
+        type: "alert",
+        name: "ta_approvals_rca_latency_high",
+        status: "done",
+        id: "3Lrp9Mt5h7UGo5tNt6sEKkxWzRX",
+        ledgerId: "3Ls8LHD41Ey9cHB2aTMc11YXwMj",
+        undoable: true,
+      },
+      {
+        type: "alert",
+        name: "ta_approvals_rca_update_target",
+        status: "failed",
+        id: "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+        message: "The call answered 409",
+      },
+    ]);
+    expect(declined.resolved).toMatchObject({ id: "apr_denied", approved: false });
+    expect(declined.resolved?.items).toBeUndefined();
+  });
+
   it("keeps a result for a call it never saw as a done step (HT-05 edge)", () => {
     const state = makeState({ messages: [assistant()] });
     reduce(state, { type: "tool_result", tool: "StreamList", call_id: "c7" }, live());
@@ -1917,6 +1986,72 @@ describe("reduce: approval cards", () => {
     expect(blocksOf(state).find((block) => block.type === "policy")?.policy).toMatchObject({
       count: 1,
       resourceId: "a1",
+    });
+  });
+
+  // The live frames of a pause an Always grant let run, as o2-ai streams them (FX-BE p3_pause).
+  const grantFrame = {
+    type: "confirmation_resolved",
+    id: "grant_3LsFZCR8P0P3phihr81MOm7u4HX",
+    approved: true,
+    by: "grant",
+    at: 1794234932204,
+    scope: "always",
+    grant_id: "3LsFZCR8P0P3phihr81MOm7u4HX",
+    tool: "MuteAlert",
+    operation: "update",
+    targets: [
+      { type: "alert", name: "ta_approvals_rca_latency_high", id: "3LrpP6aNCNvoXFqPf6yNtzimvPx" },
+    ],
+  };
+  const grantedWrite = [
+    { type: "tool_call", tool: "MuteAlert", call_id: "call_00_mute" },
+    { type: "tool_result", tool: "MuteAlert", call_id: "call_00_mute" },
+    {
+      type: "resource_changed",
+      resource_type: "alert",
+      id: "3LrpP6aNCNvoXFqPf6yNtzimvPx",
+      op: "update",
+    },
+  ];
+
+  it.each([
+    ["before", [grantFrame, ...grantedWrite]],
+    ["after", [...grantedWrite, grantFrame]],
+  ])(
+    "keeps the grant on a write an Always grant let run, with no unreviewed notice when the grant frame comes %s the change (P2-2)",
+    (_order, frames) => {
+      const state = makeState({ messages: [assistant()] });
+      for (const frame of frames) reduce(state, frame, live());
+      expect(blocksOf(state).some((block) => block.type === "policy")).toBe(false);
+      expect(blocksOf(state).find((block) => block.type === "approval_result")?.resolved).toEqual({
+        id: grantFrame.id,
+        approved: true,
+        by: "grant",
+        at: grantFrame.at,
+        scope: "always",
+        grant: {
+          id: grantFrame.grant_id,
+          tool: "MuteAlert",
+          operation: "update",
+          targets: grantFrame.targets,
+        },
+      });
+    },
+  );
+
+  it("still notices a second change of the same type that no grant covered (P2-2)", () => {
+    const state = makeState({ messages: [assistant()] });
+    for (const frame of [...grantedWrite, grantFrame]) reduce(state, frame, live());
+    reduce(
+      state,
+      { type: "resource_changed", resource_type: "alert", id: "other", op: "update" },
+      live(),
+    );
+    expect(blocksOf(state).find((block) => block.type === "policy")?.policy).toMatchObject({
+      kind: "unreviewed",
+      resourceType: "alert",
+      count: 1,
     });
   });
 

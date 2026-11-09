@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
+import { createMemoryHistory, createRouter, type Router } from "vue-router";
 
 import http from "@/services/http";
 
@@ -45,7 +46,7 @@ const created = {
   branched_from: { session_id: "s1", turn_id: "t2", title: "Checkout failures" },
 };
 
-function withBranch(): BranchChat {
+function withBranch(router?: Router): BranchChat {
   let api: BranchChat | null = null;
   mount(
     defineComponent({
@@ -54,6 +55,7 @@ function withBranch(): BranchChat {
         return () => null;
       },
     }),
+    { global: { plugins: router ? [router] : [] } },
   );
   return api!;
 }
@@ -67,6 +69,26 @@ describe("useBranchChat", () => {
     openSession.mockReset().mockResolvedValue("new-1");
     toast.mockReset();
     track.mockReset();
+  });
+
+  it("B-conversation-16: the Full view's `?thread=` moves to the new branch, so a reload opens it", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", name: "home", component: { render: () => null } }],
+    });
+    await router.push({
+      name: "home",
+      query: { tab: "ai", thread: "s1", org_identifier: "default" },
+    });
+    const branch = withBranch(router);
+    await branch.branch({ sid: "s1", turnId: "t2" });
+    await flushPromises();
+    expect(openSession).toHaveBeenCalledWith({ sid: "new-1" }, { focus: true });
+    expect(router.currentRoute.value.query).toEqual({
+      tab: "ai",
+      thread: "new-1",
+      org_identifier: "default",
+    });
   });
 
   it("posts the turn and version as JSON, then opens the new chat", async () => {

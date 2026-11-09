@@ -26,11 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #trigger>
       <OButton
-        variant="ghost-subtle"
+        variant="ghost"
         size="xs"
         :disabled="disabled"
         :data-pending="pending ? '' : undefined"
-        :class="[AGENT_PILL_CLASS, TOUCH_TARGET_CLASS]"
+        :class="[AGENT_PILL_CLASS, AGENT_PICKER_CLASS, TOUCH_TARGET_CLASS]"
         data-test="assistant-agent-picker"
         @keydown.up.prevent="menuOpen = true"
       >
@@ -118,6 +118,7 @@ import { useStore } from "vuex";
 import { agentGlyph, assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import AssistantAgentPill, {
+  AGENT_PICKER_CLASS,
   AGENT_PILL_CLASS,
 } from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";

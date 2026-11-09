@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createBrowserEngine,
   detectBrand,
+  helpBrand,
   languageEndonym,
   serviceVendor,
   speechLang,
@@ -60,6 +61,24 @@ describe("speechLang", () => {
     ["zh-TW", "cmn-Hant-TW"],
   ])("maps %s to %s", (locale, lang) => {
     expect(speechLang(locale)).toBe(lang);
+  });
+});
+
+describe("helpBrand", () => {
+  it.each([
+    [
+      {
+        userAgent: CHROME_UA,
+        userAgentData: { brands: [{ brand: "Chromium" }, { brand: "Not?A_Brand" }] },
+      },
+      "chrome",
+    ],
+    [{ userAgent: `${CHROME_UA} Edg/130.0` }, "edge"],
+    [{ userAgent: `${CHROME_UA} OPR/110.0` }, "chrome"],
+    [{ userAgent: "Mozilla/5.0 (Macintosh) Version/18.0 Safari/605.1.15" }, "safari"],
+    [{ userAgent: "Mozilla/5.0 Firefox/130.0" }, null],
+  ])("finds the help page for %j", (nav, brand) => {
+    expect(helpBrand(nav)).toBe(brand);
   });
 });
 

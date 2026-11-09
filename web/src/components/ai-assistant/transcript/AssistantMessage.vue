@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <p
       v-if="userText"
-      class="bg-assistant-user-bg rounded-surface rounded-ee-default text-text-body max-w-[80%] min-w-0 px-3.5 py-2 text-sm break-words whitespace-pre-wrap"
+      class="bg-assistant-user-bg rounded-ee-default text-text-body max-w-[80%] min-w-0 rounded-[1.125rem] px-3.5 py-2 text-sm break-words whitespace-pre-wrap"
       data-test="assistant-message-text"
     >
       {{ userText }}
@@ -152,16 +152,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantMarkdownPart
             v-if="part.kind !== 'code'"
             :part="part"
-            :html-class="
-              item.key === leadKey
-                ? `${PROSE_CLASSES.html} ${PROSE_CLASSES.leadHtml}`
-                : PROSE_CLASSES.html
-            "
-            :text-class="
-              item.key === leadKey
-                ? `${PROSE_CLASSES.plain} ${PROSE_CLASSES.leadPlain}`
-                : PROSE_CLASSES.plain
-            "
+            :html-class="PROSE_CLASSES.html"
+            :text-class="PROSE_CLASSES.plain"
+            :lead="item.key === leadKey && part.key === item.parts[0]?.key"
             :live="item.live"
           />
           <AssistantMarkdownCode
@@ -189,8 +182,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OCodeBlock
               :code="part.code"
-              :lang="part.lang"
+              :lang="String(codeLang(part.lang))"
               :highlight="false"
+              wrap
+              padded
               :highlighted-html="part.highlighted"
               :copyable="!part.open"
               :scroll-label="t('assistant.message.codeName', { lang: codeLang(part.lang) })"
@@ -286,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #line-end>
         <div
           :class="[
-            'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 empty:hidden',
+            'flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 empty:hidden',
             !steps.length &&
               $slots.actions &&
               'md:pointer-fine:[&>[data-test=assistant-msg-actions]]:-ms-1.5',
@@ -455,6 +450,7 @@ import {
   stepsOf,
   toolLinksOf,
   type LinkTarget,
+  type QueryBlockData,
 } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -465,6 +461,8 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgRange, formatOrgTime } from "@/utils/formatters";
+
+import { decisionsAfterProposal } from "@/components/ai-assistant/approvals/approvalPlacement";
 
 import AssistantAttachmentBlock from "./AssistantAttachmentBlock.vue";
 import { PROSE_CLASSES } from "./markdownCore";
@@ -502,6 +500,7 @@ const props = withDefaults(defineProps<AssistantMessageProps>(), {
 
 const { t } = useI18nTyped();
 const router = useRouter();
+
 const evidence = props.readonly ? null : inject(assistantEvidenceHostKey, null);
 
 const renderMarkdown = useRenderedMarkdown();
@@ -513,7 +512,7 @@ const blocks = computed<ContentBlock[]>(() => {
   return [{ type: "text", text: String(content) }];
 });
 
-const shownBlocks = computed<ContentBlock[]>(() =>
+const baseBlocks = computed<ContentBlock[]>(() =>
   blocks.value.some((block) => block.type === "findings")
     ? blocks.value.map((block) =>
         block.type === "text" && block.text
@@ -522,6 +521,9 @@ const shownBlocks = computed<ContentBlock[]>(() =>
       )
     : blocks.value,
 );
+
+// The decision follows the "I proposed …" text it answers; the model's words stay as written.
+const shownBlocks = computed<ContentBlock[]>(() => decisionsAfterProposal(baseBlocks.value));
 
 // A record from before the v2 composer has its blocks in the text; a v2 message keeps typed text and chips apart.
 const legacyUser = computed(() =>
@@ -603,10 +605,18 @@ const rendered = computed<Rendered[]>(() => {
   const links = new Set<string>();
   // The conclusion leads the answer wherever its frame landed among the text.
   const shown = shownBlocks.value;
+  // Keys follow each block's reducer position, so a moved record keeps its node and no text is parsed again.
+  const keyOf = (block: ContentBlock, at: number) => {
+    const own = baseBlocks.value.indexOf(block);
+    return own >= 0 ? own : at;
+  };
   const findingsIndex = shown.findIndex((block) => block.type === "findings");
-  if (findingsIndex >= 0) out.push(...renderBlock(shown[findingsIndex], findingsIndex, links));
+  if (findingsIndex >= 0)
+    out.push(
+      ...renderBlock(shown[findingsIndex], keyOf(shown[findingsIndex], findingsIndex), links),
+    );
   shown.forEach((block, index) => {
-    if (index !== findingsIndex) out.push(...renderBlock(block, index, links));
+    if (index !== findingsIndex) out.push(...renderBlock(block, keyOf(block, index), links));
   });
   toolLinksOf(props.message).forEach((action, index) => {
     const link = buildNavigationRoute(action, org.value);
@@ -618,8 +628,31 @@ const rendered = computed<Rendered[]>(() => {
       copyText: null,
     });
   });
-  return out;
+  return withoutCardedLinks(out);
 });
+
+// A navigation link to a query the answer also shows as a card would be a second Open for the same query.
+function withoutCardedLinks(items: Rendered[]): Rendered[] {
+  const carded = new Set<string>();
+  for (const item of items) {
+    if (item.kind === "query") carded.add(queryKey(item.block.query.text));
+    if (item.kind === "markdown")
+      for (const part of item.parts)
+        if (part.kind === "code" && part.query && !part.open) carded.add(queryKey(part.code));
+  }
+  if (!carded.size) return items;
+  return items.filter(
+    (item) =>
+      item.kind !== "link" ||
+      item.source !== "navigation" ||
+      !item.copyText ||
+      !carded.has(queryKey(item.copyText)),
+  );
+}
+
+function queryKey(text: string): string {
+  return text.trim().replace(/;\s*$/, "").replace(/\s+/g, " ").toLowerCase();
+}
 
 function renderBlock(block: ContentBlock, index: number, links: Set<string>): Rendered[] {
   const key = `${props.turnId}:${index}`;
@@ -630,18 +663,7 @@ function renderBlock(block: ContentBlock, index: number, links: Set<string>): Re
       : [];
   }
   if (block.type === "query" && block.query)
-    return [
-      {
-        kind: "query",
-        key,
-        block: {
-          blockId: key,
-          query: { ...block.query, org: org.value },
-          rangeSource: "turn",
-          ...(block.query.callId && { sourceCallId: block.query.callId }),
-        },
-      },
-    ];
+    return [{ kind: "query", key, block: typedQueryBlock(key, block.query) }];
   if (block.type === "link" && block.link?.redacted)
     return [
       { kind: "link", key, link: null, source: "navigation", copyText: null, redacted: true },
@@ -789,6 +811,22 @@ function fenceBlock(key: string, part: MarkdownPart): QueryBlock | null {
     : null;
   fences.set(memo, block);
   return block;
+}
+
+// The stored query frame names no window, so it takes the one its fence would: the step that ran it, else the turn's.
+function typedQueryBlock(blockId: string, typed: QueryBlockData): QueryBlock {
+  const own = { ...typed, org: org.value };
+  const fence =
+    own.from && own.to
+      ? null
+      : fenceQuery(own.text, own.language, steps.value, org.value, pageRange.value);
+  const { from, to } = fence?.query ?? {};
+  return {
+    blockId,
+    query: from && to ? { ...own, from, to } : own,
+    rangeSource: fence?.rangeSource ?? "turn",
+    ...(typed.callId && { sourceCallId: typed.callId }),
+  };
 }
 
 function sourceStepOf(block: QueryBlock): number | null {

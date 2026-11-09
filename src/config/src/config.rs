@@ -155,7 +155,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 155: create ai_approvals.
 // 156: add agent to ai_chat_turns.
 // 157: add branched_from to ai_chat_sessions.
-pub const DB_SCHEMA_VERSION: u64 = 157;
+// 158: add approval_scope to ai_actions.
+pub const DB_SCHEMA_VERSION: u64 = 158;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

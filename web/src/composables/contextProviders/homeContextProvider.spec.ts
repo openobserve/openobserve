@@ -23,7 +23,9 @@ import {
   createHomeContextProvider,
   homeContextOf,
   useHomeContextProvider,
+  useHomeWindowProvider,
 } from "./homeContextProvider";
+import { timeWindowOf, wireTimeRange } from "@/composables/assistant/context/contextChips";
 import { contextRegistry } from "./registry";
 import type { OverviewNowRow, OverviewNowSnapshot } from "./types";
 
@@ -241,6 +243,24 @@ describe("homeContextOf", () => {
 });
 
 describe("createHomeContextProvider", () => {
+  it("sends a relative Home range as Home's period ending at send time, never as frozen dates", () => {
+    const period = { period: "24h", ms: 86_400_000 };
+    const context = homeContextOf(snapshot(), "acme", NOW_MS, period);
+    expect(context.timeRange).toEqual({
+      type: "relative",
+      relativeTimePeriod: "24h",
+      startTime: (NOW_MS - 86_400_000) * 1000,
+      endTime: NOW_MS * 1000,
+    });
+    const window = timeWindowOf(context, null, NOW_MS);
+    expect(window).toMatchObject({ period: "24h", source: "page" });
+    expect(wireTimeRange(window)).toMatchObject({ type: "relative", relativeTimePeriod: "24h" });
+    const later = createHomeContextProvider(snapshot, store, () => period).getContext() as {
+      timeRange: { endTime: number };
+    };
+    expect(later.timeRange.endTime).toBeGreaterThan(NOW_MS * 1000);
+  });
+
   it("reads the org from the store and the snapshot at each call", () => {
     const state = reactive(snapshot());
     const provider = createHomeContextProvider(() => state, store);
@@ -271,6 +291,29 @@ describe("useHomeContextProvider", () => {
       kind: "alert",
       id: "al-9",
     });
+    wrapper.unmount();
+    contextRegistry.setActive(HOME_CONTEXT_KEY);
+    expect(await contextRegistry.getActiveContext()).toBeNull();
+  });
+});
+
+describe("useHomeWindowProvider", () => {
+  it("gives a thread on the Home route Home's window and no Overview rows", async () => {
+    const Host = defineComponent({
+      setup() {
+        useHomeWindowProvider(store, () => ({ period: "24h", ms: 86_400_000 }));
+        return () => h("div");
+      },
+    });
+    const wrapper = mount(Host);
+    const context = await contextRegistry.getActiveContext();
+    expect(context).toMatchObject({
+      currentPage: "home",
+      organization_identifier: "acme",
+      timeRange: { type: "relative", relativeTimePeriod: "24h" },
+    });
+    expect(context).not.toHaveProperty("page");
+    expect(context).not.toHaveProperty("overviewIncidents");
     wrapper.unmount();
     contextRegistry.setActive(HOME_CONTEXT_KEY);
     expect(await contextRegistry.getActiveContext()).toBeNull();

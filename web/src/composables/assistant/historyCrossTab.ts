@@ -27,6 +27,7 @@ import {
   cardEnding,
   ownerOptions,
   placeCard,
+  shownTurns,
   type ElsewhereMark,
   type HistoryRecords,
 } from "./historyRecords";
@@ -66,7 +67,7 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
       }
       const session = ctx.session(sid);
       if (session && !session.turnMeta.ownedByThisTab) {
-        const messages = projectRecord(detail.turns ?? [], "owner", {
+        const messages = projectRecord(shownTurns(detail), "owner", {
           ...ownerOptions(ctx),
           ...(detail.approvals && { approvals: detail.approvals }),
         });

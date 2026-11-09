@@ -171,6 +171,7 @@ export const CLASSES = {
     "w-full border-collapse text-sm [&_td]:border-b [&_td]:border-border-default [&_td]:px-2 [&_td]:py-1 [&_td]:align-top [&_th]:border-b [&_th]:border-border-default [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_th]:text-text-heading",
   tableSplit:
     "w-max min-w-full table-fixed border-collapse text-sm [&_td]:w-32 [&_td]:border-b [&_td]:border-border-default [&_td]:px-2 [&_td]:py-1 [&_td]:align-top [&_th]:w-32 [&_th]:border-b [&_th]:border-border-default [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_th]:text-text-heading",
+  claimGlue: "whitespace-nowrap",
   cellStart: "text-start",
   cellEnd: "text-end",
   cellCenter: "text-center",
@@ -189,6 +190,16 @@ export const CLASSES = {
   calloutIconNote:
     "assistant-callout-icon-note text-text-secondary mt-0.5 size-4 shrink-0 bg-current",
   calloutBody: "min-w-0 flex-1",
+  entityLink:
+    "text-text-link font-medium whitespace-nowrap no-underline underline-offset-2 hover:underline",
+  entityStream:
+    "inline-block size-3 shrink-0 bg-current me-1 align-[-0.0625rem] [mask-size:contain] [mask-repeat:no-repeat] [mask-position:center] [mask-image:url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cellipse%20cx=%2712%27%20cy=%275%27%20rx=%279%27%20ry=%273%27/%3E%3Cpath%20d=%27M3%205v14c0%201.66%204%203%209%203s9-1.34%209-3V5%27/%3E%3Cpath%20d=%27M3%2012c0%201.66%204%203%209%203s9-1.34%209-3%27/%3E%3C/svg%3E)]",
+  entityService:
+    "inline-block size-3 shrink-0 bg-current me-1 align-[-0.0625rem] [mask-size:contain] [mask-repeat:no-repeat] [mask-position:center] [mask-image:url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Crect%20x=%273%27%20y=%273%27%20width=%2718%27%20height=%277%27%20rx=%272%27/%3E%3Crect%20x=%273%27%20y=%2714%27%20width=%2718%27%20height=%277%27%20rx=%272%27/%3E%3Cpath%20d=%27M7%206.5h.01M7%2017.5h.01%27/%3E%3C/svg%3E)]",
+  entityDashboard:
+    "inline-block size-3 shrink-0 bg-current me-1 align-[-0.0625rem] [mask-size:contain] [mask-repeat:no-repeat] [mask-position:center] [mask-image:url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Crect%20x=%273%27%20y=%273%27%20width=%277%27%20height=%279%27%20rx=%271%27/%3E%3Crect%20x=%2714%27%20y=%273%27%20width=%277%27%20height=%275%27%20rx=%271%27/%3E%3Crect%20x=%2714%27%20y=%2712%27%20width=%277%27%20height=%279%27%20rx=%271%27/%3E%3Crect%20x=%273%27%20y=%2716%27%20width=%277%27%20height=%275%27%20rx=%271%27/%3E%3C/svg%3E)]",
+  entityAlert:
+    "inline-block size-3 shrink-0 bg-current me-1 align-[-0.0625rem] [mask-size:contain] [mask-repeat:no-repeat] [mask-position:center] [mask-image:url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M6%208a6%206%200%200%201%2012%200c0%207%203%209%203%209H3s3-2%203-9%27/%3E%3Cpath%20d=%27M10.3%2021a1.94%201.94%200%200%200%203.4%200%27/%3E%3C/svg%3E)]",
 } as const;
 
 /** The answer's prose column: a 72ch measure, relaxed leading and tabular figures, so numbers line up down a paragraph. */
@@ -202,11 +213,19 @@ export const PROSE_CLASSES = {
   plain:
     "text-text-body min-w-0 max-w-[72ch] text-sm leading-relaxed break-words whitespace-pre-wrap tabular-nums",
   /** The answer's first sentence states the conclusion, so it alone takes the heading colour at semibold. */
-  leadHtml: "[&_p:first-child]:text-text-heading [&_p:first-child]:font-semibold",
-  leadPlain: "text-text-heading font-semibold",
+  lead: "text-text-heading font-semibold",
 } as const;
 
 export type CalloutKind = "cause" | "next" | "watch" | "note";
+
+export type EntityKind = "stream" | "service" | "dashboard" | "alert";
+
+const ENTITY_GLYPHS: Readonly<Record<EntityKind, string>> = {
+  stream: CLASSES.entityStream,
+  service: CLASSES.entityService,
+  dashboard: CLASSES.entityDashboard,
+  alert: CLASSES.entityAlert,
+};
 
 // A quote opening with one of these bold labels is that kind of callout; any other quote is a neutral note.
 const CALLOUT_LABELS: readonly [CalloutKind, RegExp][] = [
@@ -489,6 +508,7 @@ export function parseBlock(request: ParseRequest): ParseResult {
     const tokens = instance().lexer(repaired.text);
     // Markers come out of prose only; code keeps `[^0-9]` and every other bracket as written.
     stripClaims(tokens, claims, open);
+    linkFirstMentions(tokens);
     spend(claims.join(""));
     const parts = partsOf(request.blockId, tokens, repaired.open);
     const plain = spend(
@@ -667,6 +687,85 @@ function stripClaims(tokens: Token[], claims: string[], open: boolean): void {
   }
   const last = leaves[leaves.length - 1] as Tokens.Text | undefined;
   if (open && last?.type === "text") last.text = last.text.replace(PARTIAL_CLAIM, "");
+}
+
+// An entity link the model put on a later mention moves to the first plain mention of its label, so a reader meets it there (K2).
+function linkFirstMentions(tokens: Token[]): void {
+  const prose: ProseEntry[] = [];
+  collectProse(tokens, prose);
+  const moved = new Set<string>();
+  for (let at = 0; at < prose.length; at += 1) {
+    const entry = prose[at];
+    const link = entry.token as Tokens.Link;
+    if (link.type !== "link" || moved.has(link.href) || !isEntityHref(link.href)) continue;
+    if (!link.text.trim()) continue;
+    moved.add(link.href);
+    const word = wholeWord(link.text);
+    const first = prose
+      .slice(0, at)
+      .findIndex((e) => e.token.type === "text" && word.test(textOf(e)));
+    if (first < 0) continue;
+    const mention = prose[first];
+    const text = textOf(mention);
+    const match = word.exec(text)!;
+    const before = plainText(text.slice(0, match.index));
+    const after = plainText(text.slice(match.index + match[0].length));
+    entry.list.splice(entry.list.indexOf(link), 1, ...(link.tokens ?? [plainText(link.text)]));
+    mention.list.splice(mention.list.indexOf(mention.token), 1, before, { ...link }, after);
+    prose.splice(
+      first,
+      1,
+      { list: mention.list, token: before },
+      { list: mention.list, token: after },
+    );
+    at += 1;
+  }
+}
+
+interface ProseEntry {
+  list: Token[];
+  token: Token;
+}
+
+// Text leaves and links in reading order, each with the list that holds it; code and a link's own label are not prose.
+function collectProse(tokens: Token[], out: ProseEntry[]): void {
+  for (const token of tokens) {
+    if (token.type === "table") {
+      const table = token as Tokens.Table;
+      for (const cell of [...table.header, ...table.rows.flat()]) collectProse(cell.tokens, out);
+    } else if (token.type === "list") {
+      for (const item of (token as Tokens.List).items) collectProse(item.tokens, out);
+    } else if (token.type === "link") {
+      out.push({ list: tokens, token });
+    } else if (token.type !== "code" && token.type !== "codespan" && token.type !== "html") {
+      const nested = (token as { tokens?: Token[] }).tokens;
+      if (nested?.length) collectProse(nested, out);
+      else if (token.type === "text" && !(token as Tokens.Text).escaped)
+        out.push({ list: tokens, token });
+    }
+  }
+}
+
+function isEntityHref(href: string): boolean {
+  const url = parseUrl(href);
+  return !!url && url.origin === page.origin && entityKindOf(url) !== null;
+}
+
+function wholeWord(label: string): RegExp {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Names hold `-`, `_`, `.` and `/`, so `checkout` is not a mention inside `checkout-api` or `checkout.v2`.
+  return new RegExp(
+    `(?<![\\p{L}\\p{N}_\\-./])${escaped}(?![\\p{L}\\p{N}_\\-/]|\\.[\\p{L}\\p{N}])`,
+    "u",
+  );
+}
+
+function textOf(entry: ProseEntry): string {
+  return (entry.token as Tokens.Text).text;
+}
+
+function plainText(text: string): Tokens.Text {
+  return { type: "text", raw: text, text };
 }
 
 function collectLeaves(tokens: Token[], out: Token[]): void {
@@ -859,6 +958,8 @@ function linkHtml(href: string | null | undefined, label: string): string {
   if (!url || (url.protocol !== "http:" && url.protocol !== "https:"))
     return `<span>${label}</span>`;
   if (url.origin === page.origin) {
+    const kind = entityKindOf(url);
+    if (kind) return entityLinkHtml(url, kind, label);
     const path = url.pathname + url.search;
     if (sameOrigin.length < MAX_LINKS && !sameOrigin.includes(path)) sameOrigin.push(path);
     return `<span>${label}</span>`;
@@ -869,6 +970,26 @@ function linkHtml(href: string | null | undefined, label: string): string {
   linked.add(url.href);
   const host = escapeHtml(url.host);
   return `<a href="${attr}" target="_blank" rel="${EXTERNAL_REL}" class="${CLASSES.link}">${label}</a><span class="${CLASSES.host}">${host}</span>`;
+}
+
+/** The app object a same-origin link opens: a stream, a service, a dashboard or an alert; null for any other page. */
+export function entityKindOf(url: URL): EntityKind | null {
+  const path = url.pathname;
+  const query = url.searchParams;
+  if (/\/logs\/?$/.test(path) && query.get("stream")) return "stream";
+  if (/\/traces\/?$/.test(path) && query.get("tab") === "services-catalog" && query.get("service"))
+    return "service";
+  if (/\/dashboards\/view\/?$/.test(path) && query.get("dashboard")) return "dashboard";
+  if (/\/alerts\/detail\/[^/]+\/?$/.test(path)) return "alert";
+  return null;
+}
+
+// An in-app link with its type's glyph, on the object's first mention only (K2).
+function entityLinkHtml(url: URL, kind: EntityKind, label: string): string {
+  const attr = escapeAttr(url.href);
+  if (attr.length > MAX_URL_CHARS || linked.has(url.href)) return `<span>${label}</span>`;
+  linked.add(url.href);
+  return `<a href="${attr}" class="${CLASSES.entityLink}"><span class="${ENTITY_GLYPHS[kind]}"></span>${label}</a>`;
 }
 
 /** An href as a URL against the page origin, or `null`; the sanitiser re-checks links with it. */

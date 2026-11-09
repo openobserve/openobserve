@@ -33,8 +33,8 @@ export type ApprovalCardView = ApprovalBlockData &
     Pick<PendingApproval, "sessionId" | "turnId" | "expiresAt" | "askedIn" | "userExtendsLeft">
   >;
 
-/** Every state a record renders; `waiting_elsewhere` is a card another tab of this browser holds. */
-export type ApprovalResultState = ApprovalOutcome["state"] | "waiting_elsewhere";
+/** Every state a record renders; `waiting_elsewhere` is a card another tab of this browser holds, `standing` a write the user's grant let run with no card. */
+export type ApprovalResultState = ApprovalOutcome["state"] | "waiting_elsewhere" | "standing";
 
 /** What a record shows: its state, the decision's own record and, for an approve, the rows `/confirm` answered. */
 export interface ApprovalResultView {

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { ChatApproval, ChatDetail } from "@/services/assistant";
 import type { ChatMessage, TurnSpan } from "@/ts/interfaces/chat";
 
 import type { EntryOrigin, ForkSeed } from "./assistantStore.types";
@@ -38,6 +39,9 @@ export interface LocalRecord {
   userOrgKey?: string;
   serverBacked?: boolean;
   cachedLastSeq?: number;
+  /** The read's `seed` and `approvals`, which a `not_modified` answer to `cachedLastSeq` leaves out. */
+  cachedSeed?: ChatDetail["seed"];
+  cachedApprovals?: ChatApproval[];
   cachedStateVersion?: string;
   cachedTurnSpans?: TurnSpan[];
   forkedFromShare?: string;

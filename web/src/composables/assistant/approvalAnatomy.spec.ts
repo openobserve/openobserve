@@ -145,3 +145,84 @@ describe("approvalEditor", () => {
     expect(approvalEditor(pause({ value: false }), "default")).toBeNull();
   });
 });
+
+// The CreateDowntime card o2-ai sends for a bulk mute (o2-ai tests/test_card_gather.py `_DOWNTIME`).
+const DOWNTIME_FRAME = {
+  type: "confirmation_required",
+  id: "apr_dt",
+  tool: "CreateDowntime",
+  kind: "create",
+  operation: "create",
+  title: "Mute 2 alerts",
+  targets: [
+    { type: "alert", id: "a1", name: "latency_high" },
+    { type: "alert", id: "a2", name: "checkout_5xx" },
+  ],
+  schedule: {
+    starts_at: 1794226306391,
+    ends_at: 1794226306391 + 1_200_000,
+    duration_secs: 1200,
+    timezone: "Asia/Calcutta",
+    repeat: "none",
+  },
+  args: {
+    request_body: {
+      name: "Bulk mute",
+      reason: "maintenance",
+      starts_at: 1794226306391000,
+      duration_secs: 1200,
+      timezone: "Asia/Calcutta",
+      repeat: "none",
+      targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1", "a2"] }],
+    },
+  },
+};
+
+describe("N3: a downtime (bulk mute) card", () => {
+  it("reads as a pause of its alerts", () => {
+    expect(approvalVerb(approvalOf(DOWNTIME_FRAME))).toBe("pause");
+  });
+
+  it("ends at its start plus its duration, from the microsecond request body", () => {
+    expect(approvalUntil(approvalOf(DOWNTIME_FRAME))).toBe(1794226306391 + 1_200_000);
+  });
+});
+
+describe("N2: a multi-target card keeps each target's own change", () => {
+  it("bounds and keeps after, before and before_digest per target", () => {
+    const digest = "8d9e9ad0c4595ed3ad067dba4d2fcece7695d1ba5c194b2c16f94e1a6f0580b3";
+    const card = approvalOf({
+      type: "confirmation_required",
+      id: "apr_m",
+      tool: "UpdateAlert",
+      kind: "update",
+      targets: [
+        {
+          type: "alert",
+          id: "3Lrp",
+          name: "ta_approvals_rca_latency_high",
+          after: { threshold: 4 },
+          before: { threshold: 3 },
+          before_digest: digest,
+        },
+        {
+          type: "alert",
+          id: "3Lrq",
+          name: "ta_approvals_rca_checkout_5xx",
+          after: { threshold: 6 },
+        },
+      ],
+    });
+    expect(card.targets).toEqual([
+      {
+        type: "alert",
+        id: "3Lrp",
+        name: "ta_approvals_rca_latency_high",
+        after: { threshold: 4 },
+        before: { threshold: 3 },
+        beforeDigest: digest,
+      },
+      { type: "alert", id: "3Lrq", name: "ta_approvals_rca_checkout_5xx", after: { threshold: 6 } },
+    ]);
+  });
+});
