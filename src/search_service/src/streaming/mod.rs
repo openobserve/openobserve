@@ -272,13 +272,21 @@ pub async fn process_search_stream_request(
         && req.query.streaming_id.is_none()
     {
         // check cache for the first page
-        let (c_resp, _should_exec_query) = match search_cache::prepare_cache_response(
-            &trace_id,
-            &org_id,
-            stream_type,
-            &mut req,
-            use_cache,
-        )
+        let (c_resp, _should_exec_query) = match async {
+            crate::sql::histogram::pin_histogram_timezone(
+                &mut req.query.sql,
+                &mut req.query.timezone,
+                req.query.end_time,
+            )?;
+            search_cache::prepare_cache_response(
+                &trace_id,
+                &org_id,
+                stream_type,
+                &mut req,
+                use_cache,
+            )
+            .await
+        }
         .instrument(search_span.clone())
         .await
         {

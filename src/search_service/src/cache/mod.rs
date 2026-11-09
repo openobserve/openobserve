@@ -151,6 +151,11 @@ pub async fn search(
     };
 
     let mut req = in_req.clone();
+    pin_histogram_timezone(
+        &mut req.query.sql,
+        &mut req.query.timezone,
+        req.query.end_time,
+    )?;
 
     // check the original query function first
     let mut query_fn = req
@@ -560,11 +565,6 @@ pub async fn prepare_cache_response(
     req: &mut search::Request,
     use_cache: bool,
 ) -> Result<(MultiCachedQueryResponse, bool), Error> {
-    pin_histogram_timezone(
-        &mut req.query.sql,
-        &mut req.query.timezone,
-        req.query.end_time,
-    )?;
     let mut origin_sql = req.query.sql.clone();
     let is_complex_query = is_complex_query(&origin_sql).unwrap_or(true);
     let stream_name = match resolve_stream_names(&origin_sql) {
