@@ -59,6 +59,12 @@ struct BulkStream {
     order: BulkResponseOrder,
 }
 
+enum BulkLine {
+    Action,
+    Data,
+    RejectedData,
+}
+
 pub async fn ingest(
     thread_id: usize,
     org_id: &str,
@@ -94,7 +100,7 @@ pub async fn ingest(
     let mut plans: HashMap<String, BulkStream> = HashMap::new();
     let mut action_position = 0;
     let mut action_count = 0;
-    let mut next_line_is_data = false;
+    let mut next_line = BulkLine::Action;
     // Read lines as bytes to handle potential invalid UTF-8 characters
     let mut line_buffer = Vec::new();
     let mut reader = BufReader::new(body.as_ref());
@@ -114,7 +120,11 @@ pub async fn ingest(
             continue;
         }
 
-        let is_data = std::mem::take(&mut next_line_is_data);
+        let is_data = match std::mem::replace(&mut next_line, BulkLine::Action) {
+            BulkLine::Action => false,
+            BulkLine::Data => true,
+            BulkLine::RejectedData => continue,
+        };
         if is_data {
             let stream = stream_plan(&mut plans, org_id, &stream_name, (min_ts, max_ts)).await;
             if stream
@@ -139,6 +149,7 @@ pub async fn ingest(
             else {
                 continue;
             };
+            next_line = BulkLine::RejectedData;
             action_position = action_count;
             action_count += 1;
             if line_action != action {
@@ -226,7 +237,7 @@ pub async fn ingest(
             if blocked {
                 continue; // skip
             }
-            next_line_is_data = true;
+            next_line = BulkLine::Data;
         } else {
             let mut local_val = match value {
                 json::Value::Object(v) => v,
@@ -737,6 +748,102 @@ mod tests {
             prepare(json::json!({"_timestamp": max_ts + 1}), None),
             Err(get_future_discard_error().to_string())
         );
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_rejected_actions_consume_their_data_lines() {
+        use arrow::{array::StringArray, compute::cast, datatypes::DataType};
+
+        infra::db::create_table().await.unwrap();
+        infra::schema::init().await.unwrap();
+        let org = "bulk_rejected_action_framing";
+        for (case, rejected) in [("invalid", "_"), ("internal", "_o2_rejected_framing")] {
+            let allowed = format!("framing_allowed_{case}");
+            let forged_stream = format!("framing_forged_{case}");
+            let user = IngestUser::from_user_email("framing@example.com");
+            let warm = format!(
+                "{{\"index\":{{\"_index\":\"{allowed}\",\"_id\":\"warm\"}}}}\n{{\"message\":\"warm\"}}\n"
+            );
+            ingest(0, org, Bytes::from(warm), user.clone())
+                .await
+                .unwrap();
+            #[cfg(not(feature = "vectorscan"))]
+            assert!(
+                super::super::ingest::plan_bulk_columnar(org, &allowed, (0, i64::MAX))
+                    .await
+                    .is_some()
+            );
+            let lines = [
+                json::json!({"index": {"_index": rejected, "_id": "rejected1"}}),
+                json::json!({"message": "discard this document"}),
+                json::json!({"create": {"_index": rejected, "_id": "rejected2"}}),
+                json::json!({"index": {"_index": &forged_stream, "_id": "forged"}}),
+                json::json!({"index": {"_index": &allowed, "_id": "real"}}),
+                json::json!({"message": "must survive"}),
+            ];
+            let body = lines
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("\n\n")
+                + "\n";
+            let response = ingest(0, org, Bytes::from(body), user).await.unwrap();
+            let items: Vec<_> = response
+                .items
+                .iter()
+                .flat_map(|item| item.values())
+                .collect();
+            let expected = if get_config().common.bulk_api_response_errors_only {
+                vec!["rejected1", "rejected2"]
+            } else {
+                vec!["rejected1", "rejected2", "real"]
+            };
+            assert_eq!(
+                items
+                    .iter()
+                    .map(|item| item._id.as_str())
+                    .collect::<Vec<_>>(),
+                expected,
+                "{case}"
+            );
+            assert!(response.errors);
+            assert_eq!(items[0].request_position, Some(0));
+            assert_eq!(items[1].request_position, Some(1));
+            if !get_config().common.bulk_api_response_errors_only {
+                assert_eq!(items[2].request_position, Some(2));
+            }
+            assert!(!infra::schema::exists(org, StreamType::Logs, &forged_stream).await);
+            let (_, batches) = ingester::read_from_memtable(org, "logs", &allowed, None, &[])
+                .await
+                .unwrap();
+            let mut stored = Vec::new();
+            for entry in batches.into_iter().flat_map(|(_, entries)| entries) {
+                let ids = cast(entry.data.column_by_name("_id").unwrap(), &DataType::Utf8).unwrap();
+                let messages = cast(
+                    entry.data.column_by_name("message").unwrap(),
+                    &DataType::Utf8,
+                )
+                .unwrap();
+                let ids = ids.as_any().downcast_ref::<StringArray>().unwrap();
+                let messages = messages.as_any().downcast_ref::<StringArray>().unwrap();
+                for row in 0..entry.data.num_rows() {
+                    stored.push((ids.value(row).to_string(), messages.value(row).to_string()));
+                }
+            }
+            stored.sort();
+            assert_eq!(
+                stored,
+                [
+                    ("real".to_string(), "must survive".to_string()),
+                    ("warm".to_string(), "warm".to_string())
+                ]
+            );
+            let (_, forged) = ingester::read_from_memtable(org, "logs", &forged_stream, None, &[])
+                .await
+                .unwrap();
+            assert!(forged.is_empty());
+        }
     }
 
     // cloud builds reject the unknown test org at the trial check
