@@ -15,7 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <DecisionDismissDialog
+    v-if="mode !== 'compat'"
+    :open="open"
+    :target="decisionTarget"
+    :transport="mode"
+    :refresh="refresh"
+    @update:open="emit('update:open', $event)"
+  />
   <ODialog
+    v-else
     :open="open"
     size="md"
     :title="copy.title(finding.alert_name)"
@@ -113,6 +122,12 @@ import { httpStatus } from "@/services/alert_calibration";
 import { dismissFindingMutation } from "@/services/alert_calibration.queries";
 import { alertCalibrationKeys } from "@/services/alert_calibration.querykeys";
 import { useReopenDismissal } from "@/composables/alertCalibration/useDismissals";
+import {
+  useDecisionRoute,
+  type DecisionTransport,
+} from "@/composables/autoobserve/useDecisionRoute";
+import DecisionDismissDialog from "@/components/autoobserve/decisions/DecisionDismissDialog.vue";
+import type { DecisionTarget } from "@/components/autoobserve/decisions/decisionDismiss";
 import { dismissDefaults, makeDismissSchema } from "./AlertCalibrationDismissDialog.schema";
 import {
   dismissalCopy,
@@ -155,6 +170,26 @@ const form = useOForm<DismissForm>({
 const reason = form.useStore((s) => s.values.reason);
 const duration = form.useStore((s) => s.values.duration);
 const submitting = form.useStore((s) => s.isSubmitting);
+
+const decisionRoute = useDecisionRoute();
+const mode = ref<DecisionTransport>(decisionRoute.transport.value);
+const decisionTarget = computed<DecisionTarget>(() => ({
+  family: "alert_finding",
+  id: props.finding.finding_id,
+  title: props.finding.alert_name ?? null,
+}));
+// A form the reader can fill keeps its transport while open; only a check still pending or failed resolves in place.
+watch(decisionRoute.transport, (next) => {
+  if (!props.open || mode.value === "pending" || mode.value === "failed") mode.value = next;
+});
+watch(
+  () => props.open,
+  (open, was) => {
+    if (!open || was) return;
+    mode.value = decisionRoute.transport.value;
+    if (mode.value === "failed") void decisionRoute.probe.refetch();
+  },
+);
 
 const durationOptions = computed<OptionGroupOption[]>(() =>
   DURATION_OPTIONS.map((value) => ({ value, label: copy.value.durationLabel(value) })),

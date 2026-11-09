@@ -34188,6 +34188,103 @@
       "undone": "{count} alert removed. | {count} alerts removed.",
       "undoFailed": "{failed} of {total} alerts couldn't be removed. Remove them from Alerts.",
       "more": "{count} more"
+    },
+    "decisions": {
+      "reasons": {
+        "not_needed": "Not needed for these sources",
+        "planned_work": "Planned work",
+        "false_positive": "Wrong: this didn't happen",
+        "will_fix_later": "Will fix later",
+        "intended_report": "Intended report",
+        "other": "Other",
+        "expected": "Expected",
+        "unknown": "Other reason"
+      },
+      "untitled": "An item that is no longer listed",
+      "you": "you",
+      "undo": "Undo",
+      "retry": "Retry",
+      "namesMore": "{names} and {count} more",
+      "dismiss": {
+        "title": "Dismiss “{title}”?",
+        "button": "Dismiss",
+        "reason": "Why",
+        "falsePositiveHelp": "Tells us, so the check gets better.",
+        "until": "until",
+        "untilDate": "End date",
+        "untilTime": "End time",
+        "reasonRequired": "Choose why you are dismissing it.",
+        "untilRequired": "Choose when the planned work ends.",
+        "untilInvalid": "Choose an end time within the next 7 days.",
+        "effectUntil": "Hidden for everyone in {org} until {when}, then shown again if it is still true. Recorded with your name and reason. Undo from Dismissed.",
+        "effectUndone": "Hidden for everyone in {org} until someone undoes it. Recorded with your name and reason. Undo from Dismissed.",
+        "effectLoading": "Checking what this changes…",
+        "effectFailed": "Couldn't check what this changes, so nothing can be dismissed yet. Close and try again."
+      },
+      "saved": {
+        "until": "Dismissed until {when}: {title}.",
+        "noEnd": "Dismissed: {title}.",
+        "markedOne": "{title} marked as intended report.",
+        "marked": "{count} alert marked as intended report. | {count} alerts marked as intended reports."
+      },
+      "undone": {
+        "one": "Undone: {title} is shown again.",
+        "many": "Undone: {count} item is shown again. | Undone: {count} items are shown again."
+      },
+      "error": {
+        "changed": "This changed since you opened it. Refresh and try again.",
+        "gone": "This is no longer listed. Refresh and try again.",
+        "invalid": "This couldn't be saved as entered. Check it and try again.",
+        "denied": "You don't have permission to change this.",
+        "throttled": "Too many changes at once. Wait a moment and try again.",
+        "failed": "This couldn't be saved. Try again."
+      },
+      "undoError": {
+        "changed": "This changed since it was saved, so nothing was undone. Refresh and try again.",
+        "gone": "This is no longer dismissed, so there is nothing to undo.",
+        "failed": "Nothing was undone. Try again."
+      },
+      "undoPartial": {
+        "summary": "{done} of {total} undone. Not undone: {names}.",
+        "changed": "It changed since it was saved; refresh to see it. | They changed since they were saved; refresh to see them.",
+        "gone": "It is no longer dismissed. | They are no longer dismissed."
+      },
+      "mark": {
+        "action": "Mark as intended report",
+        "title": "Mark alerts as intended reports",
+        "intro": "They stop showing as noise.",
+        "keeps": "The alerts keep sending exactly as before.",
+        "untick": "Untick any that are not meant as reports.",
+        "team": "{team} team",
+        "folder": "folder {folder}",
+        "canMark": "You can mark {count} of {total}.",
+        "locked": "{alerts} stays as it is. | {alerts} stay as they are.",
+        "recorded": "Recorded with your name. Undo from Dismissed at any time.",
+        "button": "Mark {count} as intended",
+        "failed": "{failed} of {total} weren't marked: {names}.",
+        "loading": "Checking which alerts you can mark…",
+        "loadFailed": "Couldn't check which alerts you can mark. Close and try again."
+      },
+      "kind": {
+        "suggestion": "Suggestion",
+        "alert_finding": "Alert finding"
+      },
+      "list": {
+        "title": "Dismissed suggestions and alert findings",
+        "filterAll": "All",
+        "filterSuggestion": "Suggestions",
+        "filterAlertFinding": "Alert findings",
+        "summary": "{reason} · by {actor}, {when}",
+        "until": "shown again {when} if still true",
+        "untilUndone": "until someone undoes it",
+        "empty": "Nothing is dismissed or marked.",
+        "emptySuggestion": "No suggestion is dismissed.",
+        "emptyAlertFinding": "No alert finding is dismissed or marked.",
+        "loadFailed": "Couldn't load what is dismissed.",
+        "range": "{from}–{to} of {total}",
+        "previous": "Previous page",
+        "next": "Next page"
+      }
     }
   }
 }

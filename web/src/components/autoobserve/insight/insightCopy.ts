@@ -28,6 +28,12 @@ import {
   type ErrorClass,
 } from "@/components/alert_calibration/rules";
 import { dismissableOf, type DismissTarget } from "@/components/alert_calibration/dismissals";
+import {
+  refusalOf,
+  type BatchItemResult,
+  type DecisionView,
+  type Preview,
+} from "@/services/autoobserveDecisions";
 
 export type InsightTone = "failure" | "gap" | "info";
 
@@ -85,6 +91,12 @@ export interface InsightZone {
   timeZone: string;
 }
 
+/** A failed decision write, coloured by what the reader can do about it. */
+export interface DecisionNotice {
+  variant: "error" | "warning";
+  text: I18nText;
+}
+
 const NOT_WORKING = "alert_not_working";
 
 const HOUR_US = 3_600_000_000;
@@ -134,6 +146,19 @@ const WINDOW_UNITS: [number, "day" | "hour" | "minute"][] = [
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 const num = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const DECISION_REASON_LABEL: Record<string, I18nKey> = {
+  not_needed: "insight.decisions.reasons.not_needed",
+  planned_work: "insight.decisions.reasons.planned_work",
+  false_positive: "insight.decisions.reasons.false_positive",
+  will_fix_later: "insight.decisions.reasons.will_fix_later",
+  intended_report: "insight.decisions.reasons.intended_report",
+  other: "insight.decisions.reasons.other",
+  expected: "insight.decisions.reasons.expected",
+};
+
+/** How many failed items a banner names before it says "and N more". */
+const FAILURES_SHOWN = 3;
 
 const isEnterprise = () => config.isEnterprise === "true";
 
@@ -377,3 +402,151 @@ export const insightCopy = (
       ? notWorkingParts(t, zone, item, today, nowMs)
       : todayParts(t, item, today, nowMs),
   );
+
+/** The one copy helper for the decision route's dialogs, toasts and list; ids and reason codes never reach the reader. */
+export function decisionCopy(t: TranslateFn, locale: string) {
+  const sameDay = (a: number, b: number) =>
+    new Date(a).toDateString() === new Date(b).toDateString();
+  /** Minute precision in the reader's zone, with the date only when it isn't today. */
+  const when = (micros: number, nowMs: number = Date.now()): I18nText => {
+    const ms = micros / 1000;
+    const time: Intl.DateTimeFormatOptions = {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    };
+    const options: Intl.DateTimeFormatOptions = sameDay(ms, nowMs)
+      ? time
+      : { month: "short", day: "numeric", ...time };
+    return raw(new Intl.DateTimeFormat(locale, options).format(ms));
+  };
+  const title = (value: string | null | undefined): I18nText =>
+    value ? raw(value) : t("insight.decisions.untitled");
+  const reasonLabel = (reason: string | null): I18nText =>
+    t(DECISION_REASON_LABEL[reason ?? ""] ?? "insight.decisions.reasons.unknown");
+
+  /** By status only: the server's words are shown for a refusal alone, which is written for people. */
+  const writeError = (error: unknown): DecisionNotice => {
+    const refusal = refusalOf(error);
+    if (refusal) return { variant: "error", text: raw(refusal.message) };
+    switch ((error as { response?: { status?: number } } | null)?.response?.status) {
+      case 400:
+        return { variant: "error", text: t("insight.decisions.error.invalid") };
+      case 403:
+        return { variant: "error", text: t("insight.decisions.error.denied") };
+      case 404:
+        return { variant: "error", text: t("insight.decisions.error.gone") };
+      case 409:
+        return { variant: "warning", text: t("insight.decisions.error.changed") };
+      case 429:
+        return { variant: "error", text: t("insight.decisions.error.throttled") };
+      default:
+        return { variant: "error", text: t("insight.decisions.error.failed") };
+    }
+  };
+
+  const undoError = (error: unknown): DecisionNotice => {
+    const refusal = refusalOf(error);
+    if (refusal) return { variant: "error", text: raw(refusal.message) };
+    switch ((error as { response?: { status?: number } } | null)?.response?.status) {
+      case 404:
+        return { variant: "error", text: t("insight.decisions.undoError.gone") };
+      case 409:
+        return { variant: "warning", text: t("insight.decisions.undoError.changed") };
+      default:
+        return { variant: "error", text: t("insight.decisions.undoError.failed") };
+    }
+  };
+
+  /** A batch item's failure, as the same words a single write would show. */
+  const itemError = (item: BatchItemResult): I18nText =>
+    writeError({ response: { status: item.status, data: item.error } }).text;
+
+  /** Names the first few and counts the rest, so a long list stays one line. */
+  const names = (values: string[]): I18nText => {
+    const shown = values.slice(0, FAILURES_SHOWN);
+    const rest = values.length - shown.length;
+    if (rest <= 0) return raw(new Intl.ListFormat(locale, { type: "conjunction" }).format(shown));
+    return t("insight.decisions.namesMore", {
+      names: raw(new Intl.ListFormat(locale, { type: "unit" }).format(shown)),
+      count: countText(rest, locale),
+    });
+  };
+
+  const statusOf = (error: unknown) =>
+    (error as { response?: { status?: number } } | null)?.response?.status;
+  /** A refusal, a conflict or a missing decision fails the same way again; anything else may pass on a retry. */
+  const undoRetryable = (error: unknown): boolean => {
+    const status = statusOf(error);
+    return status === undefined || status === 429 || status >= 500;
+  };
+  /** Why part of an undo failed, from its first failure; a plain failure says nothing, its Retry does. */
+  const undoPartialReason = (error: unknown, n: number): I18nText | null => {
+    const refusal = refusalOf(error);
+    if (refusal) return raw(refusal.message);
+    if (statusOf(error) === 409) return t("insight.decisions.undoPartial.changed", {}, n);
+    if (statusOf(error) === 404) return t("insight.decisions.undoPartial.gone", {}, n);
+    return null;
+  };
+
+  /** The one toast an undo ends in when something failed: all of it, or how much and which ones. */
+  const undoOutcome = (
+    total: number,
+    failures: { title: string | null; error: unknown }[],
+  ): DecisionNotice => {
+    if (failures.length === total) return undoError(failures[0].error);
+    const variant = failures.some((f) => undoError(f.error).variant === "error")
+      ? "error"
+      : "warning";
+    const head = t("insight.decisions.undoPartial.summary", {
+      done: countText(total - failures.length, locale),
+      total: countText(total, locale),
+      names: names(failures.map((f) => String(title(f.title)))),
+    });
+    const why = undoPartialReason(failures[0].error, failures.length);
+    return { variant, text: why ? raw(`${head} ${why}`) : head };
+  };
+
+  return {
+    when,
+    title,
+    reasonLabel,
+    writeError,
+    undoError,
+    itemError,
+    names,
+    undoRetryable,
+    undoOutcome,
+    failuresShown: FAILURES_SHOWN,
+    undo: () => t("insight.decisions.undo"),
+    retry: () => t("insight.decisions.retry"),
+    dismissTitle: (subject: string | null | undefined) =>
+      t("insight.decisions.dismiss.title", { title: title(subject) }),
+    dismissButton: () => t("insight.decisions.dismiss.button"),
+    effect: (preview: Pick<Preview, "effect">, org: string, nowMs?: number): I18nText =>
+      preview.effect.until === null
+        ? t("insight.decisions.dismiss.effectUndone", { org: raw(org) })
+        : t("insight.decisions.dismiss.effectUntil", {
+            org: raw(org),
+            when: when(preview.effect.until, nowMs),
+          }),
+    saved: (view: Pick<DecisionView, "reason" | "until">, subject: string | null | undefined) => {
+      if (view.reason === "intended_report")
+        return t("insight.decisions.saved.markedOne", { title: title(subject) });
+      return view.until === null
+        ? t("insight.decisions.saved.noEnd", { title: title(subject) })
+        : t("insight.decisions.saved.until", { title: title(subject), when: when(view.until) });
+    },
+    marked: (n: number): I18nText =>
+      t("insight.decisions.saved.marked", { count: countText(n, locale) }, n),
+    undone: (n: number, subject?: string | null): I18nText =>
+      n === 1 && subject
+        ? t("insight.decisions.undone.one", { title: raw(subject) })
+        : t("insight.decisions.undone.many", { count: countText(n, locale) }, n),
+    actor: (actor: string, me: string | undefined): I18nText =>
+      me && actor === me ? t("insight.decisions.you") : raw(actor),
+    count: (n: number): I18nText => countText(n, locale),
+  };
+}
+
+export type DecisionCopy = ReturnType<typeof decisionCopy>;

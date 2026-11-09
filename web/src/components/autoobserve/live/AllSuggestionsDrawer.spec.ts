@@ -25,6 +25,13 @@ import AllSuggestionsDrawer from "./AllSuggestionsDrawer.vue";
 import config from "@/aws-exports";
 import router from "@/test/unit/helpers/router";
 
+// The decision route answers 404 while its switch is off; this spec pins today's routes.
+vi.mock("@/services/autoobserveDecisions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/autoobserveDecisions")>();
+  const off = () =>
+    Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } }));
+  return { ...actual, default: { ...actual.default, list: vi.fn(off) } };
+});
 vi.mock("@/services/autoobserve", () => ({
   default: { coverage: vi.fn(), suggestions: vi.fn() },
 }));

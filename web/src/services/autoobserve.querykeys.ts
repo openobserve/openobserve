@@ -27,4 +27,10 @@ export const autoobserveKeys = {
     orgKey(org, "autoobserve", "incidents", limit, offset),
   incidentsPages: (org: string, range: string, pageSize: number, cap: number) =>
     orgKey(org, "autoobserve", "incidents", "pages", range, pageSize, cap),
+  decisionsEnabled: (org: string) => orgKey(org, "autoobserve", "decisions", "enabled"),
+  decisionsPages: (org: string) => orgKey(org, "autoobserve", "decisions", "page"),
+  decisionsPage: (org: string, family: string, limit: number, offset: number) =>
+    orgKey(org, "autoobserve", "decisions", "page", family, limit, offset),
+  decisionPreview: (org: string, params: Record<string, unknown>) =>
+    orgKey(org, "autoobserve", "decisions", "preview", params),
 };

@@ -240,6 +240,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ dismissCopy.button() }}
           </OButton>
+          <OButton
+            v-if="markable"
+            variant="outline"
+            size="xs"
+            data-test="alert-calibration-finding-mark-report"
+            @click="openMark"
+          >
+            {{ t("insight.decisions.mark.action") }}
+          </OButton>
         </div>
       </div>
     </OCardSection>
@@ -256,6 +265,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="dismissOpen"
       :finding="dismissTarget"
       :refresh="refresh"
+    />
+    <MarkIntendedReportsDialog
+      v-if="markable && markRequested"
+      v-model:open="markOpen"
+      :alerts="[{ finding_id: markable.finding_id, alert_name: markable.alert_name ?? null }]"
     />
   </OCard>
 </template>
@@ -308,6 +322,8 @@ import {
 import AlertCalibrationApplyDialog from "./AlertCalibrationApplyDialog.vue";
 import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import { useReopenDismissal } from "@/composables/alertCalibration/useDismissals";
+import { useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
+import MarkIntendedReportsDialog from "@/components/autoobserve/decisions/MarkIntendedReportsDialog.vue";
 import { dismissalCopy, isDismissable, type DismissalView } from "./dismissals";
 import { openAlertReview } from "./reviewAlert";
 import {
@@ -349,6 +365,17 @@ const dismissOpen = ref(false);
 const openDismiss = () => {
   dismissRequested.value = true;
   dismissOpen.value = true;
+};
+const decisionRoute = useDecisionRoute();
+/** m11: an always-firing alert may be a report someone wants; the route records that, the alert keeps sending. */
+const markable = computed(() =>
+  decisionRoute.enabled.value && props.finding.rule_id === "noise" ? dismissable.value : null,
+);
+const markRequested = ref(false);
+const markOpen = ref(false);
+const openMark = () => {
+  markRequested.value = true;
+  markOpen.value = true;
 };
 
 /** Version-2 fields, shown only when the record carries a value this build knows. */

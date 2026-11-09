@@ -30,6 +30,13 @@ import analytics from "@/services/product_analytics";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
+// The decision route answers 404 while its switch is off; this spec pins today's routes.
+vi.mock("@/services/autoobserveDecisions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/autoobserveDecisions")>();
+  const off = () =>
+    Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } }));
+  return { ...actual, default: { ...actual.default, list: vi.fn(off) } };
+});
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/aws-exports")>();
   return { default: { ...actual.default, isEnterprise: "true" } };

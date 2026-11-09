@@ -64,7 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <AlertCalibrationDismissedList v-if="view === 'dismissed'" />
+      <template v-if="view === 'dismissed'">
+        <AlertCalibrationDismissedList />
+        <DecisionsDismissedList v-if="decisionRoute.enabled.value" />
+      </template>
 
       <OEmptyState
         v-else-if="data.error.value"
@@ -144,7 +147,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <AlertCalibrationDismissedList v-if="view === 'dismissed'" />
+        <template v-if="view === 'dismissed'">
+          <AlertCalibrationDismissedList />
+          <DecisionsDismissedList v-if="decisionRoute.enabled.value" />
+        </template>
 
         <OBanner
           v-if="view === 'open' && dismissals.unknown.value"
@@ -348,6 +354,8 @@ import AlertCalibrationActions from "./AlertCalibrationActions.vue";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import AlertCalibrationDismissedList from "./AlertCalibrationDismissedList.vue";
+import DecisionsDismissedList from "@/components/autoobserve/decisions/DecisionsDismissedList.vue";
+import { useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
 import AlertCalibrationFindingsFilter from "./AlertCalibrationFindingsFilter.vue";
 import {
   dismissalCopy,
@@ -387,6 +395,7 @@ const route = useRoute();
 const { search, orgId } = useDigestSearch();
 const copy = computed(() => dismissalCopy(t, locale.value));
 const dismissals = useActiveDismissals({ reportRefetchFailure: true, freshOnMount: true });
+const decisionRoute = useDecisionRoute();
 
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);

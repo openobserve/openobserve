@@ -16,6 +16,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 
+// The decision route answers 404 while its switch is off; this spec pins today's routes.
+vi.mock("@/services/autoobserveDecisions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/autoobserveDecisions")>();
+  const off = () =>
+    Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } }));
+  return { ...actual, default: { ...actual.default, list: vi.fn(off) } };
+});
 vi.mock("@/services/alert_calibration", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/alert_calibration")>();
   return {
