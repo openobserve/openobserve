@@ -6003,7 +6003,8 @@ mod tests {
     fn slack_action_scope_routes_are_exactly() {
         use openobserve_api_common::auth::delegation::in_slack_action_scope;
 
-        let expected = [
+        #[allow(unused_mut)]
+        let mut expected = vec![
             "GET /v2/{org_id}/alerts/{alert_id}",
             "GET /v2/{org_id}/alerts/{alert_id}/acks",
             "GET /v2/{org_id}/alerts/{alert_id}/groups",
@@ -6018,6 +6019,12 @@ mod tests {
             "POST /{org_id}/oncall/responses/{response_id}/snooze",
             "POST /{org_id}/oncall/responses/{response_id}/unacknowledge",
         ];
+        #[cfg(feature = "enterprise")]
+        expected.extend([
+            "GET /v2/{org_id}/autoobserve/decisions/preview",
+            "POST /v2/{org_id}/autoobserve/decisions",
+            "POST /v2/{org_id}/autoobserve/decisions/{decision_id}/undo",
+        ]);
         assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
     }
 
