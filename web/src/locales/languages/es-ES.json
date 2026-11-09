@@ -7716,7 +7716,7 @@
       "intro": "Envía logs, métricas y trazas desde un {product} existente a esta organización cambiando su configuración. Tus aplicaciones y trazadores no cambian.",
       "envTitle": "Configuración del Agent",
       "envBody": "Configura estas variables de entorno en el {product} y reinícialo. Requiere {product} {version} o una versión posterior.",
-      "tokenBody": "La clave de API debe ser un token de ingesta de la organización, que empieza por {prefix}. Esta organización no tiene ningún token de ingesta habilitado, por lo que el fragmento muestra tu código de acceso, que se rechaza. Crea un token de ingesta y, después, selecciónalo aquí.",
+      "tokenBody": "La clave de API debe ser un token de ingesta de la organización, que empieza por {prefix}. Esta organización no tiene ningún token de ingesta habilitado, por lo que no se muestra ningún fragmento de configuración. Cree un token de ingesta y vuelva a esta página.",
       "tokenLink": "Abrir tokens de ingesta",
       "featuresOffBody": "Las líneas posteriores a las URL desactivan funciones del Agent que envían a los servidores propios de {vendor} con la misma clave. {setting} también mantiene desactivado {component}, que ejecutan las versiones más recientes del Agent y que no conserva la ruta en estas URL.",
       "logsTitle": "Logs",

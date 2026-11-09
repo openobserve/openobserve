@@ -7716,7 +7716,7 @@
       "intro": "透過變更現有 {product} 的設定，將其日誌、指標與追蹤傳送到此組織。您的應用程式與追蹤器維持不變。",
       "envTitle": "Agent 設定",
       "envBody": "在 {product} 上設定這些環境變數並重新啟動。需要 {product} {version} 或更新版本。",
-      "tokenBody": "API 金鑰必須是組織資料擷取權杖，其開頭為 {prefix}。此組織沒有已啟用的資料擷取權杖，因此程式碼片段會顯示您的通行碼，而該通行碼會遭到拒絕。建立資料擷取權杖，然後在此選取。",
+      "tokenBody": "API 金鑰必須是組織資料擷取權杖，開頭為 {prefix}。此組織沒有已啟用的資料擷取權杖，因此不顯示設定片段。請建立資料擷取權杖，然後返回此頁面。",
       "tokenLink": "開啟資料擷取權杖",
       "featuresOffBody": "The lines after the URLs turn off Agent features that send to {vendor}'s own servers with the same key. {setting} also keeps {component} off, which newer Agent versions run and which does not keep the path in these URLs.",
       "logsTitle": "日誌",

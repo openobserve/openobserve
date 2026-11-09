@@ -7716,7 +7716,7 @@
       "intro": "Invia log, metriche e tracce da un {product} esistente a questa organizzazione modificandone la configurazione. Le tue applicazioni e i tuoi tracer restano invariati.",
       "envTitle": "Configurazione dell'Agent",
       "envBody": "Imposta queste variabili d'ambiente su {product} e riavvialo. Richiede {product} {version} o versione successiva.",
-      "tokenBody": "La chiave API deve essere un token di ingestione dell'organizzazione, che inizia con {prefix}. Questa organizzazione non ha alcun token di ingestione abilitato, quindi lo snippet mostra il tuo passcode, che viene rifiutato. Crea un token di ingestione, poi selezionalo qui.",
+      "tokenBody": "La chiave API deve essere un token di ingestione dell'organizzazione, che inizia con {prefix}. Questa organizzazione non ha token di ingestione abilitati, quindi non viene mostrato alcuno snippet di configurazione. Crea un token di ingestione, poi torna a questa pagina.",
       "tokenLink": "Apri token di ingestione",
       "featuresOffBody": "Le righe dopo gli URL disattivano le funzionalità dell'Agent che inviano ai server di {vendor} con la stessa chiave. {setting} mantiene anche {component} disattivato, che le versioni più recenti dell'Agent eseguono e che non conserva il percorso in questi URL.",
       "logsTitle": "Log",

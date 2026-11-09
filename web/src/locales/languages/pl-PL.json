@@ -7716,7 +7716,7 @@
       "intro": "Wysyłaj logi, metryki i trace z istniejącego {product} do tej organizacji, zmieniając jego konfigurację. Twoje aplikacje i tracery pozostają bez zmian.",
       "envTitle": "Konfiguracja agenta",
       "envBody": "Ustaw te zmienne środowiskowe dla {product} i uruchom go ponownie. Wymaga {product} w wersji {version} lub nowszej.",
-      "tokenBody": "Klucz API musi być tokenem pozyskiwania danych organizacji, który zaczyna się od {prefix}. Ta organizacja nie ma włączonego tokenu pozyskiwania danych, więc fragment kodu pokazuje Twój kod dostępu, który zostanie odrzucony. Utwórz token pozyskiwania danych, a następnie wybierz go tutaj.",
+      "tokenBody": "Klucz API musi być tokenem pozyskiwania danych organizacji, który zaczyna się od {prefix}. Ta organizacja nie ma włączonego tokenu pozyskiwania danych, więc fragment konfiguracji nie jest wyświetlany. Utwórz token pozyskiwania danych, a następnie wróć na tę stronę.",
       "tokenLink": "Otwórz tokeny pozyskiwania danych",
       "featuresOffBody": "Wiersze po adresach URL wyłączają funkcje Agenta, które wysyłają na własne serwery {vendor} przy użyciu tego samego klucza. {setting} także wyłącza {component}, który jest uruchamiany w nowszych wersjach Agenta i który nie zachowuje ścieżki w tych adresach URL.",
       "logsTitle": "Logi",

@@ -7716,7 +7716,7 @@
       "intro": "Envoyez les logs, les métriques et les traces d’un {product} existant vers cette organisation en modifiant sa configuration. Vos applications et vos traceurs restent inchangés.",
       "envTitle": "Configuration de l’Agent",
       "envBody": "Définissez ces variables d’environnement sur le {product} et redémarrez-le. Nécessite {product} {version} ou une version ultérieure.",
-      "tokenBody": "La clé API doit être un jeton d’ingestion de l’organisation, qui commence par {prefix}. Cette organisation n’a aucun jeton d’ingestion activé, donc l’extrait de code affiche votre code d’accès, qui est rejeté. Créez un jeton d’ingestion, puis sélectionnez-le ici.",
+      "tokenBody": "La clé API doit être un jeton d'ingestion d'organisation, qui commence par {prefix}. Cette organisation n'a aucun jeton d'ingestion activé, aucun extrait de configuration n'est donc affiché. Créez un jeton d'ingestion, puis revenez à cette page.",
       "tokenLink": "Ouvrir les jetons d’ingestion",
       "featuresOffBody": "Les lignes après les URL désactivent les fonctionnalités de l’Agent qui envoient vers les serveurs propres de {vendor} avec la même clé. {setting} maintient également {component} désactivé, que les versions plus récentes de l’Agent exécutent et qui ne conserve pas le chemin dans ces URL.",
       "logsTitle": "Logs",

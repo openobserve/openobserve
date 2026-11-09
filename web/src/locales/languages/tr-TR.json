@@ -7716,7 +7716,7 @@
       "intro": "Yapılandırmasını değiştirerek mevcut bir {product} üzerinden bu kuruluşa günlükler, metrikler ve izler gönderin. Uygulamalarınız ve tracer'larınız olduğu gibi kalır.",
       "envTitle": "Agent yapılandırması",
       "envBody": "Bu ortam değişkenlerini {product} üzerinde ayarlayın ve yeniden başlatın. {product} {version} veya üzerini gerektirir.",
-      "tokenBody": "API anahtarı, {prefix} ile başlayan bir kuruluş veri alımı token'ı olmalıdır. Bu kuruluşta etkin bir veri alımı token'ı yok; bu nedenle kod parçacığı, reddedilen geçiş kodunuzu gösteriyor. Bir veri alımı token'ı oluşturun, ardından burada seçin.",
+      "tokenBody": "API anahtarı {prefix} ile başlayan bir kuruluş veri alımı token'ı olmalıdır. Bu kuruluşta etkin bir veri alımı token'ı yok, bu nedenle kurulum snippet'i gösterilmiyor. Bir veri alımı token'ı oluşturun, ardından bu sayfaya dönün.",
       "tokenLink": "Veri alımı token'larını aç",
       "featuresOffBody": "URL'lerden sonraki satırlar, aynı anahtarla {vendor} sunucularına gönderen Agent özelliklerini kapatır. {setting} ayrıca {component} bileşenini kapalı tutar; daha yeni Agent sürümleri bunu çalıştırır ve bu URL'lerdeki yolu korumaz.",
       "logsTitle": "Günlükler",

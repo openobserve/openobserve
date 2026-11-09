@@ -7716,7 +7716,7 @@
       "intro": "既存の {product} の設定を変更して、ログ、メトリクス、トレースをこの組織に送信します。アプリケーションとトレーサーはそのままです。",
       "envTitle": "エージェント設定",
       "envBody": "これらの環境変数を {product} に設定して再起動します。{product} {version} 以降が必要です。",
-      "tokenBody": "API キーは {prefix} で始まる組織の取り込みトークンである必要があります。この組織には有効な取り込みトークンがないため、スニペットにはパスコードが表示され、拒否されます。取り込みトークンを作成し、ここで選択してください。",
+      "tokenBody": "API キーは組織の取り込みトークンである必要があり、{prefix} で始まります。この組織には有効な取り込みトークンがないため、セットアップスニペットは表示されません。取り込みトークンを作成してから、このページに戻ってください。",
       "tokenLink": "取り込みトークンを開く",
       "featuresOffBody": "The lines after the URLs turn off Agent features that send to {vendor}'s own servers with the same key. {setting} also keeps {component} off, which newer Agent versions run and which does not keep the path in these URLs.",
       "logsTitle": "ログ",

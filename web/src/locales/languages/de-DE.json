@@ -7716,7 +7716,7 @@
       "intro": "Senden Sie Logs, Metriken und Traces von einem vorhandenen {product} an diese Organisation, indem Sie dessen Konfiguration ändern. Ihre Anwendungen und Tracer bleiben unverändert.",
       "envTitle": "Agent-Konfiguration",
       "envBody": "Legen Sie diese Umgebungsvariablen auf dem {product} fest und starten Sie ihn neu. Erfordert {product} {version} oder höher.",
-      "tokenBody": "Der API-Schlüssel muss ein Datenerfassungs-Token der Organisation sein, das mit {prefix} beginnt. Diese Organisation hat kein aktiviertes Datenerfassungs-Token, daher zeigt der Ausschnitt Ihren Passcode, der abgelehnt wird. Erstellen Sie ein Datenerfassungs-Token und wählen Sie es dann hier aus.",
+      "tokenBody": "Der API-Schlüssel muss ein Datenerfassungs-Token der Organisation sein, das mit {prefix} beginnt. Diese Organisation hat kein aktiviertes Datenerfassungs-Token, daher wird kein Einrichtungssnippet angezeigt. Erstellen Sie ein Datenerfassungs-Token und kehren Sie dann zu dieser Seite zurück.",
       "tokenLink": "Datenerfassungs-Token öffnen",
       "featuresOffBody": "Die Zeilen nach den URLs deaktivieren Agent-Funktionen, die mit demselben Schlüssel an die eigenen Server von {vendor} senden. {setting} hält außerdem {component} deaktiviert, das neuere Agent-Versionen ausführen und das den Pfad in diesen URLs nicht beibehält.",
       "logsTitle": "Logs",

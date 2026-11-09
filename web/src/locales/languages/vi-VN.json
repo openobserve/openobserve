@@ -7716,7 +7716,7 @@
       "intro": "Gửi nhật ký, chỉ số và trace từ {product} hiện có đến tổ chức này bằng cách thay đổi cấu hình của nó. Ứng dụng và tracer của bạn vẫn giữ nguyên.",
       "envTitle": "Cấu hình Agent",
       "envBody": "Đặt các biến môi trường này trên {product} và khởi động lại nó. Yêu cầu {product} {version} trở lên.",
-      "tokenBody": "Khóa API phải là token tiếp nhận dữ liệu của tổ chức, bắt đầu bằng {prefix}. Tổ chức này chưa bật token tiếp nhận dữ liệu nào, nên đoạn mã hiển thị passcode của bạn và nó sẽ bị từ chối. Hãy tạo token tiếp nhận dữ liệu, rồi chọn token đó ở đây.",
+      "tokenBody": "Khóa API phải là token tiếp nhận dữ liệu của tổ chức, bắt đầu bằng {prefix}. Tổ chức này không có token tiếp nhận dữ liệu nào được bật, vì vậy không có đoạn mã thiết lập nào được hiển thị. Hãy tạo token tiếp nhận dữ liệu, sau đó quay lại trang này.",
       "tokenLink": "Mở token tiếp nhận dữ liệu",
       "featuresOffBody": "Các dòng sau URL tắt những tính năng của Agent gửi đến máy chủ riêng của {vendor} bằng cùng khóa đó. {setting} cũng giữ {component} ở trạng thái tắt, thành phần mà các phiên bản Agent mới hơn chạy và không giữ đường dẫn trong các URL này.",
       "logsTitle": "Nhật ký",

@@ -7716,7 +7716,7 @@
       "intro": "Verstuur logs, metrieken en traces van een bestaande {product} naar deze organisatie door de configuratie ervan te wijzigen. Je applicaties en tracers blijven ongewijzigd.",
       "envTitle": "Agentconfiguratie",
       "envBody": "Stel deze omgevingsvariabelen in op de {product} en herstart deze. Vereist {product} {version} of later.",
-      "tokenBody": "De API-sleutel moet een ingestietoken van de organisatie zijn, die begint met {prefix}. Deze organisatie heeft geen ingeschakelde ingestietoken, dus het fragment toont je passcode, die wordt geweigerd. Maak een ingestietoken aan en selecteer deze hier.",
+      "tokenBody": "De API-sleutel moet een ingestietoken van de organisatie zijn dat met {prefix} begint. Deze organisatie heeft geen ingeschakelde ingestietoken, dus er wordt geen setupfragment getoond. Maak een ingestietoken aan en keer vervolgens terug naar deze pagina.",
       "tokenLink": "Ingestietokens openen",
       "featuresOffBody": "De regels na de URL's schakelen Agent-functies uit die met dezelfde sleutel naar de eigen servers van {vendor} verzenden. {setting} houdt ook {component} uitgeschakeld, dat nieuwere Agent-versies uitvoeren en dat het pad in deze URL's niet behoudt.",
       "logsTitle": "Logs",
