@@ -294,7 +294,7 @@ pub async fn coverage_history(
     tag = "AutoObserve",
     operation_id = "AutoObserveSuggestions",
     summary = "List suggestions",
-    description = "Each suggestion's newest state from the last 7 days, highest score first, with a stored accept or reject applied. `total` counts the matches before paging; a decision made since the last engine pass can drop an item from a status-filtered page. `last_seen_at` is when the suggestion last changed or was confirmed (at most 24 h old while current). Where alert calibration owns alert findings, an alert's broken-definition finding is listed once as `alert_not_working` from the newest calibration run, and dismissed findings are left out.",
+    description = "Each suggestion's newest state from the last 7 days, highest score first, with a stored accept or reject applied. `total` counts the matches before paging; a decision made since the last engine pass can drop an item from a status-filtered page. `last_seen_at` is when the suggestion last changed or was confirmed (at most 24 h old while current). Where alert calibration owns alert findings, an alert's broken-definition finding is listed once as `alert_not_working` from the newest calibration run, and dismissed findings are left out. Where the deployment lists them, a source that stopped sending while its stream kept flowing is listed as `source_silence`, one per outage, until a day after every source of the outage sends again.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), SuggestionsQuery),
     responses(
@@ -1003,6 +1003,27 @@ mod tests {
         assert_eq!(auth.grant_calls.load(Ordering::SeqCst), 0);
         assert_eq!(auth.folder_reads.load(Ordering::SeqCst), 0);
         assert!(readable_mask(&auth, &[]).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_source_silence_stream_subject_needs_logs_read_org_wide() {
+        let stream = EntityRef::new(
+            kinds::STREAM,
+            &[("stream_type", "logs"), ("stream_name", "k8s_events")],
+        );
+        let subject = Subject::of(&stream);
+        assert_eq!((subject.resource, subject.alert_id), ("logs", None));
+        let folder_reader = CountingAuthority {
+            folders: HashMap::from([("a0".to_string(), "ops".to_string())]),
+            grants: vec!["afolder:ops".into()],
+            ..Default::default()
+        };
+        assert_eq!(readable_mask(&folder_reader, &[subject]).await, [false]);
+        let org_reader = CountingAuthority {
+            org_wide: HashMap::from([("logs", true)]),
+            ..Default::default()
+        };
+        assert_eq!(readable_mask(&org_reader, &[subject]).await, [true]);
     }
 
     /// Calibration v1's convention: a switched-off deployment answers 404 before any other check.
