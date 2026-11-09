@@ -18,7 +18,7 @@
 
 use config::meta::stream::{FileKey, MergeStrategy};
 use metrics_index::MetricsFileLayout;
-use search::datafusion::merge::MergeMode;
+use search::merge::MergeMode;
 
 use super::metrics::{MetricsIndexMergeScope, metrics_index_merge_scope};
 use crate::incremental::OPEN_HOUR_MERGE_FILES;

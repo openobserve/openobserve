@@ -61,6 +61,11 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 vi.mock("@/services/overview", () => ({ default: { getOrgOverview: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/utils/sampleData/loader", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/sampleData/loader")>()),
+  removeSampleData: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/services/service_graph", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -71,6 +76,14 @@ vi.mock("@/services/service_graph", async (importOriginal) => {
 // Heavy children — stubbed to keep the suite focused on OverviewTab's own
 // render gating. OverviewSkeleton and OEmptyState are deliberately left REAL
 // so the assertions below exercise the actual rendered output.
+// HomeNoDataState's setup buttons read the org's full stream lists, which HomeView has already
+// loaded in the app; mocked so the probe counts below stay OverviewTab's own.
+vi.mock("@/composables/useOrgHasUserData", async () => {
+  const { ref } = await import("vue");
+  return {
+    useOrgHasUserData: () => ({ hasUserData: ref(undefined), isFetching: ref(false) }),
+  };
+});
 vi.mock("@/components/DateTime.vue", () => ({
   default: {
     name: "DateTime",
@@ -117,8 +130,10 @@ import { buildHealthyOverview, buildOverview } from "./overview/overviewFixtures
 import streamService from "@/services/stream";
 import config from "@/aws-exports";
 import OverviewTab from "./OverviewTab.vue";
+import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { firstDataStorageKey } from "@/composables/firstEvent/useFirstDataNotice";
 
 // OverviewTab renders only O2 `lib` components.
@@ -296,6 +311,49 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="overview-alerts-view-all"]').exists()).toBe(false);
       expect(push).not.toHaveBeenCalled();
       push.mockRestore();
+    });
+  });
+
+  describe("analytics", () => {
+    it("tracks a signal card drill-down, and none for a locked one", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, features: { traces: "locked" } });
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      await wrapper.get('[data-test="overview-signal-logs-view-all"]').trigger("click");
+      expect(analytics.track).toHaveBeenCalledWith("home_overview_drilldown_clicked", {
+        target: "signal",
+        signal: "logs",
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "home_overview_drilldown_clicked",
+        expect.objectContaining({ signal: "traces" }),
+      );
+      push.mockRestore();
+    });
+
+    it("tracks a time range the user picked, but not one the picker replayed", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const picker = wrapper.findComponent({ name: "DateTime" });
+      picker.vm.$emit("on:date-change", {
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "15m",
+        userChangedValue: false,
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "home_time_range_changed",
+        expect.anything(),
+      );
+      picker.vm.$emit("on:date-change", {
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "1h",
+        userChangedValue: true,
+      });
+      expect(analytics.track).toHaveBeenCalledWith("home_time_range_changed", { type: "relative" });
+      await flushPromises();
     });
   });
 
@@ -1463,10 +1521,12 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="first-data-panel"]').exists()).toBe(false);
     });
 
+    // Refresh is the hero's way to check again once data was sent
     it("should keep the toolbar with a fresh refresh run beside the hero", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
+      expect(wrapper.find(HERO).exists()).toBe(true);
       expect(wrapper.find(REFRESH_BTN).exists()).toBe(true);
       expect(refreshLastRun()).not.toBeNull();
     });
@@ -1512,6 +1572,68 @@ describe("OverviewTab", () => {
       expect(streamService.nameList).not.toHaveBeenCalled();
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
       expect(wrapper.find(HERO).exists()).toBe(false);
+    });
+
+    it("should drop the no-data hero when sample data finishes loading for this org", async () => {
+      const session = useSampleDataSession();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find(HERO).exists()).toBe(true);
+
+      session.loadingOrg.value = store.state.selectedOrganization.identifier;
+      session.status.value = "loading";
+      await flushPromises();
+      givenStreams({ logs: [{ name: "sample_logs", stream_type: "logs" }] });
+      session.status.value = "loaded";
+      await flushPromises();
+      session.status.value = "idle";
+
+      expect(wrapper.find(HERO).exists()).toBe(false);
+    });
+
+    it("should show the overview while only sample data is there, and the hero again once it is deleted", async () => {
+      const org = store.state.selectedOrganization.identifier;
+      // what the first-data notice records for an org that holds only sample data
+      localStorage.setItem(
+        firstDataStorageKey(org),
+        JSON.stringify({ lastVisit: Date.now(), hadData: false }),
+      );
+      try {
+        givenStreams({ logs: [{ name: "o2_demo_app_logs", stream_type: "logs" }] });
+        wrapper = mountOverviewTab();
+        await flushPromises();
+        expect(wrapper.find(HERO).exists()).toBe(false);
+
+        wrapper.unmount();
+        queryClient.clear();
+        givenStreams(internalOnly);
+        wrapper = mountOverviewTab();
+        await flushPromises();
+        expect(wrapper.find(HERO).exists()).toBe(true);
+      } finally {
+        localStorage.removeItem(firstDataStorageKey(org));
+      }
+    });
+
+    it("should show the hero again when this org's sample data is deleted while Home is open", async () => {
+      const org = store.state.selectedOrganization.identifier;
+      localStorage.setItem(
+        firstDataStorageKey(org),
+        JSON.stringify({ lastVisit: Date.now(), hadData: false }),
+      );
+      try {
+        givenStreams({ logs: [{ name: "o2_demo_app_logs", stream_type: "logs" }] });
+        wrapper = mountOverviewTab();
+        await flushPromises();
+        expect(wrapper.find(HERO).exists()).toBe(false);
+
+        givenStreams(internalOnly);
+        await useSampleDataSession().remove(org);
+        await flushPromises();
+        expect(wrapper.find(HERO).exists()).toBe(true);
+      } finally {
+        localStorage.removeItem(firstDataStorageKey(org));
+      }
     });
 
     it("should answer a later load from the cache, never a new request", async () => {

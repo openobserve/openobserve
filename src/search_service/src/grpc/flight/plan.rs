@@ -43,13 +43,12 @@ use infra::errors::{Error, ErrorCodes};
 use super::scan::{PrecomputedAggregates, collect_stats};
 use crate::{
     datafusion::{
-        distributed_plan::{
-            NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
-            rewrite::aggregate_optimize_rewrite,
-        },
+        datasource::{enrich_table::EnrichTable, uniontable::NewUnionTable},
+        distributed::codec::get_physical_extension_codec,
         exec::{DataFusionContextBuilder, register_udf},
+        physical_optimizer::index_optimizer::index_aggregate_rewrite::aggregate_optimize_rewrite,
+        physical_plan::empty_exec::{NewEmptyExecVisitor, ReplaceTableScanExec},
         sort_order::FileSortOrder,
-        table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
     },
     grpc::QueryParams,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -327,7 +326,7 @@ mod tests {
 
     use super::*;
     use crate::datafusion::{
-        distributed_plan::empty_exec::NewEmptyExec, table_provider::empty_table::NewEmptyTable,
+        datasource::empty_table::NewEmptyTable, physical_plan::empty_exec::NewEmptyExec,
     };
 
     #[tokio::test]

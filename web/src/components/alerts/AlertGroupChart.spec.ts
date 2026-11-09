@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { toZonedTime } from "date-fns-tz";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -62,6 +63,50 @@ beforeEach(() => {
 afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
+});
+
+describe("AlertGroupChart — firing band", () => {
+  const alert = {
+    stream_name: "logs",
+    stream_type: "logs",
+    query_condition: { type: "sql", sql: "SELECT 1" },
+    trigger_condition: { threshold: 500 },
+  };
+  const mountFiring = async (firingSinceUs?: number) => {
+    wrapper = mount(AlertGroupChart, {
+      props: { alert, firingSinceUs },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+    return panelConfig(wrapper);
+  };
+
+  it("draws nothing without a firing start", async () => {
+    expect((await mountFiring()).mark_area).toBeUndefined();
+  });
+
+  it("shades from the firing start to now, in milliseconds", async () => {
+    const startedMs = Date.now() - 10 * 60_000;
+    const [band] = (await mountFiring(startedMs * 1000)).mark_area;
+    expect(band.axis).toBe("x");
+    expect(band.from).toBe(startedMs);
+    expect(band.to).toBeGreaterThan(startedMs);
+  });
+
+  it("zones the band like the series", async () => {
+    const original = store.state.timezone;
+    store.state.timezone = "Asia/Kolkata";
+    const startedMs = Date.now() - 10 * 60_000;
+    const [band] = (await mountFiring(startedMs * 1000)).mark_area;
+    store.state.timezone = original;
+    expect(band.from).toBe(toZonedTime(startedMs, "Asia/Kolkata").getTime());
+  });
+
+  it("starts at the range when the alert began firing before it", async () => {
+    const startedMs = Date.now() - 5 * 3_600_000;
+    const [band] = (await mountFiring(startedMs * 1000)).mark_area;
+    expect(band.from).toBeGreaterThan(startedMs);
+  });
 });
 
 describe("AlertGroupChart — threshold visibility", () => {

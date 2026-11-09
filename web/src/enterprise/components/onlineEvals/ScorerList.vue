@@ -48,10 +48,7 @@
         <!-- Type breakdown (catalog signal) — doubles as a filter synced to the
              type dropdown; Total last, never itself the active tile. -->
         <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="scorer-list-summary"
-          >
+          <div data-test="scorer-list-summary">
             <OStatStrip
               :items="summaryStats"
               :loading="loading"

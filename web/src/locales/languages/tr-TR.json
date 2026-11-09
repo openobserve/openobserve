@@ -1380,6 +1380,7 @@
     "autoRefreshRelativeOnly": "Yalnızca göreli zaman aralıkları için geçerlidir",
     "turnOffLiveMode": "Canlı modu kapat",
     "autoRefreshWithValue": "Otomatik Yenileme: {value}",
+    "autoRefreshTrigger": "Otomatik: {interval}",
     "searchHistory": "Arama Geçmişi",
     "usageCostHistory": "Kullanım ve maliyet geçmişi",
     "createScheduledSearch": "Zamanlanmış Arama Oluştur",
@@ -2191,12 +2192,12 @@
       "fileTypeZip": "Yalnızca ZIP dosyalarına izin verilir"
     },
     "emptyState": {
-      "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
-      "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
       "webApp": "Bir web uygulaması düzenleyin",
       "webAppDesc": "OpenObserve RUM SDK'sını herhangi bir {product} uygulamasına ekleyin",
       "sessionReplay": "Oturum Tekrarını Etkinleştir",
       "sessionReplayDesc": "UX sorunlarında hata ayıklamak için kullanıcı oturumlarını kaydedin ve tekrarlayın",
+      "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
+      "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
       "learnMore": "Daha fazla bilgi edinin:",
       "quickImpl": "Hızlı uygulama kılavuzu",
       "blogPost": "Ön uç izleme temelleri"
@@ -2328,6 +2329,8 @@
     "translatingStackTrace": "Kaynak haritaları ile yığın izi çevriliyor...",
     "translatingStackTraceHint": "Bu birkaç dakika sürebilir",
     "sourceMapsNotAvailable": "Kaynak Haritaları Mevcut Değil",
+    "mobileSourceMapsNotApplicable": "Kaynak haritaları iOS ve Android hataları için geçerli değildir",
+    "mobileSourceMapsNotApplicableBody": "Yüklenen JavaScript kaynak haritaları yerel mobil yığın çerçevelerini çözemez. Orijinal yığını {tab} sekmesinde okuyun.",
     "sourceMapsNotAvailableBody": "Orijinal kaynak kodu ve satır numaralarıyla ayrıntılı yığın izlerini görüntülemek için lütfen bu uygulama için kaynak haritaları yükleyin.",
     "serviceBadge": "Hizmet:",
     "versionBadge": "Sürüm:",
@@ -4061,13 +4064,9 @@
     "getStartedBannerMessage": "Daha verimli ve performanslı gözlemlenebilirlik için bugün OpenObserve'i deneyin.",
     "getStartedBannerAlt": "Başlarken Banner",
     "getStartedHeading": "Başlamadan önce son bir şey",
-    "hearAboutUsLabel": "Bizi nereden duydunuz?",
     "hearAboutUsPlaceholder": "Örn. Bir arkadaştan",
-    "whereDoYouWorkLabel": "Nerede çalışıyorsunuz?",
     "whereDoYouWorkPlaceholder": "Şirket Adı",
-    "agreeToTermsPrefix": "Okudum ve kabul ediyorum",
     "termsOfUse": "Kullanım Koşulları",
-    "and": "ve",
     "privacyPolicyStar": "Gizlilik Politikası*",
     "startTrialButton": "14 günlük denemenizi başlatın",
     "copyrightNotice": "© OpenObserve",
@@ -4078,19 +4077,28 @@
     "emailRequired": "E-posta zorunludur",
     "emailInvalid": "Lütfen geçerli bir e-posta adresi girin",
     "passwordRequired": "Şifre zorunludur",
-    "mustAcceptTerms": "Devam etmek için şartları kabul etmelisiniz",
     "getStarted": {
       "title": "OpenObserve'ye Hoş Geldiniz",
-      "subtitle": "14 günlük deneme süreniz başladı. İki kısa soru, ardından sizi kuruluma yönlendireceğiz.",
-      "sourceLabel": "İlk olarak ne göndermek istiyorsunuz?",
-      "optional": "(isteğe bağlı)",
-      "skip": "Soruları atla",
-      "continue": "Devam et",
-      "hearAboutUsPlaceholder": "Örneğin, bir iş arkadaşı veya bir blog yazısı",
-      "whereDoYouWorkPlaceholder": "Şirket veya ekip",
-      "termsOfService": "Hizmet koşulları",
-      "privacyPolicy": "Gizlilik politikası",
-      "agreeHint": "Soruları atlasanız bile devam etmek için gereklidir.",
+      "skipForNow": "Şimdilik Atla",
+      "heard": {
+        "label": "Bizi nasıl duydunuz?",
+        "placeholder": "Bir Seçenek Belirleyin",
+        "thanks": "Teşekkürler!"
+      },
+      "connect": {
+        "title": "Verilerinizi Bağlayın",
+        "point1": "Her kaynak için adım adım kurulum",
+        "point2": "Günlükler, metrikler ve izler tek bir yerde",
+        "point3": "İlk olaylarınızı dakikalar içinde görün",
+        "cta": "Diğer Veri Kaynaklarını Keşfedin"
+      },
+      "sample": {
+        "title": "Örnek Verilerle Keşfedin",
+        "point1": "Örnek hizmetlerden günlükler, izler ve metrikler",
+        "point2": "Gösterge panoları, uyarılar, bir işlem hattı ve VRL fonksiyonları",
+        "point3": "Rehberli bir tur ve tümünü kaldırmak için tek tık",
+        "cta": "Örnek Verilerle Keşfedin"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Linux veya VM ana bilgisayarı",
@@ -4103,7 +4111,28 @@
         "llm": "LLM veya yapay zeka uygulaması",
         "agent": "Bir yapay zeka aracısının kurmasına izin verin",
         "unsure": "Henüz emin değilim"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "Web Sunucusu",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "Tarayıcı (RUM)",
+        "llm": "LLM veya Yapay Zeka Uygulaması",
+        "agent": "Yapay Zeka Aracısı"
       }
+    },
+    "heardFrom": {
+      "question": "Bizi nasıl buldunuz?",
+      "quickQuestion": "Kısa bir soru: bizi nasıl buldunuz?",
+      "skip": "Atla",
+      "searchEngine": "Arama motoru",
+      "friendOrColleague": "Arkadaş veya meslektaş",
+      "aiAssistant": "Yapay zeka asistanı",
+      "other": "Diğer",
+      "thanks": "Bize söylediğiniz için teşekkürler!"
     }
   },
   "user": {
@@ -5043,8 +5072,8 @@
     "otherFieldsSchemaTooltip": "Diğer alanlar, akışın kullanıcı tanımlı bir şema kullanacak şekilde yapılandırılmasından önce var olan şema alanlarını gösterir.",
     "addFieldsTitle": "Alan Ekle",
     "dataRetentionDaysLabel": "Veri Saklama (gün)",
-    "globalRetentionDays": "Genel saklama {days} gündür",
-    "retentionMinOneDay": "Saklama süresi en az 1 gün olmalıdır",
+    "retentionDefaultDays": "Bu akış türü için varsayılanı kullanmak üzere boş bırakın: {days} gün",
+    "retentionDefaultForever": "Bu akış türü için varsayılanı kullanmak üzere boş bırakın: sonsuza kadar sakla",
     "maxQueryRangeHoursLabel": "Maksimum Sorgu Aralığı (saat)",
     "maxQueryRangeHelp": "Sorgular için izin verilen maksimum zaman aralığı. Sınırsız aralık için 0 ayarlayın.",
     "globalFlattenLevel": "Genel seviye {level}",
@@ -6485,12 +6514,6 @@
     "joinSlack": "Slack'e Katılın",
     "maybeLater": "Belki daha sonra"
   },
-  "connectDataSourcePopup": {
-    "title": "Başlamak için ilk veri kaynağınızı bağlayalım.",
-    "description": "Size gösterecek çok şeyimiz var, ancak önce verilerinizi bağlamamız gerekiyor. Çoğu ekip ilk günlüklerini yaklaşık bir dakika içinde görür.",
-    "connectButton": "Bir veri kaynağı bağla",
-    "slackLink": "Ayrıca Slack topluluğumuza katılın"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Kaldığı yerden devam et",
     "startFromNow": "Şu andan itibaren başlat.",
@@ -7071,6 +7094,9 @@
       "k8sNetworkFlowsTitle": "Hangi iş yüklerinin birbiriyle konuştuğunu görün: eBPF ağ akışları",
       "k8sInstallerNote": "Bu, cert-manager'ı, OpenTelemetry operatörünü ve OpenObserve toplayıcısını otomatik olarak kurar.",
       "k8sInternalEndpointNote": "Bunu, OpenObserve aynı kümede çalışıyorsa kullanın — trafik asla kümeden dışarı çıkmaz.",
+      "k8sTraceAppsTitle": "Uygulamalarınızı izleyin",
+      "k8sTraceEbpfDesc": "Toplayıcıda eBPF izlemeyi açın, ardından izlenecek uygulamaları bağlantı noktası, çalıştırılabilir dosya yolu veya komut satırına göre seçin.",
+      "k8sTraceLibraryDesc": "Her dilin ad alanına not ekleyin, böylece operatör kütüphanesini oradaki pod'lara ekler. Ardından bu uygulamaları bir kez yeniden başlatın.",
       "k8sTroubleAnnotationA": "Enjeksiyon pod oluşturulurken gerçekleşir, bu nedenle mevcut podlar yeniden başlatılana kadar etkilenmez — `kubectl rollout restart deployment -n my-namespace` komutunu çalıştırın. Notun yerleştiğini `kubectl get ns my-namespace -o yaml` ile doğrulayın ve değerin `openobserve-collector/openobserve-<language>` ile eşleştiğini kontrol edin.",
       "k8sTroubleAnnotationQ": "Bir namespace'e annotasyon ekledim ama hiç iz görünmüyor",
       "k8sTroubleEndpointA": "**Dahili uç noktayı** yalnızca OpenObserve'ün kendisi bu kümede çalışıyorsa kullanın; bu durumda trafik kümenin içinde kalır ve ağı hiç geçmez. URL `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` şeklindedir — varsayılan, `openobserve` ad alanında `o2` sürümünü varsayar, farklıysa düzenleyin. Diğer herkes harici uç noktayı kullanır.",
@@ -7343,6 +7369,7 @@
       "androidTroubleScreenNamesQ": "Oturumlar görünüyor ancak ekranların tümü aynı adla adlandırılmış",
       "androidTroubleScreenNamesA": "Görünüm izleme bağlanmamış. `RumConfiguration` oluştururken bir `useViewTrackingStrategy(...)` iletin — örn. Etkinlikler için `ActivityViewTrackingStrategy(trackExtras = true)` veya AndroidX Navigation kullanıyorsanız `NavigationViewTrackingStrategy(...)` —.",
       "setupTime5Min": "~5 dakika",
+      "showStepInstructions": "Talimatları göster",
       "snowflakeCollectorVersionNote": "Snowflake, collector v0.92.0 gerektirir — daha yeni sürümlerde bilinen bir hata vardır.",
       "snowflakeTagline": "Snowflake hesap metriklerini OpenTelemetry Collector ile toplayın ve OpenObserve'e gönderin.",
       "sqlClientGuiVariant": "SQL İstemcisi (GUI)",
@@ -7386,6 +7413,7 @@
       "verifyCassandraMetricsDesc": "Veri geldiğinde aşağıdaki kontrol yeşile döner; ya da `cassandra_*` metrikleri için Akışlar'a bakın.",
       "verifyDatabricksLogsDesc": "Veri geldiğinde aşağıdaki kontrol yeşile döner; ya da Günlükler'i açıp `source:databricks` araması yapın.",
       "verifyDataTitle": "OpenObserve'de verileri doğrulayın",
+      "checkYourDataTitle": "Verilerinizi Kontrol Edin",
       "verifyDynamodbLogsDesc": "Veri geldiğinde aşağıdaki kontrol yeşile döner; ya da öğeler değiştiğinde `dynamodb` akışı için Günlükler'i açın.",
       "verifyGcpLogsDesc": "Projede biraz etkinlik oluşturun (ya da sink'in bir günlükle eşleşmesini bekleyin); veri geldiğinde aşağıdaki kontrol yeşile döner.",
       "verifyK8sDataDesc": "Toplayıcının başlaması için birkaç saniye bekleyin; veri geldiğinde aşağıdaki kontrol yeşile döner — küme günlükleri `default` akışına düşer.",
@@ -7935,6 +7963,7 @@
     "homeDashboardSetFailed": "Ana sayfa panosu ayarlanamadı",
     "homeDashboardRemoveFailed": "Ana sayfa panosu kaldırılamadı",
     "setAsHomeDesc": "Kuruluştaki herkes için bu gösterge panosunu ana sayfada göster",
+    "moreOptionsSettingsDraft": "Diğer seçenekler, kaydedilmemiş ayarlar taslağı",
     "favorites": "Favoriler",
     "addToFavorites": "Favorilere ekle",
     "removeFromFavorites": "Favorilerden kaldır",
@@ -9320,6 +9349,7 @@
       "refresh": "Yenile",
       "refreshCacheReload": "Önbelleği yenile ve yeniden yükle",
       "moreRefreshOptions": "Daha fazla yenileme seçeneği",
+      "moreShareOptions": "Diğer paylaşım seçenekleri",
       "autoRunDescription": "Açıldığında ve filtre/zaman değişikliklerinde sorguları çalıştırır",
       "autoRunScope": "Tüm gösterge panoları, Günlükler ve İzler için geçerlidir",
       "dashboard": "Pano",
@@ -11462,6 +11492,68 @@
     }
   },
   "alerts": {
+    "firing": {
+      "title": "Tetiklenmiş",
+      "drawer": {
+        "openInLogs": "Günlüklerde Aç",
+        "partOfIncident": "Vakaya ait:",
+        "incidentAck": "Buradan üstlenmek tüm vakayı üstlenir.",
+        "incidentTakeOver": "Buradan devralmak tüm vakayı devralır.",
+        "now": "Şimdi",
+        "threshold": "eşik {value}",
+        "since": "{time} zamanından beri",
+        "flaps": "Durum değişimleri, son 6s",
+        "flapsUnit": "durum değişiklikleri",
+        "notified": "Bildirildi",
+        "notDeliveredTo": "{name}: teslim edilmedi",
+        "history": "Geçmiş",
+        "last2h": "son 2s",
+        "lastSpan": "son {span}",
+        "viewAll": "Tümünü görüntüle",
+        "historyEmpty": "Bu zaman aralığında çalıştırma yok.",
+        "historyFailed": "Geçmiş yüklenemedi.",
+        "barFiring": "{span} tetiklenmiş",
+        "barOk": "{span} sorunsuz",
+        "barUnknown": "{span} okunmadı",
+        "eventStarted": "Tetiklenmeye başladı",
+        "eventRecovered": "Düzeldi",
+        "eventNotified": "Bildirildi",
+        "eventNotifiedTo": "{names}: bildirildi",
+        "eventFailed": "Teslim edilmedi",
+        "eventFailedTo": "{names}: teslim edilmedi",
+        "soFar": "şu ana kadar {span}",
+        "lasted": "{span} sürdü",
+        "okFor": "{span} boyunca sorunsuz"
+      },
+      "chipCount": "{label} {count}",
+      "chipFiring": "Tetiklenmiş",
+      "chipAcked": "Üstlenildi",
+      "chipMuted": "Sessize alındı",
+      "chipFailed": "Teslim edilmedi",
+      "searchPlaceholder": "Uyarı ara",
+      "priorityAll": "Öncelik",
+      "priorityLabel": "Öncelik",
+      "priorityUnset": "Öncelik yok",
+      "folderAll": "Klasör: tümü",
+      "folderLabel": "Klasör",
+      "stale": "eski",
+      "refreshFailed": "Tetiklenmiş uyarılar yenilenemedi ({reason}). {time} itibarıyla veriler gösteriliyor.",
+      "refreshFailedReason": "istek başarısız oldu",
+      "statusUnavailable": "Uyarı durumu şu anda kullanılamıyor, bu nedenle tetiklenmiş uyarılar gösterilemiyor.",
+      "retry": "Yeniden dene",
+      "columnPriority": "Öncelik",
+      "columnState": "Durum",
+      "columnAlert": "Uyarı",
+      "columnFolder": "Klasör",
+      "columnFiringFor": "Tetiklenme süresi",
+      "acknowledgeCount": "Onayla {count}",
+      "mute": "Sessize al",
+      "clear": "Temizle",
+      "emptyFiring": "Tetiklenen yok",
+      "emptyAcked": "Onaylanan yok",
+      "emptyMuted": "Sessize alınan yok",
+      "emptyFailed": "İletilemeyen yok"
+    },
     "moreActions": "Diğer işlemler",
     "promRuleMode": "Kural modu",
     "promRulePreview": "{count} döndürülen seri şu anda eşleşiyor. Her seri, tetiklenmeden önce bekleme süresini tamamlamalıdır.",
@@ -11474,7 +11566,6 @@
       "anomalyImportSuccess": "Anomali Tespiti - {index}: \"{name}\" başarıyla içe aktarıldı",
       "anomalyImportFailed": "Anomali Tespiti - {index}: \"{name}\" içe aktarılamadı — {reason}",
       "nameRequired": "Uyarı - {index}: Ad zorunludur ve geçerli bir dize olmalıdır.",
-      "orgIdInvalid": "Uyarı - {index}: Kuruluş Kimliği zorunludur, kuruluş listesinde bulunmalı ve {orgId} değerine eşit olmalıdır.",
       "streamTypeInvalid": "Uyarı - {index}: Akış Türü zorunludur ve şunlardan biri olmalıdır: 'logs', 'metrics', 'traces'.",
       "streamNameInvalid": "Uyarı - {index}: Akış Adı zorunludur, akış listesinde bulunmalı ve geçerli bir dize olmalıdır.",
       "destinationsArray": "Uyarı - {index}: Hedefler bir dizi olmalıdır.",
@@ -11623,7 +11714,6 @@
     "jsonFilesOnlyHint": "Yalnızca .json dosyaları",
     "outputMessages": "Çıktı Mesajları",
     "timezoneRequiredLabel": "Saat Dilimi *",
-    "organizationIdLabel": "Kuruluş Kimliği",
     "alertCreationTitle": "Uyarı Oluşturma",
     "noAlertsFound": "Uyarı bulunamadı",
     "groupedNotification": "Gruplanmış bildirim",
@@ -12929,6 +13019,9 @@
       "noDestinationsFound": "Hedef bulunamadı",
       "noDetectionResults": "Bu aralıkta henüz algılama sonucu yok",
       "noFieldsFound": "Alan bulunamadı",
+      "checkDataNow": "Şimdi kontrol et",
+      "checkDataNowTooltip": "Sonraki otomatik kontrolü beklemeden mevcut verileri şimdi yeniden değerlendirin.",
+      "dataReadinessReason": "Neden",
       "noticeRetrain": "Otomatik yeniden eğitme",
       "noticeRetrainTooltip": "Kaydedilen model bir yükseltmeden sonra okunamadı, bu nedenle atıldı ve yapılandırma otomatik olarak yeniden eğitim için kuyruğa alındı. Herhangi bir işlem gerekmez; eğitim tamamlandığında algılama devam eder.",
       "noticeSkipAbsence": "Yokluk değerlendirmesi Geriye Bakış Penceresinin gerisinde kaldı; artık getirilemeyen span atlandı ve kaydedildi.",
@@ -12963,6 +13056,8 @@
       "autoUntrainedHelp": "Otomatik, geçmişinizden bir seviye öğrenecek.",
       "autoTrainingHelp": "Eğitim tamamlandığında seviye görünecek.",
       "autoFailedHelp": "Eğitim başarısız oldu. Henüz öğrenilmiş seviye yok. Yukarıdaki eğitim hatasını inceleyin.",
+      "autoWaitingForDataHelp": "Henüz yeterli uygun eğitim verisi yok. O zamana kadar öğrenilmiş seviye yok. Dedektör etkin kalır ve otomatik olarak yeniden kontrol edilir.",
+      "autoNotApplicableHelp": "Mevcut veriler bir anomali modelini desteklemiyor. Bu bir hata değildir. Dedektör etkin kalır ve otomatik olarak yeniden kontrol edilir.",
       "autoRetrainingHelp": "Yeniden eğitiliyor. Son öğrenilen seviye gösteriliyor; model kullanılabilirliği doğrulanmadı.",
       "autoRetrainFailedHelp": "Yeniden eğitim başarısız oldu. Son öğrenilen seviye gösteriliyor; model kullanılabilirliği doğrulanmadı. Yukarıdaki eğitim hatasını inceleyin.",
       "autoUnconfirmedHelp": "Son öğrenilen seviye gösteriliyor; etkin bir model doğrulanmadı.",
@@ -14566,6 +14661,7 @@
     "separator_placeholder": "Ayırıcı girin (ör. {'|'}, \\n, \\t, boşluk)",
     "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)",
     "templateDefaultOption": "Varsayılan ({name})",
+    "templateUnifiedDefaultOption": "Unified default ({name})",
     "templateHelp": "Standart {type} şablonunu ({name}) kullanmak için varsayılan olarak bırakın veya özel bir şablon seçin.",
     "loadingData": "Hedef verileri yükleniyor...",
     "noEmailTemplates": "Henüz hiçbir E-posta Şablonu oluşturmamışsınız gibi görünüyor.",
@@ -15501,6 +15597,20 @@
       "awsCredentials": "AWS Kimlik Bilgileri",
       "azureCredentials": "Azure Kimlik Bilgileri",
       "awsRoleArn": "AWS Rol ARN'si"
+    },
+    "dataRetentionDefaults": {
+      "title": "Veri saklama varsayılanları",
+      "about": "Kendi saklama ayarı olmayan akışlar için. Boş veya 0, genel değeri kullanır; aksi takdirde en az 3 gün.",
+      "defaultDays": "Varsayılan (gün)",
+      "streamType": "Akış türü",
+      "days": "Gün",
+      "addType": "Akış türü ekle",
+      "removeType": "Bu akış türünü kaldır",
+      "globalDefault": "Genel: {value}",
+      "globalType": "Genel {type}: {value}",
+      "daysValue": "{days} gün",
+      "forever": "sonsuza kadar sakla",
+      "invalid": "0 veya en az 3 gün kullanın"
     },
     "organizationSettings": {
       "fieldNameHelp": "Yalnızca alfanümerik ve '+=,.{'@'}-_' karakterlerini kullanın, boşluk olmadan.",
@@ -22506,6 +22616,7 @@
       "actions": "Eylemler",
       "rum": "ROM",
       "runningQueries": "Çalışan Sorgular",
+      "security": "Güvenlik",
       "oncall": "Nöbet",
       "synthetics": "Sentetikler",
       "fleet": "Filo",
@@ -22567,7 +22678,8 @@
       "syntheticsJourney": "Sentetikler yolculuğu",
       "downtimes": "Bakım pencereleri",
       "fleetConfigEditor": "Yapılandırma düzenleyicisi",
-      "fleetOverview": "Filo işlem hatları"
+      "fleetOverview": "Filo işlem hatları",
+      "securityRecord": "Güvenlik — kaydı aç"
     },
     "actions": {
       "openCheatsheet": "Klavye kısayolları özet sayfasını aç",
@@ -22700,7 +22812,9 @@
       "traceNextVisibleSpan": "Sonraki görünür Span",
       "tracePrevVisibleSpan": "Önceki görünür Span",
       "fleetEditorDeleteNode": "Seçili bileşeni kaldır",
-      "fleetFlowCloseDetails": "Yol ayrıntılarını kapat veya haritayı daralt"
+      "fleetFlowCloseDetails": "Yol ayrıntılarını kapat veya haritayı daralt",
+      "securityRecordNext": "Sonraki kayıt",
+      "securityRecordPrev": "Önceki kayıt"
     }
   },
   "components": {
@@ -23040,7 +23154,9 @@
         "ready": "Hazır",
         "running": "Çalışıyor",
         "training": "Eğitim",
-        "waiting": "Bekliyor"
+        "waiting": "Bekliyor",
+        "waitingForData": "Veri bekleniyor",
+        "notApplicable": "Uygulanamaz"
       },
       "anomalyStatus": {
         "active": "Etkin",
@@ -23048,7 +23164,9 @@
         "training": "Eğitim",
         "failed": "Başarısız",
         "waiting": "Bekliyor",
-        "disabled": "Devre Dışı"
+        "disabled": "Devre Dışı",
+        "waitingForData": "Veri bekleniyor",
+        "notApplicable": "Uygulanamaz"
       },
       "aiToolsetKind": {
         "skill": "Beceri",
@@ -23233,6 +23351,11 @@
       "failedToLoadToolset": "Araç seti yüklenemedi"
     },
     "alerts": {
+      "firing": {
+        "bulkResult": "{acked} onaylandı, {skipped} atlandı",
+        "bulkResultFailed": "{acked} kabul edildi, {skipped} atlandı, {failed} başarısız",
+        "bulkAllAcked": "{acked} onaylandı"
+      },
       "failedToNavigateToAlert": "Uyarıya gidilemedi",
       "alertNotFound": "Uyarı bulunamadı",
       "failedToLoadAlerts": "Uyarılar yüklenemedi",
@@ -23411,7 +23534,6 @@
     },
     "login": {
       "somethingWentWrong": "Bir şeyler ters gitti",
-      "thankYouForYourFeedback": "Geri bildiriminiz için teşekkürler",
       "selectedSuggestion": "Seçilen öneri \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Lütfen tüm alanları doldurun ve tekrar deneyin.",
       "invalidUsernameOrPassword": "Geçersiz kullanıcı adı veya şifre",
@@ -23878,6 +24000,19 @@
     "exportSucceeded": "{count} SLO dışa aktarıldı | {count} SLO dışa aktarıldı",
     "moved": "{count} SLO, {folder} konumuna taşındı",
     "moveFailed": "Taşıma başarısız",
+    "import": {
+      "title": "SLO'ları İçe Aktar",
+      "results": "İçe aktarma sonuçları",
+      "noResults": "Her SLO'nun sonucu içe aktarma işleminden sonra burada görünür.",
+      "jsonEmpty": "İçe aktarmadan önce bir dosyadan, URL'den veya düzenleyiciden SLO JSON ekleyin.",
+      "invalidJson": "SLO JSON ayrıştırılamadı.",
+      "notAnObject": "SLO #{index} bir JSON nesnesi olmadığından atlandı.",
+      "nameRequired": "SLO #{index} bir ad içermediğinden atlandı.",
+      "created": "SLO #{index} \"{name}\" içe aktarıldı.",
+      "failed": "SLO #{index} \"{name}\" içe aktarılmadı: {reason}",
+      "unknownError": "Bilinmeyen hata",
+      "succeeded": "{count} SLO içe aktarıldı | {count} SLO içe aktarıldı"
+    },
     "preview": {
       "goodEvents": "İyi olaylar",
       "badEvents": "Kötü olaylar",
@@ -23968,6 +24103,1179 @@
       "minutes": "{count} dakika | {count} dakika",
       "hours": "{count} saat | {count} saat",
       "days": "{count} gün | {count} gün"
+    }
+  },
+  "solutionSwitcher": {
+    "title": "Çözüm",
+    "hint": "Yerinizi kaybetmeden ürünler arasında geçiş yapın",
+    "observability": {
+      "label": "Gözlemlenebilirlik",
+      "description": "Günlükler, metrikler, izler, gösterge panoları"
+    },
+    "security": {
+      "label": "Güvenlik",
+      "description": "SIEM · OCSF · Sigma kuralları"
+    }
+  },
+  "siem": {
+    "severity": {
+      "critical": "Kritik",
+      "high": "Yüksek",
+      "medium": "Orta",
+      "low": "Düşük",
+      "info": "Bilgi",
+      "unknown": "Bilinmiyor",
+      "fatal": "Fatal",
+      "other": "Diğer"
+    },
+    "range": {
+      "1h": "1sa",
+      "24h": "24sa",
+      "7d": "7g",
+      "30d": "30g"
+    },
+    "common": {
+      "close": "Kapat",
+      "mitre": "MITRE ATT&CK",
+      "severity": "Önem düzeyi",
+      "viewAll": "Tümünü görüntüle"
+    },
+    "caseStatus": {
+      "open": "Yeni",
+      "acknowledged": "İnceleniyor",
+      "resolved": "Kapalı"
+    },
+    "health": {
+      "live": "Raporluyor",
+      "quiet": "24 saatten uzun süredir sessiz",
+      "never": "Henüz veri yok"
+    },
+    "outcome": {
+      "success": "Başarılı",
+      "failure": "Başarısız"
+    },
+    "op": {
+      "eq": "eşittir",
+      "neq": "eşit değil",
+      "contains": "içerir",
+      "notContains": "içermez"
+    },
+    "pivot": {
+      "include": "Değere göre filtrele",
+      "exclude": "Değeri hariç tut",
+      "copy": "Değeri kopyala"
+    },
+    "entity": {
+      "actor": "Aktör",
+      "source": "Kaynak",
+      "destination": "Hedef",
+      "host": "Ana bilgisayar",
+      "process": "Süreç",
+      "operation": "İşlem",
+      "resource": "Varlık"
+    },
+    "notices": {
+      "more": "{n} tane daha",
+      "less": "Daha az göster",
+      "readMore": "Daha fazla oku",
+      "tone": {
+        "error": "Hata",
+        "warning": "Uyarı",
+        "info": "Bilgi"
+      }
+    },
+    "fieldGroup": {
+      "event": "Olay",
+      "actor": "Aktör",
+      "src": "Kaynak uç nokta",
+      "dst": "Hedef uç nokta",
+      "network": "Bağlantı",
+      "http": "HTTP",
+      "process": "Süreç ve dosya",
+      "cloud": "Bulut ve API",
+      "finding": "Bulgu",
+      "device": "Cihaz",
+      "metadata": "Meta veri",
+      "other": "Diğer alanlar"
+    },
+    "column": {
+      "time": "Zaman",
+      "severityId": "Önem düzeyi",
+      "className": "Sınıf",
+      "activity": "Etkinlik",
+      "statusId": "Sonuç",
+      "actor": "Aktör",
+      "srcIp": "Kaynak IP",
+      "dstIp": "Hedef IP",
+      "host": "Ana bilgisayar",
+      "process": "Süreç",
+      "operation": "İşlem",
+      "resource": "Kaynak",
+      "product": "Ürün",
+      "message": "Mesaj"
+    },
+    "mitre": {
+      "tactics": {
+        "reconnaissance": "Ön Keşif",
+        "resource_development": "Kaynak Geliştirme",
+        "initial_access": "İlk Erişim",
+        "execution": "Yürütme",
+        "persistence": "Kalıcılık",
+        "privilege_escalation": "Yetki Yükseltme",
+        "defense_evasion": "Savunma Atlatma",
+        "credential_access": "Kimlik Bilgisi Erişimi",
+        "discovery": "Keşif",
+        "lateral_movement": "Yanal Hareket",
+        "collection": "Toplama",
+        "command_and_control": "Komuta ve Kontrol",
+        "exfiltration": "Veri Sızdırma",
+        "impact": "Etki"
+      }
+    },
+    "overview": {
+      "title": "SOC Genel Bakış",
+      "subtitle": "Nelerin tetiklendiği, nelerin açık olduğu ve kaynaklarınızın hâlâ raporlama yapıp yapmadığı",
+      "autoRefreshOn": "Her dakika otomatik yenileme açık",
+      "autoRefreshOff": "Otomatik yenileme kapalı",
+      "historyError": "Algılama geçmişi yüklenemedi: {reason}",
+      "rulesError": "Algılamalar yüklenemedi: {reason}",
+      "noDetections": "Henüz etkinleştirilmiş SIEM algılaması yok, bu nedenle burada hiçbir şey tetiklenemez. İzlemeye başlamak için Sigma kataloğundan algılamaları etkinleştirin.",
+      "browseDetections": "Algılamalara göz at",
+      "stat": {
+        "critical": "Kritik tetiklenmeler",
+        "high": "Yüksek tetiklenmeler",
+        "openCases": "Açık vakalar",
+        "firingDetections": "Tetiklenen algılamalar",
+        "quietSources": "Sessiz kaynaklar",
+        "activeRules": "Etkin algılamalar"
+      },
+      "activity": "Algılama etkinliği",
+      "activityHint": "Bu pencerede tetiklenme yok | Bu pencerede {n} tetiklenme, önem derecesine göre yığılmış | Bu pencerede {n} tetiklenme, önem derecesine göre yığılmış",
+      "quiet": "Hiçbir şey tetiklenmedi",
+      "quietHint": "Bu zaman penceresinde hiçbir algılama tetiklenmedi.",
+      "openCases": "Açık vakalar",
+      "casesUnsupported": "Vaka yönetimi bu dağıtımda kullanılamıyor",
+      "noOpenCases": "Açık vaka yok",
+      "untitledCase": "Başlıksız vaka",
+      "caseAlerts": "{n} uyarı | {n} uyarı",
+      "triage": "Triyaj kuyruğu",
+      "triageHint": "En son tetiklenmeler, en yeniler önce",
+      "fullQueue": "Tüm kuyruk",
+      "detection": "Algılama",
+      "matches": "Eşleşmeler",
+      "fired": "Tetiklenme",
+      "queueClear": "Triyaj kuyruğu temiz",
+      "topDetections": "En gürültülü algılamalar",
+      "topDetectionsHint": "İnce ayarın en çok işe yarayacağı yerler",
+      "mitre": "MITRE ATT&CK kapsamı",
+      "mitreHint": "{total} taktikten {covered} tanesi etkin algılamalarla kapsanıyor",
+      "rulesCount": "{n} kural | {n} kural",
+      "firingsCount": "{n} tetiklenme | {n} tetiklenme",
+      "legendFiring": "Pencere içinde tetiklendi",
+      "legendCovered": "Kapsandı",
+      "legendGap": "Kapsam yok",
+      "sources": "Günlük kaynağı sağlığı",
+      "sourcesHint": "{total} güvenlik kaynağından {live} tanesi raporluyor",
+      "explore": "Keşfet",
+      "noSources": "Henüz güvenlik kaynağı yok",
+      "noSourcesHint": "CloudTrail, Okta, VPC Flow veya syslog verisi alın. Adında security, audit, auth veya firewall geçen akışlar burada otomatik olarak görünür.",
+      "summaryPartial": "Bu pencerede bir özete sığmayacak kadar çok uyarı geçmişi var; bu nedenle sayımlar ve grafikler alt sınırdır. Tam sayılar için daha kısa bir pencere seçin."
+    },
+    "events": {
+      "title": "Güvenlik Olayları",
+      "subtitle": "Normalleştirilmiş güvenlik telemetrisi üzerinde avlanın",
+      "run": "Çalıştır",
+      "hideSidebar": "Alanları gizle",
+      "showSidebar": "Alanları göster",
+      "selectStream": "Bir akış seçin",
+      "securityStreams": "Güvenlik akışları",
+      "otherStreams": "Diğer akışlar",
+      "builder": "Oluşturucu",
+      "allSeverities": "Tüm önem dereceleri",
+      "field": "Alan",
+      "value": "Değer",
+      "addFilter": "Filtre ekle",
+      "clearFilters": "Tümünü temizle",
+      "sources": "Kaynaklar",
+      "addSource": "Kaynak olarak bir akış ekle",
+      "removeSource": "Kaynaklardan kaldır",
+      "autoSource": "Otomatik seçildi: {label}, {n}% eşleşme",
+      "nameSource": "Adı bir güvenlik kaynağına benzediği için seçildi",
+      "autoTag": "otomatik",
+      "suggested": "Önerilen",
+      "suggestedSource": "{label} gibi görünüyor ({n}% eşleşme)",
+      "addSuggested": "Kaynak olarak ekle",
+      "dismissSuggestion": "Yoksay",
+      "showMore": "{n} tane daha göster",
+      "showFewer": "Daha az göster",
+      "classShare": "{uid} {pct}%",
+      "classifying": "Akışlar güvenlik verisi için denetleniyor",
+      "searchFields": "Alan ara",
+      "addColumn": "Sütun olarak göster",
+      "removeColumn": "Sütunu gizle",
+      "noValues": "Bu pencerede değer yok",
+      "noFields": "Eşleşen alan yok",
+      "selectStreamFirst": "Alanlarını görmek için bir akış seçin",
+      "confidence": "{n}% eşleşme",
+      "telemetryOnly": "Yalnızca telemetri",
+      "matchedOn": "{fields} üzerinde eşleşti",
+      "ocsfCategory": "OCSF kategorisi: {name}",
+      "ocsfClass": "OCSF sınıfı: {name} ({uid})",
+      "rulesMatch": "Kurallar {logsource} ile eşleşir",
+      "rulesMatchHint": "Sigma logsource tespitlerinin eşleştirildiği kaynak; OCSF kategorisi değil",
+      "product": "Ürün: {name}",
+      "classMix": "Son bir saatteki sınıflar: {mix}",
+      "objects": "OCSF nesneleri",
+      "missingSignals": "Görülmeyen: {fields}",
+      "detections": "{n} tespit | {n} tespit",
+      "firing": "{n} tetiklenmiş | {n} tetiklenmiş",
+      "rulesFor": "{source} için Sigma kuralları",
+      "hits": "{n} isabet | {n} isabet",
+      "viewHits": "İsabetleri görüntüle",
+      "createDetection": "Tespit oluştur",
+      "events": "Olaylar",
+      "sqlTimelineNote": "Zaman çizelgesi ve önem derecesi kırılımı oluşturucu filtrelerini izler. Bu arama için bunları görmek üzere Oluşturucu'ya geri dönün.",
+      "noStreamTitle": "Aranacak akış yok",
+      "noStreamHint": "Tehdit avcılığına başlamak için güvenlik günlüklerini alın. Veri ulaştığında akışlar burada görünür.",
+      "showingOf": "{total} olaydan en son {shown} tanesi gösteriliyor",
+      "count": "{n} olay | {n} olay",
+      "hideTimeline": "Zaman çizelgesini gizle",
+      "showTimeline": "Zaman çizelgesini göster",
+      "normalized": "Normalleştirilmiş",
+      "normalizedHint": "Her kaynak OCSF sütunlarına eşlendi",
+      "raw": "Ham",
+      "refresh": "Sonuçları yenile",
+      "noEvents": "Olay bulunamadı",
+      "noEventsHint": "Zaman aralığını genişletin veya filtreleri gevşetin.",
+      "noEventsLastReported": "{stream} bu zaman aralığında veri içermiyor. En son {ago} bildirdi.",
+      "searchWider": "Son {period} içinde ara",
+      "searchFailed": "Arama başarısız",
+      "cancel": "İptal",
+      "cancelled": "Arama iptal edildi",
+      "latestCount": "En son eşleşen {n} olay | En son eşleşen {n} olay",
+      "sql": "SQL",
+      "invertFilter": "Dahil etme ve hariç tutma arasında geçiş yap",
+      "removeFilter": "Filtreyi kaldır",
+      "pivotSqlUnsupported": "Bu SQL sorgusu basit bir SELECT … WHERE değildir; bu nedenle filtre sorguya eklenemedi. Sorguyu elle düzenleyin veya Oluşturucu'ya geçin.",
+      "topValuesWholeStream": "SQL modu: değerler sorgunuzda değil, tüm akışta sayılır."
+    },
+    "drawer": {
+      "event": "Güvenlik olayı",
+      "overview": "Genel Bakış",
+      "detections": "Algılamalar",
+      "fields": "Alanlar",
+      "json": "JSON",
+      "noEntities": "Tanınan varlık yok",
+      "noEntitiesHint": "Bu kaynağın aktör, ağ veya ana bilgisayar alanları için eşlemesi yok. Gelen her şey için Alanlar sekmesine bakın.",
+      "classifiedAs": "Şu şekilde sınıflandırıldı",
+      "evaluating": "Bu olaya karşı algılamalar değerlendiriliyor",
+      "noRules": "Bu kaynağa uygulanan algılama yok",
+      "noRulesHint": "Paketle gelen Sigma kurallarının hiçbiri bu günlük kaynağı için yazılmamış.",
+      "matchError": "Algılamalar değerlendirilemedi",
+      "noMatches": "Hiçbir algılama eşleşmedi",
+      "noMatchesHint": "Bu olaya karşı {n} kural değerlendirildi; eşleşmedi. | Bu olaya karşı {n} kural değerlendirildi; hiçbiri eşleşmedi.",
+      "attack": "ATT&CK teknikleri",
+      "classUid": "class_uid {n}",
+      "eyebrow": "Güvenlik olayı",
+      "source": "Kaynak",
+      "matchedRules": "{n} algılama eşleşti | {n} algılama eşleşti"
+    },
+    "record": {
+      "prev": "Önceki kayıt",
+      "next": "Sonraki kayıt",
+      "position": "{n} / {total}",
+      "copyLink": "Bu kaydın bağlantısını kopyala",
+      "linkCopied": "Bağlantı kopyalandı",
+      "searchFields": "Alanlarda ve değerlerde ara",
+      "noFields": "Eşleşen alan yok",
+      "copyFailed": "Panoya kopyalanamadı"
+    },
+    "alerts": {
+      "title": "Uyarılar",
+      "subtitle": "Her algılama tetiklendiğinde, arkasındaki kanıtlarla birlikte.",
+      "eyebrow": "Algılama tetiklenmesi",
+      "range": {
+        "1h": "1sa",
+        "6h": "6sa",
+        "24h": "24sa",
+        "7d": "7g",
+        "30d": "30g"
+      },
+      "stat": {
+        "firings": "{severity} tetiklenmeleri",
+        "error": "Başarısız değerlendirmeler",
+        "silenced": "Sessize alınmış",
+        "low": "Düşük / bilgi tetiklenmeleri"
+      },
+      "status": {
+        "firing": "Tetiklenmiş",
+        "notify_failed": "Tetiklenmiş · bildirim başarısız",
+        "error": "Değerlendirme başarısız",
+        "normal": "Normal",
+        "skipped": "Atlandı",
+        "other": "Bilinmiyor"
+      },
+      "column": {
+        "detection": "Algılama",
+        "status": "Sonuç",
+        "value": "Eşleşen",
+        "window": "Pencere",
+        "fired": "Tetiklendi",
+        "evaluated": "Değerlendirildi"
+      },
+      "fact": {
+        "firedAt": "Tetiklenme zamanı",
+        "value": "Eşleşen / eşik",
+        "window": "Pencere",
+        "evaluation": "Değerlendirme süresi",
+        "windowRange": "Değerlendirilen pencere",
+        "group": "Grup",
+        "error": "Hata",
+        "evaluatedAt": "Değerlendirilme zamanı"
+      },
+      "tab": {
+        "overview": "Genel Bakış",
+        "evidence": "Kanıt",
+        "detection": "Algılama",
+        "raw": "Ham"
+      },
+      "rule": {
+        "name": "Ad",
+        "state": "Durum",
+        "enabled": "Etkin",
+        "disabled": "Devre dışı",
+        "stream": "Akış",
+        "frequency": "Çalışma sıklığı",
+        "logsource": "Günlük kaynağı",
+        "sigmaId": "Sigma kural kimliği"
+      },
+      "minutes": "{n} dakika | {n} dakika",
+      "seconds": "{n} sn",
+      "yes": "Evet",
+      "search": "Algılamalarda veya tekniklerde ara",
+      "showEvaluations": "Tüm değerlendirmeleri göster",
+      "count": "{n} satır | {n} satır",
+      "refresh": "Yenile",
+      "cappedRows": "Tablo, eşleşen {total} çalıştırmadan en yeni {n} tanesini {from} zamanına kadar listeler. Önem derecesi sayıları tüm pencereyi kapsar.",
+      "summaryPartial": "Önem derecesi sayıları sunucunun satır sınırına ulaştı ve düşük olabilir; tam sayılar için daha kısa bir pencere seçin.",
+      "notSiem": "SIEM kuralı değil",
+      "notSiemTitle": "SIEM algılaması değil",
+      "notSiemHint": "Bu uyarının Sigma üst verisi yok, bu nedenle gösterilecek kural yok. Yalnızca SIEM seçeneği kapalı olduğu için listeleniyor.",
+      "empty": "Tetiklenen yok",
+      "emptyHint": "Bu pencerede hiçbir algılama tetiklenmedi.",
+      "noDetections": "Henüz SIEM tespiti yok",
+      "noDetectionsHint": "Tespitler sayfasındaki Sigma kataloğundan tespitleri etkinleştirin; bunların tetiklenmeleri burada görünür.",
+      "whatItDetects": "Neyi tespit eder",
+      "whyItFired": "Neden tetiklendi",
+      "falsePositives": "Bilinen yanlış pozitifler",
+      "noEvidence": "Kanıt sorgusu yok",
+      "noEvidenceHint": "Bu tespitin yeniden oynatılacak bir akışı veya WHERE koşulu yok.",
+      "evidenceCount": "{n} eşleşen olay | {n} eşleşen olay",
+      "evidenceError": "Eşleşen olaylar yüklenemedi",
+      "evidenceAgedOut": "Bu pencerede eşleşen olay kalmadı; saklama süresinden çıkmış olabilirler.",
+      "query": "Tespit sorgusu",
+      "investigate": "Olaylar'da incele",
+      "openDetection": "Tespiti aç",
+      "evaluation": "Değerlendirme",
+      "eyebrowEvaluation": "Tespit değerlendirmesi",
+      "evidenceNone": "Değerlendirilen pencerede bu tespitle hiçbir şey eşleşmedi.",
+      "customWindow": "Sabit bir pencere gösteriliyor: {from} → {to}",
+      "backToRange": "Son {range} dilimine dön",
+      "missing": "Bu bağlantının işaret ettiği uyarı yüklenen pencerede yok. Bu aralıktan daha eski olabilir veya en yeni satır sınırının ötesinde kalmış olabilir.",
+      "dismiss": "Kapat"
+    },
+    "cases": {
+      "title": "Vakalar",
+      "subtitle": "İlişkilendirilmiş tetiklenmeler, bir sonuca bağlanmak üzere triyaj edilir",
+      "eyebrow": "Vaka",
+      "search": "Bu sayfayı başlık, id, atanan kişi veya varlığa göre filtrele",
+      "refresh": "Yenile",
+      "loadError": "Vakalar yüklenemedi",
+      "openError": "Vaka açılamadı",
+      "hiddenAlerts": "{n} güvenlik dışı uyarı tetiklenmesi bu vakada gizleniyor | {n} güvenlik dışı uyarı tetiklenmesi bu vakada gizleniyor",
+      "noSecurityAlerts": "Bu vaka güvenlik tespiti olmayan uyarılarla açıldı, bu yüzden burada gösterilmiyorlar",
+      "updateError": "Vaka güncellenemedi",
+      "commentError": "Yorum gönderilemedi",
+      "analysisError": "Kök neden analizi başarısız oldu",
+      "empty": "Vaka yok",
+      "emptyHint": "İlgili tespitler birlikte tetiklendiğinde vakalar otomatik olarak açılır.",
+      "unassigned": "Atanmamış",
+      "column": {
+        "priority": "Öncelik",
+        "title": "Vaka",
+        "status": "Durum",
+        "alerts": "Uyarılar",
+        "assignee": "Atanan kişi",
+        "firstSeen": "İlk görülme",
+        "lastSeen": "Son görülme"
+      },
+      "fact": {
+        "duration": "Süre"
+      },
+      "durationMinutes": "{n} dk",
+      "durationHours": "{n} sa",
+      "durationDays": "{n} g",
+      "tab": {
+        "overview": "Genel bakış",
+        "alerts": "Uyarılar",
+        "timeline": "Zaman çizelgesi",
+        "analysis": "Analiz"
+      },
+      "detections": "Bu vakadaki tespitler",
+      "noDetections": "Henüz tespit kaydedilmedi",
+      "firedTimes": "{n} kez tetiklendi | {n} kez tetiklendi",
+      "entities": "Etkilenen varlıklar",
+      "noEntities": "Korelasyon motoru bu vaka için hiçbir gruplama boyutu kaydetmedi.",
+      "noAlerts": "Uyarı kaydedilmedi",
+      "external": "Harici",
+      "reason": {
+        "service_discovery": "Hizmet keşfiyle korelasyon kuruldu",
+        "primary_match": "Birincil boyutlar üzerinden korelasyon kuruldu",
+        "secondary_match": "İkincil boyutlar üzerinden korelasyon kuruldu",
+        "alert_id": "Aynı tespit"
+      },
+      "commentPlaceholder": "Ekibe bir not ekleyin",
+      "postComment": "Not gönder",
+      "noEvents": "Henüz etkinlik yok",
+      "event": {
+        "created": "Vaka açıldı",
+        "alert": "{name} tetiklendi ({n})",
+        "severityUpgrade": "Öncelik yükseltildi {from} → {to}: {reason}",
+        "severityOverride": "Öncelik {from} → {to} olarak ayarlandı",
+        "acknowledged": "İnceleniyor olarak işaretlendi",
+        "resolved": "Kapatıldı",
+        "autoResolved": "Otomatik kapatıldı",
+        "reopened": "Yeniden açıldı: {reason}",
+        "titleChanged": "{to} olarak yeniden adlandırıldı",
+        "assigned": "Atandı: {to}",
+        "unassigned": "Atanmamış",
+        "comment": "Not",
+        "analysisBegin": "Kök neden analizi başladı",
+        "analysisComplete": "Kök neden analizi tamamlandı",
+        "analysisFailed": "Kök neden analizi başarısız oldu: {reason}",
+        "analysisCancelled": "Kök neden analizi iptal edildi",
+        "other": "{type}"
+      },
+      "analysisHint": "Bu vakadaki tetiklenmeleri birbirine bağlayan şeylerin yapay zeka özeti.",
+      "runAnalysis": "Analiz et",
+      "rerunAnalysis": "Yeniden analiz et",
+      "noAnalysis": "Henüz analiz yok",
+      "priorityOption": "{p} · {level}",
+      "priorityChanged": "Öncelik {p} olarak ayarlandı",
+      "statusChanged": "Vaka {status} olarak işaretlendi",
+      "viewFirings": "Tetiklenmeleri görüntüle",
+      "transition": {
+        "open": "Yeniden aç",
+        "acknowledged": "İncelemeyi başlat",
+        "resolved": "Vakayı kapat"
+      },
+      "notFound": "Vaka bulunamadı",
+      "timelinePartial": "Bu zaman çizelgesi vaka kaydından yeniden oluşturuldu; bu nedenle yeniden oluşturmadan önceki notlar, onaylar ve analiz etkinlikleri eksik olabilir."
+    },
+    "mitrePage": {
+      "title": "MITRE ATT&CK",
+      "subtitle": "Etkin tespitlerinizin hangi teknikleri kapsadığı ve hangilerinin tetiklendiği",
+      "summaryPartial": "Bu pencerede tek bir özetin alabileceğinden daha fazla uyarı geçmişi var; bu nedenle tetiklenme sayıları alt sınırdır. Tam sayılar için daha kısa bir pencere seçin.",
+      "stat": {
+        "firing": "Tetiklenen teknikler",
+        "gaps": "Kapsam boşlukları",
+        "techniques": "Kapsanan teknikler / {total}",
+        "tactics": "Kapsanan taktikler ({total} içinden)"
+      },
+      "view": {
+        "all": "Tümü",
+        "covered": "Kapsanan",
+        "gaps": "Boşluklar",
+        "firing": "Tetiklenmiş"
+      },
+      "search": "Teknik veya kural ara",
+      "legend": {
+        "firing": "Pencere içinde tetiklendi (daha koyu = daha fazla)",
+        "covered": "Etkin bir algılama tarafından kapsanıyor",
+        "available": "Kural kullanılabilir, etkin değil"
+      },
+      "columnCount": "{covered} tanesi kapsandı ({total} içinden)",
+      "cellEnabled": "{n} açık algılama | {n} açık algılama",
+      "cellAvailable": "{n} kullanılabilir kural | {n} kullanılabilir kural",
+      "noMatch": "Eşleşen teknik yok",
+      "unmapped": "Bilinen taktiği olmayan teknikler",
+      "footnote": "Teknikler, birlikte gelen {n} Sigma kuralından ve kendi algılamalarınızdan gelir; yerleşim, her kuralın etiketlendiği taktikleri izler.",
+      "drawerEyebrow": "ATT&CK tekniği",
+      "state": {
+        "firing": "Tetiklenmiş",
+        "covered": "Kapsanan",
+        "available": "Kapsanmıyor"
+      },
+      "fact": {
+        "state": "Kapsam",
+        "enabled": "Açık algılamalar",
+        "catalog": "Katalog kuralları",
+        "firings": "Tetiklenmeler ({range})"
+      },
+      "tab": {
+        "detections": "Algılamalar",
+        "firings": "Tetiklenmeler",
+        "reference": "Referans"
+      },
+      "subOf": "{id} alt tekniği",
+      "yourDetections": "Algılamalarınız",
+      "noDetections": "Henüz hiçbir algılamanız bu tekniği kapsamıyor",
+      "enabled": "Açık",
+      "disabled": "Kapalı",
+      "inCatalog": "Katalogda kullanılabilir",
+      "enable": "Etkinleştir",
+      "noFirings": "Son {range} içinde bu teknik için hiçbir şey tetiklenmedi",
+      "referenceHint": "Teknik adları, prosedürler ve azaltma önlemleri MITRE tarafından sürdürülür. Bu sayfa, kurallarınızın taşıdığı kimliği gösterir ve yetkili girdiye bağlantı verir.",
+      "openTechnique": "attack.mitre.org üzerinde {id} öğesini aç",
+      "viewOnAttack": "ATT&CK'te görüntüle",
+      "manageDetections": "Algılamaları yönet",
+      "historyNarrowed": "Uyarı geçmişinin maksimum sorgu aralığı, tetiklenmeleri {from} tarihinden itibaren olanlarla sınırlar; bu penceredeki daha erken tetiklenmeler sayılmaz."
+    },
+    "detections": {
+      "title": "Algılamalar",
+      "subtitle": "Güvenlik akışlarınız üzerinde zamanlanmış algılamalar olarak çalışan Sigma kuralları",
+      "new": "Yeni algılama",
+      "eyebrow": "Algılama kuralı",
+      "refresh": "Algılamaları yenile",
+      "search": "Ada, akışa veya tekniğe göre ara",
+      "anySeverity": "Tüm önem dereceleri",
+      "notSiem": "Uyarı",
+      "scheduleValue": "Her {every}dk, {over}dk üzerinden",
+      "minutes": "{n} dakika | {n} dakika",
+      "stat": {
+        "fired": "24 saatte tetiklenen",
+        "erroring": "Hata veriyor",
+        "enabled": "Etkin",
+        "disabled": "Devre dışı",
+        "all": "Tüm tespitler"
+      },
+      "column": {
+        "name": "Tespit",
+        "stream": "Akış",
+        "schedule": "Zamanlama",
+        "enabled": "Etkin",
+        "fired24h": "Tetiklenme (24 sa)",
+        "lastRun": "Son çalıştırma"
+      },
+      "state": {
+        "enabled": "Etkin",
+        "disabled": "Devre dışı",
+        "erroring": "Hata veriyor"
+      },
+      "tab": {
+        "overview": "Genel bakış",
+        "history": "Geçmiş",
+        "sigma": "Sigma kuralı",
+        "sql": "Sorgu"
+      },
+      "field": {
+        "logsource": "Günlük kaynağı",
+        "sourceType": "Kaynak türü",
+        "sigmaId": "Sigma kural kimliği",
+        "destinations": "Bildirim hedefleri",
+        "silence": "Tetiklemeden sonra sessizlik",
+        "owner": "Sahip",
+        "lastError": "Son hata"
+      },
+      "erroringHint": "Bu kuralın son değerlendirmesi başarısız oldu. Sonraki çalıştırma başarılı olana kadar hiçbir şey tespit etmeyecek.",
+      "historyLoading": "Değerlendirme geçmişi yükleniyor…",
+      "historyError": "Bu kuralın geçmişi yüklenemedi",
+      "historyEmpty": "Kaydedilmiş değerlendirme yok",
+      "historyEmptyHint": "Bu kural son {days} gün içinde değerlendirilmedi.",
+      "historySummary": "{firings} tetiklenme, son {days} gün içindeki en son {runs} değerlendirmede. | {firings} tetiklenme, son {days} gün içindeki en son {runs} değerlendirmede.",
+      "historyCapped": "Toplam {total} değerlendirme; daha eski olanlar gösterilmiyor.",
+      "outcome": {
+        "firing": "Tetiklenmiş",
+        "error": "Hata",
+        "normal": "Hiçbir şey bulunamadı",
+        "notify_failed": "Tetiklenmiş · bildirim başarısız",
+        "skipped": "Atlandı",
+        "other": "Bilinmeyen sonuç"
+      },
+      "matched": "{n} eşleşen satır",
+      "took": "{s} sn",
+      "noSigma": "Bu uyarıda Sigma kuralı yok",
+      "noSigmaHint": "SIEM dışında oluşturulan uyarılar aynı şekilde çalışır ancak tespit olarak yazılmamıştır.",
+      "noSql": "-- Bu kuralın SQL sorgusu yok",
+      "delete": "Sil",
+      "deleteTitle": "Tespiti sil",
+      "deleteMessage": "“{name}” silinsin mi? Hemen çalışmayı durdurur. Geçmiş tetiklenmeleri uyarı geçmişinde kalır.",
+      "deleted": "{name} silindi",
+      "deleteFailed": "Tespit silinemedi",
+      "enable": "Etkinleştir",
+      "disable": "Devre dışı bırak",
+      "enabledToast": "{name} etkinleştirildi",
+      "disabledToast": "{name} devre dışı bırakıldı",
+      "toggleFailed": "Kural durumu değiştirilemedi",
+      "noId": "{name} öğesinin kimliği yok ve değiştirilemez.",
+      "viewMatches": "Eşleşmeleri Olaylar bölümünde görüntüle",
+      "emptyTitle": "Henüz tespit yok",
+      "emptyHint": "Tespit, zamanlanmış bir uyarı olarak çalışan bir Sigma kuralıdır. Her tetiklenme Uyarılar bölümüne düşer ve Vakalar bölümünde toplanır.",
+      "createFirst": "Tespit oluştur",
+      "newTitle": "Yeni tespit",
+      "newSubtitle": "Akışınıza yönelik SQL'e derlenen ve uyarı olarak zamanlanan bir Sigma kuralı",
+      "create": "Tespit oluştur",
+      "cancel": "İptal",
+      "library": "Kural kitaplığı ({n})",
+      "writeSigma": "Sigma yaz",
+      "librarySearch": "Başlık, teknik veya günlük kaynağına göre filtrele",
+      "libraryEmpty": "Bu filtreyle eşleşen kural yok",
+      "stream": "Akış",
+      "streamPlaceholder": "Çalıştırılacak akışı seçin",
+      "notify": "Bildirim",
+      "notifyPlaceholder": "Bir hedef seçin",
+      "noDestinations": "Henüz uyarı hedefi yok. Bir tespitin bildirim gönderebilmesi için bir hedef gerekir; yeni bir sekmede hedef oluşturup geri dönün. Bu liste kendiliğinden yenilenir.",
+      "createDestination": "Hedef oluştur",
+      "reloadDestinations": "Yenile",
+      "lookBack": "Geriye bakış (dakika)",
+      "runEvery": "Çalıştırma sıklığı (dakika)",
+      "silence": "Sessiz kalma süresi (dakika)",
+      "compiles": "{stream} üzerinde derlenir",
+      "compilesAs": "{stream} üzerinde derlenir, {source} olarak tanımlanır",
+      "logsourceMismatch": "Bu kural {rule} için yazılmış, ancak {stream} {source} olarak tanımlanmış. Yalnızca ikisinin alan adları örtüştüğünde eşleşebilir.",
+      "ocsfBridge": "{stream} OCSF olduğundan kuralın alanları OCSF yollarına eşlenir ve yalnızca {guard} içeren olaylarda çalışır.",
+      "ocsfGuard": {
+        "class": "class_uid {uid}",
+        "activity": "activity_id {id}",
+        "product": "\"{name}\" içeren bir ürün adı"
+      },
+      "createDestinationAria": "Hedef oluştur (yeni sekmede açılır)",
+      "wontRun": "{stream} üzerinde çalışmayacak",
+      "created": "{name} tespiti oluşturuldu",
+      "createFailed": "Tespit oluşturulamadı",
+      "neverRun": "Henüz çalıştırılmadı",
+      "notFired": "Tetiklenmedi",
+      "firedTimes": "Bir kez, {when} | {n} kez, en son {when}",
+      "firedCount": "24 saatte bir kez tetiklendi | 24 saatte {n} kez tetiklendi",
+      "firingsPartial": "Son 24 saatte sayılamayacak kadar çok değerlendirme var; tetiklenme sayıları alt sınırdır.",
+      "firingsNarrowed": "Tetiklenme sayıları {from} tarihinden itibaren başlar: geçmiş deposu tek bir sorgunun ne kadar geriye bakabileceğini sınırlar.",
+      "ago": {
+        "now": "az önce",
+        "minutes": "{n} dk önce",
+        "hours": "{n} sa önce",
+        "days": "{n} gün önce"
+      },
+      "firingsError": "Tetiklenme geçmişi yüklenemedi",
+      "firingsErrorBanner": "Tetiklenme sayıları kullanılamıyor: {reason}",
+      "validation": {
+        "positive": "En az 1 dakika olmalı",
+        "nonNegative": "Negatif olamaz",
+        "periodGap": "Çalıştırma aralığından daha kısa: çalıştırmalar arasındaki dakikalar hiçbir zaman kontrol edilmez"
+      },
+      "nameTaken": "“{name}” adlı bir algılama veya uyarı zaten var. Geçmişi bununkiyle birleşeceği için başka bir akış seçin veya önce mevcut olanı kaldırın.",
+      "loadError": "Algılama kuralları yüklenemedi"
+    },
+    "content": {
+      "title": "İçerik",
+      "subtitle": "SIEM ile birlikte gelen, verilerinizle eşleştirilen algılama kuralları ve günlük kaynakları",
+      "refresh": "Yenile",
+      "streamsError": "Akışlarınız yüklenemediği için verilerinizle eşleşenler bilinmiyor",
+      "tab": {
+        "rules": "Algılama kuralları",
+        "sources": "Günlük kaynakları",
+        "overview": "Genel bakış",
+        "yourData": "Verileriniz",
+        "yaml": "Sigma YAML",
+        "yourStreams": "Akışlarınız",
+        "mapping": "Alan eşlemesi"
+      },
+      "logsources": "Günlük kaynakları",
+      "allLogsources": "Tüm kurallar",
+      "anyLevel": "Herhangi bir düzey",
+      "searchRules": "Kuralları başlık, teknik veya günlük kaynağına göre ara",
+      "searchSources": "Kaynakları ada, satıcıya veya günlük kaynağına göre ara",
+      "stat": {
+        "ready": "Kuruluma hazır",
+        "installed": "Kurulu",
+        "applies": "Verilerinize uygulananlar",
+        "allRules": "Tüm kurallar",
+        "detected": "Verilerinizde bulunanlar",
+        "supported": "Desteklenen kaynaklar"
+      },
+      "column": {
+        "rule": "Kural",
+        "logsource": "Günlük kaynağı",
+        "status": "Durum",
+        "yourData": "Verileriniz",
+        "installed": "Kurulu",
+        "source": "Kaynak",
+        "vendor": "Satıcı",
+        "ocsf": "OCSF sınıfı",
+        "rules": "Kurallar",
+        "yourStreams": "Akışlarınız"
+      },
+      "status": {
+        "stable": "Kararlı",
+        "test": "Test",
+        "experimental": "Deneysel",
+        "deprecated": "Kullanımdan kaldırıldı",
+        "unsupported": "Desteklenmiyor"
+      },
+      "streamCount": "{n} akış | {n} akış",
+      "noMatchingData": "Eşleşen kaynak yok",
+      "installed": "Kurulu",
+      "readyToInstall": "Kuruluma hazır",
+      "noRules": "Eşleşen kural yok",
+      "noSources": "Eşleşen kaynak yok",
+      "telemetryOnly": "Yalnızca telemetri",
+      "notDetected": "Verilerinizde yok",
+      "detectedInData": "Verilerinizde bulundu",
+      "ruleEyebrow": "Sigma kuralı",
+      "sourceEyebrow": "Günlük kaynağı",
+      "field": {
+        "author": "Yazar",
+        "modified": "Güncellendi",
+        "required": "Tanımlayan",
+        "signals": "Destekleyici alanlar"
+      },
+      "falsePositives": "Bilinen yanlış pozitifler",
+      "references": "Referanslar",
+      "noStreamsForRule": "Akışlarınızın hiçbiri bu kuralla eşleşmiyor",
+      "noStreamsForRuleHint": "{logsource} için yazılmış. O kaynaktan veri alın, burada görünecektir.",
+      "runnable": "Bu akışta çalışır",
+      "notRunnable": "Burada çalıştırılamaz",
+      "openInEvents": "Olaylar'da aç",
+      "installHere": "Bu akışa kur",
+      "install": "Algılama olarak kur",
+      "installAgain": "Başka bir akışa kur",
+      "viewDetection": "Algılamayı görüntüle",
+      "noStreamsForSource": "Verilerinizde bulunamadı",
+      "noStreamsForSourceHint": "Bir akış {fields} alanlarını taşıdığında bu kaynak olarak tanımlanır.",
+      "noRulesForSource": "Bu kaynak için henüz kural yazılmamış",
+      "mappingHint": "Bu kaynağın alanlarının, her SIEM sayfasının okuduğu normalize edilmiş sütunlara nasıl eşlendiği. Bir satırda bulunan ilk alan geçerli olur.",
+      "detectionCount": "Evet, {n} algılama olarak | Evet, {n} algılama olarak",
+      "notInstalled": "Kurulu değil",
+      "mapColumn": {
+        "actorId": "Aktör kimliği",
+        "srcPort": "Kaynak portu",
+        "dstPort": "Hedef portu",
+        "vendor": "Üretici",
+        "classUid": "OCSF sınıf kimliği",
+        "className": "Sınıf",
+        "severityId": "Önem derecesi",
+        "statusId": "Sonuç"
+      },
+      "cannotRun": "Verilerinizde çalıştırılamaz"
+    },
+    "entities": {
+      "title": "Varlıklar",
+      "subtitle": "Güvenlik kaynaklarınızın bahsettiği her kullanıcı, kaynak IP ve ana bilgisayar",
+      "view": {
+        "table": "Tablo",
+        "graph": "Risk grafiği"
+      },
+      "riskGraph": {
+        "empty": "Grafikleştirilecek varlık yok",
+        "emptyHint": "Risk grafiğini görmek için güvenlik kaynakları ekleyin veya zaman aralığını genişletin.",
+        "showingTop": "Riske göre en yüksek {total} varlıktan ilk {n} tanesi gösteriliyor",
+        "illustrative": "Örnekleyici: ilişkiler gözlemlenerek değil, risk sıralamasından çıkarılmıştır.",
+        "baseScore": "temel {n}",
+        "propagatedScore": "yayılan {n}",
+        "tier": {
+          "critical": "Kritik",
+          "high": "Yüksek",
+          "medium": "Orta",
+          "low": "Düşük"
+        }
+      },
+      "kinds": {
+        "user": "Kullanıcılar",
+        "ip": "IP adresleri",
+        "host": "Ana Bilgisayarlar"
+      },
+      "kind": {
+        "user": "Kullanıcı",
+        "ip": "IP adresi",
+        "host": "Ana Bilgisayar"
+      },
+      "all": {
+        "user": "Tüm kullanıcılar",
+        "ip": "Tüm IP adresleri",
+        "host": "Tüm ana bilgisayarlar"
+      },
+      "search": {
+        "user": "Kullanıcı ara",
+        "ip": "IP adresi ara",
+        "host": "Ana bilgisayar ara"
+      },
+      "col": {
+        "signals": "Sinyaller",
+        "events": "Olaylar",
+        "failures": "Başarısızlıklar",
+        "peers": {
+          "ips": "Bir kaynaktaki en fazla IP sayısı",
+          "users": "Bir kaynaktaki en fazla kullanıcı sayısı"
+        },
+        "streams": "Kaynaklar",
+        "firstSeen": "İlk görülme",
+        "lastSeen": "Son görülme"
+      },
+      "signal": {
+        "failures": "Yüksek başarısızlık oranı",
+        "spread": {
+          "user": "Çok sayıda kaynak IP",
+          "ip": "Çok sayıda kullanıcı",
+          "host": "Çok sayıda kullanıcı"
+        },
+        "external": "Genel adres"
+      },
+      "signalHint": {
+        "failures": "Bu varlığın olaylarının en az {rate}% kadarı başarısız oldu ve en az {n} başarısızlık var; yalnızca sonuç bildiren kaynaklar sayılır.",
+        "spread": {
+          "user": "Zaman aralığında tek bir kaynakta {n} veya daha fazla kaynak IP'den görüldü.",
+          "ip": "Zaman aralığında tek bir kaynakta {n} veya daha fazla kullanıcı tarafından kullanıldı. NAT ve VPN çıkışları da böyle görünür; parola püskürtme de öyle.",
+          "host": "Zaman aralığında tek bir kaynakta {n} veya daha fazla kullanıcı tarafından erişildi."
+        },
+        "external": "Özel, geri döngü veya bağlantı yerel aralığında değil."
+      },
+      "peersChip": {
+        "ips": "Bir kaynakta en fazla {n} kaynak IP | Bir kaynakta en fazla {n} kaynak IP",
+        "users": "Bir kaynakta en fazla {n} kullanıcı | Bir kaynakta en fazla {n} kullanıcı"
+      },
+      "noSignals": "Sinyal yok",
+      "windowNote": "Sayımlar, seçilen zaman aralığını tüm güvenlik kaynakları genelinde kapsar.",
+      "capped": "Her kaynak en yoğun {n} varlığını döndürdü; daha sakin olanlar listelenmez ve bu eşiğe yakın varlıkların sayımları kısmi olabilir. + ile işaretli sekme sayımları kesilmiştir.",
+      "failedStreams": "Okunamadı: {streams}",
+      "noSources": "Okunacak güvenlik kaynağı yok",
+      "noSourcesHint": "Varlıklar, adı güvenlik verisi olduğunu belirten akışlarda ya da Olaylar sayfasında kaynak olarak eklediğiniz akışlarda bulunur.",
+      "empty": "Bu zaman aralığında varlık yok",
+      "emptyHint": "Zaman aralığını genişletin veya kaynaklarınızın kullanıcı, IP ya da ana bilgisayar alanları içerdiğini kontrol edin.",
+      "refresh": "Yenile",
+      "drawerSubtitle": "Son {window} içindeki etkinlik",
+      "tab": {
+        "activity": "Etkinlik",
+        "related": "İlgili",
+        "sources": "Kaynaklar"
+      },
+      "activity": "Zaman içinde olaylar",
+      "chart": {
+        "ok": "Başarılı veya bilinmiyor",
+        "failed": "Başarısız"
+      },
+      "topN": "olaylara göre ilk {n}",
+      "noRelated": "Bu zaman aralığında ilgili bir şey yok.",
+      "failedCount": "{n} başarısız | {n} başarısız",
+      "openEvents": "Olaylarda Aç",
+      "huntInEvents": "Olaylarda Avla",
+      "partialStreams": "Şu kaynaklardan kısmi sonuçlar: {streams}",
+      "limited": "{stream}: {window} içinde ~{rows} satır. Son {slice} gösteriliyor.",
+      "runFull": "Tam pencereyi çalıştır",
+      "limitedMany": "{n} büyük kaynak, {window} aralığının yalnızca son {slice} kısmını gösteriyor: {streams}",
+      "sourcesLoading": "Kaynaklar okunuyor:",
+      "sourceStatus": {
+        "loading": "Yükleniyor",
+        "done": "Yüklendi",
+        "failed": "Okunamadı"
+      },
+      "loadError": "Güvenlik kaynakları yüklenemedi",
+      "detailFailed": "Bu varlığın bazı verileri okunamadı: {streams}."
+    },
+    "ueba": {
+      "title": "Kullanıcı Davranışı Analizi",
+      "subtitle": "Her kullanıcı kendi yakın geçmişiyle karşılaştırılır",
+      "windowHint": "Son {current}, bundan önceki {baseline} ile karşılaştırılır",
+      "method": "Risk puanları sezgiseldir: her kullanıcının son {current} dönemi, kendi öncesindeki {baseline} dönemiyle karşılaştırılır. Her işaret, onu yükselten sayıları gösterir.",
+      "noSources": "Hiçbir kaynakta kullanıcı adı yok",
+      "noSourcesHint": "UEBA, kullanıcı alanı olan bir güvenlik kaynağı gerektirir (CloudTrail, Okta, kullanıcı sütunu olan bir kimlik doğrulama günlüğü).",
+      "search": "Kullanıcı ara",
+      "empty": "Bu pencerede kullanıcı etkinliği yok",
+      "emptyHint": "Pencereyi genişletin veya kaynaklarınızda bir kullanıcı alanı olduğunu kontrol edin.",
+      "eyebrow": "Kullanıcı davranışı",
+      "riskChip": "{tone} risk · {score}",
+      "expected": "olağan ~{n} değerine karşı",
+      "new": "Yeni",
+      "newIp": "Yeni",
+      "noIps": "Bu kullanıcı için kaynak IP kaydedilmemiş.",
+      "col": {
+        "user": "Kullanıcı",
+        "risk": "Risk",
+        "signals": "Sinyaller",
+        "events": "Olaylar",
+        "failures": "Başarısızlıklar",
+        "ips": "Kaynak IP'ler"
+      },
+      "stat": {
+        "critical": "Kritik risk",
+        "high": "Yüksek risk",
+        "medium": "Orta risk",
+        "all": "Analiz edilen kullanıcılar"
+      },
+      "signal": {
+        "volume": "Hacim sıçraması",
+        "new_ip": "Yeni kaynak IP",
+        "failure_jump": "Başarısızlıklar arttı",
+        "new_hours": "Olağandışı saatler",
+        "first_seen": "İlk görülme"
+      },
+      "reason": {
+        "volume": "{n} olay, önceki {baseline} döneminde beklenen ~{expected} değerinin yaklaşık {ratio}× katı.",
+        "newIp": "{ip} adresinden, önceki {baseline} döneminde hiç görülmemiş {n} olay. | {ip} adresinden, önceki {baseline} döneminde hiç görülmemiş {n} olay (toplamda {count} yeni adres).",
+        "newIpExternal": "Genel {ip} adresinden, önceki {baseline} döneminde hiç görülmemiş {n} olay. | Genel {ip} adresinden, önceki {baseline} döneminde hiç görülmemiş {n} olay (toplamda {count} yeni adres).",
+        "failureJump": "{n} başarısızlık — olayların %{rate}'i; temel dönemdeki %{baseline} değerinden yükseldi.",
+        "newHours": "{n} olay {hours} UTC'de; bu saatlerde kullanıcı önceki {baseline} döneminde hiç etkin olmamıştı.",
+        "firstSeen": "Önceki {baseline} döneminde hiç etkinliği olmayan bir kullanıcıdan {n} olay."
+      },
+      "fact": {
+        "events": "Olaylar",
+        "eventsValue": "{n}, ~{expected} değerine karşı",
+        "failureRate": "Başarısızlık oranı",
+        "failureValue": "%{now} / %{base}",
+        "history": "Temel dönem geçmişi",
+        "historyValue": "{window} aralığının {span} kısmı",
+        "noHistory": "Yok — ilk kez görüldü",
+        "scoreValue": "100 üzerinden {n}"
+      },
+      "tab": {
+        "signals": "Sinyaller",
+        "hours": "Etkin saatler",
+        "ips": "Kaynak IP'ler"
+      },
+      "noSignals": "Olağan dışı bir durum yok",
+      "noSignalsHint": "Bu kullanıcının pencere içindeki etkinliği kendi temel çizgisine benziyor.",
+      "scoring": "Puan = sinyal ağırlıklarının toplamı, en fazla 100 olacak şekilde sınırlandırılır. Beklenen hacim, kullanıcının gerçekte sahip olduğu geçmişe göre ölçeklenir; bir hacim artışı en az {min} olay ve bunun {ratio}× katını gerektirir. Olağan dışı saatler, önceki {baseline} döneminin %{share}'ini kapsayan geçmiş gerektirir.",
+      "hoursTitle": "Bu kullanıcının etkin olduğu saatler",
+      "hoursUtc": "Günün saati, UTC",
+      "baselineRow": "Önceki {w}",
+      "nowRow": "Son {w}",
+      "hourCell": "{h}:00 UTC — {n} olay",
+      "legendUsual": "Etkinlik",
+      "legendNew": "Temel çizgide hiç kullanılmayan saat",
+      "openEntity": "Varlığı aç",
+      "withheld": "Bazı temel veriler eksik geldiği için şu sinyaller değerlendirilmedi: {signals}.",
+      "currentPartial": "Geçerli pencere kısmi veri döndürdü; sayımlar düşük olabilir.",
+      "limited": "{stream}: {window} içinde ~{rows} satır ve kendi {baseline} temel çizgisi var. Yalnızca son {slice} ile pencereden önceki {slice} okunuyor; bu nedenle ilk kez görülen, yeni IP ve olağan dışı saat sinyalleri değerlendirilmiyor, kullanıcıları için hacim ve hata oranı sinyalleri de değerlendirilmiyor.",
+      "limitedMany": "{n} büyük kaynak, {window} süresinin yalnızca son {slice} diliminde ve bundan önceki {slice} diliminde okunuyor; tam {baseline} temel çizgisi okunmuyor. Bu nedenle onlar için ilk kez görülen, yeni IP ve olağan dışı saat sinyalleri değerlendirilmiyor; kullanıcıları için hacim ve hata oranı sinyalleri de değerlendirilmiyor: {streams}",
+      "provisional": "Kaynaklar hâlâ okunuyor: ilk kez görülen, yeni IP ve olağan dışı saat sinyalleri tüm kaynaklar yanıt verdiğinde görünür.",
+      "limitedTag": "Son {slice}",
+      "limitedTagHint": "Bu kullanıcının bazı olayları, tam pencere için çok büyük olan bir kaynaktan geliyor; bunlar yalnızca son {slice} üzerinden sayılır.",
+      "excluded": "Dışarıda bırakıldı (verileri her iki pencerede de okunamadı): {streams}.",
+      "loadError": "Güvenlik kaynakları yüklenemedi",
+      "spanHours": "{n} saat | {n} saat",
+      "spanDays": "{n} gün | {n} gün",
+      "notEvaluated": "Temel veriler eksik olduğu için bu kullanıcı için değerlendirilmedi: {signals}.",
+      "hoursNotJudged": "Olağan dışı saatler yalnızca önceki {baseline} döneminin %{share}'ini kapsayan en az {min} temel olayla değerlendirilir. Bu kullanıcının geçmişi daha kısa olduğundan hiçbir saat işaretlenmez.",
+      "noHistory": "Önceki {baseline} döneminde {streams} için veri yok; bu nedenle oradaki hiç kimse ilk kez görülen olarak adlandırılmaz.",
+      "volumeNotJudged": "Bu kullanıcı için hacim değerlendirilmez: bir günden kısa pencereler temeldeki aynı gün saatleriyle karşılaştırılır; bu da en az bir günlük geçmiş gerektirir."
+    },
+    "intel": {
+      "title": "Tehdit İstihbaratı",
+      "subtitle": "Bilinen kötü amaçlı göstergeler ve bunların güvenlik verilerinizde göründüğü her yer",
+      "loadFailed": "Gösterge listeleri yüklenemedi",
+      "add": "Gösterge ekle",
+      "import": "İçe aktar",
+      "importFile": "CSV dosyası",
+      "importFeed": "Besleme URL'si",
+      "runSweep": "Taramayı çalıştır",
+      "refresh": "Listeleri yeniden yükle ve tekrar tara",
+      "search": "Gösterge, kaynak ve liste ara",
+      "allTypes": "Tüm türler",
+      "expiringOnly": "Süresi dolmak üzere",
+      "expired": "Süresi dolmuş",
+      "never": "Hiçbir zaman",
+      "notSighted": "Görülmedi",
+      "notSightedIn": "{range} içinde görülmedi",
+      "sighted": "Bir kez görüldü | {n} kez görüldü",
+      "sweeping": "Tarama sürüyor… {total} sorgudan {done}",
+      "sweptAcross": "{n} güvenlik kaynağı tarandı | {n} güvenlik kaynağı tarandı",
+      "partial": "Bu tarama {n} sorguluk sınırında durdu, bu nedenle bazı sütunlar aranmadı. Sorgu sayısı liste × sütun ile artar: tam bir tarama için eski listeleri veya süresi dolmuş göstergeleri kaldırın ya da listeleri türe göre bölün.",
+      "failedQueries": "{n} sütun aranamadı ve atlandı. | {n} sütun aranamadı ve atlandı.",
+      "truncated": "{lists} listesinin yalnızca ilk {n} satırı okundu; geri kalanı taranmadı.",
+      "noIndicators": "Gösterge yok",
+      "noCoverage": "Hangi sütunların arandığını görmek için bir tarama çalıştırın",
+      "coverageHint": "Bir taramanın {n} güvenlik kaynağında neleri aradığı. Eşleşme, listelenen sütunlarda tam olarak yapılır; sütunu olmayan bir tür hiçbir şekilde görülemez.",
+      "indicatorCount": "{n} gösterge | {n} gösterge",
+      "columnsSearched": "{n} sütun | {n} sütun",
+      "blind": "Aranamaz",
+      "blindHint": "Hiçbir güvenlik akışında bu tür bir değeri taşıyan sütun yok, bu nedenle bu göstergeler henüz hiçbir şeyle eşleşemez.",
+      "cidrNote": "{n} CIDR aralığı listede tutuluyor ancak taranmıyor: tam eşleşme aralık üyeliğini test edemez. | {n} CIDR aralığı listede tutuluyor ancak taranmıyor: tam eşleşme aralık üyeliğini test edemez.",
+      "stat": {
+        "matched": "Görülen göstergeler",
+        "hits": "Görülme",
+        "indicators": "Göstergeler",
+        "expiring": "Süresi dolmuş veya dolmak üzere",
+        "lists": "Listeler"
+      },
+      "tab": {
+        "matches": "Eşleşmeler",
+        "indicators": "Göstergeler",
+        "coverage": "Kapsam"
+      },
+      "col": {
+        "indicator": "Gösterge",
+        "type": "Tür",
+        "hits": "Görülme",
+        "seenIn": "Görüldüğü yer",
+        "firstSeen": "İlk görülme",
+        "lastSeen": "Son görülme",
+        "source": "Kaynak",
+        "confidence": "Güven düzeyi",
+        "list": "Liste",
+        "added": "Eklendi",
+        "expires": "Süresi doluyor",
+        "description": "Açıklama"
+      },
+      "type": {
+        "auto": "Otomatik algıla",
+        "ip": "IP adresi",
+        "cidr": "CIDR aralığı",
+        "domain": "Alan adı",
+        "url": "URL",
+        "hash": "Dosya karması",
+        "email": "E-posta adresi"
+      },
+      "empty": {
+        "title": "Henüz tehdit istihbaratı yok",
+        "description": "Bir rapordan gösterge ekleyin, CSV içe aktarın veya bir beslemeye abone olun. Ardından her gösterge güvenlik kaynaklarınızda taranır."
+      },
+      "noMatches": {
+        "title": "Hiçbir gösterge görülmedi",
+        "description": "{n} canlı göstergenin hiçbiri {range} boyunca {streams} güvenlik kaynağında görülmedi."
+      },
+      "drawer": {
+        "eyebrow": "Gösterge · {type}",
+        "sightings": "Görülmeler",
+        "details": "Ayrıntılar",
+        "overTime": "Zaman içinde görülmeler",
+        "hunt": "Avla",
+        "huntTop": "Olaylarda avla",
+        "notSeenTitle": "Bu aralıkta görülmedi",
+        "notSeen": "Bu gösterge {range} boyunca {streams} güvenlik kaynağında görülmedi.",
+        "cidrNotSwept": "CIDR aralıkları taranmaz: tam eşleşme aralık üyeliğini test edemez."
+      },
+      "remove": {
+        "action": "Kaldır",
+        "title": "Göstergeyi kaldır",
+        "message": "{indicator} öğesi {table} içinden kaldırılsın mı? Liste, bu olmadan okunur ve geri yazılır; diğer tüm satırlar saklandığı gibi kalır. Bu atomik değildir: bu işlem çalışırken başka biri tarafından {table} tablosuna eklenen göstergeler kaybolur.",
+        "confirm": "Kaldır",
+        "done": "{indicator} kaldırıldı | {indicator} içeren {n} satır kaldırıldı",
+        "failed": "Gösterge kaldırılamadı",
+        "tooLarge": "{table} {n} satır içeriyor; bu, bu sayfanın okuyabileceğinden daha fazla olduğundan güvenli şekilde yeniden yazılamaz. Zenginleştirme Tabloları sayfasında düzenleyin.",
+        "feedHint": "Bu liste bir beslemeden yenilenir; göstergeyi besleme tarafında kaldırın.",
+        "notFound": "{indicator} artık {table} içinde değil; daha önce kaldırılmış olabilir."
+      },
+      "form": {
+        "addTitle": "Gösterge ekle",
+        "addSubtitle": "Bir rapordan yapıştırın. evil[.]com ve hxxp:// gibi etkisizleştirilmiş değerler kabul edilir.",
+        "addSubmit": "Ekle",
+        "cancel": "İptal",
+        "indicators": "Göstergeler",
+        "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
+        "indicatorsHelp": "Her satırda bir tane veya virgül ya da boşluklarla ayırın. Yinelenenler yok sayılır.",
+        "indicatorsRequired": "En az bir gösterge girin",
+        "invalid": "Gösterge olarak tanınmayanlar ({n}): {sample}",
+        "line": "satır {n}",
+        "list": "Liste",
+        "listHelp": "Zenginleştirme tablosu olarak saklanır; adlara ioc_ öneki eklenir.",
+        "listRequired": "Listeye ad verin",
+        "type": "Tür",
+        "confidence": "Güven (0–100)",
+        "confidenceRange": "Güven 0 ile 100 arasında olmalıdır",
+        "source": "Kaynak",
+        "sourcePlaceholder": "Rapor, satıcı veya besleme adı",
+        "description": "Açıklama",
+        "expiry": "Bitiş",
+        "never": "Asla",
+        "days": "{n} gün içinde | {n} gün içinde",
+        "added": "{table} tablosuna {n} gösterge eklendi | {table} tablosuna {n} gösterge eklendi",
+        "importedSkipped": "{table} tablosuna {n} gösterge eklendi; gösterge olmayan {skipped} satır atlandı | {table} tablosuna {n} gösterge eklendi; gösterge olmayan {skipped} satır atlandı",
+        "saveFailed": "Göstergeler kaydedilemedi",
+        "feedReadOnly": "{table} bir beslemeden yenilenir ve eklenen satırları kabul edemez. Başka bir liste seçin.",
+        "importTitle": "CSV'den gösterge içe aktar",
+        "importSubtitle": "Bir gösterge sütunu gerekir; tür, önem derecesi, kaynak ve son kullanma isteğe bağlıdır.",
+        "importSubmit": "İçe Aktar",
+        "file": "CSV dosyası",
+        "fileHelp": "Gösterge olmayan satırlar atlanır ve sayılır.",
+        "fileRequired": "Bir CSV dosyası seçin",
+        "defaultSeverity": "Önem derecesi bulunmayan satırlar için kullanılacak önem derecesi",
+        "append": "Listeyi değiştirmek yerine listeye ekle",
+        "noIndicatorColumn": "Dosyada gösterge sütunu yok",
+        "noValidRows": "Dosyadaki hiçbir satır tanınan bir gösterge değil",
+        "feedTitle": "Bir beslemeye abone ol",
+        "feedSubtitle": "Sunucu CSV'yi arka planda çeker ve listeyi onunla senkronize tutar.",
+        "feedSubmit": "Abone Ol",
+        "url": "Besleme URL'si",
+        "urlHelp": "Gösterge sütunu olan herkese açık bir CSV.",
+        "urlInvalid": "http:// veya https:// URL girin",
+        "feedQueued": "{table} getiriliyor. İndirme tamamlandığında göstergeler görünür.",
+        "allPresent": "Tüm göstergeler zaten {table} içinde",
+        "addedSkippedDupes": "{table} içine {n} gösterge eklendi; {dupes} tanesi zaten vardı | {table} içine {n} gösterge eklendi; {dupes} tanesi zaten vardı",
+        "urlPlaceholder": "https://feeds.example/indicators.csv",
+        "noIndicatorColumnIn": "{table} içinde indicator, ioc veya value sütunu yok, bu nedenle gösterge eklenemez. Başka bir liste seçin.",
+        "replaceTitle": "Listeyi değiştir",
+        "replaceMessage": "Ekleme kapalıyken içe aktarma {table} tablosunu tamamen değiştirir: mevcut tüm satırlar, sütunları ve ayarları kaldırılır ve yalnızca bu dosyanın göstergeleri kalır.",
+        "replaceConfirm": "Değiştir"
+      },
+      "importCsv": "CSV içe aktar",
+      "unreadTables": "{lists} okunamadı; göstergeleri gösterilmez veya taranmaz. | {lists} okunamadı; göstergeleri gösterilmez veya taranmaz.",
+      "noIndicatorColumn": "{lists} içinde gösterge sütunu yok, bu nedenle satırlarının hiçbiri kullanılmaz. | {lists} içinde gösterge sütunu yok, bu nedenle satırlarının hiçbiri kullanılmaz.",
+      "skippedRows": "Gösterge olarak tanınamayan satırlar atlandı: {detail}.",
+      "unreadStreams": "{streams} şeması okunamadı, bu nedenle aranmadı. | {streams} şemaları okunamadı, bu nedenle aranmadı.",
+      "columnsSkipped": "{n} sütun aranmadı | {n} sütun aranmadı",
+      "skippedHint": "Tamamen aranmadı — tarama sorgu sınırına ulaştı veya sorgu başarısız oldu:",
+      "caveat": {
+        "capped": "Tarama sorgu sınırına ulaştı, bu nedenle bazı sütunlar aranmadı.",
+        "failed": "{n} sütun aranamadı. | {n} sütun aranamadı.",
+        "partial": "{n} sorgu yalnızca kısmi sonuç döndürdü, bu nedenle bu sütunlar tam olarak aranmadı. | {n} sorgu yalnızca kısmi sonuç döndürdü, bu nedenle bu sütunlar tam olarak aranmadı.",
+        "unsearched": "Hiçbir akışta şunlar için sütun yok: {types}.",
+        "cidr": "{n} CIDR aralığı taranmadı. | {n} CIDR aralığı taranmadı."
+      }
+    },
+    "sources": {
+      "title": "Veri kaynakları",
+      "comingSoon": "OCSF normalleştirme şablonlarıyla rehberli kurulum yakında geliyor. O zamana kadar güvenlik günlüklerini herhangi bir akış olarak alın; Olaylar sayfası bunları otomatik olarak tanımlar ve normalleştirir.",
+      "subtitle": "Veri alımı sırasında bir akışı normalleştirmek için bir OCSF paketi iliştirin veya olduğu gibi güvenlik kaynağı olarak dahil edin.",
+      "colStream": "Akış",
+      "colSourceType": "Kaynak türü",
+      "colMapping": "Eşleme",
+      "colActions": "İşlemler",
+      "stateMapped": "{pack} eşlendi",
+      "stateIncluded": "Dahil edildi (eşlenmedi)",
+      "stateNotMapped": "Eşlenmedi",
+      "stateSuggested": "Önerilen: {label}",
+      "attach": "Paket iliştir",
+      "detach": "Ayır",
+      "include": "Dahil et",
+      "exclude": "Hariç tut",
+      "attached": "{pack} iliştirildi.",
+      "detached": "Paket ayrıldı.",
+      "detachedPipelineSkipped": "Paket ayrıldı. Kayıtlı işlem hattı artık bu akış ve paketle eşleşmiyor, bu nedenle değiştirilmedi.",
+      "empty": "Henüz günlük akışı yok. Güvenlik günlüklerini herhangi bir akış olarak alın; burada görünürler.",
+      "noticePackRemoved": "{stream}: paket SIEM dışında kaldırıldı. Yeniden iliştirin veya temizleyin.",
+      "noticeNoRecord": "{stream}: bir paket kayıt olmadan iliştirilmiş. Kaydını oluşturun veya ayırın.",
+      "noticeNotWriting": "{stream}: işlem hattı artık bu akışa yazmıyor.",
+      "noticeDisabled": "{stream}: işlem hattı devre dışı; hiçbir şey eşlenmiyor.",
+      "blockStreamNotWritten": "{stream}: mevcut işlem hattı satırları yalnızca {streams} akışına yönlendiriyor; bu akışa geri yönlendirmiyor.",
+      "blockFlattenLevel": "{stream}: akışın düzleştirme düzeyi genel düzeyden farklı; bu nedenle iliştirme işlemi sütunlarını yeniden adlandırır.",
+      "blockGlobalFlatten": "{stream}: genel düzleştirme düzeyi ({level}) OCSF sütunlarının düz kalmasını sağlamaz.",
+      "blockSchemaMissing": "{stream}: kullanıcı tanımlı şemada şu OCSF sütunları eksik: {columns}.",
+      "blockPipelineDisabled": "{stream}: mevcut işlem hattı devre dışı; iliştirmeden önce etkinleştirin.",
+      "attachErrors": {
+        "functionEditedOutside": "Fonksiyon {name} SIEM dışında düzenlendi.",
+        "pipelineNoAccess": "Bu akışta erişiminiz olmayan bir işlem hattı var.",
+        "permissionDenied": "Bu akış için fonksiyonları ve işlem hatlarını düzenleme izniniz olmalı.",
+        "pipelineChanged": "Bu akışın işlem hattı değişti ve artık eklemeyi engelliyor; yenileyip tekrar kontrol edin.",
+        "packConflict": "Bu akışta zaten {pack} paketi var; önce ayırın.",
+        "noPipeline": "Bu akış için gerçek zamanlı bir işlem hattı oluşturulamadı veya bulunamadı.",
+        "failed": "Ekleme başarısız oldu."
+      }
+    },
+    "nav": {
+      "overview": "Genel Bakış",
+      "events": "Olaylar",
+      "detections": "Tespitler",
+      "alerts": "Uyarılar",
+      "cases": "Vakalar",
+      "entities": "Varlıklar",
+      "intel": "Tehdit İstihbaratı",
+      "ueba": "UEBA",
+      "mitre": "MITRE ATT&CK",
+      "content": "İçerik"
+    },
+    "sigma": {
+      "notSupported": "Desteklenmiyor: {fields}",
+      "cannotMatch": "Eşleştirilemiyor: bu akışta {fields} yok",
+      "compiledEmpty": "Kural boş olarak derlendi",
+      "assumedAbsent": "Bu akışta {fields} hiç bulunmadığı varsayılıyor"
     }
   },
   "promql": {
@@ -24145,6 +25453,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "Başlayın",
     "reportDetail": "Rapor",
     "sharedChat": "Paylaşılan sohbet",
     "passwordPolicy": "Parola Politikası",
@@ -24728,16 +26037,17 @@
       "groupStorage": "Depolama",
       "groupAutoscaling": "Otomatik Ölçeklendirme",
       "subtitle": "Kümeleri, iş yüklerini ve kaynakları izleyin",
-      "hotbarAll": "Tüm kümeler",
+      "clusterPickerLabel": "Küme",
+      "clusterPickerTrigger": "Küme: {name}",
+      "clusterPickerSearch": "Küme bul",
+      "clusterPickerEmpty": "Eşleşen küme yok",
       "healthHealthy": "Sağlıklı",
       "healthWarning": "Uyarı",
       "healthCritical": "Kritik",
       "healthSilent": "Rapor vermiyor",
       "treeWorkloadsOverview": "İş yüklerine genel bakış",
       "viewSelect": "Görünüm",
-      "hotbarLabel": "Kümeler",
       "hotbarTileLabel": "{name}, {health}",
-      "hotbarTitle": "Kümeler",
       "treeFilter": "Kaynakları filtrele",
       "treeOverview": "Genel bakış",
       "treeNodesReady": "{ready} / {total} düğüm hazır | {ready} / {total} düğüm hazır",
@@ -25028,6 +26338,13 @@
       "depsCaption": "Zaman aralığının sonuna kadar {window} üzerinden ortalanmış yaklaşık saniye başına bayt",
       "depsCaptionMore": "Kenar genişliği saniye başına bayt miktarını izler. Oklar, yönün bilindiği yerlerde istemciden sunucuya doğru gösterir; gri bir çizginin istemcisi bilinmiyor veya her iki uç da istemci olarak davranıyor. Bir kartın rengi, onun ad alanını gösterir. Düşük trafikli bağlantılar açık değilse 1 B/s'nin altındaki bağlantılar gizlenir.",
       "depsCapped": "Toplam {total} bağlantıdan en yoğun {shown} tanesi gösteriliyor. Geri kalanını görmek için ad alanına göre filtreleyin.",
+      "depsCollapseMode": "Gruplama",
+      "depsCollapseAuto": "Otomatik",
+      "depsCollapseExpanded": "Genişletilmiş",
+      "depsCollapseCollapsed": "Daraltılmış",
+      "depsGroupDetail": "{count} iş yükü | {count} iş yükü",
+      "depsGroupHint": "İş yüklerini göstermek için bir namespace'e tıklayın.",
+      "depsGroupCollapse": "{namespace} daralt",
       "depsNoStreamTitle": "Ağ akışı verisi yok",
       "depsNoStreamDescription": "Bağımlılık haritası eBPF ağ akışı metriklerinden ({stream}) çizilir. Bunlar, ebpf.enabled=true ve ebpf.network.enabled=true ile openobserve-collector Helm chart 0.8.0 veya sonraki sürümlerden gelir.",
       "depsNoFlowsTitle": "Bu zaman aralığında ağ akışı yok",
@@ -25045,6 +26362,9 @@
       "depsTypeIn": "{type} {namespace} içinde",
       "depsKindNode": "Düğüm",
       "depsKindExternal": "Diğer adresler",
+      "depsCollapseFiltering": "Bir filtre veya arama etkinken gruplama kapalıdır",
+      "depsCollapseHint": "Haritada {count} uç noktadan fazla olduğunda Otomatik, iş yüklerini namespace'e göre gruplar. Daraltılmış her zaman gruplar, Genişletilmiş hiç gruplamaz.",
+      "depsExpandEnd": "{name} içindeki iş yüklerini göster: {detail}, {summary}",
       "depsOpenEnd": "{name} için ayrıntıları aç: {detail}, {summary}",
       "depsEndSummary": "{count} bağlantı · {rate} | {count} bağlantı · {rate}",
       "depsApprox": "~{rate}",
@@ -26870,10 +28190,6 @@
     "saveScheduleFailed": "Zamanlama kaydedilemedi",
     "policy": "Eskalasyon politikası",
     "policyIfNoAck": "Kimse onaylamazsa,",
-    "policyRepeatTimes": "Merdiveni bir kez çalıştır | Merdiveni {count} kez çalıştır",
-    "policyFinalStop": "sonra dur",
-    "policyFinalNotifyDefault": "sonra varsayılan takımı bilgilendir",
-    "policyNoDefaultTeam": "Varsayılan takım belirlenmemiş, bu yüzden bu durdurmakla aynıdır. Birini Yönlendirme sekmesinde belirleyin.",
     "policyPrioritySilent": "{priority} kimseyi aramaz. Bunu değiştirmek için bir basamak ekleyin — buradaki sessizlik bir ihmal değil, bir karardır.",
     "policyDoneEditing": "Düzenlemeyi bitir",
     "policyHint": "Her öncelikte kimin çağrılacağı ve ne kadar sonra çağrılacağı. Bunlar varsayılanlardır - istediğinizi değiştirin.",
@@ -27353,9 +28669,6 @@
     "policyP1ParallelHint": "Kimse sitenin çöktüğünü öğrenmek için beş dakika beklemez.",
     "policyP4Pages": "Bu öncelik için de çağrı gönder",
     "policyP4PagesHint": "Varsayılan olarak kapalı — birini uyandıran P4, önem derecesi hatasıdır.",
-    "policyFinalAction": "Kimse onaylamazsa",
-    "policyFinal_notifyDefaultTeam": "Varsayılan ekibi bilgilendir",
-    "policyFinal_stop": "Durdur",
     "policySummaryTitle": "Bu politikanın şu anda ne yaptığı",
     "policySummaryLine": "{priority} — {who} {channels}",
     "policySummaryAllAtOnce": "tümü aynı anda",
@@ -27608,7 +28921,6 @@
     "ladderL0Off": "Yapay Zeka SRE yok",
     "ladderStaleDefaultTag": "Merdiven rotasyonları hiç öğrenmedi",
     "ladderStaleDefaultHint": "Her seviye tüm ekibi çağırır, ancak bu ekibin rotasyonları var — merdiven, rotasyonlar oluşturulmadan önce oluşturulmuş. Üye eklemek veya çıkarmak varsayılanı yeniden çalıştırır, ya da merdiveni elle bir kez düzenleyin.",
-    "ladderEndsHandsOff": "Çağrı devredilir",
     "reachShortNoSmtp": "yalnızca e-posta · SMTP aktarımı yok",
     "reachShortNoFromAddress": "yalnızca e-posta · gönderen adresi yok",
     "reachShortNoAddress": "Kayıtlarda adres yok",
@@ -27734,7 +29046,6 @@
     "ladderEvery": "· her {duration}",
     "ladderEnd": "Son",
     "ladderEndUnknown": "Başka bir planlanmış çağrı yok.",
-    "ladderEndsDefaultTeam": "Basamaklar tükendi — varsayılan ekip bilgilendirildi.",
     "rungLost": "başarısız",
     "rungLostTimes": "başarısız ×{count}",
     "routingDetails": "Yönlendirme detayları",
@@ -27749,7 +29060,6 @@
     "policyStepsSection": "Eskalasyon adımları",
     "policyChipSteps": "{count} adım | {count} adım",
     "policyAddStep": "Adım ekle",
-    "policyWhenStepsRunOut": "Adımlar tükendiğinde",
     "policyAppliesToNewPages": "Değişiklikler yalnızca yeni çağrılar için geçerlidir.",
     "policySave": "Kaydet",
     "policyFix": "Düzelt",
@@ -27759,9 +29069,6 @@
     "policyEmailLockedBySlack": "E-posta, Slack ile açık kalır: bağlı Slack hesabı olmayan kişiler yine de e-postayı alır.",
     "policyNoProvider": "Telefon sağlayıcısı bağlı değil, bu nedenle SMS ve Ses atlanır ve bu bildirimler e-postayla gönderilir.",
     "policyNoProviderLink": "Ayarlar → Telefon bölümünden bir sağlayıcı bağlayın",
-    "policyEndOptionStop": "Bir kez çalıştır, sonra dur | {count} kez çalıştır, sonra dur",
-    "policyEndOptionHandOff": "Bir kez çalıştır, sonra catch-all ekibine devret | {count} kez çalıştır, sonra catch-all ekibine devret",
-    "policyEndOptionHandOffTo": "Bir kez çalıştır, sonra {team} ekibine devret | {count} kez çalıştır, sonra {team} ekibine devret",
     "policyDeliveryTitle": "Teslimat",
     "policyTodayIs": "bugün: {who}",
     "policyPeopleCount": "{count} kişi | {count} kişi",
@@ -27883,6 +29190,12 @@
     "ruleEditorTakesFrom": "{team} ekibinden uyarıları devralır",
     "ruleEditorKeptBy": "{team} bu uyarıları korur: kuralı daha özgüldür",
     "ruleEditorContends": "{team} için bir kuralla yarışıyor: daha özgül olan kazanır",
+    "ruleEditorFieldSourcesMore": "{fields} +{count} daha",
+    "ruleEditorFieldsHelp": "Alanlar korelasyon alan gruplarınızdan gelir. {link}",
+    "ruleEditorFieldsSource": "Alanlar korelasyon alan gruplarınızdan gelir.",
+    "ruleEditorManageFieldGroups": "Alan gruplarını yönet",
+    "ruleEditorDuplicatePath": "{team} tam olarak bu koşullar için zaten bir kurala sahip. Bunun yerine o kuralı düzenleyin.",
+    "ruleEditorDuplicatePathSameTeam": "Bu ekip tam olarak bu koşullar için zaten bir kurala sahip.",
     "routingTestRouting": "Yönlendirmeyi test et",
     "routingTabNeedsOwnerPlain": "Bir sahip gerekiyor",
     "simulatorStartFrom": "Şununla başla",
@@ -29665,6 +30978,387 @@
       }
     }
   },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "Herhangi bir Linux sunucusundan günlükler, metrikler ve izler.",
+      "windows": "Windows sunucularından olay günlükleri ve metrikler.",
+      "macos": "Mac makinelerinden günlükler ve metrikler.",
+      "aws": "AWS hizmetlerinizden günlükler ve metrikler.",
+      "googleCloud": "{gcp} projelerinizden, bir {pubSub} push aboneliği aracılığıyla günlükler.",
+      "azure": "{azure} aboneliğinizden, {eventHub} aracılığıyla etkinlik günlükleri.",
+      "postgresql": "Sorgu, bağlantı ve çoğaltma metrikleri.",
+      "mysql": "Sorgu, bağlantı ve InnoDB metrikleri.",
+      "mongodb": "İşlem, bağlantı ve önbellek metrikleri.",
+      "redis": "Bellek, komut ve anahtar alanı metrikleri.",
+      "sqlServer": "Sorgu, bekleme ve tampon metrikleri.",
+      "oracle": "Oturum, tablo alanı ve kaynak sınırı metrikleri.",
+      "mariadb": "Sorgu, bağlantı ve InnoDB metrikleri.",
+      "elasticsearch": "Küme, indeks ve düğüm sağlığı.",
+      "cassandra": "Okuma, yazma ve compaction metrikleri.",
+      "dynamodb": "Öğe değişiklikleri (ekleme, güncelleme, silme) {kinesisFirehose} aracılığıyla günlük olarak.",
+      "snowflake": "Warehouse, sorgu ve kredi kullanımı.",
+      "databricks": "Günlükler API'si üzerinden gönderilen Notebook günlükleri.",
+      "couchdb": "İstek, veritabanı ve çoğaltma metrikleri.",
+      "aerospike": "Ad alanı, düğüm, bellek ve bağlantı metrikleri.",
+      "sapHana": "Bellek, CPU ve hizmet metrikleri.",
+      "zookeeper": "Gecikme, bağlantı ve düğüm metrikleri.",
+      "nginx": "Erişim ve hata günlükleri, {fluentBit} ile izlenir.",
+      "apache": "Erişim ve hata günlükleri, {fluentBit} ile izlenir.",
+      "iis": "İstek günlükleri, {fluentBit} ile izlenir.",
+      "kafka": "Broker, konu ve tüketici gecikmesi metrikleri.",
+      "rabbitmq": "Kuyruk derinliği, mesaj hızı ve düğüm metrikleri.",
+      "nats": "Bağlantı, mesaj ve akış metrikleri.",
+      "prometheus": "Zaten topladığınız metrikleri uzaktan yazma ile gönderin.",
+      "telegraf": "Zaten çalıştırdığınız bir aracıdan metrik gönderin.",
+      "opentelemetryCollector": "Zaten çalıştırdığınız bir toplayıcıyı buraya yönlendirin.",
+      "cloudwatch": "AWS hesabınızdan metrikleri akış olarak gönderin.",
+      "gpu": "{nvidia} GPU başına kullanım, bellek ve sıcaklık.",
+      "networkFlows": "Ana bilgisayarlarınız ve ağlarınız arasındaki trafik akışları.",
+      "fluentBit": "Ana bilgisayarlar ve Kubernetes için hafif günlük ileticisi.",
+      "fluentd": "Geniş eklenti setine sahip günlük toplayıcısı.",
+      "vector": "Günlükler ve metrikler için hızlı işlem hattı.",
+      "filebeat": "Hafif bir aracıyla günlük dosyalarını gönderin.",
+      "logstash": "Mevcut bir işlem hattından günlük gönderin.",
+      "syslogNg": "Sunucularınızdan syslog iletin.",
+      "loongcollector": "Ana bilgisayarlar ve konteynerler için günlük ve metrik aracısı.",
+      "splunkHec": "HTTP Event Collector göndericilerinizi olduğu gibi koruyun.",
+      "cribl": "Zaten çalıştırdığınız işlem hatlarından veri yönlendirin.",
+      "kinesisFirehose": "AWS'deki bir teslimat akışından günlükleri akıtın.",
+      "googleCloudLogs": "Günlükleri projelerinizden bir günlük havuzu aracılığıyla dışa aktarın.",
+      "okta": "Oturum açma ve yönetici denetim olayları.",
+      "office365": "Posta, dosya ve yönetici denetim günlükleri.",
+      "googleWorkspace": "Oturum açma ve yönetici denetim günlükleri.",
+      "falco": "Konteynerlerden çalışma zamanı güvenlik uyarıları.",
+      "osquery": "Sorgulayabileceğiniz günlükler olarak uç nokta durumu.",
+      "jumpcloud": "Dizin ve oturum açma olayları.",
+      "openvpn": "VPN bağlantı ve oturum günlükleri.",
+      "githubActions": "İş akışı çalıştırma ve iş günlükleri.",
+      "jenkins": "Derleme günlükleri ve işlem hattı olayları.",
+      "terraform": "Çalıştırmalarınızdan plan ve uygulama günlükleri.",
+      "ansible": "Playbook çalıştırma günlükleri ve sonuçları.",
+      "vercel": "Dağıtım ve fonksiyon günlükleri.",
+      "heroku": "Bir log drain'den uygulama ve yönlendirici günlükleri.",
+      "airflow": "DAG çalıştırma günlükleri ve görev metrikleri.",
+      "airbyte": "Eşitleme işi günlükleri ve durumu.",
+      "languageTile": "Dilinizde otomatik enstrümantasyon varsa, {otel} SDK'sı ile izler.",
+      "aiIntegration": "Yapay zeka uygulamanızın çağrılarının izleri, model çağrıları için token ve maliyetle birlikte."
+    },
+    "skipToApp": "Uygulamaya Geç",
+    "chooseTitle": "İlk olarak neyi izlemek istiyorsunuz?",
+    "back": "Geri",
+    "searchGuides": "{count} kılavuzda ara | {count} kılavuzda ara",
+    "showMore": "{count} tane daha göster | {count} tane daha göster",
+    "noMatch": "Burada \"{query}\" ile eşleşen kılavuz yok.",
+    "foundElsewhere": "Diğer seçeneklerde bulundu:",
+    "inChoice": "{choice} içinde",
+    "tryShorter": "Daha kısa bir ad deneyin. Her araç ayrıca {link}.",
+    "sendOverHttp": "HTTP üzerinden günlük gönderebilir",
+    "clearSearch": "Aramayı temizle",
+    "othersTitle": "Başlamanın diğer yolları",
+    "whatYouGet": "Neler elde edersiniz",
+    "signals": {
+      "metrics": "Metrikler",
+      "logs": "Günlükler",
+      "traces": "İzler",
+      "profiles": "Profiller",
+      "sessions": "Oturumlar",
+      "errors": "Hatalar",
+      "webVitals": "Web hayati göstergeleri (web)",
+      "replays": "Oturum tekrarları",
+      "tokens": "Tokenlar",
+      "cost": "Maliyet",
+      "latency": "Gecikme",
+      "uptime": "Çalışma süresi",
+      "certificates": "Sertifikalar"
+    },
+    "example": {
+      "caption": {
+        "row": "Örnek ekran: {name} için {product} tarafından gösterilenler.",
+        "infrastructure": "Örnek ekran: CPU, bellek ve pod sağlığı ile {k8s} kümesine genel bakış.",
+        "backend": "Örnek ekran: 9 hizmette 21 span içeren başarısız bir ödeme işlemi izinin şelalesi.",
+        "frontend": "Örnek ekran: gerçek kullanıcı oturumlarından {rum} web hayati göstergeleri.",
+        "logs": "Örnek ekran: histogram ve eşleşen günlük satırlarıyla bir günlük araması.",
+        "llm": "Örnek ekran: model bazında maliyet, tokenlar ve gecikme ile zaman içindeki izler ve hataları içeren {insights}.",
+        "agent": "Örnek ekran: kodlama ajanınızın bağlandığı {mcp} sunucu sayfası.",
+        "synthetics": "Örnek ekran: 3 konumda bir {http} kontrolünün sonuçları."
+      }
+    },
+    "guide": {
+      "agentTitle": "Kodlama ajanını mı tercih edersiniz?",
+      "agentSteps": "Bunu terminalinizde çalıştırın, ardından {claudeCode}, {cursor} veya {codex} uygulamasına istemi ya da dosyayı verin.",
+      "copyPrompt": "İstemi kopyala",
+      "downloadFile": ".md indir",
+      "inviteTitle": "Erişiminiz yok mu?",
+      "inviteText": "Komutu çalıştırabilecek bir ekip arkadaşınızı davet edin.",
+      "inviteAction": "Ekip Arkadaşı Davet Et",
+      "loadFailed": "Bu kılavuz yüklenemedi.",
+      "openInApp": "Veri kaynaklarında aç",
+      "languageText": "{language} için {otelSdk} ekleyin; {language} için otomatik enstrümantasyon mevcutsa onu kullanın, ardından aşağıdaki ayarlarla {product} ürününe yönlendirin.",
+      "languageLink": "{otel} {language} Kılavuzu"
+    },
+    "rail": {
+      "label": "Kurulum İlerlemesi",
+      "check": "Verilerinizi Kontrol Edin",
+      "received": "Veri alındı",
+      "attention": "Dikkat gerekiyor",
+      "waitingShort": "Veri bekleniyor",
+      "title": "{name} Kur",
+      "run": "Kurulum komutunu çalıştır",
+      "explore": "Verilerinizi keşfedin"
+    },
+    "firstData": {
+      "title": "Verileriniz geliyor",
+      "count": "{count} kayıt {stream} akışına ulaştı | {count} kayıt {stream} akışına ulaştı",
+      "exploreLogs": "Günlüklerinizi keşfedin",
+      "exploreMetrics": "Metriklerinizi keşfedin",
+      "exploreTraces": "İzlerinizi keşfedin",
+      "exploreProfiles": "Profillerinizi keşfedin",
+      "addAnother": "Başka bir kaynak ekle"
+    },
+    "others": {
+      "synthetics": {
+        "name": "Sentetik kontroller",
+        "description": "Bir web sitesini, API'yi, portu veya sertifikayı kontrol edin. Kurulum gerekmez.",
+        "gets": "Ağınızın dışından bir zamanlamayla kontroller çalıştırın."
+      },
+      "invite": {
+        "name": "Kurulum yapması için bir ekip arkadaşını davet et",
+        "description": "Kuruluşunuza davet edilirler."
+      },
+      "agent": {
+        "name": "Kodlama ajanınızla kurulum yapın",
+        "description": "{claudeCode}, {cursor} veya {codex}'e tek bir istem verin.",
+        "gets": "Kodlama ajanınız kurulumu ekler ve verilerin ulaştığını kontrol eder."
+      }
+    },
+    "agentLink": "Ya da kodlama ajanınıza yaptırın",
+    "stepDone": "(tamamlandı)",
+    "agent": {
+      "crumb": "Kodlama ajanı",
+      "title": "Kodlama ajanınızla kurulum yapın",
+      "lead": "{claudeCode}, {cursor}, {codex} veya herhangi bir kodlama ajanı projenizi okur, kurulumu ekler ve verilerin ulaştığını kontrol eder. Herhangi bir şey kurmadan veya dağıtım dosyalarını değiştirmeden önce size sorar.",
+      "tokenTitle": "Tokeninizi kaydedin",
+      "tokenText": "Bunu, kodlama ajanınızı başlatacağınız terminalde, başlatmadan önce çalıştırın.",
+      "powerShell": "{powerShell} içinde:",
+      "copyPowerShell": "{powerShell} komutunu kopyala",
+      "promptTitle": "İstemi kopyala",
+      "focusLabel": "Kurulum",
+      "focus": {
+        "kubernetes": "{k8s} kümesi",
+        "host": "{linux}, {macos} veya {windows} ana bilgisayarı",
+        "backend": "Arka uç hizmeti ({otel})",
+        "llm": "LLM uygulaması",
+        "frontend": "Web ön ucu",
+        "logs": "Yalnızca günlükler"
+      },
+      "copyPrompt": "İstemi kopyala",
+      "promptCopied": "İstem kopyalandı",
+      "download": ".md indir",
+      "preview": "İstemi önizle",
+      "previewLines": "{count} satır | {count} satır",
+      "pasteTitle": "Kodlama ajanınıza yapıştırın",
+      "other": "Diğer",
+      "hint": {
+        "claudeCode": "Aynı terminalde, proje klasörünüzde {command} komutunu çalıştırın, ardından istemi yapıştırın.",
+        "cursor": "{product} uygulamasını aynı terminalden {command} ile başlatın, böylece tokeni okuyabilir. Ardından istemi sohbetine yapıştırın.",
+        "codex": "Aynı terminalde, proje klasörünüzde {command} komutunu çalıştırın, ardından istemi yapıştırın.",
+        "other": "Kodlama ajanınızı aynı terminalden başlatın, böylece tokeni okuyabilir. Ardından istemi yapıştırın veya ona {file} dosyasını verin."
+      },
+      "mcp": "{mcp} sunucusunu bağlayın, böylece kodlama ajanınız verilerinizi okuyabilir.",
+      "aside": {
+        "eyebrow": "İstemin kodlama ajanınıza söyledikleri",
+        "title": "Küçük, güvenli değişiklikler",
+        "line1": "Projenin ne çalıştırdığını bulun",
+        "line2": "İşe yarayan en küçük değişikliği yapın",
+        "line3": "Token'ı ortam değişkeninde tutun",
+        "line4": "{stream} akışına bir test olayı gönderin",
+        "line5": "Hangi dosyaların değiştiğini bildirin"
+      }
+    },
+    "collect": {
+      "continueToSetup": "Kuruluma Devam Et",
+      "languages": "Diller",
+      "languagesRequired": "En az bir dil seçin.",
+      "kubernetesCluster": {
+        "question": "Kümenizden nelerin toplanacağını seçin",
+        "off": {
+          "name": "Günlükler ve Metrikler",
+          "description": "Küme sağlığı ve konteyner günlükleri. Tek komut.",
+          "about": "Tek bir kurulum komutuyla her düğüm ve pod için konteyner günlükleri, CPU ve bellek kullanımı ve günlük olarak {k8s} olayları."
+        },
+        "ebpf": {
+          "name": "eBPF ile İzler Ekleyin",
+          "description": "Kod değişikliği yok, her dil. Düğümlerinizde Linux çekirdeği 5.8+ gerekir.",
+          "about": "Aynı kurulum, artı izler. Toplayıcı istekleri Linux çekirdeğinden görür; bu nedenle uygulamalarınız değişmez. Bir isteği hizmetler arasında yalnızca düz HTTP üzerinden bağlar."
+        },
+        "library": {
+          "name": "Dil Kütüphaneleriyle İzler Ekleyin",
+          "description": "Uygulama başına daha fazla ayrıntı. Dillerinizi seçin, ardından uygulamalarınızı bir kez yeniden başlatın.",
+          "about": "Aynı kurulum, artı izler. {otelOperator}, seçtiğiniz ad alanlarındaki podlara her dil için {otelLibrary} ekler. Kodunuz değişmez."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Web sunucuları",
+      "messageQueues": "Mesaj kuyrukları",
+      "metricsYouCollect": "Zaten topladığınız metrikler",
+      "gpuAndNetwork": "GPU ve ağ akışları",
+      "movingFromAnotherTool": "Başka bir araçtan geçiş",
+      "cloudLogs": "Bulut günlükleri",
+      "securityTools": "Güvenlik araçları",
+      "cicdAndPlatforms": "CI/CD ve platformlar"
+    },
+    "infrastructure": {
+      "name": "Altyapı",
+      "description": "Sunucular, {k8s}, bulut hesapları ve veritabanları",
+      "gets": "Tüm ana bilgisayarları, podları ve bulut hizmetlerini tek bir yerde görün.",
+      "question": "Altyapınızı nasıl izlemek istiyorsunuz?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "{k8s} kümesi",
+          "description": "Tek kurulumla günlükler, metrikler ve {k8s} olayları. Bir komut daha ile izler.",
+          "about": "{productCollector} bileşenini kümenize tek komutla kurar. Konteyner günlükleri, {k8s} olayları ve küme metrikleri elde edersiniz."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "{linux}, {windows} veya {macos} ana bilgisayarı",
+          "description": "{productAgent} bileşenini hizmet olarak kurun",
+          "about": "Tek bir ajan ana bilgisayardan günlükleri ve metrikleri toplar. {linux} üzerinde ayrıca programları kod değişikliği olmadan izleyebilir.",
+          "question": "Ana bilgisayarınızın işletim sistemi hangisi?"
+        },
+        "cloudAccount": {
+          "name": "Bulut hesabı",
+          "description": "{aws}, {gcp} veya {azure}",
+          "about": "Bulut hesabınızdan günlükleri, {aws} üzerinden de metrikleri akış olarak alır. Sunucularınızda hiçbir şey çalışmaz.",
+          "question": "Hesabınız hangi bulutta?"
+        },
+        "databases": {
+          "name": "Veritabanları",
+          "description": "{examples} ve {count} tane daha",
+          "about": "Çoğunlukla {otelCollector} aracılığıyla veritabanı metriklerini toplar.",
+          "question": "Hangi veritabanını izlemek istiyorsunuz?"
+        },
+        "somethingElse": {
+          "name": "Başka bir şey",
+          "description": "Web sunucuları, mesaj kuyrukları, {prometheus}, GPU ve ağ akışları",
+          "about": "Web sunucuları, mesaj kuyrukları, zaten topladığınız metrikler, GPU kullanımı ve ağ akışları.",
+          "question": "Başka neleri izlemek istiyorsunuz?"
+        }
+      }
+    },
+    "backend": {
+      "name": "Arka uç uygulamaları",
+      "description": "Hizmetlerinizden izler ve SDK'nızın gönderdiği yerlerden günlükler",
+      "gets": "Her isteğin hizmetleriniz arasında nasıl ilerlediğini görün.",
+      "question": "Hizmetlerinizi nasıl izlemek istersiniz?",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "Kodunuza bir kütüphane ekleyin",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} veya {fastapi}",
+          "about": "Diliniz için {otelLibrary} ekler. İzler {product} ürününe gider.",
+          "question": "Hizmetiniz hangi dilde yazıldı?"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "{k8s} iş yükleri, kod değişikliği yok",
+          "description": "Kümenizin içinde otomatik enstrümantasyon",
+          "about": "{otelOperator}, tek bir ad alanındaki podlara enstrümantasyon ekler. Kod veya imaj değişikliği gerekmez."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "{otel} ile herhangi bir dil",
+          "description": "Kendi kurulumunuzdan OTLP gönderin",
+          "about": "Herhangi bir {otelSdk} veya toplayıcıyı {product} uç noktanıza yönlendirin."
+        },
+        "continuousProfiling": {
+          "name": "Sürekli profilleme",
+          "description": "CPU ve bellek profilleri",
+          "about": "Profilleyicilerinizden ({go}, {java}, {rust} veya eBPF profilleyici) gelen profilleri {otelCollector} aracılığıyla iletir."
+        }
+      }
+    },
+    "frontend": {
+      "name": "Ön yüz ve mobil uygulamalar",
+      "description": "Web ve mobil için gerçek kullanıcı izleme",
+      "gets": "Gerçek kullanıcıların web ve mobil uygulamalarınızda neler deneyimlediğini görün.",
+      "question": "Uygulamanız nerede çalışıyor?",
+      "rows": {
+        "browser": {
+          "name": "Tarayıcı",
+          "description": "Web siteleri ve web uygulamaları",
+          "about": "Web uygulamanıza {sdk} ekler. Gerçek tarayıcılardan sayfa yüklemeleri, hatalar ve oturumlar alırsınız."
+        },
+        "reactNative": {
+          "description": "Tek bir kod tabanından {ios} ve {android}",
+          "about": "{platform} uygulamanıza {sdk} ekler."
+        },
+        "android": {
+          "description": "Yerel {android} uygulamaları",
+          "about": "{platform} uygulamanıza {sdk} ekler. Oturumlar, ekran görüntülemeleri, hatalar ve çökmeler alırsınız."
+        },
+        "ios": {
+          "description": "Yerel {ios} uygulamaları",
+          "about": "{platform} uygulamanıza {sdk} ekler. Oturumlar, ekran görüntülemeleri, hatalar ve çökmeler alırsınız."
+        }
+      }
+    },
+    "logs": {
+      "name": "Herhangi bir kaynaktan günlükler",
+      "description": "Herhangi bir günlük göndericisinden, hizmetten veya araçtan günlük gönderin",
+      "gets": "Her günlük satırını, onu ne gönderirse göndersin arayın ve filtreleyin.",
+      "question": "Günlüklerinizi nasıl göndermek istiyorsunuz?",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "Çalıştırdığınız bir günlük göndericisinden",
+          "description": "{examples} ve {count} tane daha",
+          "about": "Zaten çalıştırdığınız göndericiyi {product} ürününe yönlendirir. Yeni bir aracı gerekmez.",
+          "question": "Hangi günlük göndericisini çalıştırıyorsunuz?"
+        },
+        "overHttpWithCurl": {
+          "name": "{curl} ile HTTP üzerinden",
+          "description": "Herhangi bir betikten tek istek. Kurulum gerekmez.",
+          "about": "Herhangi bir betik veya hizmetten tek bir HTTP isteğiyle JSON günlükleri gönderin."
+        },
+        "fromOpentelemetry": {
+          "name": "{otel} üzerinden",
+          "description": "Bir SDK veya toplayıcıdan OTLP günlükleri",
+          "about": "Bir {otelSdk} veya toplayıcıdan OTLP üzerinden günlük gönderin."
+        },
+        "somethingElse": {
+          "name": "Başka bir şey",
+          "description": "{splunk} veya {cribl}, bulut günlükleri, güvenlik araçları ve CI/CD",
+          "about": "{splunk} veya {cribl} ürününden geçin ya da bulutunuzdan, güvenlik araçlarınızdan ve CI/CD'nizden günlükleri toplayın.",
+          "question": "Günlükleriniz başka nereden geliyor?"
+        }
+      }
+    },
+    "llm": {
+      "name": "LLM ve yapay zeka uygulamaları",
+      "description": "LLM çağrılarını, ajanları ve araçları izleyin",
+      "gets": "Her LLM çağrısını, araç çağrısını ve ajan adımını görün.",
+      "question": "Yapay zeka uygulamanız ne kullanıyor?",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, Agents veya {assistantsApi}",
+          "about": "{openaiSdk} üzerinden yapılan her çağrıyı token, maliyet ve gecikme ile izler.",
+          "question": "Hangi {openai} kütüphanesini kullanıyorsunuz?"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} veya {claudeAgentSdk}",
+          "about": "{anthropicSdk} üzerinden yapılan her çağrıyı token, maliyet ve gecikme ile izler.",
+          "question": "Hangi {anthropic} kütüphanesini kullanıyorsunuz?"
+        },
+        "langchainOrLanggraph": {
+          "description": "Zincirler, ajanlar ve grafikler",
+          "about": "Her zinciri, ajan adımını ve araç çağrısını izler.",
+          "question": "Hangi {langchain} kütüphanesini kullanıyorsunuz?"
+        },
+        "somethingElse": {
+          "name": "Başka bir şey",
+          "description": "Diğer çerçeveler, model sağlayıcıları, ağ geçitleri ve araçlar",
+          "about": "Çerçeveler, model sağlayıcıları, ağ geçitleri, kod gerektirmeyen araçlar, analitik ve araçlar.",
+          "question": "Yapay zeka uygulamanız ne kullanıyor?"
+        }
+      }
+    }
+  },
   "fleet": {
     "title": "Filo yönetimi",
     "subtitle": "OpenTelemetry toplayıcılarını kaydedin, yapılandırmalarını sürümleyin ve değişiklikleri güvenle dağıtın",
@@ -30327,6 +32021,171 @@
       "receiverEvidence": "{receiver} alıcısı tarafından reddedildi",
       "legend": "İşlem hattı durumu",
       "legendToggle": "Bu durumu haritada göster veya gizle"
+    }
+  },
+  "sampleData": {
+    "delete": "Örnek Verileri Sil",
+    "loadForbidden": "Örnek verileri yüklemek için bu kuruluşa yazma erişiminiz olmalı.",
+    "steps": {
+      "functions": "Fonksiyonlar oluşturuluyor",
+      "pipeline": "Gerçek zamanlı bir işlem hattı oluşturuluyor",
+      "telemetry": "Günlükler, izler ve metrikler oluşturulup gönderiliyor",
+      "dashboards": "Gösterge panoları oluşturuluyor",
+      "alerts": "Uyarılar oluşturuluyor",
+      "enrichment": "Hizmet sahipleri tablosu yükleniyor"
+    },
+    "progress": {
+      "loading": "Örnek veriler yükleniyor…",
+      "done": "Örnek veriler yüklendi",
+      "counts": "{logs} günlük kaydı · {spans} span · {metrics} metrik noktası",
+      "skipped": "Atlandı",
+      "logs": "Günlükler",
+      "spans": "Span'ler",
+      "metrics": "Metrik Noktaları"
+    },
+    "removeSteps": {
+      "alerts": "Uyarılar",
+      "alertDelivery": "Uyarı şablonu ve webhook",
+      "dashboards": "Gösterge panoları",
+      "pipeline": "İşlem hattı",
+      "functions": "Fonksiyonlar",
+      "streams": "Akışlar"
+    },
+    "removeDialog": {
+      "removing": {
+        "title": "Örnek veriler kaldırılıyor",
+        "body": "Bu birkaç saniye sürer. Bu iletişim kutusunu kapatabilirsiniz, ancak işlem bitene kadar bu sekmeyi açık tutun.",
+        "label": "Örnek veriler kaldırılıyor…"
+      },
+      "done": {
+        "title": "Örnek veriler kaldırıldı",
+        "body": "Sunucu, depolanan verileri birkaç dakika içinde silmeyi tamamlar. Bundan sonra örnek verileri yeniden yükleyebilirsiniz.",
+        "label": "Kaldırma tamamlandı",
+        "done": "Tamam",
+        "keptLabel": "Korundu, çünkü başka bir şey bunları kullanıyor:"
+      },
+      "failed": {
+        "title": "Tüm örnek veriler kaldırılamadı",
+        "body": "Yeniden deneyin: zaten kaldırılmış öğeler atlanır.",
+        "label": "Kaldırma durduruldu",
+        "close": "Kapat",
+        "tryAgain": "Yeniden Dene"
+      }
+    },
+    "removeConfirm": {
+      "title": "Örnek veriler silinsin mi?",
+      "message": "Bu işlem örnek akışları, gösterge panolarını, uyarıları, fonksiyonları ve zenginleştirme tablosunu siler. Kendi verilerinize dokunulmaz."
+    },
+    "toast": {
+      "loaded": "Örnek veriler yüklendi. İyi keşifler!",
+      "loadFailed": "Örnek veriler yüklenemedi",
+      "removed": "Örnek veriler kaldırıldı",
+      "removedWithKept": "Örnek veriler kaldırıldı. Başka bir şey tarafından kullanıldığı için {count} örnek öğe kalıyor. | Örnek veriler kaldırıldı. Başka bir şey tarafından kullanıldığı için {count} örnek öğe kalıyor.",
+      "removeFailed": "Tüm örnek veriler kaldırılamadı",
+      "removeWhileLoading": "Örnek verilerin yüklenmesi bitene kadar bekleyin."
+    },
+    "entry": {
+      "onboardingSource": "Örnek verileri keşfet"
+    },
+    "callout": {
+      "title": "Henüz veri göndermeye hazır değil misiniz?",
+      "body": "Önce örnek bir çevrimiçi mağazayla {product} ürününü keşfedin: devam eden bir vaka ve gösterge panoları, uyarılar, günlükler, izler, metrikler ve işlem hatları arasında rehberli bir tur.",
+      "cta": "Örnek Verilerle Keşfet"
+    },
+    "header": {
+      "label": "Örnek Veri",
+      "try": "Örnek Veriyi Dene",
+      "finish": "Yüklemeyi Bitir"
+    },
+    "dock": {
+      "details": "Ayrıntıları Göster"
+    },
+    "homeBanner": {
+      "cleanup": {
+        "message": "Kendi verileriniz geliyor. Gösterge panolarınıza, uyarılarınıza ve aramalarınıza karışmaması için örnek verileri silin.",
+        "keep": "Şimdilik Sakla",
+        "remove": "Örnek Verileri Sil"
+      }
+    },
+    "welcome": {
+      "continueInBackground": "Arka Planda Devam Et",
+      "progress": {
+        "title": "Örnek mağazanız oluşturuluyor",
+        "body": "Bu yaklaşık bir dakika sürer. Bu iletişim kutusunu kapatabilirsiniz, ancak yükleme bitene kadar bu sekmeyi açık tutun."
+      },
+      "ready": {
+        "title": "Örnek mağazanız canlı",
+        "startTour": "Rehberli Turu Başlat",
+        "ownWay": "Kendi Başıma Keşfet"
+      },
+      "errorBody": "Yükleme sırasında bir sorun oluştu. Tekrar deneyin: mevcut gösterge panoları ve uyarılar yeniden kullanılır, çoğaltılmaz."
+    },
+    "tour": {
+      "label": "Rehberli tur",
+      "position": "Rehberli tur · adım {current}/{total}",
+      "pill": "Tur {current}/{total}",
+      "done": "Tur tamamlandı",
+      "stepFailed": "Bu adım açılamadı. Tekrar deneyin.",
+      "minimize": "Turu küçült",
+      "close": "Turu bitir",
+      "next": "İleri",
+      "capabilities": {
+        "dashboards": "Gösterge panoları",
+        "alerts": "Uyarılar",
+        "logs": "Günlük araması",
+        "traces": "İzleme",
+        "metrics": "Metrikler ve PromQL",
+        "pipelines": "İşlem hatları"
+      },
+      "steps": {
+        "dashboard": {
+          "title": "Sorunu tespit edin",
+          "body": "Bu, mağaza vitrininin hizmet özetidir. Hata oranı ve ödeme gecikmesi son 35 dakikada birlikte arttı.",
+          "look": "Her panel bir SQL sorgusudur. Serileri karşılaştırmak için bir grafiğin üzerine gelin, yakınlaştırmak için üzerinde sürükleyin veya sorgusunu düzenlemek için bir panelin menüsünü açın."
+        },
+        "alert": {
+          "title": "Uyarı zaten tetiklendi",
+          "body": "Ödeme hatalarına ilişkin bir uyarı, günlükler üzerinde bir SQL sorgusunu belirli bir zamanlamayla çalıştırır ve hatalar eşiğini aştığı anda tetiklendi.",
+          "look": "Bir uyarıyı açarak sorgusunu, eşiğini ve zamanlamasını görün. Örnek hedef bir yer tutucu webhook'tur; bu nedenle teslimatlar başarısız görünür: gerçek bildirimler almak için onu Slack, e-posta veya PagerDuty'ye yönlendirin."
+        },
+        "logs": {
+          "title": "Hataları arayın",
+          "body": "Günlükler ödeme hatalarına göre filtrelendi. Neredeyse hepsi aynı şeyi söylüyor: havuzdan bağlantı alınırken zaman aşımı.",
+          "look": "Her alanı görmek için bir kaydı genişletin. Bu alana göre filtrelemek için bir alan değerine tıklayın veya gruplamak ve toplamak için SQL moduna geçin."
+        },
+        "deploy": {
+          "title": "Neyin değiştiğini bulun",
+          "body": "Ödeme v2.15.0, hatalar başlamadan bir dakika önce kullanıma sunuldu ve sürüm notları bağlantı havuzunu 20'ye düşürdü.",
+          "look": "Aynı günlükler üzerinde tek bir aramayla bulunan kök neden budur. Tam metin ve SQL araması aynı veriler üzerinde çalışır."
+        },
+        "traces": {
+          "title": "Başarısız bir isteği izleyin",
+          "body": "Her iz, hizmetler arasında bir ödeme işlemini takip eder. Birini açın: şelale görünümü, ödeme hizmetinin bir veritabanı bağlantısı için 3 saniye beklediğini gösterir.",
+          "look": "Günlükler aynı iz ID'sini taşır; böylece bir span ile günlükleri arasında her iki yönde geçiş yapabilirsiniz."
+        },
+        "metrics": {
+          "title": "PromQL ile doğrulayın",
+          "body": "Her hizmetin p95 gecikmesi PromQL ile sorgulanır. Payment ve checkout birlikte yükseliyor.",
+          "look": "Metrikler günlükler ve izlerle aynı motorda bulunur; bu nedenle Altyapı gösterge panosu tamamen PromQL ile oluşturulmuştur."
+        },
+        "pipeline": {
+          "title": "Veriyi geldiği anda işleyin",
+          "body": "Gerçek zamanlı bir işlem hattı her erişim günlüğünde bir VRL fonksiyonu çalıştırarak kayıt saklanmadan önce client_os ve is_mobile alanlarını ekler.",
+          "look": "Grafiğini görmek için işlem hattını açın. İşlem hatları uygulamalarınıza dokunmadan verileri filtreleyebilir, zenginleştirebilir, yönlendirebilir ve maskeleyebilir."
+        },
+        "business": {
+          "title": "İş etkisini ölçün",
+          "body": "Aynı günlükler iş gösterge panolarını besler: başarısız ödeme işlemleri, gelir ve ödeme yöntemine göre siparişler.",
+          "look": "Ayrı bir analiz aracına gerek yok. Günlüklerinizdeki her şey bir KPI'ya dönüşebilir."
+        }
+      },
+      "finale": {
+        "title": "Kök nedeni buldunuz",
+        "body": "Birkaç dakika içinde gösterge panosundaki ani artıştan buna neden olan dağıtıma ulaştınız; tüm sinyaller tek bir yerde.",
+        "connect": "Kendi Verinizi Bağlayın",
+        "restart": "Turu Yeniden Başlat",
+        "finish": "Turu Bitir"
+      }
     }
   },
   "recentSearches": {

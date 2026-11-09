@@ -76,6 +76,12 @@ impl NotifyError {
     }
 
     fn from_send(e: anyhow::Error) -> Self {
+        if let Some(rejected) = e.downcast_ref::<jira::JiraRejected>() {
+            return NotifyError::Rejected {
+                status: rejected.status,
+                body: rejected.message.clone(),
+            };
+        }
         match e.downcast_ref::<SendError>() {
             Some(SendError::Blocked(m)) => NotifyError::Blocked(m.clone()),
             Some(SendError::Rejected { status, body }) => NotifyError::Rejected {
@@ -213,12 +219,15 @@ pub fn route(resolved: &Resolved, ctx: &NotificationContext) -> Result<Route, No
     }
     if let DestinationType::Http(endpoint) = dest_type
         && jira::is_jira(endpoint)
-        && !matches!(
-            ctx.kind,
-            NotificationKind::Alert | NotificationKind::Incident
-        )
     {
-        return Err(NotifyError::Blocked(jira::UNSUPPORTED_SENDER.to_string()));
+        if !matches!(
+            ctx.kind,
+            NotificationKind::Alert | NotificationKind::Incident | NotificationKind::Anomaly
+        ) {
+            return Err(NotifyError::Blocked(jira::UNSUPPORTED_SENDER.to_string()));
+        }
+        // Jira builds its own text, so an anomaly's legacy webhook body never applies.
+        return Ok(Route::Render);
     }
     Ok(match legacy_body(resolved, ctx) {
         Some(body) => Route::Legacy(body),
@@ -499,10 +508,35 @@ mod tests {
     }
 
     #[test]
-    fn jira_takes_only_alerts_and_incidents() {
-        let ctx = anomaly_ctx(NotificationEvent::Firing);
+    fn jira_takes_alerts_incidents_and_anomalies() {
+        let mut ctx = anomaly_ctx(NotificationEvent::Firing);
         let r = resolved_for(http("jira", None), TemplateSource::Compiled);
+        assert_eq!(route(&r, &ctx).unwrap(), Route::Render);
+        ctx.kind = NotificationKind::Synthetics;
         assert!(matches!(route(&r, &ctx), Err(NotifyError::Blocked(_))));
+    }
+
+    #[test]
+    fn a_jira_refusal_keeps_its_status_and_only_try_later_retries() {
+        let mapped = |status| {
+            NotifyError::from_send(
+                jira::JiraRejected {
+                    status,
+                    message: "refused".into(),
+                }
+                .into(),
+            )
+        };
+        for status in [400, 401, 404] {
+            let e = mapped(status);
+            assert!(
+                matches!(&e, NotifyError::Rejected { status: s, body } if *s == status && body == "refused")
+            );
+            assert!(!e.is_retryable(), "{status}");
+        }
+        for status in [408, 429, 503] {
+            assert!(mapped(status).is_retryable(), "{status}");
+        }
     }
 
     #[test]

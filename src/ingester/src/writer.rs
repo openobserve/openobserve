@@ -268,17 +268,16 @@ pub async fn flush_all() -> Result<()> {
     Ok(())
 }
 
-// get the max seq id of all writers
-pub async fn get_max_writer_seq_id() -> u64 {
-    let mut max_seq_id = 0;
+/// Max id of the writers' active memtables, comparable with `check_persist_done`.
+pub async fn get_max_memtable_id() -> u64 {
+    let mut max_id = 0;
     for w in WRITERS.iter() {
         let w = w.read().await;
         for r in w.values() {
-            // next_seq is the next seq id to be used, so we need to subtract 1
-            max_seq_id = max_seq_id.max(r.next_seq.load(Ordering::Relaxed) - 1);
+            max_id = max_id.max(r.memtable.read().await.id());
         }
     }
-    max_seq_id
+    max_id
 }
 
 impl Writer {

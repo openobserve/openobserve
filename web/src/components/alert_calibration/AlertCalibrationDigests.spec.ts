@@ -21,6 +21,9 @@ import { queryClient } from "@/composables/query/queryClient";
 import alertCalibration from "@/services/alert_calibration";
 import AlertCalibrationDigests from "./AlertCalibrationDigests.vue";
 import type { RunRow } from "./digests";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/aws-exports")>();
@@ -169,6 +172,16 @@ describe("AlertCalibrationDigests", () => {
     expect(wrapper.router.currentRoute.value.params).toEqual({
       windowStart: String(latest.window_start),
       windowEnd: String(latest.window_end),
+    });
+    wrapper.unmount();
+  });
+
+  it("tracks a scope change", async () => {
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([]);
+    const wrapper = await mountPage();
+    (wrapper.vm as any).onScope("findings");
+    expect(analytics.track).toHaveBeenCalledWith("alert_calibration_runs_scope_changed", {
+      scope: "findings",
     });
     wrapper.unmount();
   });

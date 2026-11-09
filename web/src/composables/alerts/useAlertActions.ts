@@ -121,6 +121,18 @@ export function useAlertActions() {
     return false;
   };
 
+  const reportAckFailure = (err: unknown, alertName: string, takingOver = false) => {
+    const error = alertActionErrorOf(err);
+    if (sharedErrorToast(error, takingOver ? "takeOver" : "ack")) return;
+    const message =
+      error?.code === "not_firing"
+        ? t("alerts.ack.errors.notFiring")
+        : error?.code === "firing_changed"
+          ? t("alerts.ack.errors.firingChanged")
+          : t("toastMessages.alerts.ack.failed", { name: raw(alertName) });
+    toast({ variant: "error", message });
+  };
+
   const sendAck = async (
     target: AlertActionTarget,
     body: AckAlertRequest,
@@ -198,15 +210,7 @@ export function useAlertActions() {
       }
       return true;
     } catch (err: unknown) {
-      const error = alertActionErrorOf(err);
-      if (sharedErrorToast(error, takingOver ? "takeOver" : "ack")) return false;
-      const message =
-        error?.code === "not_firing"
-          ? t("alerts.ack.errors.notFiring")
-          : error?.code === "firing_changed"
-            ? t("alerts.ack.errors.firingChanged")
-            : t("toastMessages.alerts.ack.failed", { name });
-      toast({ variant: "error", message });
+      reportAckFailure(err, target.name, takingOver);
       return false;
     }
   };
@@ -365,6 +369,7 @@ export function useAlertActions() {
     me,
     pending,
     acknowledge,
+    reportAckFailure,
     takeOver,
     unacknowledge,
     mute,

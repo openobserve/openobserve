@@ -1805,6 +1805,16 @@ describe("ChartRenderer device pixel ratio", () => {
     await flushPromises();
   };
 
+  const attachPainter = (type: "canvas" | "svg" = "canvas") => {
+    const chart = vi.mocked(echartsInit).mock.results[0].value;
+    const painter = fakeCanvasPainter(1, type);
+    zr = chart.getZr();
+    zr.painter = painter;
+    chart.setOption.mockClear();
+    chart.dispose.mockClear();
+    return { chart, painter };
+  };
+
   const initRatios = () =>
     vi.mocked(echartsInit).mock.calls.map(([, , opts]) => opts?.devicePixelRatio);
 
@@ -1832,11 +1842,15 @@ describe("ChartRenderer device pixel ratio", () => {
   });
 
   it("pixel-snaps its canvases only while the ratio is fractional", async () => {
-    display = fakeDevicePixelRatio(1.25);
+    display = fakeDevicePixelRatio(1);
     await mountAt();
+    attachPainter();
     const pixelated = () => wrapper.classes().includes("chart-canvas-pixelated");
-    expect(pixelated()).toBe(true);
+    expect(pixelated()).toBe(false);
 
+    display.setRatio(1.25);
+    await flushPromises();
+    expect(pixelated()).toBe(true);
     display.setRatio(2);
     await flushPromises();
     expect(pixelated()).toBe(false);
@@ -1847,16 +1861,6 @@ describe("ChartRenderer device pixel ratio", () => {
     await flushPromises();
     expect(pixelated()).toBe(true);
   });
-
-  const attachPainter = (type: "canvas" | "svg" = "canvas") => {
-    const chart = vi.mocked(echartsInit).mock.results[0].value;
-    const painter = fakeCanvasPainter(1, type);
-    zr = chart.getZr();
-    zr.painter = painter;
-    chart.setOption.mockClear();
-    chart.dispose.mockClear();
-    return { chart, painter };
-  };
 
   it("re-rasterizes the mounted chart in place when the window changes display", async () => {
     display = fakeDevicePixelRatio(1);
@@ -1890,6 +1894,36 @@ describe("ChartRenderer device pixel ratio", () => {
     expect(initRatios()).toEqual([1]);
     expect(chart.dispose).not.toHaveBeenCalled();
     expect(painter.refresh).not.toHaveBeenCalled();
+  });
+
+  it("stays smooth at a fractional ratio an SVG chart was not re-rasterized at", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt("svg");
+    attachPainter("svg");
+
+    display.setRatio(1.5);
+    await flushPromises();
+
+    expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+  });
+
+  it("pixel-snaps once a re-init rasterizes at the fractional ratio a skipped change left behind", async () => {
+    display = fakeDevicePixelRatio(1);
+    await mountAt();
+    const { painter } = attachPainter();
+    painter.getLayers.mockReturnValue({ ...painter.layers, gl: { dpr: 1, resize: vi.fn() } });
+
+    display.setRatio(1.5);
+    await flushPromises();
+    expect(painter.dpr).toBe(1);
+    expect(wrapper.classes()).not.toContain("chart-canvas-pixelated");
+
+    // A real init at the live ratio builds its painter at that ratio.
+    painter.dpr = 1.5;
+    store.state.theme = "dark";
+    await flushPromises();
+    expect(initRatios()).toEqual([1, 1.5]);
+    expect(wrapper.classes()).toContain("chart-canvas-pixelated");
   });
 
   it("stops listening for ratio changes on unmount", async () => {

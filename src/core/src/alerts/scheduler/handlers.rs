@@ -512,6 +512,8 @@ struct GroupDispatchOutcome {
     // how many have transitioned to pending state
     pending: usize,
     errors: Vec<String>,
+    /// Firing groups no send was made for; a dropped page is not a destination failing.
+    undelivered: Vec<String>,
     /// Whether any group's send dispatched a destination or workflow.
     attempted: bool,
     /// The state layer failed, so nothing was even attempted. Distinct from
@@ -542,6 +544,17 @@ impl GroupDispatchOutcome {
         if let Some(acked_by) = self.acked_by.clone() {
             row.acked_by = Some(acked_by);
         }
+    }
+
+    /// Everything the evaluation's record should say went wrong, failed sends first.
+    fn record_error(&self) -> Option<String> {
+        let parts: Vec<&str> = self
+            .errors
+            .iter()
+            .chain(&self.undelivered)
+            .map(String::as_str)
+            .collect();
+        (!parts.is_empty()).then(|| parts.join("; "))
     }
 
     /// The evaluation's record: any undelivered destination is a delivery failure.
@@ -636,6 +649,7 @@ async fn dispatch_per_group(
             fired: 0,
             pending: 0,
             errors: vec!["group state did not commit".to_string()],
+            undelivered: Vec::new(),
             attempted: false,
             state_failed: true,
             downtime_id: None,
@@ -655,6 +669,7 @@ async fn dispatch_per_group(
                 fired: 0,
                 pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
+                undelivered: Vec::new(),
                 attempted: false,
                 state_failed: true,
                 downtime_id: None,
@@ -689,6 +704,7 @@ async fn dispatch_per_group(
     let acked_groups =
         crate::alerts::ack::in_force_by_group(&alert.org_id, &alert_id, &states).await;
 
+    let max_sends = cfg.limit.alert_max_group_notifications_per_eval;
     // Downtime first, then ack; an ack never holds back a real level increase (R-119).
     let plan = plan_dispatch(
         classification,
@@ -696,7 +712,7 @@ async fn dispatch_per_group(
         &rows,
         &alert.trigger_condition,
         now_micros(),
-        cfg.limit.alert_max_group_notifications_per_eval,
+        max_sends,
         alert.suppresses_repeats(),
         |key, decision, last_notified| {
             muted_groups.contains_key(key)
@@ -712,7 +728,7 @@ async fn dispatch_per_group(
             "[SCHEDULER trace_id {trace_id}] alert {alert_id}: {} group notification(s) dropped by \
              ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL={}: {:?}",
             plan.dropped_by_knob.len(),
-            cfg.limit.alert_max_group_notifications_per_eval,
+            max_sends,
             plan.dropped_by_knob
         );
     }
@@ -752,10 +768,13 @@ async fn dispatch_per_group(
         downtime_id.get_or_insert(downtime.id.clone());
     }
     // Groups with nowhere to send open no silence window for a later destination to inherit.
-    let items: &[_] = if has_delivery_target(alert) {
-        &plan.items
+    let (items, undelivered): (&[_], _) = if has_delivery_target(alert) {
+        (
+            &plan.items,
+            plan.undelivered_notes(classification, max_sends),
+        )
     } else {
-        &[]
+        (&[], Vec::new())
     };
     for item in items {
         // The plan already moved muted groups out; this only guards a send.
@@ -877,9 +896,10 @@ async fn dispatch_per_group(
     );
     Some(GroupDispatchOutcome {
         failed,
-        fired: plan.items.len(),
+        fired: plan.not_withheld(),
         pending: plan.pending,
         errors,
+        undelivered,
         attempted,
         state_failed: false,
         downtime_id,
@@ -2105,6 +2125,8 @@ async fn handle_anomaly_detection_triggers(
                 .set(active)
                 .filter(anomaly_entity::Column::AnomalyId.eq(anomaly_id.as_str()))
                 .filter(anomaly_entity::Column::Status.ne(AnomalyStatus::Training.to_i32()))
+                // A refusal during this run revoked the model, so its status must survive.
+                .filter(anomaly_entity::Column::IsTrained.eq(true))
                 .exec(db)
                 .await
             {
@@ -4400,8 +4422,8 @@ async fn handle_alert_triggers(
             if let Some(status) = dispatch.history_status() {
                 trigger_data_stream.status = status;
             }
-            if !dispatch.errors.is_empty() {
-                trigger_data_stream.error = Some(dispatch.errors.join("; "));
+            if let Some(error) = dispatch.record_error() {
+                trigger_data_stream.error = Some(error);
             }
 
             dispatch.record_downtime(&mut trigger_data_stream);
@@ -7553,24 +7575,28 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
-    async fn a_firing_past_its_deadline_sends_nothing_and_opens_no_silence_window() {
-        use config::meta::alerts::{
-            Aggregation,
-            grouping::{GroupObservation, classify_groups_by, group_key},
-            level::AlertLevel,
-        };
+    /// A stored multi-alert grouped by host; `None` without the meta store CI configures.
+    async fn stored_host_alert(
+        name: &str,
+        destinations: &[&str],
+        pending_period_sec: i64,
+    ) -> Option<config::meta::alerts::alert::Alert> {
+        use config::meta::alerts::Aggregation;
         use svix_ksuid::KsuidLike;
 
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
         if std::env::var("ZO_META_STORE").is_err() {
             eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
-            return;
+            return None;
         }
-        std::fs::create_dir_all(&get_config().common.data_db_dir).expect("db dir");
-        infra::db_init().await.expect("meta store");
-        infra::table::migrate().await.expect("migrations");
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
 
-        let org = format!("deadline_{}", now_micros());
+        let org = format!("{name}_{}", now_micros());
         let folder = config::meta::folder::Folder {
             folder_id: "default".to_string(),
             name: "default".to_string(),
@@ -7585,9 +7611,10 @@ mod tests {
         .unwrap();
         let mut alert = config::meta::alerts::alert::Alert::default();
         alert.org_id = org.clone();
-        alert.name = "deadline".to_string();
+        alert.name = name.to_string();
         alert.id = Some(svix_ksuid::Ksuid::new(None, None));
-        alert.destinations = vec!["deadline-dest".to_string()];
+        alert.destinations = destinations.iter().map(ToString::to_string).collect();
+        alert.pending_period_sec = pending_period_sec;
         alert.query_condition.aggregation = Some(
             serde_json::from_value::<Aggregation>(serde_json::json!({
                 "group_by": ["host"],
@@ -7598,24 +7625,41 @@ mod tests {
             .unwrap(),
         );
         // Group rows are written only for a stored alert that still has multi_alert on.
-        let alert = infra::table::alerts::create(
-            infra::db::get_orm_client_rw().await,
-            &org,
-            "default",
-            alert,
-            false,
+        Some(
+            infra::table::alerts::create(
+                infra::db::get_orm_client_rw().await,
+                &org,
+                "default",
+                alert,
+                false,
+            )
+            .await
+            .unwrap(),
         )
-        .await
-        .unwrap();
-        let alert_id = alert.id.unwrap().to_string();
-        let hosts = ["a", "b"];
-        let labels = |host: &str| std::collections::BTreeMap::from([("host".into(), host.into())]);
+    }
+
+    fn host_labels(host: &str) -> std::collections::BTreeMap<String, String> {
+        std::collections::BTreeMap::from([("host".into(), host.into())])
+    }
+
+    fn critical_hosts(hosts: &[&str]) -> config::meta::alerts::grouping::GroupClassification {
+        use config::meta::alerts::grouping::{GroupObservation, classify_groups_by};
+
         let observations = hosts
             .iter()
-            .map(|host| GroupObservation::new(labels(host), 5.0))
+            .map(|host| GroupObservation::new(host_labels(host), 5.0))
             .collect();
-        let classification = classify_groups_by(observations, |_| Some(AlertLevel::Critical), 100);
-        let records: Vec<_> = hosts
+        classify_groups_by(
+            observations,
+            |_| Some(config::meta::alerts::level::AlertLevel::Critical),
+            100,
+        )
+    }
+
+    fn host_rows(
+        hosts: &[&str],
+    ) -> Vec<config::utils::json::Map<String, config::utils::json::Value>> {
+        hosts
             .iter()
             .map(|host| {
                 serde_json::json!({"host": host, "value": 5})
@@ -7623,7 +7667,132 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect();
+            .collect()
+    }
+
+    async fn dispatch_critical(
+        alert: &config::meta::alerts::alert::Alert,
+        classification: &config::meta::alerts::grouping::GroupClassification,
+        records: &[config::utils::json::Map<String, config::utils::json::Value>],
+    ) -> GroupDispatchOutcome {
+        let now = now_micros();
+        dispatch_per_group(
+            alert,
+            "default",
+            "trace",
+            Some(classification),
+            records,
+            now,
+            Some(config::meta::alerts::level::AlertLevel::Critical),
+            None,
+            now,
+            now,
+        )
+        .await
+        .expect("a classified alert with an id dispatches")
+    }
+
+    fn assert_stays_firing_with_note(outcome: &GroupDispatchOutcome) {
+        assert_eq!(outcome.history_status(), None);
+        assert_eq!(outcome.rollup_rewrite(), None);
+        let mut row = TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        outcome.record_downtime(&mut row);
+        assert_eq!(row.status, RunOutcome::Firing);
+        assert_eq!(
+            outcome.record_error().as_deref(),
+            Some(
+                "1 firing group(s) not notified, missing state or payload row or a duplicate \
+                 key: host=unpaged"
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unpaged_group_beside_a_pending_one_keeps_the_record_firing() {
+        let Some(alert) = stored_host_alert("beside_pending", &["dest"], 60).await else {
+            return;
+        };
+        let classification = critical_hosts(&["held", "unpaged"]);
+
+        let outcome = dispatch_critical(&alert, &classification, &host_rows(&["held"])).await;
+
+        assert_eq!((outcome.fired, outcome.pending), (1, 1));
+        assert!(!outcome.attempted, "{:?}", outcome.errors);
+        assert_stays_firing_with_note(&outcome);
+    }
+
+    #[tokio::test]
+    async fn an_unpaged_group_beside_an_acked_one_keeps_the_record_firing() {
+        let Some(alert) = stored_host_alert("beside_acked", &["dest"], 0).await else {
+            return;
+        };
+        let alert_id = alert.id.unwrap().to_string();
+        let classification = critical_hosts(&["acked", "unpaged"]);
+        persist_alert_run_state_deferred(
+            &alert,
+            &alert_id,
+            &RunOutcome::Firing,
+            Some(config::meta::alerts::level::AlertLevel::Critical),
+            Some(&classification),
+            None,
+            &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
+        )
+        .await
+        .expect("the plan commits");
+        let acked_key = config::meta::alerts::grouping::group_key(&host_labels("acked"));
+        let firing_started_at = infra::table::alert_states::get(&alert_id, &acked_key)
+            .await
+            .unwrap()
+            .and_then(|state| state.firing_started_at)
+            .expect("the plan started the group's firing");
+        infra::table::alert_acks::put_with_outbox(&config::meta::alerts::ack::AlertAck {
+            org_id: alert.org_id.clone(),
+            alert_id: alert_id.clone(),
+            group_key: acked_key,
+            firing_started_at,
+            acked_by: "oncall@example.com".to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        let outcome = dispatch_critical(&alert, &classification, &host_rows(&["acked"])).await;
+
+        assert_eq!(outcome.fired, 1);
+        assert_eq!(outcome.acked_by.as_deref(), Some("oncall@example.com"));
+        assert!(!outcome.attempted, "{:?}", outcome.errors);
+        assert_stays_firing_with_note(&outcome);
+    }
+
+    #[tokio::test]
+    async fn an_alert_with_no_delivery_target_notes_no_unpaged_group() {
+        let Some(alert) = stored_host_alert("no_target", &[], 0).await else {
+            return;
+        };
+        let classification = critical_hosts(&["with_row", "unpaged"]);
+
+        let outcome = dispatch_critical(&alert, &classification, &host_rows(&["with_row"])).await;
+
+        assert_eq!(outcome.fired, 2);
+        assert!(!outcome.attempted, "{:?}", outcome.errors);
+        assert_eq!(outcome.history_status(), None);
+        assert_eq!(outcome.record_error(), None);
+    }
+
+    #[tokio::test]
+    async fn a_firing_past_its_deadline_sends_nothing_and_opens_no_silence_window() {
+        use config::meta::alerts::{grouping::group_key, level::AlertLevel};
+
+        let Some(alert) = stored_host_alert("deadline", &["deadline-dest"], 0).await else {
+            return;
+        };
+        let alert_id = alert.id.unwrap().to_string();
+        let hosts = ["a", "b"];
+        let classification = critical_hosts(&hosts);
+        let records = host_rows(&hosts);
         let now = now_micros();
         let outcome = dispatch_per_group(
             &alert,
@@ -7648,7 +7817,7 @@ mod tests {
             outcome.errors
         );
         for host in hosts {
-            let state = infra::table::alert_states::get(&alert_id, &group_key(&labels(host)))
+            let state = infra::table::alert_states::get(&alert_id, &group_key(&host_labels(host)))
                 .await
                 .unwrap()
                 .expect("the plan wrote the group row");
@@ -7777,6 +7946,7 @@ mod tests {
             fired: delivered + failed,
             pending,
             errors: errors.iter().map(|e| (*e).to_string()).collect(),
+            undelivered: Vec::new(),
             attempted: false,
             state_failed: false,
             downtime_id: None,
@@ -7833,6 +8003,30 @@ mod tests {
             assert_eq!(dispatch.history_status(), history, "{case}");
             assert_eq!(dispatch.rollup_rewrite(), rollup, "{case}");
         }
+    }
+
+    #[test]
+    fn undelivered_groups_reach_the_record_without_failing_the_delivery() {
+        let dispatch = GroupDispatchOutcome {
+            undelivered: vec!["1 firing group(s) not notified".to_string()],
+            ..dispatch_counts(2, 0, 0, &[])
+        };
+        assert_eq!(dispatch.history_status(), None);
+        assert_eq!(dispatch.rollup_rewrite(), None);
+        assert_eq!(
+            dispatch.record_error().as_deref(),
+            Some("1 firing group(s) not notified")
+        );
+
+        let with_failure = GroupDispatchOutcome {
+            undelivered: vec!["1 firing group(s) not notified".to_string()],
+            ..dispatch_counts(1, 1, 0, &["group a: boom"])
+        };
+        assert_eq!(
+            with_failure.record_error().as_deref(),
+            Some("group a: boom; 1 firing group(s) not notified")
+        );
+        assert_eq!(dispatch_counts(2, 0, 0, &[]).record_error(), None);
     }
 
     #[test]

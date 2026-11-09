@@ -1214,6 +1214,33 @@ async fn delete_org_fleet_resources(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn delete_org_pipelines(org_id: &str) -> Result<(), anyhow::Error> {
+    // Through the service layer, so triggers, backfill jobs, ownership and caches go cluster-wide.
+    let pipelines = infra::pipeline::list_by_org(org_id).await?;
+    for p in pipelines {
+        let id = p.id.clone();
+        crate::pipeline::delete_listed_pipeline(p)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline {id}: {e}"))?;
+    }
+    // One delete takes any pipeline the listing missed; its triggers and jobs go at later steps.
+    for id in infra::pipeline::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipelines: {e}"))?
+    {
+        crate::db::authz::remove_ownership(
+            org_id,
+            "pipelines",
+            common::meta::authz::Authz::new(&id),
+        )
+        .await;
+    }
+    crate::db::pipeline_errors::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline_last_errors: {e}"))?;
+    Ok(())
+}
+
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "enterprise"))]
     use infra::table::service_streams;
@@ -1519,32 +1546,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/functions: {e}"))?;
 
-    // Delete pipelines through the service layer so derived-stream triggers,
-    // backfill jobs, OFGA ownership, and the executable-pipeline caches are all
-    // torn down and evicted cluster-wide — a raw infra::pipeline::delete would
-    // leave those side effects (and stale cache entries) behind.
-    let pipelines = infra::pipeline::list_by_org(org_id).await?;
-    for p in pipelines {
-        let id = p.id.clone();
-        crate::pipeline::delete_listed_pipeline(p)
-            .await
-            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline {id}: {e}"))?;
-    }
-    // One delete takes any pipeline the listing missed; its triggers and jobs go at later steps.
-    for id in infra::pipeline::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipelines: {e}"))?
-    {
-        crate::db::authz::remove_ownership(
-            org_id,
-            "pipelines",
-            common::meta::authz::Authz::new(&id),
-        )
-        .await;
-    }
-    crate::db::pipeline_errors::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline_last_errors: {e}"))?;
+    delete_org_pipelines(org_id).await?;
 
     // Delete saved views from the meta key-value store. Reuse the canonical key
     // prefix const rather than hardcoding the path, so this stays correct if the
@@ -4786,8 +4788,10 @@ mod tests {
 
     #[test]
     fn test_pipeline_teardown_deletes_the_listed_pipeline_without_a_re_read() {
+        position_of("delete_org_pipelines(org_id)");
         assert!(
-            db_resources_step().contains("crate::pipeline::delete_listed_pipeline(p)"),
+            fn_body(SOURCE, "delete_org_pipelines")
+                .contains("crate::pipeline::delete_listed_pipeline(p)"),
             "the pipeline teardown must delete the pipeline it listed"
         );
         let body = fn_body(include_str!("../pipeline/mod.rs"), "delete_listed_pipeline");

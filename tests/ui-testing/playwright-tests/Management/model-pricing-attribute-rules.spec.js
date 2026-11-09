@@ -32,8 +32,6 @@ test.describe("Model Pricing — Attribute Rules", () => {
             await pm.modelPricingPage.fillName(name);
             await pm.modelPricingPage.fillPattern(`^${name}.*`);
 
-            // Three default-tier prices so the list row shows the "+N more" overflow chip
-            // that opens the pricing drawer.
             await pm.modelPricingPage.addPriceRow('input', '0.000002');
             await pm.modelPricingPage.addPriceRow('output', '0.000008');
             await pm.modelPricingPage.addPriceRow('cache_read', '0.000001');

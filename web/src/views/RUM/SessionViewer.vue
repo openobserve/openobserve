@@ -2265,6 +2265,7 @@ const handleSidebarEvent = (event: string, payload: any) => {
     selectedEvent.value = payload;
     selectedRawEvent.value = rawEventsMap.value.get(payload.event_id) || {};
     showEventDetailDrawer.value = true;
+    analytics.track("rum_session_event_opened", { type: payload.type });
   }
 
   // Always seek to the event time in the player, through the same path as a bar click.

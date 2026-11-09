@@ -205,10 +205,13 @@ pub async fn generate_old_data_job_by_stream(
     let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap_or_default();
-    let mut stream_data_retention_days = cfg.compact.data_retention_days;
-    if stream_settings.data_retention > 0 {
-        stream_data_retention_days = stream_settings.data_retention;
-    }
+    let mut stream_data_retention_days = db::organization::stream_retention_days(
+        org_id,
+        stream_type,
+        stream_name,
+        stream_settings.data_retention,
+    )
+    .await?;
     if stream_data_retention_days > cfg.compact.old_data_max_days {
         stream_data_retention_days = cfg.compact.old_data_max_days;
     }

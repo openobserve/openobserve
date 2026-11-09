@@ -225,6 +225,17 @@ export function generateDestinationHeaders(
   return headers;
 }
 
+// Same host rule as the server's teams_format_for_url.
+const TEAMS_MESSAGE_CARD_URL = /^https?:\/\/(outlook|webhook)\.office\.com(\/|$)/i;
+const SAME_NAME_CHANNELS = ["slack", "email", "discord", "pagerduty", "opsgenie", "servicenow"];
+
+export function templateChannelFor(type: string, url: string): string {
+  if (type === "msteams") {
+    return TEAMS_MESSAGE_CARD_URL.test(url) ? "teams_messagecard" : "teams_adaptivecard";
+  }
+  return SAME_NAME_CHANNELS.includes(type) ? type : "webhook";
+}
+
 /**
  * Generate destination metadata (bare template variables) for a prebuilt type.
  *

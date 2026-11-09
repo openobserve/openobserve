@@ -45,6 +45,7 @@ import type { CardSubstitutions } from "./content/renderMarkdown";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { MCP_READONLY_ROLE, useMcpCredential } from "@/composables/useMcpCredential";
+import analytics from "@/services/product_analytics";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -431,6 +432,7 @@ const activeDeepLink = computed(
 const openDeepLink = () => {
   const link = activeDeepLink.value;
   if (!link) return;
+  analytics.track("mcp_client_deep_link_opened", { client: activeClient.value.id });
   if (link.startsWith("https://")) {
     window.open(link, "_blank", "noopener,noreferrer");
   } else {

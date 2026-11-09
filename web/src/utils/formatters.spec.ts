@@ -8,6 +8,7 @@ vi.mock("@/utils/date", () => ({
 }));
 
 import {
+  formatMs,
   b64EncodeUnicode,
   b64DecodeUnicode,
   b64DecodeUnicodeSafe,
@@ -17,6 +18,7 @@ import {
   convertToTitleCase,
   truncateText,
   formatLargeNumber,
+  formatCompactCount,
   formatEventCount,
   formatSizeFromMB,
   addCommasToNumber,
@@ -344,6 +346,32 @@ describe("formatEventCount", () => {
 
   it("stays on T past the largest unit", () => {
     expect(formatEventCount(1e15)).toBe("1000T");
+  });
+});
+
+describe("formatCompactCount", () => {
+  it("keeps counts below 1000 exact", () => {
+    expect(formatCompactCount(0)).toBe("0");
+    expect(formatCompactCount(999)).toBe("999");
+  });
+
+  it("abbreviates from 1000 and drops a trailing .0", () => {
+    expect(formatCompactCount(1000)).toBe("1K");
+    expect(formatCompactCount(23000)).toBe("23K");
+    expect(formatCompactCount(819525)).toBe("819.5K");
+    expect(formatCompactCount(225552388)).toBe("225.6M");
+    expect(formatCompactCount(25_900_000_000)).toBe("25.9B");
+  });
+
+  it("promotes a value that rounds up to the next unit", () => {
+    expect(formatCompactCount(999_950)).toBe("1M");
+    expect(formatCompactCount(999_999_999)).toBe("1B");
+  });
+
+  it("handles negatives and non-finite input", () => {
+    expect(formatCompactCount(-23000)).toBe("-23K");
+    expect(formatCompactCount(Number.NaN)).toBe("");
+    expect(formatCompactCount(Number.POSITIVE_INFINITY)).toBe("");
   });
 });
 
@@ -727,5 +755,19 @@ describe("formatUtcWindowsInTz", () => {
     expect(formatUtcWindowsInTz([], "Asia/Kolkata")).toBe("");
     expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "")).toBe("");
     expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "Not/AZone")).toBe("");
+  });
+});
+
+describe("formatMs", () => {
+  it("uses ms under a second and two-decimal seconds from a second up", () => {
+    expect(formatMs(0)).toBe("0 ms");
+    expect(formatMs(85)).toBe("85 ms");
+    expect(formatMs(999)).toBe("999 ms");
+    expect(formatMs(1000)).toBe("1.00 s");
+    expect(formatMs(62579)).toBe("62.58 s");
+  });
+
+  it("shows a dash for no value", () => {
+    expect(formatMs(null)).toBe("—");
   });
 });

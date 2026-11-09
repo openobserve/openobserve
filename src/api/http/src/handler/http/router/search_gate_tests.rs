@@ -225,8 +225,9 @@ const UNGATED_SIBLINGS: &[(&str, &str)] = &[
 ];
 
 /// Pages an over-limit customer needs to understand and fix their state; none may be gated.
-const OPERATIONAL_READS: [&str; 23] = [
+const OPERATIONAL_READS: [&str; 24] = [
     "/v2/{org_id}/alerts/history",
+    "/v2/{org_id}/alerts/history/summary",
     "/v2/{org_id}/reports/history",
     "/{org_id}/pipelines/history",
     "/{org_id}/fleet/audit",
@@ -275,10 +276,11 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 67] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 68] = [
     ("api/management/src/request/alert_calibration/digests.rs", "read", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
+    ("api/management/src/request/alerts/history_summary.rs", "get_alert_history_summary", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/dashboards/reports_history.rs", "run_search", Caller::Exempt("the org's own report run history; its route stays open")),
     ("api/management/src/request/db_monitoring/service/common.rs", "run_events_search", Caller::Routed("db_monitoring::handler::")),
     ("api/management/src/request/db_monitoring/service/common.rs", "stats_search_once", Caller::Routed("db_monitoring::handler::")),

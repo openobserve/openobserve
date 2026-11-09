@@ -40,7 +40,10 @@ vi.mock("@/services/search", () => ({
   default: { search: (...a: unknown[]) => mockSearch(...a) },
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import PerformanceOverview from "./PerformanceOverview.vue";
+import analytics from "@/services/product_analytics";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 type Hits = Record<string, unknown>[];
@@ -449,6 +452,20 @@ describe("PerformanceOverview", () => {
       w.findComponent({ name: "VerdictCard" }).vm.$emit("update:percentile", "p50");
       await flushPromises();
       expect(mockReplace).toHaveBeenLastCalledWith({ query: { ov_pct: "p50" } });
+    });
+
+    it("tracks a filter by its key and value count, and a percentile change", async () => {
+      const w = await mountOverview();
+      vi.mocked(analytics.track).mockClear();
+      w.findAllComponents({ name: "OSelect" })
+        .find((c) => c.props("label") === "Service")!
+        .vm.$emit("update:modelValue", ["web", "api"]);
+      w.findComponent({ name: "VerdictCard" }).vm.$emit("update:percentile", "p95");
+      await flushPromises();
+      expect(vi.mocked(analytics.track).mock.calls).toEqual([
+        ["rum_performance_filter_applied", { filter: "service", count: 2 }],
+        ["rum_performance_percentile_changed", { percentile: "p95" }],
+      ]);
     });
 
     it("hides a filter whose column the stream lacks", async () => {

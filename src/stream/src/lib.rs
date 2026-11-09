@@ -229,6 +229,7 @@ pub fn stream_res(
         pattern_associations,
         is_derived,
         is_internal: is_system_stream(org_id, stream_name),
+        inherited_retention_days: None,
     }
 }
 
@@ -545,6 +546,9 @@ pub async fn update_stream_settings(
     }
     if let Some(v) = new_settings.is_llm_stream {
         settings.is_llm_stream = v;
+    }
+    if let Some(v) = new_settings.security {
+        settings.security = Some(v);
     }
 
     // partition_keys: remove-then-add, dedup (by `field`) deferred to normalize.
@@ -1276,7 +1280,7 @@ mod tests {
     use std::collections::HashMap;
 
     use arrow_schema::{DataType, Field};
-    use config::meta::stream::UpdateSettingsWrapper;
+    use config::meta::stream::{SecuritySourceSetting, UpdateSettingsWrapper};
 
     use super::*;
 
@@ -2325,5 +2329,38 @@ mod tests {
         let index_fields = settings_test_stream(name).await.index_fields;
         assert!(index_fields.contains(&"fa".to_string()), "{index_fields:?}");
         assert!(index_fields.contains(&"fb".to_string()), "{index_fields:?}");
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_replaces_security_only_when_sent() {
+        let name = &format!("security_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        let security = |pack_version| SecuritySourceSetting {
+            source_type: "entity".to_string(),
+            pack_id: "entity".to_string(),
+            pack_version,
+            ..Default::default()
+        };
+        for pack_version in [1, 2] {
+            update_settings_test_stream(
+                name,
+                UpdateStreamSettings {
+                    security: Some(security(pack_version)),
+                    ..Default::default()
+                },
+            )
+            .await;
+        }
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                data_retention: Some(17),
+                ..Default::default()
+            },
+        )
+        .await;
+        // read what was persisted, not what this node cached
+        evict_settings_test_stream(name).await;
+        assert_eq!(settings_test_stream(name).await.security, Some(security(2)));
     }
 }

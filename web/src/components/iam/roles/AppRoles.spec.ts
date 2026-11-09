@@ -26,7 +26,17 @@ vi.mock("@/services/iam", async (importOriginal) => {
 vi.mock("@/services/users", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock((await importOriginal()) as any, {
-    default: { getUserRoles: vi.fn(async () => ({ data: [] })) },
+    default: {
+      getUserRoles: vi.fn(async () => ({ data: [] })),
+      getAllUserRoles: vi.fn(async () => ({ data: {} })),
+    },
+  });
+});
+
+vi.mock("@/services/service_accounts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock((await importOriginal()) as any, {
+    default: { list: vi.fn(async () => ({ data: { data: [] } })) },
   });
 });
 
@@ -41,6 +51,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import AppRoles from "@/components/iam/roles/AppRoles.vue";
 import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers, updateRole } from "@/services/iam";
 import users from "@/services/users";
+import serviceAccounts from "@/services/service_accounts";
+import { queryClient } from "@/composables/query/queryClient";
 import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 import { clickIn } from "@/test/unit/helpers/draftDom";
 
@@ -774,5 +786,77 @@ describe("AppRoles - editor drafts", () => {
     expect(deleteRole).toHaveBeenCalledTimes(1);
     expect(readEditorDraft(draftOf("Admin"))).not.toBeNull();
     wrapper.unmount();
+  });
+});
+
+describe("AppRoles - member counts split", () => {
+  const members = {
+    "u1@o2.ai": ["Admin", "Viewer"],
+    "u2@o2.ai": ["Admin"],
+    "svc@o2.ai": ["Admin"],
+  };
+
+  beforeEach(() => {
+    queryClient.clear();
+    store.state.zoConfig = { ...store.state.zoConfig, service_account_enabled: true };
+    vi.mocked(users.getAllUserRoles).mockResolvedValue({ data: members } as any);
+    vi.mocked(serviceAccounts.list).mockResolvedValue({
+      data: { data: [{ email: "svc@o2.ai" }] },
+    } as any);
+  });
+
+  afterEach(() => {
+    store.state.zoConfig = { ...store.state.zoConfig, service_account_enabled: false };
+    queryClient.clear();
+  });
+
+  it("counts service accounts apart from users", async () => {
+    const wrapper = await mountAppRoles();
+    const admin = (wrapper.vm as any).rows.find((r: any) => r.role_name === "Admin");
+    expect([admin.user_count, admin.service_account_count]).toEqual([2, 1]);
+  });
+
+  it("gives a role nobody holds zero in both columns", async () => {
+    const wrapper = await mountAppRoles();
+    const editor = (wrapper.vm as any).rows.find((r: any) => r.role_name === "Editor");
+    expect([editor.user_count, editor.service_account_count]).toEqual([0, 0]);
+  });
+
+  it("keeps system accounts out of both counts", async () => {
+    vi.mocked(users.getAllUserRoles).mockResolvedValue({
+      data: { ...members, "sre@o2.ai": ["Admin"] },
+    } as any);
+    vi.mocked(serviceAccounts.list).mockResolvedValue({
+      data: { data: [{ email: "svc@o2.ai" }, { email: "sre@o2.ai", is_system: true }] },
+    } as any);
+    const wrapper = await mountAppRoles();
+    const admin = (wrapper.vm as any).rows.find((r: any) => r.role_name === "Admin");
+    expect([admin.user_count, admin.service_account_count]).toEqual([2, 1]);
+  });
+
+  it("opens the role edit page on the clicked tab", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).editRole({ role_name: "Admin" }, "serviceAccounts");
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "editRole",
+        query: expect.objectContaining({ tab: "serviceAccounts" }),
+      }),
+    );
+  });
+
+  it("keeps all members as users when the service account list cannot load", async () => {
+    vi.mocked(serviceAccounts.list).mockRejectedValue(new Error("boom"));
+    const wrapper = await mountAppRoles();
+    const admin = (wrapper.vm as any).rows.find((r: any) => r.role_name === "Admin");
+    expect([admin.user_count, admin.service_account_count]).toEqual([3, null]);
+  });
+
+  it("keeps all members as users and hides the column when service accounts are off", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, service_account_enabled: false };
+    const wrapper = await mountAppRoles();
+    const admin = (wrapper.vm as any).rows.find((r: any) => r.role_name === "Admin");
+    expect([admin.user_count, admin.service_account_count]).toEqual([3, null]);
   });
 });

@@ -67,6 +67,13 @@ describe("internalStreams", () => {
     ).toBe(false);
   });
 
+  it("skips the service graph metrics O2 derives from traces", () => {
+    expect(
+      isUserDataStream({ name: "traces_service_graph_request_total", stream_type: "metrics" }),
+    ).toBe(false);
+    expect(isUserDataStream({ name: "traces_app", stream_type: "traces" })).toBe(true);
+  });
+
   it("filters a stream list down to user data rows", () => {
     const rows = [
       { name: "usage", stream_type: "logs", is_internal: true },

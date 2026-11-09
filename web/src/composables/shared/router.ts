@@ -188,6 +188,7 @@ const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const PublicDashboardLinks = () => import("@/views/Dashboards/PublicLinks.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
+const FiringAlerts = () => import("@/components/alerts/FiringAlerts.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
@@ -243,6 +244,7 @@ const useRoutes = () => {
   const parentRoutes: any = [
     {
       path: "/login",
+      name: "login",
       component: Login,
       meta: {
         titleKey: "login.login",
@@ -950,6 +952,18 @@ const useRoutes = () => {
       },
     },
     {
+      path: "slos/import",
+      name: "importSlo",
+      component: () => import("@/views/slos/ImportSlo.vue"),
+      meta: {
+        titleKey: "slos.import.title",
+        licenseFeature: "anomaly_detection",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "slos/edit/:slo_id",
       name: "editSlo",
       component: () => import("@/views/slos/AddSlo.vue"),
@@ -979,6 +993,18 @@ const useRoutes = () => {
       component: AlertList,
       meta: {
         titleKey: "menu.alerts",
+        licenseFeature: "alerts",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/firing",
+      name: "alertFiring",
+      component: FiringAlerts,
+      meta: {
+        titleKey: "alerts.firing.title",
         licenseFeature: "alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
@@ -1509,6 +1535,116 @@ const useRoutes = () => {
     },
     ...useIngestionRoutes(),
     ...useEnterpriseRoutes(),
+
+    ...(config.isEnterprise == "true"
+      ? [
+          // MenuLink.isActive prefix-matches, so bare /security must not render Overview itself.
+          {
+            path: "security",
+            redirect: "security/overview",
+          },
+          {
+            path: "security/overview",
+            name: "securityOverview",
+            component: () => import("@/views/Security/SecurityOverview.vue"),
+            meta: { title: "Security Overview" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/events",
+            name: "securityEvents",
+            component: () => import("@/views/Security/SecurityEvents.vue"),
+            meta: { title: "Security Events" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/detections",
+            name: "securityDetections",
+            component: () => import("@/views/Security/SecurityDetections.vue"),
+            meta: { title: "Security Detections" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/alerts",
+            name: "securityAlerts",
+            component: () => import("@/views/Security/SecurityAlerts.vue"),
+            meta: { title: "Security Alerts" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/cases",
+            name: "securityCases",
+            component: () => import("@/views/Security/SecurityCases.vue"),
+            meta: { title: "Security Cases" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/entities",
+            name: "securityEntities",
+            component: () => import("@/views/Security/SecurityEntities.vue"),
+            meta: { title: "Security Entities" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/intel",
+            name: "securityIntel",
+            component: () => import("@/views/Security/SecurityIntel.vue"),
+            meta: { title: "Threat Intel" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/ueba",
+            name: "securityUEBA",
+            component: () => import("@/views/Security/SecurityUEBA.vue"),
+            meta: { title: "UEBA" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/mitre",
+            name: "securityMitre",
+            component: () => import("@/views/Security/SecurityMitre.vue"),
+            meta: { title: "MITRE ATT&CK" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/sources",
+            name: "securitySources",
+            component: () => import("@/views/Security/SecuritySources.vue"),
+            meta: { title: "Data Sources" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+          {
+            path: "security/content",
+            name: "securityContent",
+            component: () => import("@/views/Security/SecurityContent.vue"),
+            meta: { title: "Content" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+        ]
+      : []),
+
     {
       path: "/:catchAll(.*)*",
       component: Error404,

@@ -20,13 +20,16 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::alerts::{
-        alert::Alert,
-        incidents::{
-            AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason, EdgeType,
-            Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent, IncidentTopology,
-            IncidentWithAlerts,
+    meta::{
+        alerts::{
+            alert::Alert,
+            incidents::{
+                AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason,
+                EdgeType, Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent,
+                IncidentTopology, IncidentWithAlerts,
+            },
         },
+        correlation::{FieldAlias, ServiceIdentityConfig},
     },
     utils::json::{Map, Value},
 };
@@ -119,11 +122,10 @@ enum MuteChange<'a> {
 async fn extract_filtered_semantic_dimensions(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     use config::meta::alerts::incidents::KeyType;
-
-    // Load ServiceIdentityConfig with auto-configuration applied
-    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
 
     // No identity sets configured AND service is opted out — nothing to extract.
     // Otherwise fall through: "service" alone is a viable dimension even with zero sets.
@@ -134,9 +136,6 @@ async fn extract_filtered_semantic_dimensions(
         );
         return None;
     }
-
-    // Load semantic groups for field mapping
-    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
 
     // Collect all distinguish_by group IDs from ALL identity sets (flattened)
     // Don't require a specific set to "match" - extract whatever we can
@@ -200,6 +199,8 @@ async fn extract_filtered_semantic_dimensions(
 async fn extract_filtered_semantic_dimensions(
     _org_id: &str,
     _labels: &HashMap<String, String>,
+    _identity_config: &ServiceIdentityConfig,
+    _semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     None
 }
@@ -208,11 +209,13 @@ async fn extract_filtered_semantic_dimensions(
 async fn correlate_parallel(
     org_id: &str,
     labels: &HashMap<String, String>,
+    semantic_groups: &[FieldAlias],
 ) -> ParallelCorrelationResult {
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
     // Execute both approaches in parallel
     let (sd_result, semantic_result) = tokio::join!(
-        query_service_discovery_key(org_id, labels),
-        extract_filtered_semantic_dimensions(org_id, labels)
+        query_service_discovery_key(org_id, labels, &identity_config, semantic_groups),
+        extract_filtered_semantic_dimensions(org_id, labels, &identity_config, semantic_groups)
     );
 
     log::debug!(
@@ -686,13 +689,13 @@ pub async fn correlate_alert_to_incident(
     downtime: Option<&config::meta::downtimes::ActiveDowntime>,
 ) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
+    let semantic_groups =
+        crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
 
     // Enrich with alert condition dimensions (deterministic baseline)
     // Handles SQL WHERE, GUI conditions, and PromQL label matchers
     #[cfg(feature = "enterprise")]
     {
-        let semantic_groups =
-            crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
         let condition_dims =
             o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
                 &alert.query_condition,
@@ -723,7 +726,7 @@ pub async fn correlate_alert_to_incident(
     );
 
     // Execute Service Discovery and semantic extraction in parallel (non-blocking)
-    let parallel_result = correlate_parallel(&alert.org_id, &labels).await;
+    let parallel_result = correlate_parallel(&alert.org_id, &labels, &semantic_groups).await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -826,7 +829,7 @@ pub async fn correlate_alert_to_incident(
     {
         // Single-sourced with `scheduler::handlers`: the row, then the alert's own conditions.
         let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
-            &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
+            &semantic_groups,
             &alert.query_condition,
             result_row,
         );
@@ -1011,7 +1014,8 @@ pub async fn correlate_external_event(
     );
 
     // Same parallel correlation the internal path uses.
-    let parallel_result = correlate_parallel(org_id, &labels).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let parallel_result = correlate_parallel(org_id, &labels, &semantic_groups).await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -1277,7 +1281,15 @@ pub(crate) async fn correlated_service_for_routing(
     org_id: &str,
     row: &Map<String, Value>,
 ) -> Option<String> {
-    let found = query_service_discovery_key(org_id, &labels_from_row(row)).await?;
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let found = query_service_discovery_key(
+        org_id,
+        &labels_from_row(row),
+        &identity_config,
+        &semantic_groups,
+    )
+    .await?;
     if found.service_name_from_stream || found.service_name.trim().is_empty() {
         return None;
     }
@@ -1291,18 +1303,16 @@ pub(crate) async fn correlated_service_for_routing(
 async fn query_service_discovery_key(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<ServiceDiscoveryResult> {
     #[cfg(feature = "enterprise")]
     {
-        let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
-
-        let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
-
         match o2_enterprise::enterprise::service_streams::storage::correlate(
             org_id,
             labels,
-            &identity_config,
-            &semantic_groups,
+            identity_config,
+            semantic_groups,
         )
         .await
         {
@@ -2095,12 +2105,21 @@ async fn find_or_create_incident(
     })
 }
 
-/// Get incident with its alerts and RCA runs for the detail view.
+/// The detail view: the incident, its RCA runs and the alert definitions `user_id` may read.
 pub async fn get_incident_with_alerts(
     org_id: &str,
     incident_id: &str,
+    user_id: &str,
 ) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
-    incident_with_alerts(org_id, incident_id, true).await
+    incident_with_alerts(
+        org_id,
+        incident_id,
+        true,
+        |alert_id: String, folder_id: String| async move {
+            can_read_alert(org_id, user_id, &alert_id, &folder_id).await
+        },
+    )
+    .await
 }
 
 /// [get_incident_with_alerts] without the RCA runs, for callers that never read them.
@@ -2108,14 +2127,65 @@ pub async fn get_incident_with_triggers(
     org_id: &str,
     incident_id: &str,
 ) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
-    incident_with_alerts(org_id, incident_id, false).await
+    incident_with_alerts(org_id, incident_id, false, |_, _| std::future::ready(true)).await
 }
 
-async fn incident_with_alerts(
+/// Whether `user_id` may GET the alert, checked as the `GET /v2/{org}/alerts/{id}` route checks it.
+#[cfg(feature = "enterprise")]
+async fn can_read_alert(org_id: &str, user_id: &str, alert_id: &str, folder_id: &str) -> bool {
+    !o2_openfga::config::get_config().enabled
+        || crate::auth::check_permissions(
+            alert_id,
+            org_id,
+            user_id,
+            "alerts",
+            "GET",
+            Some(folder_id),
+            false,
+            true,
+            false,
+        )
+        .await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn can_read_alert(_org_id: &str, _user_id: &str, _alert_id: &str, _folder_id: &str) -> bool {
+    true
+}
+
+/// The alerts, given as `(alert_id, folder_id, alert)`, and composites that `can_read` allows.
+async fn readable_definitions<F>(
+    alerts: Vec<(String, String, Alert)>,
+    composites: Vec<CompositeAlertSummary>,
+    can_read: impl Fn(String, String) -> F,
+) -> (Vec<Alert>, Vec<CompositeAlertSummary>)
+where
+    F: Future<Output = bool>,
+{
+    let mut readable_alerts = Vec::with_capacity(alerts.len());
+    for (alert_id, folder_id, alert) in alerts {
+        if can_read(alert_id, folder_id).await {
+            readable_alerts.push(alert);
+        }
+    }
+    let mut readable_composites = Vec::with_capacity(composites.len());
+    for composite in composites {
+        if can_read(composite.id.clone(), composite.folder_id.clone()).await {
+            readable_composites.push(composite);
+        }
+    }
+    (readable_alerts, readable_composites)
+}
+
+async fn incident_with_alerts<F>(
     org_id: &str,
     incident_id: &str,
     with_rca_runs: bool,
-) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
+    can_read: impl Fn(String, String) -> F,
+) -> Result<Option<IncidentWithAlerts>, anyhow::Error>
+where
+    F: Future<Output = bool>,
+{
     let incident = match infra::table::alert_incidents::get(org_id, incident_id).await? {
         Some(i) => i,
         None => return Ok(None),
@@ -2233,8 +2303,16 @@ async fn incident_with_alerts(
         if let Some(trigger) = incident_alerts.iter().find(|a| a.alert_name == alert_name) {
             // Parse alert_id as Ksuid
             if let Ok(alert_ksuid) = trigger.alert_id.parse() {
-                match super::alert::get_by_id_db(&incident_org_id, alert_ksuid).await {
-                    Ok(alert) => alerts.push(alert),
+                match super::alert::get_by_id(
+                    infra::db::get_orm_client_ro().await,
+                    &incident_org_id,
+                    alert_ksuid,
+                )
+                .await
+                {
+                    Ok((folder, alert)) => {
+                        alerts.push((trigger.alert_id.clone(), folder.folder_id, alert))
+                    }
                     Err(e) => {
                         // Not an ordinary alert — a composite has no `alerts`
                         // row, so fall back to the composite graph (§9.6).
@@ -2272,6 +2350,7 @@ async fn incident_with_alerts(
             }
         }
     }
+    let (alerts, composite_alerts) = readable_definitions(alerts, composite_alerts, can_read).await;
 
     Ok(Some(IncidentWithAlerts {
         incident: incident_data,
@@ -2288,10 +2367,23 @@ pub async fn list_incidents(
     limit: u64,
     offset: u64,
 ) -> Result<(Vec<Incident>, u64), anyhow::Error> {
-    // Get total count before pagination
-    let total = infra::table::alert_incidents::count(org_id, status).await?;
+    list_incidents_filtered(org_id, status, None, limit, offset).await
+}
 
-    let incidents = infra::table::alert_incidents::list(org_id, status, limit, offset).await?;
+/// List incidents, optionally only those containing at least one of `alert_ids`.
+pub async fn list_incidents_filtered(
+    org_id: &str,
+    status: Option<&str>,
+    alert_ids: Option<&[String]>,
+    limit: u64,
+    offset: u64,
+) -> Result<(Vec<Incident>, u64), anyhow::Error> {
+    // Get total count before pagination
+    let total = infra::table::alert_incidents::count_filtered(org_id, status, alert_ids).await?;
+
+    let incidents =
+        infra::table::alert_incidents::list_filtered(org_id, status, alert_ids, limit, offset)
+            .await?;
 
     // Get actual alert counts from junction table (source of truth)
     let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();
@@ -3695,6 +3787,50 @@ mod tests {
         assert_eq!(reason, "alert_id_fallback");
     }
 
+    #[tokio::test]
+    async fn semantic_extraction_uses_the_settings_it_is_given() {
+        use config::meta::correlation::IdentitySet;
+        let identity = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "k8s".to_string(),
+                label: "Kubernetes".to_string(),
+                distinguish_by: vec!["k8s-namespace".to_string()],
+            }],
+            ..Default::default()
+        };
+        let groups = vec![
+            FieldAlias::new("k8s-namespace", "Namespace", &["k8s_namespace_name"]),
+            FieldAlias::new("service", "Service", &["service_name"]),
+        ];
+        let labels: HashMap<String, String> = [
+            ("k8s_namespace_name".to_string(), "prod".to_string()),
+            ("service_name".to_string(), "checkout".to_string()),
+            ("host".to_string(), "node-1".to_string()),
+        ]
+        .into();
+
+        let found = extract_filtered_semantic_dimensions("org-16560", &labels, &identity, &groups)
+            .await
+            .expect("the configured groups resolve");
+        assert_eq!(
+            found.group_values,
+            HashMap::from([
+                ("k8s-namespace".to_string(), "prod".to_string()),
+                ("service".to_string(), "checkout".to_string()),
+            ])
+        );
+
+        let opted_out = ServiceIdentityConfig {
+            service_optional: true,
+            ..Default::default()
+        };
+        assert!(
+            extract_filtered_semantic_dimensions("org-16560", &labels, &opted_out, &groups)
+                .await
+                .is_none()
+        );
+    }
+
     #[test]
     fn test_extract_service_name_from_sd_result() {
         use config::meta::alerts::incidents::KeyType;
@@ -4058,14 +4194,17 @@ mod tests {
     async fn a_run_started_while_rca_is_off_ends_rca_disabled() {
         use config::meta::alerts::rca_runs::{RunState, RunTrigger};
 
-        use crate::alerts::rca_runs::tests::{db, failures, new_incident, start, stored, timeline};
+        use crate::alerts::rca_runs::tests::{
+            db, failures, new_incident, rca_off, start, stored, timeline,
+        };
 
+        let _db = db().await;
+        rca_off();
         let cfg = o2_enterprise::enterprise::common::config::get_config();
         assert!(
             !(cfg.incidents.enabled && cfg.incidents.rca_enabled),
-            "the test relies on the default: RCA off"
+            "rca_off() turned RCA off"
         );
-        let _db = db().await;
         let (org, inc) = new_incident(None).await;
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
 
@@ -4276,10 +4415,11 @@ mod tests {
 
         use crate::alerts::rca_runs::{
             StartOutcome, StartRun, start_run,
-            tests::{db, incident_start, new_incident, start, stored},
+            tests::{db, incident_start, new_incident, rca_off, start, stored},
         };
 
         let _db = db().await;
+        rca_off();
         let (org, inc) = new_incident(None).await;
         let source_run = start(&org, &inc, RunTrigger::Manual).await;
         crate::alerts::rca_runs::fail_run(
@@ -4523,8 +4663,13 @@ mod tests {
         let _db = db().await;
         let (org, repeat) = new_incident(None).await;
         let unlinked = add_incident(&org, None).await;
-        for (alert, fired_at) in [("a", 1), ("b", 2), ("a", 3), ("a", 4)] {
-            add_alert_to_incident(
+        for (alert, fired_at, new_type) in [
+            ("a", 1, true),
+            ("b", 2, true),
+            ("a", 3, false),
+            ("a", 4, false),
+        ] {
+            let joined = add_alert_to_incident(
                 &repeat,
                 alert,
                 &format!("{alert}-name"),
@@ -4534,6 +4679,7 @@ mod tests {
             )
             .await
             .unwrap();
+            assert_eq!(joined, new_type, "{alert} at {fired_at}");
         }
 
         let (incidents, _) = list_incidents(&org, None, 50, 0).await.unwrap();
@@ -4696,5 +4842,44 @@ mod tests {
                 r#"{{"text":"go_gc_rate_high on coredns [P2] new_incident_created {incident_url}"}}"#
             )
         );
+    }
+
+    #[tokio::test]
+    async fn incident_details_keep_only_the_alert_definitions_the_caller_may_read() {
+        let alert = |name: &str| {
+            let mut alert = Alert::default();
+            alert.name = name.to_string();
+            alert
+        };
+        let composite = |id: &str, folder_id: &str| CompositeAlertSummary {
+            id: id.to_string(),
+            name: id.to_string(),
+            alert_type: "composite".to_string(),
+            enabled: true,
+            folder_id: folder_id.to_string(),
+        };
+        let alerts = vec![
+            ("allowed".to_string(), "open".to_string(), alert("allowed")),
+            ("denied".to_string(), "open".to_string(), alert("denied")),
+            (
+                "in_closed".to_string(),
+                "closed".to_string(),
+                alert("in_closed"),
+            ),
+        ];
+        let composites = vec![
+            composite("c_allowed", "open"),
+            composite("c_closed", "closed"),
+        ];
+
+        let (alerts, composites) = readable_definitions(alerts, composites, |id, folder| {
+            std::future::ready(id != "denied" && folder != "closed")
+        })
+        .await;
+
+        let names: Vec<_> = alerts.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["allowed"]);
+        let ids: Vec<_> = composites.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["c_allowed"]);
     }
 }

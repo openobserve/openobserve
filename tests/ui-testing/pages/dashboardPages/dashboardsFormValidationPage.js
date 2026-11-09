@@ -16,6 +16,8 @@
  *   [data-test="<dialog>"] [data-test="o-dialog-primary-btn"]
  *   [data-test="<dialog>"] [data-test="o-dialog-secondary-btn"]
  */
+import { SELECTORS, clickDashboardMenuItem } from "./dashboard-selectors.js";
+
 export class DashboardsFormValidationPage {
     /**
      * @param {import('@playwright/test').Page} page
@@ -94,7 +96,6 @@ export class DashboardsFormValidationPage {
         this.drilldownTabSelect      = '[data-test="dashboard-drilldown-tab-select-popover"]';
 
         // ── Dashboard Settings navigation ─────────────────────────────────────
-        this.dashboardSettingsBtn    = '[data-test="dashboard-setting-btn"]';
         this.settingsGeneralTab      = '[data-test="dashboard-settings-general-tab"]';
         this.settingsVariablesTab    = '[data-test="dashboard-settings-variable-tab"]';
         // App renders `dashboard-add-variable-btn` (VariableSettings.vue) — the
@@ -407,8 +408,12 @@ export class DashboardsFormValidationPage {
         await this.page.locator(this.variableCancelBtn).click();
     }
 
-    getDashboardSettingsBtnLocator() {
-        return this.page.locator(this.dashboardSettingsBtn);
+    getMoreOptionsBtnLocator() {
+        return this.page.locator(SELECTORS.MORE_OPTIONS_BTN);
+    }
+
+    async clickDashboardSettingsBtn() {
+        await clickDashboardMenuItem(this.page, SELECTORS.SETTING_BTN);
     }
 
     getSettingsGeneralTabLocator() {

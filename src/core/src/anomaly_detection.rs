@@ -421,7 +421,8 @@ async fn pk_to_name(pk: Option<&str>) -> String {
 
 /// Convert an integer status code to its human-readable string label.
 /// This is applied when serializing configs to API responses so the UI
-/// continues to receive "waiting"/"ready"/"training"/"failed"/"disabled".
+/// continues to receive "waiting"/"ready"/"training"/"failed"/"disabled", plus the
+/// data-readiness labels "waiting_for_data"/"not_applicable".
 fn status_label(status: i32) -> &'static str {
     o2_enterprise::enterprise::anomaly_detection::types::Status::label(status)
 }
@@ -1072,7 +1073,37 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
-    let updated = active_model.update(db).await?;
+    let mut updated = active_model.update(db).await?;
+
+    // After the save, so the training it queues reads the repaired config, even over a claim.
+    if retryable_change {
+        match o2_enterprise::enterprise::anomaly_detection::scheduler::requeue_data_readiness(
+            db,
+            &updated.anomaly_id,
+        )
+        .await
+        {
+            Ok(true) => {
+                updated.status =
+                    o2_enterprise::enterprise::anomaly_detection::types::Status::Waiting.to_i32();
+                updated.retries = 0;
+                updated.last_error = None;
+                // A verdict between the save and the requeue can revoke the model, and the
+                // broadcast below must not restore `is_trained` in a peer region.
+                match config_to_update(db, org_id, anomaly_id).await {
+                    Ok(row) => updated = row,
+                    Err(e) => log::warn!(
+                        "[anomaly_detection {anomaly_id}] failed to re-read the config after a requeue: {e}"
+                    ),
+                }
+            }
+            Ok(false) => {}
+            // The edit is saved, so this logs and continues like the other steps after the save.
+            Err(e) => log::warn!(
+                "[anomaly_detection {anomaly_id}] failed to requeue a data-readiness config after an edit: {e}"
+            ),
+        }
+    }
 
     // Evict any cached model for this config — training params may have changed,
     // so the next detection run should load a fresh model from S3.
@@ -7282,6 +7313,20 @@ mod tests {
         }
 
         #[test]
+        fn the_context_gives_jira_the_detector_id_and_kind() {
+            let c = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::PartialDrop));
+            let attribute = |key: &str| {
+                c.context_attributes
+                    .iter()
+                    .find(|(k, _)| k == key)
+                    .map(|(_, v)| v.as_str())
+            };
+            assert_eq!(attribute("anomaly_id"), Some("id1"));
+            assert_eq!(attribute("anomaly_kind"), Some("partial_drop"));
+            assert!(c.alert_id.is_empty() && c.incident_id.is_empty());
+        }
+
+        #[test]
         fn the_context_is_keyed_by_the_anomaly_id_and_the_recovery_resolves() {
             use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
             let firing = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
@@ -7609,6 +7654,28 @@ mod tests {
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.explore = None;
             assert_eq!(super::super::anomaly_explore_link(&c), empty);
+        }
+
+        /// A detector that scores one bucket per run gets a window one interval wide,
+        /// not a zero-width one, so the link survives the guard and `from`..`to` is the
+        /// lead-in plus that one bucket.
+        #[test]
+        fn a_one_bucket_window_keeps_the_link_and_spans_the_bucket() {
+            const MIN_US: i64 = 60 * 1_000_000;
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            // Bucket 00:00..00:05 behind a 15 minute (3 x 5m) lead-in.
+            c.window_start_us = 1_704_067_200_000_000;
+            c.window_end_us = c.window_start_us + 5 * MIN_US;
+            c.explore.as_mut().unwrap().start_us = c.window_start_us - 15 * MIN_US;
+            let (url, label) = super::super::anomaly_explore_link(&c);
+            assert!(!url.is_empty());
+            let (_, p) = pairs(&url);
+            let from: i64 = get(&p, "from").unwrap().parse().unwrap();
+            let to: i64 = get(&p, "to").unwrap().parse().unwrap();
+            assert_eq!(from, c.window_start_us - 15 * MIN_US);
+            assert_eq!(to, c.window_end_us);
+            assert_eq!(to - from, 20 * MIN_US);
+            assert_eq!(label, FILTERED);
         }
 
         #[test]

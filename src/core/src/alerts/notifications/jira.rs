@@ -48,7 +48,7 @@ use super::{NotificationContext, STATUS_RESOLVED};
 pub const DESTINATION_TYPE: &str = "jira";
 
 pub const UNSUPPORTED_SENDER: &str =
-    "Jira destinations only accept alert, composite alert and incident notifications.";
+    "Jira destinations only accept alert, composite alert, incident and anomaly notifications.";
 
 const REJECTED_TOKEN: &str =
     "Jira rejected the token. Make sure that the email and token belong to the same account.";
@@ -182,10 +182,11 @@ impl Jira {
         let hide_body = admitted_only_by_allowlist(&resp);
         let text = resp.text().await.map_err(|e| self.unreachable(&e))?;
         if !status.is_success() {
-            return Err(anyhow!(status_error(
-                status,
-                if hide_body { "" } else { &text }
-            )));
+            return Err(JiraRejected {
+                status: status.as_u16(),
+                message: status_error(status, if hide_body { "" } else { &text }),
+            }
+            .into());
         }
         if text.trim().is_empty() {
             return Ok(Value::Null);
@@ -212,19 +213,36 @@ impl Jira {
     }
 }
 
+/// A Jira answer that was not a success; the status tells a permanent refusal from a retry.
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct JiraRejected {
+    pub status: u16,
+    pub message: String,
+}
+
+/// A destination setting Jira can never accept; a 400 so the caller does not retry it.
+fn misconfigured(message: String) -> anyhow::Error {
+    JiraRejected {
+        status: 400,
+        message,
+    }
+    .into()
+}
+
 pub fn is_jira(endpoint: &Endpoint) -> bool {
     endpoint.destination_type.as_deref() == Some(DESTINATION_TYPE)
 }
 
-/// Comment on the open issue for this alert or incident, or create one; a recovery never creates.
+/// Comment on the open issue for this alert, incident or anomaly, or create one; never on recovery.
 pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<String> {
     let meta = |key: &str| endpoint.metadata.get(key).map_or("", String::as_str);
     let project_key = meta("jira_project_key");
     if project_key.is_empty() {
-        bail!("Jira destination has no project key");
+        return Err(misconfigured("Jira destination has no project key".into()));
     }
     let Some(label) = issue_label(ctx) else {
-        bail!("Jira destination has no alert or incident id to find its issue by");
+        bail!("Jira destination has no alert, incident or anomaly id to find its issue by");
     };
     let headers = endpoint
         .headers
@@ -267,7 +285,7 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     let extra = match meta("jira_fields") {
         "" => Map::new(),
         raw => serde_json::from_str(raw)
-            .map_err(|e| anyhow!("Jira destination has invalid jira_fields: {e}"))?,
+            .map_err(|e| misconfigured(format!("Jira destination has invalid jira_fields: {e}")))?,
     };
     let mut fields = issue_fields(
         extra,
@@ -284,7 +302,11 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
             "/rest/api/2/issue",
             Some(json!({ "fields": fields })),
         )
-        .await?;
+        .await;
+    let issue = match issue {
+        Ok(issue) => issue,
+        Err(refused) => return Err(name_rejected_token(&jira, refused).await),
+    };
     let key = issue["key"].as_str().unwrap_or_default();
     if !key.is_empty() {
         *created = Some((key.to_string(), Instant::now()));
@@ -341,6 +363,21 @@ async fn comment_on(jira: &Jira, key: &str, ctx: &NotificationContext) -> Result
     )
     .await?;
     Ok(format!("commented on {key}"))
+}
+
+/// Jira Cloud treats a wrong token as anonymous, so only `/myself` can tell it from a bad project.
+async fn name_rejected_token(jira: &Jira, refused: anyhow::Error) -> anyhow::Error {
+    let has_status = |e: &anyhow::Error, status: u16| {
+        e.downcast_ref::<JiraRejected>()
+            .is_some_and(|r| r.status == status)
+    };
+    if !has_status(&refused, 400) {
+        return refused;
+    }
+    match jira.call(Method::GET, "/rest/api/2/myself", None).await {
+        Err(e) if has_status(&e, 401) => e,
+        _ => refused,
+    }
 }
 
 /// Answers the destination form's lookups with the credentials it typed, or the saved token.
@@ -715,13 +752,29 @@ fn context_value<'a>(ctx: &'a NotificationContext, key: &str) -> Option<&'a str>
         .filter(|v| !v.is_empty())
 }
 
+/// Read only without an alert or incident id, so an alert attribute cannot move its issue.
+fn anomaly_id(ctx: &NotificationContext) -> Option<&str> {
+    if ctx.alert_id.is_empty() && ctx.incident_id.is_empty() {
+        context_value(ctx, "anomaly_id")
+    } else {
+        None
+    }
+}
+
+/// `value`, `partial drop`, `absence` or `recovery`; empty when the context does not name it.
+fn anomaly_kind(ctx: &NotificationContext) -> String {
+    context_value(ctx, "anomaly_kind")
+        .unwrap_or_default()
+        .replace('_', " ")
+}
+
 fn issue_label(ctx: &NotificationContext) -> Option<String> {
     if !ctx.incident_id.is_empty() {
         Some(format!("openobserve-incident-{}", ctx.incident_id))
     } else if !ctx.alert_id.is_empty() {
         Some(format!("openobserve-alert-{}", ctx.alert_id))
     } else {
-        None
+        anomaly_id(ctx).map(|id| format!("openobserve-anomaly-{id}"))
     }
 }
 
@@ -747,6 +800,11 @@ fn summary(ctx: &NotificationContext) -> String {
     let text = if !ctx.incident_id.is_empty() {
         let title = context_value(ctx, "incident_title").unwrap_or(&ctx.alert_name);
         format!("Incident: {title}")
+    } else if anomaly_id(ctx).is_some() {
+        match anomaly_kind(ctx) {
+            kind if kind.is_empty() => format!("Anomaly: {}", ctx.alert_name),
+            kind => format!("Anomaly: {} ({kind})", ctx.alert_name),
+        }
     } else {
         format!("{} is firing", ctx.alert_name)
     };
@@ -778,13 +836,12 @@ fn plain(text: &str) -> String {
 }
 
 fn description(ctx: &NotificationContext) -> String {
+    if anomaly_id(ctx).is_some() {
+        return anomaly_description(ctx);
+    }
     let line = |label: &str, value: &str| (!value.is_empty()).then(|| format!("{label}: {value}"));
     let text_line = |label: &str, value: &str| line(label, &plain(value));
-    let stream = match ctx.stream_type.as_str() {
-        _ if ctx.stream_name.is_empty() => String::new(),
-        "" => ctx.stream_name.clone(),
-        stream_type => format!("{} ({stream_type})", ctx.stream_name),
-    };
+    let stream = stream_text(ctx);
     let (operator, threshold) = evaluated_threshold(ctx);
     let condition = if threshold.is_empty() {
         String::new()
@@ -834,6 +891,41 @@ fn description(ctx: &NotificationContext) -> String {
         rows.len(),
         rows.join("\n")
     )
+}
+
+/// An anomaly has no threshold or rows, so its issue prints the window and the detector's own text.
+fn anomaly_description(ctx: &NotificationContext) -> String {
+    let line = |label: &str, value: &str| (!value.is_empty()).then(|| format!("{label}: {value}"));
+    let text_line = |label: &str, value: &str| line(label, &plain(value));
+    let millis = |text: &str| {
+        utc(text
+            .parse()
+            .ok()
+            .and_then(chrono::DateTime::from_timestamp_millis))
+        .unwrap_or_default()
+    };
+    let lines = [
+        text_line("Anomaly detector", &ctx.alert_name),
+        text_line("Kind", &anomaly_kind(ctx)),
+        text_line("Level", &ctx.alert_level),
+        text_line("Stream", &stream_text(ctx)),
+        line("Window start", &millis(&ctx.alert_start_time_millis)),
+        line("Window end", &millis(&ctx.alert_end_time_millis)),
+        text_line("Details", &ctx.alert_description),
+        line("View in OpenObserve", &ctx.alert_url),
+    ];
+    cut(
+        &lines.into_iter().flatten().collect::<Vec<_>>().join("\n"),
+        DESCRIPTION_MAX_CHARS,
+    )
+}
+
+fn stream_text(ctx: &NotificationContext) -> String {
+    match ctx.stream_type.as_str() {
+        _ if ctx.stream_name.is_empty() => String::new(),
+        "" => ctx.stream_name.clone(),
+        stream_type => format!("{} ({stream_type})", ctx.stream_name),
+    }
 }
 
 /// Drops braces inside keys and values, so no row can close the `{noformat}` block or open a macro.
@@ -890,6 +982,22 @@ fn comment(ctx: &NotificationContext) -> String {
     if ctx.alert_status == STATUS_RESOLVED {
         return format!(
             "[OpenObserve] Recovered{at}.{}",
+            link("View in OpenObserve")
+        );
+    }
+    if anomaly_id(ctx).is_some() {
+        let kind = match anomaly_kind(ctx) {
+            kind if kind.is_empty() => String::new(),
+            kind => format!(" ({})", plain(&kind)),
+        };
+        let detail = plain(ctx.alert_description.lines().next().unwrap_or_default());
+        let detail = if detail.is_empty() {
+            String::new()
+        } else {
+            format!(" {detail}.")
+        };
+        return format!(
+            "[OpenObserve] Anomaly{kind}{at}.{detail}{}",
             link("View in OpenObserve")
         );
     }
@@ -960,6 +1068,26 @@ mod tests {
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .to_vec();
         ctx
+    }
+
+    fn anomaly_ctx(kind: &str, status: &str) -> NotificationContext {
+        NotificationContext {
+            alert_name: "checkout latency".into(),
+            alert_status: status.into(),
+            alert_level: "critical".into(),
+            stream_name: "checkout_logs".into(),
+            stream_type: "logs".into(),
+            alert_start_time_millis: "1792749600000".into(),
+            alert_end_time_millis: "1792751400000".into(),
+            alert_trigger_time: 1_792_751_400_000_000,
+            alert_description: "score 4.20 over threshold 3.00 [p95]\nsecond line".into(),
+            alert_url: "https://o2.example.com/web/alerts/anomaly/edit/an-42".into(),
+            context_attributes: vec![
+                ("anomaly_id".into(), "an-42".into()),
+                ("anomaly_kind".into(), kind.into()),
+            ],
+            ..Default::default()
+        }
     }
 
     fn row(json: Value) -> Map<String, Value> {
@@ -1143,6 +1271,90 @@ mod tests {
         assert_eq!(
             jql(r#"O"PS"#, "l"),
             r#"project = "O\"PS" AND labels = "l" AND statusCategory != Done ORDER BY created DESC"#
+        );
+    }
+
+    #[test]
+    fn an_anomaly_issue_is_keyed_on_its_detector() {
+        for kind in ["value", "partial_drop", "absence", "recovery"] {
+            assert_eq!(
+                issue_label(&anomaly_ctx(kind, STATUS_FIRING)).unwrap(),
+                "openobserve-anomaly-an-42"
+            );
+        }
+        let mut other_detector = anomaly_ctx("value", STATUS_FIRING);
+        other_detector.context_attributes[0].1 = "an-43".into();
+        assert_eq!(
+            issue_label(&other_detector).unwrap(),
+            "openobserve-anomaly-an-43"
+        );
+        let mut no_id = anomaly_ctx("value", STATUS_FIRING);
+        no_id.context_attributes.remove(0);
+        assert_eq!(issue_label(&no_id), None);
+        let mut alert_with_anomaly_id = alert_ctx();
+        alert_with_anomaly_id.context_attributes =
+            anomaly_ctx("value", STATUS_FIRING).context_attributes;
+        assert_eq!(
+            issue_label(&alert_with_anomaly_id).unwrap(),
+            "openobserve-alert-2nX8bQk3LpT0"
+        );
+        assert_eq!(
+            summary(&alert_with_anomaly_id),
+            "Checkout 5xx errors is firing"
+        );
+    }
+
+    #[test]
+    fn anomaly_summary_names_the_detector_and_its_kind() {
+        for (kind, said) in [
+            ("value", "Anomaly: checkout latency (value)"),
+            ("partial_drop", "Anomaly: checkout latency (partial drop)"),
+            ("absence", "Anomaly: checkout latency (absence)"),
+            ("", "Anomaly: checkout latency"),
+        ] {
+            assert_eq!(summary(&anomaly_ctx(kind, STATUS_FIRING)), said);
+        }
+        let mut long = anomaly_ctx("value", STATUS_FIRING);
+        long.alert_name = "é".repeat(300);
+        assert_eq!(summary(&long).chars().count(), SUMMARY_MAX_CHARS);
+    }
+
+    #[test]
+    fn anomaly_description_prints_the_window_and_no_threshold() {
+        assert_eq!(
+            description(&anomaly_ctx("partial_drop", STATUS_FIRING)),
+            [
+                "Anomaly detector: checkout latency",
+                "Kind: partial drop",
+                "Level: critical",
+                "Stream: checkout_logs (logs)",
+                "Window start: 2026-10-23 10:00 UTC",
+                "Window end: 2026-10-23 10:30 UTC",
+                "Details: score 4.20 over threshold 3.00 p95\nsecond line",
+                "View in OpenObserve: https://o2.example.com/web/alerts/anomaly/edit/an-42",
+            ]
+            .join("\n")
+        );
+    }
+
+    #[test]
+    fn anomaly_comments_print_the_kind_and_first_line() {
+        let link = " View in OpenObserve: https://o2.example.com/web/alerts/anomaly/edit/an-42";
+        assert_eq!(
+            comment(&anomaly_ctx("value", STATUS_FIRING)),
+            format!(
+                "[OpenObserve] Anomaly (value) at 2026-10-23 10:30 UTC. score 4.20 over threshold 3.00 p95.{link}"
+            )
+        );
+        assert_eq!(
+            comment(&anomaly_ctx("absence", STATUS_FIRING)),
+            format!(
+                "[OpenObserve] Anomaly (absence) at 2026-10-23 10:30 UTC. score 4.20 over threshold 3.00 p95.{link}"
+            )
+        );
+        assert_eq!(
+            comment(&anomaly_ctx("recovery", STATUS_RESOLVED)),
+            format!("[OpenObserve] Recovered at 2026-10-23 10:30 UTC.{link}")
         );
     }
 
@@ -1622,6 +1834,133 @@ mod tests {
                     "no open Jira issue with label openobserve-alert-2nX8bQk3LpT0"
                 );
                 assert_eq!(calls.len(), 1);
+            },
+        );
+    }
+
+    #[test]
+    fn an_anomaly_with_no_open_issue_creates_one_labelled_for_its_detector() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::an_anomaly_with_no_open_issue_creates_one_labelled_for_its_detector"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let sent = send(&endpoint(base), &anomaly_ctx("value", STATUS_FIRING))
+                    .await
+                    .unwrap();
+                assert_eq!(sent, "created OPS-142");
+                let calls = seen.lock().unwrap().clone();
+                assert_eq!(calls[0].1["jql"], jql("OPS", "openobserve-anomaly-an-42"));
+                let fields = &calls[1].1["fields"];
+                assert_eq!(fields["summary"], "Anomaly: checkout latency (value)");
+                assert_eq!(
+                    fields["labels"],
+                    json!(["openobserve", "openobserve-anomaly-an-42"])
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_refused_call_keeps_its_http_status() {
+        isolated(
+            concat!(module_path!(), "::a_refused_call_keeps_its_http_status"),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let app =
+                    axum::Router::new().fallback(|| async { axum::http::StatusCode::UNAUTHORIZED });
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let base = format!("http://{}", listener.local_addr().unwrap());
+                tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+                let err = send(&endpoint(base), &anomaly_ctx("value", STATUS_FIRING))
+                    .await
+                    .unwrap_err();
+                let rejected = err.downcast_ref::<JiraRejected>().unwrap();
+                assert_eq!(rejected.status, 401);
+                assert_eq!(rejected.message, REJECTED_TOKEN);
+                assert_eq!(err.to_string(), REJECTED_TOKEN);
+            },
+        );
+    }
+
+    /// A site that finds nothing, refuses every create with a 400 and answers `/myself` with `me`.
+    async fn refusing_site(me: axum::http::StatusCode) -> String {
+        let app = axum::Router::new()
+            .route(
+                "/rest/api/2/search/jql",
+                axum::routing::post(|| async { axum::Json(json!({"issues": []})) }),
+            )
+            .route(
+                "/rest/api/2/issue",
+                axum::routing::post(|| async {
+                    (
+                        axum::http::StatusCode::BAD_REQUEST,
+                        axum::Json(json!({"errors": {"project": "project is not valid"}})),
+                    )
+                }),
+            )
+            .route(
+                "/rest/api/2/myself",
+                axum::routing::get(move || async move { me }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        base
+    }
+
+    #[test]
+    fn a_wrong_token_that_jira_reads_as_anonymous_is_named_as_the_token() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_wrong_token_that_jira_reads_as_anonymous_is_named_as_the_token"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let ctx = anomaly_ctx("value", STATUS_FIRING);
+                let base = refusing_site(axum::http::StatusCode::UNAUTHORIZED).await;
+                let err = send(&endpoint(base), &ctx).await.unwrap_err();
+                let rejected = err.downcast_ref::<JiraRejected>().unwrap();
+                assert_eq!(rejected.status, 401);
+                assert_eq!(rejected.message, REJECTED_TOKEN);
+
+                let base = refusing_site(axum::http::StatusCode::OK).await;
+                let err = send(&endpoint(base), &ctx).await.unwrap_err();
+                let rejected = err.downcast_ref::<JiraRejected>().unwrap();
+                assert_eq!(rejected.status, 400);
+                assert_ne!(rejected.message, REJECTED_TOKEN);
+            },
+        );
+    }
+
+    #[test]
+    fn a_destination_with_no_project_or_bad_fields_is_refused_as_a_400() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_with_no_project_or_bad_fields_is_refused_as_a_400"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let ctx = anomaly_ctx("value", STATUS_FIRING);
+                let mut no_project = endpoint("http://127.0.0.1:9".into());
+                no_project.metadata.remove("jira_project_key");
+                let err = send(&no_project, &ctx).await.unwrap_err();
+                assert_eq!(err.downcast_ref::<JiraRejected>().unwrap().status, 400);
+                assert_eq!(err.to_string(), "Jira destination has no project key");
+
+                let (base, _) = jira_site(None, "indeterminate").await;
+                let mut bad_fields = endpoint(base);
+                bad_fields
+                    .metadata
+                    .insert("jira_fields".into(), "{not json".into());
+                let err = send(&bad_fields, &ctx).await.unwrap_err();
+                assert_eq!(err.downcast_ref::<JiraRejected>().unwrap().status, 400);
+                assert!(err.to_string().contains("invalid jira_fields"), "{err}");
             },
         );
     }

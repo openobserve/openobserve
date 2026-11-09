@@ -16,45 +16,23 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { mount } from "@vue/test-utils";
-import { defineComponent, ref, h } from "vue";
+import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
+import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
+import { writeFirstDataRecord } from "@/composables/firstEvent/useFirstDataNotice";
+import MainLayout from "./MainLayout.vue";
 import * as cookies from "@/utils/cookies";
 import { shouldPaywallRoute } from "@/utils/auth";
 import config from "@/aws-exports";
+import stream from "@/services/stream";
+import billings from "@/services/billings";
+import configService from "@/services/config";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
-
-// ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
-// update:open / click:* emits). Mirrors stubs used in other migrated specs.
-const ODialogStub = defineComponent({
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryVariant",
-    "secondaryVariant",
-    "neutralVariant",
-    "primaryDisabled",
-    "secondaryDisabled",
-    "neutralDisabled",
-    "primaryLoading",
-    "secondaryLoading",
-    "neutralLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  setup(_, { slots }) {
-    return () =>
-      h("div", { class: "o-dialog-stub" }, [slots.header?.(), slots.default?.(), slots.footer?.()]);
-  },
-});
 
 // Mock cookies module
 vi.mock("@/utils/cookies", () => ({
@@ -68,6 +46,19 @@ vi.mock("@/utils/cookies", () => ({
   setToken: vi.fn(),
   removeToken: vi.fn(),
 }));
+
+vi.mock("@/services/config", () => ({
+  default: { get_config_full: vi.fn(() => new Promise(() => {})) },
+}));
+vi.mock("@openobserve/browser-rum", () => ({
+  openobserveRum: { setUser: vi.fn(), startView: vi.fn() },
+}));
+vi.mock("@/composables/useHomeDashboard", () => ({
+  useHomeDashboard: () => ({ load: vi.fn(async () => undefined) }),
+}));
+
+// An earlier describe replaces global.window with a stub and never restores it
+const realWindow = global.window;
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -555,20 +546,6 @@ describe("MainLayout Methods and Functions", () => {
       expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
       // Verify message context is set
       expect(mockStore.dispatch).toHaveBeenCalledWith("setAiChatContext", testMessage);
-    });
-
-    it("should handle removeFirstTimeLogin", () => {
-      const removeFirstTimeLogin = (show: boolean) => {
-        localStorage.setItem("isFirstTimeLogin", "true");
-        if (!show) {
-          localStorage.removeItem("isFirstTimeLogin");
-        }
-        return !show;
-      };
-
-      const result = removeFirstTimeLogin(false);
-      expect(result).toBe(true);
-      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
     });
   });
 
@@ -1069,33 +1046,6 @@ describe("MainLayout Methods and Functions", () => {
     });
   });
 
-  describe("Local Storage Operations", () => {
-    it("should handle first time login flag removal", () => {
-      localStorage.setItem("isFirstTimeLogin", "true");
-
-      const removeFirstTimeLogin = () => {
-        localStorage.removeItem("isFirstTimeLogin");
-        return localStorage.getItem("isFirstTimeLogin") === null;
-      };
-
-      const result = removeFirstTimeLogin();
-      expect(result).toBe(true);
-      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
-    });
-
-    it("should check if first time login flag exists", () => {
-      const checkFirstTimeLogin = () => {
-        return localStorage.getItem("isFirstTimeLogin") === "true";
-      };
-
-      localStorage.setItem("isFirstTimeLogin", "true");
-      expect(checkFirstTimeLogin()).toBe(true);
-
-      localStorage.removeItem("isFirstTimeLogin");
-      expect(checkFirstTimeLogin()).toBe(false);
-    });
-  });
-
   describe("Event Handling", () => {
     it("should dispatch window resize event", () => {
       const mockEventListeners: { [key: string]: Function[] } = {};
@@ -1248,101 +1198,6 @@ describe("MainLayout Methods and Functions", () => {
           { name: "", title: "Invalid" },
         ]),
       ).toHaveLength(2);
-    });
-  });
-
-  // The MainLayout template now uses <ODialog v-model:open="showGetStarted" size="full"
-  // :show-close="false"> to host <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />.
-  // The full layout requires complex DI (skipped above), so we exercise just the migrated
-  // fragment via a small host component plus an ODialogStub. This guards the migration
-  // contract: prop bindings, v-model:open round-trip, and the removeFirstTimeLogin handler.
-  describe("ODialog Migration - GetStarted Dialog", () => {
-    const GetStartedStub = defineComponent({
-      name: "GetStarted",
-      emits: ["removeFirstTimeLogin"],
-      setup(_, { emit }) {
-        return () =>
-          h(
-            "button",
-            {
-              class: "get-started-stub",
-              onClick: () => emit("removeFirstTimeLogin", false),
-            },
-            "submit",
-          );
-      },
-    });
-
-    const Host = defineComponent({
-      name: "MainLayoutDialogHost",
-      components: { ODialog: ODialogStub, GetStarted: GetStartedStub },
-      setup() {
-        const showGetStarted = ref(true);
-        const removeFirstTimeLogin = (val: boolean) => {
-          showGetStarted.value = val;
-          localStorage.removeItem("isFirstTimeLogin");
-        };
-        return { showGetStarted, removeFirstTimeLogin };
-      },
-      template: `
-        <ODialog v-model:open="showGetStarted" size="full" :show-close="false">
-          <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-        </ODialog>
-      `,
-    });
-
-    beforeEach(() => {
-      localStorage.setItem("isFirstTimeLogin", "true");
-    });
-
-    afterEach(() => {
-      localStorage.removeItem("isFirstTimeLogin");
-    });
-
-    it("renders ODialog with size='full' and showClose=false", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.props("size")).toBe("full");
-      expect(dialog.props("showClose")).toBe(false);
-    });
-
-    it("binds open prop from showGetStarted (initially true)", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.props("open")).toBe(true);
-    });
-
-    it("closes via v-model:open when ODialog emits update:open=false", async () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      await dialog.vm.$emit("update:open", false);
-
-      expect(dialog.props("open")).toBe(false);
-      expect((wrapper.vm as any).showGetStarted).toBe(false);
-    });
-
-    it("closes and clears isFirstTimeLogin when GetStarted emits removeFirstTimeLogin", async () => {
-      const wrapper = mount(Host);
-      const getStarted = wrapper.findComponent(GetStartedStub);
-
-      await getStarted.vm.$emit("removeFirstTimeLogin", false);
-
-      expect((wrapper.vm as any).showGetStarted).toBe(false);
-      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
-    });
-
-    it("does NOT forward any legacy dialog-specific props (migration removed maximized/full-height)", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      // ODialog has no `maximized` / `fullHeight` props — verify only the new contract is in use.
-      expect(dialog.props()).not.toHaveProperty("maximized");
-      expect(dialog.props()).not.toHaveProperty("fullHeight");
-      expect(dialog.props("size")).toBe("full");
     });
   });
 
@@ -2043,6 +1898,412 @@ describe("MainLayout — rail source", () => {
       expect(traces).toBe("account-tree");
       expect(profiles).toBe("memory");
     });
+  });
+});
+
+describe("MainLayout — focus-mode route", () => {
+  const StubDiv = defineComponent({ name: "StubDiv", setup: () => () => h("div") });
+  const NoticeStub = defineComponent({
+    setup: () => () => h("div", { "data-test": "first-data-notice" }),
+  });
+  const mountAt = async (focusMode: boolean) => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/page", name: "page", component: StubDiv, meta: { focusMode } }],
+    });
+    await router.push("/page");
+    const wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: { name: "ONavbar", setup: () => () => h("nav") },
+          O2AIChat: StubDiv,
+          WebinarBanner: { name: "WebinarBanner", setup: () => () => h("div") },
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          CommunitySlackInvite: { name: "CommunitySlackInvite", setup: () => () => h("div") },
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+          FirstDataNotice: NoticeStub,
+        },
+      },
+    });
+    await flushPromises();
+    store.state.selectedOrganization = { identifier: "focus_org", label: "focus_org" };
+    writeFirstDataRecord("focus_org", { lastVisit: 1, hadData: false });
+    store.state.organizationData.isDataIngested = false;
+    (wrapper.vm as unknown as { isLoading: boolean }).isLoading = true;
+    store.state.isAiChatEnabled = true;
+    await flushPromises();
+    return wrapper;
+  };
+
+  beforeEach(() => {
+    global.window = realWindow;
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+    store.state.isAiChatEnabled = false;
+    localStorage.clear();
+  });
+
+  it("keeps the header but hides the side menu, the AI panel and the banners on a focus-mode route", async () => {
+    // The webinar banner shows on cloud builds only.
+    const wasCloud = config.isCloud;
+    (config as any).isCloud = "true";
+    const wrapper = await mountAt(true);
+    (config as any).isCloud = wasCloud;
+    expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
+    expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="first-data-notice"]').exists()).toBe(false);
+    expect(wrapper.find("aside.o2-sidebar-right").exists()).toBe(false);
+    // it mounts before the page renders, so only its absence keeps the Slack invite off onboarding
+    expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("keeps the chrome on a normal route", async () => {
+    const wasCloud = config.isCloud;
+    (config as any).isCloud = "true";
+    const wrapper = await mountAt(false);
+    (config as any).isCloud = wasCloud;
+    expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(true);
+    expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
+    expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(true);
+    wrapper.unmount();
+  });
+});
+
+describe("MainLayout — first-time cloud login", () => {
+  const StubDiv = defineComponent({ name: "StubDiv", setup: () => () => h("div") });
+  const mountAtHome = async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", name: "home", component: StubDiv },
+        { path: "/onboarding", name: "onboarding", component: StubDiv },
+        { path: "/logs", name: "logs", component: StubDiv },
+      ],
+    });
+    // The org rides in the URL, as after a real login; without it the layout clears the selection.
+    window.history.replaceState({}, "", "/?org_identifier=org1");
+    await router.push("/?org_identifier=org1");
+    const replace = vi.spyOn(router, "replace");
+    const wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: StubDiv,
+          O2AIChat: StubDiv,
+          WebinarBanner: StubDiv,
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+        },
+      },
+    });
+    await flushPromises();
+    return { wrapper, replace, router };
+  };
+  // The org's stream lists: `logs` names a logs stream holding records.
+  const streams = (logs: string[] = []) =>
+    vi.spyOn(stream, "nameList").mockImplementation((async (_org: string, type: string) => ({
+      data: {
+        list: (type === "logs" ? logs : []).map((name) => ({
+          name,
+          stream_type: type,
+          stats: { doc_num: 3, doc_time_min: 1, doc_time_max: 2 },
+        })),
+      },
+    })) as never);
+
+  const startCalls = () => vi.mocked(billings.submit_new_user_info).mock.calls;
+
+  beforeEach(() => {
+    streams();
+    vi.spyOn(billings, "submit_new_user_info").mockResolvedValue({ status: 200 } as never);
+    // the org list holds org1, as the API's does after a real login; without it the layout picks another
+    store.state.organizations = [{ id: 1, name: "org1", identifier: "org1" }];
+    global.window = realWindow;
+    (config as any).isCloud = "true";
+    store.state.organizationData.isDataIngested = false;
+    store.state.selectedOrganization = { ...store.state.selectedOrganization, identifier: "org1" };
+    localStorage.setItem("isFirstTimeLogin", store.state.userInfo.email);
+  });
+
+  afterEach(() => {
+    window.history.replaceState({}, "", "/");
+    queryClient.clear();
+    localStorage.clear();
+    sessionStorage.clear();
+    (config as any).isCloud = "false";
+    vi.mocked(stream.nameList).mockRestore();
+    vi.mocked(billings.submit_new_user_info).mockRestore();
+    delete store.state.zoConfig.sample_data_onboarding_enabled;
+  });
+
+  it("leaves a first login to the sample data welcome when the deployment runs it", async () => {
+    store.state.zoConfig.sample_data_onboarding_enabled = true;
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    expect(
+      localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
+    ).toBeNull();
+    wrapper.unmount();
+  });
+
+  // the bootstrap config has no switches, so a failed full config must not read as onboarding on
+  it("decides nothing while the full config is unknown, and decides once it lands", async () => {
+    const version = store.state.zoConfig.version;
+    delete store.state.zoConfig.version;
+    vi.mocked(configService.get_config_full).mockRejectedValueOnce(new Error("offline"));
+    try {
+      const { wrapper, router } = await mountAtHome();
+      expect(router.currentRoute.value.name).toBe("home");
+      expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+      expect(startCalls()).toEqual([]);
+
+      // a retry lands the full config of a deployment that runs onboarding
+      store.commit("setConfig", { ...store.state.zoConfig, version });
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe("onboarding");
+      wrapper.unmount();
+    } finally {
+      store.state.zoConfig.version = version;
+    }
+  });
+
+  // the header Try marks the welcome seen, so the welcome never ends this first login
+  it("ends a first login when sample data starts loading outside the welcome, as a sample start", async () => {
+    store.state.zoConfig.sample_data_onboarding_enabled = true;
+    const session = useSampleDataSession();
+    const { wrapper } = await mountAtHome();
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    try {
+      session.loadingOrg.value = "org1";
+      session.status.value = "loading";
+      await flushPromises();
+      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+      expect(startCalls()).toEqual([
+        ["org1", expect.objectContaining({ first_source: "sample", skipped: false })],
+      ]);
+    } finally {
+      session.status.value = "idle";
+      session.loadingOrg.value = "";
+      wrapper.unmount();
+    }
+  });
+
+  it("holds Home for a first login only while the onboarding flow is on", async () => {
+    store.state.zoConfig.sample_data_onboarding_enabled = true;
+    const { wrapper, router } = await mountAtHome();
+    const hold = () => (wrapper.vm as unknown as { holdForOnboarding: boolean }).holdForOnboarding;
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    expect(hold()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("sends a first-time cloud user to onboarding and marks the start as pending", async () => {
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).toHaveBeenCalledWith({
+      name: "onboarding",
+      query: { org_identifier: "org1" },
+    });
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`)).toBe(
+      "true",
+    );
+    wrapper.unmount();
+  });
+
+  it("keeps a pending redirect: no onboarding, and the flag stays for a later visit", async () => {
+    sessionStorage.setItem("redirectURI", "/logs");
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    wrapper.unmount();
+  });
+
+  it("never onboards a user the flag was set for someone else", async () => {
+    localStorage.setItem("isFirstTimeLogin", "someone-else@example.com");
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(
+      localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
+    ).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("does not redirect an org that already has data, and clears the flag", async () => {
+    store.state.organizationData.isDataIngested = true;
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    // A flag left behind would mute the day-two Slack invite for good.
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(startCalls()).toEqual([["org1", expect.objectContaining({ skipped: true })]]);
+    wrapper.unmount();
+  });
+
+  // the store flag is still false at mount: weeks after a deep-link sign-up the org has data
+  it("reads the org's stream lists, and leaves an org with data on Home with one skipped start sent", async () => {
+    streams(["default"]);
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(startCalls()).toEqual([["org1", expect.objectContaining({ skipped: true })]]);
+    expect(
+      localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
+    ).toBeNull();
+    wrapper.unmount();
+  });
+
+  // stats count flushed files only, so an org whose data just arrived lists streams without them
+  it("decides nothing while the org's streams have no stats yet, and decides on the next Home visit", async () => {
+    vi.mocked(stream.nameList).mockImplementation((async (_org: string, type: string) => ({
+      data: { list: type === "logs" ? [{ name: "default", stream_type: "logs", stats: {} }] : [] },
+    })) as never);
+    const { wrapper, router } = await mountAtHome();
+    expect(router.currentRoute.value.name).toBe("home");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    expect(startCalls()).toEqual([]);
+
+    streams(["default"]);
+    queryClient.clear();
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("home");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(startCalls()).toEqual([["org1", expect.objectContaining({ skipped: true })]]);
+    wrapper.unmount();
+  });
+
+  it("onboards on the next Home visit in the session after a pending redirect, without a remount", async () => {
+    sessionStorage.setItem("redirectURI", "/logs");
+    const { wrapper, router } = await mountAtHome();
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    sessionStorage.removeItem("redirectURI");
+
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("leaves a user who moved on while the lists loaded, and onboards on the next Home visit", async () => {
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    vi.mocked(stream.nameList).mockImplementation((async () => {
+      await held;
+      return { data: { list: [] } };
+    }) as never);
+    const { wrapper, router } = await mountAtHome();
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+
+    answer();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    wrapper.unmount();
+  });
+
+  it("holds only Home: a user who leaves it while the lists load sees the page at once", async () => {
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    vi.mocked(stream.nameList).mockImplementation((async () => {
+      await held;
+      return { data: { list: [] } };
+    }) as never);
+    const { wrapper, router } = await mountAtHome();
+    const hold = () => (wrapper.vm as unknown as { holdForOnboarding: boolean }).holdForOnboarding;
+    expect(hold()).toBe(true);
+
+    await router.push({ name: "logs", query: { org_identifier: "org1" } });
+    expect(hold()).toBe(false);
+    // back on Home before the lists answer, the hold covers it again
+    await router.push({ name: "home", query: { org_identifier: "org1" } });
+    expect(hold()).toBe(true);
+
+    answer();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("onboarding");
+    expect(hold()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("decides for the org switched to while the first org's lists loaded", async () => {
+    store.state.organizations.push({ id: 2, name: "org2", identifier: "org2" });
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    vi.mocked(stream.nameList).mockImplementation((async (org: string, type: string) => {
+      if (org !== "org1") return { data: { list: [] } };
+      await held;
+      return {
+        data: {
+          list:
+            type === "logs"
+              ? [{ name: "default", stream_type: "logs", stats: { doc_num: 3 } }]
+              : [],
+        },
+      };
+    }) as never);
+    const { wrapper, replace } = await mountAtHome();
+    store.state.selectedOrganization = { ...store.state.selectedOrganization, identifier: "org2" };
+
+    answer();
+    await flushPromises();
+    expect(replace).toHaveBeenCalledWith({ name: "onboarding", query: { org_identifier: "org2" } });
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
+  // a flag set before it held the email, by a login just before the deploy
+  it("takes a legacy 'true' flag as this user's first login, once", async () => {
+    localStorage.setItem("isFirstTimeLogin", "true");
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).toHaveBeenCalledWith({ name: "onboarding", query: { org_identifier: "org1" } });
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("keeps the flag off cloud for the sample data welcome, with no onboarding page", async () => {
+    (config as any).isCloud = "false";
+    store.state.zoConfig.sample_data_onboarding_enabled = true;
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    wrapper.unmount();
+  });
+
+  it("clears the flag off cloud when the sample data welcome is off too", async () => {
+    (config as any).isCloud = "false";
+    store.state.zoConfig.sample_data_onboarding_enabled = false;
+    const { wrapper } = await mountAtHome();
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(startCalls()).toEqual([]);
+    wrapper.unmount();
   });
 });
 

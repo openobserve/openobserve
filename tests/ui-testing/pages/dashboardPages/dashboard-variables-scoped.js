@@ -306,13 +306,13 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Wait for dashboard to be ready (settings button visible)
+   * Wait for dashboard to be ready (toolbar More button visible)
    * @param {Object} options - Wait options
    * @param {number} options.timeout - Timeout in ms (default: 10000)
    */
   async waitForDashboardReady(options = {}) {
     const { timeout = 10000 } = options;
-    await this.page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout });
+    await this.page.locator(SELECTORS.MORE_OPTIONS_BTN).waitFor({ state: "visible", timeout });
   }
 
   /**
@@ -442,11 +442,11 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Get the dashboard settings button locator
+   * Get the toolbar More button locator (it holds Settings and shows once the dashboard is ready)
    * @returns {import('@playwright/test').Locator}
    */
-  getSettingBtnLocator() {
-    return this.page.locator(SELECTORS.SETTING_BTN);
+  getMoreOptionsBtnLocator() {
+    return this.page.locator(SELECTORS.MORE_OPTIONS_BTN);
   }
 
   /**

@@ -58,6 +58,9 @@ import {
 } from "./fleet.queries";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { fleetKeys } from "./fleet.querykeys";
+import analytics from "./product_analytics";
+
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("./http", () => {
   const mockClient = {
@@ -624,6 +627,10 @@ describe("fleet mutations", () => {
     expect(await run(createFleetTokenMutation("acme"), body)).toEqual(created);
     expect(mockClient.post).toHaveBeenCalledWith("/api/acme/fleet/tokens", body);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.tokens("acme") });
+    expect(analytics.track).toHaveBeenCalledWith("fleet_token_created", {
+      expires: true,
+      limited_uses: false,
+    });
   });
 
   const heldPlaintext = () =>
@@ -824,6 +831,33 @@ describe("fleet mutations", () => {
     expect(mockClient.put).toHaveBeenCalledWith("/api/acme/fleet/fleets/f1/desired", body);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.all("acme") });
     expect(setFleetDesiredMutation("acme").meta?.silentError).toBe(true);
+    expect(analytics.track).toHaveBeenCalledWith("fleet_rollout_started", {
+      start: "now",
+      batching: "one",
+      verify: true,
+      auto_rollback: true,
+    });
+  });
+
+  it("tracks only the collectors a bulk remove actually removed", async () => {
+    mockClient.delete.mockResolvedValueOnce({ status: 204 });
+    mockClient.delete.mockRejectedValueOnce({ response: { status: 403 } });
+    await run(deleteCollectorsMutation("acme"), ["c1", "c2"]);
+    expect(analytics.track).toHaveBeenCalledWith("fleet_collector_deleted", { count: 1 });
+  });
+
+  it("tracks a publish with its warning count, and nothing when it is refused", async () => {
+    mockClient.post.mockResolvedValueOnce({
+      data: { version: 3, warnings: { "": [{ severity: "warning", text: "w" }] } },
+    });
+    await run(publishFleetConfigVersionMutation("acme"), { id: "edge", yaml: "x", message: "" });
+    expect(analytics.track).toHaveBeenCalledWith("fleet_config_published", { warnings: 1 });
+    vi.mocked(analytics.track).mockClear();
+    mockClient.post.mockRejectedValueOnce({ response: { status: 422 } });
+    await expect(
+      run(publishFleetConfigVersionMutation("acme"), { id: "edge", yaml: "x", message: "" }),
+    ).rejects.toBeTruthy();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   it("fails the remove with the first error when every call fails", async () => {
@@ -910,6 +944,7 @@ describe("fleet mutations", () => {
     await run(rolloutExitMutation("acme"), { id: "r1", exit, collectorIds: ["c1"] });
     if (body) expect(mockClient.post).toHaveBeenCalledWith(path, body);
     else expect(mockClient.post).toHaveBeenCalledWith(path);
+    expect(analytics.track).toHaveBeenCalledWith("fleet_rollout_exit_taken", { exit });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: fleetKeys.all("acme") });
   });
 

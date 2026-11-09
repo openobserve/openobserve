@@ -32,7 +32,7 @@ use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
 use search::{
-    datafusion::distributed_plan::profile,
+    datafusion::distributed::analyze::profile,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 use search_service::{grpc::flight as grpcFlight, work_group::DeferredLock};
@@ -376,10 +376,9 @@ mod tests {
     use datafusion::physical_plan::empty::EmptyExec;
     use flight::profile::{NodeReport, NodeStatus, ProfileNode};
     use proto::cluster_rpc::QueryIdentifier;
-    use search::datafusion::distributed_plan::{
-        node::RemoteScanNode,
-        profile::{NodeProfileRecorder, complete_remote_profiles},
-        remote_scan_exec::RemoteScanExec,
+    use search::datafusion::distributed::{
+        analyze::profile::{NodeProfileRecorder, complete_remote_profiles},
+        remote_scan::{node::RemoteScanNode, remote_scan_exec::RemoteScanExec},
     };
     use tonic::transport::server::TcpIncoming;
 

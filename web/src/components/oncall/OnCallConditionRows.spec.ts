@@ -168,6 +168,33 @@ describe("OnCallConditionRows field catalogue", () => {
       }),
     ).toEqual(["service", "region"]);
   });
+
+  it("captions each field with the telemetry fields its group is made of", () => {
+    const w = mount(OnCallConditionRows, {
+      props: {
+        testPrefix: PREFIX,
+        aliases: [
+          { id: "service", display: "Service", fields: ["service", "service_name"] },
+          {
+            id: "k8s-cluster",
+            display: "K8s cluster",
+            fields: ["k8s_cluster", "k8s_cluster_name", "cluster", "a", "b", "c"],
+          },
+          { id: "host", display: "Host", fields: [] },
+        ],
+      },
+      global: { plugins: [i18n] },
+    });
+    const options = w
+      .findAllComponents(OSelect)
+      .find((c) => c.attributes("data-test") === `${PREFIX}-field-0`)!
+      .props("options") as { value: string; subLabel?: string }[];
+    expect(options.map((option) => [option.value, option.subLabel])).toEqual([
+      ["service", "service, service_name"],
+      ["k8s-cluster", "k8s_cluster, k8s_cluster_name, cluster +3 more"],
+      ["host", undefined],
+    ]);
+  });
 });
 
 describe("OnCallConditionRows half-filled rows", () => {

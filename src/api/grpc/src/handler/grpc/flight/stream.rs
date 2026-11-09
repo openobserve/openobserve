@@ -25,7 +25,7 @@ use flight::{
     profile::{NodeReport, NodeStatus},
 };
 use futures::{Stream, StreamExt};
-use search::datafusion::distributed_plan::profile::{
+use search::datafusion::distributed::analyze::profile::{
     REMOTE_PROFILE_TIMEOUT, build_profile, complete_remote_profiles,
 };
 use search_service::work_group::DeferredLock;
@@ -465,7 +465,7 @@ mod tests {
         profile::{NodeStatus, ProfileInputs},
     };
     use futures::TryStreamExt;
-    use search::datafusion::distributed_plan::{
+    use search::datafusion::distributed::remote_scan::{
         node::RemoteScanNode, remote_scan_exec::RemoteScanExec,
     };
 

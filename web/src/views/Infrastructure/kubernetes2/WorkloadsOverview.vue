@@ -16,10 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { fitColumnSize, TABLE_MAX_HEIGHT } from "./tableSizing";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -82,6 +83,8 @@ const { t } = useI18nTyped();
 const RECENT_EVENTS = 10;
 
 const COMPACT = { cellClass: "text-compact" };
+
+const STATUS_TAG_PAD_PX = 24;
 
 const CARDS: Array<{ kind: StatusKind; title: I18nKey; icon: IconName }> = [
   { kind: "pod", title: "infra.k8s2.workloadsCardPods", icon: "view-in-ar" },
@@ -191,110 +194,144 @@ const problemResult = computed(() =>
 
 const problems = computed(() => problemResult.value.rows);
 
-const problemColumns = computed<OTableColumnDef<WorkloadProblem>[]>(() => [
-  {
-    id: "name",
-    header: t("infra.k8s2.workloadsColWorkload"),
-    accessorKey: "name",
-    size: 260,
-    meta: COMPACT,
-  },
-  {
-    id: "kind",
-    header: t("infra.k8s2.workloadsColKind"),
-    accessorFn: (row) => t(KIND_TITLE[row.kind]),
-    size: 130,
-    meta: COMPACT,
-  },
-  {
-    id: "ready",
-    header: t("infra.k8s2.workloadsColPods"),
-    accessorFn: (row) => row.ready?.ready ?? 0,
-    size: 120,
-    meta: COMPACT,
-  },
-  {
-    id: "reason",
-    header: t("infra.k8s2.workloadsColReason"),
-    accessorFn: (row) => (row.reason ? chipLabel(row.reason, t) : ""),
-    size: 260,
-    minSize: 140,
-    meta: COMPACT,
-  },
-  {
-    id: "status",
-    header: t("infra.k8s2.workloadsColStatus"),
-    accessorKey: "severity",
-    size: 120,
-    meta: COMPACT,
-  },
-  { id: "actions", header: raw(""), size: 90, enableSorting: false, meta: COMPACT },
-]);
+const problemColumns = computed<OTableColumnDef<WorkloadProblem>[]>(() => {
+  const rows = problems.value;
+  const fit = (header: I18nText, pick: (r: WorkloadProblem) => string, max?: number) =>
+    fitColumnSize(String(header), rows.map(pick), { max });
+  const colName = t("infra.k8s2.workloadsColWorkload");
+  const colKind = t("infra.k8s2.workloadsColKind");
+  const colReason = t("infra.k8s2.workloadsColReason");
+  const colStatus = t("infra.k8s2.workloadsColStatus");
+  return [
+    {
+      id: "name",
+      header: colName,
+      accessorKey: "name",
+      size: fit(colName, (r) => (r.name.length > r.namespace.length ? r.name : r.namespace), 360),
+      sortable: true,
+      meta: COMPACT,
+    },
+    {
+      id: "kind",
+      header: colKind,
+      accessorFn: (row) => t(KIND_TITLE[row.kind]),
+      size: fit(colKind, (r) => String(t(KIND_TITLE[r.kind]))),
+      sortable: true,
+      meta: COMPACT,
+    },
+    {
+      id: "ready",
+      header: t("infra.k8s2.workloadsColPods"),
+      accessorFn: (row) => row.ready?.ready ?? 0,
+      size: 110,
+      sortable: true,
+      meta: COMPACT,
+    },
+    {
+      id: "reason",
+      header: colReason,
+      accessorFn: (row) => (row.reason ? chipLabel(row.reason, t) : ""),
+      size: fit(colReason, (r) => (r.reason ? String(chipLabel(r.reason, t)) : ""), 360),
+      minSize: 140,
+      sortable: true,
+      meta: { ...COMPACT, flex: true },
+    },
+    {
+      id: "status",
+      header: colStatus,
+      accessorKey: "severity",
+      size: fit(colStatus, (r) => t(problemStatusWord(r.kind, r.severity))) + STATUS_TAG_PAD_PX,
+      sortable: true,
+      meta: COMPACT,
+    },
+    { id: "actions", header: raw(""), size: 90, enableSorting: false, meta: COMPACT },
+  ];
+});
 
 const recentEvents = computed(() => props.events.slice(0, RECENT_EVENTS));
 
-const columns = computed<OTableColumnDef<EventRow>[]>(() => [
-  {
-    id: "type",
-    header: t("infra.k8s2.workloadsColType"),
-    accessorKey: "type",
-    size: 90,
-    meta: COMPACT,
-  },
-  {
-    id: "message",
-    header: t("infra.k8s2.workloadsColMessage"),
-    accessorKey: "note",
-    size: 360,
-    minSize: 160,
-    meta: COMPACT,
-  },
-  {
-    id: "namespace",
-    header: t("infra.k8s2.workloadsColNamespace"),
-    accessorFn: (row) => row.object.namespace,
-    size: 130,
-    meta: COMPACT,
-  },
-  {
-    id: "object",
-    header: t("infra.k8s2.workloadsColObject"),
-    accessorFn: (row) => `${row.object.kind}: ${row.object.name}`,
-    size: 240,
-    meta: COMPACT,
-  },
-  {
-    id: "source",
-    header: t("infra.k8s2.workloadsColSource"),
-    accessorKey: "source",
-    size: 180,
-    meta: COMPACT,
-  },
-  {
-    id: "count",
-    header: t("infra.k8s2.workloadsColCount"),
-    accessorKey: "count",
-    size: 80,
-    meta: COMPACT,
-  },
-  {
-    id: "age",
-    header: t("infra.k8s2.workloadsColAge"),
-    accessorKey: "firstSeen",
-    size: 80,
-    meta: COMPACT,
-  },
-  {
-    id: "lastSeen",
-    header: t("infra.k8s2.workloadsColLastSeen"),
-    accessorKey: "lastSeen",
-    size: 90,
-    meta: COMPACT,
-  },
-]);
+const columns = computed<OTableColumnDef<EventRow>[]>(() => {
+  const rows = recentEvents.value;
+  const fit = (
+    header: I18nText,
+    pick: (r: EventRow) => string | number | undefined,
+    max?: number,
+  ) => fitColumnSize(String(header), rows.map(pick), { max });
+  return [
+    {
+      id: "type",
+      header: t("infra.k8s2.workloadsColType"),
+      accessorKey: "type",
+      size: fit(t("infra.k8s2.workloadsColType"), (r) => r.type),
+      sortable: true,
+      meta: COMPACT,
+    },
+    {
+      id: "message",
+      header: t("infra.k8s2.workloadsColMessage"),
+      accessorKey: "note",
+      size: fit(t("infra.k8s2.workloadsColMessage"), (r) => r.note, 480),
+      minSize: 160,
+      sortable: true,
+      meta: { ...COMPACT, flex: true },
+    },
+    {
+      id: "namespace",
+      header: t("infra.k8s2.workloadsColNamespace"),
+      accessorFn: (row) => row.object.namespace,
+      size: fit(t("infra.k8s2.workloadsColNamespace"), (r) => r.object.namespace),
+      sortable: true,
+      meta: COMPACT,
+    },
+    {
+      id: "object",
+      header: t("infra.k8s2.workloadsColObject"),
+      accessorFn: (row) => `${row.object.kind}: ${row.object.name}`,
+      size: fit(t("infra.k8s2.workloadsColObject"), (r) => `${r.object.kind}: ${r.object.name}`),
+      sortable: true,
+      meta: COMPACT,
+    },
+    {
+      id: "source",
+      header: t("infra.k8s2.workloadsColSource"),
+      accessorKey: "source",
+      size: fit(t("infra.k8s2.workloadsColSource"), (r) => r.source || "—"),
+      sortable: true,
+      meta: COMPACT,
+    },
+    {
+      id: "count",
+      header: t("infra.k8s2.workloadsColCount"),
+      accessorKey: "count",
+      size: fit(t("infra.k8s2.workloadsColCount"), (r) => r.count ?? "—"),
+      sortable: true,
+      meta: COMPACT,
+    },
+    {
+      id: "age",
+      header: t("infra.k8s2.workloadsColAge"),
+      accessorKey: "firstSeen",
+      size: fit(t("infra.k8s2.workloadsColAge"), (r) => ageText(r.firstSeen)),
+      sortable: true,
+      meta: COMPACT,
+    },
+    {
+      id: "lastSeen",
+      header: t("infra.k8s2.workloadsColLastSeen"),
+      accessorKey: "lastSeen",
+      size: fit(t("infra.k8s2.workloadsColLastSeen"), (r) => ageText(r.lastSeen)),
+      sortable: true,
+      meta: COMPACT,
+    },
+  ];
+});
+
+function ageText(us: number | null) {
+  return formatAge(us == null ? null : props.endUs - us);
+}
 
 function since(us: number | null) {
-  return raw(formatAge(us == null ? null : props.endUs - us));
+  return raw(ageText(us));
 }
 
 function linkable(row: EventRow) {
@@ -424,6 +461,9 @@ function setNamespaces(namespaces: string[]) {
         :frame="false"
         :show-global-filter="false"
         pagination="none"
+        sorting="client"
+        enable-column-resize
+        :max-height="TABLE_MAX_HEIGHT"
         data-test="k8s2-workloads-problems-table"
         @row-click="openProblem"
       >
@@ -514,6 +554,9 @@ function setNamespaces(namespaces: string[]) {
         :frame="false"
         :show-global-filter="false"
         pagination="none"
+        sorting="client"
+        enable-column-resize
+        :max-height="TABLE_MAX_HEIGHT"
         data-test="k8s2-workloads-events-table"
       >
         <template #cell-type="{ row }">

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 /** `disabled`: the organization has public links turned off, so the link serves nothing. */
 export type PublicLinkStatus =
@@ -99,35 +100,76 @@ const linksPath = (org: string, dashboardId: string) =>
 // Every public-links screen shows its own message for a 403, so the global toast would repeat it.
 const silent = { silentForbidden: true };
 
+const configProps = (config: PublicLinkConfig) => ({
+  ranges: config.time_range.ranges.length,
+  auto_refresh: config.refresh_secs > 0,
+  expires: config.expires_at != null,
+});
+
 const public_dashboards_admin = {
   listOrg: (org: string) =>
     http().get<{ list: PublicLink[] }>(`/api/${org}/public_dashboards`, silent),
   list: (org: string, dashboardId: string) =>
     http().get<{ list: PublicLink[] }>(linksPath(org, dashboardId), silent),
   create: (org: string, dashboardId: string, config: PublicLinkConfig) =>
-    http().post<PublicLink>(linksPath(org, dashboardId), config, silent),
+    http()
+      .post<PublicLink>(linksPath(org, dashboardId), config, silent)
+      .then((res) => {
+        analytics.track("public_dashboard_link_created", configProps(config));
+        return res;
+      }),
   update: (org: string, dashboardId: string, linkId: string, config: PublicLinkConfig) =>
-    http().put<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}`, config, silent),
+    http()
+      .put<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}`, config, silent)
+      .then((res) => {
+        analytics.track("public_dashboard_link_updated", configProps(config));
+        return res;
+      }),
   pause: (org: string, dashboardId: string, linkId: string) =>
-    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/pause`, undefined, silent),
+    http()
+      .post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/pause`, undefined, silent)
+      .then((res) => {
+        analytics.track("public_dashboard_link_paused");
+        return res;
+      }),
   resume: (org: string, dashboardId: string, linkId: string) =>
-    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/resume`, undefined, silent),
+    http()
+      .post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/resume`, undefined, silent)
+      .then((res) => {
+        analytics.track("public_dashboard_link_resumed");
+        return res;
+      }),
   // The server refuses with 409 when someone else took the link over since the UI showed this publisher.
   takeOver: (org: string, dashboardId: string, linkId: string, expectedPublisher: string) =>
-    http().post<PublicLink>(
-      `${linksPath(org, dashboardId)}/${linkId}/take_over`,
-      { expected_publisher: expectedPublisher },
-      silent,
-    ),
+    http()
+      .post<PublicLink>(
+        `${linksPath(org, dashboardId)}/${linkId}/take_over`,
+        { expected_publisher: expectedPublisher },
+        silent,
+      )
+      .then((res) => {
+        analytics.track("public_dashboard_link_taken_over");
+        return res;
+      }),
   refresh: (org: string, dashboardId: string, linkId: string) =>
-    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/refresh`, undefined, silent),
+    http()
+      .post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/refresh`, undefined, silent)
+      .then((res) => {
+        analytics.track("public_dashboard_link_refreshed");
+        return res;
+      }),
   statusBatch: (org: string, ids: string[]) =>
     http().get<{ list: PublicLinkStatusReport[] }>(`/api/${org}/public_dashboards/status`, {
       ...silent,
       params: { ids: ids.join(",") },
     }),
   revoke: (org: string, dashboardId: string, linkId: string) =>
-    http().delete(`${linksPath(org, dashboardId)}/${linkId}`, silent),
+    http()
+      .delete(`${linksPath(org, dashboardId)}/${linkId}`, silent)
+      .then((res) => {
+        analytics.track("public_dashboard_link_revoked");
+        return res;
+      }),
 };
 
 export default public_dashboards_admin;

@@ -32,7 +32,10 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import { rumPaApiMock as api } from "@/utils/rum/__fixtures__/namedEventsApiMock";
 import { resetNamedEvents } from "@/composables/rum/useNamedEvents";
 import { encodeDef } from "@/utils/rum/productAnalyticsModel";
@@ -337,6 +340,16 @@ describe("AnalyticsRetention", () => {
     expect(
       document.querySelector('[data-test="rum-analytics-retention-users-truncated"]')?.textContent,
     ).toContain("1 most recently seen of 20");
+  });
+
+  it("tracks a cell drill-down with its period and granularity only", async () => {
+    await mountRetention();
+    vi.mocked(analytics.track).mockClear();
+    await wrapper!.find('[data-test="rum-analytics-retention-cell-0-1"]').trigger("click");
+    expect(analytics.track).toHaveBeenCalledWith("rum_retention_cell_opened", {
+      period: 1,
+      granularity: expect.any(String),
+    });
   });
 
   it("names a cell for a screen reader with its unit and whether it is still running (W30)", async () => {
