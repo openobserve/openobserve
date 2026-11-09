@@ -83,8 +83,8 @@ pub use rotation::{
 };
 pub use routing::{
     DimensionDepth, OwnershipError, OwnershipRule, Routed, RoutingConfig, RoutingDecision,
-    RoutingInputs, SERVICE_DIMENSION, UnroutedSignal, canonical_path, outstanding, resolve_owner,
-    resolve_owner_ranked, route,
+    RoutingInputs, SERVICE_DIMENSION, UnroutedSignal, canonical_path, compare_precedence,
+    outstanding, resolve_owner, resolve_owner_ranked, route,
 };
 pub use subject::{SubjectError, SubjectRef, SubjectType};
 pub use target::{EscalationTarget, RotationMode, TargetError};

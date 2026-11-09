@@ -87,7 +87,7 @@ pub struct Sql {
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
     pub timezone: Option<String>,
-    pub sorted_by_time: bool, // if only order by _timestamp
+    pub sorted_by_time: bool, // if a plain scan only orders by _timestamp
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
 }
 
@@ -235,9 +235,8 @@ impl Sql {
         {
             order_by.push((TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc));
         }
-        let need_sort_by_time = order_by.len() == 1
-            && order_by[0].0 == TIMESTAMP_COL_NAME
-            && order_by[0].1 == OrderBy::Desc
+        let is_complex = is_complex_query_stmt(&statement);
+        let need_sort_by_time = can_use_time_order(is_complex, &order_by)
             && !total_schemas.iter().any(|(stream, _)| {
                 matches!(stream.get_stream_type(stream_type), StreamType::Metrics)
             });
@@ -315,7 +314,7 @@ impl Sql {
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
-        if !is_complex_query_stmt(&statement) {
+        if !is_complex {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
             if o2_id_is_needed(&used_schemas, &search_event_type) {
@@ -327,8 +326,6 @@ impl Sql {
 
         // 13. replace the Utf8 to Utf8View type
         let final_schemas = finalize_schemas(&used_schemas);
-
-        let is_complex = is_complex_query_stmt(&statement);
 
         Ok(Sql {
             sql: statement.to_string(),
@@ -398,6 +395,14 @@ impl std::fmt::Display for Sql {
             self.is_complex,
         )
     }
+}
+
+// A follower interleaves its partitions, so only a plain scan can rely on the files' time order.
+fn can_use_time_order(is_complex: bool, order_by: &[(String, OrderBy)]) -> bool {
+    !is_complex
+        && order_by.len() == 1
+        && order_by[0].0 == TIMESTAMP_COL_NAME
+        && order_by[0].1 == OrderBy::Desc
 }
 
 fn is_read_only_sql_statement(statement: &Statement) -> bool {
@@ -497,6 +502,39 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap()
+    }
+
+    #[test]
+    fn test_can_use_time_order_only_for_plain_scans() {
+        let time_desc = [(TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc)];
+        let is_complex = |sql| is_complex_query_stmt(&parse_one(sql));
+        assert!(can_use_time_order(
+            is_complex("SELECT * FROM t ORDER BY _timestamp DESC LIMIT 10"),
+            &time_desc
+        ));
+        for sql in [
+            "SELECT a FROM t UNION ALL SELECT a FROM t ORDER BY _timestamp DESC LIMIT 10",
+            "SELECT t.a FROM t JOIN u ON t.a = u.a ORDER BY _timestamp DESC LIMIT 10",
+            "SELECT a FROM t WHERE a IN (SELECT a FROM u) ORDER BY _timestamp DESC LIMIT 10",
+            "SELECT a FROM t WHERE EXISTS (SELECT 1 FROM u) ORDER BY _timestamp DESC LIMIT 10",
+        ] {
+            assert!(!can_use_time_order(is_complex(sql), &time_desc), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_can_use_time_order_needs_exactly_time_descending() {
+        for order_by in [
+            vec![],
+            vec![(TIMESTAMP_COL_NAME.to_string(), OrderBy::Asc)],
+            vec![("a".to_string(), OrderBy::Desc)],
+            vec![
+                (TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc),
+                ("a".to_string(), OrderBy::Asc),
+            ],
+        ] {
+            assert!(!can_use_time_order(false, &order_by), "{order_by:?}");
+        }
     }
 
     #[test]
