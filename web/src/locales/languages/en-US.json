@@ -12432,6 +12432,7 @@
     "lastTriggered": "Last Triggered At",
     "importedFromPanel": "Query imported from dashboard panel: \"{panelTitle}\"",
     "lastSatisfied": "Last Satisfied At",
+    "notifies": "Notifies",
     "owner": "Owner",
     "title": "Title",
     "newFunctionAssociationMsg": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the pipeline.",
@@ -15239,6 +15240,15 @@
     "health": {
       "line": "{title}: no data since {since}.",
       "checkCollector": "Check your collector"
+    },
+    "coverage": {
+      "line": "{on} of {matched} matched packs have alerts on.",
+      "setUp": "Set up {title}",
+      "turnOn": "Turn on {title} alerts"
+    },
+    "notifies": {
+      "nobody": "Nobody",
+      "more": "+{n}"
     },
     "turnOn": {
       "title": "Turn on {title} alerts",

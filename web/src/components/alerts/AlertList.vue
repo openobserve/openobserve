@@ -123,6 +123,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="store.state.selectedOrganization?.identifier"
         :org="store.state.selectedOrganization?.identifier"
       />
+      <StarterPackCoverageLine
+        v-if="packsEnabled"
+        :key="`coverage-${store.state.selectedOrganization?.identifier}`"
+        :org="store.state.selectedOrganization?.identifier"
+        :refresh-key="alertStates"
+      />
       <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
         <!-- Left: FolderList -->
         <div
@@ -404,6 +410,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #cell-owner="{ row }">
                 <OUserCell :value="row.owner" />
+              </template>
+
+              <template #cell-notifies="{ row }">
+                <span
+                  v-if="row.destinations?.length"
+                  class="inline-flex min-w-0 items-center gap-1.5"
+                  :data-test="`alert-list-${row.name}-notifies`"
+                >
+                  <OTruncatedText>{{ row.destinations[0] }}</OTruncatedText>
+                  <OTooltip
+                    v-if="row.destinations.length > 1"
+                    :content="row.destinations.join(', ')"
+                  >
+                    <span class="text-text-secondary text-2xs">
+                      {{ t("starterPacks.notifies.more", { n: row.destinations.length - 1 }) }}
+                    </span>
+                  </OTooltip>
+                </span>
+                <span
+                  v-else-if="row.destinations"
+                  class="text-text-secondary"
+                  :data-test="`alert-list-${row.name}-notifies`"
+                  >{{ t("starterPacks.notifies.nobody") }}</span
+                >
+                <span v-else class="text-text-secondary">—</span>
               </template>
 
               <template #cell-frequency="{ row }">
@@ -1376,6 +1407,7 @@ import { activates } from "@/lib/core/Button/activation";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
+import StarterPackCoverageLine from "@/components/starterPacks/StarterPackCoverageLine.vue";
 import StarterPackHealthLine from "@/components/starterPacks/StarterPackHealthLine.vue";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
@@ -1437,6 +1469,7 @@ function parseQueryChoice<T extends string>(value: unknown, choices: readonly T[
 export default defineComponent({
   name: "AlertList",
   components: {
+    StarterPackCoverageLine,
     StarterPackHealthLine,
     MutedChip,
     AckChip,
@@ -2319,6 +2352,21 @@ export default defineComponent({
           size: COL.owner,
           meta: { align: "left" },
         },
+        ...(STARTER_PACKS_ENABLED
+          ? [
+              {
+                id: "notifies",
+                accessorKey: "destinations",
+                header: t("alerts.notifies"),
+                cell: " ",
+                sortable: false,
+                resizable: true,
+                hideable: true,
+                size: COL.owner,
+                meta: { align: "left" },
+              } as OTableColumnDef,
+            ]
+          : []),
         // "frequency" — the "Check every" cadence, meaningless for real-time alerts
         ...(activeTab.value !== "realTime"
           ? [
@@ -2400,6 +2448,10 @@ export default defineComponent({
 
       return baseColumns;
     });
+
+    const alertStates = computed(() =>
+      allAlerts.value.map((alert: any) => `${alert.alert_id}:${alert.enabled}`).join(","),
+    );
 
     const destinations = ref([]);
     const templates = ref([0]);
@@ -2607,6 +2659,8 @@ export default defineComponent({
               ...data,
               alert_id: data.alert_id || data.id,
               alert_type: "Composite",
+              // The list leaves composite destinations empty, so Notifies must not read them as "Nobody".
+              destinations: undefined,
               stream_name: "--",
               stream_type: "",
               conditions: data.expression_summary || data.composite_condition?.expression || "--",
@@ -2645,6 +2699,7 @@ export default defineComponent({
             stream_name: data.stream_name ? data.stream_name : "--",
             stream_type: data.stream_type,
             enabled: data.enabled,
+            destinations: data.destinations ?? [],
             conditions: "--", // Placeholder - will be converted on-demand in triggerExpand
             rawCondition: data.condition, // Store raw condition for lazy conversion
             description: data.description,
@@ -2762,12 +2817,17 @@ export default defineComponent({
       const fetchStart = ++alertsFetchSeq;
       if (refreshResults) latestTableFetch = fetchStart;
       const obsolete = () => refreshResults && fetchStart !== latestTableFetch;
-      const cachedRows = queryClient.getQueryData<any[]>(
-        alertKeys.list(org, folderId, query, alertType),
+      const opts = alertsListQuery(
+        org,
+        folderId,
+        query,
+        alertType,
+        undefined,
+        STARTER_PACKS_ENABLED,
       );
+      const cachedRows = queryClient.getQueryData<any[]>(opts.queryKey);
       // Cached rows have no known request behind them, so every kept write applies.
       const painted = cachedRows ? renderAlerts(cachedRows, 0) : false;
-      const opts = alertsListQuery(org, folderId, query, alertType);
       // Marks the entry stale in place, so the read is tracked against the request fetchQuery really joins.
       if (force)
         void queryClient.invalidateQueries({
@@ -4896,6 +4956,7 @@ export default defineComponent({
       searchQuery,
       clearSearchHistory,
       filteredResults,
+      alertStates,
       triggerExpand,
       formatGroupCount,
       allSelectedAlerts,

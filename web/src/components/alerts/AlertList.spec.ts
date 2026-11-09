@@ -26,6 +26,14 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+const packsFlag = vi.hoisted(() => ({ on: false }));
+// A getter, so a test can switch the flag on before mounting.
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return packsFlag.on;
+  },
+}));
+
 // Passthrough spy: real toasts still render, and specs can read what was raised.
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -277,6 +285,8 @@ async function mountAlertList({ renderTable = true } = {}) {
           template: '<button type="button"><slot /></button>',
         },
         SelectFolderDropDown: true,
+        StarterPackHealthLine: true,
+        StarterPackCoverageLine: true,
       },
     },
   });
@@ -514,6 +524,71 @@ describe("AlertList - basic rendering", () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
     expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
+  });
+});
+
+describe("AlertList - Notifies column", () => {
+  afterEach(() => {
+    packsFlag.on = false;
+  });
+
+  const notifies = (wrapper: any, name: string) =>
+    wrapper.find(`[data-test="alert-list-${name}-notifies"]`).text();
+
+  it("is absent while starter packs are off", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.vm.columns.map((c: any) => c.id)).not.toContain("notifies");
+  });
+
+  it("shows Nobody, one name, or the first name plus a count", async () => {
+    packsFlag.on = true;
+    const sent: Record<string, string[]> = {
+      Silent: [],
+      Single: ["slack"],
+      Several: ["pager", "email", "slack"],
+    };
+    alertsDB = Object.keys(sent).map((name, index) => makeAlert(index + 1, { name }));
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults = wrapper.vm.filteredResults.map((row: any) => ({
+      ...row,
+      destinations: sent[row.name],
+    }));
+    wrapper.vm.activeTab = "all";
+    await flushPromises();
+    expect(wrapper.vm.columns.map((c: any) => c.id)).toContain("notifies");
+    expect(notifies(wrapper, "Silent")).toBe("Nobody");
+    expect(notifies(wrapper, "Single")).toBe("slack");
+    expect(notifies(wrapper, "Several")).toContain("pager");
+    expect(notifies(wrapper, "Several")).toContain("+2");
+    const listCalls = alertsSvc.listByFolderId.mock.calls.filter(
+      (call: any[]) => call[6] !== undefined,
+    );
+    expect(listCalls.length).toBeGreaterThan(0);
+    expect(listCalls.every((call: any[]) => call[9] === true)).toBe(true);
+  });
+
+  it("maps the list's destinations, and leaves a composite without them", async () => {
+    packsFlag.on = true;
+    alertsDB = [
+      { ...makeAlert(1, { name: "Silent" }), destinations: [] } as any,
+      { ...makeAlert(2, { name: "Paged" }), destinations: ["pager"] } as any,
+      {
+        ...makeAlert(3, { name: "Combined" }),
+        alert_type: "composite",
+        condition: null,
+        destinations: [],
+      } as any,
+    ];
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+    const byName = Object.fromEntries(
+      wrapper.vm.filteredResults.map((row: any) => [row.name, row.destinations]),
+    );
+    expect(byName).toEqual({ Silent: [], Paged: ["pager"], Combined: undefined });
   });
 });
 
