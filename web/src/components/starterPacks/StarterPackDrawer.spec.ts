@@ -21,6 +21,7 @@ const render = (flow = fakeFlow()) =>
             '<div data-test="stub-dialog"><span data-test="stub-dialog-title">{{ title }}</span><slot /><slot name="footer" /></div>',
         },
         OIcon: true,
+        StarterPackAdaptedRows: true,
       },
     },
   });

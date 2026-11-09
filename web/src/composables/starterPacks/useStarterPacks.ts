@@ -44,8 +44,8 @@ import {
   savedViewsQuery,
 } from "@/services/saved_views.queries";
 import { viewTypeOf } from "@/services/saved_views";
-import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
-import type { AlertLibraryEntry } from "@/types/alertLibrary";
+import { streamNameListQuery } from "@/services/stream.queries";
+import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types/alertLibrary";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import { buildSavedViewPayload } from "@/utils/logs/savedViewPayload";
@@ -60,18 +60,37 @@ import {
   type PackKeptItem,
   type PackKeptReason,
   type PackNotIncludedItem,
+  type PackNotIncludedReason,
   type PackPreview,
   type PackRecordItem,
   type PackRemovalResult,
-  type PackRepair,
+  type PackChoices,
+  type PackFlavourAlert,
   type StarterPack,
 } from "./types";
-import { dashboardStreams, fitDashboard, type DashboardFit } from "./dashboardFit";
-import { matchAlerts, readOrgStreams } from "./packMatchData";
+import { dashboardStreams, fitDashboard, queryNeeds, type DashboardFit } from "./dashboardFit";
+import {
+  adaptAlert,
+  adaptDashboard,
+  adaptSavedView,
+  addStreamPickers,
+  planKeptPanels,
+  withFlavour,
+  type PackAdaptation,
+} from "./packAdapt";
+import { planAdaptation } from "./packAdaptationPlan";
+import { alertItem, dashboardItems, locateStream, type MatchItem } from "./packMatch";
+import {
+  matchAlerts,
+  readBindingSources,
+  readOrgStreams,
+  readSchemaColumns,
+} from "./packMatchData";
+import { isFresh, MAX_STREAM_COPIES } from "./streamCandidates";
 import { contentHash, useInstallRecords } from "./useInstallRecords";
-import { strictRenames } from "./strictRenames";
-import { rewriteAlert, rewriteDashboard, StreamRewriteError } from "./streamRewriter";
+import { StreamRewriteError } from "./streamRewriter";
 import { useRewriteChecks } from "./useRewriteChecks";
+import { useStreamValues } from "./useStreamValues";
 
 interface FoundItem {
   id: string;
@@ -104,20 +123,39 @@ const inFlight = new Map<string, Promise<PackInstallRecord>>();
 const isNotFound = (error: any): boolean => error?.response?.status === 404;
 
 // The backend stores tags lowercased, and a filter on any other case matches nothing.
-const alertTags = (packId: string, entryId: string): string[] => [
+const alertTags = (packId: string, entryId: string, stream?: string): string[] => [
   `pack:${packId}`.toLowerCase(),
   `library:${entryId}`.toLowerCase(),
+  ...(stream ? [`stream:${stream}`.toLowerCase()] : []),
 ];
 
 const folderIdOf = (items: PackRecordItem[], type: PackFolderType): string | undefined =>
   items.find((item) => item.kind === "folder" && item.itemId === type)?.id;
 
-const packItems = (pack: StarterPack): PackRecordItem[] => {
+const NO_ADAPTATION: PackAdaptation = { repairs: [], bindings: [] };
+
+const copyItemId = (copyOf: string, stream: string) => `${copyOf}@${stream}`;
+
+const flavourAlert = (pack: StarterPack, flavourId: string | undefined, alertId: string) =>
+  pack.flavours?.find(({ id }) => id === flavourId)?.alerts[alertId];
+
+const packItems = (pack: StarterPack, copies: PackPreview["copies"] = []): PackRecordItem[] => {
   const pending = { status: "pending" } as const;
+  const alertRows = pack.alerts.flatMap((itemId) => {
+    const own = copies.filter(({ copyOf }) => copyOf === itemId);
+    if (!own.length) return [{ ...pending, kind: "alert" as const, itemId }];
+    return own.map(({ copyOf, stream }) => ({
+      ...pending,
+      kind: "alert" as const,
+      itemId: copyItemId(copyOf, stream),
+      copyOf,
+      stream,
+    }));
+  });
   return [
     ...FOLDER_TYPES.map((itemId) => ({ ...pending, kind: "folder" as const, itemId })),
     ...pack.dashboards.map(({ id }) => ({ ...pending, kind: "dashboard" as const, itemId: id })),
-    ...pack.alerts.map((itemId) => ({ ...pending, kind: "alert" as const, itemId })),
+    ...alertRows,
     ...pack.savedViews.map(({ id }) => ({ ...pending, kind: "savedView" as const, itemId: id })),
   ];
 };
@@ -126,6 +164,7 @@ export function useStarterPacks(org: string) {
   const store = useStore();
   const records = useInstallRecords(org);
   const rewriteChecks = useRewriteChecks(org);
+  const { readValues } = useStreamValues(org);
   const { loadManifest, loadAlertFile } = useAlertLibrary();
   const { installOne } = useLibraryInstall(() => org);
 
@@ -173,9 +212,8 @@ export function useStarterPacks(org: string) {
       wanted
         .filter((name) => typeOf.has(name))
         .map(async (name) => {
-          const data = await readQuery(streamSchemaQuery(org, name, typeOf.get(name)!), true);
-          const columns = (data?.schema ?? []) as Array<{ name: string }>;
-          if (columns.length) schemas.set(name, new Set(columns.map((field) => field.name)));
+          const columns = await readSchemaColumns(org, typeOf.get(name)!, name, true);
+          if (columns.length) schemas.set(name, new Set(columns));
         }),
     );
     return schemas;
@@ -183,20 +221,25 @@ export function useStarterPacks(org: string) {
 
   const fitPackDashboard = async (
     dashboard: PackDashboard,
-    repairs: PackRepair[] = [],
+    adaptation: PackAdaptation = NO_ADAPTATION,
   ): Promise<DashboardFit> => {
     const loaded = await dashboard.load();
-    const doc = repairs.length
-      ? (await rewriteDashboard(loaded, repairs, rewriteChecks)).doc
-      : loaded;
-    return fitDashboard(doc, await readDashboardSchemas(doc));
+    if (!adaptation.repairs.length && !adaptation.bindings.length) {
+      return fitDashboard(loaded, await readDashboardSchemas(loaded));
+    }
+    // A panel the fit drops anyway must not fail the whole dashboard, so planning waits for the fit.
+    const unplanned = { ...rewriteChecks, sql: async () => {} };
+    const doc = await adaptDashboard(loaded, adaptation, unplanned);
+    const fit = fitDashboard(doc, await readDashboardSchemas(doc));
+    await planKeptPanels(fit.doc, rewriteChecks);
+    return fit;
   };
 
   const dashboardAdapter = (
     pack: StarterPack,
     itemId: string,
     items: PackRecordItem[],
-    repairs: PackRepair[],
+    adaptation: PackAdaptation,
   ): PackItemAdapter => {
     const dashboard = pack.dashboards.find((candidate) => candidate.id === itemId)!;
     return {
@@ -208,8 +251,9 @@ export function useStarterPacks(org: string) {
         return row ? { id: row.dashboard_id, folderId } : null;
       },
       create: async () => {
-        const { doc: fitted } = await fitPackDashboard(dashboard, repairs);
-        const doc = convertDashboardSchemaVersion(structuredClone(fitted));
+        const { doc: fitted } = await fitPackDashboard(dashboard, adaptation);
+        const picked = await addStreamPickers(structuredClone(fitted), adaptation.repairs);
+        const doc = convertDashboardSchemaVersion(picked);
         await createDashboard.mutateAsync({
           json: { ...doc, title: dashboard.title, created: new Date().toISOString() },
           folderId: folderIdOf(items, "dashboards")!,
@@ -228,24 +272,27 @@ export function useStarterPacks(org: string) {
 
   const alertAdapter = (
     pack: StarterPack,
-    itemId: string,
+    { copyOf, itemId, stream }: PackRecordItem,
     items: PackRecordItem[],
     entries: Map<string, AlertLibraryEntry>,
-    repairs: PackRepair[],
+    adaptation: PackAdaptation,
+    flavour?: PackFlavourAlert,
   ): PackItemAdapter => {
     let savedId: string | undefined;
     return {
       // Alert names and client ids are not unique, so the tags are the only identity.
       lookup: async () => {
-        const rows = await readQuery(alertsByTagsQuery(org, alertTags(pack.id, itemId)), true);
+        const tags = alertTags(pack.id, copyOf ?? itemId, stream);
+        const rows = await readQuery(alertsByTagsQuery(org, tags), true);
         if (rows[0]) return { id: rows[0].alert_id, folderId: rows[0].folder_id };
         // The server's tag search reads a cache that trails a create, so trust the id it returned.
         return savedId ? { id: savedId, folderId: folderIdOf(items, "alerts") } : null;
       },
       create: async () => {
-        const entry = entries.get(itemId);
-        if (!entry) throw new Error(`Alert Library has no entry ${itemId}`);
-        const bundled = pack.bundledAlerts?.find((alert) => alert.entry.id === itemId);
+        const entryId = copyOf ?? itemId;
+        const entry = entries.get(entryId);
+        if (!entry) throw new Error(`Alert Library has no entry ${entryId}`);
+        const bundled = pack.bundledAlerts?.find((alert) => alert.entry.id === entryId);
         const file = await loadAlertFile(entry).catch((error) => {
           if (!bundled) throw error;
           return bundled.file;
@@ -257,12 +304,15 @@ export function useStarterPacks(org: string) {
           timezone: store.state.timezone,
           scheduledOnly: true,
           decoratePayload: async (payload) => {
-            const { doc } = await rewriteAlert(payload, repairs, rewriteChecks);
+            const flavoured = withFlavour(payload, flavour);
+            const doc = await adaptAlert(flavoured, adaptation, rewriteChecks, stream);
+            const tags = [...(payload.tags as string[]), ...alertTags(pack.id, entryId, stream)];
             return {
               ...doc,
+              name: stream ? `${doc.name}_${stream}` : doc.name,
               enabled: false,
               destinations: [],
-              tags: [...new Set([...(payload.tags as string[]), ...alertTags(pack.id, itemId)])],
+              tags: [...new Set(tags)],
             };
           },
           onSaved: (id) => {
@@ -281,7 +331,11 @@ export function useStarterPacks(org: string) {
     };
   };
 
-  const savedViewAdapter = (pack: StarterPack, itemId: string): PackItemAdapter => {
+  const savedViewAdapter = (
+    pack: StarterPack,
+    itemId: string,
+    adaptation: PackAdaptation,
+  ): PackItemAdapter => {
     const view = pack.savedViews.find((candidate) => candidate.id === itemId)!;
     return {
       lookup: async () => {
@@ -293,7 +347,9 @@ export function useStarterPacks(org: string) {
       },
       create: async () => {
         await createSavedView.mutateAsync({
-          data: buildSavedViewPayload(view.search, { timezone: store.state.timezone }),
+          data: buildSavedViewPayload(adaptSavedView(view.search, adaptation.repairs), {
+            timezone: store.state.timezone,
+          }),
           view_name: view.name,
           view_type: "logs",
         });
@@ -310,17 +366,25 @@ export function useStarterPacks(org: string) {
     item: PackRecordItem,
     items: PackRecordItem[],
     entries: Map<string, AlertLibraryEntry>,
-    repairs: PackRepair[] = [],
+    adaptation: PackAdaptation = NO_ADAPTATION,
+    flavours: Record<string, string> = {},
   ): PackItemAdapter => {
     if (item.kind === "folder") return folderAdapter(pack, item.itemId as PackFolderType);
-    if (item.kind === "dashboard") return dashboardAdapter(pack, item.itemId, items, repairs);
-    if (item.kind === "alert") return alertAdapter(pack, item.itemId, items, entries, repairs);
-    return savedViewAdapter(pack, item.itemId);
+    if (item.kind === "dashboard") return dashboardAdapter(pack, item.itemId, items, adaptation);
+    if (item.kind === "alert") {
+      const id = item.copyOf ?? item.itemId;
+      const flavour = flavourAlert(pack, flavours[id], id);
+      return alertAdapter(pack, item, items, entries, adaptation, flavour);
+    }
+    return savedViewAdapter(pack, item.itemId, adaptation);
   };
 
-  const planItems = async (pack: StarterPack): Promise<PackRecordItem[]> => {
+  const planItems = async (
+    pack: StarterPack,
+    copies?: PackPreview["copies"],
+  ): Promise<PackRecordItem[]> => {
     const planned: PackRecordItem[] = [];
-    for (const item of packItems(pack)) {
+    for (const item of packItems(pack, copies)) {
       const found = await adapterFor(pack, item, planned, new Map()).lookup();
       planned.push(found ? { ...item, ...found, status: "existing" } : item);
     }
@@ -341,56 +405,117 @@ export function useStarterPacks(org: string) {
     }
   };
 
-  const notIncludedAlert = (
-    entry: AlertLibraryEntry | undefined,
-    streams: Record<string, Set<string>>,
-    repairs: PackRepair[],
-    verdicts: Map<string, boolean> | null,
-  ): PackNotIncludedItem["reason"] | null => {
-    if (!entry) return "unavailable";
-    if (verdicts) return verdicts.get(entry.id) ? null : "no_data";
-    const names = streams[entry.stream_type];
-    const fits = (name: string) => names?.has(name) || repairs.some(({ from }) => from === name);
-    return entry.required_streams.every(fits) ? null : "no_data";
+  const alertFile = (pack: StarterPack, entry: AlertLibraryEntry) =>
+    loadAlertFile(entry).catch(
+      () => pack.bundledAlerts?.find((alert) => alert.entry.id === entry.id)?.file ?? null,
+    );
+
+  /** An alert whose shipped names are absent takes the variant its data can answer. */
+  const pickFlavours = (
+    pack: StarterPack,
+    alerts: Map<string, MatchItem>,
+    streams: StreamsByType,
+  ) => {
+    const here = (name: string) => {
+      const found = locateStream(name, "metrics", { streams, repairs: [] });
+      return !!found && isFresh(found.lastIngested, Date.now());
+    };
+    const flavours: Record<string, string> = {};
+    const unsupported = new Set<string>();
+    for (const [id, item] of alerts) {
+      if (item.streams.every(here)) continue;
+      const chosen = pack.flavours?.find(({ alerts: own }) => own[id]?.streams.every(here));
+      if (chosen) {
+        const variant = chosen.alerts[id];
+        flavours[id] = chosen.id;
+        const needs = queryNeeds(variant.promql, "promql");
+        alerts.set(id, { ...item, streams: variant.streams, fields: [...needs.fields] });
+      } else if (pack.flavours?.some((row) => !row.alerts[id] && row.detect.some(here))) {
+        unsupported.add(id);
+      }
+    }
+    return { flavours, unsupported };
   };
 
-  const readStreamNames = async (type: string): Promise<Set<string>> => {
-    const rows = await readQuery(streamNameListQuery(org, type), true);
-    return new Set(rows.map((row) => row.name));
+  const adaptationFor = async (
+    pack: StarterPack,
+    listed: AlertLibraryEntry[],
+    choices?: PackChoices,
+  ) => {
+    const streams = await readOrgStreams(org);
+    const alerts = new Map<string, MatchItem>();
+    await Promise.all(
+      listed.map(async (entry) => {
+        const item = alertItem(entry, await alertFile(pack, entry));
+        if (item) alerts.set(entry.id, item);
+      }),
+    );
+    const { flavours, unsupported } = pickFlavours(pack, alerts, streams);
+    const docs = await Promise.all(pack.dashboards.map((dashboard) => dashboard.load()));
+    const sources = await readBindingSources(org, [pack]);
+    const plan = await planAdaptation({
+      pack,
+      streams,
+      alerts: [...alerts.values()],
+      panels: docs.flatMap(dashboardItems),
+      sources,
+      choices,
+      nowMs: Date.now(),
+      readers: {
+        columns: async (type, name) => new Set(await readSchemaColumns(org, type, name)),
+        values: (stream, fields) => readValues(stream, fields),
+      },
+    });
+    return { ...plan, alerts, flavours, unsupported, streams, titles: sources.titles };
+  };
+
+  const alertCopies = (alerts: Map<string, MatchItem>, repairs: PackPreview["repairs"]) =>
+    repairs.flatMap(({ from, to, also }) => {
+      if (!also?.length) return [];
+      const streams = [to, ...also].slice(0, MAX_STREAM_COPIES);
+      const reading = [...alerts].filter(([, item]) => item.streams.includes(from));
+      return reading.flatMap(([copyOf]) => streams.map((stream) => ({ copyOf, stream })));
+    });
+
+  const flavouredEntry = (pack: StarterPack, entry: AlertLibraryEntry, flavourId?: string) => {
+    const variant = flavourAlert(pack, flavourId, entry.id);
+    return variant ? { ...entry, required_streams: variant.streams } : entry;
   };
 
   /** The names, the plan and what is left out, read before anything is created. */
-  const previewPack = async (pack: StarterPack): Promise<PackPreview> => {
+  const previewPack = async (pack: StarterPack, choices?: PackChoices): Promise<PackPreview> => {
     const { entries, offline } = await loadEntries(pack);
-    const wanted = pack.alerts.flatMap((id) => entries.get(id)?.stream_type ?? []);
-    const types = [...new Set(wanted)];
-    const lists = await Promise.all(types.map(readStreamNames));
-    const streams = Object.fromEntries(types.map((type, index) => [type, lists[index]]));
-    const alertStreams = pack.alerts.flatMap((id) => {
-      const entry = entries.get(id);
-      return entry ? entry.required_streams.map((name) => ({ name, type: entry.stream_type })) : [];
-    });
-    const found = alertStreams.flatMap(({ name, type }) =>
-      streams[type] ? strictRenames([name], streams[type]) : [],
-    );
-    const repairs = [...new Map(found.map((repair) => [repair.from, repair])).values()];
+    const listed = pack.alerts.flatMap((id) => entries.get(id) ?? []);
+    const plan = await adaptationFor(pack, listed, choices);
+    const { repairs, bindings, flavours, alerts, unsupported, streams } = plan;
+    const flavoured = listed.map((entry) => flavouredEntry(pack, entry, flavours[entry.id]));
     const verdicts = STARTER_PACKS_ENABLED
-      ? await matchAlerts(
-          org,
-          [...entries.values()].filter(({ id }) => pack.alerts.includes(id)),
-          await readOrgStreams(org),
-          { loadFile: loadAlertFile, packs: [pack], repairs },
-        )
+      ? await matchAlerts(org, flavoured, streams, {
+          loadFile: async (entry) => {
+            const file = await alertFile(pack, entry);
+            const variant = flavourAlert(pack, flavours[entry.id], entry.id);
+            if (!file || !variant) return file as AlertLibraryFile;
+            const original = file.query_condition as Record<string, unknown> | undefined;
+            const condition = { ...original, promql: variant.promql };
+            return { ...file, query_condition: condition } as AlertLibraryFile;
+          },
+          packs: [pack],
+          repairs,
+        })
       : null;
     const names: Record<string, string> = {};
     for (const { id, title } of pack.dashboards) names[id] = title;
     for (const { id, name } of pack.savedViews) names[id] = name;
     for (const id of pack.alerts) names[id] = entries.get(id)?.title ?? id;
+    const copies = alertCopies(alerts, repairs);
+    for (const { copyOf, stream } of copies) {
+      names[copyItemId(copyOf, stream)] = `${names[copyOf]} (${stream})`;
+    }
 
     const panels = { kept: 0, dropped: 0 };
     const noFit = new Set<string>();
     for (const dashboard of pack.dashboards) {
-      const fit = await fitPackDashboard(dashboard, repairs).catch((error) => {
+      const fit = await fitPackDashboard(dashboard, { repairs, bindings }).catch((error) => {
         if (error instanceof StreamRewriteError) return { doc: {}, kept: 0, dropped: 1 };
         throw error;
       });
@@ -399,27 +524,53 @@ export function useStarterPacks(org: string) {
       if (!fit.kept && fit.dropped) noFit.add(dashboard.id);
     }
 
+    const alertReason = (id: string): PackNotIncludedReason | null => {
+      const entry = entries.get(id);
+      if (!entry) return "unavailable";
+      const fits = verdicts
+        ? verdicts.get(id)
+        : flavouredEntry(pack, entry, flavours[id]).required_streams.every((name) =>
+            locateStream(name, entry.stream_type, { streams, repairs }),
+          );
+      if (fits) return null;
+      return unsupported.has(id) ? "no_flavour" : "no_data";
+    };
+
     const notIncluded: PackNotIncludedItem[] = [];
     const items: PackRecordItem[] = [];
-    for (const item of await planItems(pack)) {
+    const reported = new Set<string>();
+    for (const item of await planItems(pack, copies)) {
       const name = names[item.itemId] ?? item.itemId;
       if (item.kind === "dashboard" && item.status !== "existing" && noFit.has(item.itemId)) {
         notIncluded.push({ kind: "dashboard", itemId: item.itemId, name, reason: "no_data" });
         continue;
       }
-      const missing =
-        item.kind === "alert"
-          ? notIncludedAlert(entries.get(item.itemId), streams, repairs, verdicts)
-          : null;
+      const id = item.copyOf ?? item.itemId;
+      const missing = item.kind === "alert" ? alertReason(id) : null;
       if (item.kind !== "folder" && item.status === "existing") {
         notIncluded.push({ kind: item.kind, itemId: item.itemId, name, reason: "already_have" });
       } else if (missing) {
-        notIncluded.push({ kind: "alert", itemId: item.itemId, name, reason: missing });
+        if (!reported.has(id))
+          notIncluded.push({ kind: "alert", itemId: id, name: names[id] ?? id, reason: missing });
+        reported.add(id);
         continue;
       }
       items.push(item);
     }
-    return { items, names, notIncluded, offline, panels, repairs };
+    return {
+      items,
+      names,
+      notIncluded,
+      offline,
+      panels,
+      repairs,
+      bindings,
+      questions: plan.questions,
+      columns: plan.columns,
+      groupTitles: plan.titles,
+      flavours,
+      copies,
+    };
   };
 
   const settleItem = async (
@@ -427,9 +578,10 @@ export function useStarterPacks(org: string) {
     item: PackRecordItem,
     items: PackRecordItem[],
     entries: Map<string, AlertLibraryEntry>,
-    repairs: PackRepair[],
+    record: PackInstallRecord,
   ): Promise<PackRecordItem> => {
-    const adapter = adapterFor(pack, item, items, entries, repairs);
+    const adaptation = { repairs: record.repairs ?? [], bindings: record.bindings ?? [] };
+    const adapter = adapterFor(pack, item, items, entries, adaptation, record.flavours);
     try {
       let found = await adapter.lookup();
       if (!found) {
@@ -458,7 +610,15 @@ export function useStarterPacks(org: string) {
 
   const runInstall = async (
     sourcePack: StarterPack,
-    { exclude = [], onProgress, repairs = [], folderName }: PackInstallOptions,
+    {
+      exclude = [],
+      onProgress,
+      repairs = [],
+      bindings = [],
+      flavours = {},
+      copies,
+      folderName,
+    }: PackInstallOptions,
   ): Promise<PackInstallRecord> => {
     const { entries } = await loadEntries(sourcePack);
 
@@ -468,7 +628,7 @@ export function useStarterPacks(org: string) {
     const pack = withFolder(sourcePack, interrupted?.folderName ?? folderName);
     // A resumed record still lists items the current plan leaves out; only made ones stay.
     const kept = (item: PackRecordItem) =>
-      item.status === "created" || !exclude.includes(item.itemId);
+      item.status === "created" || !exclude.includes(item.copyOf ?? item.itemId);
     const record: PackInstallRecord = interrupted
       ? {
           ...interrupted,
@@ -484,8 +644,12 @@ export function useStarterPacks(org: string) {
           installedBy: store.state.userInfo?.email ?? "",
           version: pack.version,
           ...(repairs.length ? { repairs } : {}),
+          ...(bindings.length ? { bindings } : {}),
+          ...(Object.keys(flavours).length ? { flavours } : {}),
           ...(folderName ? { folderName } : {}),
-          items: (await planItems(pack)).filter((item) => !exclude.includes(item.itemId)),
+          items: (await planItems(pack, copies)).filter(
+            (item) => !exclude.includes(item.copyOf ?? item.itemId),
+          ),
         };
     await writeFirstRecord(record);
     onProgress?.(record);
@@ -493,8 +657,7 @@ export function useStarterPacks(org: string) {
     for (let index = 0; index < record.items.length; index += 1) {
       const item = record.items[index];
       if (item.status === "created" || item.status === "existing") continue;
-      const itemRepairs = record.repairs ?? [];
-      record.items[index] = await settleItem(pack, item, record.items, entries, itemRepairs);
+      record.items[index] = await settleItem(pack, item, record.items, entries, record);
       await records.write(record);
       onProgress?.(record);
       // Everything after a folder needs its id.
