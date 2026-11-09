@@ -484,30 +484,8 @@ const columns = computed(() =>
       size: COL.dateAbsolute,
       meta: { align: "left" },
     },
-    {
-      id: "stream",
-      header: t("onlineEvals.job.columns.stream"),
-      accessorKey: "stream",
-      sortable: true,
-      size: COL.streamName,
-      meta: { align: "left" },
-    },
-    {
-      id: "targetScope",
-      header: t("onlineEvals.job.columns.targetScope"),
-      accessorFn: (row: EvalJob) => targetScopeOf(row),
-      sortable: true,
-      size: 120,
-      meta: { align: "left" },
-    },
-    {
-      id: "scorers",
-      header: t("onlineEvals.job.columns.scorers"),
-      accessorFn: (row: EvalJob) => (row.scorers || []).length,
-      sortable: true,
-      size: COL.count,
-      meta: { align: "right" },
-    },
+    // Health, spend and the last error come before the job's set-up columns, so a
+    // 1280 px window shows today's spend without scrolling.
     {
       id: "health",
       header: t("onlineEvals.job.columns.health"),
@@ -535,6 +513,30 @@ const columns = computed(() =>
       sortable: true,
       size: 200,
       meta: { align: "left" },
+    },
+    {
+      id: "stream",
+      header: t("onlineEvals.job.columns.stream"),
+      accessorKey: "stream",
+      sortable: true,
+      size: COL.streamName,
+      meta: { align: "left" },
+    },
+    {
+      id: "targetScope",
+      header: t("onlineEvals.job.columns.targetScope"),
+      accessorFn: (row: EvalJob) => targetScopeOf(row),
+      sortable: true,
+      size: 120,
+      meta: { align: "left" },
+    },
+    {
+      id: "scorers",
+      header: t("onlineEvals.job.columns.scorers"),
+      accessorFn: (row: EvalJob) => (row.scorers || []).length,
+      sortable: true,
+      size: COL.count,
+      meta: { align: "right" },
     },
     {
       id: "created",

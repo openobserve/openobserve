@@ -81,7 +81,7 @@
           />
         </template>
         <!-- Repeated tool calls for this agent and tool, prefilled (AIO-20). -->
-        <template #cell-actions="{ row }">
+        <template #cell-alert="{ row }">
           <span @click.stop>
             <CreateAlertAction
               variant="icon"
@@ -317,12 +317,21 @@ const behaviorStats = computed<StatItem[]>(() => {
   ];
 });
 
+// Agent, tool, failure class, env and version are what tell rows apart. They share
+// the width the fixed columns leave (`autoWidth`) and, below `minSize`, the table
+// scrolls instead of crushing them to a few letters (`flex`).
+const identityColumn = { size: 136, minSize: 136 } as const;
+const identityMeta = { align: "left", flex: true, autoWidth: true } as const;
+
 // Calls/trace, calls and traces: the same for an (agent, tool) row and its variants.
+// Short numbers, so they stay compact and leave the width to the identifying columns.
 const loopMetricColumns = computed<OTableColumnDef[]>(() => [
   {
     id: "ratio",
     header: t("aiObservability.behavior.colRatio"),
     accessorKey: "ratio",
+    // Fits the "Calls / trace" header beside its sort icon.
+    size: 108,
     meta: { align: "right" },
     sortable: true,
   },
@@ -330,6 +339,7 @@ const loopMetricColumns = computed<OTableColumnDef[]>(() => [
     id: "calls",
     header: t("aiObservability.behavior.colCalls"),
     accessorKey: "calls",
+    size: 76,
     meta: { align: "right" },
     sortable: true,
   },
@@ -337,6 +347,7 @@ const loopMetricColumns = computed<OTableColumnDef[]>(() => [
     id: "traces",
     header: t("aiObservability.behavior.colTraces"),
     accessorKey: "traces",
+    size: 76,
     meta: { align: "right" },
     sortable: true,
   },
@@ -347,18 +358,21 @@ const loopColumns = computed<OTableColumnDef[]>(() => [
     id: "agent",
     header: t("aiObservability.behavior.colAgent"),
     accessorKey: "agent",
-    meta: { align: "left", autoWidth: true },
+    ...identityColumn,
+    meta: identityMeta,
     sortable: true,
   },
   {
     id: "tool",
     header: t("aiObservability.behavior.colTool"),
     accessorKey: "tool",
-    meta: { align: "left", autoWidth: true },
+    ...identityColumn,
+    meta: identityMeta,
     sortable: true,
   },
   ...loopMetricColumns.value,
-  { id: "actions", header: raw(""), size: 56, meta: { align: "right" }, sortable: false },
+  // Not `actions`: that id reserves room for an "Actions" header this icon column does without.
+  { id: "alert", header: raw(""), size: 52, meta: { align: "right" }, sortable: false },
 ]);
 
 // Env and version of a variant row, shared by the loop and failure variants.
@@ -367,9 +381,9 @@ const variantScopeColumns = computed<OTableColumnDef[]>(() => [
     id: "env",
     header: t("aiObservability.scope.env"),
     accessorKey: "env",
+    ...identityColumn,
     meta: {
-      align: "left",
-      autoWidth: true,
+      ...identityMeta,
       format: (v: string | null) => v ?? t("traces.agentNoEnv"),
     },
   },
@@ -377,9 +391,9 @@ const variantScopeColumns = computed<OTableColumnDef[]>(() => [
     id: "version",
     header: t("aiObservability.scope.version"),
     accessorKey: "version",
+    ...identityColumn,
     meta: {
-      align: "left",
-      autoWidth: true,
+      ...identityMeta,
       format: (v: string | null) => v ?? t("traces.agentNoVersion"),
     },
   },
@@ -404,14 +418,16 @@ const failureColumns = computed<OTableColumnDef[]>(() => [
     id: "agent",
     header: t("aiObservability.behavior.colAgent"),
     accessorKey: "agent",
-    meta: { align: "left", autoWidth: true },
+    ...identityColumn,
+    meta: identityMeta,
     sortable: true,
   },
   {
     id: "failClass",
     header: t("aiObservability.behavior.colFailClass"),
     accessorKey: "failClass",
-    meta: { align: "left", autoWidth: true },
+    ...identityColumn,
+    meta: identityMeta,
     sortable: true,
   },
   failureCountColumn.value,
@@ -421,6 +437,7 @@ const failureCountColumn = computed<OTableColumnDef>(() => ({
   id: "count",
   header: t("aiObservability.behavior.colCount"),
   accessorKey: "count",
+  size: 76,
   meta: { align: "right" },
   sortable: true,
 }));

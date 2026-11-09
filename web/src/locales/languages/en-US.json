@@ -17941,6 +17941,7 @@
       "defaultTierPrices": "in {input} / out {output} per 1M",
       "notPriced": "not priced",
       "createPrice": "Create price",
+      "keepPricesButton": "Keep prices",
       "keepPrices": "Keep {name} prices",
       "mute": "Mute",
       "muteConfirmTitle": "Mute this model?",

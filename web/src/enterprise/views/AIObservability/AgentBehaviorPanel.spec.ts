@@ -328,6 +328,27 @@ describe("AgentBehaviorPanel", () => {
     expect(wrapper.find('[data-test="strip"]').text()).toBe("3,9,3");
   });
 
+  // U3-08: at 1024 px the counts took 150 px each and crushed Agent and Tool to "q…".
+  it("keeps Agent and Tool at a usable floor and the loop counts compact", async () => {
+    const wrapper = await mountWith(reportSignals);
+    const loops = wrapper
+      .findAllComponents({ name: "OTable" })
+      .find((t) => t.attributes("data-test") === "agent-behavior-loops-table")!;
+    const columns = loops.props("columns") as Array<{
+      id: string;
+      size?: number;
+      minSize?: number;
+      meta?: Record<string, unknown>;
+    }>;
+    const byId = Object.fromEntries(columns.map((c) => [c.id, c]));
+
+    for (const id of ["agent", "tool"]) {
+      expect(byId[id].minSize).toBe(136);
+      expect(byId[id].meta).toMatchObject({ flex: true, autoWidth: true });
+    }
+    for (const id of ["ratio", "calls", "traces"]) expect(byId[id].size).toBeLessThanOrEqual(108);
+  });
+
   it("highlights and scopes the drawer to exactly the clicked row", async () => {
     const wrapper = await mountWith(reportSignals);
     // The panel's own bindings: the table and drawer are stubbed.

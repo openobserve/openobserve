@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="loading"
       :show-global-filter="false"
       :fill-height="false"
+      :default-columns="false"
       pagination="none"
       :empty-message="
         failed
@@ -52,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="truncate" :title="row.operation">{{ where(row) }}</span>
       </template>
       <template #cell-last="{ value }">
-        {{ value ? timestampToTimezoneDate(Number(value), timezone, "yyyy-MM-dd HH:mm:ss") : "—" }}
+        {{ value ? timestampToTimezoneDate(Number(value), timezone, "yyyy-MM-dd HH:mm") : "—" }}
       </template>
     </OTable>
   </LLMPanelCard>
@@ -63,7 +64,7 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import LLMPanelCard from "./LLMPanelCard.vue";
 import { renderPanelSql, type LLMPanelDef } from "./config/llmInsightsPanels";
 import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
@@ -90,32 +91,36 @@ const loading = ref(false);
 const failed = ref(false);
 let seq = 0;
 
+// Fits a half-width panel at 1280 px: the message takes what the fixed columns leave
+// (`autoWidth`) and the table scrolls once that drops below `minSize` (`flex`).
 const columns: OTableColumnDef[] = [
   {
     id: "message",
     header: t("aiObservability.panels.topErrors.columns.message"),
     accessorKey: "message",
-    meta: { align: "left", flex: true },
+    size: 100,
+    minSize: 100,
+    meta: { align: "left", flex: true, autoWidth: true },
   },
   {
     id: "operation",
     header: t("aiObservability.panels.topErrors.columns.where"),
     accessorKey: "operation",
-    size: COL.name,
+    size: 150,
     meta: { align: "left" },
   },
   {
     id: "traces",
     header: t("aiObservability.panels.topErrors.columns.traces"),
     accessorKey: "traces",
-    size: COL.count,
+    size: 64,
     meta: { align: "right" },
   },
   {
     id: "last",
     header: t("aiObservability.panels.topErrors.columns.last"),
     accessorKey: "last_seen",
-    size: COL.createdAt,
+    size: 136,
     meta: { align: "left" },
   },
 ];

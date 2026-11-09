@@ -222,6 +222,8 @@ const columns: OTableColumnDef[] = [
     id: "user_id",
     header: t("llmAttribution.dims.user"),
     accessorKey: "user_id",
+    size: 160,
+    minSize: 160,
     meta: { align: "left", flex: true },
     sortable: true,
   },
@@ -261,7 +263,8 @@ const columns: OTableColumnDef[] = [
     id: "failure_rate",
     header: t("traces.lLMInsightsDashboard.errorRate"),
     accessorKey: "failure_rate",
-    size: COL.count,
+    // Fits the "Error Rate" header next to its sort icon.
+    size: 120,
     meta: { align: "right" },
     sortable: true,
   },
@@ -273,7 +276,8 @@ const columns: OTableColumnDef[] = [
     meta: { align: "left" },
     sortable: true,
   },
-  { id: "actions", header: raw(""), size: COL.count, meta: { align: "right" } },
+  // Pinned, so the row's Sessions button stays in reach when a narrow window scrolls the table.
+  { id: "actions", header: raw(""), isAction: true, size: 110, meta: { align: "right" } },
 ];
 
 async function reload() {

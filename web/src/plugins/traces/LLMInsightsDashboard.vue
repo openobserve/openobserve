@@ -414,11 +414,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            remount is what lets it restore an already-fetched result instead of
            re-querying. Same selection + window → instant cache hit; a new one →
            a clean miss that fetches. -->
-        <div class="grid grid-cols-2 gap-2.5">
+        <!-- One column below xl: at 1024 px a half-width panel leaves its table too narrow
+           for its columns. -->
+        <div class="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
           <div
             v-for="panel in LLM_INSIGHTS_PANELS"
             :key="`${panel.id}::${panelCacheDashboardId}`"
-            :class="panel.layout.colSpan === 2 ? 'col-span-2' : ''"
+            :class="panel.layout.colSpan === 2 ? 'xl:col-span-2' : ''"
           >
             <!-- Table panels use OTable (interactive, app-navigation) — matches
                the other AI Observability tables; every chart panel renders

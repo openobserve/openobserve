@@ -609,15 +609,16 @@ watch(total, () => {
 // `hideable` exposes a column in OTable's auto-injected column chooser;
 // `sessionId` stays mandatory (it's the row identity). `firstUserMessage` is
 // the flex column — it fills leftover width on load and freezes on first
-// resize. All widths are user-resizable + persisted via `table-id`.
+// resize. All widths are user-resizable + persisted via `table-id`. Cost and
+// status come right after turns, so a 1280 px window shows them without scrolling.
 const tableColumns = computed(() =>
   [
     {
       id: "userId",
       header: t("traces.sessionsList.columns.user"),
       accessorKey: "userId",
-      // Email-identity width preset; OUserCell truncates + tooltips beyond it.
-      size: COL.email,
+      // OUserCell truncates + tooltips beyond this width.
+      size: 180,
       sortable: true,
       hideable: true,
       meta: { align: "left" },
@@ -644,7 +645,7 @@ const tableColumns = computed(() =>
       // Flex columns collapse to `minSize` when the table overflows horizontally;
       // pin a floor so the message stays readable instead of clipping to "Han…".
       // The user drives how much they want to see via resize, capped by maxSize.
-      minSize: 200,
+      minSize: 160,
       maxSize: 600,
       sortable: false,
       hideable: true,
@@ -655,25 +656,6 @@ const tableColumns = computed(() =>
       header: t("traces.sessionsList.columns.turns"),
       accessorKey: "turns",
       size: 70,
-      sortable: true,
-      hideable: true,
-      meta: { align: "right" },
-    },
-    {
-      id: "durationNanos",
-      header: t("traces.sessionsList.columns.duration"),
-      accessorKey: "durationNanos",
-      size: 90,
-      sortable: true,
-      hideable: true,
-      meta: { align: "left" },
-    },
-    {
-      id: "tokens",
-      header: t("traces.sessionsList.columns.tokens"),
-      accessorKey: "tokens",
-      size: 150,
-      minSize: 150,
       sortable: true,
       hideable: true,
       meta: { align: "right" },
@@ -696,6 +678,25 @@ const tableColumns = computed(() =>
       sortable: true,
       hideable: true,
       meta: { align: "left", disableCellAction: true },
+    },
+    {
+      id: "durationNanos",
+      header: t("traces.sessionsList.columns.duration"),
+      accessorKey: "durationNanos",
+      size: 90,
+      sortable: true,
+      hideable: true,
+      meta: { align: "left" },
+    },
+    {
+      id: "tokens",
+      header: t("traces.sessionsList.columns.tokens"),
+      accessorKey: "tokens",
+      size: 150,
+      minSize: 150,
+      sortable: true,
+      hideable: true,
+      meta: { align: "right" },
     },
     {
       id: "lastSeenNanos",

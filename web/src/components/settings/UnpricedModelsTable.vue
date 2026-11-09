@@ -89,8 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("modelPricing.unpriced.noMatch") }}
           </OBadge>
           <div v-else class="flex min-w-0 flex-col py-1">
-            <div class="flex min-w-0 items-center gap-1.5">
-              <OTruncatedText as="span">{{ row.matched.name }}</OTruncatedText>
+            <!-- A narrow column wraps the badge under the name instead of cutting the name short. -->
+            <div class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <OTruncatedText as="span" class="max-w-full min-w-0">{{
+                row.matched.name
+              }}</OTruncatedText>
               <OBadge
                 :variant="row.priced_now ? 'success-soft' : 'warning-soft'"
                 size="sm"
@@ -105,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </OBadge>
             </div>
-            <span v-if="matchedPrices(row)" class="text-text-secondary text-xs">
+            <span v-if="matchedPrices(row)" class="text-text-secondary text-xs whitespace-normal">
               {{ matchedPrices(row) }}
             </span>
           </div>
@@ -156,7 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="model-pricing-unpriced-keep-btn"
               @click.stop="keepPrices(row)"
             >
-              {{ t("modelPricing.unpriced.keepPrices", { name: row.matched.name }) }}
+              {{ t("modelPricing.unpriced.keepPricesButton") }}
+              <OTooltip
+                :content="t('modelPricing.unpriced.keepPrices', { name: row.matched.name })"
+              />
             </OButton>
             <OButton
               v-else
@@ -308,23 +314,28 @@ const columns: OTableColumnDef<UnpricedModel>[] = [
     header: t("modelPricing.unpriced.colModel"),
     accessorKey: "model",
     sortable: true,
-    minSize: 180,
-    meta: { align: "left", flex: true },
+    // `autoWidth` hands Model and Priced as the width the fixed columns leave, split
+    // evenly; `flex` makes the table scroll instead once that drops below `minSize`.
+    // At the minimums the columns fit the 696 px pane of a 1024 px window.
+    size: 136,
+    minSize: 136,
+    meta: { align: "left", flex: true, autoWidth: true },
   },
   {
     id: "priced_as",
     header: t("modelPricing.unpriced.colPricedAs"),
     accessorFn: (row) => row.matched?.name ?? "",
     sortable: true,
-    minSize: 180,
-    meta: { align: "left", flex: true },
+    size: 136,
+    minSize: 136,
+    meta: { align: "left", flex: true, autoWidth: true },
   },
   {
     id: "tokens",
     header: t("modelPricing.unpriced.colTokens"),
     accessorKey: "tokens",
     sortable: true,
-    size: 100,
+    size: 76,
     meta: { align: "right" },
   },
   {
@@ -332,7 +343,7 @@ const columns: OTableColumnDef<UnpricedModel>[] = [
     header: t("modelPricing.unpriced.colCost"),
     accessorKey: "cost",
     sortable: true,
-    size: 120,
+    size: 116,
     meta: { align: "right" },
   },
   {
@@ -340,8 +351,9 @@ const columns: OTableColumnDef<UnpricedModel>[] = [
     header: t("modelPricing.unpriced.colActions"),
     isAction: true,
     pinned: "right",
-    // Fits "Create price" next to "Keep <model name> prices" for a typical model name.
-    size: 330,
+    // "Create price" next to "Keep prices" (the matched name rides in the tooltip),
+    // so the columns fit a 1024 px window without the pinned column covering Tokens and Cost.
+    size: 232,
     meta: { align: "right", actionCount: 2 },
   },
 ];

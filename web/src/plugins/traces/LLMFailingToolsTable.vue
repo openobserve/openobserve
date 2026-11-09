@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ row.calls ? `${((100 * row.failures) / row.calls).toFixed(0)}%` : "—" }}
       </template>
       <template #cell-last="{ value }">
-        {{ value ? timestampToTimezoneDate(Number(value), timezone, "yyyy-MM-dd HH:mm:ss") : "—" }}
+        {{ value ? timestampToTimezoneDate(Number(value), timezone, "yyyy-MM-dd HH:mm") : "—" }}
       </template>
     </OTable>
   </LLMPanelCard>
