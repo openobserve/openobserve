@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="`home-now-row-${row.key}`"
     :data-bucket="row.bucket"
   >
-    <div class="flex min-w-0 flex-wrap items-center gap-2 @[32rem]/row:flex-nowrap">
+    <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 @[40rem]/row:flex-nowrap">
       <HomeStateMark :bucket="row.bucket" />
       <div
-        class="flex min-w-0 flex-1 basis-[calc(100%-2rem)] flex-col gap-0.5 @[32rem]/row:basis-0"
+        class="flex min-w-0 flex-1 basis-[calc(100%-2rem)] flex-col gap-0.5 @[40rem]/row:basis-0"
       >
         <div class="flex min-w-0 items-baseline gap-1 text-sm">
           <OButton
@@ -41,97 +41,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OTruncatedText
             v-else
-            class="text-text-heading min-w-0"
+            class="text-text-heading min-w-0 font-medium"
             data-test="home-now-row-sentence"
             >{{ sentence }}</OTruncatedText
           >
         </div>
         <div
-          class="text-text-secondary flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs"
+          v-if="detail.length"
+          class="text-text-secondary flex min-w-0 flex-wrap items-center gap-x-1 text-xs"
+          data-test="home-now-row-detail"
         >
-          <span
-            v-if="meta?.service && row.kind !== 'service'"
-            data-test="home-now-row-service-name"
-            >{{ meta.service }}</span
-          >
-          <OTag
-            v-if="meta?.flapping"
-            type="countChip"
-            value="warning"
-            data-test="home-now-row-flapping"
-            >{{ t("home.agent.flapping", { count: flapCount }) }}</OTag
-          >
-          <template v-if="row.kind === 'incident'">
-            <OTag type="severity" :value="row.severity.toLowerCase()" />
-            <span>{{ row.status }}</span>
-            <span>{{ t("alerts.incidents.alertCount") }} {{ row.alertCount }}</span>
+          <template v-for="(part, index) in detail" :key="part.id">
+            <span v-if="index > 0" aria-hidden="true">·</span>
+            <span :class="part.tone" :data-test="`home-now-row-${part.id}`">{{ part.text }}</span>
           </template>
-          <OTag
-            v-else-if="row.kind === 'alert' && row.state === 'firing' && row.count > 1"
-            type="countChip"
-            value="error"
-            data-test="home-now-row-count"
-            >{{ t("overview.now.firingCount", { count: row.count }) }}</OTag
-          >
-          <span v-else-if="row.kind === 'alert' && row.state === 'recovered'">{{
-            t("overview.now.recovered")
-          }}</span>
-          <span v-else-if="row.kind === 'anomaly'">{{ row.stream }}</span>
-          <template v-if="row.kind === 'service'">
-            <span
-              v-if="row.coverage === 'none'"
-              class="text-status-warning-text"
-              data-test="home-now-row-no-alert"
-              >{{
-                createAlert ? t("home.agent.problems.noAlert") : t("overview.now.noAlert")
-              }}</span
-            >
-            <span
-              v-else-if="row.coverage === 'unknown'"
-              data-test="home-now-row-coverage-unknown"
-              >{{ t("overview.now.coverageUnknown") }}</span
-            >
-            <span v-if="row.partial" data-test="home-now-row-partial">{{
-              t("overview.now.partialRow")
-            }}</span>
-          </template>
-          <span :title="changedTitle" data-test="home-now-row-changed">{{
-            t("overview.now.changedAt", { time: changedTime })
-          }}</span>
         </div>
       </div>
       <div
-        v-if="row.kind === 'service'"
-        class="hidden shrink-0 items-center gap-2 @[32rem]/row:flex"
+        class="flex shrink-0 items-center justify-end gap-2 ps-6 @[40rem]/row:w-36 @[40rem]/row:ps-0"
+        data-test="home-now-row-state"
       >
-        <OText
-          :variant="noBaseline ? 'meta' : 'mono'"
-          class="whitespace-nowrap"
-          :class="noBaseline ? 'text-text-secondary' : 'text-text-body'"
-          data-test="home-now-row-figure"
-          >{{ figure }}</OText
-        >
-        <OSparkline
-          v-if="points && !noBaseline"
-          :points="points.points"
-          :baseline="points.baseline ?? undefined"
+        <template v-if="row.kind === 'service'">
+          <OText
+            :variant="noBaseline ? 'meta' : 'mono'"
+            class="hidden whitespace-nowrap @[40rem]/row:inline"
+            :class="noBaseline ? 'text-text-secondary' : 'text-text-body'"
+            data-test="home-now-row-figure"
+            >{{ figure }}</OText
+          >
+          <OSparkline
+            v-if="points && !noBaseline"
+            :points="points.points"
+            :baseline="points.baseline ?? undefined"
+            size="xs"
+            :tone="row.signal === 'errors' ? 'danger' : 'warning'"
+            :aria-label="sentence"
+            class="hidden w-16 @[40rem]/row:block"
+            data-test="home-now-row"
+          />
+        </template>
+        <OTag
+          v-else-if="meta?.flapping"
+          variant="warning-soft"
+          dot
           size="xs"
-          :tone="row.signal === 'errors' ? 'danger' : 'warning'"
-          :aria-label="sentence"
-          class="w-20"
-          data-test="home-now-row"
+          :label="t('home.agent.flapping', { count: flapCount })"
+          data-test="home-now-row-flapping"
         />
+        <OTag
+          v-else-if="row.kind === 'incident'"
+          type="severity"
+          :value="severityValue"
+          size="xs"
+          data-test="home-now-row-severity"
+        />
+        <OTag
+          v-else-if="row.kind === 'alert' && row.state === 'recovered'"
+          variant="default-outline"
+          size="xs"
+          :label="t('overview.now.recovered')"
+          data-test="home-now-row-recovered"
+        />
+        <OTag
+          v-else-if="row.kind === 'alert' && row.count > 1"
+          type="countChip"
+          value="error"
+          data-test="home-now-row-count"
+          >{{ t("overview.now.firingCount", { count: row.count }) }}</OTag
+        >
       </div>
+      <span
+        class="text-text-secondary w-12 shrink-0 text-xs tabular-nums max-md:hidden"
+        :title="changedTitle"
+        data-test="home-now-row-changed"
+        >{{ changedTime }}</span
+      >
       <!-- A narrow row gives the name its own line and puts the actions under it -->
-      <div class="flex shrink-0 items-center gap-1 ps-6 @[32rem]/row:ps-0">
-        <OTooltip :content="fallbackText ?? undefined" :disabled="!fallbackText">
+      <div
+        class="flex shrink-0 items-center justify-end gap-1 ps-6 @[40rem]/row:w-64 @[40rem]/row:ps-0"
+        data-test="home-now-row-actions"
+      >
+        <OButton
+          v-if="followRun"
+          variant="outline"
+          size="sm"
+          :icon-left="assistantGlyph.thread"
+          :aria-label="t('home.agent.followInThreadName', { row: sentence })"
+          class="max-md:min-h-11"
+          data-test="home-now-row-follow"
+          @click="emit('follow', row, followRun)"
+        >
+          {{ t("alerts.incidents.rcaRun.followInThread") }}
+        </OButton>
+        <OTooltip v-else :content="fallbackText ?? undefined" :disabled="!fallbackText">
           <OButton
             variant="outline"
             size="sm"
             :aria-label="t('overview.now.investigateName', { row: sentence })"
             :aria-describedby="fallbackText ? `${rowId}-fallback` : undefined"
             :loading="busy"
-            :icon-left="askable ? assistantGlyph.assistant : undefined"
+            :icon-left="askable ? assistantGlyph.scan : undefined"
+            class="max-md:min-h-11"
             data-test="home-now-row-investigate"
             :data-askable="askable ? 'true' : 'false'"
             @click="emit('investigate', row)"
@@ -163,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-primary"
           size="sm"
           :disabled="linkLocked"
+          class="max-md:min-h-11"
           data-test="home-now-row-open"
           @click="emit('open', row)"
         >
@@ -172,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="row.kind === 'service'"
-      class="text-text-secondary flex items-center gap-2 ps-6 text-xs @[32rem]/row:hidden"
+      class="text-text-secondary flex items-center gap-2 ps-6 text-xs @[40rem]/row:hidden"
     >
       <OText
         :variant="noBaseline ? 'meta' : 'mono'"
@@ -214,6 +225,7 @@ export interface NowRowMeta {
 import { computed } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { runStateLabel } from "@/components/ai-assistant/history/autoRuns";
 import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextProviders/types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -222,6 +234,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import type { SparklinePoint } from "@/lib/data/Sparkline/OSparkline.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { OrgRcaRun } from "@/services/rca_runs_org";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
 
@@ -246,6 +259,8 @@ const props = withDefaults(
     meta?: NowRowMeta | null;
     /** Shown on Problems with no alert; a read-only role sees it disabled. */
     createAlert?: { enabled: boolean } | null;
+    /** The incident's newest RCA run; its door is Follow in thread instead of starting another. */
+    run?: OrgRcaRun | null;
   }>(),
   {
     selected: false,
@@ -257,6 +272,7 @@ const props = withDefaults(
     askable: true,
     meta: null,
     createAlert: null,
+    run: null,
   },
 );
 
@@ -266,6 +282,7 @@ const emit = defineEmits<{
   service: [row: OverviewNowRow];
   showRuns: [];
   createAlert: [row: OverviewNowRow];
+  follow: [row: OverviewNowRow, run: OrgRcaRun];
 }>();
 
 const { t } = useI18nTyped();
@@ -286,7 +303,7 @@ const figure = computed<I18nText>(() => {
   return serviceFigure(row, t);
 });
 const changedTime = computed(() =>
-  formatTimestampInTimezone(props.row.changedAt, "HH:mm", props.timezone),
+  raw(formatTimestampInTimezone(props.row.changedAt, "HH:mm", props.timezone)),
 );
 const changedTitle = computed(() =>
   raw(
@@ -307,7 +324,50 @@ const flapCount = computed(() => {
 });
 const linkLabel = computed<I18nText>(() => {
   if (props.row.kind === "service") return t("traces.servicesCatalog.viewTraces");
-  if (props.row.kind === "incident") return t("overview.goTo.open");
-  return t("alerts.history");
+  if (props.row.kind === "incident") return t("home.agent.openIncident");
+  return t("home.agent.openAlert");
+});
+// A run that is going or ended is followed; only a missing run starts one.
+const followRun = computed(() =>
+  props.row.kind === "incident" && props.askable ? (props.run ?? null) : null,
+);
+const severityValue = computed(() =>
+  props.row.kind === "incident" ? props.row.severity.toLowerCase() : "",
+);
+// The muted line carries only what the title and pill do not: the service, the run, or what is off about a service row.
+const detail = computed(() => {
+  const row = props.row;
+  const parts: { id: string; text: I18nText; tone?: string }[] = [];
+  if (props.meta?.service && row.kind !== "service")
+    parts.push({ id: "service-name", text: raw(props.meta.service) });
+  if (row.kind === "incident" && props.run)
+    parts.push({
+      id: "run",
+      text: t("home.agent.runLine", {
+        state: runStateLabel(props.run, t),
+        time: raw(
+          formatTimestampInTimezone(
+            props.run.ended_at ?? props.run.started_at,
+            "HH:mm",
+            props.timezone,
+          ),
+        ),
+      }),
+    });
+  if (row.kind === "alert" && row.state === "recovered" && props.meta?.flapping)
+    parts.push({ id: "recovered-note", text: t("overview.now.recovered") });
+  if (row.kind === "anomaly") parts.push({ id: "stream", text: raw(row.stream) });
+  if (row.kind === "service") {
+    if (row.coverage === "none")
+      parts.push({
+        id: "no-alert",
+        text: props.createAlert ? t("home.agent.problems.noAlert") : t("overview.now.noAlert"),
+        tone: "text-status-warning-text",
+      });
+    else if (row.coverage === "unknown")
+      parts.push({ id: "coverage-unknown", text: t("overview.now.coverageUnknown") });
+    if (row.partial) parts.push({ id: "partial", text: t("overview.now.partialRow") });
+  }
+  return parts;
 });
 </script>

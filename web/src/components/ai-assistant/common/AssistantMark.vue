@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-mark"
     :data-size="size"
     :class="[
-      'rounded-default bg-assistant-mark-bg inline-flex shrink-0 items-center justify-center',
+      'rounded-default bg-assistant-mark-bg shadow-assistant-mark inline-flex shrink-0 items-center justify-center',
       chipSize,
+      sparkle ? ASSISTANT_MOTION.sparkle : '',
       muted ? 'text-text-muted' : 'text-assistant-mark-fg',
     ]"
   >
@@ -35,6 +36,7 @@ import { computed } from "vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
+import { ASSISTANT_MOTION } from "./assistantMotion";
 import { assistantGlyph } from "./glyphs";
 
 const CHIP_SIZES = { xs: "size-5", sm: "size-6", md: "size-9", lg: "size-12" } as const;
@@ -46,8 +48,10 @@ const props = withDefaults(
     glyph?: IconName;
     /** Gate states: the glyph in `text-text-muted`. */
     muted?: boolean;
+    /** Plays the one-off opening sparkle; the panel sets it only on the open that should animate. */
+    sparkle?: boolean;
   }>(),
-  { size: "sm", muted: false, glyph: undefined },
+  { size: "sm", muted: false, glyph: undefined, sparkle: false },
 );
 
 const chipSize = computed(() => CHIP_SIZES[props.size]);

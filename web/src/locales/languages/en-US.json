@@ -10495,13 +10495,6 @@
       "admins": "Admins: {names}",
       "briefMe": "Brief me",
       "briefMePrompt": "Brief me on what changed and what needs me now.",
-      "headline": {
-        "clear": "Nothing needs you right now",
-        "needYou": "{count} thing needs you | {count} things need you",
-        "noAlert": "{count} service has no alert | {count} services have no alert"
-      },
-      "briefingNote": "Ranked against each service's last 24 h · grouped by service · no AI used to build this list",
-      "briefingNoteRefresh": "Ranked against each service's last 24 h · grouped by service · refreshes every 60 s · no AI used to build this list",
       "flapping": "Flapping · {count}×",
       "problems": {
         "title": "Problems with no alert",
@@ -10540,8 +10533,18 @@
         "note": "Home fills in by itself once a service sends data: Now, Problems with no alert and dashboards. Building it uses no AI."
       },
       "tabLabel": "AI Assistant",
-      "nowClearProblems": "Nothing else is over baseline right now"
-    }
+      "nowClearProblems": "Nothing else is over baseline right now",
+      "needsYouTitle": "Needs you",
+      "briefMeHint": "What changed since you were last here",
+      "failedRunTitle": "Auto RCA for {title}",
+      "failedRunDetail": "Auto-run · {code}",
+      "autoRun": "Auto-run",
+      "retryRunFailed": "Couldn't start the analysis again",
+      "followInThreadName": "Follow {row} in thread",
+      "runLine": "{state} · {time}"
+    },
+    "answersReady": "{count} answer ready | {count} answers ready",
+    "needYou": "{count} needs you | {count} need you"
   },
   "overview": {
     "alertsSuffix": "alerts",
@@ -11021,16 +11024,16 @@
     },
     "attachImageTooltip": "Attach images (PNG, JPEG, max 2MB)",
     "greeting": {
-      "morning": "Good Morning",
-      "afternoon": "Good Afternoon",
-      "evening": "Good Evening",
-      "night": "Working Late"
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening",
+      "night": "Working late"
     },
     "greetingNamed": {
-      "morning": "Good Morning, {name}",
-      "afternoon": "Good Afternoon, {name}",
-      "evening": "Good Evening, {name}",
-      "night": "Working Late, {name}"
+      "morning": "Good morning, {name}",
+      "afternoon": "Good afternoon, {name}",
+      "evening": "Good evening, {name}",
+      "night": "Working late, {name}"
     },
     "aiChat": {
       "analyzingMessages": {
@@ -11313,7 +11316,21 @@
         "resumed": "Resumed {entity} {name}",
         "youAt": "you · {time}"
       },
-      "onDashboard": "On dashboard {name}"
+      "onDashboard": "On dashboard {name}",
+      "alwaysFor": "Always for {action}",
+      "alwaysAllowed": "Always allowed: {action}",
+      "revoke": "Revoke",
+      "changedSince": "Changed since asked",
+      "recheckFailed": "Couldn't check for changes, so nothing was written",
+      "more": "More actions",
+      "revokeFailed": "Couldn't revoke. Try again from Settings.",
+      "actionPhrase": {
+        "create": "creating {entity}",
+        "pause": "pausing {entity}",
+        "resume": "resuming {entity}",
+        "update": "updating {entity}",
+        "delete": "deleting {entity}"
+      }
     },
     "askAdmin": {
       "adminsOf": "Admins of {org}",
@@ -11473,7 +11490,32 @@
       "replyCancel": "Cancel",
       "replyRefused": "Your reply wasn't sent. This request can't be answered from this page.",
       "inertAnswer": "Answer above to continue",
-      "goToRequest": "Go to request"
+      "goToRequest": "Go to request",
+      "placeholderAt": "Ask anything · {'@'} to add context",
+      "followUpAt": "Ask a follow-up · {'@'} to add context",
+      "queued": "{count} queued",
+      "queuedEdit": "Edit",
+      "steerPlaceholder": "Steer this run · read after the current step",
+      "strip": {
+        "runLimit": "Run limit reached",
+        "showRunning": "Show running chats",
+        "creditsOut": "AI credits used up",
+        "managePaid": "Manage paid usage",
+        "orgBusy": "Assistant busy for your org",
+        "retry": "Retry",
+        "micBlocked": "Microphone blocked",
+        "howToAllow": "How to allow",
+        "decideAbove": "Decide above to continue",
+        "pastedLines": "Pasted {count} line | Pasted {count} lines",
+        "attachAsFile": "Attach as file",
+        "replaceDraft": "Replace draft?",
+        "needsAccess": "Needs AI access",
+        "offline": "Offline · draft kept",
+        "busyFor": "Busy · send again in {s} s",
+        "pasteInline": "Paste into the message",
+        "enterQueues": "Answer running · Enter queues this"
+      },
+      "queuedSentence": "Your next message is sent when this answer finishes."
     },
     "consent": {
       "aMember": "a member",
@@ -12428,7 +12470,12 @@
         "remove": "Remove filter {filter}",
         "shared": "Shared",
         "show": "Show",
-        "started": "Started from"
+        "started": "Started from",
+        "investigations": "Investigations",
+        "autoRuns": "Auto-runs",
+        "all": "All",
+        "needsYou": "Needs you",
+        "needsYouCount": "Needs you · {count}"
       },
       "filterEmpty": "No chats match these filters",
       "group": {
@@ -12523,7 +12570,11 @@
       "openFloating": "Open in a floating window",
       "serverErrorAgain": "Still couldn't load your chats",
       "stop": "Stop",
-      "titlesOnly": "Searching titles of the chats loaded so far"
+      "titlesOnly": "Searching titles of the chats loaded so far",
+      "autoRuns": {
+        "empty": "No auto-runs in this org yet",
+        "openName": "Open {title}, {state}"
+      }
     },
     "label": {
       "acceptedAt": "Accepted {time}",
@@ -12608,7 +12659,17 @@
       "versionOf": "{n} of {count}",
       "you": "You",
       "metaHandoff": "{meta} · to {agent}",
-      "copyChatId": "Copy chat id"
+      "copyChatId": "Copy chat id",
+      "readAloud": "Read aloud",
+      "pauseReading": "Pause",
+      "readingAloud": "Reading aloud",
+      "shareAnswer": "Share link",
+      "linkCopied": "Link copied",
+      "branch": "Branch in new chat",
+      "branchTitle": "Branch of {title}",
+      "branchedFrom": "Branched from",
+      "branchFailed": "Couldn't branch this chat",
+      "newTag": "New"
     },
     "name": "O2 Assistant",
     "limit": {
@@ -12681,7 +12742,8 @@
       "open": "Open in {explorer}",
       "run": "Run",
       "running": "Running… · {n} s",
-      "stop": "Stop"
+      "stop": "Stop",
+      "openAll": "Open in {explorer} for all {count}"
     },
     "record": {
       "compacted": "Earlier context was summarised by the assistant at {time}",
@@ -13045,7 +13107,6 @@
       "dockTooNarrow": "Opened in the sidebar: this editor is too narrow for a docked chat",
       "keep": "Keep",
       "keepEditing": "Keep editing",
-      "layout": "Layout",
       "leaveGuardBody": "Leaving discards your changes to {name}.",
       "leaveGuardThisAlert": "this alert",
       "leaveGuardThisPattern": "this pattern",
@@ -13059,8 +13120,6 @@
       "orgSwitchWithdrawn": "Keeping withdraws {count} waiting approval. | Keeping withdraws {count} waiting approvals.",
       "otherAccount": "Another account signed in. Reload to continue with it; this tab's chats stay with the account that signed out.",
       "placeDock": "Beside the editor",
-      "placeFull": "Full page",
-      "placeSidebar": "Side panel",
       "placeWindow": "Floating",
       "placeWindowLimit": "Limit is 4. Close one first.",
       "prefersWindowHint": "This page keeps its width with a floating window",
@@ -13093,12 +13152,10 @@
       "widthNoRoom": "Not enough room at this window size",
       "widthWider": "Wider",
       "loadFailedAgain": "Still couldn't load this chat · tried {time}",
-      "density": {
-        "label": "Density",
-        "full": "Full",
-        "panel": "Panel",
-        "float": "Float"
-      }
+      "openAs": "Open as",
+      "sidePanel": "Side panel",
+      "fullPage": "Full page",
+      "popOut": "Pop out"
     },
     "tray": {
       "close": "Close {title}",
@@ -13202,7 +13259,6 @@
       "windowShowing": "{from} → {to} · Showing {shown} of {total} rows"
     },
     "strip": {
-      "goToAnswer": "Go to answer",
       "review": "Review request",
       "reviewExpires": "Review request · expires in {time}",
       "reviewLabel": "Review"
@@ -13446,7 +13502,8 @@
       "offAdmin": "Dictation is off in this browser.",
       "turnOn": "Turn on",
       "silent": "Your browser didn't turn speech into text. Reload to try again.",
-      "language": "Dictation isn't available in {language}, your browser language."
+      "language": "Dictation isn't available in {language}, your browser language.",
+      "listeningPlaceholder": "Listening… press ↵ to send"
     },
     "welcome": {
       "lastRange": "last {period}",
@@ -13535,7 +13592,7 @@
           "1Generic": "Which services had the slowest spans recently?"
         }
       },
-      "suggestions": "Suggestions"
+      "question": "What do you want to look into?"
     },
     "rca": {
       "tag": "Incident analysis",
@@ -13635,6 +13692,17 @@
       "yourThreads": "Your threads · {count}",
       "noThreads": "No threads running",
       "keys": "Arrow keys move · Enter opens · Esc closes"
+    },
+    "chart": {
+      "showChart": "Show chart",
+      "openInMetrics": "Open in Metrics",
+      "addToDashboard": "Add to dashboard",
+      "createAlert": "Create alert",
+      "copyQuery": "Copy query",
+      "seriesCount": "{count} series",
+      "meta": "{range} · {series}",
+      "name": "{title}, {series}",
+      "legend": "Series"
     }
   },
   "llmObservability": {
@@ -15590,7 +15658,14 @@
           "medium": "Medium confidence",
           "low": "Low confidence",
           "none": "No confidence"
-        }
+        },
+        "cancelConfirmTitle": "Cancel run?",
+        "cancelConfirmBody": "Cancel the analysis for everyone on incident #{number}?",
+        "showQuery": "Show query",
+        "showResult": "Show result",
+        "keepRunning": "Keep running",
+        "resultFailed": "Couldn't run this query.",
+        "resultEmpty": "The query returned no rows."
       },
       "rcaThread": {
         "title": "Investigation thread",

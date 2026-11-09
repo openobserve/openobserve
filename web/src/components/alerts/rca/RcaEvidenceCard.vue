@@ -40,10 +40,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </RcaPill>
     </div>
 
+    <!-- Visual first: the stored query runs again only when the reader asks for its result. -->
+    <div
+      v-if="runnable"
+      data-test="rca-evidence-visual"
+      class="bg-surface-base flex flex-col gap-2 px-3 py-2.5"
+    >
+      <OButton
+        v-if="resultState === 'idle'"
+        data-test="rca-evidence-show-result"
+        class="self-start"
+        variant="outline"
+        size="sm"
+        icon-left="play-arrow"
+        @click="showResult"
+      >
+        {{ t("alerts.incidents.rcaRun.showResult") }}
+      </OButton>
+      <p
+        v-else-if="resultState === 'loading' && isEmptyResult"
+        data-test="rca-evidence-result-loading"
+        class="text-text-secondary m-0 flex items-center gap-2 text-xs"
+      >
+        <OSpinner size="xs" />
+        {{ t("common.loading") }}
+      </p>
+      <div
+        v-else-if="resultState === 'error'"
+        data-test="rca-evidence-result-error"
+        class="text-text-secondary flex flex-wrap items-center gap-2 text-xs"
+      >
+        <OIcon name="error-outline" size="sm" class="text-status-error-text" />
+        {{ t("alerts.incidents.rcaRun.resultFailed") }}
+        <OButton variant="ghost-primary" size="sm" @click="showResult">
+          {{ t("common.retry") }}
+        </OButton>
+      </div>
+      <template v-else-if="result?.kind === 'rows'">
+        <p
+          v-if="result.rows.length === 0"
+          data-test="rca-evidence-result-empty"
+          class="text-text-secondary m-0 text-xs"
+        >
+          {{ t("alerts.incidents.rcaRun.resultEmpty") }}
+        </p>
+        <AssistantResultTable
+          v-else
+          data-test="rca-evidence-result-table"
+          :rows="textRows"
+          :columns="result.columns"
+          :label="title"
+        />
+      </template>
+      <ul
+        v-else-if="result?.kind === 'series'"
+        data-test="rca-evidence-result-series"
+        class="m-0 flex list-none flex-col gap-1.5 p-0"
+      >
+        <li v-if="result.series.length === 0" class="text-text-secondary text-xs">
+          {{ t("alerts.incidents.rcaRun.resultEmpty") }}
+        </li>
+        <li
+          v-for="series in result.series"
+          :key="series.name"
+          class="grid grid-cols-[minmax(0,1fr)_8rem_auto] items-center gap-3 text-xs"
+        >
+          <OTruncatedText class="text-text-body font-mono">{{ series.name }}</OTruncatedText>
+          <OSparkline :points="series.points" size="xs" />
+          <span class="text-text-heading font-mono tabular-nums">{{
+            series.latest === null ? "—" : cellText(series.latest)
+          }}</span>
+        </li>
+      </ul>
+    </div>
+
     <pre
-      v-if="query"
+      v-if="query && queryOpen"
+      :id="queryId"
       data-test="rca-evidence-query"
-      class="text-text-body m-0 px-3 py-2.5 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap"
+      class="border-border-default text-text-body m-0 border-t px-3 py-2.5 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap"
       >{{ query }}</pre>
 
     <ul
@@ -88,6 +163,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="border-border-default bg-surface-base flex flex-wrap items-center gap-2 border-t py-1.5 ps-3 pe-2 text-xs"
     >
+      <OButton
+        v-if="query"
+        data-test="rca-evidence-show-query"
+        variant="ghost-muted"
+        size="sm"
+        :icon-left="queryOpen ? 'expand-more' : 'chevron-right'"
+        :aria-expanded="queryOpen"
+        :aria-controls="queryId"
+        @click="queryOpen = !queryOpen"
+      >
+        {{ t("alerts.incidents.rcaRun.showQuery") }}
+      </OButton>
       <span data-test="rca-evidence-result" class="text-text-secondary min-w-0 flex-1">
         {{ entry.result_summary }}
         <span v-if="source" class="text-text-secondary">· {{ source }}</span>
@@ -132,10 +219,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, useId } from "vue";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
@@ -147,11 +237,16 @@ import type {
 } from "@/services/incidents";
 import { rcaEvidenceLink, rcaEvidenceQuery } from "@/utils/incidents/rcaEvidenceLinks";
 import { rcaEvidenceKindIcon, rcaEvidenceTitle, rcaUtcRange } from "@/utils/incidents/rcaSummary";
+import AssistantResultTable from "@/components/ai-assistant/evidence/AssistantResultTable.vue";
 import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
+import {
+  rcaEvidenceRunnable,
+  useRcaEvidenceResult,
+} from "@/components/ai-assistant/rca/useRcaEvidenceResult";
 
 const props = withDefaults(
   defineProps<{
@@ -246,6 +341,32 @@ const strengthLabel = (strength: RcaStrength): I18nText =>
   strength === "decisive"
     ? t("alerts.incidents.rcaSummary.decisive")
     : t("alerts.incidents.rcaSummary.supporting");
+
+const queryOpen = ref(false);
+const queryId = useId();
+
+const runnable = computed(() => rcaEvidenceRunnable(props.entry.link));
+const { state: resultState, result, run } = useRcaEvidenceResult(() => props.org);
+const isEmptyResult = computed(() => {
+  const current = result.value;
+  if (!current) return true;
+  return current.kind === "rows" ? current.rows.length === 0 : current.series.length === 0;
+});
+const showResult = () => run(props.entry.link);
+const textRows = computed(() => {
+  const current = result.value;
+  if (current?.kind !== "rows") return [];
+  return current.rows.map((row) =>
+    Object.fromEntries(current.columns.map((column) => [column, cellText(row[column])])),
+  );
+});
+
+/** Numbers keep their digits; objects show as JSON. */
+const cellText = (value: unknown): string => {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+};
 
 const copyQuery = async () => {
   if (!query.value) return;

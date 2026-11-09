@@ -34,7 +34,12 @@ import type {
   PendingApproval,
   Sid,
 } from "../../assistantStore.types";
-import { isDeleteCard, type ApprovalBlockData, type ResolvedBlockData } from "../../reducer";
+import {
+  isDeleteCard,
+  skippedApprovalItem,
+  type ApprovalBlockData,
+  type ResolvedBlockData,
+} from "../../reducer";
 import { registerApplier, type ActionEnv } from "../registry";
 import type { ActionResult, AssistantAction } from "../types";
 
@@ -170,8 +175,15 @@ export function approvalResultOf(
   if (!rows?.length) return null;
   const items = rows.slice(0, MAX_RESULT_ITEMS).map((raw) => itemOf(raw, card));
   const done = items.filter((item) => item.status === "done").length;
-  const status = done === items.length ? "done" : done === 0 ? "failed" : "partial";
-  return { status, items, resolvedBy, resolvedAt };
+  const skipped = items.filter((item) => item.status === "skipped").length;
+  return { status: resultStatus(items.length, done, skipped), items, resolvedBy, resolvedAt };
+}
+
+// C3: every item skipped wrote nothing; a mix of written and skipped items is partial.
+function resultStatus(total: number, done: number, skipped: number): ApprovalResult["status"] {
+  if (done === total) return "done";
+  if (skipped === total) return "skipped";
+  return done === 0 && skipped === 0 ? "failed" : "partial";
 }
 
 /** The timeline rows a reopened chat's approved writes stand for when this browser kept none; without the server's ledger id they offer no Undo. */
@@ -317,7 +329,11 @@ function detailOf(
     };
   if (Array.isArray(rows) && rows.length === 0)
     return { outcome: { state: "unconfirmed", at, decision } };
-  const state = result ? result.status : said === "partial" ? "partial" : "approved";
+  const state = result
+    ? result.status
+    : said === "partial" || said === "skipped"
+      ? said
+      : "approved";
   return { outcome: { state, at, decision, ...(reason && { reason }) }, ...(result && { result }) };
 }
 
@@ -337,6 +353,12 @@ function itemOf(raw: unknown, card: Pick<ApprovalBlockData, "targets">): Approva
     text(item.resource_type ?? item.type)
       .slice(0, 40)
       .toLowerCase() || "object";
+  const skipped = skippedApprovalItem(raw);
+  if (skipped) {
+    const target = card.targets.find((t) => t.name === name && (t.type === type || !t.type));
+    const id = target?.id ?? (typeof item.id === "string" ? item.id.slice(0, 200) : "");
+    return { type, name, ...(id && { id }), ...skipped };
+  }
   const done = item.deleted === true || item.success === true || item.status === "done";
   const target = card.targets.find((t) => t.name === name && (t.type === type || !t.type));
   const status = typeof item.status_code === "number" ? item.status_code : undefined;
@@ -359,7 +381,9 @@ function appendLedger(
   card: ApprovalBlockData & { turnId?: string },
   result: ApprovalResult,
 ): ActionLedgerEntry[] {
-  const entries = result.items.map<ActionLedgerEntry>((item, index) => ({
+  // A skipped item wrote nothing, so the activity timeline has nothing to list for it.
+  const written = result.items.filter((item) => item.status !== "skipped");
+  const entries = written.map<ActionLedgerEntry>((item, index) => ({
     id: item.ledgerId ?? `${card.id}:${index}`,
     approvalId: card.id,
     turnId: card.turnId ?? session.turnMeta.turnId ?? "",

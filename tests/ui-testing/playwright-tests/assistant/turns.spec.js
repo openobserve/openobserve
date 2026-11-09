@@ -285,12 +285,11 @@ test.describe("assistant honest turns", () => {
     expect(await cancels(page)).toEqual([]);
   });
 
-  test("Go to answer focuses the latest answer from the strip and from Ctrl+↑", { tag: ["@mock"] }, async ({ page }) => {
+  test("Go to answer focuses the latest answer from Ctrl+↑, with no strip above the composer", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "complete");
     await expect(assistant.answer().locator("h2")).toBeVisible();
-    await assistant.strip().locator('[data-test="assistant-strip-go-to-answer"]').click();
-    await expect(assistant.answer()).toBeFocused();
+    await expect(assistant.container().locator('[data-test="assistant-status-strip"]')).toHaveCount(0);
     await assistant.composer().click();
     await assistant.composer().press("Control+ArrowUp");
     await expect(assistant.answer()).toBeFocused();
@@ -320,7 +319,7 @@ test.describe("assistant honest turns", () => {
     expect(await page.evaluate(() => window.__ht08Line.isConnected)).toBe(true);
     expect(Math.abs((await line()) - read)).toBeLessThan(5);
     expect(await log.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeGreaterThan(100);
-    const jump = assistant.container().locator('[data-test="assistant-scroll-latest"]');
+    const jump = assistant.container().locator('[data-test="assistant-transcript-jump-latest"]');
     await expect(jump).toBeVisible();
     await jump.click();
     await expect.poll(() => log.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(3);
@@ -335,7 +334,7 @@ test.describe("assistant honest turns", () => {
     await expect.poll(() => log.evaluate((el) => el.scrollHeight - el.clientHeight), { timeout: 30_000 }).toBeGreaterThan(400);
     await log.hover();
     await page.mouse.wheel(0, -300);
-    const jump = assistant.container().locator('[data-test="assistant-scroll-latest"]');
+    const jump = assistant.container().locator('[data-test="assistant-transcript-jump-latest"]');
     await expect(jump).toBeVisible();
     await jump.click();
     await page.waitForTimeout(1_500);
@@ -353,7 +352,7 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.outcome().or(assistant.answer())).toBeVisible();
     await page.waitForTimeout(500);
     expect(await log.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(3);
-    await expect(assistant.container().locator('[data-test="assistant-scroll-latest"]')).toHaveCount(0);
+    await expect(assistant.container().locator('[data-test="assistant-transcript-jump-latest"]')).toHaveCount(0);
   });
 
   test("EB-09 Re-run shows the new attempt as version 2 and gives focus to the composer", { tag: ["@mock"] }, async ({ page }) => {

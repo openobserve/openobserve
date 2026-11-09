@@ -95,4 +95,21 @@ describe("AssistantIconButton", () => {
     expect(button.attributes("disabled")).toBeDefined();
     expect(button.attributes("aria-describedby")).toBeUndefined();
   });
+  it("fills an action that is running now and marks it data-on", () => {
+    const button = mountButton({ on: true, label: raw("Pause") }).get("button");
+    expect(button.attributes("data-on")).toBe("true");
+    expect(button.classes()).toEqual(expect.arrayContaining(["bg-button-primary"]));
+    expect(mountButton().get("button").attributes("data-on")).toBeUndefined();
+  });
+
+  it("confirms a finished action in place with a check and visible text", () => {
+    const wrapper = mountButton({ done: raw("Link copied"), label: raw("Share link") });
+    const button = wrapper.get("button");
+    expect(button.attributes("data-done")).toBe("true");
+    expect(button.attributes("aria-label")).toBe("Link copied");
+    expect(button.text()).toContain("Link copied");
+    expect(button.classes()).toEqual(expect.arrayContaining(["text-status-success-text!", "h-7"]));
+    expect(wrapper.find('[aria-live="polite"]').text()).toBe("Link copied");
+    expect(mountButton().get("button").attributes("data-done")).toBeUndefined();
+  });
 });

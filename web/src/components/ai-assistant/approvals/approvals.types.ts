@@ -15,6 +15,8 @@
 
 import type { InjectionKey } from "vue";
 
+import type { I18nText } from "@/types/i18n";
+
 import type {
   ActionResult,
   ApprovalBlockData,
@@ -64,6 +66,14 @@ export interface AssistantApprovalsHost {
   /** The chat the reader came from when they reached this request from another chat. */
   backTarget?(sid: Sid, approvalId?: string): { title: string; org?: string } | null;
   goBack?(sid: Sid): void;
+}
+
+/** One changed field: the old value struck through, the new one in the success colour. */
+export interface ApprovalDiffRow {
+  field: I18nText;
+  value: I18nText;
+  /** The value now; null when the change has no old side (a create, an added field). */
+  before: I18nText | null;
 }
 
 /** Provided by the shell beside the evidence host. */

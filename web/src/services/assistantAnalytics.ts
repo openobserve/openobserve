@@ -93,6 +93,9 @@ export const AI_EVENT_NAMES = [
   "ai_share",
   "ai_shared_view",
   "ai_fork",
+  "ai_read_aloud",
+  "ai_answer_link",
+  "ai_branch",
   "ai_local_import",
   "ai_consent",
   "ai_credit_notice",
@@ -455,6 +458,11 @@ export interface AiEventProps {
     truncated: boolean;
   };
   ai_fork: { result: "ok" | "unavailable" | "failed" };
+  /** `stop` is the reader's Pause or Stop, never the end of the text. */
+  ai_read_aloud: { action: "start" | "stop" };
+  ai_answer_link: { result: "copied" | "failed" };
+  /** `status` is the HTTP status of a refused branch (409 while the answer still runs). */
+  ai_branch: { result: "created" | "failed"; status?: number };
   ai_local_import: {
     result: "done" | "partial" | "failed" | "unavailable" | "forbidden" | "offline";
     count: number;

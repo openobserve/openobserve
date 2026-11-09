@@ -40,6 +40,7 @@ import {
   parseUrl,
   plainResult,
   SAFE_DATA_IMAGE,
+  SYNTAX_CLASSES,
   type MarkdownPart,
   type ParseRequest,
   type ParseResult,
@@ -92,11 +93,10 @@ const CRASH_STRIKES = 2;
 
 const KNOWN_BAD_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 
-// highlight.js output is only spans with hljs classes around escaped text; anything else is dropped to plain code.
-const HIGHLIGHT_PIECE = /<span class="([^"<>]*)">|<\/span>|[^<>]+/y;
+// Highlighted code is only spans, bare or with one role class, around escaped text; anything else is dropped to plain code.
+const HIGHLIGHT_PIECE = /<span(?: class="([^"<>]*)")?>|<\/span>|[^<>]+/y;
 
-// Each class of a highlight span on its own: hljs scopes, a language, or a sub-scope like `function_` (Y6).
-const HIGHLIGHT_CLASS = /^(?:hljs-[a-z_-]+|language-[\w-]+|[a-z]+_+)$/;
+const SYNTAX_CLASS_SET: ReadonlySet<string> = new Set(Object.values(SYNTAX_CLASSES));
 
 const ALLOWED_CLASSES: ReadonlySet<string> = new Set(Object.values(CLASSES));
 
@@ -822,8 +822,7 @@ function safeHighlight(html: string): boolean {
   while (HIGHLIGHT_PIECE.lastIndex < html.length) {
     const piece = HIGHLIGHT_PIECE.exec(html);
     if (!piece) return false;
-    if (piece[1] !== undefined && !piece[1].split(" ").every((cls) => HIGHLIGHT_CLASS.test(cls)))
-      return false;
+    if (piece[1] !== undefined && !SYNTAX_CLASS_SET.has(piece[1])) return false;
   }
   return true;
 }

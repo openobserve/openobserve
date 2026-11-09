@@ -21,7 +21,7 @@ import {
   hintBus,
   memoryHistoryDb,
 } from "@/components/ai-assistant/__tests__/fakeAssistant";
-import assistant, { type ChatSummaryWire } from "@/services/assistant";
+import assistant, { parseChatDetail, type ChatSummaryWire } from "@/services/assistant";
 import { gt, raw } from "@/types/i18n";
 
 import { approvalAnnotationKey } from "./actions/appliers/approval";
@@ -769,6 +769,23 @@ describe("useAssistantHistory reload", () => {
     const text = fake.store.state.sessions[sid].messages.map((m) => String(m.content)).join(" ");
     expect(text).toContain("kept question");
     expect(text).toContain("kept answer");
+  });
+
+  it("keeps a branched chat's source on reload, so its Branched from header comes back", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+    const wire = {
+      ...detail([]),
+      branched_from: { session_id: "src-1", turn_id: "t2", title: "Checkout failures" },
+    };
+    vi.spyOn(assistant, "getChat").mockResolvedValue(parseChatDetail(wire));
+    const fake = setup({ persistence: true }, [record(1, { serverBacked: true })]);
+    await flushPromises();
+    await fake.history.open({ sid });
+    expect(fake.store.state.sessions[sid].record.branchedFrom).toEqual({
+      sessionId: "src-1",
+      turnId: "t2",
+      title: "Checkout failures",
+    });
   });
 
   it("keeps model names on the owner's own reload, as the live answer showed them", async () => {

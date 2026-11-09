@@ -13,8 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { ApprovalBlockData } from "@/composables/assistant/pure";
+import {
+  approvalDiff,
+  approvalNotifies,
+  approvalNoun,
+  approvalVerb,
+  type ApprovalBlockData,
+} from "@/composables/assistant/pure";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+
+import type { ApprovalDiffRow } from "./approvals.types";
 
 type NamedCard = Pick<ApprovalBlockData, "tool" | "targets" | "args">;
 
@@ -114,4 +122,40 @@ function recordOf(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function valueText(value: unknown): string {
+  if (value === undefined) return "—";
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+/** The card's changed fields; `before` replaces the card's own old side, as a `changed_since` record does. */
+export function approvalDiffRows(
+  t: TranslateFn,
+  card: ApprovalBlockData,
+  before: unknown = card.before,
+): ApprovalDiffRow[] {
+  const changed = approvalDiff({ ...card, before });
+  const unknown = t("assistant.approval.currentUnknown");
+  const rows = (changed?.rows ?? []).map((row) => {
+    const value = raw(valueText(row.after));
+    if (card.kind === "create") return { field: raw(row.field), value, before: null };
+    const old = "before" in row ? valueText(row.before) : changed?.oneSided ? unknown : null;
+    return { field: raw(row.field), value, before: old === null ? null : raw(old) };
+  });
+  const notifies = approvalNotifies(card);
+  return notifies
+    ? [...rows, { field: t("assistant.approval.notifies"), value: raw(notifies), before: null }]
+    : rows;
+}
+
+/** "pausing alerts": what an always grant covers, in the reader's words; the tool name when the card has no verb. */
+export function approvalActionPhrase(
+  t: TranslateFn,
+  card: Pick<ApprovalBlockData, "kind" | "tool" | "targets" | "args">,
+): I18nText {
+  const verb = approvalVerb(card);
+  if (!verb) return raw(card.tool);
+  const entity = t(`assistant.entity.${approvalNoun(card)}`, 2);
+  return t(`assistant.approval.actionPhrase.${verb}`, { entity });
 }

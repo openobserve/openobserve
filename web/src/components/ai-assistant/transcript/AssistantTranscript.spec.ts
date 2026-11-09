@@ -39,8 +39,9 @@ vi.mock("./AssistantMessageActions.vue", () => ({
   __esModule: true,
   default: {
     name: "ActionsStub",
-    props: ["fresh"],
-    template: '<div data-test="actions-stub-bar" />',
+    props: ["fresh", "variant"],
+    template:
+      '<div data-test="actions-stub-bar" :data-variant="variant"><slot name="versions" /></div>',
   },
 }));
 
@@ -141,9 +142,10 @@ describe("AssistantTranscript", () => {
       liveSession([prompt("why 5xx?", "t1"), reply("Because.", [query])]),
     );
     await flushPromises();
-    const fresh = wrapper.findComponent({ name: "ActionsStub" }).props("fresh") as {
-      range: string;
-    };
+    const bar = wrapper
+      .findAllComponents({ name: "ActionsStub" })
+      .find((stub) => stub.props("variant") !== "prompt")!;
+    const fresh = bar.props("fresh") as { range: string };
     expect(String(fresh.range)).toBe("the last 15 min");
   });
 
@@ -429,12 +431,15 @@ describe("AssistantTranscript", () => {
     );
   });
 
-  it("shows the answer buttons on a settled answer only, never on the prompt, and drops it while a turn runs (H3)", async () => {
+  it("shows the answer row on a settled answer, Copy and Edit on the prompt, and drops both while a turn runs (H3)", async () => {
     const session = liveSession([prompt("q", "t1"), reply("a")]);
     const { wrapper } = mountLive(session);
     await flushPromises();
     const bars = wrapper.findAll('[data-test="actions-stub-bar"]');
-    expect(bars).toHaveLength(1);
+    expect(bars.map((bar) => bar.attributes("data-variant") ?? "answer")).toEqual([
+      "prompt",
+      "answer",
+    ]);
     expect(
       wrapper.find('[data-test="assistant-answer-t1"] [data-test="actions-stub-bar"]').exists(),
     ).toBe(true);
@@ -448,6 +453,13 @@ describe("AssistantTranscript", () => {
     latest.versions = [reply("first try")];
     const session = liveSession([prompt("q", "t1"), latest]);
     const { wrapper, host } = mountLive(session);
+    await flushPromises();
+    expect(
+      wrapper
+        .get('[data-test="assistant-answer-t1"] [data-test="actions-stub-bar"]')
+        .find('[data-test="assistant-version-picker"]')
+        .exists(),
+    ).toBe(true);
     expect(wrapper.get('[data-test="assistant-version-count"]').text()).toBe("2 of 2");
     await wrapper.get('[data-test="assistant-version-prev"]').trigger("click");
     expect(host.selectVersion).toHaveBeenCalledWith("s1", "t1", 1);
@@ -474,6 +486,39 @@ describe("AssistantTranscript", () => {
     );
   });
 
+  it("offers Jump to latest only while the reader has scrolled up, and jumps through the scroll model", async () => {
+    const session = liveSession([prompt("q", "t1"), reply("a")]);
+    const { wrapper, host } = mountLive(session);
+    expect(wrapper.find('[data-test="assistant-transcript-jump-latest"]').exists()).toBe(false);
+    session.ui.follow = false;
+    session.ui.unseen = 2;
+    await flushPromises();
+    const pill = wrapper.get('[data-test="assistant-transcript-jump-latest"]');
+    expect(pill.attributes("aria-label")).toContain("2");
+    await pill.trigger("click");
+    expect(host.setFollow).toHaveBeenCalledWith("s1", true);
+  });
+
+  it("gives each answer the anchor its share link lands on", async () => {
+    const { wrapper } = mountLive(liveSession([prompt("q", "t1"), reply("a")]));
+    expect(wrapper.get('[data-test="assistant-answer-t1"]').attributes("id")).toBe("answer-t1");
+  });
+
+  it("lands on the answer a share link names, by its turn or the server's turn id", async () => {
+    window.location.hash = "#answer-srv-2";
+    const answer = reply("second", [{ type: "footer", footer: { serverTurnId: "srv-2" } }]);
+    const wrapper = mount(AssistantTranscript, {
+      props: {
+        readonly: true,
+        messages: [prompt("q1", "t1"), reply("first"), prompt("q2", "t2"), answer],
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(document.activeElement).toBe(wrapper.get('[data-test="assistant-answer-t2"]').element);
+    window.location.hash = "";
+  });
+
   it("mounts only the latest 40 turns above 150 blocks, and Show earlier adds 40 more (`30` §1.4)", async () => {
     const messages: ChatMessage[] = [];
     for (let i = 0; i < 100; i++) messages.push(prompt(`q${i}`, `t${i}`), reply(`a${i}`));
@@ -496,7 +541,7 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
     ...over,
   });
 
-  it("names each answer by its own turn's agent", () => {
+  it("names each answer by its own turn's agent, the default one included", () => {
     const session = liveSession([
       { ...prompt("first", "t1"), agentId: "o2-ai" },
       reply("one"),
@@ -505,7 +550,7 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
     ]);
     const { wrapper } = mountLive(session);
     const metas = wrapper.findAll('[data-test="assistant-agent-identity"]');
-    expect(metas.map((meta) => meta.attributes("data-agent"))).toEqual(["sre"]);
+    expect(metas.map((meta) => meta.attributes("data-agent"))).toEqual(["o2-ai", "sre"]);
     expect(wrapper.get('[data-test="assistant-answer-t2"]').attributes("aria-label")).toBe(
       "Investigator, answer to look deeper",
     );

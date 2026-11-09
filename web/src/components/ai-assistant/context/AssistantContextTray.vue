@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-context-tray"
     data-dd-privacy="mask"
     :data-collapsed="hiddenCount > 0 ? '' : undefined"
-    :class="['flex min-w-0 items-center gap-0.5', expanded ? 'flex-wrap' : '']"
+    :class="['flex min-w-0 items-center gap-0.5', expanded ? 'overflow-x-auto' : '']"
   >
     <AssistantTimePrefix
       :window="context.window.value"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :timezone="timezone"
       @change="applyTime"
     />
-    <ul v-if="shownChips.length > 0" class="flex min-w-0 flex-wrap items-center gap-0.5">
+    <ul v-if="shownChips.length > 0" class="flex min-w-0 items-center gap-0.5">
       <li v-for="chip in shownChips" :key="chip.id" class="max-w-40 min-w-0">
         <AssistantChipPopover
           :chip="chip"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </li>
     </ul>
     <OButton
-      v-if="!layout.yieldChips && (hiddenCount > 0 || expanded)"
+      v-if="hiddenCount > 0 || expanded"
       variant="ghost"
       size="chip"
       :class="['text-text-secondary min-w-6 shrink-0 justify-center', TOUCH_TARGET_CLASS]"
@@ -170,7 +170,7 @@ const allChips = computed(() => [
 ]);
 const shownChips = computed(() => {
   if (expanded.value) return allChips.value;
-  return layout.value.yieldChips ? [] : allChips.value.slice(0, trayChipLimit(layout.value));
+  return allChips.value.slice(0, trayChipLimit(layout.value));
 });
 const hiddenCount = computed(() =>
   expanded.value ? 0 : allChips.value.length - shownChips.value.length,

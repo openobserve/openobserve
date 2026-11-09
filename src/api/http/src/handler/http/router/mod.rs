@@ -1328,6 +1328,10 @@ fn ai_chat_routes(router: Router) -> Router {
             post(ai::chat::cancel),
         )
         .route(
+            "/{org_id}/ai/chats/{session_id}/branch",
+            post(ai::branch::branch),
+        )
+        .route(
             "/{org_id}/ai/chats/{session_id}/turns/{turn_id}/stream",
             get(ai::chats::stream_turn),
         )
@@ -1649,6 +1653,7 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
         .route("/v2/{org_id}/alerts/auto_investigate/decisions", get(alerts::auto_investigate::list_auto_investigate_decisions))
+        .route("/v2/{org_id}/alerts/rca_runs", get(alerts::rca_runs_org::list_org_rca_runs))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
@@ -6087,6 +6092,7 @@ mod tests {
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
+            "GET /v2/{org_id}/alerts/rca_runs",
             "GET /v2/{org_id}/alerts/tags",
             "GET /v2/{org_id}/alerts/{alert_id}",
             "GET /v2/{org_id}/alerts/{alert_id}/groups",

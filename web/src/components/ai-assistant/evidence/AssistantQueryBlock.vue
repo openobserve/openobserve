@@ -19,43 +19,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="root"
     role="group"
     :aria-label="groupName"
-    class="rounded-surface border-border-default bg-surface-base flex min-w-0 flex-col gap-2 border p-2"
+    class="flex min-w-0 flex-col gap-2"
     :data-block-id="block.blockId"
     data-test="assistant-query-block"
   >
-    <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-      <OTag
-        type="assistantQueryLanguage"
-        :value="block.query.language"
-        :label="languageLabel(block.query.language)"
-        data-test="assistant-query-language"
-      />
-      <OCode
-        v-if="block.query.stream"
-        class="max-w-full min-w-0"
-        data-test="assistant-query-stream"
-      >
-        <OTruncatedText class="max-w-40">{{ raw(block.query.stream) }}</OTruncatedText>
-      </OCode>
-      <OText variant="meta" data-test="assistant-query-range">{{ rangeLine }}</OText>
-      <OButton
-        v-if="sourceStep && block.sourceCallId"
-        variant="ghost-primary"
-        size="xs"
-        :class="TOUCH_TARGET_CLASS"
-        data-test="assistant-query-source-step"
-        @click="openSource"
-      >
-        {{ t("assistant.evidence.fromStep", { n: sourceStep }) }}
-      </OButton>
-    </div>
-
     <AssistantQueryText
+      chrome
       :text="block.query.text"
       :language="block.query.language"
       :label="groupName"
+      :meta="metaLine"
       data-test="assistant-query-text"
-    />
+    >
+      <template v-if="run?.status !== 'running'" #foot>
+        <div
+          class="flex min-w-0 flex-1 flex-wrap items-center gap-1"
+          data-test="assistant-query-actions"
+        >
+          <OButton
+            v-if="canRun && mdUp"
+            :variant="isLast ? 'primary' : 'secondary'"
+            size="sm"
+            :icon-left="assistantGlyph.run"
+            :class="['shrink-0', TOUCH_TARGET_CLASS]"
+            data-test="assistant-query-run"
+            @click="startRun"
+          >
+            {{ t("assistant.query.run") }}
+          </OButton>
+          <OButton
+            v-if="canOpen"
+            :variant="canRun && mdUp ? 'ghost' : run?.status === 'forbidden' ? 'ghost' : 'outline'"
+            size="sm"
+            as="a"
+            :href="openHref"
+            :target="openInNewTab ? '_blank' : undefined"
+            :rel="openInNewTab ? 'noopener noreferrer' : undefined"
+            :icon-left="assistantGlyph.newTab"
+            :aria-label="
+              openInNewTab ? t('assistant.evidence.opensNewTab', { label: openLabel }) : undefined
+            "
+            :class="['min-w-0 max-md:flex-1', TOUCH_TARGET_CLASS]"
+            data-test="assistant-query-open"
+            @click="onOpen"
+          >
+            {{ openLabel }}
+            <OTooltip :content="t('assistant.evidence.openHint')" />
+          </OButton>
+          <OButton
+            v-if="sourceStep && block.sourceCallId"
+            variant="ghost-primary"
+            size="xs"
+            :class="TOUCH_TARGET_CLASS"
+            data-test="assistant-query-source-step"
+            @click="openSource"
+          >
+            {{ t("assistant.evidence.fromStep", { n: sourceStep }) }}
+          </OButton>
+          <span class="flex-1" />
+          <AssistantIconButton
+            v-if="mdUp"
+            :label="t('assistant.query.copy')"
+            :icon="assistantGlyph.copy"
+            data-test="assistant-query-copy"
+            @click="copyQuery"
+          />
+          <OButton
+            v-if="canInsert && mdUp"
+            variant="ghost"
+            size="sm"
+            :disabled="insertState !== 'idle'"
+            :focusable-unavailable="insertState !== 'idle'"
+            :icon-left="insertState === 'inserted' ? assistantGlyph.done : undefined"
+            :class="['shrink-0', TOUCH_TARGET_CLASS]"
+            data-test="assistant-query-insert"
+            :data-state="insertState"
+            @click="insert"
+          >
+            {{ insertLabel }}
+          </OButton>
+          <ODropdown v-if="menuItems.length" align="end" privacy="mask">
+            <template #trigger>
+              <AssistantIconButton
+                :label="t('assistant.query.more')"
+                :icon="assistantGlyph.more"
+                data-test="assistant-query-more"
+              />
+            </template>
+            <ODropdownItem
+              v-for="item in menuItems"
+              :key="item.id"
+              :icon-left="item.icon"
+              class="max-md:min-h-11 pointer-coarse:min-h-11"
+              :data-test="item.dataTest"
+              @select="item.run"
+            >
+              {{ item.label }}
+            </ODropdownItem>
+          </ODropdown>
+        </div>
+      </template>
+    </AssistantQueryText>
 
     <OText
       v-if="otherOrg"
@@ -66,83 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("assistant.evidence.otherOrg", { org: raw(block.query.org) }) }}
     </OText>
-
-    <div
-      v-if="run?.status !== 'running'"
-      class="flex min-w-0 flex-wrap items-center gap-2"
-      data-test="assistant-query-actions"
-    >
-      <OButton
-        v-if="canRun && mdUp"
-        :variant="isLast ? 'primary' : 'secondary'"
-        size="sm"
-        :icon-left="assistantGlyph.run"
-        :class="['shrink-0', TOUCH_TARGET_CLASS]"
-        data-test="assistant-query-run"
-        @click="startRun"
-      >
-        {{ t("assistant.query.run") }}
-      </OButton>
-      <OButton
-        v-if="canOpen"
-        :variant="canRun && mdUp ? 'secondary' : run?.status === 'forbidden' ? 'ghost' : 'primary'"
-        size="sm"
-        as="a"
-        :href="openHref"
-        :target="openInNewTab ? '_blank' : undefined"
-        :rel="openInNewTab ? 'noopener noreferrer' : undefined"
-        :icon-right="openInNewTab ? assistantGlyph.newTab : undefined"
-        :aria-label="
-          openInNewTab ? t('assistant.evidence.opensNewTab', { label: openLabel }) : undefined
-        "
-        :class="['min-w-0 max-md:flex-1', TOUCH_TARGET_CLASS]"
-        data-test="assistant-query-open"
-        @click="onOpen"
-      >
-        {{ openLabel }}
-        <OTooltip :content="t('assistant.evidence.openHint')" />
-      </OButton>
-      <AssistantIconButton
-        v-if="mdUp"
-        :label="t('assistant.query.copy')"
-        :icon="assistantGlyph.copy"
-        data-test="assistant-query-copy"
-        @click="copyQuery"
-      />
-      <OButton
-        v-if="canInsert && mdUp"
-        variant="ghost"
-        size="sm"
-        :disabled="insertState !== 'idle'"
-        :focusable-unavailable="insertState !== 'idle'"
-        :icon-left="insertState === 'inserted' ? assistantGlyph.done : undefined"
-        :class="['shrink-0', TOUCH_TARGET_CLASS]"
-        data-test="assistant-query-insert"
-        :data-state="insertState"
-        @click="insert"
-      >
-        {{ insertLabel }}
-      </OButton>
-      <ODropdown v-if="menuItems.length" align="end" privacy="mask">
-        <template #trigger>
-          <AssistantIconButton
-            :label="t('assistant.query.more')"
-            :icon="assistantGlyph.more"
-            data-test="assistant-query-more"
-          />
-        </template>
-        <ODropdownItem
-          v-for="item in menuItems"
-          :key="item.id"
-          :icon-left="item.icon"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          :data-test="item.dataTest"
-          @select="item.run"
-        >
-          {{ item.label }}
-        </ODropdownItem>
-      </ODropdown>
-    </div>
 
     <OText
       v-if="insertNote"
@@ -192,11 +179,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else-if="run.status === 'done'">
         <OText variant="meta" data-test="assistant-query-summary">{{ summaryLine }}</OText>
         <AssistantResultTable
-          :rows="run.rows ?? []"
+          :rows="previewRows"
           :columns="run.columns"
           :label="t('assistant.evidence.resultsOf', { name: groupName })"
           data-test="assistant-query-table"
         />
+        <OButton
+          v-if="canOpen && hiddenRows > 0"
+          variant="outline"
+          size="sm"
+          as="a"
+          :href="openHref"
+          :icon-left="assistantGlyph.newTab"
+          :class="['self-start', TOUCH_TARGET_CLASS]"
+          data-test="assistant-query-open-all"
+          @click="onOpen"
+        >
+          {{ openAllLabel }}
+        </OButton>
       </template>
       <OText
         v-else-if="run.status === 'forbidden'"
@@ -244,6 +244,9 @@ export interface AssistantQueryBlockProps {
   /** False on a readonly page with no explorer behind it. */
   openable?: boolean;
 }
+
+/** The preview's rows; the explorer holds the rest, one click away. */
+export const PREVIEW_ROWS = 5;
 </script>
 
 <script setup lang="ts">
@@ -261,12 +264,10 @@ import {
   type InsertOutcome,
 } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -377,6 +378,29 @@ const openHref = computed(() => {
 const openLabel = computed(() =>
   t("assistant.query.open", { explorer: explorerLabel(explorer.value, t) }),
 );
+
+// The card head names where and when; the language label sits beside it.
+const metaLine = computed<I18nText>(() => {
+  const stream = props.block.query.stream;
+  return stream
+    ? t("assistant.message.fenceSource", { stream: raw(stream), range: rangeLine.value })
+    : rangeLine.value;
+});
+
+const previewRows = computed(() => (run.value?.rows ?? []).slice(0, PREVIEW_ROWS));
+const hiddenRows = computed(() => {
+  const current = run.value;
+  const total = current?.total ?? current?.rows?.length ?? 0;
+  return Math.max(0, total - previewRows.value.length);
+});
+const openAllLabel = computed(() => {
+  const total = run.value?.total ?? run.value?.rows?.length ?? 0;
+  return t(
+    "assistant.query.openAll",
+    { explorer: explorerLabel(explorer.value, t), count: formatCount(total) },
+    total,
+  );
+});
 
 const rangeLine = computed<I18nText>(() => {
   const { from, to } = props.block.query;

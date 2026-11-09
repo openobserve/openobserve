@@ -142,6 +142,8 @@ export interface ChatSummaryWire {
   updated_at: number;
   last_committed_seq: number;
   forked_from_share?: string;
+  /** C1: the chat and answer this chat was branched from; null on any other chat. */
+  branched_from?: { session_id: string; turn_id: string; title: string } | null;
   active_turn?: boolean;
   active_turn_id?: string;
   pending_approval?: boolean;
@@ -296,6 +298,18 @@ const chatSummarySchema = z.object({
   updated_at: z.number().catch(0),
   last_committed_seq: z.number().catch(0),
   forked_from_share: z.string().max(128).optional().catch(undefined),
+  branched_from: z
+    .object({
+      session_id: z.string().min(1).max(128),
+      turn_id: z.string().max(128),
+      title: z
+        .string()
+        .catch("")
+        .transform((title) => title.slice(0, 200)),
+    })
+    .nullable()
+    .optional()
+    .catch(null),
   active_turn: z.boolean().optional().catch(undefined),
   active_turn_id: z.string().max(128).optional().catch(undefined),
   pending_approval: z.boolean().optional().catch(undefined),

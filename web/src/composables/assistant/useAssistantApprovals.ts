@@ -876,7 +876,10 @@ function trackResult(
     ? "undelivered"
     : detail.result?.status === "partial"
       ? "partial"
-      : detail.result?.status === "failed"
+      : // A skipped write (C3) wrote nothing, so it never counts as a success.
+        detail.result?.status === "failed" ||
+          detail.result?.status === "skipped" ||
+          detail.outcome.state === "skipped"
         ? "failed"
         : "succeeded";
   trackAssistant(

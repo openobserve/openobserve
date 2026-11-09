@@ -38,6 +38,10 @@ export interface AssistantIconButtonProps {
   noTooltip?: boolean;
   /** A trailing chevron for a control that opens a menu of its own value, such as the agent picker. */
   chevron?: boolean;
+  /** An action that is running now (Read aloud while it plays): the primary fill, and `data-on`. */
+  on?: boolean;
+  /** Confirms a finished action in place ("Link copied"): a check, this text and the success colour, with `data-done`. */
+  done?: I18nText;
   dataTest: string;
 }
 

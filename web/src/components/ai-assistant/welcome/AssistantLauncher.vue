@@ -26,7 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-state="goToOnly ? 'go_to' : state"
     :data-layout="layout"
   >
-    <OCard variant="outlined" class="@container flex min-w-0 flex-col gap-3 p-3">
+    <component
+      :is="layout === 'overview' ? 'div' : OCard"
+      v-bind="layout === 'overview' ? {} : { variant: 'outlined' }"
+      :class="['@container flex min-w-0 flex-col gap-3', layout === 'overview' ? '' : 'p-3']"
+    >
       <div v-if="layout === 'card'" class="flex min-h-7 min-w-0 flex-wrap items-center gap-2">
         <OIcon :name="assistantGlyph.assistant" size="sm" class="text-text-secondary shrink-0" />
         <h2 :id="titleId" class="text-text-heading text-sm font-medium">
@@ -60,16 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is-admin="capability.isAdmin"
         :context="{ org, feature: 'chat' }"
       />
-      <OInput
+      <AssistantComposerFrame
         v-else-if="layout !== 'chats'"
         ref="input"
-        v-model="text"
-        size="md"
-        width="full"
+        :model-value="shownText"
+        :state="goToOnly ? 'go_to' : (state ?? undefined)"
+        :trailing="voice.mine.value"
         :disabled="state === 'loading' && !goToOnly"
-        :placeholder="
-          goToOnly ? t('home.agent.goToPlaceholder') : t('assistant.composer.placeholder')
-        "
+        :placeholder="placeholder"
         :input-attrs="{
           'aria-label': goToOnly
             ? t('home.agent.goToName')
@@ -85,12 +87,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'aria-activedescendant': results?.activeDescendant,
           }),
         }"
-        class="min-w-0 max-md:[&>div]:h-11.5 pointer-coarse:[&>div]:h-11.5"
         data-test="assistant-launcher-input"
+        @update:model-value="onInput"
         @keydown="onKeydown"
       >
-        <template #icon-right>
-          <span class="flex shrink-0 items-center gap-0.5">
+        <template v-if="!goToOnly" #strip>
+          <AssistantComposerStrip :notice="null">
+            <span class="flex min-w-0 items-center gap-1.5" data-test="assistant-launcher-chips">
+              <AssistantTimePrefix
+                :window="window"
+                :disabled="state === 'loading'"
+                align="start"
+                @change="onTimeChange"
+              />
+              <span
+                v-if="layout === 'overview' && (pageChips.length || ghostChips.length)"
+                class="flex min-w-0 items-center gap-1.5"
+                data-test="assistant-launcher-page-chips"
+              >
+                <AssistantContextChip
+                  v-for="chip in pageChips"
+                  :key="chip.id"
+                  :chip="chip"
+                  :popup="false"
+                  @open="showPageSection"
+                  @remove="removePageKey(chip)"
+                />
+                <AssistantContextChip
+                  v-for="chip in ghostChips"
+                  :key="chip.id"
+                  :chip="chip"
+                  state="ghost"
+                  :popup="false"
+                  @open="addBackPageKey(chip)"
+                />
+              </span>
+            </span>
+            <template #sees>
+              <AssistantContextSeesPopover :sid="null" hide-streams>
+                <template #trigger>
+                  <AssistantIconButton
+                    :label="t('assistant.context.title')"
+                    :icon="assistantGlyph.info"
+                    data-test="assistant-launcher-sees"
+                  />
+                </template>
+              </AssistantContextSeesPopover>
+            </template>
+          </AssistantComposerStrip>
+        </template>
+        <template #trailing>
+          <AssistantDictationWave :elapsed-ms="voice.elapsedMs.value" />
+        </template>
+        <template #bar>
+          <AssistantComposerBottomRow>
+            <template v-if="!goToOnly" #agent>
+              <AssistantAgentPill :agent="DEFAULT_AGENT" :disabled="state === 'loading'" />
+            </template>
             <AssistantIconButton
               v-if="text"
               :label="t('assistant.welcome.launcher.clear')"
@@ -98,37 +151,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="assistant-launcher-clear"
               @click="clear"
             />
-            <AssistantTimePrefix
-              v-if="!goToOnly && mdUp"
-              :window="window"
-              :disabled="state === 'loading'"
-              align="end"
-              @change="onTimeChange"
+            <AssistantDictateButton
+              v-if="!goToOnly && voice.mic.value !== 'none' && voice.mic.value !== 'off'"
+              :mic="voice.mic.value"
+              :pressed="voice.mine.value"
+              :disabled-reason="voice.helperLine.value ?? undefined"
+              @press="onMicPress"
             />
-            <AssistantContextSeesPopover v-if="!goToOnly && mdUp" :sid="null" hide-streams>
-              <template #trigger>
-                <AssistantIconButton
-                  :label="t('assistant.context.title')"
-                  :icon="assistantGlyph.info"
-                  data-test="assistant-launcher-sees"
-                />
-              </template>
-            </AssistantContextSeesPopover>
-            <OButton
+            <AssistantIconButton
               v-if="!goToOnly"
               variant="primary"
-              size="xs"
-              :icon-left="mdUp ? undefined : assistantGlyph.send"
+              size="md"
+              :label="t('assistant.welcome.launcher.ask')"
+              :icon="assistantGlyph.send"
               :disabled="state === 'loading' || !text.trim()"
-              class="shrink-0 max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11"
+              :class="ROUND_ACTION_CLASS"
               data-test="assistant-launcher-ask"
               @click="ask(false)"
-            >
-              <span :class="mdUp ? '' : 'sr-only'">{{ t("assistant.welcome.launcher.ask") }}</span>
-            </OButton>
-          </span>
+            />
+          </AssistantComposerBottomRow>
         </template>
-      </OInput>
+      </AssistantComposerFrame>
       <div
         v-if="goToShown"
         class="border-border-default rounded-default bg-surface-base -mt-2 flex max-h-80 flex-col overflow-y-auto border border-[0.0625em] p-1"
@@ -145,51 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="text = ''"
         />
       </div>
-      <!-- A phone keeps the field for the question, so the time and context controls sit under it -->
-      <div
-        v-if="!goToOnly && !mdUp && layout !== 'chats' && !(state === 'gate' && layout === 'card')"
-        class="flex min-w-0 items-center gap-1"
-        data-test="assistant-launcher-narrow-tools"
-      >
-        <AssistantTimePrefix
-          :window="window"
-          :disabled="state === 'loading'"
-          align="start"
-          @change="onTimeChange"
-        />
-        <AssistantContextSeesPopover :sid="null" hide-streams>
-          <template #trigger>
-            <AssistantIconButton
-              :label="t('assistant.context.title')"
-              :icon="assistantGlyph.info"
-              data-test="assistant-launcher-sees"
-            />
-          </template>
-        </AssistantContextSeesPopover>
-      </div>
       <slot v-if="goToOnly" name="note" />
-      <div
-        v-if="layout === 'overview' && !goToOnly && (pageChips.length || ghostChips.length)"
-        class="flex min-w-0 flex-wrap items-center gap-1.5"
-        data-test="assistant-launcher-page-chips"
-      >
-        <AssistantContextChip
-          v-for="chip in pageChips"
-          :key="chip.id"
-          :chip="chip"
-          :popup="false"
-          @open="showPageSection"
-          @remove="removePageKey(chip)"
-        />
-        <AssistantContextChip
-          v-for="chip in ghostChips"
-          :key="chip.id"
-          :chip="chip"
-          state="ghost"
-          :popup="false"
-          @open="addBackPageKey(chip)"
-        />
-      </div>
 
       <div
         :class="[
@@ -209,10 +208,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-5 w-3/5" /></li>
           </ul>
-          <ul v-else class="flex flex-col items-start">
-            <li v-for="(starter, index) in shownStarters" :key="starter.id" class="max-w-full">
+          <ul
+            v-else
+            :class="[
+              'grid min-w-0 grid-cols-1 gap-2',
+              layout === 'overview' && '@[40rem]:grid-cols-3',
+            ]"
+          >
+            <li v-for="(starter, index) in shownStarters" :key="starter.id" class="flex min-w-0">
               <AssistantStarterRow
                 :label="starter.label"
+                :icon="starterIcon(starter.kind)"
                 :data-test="`assistant-launcher-starter-${index}`"
                 @click="pickStarter(starter, index)"
               />
@@ -310,11 +316,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ul>
         </div>
       </div>
-    </OCard>
+    </component>
   </section>
 </template>
 
 <script lang="ts">
+import type { AgentId, Sid } from "@/composables/assistant";
+
+// A door always starts a new chat with the default agent; the chat's own picker changes it later.
+const DEFAULT_AGENT: AgentId = "o2-ai";
+
+// Dictation writes here, never to a chat; the line becomes a chat only when it is sent.
+const LAUNCHER_DRAFT: Sid = "assistant-launcher";
+
 /** The launcher's line is one prompt; longer text belongs in the full view's composer. */
 export const MAX_LAUNCHER_CHARS = 4_000;
 
@@ -390,12 +404,22 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatRelativeCompact } from "@/utils/formatters";
 
+import AssistantAgentPill from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
+import AssistantComposerBottomRow, {
+  ROUND_ACTION_CLASS,
+} from "@/components/ai-assistant/composer/AssistantComposerBottomRow.vue";
+import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
+import AssistantComposerStrip from "@/components/ai-assistant/composer/AssistantComposerStrip.vue";
+import AssistantDictateButton from "@/components/ai-assistant/composer/AssistantDictateButton.vue";
+import AssistantDictationWave from "@/components/ai-assistant/composer/AssistantDictationWave.vue";
+import { useAssistantVoice } from "@/components/ai-assistant/composer/useAssistantVoice";
+
 import AssistantStarterRow from "./AssistantStarterRow.vue";
+import { starterIcon } from "./starterIcons";
 
 const props = withDefaults(
   defineProps<{
@@ -431,7 +455,7 @@ const { starters, loading } = useAssistantStarters({ page: "home" });
 const titleId = `assistant-launcher-title-${useId()}`;
 const text = ref("");
 const timeOverride = ref<ComposerState["timeOverride"]>(null);
-const input = ref<InstanceType<typeof OInput> | null>(null);
+const input = ref<InstanceType<typeof AssistantComposerFrame> | null>(null);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const state = computed(() => {
@@ -486,6 +510,32 @@ const { matches: goToMatches } = useGoToIndex(text, {
   enabled: () => props.layout === "overview" && shown.value,
 });
 const goToShown = computed(() => props.layout === "overview" && text.value.trim() !== "");
+const placeholder = computed(() =>
+  goToOnly.value ? t("home.agent.goToPlaceholder") : t("assistant.composer.placeholderAt"),
+);
+
+const coarse = ref(!!globalThis.matchMedia?.("(pointer: coarse)")?.matches);
+const voice = useAssistantVoice({
+  field: () => input.value?.textarea ?? null,
+  ensureSid: () => LAUNCHER_DRAFT,
+  draftOf: () => text.value,
+  writeDraft: (_sid, value) => (text.value = value),
+  blocked: () => !shown.value || state.value !== "ready" || goToOnly.value,
+  tap: () => undefined,
+  touch: () => !mdUp.value && coarse.value,
+  say: () => undefined,
+});
+const shownText = computed(() => voice.shown(text.value));
+
+function onInput(value: string): void {
+  text.value = value;
+  voice.noteEdit(input.value?.textarea?.selectionStart ?? value.length);
+}
+
+function onMicPress(event: MouseEvent): void {
+  voice.press("mic");
+  if (event.detail > 0) input.value?.focus({ preventScroll: true });
+}
 
 function onTimeChange(range: ComposerState["timeOverride"]): void {
   if (props.layout !== "overview" || !props.pageRange) {
@@ -611,6 +661,7 @@ watch(
 );
 onBeforeUnmount(() => {
   if (clockTimer) clearInterval(clockTimer);
+  if (voice.mine.value) voice.stop("other");
 });
 
 function onKeydown(event: KeyboardEvent): void {
@@ -635,6 +686,7 @@ function openFirstMatch(): void {
 // The launcher is a door, not a composer: the line goes to `/assistant` and nothing stays here (`70` §5 note 6).
 function ask(stage: boolean): void {
   if (state.value !== "ready" || goToOnly.value) return;
+  if (voice.mine.value) voice.stop("send");
   const line = text.value.trim();
   if (!line) return openFull();
   text.value = "";

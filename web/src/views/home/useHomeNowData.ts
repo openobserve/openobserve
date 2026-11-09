@@ -25,6 +25,8 @@ import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import anomalyService from "@/services/anomaly_detection";
 import { anomalyConfigsQuery, anomalyHistoryQuery } from "@/services/anomaly_detection.queries";
 import type { Incident } from "@/services/incidents";
+import type { OrgRcaRun } from "@/services/rca_runs_org";
+import { latestRunByIncident } from "@/services/rca_runs_org.queries";
 import { incidentsQuery } from "@/services/incidents.queries";
 import type { ServicesTrendResponse } from "@/services/service_graph";
 import { serviceTopologyQuery, servicesTrendQuery } from "@/services/service_graph.queries";
@@ -69,6 +71,12 @@ type SourceKey = "incidents" | "services" | "anomalies" | "recentEvents";
 
 export type IncidentLists = { open: Incident[]; acknowledged: Incident[]; resolved: Incident[] };
 
+/** What Home reads from the org's RCA runs: each incident's newest run, and the auto-runs whose newest attempt failed. */
+export interface HomeRuns {
+  byIncident: Map<string, OrgRcaRun>;
+  failedAuto: OrgRcaRun[];
+}
+
 export interface HomeNowData {
   nowList: UseHomeNow;
   range: Ref<HomeRange>;
@@ -90,6 +98,15 @@ export interface HomeNowData {
   org: Ref<string>;
   load: (force?: boolean) => Promise<void>;
   setRange: (range: HomeRange) => void;
+}
+
+/** Splits the org's runs (newest first) for Home; a failure a later run of the same incident replaced no longer needs anyone. */
+export function homeRunsOf(runs: readonly OrgRcaRun[]): HomeRuns {
+  const byIncident = latestRunByIncident(runs);
+  const failedAuto = [...byIncident.values()].filter(
+    (run) => run.trigger === "auto" && (run.state === "failed" || run.state === "refused"),
+  );
+  return { byIncident, failedAuto };
 }
 
 /** Milliseconds of a relative period such as `15m` or `24h`; an unreadable one is 15 minutes. */

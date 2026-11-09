@@ -254,11 +254,17 @@ describe("AssistantTurnOutcome", () => {
     ).toBe(false);
   });
 
-  it("draws a failure and a refusal as one unframed error row with ink text", () => {
+  it("draws a failure and a refusal as one tinted callout: tone title, the sentence, one action", () => {
     const failed = mountOutcome({ kind: "failed", error: error("unknown") });
     expect(failed.attributes("role")).toBeUndefined();
     expect(failed.html()).not.toContain("bg-banner");
-    expect(failed.classes().join(" ")).not.toMatch(/bg-|border|rounded/);
+    expect(failed.classes()).toEqual(
+      expect.arrayContaining(["rounded-surface", "bg-status-error-bg"]),
+    );
+    expect(failed.classes().join(" ")).not.toMatch(/border/);
+    expect(failed.get('[data-test="assistant-turn-outcome-title"]').classes()).toEqual(
+      expect.arrayContaining(["font-semibold", "text-status-error-text"]),
+    );
     const failedRow = failed.get('[data-test="assistant-turn-outcome-row"]');
     expect(failedRow.attributes("data-tone")).toBe("failed");
     expect(failed.get('[data-test="assistant-error-row-text"]').classes()).toContain(
@@ -277,6 +283,7 @@ describe("AssistantTurnOutcome", () => {
     expect(refused.get('[data-test="assistant-error-row-icon"]').classes()).toContain(
       "text-text-secondary",
     );
+    expect(refused.classes()).toContain("bg-status-warning-bg");
   });
 
   it("keeps a banner only for the save and session notices", () => {

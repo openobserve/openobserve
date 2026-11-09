@@ -778,6 +778,32 @@ describe("openAssistant: door default agent (MULTI-AGENT-06)", () => {
     expect(h.store.state.sessions[sid].agentId).toBe("sre");
   });
 
+  it("opens an editor door in its dock with the query builder agent", async () => {
+    const h = setup({ mounted: ["alert_query"] });
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const result = ok(
+      await h.open({ ...headerOpen, entryKind: "editor_toggle", dockHost: "alert_query" }),
+    );
+    expect(result.container).toBe("docked.alert_query");
+    expect(h.store.state.shell.placement).toMatchObject({ kind: "docked", hostId: "alert_query" });
+    expect(h.store.state.sessions[result.sid].agentId).toBe("generate-query");
+  });
+
+  it("gives the Generate query editor button the query builder in the panel beside a page with no dock", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const result = ok(
+      await h.open({
+        ...headerOpen,
+        entryKind: "editor_button",
+        entryVerb: "generate_query",
+        objectKind: "query",
+      }),
+    );
+    expect(result.container).toBe("sidebar");
+    expect(h.store.state.sessions[result.sid].agentId).toBe("generate-query");
+  });
+
   it("leaves a chat the user picked for alone", async () => {
     const h = setup();
     h.store.syncCapability({ ...capability, agents: ROSTER });

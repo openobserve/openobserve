@@ -188,7 +188,8 @@ export function rcaHypothesisStatusLabel(
 
 /** Pill tone of a hypothesis status (redesign `HT`). */
 export const RCA_HYPOTHESIS_TONE: Record<RcaHypothesisStatus, RcaPillTone> = {
-  root_cause: "strong",
+  // A confirmed cause reads as a green tag; the accent fill stays for decisive evidence.
+  root_cause: "ok",
   contributing: "warn",
   likely: "warn",
   symptom: "neutral",

@@ -2444,9 +2444,38 @@
   --color-assistant-signal-attention: var(--color-status-warning-text);
   --color-assistant-signal-failed: var(--color-status-negative);
   --color-assistant-signal-unread: var(--color-text-secondary);
-  --color-assistant-user-bg: var(--color-surface-subtle);
-  --color-assistant-mark-bg: var(--color-surface-subtle);
-  --color-assistant-mark-fg: var(--color-text-secondary);
+  --color-assistant-user-bg: color-mix(
+    in srgb,
+    var(--color-primary-600) 9%,
+    var(--color-surface-base)
+  );
+  --color-assistant-mark-bg: color-mix(
+    in srgb,
+    var(--color-primary-600) 14%,
+    var(--color-surface-base)
+  );
+  --color-assistant-mark-fg: var(--color-primary-600);
+  /* Code in the assistant: keywords take the AA link shade so a brand theme can never drop them under 4.5:1. */
+  --color-assistant-syn-bg: var(--color-syntax-bg);
+  --color-assistant-syn-text: var(--color-syntax-text);
+  --color-assistant-syn-keyword: var(--color-assistant-link);
+  --color-assistant-syn-function: var(--color-syntax-function);
+  --color-assistant-syn-string: var(--color-success-700);
+  --color-assistant-syn-number: var(--color-syntax-number);
+  --color-assistant-syn-field: var(--color-syntax-text);
+  --color-assistant-syn-label: var(--color-syntax-string);
+  /* One step darker than text-secondary, which misses 4.5:1 on the light code block. */
+  --color-assistant-syn-operator: var(--color-grey-600);
+  --color-assistant-syn-comment: var(--color-syntax-comment);
+  --color-assistant-syn-punct: var(--color-grey-600);
+  /* The sweep's travelling light, head then tail. */
+  --color-assistant-sweep-head: var(--color-accent);
+  --color-assistant-sweep-tail: var(--color-primary-600);
+  /* eslint-disable local/no-hardcoded-px -- optical: the tile's inner highlight and ring are one device pixel */
+  --shadow-assistant-mark:
+    inset 0 1px 0 color-mix(in srgb, var(--color-primary-200) 55%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-primary-600) 18%, transparent);
+  /* eslint-enable local/no-hardcoded-px */
   /* Assistant link and primary roles (PO A10): a darker existing shade, since light primary-600 is under 4.5:1 on white. */
   --color-assistant-link: var(--color-primary-700);
   --color-assistant-link-hover: var(--color-primary-800);
@@ -2467,6 +2496,9 @@
   --color-focus-ring-accent: var(--color-assistant-focus-ring);
   --color-button-outline-hover-border: var(--color-assistant-focus-ring);
   --color-kbd-text: var(--color-text-body);
+  /* Every code block inside the assistant sits on the assistant's code well; custom properties inherit resolved, so this is no cycle. */
+  --color-syntax-bg: var(--color-assistant-syn-bg);
+  --color-syntax-text: var(--color-assistant-syn-text);
 }
 
 /* ── Trace thread view (LLM observability) owns its colours so the assistant's tokens can change alone ── */
@@ -2494,6 +2526,20 @@
   --color-assistant-primary-hover: var(--color-assistant-primary-hover);
   --color-assistant-primary-foreground: var(--color-assistant-primary-foreground);
   --color-assistant-focus-ring: var(--color-assistant-focus-ring);
+  --color-assistant-syn-bg: var(--color-assistant-syn-bg);
+  --color-assistant-syn-text: var(--color-assistant-syn-text);
+  --color-assistant-syn-keyword: var(--color-assistant-syn-keyword);
+  --color-assistant-syn-function: var(--color-assistant-syn-function);
+  --color-assistant-syn-string: var(--color-assistant-syn-string);
+  --color-assistant-syn-number: var(--color-assistant-syn-number);
+  --color-assistant-syn-field: var(--color-assistant-syn-field);
+  --color-assistant-syn-label: var(--color-assistant-syn-label);
+  --color-assistant-syn-operator: var(--color-assistant-syn-operator);
+  --color-assistant-syn-comment: var(--color-assistant-syn-comment);
+  --color-assistant-syn-punct: var(--color-assistant-syn-punct);
+  --color-assistant-sweep-head: var(--color-assistant-sweep-head);
+  --color-assistant-sweep-tail: var(--color-assistant-sweep-tail);
+  --shadow-assistant-mark: var(--shadow-assistant-mark);
   --color-trace-thread-model: var(--color-trace-thread-model);
   --color-trace-thread-model-strong: var(--color-trace-thread-model-strong);
   --color-trace-thread-avatar-wash: var(--color-trace-thread-avatar-wash);

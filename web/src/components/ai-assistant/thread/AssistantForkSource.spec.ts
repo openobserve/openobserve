@@ -164,3 +164,28 @@ describe("AssistantForkSource", () => {
     );
   });
 });
+
+describe("AssistantForkSource: a branched chat", () => {
+  it("heads a branch with Branched from its source, which opens the source chat", async () => {
+    const sid = session({ seed: false });
+    fake.current.store.state.sessions[sid].record.branchedFrom = {
+      sessionId: "src-1",
+      turnId: "t2",
+      title: "Checkout failures",
+    };
+    const open = vi.spyOn(fake.current.store, "openSession").mockResolvedValue("src-1");
+    const wrapper = mountSource(sid);
+    const head = wrapper.get('[data-test="assistant-branch-source"]');
+    expect(head.text()).toContain("Branched from");
+    expect(head.text()).toContain("Checkout failures");
+    expect(at(wrapper, "assistant-fork-source").exists()).toBe(false);
+    await wrapper.get('[data-test="assistant-branch-source-open"]').trigger("click");
+    await flushPromises();
+    expect(open).toHaveBeenCalledWith({ sid: "src-1" }, { focus: true });
+  });
+
+  it("renders nothing for a chat that is neither a fork nor a branch", () => {
+    const sid = session({ seed: false });
+    expect(at(mountSource(sid), "assistant-branch-source").exists()).toBe(false);
+  });
+});

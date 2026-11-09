@@ -19,22 +19,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-welcome"
     :data-variant="variant"
     :data-fresh="fresh ? '' : undefined"
+    :data-opening="opening ? '' : undefined"
     :aria-labelledby="headingId"
     :class="[
-      'flex min-h-full flex-col justify-end gap-1 px-3 pb-1',
+      'flex min-h-full flex-col justify-end gap-4 px-3 pb-2',
       variant === 'roomy' ? 'mx-auto w-full max-w-3xl' : '',
     ]"
   >
-    <OText :id="headingId" variant="meta" as="h2" data-test="assistant-welcome-heading">
-      {{ t("assistant.welcome.suggestions") }}
-    </OText>
-    <div v-if="loading" class="flex flex-col gap-2" data-test="assistant-welcome-loading">
-      <OSkeleton v-for="row in 3" :key="row" type="text" class="h-5 w-3/5" />
+    <div
+      :class="['flex min-w-0 flex-col items-start gap-3', opening ? fadeUpClasses(0) : '']"
+      data-test="assistant-welcome-greeting"
+    >
+      <AssistantMark size="lg" :sparkle="opening" />
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <h2
+          :id="headingId"
+          class="text-text-heading text-lg font-semibold"
+          data-test="assistant-welcome-heading"
+        >
+          {{ greeting }}
+        </h2>
+        <OText variant="meta" as="p" class="text-sm">{{ t("assistant.welcome.question") }}</OText>
+      </div>
     </div>
-    <ul v-else class="flex flex-col items-start">
-      <li v-for="(starter, index) in shownStarters" :key="starter.id" class="max-w-full">
+    <div v-if="loading" class="flex flex-col gap-2" data-test="assistant-welcome-loading">
+      <OSkeleton v-for="row in 3" :key="row" type="rect" class="h-16 w-full" />
+    </div>
+    <ul v-else class="flex flex-col gap-2">
+      <li
+        v-for="(starter, index) in shownStarters"
+        :key="starter.id"
+        :class="['flex min-w-0', opening ? fadeUpClasses(index + 1) : '']"
+      >
         <AssistantStarterRow
           :label="starter.label"
+          :icon="starterIcon(starter.kind)"
           :data-test="starter.dataTest"
           @click="select(starter, index)"
         />
@@ -51,6 +70,8 @@ export interface AssistantWelcomeProps {
   scope: AssistantScope;
   starters: Starter[];
   loading: boolean;
+  /** Plays the opening sequence: mark sparkle, then greeting and cards rise in turn. */
+  opening?: boolean;
   /** The telemetry container this welcome renders in. */
   container?: Container;
   sid?: Sid | null;
@@ -75,15 +96,21 @@ export function resetWelcomeTelemetryForTests(): void {
 
 <script setup lang="ts">
 import { computed, useId, watch } from "vue";
+import { useStore } from "vuex";
 
+import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
+import { fadeUpClasses } from "@/components/ai-assistant/common/assistantMotion";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
 
 import AssistantStarterRow from "./AssistantStarterRow.vue";
+import { starterIcon } from "./starterIcons";
+import { useGreeting } from "./useGreeting";
 
 const props = withDefaults(defineProps<AssistantWelcomeProps>(), {
+  opening: false,
   container: "sidebar",
   sid: null,
 });
@@ -91,6 +118,8 @@ const props = withDefaults(defineProps<AssistantWelcomeProps>(), {
 const emit = defineEmits<AssistantWelcomeEmits>();
 
 const { t } = useI18nTyped();
+const vuex = useStore();
+const { greeting } = useGreeting(() => vuex?.state.userInfo?.email);
 const headingId = `assistant-welcome-${useId()}`;
 
 const fresh = computed(() => props.scope.streamCount === 0);

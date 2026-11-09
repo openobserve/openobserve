@@ -25,7 +25,7 @@ import AssistantDictateButton, {
 
 function render(props: Partial<AssistantDictateButtonProps> = {}) {
   return mount(AssistantDictateButton, {
-    props: { mic: "live", pressed: false, primerOpen: false, sentence: null, ...props },
+    props: { mic: "live", pressed: false, ...props },
     attachTo: document.body,
   });
 }
@@ -51,7 +51,6 @@ describe("AssistantDictateButton", () => {
   it("uses aria-disabled with a reason, so the mic stays focusable", () => {
     const button = render({ mic: "crossed", disabledReason: raw("Blocked") }).get(mic);
     expect(button.attributes("aria-disabled")).toBe("true");
-    expect(button.attributes("aria-haspopup")).toBe("dialog");
     expect(button.attributes("disabled")).toBeUndefined();
   });
 
@@ -69,30 +68,19 @@ describe("AssistantDictateButton", () => {
     expect(wrapper.emitted("press")).toHaveLength(1);
   });
 
-  it("opens Turn on for an admin's off mic instead of pressing, and hands the choice up", async () => {
+  it("emits press for an admin's off mic too, so the composer offers Turn on in its strip", async () => {
     const wrapper = render({ mic: "off" });
     await wrapper.get(mic).trigger("click");
     await flushPromises();
-    expect(wrapper.emitted("press")).toBeUndefined();
-    const off = document.body.querySelector('[data-test="assistant-dictate-off"]');
-    expect(off?.textContent).toContain("Dictation is off in this browser.");
-    document.body.querySelector<HTMLElement>('[data-test="assistant-dictate-turn-on"]')!.click();
-    await flushPromises();
-    expect(wrapper.emitted("turn-on")).toHaveLength(1);
+    expect(wrapper.emitted("press")).toHaveLength(1);
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it("names the engine in the primer and answers Not now and Continue", async () => {
-    const wrapper = render({ primerOpen: true, sentence: raw("Edge uses Microsoft.") });
-    await flushPromises();
-    const engine = '[data-test="assistant-dictate-primer-engine"]';
-    expect(document.body.querySelector(engine)?.textContent).toContain(
-      "Edge uses Microsoft. OpenObserve doesn't store the audio.",
-    );
-    const click = (id: string) =>
-      document.body.querySelector<HTMLElement>(`[data-test="${id}"]`)!.click();
-    click("assistant-dictate-primer-accept");
-    click("assistant-dictate-primer-decline");
-    expect(wrapper.emitted("accept")).toHaveLength(1);
-    expect(wrapper.emitted("decline")).toHaveLength(1);
+  it("turns into a filled round Stop in the same slot while dictating, with no primer", () => {
+    const button = render({ pressed: true }).get(mic);
+    expect(button.attributes("data-on")).toBeDefined();
+    expect(button.classes()).toContain("rounded-full");
+    expect(button.findComponent(OIcon).props("name")).toBe("stop");
+    expect(document.body.querySelector('[data-test="assistant-dictate-primer"]')).toBeNull();
   });
 });

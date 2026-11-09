@@ -126,6 +126,7 @@ describe("RcaWhatHappened (03 VE31, VE36, VE-D4)", () => {
     await chip.trigger("click");
     const card = rows(wrapper)[1].find('[data-test="rca-evidence-card"]');
     expect(card.exists()).toBe(true);
+    await card.get('[data-test="rca-evidence-show-query"]').trigger("click");
     expect(card.text()).toContain("max(db_pool_in_use");
     expect(chip.attributes("aria-expanded")).toBe("true");
     expect(chip.attributes("aria-controls")).toBe(card.attributes("id"));

@@ -294,6 +294,32 @@ describe("useAssistantApprovals", () => {
     );
   });
 
+  it("C3: an approve o2-ai skipped as changed since asked reads skipped and is never tracked as a success", async () => {
+    const { sid, env, approvals, outcome } = setup();
+    env.confirm.mockResolvedValueOnce({
+      status: "skipped",
+      items: [
+        {
+          id: "2abc",
+          type: "alert",
+          name: "High error rate",
+          status: "skipped",
+          code: "changed_since",
+          message: "The alert changed after you were asked.",
+          before: { threshold: 2.5 },
+        },
+      ],
+      resolved: { outcome: "skipped", code: "changed_since", detail: "changed" },
+    });
+    await approvals.decide(sid, { approved: true, scope: "once" }, held(sid));
+    expect(outcome()?.state).toBe("skipped");
+    expect(track).toHaveBeenCalledWith(
+      "ai_approval_result",
+      { status: "failed", succeeded_count: 0, failed_count: 1 },
+      expect.anything(),
+    );
+  });
+
   it("drops the card on a sign-out elsewhere without posting anything", () => {
     const { env, session, handlers } = setup();
     handlers.get("signed_out")?.({ v: 1, type: "signed_out", at: now });

@@ -63,6 +63,20 @@ const TEXT_MIN = 4.5;
 const LARGE_TEXT_MIN = 3;
 const NON_TEXT_MIN = 3;
 
+/** Every role of the assistant's code palette (`--color-assistant-syn-*`). */
+const ASSISTANT_SYNTAX_ROLES = [
+  "text",
+  "keyword",
+  "function",
+  "string",
+  "number",
+  "field",
+  "label",
+  "operator",
+  "comment",
+  "punct",
+];
+
 /** Ratchets. Both only ever go down; see the module docstring. */
 const MAX_PENDING = 88;
 const MAX_EXEMPT = 37;
@@ -362,6 +376,31 @@ describe("design token contrast", () => {
         .filter(([, ratio, need]) => ratio === null || ratio < need)
         .map(([pair, ratio, need]) => describePair(pair, ratio ?? 0, need));
       expect(offenders).toEqual([]);
+    });
+  });
+
+  describe.each(["light", "dark"] as const)("assistant code and bubbles in %s", (theme) => {
+    const scope = THEMES[theme];
+    const on = (fg: string, bg: string): number => {
+      const paint = composite(resolveColor(bg, scope)!, resolveColor(SURFACE_BASE, scope)!);
+      return contrastRatio(composite(resolveColor(fg, scope)!, paint), paint);
+    };
+
+    it.each(ASSISTANT_SYNTAX_ROLES)("paints %s at 4.5:1 on the code block", (role) => {
+      expect(
+        on(`--color-assistant-syn-${role}`, "--color-assistant-syn-bg"),
+      ).toBeGreaterThanOrEqual(TEXT_MIN);
+    });
+
+    it("keeps keywords on the brand ramp and strings apart from JSON keys", () => {
+      expect(scope.get("--color-assistant-syn-keyword")).toMatch(/assistant-link/);
+      expect(resolveColor("--color-assistant-syn-string", scope)).not.toEqual(
+        resolveColor("--color-assistant-syn-label", scope),
+      );
+    });
+
+    it("reads body text at 4.5:1 on the sent bubble", () => {
+      expect(on("--color-text-body", "--color-assistant-user-bg")).toBeGreaterThanOrEqual(TEXT_MIN);
     });
   });
 

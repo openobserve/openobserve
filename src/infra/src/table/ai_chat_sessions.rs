@@ -121,6 +121,21 @@ pub struct NewFork<'a> {
     pub seed: Option<&'a serde_json::Value>,
 }
 
+/// A new chat branched from one of the owner's chats at an answer (see [`insert_branch`]).
+#[derive(Debug, Clone)]
+pub struct NewBranch<'a> {
+    pub org_id: &'a str,
+    pub session_id: &'a str,
+    pub user_id: &'a str,
+    pub user_email: &'a str,
+    pub agent_type: &'a str,
+    pub title: &'a str,
+    /// `{owner_name, as_of, turns}`: the source turns through the answer, read like a fork's seed.
+    pub seed: &'a serde_json::Value,
+    /// `{session_id, turn_id, title}` of the source.
+    pub branched_from: &'a serde_json::Value,
+}
+
 /// A new chat holding imported browser turns (see [`insert_import_with`]).
 #[derive(Debug, Clone)]
 pub struct NewImport<'a> {
@@ -239,6 +254,7 @@ pub async fn get_or_create_with<C: ConnectionTrait>(
         pinned_at: Set(None),
         seed: Set(None),
         search_text: Set(None),
+        branched_from: Set(None),
     };
     if let Err(e) = Entity::insert(record).exec(conn).await {
         match e.sql_err() {
@@ -286,9 +302,52 @@ pub async fn insert_fork_with<C: ConnectionTrait>(
         pinned_at: Set(None),
         seed: Set(fork.seed.map(|v| v.to_string())),
         search_text: Set(None),
+        branched_from: Set(None),
     };
     Entity::insert(record).exec(conn).await.map_err(db_err)?;
     get_with(conn, fork.org_id, fork.session_id)
+        .await?
+        .ok_or_else(|| errors::Error::Message("ai_chat_sessions row vanished after insert".into()))
+}
+
+/// Create a branch's index row; its title counts as the user's, so nothing renames it.
+pub async fn insert_branch(branch: &NewBranch<'_>, now: i64) -> Result<Model, errors::Error> {
+    insert_branch_with(get_orm_client_rw().await, branch, now).await
+}
+
+pub async fn insert_branch_with<C: ConnectionTrait>(
+    conn: &C,
+    branch: &NewBranch<'_>,
+    now: i64,
+) -> Result<Model, errors::Error> {
+    let record = ActiveModel {
+        org_id: Set(branch.org_id.to_string()),
+        session_id: Set(branch.session_id.to_string()),
+        user_id: Set(branch.user_id.to_string()),
+        user_email: Set(branch.user_email.to_string()),
+        opencode_session_id: Set(None),
+        agent_type: Set(branch.agent_type.to_string()),
+        title: Set(branch.title.to_string()),
+        title_source: Set(TITLE_FROM_USER.to_string()),
+        status: Set(STATUS_ACTIVE.to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+        first_event_at: Set(None),
+        last_event_at: Set(None),
+        last_committed_seq: Set(NO_SEQ),
+        session_epoch: Set(1),
+        last_turn_id: Set(None),
+        forked_from_share: Set(None),
+        fork_seed_seq: Set(None),
+        replica_purged_at: Set(None),
+        pinned: Set(false),
+        pinned_at: Set(None),
+        seed: Set(Some(branch.seed.to_string())),
+        search_text: Set(None),
+        branched_from: Set(Some(branch.branched_from.to_string())),
+    };
+    Entity::insert(record).exec(conn).await.map_err(db_err)?;
+    get_with(conn, branch.org_id, branch.session_id)
         .await?
         .ok_or_else(|| errors::Error::Message("ai_chat_sessions row vanished after insert".into()))
 }
@@ -323,6 +382,7 @@ pub async fn insert_import_with<C: ConnectionTrait>(
         pinned_at: Set(import.pinned.then_some(now)),
         seed: Set(None),
         search_text: Set(Some(capped_search_text(import.search_text))),
+        branched_from: Set(None),
     };
     Entity::insert(record)
         .exec_without_returning(conn)
@@ -1401,6 +1461,39 @@ mod tests {
             .collect();
         found.sort();
         assert_eq!(found, vec![SID.to_string(), "other".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn a_branch_keeps_its_title_seed_and_source() {
+        let db = db().await;
+        let seed =
+            serde_json::json!({"owner_name": "Alice", "as_of": 9, "turns": [{"turn_id": "t1"}]});
+        let source = serde_json::json!({"session_id": "src", "turn_id": "t1", "title": "p99"});
+        let branch = NewBranch {
+            org_id: ORG,
+            session_id: SID,
+            user_id: ALICE,
+            user_email: "a@x",
+            agent_type: "o2-ai",
+            title: "Branch of p99",
+            seed: &seed,
+            branched_from: &source,
+        };
+        let row = insert_branch_with(&db, &branch, 10).await.unwrap();
+        assert_eq!(row.user_id, ALICE);
+        assert_eq!(row.last_committed_seq, NO_SEQ);
+        assert!(row.forked_from_share.is_none());
+        assert_eq!(row.seed.as_deref(), Some(seed.to_string().as_str()));
+        let stored: serde_json::Value =
+            serde_json::from_str(row.branched_from.as_deref().unwrap()).unwrap();
+        assert_eq!(stored, source);
+        assert!(insert_branch_with(&db, &branch, 11).await.is_err());
+
+        set_prompt_title_with(&db, ORG, SID, "first prompt", 12)
+            .await
+            .unwrap();
+        assert_eq!(title_of(&db).await.0, "Branch of p99");
+        assert!(chat(&db, "plain", ALICE, 13).await.branched_from.is_none());
     }
 
     #[tokio::test]

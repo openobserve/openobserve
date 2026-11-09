@@ -29,7 +29,7 @@ use futures::future::BoxFuture;
 use infra::table::{
     ai_actions::{
         self, APPROVAL_APPROVED, APPROVAL_NONE, APPROVAL_STANDING, ListQuery, STATUS_DONE,
-        STATUS_FAILED,
+        STATUS_FAILED, STATUS_SKIPPED,
     },
     ai_grants,
 };
@@ -56,6 +56,9 @@ const REASON_IS_UNDO: &str = "is_undo";
 // A `/confirm` relays results of calls the MCP executor recorded moments before.
 const CONFIRM_MATCH_WINDOW_MICROS: i64 = 10 * 60 * 1_000_000;
 const MESSAGE_MAX_CHARS: usize = 256;
+// o2-ai's result codes for a confirmed write it refused because the target moved under it.
+const SKIP_CHANGED_SINCE: &str = "changed_since";
+const SKIP_RECHECK_FAILED: &str = "recheck_failed";
 
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -540,7 +543,7 @@ fn confirmed_row(
     approval_id: &str,
     item: &Value,
 ) -> ai_actions::Model {
-    let done = text(item, "status").as_deref() == Some(STATUS_DONE);
+    let (status, message, skip_code) = confirmed_outcome(item);
     ai_actions::Model {
         id: String::new(),
         org_id: org_id.to_string(),
@@ -559,15 +562,41 @@ fn confirmed_row(
         resource_name: text(item, "name"),
         before: None,
         after: None,
-        status: if done { STATUS_DONE } else { STATUS_FAILED }.to_string(),
-        message: (!done).then(|| "The approved change did not complete".to_string()),
+        status: status.to_string(),
+        message,
         undoable: false,
-        undo_reason: Some(ledger::REASON_NO_SNAPSHOT.to_string()),
+        undo_reason: Some(skip_code.unwrap_or_else(|| ledger::REASON_NO_SNAPSHOT.to_string())),
         undo_until: None,
         undone_by: None,
         undone_at: None,
         undo_of: None,
         created_at: now_micros(),
+    }
+}
+
+/// `(status, message, skip code)` of a confirm result item; only o2-ai's stale checks skip.
+fn confirmed_outcome(item: &Value) -> (&'static str, Option<String>, Option<String>) {
+    let kind = text(item, "type").unwrap_or_else(|| "object".to_string());
+    match (text(item, "status").as_deref(), text(item, "code")) {
+        (Some(STATUS_DONE), _) => (STATUS_DONE, None, None),
+        (Some(STATUS_SKIPPED), Some(code)) if code == SKIP_CHANGED_SINCE => (
+            STATUS_SKIPPED,
+            Some(format!(
+                "Not applied: the {kind} changed since this was asked"
+            )),
+            Some(code),
+        ),
+        (Some(STATUS_SKIPPED), Some(code)) if code == SKIP_RECHECK_FAILED => (
+            STATUS_SKIPPED,
+            Some(format!("Not applied: could not re-check the {kind}")),
+            Some(code),
+        ),
+        (Some(STATUS_SKIPPED), code) => (STATUS_SKIPPED, Some("Not applied".to_string()), code),
+        _ => (
+            STATUS_FAILED,
+            Some("The approved change did not complete".to_string()),
+            None,
+        ),
     }
 }
 
@@ -594,7 +623,11 @@ async fn audit_row(row: &ai_actions::Model, stored: bool) {
         row.user_email.clone(),
         row.org_id.clone(),
         String::new(),
-        if row.status == STATUS_DONE { 200 } else { 500 },
+        match row.status.as_str() {
+            STATUS_DONE => 200,
+            STATUS_SKIPPED => 409,
+            _ => 500,
+        },
         None,
         "POST".to_string(),
         format!("/api/{}/ai/activity", row.org_id),
@@ -1071,6 +1104,46 @@ mod tests {
             &json!({"type": "alert", "id": "a1", "status": "failed"}),
         );
         assert_eq!(failed.status, STATUS_FAILED);
+    }
+
+    #[test]
+    fn a_confirmed_item_skipped_as_stale_is_recorded_as_skipped_with_its_code() {
+        let skipped = |code: &str| {
+            confirmed_row(
+                "o",
+                "s",
+                "a@x",
+                "ap1",
+                &json!({"type": "alert", "id": "a1", "status": "skipped", "code": code, "message": "x"}),
+            )
+        };
+        let changed = skipped("changed_since");
+        assert_eq!(changed.status, STATUS_SKIPPED);
+        assert_eq!(changed.undo_reason.as_deref(), Some("changed_since"));
+        assert_eq!(
+            changed.message.as_deref(),
+            Some("Not applied: the alert changed since this was asked")
+        );
+        assert!(!changed.undoable);
+        let unchecked = skipped("recheck_failed");
+        assert_eq!(unchecked.status, STATUS_SKIPPED);
+        assert_eq!(unchecked.undo_reason.as_deref(), Some("recheck_failed"));
+        assert_eq!(
+            unchecked.message.as_deref(),
+            Some("Not applied: could not re-check the alert")
+        );
+        let failed = confirmed_row(
+            "o",
+            "s",
+            "a@x",
+            "ap1",
+            &json!({"type": "alert", "status": "error"}),
+        );
+        assert_eq!(failed.status, STATUS_FAILED);
+        assert_eq!(
+            failed.message.as_deref(),
+            Some("The approved change did not complete")
+        );
     }
 
     #[test]

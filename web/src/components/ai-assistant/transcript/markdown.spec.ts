@@ -36,6 +36,9 @@ import {
   type ParserEvents,
 } from "./markdown";
 import {
+  CLASSES,
+  PROSE_CLASSES,
+  SYNTAX_CLASSES,
   MAX_ALT_CHARS,
   MAX_CODE_PARTS,
   MAX_HIGHLIGHT_CHARS,
@@ -54,6 +57,11 @@ import {
 } from "./markdownCore";
 
 const PARSING_KEY = "o2.assistant.markdownParsing";
+
+// A safe inline image whose reference repeats: links render on their first mention only, images every time.
+const IMAGE_URL = (size: number) => "data:image/png;base64," + "A".repeat(size);
+
+const strong = (text: string) => `<strong class="${CLASSES.strong}">${text}</strong>`;
 
 const KNOWN_BAD_KEY = "o2.assistant.markdownPlain";
 
@@ -208,10 +216,10 @@ describe("markdown.ts strict profile", () => {
       "Deep",
     ]);
     expect(wrapper.get("h2").classes()).toEqual(
-      expect.arrayContaining(["text-base", "font-semibold"]),
+      expect.arrayContaining(["text-lg", "font-semibold"]),
     );
     expect(wrapper.get("h3").classes()).toEqual(
-      expect.arrayContaining(["text-sm", "font-semibold"]),
+      expect.arrayContaining(["text-base", "font-semibold", "text-text-heading"]),
     );
   });
 
@@ -246,7 +254,7 @@ describe("markdown.ts strict profile", () => {
     });
     const closed = render("Before\n\n```sql\nSELECT *\n```\n\nAfter **bold**", "closed");
     expect(closed.parts.map((part) => part.kind)).toEqual(["html", "code", "html"]);
-    expect(htmlOf(closed.parts)).toContain("<strong>bold</strong>");
+    expect(htmlOf(closed.parts)).toContain(strong("bold"));
   });
 
   it("escapes inline code and renders it in the code chip classes", () => {
@@ -305,7 +313,7 @@ describe("markdown.ts strict profile", () => {
       "not just no errors.",
     );
     const html = htmlOf(render("Rows [^2] . And **bold** , then 1 .5").parts);
-    expect(html).toContain("Rows. And <strong>bold</strong>, then 1 .5");
+    expect(html).toContain(`Rows. And ${strong("bold")}, then 1 .5`);
   });
 
   it("leaves an empty slot against the cited word, never a space before punctuation", () => {
@@ -413,7 +421,7 @@ describe("markdown.ts strict profile", () => {
 
   it("keeps ordinary emphasis and shows a flattened bomb's delimiters as text", () => {
     expect(htmlOf(render("Some **bold** and *em* and snake_case_name.").parts)).toContain(
-      "<strong>bold</strong>",
+      strong("bold"),
     );
     const flat = render("*a ".repeat(20) + "x");
     expect(flat.parts.map((part) => (part as { html: string }).html).join("")).not.toContain(
@@ -484,13 +492,11 @@ describe("markdown.ts strict profile", () => {
     expect(calls).toHaveLength(1);
     answer(0);
     await flush();
-    expect(htmlOf(renderMarkdown("w:0", "Small **three**", "open").parts)).toContain(
-      "<strong>one</strong>",
-    );
+    expect(htmlOf(renderMarkdown("w:0", "Small **three**", "open").parts)).toContain(strong("one"));
     expect(calls.map((call) => call.request.text)).toEqual(["Small **one**", "Small **three**"]);
     answer(1);
     expect(htmlOf(renderMarkdown("w:0", "Small **three**", "open").parts)).toContain(
-      "<strong>three</strong>",
+      strong("three"),
     );
   });
 
@@ -528,7 +534,7 @@ describe("markdown.ts strict profile", () => {
     expect(calls).toHaveLength(2);
     answer(1);
     const retried = renderMarkdown("w:0", big("two"), "closed");
-    expect(htmlOf(retried.parts)).toContain("<strong>two</strong>");
+    expect(htmlOf(retried.parts)).toContain(strong("two"));
     expect(retried.plain).toBe(false);
   });
 
@@ -582,7 +588,7 @@ describe("markdown.ts strict profile", () => {
         {
           kind: "html",
           key: "x:0:0",
-          html: `<p><a href="https://evil.example/" class="fixed inset-0" target="_self">x</a><a href="${origin}/logout">out</a><code class="rounded-default border-code-border bg-code-bg text-code-text border px-1 py-px font-mono text-xs">c</code></p>`,
+          html: `<p><a href="https://evil.example/" class="fixed inset-0" target="_self">x</a><a href="${origin}/logout">out</a><code class="${CLASSES.code}">c</code></p>`,
         },
       ],
     });
@@ -593,7 +599,7 @@ describe("markdown.ts strict profile", () => {
     expect(html).toContain("font-mono");
   });
 
-  it("drops worker highlighting that is anything but hljs spans", async () => {
+  it("drops worker highlighting that is anything but role-classed spans", async () => {
     const { parser, answer } = manualParser();
     setMarkdownParserForTests(parser);
     renderMarkdown("h:1", "x", "closed");
@@ -603,7 +609,11 @@ describe("markdown.ts strict profile", () => {
       claims: [],
       plain: "",
       parts: [
-        { ...code, key: "h:1:0", highlighted: '<span class="hljs-keyword">select</span>' },
+        {
+          ...code,
+          key: "h:1:0",
+          highlighted: `<span class="${SYNTAX_CLASSES.keyword}">select</span>`,
+        },
         { ...code, key: "h:1:1", highlighted: '<img src=x onerror="alert(1)">' },
       ],
     });
@@ -611,7 +621,7 @@ describe("markdown.ts strict profile", () => {
       MarkdownPart,
       { kind: "code" }
     >[];
-    expect(kept.highlighted).toContain("hljs-keyword");
+    expect(kept.highlighted).toContain(SYNTAX_CLASSES.keyword);
     expect(dropped.highlighted).toBeUndefined();
   });
 
@@ -620,7 +630,8 @@ describe("markdown.ts strict profile", () => {
       MarkdownPart,
       { kind: "code" }
     >[];
-    expect(parts[0].highlighted).toContain("hljs-keyword");
+    expect(parts[0].highlighted).toContain(SYNTAX_CLASSES.keyword);
+    expect(parts[0].highlighted).not.toContain("hljs-");
     expect(parts[1].highlighted).toBeUndefined();
   });
 
@@ -634,7 +645,7 @@ describe("markdown.ts strict profile", () => {
       { kind: "code" }
     >[];
     expect(code).toHaveLength(4);
-    expect(code[0].highlighted).toContain("hljs-");
+    expect(code[0].highlighted).toContain(SYNTAX_CLASSES.label);
     expect(code.at(-1)!.highlighted).toBeUndefined();
     const total = code.reduce((sum, part) => sum + (part.highlighted?.length ?? 0), 0);
     expect(total).toBeLessThanOrEqual(MAX_HIGHLIGHT_CHARS);
@@ -711,7 +722,7 @@ describe("markdown.ts strict profile", () => {
     }
   });
 
-  it("checks each class of worker highlighting on its own (Y6)", async () => {
+  it("accepts a highlight span only with one whole role class (Y6)", async () => {
     const { parser, answer } = manualParser();
     setMarkdownParserForTests(parser);
     renderMarkdown("h:6", "x", "closed");
@@ -721,15 +732,19 @@ describe("markdown.ts strict profile", () => {
       claims: [],
       plain: "",
       parts: [
-        { ...code, key: "h:6:0", highlighted: '<span class="hljs-title function_">f</span>' },
-        { ...code, key: "h:6:1", highlighted: '<span class="hljs-title fixed inset-0">f</span>' },
+        { ...code, key: "h:6:0", highlighted: `<span class="${SYNTAX_CLASSES.function}">f</span>` },
+        {
+          ...code,
+          key: "h:6:1",
+          highlighted: `<span class="${SYNTAX_CLASSES.function} fixed inset-0">f</span>`,
+        },
       ],
     });
     const [kept, dropped] = renderMarkdown("h:6", "x", "closed").parts as Extract<
       MarkdownPart,
       { kind: "code" }
     >[];
-    expect(kept.highlighted).toContain("function_");
+    expect(kept.highlighted).toContain(SYNTAX_CLASSES.function);
     expect(dropped.highlighted).toBeUndefined();
   });
 
@@ -884,7 +899,7 @@ describe("markdown.ts strict profile", () => {
   });
 
   it("replaces a render that outgrows its input with the text (X1)", () => {
-    const bomb = "[a]: https://e.com/" + "x".repeat(1_500) + "\n\n" + "[a] ".repeat(3_000);
+    const bomb = "[a]: " + IMAGE_URL(1_500) + "\n\n" + "![a] ".repeat(3_000);
     const started = performance.now();
     const block = render(bomb);
     expect(performance.now() - started).toBeLessThan(1_000);
@@ -1134,7 +1149,7 @@ describe("markdown.ts strict profile", () => {
   });
 
   it("stops a render once its output budget is spent, before building the rest (Y7)", () => {
-    const text = "[a]: https://e.com/" + "x".repeat(2_000) + "\n\n" + "[a] ".repeat(4_400);
+    const text = "[a]: " + IMAGE_URL(2_000) + "\n\n" + "![a] ".repeat(3_500);
     const started = performance.now();
     const result = parse(text);
     expect(performance.now() - started).toBeLessThan(500);
@@ -1478,5 +1493,156 @@ describe("markdown.ts strict profile", () => {
         "## Title\n\nSome **bold** and `code` [link](https://x.io) [^call_1].\n\n- a\n- b",
       ),
     ).toBe("Title\n\nSome bold and code link.\n\n- a\n- b");
+  });
+});
+
+describe("assistant answer styling (K1, K2)", () => {
+  beforeEach(() => {
+    resetMarkdownForTests();
+    setMarkdownParserForTests(syncMarkdownParserForTests);
+  });
+
+  const fence = (lang: string, code: string) => {
+    const part = render("```" + lang + "\n" + code + "\n```").parts[0] as Extract<
+      MarkdownPart,
+      { kind: "code" }
+    >;
+    return part.highlighted ?? "";
+  };
+
+  // The text each role class wraps, in order, so a spec reads like the kit's specimen.
+  const roles = (html: string) => {
+    const host = document.createElement("div");
+    host.innerHTML = html;
+    const out: Record<string, string[]> = {};
+    for (const [role, cls] of Object.entries(SYNTAX_CLASSES))
+      out[role] = [...host.querySelectorAll(`span.${cls}:not(:has(span))`)].map(
+        (el) => el.textContent ?? "",
+      );
+    return out;
+  };
+
+  it("paints SQL keywords, functions, strings, numbers and operators with the role classes", () => {
+    const html = fence(
+      "sql",
+      "SELECT pod, count(*) AS failures FROM \"k8s_logs\" WHERE service = 'checkout' AND http_status >= 500",
+    );
+    const found = roles(html);
+    expect(found.keyword).toEqual(expect.arrayContaining(["SELECT", "AS", "FROM", "WHERE", "AND"]));
+    expect(found.function).toContain("count");
+    expect(found.string).toContain("'checkout'");
+    expect(found.number).toContain("500");
+    expect(found.operator).toEqual(expect.arrayContaining(["*", "=", ">="]));
+    expect(html).not.toMatch(/hljs-|syntax-keyword/);
+  });
+
+  it("paints PromQL functions, grouping keywords, labels, metric, matcher and range", () => {
+    const found = roles(
+      fence(
+        "promql",
+        '# 5xx share\nsum by (service) (rate(http_requests_total{status=~"5.."}[5m]))',
+      ),
+    );
+    expect(found.comment).toEqual(["# 5xx share"]);
+    expect(found.function).toEqual(["sum", "rate"]);
+    expect(found.keyword).toEqual(["by"]);
+    expect(found.label).toEqual(["service", "status"]);
+    expect(found.field).toEqual(["http_requests_total"]);
+    expect(found.operator).toEqual(["=~"]);
+    expect(found.string).toEqual(['"5.."']);
+    expect(found.number).toEqual(["5m"]);
+    expect(found.punct).toEqual(expect.arrayContaining(["(", ")", "{", "}", "[", "]"]));
+  });
+
+  it("paints VRL paths as fields and fallible calls as functions", () => {
+    const found = roles(
+      fence(
+        "vrl",
+        '# flag resets\n.is_reset = contains(string!(.message), "connection reset")\nif .is_reset && .upstream == "inventory" {\n  .retry_after_ms = 250\n}',
+      ),
+    );
+    expect(found.comment).toEqual(["# flag resets"]);
+    expect(found.field).toEqual(
+      expect.arrayContaining([".is_reset", ".message", ".upstream", ".retry_after_ms"]),
+    );
+    expect(found.function).toEqual(["contains", "string!"]);
+    expect(found.keyword).toEqual(["if"]);
+    expect(found.string).toEqual(['"connection reset"', '"inventory"']);
+    expect(found.number).toEqual(["250"]);
+    expect(found.operator).toEqual(expect.arrayContaining(["=", "&&", "=="]));
+  });
+
+  it("tells JSON keys from string values", () => {
+    const found = roles(fence("json", '{"level": "error", "status": 502, "retried": false}'));
+    expect(found.label).toEqual(['"level"', '"status"', '"retried"']);
+    expect(found.string).toEqual(['"error"']);
+    expect(found.number).toEqual(["502"]);
+    expect(found.keyword).toEqual(["false"]);
+    expect(SYNTAX_CLASSES.label).not.toBe(SYNTAX_CLASSES.string);
+  });
+
+  it("links an entity on its first mention only", () => {
+    const html = htmlOf(
+      render(
+        "[checkout](https://svc.example/checkout) fails. Later, [checkout](https://svc.example/checkout) recovers; [inventory](https://svc.example/inventory) too.",
+      ).parts,
+    );
+    const anchors = [...mountHtml(html).element.querySelectorAll("a")];
+    expect(anchors.map((a) => a.textContent)).toEqual(["checkout", "inventory"]);
+    expect(anchors[0].className).toBe(CLASSES.link);
+    expect(
+      mountHtml(html)
+        .text()
+        .match(/checkout/g),
+    ).toHaveLength(2);
+  });
+
+  it("keeps status words plain in prose", () => {
+    const html = htmlOf(
+      render("The deploy failed, then recovered. Error rate is healthy again.").parts,
+    );
+    const wrapper = mountHtml(html);
+    expect(wrapper.element.querySelectorAll("span, strong, code")).toHaveLength(0);
+    expect(wrapper.text()).toBe("The deploy failed, then recovered. Error rate is healthy again.");
+  });
+
+  it("sets bold key terms and headings in the heading colour, inline code tinted without a border", () => {
+    const wrapper = mountHtml(
+      htmlOf(render("### What changed\n\nUse **inventory** and `retry`.").parts),
+    );
+    expect(wrapper.get("h3").classes()).toEqual(
+      expect.arrayContaining(["text-base", "font-semibold", "text-text-heading"]),
+    );
+    expect(wrapper.get("strong").classes()).toEqual(["font-semibold", "text-text-heading"]);
+    expect(wrapper.get("code").classes()).toEqual(expect.arrayContaining(["bg-code-bg"]));
+    expect(wrapper.get("code").classes()).not.toContain("border");
+  });
+
+  it("sets the lead semibold in the heading colour, in a 72ch tabular-figure column", () => {
+    expect(PROSE_CLASSES.leadHtml).toContain("[&_p:first-child]:font-semibold");
+    expect(PROSE_CLASSES.leadHtml).toContain("[&_p:first-child]:text-text-heading");
+    expect(PROSE_CLASSES.leadPlain.split(" ")).toEqual(
+      expect.arrayContaining(["font-semibold", "text-text-heading"]),
+    );
+    for (const cls of ["max-w-[72ch]", "tabular-nums", "leading-relaxed"]) {
+      expect(PROSE_CLASSES.html.split(" ")).toContain(cls);
+      expect(PROSE_CLASSES.plain.split(" ")).toContain(cls);
+    }
+    expect(PROSE_CLASSES.html).not.toContain("blockquote");
+  });
+
+  it.each([
+    ["**Root cause:** keep-alive closes at 250 ms", CLASSES.calloutCause, CLASSES.calloutIconCause],
+    ["**Next step:** roll back inventory", CLASSES.calloutNext, CLASSES.calloutIconNext],
+    ["**Watch out:** restarts alone will not help", CLASSES.calloutWatch, CLASSES.calloutIconWatch],
+    ["a quoted log line", CLASSES.calloutNote, CLASSES.calloutIconNote],
+  ])("renders the quote %j as a tinted callout with its glyph", (body, box, icon) => {
+    const wrapper = mountHtml(htmlOf(render(`> ${body}`).parts));
+    expect(wrapper.element.querySelector("blockquote")).toBeNull();
+    const callout = wrapper.element.querySelector(":scope > div")!;
+    expect(callout.getAttribute("class")).toBe(box);
+    expect(callout.querySelector(":scope > span")!.getAttribute("class")).toBe(icon);
+    expect(callout.textContent).toContain(body.replace(/\*\*/g, ""));
+    expect(box).not.toMatch(/border/);
   });
 });

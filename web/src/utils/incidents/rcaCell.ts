@@ -331,3 +331,31 @@ export function rcaCellModel(
 /** True for a run the list polls for. */
 export const isLiveRca = (rca: { state: RcaRunState | null } | null | undefined): boolean =>
   rca?.state === "running" || rca?.state === "waiting_input";
+
+/** Incidents carry no sequence number, so the cancel confirm names one by its id's first 8 characters. */
+export const rcaIncidentNumber = (incidentId: string): string => incidentId.slice(0, 8);
+
+/** The run "Follow in thread" opens for an incident: its latest run, or null when none ran. */
+export function rcaFollowTarget(
+  incident: Pick<Incident, "id" | "rca">,
+  org: string,
+): { org: string; incidentId: string; runId: string } | null {
+  const runId = incident.rca?.run_id;
+  return runId ? { org, incidentId: incident.id, runId } : null;
+}
+
+/** Alert id → the newest open incident that alert fired into and that has a run. */
+export function alertRcaRuns(
+  incidents: readonly Pick<Incident, "id" | "rca" | "created_at" | "alert_groups">[],
+): Map<string, { incidentId: string; runId: string }> {
+  const out = new Map<string, { incidentId: string; runId: string }>();
+  const newestFirst = [...incidents].sort((a, b) => b.created_at - a.created_at);
+  for (const incident of newestFirst) {
+    const runId = incident.rca?.run_id;
+    if (!runId) continue;
+    for (const group of incident.alert_groups ?? []) {
+      if (!out.has(group.alert_id)) out.set(group.alert_id, { incidentId: incident.id, runId });
+    }
+  }
+  return out;
+}

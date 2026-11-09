@@ -1444,4 +1444,10 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     category: "text",
     why: "the toast action button paints its label on its own solid fill, never on the page",
   },
+  {
+    fg: "--color-assistant-mark-fg",
+    bg: "--color-assistant-mark-bg",
+    category: "non-text",
+    why: "the assistant mark is a glyph drawn on its own tinted tile, never on the page",
+  },
 ];

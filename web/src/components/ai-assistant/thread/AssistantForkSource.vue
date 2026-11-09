@@ -95,6 +95,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       t("assistant.fork.contextNote")
     }}</OText>
   </section>
+  <div
+    v-else-if="branch"
+    class="border-border-default text-text-secondary flex shrink-0 items-center gap-1.5 border-b px-3 py-1.5"
+    data-dd-privacy="mask"
+    data-test="assistant-branch-source"
+  >
+    <OIcon :name="assistantGlyph.branch" size="xs" />
+    <OText variant="meta" as="span">{{ t("assistant.message.branchedFrom") }}</OText>
+    <OButton
+      variant="ghost-primary"
+      size="xs"
+      :icon-right="assistantGlyph.next"
+      class="min-w-0 max-md:min-h-11"
+      data-test="assistant-branch-source-open"
+      @click="openBranchSource"
+    >
+      <OTruncatedText class="min-w-0">{{ branchTitle }}</OTruncatedText>
+    </OButton>
+  </div>
 </template>
 
 <script lang="ts">
@@ -109,16 +128,21 @@ export interface AssistantForkSourceProps {
 import { computed, onMounted, ref, watch } from "vue";
 import { useQueryClient } from "@tanstack/vue-query";
 
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { statusOfError } from "@/components/ai-assistant/share/chatShare";
 import { forkSeedOf } from "@/components/ai-assistant/shared/forkMemory";
 import { projectSharedRecord } from "@/components/ai-assistant/shared/sharedRecord";
 import AssistantTranscript from "@/components/ai-assistant/transcript/AssistantTranscript.vue";
-import { useAssistantSession, type ForkSeed } from "@/composables/assistant";
+import { rememberedBranch } from "@/components/ai-assistant/transcript/useBranchChat";
+import { useAssistantSession, useAssistantStore, type ForkSeed } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import type { StoredTurn } from "@/components/O2AIChat.history";
 import { sharedChatQuery } from "@/services/ai_chat_share.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -128,6 +152,7 @@ const props = defineProps<AssistantForkSourceProps>();
 
 const { t } = useI18nTyped();
 const view = useAssistantSession(() => props.sid);
+const store = useAssistantStore();
 const queryClient = useQueryClient();
 const { mdUp } = useBreakpoint();
 
@@ -147,6 +172,11 @@ const source = computed(() => {
   if (!token) return null;
   return { title: String(view.session.value?.title ?? ""), ownerName: "", asOf: 0 };
 });
+const branch = computed(
+  () => view.session.value?.record.branchedFrom ?? rememberedBranch(props.sid),
+);
+const branchTitle = computed(() => raw(branch.value?.title) || t("assistant.thread.newChatTitle"));
+
 const state = computed(() => (seed.value ? (acknowledged.value ? "gone" : "seeded") : "missing"));
 const turns = computed(() => (seed.value?.turns ?? []) as StoredTurn[]);
 const seedTurns = computed(() => turns.value.length);
@@ -187,6 +217,15 @@ onMounted(async () => {
     if (statusOfError(err) === 404) lost.value = true;
   }
 });
+
+// The source opens where this chat is; nothing in it re-runs.
+function openBranchSource(): void {
+  const sid = branch.value?.sessionId;
+  if (!sid) return;
+  void store
+    .openSession({ sid }, { focus: true })
+    .catch(() => toast({ variant: "error", message: t("assistant.history.openFailed") }));
+}
 
 function sendAnyway(): void {
   acknowledged.value = true;

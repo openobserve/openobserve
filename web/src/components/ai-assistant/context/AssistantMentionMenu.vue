@@ -191,7 +191,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 
 import { agentGlyph, assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { agentRowClause, sharedAgentPolicy } from "@/components/ai-assistant/agents/agentClause";
+import { sharedAgentPolicy } from "@/components/ai-assistant/agents/agentClause";
 import { announceComposer } from "@/components/ai-assistant/composer/composerUi";
 import { shortLabelFor, useAssistantCapability, useAssistantStore } from "@/composables/assistant";
 import {
@@ -341,7 +341,8 @@ const agentGroup = computed<Group[]>(() => {
         action: "agent",
         agent: agent.id,
         glyph: reason ? assistantGlyph.locked : agentGlyph[agent.id],
-        secondary: reason ?? agentRowClause(agent, !!shared, t) ?? undefined,
+        // Names only (K10): an unavailable agent still says why.
+        secondary: reason ?? undefined,
         ...(reason && { disabled: true }),
       },
     ];

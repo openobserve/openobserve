@@ -357,3 +357,20 @@ describe("parseChatDetail approvals", () => {
     expect(parseChatDetail({ session_id: "s1" })).not.toHaveProperty("approvals");
   });
 });
+
+describe("parseChatDetail branched_from (C1)", () => {
+  it("keeps a branch's source, nulls it on any other chat and on a malformed value", () => {
+    const source = { session_id: "src-1", turn_id: "t2", title: "Checkout failures" };
+    expect(parseChatDetail({ session_id: "s1", branched_from: source }).branched_from).toEqual(
+      source,
+    );
+    expect(parseChatDetail({ session_id: "s1", branched_from: null }).branched_from).toBeNull();
+    expect(parseChatDetail({ session_id: "s1", branched_from: { turn_id: 3 } }).branched_from).toBe(
+      null,
+    );
+    expect(
+      parseChatDetail({ session_id: "s1", branched_from: { ...source, title: "x".repeat(300) } })
+        .branched_from?.title,
+    ).toHaveLength(200);
+  });
+});

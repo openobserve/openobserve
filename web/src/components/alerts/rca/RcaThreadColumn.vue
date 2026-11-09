@@ -17,14 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <aside
     data-test="rca-thread-column"
-    class="border-border-default bg-surface-panel flex min-h-0 flex-none flex-col border-t max-lg:h-144 lg:h-full lg:border-s lg:border-t-0"
+    :data-variant="variant"
+    class="flex min-h-0 flex-col"
+    :class="
+      variant === 'inline'
+        ? 'flex-1'
+        : 'border-border-default bg-surface-panel flex-none border-t max-lg:h-144 lg:h-full lg:border-s lg:border-t-0'
+    "
     :aria-label="t('alerts.incidents.rcaThread.title')"
   >
     <header
+      v-if="variant === 'column'"
       class="border-border-default bg-surface-base flex flex-none flex-col gap-1 border-b px-4 pt-3.5 pb-3"
     >
       <div class="flex items-center gap-2">
-        <OIcon name="forum" size="sm" class="text-accent" />
+        <OIcon :name="assistantGlyph.investigator" size="sm" class="text-accent" />
         <h2 class="text-text-heading m-0 text-sm font-bold">
           {{ t("alerts.incidents.rcaThread.title") }}
         </h2>
@@ -69,7 +76,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
     </header>
 
-    <div ref="scrollArea" class="flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto px-4 py-3.5">
+    <div
+      ref="scrollArea"
+      class="flex min-h-0 flex-1 flex-col gap-3.5"
+      :class="variant === 'inline' ? '' : 'overflow-auto px-4 py-3.5'"
+    >
+      <!-- A finished run's activity folds into one line; the record above is the answer. -->
+      <button
+        v-if="activityFoldable"
+        type="button"
+        data-test="rca-thread-activity-toggle"
+        class="text-text-secondary flex cursor-pointer items-center gap-1.5 self-start border-none bg-transparent p-0 text-xs"
+        :aria-expanded="activityOpen"
+        @click="activityOpen = !activityOpen"
+      >
+        <OIcon name="check" size="sm" />
+        {{ statsLine || t("alerts.incidents.rcaThread.title") }}
+        <OIcon :name="activityOpen ? 'expand-less' : 'expand-more'" size="sm" />
+      </button>
       <p
         v-if="status === 'loading'"
         data-test="rca-thread-loading"
@@ -111,7 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.incidents.rcaThread.working") }}
       </p>
 
-      <ol v-else-if="thread" class="m-0 flex list-none flex-col gap-3.5 p-0">
+      <ol
+        v-else-if="thread && (!activityFoldable || activityOpen)"
+        data-test="rca-thread-entries"
+        class="m-0 flex list-none flex-col gap-3.5 p-0"
+      >
         <li
           v-if="thread.truncated"
           data-test="rca-thread-truncated"
@@ -288,8 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.incidents.rcaSteer.agentNote", { note: entry.item.agent_note }) }}
             </p>
+            <!-- A finished run offers Re-analyze once, in the closed line, seeded with this text. -->
             <OButton
-              v-if="canReanalyze && rcaSteerOffersReanalyze(entry.item)"
+              v-if="runLive && canReanalyze && rcaSteerOffersReanalyze(entry.item)"
               data-test="rca-thread-steer-reanalyze"
               variant="outline"
               size="sm"
@@ -362,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ refusal.text }}
       </p>
       <OButton
-        v-if="canReanalyze"
+        v-if="canReanalyze && runLive"
         data-test="rca-thread-refusal-reanalyze"
         class="self-start"
         variant="outline"
@@ -375,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <RcaSteerComposer
-      v-if="canSteer && send"
+      v-if="runLive && canSteer && send"
       ref="composer"
       :run-id="thread?.run_id ?? ''"
       :waiting-input="runState === 'waiting_input'"
@@ -384,18 +413,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :sending="sending"
       :send="sendFromComposer"
     />
-    <!-- The note under every run that no longer takes messages; a run Resume can continue is not final. -->
+    <!-- A finished run takes no messages: the closed line and the one Re-analyze replace the composer. -->
     <footer
       v-else-if="runState && !runLive"
       data-test="rca-thread-final-note"
-      class="border-border-default bg-surface-base text-text-secondary flex flex-none items-start gap-2 border-t px-4 py-3 text-xs"
+      class="rounded-default bg-surface-subtle text-text-secondary flex flex-none flex-wrap items-center gap-2 px-3 py-2 text-xs"
+      :class="variant === 'column' ? 'border-border-default m-3 border' : ''"
     >
-      <OIcon :name="canResume ? 'info' : 'lock'" size="sm" class="mt-px shrink-0" />
-      <span>{{
+      <OIcon :name="canResume ? 'info' : 'lock'" size="sm" class="shrink-0" />
+      <span data-test="rca-thread-final-text" class="min-w-0 flex-1">{{
         canResume
           ? t("alerts.incidents.rcaThread.resumableNote")
-          : t("alerts.incidents.rcaThread.finalNote")
+          : t("alerts.incidents.rcaSteer.error.runNotSteerable")
       }}</span>
+      <OTooltip :content="startLockedReason" :disabled="!startLockedReason" side="top">
+        <span class="inline-flex shrink-0">
+          <OButton
+            data-test="rca-thread-reanalyze"
+            variant="outline"
+            size="sm"
+            :icon-left="startLockedReason ? 'lock' : 'refresh'"
+            :loading="reanalyzing"
+            :disabled="!canReanalyze || !!startLockedReason"
+            @click="reanalyzeClosed"
+          >
+            {{ t("alerts.incidents.rcaReanalyze") }}
+          </OButton>
+        </span>
+      </OTooltip>
     </footer>
   </aside>
 </template>
@@ -406,6 +451,8 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   RcaContextUsed,
@@ -470,6 +517,12 @@ const props = withDefaults(
     sending?: boolean;
     /** Sends one message to the run. */
     send?: ((text: string) => Promise<RcaSteerSendResult>) | null;
+    /** `column` is the incident page's side column; `inline` sits under the record in the assistant. */
+    variant?: "column" | "inline";
+    /** Why no new run can start: Re-analyze stays visible, disabled, with this reason. */
+    startLockedReason?: I18nText;
+    /** A new run is being started. */
+    reanalyzing?: boolean;
   }>(),
   {
     canResume: false,
@@ -485,6 +538,9 @@ const props = withDefaults(
     authorEmail: "",
     sending: false,
     send: null,
+    variant: "column",
+    startLockedReason: undefined,
+    reanalyzing: false,
   },
 );
 
@@ -503,7 +559,10 @@ const contextPanelId = useId();
 
 watch(
   () => props.thread?.run_id,
-  () => (contextOpen.value = false),
+  () => {
+    contextOpen.value = false;
+    activityOpen.value = false;
+  },
 );
 
 const emptyMessage = computed<I18nText | null>(() => {
@@ -612,6 +671,12 @@ const hasRunningStep = computed(
 
 const runWaiting = computed(() => props.runLive && props.runState === "waiting_input");
 
+const activityOpen = ref(false);
+/** Inline, a finished run's steps sit behind one line. */
+const activityFoldable = computed(
+  () => props.variant === "inline" && !props.runLive && props.thread?.transcript === "available",
+);
+
 const contextItems = computed(() => {
   const used = props.contextUsed;
   if (!used) return [];
@@ -701,6 +766,20 @@ watch(
   () => props.thread?.run_id,
   () => (refusal.value = null),
 );
+
+/** The newest message this run never read; Re-analyze starts from it. */
+const unreadMessageText = computed(() => {
+  const runId = props.thread?.run_id;
+  const items = (props.steering?.items ?? []).filter(
+    (item) => item.kind === "message" && (!runId || item.run_id === runId),
+  );
+  return refusal.value?.text ?? items.filter(rcaSteerOffersReanalyze).at(-1)?.text ?? "";
+});
+
+const reanalyzeClosed = () => {
+  emit("reanalyze-with", unreadMessageText.value);
+  refusal.value = null;
+};
 
 const reanalyzeRefused = () => {
   if (!refusal.value) return;

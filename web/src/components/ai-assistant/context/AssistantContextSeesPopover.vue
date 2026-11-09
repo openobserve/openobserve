@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPopover
     :open="isOpen"
     privacy="mask"
-    side="top"
+    :side="placement"
     :align="align"
     :aria-label="t('assistant.context.title')"
     :collision-padding="inset"
@@ -83,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODescriptionList>
       </div>
 
+      <slot name="detail" />
       <OText variant="meta" as="p" data-test="assistant-context-sees-disclosure">{{
         disclosure
       }}</OText>
@@ -103,6 +104,7 @@ import type { Sid } from "@/composables/assistant";
 
 export interface AssistantContextSeesPopoverProps {
   sid: Sid | null;
+  placement?: "top" | "bottom";
   /** Controlled open state; omit to let the trigger own it. */
   open?: boolean;
   align?: "start" | "center" | "end";
@@ -133,13 +135,14 @@ import { useI18nTyped } from "@/types/i18n";
 
 const props = withDefaults(defineProps<AssistantContextSeesPopoverProps>(), {
   open: undefined,
+  placement: "top",
   align: "end",
   hideStreams: false,
 });
 
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
-defineSlots<{ trigger?: () => unknown; anchor?: () => unknown }>();
+defineSlots<{ trigger?: () => unknown; anchor?: () => unknown; detail?: () => unknown }>();
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();

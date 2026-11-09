@@ -122,8 +122,8 @@ test.describe("assistant shell", () => {
     await assistant.open("header");
     await expect(assistant.welcome).toBeVisible();
     await expect(
-      assistant.welcome.locator('[data-test="assistant-welcome-capability"]'),
-    ).toContainText("It runs read-only queries");
+      assistant.welcome.locator('[data-test="assistant-welcome-heading"]'),
+    ).toContainText(/Good|Working/);
     await expect(
       assistant.welcome.locator('[data-test^="assistant-starter-"]'),
     ).toHaveCount(3);

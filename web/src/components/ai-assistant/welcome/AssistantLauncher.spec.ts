@@ -82,7 +82,7 @@ function setup(gate: GateCode = "available", history: Record<string, unknown> = 
   return { wrapper, router, store: fake.current.store };
 }
 
-const input = (wrapper: ReturnType<typeof setup>["wrapper"]) => wrapper.get("input");
+const input = (wrapper: ReturnType<typeof setup>["wrapper"]) => wrapper.get("textarea");
 
 const PAGES: GoToPage[] = [
   {
@@ -138,7 +138,7 @@ describe("AssistantLauncher", () => {
     expect(locked.get('[data-test="assistant-gate-state"]').attributes("data-gate")).toBe(
       "no_permission",
     );
-    expect(locked.find("input").exists()).toBe(false);
+    expect(locked.find("textarea").exists()).toBe(false);
   });
 
   it("is one masked card named by its heading, with a named input and three starters", () => {
@@ -282,7 +282,19 @@ describe("AssistantLauncher", () => {
     expect(field.find('[data-test="assistant-context-chip-time"]').text()).toBe("Last 15 min");
     expect(field.find('[data-test="assistant-launcher-sees"]').exists()).toBe(true);
     expect(wrapper.get('[data-test="assistant-launcher-open"]').text()).toBe("Open full view");
-    expect(input(wrapper).attributes("placeholder")).toBe("Ask about your data");
+    expect(input(wrapper).attributes("placeholder")).toBe("Ask anything · @ to add context");
+  });
+
+  it("is the composer everywhere else is: strip with chips and ⓘ on top, agent pill left, Send right", () => {
+    const { wrapper } = setup();
+    const field = wrapper.get('[data-test="assistant-composer-frame"]');
+    expect(field.find('[data-test="assistant-composer-strip"]').exists()).toBe(true);
+    const left = field.get('[data-test="assistant-composer-bar-left"]');
+    expect(left.find('[data-test="assistant-agent-pill"]').attributes("data-agent")).toBe("o2-ai");
+    expect(left.findAll("button")).toHaveLength(0);
+    const right = field.get('[data-test="assistant-composer-bar-right"]');
+    expect(right.find('[data-test="assistant-launcher-ask"]').classes()).toContain("rounded-full");
+    expect(wrapper.find('[data-test="assistant-launcher-narrow-tools"]').exists()).toBe(false);
   });
 
   it("turns Ask on only with text", async () => {
@@ -356,7 +368,7 @@ describe("AssistantLauncher", () => {
       expect(wrapper.find('[data-test="assistant-launcher"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(false);
       const chats = setupOn({ layout: "chats" }).wrapper;
-      expect(chats.find("input").exists()).toBe(false);
+      expect(chats.find("textarea").exists()).toBe(false);
       expect(chats.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(true);
     });
 

@@ -15,6 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  RCA_HYPOTHESIS_TONE,
+  RCA_PILL_TONE_CLASS,
   filterRcaEvidence,
   groupRcaHypotheses,
   rcaBandLabel,
@@ -240,5 +242,14 @@ describe("rcaVerdictDetails (stored verdict on the card)", () => {
   it("is null for a record with no verdict (a cancelled or failed run) and for no record", () => {
     expect(rcaVerdictDetails({ schema_version: 1, ledger: { hypotheses: [] } })).toBeNull();
     expect(rcaVerdictDetails(undefined)).toBeNull();
+  });
+});
+
+describe("RCA_HYPOTHESIS_TONE", () => {
+  it("draws a confirmed root cause as a green tag", () => {
+    expect(RCA_HYPOTHESIS_TONE.root_cause).toBe("ok");
+    expect(RCA_PILL_TONE_CLASS[RCA_HYPOTHESIS_TONE.root_cause]).toContain(
+      "text-status-success-text",
+    );
   });
 });

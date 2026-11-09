@@ -170,13 +170,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.incidents.rcaSummary.noEvidenceYet") }}
             </span>
-            <template v-if="canSteer">
+            <!-- A finished run takes no actions, whatever the steering view still says. -->
+            <template v-if="canSteer && live">
               <OButton
                 v-for="action in rcaHypothesisActions(hypothesis.status)"
                 :key="action"
                 :data-test="`rca-hypothesis-action-${action}`"
                 variant="outline"
                 size="xs"
+                class="max-md:min-h-11"
                 :disabled="sending || pending.has(hypothesis.id)"
                 :aria-label="actionAriaLabel(action, hypothesis.statement)"
                 @click="$emit('steer-action', { hypothesisId: hypothesis.id, action })"

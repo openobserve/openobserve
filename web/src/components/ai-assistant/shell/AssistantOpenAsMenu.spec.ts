@@ -21,8 +21,8 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import { historyStubs } from "../__tests__/historyStubs";
-import AssistantLayoutMenu, { placementMode } from "./AssistantLayoutMenu.vue";
-import type { AssistantLayoutMenuProps } from "./AssistantLayoutMenu.vue";
+import AssistantOpenAsMenu, { placementMode } from "./AssistantOpenAsMenu.vue";
+import type { AssistantOpenAsMenuProps } from "./AssistantOpenAsMenu.vue";
 
 const { fake, lg, track } = vi.hoisted(() => ({
   fake: { current: null as any },
@@ -66,7 +66,7 @@ vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
 const ORIGIN = { entryKind: "header_button", objectKind: "none", container: "sidebar" } as const;
 
 // The bare menu renders its items inside whichever dropdown hosts it, so a spec opens one around it.
-async function setup(props: Partial<AssistantLayoutMenuProps>) {
+async function setup(props: Partial<AssistantOpenAsMenuProps>) {
   const router = fakeRouter();
   await router.push("/logs");
   const wrapper = mount(
@@ -78,7 +78,7 @@ async function setup(props: Partial<AssistantLayoutMenuProps>) {
           {
             trigger: () => h("button", "open"),
             default: () =>
-              h(AssistantLayoutMenu, {
+              h(AssistantOpenAsMenu, {
                 placement: "sidebar",
                 sid: fake.current.store.state.shell.activeSid,
                 bare: true,
@@ -116,7 +116,7 @@ afterEach(() => {
   track.mockClear();
 });
 
-describe("Places", () => {
+describe("Open as", () => {
   it("offers sidebar, window and full view on a desktop sidebar with the current one checked", async () => {
     await setup({});
     expect(item("sidebar")!.getAttribute("aria-checked")).toBe("true");
@@ -173,17 +173,6 @@ describe("Places", () => {
     expect(item("full")).not.toBeNull();
   });
 
-  it("lists only the places, with no width, position or size groups", async () => {
-    await setup({});
-    const items = document.body.querySelectorAll('[role="menuitemradio"], [role="menuitem"]');
-    expect([...items].map((el) => el.getAttribute("data-test"))).toEqual([
-      "assistant-shell-place-sidebar",
-      "assistant-shell-place-window",
-      "assistant-shell-place-full",
-    ]);
-    expect(document.body.querySelector('[role="separator"]')).toBeNull();
-  });
-
   it("moves a window's chat to the full view by its own sid", async () => {
     const { store } = fake.current;
     const sid = store.state.shell.activeSid;
@@ -196,7 +185,7 @@ describe("Places", () => {
     expect(router.currentRoute.value.name).toBe("assistant");
   });
 
-  it("pins a window's chat from Sidebar", async () => {
+  it("pins a window's chat from Side panel", async () => {
     const { store } = fake.current;
     const sid = store.state.shell.activeSid;
     store.floatChat(sid);
@@ -205,6 +194,55 @@ describe("Places", () => {
     await flushPromises();
     expect(store.windowOf(sid)).toBeNull();
     expect(store.state.shell.placement.kind).toBe("sidebar");
+  });
+
+  it("names the moves Side panel, Pop out and Full page", async () => {
+    await setup({});
+    const items = document.body.querySelectorAll('[role="menuitemradio"], [role="menuitem"]');
+    expect([...items].map((el) => el.getAttribute("data-test"))).toEqual([
+      "assistant-shell-place-sidebar",
+      "assistant-shell-place-window",
+      "assistant-shell-place-full",
+    ]);
+    expect([...items].map((el) => el.textContent?.trim())).toEqual([
+      "Side panel",
+      "Pop out",
+      "Full page",
+    ]);
+    expect(document.body.querySelector('[role="separator"]')).toBeNull();
+  });
+
+  it("opens from its own Open as trigger with the moves under one label", async () => {
+    const router = fakeRouter();
+    await router.push("/logs");
+    const wrapper = mount(AssistantOpenAsMenu, {
+      props: { placement: "sidebar", sid: fake.current.store.state.shell.activeSid },
+      global: { plugins: [router, fakeVuex()] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const trigger = wrapper.get('[data-test="assistant-open-as-button"]');
+    expect(trigger.attributes("aria-label")).toBe("Open as");
+    await trigger.trigger("click");
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="assistant-open-as"]')?.textContent).toContain(
+      "Open as",
+    );
+    expect(item("full")).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("reads Open as on the full page, where the bar has room for the word", async () => {
+    const router = fakeRouter();
+    await router.push("/logs");
+    const wrapper = mount(AssistantOpenAsMenu, {
+      props: { placement: "full", sid: null, labelled: true },
+      global: { plugins: [router, fakeVuex()] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-open-as-button"]').text()).toBe("Open as");
+    wrapper.unmount();
   });
 });
 

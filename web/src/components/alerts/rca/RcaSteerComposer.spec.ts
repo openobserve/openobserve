@@ -44,31 +44,55 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
   let wrapper: VueWrapper;
   afterEach(() => wrapper?.unmount());
 
-  it("frame F: title, chips, 'Sending as …' and no question", () => {
+  const openSees = async (wrapper: VueWrapper) => {
+    await byTest(wrapper, "rca-steer-sees").trigger("click");
+    await flushPromises();
+    return (id: string) => document.body.querySelector(`[data-test="${id}"]`);
+  };
+
+  it("K6: the same composer frame, steer placeholder and Investigator pill, no helper lines", () => {
     wrapper = mountComposer();
 
-    expect(wrapper.text()).toContain("Steer this run");
-    expect(byTest(wrapper, "rca-steer-sending-as").text()).toBe(
-      "Sending as a.rao@acme.io · visible to everyone on this incident",
+    expect(byTest(wrapper, "assistant-composer-frame").exists()).toBe(true);
+    expect(byTest(wrapper, "assistant-composer-strip").exists()).toBe(true);
+    expect(textarea(wrapper).attributes("placeholder")).toBe(
+      "Steer this run · read after the current step",
     );
+    expect(textarea(wrapper).attributes("aria-label")).toBe("Steer this run");
+    expect(byTest(wrapper, "assistant-agent-pill").attributes("data-agent")).toBe("sre");
+    expect(byTest(wrapper, "assistant-agent-pill").text()).toBe("Investigator");
+    const right = byTest(wrapper, "assistant-composer-bar-right");
+    expect(right.findAll("button").map((b) => b.attributes("data-test"))).toEqual([
+      "rca-steer-send-btn",
+    ]);
+    expect(byTest(wrapper, "rca-steer-sending-as").exists()).toBe(false);
     expect(
       ["check", "ignore", "focus", "changed"].map((id) =>
         byTest(wrapper, `rca-steer-chip-${id}`).text(),
       ),
     ).toEqual(["Check …", "Ignore …", "Focus on service …", "We changed …"]);
-    expect(byTest(wrapper, "rca-steer-question").exists()).toBe(false);
-    expect(byTest(wrapper, "rca-steer-answer-note").exists()).toBe(false);
   });
 
-  it("frame D: 'Agent asks …' with the open question and the answer note", () => {
+  it("puts 'Sending as … visible to everyone' in the ⓘ popover, not under the field", async () => {
+    wrapper = mountComposer();
+    const find = await openSees(wrapper);
+
+    expect(find("rca-steer-sending-as")?.textContent?.trim()).toBe(
+      "Sending as a.rao@acme.io · visible to everyone on this incident",
+    );
+    expect(find("rca-steer-answer-note")).toBeNull();
+  });
+
+  it("paused: the strip says the agent asks, with the full question in title=, and ⓘ keeps the answer note", async () => {
     const question = rcaSteeringPaused().open_question;
     wrapper = mountComposer({ waitingInput: true, openQuestion: question });
 
-    expect(wrapper.text()).toContain("Answer the agent");
-    expect(byTest(wrapper, "rca-steer-question").text().replace(/\s+/g, " ")).toBe(
-      `Agent asks: ${question?.question}`,
-    );
-    expect(byTest(wrapper, "rca-steer-answer-note").text()).toBe(
+    const notice = byTest(wrapper, "assistant-composer-notice");
+    expect(notice.attributes("title")).toBe(question?.question);
+    expect(byTest(wrapper, "assistant-composer-notice-title").text()).toBe("Agent asks");
+    expect(byTest(wrapper, "rca-steer-chip-check").exists()).toBe(false);
+    const find = await openSees(wrapper);
+    expect(find("rca-steer-answer-note")?.textContent?.trim()).toBe(
       "Your answer is a lead, not evidence. It can move the hypothesis to Likely. Root cause needs a tool result.",
     );
   });
@@ -131,15 +155,18 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
     expect(send).toHaveBeenCalledWith("Ignore the canary");
   });
 
-  it("a plain Enter does not send", async () => {
+  it("a plain Enter sends like every composer, and Shift+Enter does not", async () => {
     const send = okSend();
     wrapper = mountComposer({ send });
     await textarea(wrapper).setValue("Ignore the canary");
 
+    await textarea(wrapper).trigger("keydown", { key: "Enter", shiftKey: true });
+    await flushPromises();
+    expect(send).not.toHaveBeenCalled();
+
     await textarea(wrapper).trigger("keydown", { key: "Enter" });
     await flushPromises();
-
-    expect(send).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith("Ignore the canary");
   });
 
   it("a 429 shows its retry time and keeps the text", async () => {
@@ -155,6 +182,9 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
     await flushPromises();
 
     expect(byTest(wrapper, "rca-steer-error").text()).toContain(
+      "Too many messages. You can send again at 12:00:45.",
+    );
+    expect(byTest(wrapper, "assistant-composer-notice").attributes("title")).toBe(
       "Too many messages. You can send again at 12:00:45.",
     );
     expect((textarea(wrapper).element as HTMLTextAreaElement).value).toBe("Check the pool");

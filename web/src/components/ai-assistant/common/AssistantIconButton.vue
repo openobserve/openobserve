@@ -16,22 +16,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton
-    :variant="variant"
-    :size="ICON_SIZES[size]"
+    :variant="on ? 'primary' : variant"
+    :size="done ? 'xs' : ICON_SIZES[size]"
     :disabled="disabled"
     :loading="loading"
     :focusable-unavailable="unavailable"
-    :aria-label="label"
+    :aria-label="done ?? label"
     :aria-pressed="pressed"
     :data-test="dataTest"
     :data-size="size"
+    :data-on="on || undefined"
+    :data-done="done ? true : undefined"
     :class="[
       'max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
       chevron ? 'w-9! gap-0.5' : '',
+      done ? 'text-status-success-text! ps-1.5 pe-2 font-medium' : '',
     ]"
     @click="emit('click', $event)"
   >
-    <span v-if="badge" class="relative inline-flex">
+    <template v-if="done">
+      <OIcon :name="assistantGlyph.done" size="sm" />
+      <span aria-live="polite">{{ done }}</span>
+    </template>
+    <span v-else-if="badge" class="relative inline-flex">
       <OIcon :name="icon" size="sm" />
       <span
         aria-hidden="true"
@@ -45,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="unavailable" #unavailable-reason>{{ disabledReason }}</template>
     <!-- An open menu or popover covers what the tooltip would say, so the tooltip waits (D2) -->
     <OTooltip
-      v-if="!noTooltip"
+      v-if="!noTooltip && !done"
       :disabled="$attrs['aria-expanded'] === true || $attrs['aria-expanded'] === 'true'"
       :content="$slots.tooltip && !unavailable ? undefined : tooltip"
       :shortcut-id="shortcutId"
@@ -82,6 +89,8 @@ const props = withDefaults(defineProps<AssistantIconButtonProps>(), {
   badge: undefined,
   noTooltip: false,
   chevron: false,
+  on: false,
+  done: undefined,
 });
 
 const emit = defineEmits<AssistantIconButtonEmits>();

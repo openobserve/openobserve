@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// Credits with the flag on: the strip meter in every mode, the 70 % notice once, per-turn credits and the role-aware 402.
+// Credits with the flag on: no meter or usage notice in the panel, per-turn credits and the role-aware 402.
 
 import { test, expect } from "@playwright/test";
 
@@ -42,27 +42,6 @@ test.describe("assistant credits", () => {
     await expect(target.composer()).toBeVisible();
   }
 
-  const meterPart = (id) =>
-    assistant.meter().locator(`[data-test="assistant-credit-meter-${id}"]`);
-
-  // Clipping hides inside the panel, so page scroll proves nothing: every visible part must sit inside the meter and the meter inside the strip.
-  async function expectMeterUnclipped() {
-    const boxes = await assistant.meter().evaluate((meter) => {
-      const strip = meter.closest('[data-test="assistant-status-strip"]').getBoundingClientRect();
-      const own = meter.getBoundingClientRect();
-      const parts = [...meter.querySelectorAll("*")]
-        .map((el) => el.getBoundingClientRect())
-        .filter((r) => r.width > 0 && r.height > 0);
-      return { strip, own, parts };
-    });
-    expect(boxes.own.left).toBeGreaterThanOrEqual(boxes.strip.left - 0.5);
-    expect(boxes.own.right).toBeLessThanOrEqual(boxes.strip.right + 0.5);
-    for (const r of boxes.parts) {
-      expect(r.left).toBeGreaterThanOrEqual(boxes.own.left - 0.5);
-      expect(r.right).toBeLessThanOrEqual(boxes.own.right + 0.5);
-    }
-  }
-
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
     mocks = await loadMocks();
@@ -79,144 +58,22 @@ test.describe("assistant credits", () => {
       await page.reload();
     });
 
-    test("the strip meter reads every mode honestly", { tag: ["@mock"] }, async ({ page }) => {
-      const rows = [
-        {
-          usage: usage("free", 412),
-          text: "412 of 1,000",
-          label: "412 of 1,000 included credits · they don't renew",
-          tag: null,
-        },
-        {
-          usage: usage("free", 712),
-          text: "712 of 1,000",
-          label: "712 of 1,000 included credits · they don't renew",
-          tag: null,
-        },
-        {
-          usage: usage("consent_required", 1000),
-          text: "1,000 of 1,000",
-          label: "Included credits used · paid usage needs consent",
-          tag: "Consent required",
-        },
-        {
-          usage: usage("pay_as_you_go", 1200),
-          text: null,
-          label: "1,000 included credits used · 200 billed · paid usage on",
-          tag: "Paid usage on",
-        },
-        {
-          usage: usage("exhausted", 1000),
-          text: "Used up",
-          label: "AI credits are used up for default",
-          tag: "Exhausted",
-        },
-        {
-          usage: usage("pay_as_you_go", 0, 0),
-          text: "No included credits",
-          label: "No included credits",
-          tag: "Paid usage on",
-        },
+    test("the panel shows no meter, usage notice or credits-used number in any mode", { tag: ["@mock"] }, async ({ page }) => {
+      const modes = [
+        usage("free", 412),
+        usage("free", 712),
+        usage("free", 905),
+        usage("consent_required", 1000),
+        usage("pay_as_you_go", 1200),
       ];
-      for (const row of rows) {
-        state.usage = row.usage;
+      for (const row of modes) {
+        state.usage = row;
         await openOn(page);
-        if (row.text) await expect(meterPart("text")).toHaveText(row.text);
-        else await expect(meterPart("text")).toHaveCount(0);
-        await expect(assistant.meter()).toHaveAttribute(
-          "aria-label",
-          row.label,
-        );
-        if (row.tag) await expect(meterPart("mode")).toHaveText(row.tag);
-        else await expect(meterPart("mode")).toHaveCount(0);
-        await expect(assistant.meter()).not.toContainText(
-          /Free|1200 \/ 1000|0 of 0/,
-        );
+        await expect(assistant.meter()).toHaveCount(0);
+        await expect(assistant.container().locator('[data-test="assistant-status-strip"]')).toHaveCount(0);
+        await expect(assistant.container().locator('[data-test="assistant-credit-notice"]')).toHaveCount(0);
+        await expect(assistant.container()).not.toContainText(/of 1,000|credits used/);
       }
-      state.usage = usage("consent_required", 1000);
-      await openOn(page);
-      await expect(meterPart("bar")).toHaveAttribute(
-        "aria-valuetext",
-        "1,000 of 1,000 credits",
-      );
-      await expect(meterPart("manage")).toHaveAttribute("target", "_blank");
-      for (const width of [1280, 375]) {
-        await page.setViewportSize({ width, height: 900 });
-        await openOn(page);
-        await expect(meterPart("manage")).toBeHidden();
-        await expect(meterPart("more")).toBeVisible();
-        await expectMeterUnclipped();
-      }
-      await meterPart("more").click();
-      await expect(
-        page.locator('[data-test="assistant-credit-meter-more-manage"]'),
-      ).toBeVisible();
-    });
-
-    test("the meter never vanishes when its reads fail", { tag: ["@mock"] }, async ({ page }) => {
-      state.usageStatus = 500;
-      state.overage = mocks.overageStatus({ effective: true, enabled: true });
-      await openOn(page);
-      await expect(meterPart("text")).toHaveText("Credits unavailable");
-      await expect(meterPart("mode")).toHaveText("Paid usage on");
-      state.usageStatus = 200;
-      state.usage = usage("free", 412);
-      await meterPart("retry").click();
-      await expect(meterPart("text")).toHaveText("412 of 1,000");
-      state.usageStatus = 500;
-      state.overageStatus = 500;
-      await openOn(page);
-      await expect(meterPart("text")).toHaveText("Credits unavailable");
-      await expect(meterPart("mode")).toHaveCount(0);
-      await expect(meterPart("retry")).toBeVisible();
-    });
-
-    test("the meter re-reads when a turn completes", { tag: ["@mock"] }, async ({ page }) => {
-      state.usage = usage("free", 412);
-      await openOn(page);
-      await expect(meterPart("text")).toHaveText("412 of 1,000");
-      state.usage = usage("free", 413);
-      await assistant.send("why did checkout 5xx spike?", "complete");
-      await expect(meterPart("text")).toHaveText("413 of 1,000", {
-        timeout: 15_000,
-      });
-    });
-
-    test("the 70 % notice shows once and its dismiss holds across reloads and tabs", { tag: ["@mock"] }, async ({
-      context,
-      page,
-    }) => {
-      state.usage = usage("free", 712);
-      await openOn(page);
-      await expect(assistant.creditNotice()).toHaveText(
-        /70% of included AI credits used · they don't renew/,
-      );
-      await expect(assistant.creditNotice()).toHaveAttribute("role", "status");
-      const second = await context.newPage();
-      const other = new AssistantPage(second);
-      await openOn(second, other);
-      await expect(other.creditNotice()).toBeVisible();
-      await assistant
-        .creditNotice()
-        .locator('[data-test="assistant-credit-notice-dismiss"]')
-        .click();
-      await expect(assistant.creditNotice()).toHaveCount(0);
-      await expect(assistant.composer()).toBeFocused();
-      await expect(other.creditNotice()).toHaveCount(0);
-      await openOn(page);
-      await expect(assistant.meter()).toBeVisible();
-      await expect(assistant.creditNotice()).toHaveCount(0);
-      state.usage = usage("free", 905);
-      await openOn(page);
-      await expect(assistant.creditNotice()).toHaveText(
-        /90% of included AI credits used/,
-      );
-      await expect(assistant.creditNotice()).toHaveAttribute("role", "alert");
-      const events = (await harness.captureTelemetry(page)).filter(
-        (e) => e.name === "ai_credit_notice",
-      );
-      expect(events.map((e) => e.properties.action)).toContain("shown");
-      await second.close();
     });
 
     test("a 402 offers the one action the role and billing state allow, and gives the prompt back", { tag: ["@mock"] }, async ({

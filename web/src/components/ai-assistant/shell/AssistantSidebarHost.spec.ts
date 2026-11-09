@@ -21,6 +21,11 @@ import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant"
 import AssistantSidebarHost from "./AssistantSidebarHost.vue";
 import { tearOffRequest } from "./assistantWindowHost";
 import { closeLockedPanel, openLockedPanel, useLockedPanel } from "./lockedPanel";
+import {
+  followedRcaRun,
+  stopFollowingRca,
+  useRcaFollow,
+} from "@/components/ai-assistant/shell/rcaFollow";
 
 const { fake, lg, closers, shortcuts, track, deep } = vi.hoisted(() => ({
   deep: { blocked: null as null | "no_permission" | "off_for_org" },
@@ -112,6 +117,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
+  stopFollowingRca();
   window.innerWidth = 1024;
   document.body.innerHTML = "";
   closeLockedPanel();
@@ -436,3 +443,102 @@ describe("AssistantSidebarHost", () => {
     expect(document.activeElement).toBe(outside);
   });
 });
+
+describe("opening and Follow in thread", () => {
+  // Swapped in and back by hand, so the setup's own matchMedia stays for the composer.
+  const reduce = (on: boolean) => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: on && query.includes("reduce"),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+    })) as unknown as typeof window.matchMedia;
+    return { mockRestore: () => (window.matchMedia = original) };
+  };
+
+  it("slides the panel in on the open that shows it, then drops the class once the sequence played", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const media = reduce(false);
+    const { open } = await setup();
+    expect(column()!.classList.contains("assistant-panel-in")).toBe(false);
+    open();
+    await flushPromises();
+    expect(column()!.classList.contains("assistant-panel-in")).toBe(true);
+    expect(column()!.hasAttribute("data-opening")).toBe(true);
+    vi.advanceTimersByTime(1_400);
+    await flushPromises();
+    expect(column()!.classList.contains("assistant-panel-in")).toBe(false);
+    media.mockRestore();
+  });
+
+  it("keeps a reduced-motion open to the short fade, ending with it", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const media = reduce(true);
+    const { open } = await setup();
+    open();
+    await flushPromises();
+    expect(column()!.classList.contains("assistant-panel-in")).toBe(true);
+    vi.advanceTimersByTime(210);
+    await flushPromises();
+    expect(column()!.classList.contains("assistant-panel-in")).toBe(false);
+    media.mockRestore();
+  });
+
+  it("never replays the opening on a panel that was already open when it mounted", async () => {
+    fake.current = fakeAssistant();
+    const { store } = fake.current;
+    store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.open({ kind: "sidebar" }, { focus: "none" });
+    const router = fakeRouter();
+    await router.push("/logs");
+    mount(AssistantSidebarHost, {
+      global: { plugins: [router, fakeVuex()] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(column()!.classList.contains("assistant-panel-in")).toBe(false);
+  });
+
+  it("follows a run in the panel in place of the chat, gives the chat back on close, and ends on a panel close", async () => {
+    const { store } = await setup();
+    const door = useRcaFollowOutside();
+    door.follow({ org: "default", incidentId: "inc-482", runId: "run-1" });
+    await vi.dynamicImportSettled();
+    await flushPromises();
+    expect(store.state.shell.placement.kind).toBe("sidebar");
+    const card = () =>
+      document.body.querySelector<HTMLElement>('[data-test="assistant-sidebar-card"]')!;
+    const shell = () => card().querySelector<HTMLElement>('[data-test="assistant-shell-sidebar"]')!;
+    expect(card().querySelector('[data-test="assistant-rca-thread"]')).not.toBeNull();
+    expect(shell().style.display).toBe("none");
+    card().querySelector<HTMLElement>('[data-test="assistant-rca-thread-close"]')!.click();
+    await flushPromises();
+    expect(followedRcaRun().value).toBeNull();
+    expect(card().querySelector('[data-test="assistant-rca-thread"]')).toBeNull();
+    expect(shell().style.display).toBe("");
+    door.follow({ org: "default", incidentId: "inc-482", runId: "run-1" });
+    await flushPromises();
+    store.close("close");
+    await flushPromises();
+    expect(followedRcaRun().value).toBeNull();
+  });
+});
+
+// The follow door outside a component; it reads the same store the host does.
+function useRcaFollowOutside() {
+  let door!: ReturnType<typeof useRcaFollow>;
+  mount(
+    defineComponent({
+      setup() {
+        door = useRcaFollow();
+        return () => null;
+      },
+    }),
+  );
+  return door;
+}

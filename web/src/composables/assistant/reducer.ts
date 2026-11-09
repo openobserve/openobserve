@@ -21,10 +21,12 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { toAssistantError } from "./assistantErrors";
 import {
   boundedArgs,
+  boundedChartSeries,
   boundedFindings,
   boundedQuery,
   boundedResult,
   footerUsage,
+  type ChartSeries,
   type FindingsData,
   type FooterData,
   type LinkBlockData,
@@ -32,11 +34,30 @@ import {
   type StepResult,
 } from "./evidence";
 import { contextUsedKeys } from "./frames";
-import type { ApprovalKind, ApprovalTarget, QuestionOption } from "./assistantStore.types";
+import type {
+  ApprovalKind,
+  ApprovalResultItem,
+  ApprovalSkipCode,
+  ApprovalTarget,
+  QuestionOption,
+} from "./assistantStore.types";
 import type { ConfirmationRequiredFrame, ConfirmationResolvedFrame, UsageFrame } from "./frames";
 
 const STEP_STATES: ReadonlySet<string> = new Set(["running", "done", "failed", "interrupted"]);
-const RESOLVED_OUTCOMES: ReadonlySet<string> = new Set(["approved", "denied", "failed", "partial"]);
+const RESOLVED_OUTCOMES: ReadonlySet<string> = new Set([
+  "approved",
+  "denied",
+  "failed",
+  "partial",
+  "skipped",
+]);
+
+const SKIP_CODES: ReadonlySet<string> = new Set<ApprovalSkipCode>([
+  "changed_since",
+  "recheck_failed",
+]);
+
+const DIGEST = /^[0-9a-f]{64}$/;
 
 // An answer is untrusted: its steps and evidence blocks are capped so one stream cannot fill the tab.
 const MAX_STEPS = 200;
@@ -106,6 +127,8 @@ declare module "@/ts/interfaces/chat" {
     footer?: FooterData;
     approval?: ApprovalBlockData;
     resolved?: ResolvedBlockData;
+    /** C4: the series this step's result drew; never stored by the server. */
+    chartSeries?: ChartSeries;
     policy?: PolicyBlockData;
     consentNote?: ConsentNoteData;
   }
@@ -122,6 +145,8 @@ export interface ApprovalBlockData {
   /** How many items the server acts on, when more than `targets` lists. */
   total?: number;
   before?: unknown;
+  /** C3: sha256 of `before` at ask time; o2-ai re-reads the object against it before writing. */
+  beforeDigest?: string;
   after?: unknown;
   impact?: string[];
   grantable: boolean;
@@ -157,15 +182,17 @@ export interface ResolvedBlockData {
   answer?: string;
   /** The server dropped the card because the chat moved on; `approved` is false. */
   withdrawn?: boolean;
-  /** What an approved decision came to: `approved`, `denied`, `failed` or `partial`. */
+  /** What an approved decision came to: `approved`, `denied`, `failed`, `partial` or `skipped`. */
   outcome?: ResolvedOutcome;
+  /** C3: why a `skipped` outcome wrote nothing. */
+  code?: ApprovalSkipCode;
   /** The server's words for a denied, failed or partial outcome. */
   detail?: string;
   /** Read back from the stored chat: the reader's own decision, never one heard from another tab. */
   recorded?: boolean;
 }
 
-export type ResolvedOutcome = "approved" | "denied" | "failed" | "partial";
+export type ResolvedOutcome = "approved" | "denied" | "failed" | "partial" | "skipped";
 
 /** A quiet notice in the turn: a policy denial or a change made without a review step. */
 export interface PolicyBlockData {
@@ -861,6 +888,8 @@ function typedToolResult(
   const callId = boundedId(data.call_id);
   const typed = boundedQuery(data.query, callId);
   if (typed) result.query = typed;
+  const chart = boundedChartSeries(data.chart_series);
+  if (chart) result.chartSeries = chart;
   const navigationAction =
     success && data.call_args ? ctx.generateNavigation(data.tool, data.call_args, data) : null;
   if (navigationAction) result.navigationAction = navigationAction;
@@ -939,12 +968,14 @@ function appendFooter(state: StreamState, data: any, extras: StreamExtras): void
     typeof data.trace_id === "string" && data.trace_id ? data.trace_id : extras.traceId;
   const usage = footerUsage(data.usage ?? extras.usage);
   const used = contextUsedKeys(data.context_used);
+  const chart = boundedChartSeries(data.chart_series);
   const footer: FooterData = {
     ...(traceId && { traceId }),
     ...(extras.serverTurnId && { serverTurnId: String(extras.serverTurnId).slice(0, 64) }),
     ...(usage && { usage }),
     ...(used && { contextUsed: used }),
     ...(typeof data.persisted === "boolean" && { persisted: data.persisted }),
+    ...(chart && { chartSeries: chart }),
   };
   appendBlock(state, { type: "footer", footer });
 }
@@ -1103,6 +1134,7 @@ function typedResolved(state: StreamState, data: any, phase: StreamPhase): Strea
     ...(data.withdrawn === true && { withdrawn: true }),
     ...(typeof data.answer === "string" && { answer: data.answer.slice(0, MAX_LINE_CHARS) }),
     ...(RESOLVED_OUTCOMES.has(data.outcome) && { outcome: data.outcome }),
+    ...(SKIP_CODES.has(data.code) && { code: data.code }),
     ...(typeof data.detail === "string" && { detail: data.detail.slice(0, MAX_LINE_CHARS) }),
   };
   appendBlock(state, { type: "approval_result", resolved });
@@ -1114,6 +1146,20 @@ export function isDeleteCard(card: { kind: string; tool: string; operation?: str
   return (
     card.kind === "delete" || DELETE_TOOL.test(card.operation ?? "") || DELETE_TOOL.test(card.tool)
   );
+}
+
+/** C3: a `/confirm` item o2-ai skipped with nothing written, as its result row; null for any other item. */
+export function skippedApprovalItem(
+  raw: unknown,
+): Pick<ApprovalResultItem, "status" | "code" | "message" | "before"> | null {
+  if (!isRecord(raw) || raw.status !== "skipped" || !SKIP_CODES.has(String(raw.code))) return null;
+  return {
+    status: "skipped",
+    code: raw.code as ApprovalSkipCode,
+    ...(typeof raw.message === "string" && { message: raw.message.slice(0, MAX_LINE_CHARS) }),
+    ...(raw.code === "changed_since" &&
+      raw.before !== undefined && { before: boundedJson(raw.before) }),
+  };
 }
 
 /** A `confirmation_required` frame as a typed card; the kind comes from `kind`, the tool or its arguments, never a name prefix. */
@@ -1147,6 +1193,8 @@ export function approvalOf(data: any): ApprovalBlockData {
     targets,
     ...(total > targets.length && { total }),
     ...(data?.before !== undefined && { before: boundedJson(data.before) }),
+    ...(typeof data?.before_digest === "string" &&
+      DIGEST.test(data.before_digest) && { beforeDigest: data.before_digest }),
     ...(after !== undefined && { after: boundedJson(after) }),
     ...(impact?.length && { impact }),
     grantable: data?.grantable === true && !destructive,

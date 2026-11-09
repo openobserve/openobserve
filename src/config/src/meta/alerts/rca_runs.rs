@@ -24,6 +24,8 @@ use super::incidents::AnalysisTriggerType;
 pub const RCA_STAGE_COUNT: u8 = 7;
 
 pub const STALE_GRACE_SECS: u64 = 120;
+/// `error.code` of a run whose turn never started: refused at admission, not failed analysing.
+pub const REFUSAL_CODES: [&str; 4] = ["turn_limit", "credentials", "agent_unavailable", "busy"];
 
 /// `topology_context` key of the newest report written before analysis runs existed.
 pub const V1_REPORT_KEY: &str = "suggested_root_cause";
@@ -506,6 +508,11 @@ pub fn v1_reports(
                 .unwrap_or(created_at),
         })
         .collect()
+}
+
+/// Whether a failed run's `error.code` says it was refused before it started.
+pub fn is_refusal_code(code: &str) -> bool {
+    REFUSAL_CODES.contains(&code)
 }
 
 /// Whether `run_id` names a pre-run report rather than an `rca_runs` row.

@@ -97,7 +97,7 @@ const SEED_FENCE: &str = "\n---\n\n";
 const CONTEXT_HEADER: &str = "[Context]\n";
 const FORK_SUFFIX: &str = "continued";
 // A fork stores the newest shared turns that fit; the model still sees at most `SEED_MAX_CHARS`.
-const SEED_MAX_BYTES: usize = 2 * 1024 * 1024;
+pub(super) const SEED_MAX_BYTES: usize = 2 * 1024 * 1024;
 const STREAM_FORBIDDEN: &str = "stream_forbidden";
 const IMPORTED_CHAT: &str = "imported_chat";
 // Permission checks per read; steps on streams past this many are hidden unchecked.
@@ -1325,7 +1325,7 @@ async fn org_allows(share: &ShareModel) -> bool {
 }
 
 /// The caller's email, once chat history is known to be on.
-fn guard(in_req: &axum::extract::Request) -> Result<String, Response> {
+pub(super) fn guard(in_req: &axum::extract::Request) -> Result<String, Response> {
     let Some(email) = user_email(in_req) else {
         return Err(error::session_expired("Unauthorized"));
     };
@@ -1604,7 +1604,7 @@ async fn creator_is_member(share: &ShareModel, chat: &ChatModel) -> Result<bool,
             .is_some())
 }
 
-async fn owner_name(chat: &ChatModel, public: bool) -> Option<String> {
+pub(super) async fn owner_name(chat: &ChatModel, public: bool) -> Option<String> {
     let name = match infra::table::users::get_name_by_id(&chat.user_id).await {
         Ok(Some((first, last))) => display_name(&first, &last),
         Ok(None) => None,
@@ -1717,7 +1717,7 @@ fn count_op(op: &str) {
 }
 
 /// Cross-site forms cannot send JSON without a CORS preflight, so state changes require it.
-fn require_json(in_req: &axum::extract::Request) -> Result<(), Response> {
+pub(super) fn require_json(in_req: &axum::extract::Request) -> Result<(), Response> {
     if is_json(in_req.headers()) {
         return Ok(());
     }
@@ -1977,7 +1977,7 @@ fn cards_as_of(cards: Vec<ai_approvals::Model>, at: i64) -> Vec<ai_approvals::Mo
 }
 
 /// The newest `turns` whose JSON fits in `max_bytes`, and whether any were left out.
-fn newest_within(mut turns: Vec<Value>, max_bytes: usize) -> (Vec<Value>, bool) {
+pub(super) fn newest_within(mut turns: Vec<Value>, max_bytes: usize) -> (Vec<Value>, bool) {
     let mut total = 0usize;
     let mut keep = 0;
     for turn in turns.iter().rev() {
@@ -2039,7 +2039,7 @@ fn versioned_history(carried: Vec<Value>, own: Vec<Value>) -> (Vec<Value>, bool)
 }
 
 /// The turns a fork copied when it was made.
-fn stored_seed(row: &ChatModel) -> Option<Vec<Value>> {
+pub(super) fn stored_seed(row: &ChatModel) -> Option<Vec<Value>> {
     let seed: Value = serde_json::from_str(row.seed.as_deref()?).ok()?;
     match seed {
         Value::Object(mut seed) => match seed.remove("turns") {

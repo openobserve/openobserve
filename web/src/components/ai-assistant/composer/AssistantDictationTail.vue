@@ -19,12 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="tail"
     ref="mirror"
     aria-hidden="true"
-    class="pointer-events-none absolute overflow-hidden px-3 py-2 text-sm wrap-break-word whitespace-pre-wrap text-transparent"
+    class="pointer-events-none absolute overflow-hidden px-1 py-0 pe-24 text-sm leading-6 wrap-break-word whitespace-pre-wrap text-transparent"
     :style="box"
     data-test="assistant-dictate-tail"
   >
     {{ before
-    }}<span class="decoration-text-secondary underline decoration-dotted underline-offset-2">{{
+    }}<span class="bg-input-bg text-text-muted" data-test="assistant-dictate-interim">{{
       tail
     }}</span>
   </div>
@@ -47,7 +47,7 @@ const props = defineProps<AssistantDictationTailProps>();
 const mirror = ref<HTMLElement | null>(null);
 const box = ref<CSSProperties>({});
 
-// A textarea cannot style a range, so a transparent copy over it carries the dotted underline.
+// A textarea cannot style a range, so an exact copy over it masks the unsettled words and redraws them muted.
 function measure(): void {
   const { field } = props;
   const parent = mirror.value?.offsetParent;

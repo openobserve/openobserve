@@ -140,6 +140,9 @@ pub struct ChatSummary {
     /// Set on a chat forked from a share: the share's id.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub forked_from_share: Option<String>,
+    /// `{session_id, turn_id, title}` of the chat and answer this one was branched from.
+    #[schema(value_type = Option<Object>)]
+    pub branched_from: Option<Value>,
     /// A turn of this chat is running right now, on any node.
     pub active_turn: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -204,6 +207,10 @@ impl From<Model> for ChatSummary {
             updated_at: row.updated_at,
             last_committed_seq: row.last_committed_seq,
             forked_from_share: row.forked_from_share,
+            branched_from: row
+                .branched_from
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok()),
             active_turn: false,
             active_turn_id: None,
             pending_approval: false,
@@ -3035,7 +3042,21 @@ mod tests {
             pinned_at: None,
             seed: None,
             search_text: None,
+            branched_from: None,
         }
+    }
+
+    #[test]
+    fn a_branch_names_its_source_and_any_other_chat_says_null() {
+        let plain = serde_json::to_value(ChatSummary::from(chat_row())).unwrap();
+        assert!(plain["branched_from"].is_null(), "{plain}");
+        let source = serde_json::json!({"session_id": "src", "turn_id": "t1", "title": "p99"});
+        let branch = Model {
+            branched_from: Some(source.to_string()),
+            ..chat_row()
+        };
+        let row = serde_json::to_value(ChatSummary::from(branch)).unwrap();
+        assert_eq!(row["branched_from"], source);
     }
 
     fn refusal(scope: &'static str, retry_after_ms: Option<u64>) -> TurnRefusal {

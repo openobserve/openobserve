@@ -59,6 +59,8 @@ const toolResultFrameSchema = z.looseObject({
   response: z.unknown().optional(),
   error_type: z.string().optional(),
   query: typedQuerySchema.optional(),
+  /** C4: the series the reducer bounds; a malformed one is dropped there, never the frame. */
+  chart_series: z.unknown().optional(),
 });
 
 const messageDeltaFrameSchema = z.looseObject({
@@ -104,6 +106,8 @@ const confirmationRequiredFrameSchema = z.looseObject({
   destructive: z.boolean().optional(),
   targets: z.array(approvalTargetSchema).optional(),
   before: z.unknown().optional(),
+  /** C3: sha256 of the redacted `before` with volatile fields removed. */
+  before_digest: z.string().optional(),
   after: z.unknown().optional(),
   impact: z.array(z.string()).optional(),
   expires_at: z.number().optional(),
@@ -146,6 +150,8 @@ const completeFrameSchema = z.looseObject({
   persisted: z.boolean().optional(),
   /** B-02: the turn ended with no content of its own (o2-ai's empty-turn notice). */
   empty: z.boolean().optional(),
+  /** C4: the turn's last chart, or null; the reducer bounds it. */
+  chart_series: z.unknown().optional(),
   // Cut before any entry is read; `contextUsedKeys` skips a bad entry, never the frame.
   context_used: z
     .unknown()
@@ -214,6 +220,11 @@ const confirmationResolvedFrameSchema = z.looseObject({
   items: z.array(z.string()).optional(),
   expired: z.boolean().optional(),
   withdrawn: z.boolean().optional(),
+  /** `approved` · `denied` · `failed` · `partial` · `skipped` (C3). */
+  outcome: z.string().optional(),
+  /** C3: `changed_since` or `recheck_failed` on a skipped outcome. */
+  code: z.string().optional(),
+  detail: z.string().optional(),
 });
 
 const queryFrameSchema = z.looseObject({

@@ -23,6 +23,8 @@ import type {
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 
+import type { OrgRcaRun } from "@/services/rca_runs_org";
+
 import HomeNowRow from "./HomeNowRow.vue";
 
 const CHANGED = Date.UTC(2026, 10, 5, 9, 41) * 1000;
@@ -86,7 +88,7 @@ describe("HomeNowRow", () => {
     );
     expect(wrapper.find('[data-test="home-now-row-no-alert"]').text()).toBe("no alert");
     expect(wrapper.find('[data-test="home-now-row-partial"]').text()).toBe("partial");
-    expect(wrapper.get('[data-test="home-now-row-changed"]').text()).toBe("Changed 09:41");
+    expect(wrapper.get('[data-test="home-now-row-changed"]').text()).toBe("09:41");
     expect(wrapper.get('[data-test="home-now-row-changed"]').attributes("title")).toBe(
       "2026-11-05 09:41 (UTC)",
     );
@@ -159,5 +161,71 @@ describe("HomeNowRow", () => {
     const wrapper = mountRow({ row: service, fallbackText: text });
     const id = wrapper.get('[data-test="home-now-row-investigate"]').attributes("aria-describedby");
     expect(wrapper.get(`#${id}`).text()).toBe(text);
+  });
+
+  it("keeps one state pill, one time and the actions in fixed columns so every row lines up", () => {
+    const wrapper = mountRow({ row: alert });
+    expect(wrapper.get('[data-test="home-now-row-state"]').classes()).toContain(
+      "@[40rem]/row:w-36",
+    );
+    expect(wrapper.get('[data-test="home-now-row-changed"]').classes()).toContain("w-12");
+    expect(wrapper.get('[data-test="home-now-row-actions"]').classes()).toContain(
+      "@[40rem]/row:w-64",
+    );
+    expect(
+      wrapper.findAll(
+        '[data-test="home-now-row-state"] [data-o2-badge], [data-test="home-now-row-state"] .inline-flex',
+      ).length,
+    ).toBeLessThanOrEqual(1);
+  });
+
+  it("draws a flapping alert amber and a recovered one as a neutral outline, never green", () => {
+    const recovered = { ...alert, state: "recovered" as const, count: 1 };
+    const flapping = mountRow({
+      row: recovered,
+      meta: { service: null, repeats: 3, flapping: true },
+    });
+    expect(flapping.get('[data-test="home-now-row-flapping"]').text()).toBe("Flapping · 1×");
+    expect(flapping.find('[data-test="home-now-row-recovered"]').exists()).toBe(false);
+    const quiet = mountRow({ row: recovered });
+    const tag = quiet.get('[data-test="home-now-row-recovered"]');
+    expect(tag.text()).toBe("Recovered");
+    expect(tag.html()).not.toMatch(/success/);
+  });
+
+  it("offers Follow in thread on an incident with a run, with the run's state on the muted line", async () => {
+    const incident: Row = {
+      kind: "incident",
+      key: "incident:inc-482",
+      id: "inc-482",
+      bucket: "critical",
+      changedAt: CHANGED,
+      title: "Checkout 5xx",
+      severity: "P1",
+      status: "open",
+      alertCount: 2,
+    };
+    const run: OrgRcaRun = {
+      run_id: "run-1",
+      incident_id: "inc-482",
+      incident_title: "Checkout 5xx",
+      severity: "P1",
+      state: "completed",
+      trigger: "auto",
+      started_at: CHANGED,
+      ended_at: CHANGED + 420_000_000,
+      error_code: null,
+    };
+    const wrapper = mountRow({ row: incident, run });
+    expect(wrapper.find('[data-test="home-now-row-investigate"]').exists()).toBe(false);
+    const follow = wrapper.get('[data-test="home-now-row-follow"]');
+    expect(follow.text()).toBe("Follow in thread");
+    expect(wrapper.get('[data-test="home-now-row-severity"]').exists()).toBe(true);
+    await follow.trigger("click");
+    expect(wrapper.emitted("follow")).toEqual([[incident, run]]);
+    expect(wrapper.get('[data-test="home-now-row-open"]').text()).toBe("Open incident");
+    const plain = mountRow({ row: incident });
+    expect(plain.find('[data-test="home-now-row-follow"]').exists()).toBe(false);
+    expect(plain.get('[data-test="home-now-row-investigate"]').text()).toBe("Investigate");
   });
 });

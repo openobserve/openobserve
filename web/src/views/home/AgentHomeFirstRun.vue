@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section class="flex min-w-0 flex-col gap-3" data-test="agent-home-first-run" :data-state="state">
+    <AgentHomeGreeting />
     <AssistantLauncher layout="overview" :go-to-only="offReason !== null">
       <template #note>
         <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="org" />
@@ -39,6 +40,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import AgentHomeAskNote from "./AgentHomeAskNote.vue";
+import AgentHomeGreeting from "./AgentHomeGreeting.vue";
 import { useAgentHomeState } from "./useAgentHomeState";
 
 const { t } = useI18nTyped();

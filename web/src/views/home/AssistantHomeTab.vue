@@ -23,11 +23,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       :class="[
         'mx-auto grid max-w-[90rem] min-w-0 grid-cols-1 gap-x-6 gap-y-4',
-        wide && '@[75rem]/home:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)]',
+        wide && '@[75rem]/home:grid-cols-[minmax(0,1fr)_21.25rem]',
       ]"
       :data-columns="wide ? 'auto' : 'one'"
     >
       <div class="flex min-w-0 flex-col gap-4" data-test="assistant-home-main">
+        <AgentHomeGreeting :answers-ready="answersReady" :need-you="needYouCount" />
+        <HomeNowList
+          v-bind="listProps"
+          :snapshot="nowSnapshot"
+          :row-meta="rowMeta"
+          :failed-sources="data.failedSources.value"
+          :denied-sources="data.deniedSources.value"
+          :clear-text="split.problems.length > 0 ? t('home.agent.nowClearProblems') : null"
+          :incident-runs="homeRuns?.byIncident ?? null"
+          :failed-runs="homeRuns?.failedAuto ?? []"
+          @select="selectRow"
+          @open="openRow"
+          @service="openService"
+          @fallback="openRow"
+          @view-all="openSource"
+          @retry="() => data.load(true)"
+          @analysis="openAnalysis"
+          @open-incident="(id) => go(incidentLocation(id))"
+        />
         <AssistantLauncher
           layout="overview"
           :page-range="pageRange"
@@ -38,28 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AgentHomeAskNote v-if="offReason" :reason="offReason" :org="data.org.value" />
           </template>
         </AssistantLauncher>
-        <AgentHomeBriefing
-          :counts="counts"
-          :pending="data.pending.value"
-          :refreshes="refreshes"
-          :can-brief="state === 'ai'"
-          :page-range="pageRange"
-        />
-        <HomeNowList
-          v-bind="listProps"
-          :snapshot="nowSnapshot"
-          :row-meta="rowMeta"
-          :failed-sources="data.failedSources.value"
-          :denied-sources="data.deniedSources.value"
-          :clear-text="split.problems.length > 0 ? t('home.agent.nowClearProblems') : null"
-          @select="selectRow"
-          @open="openRow"
-          @service="openService"
-          @fallback="openRow"
-          @view-all="openSource"
-          @retry="() => data.load(true)"
-          @analysis="openAnalysis"
-        />
         <HomeNowList
           v-if="wide && split.problems.length > 0"
           v-bind="listProps"
@@ -78,16 +75,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AgentHomeDashboards v-if="wide" />
       </div>
       <aside v-if="wide" class="flex min-w-0 flex-col gap-4" data-test="assistant-home-aside">
+        <AgentHomeBriefing :can-brief="state === 'ai'" :page-range="pageRange" />
+        <AssistantLauncher
+          v-if="state === 'ai' || state === 'budget'"
+          layout="chats"
+          data-test="assistant-home-threads"
+        />
         <AgentHomeSince
           :since="since"
           :items="sinceItems"
           :timezone="data.timezone.value"
           @open="openSinceItem"
-        />
-        <AssistantLauncher
-          v-if="state === 'ai' || state === 'budget'"
-          layout="chats"
-          data-test="assistant-home-threads"
         />
       </aside>
     </div>
@@ -116,10 +114,12 @@ import {
 } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
+import { useQuery } from "@tanstack/vue-query";
 
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
 import {
   useAssistantHistory,
+  useAssistantRuns,
   useAssistantStore,
   type ComposerState,
   type Sid,
@@ -130,6 +130,8 @@ import { useHomeContextProvider } from "@/composables/contextProviders/homeConte
 import type { OverviewNowRow, OverviewNowSnapshot } from "@/composables/contextProviders/types";
 import { withHomeReturn } from "@/composables/goto/homeReturn";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgRcaRunsQuery } from "@/services/rca_runs_org.queries";
 import { useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
@@ -137,6 +139,7 @@ import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import AgentHomeAskNote from "./AgentHomeAskNote.vue";
 import AgentHomeBriefing from "./AgentHomeBriefing.vue";
 import AgentHomeDashboards from "./AgentHomeDashboards.vue";
+import AgentHomeGreeting from "./AgentHomeGreeting.vue";
 import AgentHomeSince from "./AgentHomeSince.vue";
 import type { BuiltFromSource } from "./HomeBuiltFrom.vue";
 import HomeNowList from "./HomeNowList.vue";
@@ -158,7 +161,7 @@ import {
   type SinceThreadEnd,
 } from "./sinceLastVisit";
 import { useAgentHomeState } from "./useAgentHomeState";
-import { useHomeNowData } from "./useHomeNowData";
+import { homeRunsOf, useHomeNowData } from "./useHomeNowData";
 import { useHomeRefresh } from "./useHomeRefresh";
 
 const AlertHistoryDrawer = defineAsyncComponent(
@@ -167,6 +170,9 @@ const AlertHistoryDrawer = defineAsyncComponent(
 
 /** History rows the since-last-visit section scans for finished threads and waiting approvals. */
 const THREAD_LOOKUP = 20;
+
+/** Runs Home reads per load; the window rarely holds more incidents than this. */
+const RCA_RUNS_LIMIT = 100;
 
 /** The traces stream a service alert reads when the topology names none. */
 const DEFAULT_TRACES_STREAM = "default";
@@ -227,6 +233,22 @@ const split = computed(() =>
   wide.value ? splitNowRows(grouped.value) : { now: grouped.value.filter(needsYou), problems: [] },
 );
 const counts = computed(() => briefingCounts(split.value));
+
+// The incidents' runs since the window opened: one read gives every row's run and the failed auto-runs.
+const rcaRuns = useQuery(
+  computed(() => ({
+    ...orgRcaRunsQuery(data.org.value, {
+      since: data.window.value.start,
+      limit: RCA_RUNS_LIMIT,
+    }),
+    enabled: state.value === "ai" && data.incidentsOn.value && !!data.org.value,
+  })),
+  queryClient,
+);
+const homeRuns = computed(() => (rcaRuns.data.value ? homeRunsOf(rcaRuns.data.value.runs) : null));
+const needYouCount = computed(
+  () => counts.value.needYou + (homeRuns.value?.failedAuto.length ?? 0),
+);
 const rowMeta = computed<Record<string, NowRowMeta>>(() =>
   Object.fromEntries(
     grouped.value.map((item) => [
@@ -256,6 +278,11 @@ const canCreateAlert = computed(
 // The Open Source build has no assistant history to read.
 const history = state.value === "oss" ? null : useAssistantHistory();
 const assistantStore = history ? useAssistantStore() : null;
+const assistantRuns = history ? useAssistantRuns() : null;
+const answersReady = computed(
+  () =>
+    assistantRuns?.rows.value.filter((row) => row.group === "ready" && !row.otherOrg).length ?? 0,
+);
 const recentRows = history?.recent(THREAD_LOOKUP) ?? null;
 const threads = computed<SinceThread[]>(() =>
   (recentRows?.value ?? []).map((row) => ({

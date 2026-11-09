@@ -749,7 +749,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <template v-if="assistantV2">
                       <AiEntryButton v-bind="alertDoor(row, 'explain')" appearance="menu-item" />
+                      <!-- An open incident of this alert already has a run: follow it rather than start another. -->
+                      <ODropdownItem
+                        v-if="alertRca.runFor(row.alert_id)"
+                        :icon-left="assistantGlyph.thread"
+                        :data-test="`alert-list-${row.name}-follow-in-thread`"
+                        @select="alertRca.followAlert(row.alert_id)"
+                      >
+                        {{ t("alerts.incidents.rcaRun.followInThread") }}
+                      </ODropdownItem>
                       <AiEntryButton
+                        v-else
                         v-bind="alertDoor(row, 'troubleshoot')"
                         appearance="menu-item"
                       />
@@ -1348,6 +1358,8 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { useAlertRcaFollow } from "@/components/alerts/rca/useAlertRcaFollow";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -1467,6 +1479,10 @@ export default defineComponent({
           : ("ai-entry-alert-troubleshoot" as const),
       build: alertBuild(() => ({ ...row, id: row.alert_id ?? row.id }), verb, store.state),
     });
+    const alertRca = useAlertRcaFollow(
+      () => store.state.selectedOrganization?.identifier ?? "",
+      assistantV2,
+    );
     const { lgUp } = useBreakpoint();
 
     // On-call is separately gated, so the column and its lookup vanish with it
@@ -4683,6 +4699,8 @@ export default defineComponent({
     return {
       assistantV2,
       alertDoor,
+      alertRca,
+      assistantGlyph,
       downtimesEnabled,
       muteDialogOpen,
       muteSelection,

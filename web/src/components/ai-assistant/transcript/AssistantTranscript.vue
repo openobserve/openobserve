@@ -15,178 +15,212 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Size, layout and paint containment: the host sizes the transcript, so a part that fills never lays out the page around it (Q1) -->
-  <section
-    ref="root"
-    role="log"
-    aria-live="off"
-    :aria-label="label ?? t('assistant.transcript.name', { product })"
-    :aria-busy="busy ? 'true' : undefined"
-    tabindex="0"
-    data-test="assistant-transcript"
-    data-transcript-scroll
-    data-dd-privacy="mask"
-    :data-readonly="readonly ? '' : undefined"
-    :class="[
-      'focus-visible:ring-border-strong flex min-h-0 flex-1 flex-col overflow-y-auto contain-layout contain-paint contain-size outline-none focus-visible:ring-2 focus-visible:ring-inset',
-      density === 'roomy' ? 'gap-6 px-4 py-4' : 'gap-4 px-4 py-3',
-    ]"
-    @keydown="scroll.onKeydown"
-  >
-    <div
-      v-if="hiddenCount > 0"
-      class="flex flex-wrap items-center gap-2"
-      data-test="assistant-transcript-window"
-    >
-      <OButton
-        variant="ghost"
-        size="sm"
-        class="max-md:min-h-11 pointer-coarse:min-h-11"
-        data-test="assistant-transcript-earlier"
-        @click="showEarlier"
-      >
-        {{ t("assistant.transcript.showEarlier") }}
-      </OButton>
-      <OText variant="meta">
-        {{ t("assistant.transcript.earlierCount", { count: hiddenCount }, hiddenCount) }}
-      </OText>
-    </div>
-    <article
-      v-for="turn in mounted"
-      :key="turn.turnId"
-      :data-test="`assistant-turn-${turn.turnId}`"
-      :data-turn-id="turn.turnId"
-      :aria-label="turnName(turn)"
-      class="[&+article]:border-border-subtle flex min-w-0 flex-col gap-3 [&+article]:border-t [&+article]:pt-4"
+  <div class="relative flex min-h-0 flex-1 flex-col" data-test="assistant-transcript-frame">
+    <!-- Size, layout and paint containment: the host sizes the transcript, so a part that fills never lays out the page around it (Q1) -->
+    <section
+      ref="root"
+      role="log"
+      aria-live="off"
+      :aria-label="label ?? t('assistant.transcript.name', { product })"
+      :aria-busy="busy ? 'true' : undefined"
+      tabindex="0"
+      data-test="assistant-transcript"
+      data-transcript-scroll
+      data-dd-privacy="mask"
+      :data-readonly="readonly ? '' : undefined"
+      :class="[
+        'focus-visible:ring-border-strong flex min-h-0 flex-1 flex-col overflow-y-auto contain-layout contain-paint contain-size outline-none focus-visible:ring-2 focus-visible:ring-inset',
+        density === 'roomy' ? 'gap-6 px-4 py-4' : 'gap-4 px-4 py-3',
+      ]"
+      @keydown="scroll.onKeydown"
     >
       <div
-        v-if="compactionOf(turn.user)"
-        class="flex min-w-0 items-center gap-2"
-        data-test="assistant-compaction-divider"
+        v-if="hiddenCount > 0"
+        class="flex flex-wrap items-center gap-2"
+        data-test="assistant-transcript-window"
       >
-        <OSeparator class="min-w-4 flex-1" />
-        <OText variant="meta" as="p" class="min-w-0 text-center break-words">
-          {{ compactionOf(turn.user) }}
+        <OButton
+          variant="ghost"
+          size="sm"
+          class="max-md:min-h-11 pointer-coarse:min-h-11"
+          data-test="assistant-transcript-earlier"
+          @click="showEarlier"
+        >
+          {{ t("assistant.transcript.showEarlier") }}
+        </OButton>
+        <OText variant="meta">
+          {{ t("assistant.transcript.earlierCount", { count: hiddenCount }, hiddenCount) }}
         </OText>
-        <OSeparator class="min-w-4 flex-1" />
       </div>
-      <AssistantHandoffMarker
-        v-if="turn.user?.handoffFrom && turn.user.agentId"
-        :agent="turn.user.agentId"
-        :at="turn.user.sentAt"
-        :questions="carried(turn).questions"
-        :answers="carried(turn).answers"
-        :chips="(turn.user.chips ?? []).map((chip) => String(chip.label))"
-        :withdrew-approval="turn.user.handoffWithdrewApproval"
-      />
-      <AssistantTurnOutcome
-        v-if="turn.user?.handoffFailed"
-        kind="failed"
-        :error="handoffError(turn.user.handoffFailed)"
-        :role="isAdmin ? 'admin' : 'member'"
-        :readonly="readonly || !handoffOpen(turn)"
-        :retry-snapshot-available="handoffOpen(turn)"
-        :sid="sid ?? undefined"
-        :online="online"
-        @action="(action) => onHandoffAction(action, turn)"
-      />
-      <AssistantMessage
-        v-if="turn.user"
-        :message="turn.user"
-        :turn-id="turn.turnId"
-        :readonly="readonly"
-        :density="density"
-        :range-label="rangeLabelOf(turn)"
-      >
-      </AssistantMessage>
       <article
-        v-if="turn.answer || statusShown(turn)"
-        :aria-label="
-          t('assistant.transcript.answerName', {
-            agent: agentName(turnAgent(turn), t),
-            prompt: turn.firstLine,
-          })
-        "
-        tabindex="-1"
-        data-answer
-        :data-test="`assistant-answer-${turn.turnId}`"
-        class="rounded-default focus-visible:ring-border-strong flex min-w-0 flex-col gap-2 outline-none focus-visible:ring-2"
+        v-for="turn in mounted"
+        :key="turn.turnId"
+        :data-test="`assistant-turn-${turn.turnId}`"
+        :data-turn-id="turn.turnId"
+        :aria-label="turnName(turn)"
+        class="[&+article]:border-border-subtle flex min-w-0 flex-col gap-3 [&+article]:border-t [&+article]:pt-4"
       >
+        <div
+          v-if="compactionOf(turn.user)"
+          class="flex min-w-0 items-center gap-2"
+          data-test="assistant-compaction-divider"
+        >
+          <OSeparator class="min-w-4 flex-1" />
+          <OText variant="meta" as="p" class="min-w-0 text-center break-words">
+            {{ compactionOf(turn.user) }}
+          </OText>
+          <OSeparator class="min-w-4 flex-1" />
+        </div>
+        <AssistantHandoffMarker
+          v-if="turn.user?.handoffFrom && turn.user.agentId"
+          :agent="turn.user.agentId"
+          :at="turn.user.sentAt"
+          :questions="carried(turn).questions"
+          :answers="carried(turn).answers"
+          :chips="(turn.user.chips ?? []).map((chip) => String(chip.label))"
+          :withdrew-approval="turn.user.handoffWithdrewApproval"
+        />
+        <AssistantTurnOutcome
+          v-if="turn.user?.handoffFailed"
+          kind="failed"
+          :error="handoffError(turn.user.handoffFailed)"
+          :role="isAdmin ? 'admin' : 'member'"
+          :readonly="readonly || !handoffOpen(turn)"
+          :retry-snapshot-available="handoffOpen(turn)"
+          :sid="sid ?? undefined"
+          :online="online"
+          @action="(action) => onHandoffAction(action, turn)"
+        />
         <AssistantMessage
-          :message="turn.answer ?? pendingAnswer"
-          :turn-id="`${sid ?? 'shared'}:${turn.turnId}:v${turn.version.current}`"
-          :live="turn.live"
+          v-if="turn.user"
+          :message="turn.user"
+          :turn-id="turn.turnId"
           :readonly="readonly"
           :density="density"
-          :turn="views.get(turn.turnId)"
-          :agent="turnAgent(turn)"
+          :range-label="rangeLabelOf(turn)"
         >
-          <template v-if="turn.version.count > 1" #versions>
-            <AssistantVersionPicker
-              :current="turn.version.current"
-              :count="turn.version.count"
-              @select="(n) => selectVersion(turn.turnId, n, turn.version.count)"
-            />
-          </template>
-          <template #after>
-            <AssistantTurnOutcome
-              v-for="outcome in outcomesOf(turn)"
-              :key="outcome.key"
-              :kind="outcome.record.kind"
-              :error="outcome.error"
-              :steps="outcome.record.steps ?? 0"
-              :role="isAdmin ? 'admin' : 'member'"
-              :readonly="readonly"
-              :retry-snapshot-available="turn.isLast && canRetry"
-              :at="outcome.record.at"
-              :partial="turn.partial"
-              :cancel-unconfirmed="outcome.record.cancelUnconfirmed"
-              :org="session?.org ?? ''"
-              :sid="sid ?? undefined"
-              :elapsed-ms="outcome.record.elapsedMs"
-              :online="online"
-              :persistence="persistence"
-              :manual-route="manualRouteFor(turn) ?? undefined"
-              @action="(action) => onOutcome(action, outcome.record)"
-              @manual="(query: QueryRef) => onManualRoute(query, turn.turnId)"
-            />
-          </template>
-          <template v-if="turn.answer && answerActionsFor(turn)" #actions>
+          <template v-if="promptActionsFor(turn)" #actions>
             <AssistantMessageActions
               :sid="sid!"
-              :message="turn.answer"
-              :prompt="turn.user"
-              :is-last="turn.isLast"
-              :can-regenerate="canRegenerate(turn)"
-              :fresh="freshRerunOf(turn)"
+              :message="turn.user"
+              variant="prompt"
+              :is-last="false"
             />
           </template>
-          <template v-if="followUpsOf(turn).length" #follow-ups>
-            <AssistantFollowUps :sid="sid!" :items="followUpsOf(turn)" />
-          </template>
         </AssistantMessage>
-        <!-- The live line closes the turn, so an answered record never sits under it (A3) -->
-        <div v-if="statusShown(turn)" data-status-row>
-          <AssistantTurnStatus
-            variant="block"
-            :turn="session!.turn"
-            :meta="session!.turnMeta"
-            :owned-by-this-tab="session!.turnMeta.ownedByThisTab"
-            :answer="turn.answer"
-          />
-        </div>
+        <article
+          v-if="turn.answer || statusShown(turn)"
+          :aria-label="
+            t('assistant.transcript.answerName', {
+              agent: agentName(turnAgent(turn), t),
+              prompt: turn.firstLine,
+            })
+          "
+          :id="answerAnchor(turn.turnId)"
+          tabindex="-1"
+          data-answer
+          :data-test="`assistant-answer-${turn.turnId}`"
+          class="rounded-default focus-visible:ring-border-strong flex min-w-0 flex-col gap-2 outline-none focus-visible:ring-2"
+        >
+          <AssistantMessage
+            :message="turn.answer ?? pendingAnswer"
+            :turn-id="`${sid ?? 'shared'}:${turn.turnId}:v${turn.version.current}`"
+            :live="turn.live"
+            :readonly="readonly"
+            :density="density"
+            :turn="views.get(turn.turnId)"
+            :agent="turnAgent(turn)"
+            :head="!!turn.user || turn.number === 1"
+          >
+            <template v-if="turn.version.count > 1 && !answerActionsFor(turn)" #versions>
+              <AssistantVersionPicker
+                :current="turn.version.current"
+                :count="turn.version.count"
+                @select="(n) => selectVersion(turn.turnId, n, turn.version.count)"
+              />
+            </template>
+            <template #after>
+              <AssistantTurnOutcome
+                v-for="outcome in outcomesOf(turn)"
+                :key="outcome.key"
+                :kind="outcome.record.kind"
+                :error="outcome.error"
+                :steps="outcome.record.steps ?? 0"
+                :role="isAdmin ? 'admin' : 'member'"
+                :readonly="readonly"
+                :retry-snapshot-available="turn.isLast && canRetry"
+                :at="outcome.record.at"
+                :partial="turn.partial"
+                :cancel-unconfirmed="outcome.record.cancelUnconfirmed"
+                :org="session?.org ?? ''"
+                :sid="sid ?? undefined"
+                :elapsed-ms="outcome.record.elapsedMs"
+                :online="online"
+                :persistence="persistence"
+                :manual-route="manualRouteFor(turn) ?? undefined"
+                @action="(action) => onOutcome(action, outcome.record)"
+                @manual="(query: QueryRef) => onManualRoute(query, turn.turnId)"
+              />
+            </template>
+            <template v-if="turn.answer && answerActionsFor(turn)" #actions>
+              <AssistantMessageActions
+                :sid="sid!"
+                :message="turn.answer"
+                :prompt="turn.user"
+                :is-last="turn.isLast"
+                :can-regenerate="canRegenerate(turn)"
+                :fresh="freshRerunOf(turn)"
+                :turn-id="turn.turnId"
+                :version="turn.version"
+              >
+                <template v-if="turn.version.count > 1" #versions>
+                  <AssistantVersionPicker
+                    :current="turn.version.current"
+                    :count="turn.version.count"
+                    @select="(n) => selectVersion(turn.turnId, n, turn.version.count)"
+                  />
+                </template>
+              </AssistantMessageActions>
+            </template>
+            <template v-if="followUpsOf(turn).length" #follow-ups>
+              <AssistantFollowUps :sid="sid!" :items="followUpsOf(turn)" />
+            </template>
+          </AssistantMessage>
+          <!-- The live line closes the turn, so an answered record never sits under it (A3) -->
+          <div v-if="statusShown(turn)" data-status-row>
+            <AssistantTurnStatus
+              variant="block"
+              :turn="session!.turn"
+              :meta="session!.turnMeta"
+              :owned-by-this-tab="session!.turnMeta.ownedByThisTab"
+              :answer="turn.answer"
+            />
+          </div>
+        </article>
+        <AssistantHandoffSuggestion
+          v-if="suggestionOf(turn)"
+          :agent="suggestionOf(turn)!.agent"
+          :collapsed="suggestionOf(turn)!.collapsed"
+          :metered="metered"
+          @accept="acceptSuggestion(suggestionOf(turn)!.reason)"
+          @dismiss="agentStore()?.dismissHandoff(sid!)"
+        />
       </article>
-      <AssistantHandoffSuggestion
-        v-if="suggestionOf(turn)"
-        :agent="suggestionOf(turn)!.agent"
-        :collapsed="suggestionOf(turn)!.collapsed"
-        :metered="metered"
-        @accept="acceptSuggestion(suggestionOf(turn)!.reason)"
-        @dismiss="agentStore()?.dismissHandoff(sid!)"
-      />
-    </article>
-    <slot name="cards" />
-  </section>
+      <slot name="cards" />
+    </section>
+    <OButton
+      v-if="jumpShown"
+      variant="outline"
+      size="sm"
+      :icon-left="assistantGlyph.jumpToLatest"
+      :aria-label="jumpName"
+      class="bg-surface-base absolute bottom-3 left-1/2 -translate-x-1/2 shadow-md max-md:min-h-11 pointer-coarse:min-h-11"
+      data-test="assistant-transcript-jump-latest"
+      @click="jumpToLatest"
+    >
+      {{ jumpLabel }}
+    </OButton>
+  </div>
 </template>
 
 <script lang="ts">
@@ -313,6 +347,7 @@ import {
   watch,
 } from "vue";
 
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { announceComposer, composerRowOf } from "@/components/ai-assistant/composer/composerUi";
 import { lastRangeText, rangeText } from "@/components/ai-assistant/evidence/evidenceText";
 import AssistantTurnOutcome, {
@@ -322,6 +357,7 @@ import AssistantTurnStatus from "@/components/ai-assistant/turn/AssistantTurnSta
 import {
   ERROR_LEDGER,
   agentName,
+  footerOf,
   agentStore,
   currentAgent,
   assistantEvidenceHostKey,
@@ -346,6 +382,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import AssistantHandoffMarker from "./AssistantHandoffMarker.vue";
 import AssistantHandoffSuggestion from "./AssistantHandoffSuggestion.vue";
 import AssistantMessage from "./AssistantMessage.vue";
+import { answerAnchor, answerTurnOf } from "./answerLink";
 import AssistantVersionPicker from "./AssistantVersionPicker.vue";
 import { useTranscriptScroll } from "./useTranscriptScroll";
 
@@ -464,6 +501,43 @@ const scroll = useTranscriptScroll({
     window.matchMedia("(prefers-reduced-motion: reduce)")?.matches === true,
 });
 
+// Only while the reader has scrolled up; following keeps the latest in view, so the pill would point at nothing.
+const jumpShown = computed(() => !props.readonly && !!session.value && !session.value.ui.follow);
+const unseen = computed(() => session.value?.ui.unseen ?? 0);
+const jumpLabel = computed(() =>
+  unseen.value > 0
+    ? t("assistant.scroll.jumpToLatestCount", { count: unseen.value })
+    : t("assistant.scroll.jumpToLatest"),
+);
+const jumpName = computed(() =>
+  unseen.value > 0
+    ? t("assistant.scroll.jumpToLatestName", { count: unseen.value })
+    : t("assistant.scroll.jumpToLatest"),
+);
+
+function jumpToLatest(): void {
+  trackAssistant("ai_scroll_jump", { unseen: unseen.value });
+  scroll.jumpToLatest();
+}
+
+// A shared answer link lands on its answer once, after the turns mount.
+function revealLinkedAnswer(): void {
+  if (typeof window === "undefined") return;
+  const linked = answerTurnOf(window.location.hash);
+  // A link names the server's turn id; a turn streamed in this tab keys on its own id until reload.
+  const turn = linked
+    ? turns.value.find(
+        (candidate) =>
+          candidate.turnId === linked || footerOf(candidate.answer)?.serverTurnId === linked,
+      )
+    : null;
+  const el = turn ? document.getElementById(answerAnchor(turn.turnId)) : null;
+  if (!el || !root.value?.contains(el)) return;
+  if (props.sid && live) live.setFollow(props.sid, false);
+  el.scrollIntoView?.({ block: "start" });
+  el.focus({ preventScroll: true });
+}
+
 // A reloaded turn that followed a compaction carries the line on its prompt; it reads as a divider above it.
 function compactionOf(message: ChatMessage | null | undefined): string | null {
   const block = message?.contentBlocks?.find((candidate) => candidate.compactedAt !== undefined);
@@ -492,6 +566,11 @@ function answerActionsFor(turn: TranscriptTurn): boolean {
     (block) => block.type === "text" && !!block.text?.trim(),
   );
   return !!props.sid && !!live && !props.readonly && !running.value && !!text && !turn.live;
+}
+
+// A sent message's Copy and Edit act on the composer, so a readonly page and a running turn offer none.
+function promptActionsFor(turn: TranscriptTurn): boolean {
+  return !!turn.user && !!props.sid && !!live && !props.readonly && !running.value;
 }
 
 // Older turns keep the hour alone, so the last turn's range reads as the chat's current one.
@@ -776,6 +855,7 @@ watch(
 onMounted(() => {
   observeStatusRow();
   observeLatestAnswer();
+  void nextTick(revealLinkedAnswer);
 });
 onBeforeUnmount(() => {
   observer?.disconnect();

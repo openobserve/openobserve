@@ -20,7 +20,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.types";
 export const assistantGlyph = {
   assistant: "auto-awesome",
   agentGeneral: "auto-awesome",
-  agentInvestigator: "troubleshoot",
+  agentInvestigator: "target",
   agentQueryBuilder: "auto-fix-high",
   handoff: "arrow-forward",
   explain: "lightbulb-outline",
@@ -101,6 +101,18 @@ export const assistantGlyph = {
   fork: "fork-right",
   filter: "filter-list",
   floatingWindow: "open-in-browser",
+  readAloud: "volume-up",
+  pause: "pause",
+  shareLink: "link",
+  branch: "git-branch",
+  // The one Investigator glyph (target ring); Investigate buttons use `scan`, never the agent's mark.
+  investigator: "target",
+  scan: "center-focus-weak",
+  thread: "chat",
+  checkShield: "verified-user",
+  sparkle: "auto-awesome",
+  queue: "schedule",
+  chart: "show-chart",
 } as const satisfies Record<string, IconName>;
 
 /** The glyph of each chip kind (`40` §2.1); the chip passes it to `OTag` as `icon`. */

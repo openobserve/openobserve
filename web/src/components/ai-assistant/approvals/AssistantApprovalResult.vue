@@ -102,6 +102,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="min-w-0 break-all">{{ row.text }}</span>
         </li>
       </ul>
+      <!-- C3: the object changed after the ask, so the diff is redrawn against it as it is now -->
+      <p
+        v-if="skippedMessage"
+        class="text-text-secondary ps-6 text-xs break-words"
+        data-test="assistant-approval-result-skipped-detail"
+      >
+        {{ skippedMessage }}
+      </p>
+      <AssistantApprovalDiff
+        v-if="freshDiff.length"
+        class="ps-6"
+        :rows="freshDiff"
+        data-test="assistant-approval-result-fresh-diff"
+      />
+      <OText
+        v-if="undoEntry && sid"
+        variant="meta"
+        as="p"
+        class="ps-6 break-words"
+        data-test="assistant-approval-result-undo-limits"
+      >
+        {{ t("assistant.actions.undoLimits") }}
+      </OText>
+      <p
+        v-if="alwaysAllowed"
+        class="text-text-secondary flex flex-wrap items-center gap-x-1.5 ps-6 text-xs"
+        data-test="assistant-approval-result-always"
+      >
+        <OIcon :name="assistantGlyph.done" size="xs" aria-hidden="true" />
+        <template v-if="revoked">{{ t("assistant.grants.revoked") }}</template>
+        <template v-else>
+          {{ alwaysAllowed }}
+          <template v-if="live">
+            {{ raw("·") }}
+            <OButton
+              variant="ghost-primary"
+              size="chip"
+              :loading="revoking"
+              :class="TOUCH_TARGET_CLASS"
+              data-test="assistant-approval-result-revoke"
+              @click="revoke"
+            >
+              {{ t("assistant.approval.revoke") }}
+            </OButton>
+          </template>
+        </template>
+      </p>
       <div v-if="action && live" class="flex flex-wrap gap-1">
         <OButton
           v-if="action.href"
@@ -156,6 +203,7 @@ const MAX_SPOKEN = 200;
 </script>
 
 <script setup lang="ts">
+import { MutationObserver } from "@tanstack/vue-query";
 import { computed, inject, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
@@ -188,13 +236,19 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { queryClient } from "@/composables/query/queryClient";
+import { assistantGrantsQuery, revokeGrantMutation } from "@/services/assistant_settings.queries";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgTime } from "@/utils/formatters";
 
+import AssistantApprovalDiff from "./AssistantApprovalDiff.vue";
 import AssistantUndoControl from "./AssistantUndoControl.vue";
 import {
+  approvalActionPhrase,
+  approvalDiffRows,
   lowerFirst,
   panelDashboardId,
   readableCard,
@@ -215,6 +269,7 @@ const TIMED_STATES: ReadonlySet<ApprovalResultState> = new Set([
   "approved",
   "done",
   "partial",
+  "skipped",
   "editing",
   "declined",
   "replied",
@@ -222,7 +277,12 @@ const TIMED_STATES: ReadonlySet<ApprovalResultState> = new Set([
   "expired",
 ]);
 
-const BY_YOU_STATES: ReadonlySet<ApprovalResultState> = new Set(["approved", "done", "partial"]);
+const BY_YOU_STATES: ReadonlySet<ApprovalResultState> = new Set([
+  "approved",
+  "done",
+  "partial",
+  "skipped",
+]);
 
 const RECORDED_STATE = {
   approved: "approved",
@@ -337,6 +397,10 @@ const line = computed<I18nText>(() => {
       return t("assistant.question.record.answered", { choice: raw(answerOf()) });
     case "partial":
       return partialLine();
+    case "skipped":
+      return skippedCode() === "recheck_failed"
+        ? t("assistant.approval.recheckFailed")
+        : t("assistant.approval.changedSince");
     case "failed":
       return t("assistant.approval.result.failed", { reason: failedReason() });
     case "declined":
@@ -397,6 +461,66 @@ const replyText = computed(() =>
   view.value?.state === "replied" && replyOf() ? raw(replyOf()) : null,
 );
 
+/** C3: why the approved write was skipped, from the item or the resolution. */
+function skippedCode(): string | undefined {
+  return (
+    view.value?.result?.items.find((item) => item.status === "skipped")?.code ??
+    resolved.value?.code
+  );
+}
+
+const skippedItem = computed(() =>
+  view.value?.state === "skipped"
+    ? (view.value.result?.items.find((item) => item.status === "skipped") ?? null)
+    : null,
+);
+
+const skippedMessage = computed<I18nText | null>(() => {
+  if (view.value?.state !== "skipped") return null;
+  const message = skippedItem.value?.message ?? resolved.value?.detail;
+  return message ? raw(message) : null;
+});
+
+const freshDiff = computed(() => {
+  const item = skippedItem.value;
+  if (!item || item.code !== "changed_since" || item.before === undefined || !card.value) return [];
+  return approvalDiffRows(t, card.value, item.before);
+});
+
+/** "Always allowed: …" under a write approved for every later call of its tool. */
+const alwaysAllowed = computed<I18nText | null>(() => {
+  const decision = view.value?.outcome?.decision;
+  const state = view.value?.state;
+  if (!decision?.approved || decision.scope !== "tool" || !card.value) return null;
+  if (state !== "done" && state !== "approved" && state !== "partial") return null;
+  const facts = cardFacts();
+  if (!facts) return null;
+  return t("assistant.approval.alwaysAllowed", { action: approvalActionPhrase(t, facts) });
+});
+
+const revoking = ref(false);
+const revoked = ref(false);
+
+// The standing grant this approve made: the reader's own always grant for the card's tool.
+async function revoke(): Promise<void> {
+  const tool = card.value?.tool;
+  if (!tool || revoking.value || !org.value) return;
+  revoking.value = true;
+  try {
+    const grants = await queryClient.fetchQuery(assistantGrantsQuery(org.value));
+    const grant = grants?.find((row) => row.tool === tool && row.scope === "always");
+    // A record outlives any one page, so it runs the declared mutation on the app's client, not a hook.
+    if (grant)
+      await new MutationObserver(queryClient, revokeGrantMutation(org.value)).mutate(grant.id);
+    revoked.value = true;
+  } catch (error) {
+    console.error("Failed to revoke the standing approval:", error);
+    toast({ variant: "error", message: t("assistant.approval.revokeFailed") });
+  } finally {
+    revoking.value = false;
+  }
+}
+
 const back = computed(() =>
   sid.value ? (host?.backTarget?.(sid.value, card.value?.id) ?? null) : null,
 );
@@ -411,6 +535,7 @@ const glyph = computed<IconName>(() => {
     state === "answered"
   )
     return assistantGlyph.done;
+  if (state === "skipped") return assistantGlyph.warning;
   if (state === "partial" || state === "failed" || state === "delivery_failed")
     return assistantGlyph.failed;
   if (state === "expired") return assistantGlyph.expired;
@@ -421,7 +546,8 @@ const glyph = computed<IconName>(() => {
 // One item is the line itself; a batch lists its rows.
 const rows = computed(() => {
   const items = view.value?.result?.items ?? [];
-  if (items.length < 2 && items[0]?.status === "done") return [];
+  if (items.length < 2 && (items[0]?.status === "done" || items[0]?.status === "skipped"))
+    return [];
   return items.map((item, index) => {
     return {
       key: item.id ?? `${index}`,
@@ -468,6 +594,12 @@ const action = computed<{
         }
       : null;
   }
+  if (state === "skipped")
+    return {
+      id: "ask-again",
+      label: t("assistant.approval.result.askAgain"),
+      run: () => host.askAgain(current, id),
+    };
   if (state === "expired" && host.gated?.()) return null;
   if (state === "expired" || (state === "unconfirmed" && !card.value.destructive))
     return {
@@ -566,6 +698,7 @@ function resolvedState(
   if (block.withdrawn) return "withdrawn";
   if (block.answer !== undefined) return "answered";
   if (block.approved && (block.outcome === "failed" || block.outcome === "denied")) return "failed";
+  if (block.approved && block.outcome === "skipped") return "skipped";
   if (block.recorded && block.approved) return block.outcome === "partial" ? "approved" : "done";
   if (block.recorded) return "declined";
   return block.approved ? "approved_elsewhere" : "declined_elsewhere";

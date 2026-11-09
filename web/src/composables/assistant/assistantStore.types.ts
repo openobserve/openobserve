@@ -203,10 +203,19 @@ export interface RecordMeta {
   liveTurnId: string | null;
   liveSavedAt: number | null;
   forkedFromShare: string | null;
+  /** C1: the chat and answer this chat was branched from; absent on any other chat. */
+  branchedFrom?: BranchedFromRef | null;
   historyUnavailable: boolean;
   ephemeral: boolean;
   pinned: boolean;
   seed?: ForkSeed;
+}
+
+/** `branched_from` of a chat made by Branch in new chat. */
+export interface BranchedFromRef {
+  sessionId: string;
+  turnId: string;
+  title: string;
 }
 
 export type BlockId = string;
@@ -387,21 +396,28 @@ export type ApprovalDecision =
       answerLabel?: string;
     };
 
+/** C3: why an approved item was skipped with nothing written. */
+export type ApprovalSkipCode = "changed_since" | "recheck_failed";
+
 export interface ApprovalResultItem {
   id?: string;
   type: string;
   name: string;
   status: "done" | "failed" | "skipped";
+  /** An HTTP status for a failed item; an `ApprovalSkipCode` for a skipped one. */
   code?: string;
   message?: string;
   link?: string;
   undoable?: boolean;
   /** The server's action-ledger id, which Undo posts. */
   ledgerId?: string;
+  /** `changed_since` only: the object as it is now, redacted, for the new diff. */
+  before?: unknown;
 }
 
 export interface ApprovalResult {
-  status: "done" | "partial" | "failed";
+  /** `skipped`: every item was skipped and nothing was written. */
+  status: "done" | "partial" | "failed" | "skipped";
   items: ApprovalResultItem[];
   resolvedBy: string;
   resolvedAt: number;
@@ -416,6 +432,8 @@ export interface ApprovalOutcome {
     | "done"
     | "partial"
     | "failed"
+    /** C3: approved, but every item was skipped with nothing written (`changed_since`, `recheck_failed`). */
+    | "skipped"
     | "declined"
     | "new_chat"
     | "stopped"

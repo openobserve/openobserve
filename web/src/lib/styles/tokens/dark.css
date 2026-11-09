@@ -1041,4 +1041,28 @@
   --color-assistant-link-hover: var(--color-primary-300);
   --color-assistant-primary: var(--color-primary-600);
   --color-assistant-primary-hover: var(--color-primary-600);
+  --color-assistant-user-bg: color-mix(
+    in srgb,
+    var(--color-primary-600) 22%,
+    var(--color-surface-base)
+  );
+  --color-assistant-mark-bg: color-mix(
+    in srgb,
+    var(--color-primary-600) 26%,
+    var(--color-surface-base)
+  );
+  --color-assistant-mark-fg: var(--color-accent);
+  /* Dark code sits in the recessed well, calmer than the near-black syntax canvas. */
+  --color-assistant-syn-bg: var(--color-surface-subtle);
+  --color-assistant-syn-keyword: var(--color-assistant-link-hover);
+  --color-assistant-syn-string: var(--color-syntax-tag);
+  /* The shared comment grey misses 4.5:1 on the well; secondary text clears it. */
+  --color-assistant-syn-comment: var(--color-text-secondary);
+  --color-assistant-syn-operator: var(--color-text-secondary);
+  --color-assistant-syn-punct: var(--color-text-secondary);
+  /* eslint-disable local/no-hardcoded-px -- optical: the tile's inner highlight and ring are one device pixel */
+  --shadow-assistant-mark:
+    inset 0 1px 0 color-mix(in srgb, var(--color-primary-300) 30%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-primary-400) 30%, transparent);
+  /* eslint-enable local/no-hardcoded-px */
 }

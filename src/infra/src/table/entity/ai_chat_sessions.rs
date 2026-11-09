@@ -44,6 +44,9 @@ pub struct Model {
     /// The chat's typed prompts, lowercased and capped, that `q` searches besides the title.
     #[sea_orm(column_type = "Text", nullable)]
     pub search_text: Option<String>,
+    /// A branch's source as JSON (`{session_id, turn_id, title}`), copied when it was branched.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub branched_from: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
