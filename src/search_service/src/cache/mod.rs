@@ -64,7 +64,7 @@ use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    sql::RE_SELECT_FROM,
+    sql::{RE_SELECT_FROM, histogram::pin_histogram_timezone},
 };
 
 pub mod cacher;
@@ -72,7 +72,8 @@ pub mod multi;
 pub mod result_utils;
 
 // Define cache version
-const CACHE_VERSION: &str = "v4";
+// v5 keys the histogram offset into the hash; older entries may carry shifted labels.
+const CACHE_VERSION: &str = "v5";
 
 /// The hits a search was about to return when redaction could not run on them.
 #[cfg(any(feature = "vectorscan", test))]
@@ -150,6 +151,11 @@ pub async fn search(
     };
 
     let mut req = in_req.clone();
+    pin_histogram_timezone(
+        &mut req.query.sql,
+        &mut req.query.timezone,
+        req.query.end_time,
+    )?;
 
     // check the original query function first
     let mut query_fn = req
@@ -666,8 +672,20 @@ pub async fn prepare_cache_response(
         }
     }
 
+    if !use_cache && sql.histogram_offset != Some(0) {
+        return Ok((
+            MultiCachedQueryResponse {
+                order_by: sql.order_by,
+                ..Default::default()
+            },
+            true,
+        ));
+    }
+
     // #16175: sort, trim and cache checks compare ORDER BY with the column the hits carry
-    sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
+    if sql.histogram_offset.is_some() {
+        sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
+    }
 
     // Refine is_descending for histogram queries with non-timestamp ORDER BY
     is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
