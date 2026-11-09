@@ -118,11 +118,10 @@ fn sketch_to_resource_metrics(
     }
     // Downstream OTLP ingest copies the resource at least once per point.
     let point_bytes = RECORD_BYTES + resource_bytes(&resource_attrs);
-    budget.charge(point_bytes, sketch.dogsketches.len())?;
     let attributes = to_key_values(tags.attributes);
     let mut data_points = Vec::with_capacity(sketch.dogsketches.len());
     for dogsketch in &sketch.dogsketches {
-        match dogsketch_to_data_point(dogsketch, &attributes, budget)? {
+        match dogsketch_to_data_point(dogsketch, &attributes, point_bytes, budget)? {
             Some(dp) => data_points.push(dp),
             None => log::warn!(
                 "[DATADOG] dropping invalid sketch for {} at {}",
@@ -146,6 +145,7 @@ fn sketch_to_resource_metrics(
 fn dogsketch_to_data_point(
     sketch: &Dogsketch,
     attributes: &[KeyValue],
+    point_bytes: usize,
     budget: &mut ExpansionBudget,
 ) -> Result<Option<ExponentialHistogramDataPoint>, DatadogError> {
     let (Ok(count), Some(mut buckets)) =
@@ -155,7 +155,10 @@ fn dogsketch_to_data_point(
     };
     let scale = fit_scale(&mut buckets);
     let dense = (span(&buckets.positive) + span(&buckets.negative)) as usize;
-    budget.charge(attributes_bytes(attributes) + dense * size_of::<u64>(), 1)?;
+    budget.charge(
+        point_bytes + attributes_bytes(attributes) + dense * size_of::<u64>(),
+        1,
+    )?;
     Ok(Some(ExponentialHistogramDataPoint {
         attributes: attributes.to_vec(),
         time_unix_nano: seconds_to_nanos(sketch.ts),
@@ -291,7 +294,7 @@ mod tests {
 
     fn point(sketch: &Dogsketch) -> ExponentialHistogramDataPoint {
         let mut budget = ExpansionBudget(usize::MAX);
-        dogsketch_to_data_point(sketch, &[], &mut budget)
+        dogsketch_to_data_point(sketch, &[], 0, &mut budget)
             .unwrap()
             .unwrap()
     }
@@ -393,7 +396,7 @@ mod tests {
                         n: vec![1, 1],
                         ..Default::default()
                     };
-                    4000
+                    8000
                 ],
                 ..Default::default()
             }],
@@ -466,7 +469,7 @@ mod tests {
         let mut budget = ExpansionBudget(usize::MAX);
         let sketch = dogsketch(vec![1400, 1401], vec![4]);
         assert!(
-            dogsketch_to_data_point(&sketch, &[], &mut budget)
+            dogsketch_to_data_point(&sketch, &[], 0, &mut budget)
                 .unwrap()
                 .is_none()
         );
@@ -541,7 +544,6 @@ mod tests {
         );
     }
 
-    // Reference implementation that proves `KEY_SHARES` yields the same bucket counts.
     fn distribute_directly(key: i32, count: u64, side: &mut BTreeMap<i32, u64>) {
         let lower = sketch_lower_bound(key);
         let upper = sketch_lower_bound(key.abs() + 1);

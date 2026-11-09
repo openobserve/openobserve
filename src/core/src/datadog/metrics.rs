@@ -289,19 +289,16 @@ mod tests {
     }
 
     #[test]
-    fn test_many_empty_series_past_the_size_budget_are_rejected() {
-        let body = MetricPayload {
-            series: vec![
-                MetricSeries {
-                    r#type: MetricType::Gauge as i32,
-                    ..Default::default()
-                };
-                200_000
-            ],
+    fn test_a_series_without_points_is_still_charged() {
+        let empty = MetricSeries {
+            r#type: MetricType::Gauge as i32,
+            ..Default::default()
+        };
+        let mut budget = ExpansionBudget(RECORD_BYTES * 3);
+        for _ in 0..3 {
+            series_to_resource_metrics(empty.clone(), &mut budget).unwrap();
         }
-        .encode_to_vec();
-        let err = series_to_otlp(&body).unwrap_err();
-        assert!(err.to_string().contains("size budget"), "{err}");
+        assert!(series_to_resource_metrics(empty, &mut budget).is_err());
     }
 
     #[test]

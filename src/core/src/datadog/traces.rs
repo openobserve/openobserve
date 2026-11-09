@@ -680,6 +680,22 @@ mod tests {
     }
 
     #[test]
+    fn test_compact_spans_sharing_many_tracer_tags_fit_the_budget() {
+        let spans = (0..5000).map(|i| dd_span(i, i, 0, &[])).collect();
+        let mut t = tracer("prod", "web-1", spans);
+        t.tags = (0..20)
+            .map(|i| (format!("tag{i}"), "v".repeat(50)))
+            .collect();
+        let body = AgentPayload {
+            tracer_payloads: vec![t],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert!(body.len() > 64 * 1024);
+        assert!(agent_payload_to_otlp(&body).is_ok());
+    }
+
+    #[test]
     fn test_many_empty_span_events_past_the_size_budget_are_rejected() {
         let span = DdSpan {
             span_events: vec![SpanEvent::default(); 200_000],
