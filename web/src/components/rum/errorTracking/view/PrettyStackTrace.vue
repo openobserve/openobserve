@@ -425,8 +425,7 @@ const setEditorRef = (traceIndex: number, frameIndex: number, el: any) => {
   }
 };
 
-// CodeQueryEditor trims the text it is created with but not new text on a live editor, so a
-// snippet's leading blank lines are left out here to give both the same line numbers.
+// CodeQueryEditor trims text on setup but not on a prop update, so leading blank lines must not reach it.
 const leadingBlankLines = (source: string) =>
   source.slice(0, source.length - source.trimStart().length).split("\n").length - 1;
 
@@ -451,8 +450,7 @@ const highlightErrorLine = (traceIndex: number, frameIndex: number) => {
   // Calculate the relative line number within the displayed source snippet
   const { source, stack_line, source_line_start } = frame.source_info;
 
-  // source_line_start is the 0-based index of the snippet's first line and stack_line is 1-based,
-  // so their difference is already Monaco's 1-based line number
+  // source_line_start is 0-based and stack_line 1-based, so the difference is Monaco's 1-based line.
   const relativeLineNumber = stack_line - source_line_start - leadingBlankLines(source);
 
   // Use the decorateRanges method to highlight the error line
