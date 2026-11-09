@@ -5,6 +5,7 @@ import Profiles from "@/plugins/profiles/Index.vue";
 import FlameGraphView from "@/components/common/FlameGraphView.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
 
 const mocks = vi.hoisted(() => ({
   nowMs: 1_700_000_000_000,
@@ -51,6 +52,8 @@ vi.mock("vue-router", () => ({
   useRoute: () => route,
   useRouter: () => router,
 }));
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/utils/date", () => ({
   getConsumableRelativeTime: mocks.getConsumableRelativeTime,
@@ -247,6 +250,7 @@ describe("Profiles page", () => {
   });
 
   it("runs the query once when the page opens", async () => {
+    vi.mocked(analytics.track).mockClear();
     mountPage();
     await flushPromises();
     await nextTick();
@@ -256,6 +260,22 @@ describe("Profiles page", () => {
     expect(mocks.meta.mock.calls[1][2]).toMatchObject({ service_name: "service-a" });
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
+    expect(analytics.track).not.toHaveBeenCalledWith("profiles_query_completed", expect.anything());
+  });
+
+  it("tracks a query run started from the Run button", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await settle();
+    vi.mocked(analytics.track).mockClear();
+
+    await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("profiles_query_completed", {
+      filter_count: 0,
+      has_breakdown: false,
+    });
   });
 
   it("runs the query once when the page opens with the real date picker", async () => {
@@ -885,6 +905,9 @@ describe("Profiles page", () => {
     const series = wrapper.findComponent({ name: "ChartRendererStub" }).props("data")
       .options.series;
     expect(series.map((line: { name: string }) => line.name)).toEqual(["pod-a", "Others"]);
+    expect(analytics.track).toHaveBeenCalledWith("profiles_breakdown_changed", {
+      has_breakdown: true,
+    });
     expect(route.query.breakdown ?? router.replace.mock.calls.at(-1)?.[0].query.breakdown).toBe(
       "k8s_pod_name",
     );
@@ -1474,9 +1497,11 @@ describe("Profiles page", () => {
 
       await wrapper.find('[data-test="profiles-view-flame"]').trigger("click");
       await nextTick();
+      expect(analytics.track).toHaveBeenCalledWith("profiles_view_changed", { view: "flame" });
       const graph = wrapper.findComponent({ name: "FlameGraphStub" });
       graph.vm.$emit("focus", "root/0");
       graph.vm.$emit("details", "fn-b");
+      expect(analytics.track).toHaveBeenCalledWith("profiles_function_details_opened");
       await wrapper.find('[data-test="profiles-search-functions"]').setValue("fn");
       graph.vm.$emit("sandwich", "fn-c");
       await flushPromises();

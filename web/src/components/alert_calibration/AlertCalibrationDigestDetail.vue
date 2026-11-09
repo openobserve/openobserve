@@ -203,6 +203,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { b64EncodeUnicode } from "@/utils/formatters";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import { raw, useI18nTyped, type I18nText, type I18nKey } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
@@ -280,7 +281,9 @@ const visibleFindings = computed(() =>
     : findings.value.filter((f) => f.rule_id === ruleFilter.value),
 );
 const onRuleFilter = (value: unknown) => {
-  if (value) ruleFilter.value = value as typeof ruleFilter.value;
+  if (!value) return;
+  ruleFilter.value = value as typeof ruleFilter.value;
+  analytics.track("alert_calibration_rule_filtered", { rule: ruleFilter.value });
 };
 
 const notes = computed(() => (run.value ? coverageNotes(t, run.value) : []));
@@ -346,6 +349,7 @@ const noneFoundReason = computed<I18nText>(() => {
 
 /** Opens Logs on the same records this page reads, from the run's end to now. */
 function viewInLogs() {
+  analytics.track("alert_calibration_digest_logs_opened");
   router.push({
     path: "/logs",
     query: {

@@ -523,6 +523,9 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
         return Ok(());
     }
 
+    // A recovery message goes only to these when set, so a missing one sends it nowhere.
+    validate_template_and_destinations(org_id, None, &alert.recovery_destinations).await?;
+
     // A resolve carries the key of the trigger that opened the ticket, so it can only be sent where
     // the firing went; a platform here would be selected and then never used.
     for dest_name in alert.recovery_destinations.iter() {
@@ -5657,6 +5660,48 @@ mod tests {
         alert.query_condition.query_type = QueryType::PromQL;
         alert.query_condition.promql_multi_alert = true;
         assert!(validate_recovery_templates("default", &alert).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_recovery_destination_this_org_lacks_is_refused() {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("recovery_targets_{}", config::utils::time::now_micros());
+        crate::common::infra::config::DESTINATIONS.insert(
+            format!("{org}/real"),
+            config::meta::destinations::Destination {
+                org_id: org.clone(),
+                name: "real".into(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint::default()),
+                },
+                ..Default::default()
+            },
+        );
+        let recovering_to = |dest: &str| {
+            let mut alert = Alert::default();
+            alert.notify_on_recovery = true;
+            alert.recovery_destinations = vec![dest.to_string()];
+            alert
+        };
+
+        assert_eq!(
+            validate_recovery_templates(&org, &recovering_to("nope"))
+                .await
+                .map_err(|e| e.to_string()),
+            Err("Alert destination nope not found".to_string())
+        );
+        assert!(
+            validate_recovery_templates(&org, &recovering_to("real"))
+                .await
+                .is_ok()
+        );
     }
 
     #[test]

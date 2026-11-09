@@ -569,6 +569,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OFormColor from "@/lib/forms/Color/OFormColor.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import analytics from "@/services/product_analytics";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OOptionGroup from "@/lib/forms/OptionGroup/OOptionGroup.vue";
@@ -786,6 +787,7 @@ const form = useOForm<BannerForm>({
         }
         return { ...latest, banners };
       });
+      analytics.track(index === null ? "announcement_created" : "announcement_updated");
       toast({ variant: "success", message: savedMessage(draft) });
       if (leaveSave) {
         leaveSave.saved = true;
@@ -1040,6 +1042,7 @@ const saveStyle = async () => {
 
   try {
     await update((latest) => ({ ...latest, styles: [...latest.styles, authoredFromStyle(style)] }));
+    analytics.track("announcement_style_saved");
     form.setFieldValue("styleId", style.id);
     styleChoice.value = `${STYLE_CHOICE_PREFIX}${style.id}`;
     saveStyleOpen.value = false;
@@ -1064,6 +1067,7 @@ const deleteStyle = async () => {
       styles: latest.styles.filter((s) => s.id !== style.id),
       banners: latest.banners.map((banner) => withoutStyle(banner, style.id)),
     }));
+    analytics.track("announcement_style_deleted");
     if (original) original = withoutStyle(original, style.id);
     // The banner keeps the look it copied, now as its own custom look.
     form.setFieldValue("styleId", "");

@@ -20,6 +20,9 @@ import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // ---------------------------------------------------------------------------
 // Service mocks
@@ -608,6 +611,37 @@ describe("AlertHistory.vue", () => {
       await flushPromises();
 
       expect((wrapper.vm as any).dateTimeType).toBe("absolute");
+    });
+  });
+
+  describe("analytics", () => {
+    it("tracks a search, a user time-range change and a detail open", async () => {
+      await mountComponent();
+      vi.mocked(analytics.track).mockClear();
+      vi.mocked(alertsService.getHistory).mockResolvedValue({ data: mockHistoryData } as any);
+
+      (wrapper.vm as any).manualSearch();
+      await (wrapper.vm as any).updateDateTime({
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "1h",
+        userChangedValue: true,
+      });
+      (wrapper.vm as any).showDetailsDialog({ alert_name: "a" });
+      await flushPromises();
+
+      expect(vi.mocked(analytics.track).mock.calls).toEqual([
+        ["alert_history_searched", { alert_filtered: false }],
+        ["alert_history_time_range_changed", { type: "relative" }],
+        ["alert_history_detail_opened"],
+      ]);
+    });
+
+    it("does not track a time range the picker applied on its own", async () => {
+      await mountComponent();
+      vi.mocked(analytics.track).mockClear();
+      await (wrapper.vm as any).updateDateTime({ startTime: 1, endTime: 2 });
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

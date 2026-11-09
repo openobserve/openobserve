@@ -20,13 +20,16 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::alerts::{
-        alert::Alert,
-        incidents::{
-            AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason, EdgeType,
-            Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent, IncidentTopology,
-            IncidentWithAlerts,
+    meta::{
+        alerts::{
+            alert::Alert,
+            incidents::{
+                AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason,
+                EdgeType, Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent,
+                IncidentTopology, IncidentWithAlerts,
+            },
         },
+        correlation::{FieldAlias, ServiceIdentityConfig},
     },
     utils::json::{Map, Value},
 };
@@ -119,11 +122,10 @@ enum MuteChange<'a> {
 async fn extract_filtered_semantic_dimensions(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     use config::meta::alerts::incidents::KeyType;
-
-    // Load ServiceIdentityConfig with auto-configuration applied
-    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
 
     // No identity sets configured AND service is opted out — nothing to extract.
     // Otherwise fall through: "service" alone is a viable dimension even with zero sets.
@@ -134,9 +136,6 @@ async fn extract_filtered_semantic_dimensions(
         );
         return None;
     }
-
-    // Load semantic groups for field mapping
-    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
 
     // Collect all distinguish_by group IDs from ALL identity sets (flattened)
     // Don't require a specific set to "match" - extract whatever we can
@@ -200,6 +199,8 @@ async fn extract_filtered_semantic_dimensions(
 async fn extract_filtered_semantic_dimensions(
     _org_id: &str,
     _labels: &HashMap<String, String>,
+    _identity_config: &ServiceIdentityConfig,
+    _semantic_groups: &[FieldAlias],
 ) -> Option<FilteredSemanticResult> {
     None
 }
@@ -208,11 +209,13 @@ async fn extract_filtered_semantic_dimensions(
 async fn correlate_parallel(
     org_id: &str,
     labels: &HashMap<String, String>,
+    semantic_groups: &[FieldAlias],
 ) -> ParallelCorrelationResult {
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
     // Execute both approaches in parallel
     let (sd_result, semantic_result) = tokio::join!(
-        query_service_discovery_key(org_id, labels),
-        extract_filtered_semantic_dimensions(org_id, labels)
+        query_service_discovery_key(org_id, labels, &identity_config, semantic_groups),
+        extract_filtered_semantic_dimensions(org_id, labels, &identity_config, semantic_groups)
     );
 
     log::debug!(
@@ -686,13 +689,13 @@ pub async fn correlate_alert_to_incident(
     downtime: Option<&config::meta::downtimes::ActiveDowntime>,
 ) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
+    let semantic_groups =
+        crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
 
     // Enrich with alert condition dimensions (deterministic baseline)
     // Handles SQL WHERE, GUI conditions, and PromQL label matchers
     #[cfg(feature = "enterprise")]
     {
-        let semantic_groups =
-            crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
         let condition_dims =
             o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
                 &alert.query_condition,
@@ -723,7 +726,7 @@ pub async fn correlate_alert_to_incident(
     );
 
     // Execute Service Discovery and semantic extraction in parallel (non-blocking)
-    let parallel_result = correlate_parallel(&alert.org_id, &labels).await;
+    let parallel_result = correlate_parallel(&alert.org_id, &labels, &semantic_groups).await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -826,7 +829,7 @@ pub async fn correlate_alert_to_incident(
     {
         // Single-sourced with `scheduler::handlers`: the row, then the alert's own conditions.
         let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
-            &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
+            &semantic_groups,
             &alert.query_condition,
             result_row,
         );
@@ -1011,7 +1014,8 @@ pub async fn correlate_external_event(
     );
 
     // Same parallel correlation the internal path uses.
-    let parallel_result = correlate_parallel(org_id, &labels).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let parallel_result = correlate_parallel(org_id, &labels, &semantic_groups).await;
 
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
@@ -1277,7 +1281,15 @@ pub(crate) async fn correlated_service_for_routing(
     org_id: &str,
     row: &Map<String, Value>,
 ) -> Option<String> {
-    let found = query_service_discovery_key(org_id, &labels_from_row(row)).await?;
+    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let found = query_service_discovery_key(
+        org_id,
+        &labels_from_row(row),
+        &identity_config,
+        &semantic_groups,
+    )
+    .await?;
     if found.service_name_from_stream || found.service_name.trim().is_empty() {
         return None;
     }
@@ -1291,18 +1303,16 @@ pub(crate) async fn correlated_service_for_routing(
 async fn query_service_discovery_key(
     org_id: &str,
     labels: &HashMap<String, String>,
+    identity_config: &ServiceIdentityConfig,
+    semantic_groups: &[FieldAlias],
 ) -> Option<ServiceDiscoveryResult> {
     #[cfg(feature = "enterprise")]
     {
-        let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
-
-        let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
-
         match o2_enterprise::enterprise::service_streams::storage::correlate(
             org_id,
             labels,
-            &identity_config,
-            &semantic_groups,
+            identity_config,
+            semantic_groups,
         )
         .await
         {
@@ -1777,6 +1787,40 @@ impl Correlation {
     }
 }
 
+fn candidate_can_join(stored: &serde_json::Value, incoming: &HashMap<String, String>) -> bool {
+    use config::meta::alerts::incidents::DimensionRelationship;
+
+    let dimensions = serde_json::from_value(stored.clone()).unwrap_or_default();
+    matches!(
+        DimensionRelationship::check(&dimensions, incoming),
+        DimensionRelationship::Equal
+            | DimensionRelationship::NewIsSubset
+            | DimensionRelationship::NewIsSuperset
+    )
+}
+
+async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    incoming: &HashMap<String, String>,
+    candidates: Vec<infra::table::alert_incidents::CorrelationCandidate>,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, infra::errors::Error> {
+    for candidate in candidates {
+        if !candidate_can_join(&candidate.group_values, incoming) {
+            continue;
+        }
+        let Some(incident) =
+            infra::table::alert_incidents::get_with(client, org_id, &candidate.id).await?
+        else {
+            continue;
+        };
+        if incident.status != "resolved" && candidate_can_join(&incident.group_values, incoming) {
+            return Ok(Some(incident));
+        }
+    }
+    Ok(None)
+}
+
 /// Find an existing open incident or create a new one
 #[allow(clippy::too_many_arguments)]
 async fn find_or_create_incident(
@@ -1886,33 +1930,26 @@ async fn find_or_create_incident(
         }
     }
 
-    // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
+    // STEP 2: Venn diagram match against open incidents (for Primary/Secondary key types)
     //
-    // Load all open incidents and check for dimension compatibility.
     // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
     // PartialOverlap or Incompatible → skip (create new incident).
     if key_type != KeyType::AlertId {
-        let open_incidents =
-            infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
-
-        for existing in open_incidents {
+        let candidates = infra::table::alert_incidents::find_correlation_candidates(org_id).await?;
+        if let Some(existing) = select_correlation_candidate(
+            infra::db::get_orm_client_ro().await,
+            org_id,
+            group_values,
+            candidates,
+        )
+        .await?
+        {
             let existing_key_type = KeyType::from_stored(&existing.key_type);
 
             let existing_dims: HashMap<String, String> =
                 serde_json::from_value(existing.group_values.clone()).unwrap_or_default();
 
             let relationship = DimensionRelationship::check(&existing_dims, group_values);
-
-            let join_incident = matches!(
-                relationship,
-                DimensionRelationship::Equal
-                    | DimensionRelationship::NewIsSubset
-                    | DimensionRelationship::NewIsSuperset
-            );
-
-            if !join_incident {
-                continue;
-            }
 
             let mut merged_dims = existing_dims.clone();
             let dimensions_changed = merge_dimensions(&mut merged_dims, group_values, &existing.id);
@@ -3573,6 +3610,182 @@ pub async fn update_severity(
 mod tests {
     use super::*;
 
+    async fn correlation_db() -> sea_orm::DatabaseConnection {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(alert_incidents::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        db
+    }
+
+    async fn store_correlation_incident(
+        db: &sea_orm::DatabaseConnection,
+        id: &str,
+        created_at: i64,
+        group_values: serde_json::Value,
+    ) -> infra::table::entity::alert_incidents::Model {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::ActiveModelTrait;
+
+        let mut row = incident(None);
+        row.id = id.to_string();
+        row.created_at = created_at;
+        row.group_values = group_values;
+        let active: alert_incidents::ActiveModel = row.into();
+        active.reset_all().insert(db).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_preserves_matching_and_legacy_fallbacks() {
+        use sea_orm::ConnectionTrait;
+
+        let incoming = HashMap::from([
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "a".to_string()),
+        ]);
+        let cases = [
+            Some(serde_json::json!({"ns": "prod", "cluster": "a"})),
+            Some(serde_json::json!({"ns": "prod"})),
+            Some(serde_json::json!({"ns": "prod", "cluster": "a", "pod": "p1"})),
+            Some(serde_json::json!({})),
+            Some(serde_json::json!({"ns": 1})),
+            Some(serde_json::Value::Null),
+            Some(serde_json::json!(["legacy"])),
+            None,
+        ];
+        for dimensions in cases {
+            let db = correlation_db().await;
+            if let Some(dimensions) = &dimensions {
+                store_correlation_incident(&db, "older", 1, dimensions.clone()).await;
+                store_correlation_incident(&db, "selected", 2, dimensions.clone()).await;
+            }
+            store_correlation_incident(&db, "conflicting", 3, serde_json::json!({"ns": "dev"}))
+                .await;
+            store_correlation_incident(
+                &db,
+                "partial",
+                4,
+                serde_json::json!({"ns": "prod", "db": "redis"}),
+            )
+            .await;
+            db.execute_unprepared(
+                "UPDATE alert_incidents SET topology_context = 'invalid JSON' WHERE id IN ('conflicting', 'partial')",
+            )
+            .await
+            .unwrap();
+            let candidates =
+                infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                    .await
+                    .unwrap();
+            let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+                .await
+                .unwrap();
+            assert_eq!(
+                found.as_ref().map(|row| row.id.as_str()),
+                dimensions.as_ref().map(|_| "selected"),
+                "stored dimensions: {dimensions:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_continues_after_stale_projected_matches() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+
+        let same = serde_json::json!({"ns": "prod", "cluster": "a"});
+        let incoming = serde_json::from_value(same.clone()).unwrap();
+        let changes = [
+            None,
+            Some(("default", "resolved", same.clone())),
+            Some(("other", "open", same.clone())),
+            Some(("default", "open", serde_json::json!({"ns": "dev"}))),
+            Some((
+                "default",
+                "open",
+                serde_json::json!({"ns": "prod", "db": "redis"}),
+            )),
+        ];
+        for change in changes {
+            let db = correlation_db().await;
+            store_correlation_incident(&db, "older", 1, same.clone()).await;
+            let newest = store_correlation_incident(&db, "newest", 2, same.clone()).await;
+            let candidates =
+                infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                    .await
+                    .unwrap();
+            if let Some((org, status, dimensions)) = change {
+                let mut active: alert_incidents::ActiveModel = newest.into();
+                active.org_id = Set(org.to_string());
+                active.status = Set(status.to_string());
+                active.group_values = Set(dimensions);
+                active.update(&db).await.unwrap();
+            } else {
+                alert_incidents::Entity::delete_by_id("newest")
+                    .exec(&db)
+                    .await
+                    .unwrap();
+            }
+            let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(found.id, "older");
+        }
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_returns_current_compatible_dimensions() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, Set};
+
+        let db = correlation_db().await;
+        let original = serde_json::json!({"ns": "prod", "cluster": "a", "pod": "p1"});
+        let current = serde_json::json!({"ns": "prod"});
+        let row = store_correlation_incident(&db, "newest", 1, original).await;
+        let candidates =
+            infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                .await
+                .unwrap();
+        let mut active: alert_incidents::ActiveModel = row.into();
+        active.group_values = Set(current.clone());
+        active.update(&db).await.unwrap();
+        let incoming = HashMap::from([
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "a".to_string()),
+        ]);
+        let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.group_values, current);
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_propagates_selected_lookup_errors() {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let incoming = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let candidates = vec![infra::table::alert_incidents::CorrelationCandidate {
+            id: "selected".to_string(),
+            group_values: serde_json::json!({"ns": "prod"}),
+        }];
+        assert!(matches!(
+            select_correlation_candidate(&db, "default", &incoming, candidates).await,
+            Err(infra::errors::Error::DbError(
+                infra::errors::DbError::SeaORMError(_)
+            ))
+        ));
+        assert!(
+            select_correlation_candidate(&db, "default", &incoming, Vec::new())
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn an_incident_send_is_keyed_by_the_incident_id() {
@@ -3775,6 +3988,50 @@ mod tests {
         assert!(dims.is_empty());
         assert!(matches!(key_type, KeyType::AlertId));
         assert_eq!(reason, "alert_id_fallback");
+    }
+
+    #[tokio::test]
+    async fn semantic_extraction_uses_the_settings_it_is_given() {
+        use config::meta::correlation::IdentitySet;
+        let identity = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "k8s".to_string(),
+                label: "Kubernetes".to_string(),
+                distinguish_by: vec!["k8s-namespace".to_string()],
+            }],
+            ..Default::default()
+        };
+        let groups = vec![
+            FieldAlias::new("k8s-namespace", "Namespace", &["k8s_namespace_name"]),
+            FieldAlias::new("service", "Service", &["service_name"]),
+        ];
+        let labels: HashMap<String, String> = [
+            ("k8s_namespace_name".to_string(), "prod".to_string()),
+            ("service_name".to_string(), "checkout".to_string()),
+            ("host".to_string(), "node-1".to_string()),
+        ]
+        .into();
+
+        let found = extract_filtered_semantic_dimensions("org-16560", &labels, &identity, &groups)
+            .await
+            .expect("the configured groups resolve");
+        assert_eq!(
+            found.group_values,
+            HashMap::from([
+                ("k8s-namespace".to_string(), "prod".to_string()),
+                ("service".to_string(), "checkout".to_string()),
+            ])
+        );
+
+        let opted_out = ServiceIdentityConfig {
+            service_optional: true,
+            ..Default::default()
+        };
+        assert!(
+            extract_filtered_semantic_dimensions("org-16560", &labels, &opted_out, &groups)
+                .await
+                .is_none()
+        );
     }
 
     #[test]

@@ -667,6 +667,7 @@ pub async fn create_config(
 ) -> Result<serde_json::Value> {
     let normalized_tags = checked_create_body(&mut req)?;
     let template = checked_template(org_id, req.template.as_deref()).await?;
+    checked_destinations(org_id, &req.alert_destinations).await?;
 
     let db = get_orm_client_rw().await;
 
@@ -846,6 +847,7 @@ pub async fn check_create_config(org_id: &str, req: &CreateAnomalyConfigRequest)
     let mut req = req.clone();
     checked_create_body(&mut req)?;
     checked_template(org_id, req.template.as_deref()).await?;
+    checked_destinations(org_id, &req.alert_destinations).await?;
     folder_pk(org_id, create_folder_name(&req))
         .await
         .map(|_| ())
@@ -862,6 +864,9 @@ pub async fn check_update_config(
     checked_update_body(&mut req, &existing)?;
     if let Some(template) = &req.template {
         checked_template(org_id, template.as_deref()).await?;
+    }
+    if let Some(destinations) = &req.alert_destinations {
+        checked_destinations(org_id, destinations).await?;
     }
     if let Some(folder) = req.folder_id.as_deref() {
         folder_pk(org_id, folder).await?;
@@ -1034,6 +1039,7 @@ pub async fn update_config(
         active_model.template = Set(checked_template(org_id, template.as_deref()).await?);
     }
     if let Some(destinations) = req.alert_destinations {
+        checked_destinations(org_id, &destinations).await?;
         active_model.alert_destinations = Set(Some(
             serde_json::to_value(&destinations).unwrap_or(serde_json::json!([])),
         ));
@@ -2096,6 +2102,13 @@ async fn checked_template(org_id: &str, name: Option<&str>) -> Result<Option<Str
     .await
     .map_err(|e| validation_error(anyhow::anyhow!(e)))?;
     Ok(Some(name.to_string()))
+}
+
+/// A destination that does not resolve would drop every notification without a word.
+async fn checked_destinations(org_id: &str, names: &[String]) -> Result<()> {
+    crate::alerts::alert::validate_template_and_destinations(org_id, None, names)
+        .await
+        .map_err(|e| validation_error(anyhow::anyhow!(e)))
 }
 
 /// Normalizes and validates a create body; returns its normalized tags.
@@ -5451,6 +5464,128 @@ mod tests {
                             .unwrap()
                             .is_some()
                     );
+                },
+            );
+        }
+    }
+
+    mod destination_binding {
+        use config::meta::{
+            destinations::{Destination, DestinationType, Endpoint, Module},
+            folder::{Folder, FolderType},
+        };
+
+        use super::{UpdateAnomalyConfigRequest, make_valid_filters_req};
+        use crate::ssrf_test_support::isolated;
+
+        const MISSING: &str = "validation error: Alert destination nope not found";
+
+        fn run<F: std::future::Future<Output = ()>>(path: &str, task: impl FnOnce() -> F) {
+            let name = path.rsplit("::").next().unwrap_or(path);
+            let dir = std::env::temp_dir().join(format!(
+                "o2-destination-binding-{name}-{}",
+                std::process::id()
+            ));
+            let dir = format!("{}/", dir.display());
+            isolated(path, &[("ZO_DATA_DIR", dir.as_str())], task);
+        }
+
+        async fn store_with_destination(org: &str) -> String {
+            infra::db_init().await.unwrap();
+            infra::table::migrate().await.unwrap();
+            infra::table::destinations::put(Destination {
+                org_id: org.to_string(),
+                name: "ops".to_string(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type: DestinationType::Http(Endpoint::default()),
+                },
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+            let folder = Folder {
+                folder_id: "default".to_string(),
+                name: "default".to_string(),
+                description: String::new(),
+                icon: None,
+            };
+            let (pk, _) = infra::table::folders::put(org, None, folder, FolderType::Alerts)
+                .await
+                .unwrap();
+            pk.to_string()
+        }
+
+        fn sending_to(dest: &str) -> super::CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.alert_destinations = vec![dest.to_string()];
+            req
+        }
+
+        fn retarget(dest: &str) -> UpdateAnomalyConfigRequest {
+            UpdateAnomalyConfigRequest {
+                alert_destinations: Some(vec![dest.to_string()]),
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn create_refuses_a_destination_the_org_lacks() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::create_refuses_a_destination_the_org_lacks"
+                ),
+                || async {
+                    store_with_destination("acme").await;
+
+                    let err = super::super::check_create_config("acme", &sending_to("nope"))
+                        .await
+                        .unwrap_err();
+                    assert_eq!(err.to_string(), MISSING);
+                    let err = super::super::create_config("acme", sending_to("nope"))
+                        .await
+                        .unwrap_err();
+                    assert_eq!(err.to_string(), MISSING);
+                    super::super::check_create_config("acme", &sending_to("ops"))
+                        .await
+                        .unwrap();
+                },
+            );
+        }
+
+        #[test]
+        fn update_refuses_a_destination_the_org_lacks() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::update_refuses_a_destination_the_org_lacks"
+                ),
+                || async {
+                    let folder = store_with_destination("acme").await;
+                    let mut model = super::update_interval_validation::stored_config();
+                    model.anomaly_id = config::ider::uuid();
+                    model.org_id = "acme".to_string();
+                    model.folder_id = folder;
+                    let id = model.anomaly_id.clone();
+                    infra::table::anomaly_detection::config::create(
+                        infra::db::get_orm_client_rw().await,
+                        model,
+                    )
+                    .await
+                    .unwrap();
+
+                    let err = super::super::check_update_config("acme", &id, &retarget("nope"))
+                        .await
+                        .unwrap_err();
+                    assert_eq!(err.to_string(), MISSING);
+                    let err = super::super::update_config("acme", &id, retarget("nope"))
+                        .await
+                        .unwrap_err();
+                    assert_eq!(err.to_string(), MISSING);
+                    super::super::check_update_config("acme", &id, &retarget("ops"))
+                        .await
+                        .unwrap();
                 },
             );
         }

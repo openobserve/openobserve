@@ -12,6 +12,7 @@ import {
   watch,
 } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -347,10 +348,12 @@ function addStreamToSecurity(name: unknown) {
   const n = String(name ?? "");
   if (!n) return;
   secSources.include(n);
+  analytics.track("security_source_inclusion_changed", { included: true, view: "events" });
   selectedStream.value = n;
 }
 function removeStreamFromSecurity(name: string) {
   secSources.exclude(name);
+  analytics.track("security_source_inclusion_changed", { included: false, view: "events" });
 }
 
 const HEALTH_DOT: Record<SourceHealth, string> = {
@@ -1105,6 +1108,7 @@ function filterByRule(where: string) {
 }
 
 function openDrawer(row: Row) {
+  if (!drawerEvent.value) analytics.track("security_detail_opened", { view: "events" });
   drawerEvent.value = row.raw;
   syncUrl();
 }
@@ -1248,7 +1252,7 @@ function cancelSearch({ quiet = false } = {}) {
 
 onBeforeUnmount(() => cancelSearch({ quiet: true }));
 
-async function runSearch() {
+async function runSearch(userRun = false) {
   if (mountComplete) syncUrl();
   if (!selectedStream.value || !orgId.value) return;
   if (dateState.value.type === "relative") timeRange.value = rangeFor(dateState.value);
@@ -1284,6 +1288,13 @@ async function runSearch() {
       if (fresh) drawerEvent.value = fresh;
     }
     lastRunAt.value = Date.now();
+    if (userRun) {
+      analytics.track("security_events_searched", {
+        mode: sqlMode.value ? "sql" : "builder",
+        filters: sqlMode.value ? 0 : fieldFilters.value.length,
+        severity_filtered: severityFilter.value.length > 0,
+      });
+    }
   } catch (e: any) {
     if (seq !== searchSeq) return;
     errorMsg.value =
@@ -1412,6 +1423,10 @@ function onDateChange(dt: any) {
   dateState.value = nextDate;
   // The picker re-reports its value on mount; only a real change re-queries.
   if (!mountComplete || unchanged) return;
+  analytics.track("security_time_range_changed", {
+    view: "events",
+    range: relative ? "relative" : "absolute",
+  });
   void runSearch();
 }
 
@@ -1509,7 +1524,7 @@ function widenTo(period: string) {
           size="sm"
           icon-left="play-arrow"
           data-test="security-events-run"
-          @click="runSearch"
+          @click="runSearch(true)"
         >
           {{ t("siem.events.run") }}
         </OButton>
@@ -1677,7 +1692,7 @@ function widenTo(period: string) {
             class="h-full"
             data-test="security-events-sql"
             @update:query="(q: string) => (sqlQuery = q)"
-            @run-query="runSearch"
+            @run-query="runSearch(true)"
           />
         </div>
       </div>
@@ -2263,7 +2278,7 @@ function widenTo(period: string) {
             icon-left="refresh"
             :loading="loading"
             data-test="security-events-refresh"
-            @click="runSearch"
+            @click="runSearch()"
           >
             <OTooltip side="bottom" :content="t('siem.events.refresh')" />
           </OButton>

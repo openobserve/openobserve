@@ -27,6 +27,7 @@ import store from "@/test/unit/helpers/store";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/organizations", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -43,6 +44,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mockToast }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn() }));
 
 import organizationsService from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 
 // ODialog stub: renders the default slot so the REAL OForm mounts; exposes the
 // form-id (the footer Save submits via it in the app).
@@ -267,6 +269,21 @@ describe("IngestionTokens — revoke Splunk HEC token confirm", () => {
     useConfirmDialog().handleCancel();
     await pending;
     provider.unmount();
+    wrapper.unmount();
+  });
+});
+
+describe("IngestionTokens — analytics", () => {
+  it("tracks disabling a token once the server accepts it", async () => {
+    vi.mocked(organizationsService.enable_disable_org_ingestion_token).mockResolvedValue({
+      data: {},
+    } as any);
+    const wrapper = mountComp();
+    await flushPromises();
+
+    await (wrapper.vm as any).toggleEnabled("edge-forwarder", false);
+
+    expect(analytics.track).toHaveBeenCalledWith("ingestion_token_disabled");
     wrapper.unmount();
   });
 });

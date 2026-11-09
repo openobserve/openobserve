@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -294,6 +295,7 @@ watch(selectedId, (id) => {
 });
 
 function open(c: Incident) {
+  if (!selectedId.value) analytics.track("security_detail_opened", { view: "cases" });
   selectedId.value = c.id;
 }
 function close() {

@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="single"
                   :label="t('rum.health')"
                   label-position="left"
-                  @update:model-value="(v: any) => setHealthSegment(v)"
+                  @update:model-value="(v: any) => pickSegment('health', v)"
                 >
                   <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-health-all">{{
                     t("rum.all")
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="single"
                   :label="t('rum.type')"
                   label-position="left"
-                  @update:model-value="(v: any) => setTypeSegment(v)"
+                  @update:model-value="(v: any) => pickSegment('type', v)"
                 >
                   <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-type-all">{{
                     t("rum.all")
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="single"
                   :label="t('rum.device')"
                   label-position="left"
-                  @update:model-value="(v: any) => setDeviceSegment(v)"
+                  @update:model-value="(v: any) => pickSegment('device', v)"
                 >
                   <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-device-all">{{
                     t("rum.all")
@@ -544,6 +544,7 @@ import useRum from "@/composables/rum/useRum";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 
 interface Session {
   timestamp: string;
@@ -1613,6 +1614,7 @@ const topInsight = computed<SessionInsight | null>(() => {
 
 const applyInsightFilter = (insight: SessionInsight) => {
   setHealthSegment(insight.kind === "frustration" ? "frustrated" : "errors");
+  analytics.track("rum_session_insight_used", { action: "segment", kind: insight.kind });
 };
 
 const escapeSqlString = (value: string) => value.replace(/'/g, "''");
@@ -1627,6 +1629,7 @@ const filterSessionsByInsightError = (insight: SessionInsight) => {
     sessionState.data.editorValue = existing ? `${existing} AND ${condition}` : condition;
   }
   runQuery();
+  analytics.track("rum_session_insight_used", { action: "filter", kind: insight.kind });
 };
 
 // Jump to Error Tracking pre-filtered to this error, carrying the time range.
@@ -1645,6 +1648,7 @@ const openInsightInErrorTracking = (insight: SessionInsight) => {
     query.query = b64EncodeUnicode(`error_message='${escapeSqlString(insight.message)}'`);
   }
   router.push({ name: "ErrorTracking", query });
+  analytics.track("rum_session_insight_used", { action: "error_tracking", kind: insight.kind });
 };
 
 const tableRows = computed(() =>
@@ -1689,6 +1693,15 @@ const setDeviceSegment = (value: DeviceSegment | undefined | null) => {
   updateUrlQueryParams();
 };
 
+const pickSegment = (segment: "health" | "type" | "device", value: string | null | undefined) => {
+  if (segment === "health") setHealthSegment(value as HealthSegment);
+  else if (segment === "type") setTypeSegment(value as TypeSegment);
+  else setDeviceSegment(value as DeviceSegment);
+  const applied = { health: healthSegment, type: typeSegment, device: deviceSegment }[segment]
+    .value;
+  analytics.track("rum_session_segment_applied", { segment, value: applied });
+};
+
 const resetSegments = () => {
   healthSegment.value = "all";
   typeSegment.value = "all";
@@ -1700,11 +1713,11 @@ const handleMetricSelect = (card: string) => {
   if (card === "sessions") {
     resetSegments();
   } else if (card === "errors") {
-    setHealthSegment(healthSegment.value === "errors" ? "all" : "errors");
+    pickSegment("health", healthSegment.value === "errors" ? "all" : "errors");
   } else if (card === "frustrated") {
-    setHealthSegment(healthSegment.value === "frustrated" ? "all" : "frustrated");
+    pickSegment("health", healthSegment.value === "frustrated" ? "all" : "frustrated");
   } else if (card === "bounced") {
-    setTypeSegment(typeSegment.value === "bounced" ? "all" : "bounced");
+    pickSegment("type", typeSegment.value === "bounced" ? "all" : "bounced");
   }
 };
 

@@ -631,6 +631,7 @@ import dbMonitoringService, {
   type ServerQueryRow,
 } from "@/services/db_monitoring";
 import config from "@/aws-exports";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
 import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
@@ -1998,6 +1999,7 @@ const rowActions = computed<DbmRowAction[]>(() => [
 ]);
 
 const onRowAction = async (id: string, row: QueryRow) => {
+  analytics.track("dbm_row_action_clicked", { page: "queries", action: id });
   if (id === "open" || id === "traces") {
     openQueryDetail(row, id === "traces" ? "samples" : undefined);
     return;

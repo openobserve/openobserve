@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   TOOLTIP_TRIGGER_ATTR,
+  INERT_TRIGGER_ATTR,
   TOOLTIP_TRIGGER_OVERFLOW,
   type TooltipEmits,
   type TooltipProps,
@@ -171,6 +172,16 @@ function onChildOpenChange(next: boolean) {
   else childOpen.value = next;
 }
 
+function isInertTrigger(): boolean {
+  return !!parentEl.value?.hasAttribute(INERT_TRIGGER_ATTR);
+}
+
+// Reka dismisses on any outside pointerdown, which would close the tooltip the click on its own trigger opens.
+function onChildPointerDownOutside(event: Event) {
+  const target = event.target as Node | null;
+  if (isInertTrigger() && target && parentEl.value?.contains(target)) event.preventDefault();
+}
+
 // A control-level tooltip yields to one owned by a hovered control nested inside it, so only the innermost opens.
 function hoversNestedTrigger(): boolean {
   const own = parentEl.value;
@@ -246,6 +257,17 @@ onMounted(() => {
           childOpen.value = false;
         }
       };
+      // A trigger with no action of its own opens on click too, so touch and click users can read it.
+      const openOnClick = () => {
+        if (props.disabled || props.overflowOnly || !isInertTrigger()) return;
+        if (childShowTimer) {
+          clearTimeout(childShowTimer);
+          childShowTimer = null;
+        }
+        childActivated.value = true;
+        childOpen.value = true;
+      };
+      parentEl.value.addEventListener("click", openOnClick);
       parentEl.value.addEventListener("mouseenter", show);
       parentEl.value.addEventListener("mouseleave", hide);
       // Keyboard-focus parity with hover, so a Tab-reachable trigger (e.g. an
@@ -253,6 +275,7 @@ onMounted(() => {
       parentEl.value.addEventListener("focus", show);
       parentEl.value.addEventListener("blur", hide);
       cleanupFn = () => {
+        parentEl.value?.removeEventListener("click", openOnClick);
         parentEl.value?.removeEventListener("mouseenter", show);
         parentEl.value?.removeEventListener("mouseleave", hide);
         parentEl.value?.removeEventListener("focus", show);
@@ -387,6 +410,7 @@ const contentClasses = computed(() => [
             :align-offset="alignOffset"
             :style="contentStyle"
             :class="contentClasses"
+            @pointer-down-outside="onChildPointerDownOutside"
             @mouseenter="onContentEnter"
             @mouseleave="onContentLeave"
           >

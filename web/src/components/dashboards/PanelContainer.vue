@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="[
             curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
             titleMeta ? 'me-2!' : undefined,
+            showInlineDescription ? 'me-0.5!' : undefined,
             hasNoticeChips
               ? 'min-w-[min(10rem,40%)]! @max-[12rem]/panelbar:min-w-[35%]!'
               : undefined,
@@ -70,6 +71,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ panelTitle }}
         </OTruncatedText>
+        <OButton
+          v-if="showInlineDescription"
+          variant="ghost"
+          size="icon-xs"
+          icon-left="info-outline"
+          class="shrink-0"
+          :class="titleMeta ? 'me-2' : 'me-5'"
+          :aria-label="t('dashboard.description')"
+          data-test="dashboard-panel-title-description-info"
+        >
+          <OTooltip side="bottom" align="start" max-width="13.75rem">
+            <template #content
+              ><div class="whitespace-pre-wrap">{{ props.data.description }}</div></template
+            >
+          </OTooltip>
+        </OButton>
         <span
           v-if="titleMeta"
           class="text-2xs text-text-secondary me-5 shrink-0 font-normal whitespace-nowrap"
@@ -862,6 +879,10 @@ export default defineComponent({
     const panelFileName = computed(() => toPanelFileName(panelTitle.value));
     // A runtime stamp from embedding pages (the traces Rate unit); stored dashboards never carry it.
     const titleMeta = computed(() => props.data?.config?.title_meta as string | undefined);
+    // The header-end info button is hidden in the simplified view, so its description sits by the title.
+    const showInlineDescription = computed(
+      () => !!props.simplifiedPanelView && !props.viewOnly && !!props.data?.description,
+    );
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -1616,6 +1637,7 @@ export default defineComponent({
       onCuratedSeriesData,
       panelTitle,
       titleMeta,
+      showInlineDescription,
       panelFileName,
       alertDisabledReason,
       canCreateAlert,

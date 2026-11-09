@@ -950,12 +950,14 @@ export default defineComponent({
     // Set/remove this dashboard as the single org-wide home dashboard, shared
     // reactive state with the dashboard list and HomeView via the composable.
     const { isHome, setHomeDashboard, clearHomeDashboard } = useHomeDashboard(t);
-    const toggleHomeDashboard = () => {
+    const toggleHomeDashboard = async () => {
       const id = dashboardId.value as string | undefined;
       if (!id) return;
       const org = store.state.selectedOrganization?.identifier;
       if (isHome(id)) {
-        clearHomeDashboard(org);
+        await clearHomeDashboard(org);
+        // clearHomeDashboard reverts the pin instead of throwing when the write fails.
+        if (!isHome(id)) analytics.track("home_dashboard_unpinned", { source: "dashboard_view" });
       } else {
         setHomeDashboard(org, {
           dashboardId: id,

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import http from "./http";
+import analytics from "./product_analytics";
 
 // visibility: 0 = draft, 1 = public, 2 = password
 export type StatusPageVisibility = 0 | 1 | 2;
@@ -135,20 +136,35 @@ const statusPagesService = {
     http().get(`/api/${orgIdentifier}/status_pages/${id}`),
 
   create: (orgIdentifier: string, payload: { name: string; description?: string }) =>
-    http().post(`/api/${orgIdentifier}/status_pages`, payload),
+    http()
+      .post(`/api/${orgIdentifier}/status_pages`, payload)
+      .then((res) => {
+        analytics.track("status_page_created");
+        return res;
+      }),
 
   // PUT accepts a partial page — only the keys present are updated.
   update: (orgIdentifier: string, id: string, payload: Record<string, unknown>) =>
     http().put(`/api/${orgIdentifier}/status_pages/${id}`, payload),
 
   delete: (orgIdentifier: string, id: string) =>
-    http().delete(`/api/${orgIdentifier}/status_pages/${id}`),
+    http()
+      .delete(`/api/${orgIdentifier}/status_pages/${id}`)
+      .then((res) => {
+        analytics.track("status_page_deleted");
+        return res;
+      }),
 
   updateComponents: (orgIdentifier: string, id: string, components: StatusPageComponent[]) =>
     http().put(`/api/${orgIdentifier}/status_pages/${id}/components`, { components }),
 
   rotateSlug: (orgIdentifier: string, id: string) =>
-    http().post(`/api/${orgIdentifier}/status_pages/${id}/rotate_slug`, {}),
+    http()
+      .post(`/api/${orgIdentifier}/status_pages/${id}/rotate_slug`, {})
+      .then((res) => {
+        analytics.track("status_page_slug_rotated");
+        return res;
+      }),
 
   preview: (orgIdentifier: string, id: string) =>
     http().get(`/api/${orgIdentifier}/status_pages/${id}/preview`),
@@ -157,18 +173,36 @@ const statusPagesService = {
     http().get(`/api/${orgIdentifier}/status_pages/${id}/notices`),
 
   createNotice: (orgIdentifier: string, id: string, payload: CreateNoticePayload) =>
-    http().post(`/api/${orgIdentifier}/status_pages/${id}/notices`, payload),
+    http()
+      .post(`/api/${orgIdentifier}/status_pages/${id}/notices`, payload)
+      .then((res) => {
+        analytics.track("status_page_notice_created", {
+          kind: (["incident", "maintenance", "info"] as const)[payload.kind],
+          impact: payload.impact,
+        });
+        return res;
+      }),
 
   deleteNotice: (orgIdentifier: string, noticeId: string) =>
-    http().delete(`/api/${orgIdentifier}/status_pages/notices/${noticeId}`),
+    http()
+      .delete(`/api/${orgIdentifier}/status_pages/notices/${noticeId}`)
+      .then((res) => {
+        analytics.track("status_page_notice_deleted");
+        return res;
+      }),
 
   listNoticeUpdates: (orgIdentifier: string, noticeId: string) =>
     http().get(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/updates`),
 
   markFalsePositive: (orgIdentifier: string, noticeId: string, snoozeHours = 6) =>
-    http().post(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/mark_false_positive`, {
-      snooze_hours: snoozeHours,
-    }),
+    http()
+      .post(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/mark_false_positive`, {
+        snooze_hours: snoozeHours,
+      })
+      .then((res) => {
+        analytics.track("status_page_notice_marked_false_positive");
+        return res;
+      }),
 
   // Widens impact (never narrows it — see UpdateNoticePayload) on the existing incident.
   updateNotice: (orgIdentifier: string, noticeId: string, payload: UpdateNoticePayload) =>
@@ -181,13 +215,28 @@ const statusPagesService = {
     http().get(`/api/${orgIdentifier}/status_pages/${id}/domains`),
 
   createDomain: (orgIdentifier: string, id: string, domain: string) =>
-    http().post(`/api/${orgIdentifier}/status_pages/${id}/domains`, { domain }),
+    http()
+      .post(`/api/${orgIdentifier}/status_pages/${id}/domains`, { domain })
+      .then((res) => {
+        analytics.track("status_page_domain_added");
+        return res;
+      }),
 
   deleteDomain: (orgIdentifier: string, domainId: string) =>
-    http().delete(`/api/${orgIdentifier}/status_pages/domains/${domainId}`),
+    http()
+      .delete(`/api/${orgIdentifier}/status_pages/domains/${domainId}`)
+      .then((res) => {
+        analytics.track("status_page_domain_deleted");
+        return res;
+      }),
 
   verifyDomain: (orgIdentifier: string, domainId: string) =>
-    http().post(`/api/${orgIdentifier}/status_pages/domains/${domainId}/verify`, {}),
+    http()
+      .post(`/api/${orgIdentifier}/status_pages/domains/${domainId}/verify`, {})
+      .then((res) => {
+        analytics.track("status_page_domain_verification_checked");
+        return res;
+      }),
 };
 
 export default statusPagesService;

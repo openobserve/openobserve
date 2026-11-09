@@ -538,6 +538,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -993,6 +994,7 @@ export default defineComponent({
     const resurrectOrganization = async (row: any) => {
       try {
         await OrganizationServices.resurrect_org(store.state.zoConfig.meta_org, row.identifier);
+        analytics.track("org_management_org_resurrected");
         toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
         getData();
       } catch (e: any) {
@@ -1033,6 +1035,7 @@ export default defineComponent({
           pool,
           { org_id: usageLimitsRow.value.identifier, limit },
         );
+        analytics.track("org_management_usage_limit_updated", { pool });
         apply(response.data.used, response.data.limit);
         usageLimitsPrompt.value = false;
         toast({ variant: "success", message: copy.success });
@@ -1111,6 +1114,7 @@ export default defineComponent({
         });
         return OrganizationServices.create_external_contract(metaOrg, payload)
           .then(() => {
+            analytics.track("org_management_contract_created");
             toast({
               variant: "success",
               message: t("settings.organizationManagementPage.contractCreatedSuccess"),
@@ -1145,6 +1149,7 @@ export default defineComponent({
         });
         return OrganizationServices.extend_external_contract(metaOrg, payload)
           .then(() => {
+            analytics.track("org_management_contract_extended");
             toast({
               variant: "success",
               message: t("settings.organizationManagementPage.contractExtendedSuccess"),
@@ -1185,6 +1190,7 @@ export default defineComponent({
         });
         OrganizationServices.revoke_external_contract(metaOrg, row.identifier)
           .then(() => {
+            analytics.track("org_management_contract_revoked");
             toast({
               variant: "success",
               message: t("settings.organizationManagementPage.contractRevokedSuccess"),
@@ -1263,6 +1269,7 @@ export default defineComponent({
       )
         .then((response) => {
           if (response.data) {
+            analytics.track("org_management_trial_extended");
             toast({
               variant: "success",
               message: t("settings.organizationManagementPage.trialExtendedSuccess"),

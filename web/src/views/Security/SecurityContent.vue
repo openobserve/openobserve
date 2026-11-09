@@ -5,6 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -450,6 +451,8 @@ watch([filteredRules, filteredSources, openRuleId, openSourceId, contextRuleIds]
 );
 
 function showRule(id: string | null, fromSource: string | null = null) {
+  if (id && !openRuleId.value && !openSourceId.value)
+    analytics.track("security_detail_opened", { view: "content_rule" });
   ruleContextSource.value = id ? fromSource : null;
   openSourceId.value = null;
   openRuleId.value = id;
@@ -457,6 +460,8 @@ function showRule(id: string | null, fromSource: string | null = null) {
   router.replace({ query: id ? { ...rest, rule: id } : rest });
 }
 function showSource(id: string | null) {
+  if (id && !openRuleId.value && !openSourceId.value)
+    analytics.track("security_detail_opened", { view: "content_source" });
   openRuleId.value = null;
   openSourceId.value = id;
   const { rule: _r, source: _s, ...rest } = route.query;

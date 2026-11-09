@@ -485,6 +485,7 @@ import dbMonitoringService, {
   type Freshness,
   type QueryStatsRow,
 } from "@/services/db_monitoring";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
@@ -1467,6 +1468,7 @@ const rowActionsFor = (row: DatabaseRow): DbmRowAction[] => {
 };
 
 const onRowAction = (id: string, row: DatabaseRow) => {
+  analytics.track("dbm_row_action_clicked", { page: "databases", action: id });
   if (id === "open") {
     openQueries(row);
     return;

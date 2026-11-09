@@ -17,10 +17,13 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import analytics from "@/services/product_analytics";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 
 import DbmScopeFilters, { type DbmInsightChip, type DbmScopeFilter } from "./DbmScopeFilters.vue";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const filter = (over: Partial<DbmScopeFilter> = {}): DbmScopeFilter => ({
   key: "service",
@@ -86,6 +89,16 @@ describe("DbmScopeFilters", () => {
       const wrapper = mountFilters([filter({ onChange })]);
       await wrapper.find('[data-test="dbm-queries-scope-chip-service-remove"]').trigger("click");
       expect(onChange).toHaveBeenCalledWith(null);
+    });
+
+    it("tracks the cleared dimension by key only", async () => {
+      vi.mocked(analytics.track).mockClear();
+      const wrapper = mountFilters([filter()]);
+      await wrapper.find('[data-test="dbm-queries-scope-chip-service-remove"]').trigger("click");
+      expect(analytics.track).toHaveBeenCalledWith("dbm_filter_applied", {
+        dimension: "service",
+        cleared: true,
+      });
     });
   });
 

@@ -300,6 +300,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import syntheticsService from "@/services/synthetics";
+import analytics from "@/services/product_analytics";
 import type { AgentSetup } from "@/types/synthetics";
 
 interface AgentToken {
@@ -470,6 +471,7 @@ export default defineComponent({
       loading.value = true;
       try {
         const res = await createAgentToken.mutateAsync(value.name.trim());
+        analytics.track("synthetics_token_created");
         showCreateForm.value = false;
         reveal(res.data.name, res.data.token);
         await fetchTokens();
@@ -496,6 +498,7 @@ export default defineComponent({
       loading.value = true;
       try {
         const res = await rotateAgentToken.mutateAsync(undefined);
+        analytics.track("synthetics_token_rotated");
         reveal(res.data.name, res.data.token);
         await fetchTokens();
         toast({ variant: "success", message: t("synthetics.tokens.rotateSuccess"), timeout: 4000 });
@@ -514,6 +517,7 @@ export default defineComponent({
       loading.value = true;
       try {
         await setAgentTokenEnabled.mutateAsync({ name, enabled });
+        analytics.track(enabled ? "synthetics_token_enabled" : "synthetics_token_disabled");
         await fetchTokens();
         toast({
           variant: "success",
