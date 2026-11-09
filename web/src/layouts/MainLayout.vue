@@ -175,6 +175,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="store.state.selectedOrganization?.identifier"
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
+              <StarterPackDailyCheck
+                v-if="packsEnabled && store.state.selectedOrganization?.identifier"
+                :org="store.state.selectedOrganization.identifier"
+              />
               <FirstDataNotice
                 v-if="
                   !focusMode &&
@@ -364,6 +368,7 @@ import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import useStreams from "@/composables/useStreams";
 import { userDataStreams } from "@/utils/internalStreams";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
 import SecurityPageGate from "@/components/security/SecurityPageGate.vue";
 import { clearLicenseDenials } from "@/composables/useLicenseDenials";
@@ -429,6 +434,9 @@ export default defineComponent({
     OButton,
     OSkeleton,
     FirstDataNotice,
+    StarterPackDailyCheck: defineAsyncComponent(
+      () => import("@/components/starterPacks/StarterPackDailyCheck.vue"),
+    ),
     EditorDraftSignOutDialog,
     FeatureLockBoundary,
     SecurityPageGate,
@@ -2003,6 +2011,7 @@ export default defineComponent({
       raw,
       dashboardSaveConflict: dashboardSaveConflictState,
       firstDataNotice,
+      packsEnabled: STARTER_PACKS_ENABLED,
       lockedFeature,
       securityGated,
       orgListSnapshot,

@@ -50,6 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #actions-overflow>
+        <StarterPackFindMore
+          v-if="packsEnabled"
+          :org="store.state.selectedOrganization?.identifier"
+          daily-toggle
+        />
         <OButton
           v-if="packsEnabled"
           variant="outline"
@@ -436,6 +441,7 @@ import useStreams from "@/composables/useStreams";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
+import StarterPackFindMore from "@/components/starterPacks/StarterPackFindMore.vue";
 import StarterPackLibraryTab from "@/components/starterPacks/StarterPackLibraryTab.vue";
 import { KUBERNETES_PACK, STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
 import { ingestTimes, matchAlerts } from "@/composables/starterPacks/packMatchData";
