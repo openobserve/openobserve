@@ -30,7 +30,7 @@ use config::{
 use hashbrown::HashSet;
 use infra::runtime::WAL_RUNTIME;
 use snafu::ResultExt;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{RwLock, RwLockWriteGuard, mpsc};
 use wal::{Writer as WalWriter, build_file_path};
 
 use crate::{
@@ -245,6 +245,17 @@ pub async fn check_ttl() -> Result<()> {
             {
                 log::error!("[INGESTER:MEM:{}] writer queue rotate error: {e}", r.idx);
             }
+        }
+    }
+    Ok(())
+}
+
+/// Rotates every registered writer without closing its queue or removing it.
+pub async fn rotate_all() -> Result<()> {
+    for w in WRITERS.iter() {
+        let w = w.read().await;
+        for r in w.values() {
+            r.rotate_locked(r.wal.write().await).await?;
         }
     }
     Ok(())
@@ -546,7 +557,7 @@ impl Writer {
 
         // rotation wal
         let start = std::time::Instant::now();
-        let mut wal = self.wal.write().await;
+        let wal = self.wal.write().await;
         let wal_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
@@ -558,6 +569,10 @@ impl Writer {
         {
             return Ok(());
         }
+        self.rotate_locked(wal).await
+    }
+
+    async fn rotate_locked(&self, mut wal: RwLockWriteGuard<'_, WalWriter>) -> Result<()> {
         let cfg = get_config();
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
@@ -729,7 +744,98 @@ impl MemorySize for WriterKey {
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::Int64Array;
+    use arrow_schema::{DataType, Field};
+
     use super::*;
+
+    #[tokio::test]
+    async fn test_delete_rotation_preserves_retained_writer() {
+        let org_id = "delete_rotation_test";
+        let stream_name = "retained_writer";
+        let writer = get_writer(0, org_id, "logs", stream_name).await;
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "_timestamp",
+            DataType::Int64,
+            false,
+        )]));
+        let make_entry = |timestamp| Entry {
+            org_id: org_id.into(),
+            stream: stream_name.into(),
+            schema: Some(schema.clone()),
+            schema_key: "timestamp".into(),
+            partition_key: "2026/11/09/00".into(),
+            data: vec![Arc::new(serde_json::json!({"_timestamp": timestamp}))],
+            ..Entry::default()
+        };
+        writer
+            .write_batch_synced(vec![make_entry(1)])
+            .await
+            .unwrap();
+        assert!(
+            !writer
+                .should_rotate(writer.wal.read().await.size(), 0, 0)
+                .await
+        );
+
+        for next_timestamp in 2..=3 {
+            rotate_all().await.unwrap();
+            assert!(!writer.is_channel_closed());
+            assert!(writer.write_queue.try_reserve().is_ok());
+            let registered = get_writer(0, org_id, "logs", stream_name).await;
+            assert!(Arc::ptr_eq(&writer, &registered));
+            let (active, immutable) = read_timestamps(org_id, stream_name).await;
+            assert!(active.is_empty());
+            assert_eq!(immutable, (1..next_timestamp).collect::<Vec<_>>());
+
+            writer
+                .write_batch_synced(vec![make_entry(next_timestamp)])
+                .await
+                .unwrap();
+            let (active, immutable) = read_timestamps(org_id, stream_name).await;
+            assert_eq!(active, vec![next_timestamp]);
+            assert_eq!(immutable, (1..next_timestamp).collect::<Vec<_>>());
+        }
+        flush_all().await.unwrap();
+    }
+
+    async fn read_timestamps(org_id: &str, stream_name: &str) -> (Vec<i64>, Vec<i64>) {
+        let (ids, active) = read_from_memtable(org_id, "logs", stream_name, None, &[])
+            .await
+            .unwrap();
+        let (_, immutable) = crate::read_from_immutable(
+            "delete_rotation_test",
+            org_id,
+            "logs",
+            stream_name,
+            None,
+            &[],
+            &ids,
+        )
+        .await
+        .unwrap();
+        let timestamps = |batches: Vec<ReadRecordBatchEntry>| {
+            let mut timestamps = Vec::new();
+            for (_, batches) in batches {
+                for batch in batches {
+                    timestamps.extend(
+                        batch
+                            .data
+                            .column(0)
+                            .as_any()
+                            .downcast_ref::<Int64Array>()
+                            .unwrap()
+                            .values()
+                            .iter()
+                            .copied(),
+                    );
+                }
+            }
+            timestamps.sort_unstable();
+            timestamps
+        };
+        (timestamps(active), timestamps(immutable))
+    }
 
     #[test]
     fn test_writer_key_new_replay_sets_fields() {
