@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm"
           icon-left="add"
+          :disabled="!!forbidden"
           data-test="ai-budgets-new"
           @click="openNew"
         >
@@ -90,6 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="none"
         class="min-h-0 flex-1"
         :empty-message="t('aiBudgets.empty')"
+        :forbidden="forbidden"
+        forbidden-resource="alert_folders"
         data-test="ai-budgets-table"
       >
         <template #cell-budget="{ row }">
@@ -271,6 +274,7 @@ import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import useStreams from "@/composables/useStreams";
 import { createFolderByType, getFoldersListByType } from "@/utils/commons";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useLlmPageScope } from "@/enterprise/composables/useLlmPageScope";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
@@ -327,6 +331,8 @@ const rows = ref<Row[]>([]);
 const loading = ref(false);
 const lastRunAt = ref<number | null>(null);
 const unpricedTraces = ref(0);
+// The user cannot read alert folders, where budgets are stored.
+const forbidden = ref<ForbiddenState>(false);
 // The month the banner counted over; the gaps page lists the same window
 // (it defaults to the last 24 hours, which missed older unpriced calls).
 const unpricedWindow = ref<TimeWindow | null>(null);
@@ -492,6 +498,7 @@ async function folderId(create: boolean): Promise<string | null> {
 async function reload() {
   await loadScope(timeRange.value.startTime, timeRange.value.endTime);
   loading.value = true;
+  forbidden.value = false;
   try {
     const id = await folderId(false);
     budgetFolder.value = id;
@@ -537,6 +544,12 @@ async function reload() {
       }),
     );
     await loadUnpriced(now);
+  } catch (e) {
+    // Budgets live in an alert folder: without access to it there is nothing to list or create.
+    const denied = forbiddenState(e);
+    if (!denied) throw e;
+    forbidden.value = denied;
+    rows.value = [];
   } finally {
     loading.value = false;
     lastRunAt.value = Date.now();
