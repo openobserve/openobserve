@@ -138,6 +138,11 @@ impl RemoteScanExec {
                 .into_iter()
                 .filter(|c| matches!(c.across_partitions, AcrossPartitions::Uniform(Some(_)))),
         )?;
+        // Followers stream all partitions at once, so only a single partition arrives sorted
+        let input_properties = input.properties();
+        if input_properties.partitioning.partition_count() == 1 {
+            eq_properties.add_orderings(input_properties.eq_properties.oeq_class().iter().cloned());
+        }
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
         Ok(Arc::new(PlanProperties::new(
             eq_properties,
