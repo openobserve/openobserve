@@ -508,6 +508,25 @@ describe("401 handling", () => {
     expect(store.dispatch).not.toHaveBeenCalled();
   });
 
+  it("hands a Cloud 401, or one before the config loads, back without a dex refresh (WT-05)", async () => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    const cloud = unauthorized();
+    await expect(onRejected(cloud)).rejects.toBe(cloud);
+    (config as any).isCloud = "false";
+    const saved = (store.state as any).zoConfig;
+    (store.state as any).zoConfig = undefined;
+    try {
+      const early = unauthorized();
+      await expect(onRejected(early)).rejects.toBe(early);
+    } finally {
+      (store.state as any).zoConfig = saved;
+    }
+    expect(instance.get).not.toHaveBeenCalled();
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+
   it("rejects with the retry's own error when the refresh worked but the retry failed", async () => {
     (config as any).isEnterprise = "true";
     (store.state as any).zoConfig.sso_enabled = true;

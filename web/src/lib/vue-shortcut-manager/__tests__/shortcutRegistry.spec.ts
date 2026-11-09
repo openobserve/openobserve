@@ -9,6 +9,7 @@ import store from "@/test/unit/helpers/store";
 import ShortcutCheatsheet from "../ShortcutCheatsheet.vue";
 import {
   getShortcutDef,
+  getShortcutDisplay,
   SHORTCUT_MODULES,
   SHORTCUT_REGISTRY,
   type ShortcutCapabilities,
@@ -390,6 +391,21 @@ describe("assistant entries", () => {
       "assistantComposerRecall",
     ])
       expect(getShortcutDef(id), id).toBeUndefined();
+  });
+});
+
+describe("getShortcutDisplay (K1)", () => {
+  it("shows the Mac binding of a pair that is not the plain Ctrl→⌘ swap", () => {
+    expect(getShortcutDisplay("editorTabFocusMode", true)).toBe("control+shift+m");
+    expect(getShortcutDisplay("editorTabFocusMode", false)).toBe("ctrl+m");
+  });
+
+  it("keeps the shared form when the Mac binding only swaps Ctrl for ⌘, in any order", () => {
+    expect(getShortcutDisplay("assistantHelper", true)).toBe("ctrl+i");
+    const redo = SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts).find(
+      (e) => e.keyForWindows === "ctrl+shift+z" && e.keyForMac === "shift+meta+z",
+    );
+    expect(getShortcutDisplay(redo!.id, true)).toBe("ctrl+shift+z");
   });
 });
 

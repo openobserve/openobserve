@@ -22,6 +22,8 @@ import http from "./http";
 export interface BranchChatRequest {
   turn_id: string;
   version?: number;
+  /** The new chat's id, picked once per user action, so a resent request returns the branch already made. */
+  session_id?: string;
 }
 
 /** Where a branched chat came from; also on `GET /ai/chats/{sid}` and the chat list rows. */
@@ -42,6 +44,7 @@ export interface BranchChatVars {
   sessionId: string;
   turnId: string;
   version?: number;
+  newSessionId?: string;
 }
 
 const enc = encodeURIComponent;
@@ -62,6 +65,7 @@ export const branchChatMutation = (org: string) =>
         await aiChatBranch.branch(org, vars.sessionId, {
           turn_id: vars.turnId,
           ...(vars.version !== undefined && { version: vars.version }),
+          ...(vars.newSessionId && { session_id: vars.newSessionId }),
         })
       ).data,
     meta: { invalidates: [assistantKeys.chats(org)], silentError: true },

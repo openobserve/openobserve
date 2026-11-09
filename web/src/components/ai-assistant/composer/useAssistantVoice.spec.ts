@@ -239,6 +239,37 @@ describe("permission wait", () => {
     expect(target.text).toBe("typed");
   });
 
+  it("V1: un-crosses a denied mic once the browser's permission is no longer denied", async () => {
+    const status = { state: "denied", onchange: null as null | (() => void) };
+    const query = vi.fn(async () => status);
+    Object.defineProperty(navigator, "permissions", { value: { query }, configurable: true });
+    try {
+      engine.rejectMic = Object.assign(new Error("no"), { name: "NotAllowedError" });
+      await controller.start(fakeVoiceTarget(), "mic");
+      await flushPromises();
+      expect(query).toHaveBeenCalledWith({ name: "microphone" });
+      expect(controller.state.denied).toBe(true);
+      status.state = "granted";
+      status.onchange!();
+      expect(controller.state.denied).toBe(false);
+    } finally {
+      Reflect.deleteProperty(navigator, "permissions");
+    }
+  });
+
+  it("V1: a dismissed prompt leaves the permission askable, so the mic is not crossed", async () => {
+    const query = vi.fn(async () => ({ state: "prompt", onchange: null }));
+    Object.defineProperty(navigator, "permissions", { value: { query }, configurable: true });
+    try {
+      engine.rejectMic = Object.assign(new Error("no"), { name: "NotAllowedError" });
+      await controller.start(fakeVoiceTarget(), "mic");
+      await flushPromises();
+      expect(controller.state.denied).toBe(false);
+    } finally {
+      Reflect.deleteProperty(navigator, "permissions");
+    }
+  });
+
   it("still dictates when the level source fails for another reason", async () => {
     engine.rejectMic = Object.assign(new Error("busy"), { name: "NotReadableError" });
     await controller.start(fakeVoiceTarget(), "mic");
@@ -273,10 +304,26 @@ describe("errors and limits", () => {
     expect(target.ends).toEqual([]);
   });
 
-  it("reports stt_unavailable when the engine errors or ends after a result (B16)", async () => {
+  it("V2: a recogniser that ends on its own after speech is a stop that keeps the words, not a failure", async () => {
     const target = await listening();
     engine.handlers!.onResults([{ index: 0, text: "kept", final: false }]);
     engine.handlers!.onEnd();
+    expect(target.text).toBe("kept");
+    expect(target.ends).toEqual([{ kind: "stopped", reason: "other", words: 1 }]);
+  });
+
+  it("V2: silence after speech is a stop too", async () => {
+    const target = await listening();
+    engine.handlers!.onResults([{ index: 0, text: "kept", final: true }]);
+    engine.handlers!.onError("no-speech");
+    expect(target.text).toBe("kept");
+    expect(target.ends).toEqual([{ kind: "stopped", reason: "other", words: 1 }]);
+  });
+
+  it("reports stt_unavailable when the engine errors after a result (B16)", async () => {
+    const target = await listening();
+    engine.handlers!.onResults([{ index: 0, text: "kept", final: false }]);
+    engine.handlers!.onError("network");
     expect(target.text).toBe("kept");
     expect(target.ends).toEqual([{ kind: "error", code: "stt_unavailable" }]);
   });

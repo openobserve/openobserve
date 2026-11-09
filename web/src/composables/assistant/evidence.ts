@@ -261,7 +261,6 @@ export function boundedQuery(raw: unknown, callId?: string): QueryBlockData | nu
   };
 }
 
-/** A findings frame as the card reads it; `null` when it is not a usable payload. */
 // The wire is untrusted: a set past the series cap, or a point that is not two finite numbers, is dropped, never the answer.
 export function boundedChartSeries(value: unknown): ChartSeries | null {
   if (!value || typeof value !== "object") return null;
@@ -288,6 +287,7 @@ export function boundedChartSeries(value: unknown): ChartSeries | null {
   return series.some((line) => line.points.length >= 2) ? { xUnit: "us", series } : null;
 }
 
+/** A findings frame as the card reads it; `null` when it is not a usable payload. */
 export function boundedFindings(raw: unknown): FindingsData | null {
   if (!raw || typeof raw !== "object") return null;
   const source = raw as Record<string, unknown>;

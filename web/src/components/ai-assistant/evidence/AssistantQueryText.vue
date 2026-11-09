@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('assistant.query.copy')"
         :icon="assistantGlyph.copy"
         :done="copied ? t('common.copied') : undefined"
+        confirms
         :data-test="`${dataTest}-copy`"
         @click="copy"
       />

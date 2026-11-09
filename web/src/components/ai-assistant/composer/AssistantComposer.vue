@@ -293,7 +293,7 @@ import {
   noteDraftCleared,
 } from "./composerUi";
 import { useAssistantVoice } from "./useAssistantVoice";
-import { takeQueued, useComposerQueue } from "./useComposerQueue";
+import { useComposerQueue } from "./useComposerQueue";
 import { useComposerWidth } from "./useComposerWidth";
 import { helpBrand } from "./voiceEngine";
 
@@ -549,18 +549,12 @@ const threadLine = computed<I18nText | null>(() => {
 
 const queue = useComposerQueue({
   sid: () => liveSid.value,
-  running: () => running.value && !elsewhere.value,
-  endedDone: () => turn.value?.state === "done",
-  draft: (id) => store.state.sessions[id]?.composer.text ?? "",
-  send(id, value) {
-    store.setDraft(id, { text: value });
-    freshSendId(id);
-    void nextTick(trySend);
-  },
-  restore(id, value) {
-    store.setDraft(id, { text: value });
-    void nextTick(() => focusInput("end"));
-  },
+  blocked: () =>
+    props.accessLost ||
+    !!props.cooldownReason ||
+    creditsOut.value ||
+    (busyLeft.value > 0 && !!errorRow.value),
+  focus: () => void nextTick(() => focusInput("end")),
 });
 
 // A followed turn speaks once, in the shell's elsewhere row, which also knows a run this tab started before a reload (B1).
@@ -1106,7 +1100,7 @@ function trySend(): void {
     if (blockedLine.value !== props.cooldownReason) say(props.cooldownReason);
     return emphasise(props.cooldownReason);
   }
-  if (running.value) return queueOrHold(id);
+  if (running.value) return queueOrHold();
   if (creditsOut.value && hasContent.value) return say(creditsSentence.value);
   if (!hasContent.value) {
     trackAssistant("ai_composer_enter_blocked", { reason: "empty" });
@@ -1127,16 +1121,14 @@ function trySend(): void {
 }
 
 // Enter while this tab's answer streams queues one message; a second one is refused with both texts kept as they are.
-function queueOrHold(id: Sid): void {
+function queueOrHold(): void {
   if (!elsewhere.value && queue.queued.value) {
     trackAssistant("ai_composer_enter_blocked", { reason: "running" });
     queueRefused.value = true;
     return say(t("assistant.composer.queuedAlreadySentence"));
   }
-  if (!elsewhere.value && hasContent.value && queue.enqueue(text.value)) {
-    store.setDraft(id, { text: "" });
+  if (!elsewhere.value && hasContent.value && queue.enqueue())
     return say(t("assistant.composer.queued", { count: 1 }));
-  }
   trackAssistant("ai_composer_enter_blocked", {
     reason: elsewhere.value ? "elsewhere" : "running",
   });
@@ -1438,15 +1430,8 @@ function openHref(href: string | null): void {
 
 // With text in the field, Edit swaps it with the queued message, so neither is lost and nothing is joined.
 function editQueued(): void {
-  const id = liveSid.value;
-  const typed = id ? (store.state.sessions[id]?.composer.text ?? "") : "";
   queueRefused.value = false;
-  if (!id || !typed.trim()) return queue.edit();
-  const item = takeQueued(id);
-  if (!item) return;
-  queue.enqueue(typed);
-  store.setDraft(id, { text: item.text });
-  void nextTick(() => focusInput("end"));
+  queue.edit();
 }
 
 function retryRefused(): void {

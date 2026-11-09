@@ -24,6 +24,8 @@ export const HISTORY_DB_NAME = "o2ChatDB";
 export const HISTORY_DB_VERSION = 2;
 export const HISTORY_STORE = "chatHistory";
 export const LOCAL_CAP = 100;
+/** Server chats cached in this browser; the server holds them, so the oldest are simply re-read. */
+export const SERVER_CACHE_CAP = 50;
 export const LIVE_SAVE_GRACE_MS = 10 * 60_000;
 
 /** One stored turn with the time it started, for ordering a merge. */

@@ -23,6 +23,7 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import {
   approvalAnnotationKey,
   approvalCardOf,
+  approvalTargetKey,
   type ApprovalDetail,
 } from "./actions/appliers/approval";
 import type { ActionResult, AssistantAction } from "./actions/types";
@@ -59,6 +60,9 @@ export const MAX_CARD_MS = 24 * 60 * 60_000;
 
 /** An approve with an unknown outcome re-reads the open lists once, this long after it gave up waiting. */
 export const UNCONFIRMED_REREAD_MS = 30_000;
+
+/** When a card another `/confirm` is deciding is re-read; the server holds that decision up to 120 s. */
+export const DECIDING_REREAD_MS = [2_000, 5_000, 15_000, 40_000, 70_000] as const;
 
 /** A keydown this recent made the decision a keyboard one (`ai_approval_decided.input`). */
 const KEYBOARD_INPUT_MS = 1_000;
@@ -311,6 +315,10 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
   ): ApprovalResult => {
     const session = sessionOf(sid);
     const key = keyOf(sid, id);
+    const turnId =
+      session?.pendingApproval?.id === id
+        ? session.pendingApproval.turnId
+        : (session?.turnMeta.turnId ?? "");
     // A decision the registry refused never left this tab, so the card stays to be answered.
     if (!result.ok && (result.reason === "other_org" || result.reason === "gated")) {
       deps.engine().approvalExtended?.(sid);
@@ -338,8 +346,9 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
         ...(sent.state && { override: sent.state }),
         ...(sent.until !== undefined && { until: sent.until }),
       });
+    if (outcome?.state === "deciding") rereadDeciding(sid, id, turnId, card.kind, 0);
     // A decision that was sent but not confirmed may have run, so the turn stops waiting on the card; one that never landed keeps the card's expiry.
-    const unknown = outcome?.state === "unconfirmed";
+    const unknown = outcome?.state === "unconfirmed" || outcome?.state === "deciding";
     if (result.ok || unknown) deps.engine().approvalDecided?.(sid);
     else deps.engine().approvalExtended?.(sid, sent.until);
     // An undelivered decision keeps its Send again, which needs no other card shown.
@@ -351,6 +360,34 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
       else if (unknown) rereadLater(key, changedTypes(card, detail));
     }
     return detail?.result ?? emptyResult(result.ok ? "done" : "failed", "", deps.now());
+  };
+
+  // The other decision's own answer ends the card, so the record follows the chat until the server says how.
+  const rereadDeciding = (
+    sid: Sid,
+    id: string,
+    turnId: string,
+    kind: ApprovalBlockData["kind"],
+    attempt: number,
+  ) => {
+    const delay = DECIDING_REREAD_MS[attempt];
+    const session = sessionOf(sid);
+    if (delay === undefined || !session || !deps.readCard) return;
+    const key = `${keyOf(sid, id)}\u0002deciding`;
+    const org = session.org;
+    const timer = setTimeout(async () => {
+      timers.delete(key);
+      const card = await deps.readCard?.(org, sid, turnId, id, kind).catch(() => null);
+      const outcome = approvalOutcomeOf(sessionOf(sid), id).outcome;
+      if (outcome?.state !== "deciding") return;
+      const ending = card?.ending;
+      if (!ending || ending === "unknown")
+        return rereadDeciding(sid, id, turnId, kind, attempt + 1);
+      deps.annotate(sid, approvalAnnotationKey(id), {
+        approvalOutcome: { state: ending, at: deps.now() },
+      });
+    }, delay);
+    timers.set(key, timer);
   };
 
   const rereadLater = (key: string, types: string[]) => {
@@ -919,7 +956,7 @@ function targetNames(t: TranslateFn, targets: readonly { name: string }[]): stri
 function namesOf(card: ApprovalBlockData, ids: string[]): string {
   const kept = new Set(ids);
   const names = card.targets
-    .filter((target) => kept.has(target.id ?? target.name))
+    .filter((target) => kept.has(approvalTargetKey(target)))
     .map((target) => target.name.slice(0, MAX_FOLLOW_UP_NAME_CHARS));
   const shown = names.slice(0, MAX_FOLLOW_UP_NAMES).join(", ");
   return names.length > MAX_FOLLOW_UP_NAMES

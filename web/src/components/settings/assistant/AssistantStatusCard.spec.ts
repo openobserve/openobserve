@@ -141,6 +141,22 @@ describe("AssistantStatusCard", () => {
     );
   });
 
+  it("says changes by the assistant are refused only when the server reports no shared secret (R3)", () => {
+    const off = mountCard({
+      capabilities: { ...OK, health: { ...OK.health, approvals_enforced: false } },
+    });
+    expect(off.find('[data-test="settings-assistant-status-approvals"]').text()).toBe(
+      "Refused: O2_AI_INTERNAL_SECRET isn't set, so no approved change can be applied.",
+    );
+    const on = mountCard({
+      capabilities: { ...OK, health: { ...OK.health, approvals_enforced: true } },
+    });
+    expect(on.find('[data-test="settings-assistant-status-approvals"]').exists()).toBe(false);
+    expect(mountCard().find('[data-test="settings-assistant-status-approvals"]').exists()).toBe(
+      false,
+    );
+  });
+
   it("reads raw rows as the data level until the org sets one", () => {
     const w = mountCard();
     expect(w.find('[data-test="settings-assistant-status-data-shared"]').text()).toBe(

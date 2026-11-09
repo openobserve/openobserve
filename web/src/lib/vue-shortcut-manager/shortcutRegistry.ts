@@ -3,6 +3,7 @@
 import { shallowRef } from "vue";
 
 import { isAssistantV2 } from "@/composables/assistant/flags";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 import type { I18nKey } from "@/types/i18n";
 /**
  * Single source of truth for every keyboard shortcut in the app.
@@ -1520,14 +1521,33 @@ export function setDictationReady(ready: boolean): void {
  * (OShortcut renders `ctrl`→`⌘` on Mac), the bare key, the list of bindings, or
  * the leading token of a multi-binding label (e.g. "del / ⌫" → "del").
  */
-export function getShortcutDisplay(id: string): string | string[] | undefined {
+export function getShortcutDisplay(
+  id: string,
+  mac: boolean = isMacOS(),
+): string | string[] | undefined {
   const e = ENTRIES.get(id);
   if (!e) return undefined;
-  if (e.keyForWindows) return e.keyForWindows;
+  if (e.keyForWindows) return platformDisplay(e, mac);
   if (e.key) return e.key;
   if (e.keys?.length) return e.keys;
   if (e.display) return e.display.split(" / ")[0].trim();
   return undefined;
+}
+
+/**
+ * The combo to show for a platform pair. Renderers turn `ctrl` into ⌘ on Mac, so a
+ * Mac binding that is not that plain swap is shown as bound, with `control` for ⌃.
+ */
+export function platformDisplay(e: ShortcutEntry, mac: boolean): string {
+  const win = e.keyForWindows ?? "";
+  if (!mac || !e.keyForMac || chordOf(e.keyForMac) === chordOf(win.replace(/\bctrl\b/g, "meta")))
+    return win;
+  const tokens = e.keyForMac.split("+");
+  return tokens.map((k) => (k === "ctrl" ? "control" : k === "meta" ? "ctrl" : k)).join("+");
+}
+
+function chordOf(combo: string): string {
+  return combo.split("+").sort().join("+");
 }
 
 /**

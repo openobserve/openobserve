@@ -66,6 +66,8 @@ const CONFIRM_MS_PER_ITEM = 1_000;
 // Under the OpenObserve proxy's own 120 s read timeout, so this tab's "unknown" comes before the proxy's 500.
 const MAX_CONFIRM_MS = 110_000;
 
+const APPROVAL_DECIDING = "approval_deciding";
+
 const DENIED_STATE: Record<
   Extract<ApprovalDecision, { approved: false }>["reason"],
   ApprovalOutcome["state"]
@@ -130,6 +132,11 @@ export function approvalCardOf(
   if (!block && !pending) return null;
   const base: ApprovalBlockData = block ?? { ...pending!, typed: false };
   return { ...base, ...(pending && { sessionId: pending.sessionId, turnId: pending.turnId }) };
+}
+
+/** The id a target is selected and answered by: the server's position key, else its object id or name. */
+export function approvalTargetKey(target: Pick<ApprovalTarget, "key" | "id" | "name">): string {
+  return target.key ?? target.id ?? target.name;
 }
 
 /** The `/confirm` body of a decision; scope and a subset go only to a server that sent a typed card, and never a scope for a destructive one. */
@@ -265,8 +272,9 @@ async function approvalApplier(
     return { ok: true, detail };
   } catch (err) {
     const httpStatus = httpStatusOf(err);
-    const error = deliveryError(httpStatus);
-    const state = httpFailed(httpStatus, decision.approved);
+    const deciding = httpStatus === 409 && refusalReasonOf(err) === APPROVAL_DECIDING;
+    const error = deciding ? decidingError() : deliveryError(httpStatus);
+    const state = deciding ? "deciding" : httpFailed(httpStatus, decision.approved);
     // A decline that may have landed changed nothing either way, so it reads as what it was.
     if (!decision.approved && state === "unconfirmed") {
       const detail = detailOf(decision, card, {}, env);
@@ -334,7 +342,19 @@ function detailOf(
     : said === "partial" || said === "skipped"
       ? said
       : "approved";
-  return { outcome: { state, at, decision, ...(reason && { reason }) }, ...(result && { result }) };
+  const grant = grantOutcomeOf(response);
+  return {
+    outcome: { state, at, decision, ...(reason && { reason }), ...(grant && { grant }) },
+    ...(result && { result }),
+  };
+}
+
+// The server says when it refused or failed to store the grant an approve asked for.
+function grantOutcomeOf(response: ConfirmResponse): ApprovalOutcome["grant"] | undefined {
+  const grant = response.grant;
+  if (!grant || typeof grant !== "object" || grant.stored !== false) return undefined;
+  const reason = text(grant.reason).slice(0, MAX_MESSAGE_CHARS);
+  return { stored: false, ...(reason && { reason }) };
 }
 
 // Newer servers send both lists; only `items` carries a skip's status and code, so it wins when present.
@@ -353,13 +373,12 @@ function itemOf(raw: unknown, card: Pick<ApprovalBlockData, "targets">): Approva
       .slice(0, 40)
       .toLowerCase() || "object";
   const skipped = skippedApprovalItem(raw);
+  const target = targetOf(item, card, name, type);
   if (skipped) {
-    const target = card.targets.find((t) => t.name === name && (t.type === type || !t.type));
     const id = target?.id ?? (typeof item.id === "string" ? item.id.slice(0, 200) : "");
     return { type, name, ...(id && { id }), ...skipped };
   }
   const done = item.deleted === true || item.success === true || item.status === "done";
-  const target = card.targets.find((t) => t.name === name && (t.type === type || !t.type));
   const status = typeof item.status_code === "number" ? item.status_code : undefined;
   const ledgerId = typeof item.ledger_id === "string" ? item.ledger_id.slice(0, 200) : "";
   return {
@@ -375,6 +394,18 @@ function itemOf(raw: unknown, card: Pick<ApprovalBlockData, "targets">): Approva
     // Only the server's own ledger can restore an object, so Undo needs the id it issued.
     ...(item.undoable === true && ledgerId && { undoable: true, ledgerId }),
   };
+}
+
+// Two targets of one card can share a name and id, so a row's position key wins over its name.
+function targetOf(
+  item: Record<string, unknown>,
+  card: Pick<ApprovalBlockData, "targets">,
+  name: string,
+  type: string,
+): ApprovalTarget | undefined {
+  const key = typeof item.key === "string" ? item.key : "";
+  const byKey = key ? card.targets.find((t) => t.key === key) : undefined;
+  return byKey ?? card.targets.find((t) => t.name === name && (t.type === type || !t.type));
 }
 
 function appendLedger(
@@ -433,6 +464,11 @@ function deliveryError(httpStatus: number | undefined): AssistantError {
   };
 }
 
+// Another `/confirm` of the card holds its decision, so this one changed nothing and sending it again would only be refused.
+function decidingError(): AssistantError {
+  return { code: "already_submitted", ...ERROR_LEDGER.already_submitted, httpStatus: 409 };
+}
+
 // A refusal the server explained failed and o2-ai's 409 consumed nothing; the proxy answers 500 for every other failure, which an approve may have run past.
 function httpFailed(httpStatus: number | undefined, approved: boolean): ApprovalOutcome["state"] {
   if (httpStatus === 402 || httpStatus === 403 || httpStatus === 412) return "failed";
@@ -440,6 +476,10 @@ function httpFailed(httpStatus: number | undefined, approved: boolean): Approval
   return !approved && httpStatus !== undefined && httpStatus >= 500
     ? "delivery_failed"
     : "unconfirmed";
+}
+
+function refusalReasonOf(err: unknown): unknown {
+  return (err as { response?: { data?: { reason?: unknown } } } | null)?.response?.data?.reason;
 }
 
 function httpStatusOf(err: unknown): number | undefined {

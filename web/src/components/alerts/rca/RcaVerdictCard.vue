@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p data-test="rca-reanalyzing-message" class="text-banner-info-text m-0 text-sm font-medium">
         {{ reanalyzingText }}
       </p>
-      <!-- Cancel stops the run for everyone, so it lives only behind ⋯ with its confirm -->
+      <!-- Cancel stops the run for everyone, so with the assistant it lives only behind ⋯ with its confirm -->
       <template v-if="!inThread" #actions>
         <OButton
           data-test="rca-follow-thread-btn"
@@ -319,6 +319,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('follow-thread')"
         >
           {{ t("alerts.incidents.rcaRun.followInThread") }}
+        </OButton>
+        <OButton
+          v-if="legacy"
+          data-test="rca-banner-cancel-btn"
+          variant="outline"
+          size="sm"
+          :loading="cancelling"
+          @click="$emit('cancel')"
+        >
+          {{ t("alerts.incidents.rcaCancel") }}
         </OButton>
       </template>
     </OBanner>
@@ -536,6 +546,8 @@ const props = withDefaults(
     startLockedReason?: I18nText;
     /** Shown inside the assistant's thread, which is already the thread to follow. */
     inThread?: boolean;
+    /** Assistant flag off: the live banner keeps its own Cancel, with no confirm. */
+    legacy?: boolean;
   }>(),
   {
     waitingInput: false,
@@ -565,6 +577,7 @@ const props = withDefaults(
     verdictDetails: null,
     startLockedReason: undefined,
     inThread: false,
+    legacy: false,
   },
 );
 

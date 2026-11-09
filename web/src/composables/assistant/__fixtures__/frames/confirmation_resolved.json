@@ -1,12 +1,36 @@
 {
-  "_source": "B-04 decision frame (00 §18)",
+  "_source": "o2-ai ApprovalStore.resolved_frame, recorded from GET /api/default/ai/chats/{sid} approvals[0].resolved on the dev stack (2026-11-09); `before` trimmed",
   "_item": "B-04",
   "frame": {
     "type": "confirmation_resolved",
-    "id": "call_7",
+    "id": "apr_a762f98fb02b657a878d",
     "approved": true,
     "by": "root@example.com",
-    "at": 1760000000000,
-    "scope": "once"
+    "at": 1794234973046,
+    "scope": "once",
+    "tool": "UpdateAlert",
+    "operation": "update",
+    "outcome": "skipped",
+    "items": [
+      {
+        "id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+        "type": "alert",
+        "name": "ta_approvals_rca_update_target",
+        "status": "skipped",
+        "code": "changed_since",
+        "message": "The alert changed after you were asked. Nothing was changed; review the new version and ask again.",
+        "before": {
+          "id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+          "name": "ta_approvals_rca_update_target",
+          "org_id": "default",
+          "stream_type": "logs",
+          "stream_name": "ta_approvals_rca_logs",
+          "enabled": true,
+          "owner": "root@example.com"
+        }
+      }
+    ],
+    "detail": "The alert changed after you were asked. Nothing was changed; review the new version and ask again.",
+    "code": "changed_since"
   }
 }

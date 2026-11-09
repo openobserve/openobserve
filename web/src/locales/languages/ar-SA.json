@@ -12670,8 +12670,6 @@
           "ruledOut": "مستبعد"
         },
         "status": {
-          "rootCause": "السبب الجذري",
-          "rootCauseNotConfirmed": "السبب الجذري · غير مؤكد",
           "contributing": "مساهم",
           "symptom": "عَرَض",
           "ruledOut": "مستبعد",

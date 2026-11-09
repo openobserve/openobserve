@@ -140,70 +140,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </ODrawer>
 
-      <div v-if="assistantV2" class="flex h-full min-h-0 min-w-0 flex-1">
-        <AssistantSkipLink />
-        <main
-          data-test="main-content"
-          tabindex="-1"
-          class="bg-surface-chrome-deeper flex min-h-0 min-w-0 flex-1 flex-col outline-none"
-          :class="store.state.kioskMode ? '' : 'pe-2 pb-2 max-md:pe-0'"
-        >
-          <div :class="pageCardClasses(!!store.state.kioskMode, isDark)">
-            <HomeReturnBar v-if="!store.state.kioskMode" />
-            <div
-              v-if="isLoading"
-              :key="store.state.selectedOrganization?.identifier"
-              :class="['o2-content-scroll h-full flex-1 overflow-y-auto', ASSISTANT_INSET_CLASSES]"
-            >
-              <FirstDataNotice
-                v-if="
-                  firstDataNotice.visible.value &&
-                  router.currentRoute.value.name !== 'home' &&
-                  !store.state.kioskMode
-                "
-                class="mx-3 mt-3"
-                :stream="firstDataNotice.stream.value"
-                :arrived-at="firstDataNotice.arrivedAt.value"
-                @open="firstDataNotice.open"
-                @dismiss="firstDataNotice.dismiss"
-              />
-              <router-view v-slot="{ Component }">
-                <keep-alive :include="KEPT_ALIVE_VIEWS">
-                  <component :is="Component" class="h-full" @sendToAiChat="sendToAssistant" />
-                </keep-alive>
-              </router-view>
-            </div>
-          </div>
-        </main>
-        <AssistantSidebarHost v-if="!store.state.kioskMode" />
-        <AssistantWindowLayer v-if="!store.state.kioskMode && store.state.printMode !== true" />
-      </div>
-      <div v-else class="flex h-full min-h-0 min-w-0 flex-1">
+      <div class="flex h-full min-h-0 min-w-0 flex-1">
+        <AssistantSkipLink v-if="assistantV2" />
         <!-- Main Panel -->
         <main
           data-test="main-content"
+          :tabindex="assistantV2 ? -1 : undefined"
           class="bg-surface-chrome-deeper flex min-h-0 flex-col"
-          :class="
-            store.state.kioskMode
-              ? ''
-              : focusMode
-                ? 'px-2 pb-2 max-md:px-0'
-                : 'pe-2 pb-2 max-md:pe-0'
-          "
-          :style="{
-            width:
-              focusMode || !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
-                ? '100%'
-                : store.state.isAiChatExpanded
-                  ? '50%'
-                  : '75%',
-          }"
+          :class="mainPanelClasses"
+          :style="mainPanelStyle"
         >
           <div :class="pageCardClasses(!!store.state.kioskMode, isDark)">
+            <HomeReturnBar v-if="assistantV2 && !store.state.kioskMode" />
             <div
               v-if="isLoading && fullConfigSettled && !holdForOnboarding"
               :key="store.state.selectedOrganization?.identifier"
-              class="o2-content-scroll h-full flex-1 overflow-y-auto"
+              :class="[
+                'o2-content-scroll h-full flex-1 overflow-y-auto',
+                assistantV2 ? ASSISTANT_INSET_CLASSES : [],
+              ]"
             >
               <FirstDataNotice
                 v-if="
@@ -227,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <component
                         :is="Component"
                         :class="[routeEnterClass(Component), 'h-full']"
-                        @sendToAiChat="sendToAiChat"
+                        @sendToAiChat="relayToChat"
                       />
                     </keep-alive>
                   </OAccessBoundary>
@@ -248,8 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </main>
 
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
+        <template v-if="assistantV2">
+          <AssistantSidebarHost v-if="!store.state.kioskMode" />
+          <AssistantWindowLayer v-if="!store.state.kioskMode && store.state.printMode !== true" />
+        </template>
         <aside
-          v-if="!focusMode"
+          v-else-if="!focusMode"
           v-show="store.state.isAiChatEnabled && isLoading && !store.state.kioskMode"
           class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
           :class="[
@@ -2031,6 +1990,24 @@ export default defineComponent({
       void import("@/composables/assistant").then((m) =>
         m.openAssistant(m.legacyRelayArgs(value, autoSend)),
       );
+    const relayToChat = assistantV2 ? sendToAssistant : sendToAiChat;
+
+    const mainPanelClasses = computed(() => {
+      const kiosk = !!store.state.kioskMode;
+      if (assistantV2) return ["min-w-0 flex-1 outline-none", kiosk ? "" : "pe-2 pb-2 max-md:pe-0"];
+      if (kiosk) return [];
+      return [focusMode.value ? "px-2 pb-2 max-md:px-0" : "pe-2 pb-2 max-md:pe-0"];
+    });
+
+    const mainPanelStyle = computed(() => {
+      if (assistantV2) return undefined;
+      const full =
+        focusMode.value ||
+        !store.state.isAiChatEnabled ||
+        isChatOverlay.value ||
+        store.state.kioskMode;
+      return { width: full ? "100%" : store.state.isAiChatExpanded ? "50%" : "75%" };
+    });
 
     const openPredefinedThemes = () => {
       toggleThemes();
@@ -2100,6 +2077,9 @@ export default defineComponent({
       canBill,
       ASSISTANT_INSET_CLASSES,
       pageCardClasses,
+      relayToChat,
+      mainPanelClasses,
+      mainPanelStyle,
       isDark,
       t,
       raw,
@@ -2150,7 +2130,6 @@ export default defineComponent({
       getBtnLogo,
       isHovered,
       sendToAiChat,
-      sendToAssistant,
       aiChatInputContext,
       aiChatAppendMode,
       aiChatPayload,

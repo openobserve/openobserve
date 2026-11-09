@@ -168,12 +168,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("assistant.actions.undoLimits") }}
       </OText>
       <p
-        v-if="alwaysAllowed && !standingAllowed"
+        v-if="madeGrantLine"
         class="text-text-secondary flex flex-wrap items-center gap-x-1.5 ps-6 text-xs"
         data-test="assistant-approval-result-always"
+        :data-grant="madeGrantLine"
       >
         <OIcon :name="assistantGlyph.done" size="xs" aria-hidden="true" />
-        <template v-if="revoked">{{ t("assistant.grants.revoked") }}</template>
+        <template v-if="madeGrantLine === 'revoked'">{{ t("assistant.grants.revoked") }}</template>
+        <template v-else-if="madeGrantLine === 'not_stored'">
+          {{ t("assistant.approval.grantNotStored") }}
+        </template>
         <template v-else>
           {{ alwaysAllowed }}
           <template v-if="live && revocable">
@@ -423,8 +427,8 @@ const view = computed<ApprovalResultView | null>(() => {
   const result = record.value.result ?? resolvedResult.value;
   if (props.state) return { state: props.state, outcome, result };
   if (resolved.value) {
-    // A decision made in this tab already has its own record above.
-    if (outcome) return null;
+    // A decision made in this tab already has its own record above; one refused while another was deciding ends here.
+    if (outcome && outcome.state !== "deciding") return null;
     const state = resolvedState(resolved.value);
     const at = resolved.value.at ?? Date.now();
     const { by, detail } = resolved.value;
@@ -444,7 +448,7 @@ const view = computed<ApprovalResultView | null>(() => {
   if (sid.value && host?.pendingId(sid.value) === card.value.id) return null;
   if (session.value?.queuedApprovals?.some((queued) => queued.id === card.value?.id)) return null;
   // A decision made here keeps its own record even when its `confirmation_resolved` follows.
-  if (!outcome && laterResolution(card.value.id)) return null;
+  if ((!outcome || outcome.state === "deciding") && laterResolution(card.value.id)) return null;
   if (outcome)
     return outcome.state === "expired" && expiredOutcome()
       ? null
@@ -506,6 +510,8 @@ const line = computed<I18nText>(() => {
       return t("assistant.approval.result.withdrawn");
     case "delivery_failed":
       return t("assistant.approval.deliveryFailed", { entity: entityNoun(1) });
+    case "deciding":
+      return t("assistant.approval.result.deciding");
     case "unconfirmed":
       if (current.outcome) return t("assistant.approval.result.unconfirmed");
       return card.value?.noDecision
@@ -620,22 +626,34 @@ const madeGrantScope = computed<"chat" | "always" | null>(() => {
 
 // The reader's grants as the server lists them now; null until a settled read.
 const grants = shallowRef<AssistantGrant[] | null>(null);
+const grantsFailed = ref(false);
 
 const madeGrant = computed(() =>
   grants.value ? (grantMadeHere(grants.value) ?? null) : undefined,
 );
 
-// A granted write revokes the grant it ran under; one revoked since has no id left to revoke.
+// Revoke is offered only for a grant the server holds, so it never claims a revoke it did not make.
 const revocable = computed(() =>
   view.value?.state === "standing"
     ? !!grantOf(resolved.value)?.id
-    : !!card.value?.tool && madeGrant.value !== null,
+    : !!card.value?.tool && !!madeGrant.value,
 );
 
 const revoking = ref(false);
 const revokedHere = ref(false);
-// The server no longer lists the grant this approve made, so it was revoked since.
-const revoked = computed(() => revokedHere.value || madeGrant.value === null);
+const revoked = computed(() => revokedHere.value || madeGrantLine.value === "revoked");
+
+// A grant this tab just asked for and the server does not list was never stored, not revoked since.
+const madeGrantLine = computed<"listed" | "revoked" | "not_stored" | null>(() => {
+  if (!alwaysAllowed.value || standingAllowed.value) return null;
+  if (revokedHere.value) return "revoked";
+  const outcome = view.value?.outcome;
+  if (outcome?.grant?.stored === false) return "not_stored";
+  if (!live.value || grantsFailed.value) return "listed";
+  if (madeGrant.value === undefined) return null;
+  if (madeGrant.value) return "listed";
+  return outcome?.decision ? "not_stored" : "revoked";
+});
 
 let stopGrants: (() => void) | null = null;
 
@@ -645,6 +663,7 @@ watch(
     stopGrants?.();
     stopGrants = null;
     grants.value = null;
+    grantsFailed.value = false;
     if (!current) return;
     // A decision made in this tab stored its grant after any earlier read, so the list is read again.
     if (view.value?.outcome?.decision)
@@ -652,7 +671,10 @@ watch(
     const observer = new QueryObserver(queryClient, assistantGrantsQuery(current));
     const report = () => {
       const result = observer.getCurrentResult();
-      grants.value = result.isSuccess && !result.isFetching ? (result.data ?? []) : null;
+      // A refetch keeps the last settled list, so the line never blinks out under the reader.
+      if (result.isFetching) return;
+      grants.value = result.isSuccess ? (result.data ?? []) : null;
+      grantsFailed.value = result.isError;
     };
     stopGrants = observer.subscribe(report);
     report();
@@ -676,9 +698,12 @@ async function revoke(): Promise<void> {
     const id =
       grantOf(resolved.value)?.id ??
       madeGrant.value?.id ??
-      grantMadeHere(await queryClient.fetchQuery(assistantGrantsQuery(org.value)))?.id;
+      grantMadeHere(
+        await queryClient.fetchQuery({ ...assistantGrantsQuery(org.value), staleTime: 0 }),
+      )?.id;
+    if (!id) throw new Error("no stored grant to revoke");
     // A record outlives any one page, so it runs the declared mutation on the app's client, not a hook.
-    if (id) await new MutationObserver(queryClient, revokeGrantMutation(org.value)).mutate(id);
+    await new MutationObserver(queryClient, revokeGrantMutation(org.value)).mutate(id);
     revokedHere.value = true;
   } catch (error) {
     console.error("Failed to revoke the standing approval:", error);
@@ -695,12 +720,13 @@ function grantMadeHere(
   const tool = card.value?.tool;
   const scope = madeGrantScope.value;
   if (!scope) return undefined;
-  const user = host?.currentUser();
+  // The server compares emails case-insensitively, so the reader's own grant matches the same way.
+  const user = host?.currentUser()?.toLowerCase();
   return rows?.find(
     (row) =>
       row.tool === tool &&
       row.scope === scope &&
-      (!user || row.granted_by === user) &&
+      (!user || row.granted_by?.toLowerCase() === user) &&
       (scope !== "chat" || row.chat_id === sid.value),
   );
 }
@@ -724,7 +750,7 @@ const glyph = computed<IconName>(() => {
   if (state === "partial" || state === "failed" || state === "delivery_failed")
     return assistantGlyph.failed;
   if (state === "expired") return assistantGlyph.expired;
-  if (state === "waiting_elsewhere") return assistantGlyph.elsewhere;
+  if (state === "waiting_elsewhere" || state === "deciding") return assistantGlyph.elsewhere;
   return assistantGlyph.interrupted;
 });
 

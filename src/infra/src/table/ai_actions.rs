@@ -17,11 +17,12 @@
 
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    Set, sea_query::Expr,
+    Set,
+    sea_query::{Expr, LikeExpr},
 };
 
 pub use super::entity::ai_actions::Model;
-use super::{entity::ai_actions::*, fit};
+use super::{ai_chat_sessions::escape_like, entity::ai_actions::*, fit};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
@@ -173,11 +174,13 @@ pub async fn list_with<C: ConnectionTrait>(
         select = select.filter(Column::UserEmail.eq(user_email.as_str()));
     }
     if let Some(q) = query.q.as_deref().filter(|q| !q.is_empty()) {
+        let pattern = format!("%{}%", escape_like(q));
+        let like = |column: Column| Expr::col(column).like(LikeExpr::new(&pattern).escape('\\'));
         select = select.filter(
             Condition::any()
-                .add(Column::Tool.contains(q))
-                .add(Column::ResourceType.contains(q))
-                .add(Column::ResourceName.contains(q)),
+                .add(like(Column::Tool))
+                .add(like(Column::ResourceType))
+                .add(like(Column::ResourceName)),
         );
     }
     if let Some((at, id)) = &query.cursor {
@@ -494,6 +497,28 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(list_with(&db, "o", &ranged).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_search_for_a_like_wildcard_matches_it_literally() {
+        let db = db().await;
+        insert_with(&db, action("a@x", 1)).await.unwrap();
+        let mut underscored = action("a@x", 2);
+        underscored.resource_name = Some("cpu_high".to_string());
+        insert_with(&db, underscored).await.unwrap();
+        let search = |q: &str| ListQuery {
+            q: Some(q.to_string()),
+            limit: 10,
+            ..Default::default()
+        };
+        let found = list_with(&db, "o", &search("_")).await.unwrap();
+        assert_eq!(found.len(), 1, "`_` must not match any one character");
+        assert_eq!(found[0].resource_name.as_deref(), Some("cpu_high"));
+        assert!(list_with(&db, "o", &search("%")).await.unwrap().is_empty());
+        assert_eq!(
+            list_with(&db, "o", &search("Alert")).await.unwrap().len(),
+            2
+        );
     }
 
     #[tokio::test]

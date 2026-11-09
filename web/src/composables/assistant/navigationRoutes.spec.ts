@@ -235,6 +235,11 @@ describe("rebuildMarkdownTarget", () => {
     expect(link?.query?.text).toBe("select 1");
   });
 
+  it("pins an explorer target to the chat's org, never an empty one when the org is known (WT-04)", () => {
+    const href = `/logs?sql=${b64EncodeUnicode("select 1")}&stream=default&org_identifier=other`;
+    expect(rebuildMarkdownTarget(resolve(href), "acme")?.route.query?.org_identifier).toBe("acme");
+  });
+
   it("declares ids only for the routes the allowlist names, or the Traces explorer", () => {
     for (const name of Object.keys(ROUTE_ID_KEYS))
       expect([...MARKDOWN_LINK_ROUTES, "traces"]).toContain(name);

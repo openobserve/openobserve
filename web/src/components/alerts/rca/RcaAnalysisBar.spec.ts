@@ -144,26 +144,31 @@ describe("RcaAnalysisBar (contract E5)", () => {
     );
   });
 
-  it("while live, Cancel run sits in ⋯ and runs only after the confirm", async () => {
-    const wrapper = mountBar({ incidentNumber: "482" });
+  it("while live, Cancel run sits in ⋯ and hands the confirm to the page's one dialog", async () => {
+    const wrapper = mountBar();
 
     expect(byTest(wrapper, "rca-cancel-btn").text()).toBe("Cancel run");
     await byTest(wrapper, "rca-cancel-btn").trigger("click");
-    expect(wrapper.emitted("cancel")).toBeUndefined();
-    const dialog = byTest(wrapper, "rca-cancel-dialog");
-    expect(dialog.text()).toContain("Cancel run?");
-    expect(dialog.text()).toContain("Cancel the analysis for everyone on incident #482?");
-    await byTest(wrapper, "dialog-primary").trigger("click");
     expect(wrapper.emitted("cancel")).toHaveLength(1);
+    expect(byTest(wrapper, "rca-cancel-dialog").exists()).toBe(false);
   });
 
-  it("keeping the run closes the confirm without cancelling", async () => {
-    const wrapper = mountBar();
+  it("W4: legacy keeps Cancel run and Re-analyze as visible bar buttons", async () => {
+    const live = mountBar({ legacy: true });
+    const cancel = byTest(live, "rca-cancel-btn");
+    expect(cancel.element.tagName).toBe("BUTTON");
+    expect(cancel.text()).toBe("Cancel run");
+    await cancel.trigger("click");
+    expect(live.emitted("cancel")).toHaveLength(1);
 
-    await byTest(wrapper, "rca-cancel-btn").trigger("click");
-    await byTest(wrapper, "dialog-secondary").trigger("click");
-    expect(byTest(wrapper, "rca-cancel-dialog").exists()).toBe(false);
-    expect(wrapper.emitted("cancel")).toBeUndefined();
+    const done = mountBar({
+      legacy: true,
+      live: false,
+      latestRunId: "run-1",
+      selectedRunId: "run-1",
+    });
+    await byTest(done, "rca-reanalyze-btn").trigger("click");
+    expect(done.emitted("reanalyze")).toHaveLength(1);
   });
 
   it("has no plain Cancel or Re-analyze button: a finished run offers Re-analyze in its closed line", () => {

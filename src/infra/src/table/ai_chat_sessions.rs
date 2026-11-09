@@ -171,7 +171,7 @@ fn capped_search_text(text: &str) -> String {
     lower.chars().skip(skip).collect()
 }
 
-fn escape_like(text: &str) -> String {
+pub(crate) fn escape_like(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
         if matches!(c, '%' | '_' | '\\') {

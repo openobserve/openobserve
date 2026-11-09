@@ -138,7 +138,7 @@ const card = computed(() => props.card ?? props.block?.approval ?? null);
 
 const items = computed(() =>
   (card.value?.targets ?? []).map((target) => ({
-    key: target.id ?? target.name,
+    key: target.key ?? target.id ?? target.name,
     label: raw(target.name) as I18nText,
     href: target.id ? approvalTargetHref(router, props.org || props.turn?.org || "", target) : null,
   })),

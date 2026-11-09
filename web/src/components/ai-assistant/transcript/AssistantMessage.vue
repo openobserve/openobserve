@@ -156,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :text-class="PROSE_CLASSES.plain"
             :lead="item.key === leadKey && part.key === item.parts[0]?.key"
             :live="item.live"
+            :org="org"
           />
           <AssistantMarkdownCode
             v-else-if="fenceBlock(item.key, part)"
@@ -750,7 +751,7 @@ function markdownTarget(href: string): LinkTarget | null {
   const path = base && href.startsWith(`${base}/`) ? href.slice(base.length) : href;
   try {
     const resolved = router.resolve(path);
-    return resolved.matched.length ? rebuildMarkdownTarget(resolved) : null;
+    return resolved.matched.length ? rebuildMarkdownTarget(resolved, org.value) : null;
   } catch {
     return null;
   }

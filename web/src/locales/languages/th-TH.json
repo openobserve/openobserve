@@ -12641,8 +12641,6 @@
           "ruledOut": "Ruled out"
         },
         "status": {
-          "rootCause": "Root cause",
-          "rootCauseNotConfirmed": "Root cause · not confirmed",
           "contributing": "Contributing",
           "symptom": "Symptom",
           "ruledOut": "Ruled out",

@@ -100,6 +100,8 @@ const CONFIRM_RELAY_TIMEOUT: std::time::Duration = std::time::Duration::from_sec
 
 #[cfg(any(feature = "enterprise", test))]
 const APPROVAL_RESOLVED: &str = "approval_resolved";
+/// The 409 reason while another `/confirm` of the same card is being decided.
+const APPROVAL_DECIDING: &str = "approval_deciding";
 #[cfg(any(feature = "enterprise", test))]
 const CONFIRM_REFUSAL_KEYS: [&str; 10] = [
     "id",
@@ -1309,6 +1311,15 @@ fn extends_only(body: &[u8]) -> bool {
         .is_ok_and(|body| body.get("extend") == Some(&Value::Bool(true)))
 }
 
+/// The card a `/confirm` decides, to claim before forwarding; questions and extensions decide none.
+#[cfg(any(feature = "enterprise", test))]
+fn deciding_card(body: &[u8]) -> Option<String> {
+    if answers_question(body) || extends_only(body) {
+        return None;
+    }
+    confirm_id(&serde_json::from_slice::<Value>(body).ok()?)
+}
+
 /// o2-ai's refusal of a decision keeps its status (404 unknown or expired, 409 decided, 410).
 #[cfg(any(feature = "enterprise", test))]
 fn confirm_refusal(status: u16, body: &str) -> Response {
@@ -1825,7 +1836,11 @@ async fn relay_confirm_answer(answered: &Answered<'_>, response_body: &str) -> R
             .as_str()
             .or_else(|| stored.and_then(|row| row.tool.as_deref()));
         record_decision(org_id, resolved, true).await;
-        super::grants::record_from_confirm(org_id, session_id, caller, resolved, tool).await;
+        let grant =
+            super::grants::record_from_confirm(org_id, session_id, caller, resolved, tool).await;
+        if let Some(grant) = grant.and_then(|grant| serde_json::to_value(grant).ok()) {
+            answer["grant"] = grant;
+        }
         // The chat index stops reporting the confirmation as pending.
         super::turn_marks::mark_answered(org_id, session_id, caller).await;
         record_turn_decision(org_id, session_id, caller, request).await;
@@ -1846,6 +1861,14 @@ async fn record_extension(org_id: &str, row: &ai_approvals::Model, answer: &Valu
             "[org_id:{org_id}] extension of approval {} not stored: {e}",
             row.id
         );
+    }
+}
+
+/// Frees a `/confirm`'s decision claim when o2-ai never took the decision.
+#[cfg(feature = "enterprise")]
+async fn release_claim(org_id: &str, deciding: Option<&str>) {
+    if let Some(id) = deciding {
+        super::grants::release_decision(org_id, id).await;
     }
 }
 
@@ -2913,10 +2936,22 @@ pub async fn confirm_action(
             .get("user_id")
             .and_then(|v| v.to_str().ok())
             .unwrap_or_default();
+        let deciding = deciding_card(&body_bytes);
+        if let Some(id) = &deciding
+            && !super::grants::claim_decision(&org_id, id).await
+        {
+            return confirm_refusal(
+                409,
+                &serde_json::json!({"code": APPROVAL_DECIDING}).to_string(),
+            );
+        }
         let (forward_bytes, stored) =
             match prepare_confirm(&org_id, &session_id, caller, &body_bytes).await {
                 Ok(prepared) => prepared,
-                Err(resp) => return resp,
+                Err(resp) => {
+                    release_claim(&org_id, deciding.as_deref()).await;
+                    return resp;
+                }
             };
 
         // The client routes the confirm to the replica holding the paused turn.
@@ -2933,6 +2968,8 @@ pub async fn confirm_action(
                     log::warn!("Agent confirm endpoint returned {status}");
                     if status == StatusCode::CONFLICT {
                         record_known_decision(&org_id, &response_body).await;
+                    } else {
+                        release_claim(&org_id, deciding.as_deref()).await;
                     }
                     return confirm_refusal(status.as_u16(), &response_body);
                 }
@@ -2948,6 +2985,7 @@ pub async fn confirm_action(
             Ok(Err(e)) if is_timeout(&e) => confirm_timed_out(),
             Ok(Err(e)) => {
                 log::error!("Failed to forward confirmation to agent: {e}");
+                release_claim(&org_id, deciding.as_deref()).await;
                 approval_delivery_failed_error()
             }
             Err(_) => confirm_timed_out(),
@@ -3091,10 +3129,7 @@ async fn chat_turn(
         }
 
         let model = Ai::model_override(&prompt_body.model).map(str::to_string);
-        if !o2_cfg
-            .ai
-            .allows_model(model.as_deref().unwrap_or_default(), None)
-        {
+        if !o2_cfg.ai.allows_model(model.as_deref().unwrap_or_default()) {
             return model_not_allowed_error();
         }
 
@@ -3508,7 +3543,7 @@ async fn stream_turn(
         let model = Ai::model_override(&prompt_body.model).map(str::to_string);
         if !get_o2_config()
             .ai
-            .allows_model(model.as_deref().unwrap_or_default(), None)
+            .allows_model(model.as_deref().unwrap_or_default())
         {
             audit
                 .report(StatusCode::BAD_REQUEST, Some("Model override not allowed"))
@@ -4727,8 +4762,8 @@ mod tests {
             get_o2_config().ai.model_allowlist.trim().is_empty(),
             "unset in tests"
         );
-        assert!(get_o2_config().ai.allows_model("any-model-today", None));
-        assert!(get_o2_config().ai.allows_model("", None));
+        assert!(get_o2_config().ai.allows_model("any-model-today"));
+        assert!(get_o2_config().ai.allows_model(""));
     }
 
     #[cfg(feature = "enterprise")]
@@ -5128,6 +5163,24 @@ mod tests {
             br#"{"id":"apr_1","extend":true,"by":"background"}"#
         ));
         assert!(!extends_only(br#"{"id":"apr_1","approved":true}"#));
+    }
+
+    #[test]
+    fn only_a_decision_claims_its_card_before_the_relay() {
+        assert_eq!(
+            deciding_card(br#"{"id":"apr_1","approved":true}"#).as_deref(),
+            Some("apr_1")
+        );
+        assert_eq!(
+            deciding_card(br#"{"approval_id":"apr_2","approved":false}"#).as_deref(),
+            Some("apr_2")
+        );
+        assert_eq!(deciding_card(br#"{"id":"apr_1","extend":true}"#), None);
+        assert_eq!(
+            deciding_card(br#"{"request_id":"q1","answer":"yes"}"#),
+            None
+        );
+        assert_eq!(deciding_card(b"not json"), None);
     }
 
     #[test]

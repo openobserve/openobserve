@@ -12670,8 +12670,6 @@
           "ruledOut": "배제됨"
         },
         "status": {
-          "rootCause": "근본 원인",
-          "rootCauseNotConfirmed": "근본 원인 · 확인되지 않음",
           "contributing": "기여 요인",
           "symptom": "증상",
           "ruledOut": "배제됨",

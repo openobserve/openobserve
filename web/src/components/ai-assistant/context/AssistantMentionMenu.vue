@@ -204,7 +204,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { alertsListQuery } from "@/services/alerts.queries";
-import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import { dashboardsByFolderQuery, dashboardsSearchQuery } from "@/services/dashboards.queries";
 import { pipelinesQuery } from "@/services/pipelines.queries";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -244,11 +244,24 @@ const enabled = computed(() => props.open && !!props.org);
 const streams = STREAM_TYPES.map((type) =>
   useQuery(computed(() => ({ ...streamNameListQuery(props.org, type), enabled: enabled.value }))),
 );
-const dashboards = useQuery(
-  computed(() => ({ ...dashboardsByFolderQuery(props.org, "default"), enabled: enabled.value })),
+// The API lists only the default folder unless given a title, so a typed mention searches every folder by its longest term.
+const titleTerm = computed(() =>
+  props.query
+    .trim()
+    .split(/[\s_.-]+/)
+    .reduce((longest, term) => (term.length > longest.length ? term : longest), ""),
 );
+const dashboards = useQuery(
+  computed(() => ({
+    ...(titleTerm.value
+      ? dashboardsSearchQuery(props.org, titleTerm.value)
+      : dashboardsByFolderQuery(props.org, "default")),
+    enabled: enabled.value,
+  })),
+);
+// No folder lists the alerts of every folder.
 const alerts = useQuery(
-  computed(() => ({ ...alertsListQuery(props.org, "default"), enabled: enabled.value })),
+  computed(() => ({ ...alertsListQuery(props.org, ""), enabled: enabled.value })),
 );
 const pipelines = useQuery(
   computed(() => ({ ...pipelinesQuery(props.org), enabled: enabled.value })),
@@ -555,8 +568,10 @@ function stringOf(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
+// Each other character, `_` included, becomes its code point, so `app.log` and `app_log` never share an id.
 function optionId(option: MentionOption): string {
-  return `${props.listboxId}-${option.id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+  const safe = option.id.replace(/[^a-zA-Z0-9-]/g, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
+  return `${props.listboxId}-${safe}`;
 }
 
 defineExpose({

@@ -12670,8 +12670,6 @@
           "ruledOut": "Uitgesloten"
         },
         "status": {
-          "rootCause": "Grondoorzaak",
-          "rootCauseNotConfirmed": "Grondoorzaak · niet bevestigd",
           "contributing": "Bijdragend",
           "symptom": "Symptoom",
           "ruledOut": "Uitgesloten",

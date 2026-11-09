@@ -864,10 +864,16 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     response
 }
 
-/// `/{org}/ai/...` routes are the assistant's own controls and `/{org}/mcp` checks each tool call.
+/// The chat, confirm and cancel routes drive the assistant itself; `/{org}/mcp` checks each tool.
 fn assistant_approval_exempt(path: &str) -> bool {
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-    matches!(segments.as_slice(), [_org, "mcp"] | [_org, "ai", ..])
+    matches!(
+        segments.as_slice(),
+        [_org, "mcp"]
+            | [_org, "ai", "chat" | "chat_stream"]
+            | [_org, "ai", "confirm", _]
+            | [_org, "ai", "chats", _, "cancel"]
+    )
 }
 
 /// The assistant's REST changes (its approved deletes) run only with o2-ai's signed approval.
@@ -900,9 +906,20 @@ pub async fn assistant_approval_middleware(request: Request, next: Next) -> Resp
     }
     .unwrap_or_default()
     .to_string();
-    let checked =
-        openobserve_mcp::approval::check_rest(&org_id, method.as_str(), &target, origin.as_ref())
-            .await;
+    let (parts, body) = request.into_parts();
+    let limit = get_config().limit.req_payload_limit;
+    let Ok(body) = axum::body::to_bytes(body, limit).await else {
+        return common::meta::http::HttpResponse::bad_request("Request body is too large");
+    };
+    let checked = openobserve_mcp::approval::check_rest(
+        &org_id,
+        method.as_str(),
+        &target,
+        &body,
+        origin.as_ref(),
+    )
+    .await;
+    let request = Request::from_parts(parts, axum::body::Body::from(body));
     match checked {
         Ok(()) => next.run(request).await,
         Err(refused) => {
@@ -5386,11 +5403,12 @@ mod tests {
     }
 
     #[test]
-    fn assistant_approval_exempts_only_the_ai_and_mcp_routes() {
+    fn assistant_approval_exempts_only_chat_confirm_cancel_and_mcp() {
         for path in [
             "/default/ai/chat",
+            "/default/ai/chat_stream",
             "/default/ai/confirm/s1",
-            "/ai/ai/settings",
+            "/default/ai/chats/s1/cancel",
             "/mcp/ai/chat",
             "/default/mcp",
             "/default/mcp/",
@@ -5412,6 +5430,12 @@ mod tests {
             "/v2/streams/ai/settings",
             "/v2/default/alerts/a1",
             "/default/mcp/extra",
+            "/ai/ai/settings",
+            "/default/ai/settings",
+            "/default/ai/toolsets/t1",
+            "/default/ai/grants/g1",
+            "/default/ai/chats/s1/shares",
+            "/default/ai/activity/a1/undo",
             "/",
         ] {
             assert!(

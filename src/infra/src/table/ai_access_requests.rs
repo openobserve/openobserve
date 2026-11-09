@@ -65,6 +65,23 @@ pub async fn insert_if_absent_with<C: ConnectionTrait>(
     }
 }
 
+/// Removes requests made before `cutoff` (µs); only today's rows enforce the daily limit.
+pub async fn delete_before(cutoff: i64) -> Result<u64, errors::Error> {
+    delete_before_with(get_orm_client_rw().await, cutoff).await
+}
+
+pub async fn delete_before_with<C: ConnectionTrait>(
+    conn: &C,
+    cutoff: i64,
+) -> Result<u64, errors::Error> {
+    let result = Entity::delete_many()
+        .filter(Column::CreatedAt.lt(cutoff))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
 /// Remove every row of `org_id`, for the org's deletion; returns how many.
 pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
     delete_by_org_with(get_orm_client_rw().await, org_id).await
@@ -133,5 +150,9 @@ mod tests {
                 .await
                 .unwrap()
         );
+        assert_eq!(delete_before_with(&db, 2 * day).await.unwrap(), 4);
+        let left = Entity::find().all(&db).await.unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].created_at, 2 * day);
     }
 }

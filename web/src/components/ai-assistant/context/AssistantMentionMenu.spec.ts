@@ -21,7 +21,6 @@ import { composerUi } from "@/components/ai-assistant/composer/composerUi";
 import type { CapabilityAgent, ContextChip } from "@/composables/assistant";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
-import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { streamKeys } from "@/services/stream.querykeys";
 
@@ -31,9 +30,10 @@ import AssistantMentionMenu, {
   type MentionOption,
 } from "./AssistantMentionMenu.vue";
 
-const { breakpoint, fake } = vi.hoisted(() => ({
+const { breakpoint, fake, dashboardsApi } = vi.hoisted(() => ({
   breakpoint: { md: true },
   fake: { current: null as any },
+  dashboardsApi: { forbidden: false },
 }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => {
@@ -52,8 +52,22 @@ vi.mock("@/composables/useBreakpoint", async () => {
   };
 });
 
+// As the API answers: no folder and no title lists the default folder; a title alone searches every folder.
+const DASHBOARDS = [
+  { dashboard_id: "d1", title: "Checkout", folder_id: "default", folder_name: "default" },
+  { dashboard_id: "d2", title: "Payments SLOs", folder_id: "f2", folder_name: "Payments" },
+];
 vi.mock("@/services/dashboards", () => ({
-  default: { list: vi.fn(() => Promise.reject({ response: { status: 403 } })) },
+  default: {
+    list: vi.fn(async (...args: unknown[]) => {
+      if (dashboardsApi.forbidden) throw { response: { status: 403 } };
+      const [folder, title] = [args[6] as string, (args[7] as string).toLowerCase()];
+      const rows = DASHBOARDS.filter((row) =>
+        title ? row.title.toLowerCase().includes(title) : row.folder_id === (folder || "default"),
+      );
+      return { data: { dashboards: rows } };
+    }),
+  },
 }));
 
 enableAutoUnmount(afterEach);
@@ -68,14 +82,11 @@ function seed(dashboardsError = false) {
   queryClient.setQueryData(streamKeys.nameList(ORG, "logs"), streams);
   queryClient.setQueryData(streamKeys.nameList(ORG, "metrics"), []);
   queryClient.setQueryData(streamKeys.nameList(ORG, "traces"), []);
-  queryClient.setQueryData(alertKeys.list(ORG, "default", undefined, undefined), [
+  queryClient.setQueryData(alertKeys.list(ORG, "", undefined, undefined), [
     { alert_id: "a1", name: "checkout-latency" },
   ]);
   queryClient.setQueryData(pipelineKeys.list(ORG), [{ pipeline_id: "p1", name: "ingest-k8s" }]);
-  if (!dashboardsError)
-    queryClient.setQueryData(dashboardKeys.byFolder(ORG, "default"), [
-      { dashboard_id: "d1", title: "Checkout" },
-    ]);
+  dashboardsApi.forbidden = dashboardsError;
 }
 
 async function open(query = "", dashboardsError = false, sid: string | null = null) {
@@ -307,6 +318,33 @@ describe("AssistantMentionMenu", () => {
     expect(plain.options().filter((o) => o.dataset.kind === "stream")).toHaveLength(
       MENTION_GROUP_LIMIT,
     );
+  });
+
+  it("M1: a typed mention finds dashboards and alerts outside the default folder", async () => {
+    queryClient.clear();
+    const { options } = await open("slo");
+    const labels = options().map((o) => o.textContent ?? "");
+    expect(labels.some((label) => label.includes("Payments SLOs"))).toBe(true);
+    const { default: api } = await import("@/services/dashboards");
+    expect(vi.mocked(api.list).mock.calls.at(-1)?.[6]).toBe("");
+  });
+
+  it("M2: gives streams whose names differ only by punctuation distinct option ids", async () => {
+    seed();
+    queryClient.setQueryData(streamKeys.nameList(ORG, "logs"), [
+      { name: "app.log" },
+      { name: "app_log" },
+    ]);
+    const wrapper = mount(AssistantMentionMenu, {
+      props: { open: true, query: "app", org: ORG, listboxId: "lb", sid: null },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const ids = wrapper
+      .findAll('[data-test="assistant-mention-option"][data-kind="stream"]')
+      .map((row) => row.attributes("id"));
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
   });
 
   it("emits the chosen chip with the ids the wire reads (CT-05 AC 3, 12)", async () => {

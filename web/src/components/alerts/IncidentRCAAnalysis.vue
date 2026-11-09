@@ -88,9 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :has-thread="!!thread && thread.transcript === 'available'"
         :can-ask="canAsk"
         :cancelling="cancelling"
-        :incident-number="incidentNumber"
+        :legacy="legacyControls"
+        :triggering="triggering"
+        :resuming="resuming"
+        :start-locked-reason="startLockedReason"
         @select-run="$emit('view-run', $event)"
-        @cancel="$emit('cancel-rca')"
+        @cancel="requestCancel"
+        @reanalyze="openGuidance('')"
         @copy-report="copyReport"
         @download-report="downloadReport"
         @copy-thread="copyThread"
@@ -127,7 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :reanalyze-credit-cost="reanalyzeCreditCost"
         :start-locked-reason="startLockedReason"
         :in-thread="layout === 'assistant'"
-        @cancel="cancelConfirmOpen = true"
+        :legacy="legacyControls"
+        @cancel="requestCancel"
         @follow-thread="followThread"
         @retry="$emit('trigger-rca', $event)"
         @show-unverified="evidenceList?.showUnverified()"
@@ -271,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :start-locked-reason="startLockedReason"
       :reanalyzing="triggering || resuming"
       :composer-dock="composerDock"
+      :legacy="legacyControls"
       @retry="retryThread"
       @open-evidence="evidenceList?.openEntry($event)"
       @reanalyze-with="openGuidance"
@@ -327,6 +333,7 @@ import type {
 import type { RcaReadStatus, RcaRefusal } from "@/composables/useIncidentRca";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaSteering } from "@/composables/useRcaSteering";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatTimestampInTimezone } from "@/utils/date";
 import {
@@ -729,6 +736,12 @@ const composerDock = ref<HTMLElement | null>(null);
 const followThread = () => void threadColumn.value?.scrollToLatest();
 
 const cancelConfirmOpen = ref(false);
+// Flag-off users keep the incident page's visible Cancel and Re-analyze, with no confirm.
+const legacyControls = computed(() => props.layout === "page" && !isAssistantV2());
+const requestCancel = () => {
+  if (legacyControls.value) emit("cancel-rca");
+  else cancelConfirmOpen.value = true;
+};
 
 // Steering: the rows, the open question and `can_steer` of the thread's run.
 // A sent row and a resumed run arrive on the live stream.

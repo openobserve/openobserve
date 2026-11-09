@@ -32,6 +32,7 @@ import { serverCardOf } from "./historyRecords";
 import { approvalOf, reduce, type ReducerCtx, type StreamState } from "./reducer";
 import { foldTurns } from "./record";
 import {
+  DECIDING_REREAD_MS,
   DELETE_TTL_MS,
   MAX_CARD_MS,
   PERMISSION_TTL_MS,
@@ -452,6 +453,35 @@ describe("useAssistantApprovals", () => {
     }));
     await approvals.reconcile(sid);
     expect(session.pendingApproval?.expiresAt).toBe(now + 120_000);
+  });
+
+  it("reads a 409 approval_deciding as already being decided, offers no Send again, and re-reads the chat until it ends (O2AI-01)", async () => {
+    let status: "pending" | "approved" = "pending";
+    const { sid, approvals, env, engine, outcome } = setup(PERMISSION, false, () => ({
+      active_turn: true,
+      pending_approval: true,
+      approvals: [{ id: "per_1", status }],
+    }));
+    env.confirm.mockRejectedValueOnce({
+      response: { status: 409, data: { code: "already_submitted", reason: "approval_deciding" } },
+    });
+    await approvals.decide(sid, { approved: true, scope: "once" }, held(sid));
+    expect(outcome()?.state).toBe("deciding");
+    expect(engine.approvalDecided).toHaveBeenCalled();
+    await approvals.sendAgain(sid, "per_1");
+    expect(env.confirm).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(DECIDING_REREAD_MS[0]);
+    expect(outcome()?.state).toBe("deciding");
+    status = "approved";
+    await vi.advanceTimersByTimeAsync(DECIDING_REREAD_MS[1]);
+    expect(outcome()?.state).toBe("approved_elsewhere");
+  });
+
+  it("still offers Send again on a 409 that is not another decision in flight", async () => {
+    const { sid, approvals, env, outcome } = setup(PERMISSION);
+    env.confirm.mockRejectedValueOnce({ response: { status: 409, data: { code: "conflict" } } });
+    await approvals.decide(sid, { approved: true, scope: "once" }, held(sid));
+    expect(outcome()?.state).toBe("delivery_failed");
   });
 
   it("extends out of view from the background budget and reports what came of it", async () => {

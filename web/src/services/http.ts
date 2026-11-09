@@ -67,13 +67,15 @@ const sharedDexRefresh = (): Promise<void> => {
   return dexRefreshPromise;
 };
 
+/** Whether this deployment refreshes an expired session through dex: self-hosted enterprise with SSO on. */
+export const ssoRefreshable = (): boolean =>
+  config.isCloud != "true" &&
+  config.isEnterprise == "true" &&
+  !!(store.state as any).zoConfig?.sso_enabled;
+
 /** Refreshes the session for an assistant call; never logs out, clears storage or reloads (`00` §5.1). */
 export const refreshSession = (): Promise<"refreshed" | "expired"> => {
-  const sso =
-    config.isCloud != "true" &&
-    config.isEnterprise == "true" &&
-    (store.state as any).zoConfig?.sso_enabled;
-  if (!sso) return Promise.resolve("expired");
+  if (!ssoRefreshable()) return Promise.resolve("expired");
   return (refreshPromise ?? sharedDexRefresh()).then(
     () => "refreshed" as const,
     () => "expired" as const,
@@ -97,7 +99,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
     return Promise.reject(new Error("Cloud environment: direct logout"));
   }
 
-  if (config.isEnterprise == "true" && (store.state as any).zoConfig.sso_enabled) {
+  if (ssoRefreshable()) {
     if (!refreshPromise) {
       const refreshInstance = axios.create({
         withCredentials: true,
@@ -158,8 +160,7 @@ const recordRefusal = (error: any) =>
 
 // An assistant 401 keeps the SSO refresh and its one retry, but never the logout-and-reload branches (`00` §12.3).
 const retryAssistantAfterRefresh = (instance: AxiosInstance, error: any): Promise<unknown> => {
-  const sso = config.isEnterprise == "true" && (store.state as any).zoConfig.sso_enabled;
-  if (!sso || error.config.assistantRetried) return Promise.reject(error);
+  if (!ssoRefreshable() || error.config.assistantRetried) return Promise.reject(error);
   // A failed refresh rejects with the original 401; the retry settles with its own result.
   return sharedDexRefresh().then(
     () => instance.request({ ...error.config, assistantRetried: true }),

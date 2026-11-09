@@ -14,11 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { computed } from "vue";
 
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
+import { queryClient } from "@/composables/query/queryClient";
+import { chatSharesQuery } from "@/services/ai_chat_share.queries";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant } from "../__tests__/fakeAssistant";
@@ -254,6 +256,9 @@ describe("AssistantMessageActions", () => {
     it("copies the answer's link and says Link copied in place for 2 s", async () => {
       vi.useFakeTimers();
       const wrapper = mountActions({ message: answer, turnId: "t1" });
+      // The live region is mounted before the text arrives, or a screen reader skips the change (A1).
+      const region = wrapper.get('[data-test="assistant-msg-share-link"] [aria-live="polite"]');
+      expect(region.text()).toBe("");
       await wrapper.get('[data-test="assistant-msg-share-link"]').trigger("click");
       await flushPromises();
       expect(String(copy.mock.calls[0][0])).toContain("#answer-t1");
@@ -267,6 +272,31 @@ describe("AssistantMessageActions", () => {
         undefined,
       );
       vi.useRealTimers();
+    });
+
+    it("copies the chat's share link when the chat has an active one, else the private thread link (WT-03)", async () => {
+      const share = {
+        id: "s1",
+        url_path: "/web/ai/shared/tok1",
+        mode: "live",
+        visibility: "org",
+        snapshot_seq: null,
+        expires_at: null,
+        created_at: 1,
+        updated_at: 1,
+        access_count: 0,
+        last_accessed_at: null,
+        session_id: fake.current.sid,
+        title: "t",
+        redact_tools: true,
+      };
+      const key = chatSharesQuery("", fake.current.sid).queryKey;
+      queryClient.setQueryData(key, [share]);
+      onTestFinished(() => queryClient.removeQueries({ queryKey: key }));
+      const wrapper = mountActions({ message: answer, turnId: "t1" });
+      await wrapper.get('[data-test="assistant-msg-share-link"]').trigger("click");
+      await flushPromises();
+      expect(String(copy.mock.calls[0][0])).toMatch(/\/ai\/shared\/tok1#answer-t1$/);
     });
 
     it("branches at the shown answer's own server id, else at the turn and the version shown", async () => {

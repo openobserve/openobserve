@@ -28,6 +28,8 @@ export interface AssistantCapabilitiesResponse {
     status?: "ok" | "down" | "unreachable" | "unknown";
     checked_at?: number | string;
     last_error?: string | { message?: string; at?: string };
+    /** False when the server has no shared secret, so every change the assistant asks for is refused. */
+    approvals_enforced?: boolean;
   };
   model?: string;
   agent_version?: string;
@@ -111,6 +113,8 @@ export interface ConfirmResponse {
   background_extends_left?: number;
   /** What the decision came to; older servers send no `resolved`. */
   resolved?: { outcome?: string; detail?: string; code?: string } | null;
+  /** Whether the grant a chat or always approve asked for was stored; absent for any other decision. */
+  grant?: { stored?: boolean; reason?: unknown } | null;
 }
 
 /** The restored object, when the server's action ledger can undo an entry. */

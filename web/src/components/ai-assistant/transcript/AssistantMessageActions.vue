@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('assistant.message.shareAnswer')"
         :icon="assistantGlyph.shareLink"
         :done="linkCopied ? t('assistant.message.linkCopied') : undefined"
+        confirms
         data-test="assistant-msg-share-link"
         @click="copyLink"
       />
@@ -150,12 +151,14 @@ import {
   turnLockKey,
   useTurnLock,
 } from "@/composables/assistant/pure";
+import { queryClient } from "@/composables/query/queryClient";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import { chatSharesQuery } from "@/services/ai_chat_share.queries";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 
-import { answerLink } from "./answerLink";
+import { activeShareUrl, answerLink } from "./answerLink";
 import { markdownToPlainText } from "./markdown";
 import { useBranchChat } from "./useBranchChat";
 import { useReadAloud } from "./useReadAloud";
@@ -234,7 +237,12 @@ async function copyText(): Promise<void> {
 async function copyLink(): Promise<void> {
   if (!props.turnId) return;
   const turnId = footerOf(props.message)?.serverTurnId ?? props.turnId;
-  const link = answerLink({ org: org(), sid: props.sid, turnId });
+  // The cached list only: a network read here would cost the click's clipboard permission.
+  const shares = queryClient.getQueryData(chatSharesQuery(org(), props.sid).queryKey);
+  const session = view.session.value;
+  const lastSeq = session?.record.cachedLastSeq ?? session?.turnMeta.lastSeq ?? null;
+  const shareUrl = activeShareUrl(shares, lastSeq);
+  const link = answerLink({ org: org(), sid: props.sid, turnId, shareUrl });
   const ok = await copyToClipboard(link, t, { silent: true });
   trackAssistant("ai_answer_link", { result: ok ? "copied" : "failed" });
   if (!ok) return void announceComposer(props.sid, t("assistant.client.copyManually"));

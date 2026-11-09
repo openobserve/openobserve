@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
             <!-- A finished run offers Re-analyze once, in the closed line, seeded with this text. -->
             <OButton
-              v-if="runLive && canReanalyze && rcaSteerOffersReanalyze(entry.item)"
+              v-if="(runLive || legacy) && canReanalyze && rcaSteerOffersReanalyze(entry.item)"
               data-test="rca-thread-steer-reanalyze"
               variant="outline"
               size="sm"
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ refusal.text }}
       </p>
       <OButton
-        v-if="canReanalyze && runLive"
+        v-if="canReanalyze && (runLive || legacy)"
         data-test="rca-thread-refusal-reanalyze"
         class="self-start"
         variant="outline"
@@ -404,7 +404,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Inline, the panel's scroller owns the pinned dock; the composer keeps its state here -->
-    <Teleport v-if="runLive && canSteer && send" :to="composerDock" :disabled="!composerDock">
+    <Teleport
+      v-if="(runLive || legacy) && canSteer && send"
+      :to="composerDock"
+      :disabled="!composerDock"
+    >
       <RcaSteerComposer
         ref="composer"
         :run-id="thread?.run_id ?? ''"
@@ -426,9 +430,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span data-test="rca-thread-final-text" class="min-w-0 flex-1">{{
         canResume
           ? t("alerts.incidents.rcaThread.resumableNote")
-          : t("alerts.incidents.rcaSteer.error.runNotSteerable")
+          : legacy
+            ? t("alerts.incidents.rcaThread.finalNote")
+            : t("alerts.incidents.rcaSteer.error.runNotSteerable")
       }}</span>
-      <OTooltip :content="startLockedReason" :disabled="!startLockedReason" side="top">
+      <OTooltip
+        v-if="!legacy"
+        :content="startLockedReason"
+        :disabled="!startLockedReason"
+        side="top"
+      >
         <span class="inline-flex shrink-0">
           <OButton
             data-test="rca-thread-reanalyze"
@@ -527,6 +538,8 @@ const props = withDefaults(
     reanalyzing?: boolean;
     /** Inline: the element pinned to the bottom of the panel's scroller that holds the steer composer. */
     composerDock?: HTMLElement | null;
+    /** Assistant flag off: the final note keeps its old copy and Re-analyze stays on the bar. */
+    legacy?: boolean;
   }>(),
   {
     canResume: false,
@@ -546,6 +559,7 @@ const props = withDefaults(
     startLockedReason: undefined,
     reanalyzing: false,
     composerDock: null,
+    legacy: false,
   },
 );
 

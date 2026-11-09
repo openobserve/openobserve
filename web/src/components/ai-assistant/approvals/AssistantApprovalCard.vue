@@ -432,7 +432,9 @@ const headingEl = ref<HTMLElement | null>(null);
 const plan = ref<{ $el: HTMLElement } | null>(null);
 const now = ref(Date.now());
 const scope = ref<ApprovalScope>("once");
-const selected = ref<string[]>(props.card.targets.map((target) => target.id ?? target.name));
+const selected = ref<string[]>(
+  props.card.targets.map((target) => target.key ?? target.id ?? target.name),
+);
 // Which primary started the decision in flight, so only that one spins.
 const pressed = ref<"approve" | "finish" | null>(null);
 // Activations carried over from a key pressed before the card existed never decide it.
@@ -490,7 +492,7 @@ const expiringSoon = computed(() => remainingMs.value !== null && remainingMs.va
 
 const allTargets = computed(() =>
   props.card.targets.map((target) => ({
-    key: target.id ?? target.name,
+    key: target.key ?? target.id ?? target.name,
     label: raw(target.name),
     href: target.id ? approvalTargetHref(router, props.org, target) : null,
   })),
@@ -791,7 +793,8 @@ watch(
 
 watch(
   () => props.card.id,
-  () => (selected.value = props.card.targets.map((target) => target.id ?? target.name)),
+  () =>
+    (selected.value = props.card.targets.map((target) => target.key ?? target.id ?? target.name)),
 );
 
 defineExpose({ focusDefault });

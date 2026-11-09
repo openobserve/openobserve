@@ -26,7 +26,7 @@ import { gt, raw } from "@/types/i18n";
 
 import { approvalAnnotationKey } from "./actions/appliers/approval";
 import type { AssistantCapability } from "./assistantStore.types";
-import { LOCAL_CAP, type LocalRecord } from "./historyDb";
+import { LOCAL_CAP, SERVER_CACHE_CAP, type LocalRecord } from "./historyDb";
 import { writeAnnotation } from "./prefs";
 import { LIVE_SAVE_GRACE_MS } from "./historyDb";
 import { POLL_FAST_MS } from "./historyElsewhere";
@@ -730,6 +730,32 @@ describe("useAssistantHistory reload", () => {
     updated_at: 1,
     last_committed_seq: 3,
     turns,
+  });
+
+  it("caps the server chats cached in this browser, oldest unopened first, without re-reading every row (WC-2)", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+    vi.spyOn(assistant, "getChat").mockResolvedValue(detail([]) as never);
+    const old = Array.from({ length: SERVER_CACHE_CAP + 1 }, (_, i) =>
+      record(100 + i, { serverBacked: true }),
+    );
+    const live = record(99, { serverBacked: true, liveTurnId: "t-live" });
+    const local = record(98);
+    const fake = setup({ persistence: true }, [
+      record(1, { serverBacked: true }),
+      live,
+      local,
+      ...old,
+    ]);
+    await flushPromises();
+    const list = vi.spyOn(fake.db, "list");
+    await fake.history.open({ sid });
+    await flushPromises();
+    expect(list).not.toHaveBeenCalled();
+    const kept = [...fake.db.rows.keys()];
+    expect(kept).toEqual(expect.arrayContaining([1, 98, 99]));
+    expect(kept).not.toContain(100);
+    expect(kept).not.toContain(101);
+    expect(kept.filter((id) => fake.db.rows.get(id)?.serverBacked)).toHaveLength(SERVER_CACHE_CAP);
   });
 
   it("keeps this browser's live save inside the grace window and the server's after it", async () => {

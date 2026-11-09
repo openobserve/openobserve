@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- One row at any width: the subtitle truncates first, then Ask drops to an icon, then the run label. -->
+  <!-- One row at any width: the subtitle truncates first, then Ask and Re-analyze drop to icons, then the run label. -->
   <div data-test="rca-analysis-bar" class="@container flex flex-nowrap items-center gap-2.5">
     <ODropdown align="start" content-class="w-80">
       <template #trigger>
@@ -54,6 +54,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
 
     <OButton
+      v-if="legacy && live"
+      data-test="rca-cancel-btn"
+      variant="ghost-destructive"
+      size="sm"
+      class="shrink-0"
+      icon-left="stop-circle"
+      :loading="cancelling"
+      @click="$emit('cancel')"
+    >
+      {{ t("alerts.incidents.rcaRun.cancelRun") }}
+    </OButton>
+
+    <OButton
       v-if="!live && canAsk"
       data-test="rca-ask-btn"
       variant="outline"
@@ -64,6 +77,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaAsk.button") }}</span>
     </OButton>
+
+    <OTooltip
+      v-if="legacy && !live"
+      :content="startLockedReason"
+      :disabled="!startLockedReason"
+      side="bottom"
+    >
+      <span class="inline-flex shrink-0">
+        <OButton
+          data-test="rca-reanalyze-btn"
+          variant="outline"
+          size="sm"
+          :icon-left="startLockedReason ? 'lock' : 'refresh'"
+          :loading="triggering"
+          :disabled="resuming || !!startLockedReason"
+          @click="$emit('reanalyze')"
+        >
+          <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaReanalyze") }}</span>
+        </OButton>
+      </span>
+    </OTooltip>
 
     <ODropdown align="end" content-class="w-55">
       <template #trigger>
@@ -102,41 +136,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.incidents.rcaThread.copy") }}
       </ODropdownItem>
       <!-- Cancel stops the run for everyone on the incident, so it sits here behind a confirm. -->
-      <template v-if="live">
+      <template v-if="live && !legacy">
         <ODropdownSeparator />
         <ODropdownItem
           data-test="rca-cancel-btn"
           variant="destructive"
           icon-left="stop-circle"
           :disabled="cancelling"
-          @select="cancelOpen = true"
+          @select="$emit('cancel')"
         >
           {{ t("alerts.incidents.rcaRun.cancelRun") }}
         </ODropdownItem>
       </template>
     </ODropdown>
-    <RcaCancelRunDialog
-      v-model:open="cancelOpen"
-      :incident-number="incidentNumber"
-      :cancelling="cancelling"
-      @confirm="$emit('cancel')"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { RcaRunItem } from "@/services/incidents";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { rcaTriggerLabel } from "@/utils/incidents/rcaThread";
-import RcaCancelRunDialog from "./RcaCancelRunDialog.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -156,20 +184,30 @@ const props = withDefaults(
     /** The shown run has a report or a record and AI chat is available (J5). */
     canAsk?: boolean;
     cancelling?: boolean;
-    /** How the cancel confirm names the incident after "#". */
-    incidentNumber?: string;
+    /** Assistant flag off: Cancel and Re-analyze stay as visible buttons, Cancel with no confirm. */
+    legacy?: boolean;
+    triggering?: boolean;
+    /** A resume is in flight: Re-analyze waits for it. */
+    resuming?: boolean;
+    /** Why no new run can start: Re-analyze stays visible, disabled, with this reason. */
+    startLockedReason?: I18nText;
   }>(),
   {
     canAsk: false,
     cancelling: false,
-    incidentNumber: "",
+    legacy: false,
+    triggering: false,
+    resuming: false,
+    startLockedReason: undefined,
   },
 );
 
 defineEmits<{
   "select-run": [runId: string | null];
-  /** Confirmed in the dialog. */
+  /** Asks to cancel; the page confirms it unless `legacy`. */
   cancel: [];
+  /** Legacy Re-analyze: open the re-analysis dialog. */
+  reanalyze: [];
   "copy-report": [];
   "download-report": [];
   "copy-thread": [];
@@ -178,8 +216,6 @@ defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-
-const cancelOpen = ref(false);
 
 const runTime = (us: number) => formatTimestampInTimezone(us, "MMM D, HH:mm", "UTC");
 

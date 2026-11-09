@@ -12670,8 +12670,6 @@
           "ruledOut": "Đã loại trừ"
         },
         "status": {
-          "rootCause": "Nguyên nhân gốc",
-          "rootCauseNotConfirmed": "Nguyên nhân gốc · chưa được xác nhận",
           "contributing": "Góp phần",
           "symptom": "Triệu chứng",
           "ruledOut": "Đã loại trừ",

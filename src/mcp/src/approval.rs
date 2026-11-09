@@ -62,7 +62,7 @@ pub enum Refusal {
     Expired,
     BadSignature,
     Replayed,
-    /// o2-ai signed the call but this server has no secret to check it with.
+    /// This server has no secret to check an approval with, so no assistant change runs.
     NotConfigured,
     /// The grant the approval names was revoked, or never belonged to this caller.
     GrantNotLive,
@@ -204,7 +204,7 @@ pub async fn check(
     .map_err(|refusal| {
         if refusal == Refusal::NotConfigured {
             log::error!(
-                "[MCP] o2-ai signed {tool} but O2_AI_INTERNAL_SECRET is unset here; refusing it"
+                "[MCP] O2_AI_INTERNAL_SECRET is unset here, so the assistant's {tool} is refused"
             );
         }
         refuse(refusal)
@@ -234,17 +234,34 @@ pub async fn check(
     Ok(())
 }
 
-/// [`check`] for one of the assistant's REST calls, bound to its method and `/api/...` target.
+/// [`check`] for one of the assistant's REST calls, bound to its method, `/api/...` target and
+/// raw body.
 pub async fn check_rest(
     org_id: &str,
     method: &str,
     target: &str,
+    body: &[u8],
     origin: Option<&Origin>,
 ) -> Result<(), ApprovalRequired> {
     let method = method.to_ascii_uppercase();
     let changes = matches!(method.as_str(), "POST" | "PUT" | "PATCH" | "DELETE");
-    let arguments = serde_json::json!({"method": method, "target": target});
-    check(org_id, REST_DELETE_TOOL, changes, origin, &arguments).await
+    check(
+        org_id,
+        REST_DELETE_TOOL,
+        changes,
+        origin,
+        &rest_arguments(&method, target, body),
+    )
+    .await
+}
+
+/// What an approval of one REST call is bound to; o2-ai's `rest_arguments` builds the same.
+pub fn rest_arguments(method: &str, target: &str, body: &[u8]) -> Value {
+    serde_json::json!({
+        "body_sha256": hex::encode(Sha256::digest(body)),
+        "method": method.to_ascii_uppercase(),
+        "target": target,
+    })
 }
 
 /// The signature check alone, with an explicit key and clock; `None` when nothing is to verify.
@@ -259,11 +276,7 @@ pub fn check_with(
         return Ok(None);
     }
     let Some(key) = key else {
-        // No trust anchor: an unsigned write passes, but a signed one means the secrets differ.
-        return match assertion.filter(|a| !a.is_empty()) {
-            Some(_) => Err(Refusal::NotConfigured),
-            None => Ok(None),
-        };
+        return Err(Refusal::NotConfigured);
     };
     verify(key, assertion, claim, now).map(Some)
 }
@@ -539,13 +552,18 @@ mod tests {
     }
 
     #[test]
-    fn reads_are_not_checked_and_a_signed_call_without_a_key_is_a_mismatch() {
+    fn reads_are_not_checked_and_no_change_passes_without_a_key() {
         let token = sign(&claim(), "apr_1", NOW + 60);
         assert_eq!(
             check_with(Some(&key()), &claim(), None, false, NOW),
             Ok(None)
         );
-        assert_eq!(check_with(None, &claim(), None, true, NOW), Ok(None));
+        assert_eq!(
+            check_with(None, &claim(), None, true, NOW),
+            Err(Refusal::NotConfigured),
+            "without a secret an unsigned assistant change is refused, not waved through"
+        );
+        assert_eq!(check_with(None, &claim(), None, false, NOW), Ok(None));
         assert_eq!(
             check_with(None, &claim(), Some(&token), true, NOW),
             Err(Refusal::NotConfigured)
@@ -597,6 +615,40 @@ mod tests {
         let mut text = String::new();
         canonical_json(&json!({"b": [{"z": 1, "a": "é"}], "a": null}), &mut text);
         assert_eq!(text, r#"{"a":null,"b":[{"a":"é","z":1}]}"#);
+    }
+
+    #[test]
+    fn a_rest_approval_is_bound_to_the_body_o2_ai_hashed() {
+        let empty = rest_arguments("delete", "/api/default/dashboards/abc", b"");
+        assert_eq!(
+            arguments_sha256(&empty),
+            "c283f73f728dd3222c51585a91c005d46938030df355f31b231dde223c957d51",
+            "o2-ai's rest_arguments golden vector"
+        );
+        let target = "/api/default/dashboards/bulk";
+        let approved = rest_arguments("POST", target, br#"{"ids":["a"]}"#);
+        assert_eq!(
+            arguments_sha256(&approved),
+            "ebb8039edf3bde77129484682978a2b7da90adbb072dcc9a18a397500ec3607b"
+        );
+        let digest = arguments_sha256(&approved);
+        let signed = Claim {
+            tool: REST_DELETE_TOOL,
+            arguments_sha256: &digest,
+            ..claim()
+        };
+        let token = sign(&signed, "apr_bulk", NOW + 60);
+        assert!(verify(&key(), Some(&token), &signed, NOW).is_ok());
+        let widened = arguments_sha256(&rest_arguments("POST", target, br#"{"ids":["a","b"]}"#));
+        let other = Claim {
+            arguments_sha256: &widened,
+            ..signed
+        };
+        assert_eq!(
+            verify(&key(), Some(&token), &other, NOW),
+            Err(Refusal::BadSignature),
+            "one approval must not cover another id list on the same URL"
+        );
     }
 
     #[test]

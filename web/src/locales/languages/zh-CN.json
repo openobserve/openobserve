@@ -12670,8 +12670,6 @@
           "ruledOut": "已排除"
         },
         "status": {
-          "rootCause": "根本原因",
-          "rootCauseNotConfirmed": "根本原因 · 未确认",
           "contributing": "促成因素",
           "symptom": "症状",
           "ruledOut": "已排除",

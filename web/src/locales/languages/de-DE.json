@@ -12670,8 +12670,6 @@
           "ruledOut": "Ausgeschlossen"
         },
         "status": {
-          "rootCause": "Grundursache",
-          "rootCauseNotConfirmed": "Grundursache · nicht bestätigt",
           "contributing": "Mitursächlich",
           "symptom": "Symptom",
           "ruledOut": "Ausgeschlossen",

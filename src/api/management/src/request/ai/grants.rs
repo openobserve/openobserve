@@ -44,6 +44,15 @@ use super::{capabilities, error};
 const FIELD_MAX_CHARS: usize = 256;
 const SPENT_APPROVAL_PREFIX: &str = "/ai_approval_spent/";
 const SPENT_SWEEP_EVERY_SECS: i64 = 60;
+const DECIDING_PREFIX: &str = "/ai_approval_deciding/";
+// Outlasts the confirm relay's wait, so a slow decision is never claimed a second time.
+const DECIDING_HOLD_SECS: i64 = 120;
+const GRANT_NO_TOOL: &str = "no_tool";
+const GRANT_UNKNOWN_TOOL: &str = "unknown_tool";
+const GRANT_READ_ONLY: &str = "read_only";
+const GRANT_DELETE_NOT_ALWAYS: &str = "delete_not_always";
+const GRANT_NO_MEMBER: &str = "no_member";
+const GRANT_STORE_FAILED: &str = "store_failed";
 
 static LAST_SPENT_SWEEP: AtomicI64 = AtomicI64::new(0);
 
@@ -72,6 +81,28 @@ impl From<ai_grants::Model> for GrantView {
             chat_id: grant.chat_id,
             granted_by: grant.granted_by,
             granted_at: grant.granted_at,
+        }
+    }
+}
+
+/// The `grant` a `/confirm` answer reports: stored with its id, or why it was not.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub(crate) struct GrantOutcome {
+    pub stored: bool,
+    pub scope: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<&'static str>,
+}
+
+impl GrantOutcome {
+    fn refused(scope: &'static str, reason: &'static str) -> Self {
+        Self {
+            stored: false,
+            scope,
+            id: None,
+            reason: Some(reason),
         }
     }
 }
@@ -182,25 +213,26 @@ pub fn register_grant_check() {
     approval::set_spend_claim(claim_spent_approval);
 }
 
-/// Stores the grant o2-ai's `resolved` frame applied, never the scope the browser's body asked for.
+/// Stores the grant o2-ai's `resolved` frame applied, never the scope the browser's body asked
+/// for; `None` when no grant was asked.
 pub(crate) async fn record_from_confirm(
     org_id: &str,
     session_id: &str,
     user_id: &str,
     resolved: &Value,
     tool: Option<&str>,
-) {
-    if user_id.is_empty() {
-        return;
-    }
+) -> Option<GrantOutcome> {
     let requested = match requested(resolved, tool, tools::tool_class) {
         Ok(Some(requested)) => requested,
-        Ok(None) => return,
-        Err(reason) => {
+        Ok(None) => return None,
+        Err((scope, reason)) => {
             log::info!("[org_id:{org_id}] standing approval not stored: {reason}");
-            return;
+            return Some(GrantOutcome::refused(scope, reason));
         }
     };
+    if user_id.is_empty() {
+        return Some(GrantOutcome::refused(requested.scope, GRANT_NO_MEMBER));
+    }
     let grant = NewGrant {
         org_id,
         user_email: user_id,
@@ -210,17 +242,27 @@ pub(crate) async fn record_from_confirm(
         chat_id: (requested.scope == SCOPE_CHAT).then_some(session_id),
         granted_by: user_id,
     };
-    if let Err(e) = ai_grants::insert(&grant, now_micros()).await {
-        log::error!("[org_id:{org_id}] cannot store a standing approval: {e}");
+    match ai_grants::insert(&grant, now_micros()).await {
+        Ok(stored) => Some(GrantOutcome {
+            stored: true,
+            scope: requested.scope,
+            id: Some(stored.id),
+            reason: None,
+        }),
+        Err(e) => {
+            log::error!("[org_id:{org_id}] cannot store a standing approval: {e}");
+            Some(GrantOutcome::refused(requested.scope, GRANT_STORE_FAILED))
+        }
     }
 }
 
-/// `Ok(None)` when no grant is asked, `Err` why one is refused; the class is the server's own.
+/// `Ok(None)` when no grant is asked, else the asked scope and why it is refused; the class is
+/// the server's own.
 fn requested(
     resolved: &Value,
     tool: Option<&str>,
     class_of: impl Fn(&str) -> Option<ToolClass>,
-) -> Result<Option<Requested>, &'static str> {
+) -> Result<Option<Requested>, (&'static str, &'static str)> {
     let scope = match resolved.get("scope").and_then(Value::as_str) {
         Some(SCOPE_ALWAYS) => SCOPE_ALWAYS,
         Some(SCOPE_CHAT) => SCOPE_CHAT,
@@ -233,16 +275,16 @@ fn requested(
         .map(str::trim)
         .filter(|t| !t.is_empty() && t.chars().count() <= FIELD_MAX_CHARS)
     else {
-        return Err("the approval names no tool");
+        return Err((scope, GRANT_NO_TOOL));
     };
     let Some(class) = class_of(tool) else {
-        return Err("the approval names no tool this server has");
+        return Err((scope, GRANT_UNKNOWN_TOOL));
     };
     if class.read_only {
-        return Err("a read needs no standing approval");
+        return Err((scope, GRANT_READ_ONLY));
     }
     if scope == SCOPE_ALWAYS && class.destructive {
-        return Err("a delete is never approved for always");
+        return Err((scope, GRANT_DELETE_NOT_ALWAYS));
     }
     Ok(Some(Requested {
         tool: tool.to_string(),
@@ -306,6 +348,46 @@ fn claim_spent_approval(
     })
 }
 
+/// Claims card `id`'s decision for one `/confirm` on every node; `false` while another holds it.
+pub(crate) async fn claim_decision(org_id: &str, id: &str) -> bool {
+    let key = format!("{DECIDING_PREFIX}{org_id}/{id}");
+    let now = now_micros() / 1_000_000;
+    let hold = Bytes::from((now + DECIDING_HOLD_SECS).to_string());
+    let claimed = Arc::new(AtomicBool::new(false));
+    let (won, insert_key) = (claimed.clone(), key.clone());
+    let claim = Box::new(move |stored: Option<Bytes>| match stored {
+        None => {
+            won.store(true, Ordering::Release);
+            Ok(Some((None, Some((insert_key, hold, None)))))
+        }
+        Some(held) if decision_free(&held, now) => {
+            won.store(true, Ordering::Release);
+            Ok(Some((Some(hold), None)))
+        }
+        Some(_) => Ok(None),
+    });
+    let db = infra::db::get_db().await;
+    match db.get_for_update(&key, false, None, claim).await {
+        Ok(()) => {
+            tokio::spawn(sweep_spent_approvals());
+            claimed.load(Ordering::Acquire)
+        }
+        Err(e) => {
+            log::error!("[AI] cannot claim the decision on {org_id}/{id}, refusing it: {e}");
+            false
+        }
+    }
+}
+
+/// Frees a claim whose `/confirm` never reached o2-ai, so the member can decide again.
+pub(crate) async fn release_decision(org_id: &str, id: &str) {
+    let key = format!("{DECIDING_PREFIX}{org_id}/{id}");
+    let db = infra::db::get_db().await;
+    if let Err(e) = db.delete_if_exists(&key, false, false).await {
+        log::warn!("[AI] cannot release the decision claim {key}: {e}");
+    }
+}
+
 /// Drops spent claims whose approval has expired, at most once a minute per node.
 async fn sweep_spent_approvals() {
     let now = now_micros() / 1_000_000;
@@ -333,6 +415,26 @@ async fn sweep_spent_approvals() {
             log::warn!("[AI] cannot sweep spent approval {key}: {e}");
         }
     }
+    let Ok(held) = db.list_keys(DECIDING_PREFIX).await else {
+        return;
+    };
+    for key in held {
+        let free = match db.get(&key).await {
+            Ok(until) => decision_free(&until, now),
+            Err(_) => false,
+        };
+        if free && let Err(e) = db.delete_if_exists(&key, false, false).await {
+            log::warn!("[AI] cannot sweep decision claim {key}: {e}");
+        }
+    }
+}
+
+/// Whether a stored decision claim has run out at unix time `now`; an unreadable one has.
+fn decision_free(held: &[u8], now: i64) -> bool {
+    std::str::from_utf8(held)
+        .ok()
+        .and_then(|until| until.parse::<i64>().ok())
+        .is_none_or(|until| until <= now)
 }
 
 fn grant_matches(grant: &ai_grants::Model, query: &GrantQuery) -> bool {
@@ -390,10 +492,17 @@ mod tests {
             }))
         );
         let always = json!({"approved": true, "scope": "always"});
-        assert!(ask(always.clone(), None).is_err());
-        assert!(ask(always.clone(), Some(&"x".repeat(300))).is_err());
-        assert!(ask(always.clone(), Some("Unknown")).is_err());
-        assert!(ask(always, Some("SearchSQL")).is_err());
+        let refused = |reason| Err((SCOPE_ALWAYS, reason));
+        assert_eq!(ask(always.clone(), None), refused(GRANT_NO_TOOL));
+        assert_eq!(
+            ask(always.clone(), Some(&"x".repeat(300))),
+            refused(GRANT_NO_TOOL)
+        );
+        assert_eq!(
+            ask(always.clone(), Some("Unknown")),
+            refused(GRANT_UNKNOWN_TOOL)
+        );
+        assert_eq!(ask(always, Some("SearchSQL")), refused(GRANT_READ_ONLY));
     }
 
     #[test]
@@ -474,5 +583,53 @@ mod tests {
             json,
             json!({"id": "g1", "user": "a@x", "tool": "t", "operation": "update", "scope": "always", "granted_by": "a@x", "granted_at": 3})
         );
+    }
+
+    #[tokio::test]
+    async fn a_confirm_reports_a_grant_it_refused_instead_of_dropping_it() {
+        let always = json!({"type": "confirmation_resolved", "approved": true, "scope": "always"});
+        let outcome = record_from_confirm("o", "s1", "a@x", &always, Some("NoSuchTool")).await;
+        assert_eq!(
+            serde_json::to_value(outcome).unwrap(),
+            json!({"stored": false, "scope": "always", "reason": "unknown_tool"})
+        );
+        let once = json!({"type": "confirmation_resolved", "approved": true, "scope": "once"});
+        assert_eq!(
+            record_from_confirm("o", "s1", "a@x", &once, Some("NoSuchTool")).await,
+            None,
+            "no grant asked, nothing to report"
+        );
+        let stored = GrantOutcome {
+            stored: true,
+            scope: SCOPE_CHAT,
+            id: Some("g1".into()),
+            reason: None,
+        };
+        assert_eq!(
+            serde_json::to_value(stored).unwrap(),
+            json!({"stored": true, "scope": "chat", "id": "g1"})
+        );
+    }
+
+    #[test]
+    fn a_decision_claim_is_held_until_it_runs_out() {
+        assert!(!decision_free(b"1000", 999));
+        assert!(decision_free(b"1000", 1000));
+        assert!(decision_free(b"garbled", 0));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn only_one_confirm_holds_a_cards_decision_at_a_time() {
+        crate::request::security::tests::meta_store().await;
+        let id = format!("apr_{}", config::ider::uuid());
+        assert!(claim_decision("o", &id).await);
+        assert!(
+            !claim_decision("o", &id).await,
+            "a second confirm, on any replica, must not forward"
+        );
+        assert!(claim_decision("other", &id).await);
+        release_decision("o", &id).await;
+        assert!(claim_decision("o", &id).await);
     }
 }

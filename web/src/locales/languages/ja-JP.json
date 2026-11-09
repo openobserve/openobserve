@@ -12670,8 +12670,6 @@
           "ruledOut": "除外済み"
         },
         "status": {
-          "rootCause": "根本原因",
-          "rootCauseNotConfirmed": "根本原因 · 未確認",
           "contributing": "寄与要因",
           "symptom": "症状",
           "ruledOut": "除外済み",

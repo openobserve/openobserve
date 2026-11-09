@@ -262,6 +262,15 @@ describe("useAssistantClient: 401 (round 1 E-01)", () => {
     ]);
   });
 
+  it("releases the first 401's body before it resends (WC-5)", async () => {
+    const first = json(401, {});
+    const cancel = vi.spyOn(first.body!, "cancel");
+    const fetchImpl = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(sse([]));
+    const refreshSession = vi.fn().mockResolvedValue("refreshed");
+    await useAssistantClient({ fetchImpl, refreshSession }).send(request(), sink(), signal());
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
   it("maps a second 401 or an expired refresh to session_expired", async () => {
     const twice = vi.fn().mockResolvedValue(json(401, {}));
     const again = await useAssistantClient({

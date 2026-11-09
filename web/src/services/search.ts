@@ -43,7 +43,6 @@ const search = {
       is_ui_histogram,
       validate,
       signal,
-      silentForbidden,
     }: {
       org_identifier: string;
       query: any;
@@ -69,8 +68,6 @@ const search = {
        * unaffected.
        */
       signal?: AbortSignal;
-      /** The caller renders a 403 itself (the assistant's Run inline), so the grouped access toast stays out. */
-      silentForbidden?: boolean;
     },
     search_type: string = "ui",
     is_multi_stream_search: boolean = false,
@@ -108,11 +105,7 @@ const search = {
         },
       ],
     };
-    const axiosConfig = {
-      ...baseAxiosConfig,
-      ...(signal && { signal }),
-      ...(silentForbidden && { silentForbidden }),
-    };
+    const axiosConfig = signal ? { ...baseAxiosConfig, signal } : baseAxiosConfig;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${encodeURIComponent(page_type)}&search_type=${search_type}&use_cache=${use_cache}`;
       if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;

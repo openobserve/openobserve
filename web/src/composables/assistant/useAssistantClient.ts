@@ -125,7 +125,11 @@ export function useAssistantClient(opts: AssistantClientOptions = {}): Assistant
     turnId: string,
   ): Promise<Response | SendResult> => {
     let response = await request();
-    if (response.status === 401 && (await refresh()) === "refreshed") response = await request();
+    if (response.status === 401 && (await refresh()) === "refreshed") {
+      // An unread body keeps its connection open until it is collected.
+      void response.body?.cancel().catch(() => undefined);
+      response = await request();
+    }
     if (response.status !== 401) return response;
     const error = toAssistantError({ status: 401, body: await readJson(response) }, { turnId });
     return { ok: false, error: { ...error, code: expiredCode, ...ERROR_LEDGER[expiredCode] } };

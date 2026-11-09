@@ -12670,8 +12670,6 @@
           "ruledOut": "Исключено"
         },
         "status": {
-          "rootCause": "Корневая причина",
-          "rootCauseNotConfirmed": "Корневая причина · не подтверждена",
           "contributing": "Сопутствующая причина",
           "symptom": "Симптом",
           "ruledOut": "Исключено",

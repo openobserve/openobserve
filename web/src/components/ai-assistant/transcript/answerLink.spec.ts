@@ -15,7 +15,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import { answerAnchor, answerLink, answerTurnOf } from "./answerLink";
+import type { ShareView } from "@/services/ai_chat_share";
+
+import { activeShareUrl, answerAnchor, answerLink, answerTurnOf } from "./answerLink";
 
 describe("answerLink", () => {
   it("links to the thread on Home with the answer anchor", () => {
@@ -52,5 +54,42 @@ describe("answerTurnOf", () => {
     expect(answerTurnOf("#other")).toBeNull();
     expect(answerTurnOf("")).toBeNull();
     expect(answerTurnOf("#answer-%E0%A4%A")).toBeNull();
+  });
+});
+
+describe("activeShareUrl (WT-03)", () => {
+  const share = (over: Partial<ShareView>): ShareView => ({
+    id: "s",
+    url_path: "/web/ai/shared/tok",
+    mode: "live",
+    visibility: "org",
+    snapshot_seq: null,
+    expires_at: null,
+    created_at: 1,
+    updated_at: 1,
+    access_count: 0,
+    last_accessed_at: null,
+    session_id: "sid",
+    title: "t",
+    redact_tools: true,
+    ...over,
+  });
+
+  it("skips expired, linkless and stale-snapshot shares", () => {
+    const now = 2_000_000;
+    expect(
+      activeShareUrl(
+        [
+          share({ url_path: "/web/ai/shared/expired", expires_at: now - 1 }),
+          share({ url_path: undefined }),
+          share({ url_path: "/web/ai/shared/stale", mode: "snapshot", snapshot_seq: 3 }),
+          share({ url_path: "/web/ai/shared/ok", mode: "snapshot", snapshot_seq: 9 }),
+        ],
+        9,
+        now,
+      ),
+    ).toMatch(/\/ai\/shared\/ok$/);
+    expect(activeShareUrl([share({ expires_at: now - 1 })], 9, now)).toBeNull();
+    expect(activeShareUrl(undefined, null)).toBeNull();
   });
 });

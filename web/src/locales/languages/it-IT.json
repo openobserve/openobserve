@@ -12670,8 +12670,6 @@
           "ruledOut": "Escluso"
         },
         "status": {
-          "rootCause": "Causa principale",
-          "rootCauseNotConfirmed": "Causa principale · non confermata",
           "contributing": "Concorrente",
           "symptom": "Sintomo",
           "ruledOut": "Escluso",
