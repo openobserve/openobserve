@@ -215,14 +215,21 @@ async fn persist_alert_run_state_deferred(
             rule_value,
         )
     } else {
-        apply_outcome(
+        let mut update = apply_outcome(
             alert_id,
             ROLLUP_GROUP_KEY,
             prev.as_ref(),
             state_outcome,
             level,
             now,
-        )
+        );
+        // A multi-alert rollup's `last_seen` is its last group observation, which the reaper needs.
+        if alert.query_condition.multi_alert_enabled()
+            && let Some(state) = update.state.as_mut()
+        {
+            state.last_seen = prev.as_ref().and_then(|p| p.last_seen);
+        }
+        update
     };
 
     // A Slack app send of this run already published the start it predicted for the new firing.
@@ -7765,6 +7772,51 @@ mod tests {
         assert_eq!(outcome.acked_by.as_deref(), Some("oncall@example.com"));
         assert!(!outcome.attempted, "{:?}", outcome.errors);
         assert_stays_firing_with_note(&outcome);
+    }
+
+    #[tokio::test]
+    async fn a_rollup_rewrite_after_dispatch_keeps_the_observation_clock() {
+        use config::meta::alerts::{level::AlertLevel, state::ROLLUP_GROUP_KEY};
+
+        let Some(alert) = stored_host_alert("rewrite_clock", &["dest"], 0).await else {
+            return;
+        };
+        let alert_id = alert.id.unwrap().to_string();
+        let episode = config::meta::alerts::recovery::EpisodeInput::undelivered(0);
+        persist_alert_run_state_deferred(
+            &alert,
+            &alert_id,
+            &RunOutcome::Firing,
+            Some(AlertLevel::Critical),
+            Some(&critical_hosts(&["a"])),
+            None,
+            &episode,
+        )
+        .await
+        .expect("the plan commits");
+        let rollup = || async {
+            infra::table::alert_states::get(&alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        let observed = rollup().await.last_seen;
+
+        let committed = persist_alert_run_state(
+            &alert,
+            &alert_id,
+            &RunOutcome::NotifyFailed,
+            Some(AlertLevel::Critical),
+            None,
+            None,
+            &episode,
+        )
+        .await;
+
+        assert!(committed);
+        let after = rollup().await;
+        assert_eq!(after.last_outcome, Some(RunOutcome::NotifyFailed));
+        assert_eq!(after.last_seen, observed, "a rewrite observed no groups");
     }
 
     #[tokio::test]

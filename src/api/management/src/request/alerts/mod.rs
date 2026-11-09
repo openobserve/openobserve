@@ -1719,9 +1719,10 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
     // org scoping and not-found behaviour as every other alert read — a raw
     // state-table query would happily serve another org's group labels, which
     // carry host and service names.
-    if let Err(e) = alert::get_by_id(client, &org_id, ksuid).await {
-        return e.into();
-    }
+    let folder_id = match alert::get_by_id(client, &org_id, ksuid).await {
+        Ok((folder, _)) => folder.folder_id,
+        Err(e) => return e.into(),
+    };
 
     let mut groups = match infra::table::alert_states::list_groups(&alert_id).await {
         Ok(g) => g,
@@ -1748,11 +1749,25 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
         .and_then(|n| i32::try_from(n).ok());
     let group_cap = config::get_config().limit.alert_max_groups;
     let acked = group_acks(&org_id, &alert_id, &groups).await;
+    let mutes_shown = openobserve_core::alerts::downtimes::enabled();
+    let now = config::utils::time::now_micros();
 
     let list: Vec<AlertGroupResponseItem> = groups
         .into_iter()
         .map(|g| AlertGroupResponseItem {
             ack: acked.get(&g.group_key).cloned(),
+            downtime: mutes_shown
+                .then(|| {
+                    openobserve_core::alerts::downtimes::active_for_alert_group(
+                        &org_id,
+                        &alert_id,
+                        &folder_id,
+                        &StdHashMap::new(),
+                        &g.group_key,
+                        now,
+                    )
+                })
+                .flatten(),
             labels: parse_group_labels(g.group_labels.as_deref()),
             group_key: g.group_key,
             group_labels: g.group_labels,

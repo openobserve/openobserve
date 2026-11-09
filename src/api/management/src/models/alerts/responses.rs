@@ -400,6 +400,9 @@ pub struct AlertGroupResponseItem {
     /// Present only while an ack is in force on the current firing.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ack: Option<config::meta::alerts::ack::AckView>,
+    /// The mute in force on this group, its own or a whole-alert one; absent when none is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub downtime: Option<config::meta::downtimes::ActiveDowntime>,
 }
 
 /// One `key=value` pair of a group's label set.
