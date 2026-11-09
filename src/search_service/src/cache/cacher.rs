@@ -130,7 +130,7 @@ pub async fn check_cache(
     sql: &Sql,
     result_ts_col: &str,
     is_descending: bool,
-    ts_offset: i64,
+    ts_offset: Option<i64>,
     should_exec_query: &mut bool,
 ) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
@@ -178,6 +178,14 @@ pub async fn check_cache(
         req.query.sql = origin_sql.to_owned();
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
+
+    // Mixed or unresolvable offsets skip the cache, after the normalized SQL is in place.
+    let Some(ts_offset) = ts_offset else {
+        return MultiCachedQueryResponse {
+            order_by: order_by.clone(),
+            ..Default::default()
+        };
+    };
 
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
@@ -1668,7 +1676,7 @@ mod tests {
             &sql,
             &result_ts_col,
             is_descending,
-            0,
+            Some(0),
             &mut should_exec_query,
         )
         .await;
