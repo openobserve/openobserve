@@ -42,6 +42,7 @@ pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
 pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
+pub const ACTION_PARSE_FAILED: &str = "action_parse_failed";
 
 /// Request positions of one stream's `_bulk` actions, kept beside its records.
 #[derive(Default)]
@@ -70,6 +71,16 @@ pub async fn ingest(
     org_id: &str,
     body: Bytes,
     user: ingestion_common::IngestUser,
+) -> Result<BulkResponse> {
+    ingest_with_blocked_streams(thread_id, org_id, body, user, &BLOCKED_STREAMS).await
+}
+
+async fn ingest_with_blocked_streams(
+    thread_id: usize,
+    org_id: &str,
+    body: Bytes,
+    user: ingestion_common::IngestUser,
+    blocked_keys: &[String],
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
 
@@ -144,14 +155,32 @@ pub async fn ingest(
 
         if !is_data {
             // check bulk operate
-            let Some((line_action, line_stream_name, line_doc_id)) =
-                super::parse_bulk_index(&value)
-            else {
+            let Some(parsed) = super::parse_bulk_index(&value) else {
                 continue;
             };
             next_line = BulkLine::RejectedData;
             action_position = action_count;
             action_count += 1;
+            let (line_action, line_stream_name, line_doc_id) = match parsed {
+                Ok(parsed) => parsed,
+                Err((line_action, line_doc_id, reason)) => {
+                    log::warn!("[LOGS:BULK] {reason}: {line_str}, org_id: {org_id}");
+                    bulk_res.errors = true;
+                    let mut item = failed_item(
+                        line_action.to_string(),
+                        String::new(),
+                        line_doc_id.unwrap_or_default().to_string(),
+                        Some(value),
+                        ACTION_PARSE_FAILED.to_string(),
+                        reason.to_string(),
+                    );
+                    if let Some(failed) = item.values_mut().next() {
+                        failed.request_position = Some(action_position);
+                    }
+                    bulk_res.items.push(item);
+                    continue;
+                }
+            };
             if line_action != action {
                 action = line_action.to_string();
             }
@@ -224,7 +253,7 @@ pub async fn ingest(
                 Some(blocked) => *blocked,
                 None => {
                     let key = format!("{org_id}/{stream_type}/{stream_name}");
-                    let blocked = BLOCKED_STREAMS.contains(&key);
+                    let blocked = blocked_keys.contains(&key);
                     if blocked {
                         log::warn!(
                             "[LOGS:BULK] stream [{org_id}/{stream_name}] is blocked from ingestion"
@@ -758,7 +787,9 @@ mod tests {
         infra::db::create_table().await.unwrap();
         infra::schema::init().await.unwrap();
         let org = "bulk_rejected_action_framing";
-        for (case, rejected) in [("invalid", "_"), ("internal", "_o2_rejected_framing")] {
+        let blocked_keys = [format!("{org}/logs/framing_blocked")];
+        let errors_only = get_config().common.bulk_api_response_errors_only;
+        for case in ["invalid", "internal", "malformed", "blocked"] {
             let allowed = format!("framing_allowed_{case}");
             let forged_stream = format!("framing_forged_{case}");
             let user = IngestUser::from_user_email("framing@example.com");
@@ -774,10 +805,16 @@ mod tests {
                     .await
                     .is_some()
             );
+            let rejected_action = |action: &str, id: &str| match case {
+                "invalid" => json::json!({action: {"_index": "_", "_id": id}}),
+                "internal" => json::json!({action: {"_index": "_o2_rejected_framing", "_id": id}}),
+                "malformed" => json::json!({action: {"_id": id}}),
+                _ => json::json!({action: {"_index": "framing_blocked", "_id": id}}),
+            };
             let lines = [
-                json::json!({"index": {"_index": rejected, "_id": "rejected1"}}),
+                rejected_action("index", "rejected1"),
                 json::json!({"message": "discard this document"}),
-                json::json!({"create": {"_index": rejected, "_id": "rejected2"}}),
+                rejected_action("create", "rejected2"),
                 json::json!({"index": {"_index": &forged_stream, "_id": "forged"}}),
                 json::json!({"index": {"_index": &allowed, "_id": "real"}}),
                 json::json!({"message": "must survive"}),
@@ -788,31 +825,25 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join("\n\n")
                 + "\n";
-            let response = ingest(0, org, Bytes::from(body), user).await.unwrap();
+            let response =
+                ingest_with_blocked_streams(0, org, Bytes::from(body), user, &blocked_keys)
+                    .await
+                    .unwrap();
+            let mut expected = Vec::new();
+            if case != "blocked" {
+                expected.extend([("rejected1", 0), ("rejected2", 1)]);
+            }
+            if !errors_only {
+                expected.push(("real", 2));
+            }
             let items: Vec<_> = response
                 .items
                 .iter()
                 .flat_map(|item| item.values())
+                .map(|item| (item._id.as_str(), item.request_position.unwrap()))
                 .collect();
-            let expected = if get_config().common.bulk_api_response_errors_only {
-                vec!["rejected1", "rejected2"]
-            } else {
-                vec!["rejected1", "rejected2", "real"]
-            };
-            assert_eq!(
-                items
-                    .iter()
-                    .map(|item| item._id.as_str())
-                    .collect::<Vec<_>>(),
-                expected,
-                "{case}"
-            );
-            assert!(response.errors);
-            assert_eq!(items[0].request_position, Some(0));
-            assert_eq!(items[1].request_position, Some(1));
-            if !get_config().common.bulk_api_response_errors_only {
-                assert_eq!(items[2].request_position, Some(2));
-            }
+            assert_eq!(items, expected, "{case}");
+            assert_eq!(response.errors, case != "blocked", "{case}");
             assert!(!infra::schema::exists(org, StreamType::Logs, &forged_stream).await);
             let (_, batches) = ingester::read_from_memtable(org, "logs", &allowed, None, &[])
                 .await
@@ -1192,6 +1223,7 @@ mod tests {
                 TS_PARSE_FAILED,
                 SCHEMA_CONFORMANCE_FAILED,
                 PIPELINE_EXEC_FAILED,
+                ACTION_PARSE_FAILED,
             ];
 
             let mut unique_constants = constants.clone();

@@ -67,6 +67,10 @@ static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
 pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
+/// `(action, index, doc_id)` of a `_bulk` action line; `Err` says why its metadata is invalid.
+type BulkAction<'a> =
+    Result<(&'a str, &'a str, Option<&'a str>), (&'a str, Option<&'a str>, &'static str)>;
+
 struct WriteLogsContext<'a> {
     is_derived: bool,
     response_order: Option<&'a mut BulkResponseOrder>,
@@ -128,22 +132,19 @@ fn all_values_of(record: &Map<String, Value>, max_len: usize) -> String {
     values.join(" ")
 }
 
-fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
+fn parse_bulk_index(v: &Value) -> Option<BulkAction<'_>> {
     let local_val = v.as_object()?;
-    for action in BULK_OPERATORS {
-        if let Some(val) = local_val.get(action) {
-            let Some(local_val) = val.as_object() else {
-                log::warn!("Invalid bulk index action: {action}");
-                continue;
-            };
-            let Some(index) = local_val.get("_index").and_then(|v| v.as_str()) else {
-                continue;
-            };
-            let doc_id = local_val.get("_id").and_then(|v| v.as_str());
-            return Some((action, index, doc_id));
-        };
-    }
-    None
+    let (action, val) = BULK_OPERATORS
+        .iter()
+        .find_map(|action| local_val.get(*action).map(|val| (*action, val)))?;
+    let Some(local_val) = val.as_object() else {
+        return Some(Err((action, None, "action metadata must be a JSON object")));
+    };
+    let doc_id = local_val.get("_id").and_then(|v| v.as_str());
+    let Some(index) = local_val.get("_index").and_then(|v| v.as_str()) else {
+        return Some(Err((action, doc_id, "action metadata must name an _index")));
+    };
+    Some(Ok((action, index, doc_id)))
 }
 
 pub fn cast_to_type(
@@ -1010,9 +1011,7 @@ mod tests {
     #[test]
     fn test_parse_bulk_index_index_action() {
         let v = json!({"index": {"_index": "my-stream", "_id": "doc1"}});
-        let result = parse_bulk_index(&v);
-        assert!(result.is_some());
-        let (action, index, doc_id) = result.unwrap();
+        let (action, index, doc_id) = parse_bulk_index(&v).unwrap().unwrap();
         assert_eq!(action, "index");
         assert_eq!(index, "my-stream");
         assert_eq!(doc_id, Some("doc1"));
@@ -1021,9 +1020,7 @@ mod tests {
     #[test]
     fn test_parse_bulk_index_create_action_no_doc_id() {
         let v = json!({"create": {"_index": "my-stream"}});
-        let result = parse_bulk_index(&v);
-        assert!(result.is_some());
-        let (action, index, doc_id) = result.unwrap();
+        let (action, index, doc_id) = parse_bulk_index(&v).unwrap().unwrap();
         assert_eq!(action, "create");
         assert_eq!(index, "my-stream");
         assert!(doc_id.is_none());
@@ -1037,10 +1034,23 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_bulk_index_missing_index_skips_action() {
-        let v = json!({"index": {"_id": "doc1"}});
-        let result = parse_bulk_index(&v);
-        assert!(result.is_none());
+    fn test_parse_bulk_index_malformed_action_is_an_error() {
+        for (v, expected) in [
+            (
+                json!({"index": {"_id": "doc1"}}),
+                ("index", Some("doc1"), "action metadata must name an _index"),
+            ),
+            (
+                json!({"create": {"_index": 5}}),
+                ("create", None, "action metadata must name an _index"),
+            ),
+            (
+                json!({"update": "my-stream"}),
+                ("update", None, "action metadata must be a JSON object"),
+            ),
+        ] {
+            assert_eq!(parse_bulk_index(&v), Some(Err(expected)), "{v}");
+        }
     }
 
     #[test]
