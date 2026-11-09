@@ -216,7 +216,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
         "Where",
         "Errors",
         "Latency",
-        "Absence",
+        "Stops sending",
         "State",
         "Last checked",
       ]);
@@ -225,7 +225,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
     it("says Covered, No monitor or the engine's word in each cell, and never GAP", () => {
       const wrapper = mountTable();
       expect(text(wrapper, "autoobserve-coverage-cell-api-errors")).toBe("Covered");
-      expect(text(wrapper, "autoobserve-coverage-cell-web-errors")).toBe("No monitor");
+      expect(text(wrapper, "autoobserve-coverage-cell-web-errors")).toBe("Not watched");
       expect(text(wrapper, "autoobserve-coverage-cell-db-errors")).toBe("Silent");
       expect(text(wrapper, "autoobserve-coverage-cell-cart-absence")).toBe("Covered");
       const table = text(wrapper, "autoobserve-coverage-matrix");
@@ -244,14 +244,14 @@ describe("AutoObserveCoverageTab in live mode", () => {
     it("keys the cells, not the fixture marks, in the footer", () => {
       const key = text(mountTable(), "autoobserve-coverage-legend");
       expect(key).toContain("Covered");
-      expect(key).toContain("No monitor");
+      expect(key).toContain("Not watched");
       expect(key).not.toMatch(/GAP|Anomaly|Threshold|Not applicable/);
     });
 
     it("keys the filled amber dot with one word for a monitor that falls short", () => {
       const item = mountTable().find('[data-test="autoobserve-coverage-legend-problem-key"]');
       expect(item.exists()).toBe(true);
-      expect(item.text()).toBe("Monitor falls short");
+      expect(item.text()).toBe("Falls short");
       expect(item.find("span").classes().join(" ")).toContain(LIVE_DOT.problem);
     });
 
@@ -286,7 +286,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
         .map((c: { header: string }) => c.header);
       expect(headers).toContain("Saturation");
       expect(headers).toContain("Stream");
-      expect(headers).not.toContain("Absence");
+      expect(headers).not.toContain("Stops sending");
       expect(text(wrapper, "autoobserve-coverage-legend")).toContain("Anomaly");
     });
   });

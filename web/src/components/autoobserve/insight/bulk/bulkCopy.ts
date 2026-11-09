@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { deniedLine } from "../insightCta";
 import type { BulkKind, FolderRef, ReviewGroup, ReviewRow } from "./useBulkReview";
 
 // Lists name three items, then "and N more".
@@ -71,8 +72,11 @@ const commonPeriod = (rows: ReviewRow[]): number | null => {
 /** The rule line under the title; the period is the one most rows use. */
 export const ruleOf = (t: TranslateFn, kind: BulkKind, rows: ReviewRow[]): I18nText => {
   const minutes = commonPeriod(rows);
-  const rule =
-    kind === "no_data" || kind === "source"
+  // A mixed list has no one rule; each row's own "Fires when" says it.
+  const mixed = rows.some((r) => (r.row.kind ?? kind) !== kind);
+  const rule = mixed
+    ? ""
+    : kind === "no_data" || kind === "source"
       ? minutes
         ? t(`insight.bulk.rule.${kind}`, { duration: durationOf(t, minutes) })
         : ""
@@ -82,8 +86,12 @@ export const ruleOf = (t: TranslateFn, kind: BulkKind, rows: ReviewRow[]): I18nT
 
 /** The service name, with its cluster and namespace only when another row shares the name. */
 export const serviceLabel = (t: TranslateFn, row: ReviewRow, all: ReviewRow[]): I18nText => {
-  const twins = all.filter((r) => r.service === row.service);
-  if (twins.length < 2) return raw(row.service);
+  // A service's own drafts of other kinds share its scope, so only a different cluster or namespace is a twin.
+  const twins = all.filter(
+    (r) =>
+      r.service === row.service && (r.cluster !== row.cluster || r.namespace !== row.namespace),
+  );
+  if (twins.length === 0) return raw(row.service);
   const where = [row.cluster ?? "", row.namespace ?? t("insight.bulk.noNamespace")].filter(Boolean);
   return raw(`${row.service} · ${where.join(" / ")}`);
 };
@@ -93,8 +101,12 @@ export const blockLine = (t: TranslateFn, row: ReviewRow): I18nText => {
   const block = row.block;
   if (!block) return t("insight.bulk.cantBuild");
   if (block.code === "checking") return t("insight.bulk.block.checking");
+  if (block.code === "measuring") return t("insight.threshold.measuring");
   if (block.code === "schemaFailed") {
     return t("insight.bulk.block.schemaFailed", { stream: row.stream.name });
+  }
+  if (block.code === "noBaseline") {
+    return t(`insight.threshold.${block.kind}Reason`, { service: row.service });
   }
   return t(`insight.bulk.block.noField.${block.part}`, {
     stream: row.stream.name,
@@ -102,23 +114,43 @@ export const blockLine = (t: TranslateFn, row: ReviewRow): I18nText => {
   });
 };
 
+const kindOf = (kind: BulkKind, row: ReviewRow): BulkKind => row.row.kind ?? kind;
+
 export const firesWhenOf = (t: TranslateFn, kind: BulkKind, row: ReviewRow): I18nText => {
   const minutes = row.prefill?.periodMinutes;
   if (!row.prefill || !minutes) return raw("");
-  if (kind === "errors" && row.row.usually) {
-    return t("insight.bulk.firesWhen.errors", { count: row.row.usually * 3 });
+  const own = kindOf(kind, row);
+  if (own === "errors" && row.threshold) {
+    return t("insight.bulk.firesWhen.errors", { count: row.threshold });
   }
-  if (kind === "latency" && row.row.inputs?.p95Ms) {
-    return t("insight.bulk.firesWhen.latency", { value: `${row.row.inputs.p95Ms * 2} ms` });
+  if (own === "latency" && row.threshold) {
+    return t("insight.bulk.firesWhen.latency", { value: `${row.threshold} ms` });
   }
   const key = row.stream.type === "traces" ? "noSpans" : "noRows";
   return t(`insight.bulk.firesWhen.${key}`, { duration: durationOf(t, minutes) });
 };
 
-export const usuallyOf = (t: TranslateFn, locale: string, row: ReviewRow): I18nText =>
-  row.row.usually === null
+// A quiet service's usual error count is a fraction of one an hour, which whole numbers would show as 0.
+const level = (locale: string, value: number): string =>
+  new Intl.NumberFormat(locale, { maximumFractionDigits: value < 10 ? 1 : 0 }).format(value);
+
+export const usuallyOf = (
+  t: TranslateFn,
+  locale: string,
+  row: ReviewRow,
+  kind: BulkKind = "no_data",
+): I18nText => {
+  const own = kindOf(kind, row);
+  if (own === "errors" || own === "latency") {
+    if (!row.usual) return raw("");
+    return own === "errors"
+      ? t("insight.bulk.usually", { rate: level(locale, row.usual) })
+      : t("insight.bulk.usuallyLatency", { value: number(locale, row.usual) });
+  }
+  return row.row.usually === null
     ? raw("")
     : t("insight.bulk.usually", { rate: number(locale, row.row.usually) });
+};
 
 /** "ingest team", "No team yet", a folder name or a cluster. */
 export const groupTitle = (t: TranslateFn, group: ReviewGroup): I18nText => {
@@ -238,8 +270,12 @@ export const footerOf = (
 };
 
 export const reasonOf = (t: TranslateFn, reason: FailureReason): I18nText => {
-  if (reason.code === "forbidden")
-    return t("insight.bulk.reason.forbidden", { folder: reason.folder });
+  if (reason.code === "forbidden") {
+    return t("insight.bulk.reason.forbidden", {
+      denied: deniedLine(t, "addAlert"),
+      folder: reason.folder,
+    });
+  }
   if (reason.code === "duplicate") {
     return t("insight.bulk.reason.duplicate", { name: reason.name, folder: reason.folder });
   }

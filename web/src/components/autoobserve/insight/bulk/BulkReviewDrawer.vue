@@ -186,6 +186,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ blockLine(t, row) }}
             </span>
+            <OInput
+              v-if="row.block?.code === 'noBaseline' || state.thresholds[row.key]"
+              :model-value="state.thresholds[row.key] ?? ''"
+              type="number"
+              size="sm"
+              class="mt-1 max-w-52"
+              :label="t('insight.threshold.label')"
+              :suffix="String(t(`insight.threshold.${thresholdKind(row)}Suffix`))"
+              :disabled="locked"
+              :data-test="`bulk-review-threshold-${row.key}`"
+              @update:model-value="
+                (v: string | number) => setRowThreshold(row.key, Number(v) || null)
+              "
+            />
             <span
               v-else-if="row.row.unsure"
               class="text-text-secondary text-xs"
@@ -199,10 +213,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-body">{{ row.stream.name }}</span>
         </template>
         <template #cell-firesWhen="{ row }">
-          <span class="text-text-body">{{ firesWhenOf(t, kind, row) }}</span>
+          <span class="text-text-body" :data-test="`bulk-review-firesWhen-${row.key}`">
+            {{ firesWhenOf(t, kind, row) }}
+          </span>
         </template>
         <template #cell-usually="{ row }">
-          <span class="text-text-body tabular-nums">{{ usuallyOf(t, locale, row) }}</span>
+          <span class="text-text-body tabular-nums">{{ usuallyOf(t, locale, row, kind) }}</span>
         </template>
       </OTable>
     </div>
@@ -234,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="bulk-review-create"
             @click="createTicked()"
           >
-            {{ t("insight.bulk.create", { count: tickedRows.length }, tickedRows.length) }}
+            {{ t("insight.bulk.create") }}
           </OButton>
         </div>
       </div>
@@ -243,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, provide, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -253,6 +269,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import alertsService from "@/services/alerts";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -282,6 +299,7 @@ import {
   loadDestinations,
   loadReviewContext,
   setGroupBy,
+  setRowThreshold,
   toggleCollapsed,
   toggleGroup,
   toggleRow,
@@ -292,6 +310,8 @@ import {
   type ReviewRow,
 } from "./useBulkReview";
 
+// It opens from the service drawer as well as the page, so it must stack one layer above any drawer.
+provide("o2DrawerDepth", 1);
 const { t, locale: i18nLocale } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
@@ -354,8 +374,11 @@ const hidden = computed(
 
 const label = (row: ReviewRow) => serviceLabel(t, row, reviewRows.value);
 
+const thresholdKind = (row: ReviewRow) =>
+  (row.row.kind ?? kind.value) === "latency" ? "latency" : "errors";
+
 const compactLine = (row: ReviewRow) =>
-  [row.stream.name, firesWhenOf(t, kind.value, row), usuallyOf(t, locale.value, row)]
+  [row.stream.name, firesWhenOf(t, kind.value, row), usuallyOf(t, locale.value, row, kind.value)]
     .filter(Boolean)
     .join(" · ");
 

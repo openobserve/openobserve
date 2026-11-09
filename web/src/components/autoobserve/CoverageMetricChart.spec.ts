@@ -70,10 +70,10 @@ const badge = (wrapper: ReturnType<typeof mountChart>) =>
   wrapper.find('[data-test="autoobserve-coverage-chart-badge-latency"]').text();
 
 describe("CoverageMetricChart gap wording", () => {
-  it("names a live gap by its cell word, never 'Not watched'", () => {
+  it("names a live gap by its glossary word once, on the badge only", () => {
     const missing = mountChart(gapCell("none"), true);
-    expect(badge(missing)).toBe("No monitor");
-    expect(missing.text()).not.toContain("Not watched");
+    expect(badge(missing)).toBe("Not watched");
+    expect(missing.text().split("Not watched")).toHaveLength(2);
     expect(missing.find('[data-test="autoobserve-coverage-chart-gap-latency"]').exists()).toBe(
       false,
     );
@@ -211,7 +211,7 @@ describe("CoverageMetricChart live states", () => {
     const wrapper = mountLive({ cell: gapCell("none") });
     expect(find(wrapper, "gap").exists()).toBe(false);
     expect(find(wrapper, "value").text()).toBe("120 ms");
-    expect(badge(wrapper)).toBe("No monitor");
+    expect(badge(wrapper)).toBe("Not watched");
   });
 
   it("captions partial data and a stream shared with other services", () => {

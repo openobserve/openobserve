@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { firedTimes, suggestErrors, suggestLatency, twoSignificant } from "./thresholds";
+import { firedTimes, measuredThreshold, suggestErrors, suggestLatency } from "./thresholds";
 
 describe("suggestErrors", () => {
   it("is three times the usual hourly count", () => {
@@ -28,9 +28,16 @@ describe("suggestErrors", () => {
     expect(suggestErrors(-4)).toBeNull();
   });
 
-  it("rounds to two significant figures", () => {
-    expect(suggestErrors(1234)).toBe(3700);
-    expect(suggestErrors(0.123)).toBe(0.37);
+  it("is a whole count, rounded up, so a quiet service still fires above its usual", () => {
+    expect(suggestErrors(1234)).toBe(3702);
+    expect(suggestErrors(1.4)).toBe(5);
+    expect(suggestErrors(0.123)).toBe(1);
+  });
+
+  it("does not round a whole product up past itself on float noise", () => {
+    expect(suggestErrors(56 / 168)).toBe(1);
+    expect(suggestErrors(0.1)).toBe(1);
+    expect(suggestErrors(2)).toBe(6);
   });
 });
 
@@ -40,9 +47,21 @@ describe("suggestLatency", () => {
     expect(suggestLatency(null)).toBeNull();
   });
 
-  it("rounds to two significant figures", () => {
+  it("keeps two significant figures, which fits a duration in milliseconds or in seconds", () => {
     expect(suggestLatency(1263)).toBe(2500);
-    expect(twoSignificant(0.0456)).toBe(0.046);
+    expect(suggestLatency(24.3)).toBe(49);
+    expect(suggestLatency(0.42)).toBe(0.84);
+  });
+});
+
+describe("measuredThreshold: the one rounding the review list and the Add alert dialog share", () => {
+  it("answers each kind as its suggestion does", () => {
+    for (const usual of [0.123, 1.4, 17, 1234]) {
+      expect(measuredThreshold("errors", usual)).toBe(suggestErrors(usual));
+      expect(measuredThreshold("latency", usual)).toBe(suggestLatency(usual));
+    }
+    expect(measuredThreshold("errors", null)).toBeNull();
+    expect(measuredThreshold("latency", 0)).toBeNull();
   });
 });
 

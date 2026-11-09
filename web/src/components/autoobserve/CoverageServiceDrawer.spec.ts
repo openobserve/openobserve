@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
+import config from "@/aws-exports";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -24,7 +25,13 @@ import { coverageFor, detectorsOf, type CoverageRow } from "./fixtures";
 import { toCoverageSource } from "./live/liveAdapter";
 import { LIVE_DOT } from "./live/liveCopy";
 
-const api = vi.hoisted(() => ({ correlate: vi.fn(), getStream: vi.fn(), fetch: vi.fn() }));
+const api = vi.hoisted(() => ({
+  correlate: vi.fn(),
+  getStream: vi.fn(),
+  fetch: vi.fn(),
+  getLocations: vi.fn(),
+  listAlerts: vi.fn(),
+}));
 
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -38,6 +45,12 @@ vi.mock("@/services/service_streams", () => ({
 }));
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStream: (...args: unknown[]) => api.getStream(...args) }),
+}));
+vi.mock("@/services/alerts", () => ({
+  default: { listByFolderId: (...args: unknown[]) => api.listAlerts(...args) },
+}));
+vi.mock("@/services/synthetics", () => ({
+  default: { getLocations: (...args: unknown[]) => api.getLocations(...args) },
 }));
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
@@ -132,9 +145,9 @@ describe("CoverageServiceDrawer in live mode", () => {
       "autoobserve-coverage-drawer-chip-absence",
     ]);
     expect(found.map((c) => c.text())).toEqual([
-      "Errors: No monitor",
+      "Errors: Not watched",
       "Latency: Silent",
-      "Absence: Covered",
+      "Stops sending: Covered",
     ]);
     const dot = (i: number) => found[i].find("span").classes().join(" ");
     expect(dot(0)).toContain(LIVE_DOT.missing);
@@ -144,8 +157,8 @@ describe("CoverageServiceDrawer in live mode", () => {
     expect(charts).toEqual(["requests", "errors", "latency"]);
     const other = wrapper.find('[data-test="autoobserve-coverage-drawer-extra"]').text();
     expect(other).toContain("Saturation");
-    expect(other).not.toContain("Absence");
-    expect(other).toContain("No monitor");
+    expect(other).not.toContain("Stops sending");
+    expect(other).toContain("Not watched");
     expect(other).not.toMatch(/\bNone\b/);
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-logs"]').exists()).toBe(false);
   });
@@ -177,7 +190,7 @@ describe("CoverageServiceDrawer in live mode", () => {
     expect(lines).toEqual([
       "Errors: checkout-errors matches, but it notifies no one",
       "Latency: checkout-p99 matches, but it can't see its data",
-      "No monitor watches absence",
+      "No alert watches whether it stops sending",
     ]);
     expect(wrapper.text()).not.toContain("No scoped monitor");
   });
@@ -187,7 +200,9 @@ describe("CoverageServiceDrawer in live mode", () => {
     const lines = mountDrawer(row, "gap")
       .findAll('[data-test="autoobserve-coverage-drawer-gap-line"]')
       .map((l) => l.text());
-    expect(lines).toEqual(["No monitor watches errors, latency, or absence"]);
+    expect(lines).toEqual([
+      "No alert watches its errors, its latency, or whether it stops sending",
+    ]);
   });
 
   it("opens the absence check's detail from its chip", async () => {
@@ -320,5 +335,111 @@ describe("CoverageServiceDrawer in fixture mode", () => {
     const wrapper = mountDrawer(row, "watched", false);
     expect(chips(wrapper)).toHaveLength(6);
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-logs"]').exists()).toBe(true);
+  });
+});
+
+describe("CoverageServiceDrawer synthetic check inputs (F6)", () => {
+  it("reads the health address and the locations only once Synthetic check opens", async () => {
+    const enterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    onTestFinished(() => {
+      config.isEnterprise = enterprise;
+    });
+    const isAddress = (call: unknown[]) =>
+      atob((call[0] as any).queryReq.query.sql).includes("server_address");
+    api.fetch.mockImplementation((req: any, handlers: any) => {
+      if (!atob(req.queryReq.query.sql).includes("server_address")) return;
+      handlers.data(null, {
+        type: "search_response_hits",
+        content: {
+          results: {
+            hits: [{ server_address: "shop.example.com", server_port: 443, http_route: "/health" }],
+          },
+        },
+      });
+      handlers.complete();
+    });
+    api.getLocations.mockResolvedValue({
+      data: {
+        locations: [
+          {
+            id: "pub-1",
+            kind: "public",
+            status: "online",
+            label: "EU",
+            region: "eu",
+            provider: "o2",
+          },
+        ],
+      },
+    });
+    const row = liveRow(
+      {
+        errors: cell("none"),
+        latency: cell("none"),
+        absence: cell("none"),
+        external_probe: cell("none"),
+      },
+      [{ type: "traces", name: "app_traces" }],
+    );
+    const wrapper = mountDrawer(row, "gap");
+    await flushPromises();
+    expect(api.fetch.mock.calls.filter(isAddress)).toHaveLength(0);
+    expect(api.getLocations).not.toHaveBeenCalled();
+    await wrapper
+      .find('[data-test="autoobserve-coverage-drawer-row-external_probe"]')
+      .trigger("click");
+    await flushPromises();
+    expect(api.fetch.mock.calls.filter(isAddress)).toHaveLength(1);
+    expect(api.getLocations).toHaveBeenCalledTimes(1);
+    const detail = wrapper
+      .findAllComponents({ name: "CoverageSignalDetail" })
+      .find((c) => c.props("signal") === "external_probe")!;
+    const target = detail.props("insight").cta.target;
+    expect(target.prefill.url).toBe("https://shop.example.com/health");
+    expect(target.prefill.locations).toEqual(["pub-1"]);
+  });
+
+  it("fills the folder and who gets notified from the service's own alerts (F6)", async () => {
+    const enterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    onTestFinished(() => {
+      config.isEnterprise = enterprise;
+    });
+    api.fetch.mockImplementation(() => undefined);
+    api.getLocations.mockResolvedValue({ data: { locations: [] } });
+    api.listAlerts.mockResolvedValue({
+      data: {
+        list: [
+          {
+            alert_id: "checkout-errors-id",
+            folder_id: "f-pay",
+            folder_name: "payments",
+            destinations: ["pay-slack"],
+          },
+          { alert_id: "other-id", folder_id: "f-x", folder_name: "x", destinations: ["x"] },
+        ],
+      },
+    });
+    const row = liveRow(
+      {
+        errors: cell("covered", "checkout-errors"),
+        latency: cell("none"),
+        absence: cell("none"),
+        external_probe: cell("none"),
+      },
+      [{ type: "traces", name: "app_traces" }],
+    );
+    const wrapper = mountDrawer(row, "gap");
+    await wrapper
+      .find('[data-test="autoobserve-coverage-drawer-row-external_probe"]')
+      .trigger("click");
+    await flushPromises();
+    const detail = wrapper
+      .findAllComponents({ name: "CoverageSignalDetail" })
+      .find((c) => c.props("signal") === "external_probe")!;
+    const prefill = detail.props("insight").cta.target.prefill;
+    expect(prefill.folder).toBe("f-pay");
+    expect(prefill.destinations).toEqual(["pay-slack"]);
   });
 });

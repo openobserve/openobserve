@@ -19,6 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-surface-subtle rounded-default flex flex-col gap-3 p-3"
     data-test="autoobserve-coverage-detail"
   >
+    <InsightBlock
+      v-if="insight"
+      :parts="insight"
+      variant="details"
+      flush
+      :pending="pending"
+      @cta="(cta) => emit('cta', cta)"
+      @secondary="(cta) => emit('cta', cta)"
+    />
     <ODescriptionList dense>
       <ODescriptionItem v-if="cell.detector" stacked :label="t('autoobserve.coverage.detector')">
         <OText variant="mono" class="block">{{ cell.detector }}</OText>
@@ -48,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </ODescriptionItem>
       <ODescriptionItem
-        v-if="cell.reason && (cell.state !== 'gap' || cell.engine)"
+        v-if="!insight && cell.reason && (cell.state !== 'gap' || cell.engine)"
         stacked
         :label="t('autoobserve.coverage.reason')"
       >
@@ -118,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         t("autoobserve.coverage.guardrails")
       }}
     </p>
-    <div v-if="config" class="flex flex-col gap-1">
+    <div v-if="config && (!cell.engine || nerd)" class="flex flex-col gap-1">
       <span class="text-text-secondary text-xs">{{ t("autoobserve.coverage.config") }}</span>
       <OCodeBlock
         :code="config"
@@ -142,6 +151,9 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { seed } from "./coverageSeries";
+import InsightBlock from "./insight/InsightBlock.vue";
+import type { InsightCta, InsightParts } from "./insight/insightCopy";
+import { useAutoObserveView } from "./v2/useAutoObserveView";
 import { LEDGER_STATUS, type CoverageCell, type EngineMonitor, type LedgerEntry } from "./fixtures";
 
 const props = defineProps<{
@@ -149,9 +161,16 @@ const props = defineProps<{
   service: string;
   signal: string;
   ledger: LedgerEntry[];
+  insight?: InsightParts | null;
+  pending?: boolean;
 }>();
 
+const emit = defineEmits<{ cta: [cta: InsightCta] }>();
+
 const { t } = useI18nTyped();
+// Monitor ids and kind keys are engine detail, so the live config block is for Nerd view only.
+const { view } = useAutoObserveView();
+const nerd = computed(() => view.value === "nerd");
 
 const ledgerTag = (id: string) => {
   const entry = props.ledger.find((e) => e.id === id);

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import alertsService from "@/services/alerts";
 import { gt } from "@/types/i18n";
 import type { NotifyPick, TeamPick } from "@/utils/alerts/prefill/fromAutoObserve";
 
@@ -101,4 +102,38 @@ export const notifyOf = (service: string, alerts: OwnedAlert[]): NotifyPick => {
     ),
     alertCount: top.count,
   };
+};
+
+const ownedOf = (alert: any): OwnedAlert => {
+  const folder = alert?.folder_name;
+  return {
+    folder_id: alert?.folder_id ?? folder?.id ?? null,
+    folder_name: typeof folder === "string" ? folder : (folder?.name ?? null),
+    destinations: Array.isArray(alert?.destinations) ? alert.destinations : [],
+  };
+};
+
+/** The org's alerts with these ids, read with their destinations; empty when there are none or the list can't be read. */
+export const loadOwnedAlerts = async (org: string, ids: string[]): Promise<OwnedAlert[]> => {
+  if (!org || !ids.length) return [];
+  try {
+    const res = await alertsService.listByFolderId(
+      1,
+      0,
+      "name",
+      false,
+      "",
+      org,
+      undefined,
+      undefined,
+      undefined,
+      true,
+      { silentForbidden: true },
+    );
+    const wanted = new Set(ids);
+    const list: any[] = res.data?.list ?? [];
+    return list.filter((a) => wanted.has(String(a?.alert_id ?? a?.id ?? ""))).map(ownedOf);
+  } catch {
+    return [];
+  }
 };

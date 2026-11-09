@@ -49,6 +49,10 @@ vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }))
 vi.mock("@/services/alert_destination", () => ({ default: { list: api.destinations } }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: api.copy }));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
+const measureBaseline = vi.hoisted(() => vi.fn());
+vi.mock("../targets/baseline", () => ({
+  measureBaseline: (...a: unknown[]) => measureBaseline(...a),
+}));
 
 const { default: BulkReviewDrawer } = await import("./BulkReviewDrawer.vue");
 const { default: ODrawer } = await import("@/lib/overlay/Drawer/ODrawer.vue");
@@ -85,6 +89,7 @@ const httpError = (status: number) =>
   Object.assign(new Error(`HTTP ${status}`), { response: { status, data: {} } });
 
 beforeEach(() => {
+  measureBaseline.mockReset().mockResolvedValue(null);
   config.isEnterprise = "true";
   store.state.selectedOrganization.identifier = "demo-org";
   api.create.mockReset();
@@ -120,15 +125,24 @@ afterEach(() => {
 });
 
 describe("BulkReviewDrawer — review", () => {
+  it("stacks above the service drawer it is opened from", async () => {
+    await mountDrawer();
+    await openWith();
+    const layers = [...document.querySelectorAll<HTMLElement>("[style*='z-index']")].map((el) =>
+      Number(el.style.zIndex),
+    );
+    expect(Math.max(...layers)).toBeGreaterThanOrEqual(7000);
+  });
+
   it("shows the title, the rule and the footer before anything is saved", async () => {
     await mountDrawer();
     await openWith();
     expect(text("bulk-review-title")).toBe("Add 12 no-data alerts");
-    expect(text("bulk-review-rule")).toContain("Nothing is saved until you click Create.");
+    expect(text("bulk-review-rule")).toContain("Nothing is saved until you click Add alerts.");
     expect(text("bulk-review-footer")).toBe(
       "11 alerts will be created: 5 in folder ingest, 3 in folder default, 3 in folder payments. Each description says it came from an AutoObserve suggestion.",
     );
-    expect(text("bulk-review-create")).toBe("Create 11 alerts");
+    expect(text("bulk-review-create")).toBe("Add alerts");
     expect(api.create).not.toHaveBeenCalled();
   });
 
@@ -136,7 +150,7 @@ describe("BulkReviewDrawer — review", () => {
     await mountDrawer();
     await openWith(m12Rows(IDS).slice(0, 1));
     expect(text("bulk-review-title")).toBe("Add 1 no-data alert");
-    expect(text("bulk-review-create")).toBe("Create 1 alert");
+    expect(text("bulk-review-create")).toBe("Add alerts");
   });
 
   it("writes nothing on Cancel and closes", async () => {
@@ -158,7 +172,8 @@ describe("BulkReviewDrawer — review", () => {
     );
     await click("bulk-review-group-request-team-payments");
     expect(api.copy.mock.calls[0][0]).toMatch(/^Please add 3 no-data alerts in folder payments/);
-    expect(text("bulk-review-create")).toBe("Create 8 alerts");
+    expect(text("bulk-review-create")).toBe("Add alerts");
+    expect(text("bulk-review-footer")).toContain("8 alerts will be created");
   });
 
   it("shows no lock and no rights banner before the server serves rights", async () => {
@@ -210,7 +225,10 @@ describe("BulkReviewDrawer — results", () => {
     await click("bulk-review-create");
     expect(review.state.open).toBe(true);
     expect(text("bulk-review-failures")).toContain("1 of 11 alerts wasn't created.");
-    expect(text("bulk-review-failure-j")).toBe("svc-j: you can't write to folder payments.");
+    expect(text("bulk-review-failure-j")).toBe(
+      "svc-j: You can't create alerts. Your role is missing the Create permission on Alerts. The alert was going to folder payments.",
+    );
+    expect(q("bulk-review-failures")!.className).toContain("text-banner-error-soft-text");
     expect(q("bulk-review-retry-j")).toBeNull();
     expect(q("bulk-review-tick-j-failed")).not.toBeNull();
     expect(q("bulk-review-create")).toBeNull();
@@ -270,7 +288,37 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     expect(q("bulk-review-cant-unreadable")!.className).toContain("text-status-error-text");
     expect(q("bulk-review-cant-no-cluster")!.className).not.toContain("text-status-error-text");
     expect(q("bulk-review-cant-read-b")).toBeNull();
-    expect(text("bulk-review-create")).toBe("Create 1 alert");
+    expect(text("bulk-review-create")).toBe("Add alerts");
+  });
+
+  it("measures an errors draft's usual level, and asks for a threshold when the week has none (F1)", async () => {
+    api.schema.mockResolvedValue({
+      data: {
+        schema: [
+          { name: "service_name" },
+          { name: "k8s_namespace_name" },
+          { name: "level", type: "Utf8" },
+        ],
+      },
+    });
+    measureBaseline.mockResolvedValue(null);
+    await mountDrawer();
+    const [row] = fieldRows(IDS);
+    await openWith([{ ...row, key: "errs", kind: "errors", usually: null }]);
+    await flushPromises();
+    expect(measureBaseline).toHaveBeenCalledTimes(1);
+    expect(text("bulk-review-cant-errs")).toBe(
+      "AutoObserve found no usual error count for svc-ingest-b over the last 7 days. Set a threshold to add this alert.",
+    );
+    expect(createButton().disabled).toBe(true);
+    const input = document.querySelector<HTMLInputElement>(
+      '[data-test="bulk-review-threshold-errs"] input',
+    )!;
+    input.value = "40";
+    input.dispatchEvent(new Event("input"));
+    await flushPromises();
+    expect(createButton().disabled).toBe(false);
+    expect(text("bulk-review-firesWhen-errs")).toBe("errors above 40 an hour");
   });
 
   it("keeps Create off while a ticked row waits for its stream fields", async () => {
@@ -281,7 +329,7 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     expect(text("bulk-review-cant-read-b")).toBe("Checking the stream's fields…");
     expect(text("bulk-review-rule")).toContain("no rows for 15 min");
     expect(text("bulk-review-footer")).toContain("1 alert will be created in folder ingest.");
-    expect(text("bulk-review-create")).toBe("Create 1 alert");
+    expect(text("bulk-review-create")).toBe("Add alerts");
     expect(createButton().disabled).toBe(true);
     answer({ data: { schema: [{ name: "service_name" }, { name: "k8s_namespace_name" }] } });
     await flushPromises();
@@ -349,5 +397,31 @@ describe("BulkReviewDrawer — focus and edition", () => {
     await flushPromises();
     expect(q("bulk-review-drawer")).toBeNull();
     expect(q("bulk-review-title")).toBeNull();
+  });
+});
+
+describe("BulkReviewDrawer: a group that notifies no one is a warning", () => {
+  it("shows notifies no one on the No team yet row in amber, not in the red of a failure", async () => {
+    await mountDrawer();
+    await openWith([
+      {
+        key: "lonely",
+        scope: {
+          service: "svc-lonely",
+          cluster: null,
+          namespace: null,
+          stream: { type: "logs", name: "app_logs" },
+          schema: ["_timestamp", "service_name"],
+        },
+        usually: null,
+      },
+    ]);
+    const meta = q("bulk-review-group-meta-__no_team__");
+    expect(text("bulk-review-group-meta-__no_team__")).toContain("notifies no one");
+    const part = [...meta!.querySelectorAll("span")].find(
+      (span) => span.textContent?.trim() === "notifies no one",
+    )!;
+    expect(part.className).toContain("text-status-warning-text");
+    expect(part.className).not.toContain("text-status-error-text");
   });
 });

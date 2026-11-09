@@ -23,6 +23,10 @@ const api = vi.hoisted(() => ({ folders: vi.fn(), destinations: vi.fn(), schema:
 vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }));
 vi.mock("@/services/alert_destination", () => ({ default: { list: api.destinations } }));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
+const measureBaseline = vi.hoisted(() => vi.fn());
+vi.mock("../targets/baseline", () => ({
+  measureBaseline: (...a: unknown[]) => measureBaseline(...a),
+}));
 
 const {
   closeBulkReview,
@@ -31,6 +35,7 @@ const {
   loadReviewContext,
   openBulkReview,
   setFolderRightsSource,
+  setRowThreshold,
   useBulkReview,
 } = await import("./useBulkReview");
 
@@ -66,6 +71,7 @@ beforeEach(() => {
   api.destinations.mockReset().mockResolvedValue({ data: { list: [] } });
   api.schema.mockReset().mockResolvedValue(fields("service_name"));
   setFolderRightsSource(null);
+  measureBaseline.mockReset();
 });
 
 afterEach(() => {
@@ -176,5 +182,101 @@ describe("useBulkReview — review state belongs to one org", () => {
     expect(review.state.folders.map((f) => f.name)).toEqual(["ops"]);
     expect(review.state.rights).toBeNull();
     expect(review.state.destinations).toEqual([]);
+  });
+});
+
+describe("useBulkReview — a threshold is measured over 7 days, else asked for (F1)", () => {
+  const errorsRow = (key: string, usually: number | null): BulkRow => ({
+    ...row(key),
+    kind: "errors",
+    usually,
+  });
+
+  it("measures each errors row with no usual level once the fields are read, and drafts on it", async () => {
+    api.schema.mockResolvedValue(fields("service_name", "level"));
+    measureBaseline.mockResolvedValue(5);
+    openBulkReview({ kind: "errors", rows: [errorsRow("a", null), errorsRow("b", 10)] });
+    expect(rowOf("a").block).toEqual({ code: "checking" });
+    expect(review.state.ticked.has("a")).toBe(true);
+    await loadReviewContext("org-a");
+    await flushPromises();
+    expect(measureBaseline).toHaveBeenCalledTimes(1);
+    const [org, request] = measureBaseline.mock.calls[0];
+    expect(org).toBe("org-a");
+    expect(request).toMatchObject({ kind: "errors", stream: { type: "logs", name: "app_logs" } });
+    expect(request.sql).toContain(`lower("level")`);
+    expect(request.sql).not.toContain("HAVING");
+    expect(rowOf("a").block).toBeNull();
+    expect(rowOf("a").prefill?.sql).toMatch(/HAVING count\(\*\) > 15$/);
+    expect(review.toCreate.value.map((r) => r.key).sort()).toEqual(["a", "b"]);
+  });
+
+  it("unticks a row the week gave no usual level, and ticks it once the user sets a threshold", async () => {
+    api.schema.mockResolvedValue(fields("service_name", "level"));
+    measureBaseline.mockResolvedValue(null);
+    openBulkReview({ kind: "errors", rows: [errorsRow("a", null)] });
+    await loadReviewContext("org-a");
+    await flushPromises();
+    expect(rowOf("a").block).toEqual({ code: "noBaseline", kind: "errors" });
+    expect(review.state.ticked.has("a")).toBe(false);
+    setRowThreshold("a", 40);
+    expect(rowOf("a").block).toBeNull();
+    expect(review.state.ticked.has("a")).toBe(true);
+    expect(review.toCreate.value.map((r) => r.key)).toEqual(["a"]);
+    setRowThreshold("a", null);
+    expect(rowOf("a").block).toEqual({ code: "noBaseline", kind: "errors" });
+    expect(review.toCreate.value).toEqual([]);
+  });
+
+  it("drops a measurement that lands after the review moved to another org", async () => {
+    api.schema.mockResolvedValue(fields("service_name", "level"));
+    const late = deferred<number | null>();
+    measureBaseline.mockReturnValueOnce(late.promise);
+    openBulkReview({ kind: "errors", rows: [errorsRow("a", null)] });
+    const first = loadReviewContext("org-a");
+    await flushPromises();
+    openBulkReview({ kind: "errors", rows: [errorsRow("a", null)] });
+    measureBaseline.mockResolvedValue(null);
+    await loadReviewContext("org-b");
+    late.resolve(5);
+    await first;
+    await flushPromises();
+    expect(rowOf("a").block).toEqual({ code: "noBaseline", kind: "errors" });
+  });
+});
+
+describe("useBulkReview — closing the review stops its measurements (F12)", () => {
+  const errorsRow = (key: string): BulkRow => ({ ...row(key), kind: "errors", usually: null });
+
+  it("starts no measurement when the review closes while the fields are still read", async () => {
+    const schema = deferred<unknown>();
+    api.schema.mockReturnValueOnce(schema.promise);
+    openBulkReview({ kind: "errors", rows: [errorsRow("a")] });
+    const load = loadReviewContext("org-a");
+    await flushPromises();
+    closeBulkReview();
+    schema.resolve(fields("service_name", "level"));
+    await load;
+    await flushPromises();
+    expect(measureBaseline).not.toHaveBeenCalled();
+  });
+
+  it("cancels the running batch and schedules no further one when the review closes", async () => {
+    api.schema.mockResolvedValue(fields("service_name", "level"));
+    const late = deferred<number | null>();
+    measureBaseline.mockReturnValue(late.promise);
+    const keys = ["a", "b", "c", "d", "e", "f"];
+    openBulkReview({ kind: "errors", rows: keys.map(errorsRow) });
+    const load = loadReviewContext("org-a");
+    await flushPromises();
+    expect(measureBaseline).toHaveBeenCalledTimes(4);
+    closeBulkReview();
+    const signals = measureBaseline.mock.calls.map((call) => call[2] as AbortSignal);
+    expect(signals.every((signal) => signal?.aborted)).toBe(true);
+    late.resolve(5);
+    await load;
+    await flushPromises();
+    expect(measureBaseline).toHaveBeenCalledTimes(4);
+    expect(review.state.baselines).toEqual({});
   });
 });

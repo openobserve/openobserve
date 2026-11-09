@@ -126,6 +126,16 @@ export interface AlertPrefillQueryChoice {
 export interface AlertBuildOptions {
   patternMode?: AlertPatternMode;
   queryIndex?: number;
+  /** The threshold the user typed into the dialog's threshold field. */
+  threshold?: number;
+}
+
+/** A threshold the source could not measure: the dialog asks for it and keeps Continue off until it is set. */
+export interface AlertPrefillThresholdInput {
+  label: string;
+  suffix: string;
+  reason: string;
+  value: number | null;
 }
 
 /** Bumped whenever the persisted shape changes; a stale blob is ignored. */
@@ -181,6 +191,9 @@ export interface AlertPrefill {
 
   /** Present when the surface can fold its patterns into the query. */
   patternFilter?: AlertPrefillPatternFilter;
+
+  /** Present when the query's threshold must come from the user before the alert can fire. */
+  thresholdInput?: AlertPrefillThresholdInput;
 
   /** Present when the surface has several queries and the user must pick one. */
   queryChoices?: AlertPrefillQueryChoice[];

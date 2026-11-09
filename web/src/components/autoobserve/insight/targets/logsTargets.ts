@@ -24,14 +24,19 @@ import {
 } from "@/utils/alerts/prefill/fromAutoObserve";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
-/** "Open in Logs" on a paged finding starts six hours before the stop, so the last normal rows are on screen. */
+/** "Open in Logs" on an outage starts six hours before the stop, so the last normal rows are on screen. */
 export const LEAD_US = 6 * 3_600_000_000;
+
+/** A paged finding opens one hour before it started (CTA-MAP §3b). */
+export const PAGED_LEAD_US = 3_600_000_000;
 
 export interface FindingWindow {
   stream_type: string;
   stream_name: string;
   /** Microseconds. */
   signal_at: number;
+  /** Microseconds before the signal; six hours when absent. */
+  lead_us?: number;
 }
 
 export interface SourcesWindow {
@@ -95,14 +100,14 @@ const routeFor = (
 const inList = (field: string, values: string[]): string =>
   `${sqlField(field)} IN (${values.map(sqlLiteral).join(", ")})`;
 
-/** The finding's stream from six hours before the signal to now; grouped by sender only when one is known (G24). */
+/** The finding's stream from its lead before the signal to now; grouped by sender only when one is known (G24). */
 export const logsForFinding = (
   f: FindingWindow,
   now: number = nowUs(),
   senderField?: string | null,
 ): RouteLocationRaw | null => {
   if (!isAutoObserveBuild()) return null;
-  const window = { from: f.signal_at - LEAD_US, to: now };
+  const window = { from: f.signal_at - (f.lead_us ?? LEAD_US), to: now };
   const sql =
     senderField && f.stream_type !== "traces" ? groupedSql(f.stream_name, senderField) : undefined;
   return routeFor(f.stream_type, f.stream_name, window, { sql });

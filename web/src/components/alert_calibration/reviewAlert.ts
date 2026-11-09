@@ -21,6 +21,7 @@ import { toEditHandoff, type ReviewAlertAction } from "./applySuggestion";
 export interface ReviewedFinding {
   alert_name?: string | null;
   finding_id?: string;
+  rule_id?: string;
 }
 
 /** Opens the alert editor at the action's focus in the same tab, so its Cancel comes back here. */

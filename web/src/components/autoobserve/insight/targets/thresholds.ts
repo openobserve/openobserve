@@ -19,20 +19,28 @@ export const ERRORS_FACTOR = 3;
 /** PD-11: a latency alert fires at twice the usual p95. */
 export const LATENCY_FACTOR = 2;
 
-/** Two significant figures, so a suggestion reads as a round starting point rather than a measurement. */
-export const twoSignificant = (value: number): number => Number(value.toPrecision(2));
+const twoSignificant = (value: number): number => Number(value.toPrecision(2));
 
-const scaled = (usual: number | null | undefined, factor: number): number | null =>
-  typeof usual === "number" && Number.isFinite(usual) && usual > 0
-    ? twoSignificant(usual * factor)
-    : null;
+// Twelve significant figures first, so float noise such as 1.0000000000000002 does not round up to 2.
+const wholeCountAbove = (value: number): number => Math.ceil(Number(value.toPrecision(12)));
+
+/** The threshold the review list and the Add alert dialog both draft: errors a whole count rounded up, latency two significant figures, which fits milliseconds or seconds. */
+export const measuredThreshold = (
+  kind: "errors" | "latency",
+  usual: number | null | undefined,
+): number | null => {
+  if (typeof usual !== "number" || !Number.isFinite(usual) || usual <= 0) return null;
+  return kind === "errors"
+    ? wholeCountAbove(usual * ERRORS_FACTOR)
+    : twoSignificant(usual * LATENCY_FACTOR);
+};
 
 /** Null when there is no usual rate, since a number made up from nothing would read as a measured one. */
 export const suggestErrors = (usualPerHour: number | null | undefined): number | null =>
-  scaled(usualPerHour, ERRORS_FACTOR);
+  measuredThreshold("errors", usualPerHour);
 
 export const suggestLatency = (p95Ms: number | null | undefined): number | null =>
-  scaled(p95Ms, LATENCY_FACTOR);
+  measuredThreshold("latency", p95Ms);
 
 /** How many times the series crossed above the threshold; a long incident stays one firing, not one per point. */
 export const firedTimes = (

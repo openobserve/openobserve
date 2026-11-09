@@ -178,10 +178,11 @@ const { t, locale } = useI18nTyped();
 const { run, dismiss, pendingId, dismissTarget, dismissOpen } = useInsightActions();
 
 const shown = computed(() => props.rail.requests.slice(0, RAIL_CAP));
+const shownCount = computed(() => shown.value.reduce((sum, r) => sum + (r.covers ?? 1), 0));
 const settled = computed(() => !props.skeleton && props.rail.status === "ready");
 const listed = computed(() => settled.value && shown.value.length > 0);
 // The server total, not this page's length, decides whether more exist: decided suggestions can empty a page.
-const beyond = computed(() => settled.value && props.rail.total > shown.value.length);
+const beyond = computed(() => settled.value && props.rail.total > shownCount.value);
 const hidden = computed(() => beyond.value && !listed.value);
 const notice = computed(() =>
   props.rail.status === "error" && props.rail.failure
@@ -189,7 +190,7 @@ const notice = computed(() =>
     : null,
 );
 const more = computed(() =>
-  listed.value ? moreText(t, locale.value, props.rail.total, shown.value.length) : null,
+  listed.value ? moreText(t, locale.value, props.rail.total, shownCount.value) : null,
 );
 const loadPhase = useLoadPhase(() => props.rail.status, toRef(props, "skeleton"));
 const loadText = computed(() => liveLoadText(t, "suggestions", loadPhase.value));

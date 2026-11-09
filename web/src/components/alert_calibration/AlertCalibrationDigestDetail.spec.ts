@@ -205,7 +205,7 @@ describe("AlertCalibrationDigestDetail definition not checked", () => {
   it("Review query opens the alert editor at the query with the skip as its handoff", async () => {
     const wrapper = await mountDetail([notChecked(1, 7, "probe_rejected")]);
     const button = wrapper.get(`${GROUP} [data-test="alert-calibration-skip-group-row"] button`);
-    expect(button.text()).toBe("Review query");
+    expect(button.text()).toBe("Review alert");
     await button.trigger("click");
     await flushPromises();
     expect(JSON.parse(sessionStorage.getItem(ALERT_PREFILL_KEY)!)).toMatchObject({

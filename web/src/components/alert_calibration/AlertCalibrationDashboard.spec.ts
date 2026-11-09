@@ -27,8 +27,10 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AlertCalibrationDashboard from "./AlertCalibrationDashboard.vue";
 import type { DigestRecord, RunRow } from "./digests";
 import analytics from "@/services/product_analytics";
+import { openAlertReview } from "./reviewAlert";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("./reviewAlert", () => ({ openAlertReview: vi.fn() }));
 
 // The decision route answers 404 while its switch is off; this spec pins today's routes.
 vi.mock("@/services/autoobserveDecisions", async (importOriginal) => {
@@ -971,5 +973,102 @@ describe("AlertCalibrationDashboard dismissals", () => {
       false,
     );
     again.unmount();
+  });
+});
+
+describe("AlertCalibrationDashboard row next steps", () => {
+  const v2failure = record({
+    schema_version: 2,
+    kind: "finding",
+    rule_id: "failure",
+    severity: "High",
+    confidence: "High",
+    title: "payments filters on upstream_bucket, a field its stream doesn't have",
+    alert_id: "a1",
+    alert_name: "payments",
+    finding_id: fid(1),
+    scope_kind: "alert",
+    scope_key: "a1",
+    insight_actions: JSON.stringify([{ type: "review_alert", alert_id: "a1", focus: "query" }]),
+  });
+
+  beforeEach(() => {
+    queryClient.clear();
+    vi.mocked(openAlertReview).mockReset();
+    store.state.zoConfig = {
+      ...store.state.zoConfig,
+      version: "v1",
+      alert_calibration_enabled: true,
+      ai_enabled: true,
+    };
+    vi.mocked(alertCalibration.getConfig).mockResolvedValue(config(true) as never);
+    vi.mocked(alertCalibration.getStatus).mockResolvedValue({ data: { last_run: null } } as never);
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === ""
+        ? ([{ ...run, finding_count: 1 }] as never)
+        : ([{ ...v2failure, finding_count: 1 }] as never),
+    );
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+  });
+
+  const settle = async () => {
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await flushPromises();
+    }
+  };
+  const openFailures = async () => {
+    const w = await mountPage();
+    await settle();
+    await w.find('[data-test="alert-calibration-dashboard-rule-failure"] button').trigger("click");
+    await settle();
+    return w;
+  };
+
+  const rowButtons = (w: VueWrapper) =>
+    w
+      .find('[data-test="alert-calibration-dashboard-alert-a1"]')
+      .findAll("button")
+      .map((b) => b.text());
+
+  it("Review alert comes first and opens the editor at the finding's focus", async () => {
+    const w = await openFailures();
+    expect(rowButtons(w)).toEqual(["Review alert", "Open alert", "Ask AI", "Dismiss…"]);
+    await w.find('[data-test="alert-calibration-dashboard-review-alert"]').trigger("click");
+    expect(openAlertReview).toHaveBeenCalledWith(
+      w.router,
+      "default",
+      { type: "review_alert", alert_id: "a1", focus: "query" },
+      expect.objectContaining({ finding_id: fid(1), alert_name: "payments" }),
+    );
+    w.unmount();
+  });
+
+  it("Ask AI hands the chat a draft-only request and never sends it", async () => {
+    const w = await openFailures();
+    await w.find('[data-test="alert-calibration-dashboard-ask-ai"]').trigger("click");
+    const [[payload]] = w.emitted("sendToAiChat") as [[Record<string, unknown>]];
+    expect(payload.autoSend).toBe(false);
+    expect(payload.prompt).toContain("Alert payments filters on upstream_bucket");
+    expect(payload.chipName).toBe("AutoObserve finding · payments");
+    w.unmount();
+  });
+
+  it("Ask AI is absent when AI is off", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: false };
+    const w = await openFailures();
+    expect(rowButtons(w)).toEqual(["Review alert", "Open alert", "Dismiss…"]);
+    w.unmount();
+  });
+
+  it("a version-1 row keeps today's buttons", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: false };
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([run] as never) : (findings as never),
+    );
+    const w = await openFailures();
+    expect(w.findAll('[data-test="alert-calibration-dashboard-review-alert"]')).toHaveLength(0);
+    expect(rowButtons(w)).toContain("Open alert");
+    w.unmount();
   });
 });

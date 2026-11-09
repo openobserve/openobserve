@@ -30,6 +30,7 @@ import {
   MIXED_3_0_COLUMNS,
 } from "@/views/Infrastructure/kubernetes2/__fixtures__/flattenSchemas";
 import {
+  baselineSql,
   errorFieldOf,
   errorsAlert,
   latencyAlert,
@@ -190,6 +191,17 @@ describe("errorsAlert", () => {
     expect(prefill.periodMinutes).toBe(60);
   });
 
+  it("fires above a whole error count, rounded up from three times the usual", () => {
+    const prefill = errorsAlert(tracesScope(), {
+      ...options,
+      errorField: null,
+      usualPerHour: 1.4,
+    })!;
+
+    expect(prefill.sql).toMatch(/HAVING count\(\*\) > 5$/);
+    expect(prefill.meta?.threshold).toBe(5);
+  });
+
   it("scopes a traces alert by the cluster and namespace spans keep under their service_ prefix", () => {
     const prefill = errorsAlert(
       tracesScope({
@@ -225,6 +237,54 @@ describe("errorsAlert", () => {
     expect(prefill.sql).toContain(`"status_code" >= 500`);
   });
 
+  it("skips a numeric level for a text severity, and a text status code (F3)", () => {
+    const types = { level: "Int64", severity_text: "Utf8", status: "Utf8", status_code: "Int64" };
+    expect(errorFieldOf("logs", ["level", "severity_text"], types)).toEqual({
+      name: "severity_text",
+      kind: "level",
+    });
+    expect(errorFieldOf("logs", ["level", "status", "status_code"], types)).toEqual({
+      name: "status_code",
+      kind: "status_code",
+    });
+    expect(errorFieldOf("logs", ["level", "status"], types)).toBeNull();
+  });
+
+  it("takes a status field only when it holds numbers, never a boolean or a date (F3)", () => {
+    for (const type of ["Boolean", "Timestamp(Microsecond, None)", "Binary"]) {
+      expect(errorFieldOf("logs", ["status"], { status: type })).toBeNull();
+    }
+    for (const type of ["Int64", "UInt16", "Float64", "Decimal128(10, 2)"]) {
+      expect(errorFieldOf("logs", ["status"], { status: type })).toEqual({
+        name: "status",
+        kind: "status_code",
+      });
+    }
+  });
+
+  it("blocks a scoped alert whose stream lacks the namespace or cluster field it must filter on", () => {
+    const noNs = noDataAlert(logsScope({ schema: ["service_name", "k8s_cluster"] }), options)!;
+    expect(noNs.warnings).toContainEqual(
+      expect.objectContaining({ key: "autoobserve.noNamespaceField", level: "blocking" }),
+    );
+    const noCluster = noDataAlert(
+      logsScope({ schema: ["service_name"], namespace: null }),
+      options,
+    )!;
+    expect(noCluster.warnings).toContainEqual(
+      expect.objectContaining({ key: "autoobserve.noClusterField", level: "blocking" }),
+    );
+  });
+
+  it("filters on the field the schema names the service by, such as app", () => {
+    const prefill = noDataAlert(
+      logsScope({ cluster: null, namespace: null, schema: ["app", "body"] }),
+      options,
+    )!;
+    expect(prefill.sql).toContain(`"app" = 'svc-a'`);
+    expect(prefill.sql).not.toContain("service_name");
+  });
+
   it("gives no prefill for a logs stream with neither a status nor a level field", () => {
     expect(errorFieldOf("logs", ["_timestamp", "body", "message"])).toBeNull();
     expect(errorsAlert(logsScope(), { ...options, errorField: null, usualPerHour: 17 })).toBeNull();
@@ -237,7 +297,7 @@ describe("errorsAlert", () => {
     expect(prefill.sql).toMatch(/HAVING count\(\*\) > 51$/);
   });
 
-  it("leaves the threshold empty and warns when there is no usual count", () => {
+  it("with no usual count, asks for a threshold and leaves Save off until one is set (F1)", () => {
     const prefill = errorsAlert(tracesScope(), {
       ...options,
       errorField: null,
@@ -246,12 +306,53 @@ describe("errorsAlert", () => {
 
     expect(prefill.sql).not.toContain("HAVING");
     expect(prefill.meta?.threshold).toBeNull();
-    expect(prefill.triggerThreshold).toBeUndefined();
-    expect(prefill.warnings).toContainEqual({
-      key: "autoobserve.noBaseline",
-      level: "warning",
-      params: { service: "svc-a" },
+    expect(prefill.thresholdInput).toEqual({
+      label: "Fire above",
+      suffix: "errors an hour",
+      reason:
+        "AutoObserve found no usual error count for svc-a over the last 7 days. Set a threshold to add this alert.",
+      value: null,
     });
+    expect(isPrefillBlocked(prefill)).toBe(false);
+  });
+
+  it("takes a threshold the user set, so one returned row fires it (F1)", () => {
+    const prefill = errorsAlert(tracesScope(), {
+      ...options,
+      errorField: null,
+      usualPerHour: null,
+      threshold: 40,
+    })!;
+
+    expect(prefill.sql).toMatch(/HAVING count\(\*\) > 40$/);
+    expect(prefill).toMatchObject({ triggerThreshold: 1, triggerOperator: ">=" });
+    expect(prefill.thresholdInput?.value).toBe(40);
+  });
+});
+
+describe("baselineSql (F1)", () => {
+  it("counts the service's errors with the alert's own scope and error field", () => {
+    expect(
+      baselineSql(logsScope(), { kind: "errors", errorField: { name: "level", kind: "level" } }),
+    ).toBe(
+      `SELECT count(*) AS errors FROM "app_logs" WHERE "service_name" = 'svc-a' AND "k8s_cluster" = 'cluster-k' AND "k8s_namespace_name" = 'ns-b' AND lower("level") IN ('error', 'fatal', 'critical', 'err', 'crit', 'alert', 'emerg')`,
+    );
+  });
+
+  it("reads the p95 in milliseconds and the request count for latency", () => {
+    expect(baselineSql(tracesScope(), { kind: "latency", durationField: "duration" })).toBe(
+      `SELECT approx_percentile_cont("duration", 0.95) / 1000 AS p95_ms, count(*) AS requests FROM "app_traces" WHERE "service_name" = 'svc-a' AND "k8s_cluster" = 'cluster-k' AND "k8s_namespace_name" = 'ns-b'`,
+    );
+  });
+
+  it("measures nothing it could not scope to the service", () => {
+    expect(
+      baselineSql(logsScope({ schema: ["level"] }), {
+        kind: "errors",
+        errorField: { name: "level", kind: "level" },
+      }),
+    ).toBeNull();
+    expect(baselineSql(logsScope(), { kind: "errors", errorField: null })).toBeNull();
   });
 });
 
@@ -267,6 +368,24 @@ describe("latencyAlert", () => {
     expect(prefill.sql).toContain(`approx_percentile_cont("duration", 0.95) / 1000 > 840`);
     expect(prefill.sql).toContain("count(*) >= 20");
     expect(prefill.periodMinutes).toBe(15);
+  });
+
+  it("with no usual p95, asks for a threshold in milliseconds; a set one fires (F1)", () => {
+    const empty = latencyAlert(tracesScope(), {
+      ...options,
+      durationField: "duration",
+      p95Ms: null,
+    })!;
+    expect(empty.sql).not.toContain("HAVING");
+    expect(empty.thresholdInput).toMatchObject({ suffix: "ms (p95)", value: null });
+    const set = latencyAlert(tracesScope(), {
+      ...options,
+      durationField: "duration",
+      p95Ms: null,
+      threshold: 300,
+    })!;
+    expect(set.sql).toContain(`approx_percentile_cont("duration", 0.95) / 1000 > 300`);
+    expect(set.thresholdInput?.value).toBe(300);
   });
 
   it("reads a logs duration field as milliseconds and says so", () => {
@@ -404,6 +523,41 @@ describe("other checks", () => {
     expect(textOf(unknown.warnings.find((w) => w.key === "autoobserve.noCluster")!)).toBe(
       "svc-a's cluster is not known for k8s_node_memory_utilization, so this node alert would watch every cluster.",
     );
+  });
+
+  it("blocks memory on a series that can't carry the service's cluster or namespace (F2)", () => {
+    const noNamespace = memoryAlert(
+      {
+        ...metrics("k8s_pod_memory_limit_utilization"),
+        schema: ["k8s_deployment_name", "k8s_cluster"],
+      },
+      options,
+    )!;
+    const noCluster = memoryAlert(
+      {
+        ...metrics("k8s_pod_memory_limit_utilization"),
+        schema: ["k8s_deployment_name", "k8s_namespace_name"],
+      },
+      options,
+    )!;
+    expect(noNamespace.warnings.filter((w) => w.level === "blocking").map((w) => w.key)).toEqual([
+      "autoobserve.noNamespaceField",
+    ]);
+    expect(noCluster.warnings.filter((w) => w.level === "blocking").map((w) => w.key)).toEqual([
+      "autoobserve.noClusterField",
+    ]);
+  });
+
+  it("blocks restarts on an events stream that can't carry the service's cluster or namespace (F2)", () => {
+    const base = ["body_object_reason", "body_object_regarding"];
+    const scope = (schema: string[]) =>
+      logsScope({ stream: { type: "logs", name: "k8s_events" }, schema });
+    const noNamespace = restartAlert(scope([...base, "k8s_cluster"]), options)!;
+    const noCluster = restartAlert(scope([...base, "k8s_namespace_name"]), options)!;
+    expect(isPrefillBlocked(noNamespace)).toBe(true);
+    expect(noNamespace.warnings.map((w) => w.key)).toContain("autoobserve.noNamespaceField");
+    expect(isPrefillBlocked(noCluster)).toBe(true);
+    expect(noCluster.warnings.map((w) => w.key)).toContain("autoobserve.noClusterField");
   });
 
   it("leaves a memory or node alert that is scoped unblocked", () => {

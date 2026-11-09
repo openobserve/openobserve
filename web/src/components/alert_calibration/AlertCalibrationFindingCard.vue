@@ -481,13 +481,20 @@ const insightActions = (): ActionRow[] => [
     label: applyCopy(t, locale.value).button(),
     run: () => openApply(action),
   })),
-  ...insightActionsOf(props.finding).map((action, index) => ({
-    key: `${index}`,
-    type: action.type,
-    label: t(insightActionLabel(action)),
-    run: action.type === "review_alert" ? () => void openReview(`${index}`, action) : undefined,
-    pending: reviewPending.value === `${index}`,
-  })),
+  // Every focus reads "Review alert", so one button per card; the editor shows the focus.
+  ...insightActionsOf(props.finding)
+    .flatMap((action, index, all) =>
+      action.type === "review_alert" && all.findIndex((a) => a.type === "review_alert") !== index
+        ? []
+        : [action],
+    )
+    .map((action, index) => ({
+      key: `${index}`,
+      type: action.type,
+      label: t(insightActionLabel(action)),
+      run: action.type === "review_alert" ? () => void openReview(`${index}`, action) : undefined,
+      pending: reviewPending.value === `${index}`,
+    })),
 ];
 
 /** `actions` is comma-joined; an action this build does not know still shows, by its raw name. */

@@ -472,12 +472,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :ledger="ledger"
       :expanded="selected?.signal ?? null"
       :anchor="DRAWER_ANCHOR"
-      :fix="fixFor(selectedRow.service)"
-      :message="actionMessage"
+      message=""
       :live="!!source"
       @close="closeDrawer"
       @expand="(signal) => selected && (selected = { ...selected, signal })"
-      @fix="runSelectedFix"
       @select="(service) => (selected = { service, signal: null })"
     />
   </div>
@@ -624,11 +622,6 @@ const LEGEND: Record<CoverageFill, { cls: HexClass; key: I18nKey }[]> = {
     { cls: "none", key: "autoobserve.coverage.bucketNotScanned" },
   ],
 };
-const FIX_KEY: Record<"noLink" | "stopped", I18nKey> = {
-  noLink: "autoobserve.coverage.fixNoLink",
-  stopped: "autoobserve.coverage.fixStopped",
-};
-
 const props = defineProps<{
   ledger: LedgerEntry[];
   scenario: Scenario;
@@ -728,11 +721,6 @@ const splitLabel = computed(() =>
         gaps: totals.value.gaps,
       }),
 );
-
-const fixFor = (service: string): I18nText | null => {
-  const blockedBy = allRows.value.find((r) => r.service === service)?.blockedBy;
-  return blockedBy ? t(FIX_KEY[blockedBy]) : null;
-};
 
 const planned = computed(
   () => props.source?.planned ?? new Set(planFor(props.scenario).map((p) => p.service)),
@@ -947,17 +935,6 @@ const cellTip = (cell: CoverageCell, signal: Signal): I18nText => {
   return props.source
     ? t("autoobserveLive.cell.tipNoClass", { signal: name })
     : t("autoobserve.coverage.tipNa", { signal: name });
-};
-
-const actionMessage = ref<I18nText | "">("");
-const runFix = (action: I18nText, service: string) => {
-  actionMessage.value = t("autoobserve.coverage.fixQueued", { action, service: raw(service) });
-};
-
-const runSelectedFix = () => {
-  const service = selected.value?.service;
-  const action = service ? fixFor(service) : null;
-  if (service && action) runFix(action, service);
 };
 
 // The drawer returns focus to whatever opened it first; the hex selected last is the one to land on.

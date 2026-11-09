@@ -124,6 +124,44 @@ describe("destinationHandoff", () => {
   });
 });
 
+describe("a handoff whose click is no longer current (F11)", () => {
+  const lateFolder = () => {
+    let answer!: (value: unknown) => void;
+    get.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    return () =>
+      answer({ data: { list: [{ alert_id: "a1", name: "svc_c_errors", folder_id: "ops" }] } });
+  };
+  const newer = JSON.stringify({ version: 1, source: "calibration", target: { alertId: "b1" } });
+
+  it("never writes over a newer handoff when the org changed during the folder lookup", async () => {
+    let current = true;
+    const answer = lateFolder();
+    const route = destinationHandoff("a1", ["ops-webhook"], {
+      alertName: "svc_c_errors",
+      isCurrent: () => current,
+    });
+    current = false;
+    sessionStorage.setItem(ALERT_PREFILL_KEY, newer);
+    answer();
+    expect(await route).toBeNull();
+    expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBe(newer);
+  });
+
+  it("drops a review handoff the same way", async () => {
+    let current = true;
+    const answer = lateFolder();
+    const route = reviewTarget("a1", "query", {
+      alertName: "svc_c_errors",
+      isCurrent: () => current,
+    });
+    current = false;
+    sessionStorage.setItem(ALERT_PREFILL_KEY, newer);
+    answer();
+    expect(await route).toBeNull();
+    expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBe(newer);
+  });
+});
+
 describe("the editor's reading of prefill=autoobserve", () => {
   it("is a handoff only on the edit route of an enterprise build", () => {
     expect(isEditHandoffPrefill("autoobserve", true)).toBe(true);

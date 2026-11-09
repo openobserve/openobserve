@@ -170,7 +170,10 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { autoobserveSuggestionsPageQuery } from "@/services/autoobserve.queries";
+import {
+  autoobserveCoverageQuery,
+  autoobserveSuggestionsPageQuery,
+} from "@/services/autoobserve.queries";
 import InsightBlock from "../insight/InsightBlock.vue";
 import { useInsightActions } from "../insight/useInsightActions";
 import AlertCalibrationDismissDialog from "@/components/alert_calibration/AlertCalibrationDismissDialog.vue";
@@ -204,6 +207,11 @@ const query = useQuery(() => ({
   placeholderData: keepSameOrg(org.value),
 }));
 const refetch = () => void query.refetch();
+// The same cached coverage the page shows, so a row's fix can prefill from its service's streams.
+const coverage = useQuery(() => ({
+  ...autoobserveCoverageQuery(org.value, "strict"),
+  enabled: props.open && !!org.value,
+}));
 
 const state = useKeptFailure(
   () => stateOf(query, refetch),
@@ -216,7 +224,9 @@ const notice = computed(() =>
     : null,
 );
 const rows = computed<SuggestionRow[]>(() =>
-  toSuggestionRows(t, zone.value, query.data.value?.suggestions ?? []),
+  toSuggestionRows(t, zone.value, query.data.value?.suggestions ?? [], Date.now(), {
+    rows: coverage.data.value?.rows,
+  }),
 );
 const clampTotal = ref<number | null>(null);
 // An org switch voids the hold, so an older org's clamp can never set or clear the newer org's total.

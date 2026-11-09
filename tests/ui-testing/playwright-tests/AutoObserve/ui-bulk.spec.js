@@ -65,10 +65,10 @@ test.describe('Bulk review drawer', { tag: ['@autoobserve', '@enterprise'] }, ()
     const bulk = new BulkReviewPage(page);
     await bulk.open(ORG);
     await expect(bulk.title).toHaveText('Add 12 no-data alerts');
-    await expect(bulk.rule).toContainText('Nothing is saved until you click Create.');
+    await expect(bulk.rule).toContainText('Nothing is saved until you click Add alerts.');
     await bulk.tickOnly(GROUPS, INGEST);
     await expect(bulk.footer).toContainText('3 alerts will be created in folder ingest.');
-    await expect(bulk.create).toHaveText('Create 3 alerts');
+    await expect(bulk.create).toHaveText('Add alerts');
     await bulk.create.click();
     const toast = bulk.toast('3 alerts created in folder ingest.');
     await expect(toast).toBeVisible({ timeout: 30000 });
@@ -143,7 +143,7 @@ test.describe('Bulk review drawer', { tag: ['@autoobserve', '@enterprise'] }, ()
       { timeout: 30000 },
     );
     await expect(bulk.reason('read-b')).toHaveCount(0, { timeout: 30000 });
-    await expect(bulk.create).toHaveText('Create 1 alert');
+    await expect(bulk.create).toHaveText('Add alerts');
     await bulk.create.click();
     const toast = bulk.toast('1 alert created in folder ingest.');
     await expect(toast).toBeVisible({ timeout: 30000 });

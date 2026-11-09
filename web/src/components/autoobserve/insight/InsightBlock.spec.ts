@@ -13,15 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import InsightBlock from "./InsightBlock.vue";
+import { ASK_AI_KEY } from "./insightCta";
 import type { InsightCta, InsightParts } from "./insightCopy";
 
 const cta: InsightCta = {
   key: "review-query",
+  action: "reviewAlert",
   label: raw("Review query"),
   target: {
     type: "review_alert",
@@ -34,6 +37,7 @@ const cta: InsightCta = {
 
 const logs: InsightCta = {
   key: "logs-app",
+  action: "openInLogs",
   label: raw("Open in Logs"),
   target: { type: "route", to: { path: "/logs" } },
   note: null,
@@ -57,13 +61,31 @@ const insight = (over: Partial<InsightParts> = {}): InsightParts => ({
     scope_kind: "alert",
     scope_key: "a2",
   },
+  ai: {
+    kind: "alert_not_working",
+    subject: "payments-latency",
+    request: raw("Suggest a corrected query and don't save it."),
+    facts: [["Alert", "payments-latency"]],
+  },
   ...over,
 });
 
-const mountBlock = (parts: InsightParts, variant?: "card" | "details") =>
+const storeWith = (ai: boolean) =>
+  createStore({
+    state: { zoConfig: { ai_enabled: ai }, selectedOrganization: { identifier: "demo-org" } },
+  });
+
+const mountBlock = (
+  parts: InsightParts,
+  variant?: "card" | "details",
+  opts: { ai?: boolean; ask?: (p: unknown) => void } = {},
+) =>
   mount(InsightBlock, {
     props: { parts, ...(variant ? { variant } : {}) },
-    global: { plugins: [i18n] },
+    global: {
+      plugins: [i18n, storeWith(opts.ai ?? true)],
+      provide: opts.ask ? { [ASK_AI_KEY as symbol]: opts.ask } : {},
+    },
   });
 
 const sel = (part: string) => `[data-test="insight-block-f1-${part}"]`;
@@ -92,8 +114,10 @@ describe("InsightBlock card (test 8)", () => {
     expect(why.classes()).toContain("line-clamp-2");
   });
 
-  it("opens Details with Next, the secondary action, Dismiss… and the note", async () => {
+  it("keeps Dismiss… and the note on the card, and opens Details with Next and the secondary action", async () => {
     const wrapper = mountBlock(insight());
+    expect(wrapper.get(sel("dismiss")).text()).toBe("Dismiss…");
+    expect(wrapper.get(sel("note")).text()).toContain("Nothing is saved until you save.");
     const toggle = wrapper.get(sel("details-toggle"));
     await toggle.trigger("click");
     expect(toggle.attributes("aria-expanded")).toBe("true");
@@ -102,15 +126,58 @@ describe("InsightBlock card (test 8)", () => {
     expect(wrapper.get(sel("next")).text()).toContain("Check the field");
     expect(wrapper.find(sel("why-detail")).exists()).toBe(false);
     expect(wrapper.get(sel("secondary-logs-app")).text()).toBe("Open in Logs");
-    expect(wrapper.get(sel("dismiss")).text()).toBe("Dismiss…");
-    expect(wrapper.get(sel("note")).text()).toContain("Nothing is saved until you save.");
     expect(details.findAll(sel("cta"))).toHaveLength(0);
+    expect(details.findAll(sel("dismiss"))).toHaveLength(0);
   });
 
   it("shows Dismiss… only for a dismissable insight", async () => {
     const wrapper = mountBlock(insight({ dismissable: null }));
     await wrapper.get(sel("details-toggle")).trigger("click");
     expect(wrapper.find(sel("dismiss")).exists()).toBe(false);
+  });
+
+  it("offers Ask AI beside the fix and hands the chat a chip and a prefilled request, never sent", async () => {
+    const ask = vi.fn();
+    const wrapper = mountBlock(insight(), "card", { ask });
+    const button = wrapper.get(sel("ask-ai"));
+    expect(button.text()).toBe("Ask AI");
+    await button.trigger("click");
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(ask.mock.calls[0][0]).toMatchObject({
+      prompt: "Suggest a corrected query and don't save it.",
+      chipName: "AutoObserve finding · payments-latency",
+      newChat: true,
+      autoSend: false,
+      context: { currentPage: "autoobserve", org_id: "demo-org" },
+    });
+  });
+
+  it("leaves Ask AI out, not disabled, when AI is off or nothing can take the request", () => {
+    expect(
+      mountBlock(insight(), "card", { ai: false, ask: vi.fn() }).find(sel("ask-ai")).exists(),
+    ).toBe(false);
+    expect(mountBlock(insight()).find(sel("ask-ai")).exists()).toBe(false);
+    expect(
+      mountBlock(insight({ ai: null }), "card", { ask: vi.fn() })
+        .find(sel("ask-ai"))
+        .exists(),
+    ).toBe(false);
+  });
+
+  it("shows a locked fix disabled with its lock and the reason line, and never emits it", async () => {
+    const locked = {
+      ...cta,
+      locked: raw("You can't change alerts in folder ops. Ask an admin of this organization."),
+    };
+    const wrapper = mountBlock(insight({ cta: locked }), "card", { ask: vi.fn() });
+    const button = wrapper.get(sel("cta"));
+    expect(button.attributes("disabled")).toBeDefined();
+    expect(wrapper.get(sel("locked")).text()).toBe(
+      "You can't change alerts in folder ops. Ask an admin of this organization.",
+    );
+    await button.trigger("click");
+    expect(wrapper.emitted("cta")).toBeUndefined();
+    expect(wrapper.find(sel("ask-ai")).exists()).toBe(true);
   });
 
   it("keeps the CTA when there is no why", () => {
@@ -122,9 +189,9 @@ describe("InsightBlock card (test 8)", () => {
   it("emits each button's action and holds no data logic", async () => {
     const wrapper = mountBlock(insight());
     await wrapper.get(sel("cta")).trigger("click");
+    await wrapper.get(sel("dismiss")).trigger("click");
     await wrapper.get(sel("details-toggle")).trigger("click");
     await wrapper.get(sel("secondary-logs-app")).trigger("click");
-    await wrapper.get(sel("dismiss")).trigger("click");
     expect(wrapper.emitted("cta")).toEqual([[cta]]);
     expect(wrapper.emitted("secondary")).toEqual([[logs]]);
     expect(wrapper.emitted("dismiss")).toHaveLength(1);
@@ -133,7 +200,7 @@ describe("InsightBlock card (test 8)", () => {
   it("shows the CTA as busy while its target is looked up", () => {
     const wrapper = mount(InsightBlock, {
       props: { parts: insight(), pending: true },
-      global: { plugins: [i18n] },
+      global: { plugins: [i18n, storeWith(false)] },
     });
     expect(wrapper.get(sel("cta")).attributes("aria-busy")).toBe("true");
   });

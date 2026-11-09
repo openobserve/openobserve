@@ -271,12 +271,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="xs" shape="rounded">
                     {{ t(SEVERITY_LABEL[finding.severity]) }}
                   </OBadge>
-                  <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+                  <div class="flex min-w-0 flex-1 basis-56 flex-wrap items-baseline gap-x-2">
                     <OText variant="body-strong" as="span">{{ finding.alert_name }}</OText>
                     <OText variant="meta" as="span" class="min-w-0">{{
                       titleAfterName(finding)
                     }}</OText>
                   </div>
+                  <OButton
+                    v-if="ctasOf(finding).review"
+                    variant="ghost-primary"
+                    size="xs"
+                    :loading="reviewing === finding.finding_id"
+                    data-test="alert-calibration-dashboard-review-alert"
+                    @click="review(finding)"
+                  >
+                    {{ insightCtaLabel(t, "reviewAlert") }}
+                  </OButton>
                   <OButton
                     v-if="finding.alert_id"
                     variant="ghost-muted"
@@ -286,6 +296,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="openAlert(finding)"
                   >
                     {{ t("alertCalibration.dashboard.openAlert") }}
+                  </OButton>
+                  <OButton
+                    v-if="ctasOf(finding).logs"
+                    variant="ghost-muted"
+                    size="xs"
+                    data-test="alert-calibration-dashboard-logs"
+                    @click="openLogs(finding)"
+                  >
+                    {{ insightCtaLabel(t, "openInLogs") }}
+                  </OButton>
+                  <OButton
+                    v-if="canAsk && ctasOf(finding).ai"
+                    variant="ghost-primary"
+                    size="xs"
+                    icon-left="auto-awesome"
+                    data-test="alert-calibration-dashboard-ask-ai"
+                    @click="ask(finding)"
+                  >
+                    {{ insightCtaLabel(t, "askAi") }}
                   </OButton>
                   <OButton
                     v-if="isDismissable(finding)"
@@ -329,6 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -387,10 +417,20 @@ import {
 } from "./digests";
 import { COVERAGE_BADGE, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
 import { RULE_META, ruleLabelKey, rulesShownFor } from "./rules";
+import { openAlertReview } from "./reviewAlert";
+import { rowCtas, type RowCtas } from "./rowCtas";
+import {
+  aiEnabled,
+  askAiPayload,
+  insightCtaLabel,
+  type InsightAskPayload,
+} from "@/components/autoobserve/insight/insightCta";
 
+const emit = defineEmits<{ sendToAiChat: [payload: InsightAskPayload] }>();
 const { t, locale } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
+const store = useStore();
 const route = useRoute();
 const { search, orgId } = useDigestSearch();
 const copy = computed(() => dismissalCopy(t, locale.value));
@@ -558,6 +598,36 @@ const openAlert = (finding: FindingRecord) => {
     query: { org_identifier: orgId.value },
   });
   window.open(href, "_blank", "noopener,noreferrer");
+};
+
+// Parsed once per read, not per button per render: a rule can list many rows.
+const ctas = computed(
+  () =>
+    new Map(
+      (data.data.value?.findings ?? []).map((f) => [f, rowCtas(t, f, Date.now() * 1000)] as const),
+    ),
+);
+const ctasOf = (finding: FindingRecord): RowCtas =>
+  ctas.value.get(finding) ?? rowCtas(t, finding, Date.now() * 1000);
+const canAsk = computed(() => aiEnabled(store.state.zoConfig));
+const reviewing = ref<string | null>(null);
+
+const review = async (finding: FindingRecord) => {
+  const action = ctasOf(finding).review;
+  if (!action || reviewing.value !== null) return;
+  reviewing.value = finding.finding_id ?? "";
+  await openAlertReview(router, orgId.value, action, finding);
+  reviewing.value = null;
+};
+
+const openLogs = (finding: FindingRecord) => {
+  const target = ctasOf(finding).logs;
+  if (target) void router.push(target);
+};
+
+const ask = (finding: FindingRecord) => {
+  const ai = ctasOf(finding).ai;
+  if (ai) emit("sendToAiChat", askAiPayload(t, ai, orgId.value));
 };
 
 const viewEvidence = (rule: RuleId) => {

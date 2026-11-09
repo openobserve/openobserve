@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-secondary" :data-test="`bulk-review-group-meta-${slug}`">
         <template v-for="(part, i) in meta" :key="i">
           <span v-if="i > 0" aria-hidden="true"> · </span>
-          <span :class="isSilent(part) ? 'text-status-error-text' : ''">{{ part }}</span>
+          <span :class="isSilent(part) ? 'text-status-warning-text' : ''">{{ part }}</span>
         </template>
       </span>
       <OButton

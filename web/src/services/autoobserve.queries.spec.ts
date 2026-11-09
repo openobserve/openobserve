@@ -18,6 +18,7 @@ import { QueryClient } from "@tanstack/vue-query";
 import autoobserve, { type AutoObserveIncidentList } from "./autoobserve";
 import http from "./http";
 import {
+  autoobserveGapSuggestionsQuery,
   autoobserveIncidentsPageQuery,
   autoobserveSuggestionsPageQuery,
 } from "./autoobserve.queries";
@@ -59,6 +60,41 @@ describe("autoobserveSuggestionsPageQuery (OSS-11)", () => {
     const second = autoobserveSuggestionsPageQuery("acme", 25, 25).queryKey;
     expect(first).not.toEqual(second);
     expect(autoobserveSuggestionsPageQuery("acme", RAIL_CAP, 0).queryKey).not.toEqual(first);
+  });
+});
+
+describe("autoobserveGapSuggestionsQuery (F8)", () => {
+  const gap = (i: number) => ({ id: `g-${i}`, kind: "coverage_gap" });
+  const pages = (total: number, served = total) =>
+    suggestions.mockImplementation(async (_org, params) => {
+      const from = params.offset ?? 0;
+      const to = Math.min(from + (params.limit ?? 0), served);
+      const list = Array.from({ length: Math.max(0, to - from) }, (_, k) => gap(from + k));
+      return { data: { suggestions: list, total, limit: params.limit, offset: from } } as never;
+    });
+
+  beforeEach(() => {
+    suggestions.mockReset();
+  });
+
+  it("reads every page of proposed gaps, so the group's review holds each one it counts", async () => {
+    pages(1201);
+    const list = await new QueryClient().fetchQuery(autoobserveGapSuggestionsQuery("acme", 500));
+    expect(suggestions.mock.calls).toHaveLength(3);
+    expect(suggestions.mock.calls.map(([, p]) => p.offset)).toEqual([0, 500, 1000]);
+    for (const [, params] of suggestions.mock.calls)
+      expect(params).toMatchObject({ status: "proposed", kind: "coverage_gap", limit: 500 });
+    expect(list.suggestions).toHaveLength(1201);
+    expect(new Set(list.suggestions.map((s) => s.id)).size).toBe(1201);
+    expect(list.total).toBe(1201);
+  });
+
+  it("stops at a short page and counts what it read when the total shrank meanwhile", async () => {
+    pages(1201, 700);
+    const list = await new QueryClient().fetchQuery(autoobserveGapSuggestionsQuery("acme", 500));
+    expect(suggestions).toHaveBeenCalledTimes(2);
+    expect(list.suggestions).toHaveLength(700);
+    expect(list.total).toBe(700);
   });
 });
 

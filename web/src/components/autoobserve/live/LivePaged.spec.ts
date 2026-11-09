@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -23,6 +23,10 @@ import autoobserve, {
   type AutoObserveIncidentList,
 } from "@/services/autoobserve";
 import fixture from "./__fixtures__/autoobserveIncidents.json";
+import config from "@/aws-exports";
+import appStore from "@/stores";
+import { b64DecodeUnicode } from "@/utils/zincutils";
+import { ASK_AI_KEY, type InsightAskPayload } from "../insight/insightCta";
 import { analysisLink, incidentLink } from "./incidentsCopy";
 import LivePaged from "./LivePaged.vue";
 
@@ -76,11 +80,14 @@ const originalOrg = store.state.selectedOrganization;
 const originalConfig = store.state.zoConfig;
 
 let wrappers: ReturnType<typeof mountCard>[] = [];
-const mountCard = (props: { cap?: number } = {}) => {
+const mountCard = (
+  props: { cap?: number } = {},
+  ask: ((payload: InsightAskPayload) => void) | null = null,
+) => {
   const wrapper = mount(LivePaged, {
     props,
     attachTo: document.body,
-    global: { plugins: [i18n, store] },
+    global: { plugins: [i18n, store], provide: ask ? { [ASK_AI_KEY as symbol]: ask } : {} },
   });
   wrappers.push(wrapper);
   return wrapper;
@@ -465,6 +472,96 @@ describe("LivePaged (D9-web)", () => {
       expect(rows(w)).toHaveLength(3);
       expect(w.find(sel("shared-analysis")).text()).toBe(OFF_MANY);
       expect(details(w)).toEqual([]);
+    });
+  });
+  describe("the finding's own next steps", () => {
+    const HOUR_US = 3_600_000_000;
+    const originalBuild = config.isEnterprise;
+    afterEach(() => {
+      config.isEnterprise = originalBuild;
+    });
+
+    it("Open in Logs opens the stopped stream from one hour before the stop to now", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: 1_800_000_000_000 });
+      config.isEnterprise = "true";
+      const appOrg = appStore.state.selectedOrganization;
+      appStore.commit("setSelectedOrganization", { ...appOrg, identifier: "demo-org" });
+      onTestFinished(() => appStore.commit("setSelectedOrganization", appOrg));
+      api.mockResolvedValueOnce(page(pick(0)));
+      const w = mountCard();
+      await flushPromises();
+      const button = w.find(sel("row-0")).find(sel("logs"));
+      expect(button.text()).toBe("Open in Logs");
+      await button.trigger("click");
+      const route = push.mock.calls[0][0];
+      expect(route.path).toBe("/logs");
+      expect(route.query).toMatchObject({
+        stream: "checkout",
+        stream_type: "logs",
+        org_identifier: "demo-org",
+        from: String(FIXTURE.items[0].finding.first_seen_at - HOUR_US),
+        to: String(1_800_000_000_000 * 1000),
+      });
+      expect(b64DecodeUnicode(route.query.query)).toBe("");
+    });
+
+    it("no Open in Logs for a metrics stream, an unreadable finding or the open-source build", async () => {
+      config.isEnterprise = "true";
+      api.mockResolvedValueOnce(page(pick(3, 5)));
+      const w = mountCard();
+      await flushPromises();
+      expect(w.findAll(sel("logs"))).toHaveLength(0);
+      expect(w.findAll(sel("open"))).toHaveLength(2);
+      config.isEnterprise = "false";
+      queryClient.clear();
+      api.mockResolvedValueOnce(page(pick(0)));
+      const oss = mountCard();
+      await flushPromises();
+      expect(oss.findAll(sel("logs"))).toHaveLength(0);
+    });
+
+    it("Ask AI hands the chat a draft-only request about the stop, never sending it", async () => {
+      store.commit("setConfig", { ...originalConfig, ai_enabled: true });
+      const ask = vi.fn();
+      api.mockResolvedValueOnce(page(pick(0, 1, 2)));
+      const w = mountCard({}, ask);
+      await flushPromises();
+      const buttons = w.findAll(sel("ask-ai"));
+      expect(buttons).toHaveLength(3);
+      expect(buttons[0].text()).toBe("Ask AI");
+      await buttons[0].trigger("click");
+      const payload = ask.mock.calls[0][0] as InsightAskPayload;
+      expect(payload.autoSend).toBe(false);
+      expect(payload.newChat).toBe(true);
+      expect(payload.prompt).toMatch(
+        /^checkout \(logs\) stopped sending at .+\. What could stop it, and what should I check first\?$/,
+      );
+      expect(payload.chipName).toBe("AutoObserve finding · checkout (logs)");
+      expect(payload.query).toContain("Stream: checkout");
+      expect(payload.context).toEqual({ currentPage: "autoobserve", org_id: "demo-org" });
+      await buttons[1].trigger("click");
+      expect(ask.mock.calls[1][0].prompt).toMatch(/^payments \(logs\) dropped sharply at /);
+      await buttons[2].trigger("click");
+      expect(ask.mock.calls[2][0].prompt).toMatch(/^orders \(logs\) rose sharply at /);
+    });
+
+    it("Ask AI is absent when AI is off, with no chat to hand to, or for an unreadable finding", async () => {
+      store.commit("setConfig", { ...originalConfig, ai_enabled: false });
+      api.mockResolvedValueOnce(page(pick(0)));
+      const off = mountCard({}, vi.fn());
+      await flushPromises();
+      expect(off.findAll(sel("ask-ai"))).toHaveLength(0);
+      store.commit("setConfig", { ...originalConfig, ai_enabled: true });
+      queryClient.clear();
+      api.mockResolvedValueOnce(page(pick(0)));
+      const alone = mountCard();
+      await flushPromises();
+      expect(alone.findAll(sel("ask-ai"))).toHaveLength(0);
+      queryClient.clear();
+      api.mockResolvedValueOnce(page(pick(5)));
+      const unreadable = mountCard({}, vi.fn());
+      await flushPromises();
+      expect(unreadable.findAll(sel("ask-ai"))).toHaveLength(0);
     });
   });
 });

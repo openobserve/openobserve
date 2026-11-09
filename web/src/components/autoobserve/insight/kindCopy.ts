@@ -1,0 +1,821 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import type { RouteLocationRaw } from "vue-router";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import type {
+  AutoObserveCell,
+  AutoObserveCoverageRow,
+  AutoObserveSuggestion,
+} from "@/services/autoobserve";
+import {
+  heartbeatAlert,
+  noDataAlert,
+  sourceNoDataAlert,
+} from "@/utils/alerts/prefill/fromAutoObserve";
+import { draftTarget } from "./targets/alertDraft";
+import { logsForSources } from "./targets/logsTargets";
+import { notifyOf, teamOf } from "./targets/ownership";
+import type { BulkKind, BulkRow } from "./bulk/useBulkReview";
+import { insightCtaLabel, type AiFinding, type CtaAction } from "./insightCta";
+import {
+  destinationsTarget,
+  type InsightCta,
+  type InsightTarget,
+  type InsightTone,
+  type InsightZone,
+  type TypedAction,
+} from "./insightCopy";
+
+/** What the page already holds that a CTA can prefill from: the coverage rows with each service's streams. */
+export interface CtaContext {
+  rows?: AutoObserveCoverageRow[];
+}
+
+/** A kind's own copy and actions; a field left out keeps what the list row already says. */
+export interface KindCopy {
+  chip?: { label: I18nText; tone: InsightTone };
+  headline?: I18nText;
+  why: I18nText | null;
+  whyDetail: I18nText | null;
+  next: I18nText | null;
+  cta: InsightCta | null;
+  secondary: InsightCta[];
+  ai: AiFinding | null;
+}
+
+type GapClass = "errors" | "latency" | "absence";
+
+// Standard view has nothing to say about these yet (Q6), so they never render there.
+export const HIDDEN_KINDS: ReadonlySet<string> = new Set(["protect_evidence"]);
+
+const GAP_CLASSES: GapClass[] = ["errors", "latency", "absence"];
+
+/** Six or more coverage gaps fold into one card, so a long rail never repeats one sentence per service. */
+export const GAP_GROUP_AT = 6;
+
+const GROUP_NAMES = 3;
+
+const NO_DATA_MINUTES = 15;
+
+const str = (value: unknown) => (typeof value === "string" ? value : "");
+const num = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const count = (value: number, locale: string): I18nText =>
+  raw(new Intl.NumberFormat(locale).format(Math.round(value)));
+
+const listOf = (locale: string, items: string[], type: "conjunction" | "disjunction") =>
+  raw(new Intl.ListFormat(locale, { type }).format(items));
+
+const timeText = (micros: number, zone: InsightZone): I18nText =>
+  raw(
+    new Intl.DateTimeFormat(zone.locale, {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: zone.timeZone,
+    }).format(micros / 1000),
+  );
+
+const ctaOf = (
+  t: TranslateFn,
+  action: CtaAction,
+  target: InsightTarget,
+  note: I18nText | null = null,
+  key: string = action,
+): InsightCta => ({ key, action, label: insightCtaLabel(t, action), target, note });
+
+const serviceOf = (s: AutoObserveSuggestion): string =>
+  str(s.evidence.service_name) ||
+  s.subject.key_dims.service_name ||
+  s.subject.key_dims.entity_id ||
+  "";
+
+const cellsOf = (s: AutoObserveSuggestion) =>
+  (s.evidence.cells ?? {}) as Partial<Record<GapClass, AutoObserveCell>>;
+
+const rowOf = (s: AutoObserveSuggestion, ctx: CtaContext): AutoObserveCoverageRow | null => {
+  const service = serviceOf(s);
+  const dims = s.subject.key_dims;
+  const cluster = dims.k8s_cluster_name ?? null;
+  const namespace = dims.k8s_namespace_name ?? null;
+  return (
+    (ctx.rows ?? []).find(
+      (r) =>
+        r.service_name === service &&
+        (!cluster || r.cluster === cluster) &&
+        (!namespace || r.namespace === namespace),
+    ) ?? null
+  );
+};
+
+const streamOf = (row: AutoObserveCoverageRow, type: string) =>
+  row.streams.find((s) => s.type === type) ?? null;
+
+// Errors and no-data read rows, so a logs stream comes first and traces stand in when there are no logs.
+const rowStream = (row: AutoObserveCoverageRow) => streamOf(row, "logs") ?? streamOf(row, "traces");
+
+const scopeOf = (row: AutoObserveCoverageRow, stream: { type: string; name: string }) => ({
+  service: row.service_name,
+  cluster: row.cluster,
+  namespace: row.namespace,
+  stream,
+});
+
+// No alert watches a gap service, so its drafts land in the org default folder and notify no one yet.
+const ownership = (service: string) => ({
+  team: teamOf(service, []),
+  notify: notifyOf(service, []),
+});
+
+const serviceRoute = (s: AutoObserveSuggestion): InsightTarget => ({
+  type: "route",
+  to: {
+    name: "autoobserve",
+    query: { org_identifier: s.org, page: "coverage", service: serviceOf(s) },
+  },
+});
+
+const DRAFT_ORDER: BulkKind[] = ["errors", "latency", "no_data"];
+
+/** The alerts a gap service still needs drafted: errors and no-data on its rows, latency on its traces. */
+const draftsOf = (row: AutoObserveCoverageRow, missing: GapClass[]): BulkKind[] => {
+  if (!rowStream(row)) return [];
+  const kinds: BulkKind[] = [];
+  if (missing.includes("errors")) kinds.push("errors");
+  if (missing.includes("latency") && streamOf(row, "traces")) kinds.push("latency");
+  if (missing.includes("absence")) kinds.push("no_data");
+  return DRAFT_ORDER.filter((k) => kinds.includes(k));
+};
+
+// Errors and latency rows carry no usual level: the review list measures it over 7 days when it opens.
+const bulkRow = (row: AutoObserveCoverageRow, kind: BulkKind): BulkRow => ({
+  key: `${row.service_id}:${kind}`,
+  kind,
+  scope: scopeOf(row, kind === "latency" ? streamOf(row, "traces")! : rowStream(row)!),
+  usually: null,
+  ...ownership(row.service_name),
+  ...(kind === "latency" ? { inputs: { durationField: "duration", p95Ms: null } } : {}),
+});
+
+const addOne = (t: TranslateFn, row: AutoObserveCoverageRow): InsightCta | null => {
+  const stream = rowStream(row);
+  const own = ownership(row.service_name);
+  const target = stream
+    ? draftTarget(scopeOf(row, stream), (s) => noDataAlert(s, own), own.team.folderId)
+    : null;
+  return target ? ctaOf(t, "addAlert", target, t("insight.note.addAlert")) : null;
+};
+
+const draftCta = (t: TranslateFn, row: AutoObserveCoverageRow, drafts: BulkKind[]) => {
+  if (drafts.length === 1 && drafts[0] === "no_data") return addOne(t, row);
+  const rows = drafts.map((kind) => bulkRow(row, kind));
+  return ctaOf(
+    t,
+    drafts.length === 1 ? "addAlert" : "reviewAndAddAlerts",
+    {
+      type: "bulk",
+      request: {
+        kind: drafts[0],
+        rows,
+        title: String(insightCtaLabel(t, "reviewAndAddAlerts")),
+      },
+    },
+    drafts.length === 1
+      ? t("insight.note.addAlert")
+      : t("insight.note.reviewAndAdd", { count: drafts.length }, drafts.length),
+  );
+};
+
+const trafficWhy = (
+  t: TranslateFn,
+  locale: string,
+  s: AutoObserveSuggestion,
+  key: "handles" | "usually",
+): string => {
+  const traffic = num(s.evidence.traffic_per_hour);
+  return traffic === null
+    ? ""
+    : ` ${t(`insight.kind.traffic.${key}`, { count: count(traffic, locale) })}`;
+};
+
+const classWords = (t: TranslateFn, missing: GapClass[], form: "why" | "ai") =>
+  missing.map((c) => String(t(`insight.kind.classes.${form}.${c}`)));
+
+const gapCopy = (
+  t: TranslateFn,
+  zone: InsightZone,
+  s: AutoObserveSuggestion,
+  ctx: CtaContext,
+): KindCopy => {
+  const service = serviceOf(s);
+  const cells = cellsOf(s);
+  const missing = GAP_CLASSES.filter((c) => cells[c]?.state !== "covered");
+  const row = rowOf(s, ctx);
+  const drafts = row ? draftsOf(row, missing) : [];
+  const traces = row ? !!streamOf(row, "traces") : true;
+  const latencyBlocked = missing.includes("latency") && !traces;
+  const stream = row ? rowStream(row) : null;
+  const why = raw(
+    `${t("insight.kind.coverage_gap.why", { classes: listOf(zone.locale, classWords(t, missing, "why"), "disjunction") })}${trafficWhy(t, zone.locale, s, "handles")}`,
+  );
+  const nextParts = [
+    drafts.length
+      ? String(t("insight.kind.coverage_gap.next", { count: drafts.length }, drafts.length))
+      : "",
+    latencyBlocked ? String(t("insight.kind.coverage_gap.needsTraces")) : "",
+  ].filter(Boolean);
+  const cta =
+    row && drafts.length ? draftCta(t, row, drafts) : ctaOf(t, "openService", serviceRoute(s));
+  const secondary = [
+    ...(cta?.action === "openService" ? [] : [ctaOf(t, "openService", serviceRoute(s))]),
+    ...(latencyBlocked ? [setUpTraces(t, s)] : []),
+  ];
+  const traffic = num(s.evidence.traffic_per_hour);
+  return {
+    chip: { label: t("insight.kind.chip.notWatched"), tone: "gap" },
+    headline: t("insight.kind.coverage_gap.headline", { service: raw(service) }),
+    why,
+    whyDetail: gapDetail(t, missing, latencyBlocked, service),
+    next: nextParts.length ? raw(nextParts.join(" ")) : null,
+    cta,
+    secondary,
+    ai: {
+      kind: s.kind,
+      subject: service,
+      request: raw(
+        [
+          t("insight.ai.coverage_gap.ask", {
+            service: raw(service),
+            classes: listOf(zone.locale, classWords(t, missing, "ai"), "disjunction"),
+          }),
+          traffic !== null && stream
+            ? t("insight.ai.coverage_gap.volume", {
+                count: count(traffic, zone.locale),
+                stream: raw(stream.name),
+              })
+            : "",
+          t("insight.ai.coverage_gap.draft"),
+        ]
+          .filter(Boolean)
+          .join(" "),
+      ),
+      facts: [
+        ["Service", service],
+        ["Not watched", missing.join(", ")],
+        ...(traffic !== null
+          ? ([["Events an hour", String(Math.round(traffic))]] as [string, string][])
+          : []),
+        ...(stream ? ([["Stream", `${stream.type}/${stream.name}`]] as [string, string][]) : []),
+      ],
+    },
+  };
+};
+
+const gapDetail = (
+  t: TranslateFn,
+  missing: GapClass[],
+  latencyBlocked: boolean,
+  service: string,
+): I18nText =>
+  raw(
+    missing
+      .map((c) =>
+        c === "latency" && latencyBlocked
+          ? t("insight.kind.detail.cantMeasure", {
+              check: t(`insight.kind.classes.name.${c}`),
+              service: raw(service),
+            })
+          : t("insight.kind.detail.noAlert", { check: t(`insight.kind.classes.name.${c}`) }),
+      )
+      .join(" "),
+  );
+
+const setUpTraces = (t: TranslateFn, s: AutoObserveSuggestion): InsightCta =>
+  ctaOf(
+    t,
+    "setUpData",
+    { type: "route", to: { name: "ingestion", query: { org_identifier: s.org } } },
+    null,
+    "setUpTraces",
+  );
+
+const monitorOf = (cell: AutoObserveCell | undefined) => cell?.evidence?.[0] ?? null;
+
+const noDataAi = (t: TranslateFn, zone: InsightZone, s: AutoObserveSuggestion): AiFinding => {
+  const service = serviceOf(s);
+  const traffic = num(s.evidence.traffic_per_hour);
+  return {
+    kind: s.kind,
+    subject: service,
+    request: raw(
+      [
+        t("insight.ai.no_data.ask", { service: raw(service), minutes: NO_DATA_MINUTES }),
+        traffic !== null
+          ? t("insight.ai.no_data.volume", { count: count(traffic, zone.locale) })
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    ),
+    facts: [
+      ["Service", service],
+      ...(traffic !== null
+        ? ([["Events an hour", String(Math.round(traffic))]] as [string, string][])
+        : []),
+    ],
+  };
+};
+
+const silentCheckCopy = (
+  t: TranslateFn,
+  s: AutoObserveSuggestion,
+  monitor: NonNullable<ReturnType<typeof monitorOf>>,
+): KindCopy => {
+  const service = serviceOf(s);
+  const name = raw(monitor.monitor_name);
+  const cta =
+    monitor.monitor_kind === "alert"
+      ? ctaOf(
+          t,
+          "chooseWhoGetsNotified",
+          destinationsTarget(monitor.monitor_id, monitor.monitor_name),
+          t("insight.note.chooseWho"),
+        )
+      : null;
+  return {
+    chip: { label: t("insight.kind.chip.notifiesNoOne"), tone: "failure" },
+    why: t("insight.kind.no_absence_check.whySilent", { monitor: name, service: raw(service) }),
+    whyDetail: null,
+    next: t("insight.kind.no_absence_check.nextSilent"),
+    cta,
+    secondary: [],
+    ai: {
+      kind: s.kind,
+      subject: monitor.monitor_name,
+      request: t("insight.ai.silent.ask", { monitor: name }),
+      facts: [
+        ["Alert", monitor.monitor_name],
+        ["Service", service],
+      ],
+    },
+  };
+};
+
+const noAbsenceCopy = (
+  t: TranslateFn,
+  zone: InsightZone,
+  s: AutoObserveSuggestion,
+  ctx: CtaContext,
+): KindCopy => {
+  const service = serviceOf(s);
+  const cell = cellsOf(s).absence;
+  const monitor = monitorOf(cell);
+  if (cell?.state === "silent" && monitor) return silentCheckCopy(t, s, monitor);
+  const row = rowOf(s, ctx);
+  const add = row ? addOne(t, row) : null;
+  const params = { service: raw(service), monitor: raw(monitor?.monitor_name ?? "") };
+  const lead =
+    (cell?.state === "weak" || cell?.state === "blind") && monitor
+      ? String(t(`insight.kind.no_absence_check.why_${cell.state}`, params))
+      : `${t("insight.kind.no_absence_check.why", params)}${trafficWhy(t, zone.locale, s, "usually")}`;
+  return {
+    chip: { label: t("insight.kind.chip.missingAlert"), tone: "gap" },
+    why: raw(lead),
+    whyDetail: null,
+    next: t("insight.kind.no_absence_check.next", {
+      service: raw(service),
+      minutes: NO_DATA_MINUTES,
+    }),
+    cta: add ?? ctaOf(t, "openService", serviceRoute(s)),
+    secondary: add ? [ctaOf(t, "openService", serviceRoute(s))] : [],
+    ai: noDataAi(t, zone, s),
+  };
+};
+
+const reviewOf = (
+  t: TranslateFn,
+  s: AutoObserveSuggestion,
+  actions: TypedAction[],
+  action: CtaAction,
+  note: I18nText,
+): InsightCta | null => {
+  const review = actions.find((a) => a.type === "review_alert");
+  if (!review || review.type !== "review_alert") return null;
+  return ctaOf(
+    t,
+    action,
+    {
+      type: "review_alert",
+      action: review,
+      alertName: str(s.evidence.alert_name) || str(s.evidence.monitor_name),
+      findingId: "",
+    },
+    note,
+  );
+};
+
+const silentCoverageCopy = (
+  t: TranslateFn,
+  s: AutoObserveSuggestion,
+  actions: TypedAction[],
+): Partial<KindCopy> => {
+  const monitor = str(s.evidence.monitor_name);
+  const review = actions.find((a) => a.type === "review_alert");
+  return {
+    chip: { label: t("insight.kind.chip.notifiesNoOne"), tone: "failure" },
+    cta:
+      review?.type === "review_alert"
+        ? ctaOf(
+            t,
+            "chooseWhoGetsNotified",
+            destinationsTarget(review.alert_id, str(s.evidence.alert_name) || monitor),
+            t("insight.note.chooseWho"),
+          )
+        : null,
+    ai: {
+      kind: s.kind,
+      subject: monitor,
+      request: t("insight.ai.silent.ask", { monitor: raw(monitor) }),
+      facts: [["Alert", monitor]],
+    },
+  };
+};
+
+const lostCopy = (t: TranslateFn, s: AutoObserveSuggestion, ctx: CtaContext): Partial<KindCopy> => {
+  const service = serviceOf(s);
+  const lost = Object.keys((s.evidence.lost ?? {}) as object);
+  const row = rowOf(s, ctx);
+  const add = lost.includes("absence") && row ? addOne(t, row) : null;
+  return {
+    why: t("insight.kind.coverage_lost.why"),
+    whyDetail: null,
+    next: t("insight.kind.coverage_lost.next"),
+    cta: add ?? ctaOf(t, "openService", serviceRoute(s)),
+    secondary: add ? [ctaOf(t, "openService", serviceRoute(s))] : [],
+    ai: {
+      kind: s.kind,
+      subject: service,
+      request: t("insight.ai.coverage_lost.ask", { service: raw(service) }),
+      facts: [
+        ["Service", service],
+        ["Lost", lost.join(", ")],
+      ],
+    },
+  };
+};
+
+const BLIND_NEXT: Record<string, string> = {
+  stream_missing: "insight.kind.blind_guardrail.nextStream",
+  no_data: "insight.kind.blind_guardrail.nextStream",
+  empty_scope: "insight.kind.blind_guardrail.nextScope",
+  unknown_field: "insight.kind.blind_guardrail.nextField",
+  ignored_matcher: "insight.kind.blind_guardrail.nextScope",
+};
+
+const blindCopy = (
+  t: TranslateFn,
+  s: AutoObserveSuggestion,
+  actions: TypedAction[],
+): Partial<KindCopy> => {
+  const reason = s.evidence.reason;
+  const key = typeof reason === "string" ? reason : (Object.keys(reason ?? {})[0] ?? "");
+  const monitor = str(s.evidence.monitor_name);
+  const detail = str(s.evidence.detail);
+  return {
+    chip: { label: t("insight.chip.notWorking"), tone: "failure" },
+    whyDetail: null,
+    next: BLIND_NEXT[key] ? t(BLIND_NEXT[key], { detail: raw(detail) }) : null,
+    cta: reviewOf(t, s, actions, "reviewAlert", t("insight.note.reviewQuery")),
+    ai: {
+      kind: s.kind,
+      subject: monitor,
+      request: t("insight.ai.blind_guardrail.ask", { monitor: raw(monitor), detail: raw(detail) }),
+      facts: [
+        ["Alert", monitor],
+        ["Reads", detail],
+        ["Reason", key],
+      ],
+    },
+  };
+};
+
+const discoveryCopy = (t: TranslateFn, s: AutoObserveSuggestion): Partial<KindCopy> => ({
+  chip: { label: t("insight.kind.chip.dataQuality"), tone: "info" },
+  headline: t("insight.kind.discovery_unusable.headline", {
+    good: num(s.evidence.good) ?? 0,
+    active: num(s.evidence.active) ?? 0,
+  }),
+  why: t("insight.kind.discovery_unusable.why"),
+  whyDetail: null,
+  next: t("insight.kind.discovery_unusable.next"),
+  cta: ctaOf(t, "setUpData", {
+    type: "route",
+    to: { name: "ingestion", query: { org_identifier: s.org } },
+  }),
+  ai: {
+    kind: s.kind,
+    subject: "service.name",
+    request: t("insight.ai.discovery_unusable.ask"),
+    facts: [
+      ["Usable services", String(num(s.evidence.good) ?? 0)],
+      ["Services found", String(num(s.evidence.active) ?? 0)],
+    ],
+  },
+});
+
+interface SourceMember {
+  field: string;
+  value: string;
+  stream: { type: string; name: string };
+}
+
+const membersOf = (s: AutoObserveSuggestion): SourceMember[] =>
+  (Array.isArray(s.evidence.sources) ? (s.evidence.sources as Record<string, unknown>[]) : [])
+    .map((m) => ({
+      field: str(m.source_field),
+      value: str(m.source_value),
+      stream: { type: str(m.stream_type) || "logs", name: str(m.stream_name) },
+    }))
+    .filter((m) => m.field && m.value && m.stream.name);
+
+const sourceLogs = (t: TranslateFn, actions: TypedAction[], nowMs: number): InsightCta | null => {
+  const inspect = actions.find((a) => a.type === "inspect_source");
+  if (!inspect || inspect.type !== "inspect_source") return null;
+  const to = logsForSources({
+    stream_type: inspect.stream_type,
+    stream_name: inspect.stream_name,
+    field: inspect.field,
+    values: [inspect.value],
+    // The server's from already leads the stop; the builder adds its own lead, so it is taken back out.
+    from: inspect.from + 6 * 3_600_000_000,
+    to: inspect.to ?? null,
+    now: nowMs * 1000,
+  });
+  return to
+    ? ctaOf(
+        t,
+        "openInLogs",
+        { type: "route", to: to as RouteLocationRaw },
+        t("insight.note.openSourceLogs", { source: raw(inspect.value) }),
+      )
+    : null;
+};
+
+const sourceAdd = (t: TranslateFn, s: AutoObserveSuggestion, members: SourceMember[]) => {
+  const total = num(s.evidence.source_count) ?? members.length;
+  const own = ownership(members[0]?.value ?? "");
+  if (total <= 1 && members[0]) {
+    const prefill = sourceNoDataAlert({ ...members[0], cohortSize: 1 }, own);
+    return prefill
+      ? ctaOf(
+          t,
+          "addAlert",
+          { type: "create_alert", prefill, folder: own.team.folderId },
+          t("insight.note.addAlert"),
+        )
+      : null;
+  }
+  if (!members.length) return null;
+  return ctaOf(
+    t,
+    "reviewAndAddAlerts",
+    {
+      type: "bulk",
+      request: {
+        kind: "source",
+        title: String(insightCtaLabel(t, "reviewAndAddAlerts")),
+        rows: members.map((m) => ({
+          key: `${m.stream.name}:${m.field}:${m.value}`,
+          scope: { ...m, cohortSize: total },
+          usually: null,
+          ...ownership(m.value),
+        })),
+      },
+    },
+    t("insight.note.reviewAndAdd", { count: members.length }, members.length),
+  );
+};
+
+const sourceCopy = (
+  t: TranslateFn,
+  zone: InsightZone,
+  s: AutoObserveSuggestion,
+  actions: TypedAction[],
+  nowMs: number,
+): KindCopy => {
+  const source = str(s.evidence.source_value);
+  const stream = str(s.evidence.stream_name) || s.subject.key_dims.stream_name || "";
+  const signal = num(s.evidence.signal_at);
+  const perDay = num(s.evidence.rows_per_day);
+  const total = num(s.evidence.source_count) ?? 1;
+  const streams = num(s.evidence.stream_count) ?? 1;
+  const params = { source: raw(source), stream: raw(stream) };
+  const why = [
+    signal !== null ? t("insight.kind.source_silence.since", { time: timeText(signal, zone) }) : "",
+    perDay !== null
+      ? t("insight.kind.source_silence.usual", {
+          count: count(perDay, zone.locale),
+          stream: raw(stream),
+        })
+      : "",
+    total > 1 ? t("insight.kind.source_silence.more", { count: total - 1, streams }, streams) : "",
+  ].filter(Boolean);
+  const advice = s.advice === "see_source_gap" ? "nextGap" : "nextSender";
+  const logs = sourceLogs(t, actions, nowMs);
+  const add = sourceAdd(t, s, membersOf(s));
+  return {
+    chip: { label: t("insight.kind.chip.stoppedSending"), tone: "failure" },
+    headline: t("insight.kind.source_silence.headline", params),
+    why: why.length ? raw(why.join(" ")) : null,
+    whyDetail: null,
+    next: t(`insight.kind.source_silence.${advice}`, params),
+    cta: logs ?? add,
+    secondary: logs && add ? [add] : [],
+    ai: {
+      kind: s.kind,
+      subject: source,
+      request: t("insight.ai.source_silence.ask", {
+        ...params,
+        time: signal !== null ? timeText(signal, zone) : raw(""),
+      }),
+      facts: [
+        ["Source", source],
+        ["Stream", stream],
+        ...(perDay !== null
+          ? ([["Rows a day", String(Math.round(perDay))]] as [string, string][])
+          : []),
+        ["Sources stopped", String(total)],
+      ],
+    },
+  };
+};
+
+const heartbeatCopy = (
+  t: TranslateFn,
+  s: AutoObserveSuggestion,
+  actions: TypedAction[],
+): KindCopy => {
+  const job = s.subject.key_dims.service_name || str(s.evidence.anchor);
+  const days = num(s.evidence.present_days);
+  const create = actions.find((a) => a.type === "create_alert");
+  const own = ownership(job);
+  const prefill =
+    create && create.type === "create_alert" ? heartbeatAlert(create, job, own) : null;
+  return {
+    chip: { label: t("insight.kind.chip.missingAlert"), tone: "gap" },
+    headline: t("insight.kind.heartbeat_on_success.headline", { job: raw(job) }),
+    why: days !== null ? t("insight.kind.heartbeat_on_success.why", { days }, days) : null,
+    whyDetail: null,
+    next: t("insight.kind.heartbeat_on_success.next"),
+    cta: prefill
+      ? ctaOf(
+          t,
+          "addAlert",
+          { type: "create_alert", prefill, folder: own.team.folderId },
+          t("insight.note.addHeartbeat"),
+        )
+      : null,
+    secondary: [],
+    ai: {
+      kind: s.kind,
+      subject: job,
+      request: t("insight.ai.heartbeat_on_success.ask", { job: raw(job) }),
+      facts: [
+        ["Job", job],
+        ["Success line", str(s.evidence.anchor)],
+        ...(days !== null ? ([["Days seen", String(days)]] as [string, string][]) : []),
+      ],
+    },
+  };
+};
+
+/** The one card for many coverage gaps: three names and a count, one review list, Review services and Ask AI. */
+export const gapGroupCopy = (
+  t: TranslateFn,
+  zone: InsightZone,
+  gaps: AutoObserveSuggestion[],
+  ctx: CtaContext,
+  total: number = gaps.length,
+): KindCopy => {
+  const names = gaps.map((s) => {
+    const namespace = s.subject.key_dims.k8s_namespace_name;
+    return namespace ? `${serviceOf(s)} (${namespace})` : serviceOf(s);
+  });
+  const shown = names.slice(0, GROUP_NAMES);
+  const rest = Math.max(total, names.length) - shown.length;
+  const named = listOf(
+    zone.locale,
+    [
+      ...shown,
+      ...(rest > 0
+        ? [String(t("autoobserveLive.suggestions.moreNames", { count: rest }, rest))]
+        : []),
+    ],
+    "conjunction",
+  );
+  const traffic = gaps.reduce((sum, s) => sum + (num(s.evidence.traffic_per_hour) ?? 0), 0);
+  const rows = gaps.flatMap((s) => {
+    const row = rowOf(s, ctx);
+    const missing = GAP_CLASSES.filter((c) => cellsOf(s)[c]?.state !== "covered");
+    return row ? draftsOf(row, missing).map((kind) => bulkRow(row, kind)) : [];
+  });
+  // Two suggestions can resolve to one coverage row, and a review row's key must stay unique.
+  const unique = [...new Map(rows.map((r) => [r.key, r])).values()];
+  const review = ctaOf(t, "reviewServices", {
+    type: "route",
+    to: { name: "autoobserve", query: { org_identifier: gaps[0]?.org, page: "coverage" } },
+  });
+  const cta = unique.length
+    ? ctaOf(
+        t,
+        "reviewAndAddAlerts",
+        {
+          type: "bulk",
+          request: {
+            kind: unique[0].kind!,
+            rows: unique,
+            title: String(insightCtaLabel(t, "reviewAndAddAlerts")),
+          },
+        },
+        t("insight.note.reviewAndAdd", { count: unique.length }, unique.length),
+      )
+    : null;
+  return {
+    chip: { label: t("insight.kind.chip.notWatched"), tone: "gap" },
+    headline: t("insight.kind.coverage_gap.groupHeadline", { count: total }),
+    why: raw(
+      [
+        `${named}.`,
+        traffic > 0
+          ? String(
+              t("insight.kind.coverage_gap.groupTraffic", { count: count(traffic, zone.locale) }),
+            )
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    ),
+    whyDetail: null,
+    next: unique.length
+      ? t("insight.kind.coverage_gap.groupNext", { count: unique.length }, unique.length)
+      : null,
+    cta: cta ?? review,
+    secondary: cta ? [review] : [],
+    ai: {
+      kind: "coverage_gap",
+      subject: String(named),
+      request: t("insight.ai.coverage_gap.groupAsk", {
+        count: total,
+        names: listOf(zone.locale, shown, "conjunction"),
+      }),
+      facts: [
+        ["Services not watched", String(total)],
+        ["First services", shown.join(", ")],
+      ],
+    },
+  };
+};
+
+/** The kind's why, next, fix and AI request; null for a kind the list row already words in full. */
+export const kindCopy = (
+  t: TranslateFn,
+  zone: InsightZone,
+  s: AutoObserveSuggestion,
+  actions: TypedAction[],
+  nowMs: number,
+  ctx: CtaContext,
+): Partial<KindCopy> | null => {
+  switch (s.kind) {
+    case "coverage_gap":
+      return gapCopy(t, zone, s, ctx);
+    case "no_absence_check":
+      return noAbsenceCopy(t, zone, s, ctx);
+    case "silent_coverage":
+      return silentCoverageCopy(t, s, actions);
+    case "coverage_lost":
+      return lostCopy(t, s, ctx);
+    case "blind_guardrail":
+      return blindCopy(t, s, actions);
+    case "discovery_unusable":
+      return discoveryCopy(t, s);
+    case "source_silence":
+      return sourceCopy(t, zone, s, actions, nowMs);
+    case "heartbeat_on_success":
+      return heartbeatCopy(t, s, actions);
+    default:
+      return null;
+  }
+};

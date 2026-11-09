@@ -76,6 +76,9 @@ const REVIEW_FOCUS: Record<ReviewFocus, AlertEditFocus | null> = {
   settings: null,
 };
 
+/** A failing-notifications review with no field to focus goes to the failing destination (CTA-MAP §3). */
+const RULE_FOCUS: Partial<Record<string, AlertEditFocus>> = { notify_failed: "destinations" };
+
 export type ApplyField = keyof typeof APPLY_FIELDS;
 
 export interface ApplyChange {
@@ -147,7 +150,7 @@ export function applySuggestionsOf(record: DigestRecord): ApplySuggestion[] {
 /** The one handoff the editor reads; an apply carries its patch and focuses its first field. */
 export function toEditHandoff(
   action: ApplySuggestion | ReviewAlertAction,
-  finding: Pick<DigestRecord, "finding_id">,
+  finding: Pick<DigestRecord, "finding_id"> & { rule_id?: string },
 ): AlertEditHandoff {
   const base = {
     version: ALERT_PREFILL_VERSION,
@@ -158,7 +161,8 @@ export function toEditHandoff(
     const patch = patchOf(action);
     return { ...base, focus: PATCH_FOCUS[APPLY_FIELDS[action.patch[0].field]], patch };
   }
-  const focus = action.focus ? REVIEW_FOCUS[action.focus] : null;
+  const named = action.focus ? REVIEW_FOCUS[action.focus] : null;
+  const focus = named ?? (finding.rule_id ? (RULE_FOCUS[finding.rule_id] ?? null) : null);
   return focus ? { ...base, focus } : { ...base };
 }
 

@@ -17,8 +17,13 @@ import { onScopeDispose, ref, shallowRef } from "vue";
 import { useRouter } from "vue-router";
 import { useOrgId } from "@/composables/query";
 import { openAlertReview } from "@/components/alert_calibration/reviewAlert";
+import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
+import { writeSyntheticPrefill } from "@/utils/synthetics/syntheticPrefill";
+import { loadReviewContext, openBulkReview } from "./bulk/useBulkReview";
 import type { DismissTarget } from "@/components/alert_calibration/dismissals";
 import type { InsightCta, InsightParts } from "./insightCopy";
+import { resolveDraft } from "./targets/alertDraft";
+import { destinationHandoff } from "./targets/editTargets";
 
 export function useInsightActions() {
   const router = useRouter();
@@ -32,19 +37,57 @@ export function useInsightActions() {
   });
 
   async function run(id: string, cta: InsightCta) {
+    if (cta.locked) return;
     if (cta.target.type === "route") {
       void router.push(cta.target.to);
       return;
     }
+    // Nothing is created here: the dialog and the review list each end in the user's own Add.
+    if (cta.target.type === "create_alert" && !cta.target.draft) {
+      requestAlertCreation(cta.target.prefill, { folder: cta.target.folder });
+      return;
+    }
+    if (cta.target.type === "synthetic") {
+      writeSyntheticPrefill(cta.target.prefill);
+      void router.push({
+        name: "synthetics-add",
+        query: { org_identifier: orgId.value, type: "http", prefill: "autoobserve" },
+      });
+      return;
+    }
+    if (cta.target.type === "bulk") {
+      openBulkReview(cta.target.request);
+      void loadReviewContext(orgId.value);
+      return;
+    }
     if (pendingId.value) return;
     pendingId.value = id;
+    const org = orgId.value;
+    // An answer that lands after an org switch would open org A's draft or alert inside org B.
+    const current = () => live && orgId.value === org;
     try {
+      if (cta.target.type === "create_alert" && cta.target.draft) {
+        const { draft, prefill, folder } = cta.target;
+        const built = await resolveDraft(org, draft, prefill);
+        if (current()) requestAlertCreation(built.prefill, { folder }, built.rebuild);
+        return;
+      }
+      if (cta.target.type === "destinations") {
+        const { alertId, alertName, destinations } = cta.target;
+        const route = await destinationHandoff(alertId, destinations, {
+          alertName,
+          isCurrent: current,
+        });
+        if (route && current()) void router.push(route);
+        return;
+      }
+      if (cta.target.type !== "review_alert") return;
       await openAlertReview(
         router,
-        orgId.value,
+        org,
         cta.target.action,
         { alert_name: cta.target.alertName, finding_id: cta.target.findingId },
-        () => live,
+        current,
       );
     } finally {
       pendingId.value = null;

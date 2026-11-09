@@ -16,6 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import config from "@/aws-exports";
 import { manyRows, m12Rows, sourceRows } from "./bulkFixtures";
+import { suggestErrors, suggestLatency } from "../targets/thresholds";
 import {
   applyRights,
   changeGroup,
@@ -28,6 +29,10 @@ import {
   toggleRow,
   useBulkReview,
   NO_TEAM,
+  reviewRowsOf,
+  isCreatable,
+  isTickable,
+  type BulkRow,
 } from "./useBulkReview";
 
 const IDS = { ingest: "f-ingest", payments: "f-pay", ops: "f-ops" };
@@ -177,5 +182,109 @@ describe("useBulkReview — enterprise gate", () => {
     config.isEnterprise = "false";
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
     expect(review.state.open).toBe(false);
+  });
+});
+
+describe("useBulkReview — thresholds and error fields (F1, F3)", () => {
+  const scope = {
+    service: "svc-a",
+    cluster: null,
+    namespace: null,
+    stream: { type: "logs", name: "app_logs" },
+  };
+  const ctx = (types: Record<string, string> = {}) => ({
+    folders: [],
+    overrides: {},
+    rights: null,
+    schemas: { "logs/app_logs": ["service_name", "level", "severity_text"] },
+    types: { "logs/app_logs": types },
+  });
+  const one = (row: Partial<BulkRow>, kind: BulkRow["kind"] = "errors", types = {}) =>
+    reviewRowsOf(
+      { kind: kind!, rows: [{ key: "k", kind, scope, usually: null, ...row } as BulkRow] },
+      ctx(types),
+    )[0];
+
+  const latencyRow = {
+    scope: { ...scope, stream: { type: "traces", name: "app_traces" } },
+    inputs: { durationField: "duration", p95Ms: null },
+  };
+  const level = (
+    row: Partial<BulkRow>,
+    kind: BulkRow["kind"],
+    extra: { baselines?: Record<string, number | null>; thresholds?: Record<string, number> },
+  ) =>
+    reviewRowsOf(
+      { kind: kind!, rows: [{ key: "k", kind, scope, usually: null, ...row } as BulkRow] },
+      {
+        ...ctx(),
+        schemas: { ...ctx().schemas, "traces/app_traces": ["service_name", "duration"] },
+        ...extra,
+      },
+    )[0];
+
+  it("waits on the 7-day measurement for a row with no usual level, ticked but not created yet", () => {
+    for (const row of [one({}), level(latencyRow, "latency", {})]) {
+      expect(row.block).toEqual({ code: "measuring" });
+      expect(isTickable(row)).toBe(true);
+      expect(isCreatable(row)).toBe(false);
+    }
+  });
+
+  it("asks for a threshold when the week shows no usual level, and never creates it as it is", () => {
+    const errors = level({}, "errors", { baselines: { k: null } });
+    expect(errors.block).toEqual({ code: "noBaseline", kind: "errors" });
+    expect(isTickable(errors)).toBe(false);
+    const latency = level(latencyRow, "latency", { baselines: { k: null } });
+    expect(latency.block).toEqual({ code: "noBaseline", kind: "latency" });
+    expect(isCreatable(latency)).toBe(false);
+  });
+
+  it("thresholds on the measured usual level", () => {
+    const errors = level({}, "errors", { baselines: { k: 10 } });
+    expect(errors.block).toBeNull();
+    expect(errors.prefill?.sql).toMatch(/HAVING count\(\*\) > 30$/);
+    expect(errors.usual).toBe(10);
+    expect(errors.threshold).toBe(30);
+  });
+
+  it("rounds a measured threshold the way the Add alert dialog does", () => {
+    const quiet = level({}, "errors", { baselines: { k: 1.4 } });
+    expect(quiet.threshold).toBe(5);
+    expect(quiet.threshold).toBe(suggestErrors(1.4));
+    const latency = level(latencyRow, "latency", { baselines: { k: 1263 } });
+    expect(latency.threshold).toBe(2500);
+    expect(latency.threshold).toBe(suggestLatency(1263));
+  });
+
+  it("takes the threshold the user set once nothing was measured", () => {
+    const errors = level({}, "errors", { baselines: { k: null }, thresholds: { k: 40 } });
+    expect(errors.block).toBeNull();
+    expect(errors.prefill?.sql).toMatch(/HAVING count\(\*\) > 40$/);
+    expect(errors.threshold).toBe(40);
+    const latency = level(latencyRow, "latency", {
+      baselines: { k: null },
+      thresholds: { k: 300 },
+    });
+    expect(latency.block).toBeNull();
+    expect(latency.prefill?.sql).toContain("> 300000");
+  });
+
+  it("keeps a usual level from the finding's evidence over any measurement", () => {
+    const row = level({ usually: 10 }, "errors", { baselines: { k: 99 } });
+    expect(row.threshold).toBe(30);
+  });
+
+  it("thresholds an errors alert with a usual level, so one returned row fires it", () => {
+    const row = one({ usually: 10 });
+    expect(row.block).toBeNull();
+    expect(row.prefill?.sql).toMatch(/HAVING count\(\*\) > \d+/);
+    expect(row.prefill).toMatchObject({ triggerThreshold: 1, triggerOperator: ">=" });
+  });
+
+  it("picks a text severity over a numeric level", () => {
+    const row = one({ usually: 10 }, "errors", { level: "Int64", severity_text: "Utf8" });
+    expect(row.prefill?.sql).toContain(`lower("severity_text")`);
+    expect(row.prefill?.sql).not.toContain(`lower("level")`);
   });
 });

@@ -41,6 +41,8 @@ export interface HandoffOptions {
   alertName?: string | null;
   /** The destinations the alert has now, so the editor can tell a stale suggestion from a fresh one. */
   current?: string[];
+  /** False once the click is stale, such as after an org switch, so a late lookup writes nothing. */
+  isCurrent?: () => boolean;
 }
 
 // The editor has no settings field to focus, the same call calibration's Review settings makes.
@@ -77,6 +79,7 @@ export const reviewTarget = async (
 ): Promise<EditAlertRoute | null> => {
   if (!isAutoObserveBuild() || !alertId) return null;
   const route = await routeTo(alertId, opts.alertName);
+  if (opts.isCurrent && !opts.isCurrent()) return null;
   const field = FOCUS[focus];
   writeAlertEditHandoff(field ? { ...handoffFor(alertId), focus: field } : handoffFor(alertId));
   return route;
@@ -90,6 +93,8 @@ export const destinationHandoff = async (
 ): Promise<EditAlertRoute | null> => {
   if (!isAutoObserveBuild() || !alertId) return null;
   const route = await routeTo(alertId, opts.alertName);
+  // The storage key is shared across orgs, so a stale answer must not replace a newer handoff.
+  if (opts.isCurrent && !opts.isCurrent()) return null;
   const to = names(destinations).slice(0, MAX_DESTINATIONS);
   const from = names(opts.current).slice(0, MAX_DESTINATIONS);
   const same = to.length === from.length && to.every((name) => from.includes(name));

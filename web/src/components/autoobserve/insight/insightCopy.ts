@@ -32,6 +32,12 @@ import {
   recordReasonKey,
   type DismissTarget,
 } from "@/components/alert_calibration/dismissals";
+import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
+import type { BulkReviewRequest } from "./bulk/useBulkReview";
+import type { AlertDraft } from "./targets/alertDraft";
+import type { SyntheticPrefillInput } from "@/utils/synthetics/syntheticPrefill";
+import { insightCtaLabel, type AiFinding, type CtaAction } from "./insightCta";
+import { gapGroupCopy, kindCopy, type CtaContext } from "./kindCopy";
 import {
   refusalOf,
   type BatchItemResult,
@@ -50,13 +56,20 @@ export interface InsightChip {
 /** Where a button goes; the review path looks up the alert's folder on click, so it is not a plain route. */
 export type InsightTarget =
   | { type: "review_alert"; action: ReviewAlertAction; alertName: string; findingId: string }
-  | { type: "route"; to: RouteLocationRaw };
+  | { type: "route"; to: RouteLocationRaw }
+  | { type: "create_alert"; prefill: AlertPrefill; folder: string; draft?: AlertDraft }
+  | { type: "bulk"; request: BulkReviewRequest }
+  | { type: "synthetic"; prefill: SyntheticPrefillInput }
+  | { type: "destinations"; alertId: string; alertName: string; destinations: string[] };
 
 export interface InsightCta {
   key: string;
+  action: CtaAction;
   label: I18nText;
   target: InsightTarget;
   note: I18nText | null;
+  /** Set when the reader lacks the write right: the button shows disabled with this line under it. */
+  locked?: I18nText | null;
 }
 
 export interface InsightFact {
@@ -77,6 +90,7 @@ export interface InsightParts {
   facts: InsightFact[];
   meta: I18nText | null;
   dismissable: DismissTarget | null;
+  ai: AiFinding | null;
 }
 
 export interface InsightToday {
@@ -87,8 +101,35 @@ export interface InsightToday {
   tags: InsightFact[];
 }
 
-type TypedAction =
-  ReviewAlertAction | { type: "review_source"; stream_type: string; stream_name: string };
+export interface HeartbeatCondition {
+  field: string;
+  op: "eq" | "contains";
+  value: string;
+  ignore_case: boolean;
+}
+
+export type TypedAction =
+  | ReviewAlertAction
+  | { type: "review_source"; stream_type: string; stream_name: string }
+  | {
+      type: "inspect_source";
+      stream_type: string;
+      stream_name: string;
+      field: string;
+      value: string;
+      from: number;
+      to: number | null;
+    }
+  | {
+      type: "create_alert";
+      stream_type: string;
+      stream_name: string;
+      conditions: HeartbeatCondition[];
+      period_secs: number;
+      frequency_secs: number | null;
+      cron: string | null;
+      silence_secs: number;
+    };
 
 export interface InsightZone {
   locale: string;
@@ -186,31 +227,94 @@ const windowText = (secs: number, locale: string): I18nText => {
   );
 };
 
+const isText = (value: unknown): value is string => typeof value === "string" && value !== "";
+
+const inspectAction = (a: Record<string, unknown>): TypedAction[] =>
+  isText(a.stream_type) &&
+  isText(a.stream_name) &&
+  isText(a.field) &&
+  isText(a.value) &&
+  num(a.from) !== null
+    ? [
+        {
+          type: "inspect_source",
+          stream_type: a.stream_type,
+          stream_name: a.stream_name,
+          field: a.field,
+          value: a.value,
+          from: num(a.from)!,
+          to: num(a.to),
+        },
+      ]
+    : [];
+
+const conditionsOf = (value: unknown): HeartbeatCondition[] | null => {
+  if (!Array.isArray(value) || !value.length) return null;
+  const out = value.flatMap((c: Record<string, unknown>): HeartbeatCondition[] =>
+    c && isText(c.field) && isText(c.value) && (c.op === "eq" || c.op === "contains")
+      ? [{ field: c.field, op: c.op, value: c.value, ignore_case: c.ignore_case === true }]
+      : [],
+  );
+  return out.length === value.length ? out : null;
+};
+
+// A create_alert the form can't express exactly is dropped rather than guessed at.
+const createAction = (a: Record<string, unknown>): TypedAction[] => {
+  const conditions = conditionsOf(a.conditions);
+  const period = num(a.period_secs);
+  const silence = num(a.silence_secs);
+  if (!isText(a.stream_name) || !conditions || !period || period <= 0 || silence === null)
+    return [];
+  return [
+    {
+      type: "create_alert",
+      stream_type: isText(a.stream_type) ? a.stream_type : "logs",
+      stream_name: a.stream_name,
+      conditions,
+      period_secs: period,
+      frequency_secs: num(a.frequency_secs),
+      cron: isText(a.cron) ? a.cron : null,
+      silence_secs: silence,
+    },
+  ];
+};
+
+const reviewAction = (a: Record<string, unknown>): TypedAction[] => {
+  if (!isText(a.alert_id)) return [];
+  if (a.focus === undefined || a.focus === null)
+    return [{ type: "review_alert", alert_id: a.alert_id }];
+  return REVIEW_FOCI.includes(a.focus as ReviewFocus)
+    ? [{ type: "review_alert", alert_id: a.alert_id, focus: a.focus as ReviewFocus }]
+    : [];
+};
+
 /** Only an action this build can label becomes a button; an unknown or malformed one is dropped, never shown raw. */
-const typedActions = (item: AutoObserveSuggestion): TypedAction[] =>
+/** Choose who gets notified: the alert's editor at its destinations; no suggestion is known until G-new-2. */
+export const destinationsTarget = (alertId: string, alertName: string): InsightTarget => ({
+  type: "destinations",
+  alertId,
+  alertName,
+  destinations: [],
+});
+
+export const typedActions = (item: AutoObserveSuggestion): TypedAction[] =>
   (Array.isArray(item.actions) ? (item.actions as unknown[]) : []).flatMap(
     (value): TypedAction[] => {
       if (typeof value !== "object" || value === null) return [];
       const action = value as Record<string, unknown>;
-      if (action.type === "review_source") {
-        const { stream_type, stream_name } = action;
-        return typeof stream_type === "string" && typeof stream_name === "string" && stream_name
-          ? [{ type: "review_source", stream_type, stream_name }]
+      if (action.type === "review_source")
+        return isText(action.stream_type) && isText(action.stream_name)
+          ? [
+              {
+                type: "review_source",
+                stream_type: action.stream_type,
+                stream_name: action.stream_name,
+              },
+            ]
           : [];
-      }
-      if (action.type !== "review_alert" || typeof action.alert_id !== "string" || !action.alert_id)
-        return [];
-      if (action.focus === undefined || action.focus === null)
-        return [{ type: "review_alert", alert_id: action.alert_id }];
-      return REVIEW_FOCI.includes(action.focus as ReviewFocus)
-        ? [
-            {
-              type: "review_alert",
-              alert_id: action.alert_id,
-              focus: action.focus as ReviewFocus,
-            },
-          ]
-        : [];
+      if (action.type === "inspect_source") return inspectAction(action);
+      if (action.type === "create_alert") return createAction(action);
+      return action.type === "review_alert" ? reviewAction(action) : [];
     },
   );
 
@@ -272,7 +376,8 @@ const logsCta = (
   const range = logsWindow(item, nowMs);
   return {
     key: `logs-${stream}`,
-    label: t("insight.actions.openInLogs"),
+    action: "openInLogs",
+    label: insightCtaLabel(t, "openInLogs"),
     target: {
       type: "route",
       to: buildLogsRoute({
@@ -292,6 +397,7 @@ const reviewCta = (
   action: ReviewAlertAction,
 ): InsightCta => ({
   key: `review-${action.focus ?? "alert"}`,
+  action: "reviewAlert",
   label: t(insightActionLabel(action)),
   target: {
     type: "review_alert",
@@ -306,7 +412,8 @@ const reviewCta = (
 const ctaOf = (t: TranslateFn, item: AutoObserveSuggestion, nowMs: number): InsightCta | null => {
   for (const action of typedActions(item)) {
     if (action.type === "review_alert") return reviewCta(t, item, action);
-    if (action.stream_type === "logs") return logsCta(t, item, action.stream_name, nowMs);
+    if (action.type === "review_source" && action.stream_type === "logs")
+      return logsCta(t, item, action.stream_name, nowMs);
   }
   return null;
 };
@@ -326,7 +433,8 @@ const calibrationCta = (t: TranslateFn, item: AutoObserveSuggestion): InsightCta
   const rule = text(item.evidence.rule_id);
   return {
     key: "calibration",
-    label: t("insight.actions.openInCalibration"),
+    action: "openInCalibration",
+    label: insightCtaLabel(t, "openInCalibration"),
     target: {
       type: "route",
       to: {
@@ -336,6 +444,35 @@ const calibrationCta = (t: TranslateFn, item: AutoObserveSuggestion): InsightCta
       },
     },
     note: null,
+  };
+};
+
+const notWorkingAi = (
+  t: TranslateFn,
+  zone: InsightZone,
+  item: AutoObserveSuggestion,
+  today: InsightToday,
+): AiFinding => {
+  const alert = text(item.evidence.alert_name) || text(item.evidence.monitor_name);
+  const why = alertWhy(t, zone, item);
+  return {
+    kind: item.kind,
+    subject: alert,
+    request: t("insight.ai.alert_not_working.ask", {
+      alert: raw(alert),
+      why: why ?? today.headline,
+    }),
+    facts: [
+      ["Alert", alert],
+      ["Finding", String(today.headline)],
+      ...(why ? ([["Why", String(why)]] as [string, string][]) : []),
+      ...(text(item.evidence.field)
+        ? ([["Field", text(item.evidence.field)]] as [string, string][])
+        : []),
+      ...(text(item.evidence.stream)
+        ? ([["Stream", text(item.evidence.stream)]] as [string, string][])
+        : []),
+    ],
   };
 };
 
@@ -363,36 +500,72 @@ const notWorkingParts = (
     facts: today.tags,
     meta: today.why,
     dismissable: dismissableOf(item),
+    ai: notWorkingAi(t, zone, item, today),
   };
 };
 
 const todayParts = (
   t: TranslateFn,
+  zone: InsightZone,
   item: AutoObserveSuggestion,
   today: InsightToday,
   nowMs: number,
+  ctx: CtaContext,
 ): InsightParts => {
   const tone = KIND_TONE[item.kind] ?? "info";
-  const cta = ctaOf(t, item, nowMs);
+  const kind = kindCopy(t, zone, item, typedActions(item), nowMs, ctx);
+  const cta = kind && "cta" in kind ? (kind.cta ?? null) : ctaOf(t, item, nowMs);
+  const chip = kind?.chip ?? { label: today.label, tone };
   return {
     id: item.id,
-    chip: { label: today.label, variant: TONE_VARIANT[tone], tone },
-    headline: today.headline,
-    why: today.why,
-    whyDetail: today.body,
-    next: null,
+    chip: { label: chip.label, variant: TONE_VARIANT[chip.tone], tone: chip.tone },
+    headline: kind?.headline ?? today.headline,
+    why: kind && "why" in kind ? (kind.why ?? null) : today.why,
+    whyDetail: kind && "whyDetail" in kind ? (kind.whyDetail ?? null) : today.body,
+    next: kind?.next ?? null,
     cta,
-    secondary: [],
+    secondary: kind?.secondary ?? [],
     note: cta?.note ?? null,
     facts: today.tags,
-    meta: null,
+    // The list's own line (place and volume) moves to Details when the kind words its why itself.
+    meta: kind && "why" in kind ? today.why : null,
     dismissable: null,
+    ai: kind?.ai ?? null,
   };
 };
 
 // The OSS build has no AutoObserve backend to write through, so nothing there writes or navigates.
 const forBuild = (parts: InsightParts): InsightParts =>
-  isEnterprise() ? parts : { ...parts, cta: null, secondary: [], note: null, dismissable: null };
+  isEnterprise()
+    ? parts
+    : { ...parts, cta: null, secondary: [], note: null, dismissable: null, ai: null };
+
+/** The card many coverage gaps share; each one stays dismissable in All suggestions. */
+export const gapGroupInsight = (
+  t: TranslateFn,
+  zone: InsightZone,
+  gaps: AutoObserveSuggestion[],
+  ctx: CtaContext,
+  total: number = gaps.length,
+): InsightParts => {
+  const kind = gapGroupCopy(t, zone, gaps, ctx, total);
+  const chip = kind.chip!;
+  return forBuild({
+    id: "coverage_gap-group",
+    chip: { label: chip.label, variant: TONE_VARIANT[chip.tone], tone: chip.tone },
+    headline: kind.headline!,
+    why: kind.why,
+    whyDetail: null,
+    next: kind.next,
+    cta: kind.cta,
+    secondary: kind.secondary,
+    note: kind.cta?.note ?? null,
+    facts: [],
+    meta: null,
+    dismissable: null,
+    ai: kind.ai,
+  });
+};
 
 export const insightCopy = (
   t: TranslateFn,
@@ -400,11 +573,12 @@ export const insightCopy = (
   item: AutoObserveSuggestion,
   today: InsightToday,
   nowMs: number = Date.now(),
+  ctx: CtaContext = {},
 ): InsightParts =>
   forBuild(
     item.kind === NOT_WORKING
       ? notWorkingParts(t, zone, item, today, nowMs)
-      : todayParts(t, item, today, nowMs),
+      : todayParts(t, zone, item, today, nowMs, ctx),
   );
 
 /** The one copy helper for the decision route's dialogs, toasts and list; ids and reason codes never reach the reader. */

@@ -63,11 +63,11 @@ import LiveSuggestions from "./LiveSuggestions.vue";
 import { toRequests } from "./liveAdapter";
 import type { RailSource } from "./liveModel";
 
-const suggestion = (id: string): AutoObserveSuggestion => ({
+const suggestion = (id: string, kind = "coverage_gap"): AutoObserveSuggestion => ({
   id,
   org: "acme",
   analyzer: "coverage",
-  kind: "coverage_gap",
+  kind,
   subject: { kind: "service", key_dims: { service_name: id } },
   evidence: { service_name: id, severity: "medium", cells: {} },
   score: 1,
@@ -119,7 +119,10 @@ const rail = (count: number, total: number, over: Partial<RailSource> = {}): Rai
   requests: toRequests(
     gt,
     { locale: "en-US", timeZone: "UTC" },
-    Array.from({ length: count }, (_, i) => suggestion(`svc${i}`)),
+    // Odd ones are another kind, so six or more never fold into the one coverage gap card.
+    Array.from({ length: count }, (_, i) =>
+      suggestion(`svc${i}`, i % 2 ? "no_absence_check" : "coverage_gap"),
+    ),
   ),
   total,
   ...over,
@@ -146,9 +149,7 @@ describe("LiveSuggestions rail (OSS-11, OSS-9)", () => {
     const wrapper = mountRail(rail(8, 12));
     expect(cards(wrapper)).toHaveLength(5);
     expect(wrapper.find('[data-test="autoobserve2-suggestions-more"]').text()).toBe("and 7 more");
-    expect(wrapper.find('[data-test="autoobserve2-suggestions-see-all"]').text()).toBe(
-      "See all 12",
-    );
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-see-all"]').text()).toBe("See all");
     expect(countChip(wrapper)).toBe("12");
   });
 
@@ -255,7 +256,7 @@ describe("LiveSuggestions rail when decisions empty the first page", () => {
     expect(cards(wrapper)).toHaveLength(0);
     const seeAll = wrapper.find('[data-test="autoobserve2-suggestions-see-all"]');
     expect(seeAll.exists()).toBe(true);
-    expect(seeAll.text()).toBe("See all 12");
+    expect(seeAll.text()).toBe("See all");
     expect(wrapper.find('[data-test="autoobserve2-suggestions-more"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="autoobserve2-suggestions-empty"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="autoobserve2-suggestions-page-empty"]').text()).toContain(
@@ -312,7 +313,20 @@ describe("LiveSuggestions rail: one card shape for 0, 1, a few and many (test 16
     const seven = mountRail(rail(7, 7));
     expect(cards(seven)).toHaveLength(5);
     expect(seven.find('[data-test="autoobserve2-suggestions-more"]').text()).toBe("and 2 more");
-    expect(seven.find('[data-test="autoobserve2-suggestions-see-all"]').text()).toBe("See all 7");
+    expect(seven.find('[data-test="autoobserve2-suggestions-see-all"]').text()).toBe("See all");
+  });
+
+  it("folds seven coverage gaps into one card that counts them all, with no 'and N more'", () => {
+    const seven = mountRail({
+      ...rail(0, 7),
+      requests: toRequests(
+        gt,
+        { locale: "en-US", timeZone: "UTC" },
+        Array.from({ length: 7 }, (_, i) => suggestion(`svc${i}`)),
+      ),
+    });
+    expect(cards(seven).map((c) => c.text())).toEqual(["Nothing watches 7 services"]);
+    expect(seven.find('[data-test="autoobserve2-suggestions-more"]').exists()).toBe(false);
   });
 
   it("keeps the CTA bar in the skeleton, so the cards land without a shift", () => {
@@ -421,7 +435,7 @@ describe("LiveSuggestions rail: a Not working alert acts (tests 10-14)", () => {
     const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
     const card = mountItems([notWorking()]);
     const cta = card.get(block("cta"));
-    expect(cta.text()).toBe("Review query");
+    expect(cta.text()).toBe("Review alert");
     await cta.trigger("click");
     expect(alertFolderOf).toHaveBeenCalledWith("default", "a2", "payments-latency");
     expect(cta.attributes("aria-busy")).toBe("true");
@@ -516,7 +530,7 @@ describe("LiveSuggestions rail: a Not working alert acts (tests 10-14)", () => {
         actions: [{ type: "review_alert", alert_id: "a7", focus: "query" }],
       },
     ]);
-    expect(card.get('[data-test="insight-block-blind-a7-cta"]').text()).toBe("Review query");
+    expect(card.get('[data-test="insight-block-blind-a7-cta"]').text()).toBe("Review alert");
     await card.get('[data-test="insight-block-blind-a7-details-toggle"]').trigger("click");
     expect(card.find('[data-test="insight-block-blind-a7-dismiss"]').exists()).toBe(false);
   });

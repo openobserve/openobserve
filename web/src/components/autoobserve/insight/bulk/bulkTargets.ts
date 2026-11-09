@@ -49,6 +49,7 @@ export interface ServiceScope {
   namespace: string | null;
   stream: { type: string; name: string };
   schema?: string[];
+  fieldTypes?: Record<string, string>;
 }
 
 export interface OutageMember {
@@ -206,38 +207,42 @@ export const sourceNoDataAlert = (m: SourceScope, o: BuilderOptions): AlertPrefi
       )
     : null;
 
-/** An errors alert at three times the usual hourly rate; null without a baseline or an error field. */
+/** An errors alert at three times the usual hourly rate, or at the threshold the user set; null without either or an error field. */
 export const errorsAlert = (
   s: ServiceScope,
-  o: BuilderOptions & { errorField: FieldPick | null; usualPerHour: number | null },
+  o: BuilderOptions & {
+    errorField: FieldPick | null;
+    usualPerHour: number | null;
+    threshold?: number | null;
+  },
 ): AlertPrefill | null => {
   const pick =
     o.errorField ??
     (s.stream?.type === "traces" ? { name: "span_status", kind: "span_status" as const } : null);
-  if (!enterprise() || !o.usualPerHour || !pick) return null;
-  const usual = o.usualPerHour;
+  const threshold = o.threshold || (o.usualPerHour ? o.usualPerHour * 3 : null);
+  if (!enterprise() || !threshold || !pick) return null;
   return scopedPrefill(serviceScope(s), (where) => {
     const filter = `${where} AND ${errorPredicate(pick)}`;
     return {
       ...absencePrefill(s.stream, filter, "", s.service, 60),
       name: `${scopeName(s)}-errors`,
-      sql: `SELECT count(*) AS errors FROM ${quoteStream(s.stream.name)} WHERE ${filter} HAVING count(*) > ${usual * 3}`,
+      sql: `SELECT count(*) AS errors FROM ${quoteStream(s.stream.name)} WHERE ${filter} HAVING count(*) > ${threshold}`,
     };
   });
 };
 
-/** A latency alert at twice the usual p95; null without a baseline. */
+/** A latency alert at twice the usual p95, or at the threshold in ms the user set; null without either. */
 export const latencyAlert = (
   s: ServiceScope,
-  o: BuilderOptions & { durationField: string; p95Ms: number | null },
+  o: BuilderOptions & { durationField: string; p95Ms: number | null; threshold?: number | null },
 ): AlertPrefill | null => {
-  if (!enterprise() || !o.p95Ms) return null;
+  const thresholdMs = o.threshold || (o.p95Ms ? o.p95Ms * 2 : null);
+  if (!enterprise() || !thresholdMs) return null;
   const field = quoteField(o.durationField);
-  const p95Ms = o.p95Ms;
   return scopedPrefill(serviceScope(s), (where) => ({
     ...absencePrefill(s.stream, where, "", s.service, NO_DATA_MINUTES),
     name: `${scopeName(s)}-latency`,
-    sql: `SELECT approx_percentile_cont(${field}, 0.95) AS p95 FROM ${quoteStream(s.stream.name)} WHERE ${where} HAVING approx_percentile_cont(${field}, 0.95) > ${p95Ms * 2 * 1000}`,
+    sql: `SELECT approx_percentile_cont(${field}, 0.95) AS p95 FROM ${quoteStream(s.stream.name)} WHERE ${where} HAVING approx_percentile_cont(${field}, 0.95) > ${thresholdMs * 1000}`,
   }));
 };
 

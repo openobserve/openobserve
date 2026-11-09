@@ -112,6 +112,15 @@ describe("toEditHandoff", () => {
     expect(review("settings")).not.toHaveProperty("focus");
     expect(review()).not.toHaveProperty("patch");
   });
+
+  it("opens a failing-notifications alert at its destinations", () => {
+    const failed = { ...record([]), rule_id: "notify_failed" } as FindingRecord;
+    const review = (focus?: "settings" | "query") =>
+      toEditHandoff({ type: "review_alert", alert_id: "a1", focus }, failed);
+    expect(review("settings")).toMatchObject({ focus: "destinations" });
+    expect(review()).toMatchObject({ focus: "destinations" });
+    expect(review("query")).toMatchObject({ focus: "query" });
+  });
 });
 
 describe("applyCopy", () => {

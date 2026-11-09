@@ -21,7 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="
       card
         ? 'rounded-default bg-surface-base border-border-subtle relative gap-2 overflow-hidden border py-3.5 ps-4 pe-3.5 shadow-xs'
-        : 'gap-3 px-4 py-3'
+        : flush
+          ? 'gap-3'
+          : 'gap-3 px-4 py-3'
     "
     :data-test="`insight-block-${parts.id}`"
   >
@@ -55,18 +57,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ parts.why }}
       </p>
-      <div class="flex min-h-8 items-center gap-2 pt-1">
+      <div class="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1 pt-1">
         <OButton
           v-if="parts.cta"
           variant="outline"
           size="sm"
           class="min-w-0"
+          :icon-left="parts.cta.locked ? 'lock' : undefined"
+          :disabled="!!parts.cta.locked"
           :loading="pending"
           :title="parts.cta.label"
           :data-test="`insight-block-${parts.id}-cta`"
-          @click="emit('cta', parts.cta)"
+          @click="!parts.cta.locked && emit('cta', parts.cta)"
         >
           {{ parts.cta.label }}
+        </OButton>
+        <OButton
+          v-if="canAsk"
+          variant="ghost-primary"
+          size="sm"
+          icon-left="auto-awesome"
+          :data-test="`insight-block-${parts.id}-ask-ai`"
+          @click="ask"
+        >
+          {{ insightCtaLabel(t, "askAi") }}
+        </OButton>
+        <OButton
+          v-if="parts.dismissable"
+          variant="ghost-muted"
+          size="sm"
+          :data-test="`insight-block-${parts.id}-dismiss`"
+          @click="emit('dismiss')"
+        >
+          {{ insightCtaLabel(t, "dismiss") }}
         </OButton>
         <OButton
           v-if="hasDetails"
@@ -82,6 +105,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("insight.labels.details") }}
         </OButton>
       </div>
+      <OText
+        v-if="parts.cta?.locked"
+        variant="meta"
+        as="p"
+        class="flex items-start gap-1"
+        :data-test="`insight-block-${parts.id}-locked`"
+      >
+        <OIcon name="lock" size="xs" class="mt-0.5 shrink-0" />{{ parts.cta.locked }}
+      </OText>
+      <OText
+        v-else-if="parts.note"
+        variant="meta"
+        as="p"
+        :data-test="`insight-block-${parts.id}-note`"
+      >
+        {{ parts.note }}
+      </OText>
     </template>
     <div
       v-if="!card || open"
@@ -126,11 +166,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!card && parts.cta"
           variant="primary"
           size="sm"
+          :icon-left="parts.cta.locked ? 'lock' : undefined"
+          :disabled="!!parts.cta.locked"
           :loading="pending"
           :data-test="`insight-block-${parts.id}-cta`"
-          @click.stop="emit('cta', parts.cta)"
+          @click.stop="!parts.cta.locked && emit('cta', parts.cta)"
         >
           {{ parts.cta.label }}
+        </OButton>
+        <OButton
+          v-if="!card && canAsk"
+          variant="ghost-primary"
+          size="sm"
+          icon-left="auto-awesome"
+          :data-test="`insight-block-${parts.id}-ask-ai`"
+          @click.stop="ask"
+        >
+          {{ insightCtaLabel(t, "askAi") }}
         </OButton>
         <OButton
           v-for="action in parts.secondary"
@@ -143,16 +195,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ action.label }}
         </OButton>
         <OButton
-          v-if="parts.dismissable"
+          v-if="!card && parts.dismissable"
           variant="ghost-muted"
           size="sm"
           :data-test="`insight-block-${parts.id}-dismiss`"
           @click.stop="emit('dismiss')"
         >
-          {{ t("insight.actions.dismiss") }}
+          {{ insightCtaLabel(t, "dismiss") }}
         </OButton>
         <OText
-          v-if="parts.note"
+          v-if="!card && parts.cta?.locked"
+          variant="meta"
+          as="span"
+          class="flex items-start gap-1"
+          :data-test="`insight-block-${parts.id}-locked`"
+        >
+          <OIcon name="lock" size="xs" class="mt-0.5 shrink-0" />{{ parts.cta.locked }}
+        </OText>
+        <OText
+          v-else-if="!card && parts.note"
           variant="meta"
           as="span"
           :data-test="`insight-block-${parts.id}-note`"
@@ -165,12 +226,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, inject, ref, useId } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { InsightCta, InsightParts, InsightTone } from "./insightCopy";
+import { ASK_AI_KEY, aiEnabled, askAiPayload, insightCtaLabel } from "./insightCta";
 
 const ACCENT: Record<InsightTone, string> = {
   failure: "bg-status-error-text",
@@ -183,8 +247,10 @@ const props = withDefaults(
     parts: InsightParts;
     variant?: "card" | "details";
     pending?: boolean;
+    /** Details inside a panel that already pads its content. */
+    flush?: boolean;
   }>(),
-  { variant: "card", pending: false },
+  { variant: "card", pending: false, flush: false },
 );
 
 const emit = defineEmits<{
@@ -199,6 +265,8 @@ defineSlots<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
+const askAi = inject(ASK_AI_KEY, null);
 
 const detailsId = `insight-details-${useId()}`;
 const open = ref(false);
@@ -207,12 +275,18 @@ const card = computed(() => props.variant === "card");
 const detailWhy = computed(() =>
   card.value ? props.parts.whyDetail : (props.parts.whyDetail ?? props.parts.why),
 );
+// AI is a deployment setting known at first paint, so the button is absent when off, never disabled.
+const canAsk = computed(() => !!props.parts.ai && !!askAi && aiEnabled(store?.state?.zoConfig));
+const ask = () => {
+  if (!props.parts.ai || !askAi) return;
+  const org = String(store?.state?.selectedOrganization?.identifier ?? "");
+  askAi(askAiPayload(t, props.parts.ai, org));
+};
 const hasActions = computed(
   () =>
-    (!card.value && !!props.parts.cta) ||
     props.parts.secondary.length > 0 ||
-    !!props.parts.dismissable ||
-    !!props.parts.note,
+    (!card.value &&
+      (!!props.parts.cta || canAsk.value || !!props.parts.dismissable || !!props.parts.note)),
 );
 const hasDetails = computed(
   () =>

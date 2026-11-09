@@ -87,6 +87,69 @@ describe("useLiveAutoObserve", () => {
   });
 });
 
+describe("useLiveAutoObserve groups the rail from every gap (F8)", () => {
+  const gap = (i: number) => ({
+    id: `gap-${i}`,
+    org: "default",
+    kind: "coverage_gap",
+    status: "proposed",
+    entity_type: "service",
+    subject: { kind: "service", key_dims: { service_name: `svc-${i}` } },
+    evidence: { service_name: `svc-${i}`, cells: {} },
+    score: 1,
+    created_at: START * 1000,
+  });
+  const RailHarness = defineComponent({
+    setup() {
+      const { rail } = useLiveAutoObserve();
+      return () =>
+        h(
+          "span",
+          { "data-test": "rail" },
+          rail.value.requests.map((r) => `${r.id}:${r.covers ?? 1}`).join(","),
+        );
+    },
+  });
+
+  it("asks for every proposed gap and folds them into one card the rail counts in full", async () => {
+    vi.mocked(autoobserve.coverage).mockResolvedValue({ data: coverage() } as never);
+    vi.mocked(autoobserve.suggestions).mockImplementation(async (_org, params) =>
+      params.kind === "coverage_gap"
+        ? ({
+            data: { suggestions: [0, 1, 2, 3, 4, 5, 6].map(gap), total: 7, limit: 7, offset: 0 },
+          } as never)
+        : ({ data: { suggestions: [gap(0)], total: 12, limit: 5, offset: 0 } } as never),
+    );
+    const wrapper = mount(RailHarness, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    expect(autoobserve.suggestions).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ kind: "coverage_gap", status: "proposed" }),
+    );
+    expect(wrapper.find('[data-test="rail"]').text()).toBe("coverage_gap-group:7");
+  });
+
+  it("pages past the server's largest page, so a group of 501 gaps reads all 501 (F8)", async () => {
+    vi.mocked(autoobserve.coverage).mockResolvedValue({ data: coverage() } as never);
+    vi.mocked(autoobserve.suggestions).mockClear();
+    vi.mocked(autoobserve.suggestions).mockImplementation(async (_org, params) => {
+      if (params.kind !== "coverage_gap")
+        return { data: { suggestions: [gap(0)], total: 501, limit: 5, offset: 0 } } as never;
+      const from = params.offset ?? 0;
+      const ids = Array.from({ length: Math.min(500, 501 - from) }, (_, k) => from + k);
+      return { data: { suggestions: ids.map(gap), total: 501, limit: 500, offset: from } } as never;
+    });
+    const wrapper = mount(RailHarness, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    const offsets = vi
+      .mocked(autoobserve.suggestions)
+      .mock.calls.filter(([, p]) => p.kind === "coverage_gap")
+      .map(([, p]) => p.offset);
+    expect(offsets).toEqual([0, 500]);
+    expect(wrapper.find('[data-test="rail"]').text()).toBe("coverage_gap-group:501");
+  });
+});
+
 describe("keepLatched", () => {
   const FIXTURE = fixture as unknown as AutoObserveIncidentList;
   const withId = (id: string, title = id): AutoObserveIncidentItem => ({

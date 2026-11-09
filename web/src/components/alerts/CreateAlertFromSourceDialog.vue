@@ -167,6 +167,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
       </div>
 
+      <div v-if="!pickQueryOnly && prefill.thresholdInput" class="flex flex-col gap-1">
+        <OInput
+          :model-value="thresholdDraft"
+          type="number"
+          size="sm"
+          class="max-w-60"
+          :label="raw(prefill.thresholdInput.label)"
+          :suffix="prefill.thresholdInput.suffix"
+          :help-text="needsThreshold(prefill) ? raw(prefill.thresholdInput.reason) : undefined"
+          data-test="create-alert-threshold-value"
+          @update:model-value="onThresholdInput"
+        />
+      </div>
+
       <!-- The rolling window the alert will evaluate. -->
       <div v-if="!pickQueryOnly && prefill.periodMinutes" class="flex flex-col gap-1">
         <span class="text-text-secondary text-xs font-medium">
@@ -220,6 +234,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { useColorizedQuery } from "@/composables/useColorizedQuery";
 import { copyToClipboard } from "@/utils/clipboard";
 import { escapeHtml } from "@/utils/html";
@@ -231,7 +246,7 @@ import type {
   AlertPrefillWarning,
   AlertPrefillWarningLevel,
 } from "@/ts/interfaces/alertPrefill";
-import { isPrefillBlocked } from "@/utils/alerts/alertPrefill";
+import { isPrefillBlocked, needsThreshold } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { formatSqlForDisplay } from "@/utils/query/formatSql";
 
@@ -261,7 +276,18 @@ const isOpen = computed({
   set: (value: boolean) => emit("update:open", value),
 });
 
-const isBlocked = computed(() => (props.prefill ? isPrefillBlocked(props.prefill) : true));
+// An alert whose threshold was never set would return its one row on every run and never fire.
+const isBlocked = computed(() =>
+  props.prefill ? isPrefillBlocked(props.prefill) || needsThreshold(props.prefill) : true,
+);
+
+const thresholdDraft = ref<string | number>(props.prefill?.thresholdInput?.value ?? "");
+
+const onThresholdInput = (value: string | number) => {
+  thresholdDraft.value = value;
+  const typed = Number(value);
+  emit("rebuild", { threshold: Number.isFinite(typed) && typed > 0 ? typed : 0 });
+};
 
 const hasStreamChoice = computed(() => (props.prefill?.streamCandidates?.length ?? 0) > 1);
 
@@ -349,6 +375,8 @@ watch(
     selectedStream.value = prefill.streamName;
     thresholdShape.value =
       prefill.thresholdShape ?? getAlertSource(prefill.source).defaultThreshold;
+    // A rebuild without a usable value keeps what the user is typing.
+    if (prefill.thresholdInput?.value != null) thresholdDraft.value = prefill.thresholdInput.value;
   },
   { immediate: true },
 );

@@ -178,7 +178,7 @@ describe("the 'and N more' line", () => {
     expect(moreCount(12, 5)).toBe(7);
     expect(moreText(gt, "en-US", 12, 5)).toBe("and 7 more");
     expect(moreText(gt, "en-US", 6, 5)).toBe("and 1 more");
-    expect(seeAllText(gt, "en-US", 3000)).toBe("See all 3,000");
+    expect(seeAllText(gt, "en-US", 3000)).toBe("See all");
   });
 
   it("shows no line when everything fits", () => {
@@ -422,20 +422,20 @@ describe("liveGapLines (the drawer's line for a gap)", () => {
     });
     expect(lines).toEqual([
       "Errors: e matches, but it notifies no one",
-      "No monitor watches latency or absence",
+      "No alert watches its latency or whether it stops sending",
     ]);
   });
 
   it("names the key's amber dot with one shared word", () => {
-    expect(liveLookWord(gt, "problem")).toBe("Monitor falls short");
-    expect(liveLookWord(gt, "missing")).toBe("No monitor");
+    expect(liveLookWord(gt, "problem")).toBe("Falls short");
+    expect(liveLookWord(gt, "missing")).toBe("Not watched");
   });
 });
 
 describe("liveCellWord / liveCellLook (the coverage table's cells)", () => {
   it("says Covered, No monitor, or the engine's own word for a monitor that falls short", () => {
     expect(liveCellWord(gt, "covered")).toBe("Covered");
-    expect(liveCellWord(gt, "none")).toBe("No monitor");
+    expect(liveCellWord(gt, "none")).toBe("Not watched");
     expect(liveCellWord(gt, "silent")).toBe("Silent");
     expect(liveCellWord(gt, "blind")).toBe("Blind");
   });

@@ -18,6 +18,7 @@ import i18n, { localeFileMap } from "@/locales";
 import {
   ALERT_PREFILL_VERSION,
   type AlertPrefill,
+  type AlertPrefillThresholdInput,
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
 import { gt, type I18nText } from "@/types/i18n";
@@ -51,6 +52,9 @@ const EVENT_REASON_FIELDS = ["body_object_reason", "reason", "k8s_event_reason"]
 // A level-3 events stream keeps the regarding object as JSON; level 0 and core/v1 events flatten its name.
 const EVENT_REGARDING_JSON = "body_object_regarding";
 const EVENT_REGARDING_NAMES = ["body_object_regarding_name", "body_object_involvedobject_name"];
+
+const TEXT_TYPES = new Set(["Utf8", "LargeUtf8", "Utf8View"]);
+const NUMERIC_TYPE = /^(U?Int\d+|Float\d+|Decimal)/;
 
 const NO_DATA_MINUTES = 15;
 // SS1-D2 reads outages in hourly buckets, so an outage member's alert waits the same hour.
@@ -90,6 +94,8 @@ export interface ServiceScope {
   stream: { type: string; name: string };
   /** The stream's field names; scope filters use only names found here, defaults when absent. */
   schema?: string[];
+  /** Each field's data type, when read with the schema. */
+  fieldTypes?: Record<string, string>;
 }
 
 export interface AutoObserveAlertOptions {
@@ -195,16 +201,18 @@ const serviceScope = (s: ServiceScope, serviceFields = SERVICE_FIELDS): Scope =>
     };
   }
   where.push(`${sqlField(serviceField)} = ${sqlLiteral(service)}`);
-  const extra: [string | null, string[]][] = [
-    [s.cluster, scopeFieldsOf(s.stream?.type).cluster],
-    [s.namespace, scopeFieldsOf(s.stream?.type).namespace],
+  const extra: [string | null, string[], string][] = [
+    [s.cluster, scopeFieldsOf(s.stream?.type).cluster, "autoobserve.noClusterField"],
+    [s.namespace, scopeFieldsOf(s.stream?.type).namespace, "autoobserve.noNamespaceField"],
   ];
-  for (const [value, candidates] of extra) {
+  for (const [value, candidates, missing] of extra) {
     if (!value) continue;
     // Without the schema a guessed cluster field could match nothing, which a no-data alert reads as an outage.
     const field = s.schema ? pickField(candidates, s.schema) : null;
     if (field) where.push(`${sqlField(field)} = ${sqlLiteral(value)}`);
     else if (!s.schema) warnings.push(warn("autoobserve.scopeServiceOnly", "info", { service }));
+    // Unfiltered, a same-named service elsewhere would keep the alert quiet through this one's outage.
+    else warnings.push(warn(missing, "blocking", { stream: s.stream?.name ?? "", value }));
   }
   return { where, warnings: dedupe(warnings), blocked: false };
 };
@@ -303,15 +311,22 @@ const errorPredicate = (pick: FieldPick): string => {
 };
 
 /** The schema's error field: span status on traces, else a level or status field; never the message body. */
-export const errorFieldOf = (streamType: string, schema: string[] = []): FieldPick | null => {
+export const errorFieldOf = (
+  streamType: string,
+  schema: string[] = [],
+  types?: Record<string, string>,
+): FieldPick | null => {
   const present = new Set(schema);
   if (streamType === "traces") return { name: "span_status", kind: "span_status" };
+  // lower() fails on a non-text level and >= 500 on a status that is not a number, so known types must fit.
+  const fits = (f: string, type: (t: string) => boolean) =>
+    present.has(f) && (!types?.[f] || type(types[f]));
   const level = ["level", "severity", "severity_text", "log_level", "loglevel"].find((f) =>
-    present.has(f),
+    fits(f, (t) => TEXT_TYPES.has(t)),
   );
   if (level) return { name: level, kind: "level" };
   const status = ["status_code", "http_status_code", "response_code", "status"].find((f) =>
-    present.has(f),
+    fits(f, (t) => NUMERIC_TYPE.test(t)),
   );
   return status ? { name: status, kind: "status_code" } : null;
 };
@@ -332,57 +347,112 @@ export const noDataAlert = (s: ServiceScope, o: AutoObserveAlertOptions): AlertP
   );
 };
 
-/** PD-11: fires above three times the usual hourly error count; no usual count leaves the threshold empty. */
+/** What the usual level is measured on, with the inputs its alert reads. */
+export type BaselineInputs =
+  { kind: "errors"; errorField: FieldPick | null } | { kind: "latency"; durationField: string };
+
+const errorPick = (s: ServiceScope, field: FieldPick | null): FieldPick | null =>
+  field ?? (s.stream?.type === "traces" ? errorFieldOf("traces") : null);
+
+const p95Of = (s: ServiceScope, durationField: string): string =>
+  `approx_percentile_cont(${sqlField(durationField || "duration")}, 0.95)${s.stream?.type === "traces" ? " / 1000" : ""}`;
+
+/** The alert's query before its threshold: the error count, or the p95 in ms with its request count. */
+const levelSql = (s: ServiceScope, scope: Scope, b: BaselineInputs): string | null => {
+  if (b.kind === "latency") {
+    return `SELECT ${p95Of(s, b.durationField)} AS p95_ms, count(*) AS requests FROM ${sqlStream(s.stream?.name)}${whereOf(scope.where)}`;
+  }
+  const pick = errorPick(s, b.errorField);
+  if (!pick) return null;
+  return `SELECT count(*) AS errors FROM ${sqlStream(s.stream?.name)}${whereOf([...scope.where, errorPredicate(pick)])}`;
+};
+
+/** The query that measures the usual level over a past window, scoped like the alert; null when it can't be scoped. */
+export const baselineSql = (s: ServiceScope, b: BaselineInputs): string | null => {
+  const scope = serviceScope(s);
+  if (scope.blocked || scope.warnings.some((w) => w.level === "blocking")) return null;
+  return levelSql(s, scope, b);
+};
+
+/** The field that asks for a threshold when there is no usual level to suggest one. */
+const thresholdInput = (
+  kind: "errors" | "latency",
+  service: string,
+  value: number | null,
+): AlertPrefillThresholdInput => ({
+  label: gt("insight.threshold.label"),
+  suffix: gt(`insight.threshold.${kind}Suffix`),
+  reason: gt(`insight.threshold.${kind}Reason`, { service }),
+  value,
+});
+
+const userThreshold = (value: number | null | undefined): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+
+/** PD-11: fires above three times the usual hourly error count; with no usual count the user sets the threshold. */
 export const errorsAlert = (
   s: ServiceScope,
-  o: AutoObserveAlertOptions & { errorField: FieldPick | null; usualPerHour: number | null },
+  o: AutoObserveAlertOptions & {
+    errorField: FieldPick | null;
+    usualPerHour: number | null;
+    threshold?: number | null;
+  },
 ): AlertPrefill | null => {
   if (!isAutoObserveBuild()) return null;
-  const pick = o.errorField ?? (s.stream?.type === "traces" ? errorFieldOf("traces") : null);
-  if (!pick) return null;
+  if (!errorPick(s, o.errorField)) return null;
   const scope = serviceScope(s);
-  const threshold = suggestErrors(o.usualPerHour);
-  const warnings = [...scope.warnings];
-  if (threshold === null) warnings.push(noBaseline(s.service));
-  const where = whereOf([...scope.where, errorPredicate(pick)]);
+  const suggested = suggestErrors(o.usualPerHour);
+  const typed = suggested === null ? userThreshold(o.threshold) : null;
+  const threshold = suggested ?? typed;
   const having = threshold === null ? "" : ` HAVING count(*) > ${threshold}`;
   const sql = scope.blocked
     ? ""
-    : `SELECT count(*) AS errors FROM ${sqlStream(s.stream?.name)}${where}${having}`;
-  return assemble(
+    : `${levelSql(s, scope, { kind: "errors", errorField: o.errorField })}${having}`;
+  const prefill = assemble(
     s,
     s.stream,
-    { kind: "errors", sql, periodMinutes: ERRORS_MINUTES, threshold, warnings },
+    { kind: "errors", sql, periodMinutes: ERRORS_MINUTES, threshold, warnings: scope.warnings },
     o,
   );
+  return suggested === null
+    ? { ...prefill, thresholdInput: thresholdInput("errors", s.service, typed) }
+    : prefill;
 };
 
 /** PD-11: fires when p95 rises above twice its usual value; traces durations are microseconds, so the query reads milliseconds. */
 export const latencyAlert = (
   s: ServiceScope,
-  o: AutoObserveAlertOptions & { durationField: string; p95Ms: number | null },
+  o: AutoObserveAlertOptions & {
+    durationField: string;
+    p95Ms: number | null;
+    threshold?: number | null;
+  },
 ): AlertPrefill | null => {
   if (!isAutoObserveBuild()) return null;
   const scope = serviceScope(s);
-  const threshold = suggestLatency(o.p95Ms);
+  const suggested = suggestLatency(o.p95Ms);
+  const typed = suggested === null ? userThreshold(o.threshold) : null;
+  const threshold = suggested ?? typed;
   const warnings = [...scope.warnings];
-  if (threshold === null) warnings.push(noBaseline(s.service));
-  const field = sqlField(o.durationField || "duration");
-  const traces = s.stream?.type === "traces";
-  if (!traces)
+  const field = o.durationField || "duration";
+  if (s.stream?.type !== "traces")
     warnings.push(warn("autoobserve.latencyUnit", "info", { field: field.replace(/"/g, "") }));
-  const p95 = `approx_percentile_cont(${field}, 0.95)${traces ? " / 1000" : ""}`;
   const having =
-    threshold === null ? "" : ` HAVING ${p95} > ${threshold} AND count(*) >= ${MIN_LATENCY_SPANS}`;
+    threshold === null
+      ? ""
+      : ` HAVING ${p95Of(s, field)} > ${threshold} AND count(*) >= ${MIN_LATENCY_SPANS}`;
   const sql = scope.blocked
     ? ""
-    : `SELECT ${p95} AS p95_ms, count(*) AS requests FROM ${sqlStream(s.stream?.name)}${whereOf(scope.where)}${having}`;
-  return assemble(
+    : `${levelSql(s, scope, { kind: "latency", durationField: field })}${having}`;
+  const prefill = assemble(
     s,
     s.stream,
     { kind: "latency", sql, periodMinutes: LATENCY_MINUTES, threshold, warnings },
     o,
   );
+  return suggested === null
+    ? { ...prefill, thresholdInput: thresholdInput("latency", s.service, typed) }
+    : prefill;
 };
 
 /** A memory alert must match the service's own series and a node alert its cluster's, else it watches everyone's. */
@@ -396,6 +466,14 @@ const utilizationShape = (s: ServiceScope, kind: string, scopeBy: "service" | "c
   else if (!matched.has(scopeBy)) {
     const key = scopeBy === "service" ? "autoobserve.noServiceLabel" : "autoobserve.noCluster";
     warnings.push(warn(key, "blocking", params));
+  }
+  // A series without the cluster or namespace label would mix in the same-named service elsewhere.
+  for (const [part, value, key] of [
+    ["cluster", s.cluster, "autoobserve.noClusterField"],
+    ["namespace", s.namespace, "autoobserve.noNamespaceField"],
+  ] as const) {
+    if (part !== scopeBy && value && s.schema && !matched.has(part))
+      warnings.push(warn(key, "blocking", { stream: params.stream, value }));
   }
   if (!utilization) warnings.push(noBaseline(s.service));
   return {
@@ -456,12 +534,14 @@ export const restartAlert = (s: ServiceScope, o: AutoObserveAlertOptions): Alert
     const params = { stream: stream.name, service: s.service.trim() };
     warnings.push(warn("autoobserve.noWorkload", "blocking", params));
   }
-  for (const [value, candidates] of [
-    [s.cluster, CLUSTER_FIELDS],
-    [s.namespace, NAMESPACE_FIELDS],
+  for (const [value, candidates, missing] of [
+    [s.cluster, CLUSTER_FIELDS, "autoobserve.noClusterField"],
+    [s.namespace, NAMESPACE_FIELDS, "autoobserve.noNamespaceField"],
   ] as const) {
     const field = value ? pickField(candidates, s.schema) : null;
     if (field && value) where.push(`${sqlField(field)} = ${sqlLiteral(value)}`);
+    // Unfiltered, a same-named workload in another namespace would count toward this one's restarts.
+    else if (value) warnings.push(warn(missing, "blocking", { stream: stream.name, value }));
   }
   const reason = pickField(EVENT_REASON_FIELDS, s.schema) ?? EVENT_REASON_FIELDS[0];
   where.push(`${sqlField(reason)} IN (${RESTART_REASONS.map(sqlLiteral).join(", ")})`);
@@ -505,4 +585,52 @@ export const sourceNoDataAlert = (
     },
     o,
   );
+};
+
+/** The server's heartbeat action as sent: its conditions, window, schedule and silence, nothing guessed (FU heartbeat). */
+export interface HeartbeatAction {
+  stream_type: string;
+  stream_name: string;
+  conditions: { field: string; op: "eq" | "contains"; value: string; ignore_case: boolean }[];
+  period_secs: number;
+  frequency_secs: number | null;
+  cron: string | null;
+  silence_secs: number;
+}
+
+const heartbeatPredicate = (c: HeartbeatAction["conditions"][number]): string => {
+  const field = sqlField(c.field);
+  if (c.op === "eq") return `${field} = ${sqlLiteral(c.value)}`;
+  const value = c.ignore_case ? c.value.toLowerCase() : c.value;
+  const column = c.ignore_case ? `lower(${field})` : field;
+  return `${column} LIKE ${sqlLiteral(`%${likeLiteral(value)}%`)}`;
+};
+
+/** Fires when the job's success line is missing for its whole window; null for a cron schedule the form can't carry. */
+export const heartbeatAlert = (
+  a: HeartbeatAction,
+  job: string,
+  o: AutoObserveAlertOptions,
+): AlertPrefill | null => {
+  // AlertPrefill has no cron schedule, so saving would run the check on the form's default frequency instead.
+  if (!isAutoObserveBuild() || a.cron) return null;
+  const stream = { type: a.stream_type || "logs", name: a.stream_name };
+  const sql = `SELECT count(*) AS row_count FROM ${sqlStream(stream.name)}${whereOf(a.conditions.map(heartbeatPredicate))} HAVING count(*) = 0`;
+  const prefill = assemble(
+    { service: job },
+    stream,
+    {
+      kind: "heartbeat",
+      sql,
+      periodMinutes: Math.max(1, Math.round(a.period_secs / 60)),
+      threshold: 0,
+      warnings: [],
+    },
+    o,
+  );
+  return {
+    ...prefill,
+    frequencyMinutes: a.frequency_secs ? Math.max(1, Math.round(a.frequency_secs / 60)) : undefined,
+    silenceMinutes: Math.round(a.silence_secs / 60),
+  };
 };

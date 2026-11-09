@@ -195,7 +195,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ row.analysis.detail }}</OTruncatedText
               >
             </div>
-            <div class="-ms-2.5 flex items-center gap-1" data-test="autoobserve2-paged-actions">
+            <div
+              class="-ms-2.5 flex flex-wrap items-center gap-1"
+              data-test="autoobserve2-paged-actions"
+            >
               <OButton
                 variant="ghost-primary"
                 size="xs"
@@ -212,6 +215,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="router.push(analysisLink(org, row.incidentId))"
               >
                 {{ copy.viewAnalysis }}
+              </OButton>
+              <OButton
+                v-if="row.logs"
+                variant="ghost"
+                size="xs"
+                data-test="autoobserve2-paged-logs"
+                @click="router.push(row.logs)"
+              >
+                {{ insightCtaLabel(t, "openInLogs") }}
+              </OButton>
+              <OButton
+                v-if="canAsk && row.ai"
+                variant="ghost-primary"
+                size="xs"
+                icon-left="auto-awesome"
+                data-test="autoobserve2-paged-ask-ai"
+                @click="ask(row.ai)"
+              >
+                {{ insightCtaLabel(t, "askAi") }}
               </OButton>
             </div>
           </article>
@@ -254,8 +276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, inject, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -265,12 +288,21 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { RCA_BADGE_VARIANT } from "@/utils/incidents/rcaCell";
+import {
+  ASK_AI_KEY,
+  aiEnabled,
+  askAiPayload,
+  insightCtaLabel,
+  type AiFinding,
+} from "../insight/insightCta";
 import SectionCard from "../v2/SectionCard.vue";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveRefreshFailed from "./LiveRefreshFailed.vue";
 import {
   analysisLine,
   analysisLink,
+  findingAi,
+  findingLogs,
   findingSentence,
   incidentLink,
   incidentListLink,
@@ -298,7 +330,9 @@ const props = withDefaults(defineProps<{ cap?: number }>(), { cap: PAGED_CAP });
 
 const { t, locale } = useI18nTyped();
 const router = useRouter();
+const store = useStore();
 const paged = useLivePaged(props.cap);
+const askAi = inject(ASK_AI_KEY, null);
 
 const slotEl = ref<HTMLElement | null>(null);
 const bodyEl = ref<HTMLElement | null>(null);
@@ -337,8 +371,13 @@ const shown = computed(() =>
     sentence: findingSentence(t, item),
     opened: openedText(t, locale.value, item, paged.now.value),
     analysis: analysisLine(t, item, paged.rcaEnabled.value),
+    logs: findingLogs(item, paged.now.value),
+    ai: findingAi(t, item, paged.zone.value, paged.now.value),
   })),
 );
+
+const canAsk = computed(() => !!askAi && aiEnabled(store.state.zoConfig));
+const ask = (finding: AiFinding) => askAi?.(askAiPayload(t, finding, org.value));
 
 // The footer sits outside the subtitle slot, so a stale or new-findings notice never hides the reason the rows dropped.
 const shared = computed(() =>

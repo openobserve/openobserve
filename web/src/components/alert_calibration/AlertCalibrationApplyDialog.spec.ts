@@ -126,7 +126,7 @@ describe("AlertCalibrationApplyDialog", () => {
     vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: liveAlert() } as never);
     await mountDialog();
 
-    expect(dialogText()).toContain("Apply suggestion to ops_cpu");
+    expect(dialogText()).toContain("Review change: ops_cpu");
     const row = inDialog("alert-calibration-apply-row-pendingPeriodSecs")?.textContent ?? "";
     expect(row).toContain("Hold for");
     expect(row).toContain("1 minute");

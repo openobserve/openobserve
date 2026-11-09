@@ -15,7 +15,7 @@
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, type I18nKey, type I18nText } from "@/types/i18n";
-import type { DigestRecord, InsightAction, ReviewFocus, RuleId } from "./digests";
+import type { DigestRecord, InsightAction, RuleId } from "./digests";
 
 export type EvidenceFormat =
   | "count"
@@ -525,27 +525,21 @@ export const ACTION_META: Record<ProposedAction, ActionMeta> = {
 
 export const isProposedAction = (name: string): name is ProposedAction => name in ACTION_META;
 
-/** A v2 action's button label, by type and then focus; the design maps them one to one (D:L289-300). */
+/** A v2 action's button label: every focus is one "Review alert" (the note names the focus), from the shared CTA glossary. */
 export const INSIGHT_ACTION_LABEL: {
-  review_alert: Record<ReviewFocus | "unfocused", I18nKey>;
+  review_alert: I18nKey;
   review_source: I18nKey;
   review_platform: I18nKey;
 } = {
-  review_alert: {
-    unfocused: "alertCalibration.insightActions.reviewAlert",
-    query: "alertCalibration.insightActions.reviewQuery",
-    settings: "alertCalibration.insightActions.reviewSettings",
-    threshold: "alertCalibration.insightActions.reviewThreshold",
-    grouping: "alertCalibration.insightActions.reviewGrouping",
-  },
-  review_source: "alertCalibration.insightActions.reviewSource",
+  review_alert: "insight.cta.reviewAlert",
+  review_source: "insight.cta.openInLogs",
   review_platform: "alertCalibration.insightActions.inspectPlatform",
 };
 
 export function insightActionLabel(action: InsightAction): I18nKey {
   if (action.type === "review_platform") return INSIGHT_ACTION_LABEL.review_platform;
   if (action.type === "review_source") return INSIGHT_ACTION_LABEL.review_source;
-  return INSIGHT_ACTION_LABEL.review_alert[action.focus ?? "unfocused"];
+  return INSIGHT_ACTION_LABEL.review_alert;
 }
 
 /** Version 2 writes no silent finding, so an always-empty Silent group would read as a clearance (Q2). */

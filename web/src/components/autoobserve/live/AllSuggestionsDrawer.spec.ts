@@ -426,8 +426,10 @@ describe("AllSuggestionsDrawer: Next step and the row's Details (test 15)", () =
     expect(kind.props("variant")).toBe("error-soft");
     expect(
       wrapper.get(`[data-test="autoobserve2-suggestions-next-${NOT_WORKING_ID}"]`).text(),
-    ).toBe("Review query");
-    expect(wrapper.find('[data-test="autoobserve2-suggestions-next-gap"]').exists()).toBe(false);
+    ).toBe("Review alert");
+    expect(wrapper.get('[data-test="autoobserve2-suggestions-next-gap"]').text()).toBe(
+      "Open service",
+    );
     const details = `[data-test="insight-block-${NOT_WORKING_ID}-details"]`;
     expect(wrapper.find(details).exists()).toBe(false);
     await wrapper

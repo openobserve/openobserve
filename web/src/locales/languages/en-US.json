@@ -11422,8 +11422,8 @@
     "refresh": "Refresh",
     "retry": "Retry",
     "apply": {
-      "button": "Apply suggestion",
-      "title": "Apply suggestion to {alert}",
+      "button": "Review change",
+      "title": "Review change: {alert}",
       "setting": "Setting",
       "current": "Current",
       "suggested": "Suggested",
@@ -11455,7 +11455,7 @@
       }
     },
     "dismiss": {
-      "button": "Dismiss",
+      "button": "Dismiss…",
       "title": "Dismiss finding on {alert}",
       "alertFallback": "this alert",
       "scopeUntil": "Hidden for everyone in {org} until {date}, then shown again if it still fails. Recorded with your name and reason. Undo from Dismissed.",
@@ -11622,9 +11622,9 @@
       "lengthenEvaluationWindowDesc": "Widen the period so a short spike no longer trips the alert.",
       "enableDeduplication": "Turn on suppress repeats",
       "enableDeduplicationDesc": "Notify once per state change instead of on every evaluation.",
-      "reviewForDeletion": "Review for deletion",
+      "reviewForDeletion": "Review alert",
       "reviewForDeletionDesc": "Confirm the query still matches reality before retiring the alert.",
-      "fixAlertQuery": "Fix alert query",
+      "fixAlertQuery": "Review alert",
       "fixAlertQueryDesc": "The evaluation itself fails and never reaches a verdict.",
       "repairDestination": "Repair destination",
       "repairDestinationDesc": "Delivery fails on a destination the alert uses.",
@@ -11635,12 +11635,12 @@
     },
     "insightActions": {
       "reviewAlert": "Review alert",
-      "reviewQuery": "Review query",
-      "reviewSettings": "Review settings",
-      "reviewThreshold": "Review threshold",
-      "reviewGrouping": "Review grouping",
+      "reviewQuery": "Review alert",
+      "reviewSettings": "Review alert",
+      "reviewThreshold": "Review alert",
+      "reviewGrouping": "Review alert",
       "inspectPlatform": "Inspect platform",
-      "reviewSource": "Review source"
+      "reviewSource": "Open in Logs"
     },
     "advice": {
       "checkMissingStream": "Check the source the query reads: it does not exist.",
@@ -13885,7 +13885,7 @@
     },
     "prefill": {
       "dialog": {
-        "title": "Create alert",
+        "title": "Add alert",
         "continue": "Continue to alert",
         "queryChoiceLabel": "Alert on query",
         "queryChoiceOption": "{name}: {query}",
@@ -13907,19 +13907,19 @@
       },
       "sources": {
         "default": {
-          "label": "Create Alert",
+          "label": "Add alert",
           "toast": "Query imported into the alert form"
         },
         "logs": {
-          "label": "Create Alert",
+          "label": "Add alert",
           "toast": "Query imported from your logs search"
         },
         "patterns": {
-          "label": "Create alert",
+          "label": "Add alert",
           "toast": "Query imported from the selected patterns"
         },
         "panel": {
-          "label": "Create Alert",
+          "label": "Add alert",
           "toast": "Query imported from dashboard panel: \"{sourceLabel}\""
         },
         "library": {
@@ -13927,7 +13927,7 @@
           "toast": "From Alert Library: {sourceLabel}"
         },
         "explorer": {
-          "label": "Create alert",
+          "label": "Add alert",
           "toast": "Query imported from the Metrics Explorer"
         },
         "dbm": {
@@ -13943,7 +13943,7 @@
           "toast": "Imported from Product Analytics: \"{sourceLabel}\""
         },
         "traces": {
-          "label": "Create alert",
+          "label": "Add alert",
           "toast": "Query imported from your traces search",
           "noStream": "Pick a stream first",
           "errorCount": "Error count",
@@ -14017,7 +14017,11 @@
           "noServiceLabel": "{stream} has no service or workload label, so this alert cannot be scoped to {service}.",
           "noCluster": "{service}'s cluster is not known for {stream}, so this node alert would watch every cluster.",
           "outageOther": "This alert covers {source} only; {count} other source stopped at the same time.",
-          "outageOthers": "This alert covers {source} only; {count} other sources stopped at the same time."
+          "outageOthers": "This alert covers {source} only; {count} other sources stopped at the same time.",
+          "noClusterField": "Stream {stream} has no cluster field, so this alert can't be limited to cluster {value}.",
+          "noNamespaceField": "Stream {stream} has no namespace field, so this alert can't be limited to namespace {value}.",
+          "schemaUnread": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Close it and try again.",
+          "noDraft": "AutoObserve can't build this alert on the fields of stream {stream}. Write the query by hand."
         }
       }
     },
@@ -30191,7 +30195,7 @@
     },
     "issues": {
       "subtitle": "Incidents grouped and investigated by the SRE agent. One notification per problem; the cause is attached, or follows in the same thread if triage times out or fails.",
-      "open": "Open",
+      "open": "Open incident",
       "recent": "Resolved",
       "all": "All",
       "heldForDigest": "Held for Friday's summary",
@@ -30246,7 +30250,7 @@
       "waitingForOk": "Waiting for your OK",
       "proposedFix": "Proposed fix",
       "unfoldTab": "How it unfolded",
-      "seeEvidence": "See the evidence ({count}) →"
+      "seeEvidence": "See all"
     },
     "unfold": {
       "hint": "Read left to right: what changed, the signals it set off, then what reached your team. Select a card for its firings.",
@@ -30333,9 +30337,6 @@
       "never": "Never",
       "hoursAgo": "1 hour ago | {count} hours ago",
       "daysAgo": "1 day ago | {count} days ago",
-      "fixNoLink": "Add service.name label",
-      "fixStopped": "Check the collector",
-      "fixQueued": "Mock only: “{action}” for {service} was not sent anywhere",
       "viewLabel": "Coverage view",
       "viewMap": "Map",
       "viewTable": "Table",
@@ -30378,7 +30379,7 @@
       "chartBelow": "{metric}, {value} now, below normal range",
       "chartWithin": "{metric}, {value} now, within normal range",
       "tipNormal": "Normal {low} – {high}",
-      "openTraces": "Traces",
+      "openTraces": "Open in Traces",
       "openCatalog": "Service Catalog",
       "rangeLabel": "Time range",
       "logPatternsValue": "{known} known · {fresh} new today",
@@ -30593,10 +30594,10 @@
       "errors": "Errors",
       "latency": "Latency",
       "saturation": "Saturation",
-      "absence": "Absence",
-      "external_probe": "External probe",
-      "workload_health": "Workload health",
-      "node": "Node"
+      "absence": "Stops sending",
+      "external_probe": "Synthetic check",
+      "workload_health": "Restarts",
+      "node": "Nodes"
     },
     "classesInline": {
       "errors": "errors",
@@ -30640,7 +30641,7 @@
         "gaps": "{count} has a coverage gap. | {count} have a coverage gap.",
         "mixed": "{watching} {gaps}"
       },
-      "gapNone": "No monitor watches {checks}",
+      "gapNone": "No alert watches {checks}",
       "searchPlaceholder": "Search service, cluster or namespace",
       "labelNamespace": "{name} · {namespace}",
       "labelPlace": "{name} · {cluster} · {namespace}",
@@ -30650,23 +30651,23 @@
     "cell": {
       "noClass": "AutoObserve doesn't check this signal yet",
       "tipNoClass": "{signal}: AutoObserve doesn't check this yet",
-      "noMonitor": "No monitor",
+      "noMonitor": "Not watched",
       "gap": {
-        "weak": "{signal}: only {monitor}, a broad monitor, may notice a problem; it isn't scoped to this service",
+        "weak": "{signal}: only {monitor}, a broad alert, may notice a problem; it isn't scoped to this service",
         "silent": "{signal}: {monitor} matches, but it notifies no one",
         "blind": "{signal}: {monitor} matches, but it can't see its data",
         "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service",
-        "none": "{signal}: no monitor watches this"
+        "none": "{signal}: no alert watches this"
       },
-      "fallsShort": "Monitor falls short"
+      "fallsShort": "Falls short"
     },
     "drawer": {
       "moreChecks": "Other checks",
       "chartNoData": "Chart not available yet",
       "notAvailable": "Not available",
-      "monitors": "Monitors",
+      "monitors": "Alerts",
       "monitorLine": "{kind} · {state}",
-      "noMonitor": "No monitor matches"
+      "noMonitor": "No alert matches"
     },
     "charts": {
       "empty1h": "No data from {service} in the last hour",
@@ -30692,12 +30693,12 @@
       "serviceMeta": "{where}, about {traffic} events an hour",
       "trafficOnly": "About {traffic} events an hour",
       "kinds": {
-        "coverage_gap": "Coverage gap",
-        "no_absence_check": "No absence check",
+        "coverage_gap": "Not watched",
+        "no_absence_check": "Missing alert",
         "silent_coverage": "Notifies no one",
         "coverage_lost": "Coverage lost",
-        "blind_guardrail": "Blind monitor",
-        "discovery_unusable": "Discovery quality",
+        "blind_guardrail": "Not working",
+        "discovery_unusable": "Data quality",
         "other": "Other"
       },
       "severity": {
@@ -30710,9 +30711,9 @@
         "insufficient": "Weak evidence"
       },
       "body": {
-        "coverageGap": "Nothing fully covers {classes} on {service}",
+        "coverageGap": "Nothing watches {service}",
         "noAbsenceNone": "Nothing alerts if {service} stops sending data",
-        "noAbsenceWeak": "Only a broad monitor would notice if {service} stops sending data",
+        "noAbsenceWeak": "Only a broad alert would notice if {service} stops sending data",
         "noAbsenceSilent": "The check that would notice {service} going quiet notifies no one",
         "noAbsenceBlind": "The check that would notice {service} going quiet can't see its data",
         "silentCoverage": "{monitor} watches {classes} on {count} service but notifies no one | {monitor} watches {classes} on {count} services but notifies no one",
@@ -30722,7 +30723,7 @@
         "undeliverable": "{monitor} can't reach {destination}",
         "undeliverableWhy": "{destination} takes tickets, not alerts. | {destination} take tickets, not alerts.",
         "undeliverableNext": "Add a webhook or email next to it; {destination} stays. | Add a webhook or email next to them; {destination} stay.",
-        "coverageLost": "{service} lost {classes} coverage on {day}",
+        "coverageLost": "{service} lost its {classes} alert on {day}",
         "blindStreamMissing": "{monitor} reads {detail}, which doesn't exist",
         "blindNoData": "{monitor} reads {detail}, which has no recent data",
         "blindEmptyScope": "{monitor} filters to rows that never arrive",
@@ -30751,7 +30752,7 @@
       "neverFired": "Never fired",
       "lastFired": "Last fired {time}",
       "accept": "Accept",
-      "dismiss": "Dismiss",
+      "dismiss": "Dismiss…",
       "accepted": "Accepted in this preview; nothing was sent",
       "dismissed": "Dismissed in this preview; nothing was sent",
       "loading": "Loading suggestions",
@@ -30759,7 +30760,7 @@
       "more": "and {count} more | and {count} more",
       "moreNames": "{count} more | {count} more",
       "whyNext": "{why} {next}",
-      "seeAll": "See all {total} | See all {total}",
+      "seeAll": "See all",
       "drawerTitle": "Suggestions",
       "drawerLine": "Ranked by what matters most first. Open a row for what I found.",
       "columns": {
@@ -34162,7 +34163,14 @@
       "reviewAlert": "Opens the alert editor. Nothing is saved until you save.",
       "openInLogs": "Opens Logs on {stream}, from an hour before its last data.",
       "openInLogsRun": "Opens Logs on {stream} over the window the last run checked.",
-      "openInLogsHour": "Opens Logs on {stream} for the last hour."
+      "openInLogsHour": "Opens Logs on {stream} for the last hour.",
+      "addAlert": "Opens the alert form filled in. Nothing is saved until you save.",
+      "addHeartbeat": "Opens the alert form filled in from the job's own schedule. Nothing is saved until you save.",
+      "reviewAndAdd": "Opens a list of {count} alert AutoObserve filled in. Nothing is saved until you click Add alerts. | Opens a list of {count} alerts AutoObserve filled in. Nothing is saved until you click Add alerts.",
+      "chooseWho": "Opens the alert editor at who gets notified. Nothing is saved until you save.",
+      "openSourceLogs": "Opens Logs on {source}'s last rows, from 6 hours before it stopped.",
+      "addSynthetic": "Opens the synthetic check form filled in. Nothing is saved until you save.",
+      "setUpKubernetes": "Opens Kubernetes setup for its cluster."
     },
     "bulk": {
       "title": {
@@ -34177,7 +34185,7 @@
         "errors": "Each fires when its service logs more than 3 times its usual errors in an hour.",
         "latency": "Each fires when its service's p95 latency passes twice its usual value."
       },
-      "ruleTail": "Untick any you don't want. Nothing is saved until you click Create.",
+      "ruleTail": "Untick any you don't want. Nothing is saved until you click Add alerts.",
       "groupBy": "Group by",
       "groupByOption": {
         "team": "Team",
@@ -34212,7 +34220,7 @@
       "showGroup": "Show all {count}",
       "hideGroup": "Hide",
       "locked": "You can't write to folder {folder}. Its admins can add these.",
-      "copyRequest": "Copy request for {team}",
+      "copyRequest": "Copy request",
       "request": "Please add {count} no-data alert in folder {folder}: {services}. AutoObserve found that nothing alerts if it stops sending. | Please add {count} no-data alerts in folder {folder}: {services}. AutoObserve found that nothing alerts if they stop sending.",
       "requestCopied": "Request copied",
       "rights": "You can add {can} of {total}. {locked} is in {where}, where you can't write. It stays in the list so you can send the request to its admins. | You can add {can} of {total}. {locked} are in {where}, where you can't write. They stay in the list so you can send the request to its admins.",
@@ -34244,7 +34252,7 @@
       "footerRest": "{count} in {folders} more folders",
       "footerOrigin": "Each description says it came from an AutoObserve suggestion.",
       "footerNone": "Nothing is ticked, so nothing will be created.",
-      "create": "Create {count} alert | Create {count} alerts",
+      "create": "Add alerts",
       "cancel": "Cancel",
       "close": "Close",
       "status": {
@@ -34257,7 +34265,7 @@
       "createdIn": "{count} was created in {where}. | {count} were created in {where}.",
       "failure": "{service}: {reason}.",
       "reason": {
-        "forbidden": "you can't write to folder {folder}",
+        "forbidden": "{denied} The alert was going to folder {folder}",
         "duplicate": "an alert named {name} already exists in folder {folder}",
         "timeout": "the server didn't answer in time",
         "invalid": "the server refused it as invalid",
@@ -34266,13 +34274,14 @@
       },
       "retryOne": "Retry {service}",
       "retryAll": "Retry {count}",
-      "openExisting": "Open the existing alert",
+      "openExisting": "Open alert",
       "toast": "{count} alert created in {where}. | {count} alerts created in {where}.",
       "undoHint": "Undo works until you leave this page.",
       "undo": "Undo",
       "undone": "{count} alert removed. | {count} alerts removed.",
       "undoFailed": "{failed} of {total} alerts couldn't be removed. Remove them from Alerts.",
-      "more": "{count} more"
+      "more": "{count} more",
+      "usuallyLatency": "p95 {value} ms"
     },
     "decisions": {
       "reasons": {
@@ -34372,6 +34381,191 @@
         "previous": "Previous page",
         "next": "Next page"
       }
+    },
+    "cta": {
+      "openInLogs": "Open in Logs",
+      "openInTraces": "Open in Traces",
+      "addAlert": "Add alert",
+      "reviewAndAddAlerts": "Review and add alerts",
+      "addSyntheticCheck": "Add synthetic check",
+      "reviewChange": "Review change",
+      "reviewAlert": "Review alert",
+      "chooseWhoGetsNotified": "Choose who gets notified",
+      "setUpData": "Set up data",
+      "openIncident": "Open incident",
+      "openAlert": "Open alert",
+      "openService": "Open service",
+      "reviewServices": "Review services",
+      "openInCalibration": "Open in Alert calibration",
+      "askAi": "Ask AI",
+      "dismiss": "Dismiss…",
+      "markIntendedReport": "Mark as intended report",
+      "reviewAndMarkIntendedReports": "Review and mark as intended reports",
+      "undo": "Undo",
+      "copyLink": "Copy link",
+      "copyRequest": "Copy request",
+      "seeAll": "See all"
+    },
+    "locked": {
+      "add": "You can't add alerts in folder {folder}. Ask an admin of this organization.",
+      "addTeam": "You can't add alerts in folder {folder}. Ask its owners: {team} admins.",
+      "change": "You can't change alerts in folder {folder}. Ask an admin of this organization.",
+      "changeTeam": "You can't change alerts in folder {folder}. Ask its owners: {team} admins.",
+      "addSyntheticCheck": "You can't add synthetic checks. Ask an admin of this organization."
+    },
+    "ai": {
+      "chip": "AutoObserve finding · {subject}",
+      "coverage_gap": {
+        "ask": "Set up alerts for {service}. It has no alert for {classes}.",
+        "volume": "It sends about {count} events an hour to {stream}.",
+        "draft": "Draft the missing alerts scoped to this service, show them to me, and don't save until I say so.",
+        "groupAsk": "Set up alerts for {count} services that nothing watches, starting with {names}. Draft the missing alerts for each, show them to me, and don't save until I say so."
+      },
+      "no_data": {
+        "ask": "Create a no-data alert for {service}: fire when it sends nothing for {minutes} minutes.",
+        "volume": "Its usual volume is about {count} events an hour. Show me the draft and don't save until I say so."
+      },
+      "silent": {
+        "ask": "Alert {monitor} notifies no one. Who in this folder should it notify? Suggest a change and don't save it."
+      },
+      "coverage_lost": {
+        "ask": "What changed in the alerts that watched {service}? Draft what would put it back, and don't save it."
+      },
+      "blind_guardrail": {
+        "ask": "Alert {monitor} reads {detail}, which has no data it can use. Suggest the stream or field that replaced it, and don't save the change."
+      },
+      "discovery_unusable": {
+        "ask": "Most of my telemetry lacks service.name. How do I add it in my collector?"
+      },
+      "source_silence": {
+        "ask": "{source} stopped sending to {stream} at {time} while the rest of the stream kept flowing. Help me find why, and draft a no-data alert for it without saving it."
+      },
+      "heartbeat_on_success": {
+        "ask": "Create an alert that fires when {job}'s success line is missing. Show me the draft and don't save until I say so."
+      },
+      "alert_not_working": {
+        "ask": "Alert {alert} can't fire: {why} Suggest a corrected query, show it to me, and don't save until I say so."
+      },
+      "cell": {
+        "errors": "Create an errors alert for {service} at 3 times its usual error rate. Show me the draft and don't save until I say so.",
+        "latency": "Create a latency alert for {service} at 2 times its usual p95. Show me the draft and don't save until I say so.",
+        "tracing": "How do I send traces for {service}?",
+        "kubernetes": "How do I send Kubernetes metrics for {service}?",
+        "saturation": "Create an alert on memory use for {service} at 90% of its limit, from the Kubernetes metrics this org already sends. Don't save it.",
+        "node": "Create an alert on the nodes {service} runs on at 90% of capacity. Don't save it.",
+        "restarts": "Alert me when {service}'s pods restart more than usual. Show me the draft and don't save it.",
+        "synthetic": "Set up a synthetic check for {service}'s health endpoint. Show me the draft and don't save it."
+      },
+      "paged": {
+        "stream_silence": "{stream} ({type}) stopped sending at {time}. What could stop it, and what should I check first?",
+        "stream_drop": "{stream} ({type}) dropped sharply at {time}. What could cause it, and what should I check first?",
+        "stream_rise": "{stream} ({type}) rose sharply at {time}. What could cause it, and what should I check first?"
+      },
+      "calibration": {
+        "failure": "Alert {alert} {what}. Suggest a corrected query, show it to me, and don't save until I say so."
+      }
+    },
+    "kind": {
+      "chip": {
+        "notWatched": "Not watched",
+        "missingAlert": "Missing alert",
+        "notifiesNoOne": "Notifies no one",
+        "stoppedSending": "Stopped sending",
+        "dataQuality": "Data quality"
+      },
+      "traffic": {
+        "handles": "It handles about {count} events an hour.",
+        "usually": "It usually sends about {count} events an hour."
+      },
+      "classes": {
+        "why": {
+          "errors": "its errors",
+          "latency": "its latency",
+          "absence": "whether it stops sending"
+        },
+        "ai": {
+          "errors": "errors",
+          "latency": "latency",
+          "absence": "stopping"
+        },
+        "name": {
+          "errors": "Errors",
+          "latency": "Latency",
+          "absence": "Stops sending"
+        }
+      },
+      "detail": {
+        "noAlert": "{check}: no alert.",
+        "cantMeasure": "{check}: can't measure yet, {service} sends no traces."
+      },
+      "coverage_gap": {
+        "headline": "Nothing watches {service}",
+        "why": "No alert watches {classes}.",
+        "next": "Add the alert AutoObserve drafted. | Add the {count} alerts AutoObserve drafted.",
+        "needsTraces": "Latency needs traces first.",
+        "groupHeadline": "Nothing watches {count} services",
+        "groupTraffic": "They handle about {count} events an hour together.",
+        "groupNext": "Add the alert AutoObserve drafted. | Add the {count} alerts AutoObserve drafted, in one list grouped by team."
+      },
+      "no_absence_check": {
+        "why": "Nothing alerts if {service} stops sending.",
+        "why_weak": "Only {monitor} would notice, and it watches the whole stream.",
+        "why_blind": "{monitor} would notice, but it can't see {service}'s data.",
+        "whySilent": "{monitor} would notice {service} stopping, but it notifies no one.",
+        "next": "Add a no-data alert: it fires when {service} sends nothing for {minutes} minutes.",
+        "nextSilent": "Give it someone to notify."
+      },
+      "coverage_lost": {
+        "why": "Something changed in the alerts that watched it.",
+        "next": "Add it back, or check what changed in the alert that watched it."
+      },
+      "blind_guardrail": {
+        "nextStream": "Point it at the stream that replaced {detail}, or delete it.",
+        "nextScope": "Check its filter: as written it matches nothing it should.",
+        "nextField": "Fix the field its query filters on."
+      },
+      "discovery_unusable": {
+        "headline": "Only {good} of {active} services AutoObserve found are usable",
+        "why": "Most of their data has no service name, so the list of gaps is incomplete.",
+        "next": "Send service.name on your traces and logs."
+      },
+      "source_silence": {
+        "headline": "{source} stopped sending to {stream}",
+        "since": "Since {time}.",
+        "usual": "It usually sends about {count} rows a day; the rest of {stream} kept flowing.",
+        "more": "And {count} more sources in this stream. | And {count} more sources in {streams} streams.",
+        "nextSender": "Check the agent or collector on {source}.",
+        "nextGap": "It's back. Check what the gap left out."
+      },
+      "heartbeat_on_success": {
+        "headline": "Nothing alerts if job {job} stops succeeding",
+        "why": "Its success line has appeared on the last day. | Its success line has appeared on each of the last {days} days.",
+        "next": "Add an alert that fires when its success line doesn't appear."
+      },
+      "cell": {
+        "errorsWhy": "No alert watches {service}'s errors.",
+        "errorsNext": "Add an errors alert at 3 times its usual rate.",
+        "latencyWhy": "No alert watches {service}'s latency.",
+        "latencyNext": "Add a latency alert at 2 times its usual p95.",
+        "latencyNoTraces": "Latency is charted from traces. {service} sends none.",
+        "noMetrics": "No CPU or memory data arrives for {service}, so this can't be watched yet.",
+        "saturationWhy": "No alert watches memory or CPU for {service}. Container memory arrives in {stream}.",
+        "saturationNext": "Add a memory alert at 90% of its limit.",
+        "nodeWhy": "No alert watches the nodes {service} runs on. Node data arrives in {stream}.",
+        "nodeNext": "Add a node alert at 90% of capacity.",
+        "restartsWhy": "No alert watches restarts of {service}.",
+        "restartsNext": "Add an alert that fires when its pods restart 3 times in 10 minutes.",
+        "syntheticWhy": "Nothing checks {service} from outside. A synthetic check sends a request every few minutes and notices an outage even when the service sends nothing.",
+        "syntheticNext": "Add a synthetic check on its health endpoint."
+      }
+    },
+    "threshold": {
+      "label": "Fire above",
+      "errorsSuffix": "errors an hour",
+      "latencySuffix": "ms (p95)",
+      "errorsReason": "AutoObserve found no usual error count for {service} over the last 7 days. Set a threshold to add this alert.",
+      "latencyReason": "AutoObserve found no usual latency for {service} over the last 7 days. Set a threshold to add this alert.",
+      "measuring": "Measuring the usual level over the last 7 days…"
     }
   }
 }

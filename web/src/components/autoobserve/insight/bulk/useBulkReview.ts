@@ -18,6 +18,9 @@ import config from "@/aws-exports";
 import { raw } from "@/types/i18n";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import commonService from "@/services/common";
+import { baselineSql, errorFieldOf } from "@/utils/alerts/prefill/fromAutoObserve";
+import { measureBaseline, type BaselineRequest } from "../targets/baseline";
+import { measuredThreshold } from "../targets/thresholds";
 import destinationService from "@/services/alert_destination";
 import streamService from "@/services/stream";
 import {
@@ -48,14 +51,29 @@ export type GroupBy = "team" | "folder" | "cluster";
 /** Why a row cannot be created yet, or ever, from its stream fields. */
 export type RowBlock =
   | { code: "checking" }
+  | { code: "measuring" }
   | { code: "schemaFailed" }
+  | { code: "noBaseline"; kind: "errors" | "latency" }
   | { code: "noField"; part: "service" | "cluster" | "namespace"; value: string };
 
 /** Stream fields by `type/name`; null when they could not be read. */
 export type StreamSchemas = Record<string, string[] | null>;
 
+/** Each errors or latency row's usual level measured over 7 days by row key; null when the week showed none. */
+export type RowBaselines = Record<string, number | null>;
+
+/** Each stream's field data types by `type/name`, read with its fields. */
+export type StreamTypes = Record<string, Record<string, string>>;
+
+export interface StreamFields {
+  names: string[];
+  types: Record<string, string>;
+}
+
 export interface BulkRow {
   key: string;
+  /** Overrides the request's kind, so one service's errors and no-data drafts share one list. */
+  kind?: BulkKind;
   scope: ServiceScope | SourceScope;
   usually: number | null;
   unsure?: { reason: string };
@@ -65,7 +83,12 @@ export interface BulkRow {
   team?: TeamPick;
   notify?: NotifyPick;
   /** Builder inputs the errors and latency kinds need. */
-  inputs?: { errorField?: FieldPick; durationField?: string; p95Ms?: number | null };
+  inputs?: {
+    errorField?: FieldPick;
+    durationField?: string;
+    p95Ms?: number | null;
+    threshold?: number | null;
+  };
 }
 
 export interface BulkReviewRequest {
@@ -95,6 +118,10 @@ export interface ReviewRow {
   destinations: string[];
   locked: boolean;
   block: RowBlock | null;
+  /** The errors an hour or p95 in ms the threshold comes from, when one is known. */
+  usual: number | null;
+  /** The errors an hour or p95 in ms above which the alert fires. */
+  threshold: number | null;
 }
 
 export interface ReviewGroup {
@@ -126,12 +153,16 @@ const state = reactive({
   destinations: [] as string[],
   rights: null as FolderRights,
   schemas: {} as StreamSchemas,
+  types: {} as StreamTypes,
+  baselines: {} as RowBaselines,
+  thresholds: {} as Record<string, number>,
   opener: null as HTMLElement | null,
 });
 
 let rightsSource: RightsSource = async () => null;
 // Each context load supersedes the previous one, whose late answers are then dropped.
 let contextLoad = 0;
+let measuring: AbortController | null = null;
 
 const isSource = (scope: ServiceScope | SourceScope): scope is SourceScope => "field" in scope;
 
@@ -160,12 +191,14 @@ export const buildPrefill = (kind: BulkKind, row: BulkRow): AlertPrefill | null 
       ...o,
       errorField: row.inputs?.errorField ?? null,
       usualPerHour: row.usually,
+      threshold: row.inputs?.threshold,
     });
   } else if (kind === "latency" && row.inputs?.durationField) {
     prefill = latencyAlert(row.scope, {
       ...o,
       durationField: row.inputs.durationField,
       p95Ms: row.inputs.p95Ms ?? null,
+      threshold: row.inputs.threshold,
     });
   }
   return prefill && !prefill.warnings.some((w) => w.level === "blocking") ? prefill : null;
@@ -194,20 +227,106 @@ export const scopeBlockOf = (
   return null;
 };
 
-/** The prefill built on the fields of the row's stream, or the reason it cannot be built. */
-const checkedPrefill = (
-  kind: BulkKind,
+/** What the review read beside the rows: stream fields and types, measured levels and typed thresholds. */
+interface RowContext {
+  schemas: StreamSchemas;
+  types: StreamTypes;
+  baselines: RowBaselines;
+  thresholds: Record<string, number>;
+}
+
+/** A row still waiting for its fields or its measurement, which may yet be created. */
+const waiting = (block: RowBlock | null): boolean =>
+  block?.code === "checking" || block?.code === "measuring";
+
+const positive = (value: number | null | undefined): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+
+/** The threshold in the order the finding's evidence, the 7-day measurement, then the user sets it. */
+const levelOf = (
+  kind: "errors" | "latency",
   row: BulkRow,
-  schemas: StreamSchemas,
-): { prefill: AlertPrefill | null; block: RowBlock | null } => {
+  ctx: RowContext,
+): { usual: number | null; threshold: number | null; measured: boolean } => {
+  const usual =
+    positive(kind === "errors" ? row.usually : row.inputs?.p95Ms) ??
+    positive(ctx.baselines[row.key]);
+  if (usual) return { usual, threshold: measuredThreshold(kind, usual), measured: true };
+  return {
+    usual: null,
+    threshold: positive(ctx.thresholds[row.key]),
+    measured: row.key in ctx.baselines,
+  };
+};
+
+type Checked = {
+  prefill: AlertPrefill | null;
+  block: RowBlock | null;
+  usual: number | null;
+  threshold: number | null;
+};
+
+/** The prefill built on the fields of the row's stream, or the reason it cannot be built. */
+const checkedPrefill = (kind: BulkKind, row: BulkRow, ctx: RowContext): Checked => {
   const scope = row.scope;
-  if (isSource(scope)) return { prefill: buildPrefill(kind, row), block: null };
-  const schema = scope.schema ?? schemas[streamKeyOf(scope.stream)];
+  const none = { usual: null, threshold: null };
+  if (isSource(scope)) return { prefill: buildPrefill(kind, row), block: null, ...none };
+  const level = kind === "errors" || kind === "latency" ? levelOf(kind, row, ctx) : null;
+  const levels = { usual: level?.usual ?? null, threshold: level?.threshold ?? null };
+  const leveled = { ...row, inputs: { ...row.inputs, threshold: levels.threshold } };
+  const schema = scope.schema ?? ctx.schemas[streamKeyOf(scope.stream)];
+  const fieldTypes = scope.fieldTypes ?? ctx.types[streamKeyOf(scope.stream)];
   const block = scopeBlockOf(scope, schema);
   // A row still waiting for its fields keeps a provisional prefill, so its period and rule show meanwhile.
-  if (block?.code === "checking") return { prefill: buildPrefill(kind, row), block };
-  if (block) return { prefill: null, block };
-  return { prefill: buildPrefill(kind, { ...row, scope: { ...scope, schema: schema! } }), block };
+  if (block?.code === "checking") return { prefill: buildPrefill(kind, leveled), block, ...levels };
+  if (block) return { prefill: null, block, ...levels };
+  // The error field is read off the stream's fields once they arrive, never guessed before.
+  const errorField =
+    kind === "errors" && !row.inputs?.errorField
+      ? (errorFieldOf(scope.stream.type, schema!, fieldTypes) ?? undefined)
+      : row.inputs?.errorField;
+  if (kind === "errors" && !errorField && scope.stream.type !== "traces") {
+    return { prefill: null, block: null, ...none };
+  }
+  // Without a threshold the alert would return its one row on every run and never fire.
+  if (level && levels.threshold === null) {
+    const wait: RowBlock = level.measured
+      ? { code: "noBaseline", kind: kind as "errors" | "latency" }
+      : { code: "measuring" };
+    return { prefill: null, block: wait, ...none };
+  }
+  return {
+    prefill: buildPrefill(kind, {
+      ...leveled,
+      scope: { ...scope, schema: schema! },
+      inputs: { ...leveled.inputs, errorField },
+    }),
+    block,
+    ...levels,
+  };
+};
+
+/** The query that measures one waiting row's usual level on its stream's fields; null when it can't be scoped. */
+const baselineRequestOf = (
+  kind: BulkKind,
+  row: BulkRow,
+  ctx: RowContext,
+): BaselineRequest | null => {
+  const scope = row.scope;
+  if (isSource(scope) || (kind !== "errors" && kind !== "latency")) return null;
+  const key = streamKeyOf(scope.stream);
+  const schema = scope.schema ?? ctx.schemas[key] ?? undefined;
+  const fieldTypes = scope.fieldTypes ?? ctx.types[key];
+  const scoped = { ...scope, schema, fieldTypes };
+  const sql =
+    kind === "errors"
+      ? baselineSql(scoped, {
+          kind,
+          errorField:
+            row.inputs?.errorField ?? errorFieldOf(scope.stream.type, schema ?? [], fieldTypes),
+        })
+      : baselineSql(scoped, { kind, durationField: row.inputs?.durationField ?? "duration" });
+  return sql ? { kind, stream: scope.stream, sql } : null;
 };
 
 const folderName = (id: string, team: TeamPick | undefined, folders: FolderRef[]): string =>
@@ -224,6 +343,9 @@ export const reviewRowsOf = (
     overrides: Record<string, { folder: FolderRef; destinations: string[] }>;
     rights: FolderRights;
     schemas?: StreamSchemas;
+    types?: StreamTypes;
+    baselines?: RowBaselines;
+    thresholds?: Record<string, number>;
   },
 ): ReviewRow[] =>
   request.rows.map((row) => {
@@ -235,7 +357,12 @@ export const reviewRowsOf = (
       id: folderId,
       name: folderName(folderId, row.team, ctx.folders),
     };
-    const { prefill, block } = checkedPrefill(request.kind, row, ctx.schemas ?? {});
+    const { prefill, block, usual, threshold } = checkedPrefill(row.kind ?? request.kind, row, {
+      schemas: ctx.schemas ?? {},
+      types: ctx.types ?? {},
+      baselines: ctx.baselines ?? {},
+      thresholds: ctx.thresholds ?? {},
+    });
     return {
       key: row.key,
       row,
@@ -251,6 +378,8 @@ export const reviewRowsOf = (
       destinations: override?.destinations ?? row.notify?.destinations ?? [],
       locked: ctx.rights?.[folder.id] === false,
       block,
+      usual,
+      threshold,
     };
   });
 
@@ -308,9 +437,9 @@ export const groupRows = (rows: ReviewRow[], by: GroupBy): ReviewGroup[] => {
   );
 };
 
-/** A row the user may tick: built, in a writable folder, and not known to miss a stream field. */
+/** A row the user may tick: built or still waiting to be, in a writable folder, and not known to be unbuildable. */
 export const isTickable = (row: ReviewRow): boolean =>
-  !!row.prefill && !row.locked && (!row.block || row.block.code === "checking");
+  !row.locked && (waiting(row.block) || (!!row.prefill && !row.block));
 
 /** A row that can be created now: tickable, and its stream fields are confirmed. */
 export const isCreatable = (row: ReviewRow): boolean => isTickable(row) && !row.block;
@@ -351,6 +480,9 @@ const reviewRows = computed(() =>
         overrides: state.overrides,
         rights: state.rights,
         schemas: state.schemas,
+        types: state.types,
+        baselines: state.baselines,
+        thresholds: state.thresholds,
       })
     : [],
 );
@@ -375,42 +507,75 @@ export const openBulkReview = (request: BulkReviewRequest): void => {
   state.overrides = {};
   state.rights = null;
   state.schemas = {};
+  state.types = {};
+  state.baselines = {};
+  state.thresholds = {};
   state.ticked = startTicks(reviewRows.value);
   collapseDefaults();
   state.open = true;
 };
 
+/** Drops every late answer of the current load and cancels its running measurements. */
+const stopLoads = (): void => {
+  contextLoad += 1;
+  measuring?.abort();
+  measuring = null;
+};
+
+/** Closes the drawer and stops its loads, so no seven-day query runs for a review nobody sees. */
 export const closeBulkReview = (): void => {
   state.open = false;
+  stopLoads();
+};
+
+/** One stream's field names and types; null when they could not be read. */
+export const readStreamFields = async (
+  org: string,
+  stream: { type: string; name: string },
+): Promise<StreamFields | null> => {
+  try {
+    const res = await streamService.schema(org, stream.name, stream.type, {
+      silentForbidden: true,
+    });
+    const fields: any[] = res.data?.schema ?? [];
+    return {
+      names: fields.map((f) => String(f.name)),
+      types: Object.fromEntries(fields.map((f) => [String(f.name), String(f.type ?? "")])),
+    };
+  } catch {
+    return null;
+  }
 };
 
 /** Reads the fields of every stream a service row names without them, a few streams at a time. */
-const readSchemas = async (org: string): Promise<StreamSchemas> => {
+const readSchemas = async (
+  org: string,
+  load: number,
+): Promise<{ schemas: StreamSchemas; types: StreamTypes }> => {
   const scopes = (state.request?.rows ?? []).flatMap((r) =>
     isSource(r.scope) || r.scope.schema ? [] : [r.scope.stream],
   );
   const streams = uniqueBy(scopes, streamKeyOf);
-  const found: StreamSchemas = {};
-  for (let i = 0; i < streams.length; i += SCHEMA_READS) {
+  const schemas: StreamSchemas = {};
+  const types: StreamTypes = {};
+  for (let i = 0; i < streams.length && load === contextLoad; i += SCHEMA_READS) {
     await Promise.all(
       streams.slice(i, i + SCHEMA_READS).map(async (stream) => {
-        try {
-          const res = await streamService.schema(org, stream.name, stream.type, {
-            silentForbidden: true,
-          });
-          found[streamKeyOf(stream)] = (res.data?.schema ?? []).map((f: any) => String(f.name));
-        } catch {
-          found[streamKeyOf(stream)] = null;
-        }
+        const fields = await readStreamFields(org, stream);
+        schemas[streamKeyOf(stream)] = fields?.names ?? null;
+        if (fields) types[streamKeyOf(stream)] = fields.types;
       }),
     );
   }
-  return found;
+  return { schemas, types };
 };
 
 /** Loads the folders, the stream fields and, when served, the folder write rights the review shows. */
 export const loadReviewContext = async (org: string): Promise<void> => {
-  const load = ++contextLoad;
+  stopLoads();
+  const load = contextLoad;
+  measuring = new AbortController();
+  const { signal } = measuring;
   if (state.org !== org) {
     state.org = org;
     state.folders = [];
@@ -419,7 +584,7 @@ export const loadReviewContext = async (org: string): Promise<void> => {
   const [folders, rights, schemas] = await Promise.allSettled([
     commonService.list_Folders(org, "alerts", { skipAccessToast: true }),
     rightsSource(org),
-    readSchemas(org),
+    readSchemas(org, load),
   ]);
   if (load !== contextLoad) return;
   if (schemas.status === "fulfilled") applySchemas(schemas.value);
@@ -430,6 +595,41 @@ export const loadReviewContext = async (org: string): Promise<void> => {
     }));
   }
   if (rights.status === "fulfilled") applyRights(rights.value);
+  await measureRows(org, load, signal);
+};
+
+/** Measures each waiting row's usual level, a few at a time; a row the week gave none is unticked until a threshold is set. */
+const measureRows = async (org: string, load: number, signal: AbortSignal): Promise<void> => {
+  const request = state.request;
+  if (!request) return;
+  const ctx = () => ({
+    schemas: state.schemas,
+    types: state.types,
+    baselines: state.baselines,
+    thresholds: state.thresholds,
+  });
+  const rows = reviewRows.value.filter((r) => r.block?.code === "measuring").map((r) => r.row);
+  for (let i = 0; i < rows.length; i += SCHEMA_READS) {
+    await Promise.all(
+      rows.slice(i, i + SCHEMA_READS).map(async (row) => {
+        const query = baselineRequestOf(row.kind ?? request.kind, row, ctx());
+        const value = query ? await measureBaseline(org, query, signal) : null;
+        if (load !== contextLoad) return;
+        state.baselines[row.key] = value;
+        if (!positive(value)) state.ticked.delete(row.key);
+      }),
+    );
+    if (load !== contextLoad) return;
+  }
+};
+
+/** Sets or clears the threshold the user typed for a row the week gave no usual level; a creatable row is ticked. */
+export const setRowThreshold = (key: string, value: number | null): void => {
+  if (positive(value)) state.thresholds[key] = value!;
+  else delete state.thresholds[key];
+  const row = reviewRows.value.find((r) => r.key === key);
+  if (row && isCreatable(row)) state.ticked.add(key);
+  else state.ticked.delete(key);
 };
 
 /** Loads the destinations a group can switch to, once, when the user first changes one. */
@@ -455,10 +655,11 @@ export const applyRights = (rights: FolderRights): void => {
 };
 
 /** Sets the read stream fields and unticks every row they show cannot be created. */
-const applySchemas = (schemas: StreamSchemas): void => {
+const applySchemas = ({ schemas, types }: { schemas: StreamSchemas; types: StreamTypes }): void => {
+  state.types = types;
   state.schemas = schemas;
   for (const row of reviewRows.value) {
-    if (row.block && row.block.code !== "checking") state.ticked.delete(row.key);
+    if (row.block && !waiting(row.block)) state.ticked.delete(row.key);
   }
 };
 
@@ -513,6 +714,6 @@ export const useBulkReview = () => ({
   ),
   /** A ticked row still waits for its stream fields, so Create would leave it out. */
   checking: computed(() =>
-    reviewRows.value.some((r) => r.block?.code === "checking" && state.ticked.has(r.key)),
+    reviewRows.value.some((r) => waiting(r.block) && state.ticked.has(r.key)),
   ),
 });

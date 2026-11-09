@@ -31,6 +31,7 @@ import { useNow } from "@/composables/useNow";
 import {
   autoobserveCoverageQuery,
   autoobserveIncidentsPageQuery,
+  autoobserveGapSuggestionsQuery,
   autoobserveSuggestionsPageQuery,
 } from "@/services/autoobserve.queries";
 import type { AutoObserveIncidentItem } from "@/services/autoobserve";
@@ -44,6 +45,7 @@ import {
   type Zone,
 } from "./liveAdapter";
 import {
+  GAP_PAGE_SIZE,
   RAIL_CAP,
   checkedView,
   liveErrorDetail,
@@ -200,7 +202,12 @@ export const useLiveAutoObserve = () => {
       enabled: enabled.value,
     }),
   );
-  const retry = () => void Promise.all([coverage.refetch(), suggestions.refetch()]);
+  const gaps = useQuery(() =>
+    Object.assign(autoobserveGapSuggestionsQuery(org.value, GAP_PAGE_SIZE), {
+      enabled: enabled.value,
+    }),
+  );
+  const retry = () => void Promise.all([coverage.refetch(), suggestions.refetch(), gaps.refetch()]);
   const coverageState = useKeptFailure(
     () => stateOf(coverage, retry),
     () => org.value,
@@ -227,6 +234,7 @@ export const useLiveAutoObserve = () => {
       zone.value,
       (suggestions.data.value?.suggestions ?? []).filter((s) => s.status === "proposed"),
       minute.value * 60_000,
+      { rows: coverage.data.value?.rows, allGaps: gaps.data.value },
     ),
     total: suggestions.data.value?.total ?? 0,
   }));
@@ -326,6 +334,7 @@ export const useLivePaged = (cap = PAGED_CAP) => {
     state,
     skeleton,
     rcaEnabled,
+    zone,
     now: computed(() => minute.value * 60_000),
     paging: computed(() => query.data.value?.paging ?? true),
     rows: computed(() => rows.value),

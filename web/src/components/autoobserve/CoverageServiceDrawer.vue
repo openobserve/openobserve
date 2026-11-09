@@ -121,7 +121,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :service="row.service"
           signal="absence"
           :ledger="ledger"
+          :insight="insightFor('absence', liveChecks.absence)"
+          :pending="!!pendingId"
           data-test="autoobserve-coverage-drawer-absence-detail"
+          @cta="(cta) => run('absence', cta)"
         />
         <div v-if="!liveChecks" class="flex flex-wrap gap-1.5">
           <template v-for="chip in chips" :key="chip.signal">
@@ -175,14 +178,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ line }}
             </li>
           </ul>
-          <OButton
-            v-if="fix"
-            variant="outline"
-            size="sm-action"
-            data-test="autoobserve-coverage-drawer-fix"
-            @click="emit('fix')"
-            >{{ fix }}</OButton
-          >
+          <InsightBlock
+            v-if="gapParts && (gapParts.cta || gapParts.ai)"
+            :parts="gapParts"
+            variant="details"
+            flush
+            class="basis-full"
+            :pending="pendingId === gapParts.id"
+            data-test="autoobserve-coverage-drawer-gap-actions"
+            @cta="(cta) => run(gapParts!.id, cta)"
+          />
         </div>
       </section>
 
@@ -236,6 +241,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :service="row.service"
                 :signal="chart.def.signal"
                 :ledger="ledger"
+                :insight="chartInsight(chart.def.signal, chart.cell)"
+                :pending="!!pendingId"
+                @cta="(cta) => run(chart.def.signal, cta)"
               />
             </CoverageMetricChart>
             <div
@@ -248,6 +256,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :service="row.service"
                 :signal="openChart.def.signal"
                 :ledger="ledger"
+                :insight="chartInsight(openChart.def.signal, openChart.cell)"
+                :pending="!!pendingId"
+                @cta="(cta) => run(openChart!.def.signal, cta)"
               />
             </div>
           </template>
@@ -318,6 +329,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :service="row.service"
               :signal="item.key"
               :ledger="ledger"
+              :insight="insightFor(item.key, item.cell)"
+              :pending="!!pendingId"
+              @cta="(cta) => run(item.key, cta)"
             />
           </template>
         </div>
@@ -327,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, provide, ref, watch } from "vue";
+import { computed, provide, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -375,6 +389,19 @@ import {
 } from "./live/liveCopy";
 import { liveMetricDef, type LiveChartSignal } from "./live/serviceChartSql";
 import { useServiceCharts, type ServiceChartStatus } from "./live/useServiceCharts";
+import InsightBlock from "./insight/InsightBlock.vue";
+import { useInsightActions } from "./insight/useInsightActions";
+import {
+  cellInsight,
+  gapInsight,
+  ownedAlertIds,
+  probeScope,
+  tracesRoute,
+} from "./insight/coverageCta";
+import { useServiceAddress } from "./insight/targets/serviceAddress";
+import { loadOwnedAlerts, type OwnedAlert } from "./insight/targets/ownership";
+import syntheticsService from "@/services/synthetics";
+import type { SyntheticsLocation } from "@/types/synthetics";
 
 type ServiceState = "watched" | "learning" | "gap";
 
@@ -385,7 +412,6 @@ const props = defineProps<{
   ledger: LedgerEntry[];
   expanded: Signal | LiveCheck | null;
   anchor: string;
-  fix: I18nText | null;
   message: I18nText | "";
   live?: boolean;
 }>();
@@ -393,7 +419,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   expand: [signal: Signal | LiveCheck | null];
-  fix: [];
   select: [service: string];
 }>();
 
@@ -629,8 +654,66 @@ const openCheck = (check: LiveCheck) => {
 const extraValue = (cell: CoverageCell): I18nText =>
   cell.detector ? raw(cell.detector) : liveCellWord(t, cell.engine?.stateKey ?? "none");
 
+// Open in Traces lands on this service's spans; the catalog stays plain navigation (CTA-MAP §2).
 const openTraces = (tab?: string) => {
   const org = store.state.selectedOrganization?.identifier;
+  if (!tab && props.row.identity) {
+    void router.push(tracesRoute(props.row, String(org ?? ""), Date.now() * 1000));
+    return;
+  }
   void router.push({ name: "traces", query: { org_identifier: org, ...(tab ? { tab } : {}) } });
 };
+
+const { run, pendingId } = useInsightActions();
+const orgId = computed(() => String(store.state.selectedOrganization?.identifier ?? ""));
+// Drafts land where the service's own alerts live and notify whom they notify; none read means the org default.
+const owned = shallowRef<OwnedAlert[]>([]);
+const ownedKey = computed(() =>
+  props.live ? `${orgId.value}|${ownedAlertIds(props.row).join(",")}` : "",
+);
+watch(
+  ownedKey,
+  async (key) => {
+    owned.value = [];
+    const ids = props.live ? ownedAlertIds(props.row) : [];
+    if (!ids.length) return;
+    const found = await loadOwnedAlerts(orgId.value, ids);
+    if (key === ownedKey.value) owned.value = found;
+  },
+  { immediate: true },
+);
+const gapParts = computed(() =>
+  props.live && state.value === "gap" ? gapInsight(t, locale.value, props.row, owned.value) : null,
+);
+// The address query and the locations read run only once Synthetic check is open, not per drawer.
+const probeOpen = computed(() => !!props.live && extraOpen.value === "external_probe");
+const { address } = useServiceAddress(() => (probeOpen.value ? probeScope(props.row) : null));
+const locations = shallowRef<SyntheticsLocation[]>([]);
+let locationsOrg: string | null = null;
+watch(probeOpen, async (open) => {
+  if (!open || locationsOrg === orgId.value) return;
+  const org = orgId.value;
+  locationsOrg = org;
+  try {
+    const res = await syntheticsService.getLocations(org);
+    if (org === orgId.value) locations.value = (res.data as any)?.locations ?? [];
+  } catch {
+    locationsOrg = null;
+  }
+});
+const insightFor = (key: string, cell: CoverageCell) =>
+  props.live && props.row.identity
+    ? cellInsight(
+        t,
+        locale.value,
+        props.row,
+        key as LiveCheck,
+        cell,
+        orgId.value,
+        { address: address.value, locations: locations.value },
+        owned.value,
+      )
+    : null;
+const chartInsight = (signal: Signal, cell: CoverageCell) =>
+  insightFor(LIVE_CELL[signal as LiveChartSignal] ?? signal, cell);
 </script>

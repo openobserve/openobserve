@@ -1,0 +1,99 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+
+/** The window a usual level is measured over. */
+export const BASELINE_LOOKBACK_US = 7 * 24 * 3_600_000_000;
+
+const LOOKBACK_HOURS = 7 * 24;
+// The latency alert ignores windows with fewer requests, so a p95 over fewer says nothing usual.
+const MIN_REQUESTS = 20;
+
+/** One usual-level query: the error count or the p95, scoped like the alert it sets a threshold for. */
+export interface BaselineRequest {
+  kind: "errors" | "latency";
+  stream: { type: string; name: string };
+  sql: string;
+}
+
+type Hit = Record<string, unknown>;
+
+const num = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const levelOf = (kind: BaselineRequest["kind"], hits: Hit[]): number | null => {
+  if (kind === "errors") {
+    const perHour = hits.reduce((sum, h) => sum + num(h.errors), 0) / LOOKBACK_HOURS;
+    return perHour > 0 ? perHour : null;
+  }
+  const requests = hits.reduce((sum, h) => sum + num(h.requests), 0);
+  const p95 = Math.max(0, ...hits.map((h) => num(h.p95_ms)));
+  return requests >= MIN_REQUESTS && p95 > 0 ? p95 : null;
+};
+
+/** The usual errors an hour or p95 in ms over the last 7 days, from one streaming query; null when there is none or it was stopped. */
+export const measureBaseline = (
+  org: string,
+  request: BaselineRequest,
+  signal?: AbortSignal,
+): Promise<number | null> =>
+  new Promise((resolve) => {
+    if (signal?.aborted) return resolve(null);
+    const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+    const { traceId } = generateTraceContext();
+    signal?.addEventListener(
+      "abort",
+      () => {
+        cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: org });
+        resolve(null);
+      },
+      { once: true },
+    );
+    const end = Date.now() * 1000;
+    let hits: Hit[] = [];
+    void fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          query: {
+            sql: b64EncodeUnicode(request.sql),
+            start_time: end - BASELINE_LOOKBACK_US,
+            end_time: end,
+            from: 0,
+            size: 1,
+          },
+          encoding: "base64",
+        },
+        type: "search",
+        traceId,
+        org_id: org,
+        pageType: request.stream.type,
+        searchType: "ui",
+      },
+      {
+        data: (_payload: unknown, res: any) => {
+          if (res?.type !== "search_response_hits") return;
+          const chunk: Hit[] = res.content?.results?.hits ?? [];
+          // A streamed aggregate resends its running total, so only the latest chunk counts.
+          hits = res.content?.streaming_aggs ? chunk : [...hits, ...chunk];
+        },
+        error: () => resolve(null),
+        complete: () => resolve(levelOf(request.kind, hits)),
+      },
+    );
+  });

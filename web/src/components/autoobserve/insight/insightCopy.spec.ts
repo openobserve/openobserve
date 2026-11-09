@@ -151,7 +151,7 @@ describe("insightCopy: why a Not working alert can't fire (tests 1-4)", () => {
     );
     const without = parts(notWorking({ pattern: "empty_scope" }));
     expect(without.why).toBeNull();
-    expect(without.cta?.label).toBe("Review query");
+    expect(without.cta?.label).toBe("Review alert");
   });
 });
 
@@ -165,7 +165,7 @@ describe("insightCopy: Not working next step and actions (test 5)", () => {
 
   it("labels the CTA by the typed action's focus and opens the editor", () => {
     const query = parts(notWorking());
-    expect(query.cta?.label).toBe("Review query");
+    expect(query.cta?.label).toBe("Review alert");
     expect(query.cta?.target).toEqual({
       type: "review_alert",
       action: { type: "review_alert", alert_id: "a2", focus: "query" },
@@ -178,7 +178,7 @@ describe("insightCopy: Not working next step and actions (test 5)", () => {
     const threshold = parts(
       notWorking({}, { actions: [{ type: "review_alert", alert_id: "a2", focus: "threshold" }] }),
     );
-    expect(threshold.cta?.label).toBe("Review threshold");
+    expect(threshold.cta?.label).toBe("Review alert");
     expect(threshold.note).toBe(
       "Opens the alert editor at the threshold. Nothing is saved until you save.",
     );
@@ -288,17 +288,16 @@ describe("insightCopy: chip colour and words (test 6)", () => {
   });
 });
 
-describe("insightCopy: other kinds keep today's words (test 7)", () => {
-  it("keeps the headline, the card's line and the body, and offers no Dismiss…", () => {
+describe("insightCopy: coverage kinds read the same on the rail and the card (test 7)", () => {
+  it("shares the headline and why with the rail, words each check plainly, and offers no Dismiss…", () => {
     const s = gap("coverage_gap", { traffic_per_hour: 31_000 });
     const [request] = toRequests(gt, zone, [s], NOW_MS);
     const p = parts(s);
     expect(p.headline).toBe(request.copy?.headline);
     expect(p.why).toBe(request.copy?.why);
-    expect(p.whyDetail).toBe(say(gt, request.body));
-    expect(p.next).toBeNull();
-    expect(p.cta).toBeNull();
-    expect(p.secondary).toEqual([]);
+    expect(p.whyDetail).toBe("Errors: no alert. Latency: no alert. Stops sending: no alert.");
+    expect(say(gt, request.body)).toContain("Errors");
+    expect(p.cta?.label).toBe("Open service");
     expect(p.dismissable).toBeNull();
   });
 
@@ -314,7 +313,7 @@ describe("insightCopy: other kinds keep today's words (test 7)", () => {
     };
     const p = parts(blind);
     expect(p.chip.variant).toBe("error-soft");
-    expect(p.cta?.label).toBe("Review query");
+    expect(p.cta?.label).toBe("Review alert");
     expect(p.cta?.target).toMatchObject({ alertName: "checkout-errors", findingId: "" });
     expect(p.dismissable).toBeNull();
   });

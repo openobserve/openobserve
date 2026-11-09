@@ -390,7 +390,7 @@ const reviewQuery = async (key: string) => {
   void router.push(editAlertRoute(orgId.value, skip.alert_id, folder));
 };
 const reviewQueryCta = (row: SkipGroupRow): SkipGroupCta => ({
-  label: t("alertCalibration.insightActions.reviewQuery"),
+  label: t("insight.cta.reviewAlert"),
   run: () => void reviewQuery(row.key),
   pending: reviewing.value === row.key,
 });

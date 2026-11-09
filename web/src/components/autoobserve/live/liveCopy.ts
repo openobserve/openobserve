@@ -66,6 +66,9 @@ export type CheckedView = { kind: "loading" } | { kind: "text"; text: I18nText }
 
 export const RAIL_CAP = 5;
 
+/** The page size the rail's group card reads every coverage gap in; the server's largest page. */
+export const GAP_PAGE_SIZE = 500;
+
 export const DRAWER_PAGE = 25;
 
 const NOTICE_KEY: Record<LiveSurface, Record<LiveFailure, { title: I18nKey; desc: I18nKey }>> = {
@@ -409,13 +412,14 @@ export const liveCheckText = (
     state: liveCellWord(t, state),
   });
 
+// The same words as the coverage gap card's Why, so the drawer and the card never disagree.
 const CHECK_INLINE: Record<LiveCheck, I18nKey> = {
-  errors: "autoobserveLive.classesInline.errors",
-  latency: "autoobserveLive.classesInline.latency",
-  absence: "autoobserveLive.classesInline.absence",
+  errors: "insight.kind.classes.why.errors",
+  latency: "insight.kind.classes.why.latency",
+  absence: "insight.kind.classes.why.absence",
 };
 
-// Checks with no monitor share one sentence; a monitor that falls short keeps its own reason.
+// Checks with no alert share one sentence; an alert that falls short keeps its own reason.
 export const liveGapLines = (
   t: TranslateFn,
   locale: string,

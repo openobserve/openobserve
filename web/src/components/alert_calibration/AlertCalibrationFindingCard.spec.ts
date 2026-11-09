@@ -222,13 +222,7 @@ describe("AlertCalibrationFindingCard", () => {
       panel
         .findAll('[data-test="alert-calibration-finding-action-review_alert"]')
         .map((row) => row.text()),
-    ).toEqual([
-      "Review query",
-      "Review alert",
-      "Review settings",
-      "Review threshold",
-      "Review grouping",
-    ]);
+    ).toEqual(["Review alert"]);
     expect(
       panel.find('[data-test="alert-calibration-finding-action-review_platform"]').text(),
     ).toBe("Inspect platform");
@@ -291,8 +285,8 @@ describe("AlertCalibrationFindingCard", () => {
       "alert-calibration-finding-action-review_platform",
     ]);
     expect(rows.map((row) => row.text())).toEqual([
-      "Apply suggestion",
-      "Review query",
+      "Review change",
+      "Review alert",
       "Inspect platform",
     ]);
     expect(rows[0].find("button").exists()).toBe(true);
@@ -494,7 +488,7 @@ describe("AlertCalibrationFindingCard", () => {
     expect(quiet.findAll("dt").map((dt) => dt.text())).toEqual(["Stream", "Last data", "Checked"]);
     expect(quiet.find('[data-test="alert-calibration-finding-tier"]').text()).toBe("Investigate");
     expect(quiet.find('[data-test="alert-calibration-finding-action-review_source"]').text()).toBe(
-      "Review source",
+      "Open in Logs",
     );
     expect(quiet.find('[data-test="alert-calibration-finding-limitations"]').text()).toContain(
       "A quiet source can be a batch or cron job that is idle by design.",
@@ -742,7 +736,7 @@ describe("AlertCalibrationFindingCard", () => {
       timeout
         .findAll('[data-test="alert-calibration-finding-action-review_alert-button"]')
         .map((button) => button.text()),
-    ).toEqual(["Review query", "Review settings"]);
+    ).toEqual(["Review alert"]);
 
     const memory = mountCard(
       resource({
@@ -942,8 +936,8 @@ describe("AlertCalibrationFindingCard", () => {
       "Other enabled alerts in this folder send to the suggested destination.",
     );
     expect(actionRows(suggested)).toEqual([
-      ["alert-calibration-finding-action-apply_suggestion", "Apply suggestion"],
-      ["alert-calibration-finding-action-review_alert", "Review settings"],
+      ["alert-calibration-finding-action-apply_suggestion", "Review change"],
+      ["alert-calibration-finding-action-review_alert", "Review alert"],
     ]);
 
     const redacted = mountCard(noDestination({}));
@@ -955,7 +949,7 @@ describe("AlertCalibrationFindingCard", () => {
       "Add a destination in Edit Alert, or confirm this alert is meant to notify no one.",
     );
     expect(actionRows(redacted)).toEqual([
-      ["alert-calibration-finding-action-review_alert", "Review settings"],
+      ["alert-calibration-finding-action-review_alert", "Review alert"],
     ]);
 
     const v1 = mountCard(
@@ -1002,13 +996,13 @@ describe("AlertCalibrationFindingCard", () => {
     expect(buttons[buttons.length - 1].attributes("data-test")).toBe(
       "alert-calibration-finding-dismiss",
     );
-    expect(buttons[buttons.length - 1].text()).toBe("Dismiss");
+    expect(buttons[buttons.length - 1].text()).toBe("Dismiss…");
     expect(open.find('[data-test="alert-calibration-finding-dismissed"]').exists()).toBe(false);
     open.unmount();
 
     const alone = mountCard({ ...record, insight_actions: JSON.stringify([]) });
     const lonePanel = alone.find('[data-test="alert-calibration-finding-actions"]');
-    expect(lonePanel.findAll("button").map((b) => b.text())).toEqual(["Dismiss"]);
+    expect(lonePanel.findAll("button").map((b) => b.text())).toEqual(["Dismiss…"]);
     alone.unmount();
 
     const folded = mount(AlertCalibrationFindingCard, {

@@ -1,0 +1,256 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import "@/locales";
+import config from "@/aws-exports";
+import { gt, raw } from "@/types/i18n";
+import type { CoverageCell, CoverageRow } from "../fixtures";
+import { b64DecodeUnicode } from "@/utils/zincutils";
+import { cellInsight, gapInsight, tracesRoute } from "./coverageCta";
+import type { CoverageCell as Cell } from "../fixtures";
+
+const gapCell = (stateKey: "none" | "silent" = "none", monitor?: string): CoverageCell => ({
+  state: "gap",
+  reason: raw("Absence: no monitor watches this"),
+  engine: {
+    state: raw(stateKey),
+    stateKey,
+    monitors: monitor
+      ? [
+          {
+            id: "a-9",
+            name: monitor,
+            kind: raw("Alert"),
+            kindKey: "alert",
+            state: raw("Silent"),
+            stateKey: "silent",
+            predicate: "",
+          },
+        ]
+      : [],
+  },
+});
+
+const row = (streams: { type: string; name: string }[]): CoverageRow =>
+  ({
+    service: "svc-ingest-c",
+    stream: "ingest_c",
+    cells: {},
+    checks: { errors: gapCell(), latency: gapCell(), absence: gapCell() },
+    identity: {
+      serviceId: "svc-ingest-c",
+      serviceName: "svc-ingest-c",
+      cluster: null,
+      namespace: null,
+      streams,
+    },
+  }) as unknown as CoverageRow;
+
+const LOGS = { type: "logs", name: "ingest_c" };
+const TRACES = { type: "traces", name: "default" };
+const METRICS = { type: "metrics", name: "container_memory_working_set_bytes" };
+
+let enterprise: string;
+beforeEach(() => {
+  enterprise = config.isEnterprise;
+  config.isEnterprise = "true";
+});
+afterEach(() => {
+  config.isEnterprise = enterprise;
+});
+
+const covered = (): Cell => ({
+  ...gapCell(),
+  state: "watched",
+  engine: { ...gapCell().engine!, stateKey: "covered" },
+});
+
+describe("Signals watched gap line (flagged surface 2)", () => {
+  it("drafts the errors, latency and no-data alerts in one review list, and Ask AI (F1)", () => {
+    const parts = gapInsight(gt, "en-US", row([LOGS, TRACES]));
+    expect(parts?.cta?.label).toBe("Review and add alerts");
+    const target = parts?.cta?.target;
+    if (target?.type !== "bulk") throw new Error("expected bulk");
+    expect(target.request.rows.map((r) => [r.kind, r.scope.stream.name])).toEqual([
+      ["errors", "ingest_c"],
+      ["latency", "default"],
+      ["no_data", "ingest_c"],
+    ]);
+    expect(parts?.ai?.subject).toBe("svc-ingest-c");
+  });
+
+  it("offers one Add alert when only the no-data alert is missing", () => {
+    const only = row([LOGS, TRACES]);
+    only.checks!.errors = covered();
+    only.checks!.latency = covered();
+    const parts = gapInsight(gt, "en-US", only);
+    expect(parts?.cta?.label).toBe("Add alert");
+    expect(parts?.cta?.target.type).toBe("create_alert");
+  });
+
+  it("offers nothing without the service's streams", () => {
+    expect(gapInsight(gt, "en-US", row([]))?.cta ?? null).toBeNull();
+  });
+});
+
+describe("Signals chart details", () => {
+  it("words the Requests chart as stopping, not 'Absence', and adds a no-data alert", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS]), "absence", gapCell());
+    expect(parts?.why).toBe("Nothing alerts if svc-ingest-c stops sending.");
+    expect(parts?.next).toBe(
+      "Add a no-data alert: it fires when svc-ingest-c sends nothing for 15 minutes.",
+    );
+    expect(`${parts?.why} ${parts?.next}`).not.toMatch(/Absence|monitor/);
+    expect(parts?.cta?.label).toBe("Add alert");
+    const target = parts?.cta?.target;
+    if (target?.type !== "create_alert") throw new Error("expected create_alert");
+    expect(target.prefill.sql).toContain("HAVING count(*) = 0");
+  });
+
+  it("asks for traces when latency can't be measured", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS]), "latency", gapCell());
+    expect(parts?.why).toBe("Latency is charted from traces. svc-ingest-c sends none.");
+    expect(parts?.cta?.label).toBe("Set up data");
+  });
+
+  it("drafts a latency alert from the service's traces, measuring its usual p95 on click (F1)", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS, TRACES]), "latency", gapCell());
+    expect(parts?.cta?.label).toBe("Add alert");
+    const target = parts?.cta?.target;
+    if (target?.type !== "create_alert") throw new Error("expected create_alert");
+    const measure = target.draft?.measure?.({
+      ...target.draft.scope,
+      schema: ["service_name", "duration"],
+    });
+    expect(measure).toMatchObject({ kind: "latency", stream: TRACES });
+    expect(measure?.sql).toContain("approx_percentile_cont");
+  });
+
+  it("opens the one-row review list for errors on a logs stream (F10)", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS, TRACES]), "errors", gapCell());
+    expect(parts?.cta?.label).toBe("Add alert");
+    const target = parts?.cta?.target;
+    if (target?.type !== "bulk") throw new Error("expected bulk");
+    expect(target.request.rows).toHaveLength(1);
+    expect(target.request.rows[0]).toMatchObject({
+      kind: "errors",
+      scope: { stream: LOGS },
+      usually: null,
+    });
+  });
+
+  it("drafts errors on traces in the Add alert dialog, measuring the usual count on click (F1)", () => {
+    const parts = cellInsight(gt, "en-US", row([TRACES]), "errors", gapCell());
+    const target = parts?.cta?.target;
+    if (target?.type !== "create_alert") throw new Error("expected create_alert");
+    const measure = target.draft?.measure?.({
+      ...target.draft.scope,
+      schema: ["service_name", "span_status"],
+    });
+    expect(measure).toMatchObject({ kind: "errors", stream: TRACES });
+    expect(measure?.sql).toContain(`"span_status" = 'ERROR'`);
+  });
+
+  it("sends a silent alert to its editor to choose who gets notified", () => {
+    const parts = cellInsight(
+      gt,
+      "en-US",
+      row([LOGS]),
+      "absence",
+      gapCell("silent", "ingress-volume-detector"),
+    );
+    expect(parts?.why).toBe(
+      "ingress-volume-detector would notice svc-ingest-c stopping, but it notifies no one.",
+    );
+    expect(parts?.cta?.label).toBe("Choose who gets notified");
+    expect(parts?.cta?.target).toEqual({
+      type: "destinations",
+      alertId: "a-9",
+      alertName: "ingress-volume-detector",
+      destinations: [],
+    });
+  });
+});
+
+describe("Other checks (flagged surface 3)", () => {
+  it("adds a memory alert from the service's metrics", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS, METRICS]), "saturation", gapCell());
+    expect(parts?.why).toBe(
+      "No alert watches memory or CPU for svc-ingest-c. Container memory arrives in container_memory_working_set_bytes.",
+    );
+    expect(parts?.next).toBe("Add a memory alert at 90% of its limit.");
+    expect(parts?.cta?.label).toBe("Add alert");
+    const target = parts?.cta?.target;
+    if (target?.type !== "create_alert") throw new Error("expected create_alert");
+    expect(target.prefill.queryType).toBe("promql");
+  });
+
+  it("says saturation can't be watched without metrics and offers Set up data", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS]), "saturation", gapCell());
+    expect(parts?.why).toBe(
+      "No CPU or memory data arrives for svc-ingest-c, so this can't be watched yet.",
+    );
+    expect(parts?.cta?.label).toBe("Set up data");
+  });
+
+  it("adds a synthetic check prefilled for the service", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS]), "external_probe", gapCell());
+    expect(parts?.cta?.label).toBe("Add synthetic check");
+    const target = parts?.cta?.target;
+    if (target?.type !== "synthetic") throw new Error("expected synthetic");
+    expect(target.prefill).toMatchObject({ name: "svc-ingest-c health", type: "http" });
+    expect(target.prefill.url).toBe("");
+    expect(target.prefill.locations).toEqual([]);
+  });
+
+  it("fills the synthetic check's URL and public locations from what the drawer read", () => {
+    const location = (id: string, kind: "public" | "private") => ({
+      id,
+      kind,
+      label: raw(id),
+      region: "eu-west",
+      provider: "o2",
+      status: "online" as const,
+    });
+    const parts = cellInsight(gt, "en-US", row([LOGS]), "external_probe", gapCell(), "demo-org", {
+      address: { url: "https://shop.example.com/health", from: "traces" },
+      locations: [location("pub-1", "public"), location("pub-2", "public")],
+    });
+    const target = parts?.cta?.target;
+    if (target?.type !== "synthetic") throw new Error("expected synthetic");
+    expect(target.prefill.url).toBe("https://shop.example.com/health");
+    expect(target.prefill.locations).toEqual(["pub-1", "pub-2"]);
+  });
+
+  it("adds a restarts alert", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS]), "workload_health", gapCell());
+    expect(parts?.why).toBe("No alert watches restarts of svc-ingest-c.");
+    expect(parts?.cta?.label).toBe("Add alert");
+  });
+});
+
+describe("drawer header", () => {
+  it("opens Traces filtered to the service, on its traces stream", () => {
+    const to = tracesRoute(row([LOGS, TRACES]), "demo-org", 1_000_000) as {
+      name: string;
+      query: Record<string, string>;
+    };
+    expect(to.name).toBe("traces");
+    expect(to.query.stream).toBe("default");
+    expect(b64DecodeUnicode(to.query.query)).toContain("service_name");
+    expect(b64DecodeUnicode(to.query.query)).toContain("svc-ingest-c");
+  });
+});

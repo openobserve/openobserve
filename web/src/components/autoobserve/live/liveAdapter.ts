@@ -24,6 +24,7 @@ import type {
   AutoObserveCoverageRow,
   AutoObserveStatedEvidence,
   AutoObserveSuggestion,
+  AutoObserveSuggestionList,
 } from "@/services/autoobserve";
 import {
   SIGNALS,
@@ -46,7 +47,13 @@ import {
   type LiveStale,
 } from "./liveCopy";
 import { alertFindingBody, alertFindingHeadline, analysedText } from "./alertFindingCopy";
-import { insightCopy, type InsightParts, type InsightToday } from "../insight/insightCopy";
+import {
+  gapGroupInsight,
+  insightCopy,
+  type InsightParts,
+  type InsightToday,
+} from "../insight/insightCopy";
+import { GAP_GROUP_AT, HIDDEN_KINDS, type CtaContext } from "../insight/kindCopy";
 
 export type SourceStatus = "loading" | "error" | "ready";
 
@@ -81,7 +88,8 @@ export interface Zone {
   timeZone: string;
 }
 
-export type LiveRequest = Request & { insight: InsightParts };
+/** `covers` counts the suggestions one card stands for: one, or every gap a group card folds. */
+export type LiveRequest = Request & { insight: InsightParts; covers?: number };
 
 export interface SuggestionRow {
   id: string;
@@ -178,6 +186,12 @@ const SUGGESTION_KIND: Record<string, { label: I18nKey; look: LookKind; tag?: Ba
   },
   coverage_lost: { label: "autoobserveLive.suggestions.kinds.coverage_lost", look: "watching" },
   alert_not_working: { label: "alertCalibration.rules.notWorking", look: "notify" },
+  source_silence: {
+    label: "insight.kind.chip.stoppedSending",
+    look: "watching",
+    tag: "error-soft",
+  },
+  heartbeat_on_success: { label: "insight.kind.chip.missingAlert", look: "watching" },
 };
 
 const NO_ABSENCE_KEY: Record<AutoObserveCellState, I18nKey> = {
@@ -489,6 +503,13 @@ interface Parts {
   body: Msg;
 }
 
+// A service key is cluster/namespace/name; the reader sees the name and its namespace, never the key.
+const keyLabel = (key: string): string => {
+  const [cluster, namespace, ...name] = key.split("/");
+  if (!name.length) return key;
+  return namespace ? `${name.join("/")} (${namespace})` : `${name.join("/")} (${cluster})`;
+};
+
 const nameList = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((v): v is string => typeof v === "string" && v !== "") : [];
 
@@ -541,7 +562,7 @@ const blindParts = (
 const silentParts = (t: TranslateFn, locale: string, s: AutoObserveSuggestion): Parts => {
   const count = num(s.evidence.service_count) ?? 0;
   const monitor = raw(str(s.evidence.monitor_name));
-  const services = nameList(s.evidence.services);
+  const services = nameList(s.evidence.services).map(keyLabel);
   const body: Msg = services.length
     ? {
         key: "autoobserveLive.suggestions.detail.services",
@@ -657,6 +678,15 @@ const whyAndNext = (t: TranslateFn, parts: Parts): I18nText | null => {
     : parts.next;
 };
 
+// The drawer's Next step column: the kind's own next step when it has one, else the list's why-and-next.
+const nextLine = (t: TranslateFn, insight: InsightParts, parts: Parts): I18nText | null => {
+  if (insight.next)
+    return insight.why
+      ? t("autoobserveLive.suggestions.whyNext", { why: insight.why, next: insight.next })
+      : insight.next;
+  return parts.next ? whyAndNext(t, parts) : null;
+};
+
 const kindOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
   const kind = SUGGESTION_KIND[s.kind];
   return kind ? t(kind.label) : t("autoobserveLive.suggestions.kinds.other");
@@ -687,7 +717,9 @@ const tagsFor = (t: TranslateFn, s: AutoObserveSuggestion): RequestCopy["tags"] 
 // Offset pages over a moving score order can repeat an id, and each card's key is its id.
 const firstOfEachId = (suggestions: AutoObserveSuggestion[]) => {
   const seen = new Set<string>();
-  return suggestions.filter((s) => !seen.has(s.id) && !!seen.add(s.id));
+  return suggestions.filter(
+    (s) => !HIDDEN_KINDS.has(s.kind) && !seen.has(s.id) && !!seen.add(s.id),
+  );
 };
 
 const todayOf = (t: TranslateFn, s: AutoObserveSuggestion, parts: Parts): InsightToday => ({
@@ -703,7 +735,69 @@ export const insightOf = (
   zone: Zone,
   s: AutoObserveSuggestion,
   nowMs = Date.now(),
-): InsightParts => insightCopy(t, zone, s, todayOf(t, s, partsFor(t, zone, s, nowMs)), nowMs);
+  ctx: CtaContext = {},
+): InsightParts => insightCopy(t, zone, s, todayOf(t, s, partsFor(t, zone, s, nowMs)), nowMs, ctx);
+
+const requestOf = (
+  t: TranslateFn,
+  zone: Zone,
+  s: AutoObserveSuggestion,
+  nowMs: number,
+  ctx: CtaContext,
+): LiveRequest => {
+  const parts = partsFor(t, zone, s, nowMs);
+  const insight = insightCopy(t, zone, s, todayOf(t, s, parts), nowMs, ctx);
+  return {
+    insight,
+    id: s.id,
+    kind: "fromNowOn",
+    body: parts.body,
+    yes: "autoobserveLive.suggestions.accept",
+    no: "autoobserveLive.suggestions.dismiss",
+    doneYes: { key: "autoobserveLive.suggestions.accepted" },
+    doneNo: { key: "autoobserveLive.suggestions.dismissed" },
+    copy: {
+      label: kindOf(t, s),
+      headline: insight.headline,
+      why: insight.why ?? whyAndNext(t, parts),
+      tags: tagsFor(t, s),
+      look: SUGGESTION_KIND[s.kind]?.look ?? "watching",
+    },
+  };
+};
+
+const gapGroupRequest = (
+  t: TranslateFn,
+  zone: Zone,
+  gaps: AutoObserveSuggestion[],
+  ctx: CtaContext,
+  total: number,
+): LiveRequest => {
+  const insight = gapGroupInsight(t, zone, gaps, ctx, total);
+  return {
+    insight,
+    covers: total,
+    id: insight.id,
+    kind: "fromNowOn",
+    body: NO_DETAIL,
+    yes: "autoobserveLive.suggestions.accept",
+    no: "autoobserveLive.suggestions.dismiss",
+    doneYes: { key: "autoobserveLive.suggestions.accepted" },
+    doneNo: { key: "autoobserveLive.suggestions.dismissed" },
+    copy: {
+      label: kindOf(t, gaps[0]),
+      headline: insight.headline,
+      why: insight.why ?? raw(""),
+      tags: [],
+      look: SUGGESTION_KIND.coverage_gap?.look ?? "watching",
+    },
+  };
+};
+
+/** The rail's context: coverage rows, and every proposed gap with the server's count of them. */
+export type RailContext = CtaContext & {
+  allGaps?: Pick<AutoObserveSuggestionList, "suggestions" | "total">;
+};
 
 // The server ranks with sort=priority; the rail keeps that order so it matches the drawer row for row.
 export const toRequests = (
@@ -711,27 +805,22 @@ export const toRequests = (
   zone: Zone,
   suggestions: AutoObserveSuggestion[],
   nowMs = Date.now(),
-): LiveRequest[] =>
-  firstOfEachId(suggestions).map((s) => {
-    const parts = partsFor(t, zone, s, nowMs);
-    return {
-      insight: insightCopy(t, zone, s, todayOf(t, s, parts), nowMs),
-      id: s.id,
-      kind: "fromNowOn",
-      body: parts.body,
-      yes: "autoobserveLive.suggestions.accept",
-      no: "autoobserveLive.suggestions.dismiss",
-      doneYes: { key: "autoobserveLive.suggestions.accepted" },
-      doneNo: { key: "autoobserveLive.suggestions.dismissed" },
-      copy: {
-        label: kindOf(t, s),
-        headline: parts.headline,
-        why: whyAndNext(t, parts),
-        tags: tagsFor(t, s),
-        look: SUGGESTION_KIND[s.kind]?.look ?? "watching",
-      },
-    };
+  ctx: RailContext = {},
+): LiveRequest[] => {
+  const items = firstOfEachId(suggestions);
+  const paged = items.filter((s) => s.kind === "coverage_gap");
+  const listed = (ctx.allGaps?.suggestions ?? []).filter(
+    (s) => s.kind === "coverage_gap" && s.status === "proposed",
+  );
+  const gaps = firstOfEachId([...paged, ...listed]);
+  const total = Math.max(ctx.allGaps?.total ?? 0, gaps.length);
+  if (total < GAP_GROUP_AT) return items.map((s) => requestOf(t, zone, s, nowMs, ctx));
+  // The group card takes the first gap's place in the server's priority order.
+  return items.flatMap((s) => {
+    if (s.kind !== "coverage_gap") return [requestOf(t, zone, s, nowMs, ctx)];
+    return s === paged[0] ? [gapGroupRequest(t, zone, gaps, ctx, total)] : [];
   });
+};
 
 const whereOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText =>
   whereText(t, s.subject.key_dims.k8s_cluster_name, s.subject.key_dims.k8s_namespace_name) ??
@@ -742,18 +831,19 @@ export const toSuggestionRows = (
   zone: Zone,
   suggestions: AutoObserveSuggestion[],
   nowMs = Date.now(),
+  ctx: CtaContext = {},
 ): SuggestionRow[] =>
   firstOfEachId(suggestions).map((s) => {
     const parts = partsFor(t, zone, s);
-    const insight = insightCopy(t, zone, s, todayOf(t, s, parts), nowMs);
+    const insight = insightCopy(t, zone, s, todayOf(t, s, parts), nowMs, ctx);
     return {
       id: s.id,
       insight,
-      headline: parts.headline,
+      headline: insight.headline,
       where: whereOf(t, s),
       kind: insight.chip.label,
       kindVariant: insight.chip.variant,
-      note: parts.next ? whyAndNext(t, parts) : null,
+      note: nextLine(t, insight, parts),
       severity: s.kind === "alert_not_working" ? null : severityTag(t, s),
       detail: parts.body,
     };

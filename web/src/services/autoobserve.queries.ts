@@ -53,6 +53,30 @@ export const autoobserveSuggestionsPageQuery = (org: string, limit: number, offs
     staleTime: LIVE_STALE_TIME,
   });
 
+// Every proposed coverage gap, page by page, so the group's count and its review list hold the same gaps.
+export const autoobserveGapSuggestionsQuery = (org: string, pageSize: number) =>
+  queryOptions({
+    queryKey: autoobserveKeys.gapSuggestions(org, pageSize),
+    queryFn: async (): Promise<AutoObserveSuggestionList> => {
+      const all: AutoObserveSuggestionList["suggestions"] = [];
+      for (;;) {
+        const page = (
+          await autoobserve.suggestions(org, {
+            status: "proposed",
+            kind: "coverage_gap",
+            sort: "priority",
+            limit: pageSize,
+            offset: all.length,
+          })
+        ).data;
+        all.push(...page.suggestions);
+        if (page.suggestions.length < pageSize || all.length >= page.total) break;
+      }
+      return { suggestions: all, total: all.length, limit: pageSize, offset: 0 };
+    },
+    staleTime: LIVE_STALE_TIME,
+  });
+
 // Polls only while a listed analysis is live, as the incident list does; otherwise the stale time decides.
 export const autoobserveIncidentsPageQuery = (org: string, limit: number, offset: number) =>
   queryOptions({

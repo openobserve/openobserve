@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { RouteLocationRaw } from "vue-router";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type {
   AutoObserveFindingKind,
@@ -27,6 +28,8 @@ import {
   isStoredNotRunReason,
   type RcaCellTone,
 } from "@/utils/incidents/rcaCell";
+import type { AiFinding } from "../insight/insightCta";
+import { logsForFinding, PAGED_LEAD_US } from "../insight/targets/logsTargets";
 import type { IssuesRange } from "../v2/fixtures";
 import { agoText, dayKey, formatWhen } from "./liveCopy";
 
@@ -68,6 +71,12 @@ const FINDING_KEY: Record<AutoObserveFindingKind, I18nKey> = {
   stream_silence: "autoobserveLive.incidents.finding.stream_silence",
   stream_drop: "autoobserveLive.incidents.finding.stream_drop",
   stream_rise: "autoobserveLive.incidents.finding.stream_rise",
+};
+
+const FINDING_AI_KEY: Record<AutoObserveFindingKind, I18nKey> = {
+  stream_silence: "insight.ai.paged.stream_silence",
+  stream_drop: "insight.ai.paged.stream_drop",
+  stream_rise: "insight.ai.paged.stream_rise",
 };
 
 const STATUS_KEY: Record<Incident["status"], I18nKey> = {
@@ -115,6 +124,46 @@ export const findingSentence = (t: TranslateFn, item: AutoObserveIncidentItem): 
   const { kind, stream_name, stream_type } = item.finding;
   if (!isFindingKind(kind) || !stream_name || !stream_type) return raw(item.incident.title);
   return t(FINDING_KEY[kind], { stream: raw(stream_name), type: raw(stream_type) });
+};
+
+/** What Ask AI hands the chat for a paged finding; null when the finding is unreadable. */
+export const findingAi = (
+  t: TranslateFn,
+  item: AutoObserveIncidentItem,
+  zone: { locale: string; timeZone: string },
+  now: number,
+): AiFinding | null => {
+  const { kind, stream_name, stream_type, first_seen_at } = item.finding;
+  if (!isFindingKind(kind) || !stream_name || !stream_type) return null;
+  const time = formatWhen(first_seen_at / 1000, zone.locale, zone.timeZone, now);
+  return {
+    kind,
+    subject: `${stream_name} (${stream_type})`,
+    request: t(FINDING_AI_KEY[kind], {
+      stream: raw(stream_name),
+      type: raw(stream_type),
+      time,
+    }),
+    facts: [
+      ["Stream", stream_name],
+      ["Stream type", stream_type],
+      ["Started", String(time)],
+      ["Incident", item.incident.title],
+    ],
+  };
+};
+
+/** The paged stream in Logs; null for metrics, an unreadable finding or a build without AutoObserve. */
+export const findingLogs = (
+  item: AutoObserveIncidentItem,
+  now: number,
+): RouteLocationRaw | null => {
+  const { stream_name, stream_type, first_seen_at } = item.finding;
+  if (!stream_name || !stream_type) return null;
+  return logsForFinding(
+    { stream_type, stream_name, signal_at: first_seen_at, lead_us: PAGED_LEAD_US },
+    now * 1000,
+  );
 };
 
 const notRunLine = (

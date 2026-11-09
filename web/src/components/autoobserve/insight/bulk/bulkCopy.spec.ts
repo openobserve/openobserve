@@ -55,13 +55,12 @@ describe("bulkCopy — header and footer", () => {
   it("titles one and many alerts", () => {
     expect(titleOf(t, "no_data", 12)).toBe("Add 12 no-data alerts");
     expect(titleOf(t, "no_data", 1)).toBe("Add 1 no-data alert");
-    expect(t("insight.bulk.create", { count: 1 }, 1)).toBe("Create 1 alert");
-    expect(t("insight.bulk.create", { count: 8 }, 8)).toBe("Create 8 alerts");
+    expect(t("insight.bulk.create")).toBe("Add alerts");
   });
 
   it("states the rule and that nothing is saved before Create", () => {
     expect(ruleOf(t, "no_data", rowsOf())).toBe(
-      "Each fires when its service sends no rows for 15 min. Untick any you don't want. Nothing is saved until you click Create.",
+      "Each fires when its service sends no rows for 15 min. Untick any you don't want. Nothing is saved until you click Add alerts.",
     );
   });
 
@@ -102,6 +101,26 @@ describe("bulkCopy — rows and groups", () => {
     expect(label("a-none")).toBe("svc-a · no namespace");
     expect(label("a-b")).toBe("svc-a · ns-b");
     expect(label("e-b")).toBe("svc-e · cluster-k / ns-b");
+  });
+
+  it("names a service plainly when its rows are only its own drafts of different kinds", () => {
+    const scope = {
+      service: "svc-x",
+      cluster: null,
+      namespace: null,
+      stream: { type: "logs", name: "x" },
+    };
+    const rows = reviewRowsOf(
+      {
+        kind: "errors",
+        rows: [
+          { key: "x:errors", kind: "errors", scope, usually: 10 },
+          { key: "x:no_data", kind: "no_data", scope, usually: null },
+        ],
+      },
+      { folders: [], overrides: {}, rights: null },
+    );
+    expect(rows.map((r) => serviceLabel(t, r, rows))).toEqual(["svc-x", "svc-x"]);
   });
 
   it("says rows for logs and spans for traces, and the usual rate", () => {
@@ -158,7 +177,7 @@ describe("bulkCopy — results", () => {
     expect(partialBanner(t, 1, 8)).toBe("1 of 8 alerts wasn't created.");
     expect(partialBanner(t, 2, 8)).toBe("2 of 8 alerts weren't created.");
     expect(failureLine(t, "svc-j", { code: "forbidden", folder: "payments" })).toBe(
-      "svc-j: you can't write to folder payments.",
+      "svc-j: You can't create alerts. Your role is missing the Create permission on Alerts. The alert was going to folder payments.",
     );
     expect(
       failureLine(t, "svc-a · ns-j", {
@@ -178,6 +197,16 @@ describe("bulkCopy — results", () => {
     );
     expect(toastOf(t, "en-US", [ingest], 1)).toBe(
       "1 alert created in folder ingest. Undo works until you leave this page.",
+    );
+  });
+
+  it("states no one rule for a list that mixes kinds, since each row says when it fires", () => {
+    const rows = rowsOf();
+    const mixed = rows.map((r, i) =>
+      i === 0 ? { ...r, row: { ...r.row, kind: "errors" as const } } : r,
+    );
+    expect(ruleOf(t, "no_data", mixed)).toBe(
+      "Untick any you don't want. Nothing is saved until you click Add alerts.",
     );
   });
 

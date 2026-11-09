@@ -64,14 +64,14 @@ const headline = (s: AutoObserveSuggestion, zone = EAST) =>
 describe("coverage_lost headline (OSS-7)", () => {
   it("dates the loss from lost_at in the viewer's timezone", () => {
     const s = lost({ lost_at: LOST_AT_US, since_day: SINCE_DAY_US });
-    expect(headline(s, EAST)).toBe("payments lost errors coverage on Oct 30, 2026");
-    expect(headline(s, WEST)).toBe("payments lost errors coverage on Oct 29, 2026");
+    expect(headline(s, EAST)).toBe("payments lost its errors alert on Oct 30, 2026");
+    expect(headline(s, WEST)).toBe("payments lost its errors alert on Oct 29, 2026");
   });
 
   it("falls back to since_day, a UTC day start, only when lost_at is absent", () => {
     const s = lost({ since_day: SINCE_DAY_US });
-    expect(headline(s, WEST)).toBe("payments lost errors coverage on Oct 30, 2026");
-    expect(headline(s, EAST)).toBe("payments lost errors coverage on Oct 30, 2026");
+    expect(headline(s, WEST)).toBe("payments lost its errors alert on Oct 30, 2026");
+    expect(headline(s, EAST)).toBe("payments lost its errors alert on Oct 30, 2026");
   });
 
   it("never ends the sentence on a bare 'on'", () => {
@@ -109,9 +109,8 @@ describe("toSuggestionRows (the all-suggestions drawer)", () => {
     expect(rows.map((r) => r.id)).toEqual(["a", "b"]);
     expect(rows[0]).toMatchObject({
       where: "prod-eu / billing",
-      kind: "Coverage gap",
+      kind: "Not watched",
       kindVariant: "warning-soft",
-      note: null,
       severity: { label: "High", variant: "warning-soft" },
     });
     expect(rows[1]).toMatchObject({
@@ -129,7 +128,7 @@ describe("a service's location on cards and in tables", () => {
       subject: { kind: "service", key_dims: { service_name: "checkout" } },
       evidence: { service_name: "checkout", severity: "high", cells: {}, ...evidence },
     });
-  const why = (s: AutoObserveSuggestion) => toRequests(gt, EAST, [s])[0].copy?.why;
+  const why = (s: AutoObserveSuggestion) => toRequests(gt, EAST, [s])[0].insight.meta;
 
   it("a card outside Kubernetes never prints dashes", () => {
     expect(why(outside({ traffic_per_hour: 4 }))).toBe("About 4 events an hour");
