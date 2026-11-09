@@ -11,6 +11,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
+import { openCasesQuery, promoteEventMutation } from "@/services/securityCases.queries";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -20,7 +24,7 @@ import SecurityRecordDrawer, {
 } from "@/components/security/SecurityRecordDrawer.vue";
 import SecurityKeyValues, { type KeyValueRow } from "@/components/security/SecurityKeyValues.vue";
 import { buildRuleCountSql, type RuleHit } from "@/composables/security/useSigmaRules";
-import type { Classification } from "@/utils/security/classify";
+import type { Classification } from "@/services/securitySources";
 import { ocsfCategoryOf, ocsfStatusName, type NormalizedEvent } from "@/utils/security/ocsf";
 import { sourceColumnFor } from "@/utils/security/normalize";
 import { normalizeTactic, techniqueUrl } from "@/utils/security/mitre";
@@ -53,6 +57,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const { canTriage } = useSecurityAccess();
 
 const tone = computed(() => toneOfSeverityId(props.normalized.severityId));
 const title = computed(
@@ -170,7 +175,7 @@ async function evaluateRules() {
   const ts = Number(props.event._timestamp);
   // Identity by content: several events can share one timestamp.
   const key = eventKey(props.event);
-  // Snapshot: `r<i>` in the response refers to the order the query was built in.
+  // Snapshot: the parent re-sorts as counts arrive, and `r<i>` follows the built order.
   const rules = [...runnable.value];
   if (!rules.length || !Number.isFinite(ts) || !props.stream) return;
   matching.value = true;
@@ -253,6 +258,47 @@ const facts = computed<RecordFact[]>(() => [
 ]);
 
 const json = computed(() => JSON.stringify(props.event, null, 2));
+
+const openCases = useQuery(() =>
+  Object.assign(openCasesQuery(props.orgId), {
+    enabled: props.open && !!props.orgId && canTriage.value,
+  }),
+);
+const caseOptions = computed(() =>
+  (openCases.data.value ?? []).map((c) => ({
+    label: raw(c.title || c.id),
+    value: c.id,
+  })),
+);
+const targetCase = ref("");
+watch(
+  () => eventKey(props.event),
+  () => (targetCase.value = ""),
+);
+const promote = useMutation(computed(() => promoteEventMutation(props.orgId)));
+const eventAt = computed(() => Number(props.event._timestamp) || 0);
+
+async function caseFromEvent(caseId?: string) {
+  try {
+    const opened = await promote.mutateAsync({
+      event: { stream: props.stream, timestamp: eventAt.value, fields: props.event },
+      caseId,
+    });
+    const title = raw(opened.title || opened.id);
+    toast({
+      variant: "success",
+      message: caseId
+        ? t("siem.drawer.caseUpdated", { title })
+        : t("siem.drawer.caseOpened", { title }),
+    });
+    targetCase.value = "";
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: raw(e?.response?.data?.message) || t("siem.drawer.caseError"),
+    });
+  }
+}
 
 function copy(text: string) {
   const fail = () => toast({ variant: "error", message: t("siem.record.copyFailed") });
@@ -422,7 +468,7 @@ function copy(text: string) {
       <template v-else>
         <div
           v-for="hit in matched"
-          :key="hit.rule.id ?? hit.rule.title"
+          :key="hit.rule.key"
           class="border-border-default rounded-surface flex flex-col gap-2 border p-3"
           :data-test="`security-event-drawer-match-${hit.rule.id}`"
         >
@@ -490,6 +536,42 @@ function copy(text: string) {
 
     <template #tab-json>
       <OCodeBlock :code="json" lang="json" data-test="security-event-drawer-json" />
+    </template>
+
+    <template v-if="canTriage && eventAt && stream" #footer>
+      <div class="w-64 max-md:min-w-0 max-md:flex-1">
+        <OSelect
+          v-model="targetCase"
+          :options="caseOptions"
+          :placeholder="t('siem.drawer.pickCase')"
+          :loading="openCases.isFetching.value"
+          searchable
+          size="sm"
+          data-test="security-event-drawer-case-pick"
+        />
+      </div>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        :disabled="!targetCase"
+        :loading="promote.isPending.value && !!targetCase"
+        data-test="security-event-drawer-add-to-case"
+        @click="caseFromEvent(targetCase)"
+      >
+        {{ t("siem.drawer.addToCase") }}
+      </OButton>
+      <div class="flex-1" />
+      <OButton
+        variant="primary"
+        size="sm-action"
+        icon-left="assignment"
+        :loading="promote.isPending.value && !targetCase"
+        data-test="security-event-drawer-open-case"
+        @click="caseFromEvent()"
+      >
+        {{ t("siem.drawer.openCase") }}
+        <OTooltip :content="t('siem.drawer.openCaseHint')" />
+      </OButton>
     </template>
   </SecurityRecordDrawer>
 </template>

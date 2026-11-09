@@ -628,9 +628,10 @@ fn to_response(e: anyhow::Error) -> Response {
         // Not 404: the record exists, and the honest answer is that working it is not theirs.
         Some(OncallError::NotOnThisTeam { .. }) => StatusCode::FORBIDDEN,
         // A conflict, not a 400: the caller fixes it by changing the org's state, not the request.
-        Some(OncallError::NameTaken(_)) | Some(OncallError::IsDefaultTeam(_)) => {
-            StatusCode::CONFLICT
-        }
+        Some(OncallError::NameTaken(_))
+        | Some(OncallError::IsDefaultTeam(_))
+        | Some(OncallError::TeamNamedByAlerts { .. })
+        | Some(OncallError::PathTaken(_)) => StatusCode::CONFLICT,
         Some(OncallError::Invalid(_)) => StatusCode::BAD_REQUEST,
         Some(OncallError::Verification(refusal)) => return refusal_response(refusal),
         Some(OncallError::Telephony(refusal)) => {
@@ -645,6 +646,23 @@ fn to_response(e: anyhow::Error) -> Response {
     }
     // Every remaining status is an `OncallError` whose message is written for the caller.
     MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
+}
+
+/// A rule write's refusal; only an untyped error can be the unique index on (org_id, path).
+#[cfg(feature = "enterprise")]
+fn rule_write_response(e: anyhow::Error) -> Response {
+    if e.is::<o2_enterprise::enterprise::oncall::service::OncallError>() {
+        return to_response(e);
+    }
+    let text = e.to_string().to_lowercase();
+    if text.contains("unique") || text.contains("duplicate") {
+        return MetaHttpResponse::error(
+            StatusCode::CONFLICT.as_u16(),
+            "a rule already claims this path",
+        )
+        .into_response();
+    }
+    to_response(e)
 }
 
 /// The reason travels as a code so a client can word it, and the numbers so it need not parse.
@@ -1014,7 +1032,11 @@ pub async fn update_team(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse)),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict: the org's default team, or named by alerts", content_type = "application/json", body = Object),
+    ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -3840,27 +3862,18 @@ pub async fn create_ownership_rule(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        // The firing path's own source, so a rule can name only what extraction produces.
+        let semantic_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
         match o2_enterprise::enterprise::oncall::routing::create_rule(
             &org_id,
             &body.team_id,
             body.dimensions,
+            &semantic_groups,
         )
         .await
         {
             Ok(rule) => MetaHttpResponse::json(rule),
-            Err(e) => {
-                // The unique index on (org_id, path) refuses it, so it is a conflict, not a fault.
-                if e.to_string().to_lowercase().contains("unique")
-                    || e.to_string().to_lowercase().contains("duplicate")
-                {
-                    return MetaHttpResponse::error(
-                        StatusCode::CONFLICT.as_u16(),
-                        "another team already owns this path",
-                    )
-                    .into_response();
-                }
-                to_response(e)
-            }
+            Err(e) => rule_write_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -3904,30 +3917,20 @@ pub async fn update_ownership_rule(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let semantic_groups = db::system_settings::get_semantic_field_groups(&org_id).await;
         match o2_enterprise::enterprise::oncall::routing::update_rule(
             &org_id,
             &rule_id,
             &body.team_id,
             body.dimensions,
+            &semantic_groups,
         )
         .await
         {
             Ok(Some(rule)) => MetaHttpResponse::json(rule),
             Ok(None) => MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Rule not found")
                 .into_response(),
-            Err(e) => {
-                // Same unique-index shape as create: a claimed path is a conflict, not a fault.
-                if e.to_string().to_lowercase().contains("unique")
-                    || e.to_string().to_lowercase().contains("duplicate")
-                {
-                    return MetaHttpResponse::error(
-                        StatusCode::CONFLICT.as_u16(),
-                        "another team already owns this path",
-                    )
-                    .into_response();
-                }
-                to_response(e)
-            }
+            Err(e) => rule_write_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -6145,6 +6148,28 @@ pub async fn delete_telephony(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A typed refusal keeps its own status even when its text says "unique".
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_rule_refusal_is_read_by_type_before_text() {
+        use o2_enterprise::enterprise::oncall::service::OncallError;
+        let invalid = OncallError::Invalid(
+            "`unique_id` is not a correlation field group in this org (field groups are ids \
+             like `service`, `k8s-cluster`)"
+                .into(),
+        );
+        let cases = [
+            (anyhow::Error::from(invalid), StatusCode::BAD_REQUEST),
+            (
+                anyhow::anyhow!("UNIQUE constraint failed: oncall_ownership_rules.path"),
+                StatusCode::CONFLICT,
+            ),
+        ];
+        for (e, want) in cases {
+            assert_eq!(rule_write_response(e).status(), want);
+        }
+    }
 
     async fn ack_replies(org: &str) -> Vec<(axum::http::StatusCode, Vec<u8>)> {
         let token = || AckQuery {

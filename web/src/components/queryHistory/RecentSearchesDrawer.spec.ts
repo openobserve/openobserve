@@ -33,6 +33,9 @@ vi.mock("@/services/query_history", () => ({ default: api }));
 const clipboard = vi.hoisted(() => ({ copyToClipboard: vi.fn() }));
 vi.mock("@/utils/clipboard", () => clipboard);
 
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: analytics }));
+
 const push = vi.hoisted(() => vi.fn());
 vi.mock("vue-router", () => ({
   useRouter: () => ({
@@ -266,6 +269,11 @@ describe("RecentSearchesDrawer", () => {
     await wrapper.setProps({ open: true });
     await wrapper.find('[data-test="recent-searches-load-old"]').trigger("click");
     expect(wrapper.emitted("restore")?.[2]?.slice(1)).toEqual(["original", false]);
+    expect(analytics.track).toHaveBeenLastCalledWith("search_history_entry_restored", {
+      source: "logs",
+      run: false,
+      surface: "drawer",
+    });
   });
 
   it("stars, deletes and copies without restoring", async () => {

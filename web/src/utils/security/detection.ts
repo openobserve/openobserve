@@ -2,12 +2,20 @@
 
 // A detection IS an alert, tagged via `context_attributes`, so the SIEM needs no migration or second scheduler.
 
-import type { SigmaLevel, SigmaRule } from "./sigma";
-import { parseSigmaRule, sigmaLevelToSeverity } from "./sigma";
+import yaml from "js-yaml";
+
+import type { CatalogRule, CompiledCorrelation, SigmaLevel } from "@/services/securitySigma";
+
 import { quoteIdent } from "./sql";
 
 /** The key that marks an alert as belonging to the SIEM. */
 export const SIEM_MARKER = "siem";
+/** Comma-separated group columns; its presence makes the scheduler evaluate window by window. */
+export const GROUP_BY_ATTRIBUTE = "siem_group_by";
+/** A correlation's timespan; the scheduler slides windows exactly this wide over each run. */
+export const TIMESPAN_ATTRIBUTE = "siem_timespan_minutes";
+/** History the first run evaluates; absent means a new detection sees only its own look-back. */
+export const BACKFILL_ATTRIBUTE = "siem_backfill_minutes";
 
 export interface DetectionMeta {
   isSiem: boolean;
@@ -27,6 +35,11 @@ export interface DetectionMeta {
 
 const LEVELS: SigmaLevel[] = ["informational", "low", "medium", "high", "critical"];
 
+/** Sigma level onto the OCSF severity scale; an unlevelled rule is medium. */
+export function sigmaLevelToSeverity(level: SigmaLevel | undefined): number {
+  return level ? LEVELS.indexOf(level) + 1 : 3;
+}
+
 const splitList = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
   if (typeof value !== "string" || !value.trim()) return [];
@@ -36,21 +49,39 @@ const splitList = (value: unknown): string[] => {
     .filter(Boolean);
 };
 
-const titleCache = new Map<string, string>();
-function sigmaTitle(yaml: string): string {
-  if (!yaml) return "";
-  let title = titleCache.get(yaml);
-  if (title === undefined) {
-    const parsed = parseSigmaRule(yaml);
-    title = parsed.ok ? parsed.rule.title : "";
-    titleCache.set(yaml, title);
+export interface SigmaMetadata {
+  title: string;
+  description: string;
+  falsepositives: string[];
+}
+
+const metadataCache = new Map<string, SigmaMetadata>();
+/** The display metadata of a stored rule's first YAML document; detection logic stays server-side. */
+export function sigmaMetadata(text: string): SigmaMetadata {
+  const empty: SigmaMetadata = { title: "", description: "", falsepositives: [] };
+  if (!text) return empty;
+  let meta = metadataCache.get(text);
+  if (!meta) {
+    try {
+      const doc = yaml.loadAll(text).find((d) => d && typeof d === "object") as
+        Record<string, unknown> | undefined;
+      const fp = doc?.falsepositives;
+      meta = {
+        title: typeof doc?.title === "string" ? doc.title.trim() : "",
+        description: typeof doc?.description === "string" ? doc.description : "",
+        falsepositives: Array.isArray(fp) ? fp.map(String) : fp == null ? [] : [String(fp)],
+      };
+    } catch {
+      meta = empty;
+    }
+    metadataCache.set(text, meta);
   }
-  return title;
+  return meta;
 }
 
 /** Best readable name for an alert: its Sigma title, else the name with underscores as spaces. */
 export function readableAlertName(name: string, sigmaYaml = ""): string {
-  return sigmaTitle(sigmaYaml) || name.replace(/_+/g, " ").trim();
+  return sigmaMetadata(sigmaYaml).title || name.replace(/_+/g, " ").trim();
 }
 
 /** Tolerant on purpose: these attributes can be hand-edited through the alerts UI or the API. */
@@ -97,7 +128,7 @@ export function detectionAlertName(title: string, stream: string): string {
 }
 
 export interface BuildDetectionInput {
-  rule: SigmaRule;
+  rule: CatalogRule;
   /** The compiled predicate. Must be runnable; this does not compile. */
   where: string;
   /** Columns the predicate touches, projected so a firing carries its evidence. */
@@ -108,7 +139,7 @@ export interface BuildDetectionInput {
   destinations: string[];
   /** The classifier's source id, recorded so the rule can be recompiled later. */
   sourceType?: string;
-  /** Minutes of data each evaluation looks at. */
+  /** Minutes of data each evaluation looks at; a correlation's is at least its timespan. */
   period?: number;
   /** Minutes between evaluations. */
   frequency?: number;
@@ -117,6 +148,12 @@ export interface BuildDetectionInput {
   enabled?: boolean;
   /** Overrides the name derived from the rule title. */
   name?: string;
+  /** A compiled correlation: the detection runs its grouped SQL over windows of its timespan. */
+  correlation?: CompiledCorrelation;
+  /** The server-built detection SQL; preferred over the projection built here. */
+  sql?: string;
+  /** Minutes of history the first run evaluates, opted into by the author; 0 or absent for none. */
+  backfillMinutes?: number;
 }
 
 /** Fires on any matching row; a count on top would be a threshold the Sigma rule's author never wrote. */
@@ -133,7 +170,12 @@ export function buildDetectionAlert(input: BuildDetectionInput): Record<string, 
     frequency = 15,
     silence = 30,
     enabled = true,
+    correlation,
+    backfillMinutes = 0,
   } = input;
+  // The scheduler counts a correlation per timespan-wide window, so a run must cover at least one.
+  const lookBack = correlation ? Math.max(period, correlation.timespanMinutes) : period;
+  const runEvery = correlation ? Math.min(frequency, lookBack) : frequency;
 
   const logsource = [
     rule.logsource.category && `category=${rule.logsource.category}`,
@@ -151,21 +193,21 @@ export function buildDetectionAlert(input: BuildDetectionInput): Record<string, 
     is_real_time: false,
     enabled,
     destinations,
-    // Incident correlation is enterprise-only; without it the flag is inert and firings notify directly.
+    // Firings correlate into incidents, read as cases; inert on builds without correlation.
     creates_incident: true,
     query_condition: {
       type: "sql",
-      sql: detectionSql(stream, where, fields),
+      sql: correlation ? correlation.sql : preferServerSql(input.sql, stream, where, fields),
       conditions: [],
       aggregation: null,
       promql_condition: null,
       vrl_function: null,
     },
     trigger_condition: {
-      period,
+      period: lookBack,
       operator: ">=",
       threshold: 1,
-      frequency,
+      frequency: runEvery,
       frequency_type: "minutes",
       silence,
     },
@@ -179,6 +221,13 @@ export function buildDetectionAlert(input: BuildDetectionInput): Record<string, 
       mitre_techniques: rule.techniques.join(","),
       mitre_tactics: rule.tactics.join(","),
       source_type: sourceType,
+      ...(correlation
+        ? {
+            [GROUP_BY_ATTRIBUTE]: correlation.groupColumns.join(","),
+            [TIMESPAN_ATTRIBUTE]: String(correlation.timespanMinutes),
+          }
+        : {}),
+      ...(backfillMinutes > 0 ? { [BACKFILL_ATTRIBUTE]: String(Math.round(backfillMinutes)) } : {}),
     },
   };
 }
@@ -188,6 +237,16 @@ export function detectionSql(stream: string, where: string, fields: string[] = [
   const columns = ["_timestamp", ...fields.filter((field) => field !== "_timestamp")];
   const projection = [...new Set(columns)].map(quoteIdent).join(", ");
   return `SELECT ${projection} FROM ${quoteIdent(stream)} WHERE ${where}`;
+}
+
+/** The server's detection SQL when it sent one, else the projection built here. */
+export function preferServerSql(
+  serverSql: string | null | undefined,
+  stream: string,
+  where: string,
+  fields: string[] = [],
+): string {
+  return serverSql?.trim() ? serverSql : detectionSql(stream, where, fields);
 }
 
 /** Lets the Events page re-run a stored detection over an arbitrary window. */
@@ -209,5 +268,9 @@ export function whereOfDetectionSql(sql: string | null | undefined): string {
     }
   }
   const match = /\swhere\s/i.exec(masked);
-  return match ? sql.slice(match.index + match[0].length).trim() : "";
+  if (!match) return "";
+  const from = match.index + match[0].length;
+  // A correlation's aggregation follows its predicate and is no part of it.
+  const tail = /\s(group\s+by|having)\s/i.exec(masked.slice(from));
+  return sql.slice(from, tail ? from + tail.index : undefined).trim();
 }

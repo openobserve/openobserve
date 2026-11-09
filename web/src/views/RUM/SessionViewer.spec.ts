@@ -815,6 +815,7 @@ describe("SessionViewer.vue", () => {
 
       expect((wrapper.vm as any).showEventDetailDrawer).toBe(true);
       expect((wrapper.vm as any).selectedEvent).toEqual(payload);
+      expect(analytics.track).toHaveBeenCalledWith("rum_session_event_opened", { type: "error" });
     });
 
     // Seeks now go to the player in session ms through the coverage check, so they need a loaded replay.

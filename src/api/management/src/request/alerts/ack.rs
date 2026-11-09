@@ -32,7 +32,7 @@ use openobserve_core::{
     auth::UserEmail,
 };
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, request::security};
 
 /// AckAlert
 #[utoipa::path(
@@ -70,6 +70,11 @@ pub async fn ack_alert(
     headers: HeaderMap,
     Json(req): Json<AckRequest>,
 ) -> Response {
+    if let Err(resp) =
+        security::guard_siem_ids(&org_id, &user_email.user_id, "PUT", [alert_id.as_str()]).await
+    {
+        return resp;
+    }
     let source = ack_source(delegated.as_deref(), &headers);
     let groups = if req.all_groups {
         Groups::All
@@ -126,6 +131,11 @@ pub async fn unack_alert(
     headers: HeaderMap,
     Json(req): Json<UnackRequest>,
 ) -> Response {
+    if let Err(resp) =
+        security::guard_siem_ids(&org_id, &user_email.user_id, "PUT", [alert_id.as_str()]).await
+    {
+        return resp;
+    }
     let source = ack_source(delegated.as_deref(), &headers);
     let groups = Groups::One {
         group_key: req.group_key,
@@ -172,6 +182,11 @@ pub async fn ack_incident(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "PUT", &incident_id).await
+    {
+        return resp;
+    }
     let verb = match take_over_of(&body) {
         Ok(true) => Verb::TakeOver,
         Ok(false) => Verb::Acknowledge,
@@ -213,6 +228,11 @@ pub async fn unack_incident(
     delegated: Option<Extension<DelegatedCaller>>,
     headers: HeaderMap,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "PUT", &incident_id).await
+    {
+        return resp;
+    }
     let source = ack_source(delegated.as_deref(), &headers);
     incident_verb(
         org_id,
@@ -250,7 +270,16 @@ pub async fn unack_incident(
         ("x-o2-mcp" = json!({"description": "List an alert's acknowledgements in force", "category": "alerts"}))
     )
 )]
-pub async fn list_alert_acks(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn list_alert_acks(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) =
+        security::guard_siem_ids(&org_id, &user_email.user_id, "GET", [alert_id.as_str()]).await
+    {
+        return resp;
+    }
     let target = match ack::resolve_target(&org_id, &alert_id).await {
         Ok(t) => t,
         Err(e) => return error_response(e),
@@ -460,5 +489,32 @@ mod tests {
             error_response(AckError::NotFound).status(),
             StatusCode::NOT_FOUND
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_siem_detections_acks_need_the_security_grant() {
+        use config::meta::{alerts::alert::Alert, folder::Folder};
+        use svix_ksuid::{Ksuid, KsuidLike};
+
+        let org = format!("acks_{}", config::ider::uuid());
+        let id = Ksuid::new(None, None);
+        let mut alert = Alert::default();
+        alert.id = Some(id);
+        alert.org_id = org.clone();
+        alert.context_attributes = Some(
+            [(security::SIEM_ATTRIBUTE.to_string(), "true".to_string())]
+                .into_iter()
+                .collect(),
+        );
+        common::infra::config::ALERTS.write().await.insert(
+            db::alerts::alert::cache_alert_key(&org, &id.to_string()),
+            (Folder::default(), alert),
+        );
+        let stranger = Headers(UserEmail {
+            user_id: format!("{}@example.com", config::ider::uuid()),
+        });
+        let resp = list_alert_acks(Path((org, id.to_string())), stranger).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
 }

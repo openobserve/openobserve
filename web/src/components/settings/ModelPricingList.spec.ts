@@ -23,6 +23,7 @@ import ModelPricingList from "./ModelPricingList.vue";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/model_pricing", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -62,6 +63,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
 }));
 
 import modelPricingService from "@/services/model_pricing";
+import analytics from "@/services/product_analytics";
 
 // ── Stubs for child components ───────────────────────────────────────────────
 
@@ -636,6 +638,27 @@ describe("ModelPricingList.vue", () => {
       wrapper.vm.selectedIds = ["org-1", "meta-1"];
       wrapper.vm.onTabChange();
       expect(wrapper.vm.selectedIds).toEqual([]);
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "model_pricing_tab_switched",
+        expect.anything(),
+      );
+    });
+
+    it("tracks a tab switch only when the user selects a tab", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.selectedTab = "org";
+      wrapper.vm.clearFilters();
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "model_pricing_tab_switched",
+        expect.anything(),
+      );
+
+      vi.mocked(analytics.track).mockClear();
+      wrapper.vm.selectedTab = "org";
+      wrapper.vm.onTabSelect();
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("model_pricing_tab_switched", { tab: "org" });
     });
 
     it("should only return org-source models when selectedTab is 'org'", async () => {

@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-run-pending="runPending && !queryLoading ? 'true' : undefined"
           :data-test="queryLoading ? 'profiles-cancel-query' : 'profiles-run-query'"
           :class="isAutoRunAvailable ? 'border-y-0! border-s-0! border-e!' : 'border-0!'"
-          @click="queryLoading ? cancelQuery() : runQuery()"
+          @click="queryLoading ? cancelQuery() : runQuery(true)"
         >
           <span class="grid">
             <span
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
         data-test="profiles-search-cancelled"
       >
-        <OEmptyState preset="search-cancelled" size="block" @action="runQuery" />
+        <OEmptyState preset="search-cancelled" size="block" @action="runQuery(true)" />
       </div>
 
       <div
@@ -692,6 +692,7 @@ import { calleesOf, callersOf } from "./sandwich";
 import { formatPercent } from "./format";
 import { copyToClipboard } from "@/utils/clipboard";
 import streamService from "@/services/stream";
+import analytics from "@/services/product_analytics";
 import profilesService, {
   encodeProfileFilters,
   parseProfileFilters,
@@ -787,7 +788,9 @@ const searchQuery = ref("");
 const activeView = ref<ProfileView>("top");
 const setView = (value: unknown) => {
   const next = PROFILE_VIEWS.find((view) => view === value);
-  if (next) activeView.value = next;
+  if (!next || next === activeView.value) return;
+  activeView.value = next;
+  analytics.track("profiles_view_changed", { view: next });
 };
 const expandedStackIds = ref<string[]>([]);
 // On phones the page body is the one scroller and the Top Table virtualizes against it; from md up each table scrolls itself.
@@ -832,6 +835,7 @@ const showInFlameGraph = (name: string) => {
 };
 const showDetails = (name: string) => {
   detailsName.value = name;
+  analytics.track("profiles_function_details_opened");
 };
 const showSandwich = (name: string) => {
   sandwichFunction.value = name;
@@ -1737,6 +1741,7 @@ const setBreakdown = async (value: unknown) => {
     );
     if (requestSeq !== seriesRequestSeq) return;
     seriesResponse.value = response.data;
+    analytics.track("profiles_breakdown_changed", { has_breakdown: !!label });
   } catch (error) {
     if (requestSeq !== seriesRequestSeq || abort.signal.aborted) return;
     errorMessage.value = buildErrorMessage(error);
@@ -1745,7 +1750,7 @@ const setBreakdown = async (value: unknown) => {
   }
 };
 
-const runQuery = async () => {
+const runQuery = async (userRun = false) => {
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
   const range = resolveTimeRange();
@@ -1778,6 +1783,12 @@ const runQuery = async () => {
     lastRun.value = runState;
     resetStackExpansion(mergeResponseValue.data.root);
     syncUrl();
+    if (userRun) {
+      analytics.track("profiles_query_completed", {
+        filter_count: appliedFilters.value.length,
+        has_breakdown: !!breakdownLabel.value,
+      });
+    }
   } catch (error) {
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     errorMessage.value = buildErrorMessage(error);

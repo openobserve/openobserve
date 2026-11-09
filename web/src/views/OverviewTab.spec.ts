@@ -61,6 +61,7 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 vi.mock("@/services/overview", () => ({ default: { getOrgOverview: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/utils/sampleData/loader", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/sampleData/loader")>()),
   removeSampleData: vi.fn().mockResolvedValue([]),
@@ -129,6 +130,7 @@ import { buildHealthyOverview, buildOverview } from "./overview/overviewFixtures
 import streamService from "@/services/stream";
 import config from "@/aws-exports";
 import OverviewTab from "./OverviewTab.vue";
+import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
@@ -309,6 +311,49 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="overview-alerts-view-all"]').exists()).toBe(false);
       expect(push).not.toHaveBeenCalled();
       push.mockRestore();
+    });
+  });
+
+  describe("analytics", () => {
+    it("tracks a signal card drill-down, and none for a locked one", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, features: { traces: "locked" } });
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      await wrapper.get('[data-test="overview-signal-logs-view-all"]').trigger("click");
+      expect(analytics.track).toHaveBeenCalledWith("home_overview_drilldown_clicked", {
+        target: "signal",
+        signal: "logs",
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "home_overview_drilldown_clicked",
+        expect.objectContaining({ signal: "traces" }),
+      );
+      push.mockRestore();
+    });
+
+    it("tracks a time range the user picked, but not one the picker replayed", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const picker = wrapper.findComponent({ name: "DateTime" });
+      picker.vm.$emit("on:date-change", {
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "15m",
+        userChangedValue: false,
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "home_time_range_changed",
+        expect.anything(),
+      );
+      picker.vm.$emit("on:date-change", {
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "1h",
+        userChangedValue: true,
+      });
+      expect(analytics.track).toHaveBeenCalledWith("home_time_range_changed", { type: "relative" });
+      await flushPromises();
     });
   });
 

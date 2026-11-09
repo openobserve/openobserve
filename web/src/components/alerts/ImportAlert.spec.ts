@@ -326,6 +326,27 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
           expect(await destinationErrors(["no-such-destination"])).toHaveLength(1);
         });
 
+        it.each([
+          ["an unknown name", ["no-such-destination"], 1],
+          ["a known name", ["email-dest"], 0],
+        ])("checks a recovery destination with %s", async (_case, recovery, expected) => {
+          wrapper.vm.alertErrorsToDisplay = [];
+          await wrapper.vm.validateAlertInputs(
+            {
+              name: "a1",
+              stream_type: "invalid",
+              query_condition: { type: "custom" },
+              trigger_condition: {},
+              recovery_destinations: recovery,
+            },
+            1,
+          );
+          const errors = wrapper.vm.alertErrorsToDisplay
+            .flat()
+            .filter((error: any) => String(error).includes("destinationNotExist"));
+          expect(errors).toHaveLength(expected);
+        });
+
         // Leaving the fix-up picker as it is must import what it shows, so the
         // picker and the JSON have to hold the same value.
         it.each([
@@ -562,6 +583,54 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       const payload = await submitAnomaly(exportedAnomaly());
 
       expect(payload.destinations).toEqual([]);
+    });
+
+    it.each([
+      ["absent", undefined, true],
+      ["on", true, true],
+      ["off", false, false],
+    ])("imports a config whose enabled flag is %s", async (_c, enabled, expected) => {
+      const payload = await submitAnomaly(exportedAnomaly({ enabled }));
+
+      expect(payload.enabled).toBe(expected);
+    });
+
+    it("carries every user-set field the export writes", async () => {
+      const payload = await submitAnomaly(
+        exportedAnomaly({
+          description: "cpu spikes",
+          tags: ["prod"],
+          priority: 2,
+          template: "tpl",
+          threshold: 95,
+          alert_budget_per_day: null,
+          band_width: 4,
+          alert_direction: "above",
+          alert_window_buckets: 6,
+          alert_window_fire_pct: 50,
+          alert_window_recover_pct: 20,
+        }),
+      );
+
+      expect(payload).toMatchObject({ description: "cpu spikes", tags: ["prod"], priority: 2 });
+      expect(payload.anomaly_config).toMatchObject({
+        template: "tpl",
+        threshold: 95,
+        band_width: 4,
+        alert_direction: "above",
+        alert_window_buckets: 6,
+        alert_window_fire_pct: 50,
+        alert_window_recover_pct: 20,
+      });
+    });
+
+    it("keeps a budget-mode config in budget mode", async () => {
+      const payload = await submitAnomaly(
+        exportedAnomaly({ alert_budget_per_day: 3, threshold: 97, band_width: null }),
+      );
+
+      expect(payload.anomaly_config.alert_budget_per_day).toBe(3);
+      expect(payload.anomaly_config.threshold).toBeUndefined();
     });
 
     it("does not send seasonality, which create derives rather than accepts", async () => {

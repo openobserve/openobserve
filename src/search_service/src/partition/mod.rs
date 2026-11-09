@@ -43,8 +43,12 @@ pub fn generate_partitions(
     let min_step = partition_settings.min_step;
 
     if ctx.sql.histogram_interval.is_some() {
+        // Histograms with different offsets have no common bucket grid to split on.
+        let Some(offset) = ctx.sql.histogram_offset else {
+            return vec![[start_time, end_time]];
+        };
         generate_partitions_aligned_with_histogram_interval(
-            start_time, end_time, step, order_by, min_step,
+            start_time, end_time, step, order_by, min_step, offset,
         )
     } else if ctx.is_complex_query {
         vec![[start_time, end_time]]

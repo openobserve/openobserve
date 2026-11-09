@@ -284,6 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -649,11 +650,16 @@ function onScopeChange(value: unknown) {
   // Each scope shows different fields, so a term typed against the old columns
   // shouldn't silently hide rows in the new ones.
   search.value = "";
+  analytics.track("llm_discovery_filter_applied", { filter: "scope", value: scope.value });
   reload();
 }
 
 function onQueueStatusChange(value: unknown) {
   queueStatus.value = value as DiscoveryQueueStatus;
+  analytics.track("llm_discovery_filter_applied", {
+    filter: "queue_status",
+    value: queueStatus.value,
+  });
   reload();
 }
 
@@ -694,12 +700,14 @@ function openTarget(row: LlmDiscoveryItem) {
 
   if (row.scope === "session") {
     if (row.sessionId) {
+      analytics.track("llm_discovery_target_opened", { scope: row.scope });
       router.push({ name: "sessionDetails", query: { ...query, session_id: row.sessionId } });
     }
     return;
   }
   const traceId = row.scope === "trace" ? row.targetId : row.traceId;
   if (traceId) {
+    analytics.track("llm_discovery_target_opened", { scope: row.scope });
     router.push({
       name: "traceDetails",
       query: {

@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
         </OButton>
       </FeatureLockExempt>
-      <div class="min-w-0 flex-1">
+      <div class="min-w-0 flex-1" data-recent-searches-avoid>
         <!-- A slot-less OTooltip anchors to its previous sibling, so this must not sit between OSelect and it. -->
         <span
           aria-live="polite"

@@ -46,8 +46,8 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, sample_data, service_accounts, service_streams, short_url, slack,
-    slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    query_history, rum_analytics, sample_data, security, service_accounts, service_streams,
+    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -80,8 +80,7 @@ use {
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
         discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
-        playground, prompts, providers, quality, remote_tasks, score_configs, scorers, security,
-        workflows,
+        playground, prompts, providers, quality, remote_tasks, score_configs, scorers, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -788,7 +787,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         let request = axum::http::Request::from_parts(parts, Body::from(bytes));
 
         // Call next
-        let mut response = next.run(request).await;
+        let (mut response, touched_security) =
+            o2_enterprise::enterprise::security::audit::tracked(next.run(request)).await;
 
         let error_msg = response
             .headers()
@@ -833,7 +833,11 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 },
                 delegated,
                 fleet_id: named.as_ref().and_then(|n| n.fleet_id.clone()),
-                target: named.map(|n| n.target),
+                target: named.map(|n| n.target).or_else(|| {
+                    touched_security.then(|| {
+                        o2_enterprise::enterprise::security::audit::SECURITY_TARGET.to_string()
+                    })
+                }),
             })
             .await;
             if fleet_mutation(&http_method, &path) {
@@ -1351,6 +1355,8 @@ fn service_route_table() -> Router {
         .route("/{org_id}/announcements", get(announcements::get_announcements))
         .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
 
+        .route("/{org_id}/security/access", get(security::get_security_access))
+
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
         .route("/{org_id}/overview", get(organization::org::org_overview))
@@ -1590,6 +1596,40 @@ fn service_route_table() -> Router {
     #[cfg(feature = "enterprise")]
     {
         router = router
+            .route("/{org_id}/security/cases", post(security::cases::promote_to_case))
+            .route("/{org_id}/security/cases/by_alert", get(security::cases::lookup_cases))
+            .route("/{org_id}/security/cases/settings", get(security::cases::get_case_settings).put(security::cases::update_case_settings));
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        router = router
+            // Org-visible trail of Security config changes; Security is enterprise-only
+            .route("/{org_id}/security/audit", get(security::audit::list_security_audit))
+            // Threat-intel sweep, drawer timeline and list checks: reads, POST only for the body
+            .route("/{org_id}/security/intel/sweep", post(security::intel::sweep))
+            .route("/{org_id}/security/intel/sightings", post(security::intel::sightings))
+            .route("/{org_id}/security/intel/validate", post(security::intel::validate))
+            // Investigation reads (Security GET); every search runs with the caller's own permissions
+            .route("/{org_id}/security/entities", post(security::investigate::list_entities))
+            .route("/{org_id}/security/entities/graph", post(security::investigate::get_entity_graph))
+            .route("/{org_id}/security/entities/detail", post(security::investigate::get_entity_detail))
+            .route("/{org_id}/security/ueba", post(security::investigate::score_users))
+            .route("/{org_id}/security/events/search", post(security::investigate::search_events))
+            // Built-in OCSF packs: read-only, no org data
+            .route("/{org_id}/security/ocsf/packs", get(security::list_ocsf_packs))
+            // Security sources: the classifier, the source list and OCSF pack attach/detach
+            .route("/{org_id}/security/sources", get(security::sources::list_sources))
+            .route("/{org_id}/security/sources/types", get(security::sources::list_source_types))
+            .route("/{org_id}/security/sources/match", post(security::sources::match_source))
+            .route("/{org_id}/security/sources/classify", post(security::sources::classify_sources))
+            .route("/{org_id}/security/sources/{stream_name}/attach", post(security::sources::attach_pack))
+            .route("/{org_id}/security/sources/{stream_name}/detach", post(security::sources::detach_pack))
+            // Sigma catalog, compiler and ATT&CK coverage: reads, compile is POST only for the body
+            .route("/{org_id}/security/sigma/catalog", get(security::sigma::get_catalog))
+            .route("/{org_id}/security/sigma/compile", post(security::sigma::compile))
+            .route("/{org_id}/security/mitre/coverage", get(security::sigma::get_mitre_coverage))
+            .route("/{org_id}/security/detections/{alert_id}/evidence", get(security::sigma::get_detection_evidence))
             // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
             .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
             // Complexity requirements only: readable by any authenticated user, including one the
@@ -1603,8 +1643,6 @@ fn service_route_table() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
             .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
 
-            // Security (SIEM); the OCSF packs are built-in and hold no org data
-            .route("/{org_id}/security/ocsf/packs", get(security::list_ocsf_packs))
             .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary));
         router = alert_calibration_routes(router);
     }
@@ -4187,10 +4225,16 @@ mod tests {
             "bootstrap build_type must carry the real build kind"
         );
 
+        let fingerprint = config::build_fingerprint();
         assert_eq!(
             payload.get("commit_hash").and_then(Value::as_str),
-            Some(config::COMMIT_HASH),
-            "bootstrap commit_hash must carry the real commit for stale-build detection"
+            Some(fingerprint.as_str()),
+            "bootstrap commit_hash must carry a per-build value for stale-build detection"
+        );
+        assert_ne!(
+            fingerprint,
+            config::COMMIT_HASH,
+            "the unauthenticated bootstrap must not disclose the commit"
         );
     }
 

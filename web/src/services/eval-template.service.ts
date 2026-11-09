@@ -4,6 +4,7 @@
  */
 
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
 
 export interface CreateTemplateRequest {
   /** Optional: org is carried in the URL path; callers don't include it in the body */
@@ -80,6 +81,7 @@ class EvalTemplateService {
     try {
       const url = this.getBaseURL(orgId);
       const response = await http().post(url, request);
+      analytics.track("llm_eval_template_created", { response_type: request.response_type });
       return response.data;
     } catch (error) {
       console.error("Failed to create template:", error);
@@ -98,6 +100,7 @@ class EvalTemplateService {
     try {
       const url = `${this.getBaseURL(orgId)}/${templateId}`;
       const response = await http().put(url, request);
+      analytics.track("llm_eval_template_updated", { response_type: request.response_type });
       return response.data;
     } catch (error) {
       console.error("Failed to update template:", error);
@@ -112,6 +115,7 @@ class EvalTemplateService {
     try {
       const url = `${this.getBaseURL(orgId)}/${templateId}`;
       await http().delete(url);
+      analytics.track("llm_eval_template_deleted");
     } catch (error) {
       console.error("Failed to delete template:", error);
       throw error;

@@ -814,6 +814,7 @@ import {
 } from "@/utils/rum/funnelCompare";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildPrefillFromRumFunnel } from "@/utils/alerts/prefill/fromRumFunnel";
+import analytics from "@/services/product_analytics";
 
 defineOptions({ name: "AnalyticsFunnels" });
 
@@ -1281,6 +1282,7 @@ const openAlert = () => {
           : { type: "absolute", startTime: dt.startTime, endTime: dt.endTime },
     }),
   );
+  analytics.track("rum_funnel_alert_started");
 };
 
 const org = () => pa.toQuery().org_identifier as string;
@@ -1365,7 +1367,12 @@ const applyDef = (d: FunnelDef) => {
     toast({ variant: "error", message: t("rum.analytics.funnel.editTooLongForLink") });
     return;
   }
+  const prev = def.value.breakdown;
   pa.funnel.value = d;
+  if (d.breakdown && JSON.stringify(d.breakdown) !== JSON.stringify(prev))
+    analytics.track("rum_funnel_breakdown_applied", {
+      dim: typeof d.breakdown === "string" ? d.breakdown : "attribute",
+    });
 };
 
 const update = (patch: Partial<FunnelDef>) => applyDef({ ...def.value, ...patch });
@@ -1480,6 +1487,7 @@ const rerunPrevious = () => {
 
 const setCompare = (v: unknown) => {
   pa.funnelCompare.value = FUNNEL_COMPARE_MODES.find((m) => m === v) ?? null;
+  analytics.track("rum_funnel_compare_changed", { mode: pa.funnelCompare.value ?? "none" });
 };
 
 const removeBreakdownForCompare = () => {
@@ -1492,7 +1500,9 @@ const removeBreakdownForCompare = () => {
 };
 
 const setView = (v: unknown) => {
-  if (v === "steps" || v === "trend") pa.funnelView.value = v;
+  if (v !== "steps" && v !== "trend") return;
+  if (pa.funnelView.value !== v) analytics.track("rum_funnel_view_changed", { view: v });
+  pa.funnelView.value = v;
 };
 
 // Only a funnel already run for the one on screen gets a trend run of its own.
@@ -1649,6 +1659,7 @@ const openDropoff = (stepIndex: number) => {
     stepIndex,
     side: "dropped",
   };
+  analytics.track("rum_funnel_dropoff_opened", { step: stepIndex });
 };
 
 const closeDropoff = () => {
@@ -1673,6 +1684,7 @@ const openCohortPaths = (cohort: FunnelCohort) => {
   };
   pa.lastSubTab.value = "paths";
   void pa.pushSubTab(router, PA_ROUTES.paths);
+  analytics.track("rum_funnel_cohort_paths_opened");
 };
 
 watch(

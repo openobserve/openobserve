@@ -23,7 +23,10 @@ import { queryClient } from "@/composables/query/queryClient";
 import alerts from "@/services/alerts";
 import { firingAlertsQuery } from "@/services/alerts.queries";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import FiringAlerts from "./FiringAlerts.vue";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/alerts", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -145,9 +148,11 @@ describe("FiringAlerts", () => {
 
   it("selects the row in the URL on click and clears it on close", async () => {
     const wrapper = await mountPage();
+    vi.mocked(analytics.track).mockClear();
     await bodyRows(wrapper)[1].trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.query.alert).toBe("2");
+    expect(analytics.track).toHaveBeenCalledWith("alert_firing_detail_opened");
     wrapper.findComponent({ name: "FiringAlertDrawer" }).vm.$emit("close");
     await flushPromises();
     expect(router.currentRoute.value.query.alert).toBeUndefined();
@@ -205,6 +210,18 @@ describe("FiringAlerts", () => {
     wrapper.unmount();
   });
 
+  it("tracks opening an alert and switching the state chip", async () => {
+    const wrapper = await mountPage();
+    vi.mocked(analytics.track).mockClear();
+    (wrapper.vm as any).openAlert(rowsFixture[0]);
+    (wrapper.vm as any).selectState("muted");
+    expect(vi.mocked(analytics.track).mock.calls).toEqual([
+      ["alert_firing_detail_opened"],
+      ["alert_firing_state_filtered", { state: "muted" }],
+    ]);
+    wrapper.unmount();
+  });
+
   it("reports a bulk failure apart from skips, with its reason", async () => {
     ackAlert
       .mockResolvedValueOnce({ data: { changed: true, acks: [] } })
@@ -221,6 +238,7 @@ describe("FiringAlerts", () => {
     const messages = vi.mocked(toast).mock.calls.map(([call]) => call.message);
     expect(messages[0]).toBe("1 acknowledged, 1 skipped, 1 failed");
     expect(messages[1]).toBe(i18n.global.t("alerts.ack.errors.firingChanged"));
+    expect(analytics.track).toHaveBeenCalledWith("alert_acknowledged", { count: 1 });
     wrapper.unmount();
   });
 
@@ -341,6 +359,9 @@ describe("FiringAlerts", () => {
       await wrapper.find('[data-test="alerts-firing-chip-acked"]').trigger("click");
       await flushPromises();
       expect(listByFolderId).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("alert_firing_state_filtered", {
+        state: "acked",
+      });
       wrapper.unmount();
     });
   });

@@ -576,7 +576,8 @@
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",
       "schema.spec.js",
-      "first-event-status.spec.js"
+      "first-event-status.spec.js",
+      "ingestion-setup-card-tracing.spec.js"
     ],
     "disabled": []
   },

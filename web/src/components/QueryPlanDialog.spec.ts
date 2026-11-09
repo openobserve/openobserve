@@ -54,7 +54,10 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import QueryPlanDialog from "./QueryPlanDialog.vue";
+import analytics from "@/services/product_analytics";
 
 const SQL = "SELECT k8s_namespace_name,\n  count(*) AS cnt\nFROM app_logs";
 
@@ -377,6 +380,9 @@ describe("QueryPlanDialog", () => {
       expect(find(wrapper, "query-plan-analyze-notice").text()).toBe(
         "Cancelled after 0:07. The query was stopped on every node.",
       );
+      expect(analytics.track).toHaveBeenCalledWith("query_plan_analyze_cancelled", {
+        rerun: false,
+      });
       expect(vi.getTimerCount()).toBe(0);
 
       pending.resolve({ data: PROFILE_SSE });
@@ -465,6 +471,11 @@ describe("QueryPlanDialog", () => {
       expect(find(wrapper, "query-plan-analyze-rerun").text()).toBe("Re-run");
       expect(find(wrapper, "query-plan-mode-analyze-done").exists()).toBe(true);
       expect(vi.getTimerCount()).toBe(0);
+      expect(analytics.track).toHaveBeenCalledWith("query_plan_mode_changed", { mode: "analyze" });
+      expect(analytics.track).toHaveBeenCalledWith("query_plan_analyze_completed", {
+        rerun: false,
+        has_profile: true,
+      });
     });
 
     it("falls back to the analyze text when the server sends no profile", async () => {

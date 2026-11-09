@@ -896,10 +896,13 @@ export default defineComponent({
         },
       });
     };
-    const toggleHome = (row: any) => {
+    const toggleHome = async (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       if (isHome(row.id)) {
-        clearHomeDashboard(org);
+        await clearHomeDashboard(org);
+        // clearHomeDashboard reverts the pin instead of throwing when the write fails.
+        if (!isHome(row.id))
+          analytics.track("home_dashboard_unpinned", { source: "dashboard_list" });
       } else {
         // Resolve the folder the SAME way routeToViewD does: row.folder_id is
         // only populated in search-across-folders mode; in the normal folder

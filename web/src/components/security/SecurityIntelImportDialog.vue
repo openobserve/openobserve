@@ -6,6 +6,7 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -14,7 +15,16 @@ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import threatIntel, { RemoveRefused, type IntelTable } from "@/services/threat_intel";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { INTEL_SEVERITIES, indicatorsFromCsv, intelTableName } from "@/utils/security/intel";
+import securityIntel, {
+  MAX_LIST_INDICATORS,
+  type ValidateResponse,
+} from "@/services/securityIntel";
+import {
+  INTEL_SEVERITIES,
+  MAX_IMPORT_BYTES,
+  indicatorsFromCsv,
+  intelTableName,
+} from "@/utils/security/intel";
 import {
   intelImportDefaults,
   makeIntelImportSchema,
@@ -34,6 +44,9 @@ const emit = defineEmits<{ "update:open": [open: boolean]; saved: [table: string
 
 const { t } = useI18nTyped();
 const store = useStore();
+// Writing intel lists is authoring; the server refuses it without the grant too.
+const { canAuthor } = useSecurityAccess();
+const shown = computed(() => props.open && canAuthor.value);
 const { confirm } = useConfirmDialog();
 const FORM_ID = "security-intel-import-form";
 
@@ -46,6 +59,7 @@ const severityOptions = computed(() =>
 );
 
 async function onSubmit(value: IntelImportForm) {
+  if (!canAuthor.value) return;
   const org = store.state.selectedOrganization.identifier;
   const table = intelTableName(value.list);
   const existing = props.tables.find((tb) => tb.name === table);
@@ -56,7 +70,18 @@ async function onSubmit(value: IntelImportForm) {
       toast({ variant: "success", message: t("siem.intel.form.feedQueued", { table }) });
     } else {
       const file = Array.isArray(value.file) ? value.file[0] : value.file;
-      const parsed = indicatorsFromCsv(
+      if ((file as File).size > MAX_IMPORT_BYTES) {
+        toast({
+          variant: "error",
+          message: t("siem.intel.form.fileTooLarge", { max: MAX_IMPORT_BYTES / 1024 / 1024 }),
+        });
+        return;
+      }
+      const already = new Set(value.append ? (props.existingKeys[table] ?? []) : []);
+      // Stats lag uploads and the page reads a capped number of rows, so take the larger count.
+      const held = value.append ? Math.max(already.size, existing?.docs ?? 0) : 0;
+      let checked: ValidateResponse | null = null;
+      const parsed = await indicatorsFromCsv(
         await (file as File).text(),
         {
           severity: value.severity,
@@ -64,6 +89,10 @@ async function onSubmit(value: IntelImportForm) {
           confidence: 50,
         },
         new Date().toISOString(),
+        async (values) => {
+          checked = (await securityIntel.validate(org, { values, held })).data;
+          return checked.values;
+        },
       );
       if (parsed.missingColumn) {
         toast({ variant: "error", message: t("siem.intel.form.noIndicatorColumn") });
@@ -78,11 +107,25 @@ async function onSubmit(value: IntelImportForm) {
         return;
       }
       // The switch alone decides: `existing` comes from page load and may be stale.
-      const already = new Set(value.append ? (props.existingKeys[table] ?? []) : []);
       const fresh = parsed.indicators.filter((i) => !already.has(`${i.type}:${i.indicator}`));
       if (!fresh.length) {
         toast({ variant: "info", message: t("siem.intel.form.allPresent", { table }) });
         emit("update:open", false);
+        return;
+      }
+      const cap = (checked as ValidateResponse | null) ?? {
+        room: MAX_LIST_INDICATORS,
+        max_indicators: MAX_LIST_INDICATORS,
+      };
+      if (fresh.length > cap.room) {
+        toast({
+          variant: "error",
+          message: t("siem.intel.form.listFull", {
+            table,
+            count: held + fresh.length,
+            max: cap.max_indicators,
+          }),
+        });
         return;
       }
       parsed.indicators = fresh;
@@ -127,7 +170,7 @@ async function onSubmit(value: IntelImportForm) {
 
 <template>
   <ODialog
-    :open="open"
+    :open="shown"
     size="md"
     :title="mode === 'url' ? t('siem.intel.form.feedTitle') : t('siem.intel.form.importTitle')"
     :sub-title="
@@ -143,7 +186,7 @@ async function onSubmit(value: IntelImportForm) {
     @click:secondary="emit('update:open', false)"
   >
     <OForm
-      v-if="open"
+      v-if="shown"
       :id="FORM_ID"
       :schema="schema"
       :default-values="defaults"
@@ -162,7 +205,12 @@ async function onSubmit(value: IntelImportForm) {
         name="file"
         accept=".csv"
         :label="t('siem.intel.form.file')"
-        :help-text="t('siem.intel.form.fileHelp')"
+        :help-text="
+          t('siem.intel.form.fileHelp', {
+            max: MAX_LIST_INDICATORS,
+            mb: MAX_IMPORT_BYTES / 1024 / 1024,
+          })
+        "
         required
         data-test="security-intel-import-file"
       />

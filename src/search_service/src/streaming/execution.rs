@@ -81,6 +81,11 @@ pub async fn do_partitioned_search(
     // instead of returning the newest-first page this function otherwise builds.
     extract_patterns: bool,
 ) -> Result<(), infra::errors::Error> {
+    crate::sql::histogram::pin_histogram_timezone(
+        &mut req.query.sql,
+        &mut req.query.timezone,
+        req.query.end_time,
+    )?;
     // limit the search by max_query_range
     // Enrichment tables have no retention and must be searched in full (the request spans
     // [creation_time .. now]); clamping the range would drop older enrichment data, so skip it.
@@ -672,6 +677,7 @@ pub async fn get_partitions(
         histogram_interval: req.query.histogram_interval,
         sampling_ratio: req.query.sampling_ratio,
         search_type: req.search_type,
+        timezone: req.query.timezone.clone(),
     };
 
     let res = SearchService::search_partition(
