@@ -57,6 +57,7 @@ impl PartitionSqlContext {
             end_time: req.end_time,
             sql: req.sql.to_string(),
             histogram_interval: req.histogram_interval,
+            timezone: req.timezone.clone(),
             ..Default::default()
         };
         let sql = Sql::new(&query, org_id, stream_type, None).await?;
@@ -70,7 +71,9 @@ impl PartitionSqlContext {
                 && RESULT_ARRAY.is_match(&base64::decode_url(v).unwrap_or_else(|_| v.to_string()))
         });
 
+        // Non-UTC aggregates cannot share the persistent state that merges partition results.
         let use_single_partition = is_explain
+            || (is_streaming_agg && sql.histogram_offset != Some(0))
             || ((ts_column.is_none() || apply_over_hits)
                 && !(req.streaming_output && is_streaming_agg));
 
@@ -162,6 +165,7 @@ mod tests {
                 order_by,
                 histogram_interval,
                 timezone: None,
+                histogram_offset: Some(0),
                 sorted_by_time: false,
                 sampling_config: None,
             },

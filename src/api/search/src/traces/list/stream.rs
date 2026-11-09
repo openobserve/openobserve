@@ -185,6 +185,7 @@ async fn run(
         histogram_interval: 0,
         sampling_ratio: None,
         search_type: Some(config::meta::search::SearchEventType::UI),
+        timezone: None,
     };
 
     let partitions = match SearchService::search_partition(
