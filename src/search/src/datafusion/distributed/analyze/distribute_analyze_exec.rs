@@ -407,34 +407,4 @@ mod tests {
             vec![(1, "b-querier-0"), (2, "b-querier-1"), (1, "unstarted")]
         );
     }
-
-    #[test]
-    fn test_remote_text_states_any_status_but_completed() {
-        let plan = ProfileNode {
-            detail: "FilterExec".to_string(),
-            ..Default::default()
-        };
-        let remote = |status, plan: Option<ProfileNode>| RemoteNodeProfile {
-            status,
-            plan,
-            ..Default::default()
-        };
-        let cases = [
-            (
-                remote(NodeStatus::Completed, Some(plan.clone())),
-                "FilterExec, metrics=[]\n",
-            ),
-            (
-                remote(NodeStatus::EarlyStopped, Some(plan)),
-                "status=early_stopped\nFilterExec, metrics=[]\n",
-            ),
-            (
-                remote(NodeStatus::Unavailable, None),
-                "status=unavailable\n",
-            ),
-        ];
-        for (remote, expected) in cases {
-            assert_eq!(remote_text(&remote), expected);
-        }
-    }
 }

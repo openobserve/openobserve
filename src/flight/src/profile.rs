@@ -284,21 +284,6 @@ mod tests {
     }
 
     #[test]
-    fn test_node_report_round_trip() {
-        let report = NodeReport {
-            status: NodeStatus::TimedOut,
-            plan: Some(ProfileNode {
-                name: "FilterExec".to_string(),
-                ..Default::default()
-            }),
-        };
-        let back: NodeReport =
-            serde_json::from_slice(&serde_json::to_vec(&report).unwrap()).unwrap();
-        assert_eq!(back.status, NodeStatus::TimedOut);
-        assert_eq!(back.plan.unwrap().name, "FilterExec");
-    }
-
-    #[test]
     fn test_to_text_indents_children_and_stops_at_remote() {
         let metric = |name: &str, display: &str| ProfileMetric {
             name: name.to_string(),

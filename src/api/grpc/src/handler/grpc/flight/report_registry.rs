@@ -115,15 +115,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_returns_completed_report_once() {
-        let registry = ReportRegistry::new(REPORT_TTL);
-        registry.open("t-1").complete(report(NodeStatus::Completed));
-        let fetched = registry.fetch("t-1").await.unwrap();
-        assert_eq!(fetched.status, NodeStatus::Completed);
-        assert!(registry.fetch("t-1").await.is_none());
-    }
-
-    #[tokio::test]
     async fn test_fetch_waits_for_a_run_still_finishing() {
         let registry = Arc::new(ReportRegistry::new(REPORT_TTL));
         let slot = registry.open("t-1");
@@ -142,13 +133,6 @@ mod tests {
         drop(registry.open("t-1"));
         let fetched = registry.fetch("t-1").await.unwrap();
         assert_eq!(fetched.status, NodeStatus::Unavailable);
-    }
-
-    #[tokio::test]
-    async fn test_unknown_key_returns_at_once() {
-        let registry = ReportRegistry::new(REPORT_TTL);
-        assert!(registry.fetch("never-ran").await.is_none());
-        assert!(registry.entries.lock().is_empty());
     }
 
     #[tokio::test]

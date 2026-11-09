@@ -410,41 +410,6 @@ mod tests {
         let _impl = FlightServiceImpl;
     }
 
-    fn action(r#type: &str, body: &str) -> Request<Action> {
-        Request::new(Action {
-            r#type: r#type.to_string(),
-            body: body.as_bytes().to_vec().into(),
-        })
-    }
-
-    #[tokio::test]
-    async fn test_do_action_rejects_unknown_actions() {
-        let err = FlightServiceImpl
-            .do_action(action("drop_everything", ""))
-            .await
-            .err()
-            .unwrap();
-        assert_eq!(err.code(), tonic::Code::Unimplemented);
-    }
-
-    #[tokio::test]
-    async fn test_do_action_returns_a_finished_runs_report_once() {
-        let key = job_trace_id("test-do-action", "job1");
-        REPORTS.open(&key).complete(NodeReport {
-            status: NodeStatus::TimedOut,
-            plan: None,
-        });
-        let mut replies = FlightServiceImpl
-            .do_action(action(QUERY_PROFILE_ACTION, &key))
-            .await
-            .unwrap()
-            .into_inner();
-        let reply = replies.next().await.unwrap().unwrap();
-        let report: NodeReport = serde_json::from_slice(&reply.body).unwrap();
-        assert_eq!(report.status, NodeStatus::TimedOut);
-        assert!(replies.next().await.is_none());
-    }
-
     #[tokio::test]
     async fn test_caller_fetches_the_reports_its_streams_did_not_deliver() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

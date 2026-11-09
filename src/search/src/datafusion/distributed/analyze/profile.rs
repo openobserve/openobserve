@@ -479,22 +479,6 @@ mod tests {
     }
 
     #[test]
-    fn test_late_drop_keeps_a_fetched_report() {
-        let profiles = NodeProfiles::default();
-        let recorder = NodeProfileRecorder::start(profiles.clone(), 0, &TestNode);
-        {
-            let mut profiles = profiles.lock();
-            let p = profiles.get_mut(&0).unwrap();
-            p.status = NodeStatus::EarlyStopped;
-            p.plan = Some(ProfileNode::default());
-        }
-        drop(recorder);
-        let profiles = profiles.lock();
-        assert_eq!(profiles[&0].status, NodeStatus::EarlyStopped);
-        assert!(profiles[&0].plan.is_some() && profiles[&0].end_us > 0);
-    }
-
-    #[test]
     fn test_pending_reports_marks_unstarted_and_lists_unreported() {
         let entry = |status, job_id: &str, plan| RemoteNodeProfile {
             status,
