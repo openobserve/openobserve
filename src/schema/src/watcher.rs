@@ -287,8 +287,7 @@ async fn flush_cache_for_stream(
     if config::cluster::LOCAL_NODE.is_ingester() {
         // get current max memtable id
         let max_memtable_id = ingester::get_max_memtable_id().await;
-        // flush all writers
-        ingester::flush_all().await?;
+        ingester::rotate_all().await?;
         let ttl = get_config().limit.mem_persist_interval;
         // wait for max memtable id to be updated, skip it after retry 10 times
         for _ in 0..10 {

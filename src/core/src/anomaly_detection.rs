@@ -1044,8 +1044,13 @@ pub async fn update_config(
             serde_json::to_value(&destinations).unwrap_or(serde_json::json!([])),
         ));
     }
+    let mut moved_folders = None;
     if let Some(folder_id_str) = req.folder_id {
-        active_model.folder_id = Set(folder_pk(org_id, &folder_id_str).await?);
+        let pk = folder_pk(org_id, &folder_id_str).await?;
+        if pk != previous.folder_id {
+            moved_folders = Some((pk_to_name(Some(&previous.folder_id)).await, folder_id_str));
+        }
+        active_model.folder_id = Set(pk);
     }
     if let Some(owner) = req.owner {
         active_model.owner = Set(Some(owner));
@@ -1080,6 +1085,9 @@ pub async fn update_config(
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
     let mut updated = active_model.update(db).await?;
+    if let Some((from, to)) = moved_folders {
+        repoint_folder(anomaly_id, &from, &to).await;
+    }
 
     // After the save, so the training it queues reads the repaired config, even over a claim.
     if retryable_change {
@@ -1205,6 +1213,19 @@ pub async fn update_config(
         obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
     Ok(val)
+}
+
+/// Moves the config's folder grants from `from` to `to`, as an alert move does. [no-fail]
+async fn repoint_folder(anomaly_id: &str, from: &str, to: &str) {
+    use o2_openfga::authorizer::authz::{
+        get_ofga_type, remove_parent_relation, set_parent_relation,
+    };
+    if !o2_openfga::config::get_config().enabled {
+        return;
+    }
+    let (alerts, folders) = (get_ofga_type("alerts"), get_ofga_type("alert_folders"));
+    set_parent_relation(anomaly_id, &alerts, to, &folders).await;
+    remove_parent_relation(anomaly_id, &alerts, from, &folders).await;
 }
 
 /// Delete an anomaly detection configuration
@@ -1622,10 +1643,10 @@ impl SeriesDefinition {
 /// in `scheduled_jobs`.
 ///
 /// Called once at startup (in `job/mod.rs`) before the alert scheduler starts.
-/// Handles one failure mode: trigger row missing entirely (e.g. DB was reset, row never
-/// created). Processing→Waiting recovery is intentionally NOT done here — the OSS
-/// scheduler's `watch_timeout()` job already resets any `Processing` rows whose
-/// `end_time` has passed, exactly as it does for alert triggers.
+/// Handles two failure modes: trigger row missing entirely (e.g. DB was reset, row never
+/// created), and a row an older kill switch parked as Completed. Processing→Waiting recovery is
+/// intentionally NOT done here — the OSS scheduler's `watch_timeout()` job already resets any
+/// `Processing` rows whose `end_time` has passed, exactly as it does for alert triggers.
 pub async fn recover_detection_triggers_on_startup() {
     let db = get_orm_client_ro().await;
 
@@ -1649,6 +1670,7 @@ pub async fn recover_detection_triggers_on_startup() {
         configs.len()
     );
     recreate_missing_triggers(&configs).await;
+    resume_parked_triggers().await;
     if !unresolved.is_empty() {
         tokio::spawn(retry_unresolved_recovery(unresolved));
     }
@@ -1677,6 +1699,41 @@ async fn retry_unresolved_recovery(
         recreate_missing_triggers(&active).await;
         pending = unresolved;
     }
+}
+
+/// Re-arms triggers an older kill switch parked as Completed. [weak: a failed one waits a rerun]
+async fn resume_parked_triggers() {
+    let triggers = match crate::db::scheduler::list(Some(TriggerModule::AnomalyDetection)).await {
+        Ok(triggers) => triggers,
+        Err(e) => {
+            log::warn!("[anomaly_detection] Failed to list triggers to resume parked ones: {e}");
+            return;
+        }
+    };
+    let now = now_micros();
+    for trigger in triggers
+        .into_iter()
+        .filter_map(|trigger| resumed_trigger(trigger, now))
+    {
+        let key = trigger.module_key.clone();
+        log::info!("[anomaly_detection] Resuming trigger {key} parked by the kill switch");
+        if let Err(e) = crate::db::scheduler::update_trigger(trigger, false, "").await {
+            log::warn!("[anomaly_detection] Failed to resume parked trigger {key}: {e}");
+        }
+    }
+}
+
+/// `trigger` due at `now` when it is parked as Completed, else `None`. [pure]
+fn resumed_trigger(
+    mut trigger: crate::db::scheduler::Trigger,
+    now: i64,
+) -> Option<crate::db::scheduler::Trigger> {
+    if trigger.status != crate::db::scheduler::TriggerStatus::Completed {
+        return None;
+    }
+    trigger.status = crate::db::scheduler::TriggerStatus::Waiting;
+    trigger.next_run_at = now;
+    Some(trigger)
 }
 
 /// The current rows of the `pending` configs, among the configs enabled now.
@@ -5036,6 +5093,29 @@ mod tests {
             .map(|c| (c.anomaly_id, c.org_id))
             .collect();
         assert_eq!(rows, [("kept".to_string(), "acme-renamed".to_string())]);
+    }
+
+    #[test]
+    fn test_recovery_resumes_only_a_trigger_the_kill_switch_parked() {
+        use crate::db::scheduler::{Trigger, TriggerStatus};
+        let now = 1_700_000_000_000_000;
+        let cases = [
+            (
+                TriggerStatus::Completed,
+                Some((TriggerStatus::Waiting, now)),
+            ),
+            (TriggerStatus::Waiting, None),
+            (TriggerStatus::Processing, None),
+        ];
+        for (status, expected) in cases {
+            let trigger = Trigger {
+                status: status.clone(),
+                next_run_at: 5,
+                ..Default::default()
+            };
+            let resumed = resumed_trigger(trigger, now).map(|t| (t.status, t.next_run_at));
+            assert_eq!(resumed, expected, "{status:?}");
+        }
     }
 
     /// The key names here are a cross-crate contract:

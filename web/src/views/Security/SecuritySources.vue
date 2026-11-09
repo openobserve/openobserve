@@ -2,173 +2,127 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-
+import { useMutation } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { raw, useI18nTyped } from "@/types/i18n";
-
-import ocsfPacks, { type OcsfPack } from "@/services/ocsfPacks";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useSecuritySources } from "@/composables/security/useSecuritySources";
-import { realtimePipelinesFor, useOcsfAttach } from "@/composables/security/useOcsfAttach";
+import { loadSecurityAccess, useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import {
-  findOurNode,
-  preAttachChecks,
-  type AttachConfig,
-  type Pipeline,
+  attachErrorOf,
+  type AttachPlan,
+  type DetachResult,
+  type PackRef,
   type PreAttachBlock,
-  type SecuritySetting,
-} from "@/utils/security/ocsfPipeline";
-import type { StreamWithSecurity } from "@/utils/security/sourceSelection";
+  type SourceNoticeCode,
+  type SourceRow,
+} from "@/services/securitySources";
+import {
+  attachPackMutation,
+  attachPlanMutation,
+  detachPackMutation,
+} from "@/services/securitySources.queries";
+import { ocsfClass } from "@/utils/security/ocsf";
+import { formatTimestamp } from "@/utils/date";
 
-// Columns the packs guarantee; used by the user-defined-schema pre-attach check.
-const GUARANTEED_COLUMNS = [
-  "class_uid",
-  "class_name",
-  "category_uid",
-  "category_name",
-  "activity_id",
-  "activity_name",
-  "type_uid",
-  "severity_id",
-  "severity",
-  "status_id",
-  "o2_ocsf_pack",
-];
-
-interface SourceRow {
+interface Row {
   name: string;
-  state: "mapped" | "included" | "notMapped";
-  label: string;
+  state: SourceRow["state"];
+  label: I18nText;
+  sourceTypeLabel: I18nText;
   sourceType: string;
+  /** Who made the last change and what it was, from the server's record. */
+  lastChange: I18nText | null;
   included: boolean;
-  setting: SecuritySetting | null;
-  pack: OcsfPack | null;
-  streamSettings: StreamWithSecurity["settings"] | undefined;
-  // Non-null when the pipeline carries our node but no setting records it: detach can still remove it.
-  detachSetting: SecuritySetting | null;
+  pack: PackRef | null;
+  /** Set when there is a pack to remove: the recorded one, or an unrecorded node on the pipeline. */
+  detachPack: PackRef | null;
 }
 
 const { t } = useI18nTyped();
 const store = useStore();
 const secSources = useSecuritySources();
-const attachFlow = useOcsfAttach();
-
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
-// Only admins can write stream settings, so only they migrate local include/exclude choices.
-const canWrite = computed(() =>
-  ["admin", "root"].includes(
-    String(store.state.userInfo?.role ?? store.state.currentuser?.role ?? "").toLowerCase(),
-  ),
-);
-// Falls back to the backend default (3) only until zoConfig.ingest_flatten_level is loaded.
-const attachConfig = computed<AttachConfig>(() => ({
-  globalFlattenLevel: Number(store.state.zoConfig?.ingest_flatten_level ?? 3),
-  guaranteedColumns: GUARANTEED_COLUMNS,
-}));
+// Attaching writes a function and pipeline (authoring); including is triage; detaching or excluding weakens coverage (admin).
+const { canTriage, canAuthor, canAdmin } = useSecurityAccess();
+const attachMutation = useMutation(computed(() => attachPackMutation(orgId.value)));
+const detachMutation = useMutation(computed(() => detachPackMutation(orgId.value)));
+const planMutation = useMutation(computed(() => attachPlanMutation(orgId.value)));
+const busy = computed(() => attachMutation.isPending.value || detachMutation.isPending.value);
+const globalFlattenLevel = computed(() => Number(store.state.zoConfig?.ingest_flatten_level ?? 3));
 
-const packs = ref<OcsfPack[]>([]);
-const entityPack = computed(() => packs.value.find((p) => p.kind === "entity") ?? null);
-const allPipelines = ref<Pipeline[]>([]);
-const pipelinesLoaded = ref(false);
 const actionNotice = ref<SecurityNotice | null>(null);
+const errorNotice = ref<SecurityNotice | null>(null);
 const blockNotices = ref<SecurityNotice[]>([]);
 
-/** The full pack for the stream's classified type, falling back to the generic entity pack. */
-function offeredPack(sourceType: string): OcsfPack | null {
-  return (
-    packs.value.find((p) => p.kind === "full" && p.source_type === sourceType) ?? entityPack.value
-  );
+const minute = (us: number) => formatTimestamp(us, "YYYY-MM-DD HH:mm");
+
+function lastChangeText(row: SourceRow): I18nText | null {
+  const change = row.last_change;
+  if (!change) return null;
+  return t("siem.sources.lastChange", {
+    user: raw(change.by),
+    time: minute(change.at),
+    summary: raw(change.summary),
+  });
 }
 
-function realtimePipelineFor(stream: string): Pipeline | null {
-  return realtimePipelinesFor(allPipelines.value, stream)[0] ?? null;
+function excludedText(row: SourceRow) {
+  if (!row.updated_by) return t("siem.sources.stateExcluded");
+  return t("siem.sources.excludedBy", { user: raw(row.updated_by), time: minute(row.updated_at) });
 }
 
-/** A pseudo-setting so detach can remove an unrecorded OCSF node. */
-function orphanDetachSetting(
-  stream: string,
-  sourceType: string,
-  included: boolean,
-): SecuritySetting | null {
-  // Never read a stale pipeline list: an old org's pipeline_id would drive a wrong-org Detach.
-  if (!pipelinesLoaded.value) return null;
-  const pipeline = realtimePipelineFor(stream);
-  const node = pipeline ? findOurNode(pipeline) : null;
-  const tag = (node?.meta as { o2_ocsf_pack?: string })?.o2_ocsf_pack;
-  if (!pipeline || !tag) return null;
-  const [packId, version] = tag.split("@");
-  return {
-    source_type: sourceType,
-    pack_id: packId ?? "",
-    pack_version: Number(version ?? 0),
-    attached_at: 0,
-    pipeline_id: pipeline.pipeline_id ?? "",
-    pipeline_created: false,
-    included,
-  };
+function stateText(row: SourceRow): I18nText {
+  if (row.state === "mapped") {
+    return t("siem.sources.stateMapped", {
+      pack: `${row.setting?.pack_id ?? ""}@${row.setting?.pack_version ?? 0}`,
+    });
+  }
+  if (row.state === "excluded") return excludedText(row);
+  if (row.state === "included") return t("siem.sources.stateIncluded");
+  if (row.suggested && row.verdict) {
+    return t("siem.sources.stateSuggested", { label: raw(row.verdict.label) });
+  }
+  return t("siem.sources.stateNotMapped");
 }
 
-const suggestionByName = computed(
-  () => new Map(secSources.suggestions.value.map((e) => [e.name, e.verdict])),
+const rows = computed<Row[]>(() =>
+  secSources.rows.value.map((row) => ({
+    name: row.name,
+    state: row.state,
+    label: stateText(row),
+    sourceTypeLabel: row.verdict
+      ? t("siem.sources.sourceTypeConfidence", {
+          label: raw(row.verdict.label),
+          n: Math.round(row.verdict.confidence * 100),
+        })
+      : row.source_type
+        ? raw(row.source_type)
+        : t("siem.sources.notClassified"),
+    sourceType: row.source_type,
+    lastChange: lastChangeText(row),
+    included: row.reason !== null,
+    pack: row.offered_pack,
+    detachPack: row.detach_pack,
+  })),
 );
 
-const rows = computed<SourceRow[]>(() => {
-  const streams = secSources.streams.value as StreamWithSecurity[];
-  const included = new Set(secSources.sourceNames.value);
-  return streams
-    .filter((s) => !s.name.startsWith("_"))
-    .map((s) => {
-      const setting = s.settings?.security ?? null;
-      const sourceType = setting?.source_type || "";
-      if (setting?.pack_id) {
-        return {
-          name: s.name,
-          state: "mapped" as const,
-          label: t("siem.sources.stateMapped", {
-            pack: `${setting.pack_id}@${setting.pack_version}`,
-          }),
-          sourceType,
-          included: setting.included !== false,
-          setting,
-          pack: offeredPack(sourceType),
-          streamSettings: s.settings,
-          detachSetting: setting,
-        };
-      }
-      const isIncluded = setting?.included === true || included.has(s.name);
-      const suggestion = suggestionByName.value.get(s.name);
-      const label = isIncluded
-        ? t("siem.sources.stateIncluded")
-        : suggestion
-          ? t("siem.sources.stateSuggested", { label: suggestion.label })
-          : t("siem.sources.stateNotMapped");
-      return {
-        name: s.name,
-        state: isIncluded ? ("included" as const) : ("notMapped" as const),
-        label,
-        sourceType,
-        included: isIncluded,
-        setting,
-        pack: offeredPack(sourceType),
-        streamSettings: s.settings,
-        detachSetting: orphanDetachSetting(s.name, sourceType, isIncluded),
-      };
-    });
-});
-
-const columns = computed<OTableColumnDef<SourceRow>[]>(() => [
+const columns = computed<OTableColumnDef<Row>[]>(() => [
   { id: "name", header: t("siem.sources.colStream"), accessorKey: "name", meta: { isName: true } },
   {
     id: "sourceType",
     header: t("siem.sources.colSourceType"),
-    accessorKey: "sourceType",
-    size: 180,
+    accessorKey: "sourceTypeLabel",
+    size: 220,
   },
   { id: "mapping", header: t("siem.sources.colMapping"), accessorKey: "label", size: 200 },
   {
@@ -180,98 +134,35 @@ const columns = computed<OTableColumnDef<SourceRow>[]>(() => [
   },
 ]);
 
-function consistencyText(state: string, stream: string): string | null {
-  if (state === "pack_removed_outside") return t("siem.sources.noticePackRemoved", { stream });
-  if (state === "pipeline_not_writing_back") return t("siem.sources.noticeNotWriting", { stream });
-  if (state === "pipeline_disabled") return t("siem.sources.noticeDisabled", { stream });
-  return null;
+function noticeText(code: SourceNoticeCode, stream: string): I18nText {
+  if (code === "pack_removed_outside") return t("siem.sources.noticePackRemoved", { stream });
+  if (code === "pipeline_not_writing_back") return t("siem.sources.noticeNotWriting", { stream });
+  if (code === "pipeline_disabled") return t("siem.sources.noticeDisabled", { stream });
+  return t("siem.sources.noticeNoRecord", { stream });
 }
 
-// Consistency states computed from the one listPipelines call, with no per-stream GET.
-const consistencyNotices = computed<SecurityNotice[]>(() => {
-  if (!pipelinesLoaded.value) return [];
-  const out: SecurityNotice[] = [];
-  for (const row of rows.value) {
-    if (row.state === "mapped" && row.setting) {
-      const pipeline =
-        allPipelines.value.find((p) => (p.pipeline_id ?? "") === row.setting!.pipeline_id) ?? null;
-      const text = consistencyText(attachFlow.consistency(row.setting, pipeline), row.name);
-      if (text) out.push({ key: `cons-${row.name}`, tone: "warning", text });
-    }
-  }
-  // A realtime pipeline carrying our node on a stream with no recorded pack.
-  const mapped = new Set(rows.value.filter((r) => r.state === "mapped").map((r) => r.name));
-  for (const p of allPipelines.value) {
-    const stream = p.source?.stream_name;
-    if (typeof stream !== "string" || mapped.has(stream)) continue;
-    if (attachFlow.consistency(null, p) === "attached_without_record") {
-      out.push({
-        key: `rec-${stream}`,
-        tone: "warning",
-        text: t("siem.sources.noticeNoRecord", { stream }),
-      });
-    }
-  }
-  return out;
-});
+const notices = computed<SecurityNotice[]>(() => [
+  ...(errorNotice.value ? [errorNotice.value] : []),
+  ...(actionNotice.value ? [actionNotice.value] : []),
+  ...blockNotices.value,
+  ...secSources.notices.value.map((n) => ({
+    key: `${n.code}-${n.stream}`,
+    tone: "warning" as const,
+    text: noticeText(n.code, n.stream),
+  })),
+]);
 
-const notices = computed<SecurityNotice[]>(() => {
-  const out: SecurityNotice[] = [];
-  const err = attachFlow.error.value;
-  if (err) {
-    const text = "raw" in err ? raw(err.raw) : t(err.key, err.params ?? {});
-    out.push({ key: "attach-error", tone: "error", text });
-  }
-  if (actionNotice.value) out.push(actionNotice.value);
-  return [...out, ...blockNotices.value, ...consistencyNotices.value];
-});
-
-async function loadPipelines() {
-  const org = orgId.value;
-  pipelinesLoaded.value = false;
-  try {
-    const res = await ocsfPacks.listPipelines(org);
-    // Drop a late response from a previous org so its pipelines never drive another org's rows.
-    if (org !== orgId.value) return;
-    allPipelines.value = (res.data?.list ?? res.data ?? []) as Pipeline[];
-    pipelinesLoaded.value = true;
-  } catch {
-    if (org === orgId.value) allPipelines.value = [];
-  }
-}
-
-async function reload() {
-  if (!orgId.value) return;
-  // Stale pre-attach warnings must not survive a reload or an org switch.
-  blockNotices.value = [];
-  await Promise.all([secSources.load(orgId.value, { fetchSchema: false }), loadPipelines()]);
-  await secSources.migrateIncludes(canWrite.value);
-}
-
-async function loadPacks() {
-  try {
-    const res = await ocsfPacks.listPacks(orgId.value);
-    packs.value = res.packs ?? [];
-  } catch {
-    packs.value = [];
-  }
-}
-
-function blockText(block: PreAttachBlock, stream: string): string {
+function blockText(block: PreAttachBlock, stream: string): I18nText {
   if (block.code === "stream_not_written") {
     return t("siem.sources.blockStreamNotWritten", {
       stream,
       streams: (block.streams ?? []).join(", "),
     });
   }
-  if (block.code === "flatten_level_mismatch") {
+  if (block.code === "flatten_level_mismatch")
     return t("siem.sources.blockFlattenLevel", { stream });
-  }
   if (block.code === "global_flatten_level") {
-    return t("siem.sources.blockGlobalFlatten", {
-      stream,
-      level: attachConfig.value.globalFlattenLevel,
-    });
+    return t("siem.sources.blockGlobalFlatten", { stream, level: globalFlattenLevel.value });
   }
   if (block.code === "schema_missing_columns") {
     return t("siem.sources.blockSchemaMissing", {
@@ -282,86 +173,182 @@ function blockText(block: PreAttachBlock, stream: string): string {
   return t("siem.sources.blockPipelineDisabled", { stream });
 }
 
-async function onAttach(row: SourceRow) {
-  if (!row.pack) return;
+function clearNotices() {
   actionNotice.value = null;
+  errorNotice.value = null;
   blockNotices.value = [];
-  // Pre-attach checks run first, so a blocked stream is never recorded as mapped.
-  const blocks = preAttachChecks(
-    { name: row.name, settings: row.streamSettings ?? undefined },
-    pipelinesLoaded.value ? realtimePipelineFor(row.name) : null,
-    attachConfig.value,
-  );
-  if (blocks.length) {
-    blockNotices.value = blocks.map((b) => ({
-      key: `block-${row.name}-${b.code}`,
+}
+
+/** Shows a refused action: the pre-attach blocks one by one, else the server's message. */
+function showRefusal(err: unknown, stream: string, fallback: I18nText) {
+  const refusal = attachErrorOf(err);
+  if (refusal?.blocks?.length) {
+    blockNotices.value = refusal.blocks.map((b) => ({
+      key: `block-${stream}-${b.code}`,
       tone: "warning",
-      text: blockText(b, row.name),
+      text: blockText(b, stream),
     }));
     return;
   }
-  const res = await attachFlow.attach(orgId.value, row.name, row.pack, true, attachConfig.value);
-  if (res) {
+  const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  errorNotice.value = {
+    key: "action-error",
+    tone: "error",
+    text: raw(refusal?.message ?? message) || fallback,
+  };
+}
+
+async function reload() {
+  if (!orgId.value) return;
+  // Stale warnings must not survive a reload or an org switch.
+  blockNotices.value = [];
+  await secSources.load(orgId.value);
+  // Awaits the cached access answer, which a first load can reach before the reactive flag has it.
+  await secSources.migrateIncludes((await loadSecurityAccess(orgId.value)).triage);
+}
+
+/** The stream whose attach plan is shown; nothing is written until it is confirmed. */
+const previewStream = ref("");
+const plan = ref<AttachPlan | null>(null);
+const previewOpen = computed(() => !!previewStream.value);
+
+function closePreview() {
+  previewStream.value = "";
+  plan.value = null;
+}
+
+async function onAttach(row: Row) {
+  if (!row.pack || !canAuthor.value) return;
+  clearNotices();
+  previewStream.value = row.name;
+  plan.value = null;
+  try {
+    const res = await planMutation.mutateAsync(row.name);
+    if (previewStream.value === row.name) plan.value = res.plan;
+  } catch (err) {
+    closePreview();
+    showRefusal(err, row.name, t("siem.sources.actionFailed"));
+  }
+}
+
+async function confirmAttach() {
+  const stream = previewStream.value;
+  const planned = plan.value;
+  if (!stream || !planned || !canAuthor.value) return;
+  try {
+    // The previewed pack is pinned, so what runs is exactly what was shown.
+    const res = await attachMutation.mutateAsync({
+      stream,
+      packId: planned.pack_id,
+      packVersion: planned.pack_version,
+    });
+    analytics.track("security_source_pack_attached", {
+      source_type: res.setting.source_type,
+      // The server reads a setting's pack kind the same way when the pack itself is gone.
+      kind: res.setting.pack_id === "entity" ? "entity" : "full",
+      pipeline_created: res.pipeline_created,
+    });
+    closePreview();
     actionNotice.value = {
       key: "attached",
       tone: "info",
-      text: t("siem.sources.attached", { pack: `${row.pack.id}@${row.pack.version}` }),
+      text: t("siem.sources.attached", { pack: `${planned.pack_id}@${planned.pack_version}` }),
     };
+  } catch (err) {
+    closePreview();
+    showRefusal(err, stream, t("siem.sources.actionFailed"));
   }
-  await reload();
 }
 
-async function onDetach(row: SourceRow) {
-  if (!row.detachSetting) return;
-  actionNotice.value = null;
-  blockNotices.value = [];
-  // Only persist a cleared setting when the stream already had one; an undecided orphan stays undecided.
-  const res = await attachFlow.detach(
-    orgId.value,
-    row.name,
-    row.detachSetting,
-    row.setting != null,
-  );
-  if (res?.pipeline_skipped) {
+const classText = (uid: number) => {
+  const name = ocsfClass(uid)?.name ?? (uid === 0 ? "Base Event" : "");
+  return name ? `${name} (${uid})` : String(uid);
+};
+
+const planRows = computed<{ key: string; label: I18nText; value: I18nText }[]>(() => {
+  const p = plan.value;
+  if (!p) return [];
+  const pipeline =
+    p.pipeline_action === "create"
+      ? t("siem.sources.previewPipelineCreate", {
+          name: p.pipeline_name,
+          stream: previewStream.value,
+        })
+      : p.pipeline_action === "already_present"
+        ? t("siem.sources.previewPipelineAlready", { name: p.pipeline_name || p.pipeline_id })
+        : t("siem.sources.previewPipelineExtend", {
+            name: p.pipeline_name || p.pipeline_id,
+            feeds: p.feeds.join(", ") || "—",
+          });
+  return [
+    {
+      key: "pack",
+      label: t("siem.sources.previewPack"),
+      value: raw(`${p.pack_label} (${p.pack_id}@${p.pack_version})`),
+    },
+    {
+      key: "classes",
+      label: t("siem.sources.previewClasses"),
+      value: raw(p.ocsf_classes.map(classText).join(", ")),
+    },
+    {
+      key: "function",
+      label: t("siem.sources.previewFunction"),
+      value:
+        p.function_action === "reuse"
+          ? t("siem.sources.previewFunctionReuse", { name: p.function_name })
+          : t("siem.sources.previewFunctionCreate", { name: p.function_name }),
+    },
+    { key: "pipeline", label: t("siem.sources.previewPipeline"), value: pipeline },
+  ];
+});
+
+function detachedText(res: DetachResult | undefined): I18nText {
+  const skipped = res?.skipped;
+  if (!skipped) return t("siem.sources.detached");
+  return t("siem.sources.detachedSkipped", {
+    id: skipped.pipeline_id,
+    reason: t(`siem.sources.skipReason.${skipped.reason}`),
+  });
+}
+
+async function onDetach(row: Row) {
+  if (!row.detachPack || !canAdmin.value) return;
+  clearNotices();
+  try {
+    const res = await detachMutation.mutateAsync(row.name);
+    analytics.track("security_source_pack_detached", {
+      source_type: row.sourceType,
+      pipeline_skipped: !!res?.skipped,
+    });
     actionNotice.value = {
       key: "detached",
-      tone: "warning",
-      text: t("siem.sources.detachedPipelineSkipped"),
+      tone: res?.skipped ? "warning" : "info",
+      text: detachedText(res),
     };
-  } else if (res !== null) {
-    actionNotice.value = { key: "detached", tone: "info", text: t("siem.sources.detached") };
+  } catch (err) {
+    showRefusal(err, row.name, t("siem.sources.actionFailed"));
   }
-  await reload();
 }
 
-/** Include/exclude is stored in the setting when the stream has one, else in the local fallback. */
-async function setIncluded(row: SourceRow, included: boolean) {
-  blockNotices.value = [];
-  if (row.setting) {
-    // Routed through run() so a 403 surfaces in the notices and the row only reloads on success.
-    const setting = { ...row.setting, included };
-    const res = await attachFlow.run(() => ocsfPacks.saveSetting(orgId.value, row.name, setting));
-    if (res !== null) {
-      analytics.track("security_source_inclusion_changed", { included, view: "sources" });
-      await reload();
-    }
+/** Include/exclude is the org-wide stream setting; a refused save shows in the notices. */
+async function setIncluded(row: Row, included: boolean) {
+  if (!(included ? canTriage.value : canAdmin.value)) return;
+  clearNotices();
+  try {
+    await (included ? secSources.include(row.name) : secSources.exclude(row.name));
+  } catch (err) {
+    showRefusal(err, row.name, t("siem.sources.actionFailed"));
     return;
   }
-  if (included) secSources.include(row.name);
-  else secSources.exclude(row.name);
   analytics.track("security_source_inclusion_changed", { included, view: "sources" });
 }
 
-watch(orgId, async (id) => {
-  if (!id) return;
-  await loadPacks();
-  await reload();
+watch(orgId, (id) => {
+  if (id) void reload();
 });
 
-onMounted(async () => {
-  await loadPacks();
-  await reload();
-});
+onMounted(reload);
 </script>
 
 <template>
@@ -383,38 +370,52 @@ onMounted(async () => {
       data-test="security-sources-table"
     >
       <template #cell-mapping="{ row }">
-        <OTag v-if="row.state === 'mapped'" variant="teal-soft" shape="rounded" size="xs">{{
-          row.label
-        }}</OTag>
-        <OTag v-else-if="row.state === 'included'" variant="blue-soft" shape="rounded" size="xs">{{
-          row.label
-        }}</OTag>
-        <span v-else class="text-text-secondary">{{ row.label }}</span>
+        <span class="inline-flex items-center" :data-test="`security-sources-state-${row.name}`">
+          <OTag v-if="row.state === 'mapped'" variant="teal-soft" shape="rounded" size="xs">{{
+            row.label
+          }}</OTag>
+          <OTag
+            v-else-if="row.state === 'included'"
+            variant="blue-soft"
+            shape="rounded"
+            size="xs"
+            >{{ row.label }}</OTag
+          >
+          <OTag
+            v-else-if="row.state === 'excluded'"
+            variant="warning-soft"
+            shape="rounded"
+            size="xs"
+            >{{ row.label }}</OTag
+          >
+          <span v-else class="text-text-secondary">{{ row.label }}</span>
+          <OTooltip v-if="row.lastChange" :content="row.lastChange" />
+        </span>
       </template>
       <template #cell-actions="{ row }">
-        <div class="flex items-center justify-end gap-2">
+        <div v-if="canTriage || canAuthor || canAdmin" class="flex items-center justify-end gap-2">
           <OButton
-            v-if="row.detachSetting"
+            v-if="row.detachPack && canAdmin"
             size="sm"
             variant="outline"
-            :loading="attachFlow.busy.value"
+            :loading="busy"
             data-test="security-sources-detach"
             @click="onDetach(row)"
           >
             {{ t("siem.sources.detach") }}
           </OButton>
           <OButton
-            v-else-if="row.pack"
+            v-else-if="!row.detachPack && row.pack && canAuthor"
             size="sm"
             variant="primary"
-            :loading="attachFlow.busy.value"
+            :loading="busy"
             data-test="security-sources-attach"
             @click="onAttach(row)"
           >
             {{ t("siem.sources.attach") }}
           </OButton>
           <OButton
-            v-if="!row.included"
+            v-if="!row.included && canTriage"
             size="sm"
             variant="ghost"
             data-test="security-sources-include"
@@ -423,7 +424,7 @@ onMounted(async () => {
             {{ t("siem.sources.include") }}
           </OButton>
           <OButton
-            v-else-if="row.state !== 'mapped'"
+            v-else-if="row.included && row.state !== 'mapped' && canAdmin"
             size="sm"
             variant="ghost"
             data-test="security-sources-exclude"
@@ -445,5 +446,38 @@ onMounted(async () => {
         />
       </template>
     </OTable>
+
+    <ODialog
+      :open="previewOpen"
+      size="md"
+      :title="
+        t('siem.sources.previewTitle', {
+          pack: plan ? `${plan.pack_id}@${plan.pack_version}` : '…',
+          stream: previewStream,
+        })
+      "
+      :sub-title="t('siem.sources.previewSubtitle')"
+      :primary-button-label="t('siem.sources.confirmAttach')"
+      :secondary-button-label="t('siem.sources.cancel')"
+      :primary-button-disabled="!plan || !canAuthor"
+      :primary-button-loading="attachMutation.isPending.value"
+      primary-button-data-test="security-sources-attach-confirm"
+      data-test="security-sources-attach-preview"
+      @update:open="(v: boolean) => !v && closePreview()"
+      @click:secondary="closePreview"
+      @click:primary="confirmAttach"
+    >
+      <OBanner v-if="!plan" variant="info" icon="hourglass-empty" dense>
+        {{ t("siem.sources.previewLoading") }}
+      </OBanner>
+      <dl v-else class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        <template v-for="r in planRows" :key="r.key">
+          <dt class="text-text-secondary">{{ r.label }}</dt>
+          <dd class="text-text-heading break-words" :data-test="`security-sources-plan-${r.key}`">
+            {{ r.value }}
+          </dd>
+        </template>
+      </dl>
+    </ODialog>
   </OPageLayout>
 </template>

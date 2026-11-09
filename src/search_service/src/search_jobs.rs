@@ -106,7 +106,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     }
 
     // 4. get all partition jobs from `search_job_partitions` table
-    let req: search::Request = json::from_str(&job.payload)?;
+    let req = job_request(&job)?;
     let limit = if req.query.size > 0 {
         req.query.size
     } else {
@@ -196,7 +196,7 @@ where
 // 2. write to database
 async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
     let stream_type = StreamType::from(job.stream_type.as_str());
-    let req: search::Request = json::from_str(&job.payload)?;
+    let req = job_request(job)?;
     let partition_req = SearchPartitionRequest::from(&req);
     let res = grpc_search_partition(
         &job.trace_id,
@@ -213,6 +213,17 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
     set_partition_num(&job.id, res.partitions.len() as i64)
         .await
         .map_err(|e| e.into())
+}
+
+/// Parses the job request with named zones pinned at the job end, so partitions share one offset.
+fn job_request(job: &Job) -> Result<search::Request, anyhow::Error> {
+    let mut req: search::Request = json::from_str(&job.payload)?;
+    crate::sql::histogram::pin_histogram_timezone(
+        &mut req.query.sql,
+        &mut req.query.timezone,
+        req.query.end_time,
+    )?;
+    Ok(req)
 }
 
 // 1. rewrite the start_time and end_time to the query

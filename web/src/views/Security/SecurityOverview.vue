@@ -19,22 +19,24 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
+import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
+import { failedRequests, viewDenial, type AccessDenial } from "@/composables/useAccessStore";
+import { isForbiddenError } from "@/composables/security/useSecurityAccess";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import SecurityPanel from "@/components/security/SecurityPanel.vue";
+import SecurityAuditPanel from "@/components/security/SecurityAuditPanel.vue";
 import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.vue";
 import incidentsService, { type Incident } from "@/services/incidents";
-import streamService from "@/services/stream";
 import { useAlertHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
 import {
   countsByAlert,
   useAlertHistorySummary,
 } from "@/composables/security/useAlertHistorySummary";
 import { useSiemDetections, type DetectionRow } from "@/composables/security/useSiemDetections";
-import { withRecentActivity } from "@/composables/security/streamActivity";
 import { bucketMsFor, bucketize, isFiring, type HistoryRow } from "@/utils/security/history";
 import { isFiringOutcome } from "@/utils/alerts/runOutcome";
 import { firingKey } from "@/utils/security/firings";
@@ -48,8 +50,7 @@ import {
   toneOfSigmaLevel,
   type SeverityTone,
 } from "@/utils/security/severity";
-import { sourceHealth, type SourceHealth } from "@/utils/security/streams";
-import { securitySourceNames } from "@/utils/security/sourceSelection";
+import type { SourceHealth } from "@/services/securitySources";
 import { useSecuritySources } from "@/composables/security/useSecuritySources";
 import { formatEventCount } from "@/utils/formatters";
 
@@ -88,6 +89,8 @@ const {
   byId,
   loading: rulesLoading,
   error: rulesError,
+  forbidden: rulesForbidden,
+  failure: rulesFailure,
   load: loadDetections,
 } = useSiemDetections();
 
@@ -97,13 +100,23 @@ const summary = useAlertHistorySummary();
 const historyWindow = useAlertHistoryWindow();
 const history = historyWindow.rows;
 const historyError = computed(() => summary.error.value || historyWindow.error.value);
+// Without the alerts read the tiles and lists would read as a quiet org with no detections.
+const denials = computed(() =>
+  rulesForbidden.value || summary.forbidden.value || historyWindow.forbidden.value
+    ? [
+        viewDenial(
+          "alerts",
+          "list",
+          failedRequests(rulesFailure.value, summary.failure.value, historyWindow.failure.value),
+        ),
+      ]
+    : [],
+);
 
 const incidents = ref<Incident[]>([]);
 const casesLoading = ref(false);
 const casesUnsupported = ref(false);
-
-const streams = ref<any[]>([]);
-const streamsLoading = ref(false);
+const casesDenials = ref<AccessDenial[]>([]);
 
 const lastRunAt = ref<number | null>(null);
 let detectionsReady: Promise<void> = Promise.resolve();
@@ -118,7 +131,7 @@ const loading = computed(
     summaryLoading.value ||
     triageLoading.value ||
     casesLoading.value ||
-    streamsLoading.value ||
+    securitySources.loading.value ||
     rulesLoading.value,
 );
 
@@ -127,6 +140,7 @@ const openCasesTotal = ref(0);
 async function fetchCases(seq: number) {
   casesLoading.value = true;
   casesUnsupported.value = false;
+  casesDenials.value = [];
   try {
     // Asked for by status so resolved cases never crowd the open ones off the page.
     const [open, investigating] = await Promise.all(
@@ -139,8 +153,10 @@ async function fetchCases(seq: number) {
     openCasesTotal.value = Number(open.data?.total ?? 0) + Number(investigating.data?.total ?? 0);
   } catch (e: any) {
     if (seq !== refreshSeq) return;
-    // A build without incident correlation answers 403/404; that is not an error.
-    if ([403, 404].includes(e?.response?.status)) casesUnsupported.value = true;
+    // With incidents on, a plain 403 is the role; a license 403 or a 404 means no incident correlation.
+    if (store.state.zoConfig?.incidents_enabled === true && isForbiddenError(e))
+      casesDenials.value = [viewDenial("incidents", "list", failedRequests(e))];
+    else if ([403, 404].includes(e?.response?.status)) casesUnsupported.value = true;
     incidents.value = [];
     openCasesTotal.value = 0;
   } finally {
@@ -148,30 +164,11 @@ async function fetchCases(seq: number) {
   }
 }
 
-let streamsSeq = 0;
+const securitySources = useSecuritySources();
+
 async function fetchStreams() {
-  const seq = ++streamsSeq;
-  streamsLoading.value = true;
-  try {
-    const res = await streamService.nameList(orgId.value, "logs", false);
-    // A newer load owns the list; this one only writes while it is the latest.
-    if (seq !== streamsSeq) return;
-    const list = res.data?.list ?? [];
-    streams.value = list;
-    // The panel can render now; the freshness check below only patches it.
-    streamsLoading.value = false;
-    // Stats lag ingestion; a source that is receiving data must not read as silent.
-    const names = securitySourceNames(
-      orgId.value,
-      list.map((s: any) => String(s.name)),
-    );
-    const fresh = await withRecentActivity(orgId.value, list, names);
-    if (seq === streamsSeq) streams.value = fresh;
-  } catch {
-    if (seq === streamsSeq) streams.value = [];
-  } finally {
-    if (seq === streamsSeq) streamsLoading.value = false;
-  }
+  // The server patches stats that lag ingestion, so a source receiving data never reads as silent.
+  await securitySources.refetch().catch(() => {});
 }
 
 async function fetchHistory(seq: number, startMs: number, endMs: number) {
@@ -213,8 +210,6 @@ async function refresh() {
     refreshing -= 1;
   }
 }
-
-const securitySources = useSecuritySources();
 
 // Rules change rarely; they load on entry and org change, not on the timed refresh.
 function reloadAll() {
@@ -384,20 +379,14 @@ interface SourceRow {
 }
 const HEALTH_RANK: Record<SourceHealth, number> = { quiet: 0, never: 1, live: 2 };
 const sources = computed<SourceRow[]>(() => {
-  // Reads the reactive source set, so streams classified in the background appear as they land.
-  const known = new Set(securitySources.sourceNames.value);
-  const names = streams.value.map((s) => s.name).filter((name) => known.has(name));
-  const byStream = new Map(streams.value.map((s) => [s.name, s]));
-  return names
-    .map((name) => {
-      const stats = byStream.get(name)?.stats;
-      return {
-        name,
-        health: sourceHealth(stats),
-        docs: Number(stats?.doc_num ?? 0),
-        lastUs: stats?.doc_time_max ? Number(stats.doc_time_max) : null,
-      };
-    })
+  // Reads the reactive source list, so streams classified in the background appear as they land.
+  return securitySources.sources.value
+    .map((row) => ({
+      name: row.name,
+      health: row.health,
+      docs: row.activity.doc_num,
+      lastUs: row.activity.doc_time_max || null,
+    }))
     .sort((a, b) => HEALTH_RANK[a.health] - HEALTH_RANK[b.health] || b.docs - a.docs);
 });
 const quietSources = computed(() => sources.value.filter((s) => s.health === "quiet").length);
@@ -452,7 +441,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "cases",
     label: t("siem.overview.stat.openCases"),
-    value: casesUnsupported.value ? "—" : openCasesTotal.value,
+    value: casesUnsupported.value || casesDenials.value.length ? "—" : openCasesTotal.value,
     icon: "assignment",
     tone: "warning",
     dataTest: "security-overview-stat-cases",
@@ -515,7 +504,11 @@ function openSource(name?: string) {
 // Only claimed once the list has actually loaded; a failed load is reported, not read as empty.
 const noDetections = computed(
   () =>
-    !awaitingRules.value && !rulesLoading.value && !rulesError.value && siemRows.value.length === 0,
+    !awaitingRules.value &&
+    !rulesLoading.value &&
+    !rulesError.value &&
+    !rulesForbidden.value &&
+    siemRows.value.length === 0,
 );
 
 const notices = computed<SecurityNotice[]>(() => {
@@ -623,6 +616,11 @@ function nav(path: string, query: Record<string, string> = {}) {
 
     <div class="flex flex-col gap-4 pb-4">
       <SecurityNotices :notices="notices" data-test="security-overview-notices" />
+      <SecurityAccessLock
+        v-if="denials.length"
+        :denials="denials"
+        data-test="security-overview-access-lock"
+      />
 
       <OStatStrip
         compact-values
@@ -676,7 +674,7 @@ function nav(path: string, query: Record<string, string> = {}) {
 
         <SecurityPanel
           :title="t('siem.overview.openCases')"
-          :count="casesUnsupported ? null : openCasesTotal"
+          :count="casesUnsupported || casesDenials.length ? null : openCasesTotal"
           icon="assignment"
           tone="warning"
           class="h-80"
@@ -696,6 +694,11 @@ function nav(path: string, query: Record<string, string> = {}) {
           <div v-if="casesLoading && !incidents.length" class="flex flex-col gap-2 p-4">
             <OSkeleton v-for="n in 4" :key="n" type="text" class="h-8" />
           </div>
+          <SecurityAccessLock
+            v-else-if="casesDenials.length"
+            :denials="casesDenials"
+            data-test="security-overview-cases-access-lock"
+          />
           <OEmptyState
             v-else-if="casesUnsupported"
             size="inline"
@@ -940,7 +943,10 @@ function nav(path: string, query: Record<string, string> = {}) {
               {{ t("siem.overview.explore") }}
             </OButton>
           </template>
-          <div v-if="streamsLoading && !streams.length" class="flex flex-col gap-2 p-4">
+          <div
+            v-if="securitySources.loading.value && !securitySources.rows.value.length"
+            class="flex flex-col gap-2 p-4"
+          >
             <OSkeleton v-for="n in 4" :key="n" type="text" class="h-6" />
           </div>
           <OEmptyState
@@ -981,6 +987,8 @@ function nav(path: string, query: Record<string, string> = {}) {
           </ul>
         </SecurityPanel>
       </div>
+
+      <SecurityAuditPanel />
     </div>
   </OPageLayout>
 </template>

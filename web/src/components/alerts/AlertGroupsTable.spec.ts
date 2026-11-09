@@ -201,6 +201,47 @@ describe("AlertGroupsTable row actions", () => {
     );
   });
 
+  it("shows each muted group its own mute, not only the one ending last", async () => {
+    const euMute = {
+      ...groupMute,
+      id: "d2",
+      version: 5,
+      ends_at: groupMute.ends_at - 1,
+      alert_groups: [{ alert_id: "a1", group_key: "eu" }],
+    };
+    vi.mocked(alerts.extendAlertMute).mockResolvedValue({
+      data: { version: 6, ends_at: euMute.ends_at },
+    } as any);
+    await mountTable({
+      downtime: groupMute,
+      groups: groups.map((g) =>
+        g.group_key === "eu"
+          ? { ...g, downtime: euMute }
+          : g.group_key === "ap"
+            ? { ...g, downtime: groupMute }
+            : g,
+      ),
+    });
+    expect(find("alerts-alertgroupstable-end-mute-eu").exists()).toBe(true);
+    expect(find("alerts-alertgroupstable-end-mute-ap").exists()).toBe(true);
+    expect(find("alerts-alertgroupstable-end-mute-st").exists()).toBe(false);
+    await find("alerts-alertgroupstable-extend-eu-1h").trigger("click");
+    await flushPromises();
+    expect(alerts.extendAlertMute).toHaveBeenCalledWith(
+      "default",
+      "a1",
+      "d2",
+      { version: 5, minutes: 60 },
+      "ops",
+    );
+  });
+
+  it("shows a load error with Retry instead of the empty state", async () => {
+    await mountTable({ groups: [], loadError: true });
+    expect(find("alerts-alertgroupstable-empty").exists()).toBe(false);
+    expect(find("alerts-alertgroupstable-load-error").exists()).toBe(true);
+  });
+
   it("keeps the group's history one click away, in the menu and as the icon", async () => {
     await mountTable();
     await find("alerts-alertgroupstable-menu-history-eu").trigger("click");

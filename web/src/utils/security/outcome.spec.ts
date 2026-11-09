@@ -27,6 +27,18 @@ describe("outcome vocabulary", () => {
     expect(classifyOutcome("7")).toBe(99);
   });
 
+  it("reads a Windows NTSTATUS: zero is success, anything else a failure", () => {
+    expect(classifyOutcome("0x0")).toBe(1);
+    expect(classifyOutcome("0x00000000")).toBe(1);
+    expect(classifyOutcome("0xC000006D")).toBe(2);
+    expect(
+      outcomeInterpretable([
+        { value: "0xC000006D", n: 18 },
+        { value: "0x0", n: 7 },
+      ]),
+    ).toBe(true);
+  });
+
   it("builds a predicate for words and 4xx/5xx codes", () => {
     const sql = failurePredicate("status");
     expect(sql).toContain(`LOWER(TRIM(CAST("status" AS VARCHAR))) IN ('failure'`);

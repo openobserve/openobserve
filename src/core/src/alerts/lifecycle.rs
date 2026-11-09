@@ -71,6 +71,7 @@ pub enum ClearKind {
     GroupUntracked,
     GroupLimit,
     AlertDeleted,
+    AlertReEnabled,
 }
 
 /// One firing cycle of one row that a write ended.

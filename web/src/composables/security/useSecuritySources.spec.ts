@@ -1,142 +1,151 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { defineComponent, h } from "vue";
+import { flushPromises, mount } from "@vue/test-utils";
 
 import ocsfPacks from "@/services/ocsfPacks";
-import streamService from "@/services/stream";
-import { runSql } from "@/composables/security/useSecurityStreamPlans";
+import securitySources from "@/services/securitySources";
+import { withQueryClient } from "@/test/unit/helpers/queryClient";
+import { sourceRow } from "@/views/Security/__fixtures__/securityFixtures";
 import { useSecuritySources } from "@/composables/security/useSecuritySources";
-import { isLocalPrefsMigrated } from "@/utils/security/sourceSelection";
+import { isLocalPrefsMigrated, saveSourcePrefs } from "@/utils/security/sourcePrefs";
 
 vi.mock("@/services/ocsfPacks", () => ({ default: { saveSetting: vi.fn() } }));
-vi.mock("@/services/stream", () => ({ default: { nameList: vi.fn(), schema: vi.fn() } }));
-vi.mock("@/composables/security/useSecurityStreamPlans", () => ({ runSql: vi.fn() }));
+vi.mock("@/services/securitySources", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/securitySources")>()),
+  default: { list: vi.fn(), classify: vi.fn() },
+}));
+const access = vi.fn();
+vi.mock("@/composables/security/useSecurityAccess", () => ({
+  loadSecurityAccess: (...a: unknown[]) => access(...a),
+}));
 
-const svc = ocsfPacks as unknown as Record<string, ReturnType<typeof vi.fn>>;
-const streamMock = streamService as unknown as Record<string, ReturnType<typeof vi.fn>>;
+const api = securitySources as unknown as Record<string, ReturnType<typeof vi.fn>>;
+const save = vi.mocked(ocsfPacks.saveSetting);
 
-const security = (over: Record<string, unknown> = {}) => ({
-  source_type: "entity",
-  pack_id: "entity",
+const mapped = {
+  source_type: "aws_cloudtrail",
+  pack_id: "aws_cloudtrail",
   pack_version: 1,
-  attached_at: 0,
+  attached_at: 1,
   pipeline_id: "p1",
   pipeline_created: true,
-  included: true,
-  ...over,
-});
+  included: null,
+};
+
+const listing = () => {
+  const rows = [{ ...sourceRow("ct"), setting: mapped }, sourceRow("okta")];
+  return {
+    data: { streams: rows, sources: rows.map((r) => r.name), suggestions: [], notices: [] },
+  };
+};
+
+function setup() {
+  let sources!: ReturnType<typeof useSecuritySources>;
+  mount(
+    defineComponent({
+      setup() {
+        sources = useSecuritySources();
+        return () => h("div");
+      },
+    }),
+    { global: { plugins: [withQueryClient()] } },
+  );
+  return sources;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  streamMock.schema.mockResolvedValue({ data: { schema: [] } });
-  vi.mocked(runSql).mockResolvedValue({ hits: [], partial: false, functionError: "" });
-  svc.saveSetting.mockResolvedValue({ data: {} });
+  api.list.mockResolvedValue(listing());
+  api.classify.mockResolvedValue({ data: { classified: [] } });
+  save.mockResolvedValue({ data: {} } as never);
+  access.mockResolvedValue({ read: true, triage: false, admin: false });
 });
 
-describe("sourceNames honours the setting's include flag (F11)", () => {
-  it("drops a mapped stream the user excluded", async () => {
-    streamMock.nameList.mockResolvedValue({
+describe("useSecuritySources", () => {
+  it("reads the source list from the server", async () => {
+    const sources = setup();
+    await sources.load("org-read");
+    expect(sources.sourceNames.value).toEqual(["ct", "okta"]);
+    expect(sources.rows.value.map((r) => r.health)).toEqual(["live", "live"]);
+  });
+
+  it("has the server classify only for a user who may store verdicts", async () => {
+    const reader = setup();
+    await reader.load("org-a");
+    await flushPromises();
+    expect(api.classify).not.toHaveBeenCalled();
+
+    access.mockResolvedValue({ read: true, triage: true, author: false, admin: false });
+    const triager = setup();
+    await triager.load("org-b");
+    await flushPromises();
+    expect(api.classify).not.toHaveBeenCalled();
+
+    access.mockResolvedValue({ read: true, triage: false, author: true, admin: false });
+    const author = setup();
+    await author.load("org-d");
+    await flushPromises();
+    expect(api.classify).toHaveBeenCalledWith("org-d", []);
+  });
+
+  it("writes an include on top of the stored setting, keeping the pack", async () => {
+    const sources = setup();
+    await sources.load("org-c");
+    await sources.exclude("ct");
+    expect(save).toHaveBeenCalledWith("org-c", "ct", { ...mapped, included: false });
+    await sources.include("okta");
+    expect(save).toHaveBeenLastCalledWith(
+      "org-c",
+      "okta",
+      expect.objectContaining({ pack_id: "", included: true }),
+    );
+  });
+
+  it("hides dismissed suggestions", async () => {
+    api.list.mockResolvedValue({
       data: {
-        list: [
-          { name: "mapped-inc", settings: { security: security({ included: true }) } },
-          { name: "mapped-excl", settings: { security: security({ included: false }) } },
-        ],
+        streams: [sourceRow("a"), sourceRow("b")],
+        sources: [],
+        suggestions: ["b", "a"],
+        notices: [],
       },
     });
-    const sources = useSecuritySources();
-    await sources.load("org1");
-    expect(sources.sourceNames.value).toContain("mapped-inc");
-    expect(sources.sourceNames.value).not.toContain("mapped-excl");
+    const sources = setup();
+    await sources.load("org-d");
+    expect(sources.suggestions.value.map((r) => r.name)).toEqual(["b", "a"]);
+    sources.dismiss("b");
+    expect(sources.suggestions.value.map((r) => r.name)).toEqual(["a"]);
   });
 });
 
-describe("migrateIncludes (R15 / F6)", () => {
-  it("skips a stale stream name and still marks the migration done", async () => {
-    localStorage.setItem(
-      "oo_sec_sources_org1",
-      JSON.stringify({ include: ["real", "ghost"], exclude: [], dismissed: [], classified: {} }),
-    );
-    streamMock.nameList.mockResolvedValue({ data: { list: [{ name: "real" }] } });
-    const sources = useSecuritySources();
-    await sources.load("org1");
+describe("migrateIncludes", () => {
+  it("moves local choices once, skipping streams the list does not contain", async () => {
+    saveSourcePrefs("org-m", { include: ["okta", "gone"], exclude: [], dismissed: [] });
+    const sources = setup();
+    await sources.load("org-m");
     await sources.migrateIncludes(true);
-
-    expect(svc.saveSetting).toHaveBeenCalledTimes(1);
-    expect(svc.saveSetting.mock.calls[0][1]).toBe("real");
-    expect(isLocalPrefsMigrated("org1")).toBe(true);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith("org-m", "okta", expect.objectContaining({ included: true }));
+    expect(isLocalPrefsMigrated("org-m")).toBe(true);
   });
 
-  it("continues past a per-entry 4xx failure", async () => {
-    localStorage.setItem(
-      "oo_sec_sources_org1",
-      JSON.stringify({ include: ["a", "b"], exclude: [], dismissed: [], classified: {} }),
-    );
-    streamMock.nameList.mockResolvedValue({ data: { list: [{ name: "a" }, { name: "b" }] } });
-    svc.saveSetting
-      .mockRejectedValueOnce({ response: { status: 404 } })
-      .mockResolvedValueOnce({ data: {} });
-    const sources = useSecuritySources();
-    await sources.load("org1");
+  it("aborts without marking done on a transient failure", async () => {
+    saveSourcePrefs("org-n", { include: ["okta"], exclude: [], dismissed: [] });
+    save.mockRejectedValue({ response: { status: 503 } });
+    const sources = setup();
+    await sources.load("org-n");
     await sources.migrateIncludes(true);
-
-    expect(svc.saveSetting).toHaveBeenCalledTimes(2);
-    expect(isLocalPrefsMigrated("org1")).toBe(true);
-  });
-
-  it("does not mark migrated when the stream list failed to load (F6)", async () => {
-    localStorage.setItem(
-      "oo_sec_sources_org1",
-      JSON.stringify({ include: ["real"], exclude: [], dismissed: [], classified: {} }),
-    );
-    streamMock.nameList.mockRejectedValue({ response: { status: 500 } });
-    const sources = useSecuritySources();
-    await sources.load("org1");
-    await sources.migrateIncludes(true);
-
-    expect(svc.saveSetting).not.toHaveBeenCalled();
-    expect(isLocalPrefsMigrated("org1")).toBe(false);
-  });
-
-  it("aborts without marking done on a transient 5xx (F6)", async () => {
-    localStorage.setItem(
-      "oo_sec_sources_org1",
-      JSON.stringify({ include: ["a", "b"], exclude: [], dismissed: [], classified: {} }),
-    );
-    streamMock.nameList.mockResolvedValue({ data: { list: [{ name: "a" }, { name: "b" }] } });
-    svc.saveSetting.mockRejectedValue({ response: { status: 503 } });
-    const sources = useSecuritySources();
-    await sources.load("org1");
-    await sources.migrateIncludes(true);
-
-    expect(isLocalPrefsMigrated("org1")).toBe(false);
-  });
-
-  it("aborts without marking done on a 403", async () => {
-    localStorage.setItem(
-      "oo_sec_sources_org1",
-      JSON.stringify({ include: ["a", "b"], exclude: [], dismissed: [], classified: {} }),
-    );
-    streamMock.nameList.mockResolvedValue({ data: { list: [{ name: "a" }, { name: "b" }] } });
-    svc.saveSetting.mockRejectedValue({ response: { status: 403 } });
-    const sources = useSecuritySources();
-    await sources.load("org1");
-    await sources.migrateIncludes(true);
-
-    expect(isLocalPrefsMigrated("org1")).toBe(false);
+    expect(isLocalPrefsMigrated("org-n")).toBe(false);
   });
 
   it("does nothing for a user without write permission", async () => {
-    localStorage.setItem(
-      "oo_sec_sources_org1",
-      JSON.stringify({ include: ["a"], exclude: [], dismissed: [], classified: {} }),
-    );
-    streamMock.nameList.mockResolvedValue({ data: { list: [{ name: "a" }] } });
-    const sources = useSecuritySources();
-    await sources.load("org1");
+    saveSourcePrefs("org-o", { include: ["okta"], exclude: [], dismissed: [] });
+    const sources = setup();
+    await sources.load("org-o");
     await sources.migrateIncludes(false);
-
-    expect(svc.saveSetting).not.toHaveBeenCalled();
-    expect(isLocalPrefsMigrated("org1")).toBe(false);
+    expect(save).not.toHaveBeenCalled();
   });
 });

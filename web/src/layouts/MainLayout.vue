@@ -190,7 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <!-- Enter-only fade; the body's slide lives in OPageLayout so the header stays put. -->
               <FeatureLockBoundary :feature="lockedFeature">
-                <router-view v-slot="{ Component }">
+                <SecurityPageGate v-if="securityGated" />
+                <router-view v-else v-slot="{ Component }">
                   <OAccessBoundary>
                     <keep-alive :include="KEPT_ALIVE_VIEWS">
                       <component
@@ -311,6 +312,7 @@ import {
   onMounted,
   onUnmounted,
   watch,
+  watchEffect,
   markRaw,
   nextTick,
   onBeforeMount,
@@ -321,6 +323,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRoute, useRouter, RouterView } from "vue-router";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
 
 import { setLanguage } from "../utils/cookies";
@@ -359,6 +362,7 @@ import useStreams from "@/composables/useStreams";
 import { userDataStreams } from "@/utils/internalStreams";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
 import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
+import SecurityPageGate from "@/components/security/SecurityPageGate.vue";
 import { clearLicenseDenials } from "@/composables/useLicenseDenials";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import {
@@ -424,6 +428,7 @@ export default defineComponent({
     FirstDataNotice,
     EditorDraftSignOutDialog,
     FeatureLockBoundary,
+    SecurityPageGate,
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),
@@ -689,12 +694,38 @@ export default defineComponent({
 
     // The URL decides the mode, so a shared /security link or a /logs jump shows the matching nav.
     const route = useRoute();
+    const securityGated = ref(false);
+    // Not reactive: only the org watcher reads it, to skip a list that did not change.
+    const orgListSnapshot = markRaw({ value: "" });
     if (config.isEnterprise == "true") {
+      const securityAccess = useSecurityAccess();
+      // Unknown until the access answer arrives, so a cold load never flips the mode early.
+      const securityAllowed = computed(
+        () => !securityAccess.loaded.value || securityAccess.canOpen.value,
+      );
+      const onSecurityPage = computed(
+        () => route.path === "/security" || route.path.startsWith("/security/"),
+      );
+      // A member without read gets a lock naming the grant, and an unanswered check a retry, instead of the page.
+      watchEffect(() => {
+        securityGated.value =
+          onSecurityPage.value &&
+          securityAccess.feature.value === "enabled" &&
+          securityAccess.loaded.value &&
+          (securityAccess.failed.value || !securityAccess.canEnter.value);
+      });
       watch(
-        () => route.path,
-        (path: string) => {
-          const mode = solutionModeForPath(path, store.state.solutionMode);
+        [() => route.path, securityAllowed],
+        ([path, allowed]: [string, boolean]) => {
+          const mode = solutionModeForPath(path, store.state.solutionMode, allowed);
           if (mode !== store.state.solutionMode) store.commit("setSolutionMode", mode);
+          // Only a hidden feature leaves the page; a refused member stays on it to read the lock.
+          if (securityAccess.feature.value === "hidden" && onSecurityPage.value) {
+            router.replace({
+              name: "home",
+              query: { org_identifier: store.state.selectedOrganization?.identifier },
+            });
+          }
         },
         { immediate: true },
       );
@@ -1923,6 +1954,8 @@ export default defineComponent({
       dashboardSaveConflict: dashboardSaveConflictState,
       firstDataNotice,
       lockedFeature,
+      securityGated,
+      orgListSnapshot,
       layoutMixin,
       router,
       store,
@@ -1998,7 +2031,11 @@ export default defineComponent({
       this.layoutMixin.getDefaultOrganization(this.store);
     },
     changeOrganization: {
-      handler() {
+      handler(orgs: unknown) {
+        // The list is often replaced with an identical copy, which would reload the org's settings for nothing.
+        const snapshot = JSON.stringify(orgs ?? null);
+        if (snapshot === this.orgListSnapshot.value) return;
+        this.orgListSnapshot.value = snapshot;
         this.setSelectedOrganization();
       },
       deep: true,

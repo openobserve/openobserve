@@ -26,9 +26,8 @@ export const settingQuery = (org: string, key: string, userId?: string) =>
       try {
         return (await settings.getSetting(org, key, userId)).data?.setting_value ?? null;
       } catch (e: any) {
-        // "Never set" is a normal state — cache the null so an unset favourites
-        // list stops re-requesting on every mount.
-        if (e?.response?.status === 404) return null;
+        // "Never set" is a normal state, and a 403 is permanent for the role; cache both as null so neither re-requests on every mount.
+        if (e?.response?.status === 404 || e?.response?.status === 403) return null;
         throw e;
       }
     },

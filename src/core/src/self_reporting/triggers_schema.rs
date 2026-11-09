@@ -200,7 +200,21 @@ mod tests {
         // Verify count matches struct fields
         // 44: 21 original + 2 grouping + 6 value + 2 synthetics + downtime + delivery + rule_value
         // + 6 report + 4 ack
-        assert_eq!(field_names.len(), 44);
+        // `severity` stays out of the sample; history reads it only once a row carried it.
+        let siem_columns = ["siem", "historical", "siem_groups"];
+        let enterprise_only = if cfg!(feature = "enterprise") {
+            siem_columns.len()
+        } else {
+            0
+        };
+        assert_eq!(field_names.len(), 44 + enterprise_only);
+        for f in siem_columns {
+            assert_eq!(
+                field_names.contains(&f.to_string()),
+                cfg!(feature = "enterprise"),
+                "{f} is in the reflection sample exactly when enterprise is on"
+            );
+        }
 
         // Verify no duplicate fields
         let unique_count = field_names

@@ -35,7 +35,9 @@ use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
-use super::history::{alert_ids_predicate, parse_alert_ids, restrict_to_permitted};
+use super::history::{
+    alert_ids_predicate, parse_alert_ids, restrict_to_permitted, validate_history_range,
+};
 use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
@@ -86,13 +88,13 @@ pub struct AlertHistorySummaryResponse {
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
-        ("interval" = Option<i64>, Query, description = "Bucket width in seconds (default: 300; raised to keep at most 500 buckets)"),
+        ("interval" = Option<i64>, Query, description = "Bucket width in seconds, positive (default: 300; raised to keep at most 500 buckets)"),
         ("alert_ids" = Option<String>, Query, description = "Comma-separated alert ids to include, at most 500 (default: every readable alert)"),
         ("siem" = Option<bool>, Query, description = "Only SIEM detections, resolved by the server; ignored when alert_ids is set"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AlertHistorySummaryResponse)),
-        (status = 400, description = "Bad Request: an invalid or over-limit alert_ids list, or an invalid time range", content_type = "application/json"),
+        (status = 400, description = "Bad Request: an invalid or over-limit alert_ids list, a non-positive interval, or an invalid time range", content_type = "application/json"),
         (status = 403, description = "Forbidden", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
@@ -111,6 +113,9 @@ pub async fn get_alert_history_summary(
         Ok(range) => range,
         Err(msg) => return MetaHttpResponse::bad_request(msg),
     };
+    if let Err(msg) = validate_interval(query.interval) {
+        return MetaHttpResponse::bad_request(msg);
+    }
     let interval =
         summary::bucket_interval_secs(query.interval, end_time.saturating_sub(start_time));
     let empty = || {
@@ -130,15 +135,28 @@ pub async fn get_alert_history_summary(
     };
     let ids = match query.alert_ids.as_deref().map(parse_alert_ids).transpose() {
         Ok(Some(ids)) => Some(restrict_to_permitted(ids, permitted.as_deref())),
-        Ok(None) if query.siem == Some(true) => Some(restrict_to_permitted(
-            db::alerts::alert::resolve_siem_alert_ids(&org_id).await,
-            permitted.as_deref(),
-        )),
         Ok(None) => permitted,
         Err(msg) => return MetaHttpResponse::bad_request(msg),
     };
     if ids.as_ref().is_some_and(|ids| ids.is_empty()) {
         return empty();
+    }
+
+    let siem_rows = infra::schema::get(&org_id, TRIGGERS_STREAM, StreamType::Logs)
+        .await
+        .ok()
+        .and_then(|schema| summary::siem_rows_predicate(&schema));
+    let mut predicates = Vec::new();
+    if query.siem == Some(true) && query.alert_ids.is_none() {
+        let Some(siem_rows) = siem_rows.as_deref() else {
+            return empty();
+        };
+        predicates.push(siem_rows.to_string());
+    }
+    if let Some(siem_rows) = siem_rows.as_deref()
+        && !crate::request::security::security_allowed(&org_id, &user_email.user_id, "GET").await
+    {
+        predicates.push(format!("NOT {siem_rows}"));
     }
 
     let id_predicate = ids.as_deref().map(alert_ids_predicate);
@@ -148,6 +166,7 @@ pub async fn get_alert_history_summary(
         end_time,
         interval,
         id_predicate.as_deref(),
+        &predicates,
     );
     let search_req = SearchRequest {
         query: SearchQuery {
@@ -229,8 +248,18 @@ fn clamp_window(
 ) -> Result<(i64, i64), &'static str> {
     let start_time = config::utils::query_range::clamp_start_time(start_time, end_time, max_hours)
         .unwrap_or(start_time);
-    openobserve_api_common::request::validate_time_range(start_time, end_time)?;
+    validate_history_range(start_time, end_time)?;
     Ok((start_time, end_time))
+}
+
+/// A requested bucket width must be positive and fit in microseconds.
+fn validate_interval(interval: Option<i64>) -> Result<(), &'static str> {
+    match interval {
+        Some(secs) if secs <= 0 || secs.checked_mul(1_000_000).is_none() => {
+            Err("interval must be a positive number of seconds")
+        }
+        _ => Ok(()),
+    }
 }
 
 /// Alert ids the user may read; `None` means all of them.
@@ -277,12 +306,21 @@ mod tests {
     #[test]
     fn test_clamp_window_survives_extreme_bounds() {
         let hour = 3600 * 1_000_000;
-        assert_eq!(
-            clamp_window(i64::MIN, i64::MAX, 24),
-            Ok((i64::MAX - 24 * hour, i64::MAX))
-        );
+        let now = 1_793_524_776_430_732;
+        assert_eq!(clamp_window(i64::MIN, now, 24), Ok((now - 24 * hour, now)));
+        assert!(clamp_window(i64::MIN, i64::MAX, 24).is_err());
         assert!(clamp_window(i64::MIN, i64::MAX, 0).is_err());
         assert!(clamp_window(5, 5, 0).is_err());
         assert_eq!(clamp_window(1, 10, 0), Ok((1, 10)));
+        assert!(clamp_window(1, i64::MAX, 0).is_err());
+    }
+
+    #[test]
+    fn test_validate_interval_rejects_intervals_that_overflow_or_are_not_positive() {
+        for bad in [1 << 58, i64::MAX, 0, -5, i64::MIN] {
+            assert!(validate_interval(Some(bad)).is_err(), "{bad}");
+        }
+        assert!(validate_interval(None).is_ok());
+        assert!(validate_interval(Some(60)).is_ok());
     }
 }
