@@ -26,6 +26,23 @@ const fake = vi.hoisted(() => ({
   rawLogs: [] as Array<{ stream: string; column: string }>,
   rawLogsFor: [] as string[][],
   push: vi.fn(async () => {}),
+  state: { zoConfig: {}, userInfo: { role: "member", email: "a@example.com" } } as Record<
+    string,
+    any
+  >,
+  repairs: [] as Array<Record<string, any>>,
+  undo: vi.fn(async () => {}),
+}));
+
+vi.mock("vuex", () => ({ useStore: () => ({ state: fake.state }) }));
+vi.mock("@/composables/starterPacks/useNginxParse", () => ({
+  useNginxParse: () => ({
+    active: async () => fake.repairs,
+    preview: async () => ({ format: "combined", rows: [] }),
+    readers: async () => [],
+    confirm: vi.fn(),
+    undo: fake.undo,
+  }),
 }));
 
 vi.mock("vue-router", async (importOriginal) => ({
@@ -55,10 +72,13 @@ vi.mock("@/composables/starterPacks/packMatchData", () => ({
     dashboards: new Map([["overview", fake.dashboard]]),
   }),
 }));
-vi.mock("@/composables/starterPacks/useStarterPackFlow", async () => {
+vi.mock("@/composables/starterPacks/useStarterPackFlow", async (importOriginal) => {
   const { fakeFlow } = await import("./starterPackTestFlow");
   const flow = fakeFlow();
-  return { useStarterPackFlow: () => flow };
+  return {
+    ...(await importOriginal<typeof import("@/composables/starterPacks/useStarterPackFlow")>()),
+    useStarterPackFlow: () => flow,
+  };
 });
 vi.mock("@/composables/starterPacks/rawLogs", () => ({
   findRawNginxLogs: async (_org: string, streams: Map<string, number>) => {
@@ -217,17 +237,68 @@ describe("StarterPackLibraryTab", () => {
   });
 
   describe("raw logs", () => {
-    beforeEach(() => Object.assign(fake, { rawLogs: [], rawLogsFor: [] }));
+    beforeEach(() => {
+      Object.assign(fake, { rawLogs: [], rawLogsFor: [], repairs: [] });
+      fake.state.userInfo.role = "member";
+      fake.undo.mockClear();
+    });
 
-    it("names plain-text Nginx logs without an action", async () => {
+    it("names plain-text Nginx logs without an action for a non-admin", async () => {
       fake.rawLogs = [{ stream: "edge", column: "message" }];
       const wrapper = await render();
       const notice = wrapper.find('[data-test="library-tab-raw-log-edge"]');
-      expect(notice.text()).toBe(
-        "Looks like Nginx logs in edge, stored as plain text · Parsing support comes later",
-      );
+      expect(notice.text()).toBe("Looks like Nginx logs in edge, stored as plain text");
       expect(notice.find("button").exists()).toBe(false);
       expect(fake.rawLogsFor).toEqual([["edge"]]);
+    });
+
+    it("offers Parse these logs to an admin", async () => {
+      fake.state.userInfo.role = "admin";
+      fake.rawLogs = [{ stream: "edge", column: "message" }];
+      const wrapper = await render();
+      const button = wrapper.get('[data-test="library-tab-parse-edge"]');
+      expect(button.text()).toBe("Parse these logs");
+    });
+
+    it("lists a stream being parsed instead of its notice, and Undo removes only that repair", async () => {
+      fake.state.userInfo.role = "admin";
+      fake.rawLogs = [{ stream: "edge", column: "message" }];
+      const repair = {
+        packId: "nginx_parse",
+        installId: "starter_pack_nginx_edge",
+        status: "complete",
+        items: [{ kind: "function", itemId: "combined", status: "created", stream: "edge" }],
+      };
+      fake.repairs = [repair];
+      const wrapper = await render();
+      expect(wrapper.find('[data-test="library-tab-raw-log-edge"]').exists()).toBe(false);
+      expect(wrapper.get('[data-test="library-tab-parsing-edge"]').text()).toContain(
+        "Parsing new Nginx logs in edge",
+      );
+      await wrapper.get('[data-test="library-tab-parse-undo-edge"]').trigger("click");
+      await flushPromises();
+      const dialog = document.querySelector('[data-test="starter-pack-parse-undo-dialog"]');
+      expect(dialog?.textContent).toContain("keep their added fields");
+      (
+        document.querySelector('[data-test="starter-pack-parse-undo-confirm-btn"]') as HTMLElement
+      ).click();
+      await flushPromises();
+      expect(fake.undo).toHaveBeenCalledWith(repair);
+    });
+
+    it("hides Undo on a repair from a non-admin", async () => {
+      fake.repairs = [
+        {
+          packId: "nginx_parse",
+          installId: "x",
+          status: "incomplete",
+          items: [{ stream: "edge" }],
+        },
+      ];
+      const wrapper = await render();
+      const banner = wrapper.get('[data-test="library-tab-parsing-edge"]');
+      expect(banner.text()).toContain("not fully set up");
+      expect(banner.find("button").exists()).toBe(false);
     });
 
     it("shows nothing when no stream reads as raw Nginx, and never checks on Dashboards", async () => {
