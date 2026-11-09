@@ -67,6 +67,8 @@ describe("AssistantTimePrefix", () => {
     expect(chip.element.tagName).toBe("BUTTON");
     expect(chip.classes()).toContain("rounded-default");
     expect(chip.attributes("aria-haspopup")).toBe("dialog");
+    expect(chip.classes()).not.toContain("pointer-coarse:min-h-11");
+    expect(chip.classes()).toContain("pointer-coarse:after:-inset-y-2.5");
   });
 
   it("is a radiogroup whose arrows move focus between rows and Tab reaches only the checked one", async () => {

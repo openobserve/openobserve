@@ -48,6 +48,10 @@ export interface StoredTurn {
   user: {
     text: string;
     images?: { filename: string; mime: string; url: string }[];
+    /** The window the question was asked over, in ms, so a reopened chat's query cards keep their range; `relative` is the period it was picked as. */
+    window?: { from: number; to: number; relative?: string };
+    /** Where the question was asked from, e.g. `home_launcher`. */
+    entry_kind?: string;
   } | null;
   /** The SSE frames the live stream produced for this turn. */
   frames: any[];
@@ -57,6 +61,8 @@ export interface StoredTurn {
   /** Who answered this turn; absent before migration 134 and on a shared read that drops it. */
   agent_type?: string | null;
   handoff_from?: string | null;
+  /** The stored turn this one regenerated; it shows as that turn's newest answer version. */
+  version_of?: string | null;
   /** Seq range of the turn's events; absent on a turn that stored nothing. */
   first_seq?: number | null;
   last_seq?: number | null;
@@ -80,6 +86,10 @@ export interface ProjectRecordOptions {
 }
 
 declare module "@/ts/interfaces/chat" {
+  interface ChatMessage {
+    /** On a user message: a turn a branch carried from its source chat, which is not this chat's own. */
+    carried?: boolean;
+  }
   interface ContentBlock {
     /** A tool step whose stream the viewer may not read. */
     hidden?: { reason: "stream_forbidden"; stream: string };
@@ -279,11 +289,20 @@ function stampTurnAgent(turn: StoredTurn, own: ChatMessage[]): void {
 function replayedPrompt(turn: StoredTurn, images: ImageAttachment[]): ChatMessage {
   const { text, blocks } = parseAttachmentBlocks(turn.user?.text ?? "");
   const created = typeof turn.created === "number" ? turn.created : null;
+  const asked = turn.user?.window;
   return {
     role: "user",
     content: raw(text),
     ...(created !== null && { sentAt: created > 1e14 ? Math.floor(created / 1000) : created }),
     ...(turn.turn_id && { turnId: turn.turn_id }),
+    ...(asked &&
+      asked.to > asked.from && {
+        sentWindow: {
+          from: asked.from,
+          to: asked.to,
+          ...(asked.relative && { period: asked.relative }),
+        },
+      }),
     ...(images.length > 0 && { images }),
     ...(blocks.length > 0 && {
       contentBlocks: blocks.map((block) => ({
@@ -506,7 +525,7 @@ export function projectRecord(
   const { messages } = foldTurns(prepared, t, fold, "replay");
   for (const message of messages)
     settleMessage(message, prepared, options, t, audience === "owner");
-  return messages;
+  return audience === "owner" ? foldVersions(messages, prepared) : messages;
 }
 
 /** The stored turns as an audience may see them: known frames only, scrubbed and redacted; the JSON export is this. */
@@ -610,6 +629,48 @@ function scrubValue(value: unknown, theModel: string, depth = 0): any {
 
 function scrubText(text: string, theModel: string): string {
   return typeof text === "string" ? text.replace(MODEL_NAME, theModel) : text;
+}
+
+// A regenerated turn reads as the newest answer of the turn it versions, the earlier answers as its versions.
+function foldVersions(messages: ChatMessage[], turns: StoredTurn[]): ChatMessage[] {
+  const parent = new Map<string, string>();
+  for (const turn of turns)
+    if (turn.turn_id && turn.version_of) parent.set(turn.turn_id, turn.version_of);
+  if (!parent.size) return messages;
+  const rootOf = (id: string) => {
+    const seen = new Set<string>();
+    let at = id;
+    while (parent.has(at) && !seen.has(at)) {
+      seen.add(at);
+      at = parent.get(at)!;
+    }
+    return at;
+  };
+  const out: ChatMessage[] = [];
+  const answerAt = new Map<string, number>();
+  for (let i = 0; i < messages.length; i += 1) {
+    const message = messages[i];
+    const answer = messages[i + 1]?.role === "assistant" ? messages[i + 1] : null;
+    if (message.role !== "user" || !message.turnId || !answer) {
+      out.push(message);
+      continue;
+    }
+    const root = rootOf(message.turnId);
+    const at = answerAt.get(root);
+    i += 1;
+    if (at === undefined) {
+      out.push(message);
+      answerAt.set(root, out.length);
+      out.push(answer);
+      continue;
+    }
+    const earlier = out[at];
+    out[at] = {
+      ...answer,
+      versions: [...(earlier.versions ?? []), { ...earlier, versions: undefined }],
+    };
+  }
+  return out;
 }
 
 function settleMessage(

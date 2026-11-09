@@ -11108,6 +11108,8 @@
       "op": {
         "create": "Created {entity}",
         "delete": "Deleted {entity}",
+        "pause": "Paused {entity}",
+        "resume": "Resumed {entity}",
         "run_command": "Ran {entity}",
         "update": "Updated {entity}"
       },
@@ -11159,10 +11161,6 @@
       "undoTitle": "Undo this action?",
       "undoneState": "Undone",
       "unsupported": "Activity history needs a newer server version."
-    },
-    "attach": {
-      "saved": "Attachments are saved with this chat.",
-      "ok": "OK"
     },
     "announce": {
       "approval": "Waiting for your approval: {title}.",
@@ -11272,14 +11270,24 @@
         "itemsName": "Result of each item",
         "narrowed": "The assistant will propose these {count} again for your approval",
         "open": "Open {name} (opens in a new tab)",
-        "partial": "Deleted {done} of {total} {entity} · {failed} failed",
         "sending": "Sending your decision…",
         "stop": "Stop",
         "stopped": "Declined · you stopped the answer",
         "unconfirmed": "Your decision was sent, but its result couldn't be confirmed.",
         "unknown": "This browser has no record of how this request was answered.",
         "waitingElsewhere": "Waiting for your approval in the tab where you asked. Approve or deny it there, or stop this answer.",
-        "withdrawn": "This request is no longer valid. The conversation moved on."
+        "withdrawn": "This request is no longer valid. The conversation moved on.",
+        "partialBy": {
+          "change": "Changed {done} of {total} {entity} · {failed} failed",
+          "create": "Created {done} of {total} {entity} · {failed} failed",
+          "delete": "Deleted {done} of {total} {entity} · {failed} failed",
+          "pause": "Paused {done} of {total} {entity} · {failed} failed",
+          "resume": "Resumed {done} of {total} {entity} · {failed} failed",
+          "update": "Updated {done} of {total} {entity} · {failed} failed"
+        },
+        "partialUnnamed": "Only part of this went through · {reason}",
+        "partialUnnamedPlain": "Only part of this went through",
+        "standing": "Allowed by your standing approval"
       },
       "scope": {
         "chat": "For this chat",
@@ -11311,9 +11319,12 @@
         "expired": "Request expired. Nothing was changed.",
         "moved": "Moved to {editor}",
         "paused": "Paused {entity} {name}",
+        "pausedCount": "Paused {count} {entity}",
+        "pausedCountUntil": "Paused {count} {entity} until {time}",
         "pausedUntil": "Paused {entity} {name} until {time}",
         "replied": "Declined with a reply",
         "resumed": "Resumed {entity} {name}",
+        "resumedCount": "Resumed {count} {entity}",
         "youAt": "you · {time}"
       },
       "onDashboard": "On dashboard {name}",
@@ -11330,7 +11341,8 @@
         "resume": "resuming {entity}",
         "update": "updating {entity}",
         "delete": "deleting {entity}"
-      }
+      },
+      "allowedForChat": "Allowed for this chat: {action}"
     },
     "askAdmin": {
       "adminsOf": "Admins of {org}",
@@ -11515,7 +11527,8 @@
         "pasteInline": "Paste into the message",
         "enterQueues": "Answer running · Enter queues this"
       },
-      "queuedSentence": "Your next message is sent when this answer finishes."
+      "queuedSentence": "Your next message is sent when this answer finishes.",
+      "queuedAlreadySentence": "One message is already queued. Edit it to change it, or send this one after the answer finishes."
     },
     "consent": {
       "aMember": "a member",
@@ -12452,6 +12465,7 @@
       "deleted": "Chat deleted",
       "details": "Details",
       "download": "Download",
+      "exportMarkdown": "Export Markdown",
       "downloadAll": "Download all",
       "downloadFailed": "Couldn't build the download",
       "downloaded": "Downloaded",
@@ -12544,6 +12558,7 @@
       "serverErrorCached": "Showing chats saved in this browser · Couldn't reach the server",
       "sharedLinks": "Shared links",
       "sharedByMe": "Shared by me",
+      "sharedPublic": "Shared by public link",
       "state": {
         "answering": "Answering",
         "draft": "Draft",
@@ -12738,6 +12753,8 @@
       "dashboard": "Add to dashboard",
       "insert": "Insert as diff",
       "more": "More query actions",
+      "showAllLines": "Show all {count} lines",
+      "showFewerLines": "Show fewer lines",
       "newTab": "Open in new tab",
       "open": "Open in {explorer}",
       "run": "Run",
@@ -13510,11 +13527,11 @@
       "launcher": {
         "ask": "Ask",
         "clear": "Clear question",
-        "allChats": "All chats",
         "inputName": "Ask {product}",
-        "noRecent": "No chats yet",
+        "noThreadsYet": "No threads yet · your first answer shows up here",
         "openFull": "Open full view",
-        "recent": "Recent"
+        "recentThreads": "Recent threads",
+        "allThreads": "All threads"
       },
       "prefill": {
         "append": "Append",
@@ -15489,7 +15506,6 @@
       "statusUpdated": "Incident status updated",
       "statusUpdateFailed": "Failed to update incident status",
       "rcaAnalyzeIncident": "Analyze incident",
-      "rcaCancel": "Cancel",
       "rcaCancelled": "Analysis cancelled",
       "rcaCancelFailed": "Failed to cancel analysis",
       "rcaFailed": "AI analysis failed",
@@ -15879,8 +15895,6 @@
           "ruledOut": "Ruled out"
         },
         "status": {
-          "rootCause": "Root cause",
-          "rootCauseNotConfirmed": "Root cause · not confirmed",
           "contributing": "Contributing",
           "symptom": "Symptom",
           "ruledOut": "Ruled out",

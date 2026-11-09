@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex h-7 min-h-7 min-w-0 items-center gap-1.5 overflow-hidden px-0.5"
+    class="flex h-7 min-h-7 min-w-0 items-center gap-1.5 overflow-hidden px-0.5 max-md:h-11 pointer-coarse:h-11"
     data-test="assistant-composer-strip"
   >
     <span
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <span :id="sentenceId" class="sr-only">{{ notice.sentence }}</span>
     </span>
-    <div v-else class="flex min-w-0 flex-1 items-center overflow-hidden">
+    <div v-else class="flex min-w-0 flex-1 items-center self-stretch overflow-hidden">
       <slot />
     </div>
     <span class="ms-auto flex flex-none items-center">

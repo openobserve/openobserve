@@ -36,8 +36,12 @@ use infra::table::{
 use o2_enterprise::enterprise::ai::chat::registry;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{UserEmail, extract_auth_str_from_headers};
-use openobserve_mcp::ledger::{
-    self, Op, Origin, Recorded, Recorder, ResourceKind, UNDO_WINDOW_MICROS, UndoOutcome, UndoTarget,
+use openobserve_mcp::{
+    approval,
+    ledger::{
+        self, Op, Origin, Recorded, Recorder, ResourceKind, UNDO_WINDOW_MICROS, UndoOutcome,
+        UndoTarget,
+    },
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -88,6 +92,8 @@ pub struct ActivityRow {
     pub id: String,
     pub at: i64,
     pub action: String,
+    /// The MCP tool that made the change, e.g. `MuteAlert`.
+    pub tool: String,
     pub target: Target,
     pub on_behalf_of: String,
     pub approval: Approval,
@@ -107,7 +113,8 @@ impl ActivityRow {
         let undone = row.undone_at.is_some();
         let undo = Undo::of(&row, now);
         Self {
-            action: action_label(&row.op, &row.resource_type, row.undo_of.is_some()),
+            action: action_label(&row, row.undo_of.is_some()),
+            tool: row.tool,
             target: Target {
                 kind: row.resource_type,
                 id: row.resource_id,
@@ -119,6 +126,9 @@ impl ActivityRow {
             approval: Approval {
                 kind: row.approval_kind,
                 by: row.approved_by,
+                id: row.approval_id,
+                scope: row.approval_scope,
+                grant_id: None,
             },
             result: ActionResult {
                 state: if undone {
@@ -155,6 +165,15 @@ pub struct Approval {
     pub kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub by: Option<String>,
+    /// The approval the call ran under; a granted write's live frame carries the same id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// On a `standing` row, the scope of the grant it ran under: `chat` | `always`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    /// On a `standing` row, the grant that still covers the tool; absent once revoked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grant_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
@@ -256,7 +275,11 @@ pub async fn list_activity(
         Err(message) => return error::invalid_request(message),
     };
     match ai_actions::list(&org_id, &query).await {
-        Ok(rows) => Json(page(rows, query.limit, now_micros())).into_response(),
+        Ok(rows) => {
+            let mut page = page(rows, query.limit, now_micros());
+            with_grant_ids(&org_id, &mut page.rows).await;
+            Json(page).into_response()
+        }
         Err(e) => {
             log::error!("[org_id:{org_id}] cannot list AI activity: {e}");
             error::history_unavailable("Activity could not be read; please retry")
@@ -450,7 +473,7 @@ fn confirmed_id(request: &[u8], response: &Value) -> Option<String> {
 
 async fn store(action: Recorded) {
     let org_id = action.org_id.clone();
-    if !bound_to_turn(&org_id, &action.origin).await {
+    if !vouched_for(&action).await {
         log::info!(
             "[org_id:{org_id}] {} by {} not recorded: session {} has no turn of theirs running",
             action.tool,
@@ -459,13 +482,19 @@ async fn store(action: Recorded) {
         );
         return;
     }
-    let standing = has_standing_grant(&action).await;
-    let row = ledger_row(action, standing, now_micros());
+    let scope = standing_scope(&action).await;
+    let row = ledger_row(action, scope.as_deref(), now_micros());
     let stored = ai_actions::insert(row.clone()).await;
     if let Err(e) = &stored {
         log::error!("[org_id:{org_id}] cannot store an assistant action: {e}");
     }
     audit_row(&row, stored.is_ok()).await;
+}
+
+/// Whether the origin is genuine: o2-ai's verified signature binds an approved call to it.
+async fn vouched_for(action: &Recorded) -> bool {
+    // An approved call runs after its turn ended, so no turn can vouch for it.
+    action.approval_id.is_some() || bound_to_turn(&action.org_id, &action.origin).await
 }
 
 /// Whether a turn of the member runs the session on any node, so the header is not forged.
@@ -481,10 +510,9 @@ fn runs_here(org_id: &str, origin: &Origin) -> bool {
         .any(|turn| turn.user_id == origin.user_email)
 }
 
-async fn has_standing_grant(action: &Recorded) -> bool {
-    let Some(operation) = ledger::tool_operation(&action.tool) else {
-        return false;
-    };
+/// The scope of the standing grant that let `action` run, preferring the one its approval names.
+async fn standing_scope(action: &Recorded) -> Option<String> {
+    let operation = ledger::tool_operation(&action.tool)?;
     let grants = ai_grants::active_for_turn(
         &action.org_id,
         &action.origin.user_email,
@@ -492,25 +520,33 @@ async fn has_standing_grant(action: &Recorded) -> bool {
     )
     .await
     .unwrap_or_default();
-    grants
-        .iter()
-        .any(|grant| grant.tool == action.tool && grant.operation == operation)
+    let named = action.approval_id.as_deref().and_then(approval::grant_of);
+    let covering = || {
+        grants
+            .iter()
+            .filter(|grant| grant.tool == action.tool && grant.operation == operation)
+    };
+    covering()
+        .find(|grant| Some(grant.id.as_str()) == named)
+        .or_else(|| covering().next())
+        .map(|grant| grant.scope.clone())
 }
 
-fn ledger_row(action: Recorded, standing: bool, now: i64) -> ai_actions::Model {
+fn ledger_row(action: Recorded, scope: Option<&str>, now: i64) -> ai_actions::Model {
     ai_actions::Model {
         id: String::new(),
         org_id: action.org_id,
         session_id: Some(action.origin.session_id),
         turn_id: action.origin.turn_id,
         approval_id: action.approval_id,
-        approval_kind: if standing {
+        approval_kind: if scope.is_some() {
             APPROVAL_STANDING
         } else {
             APPROVAL_NONE
         }
         .to_string(),
         approved_by: None,
+        approval_scope: scope.map(str::to_string),
         user_email: action.origin.user_email,
         tool: action.tool,
         op: action.op.as_str().to_string(),
@@ -552,6 +588,7 @@ fn confirmed_row(
         approval_id: Some(approval_id.to_string()),
         approval_kind: APPROVAL_APPROVED.to_string(),
         approved_by: Some(user_id.to_string()),
+        approval_scope: None,
         user_email: user_id.to_string(),
         tool: text(item, "tool").unwrap_or_else(|| "confirm".to_string()),
         op: Op::parse(text(item, "operation").as_deref().unwrap_or_default())
@@ -670,14 +707,57 @@ fn page(rows: Vec<ai_actions::Model>, limit: u64, now: i64) -> ActivityPage {
     }
 }
 
-fn action_label(op: &str, resource_type: &str, is_undo: bool) -> String {
-    let verb = match Op::parse(op) {
-        Op::Create => "Created",
-        Op::Update => "Updated",
-        Op::Delete => "Deleted",
-        Op::Other => "Changed",
+/// Names the grant still covering each standing row, so the client can offer its Revoke.
+async fn with_grant_ids(org_id: &str, rows: &mut [ActivityRow]) {
+    let mut members: Vec<String> = rows
+        .iter()
+        .filter(|row| row.approval.kind == APPROVAL_STANDING)
+        .map(|row| row.on_behalf_of.clone())
+        .collect();
+    members.sort();
+    members.dedup();
+    let mut grants = Vec::new();
+    for member in members {
+        match ai_grants::list(org_id, Some(&member)).await {
+            Ok(found) => grants.extend(found),
+            Err(e) => log::warn!("[org_id:{org_id}] grants of {member} unreadable: {e}"),
+        }
+    }
+    for row in rows
+        .iter_mut()
+        .filter(|row| row.approval.kind == APPROVAL_STANDING)
+    {
+        let operation = ledger::tool_operation(&row.tool);
+        row.approval.grant_id = operation
+            .and_then(|operation| covering_grant(&grants, row, operation))
+            .map(|grant| grant.id.clone());
+    }
+}
+
+fn covering_grant<'a>(
+    grants: &'a [ai_grants::Model],
+    row: &ActivityRow,
+    operation: &str,
+) -> Option<&'a ai_grants::Model> {
+    grants.iter().find(|grant| {
+        grant.user_email == row.on_behalf_of
+            && grant.tool == row.tool
+            && grant.operation == operation
+            && (grant.scope == ai_grants::SCOPE_ALWAYS
+                || (grant.scope == ai_grants::SCOPE_CHAT && grant.chat_id == row.chat_id))
+    })
+}
+
+fn action_label(row: &ai_actions::Model, is_undo: bool) -> String {
+    let verb = match (row.tool.as_str(), Op::parse(&row.op)) {
+        ("MuteAlert", _) => "Paused",
+        ("CancelAlertMute", _) => "Resumed",
+        (_, Op::Create) => "Created",
+        (_, Op::Update) => "Updated",
+        (_, Op::Delete) => "Deleted",
+        (_, Op::Other) => "Changed",
     };
-    let label = format!("{verb} {}", resource_type.replace('_', " "));
+    let label = format!("{verb} {}", row.resource_type.replace('_', " "));
     if is_undo {
         format!("Undo: {label}")
     } else {
@@ -811,6 +891,7 @@ fn undo_row(
         approval_id: None,
         approval_kind: APPROVAL_NONE.to_string(),
         approved_by: None,
+        approval_scope: None,
         user_email: user_id.to_string(),
         tool: "undo".to_string(),
         op: op.as_str().to_string(),
@@ -878,15 +959,15 @@ mod tests {
             approval_id: Some("ap1".into()),
             ..action()
         };
-        let row = ledger_row(approved, false, NOW);
+        let row = ledger_row(approved, None, NOW);
         assert_eq!(row.approval_id.as_deref(), Some("ap1"));
         assert_eq!(row.approval_kind, APPROVAL_NONE);
-        assert!(ledger_row(action(), false, NOW).approval_id.is_none());
+        assert!(ledger_row(action(), None, NOW).approval_id.is_none());
     }
 
     #[test]
     fn a_ledger_row_reads_as_the_contract_row() {
-        let mut row = ledger_row(action(), false, NOW);
+        let mut row = ledger_row(action(), None, NOW);
         row.id = "r1".into();
         let json = serde_json::to_value(ActivityRow::new(row, NOW)).unwrap();
         assert_eq!(
@@ -895,6 +976,7 @@ mod tests {
                 "id": "r1",
                 "at": NOW,
                 "action": "Deleted alert",
+                "tool": "DeleteAlert",
                 "target": {"type": "alert", "id": "a1", "name": "cpu", "deleted": true},
                 "on_behalf_of": "a@x",
                 "approval": {"kind": "none"},
@@ -904,15 +986,89 @@ mod tests {
                 "turn_id": "t"
             })
         );
-        let standing = ledger_row(action(), true, NOW);
+        let standing = ledger_row(action(), Some(ai_grants::SCOPE_ALWAYS), NOW);
         assert_eq!(standing.approval_kind, APPROVAL_STANDING);
+    }
+
+    #[test]
+    fn a_standing_row_keeps_its_grants_scope_and_the_approval_its_live_frame_names() {
+        let granted = Recorded {
+            approval_id: Some("grant_g2~ab12cd34".into()),
+            ..action()
+        };
+        let row = ledger_row(granted, Some(ai_grants::SCOPE_CHAT), NOW);
+        assert_eq!(row.approval_kind, APPROVAL_STANDING);
+        let json = serde_json::to_value(ActivityRow::new(row, NOW)).unwrap();
+        assert_eq!(
+            json["approval"],
+            json!({"kind": "standing", "id": "grant_g2~ab12cd34", "scope": "chat"})
+        );
+        let unscoped = ledger_row(action(), None, NOW);
+        assert_eq!(unscoped.approval_kind, APPROVAL_NONE);
+        assert!(unscoped.approval_scope.is_none());
+    }
+
+    #[test]
+    fn a_pause_and_its_cancel_read_as_paused_and_resumed() {
+        let mute = |tool: &str| ai_actions::Model {
+            tool: tool.into(),
+            op: Op::Other.as_str().into(),
+            ..ledger_row(action(), None, NOW)
+        };
+        assert_eq!(
+            ActivityRow::new(mute("MuteAlert"), NOW).action,
+            "Paused alert"
+        );
+        assert_eq!(
+            ActivityRow::new(mute("CancelAlertMute"), NOW).action,
+            "Resumed alert"
+        );
+        assert_eq!(
+            ActivityRow::new(mute("ExtendAlertMute"), NOW).action,
+            "Changed alert"
+        );
+        assert_eq!(ActivityRow::new(mute("MuteAlert"), NOW).tool, "MuteAlert");
+    }
+
+    #[test]
+    fn a_standing_row_names_the_grant_that_still_covers_it() {
+        let grant = |id: &str, tool: &str, scope: &str, chat: Option<&str>| ai_grants::Model {
+            id: id.into(),
+            org_id: "o".into(),
+            user_email: "a@x".into(),
+            tool: tool.into(),
+            operation: "delete".into(),
+            scope: scope.into(),
+            chat_id: chat.map(str::to_string),
+            granted_by: "a@x".into(),
+            granted_at: NOW,
+        };
+        let row = ActivityRow::new(
+            ledger_row(action(), Some(ai_grants::SCOPE_ALWAYS), NOW),
+            NOW,
+        );
+        let always = grant("g1", "DeleteAlert", ai_grants::SCOPE_ALWAYS, None);
+        let this_chat = grant("g2", "DeleteAlert", ai_grants::SCOPE_CHAT, Some("s"));
+        let other_chat = grant("g3", "DeleteAlert", ai_grants::SCOPE_CHAT, Some("s2"));
+        let other_tool = grant("g4", "UpdateAlert", ai_grants::SCOPE_ALWAYS, None);
+        let other_member = ai_grants::Model {
+            user_email: "b@x".into(),
+            ..always.clone()
+        };
+        let id = |grants: &[ai_grants::Model]| {
+            covering_grant(grants, &row, "delete").map(|g| g.id.clone())
+        };
+        assert_eq!(id(&[always]).as_deref(), Some("g1"));
+        assert_eq!(id(&[this_chat]).as_deref(), Some("g2"));
+        assert_eq!(id(&[other_chat, other_tool, other_member]), None);
+        assert_eq!(id(&[]), None, "a revoked grant leaves no Revoke");
     }
 
     #[test]
     fn each_execution_names_its_ledger_row_and_undo_on_results_and_items() {
         let undoable = ai_actions::Model {
             id: "row-1".into(),
-            ..ledger_row(action(), false, NOW)
+            ..ledger_row(action(), None, NOW)
         };
         let fixed = ai_actions::Model {
             id: "row-2".into(),
@@ -923,11 +1079,17 @@ mod tests {
         let mut answer = json!({
             "results": [{"resource": "a"}, {"resource": "b"}, {"resource": "c"}],
             "items": [{"name": "a"}, {"name": "b"}, {"name": "c"}],
+            "resolved": {"items": [{"name": "a"}, {"name": "b"}, {"name": "c"}]},
         });
         let rows = [Some(undoable.clone()), Some(fixed), None];
         with_ledger_ids(&mut answer, &rows, NOW);
-        for key in ["results", "items"] {
-            let entries = &answer[key];
+        with_ledger_ids(&mut answer["resolved"], &rows, NOW);
+        for entries in [
+            &answer["results"],
+            &answer["items"],
+            &answer["resolved"]["items"],
+        ] {
+            let key = entries.to_string();
             assert_eq!(entries[0]["ledger_id"], "row-1", "{key}");
             assert_eq!(entries[0]["undoable"], true);
             assert_eq!(entries[0]["undo_until"], NOW + UNDO_WINDOW_MICROS);
@@ -958,7 +1120,7 @@ mod tests {
 
     #[test]
     fn undo_is_offered_only_within_its_window_and_once() {
-        let row = ledger_row(action(), false, NOW);
+        let row = ledger_row(action(), None, NOW);
         assert!(Undo::of(&row, NOW + 1).available);
         let late = Undo::of(&row, NOW + UNDO_WINDOW_MICROS);
         assert_eq!(late.reason.as_deref(), Some(REASON_EXPIRED));
@@ -978,7 +1140,7 @@ mod tests {
                 undo_reason: Some(ledger::REASON_FAILED),
                 ..action()
             },
-            false,
+            None,
             NOW,
         );
         assert_eq!(
@@ -990,7 +1152,7 @@ mod tests {
 
     #[tokio::test]
     async fn an_expired_undo_is_410_a_done_one_409_and_an_unsupported_one_400() {
-        let row = ledger_row(action(), false, NOW);
+        let row = ledger_row(action(), None, NOW);
         let (status, json) = body(undoable(&row, NOW + UNDO_WINDOW_MICROS).unwrap_err()).await;
         assert_eq!(
             (status, json["code"].as_str()),
@@ -1020,7 +1182,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_changed_object_is_a_409_naming_who_and_when() {
-        let row = ledger_row(action(), false, NOW);
+        let row = ledger_row(action(), None, NOW);
         let outcome = UndoOutcome::ChangedSince {
             changed_by: Some("b@x".into()),
             at: Some(7),
@@ -1032,14 +1194,14 @@ mod tests {
             (json["changed_by"].as_str(), json["at"].as_i64()),
             (Some("b@x"), Some(7))
         );
-        let row = ledger_row(action(), false, NOW);
+        let row = ledger_row(action(), None, NOW);
         let (status, _) = body(finish_undo(row, UndoOutcome::Refused(403), "a@x", NOW).await).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
     }
 
     #[test]
     fn an_undo_is_its_own_row_with_the_reverse_operation() {
-        let mut original = ledger_row(action(), false, NOW);
+        let mut original = ledger_row(action(), None, NOW);
         original.id = "r1".into();
         let undo = undo_row(&original, Some("a2".into()), "admin@x", NOW + 1);
         assert_eq!((undo.op.as_str(), undo.tool.as_str()), ("create", "undo"));
@@ -1072,8 +1234,8 @@ mod tests {
         };
         assert!(list_query(bad, None).is_err());
         let mut rows = vec![
-            ledger_row(action(), false, NOW),
-            ledger_row(action(), false, NOW),
+            ledger_row(action(), None, NOW),
+            ledger_row(action(), None, NOW),
         ];
         rows[1].id = "r2".into();
         assert_eq!(
@@ -1162,6 +1324,27 @@ mod tests {
         assert!(!runs_here("o-other", &origin("a@x")));
         drop(turn);
         assert!(!runs_here("o-bound", &origin("a@x")));
+    }
+
+    #[tokio::test]
+    async fn an_approved_call_is_recorded_after_its_turn_ended() {
+        let mut approved = action();
+        approved.org_id = "o-approved".into();
+        approved.origin.session_id = "0199e7b2-6f0c-7a3e-a1b2-c3d4e5f6bbbb".into();
+        approved.approval_id = Some("apr_0123456789abcdef0123".into());
+        assert!(!runs_here(&approved.org_id, &approved.origin));
+        assert!(vouched_for(&approved).await);
+    }
+
+    #[tokio::test]
+    async fn an_unapproved_call_is_vouched_for_by_its_members_turn() {
+        const SESSION: &str = "0199e7b2-6f0c-7a3e-a1b2-c3d4e5f6cccc";
+        let mut call = action();
+        call.org_id = "o-unapproved".into();
+        call.origin.session_id = SESSION.into();
+        let turn = registry::register("o-unapproved", SESSION, "t1", "a@x", None);
+        assert!(vouched_for(&call).await);
+        drop(turn);
     }
 
     #[test]

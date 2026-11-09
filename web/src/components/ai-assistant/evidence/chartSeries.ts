@@ -17,6 +17,24 @@ import type { FooterData } from "@/composables/assistant/pure";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { uiIntlLocale } from "@/utils/formatters";
 
+const LABEL = /([A-Za-z_][\w]*)\s*=~?\s*"((?:[^"\\]|\\.)*)"/g;
+
+const PROMQL_WORDS: ReadonlySet<string> = new Set([
+  "by",
+  "without",
+  "on",
+  "ignoring",
+  "group_left",
+  "group_right",
+  "bool",
+  "offset",
+  "and",
+  "or",
+  "unless",
+  "inf",
+  "nan",
+]);
+
 /** C4 series as the reducer keeps them on a step or the footer. */
 export type ChartSeries = NonNullable<FooterData["chartSeries"]>;
 
@@ -49,7 +67,36 @@ export function chartOf(message: ChatMessage | null | undefined): AnswerChart | 
 
 /** Each series' newest value, for the legend. */
 export function latestValues(chart: ChartSeries): { name: string; value: number | null }[] {
-  return chart.series.map((line) => ({ name: line.name, value: line.points.at(-1)?.[1] ?? null }));
+  return chart.series.map((line) => ({
+    name: seriesLabel(line.name),
+    value: line.points.at(-1)?.[1] ?? null,
+  }));
+}
+
+/** A series as a reader names it: the one label's value, else its labels, else the name as sent. */
+export function seriesLabel(name: string): string {
+  const open = name.indexOf("{");
+  if (open < 0 || !name.trimEnd().endsWith("}")) return name;
+  const labels = [...name.slice(open + 1, name.lastIndexOf("}")).matchAll(LABEL)].map(
+    ([, key, value]) => [key, value.replace(/\\(.)/g, "$1")] as const,
+  );
+  if (!labels.length) return name.slice(0, open).trim() || name;
+  if (labels.length === 1) return labels[0][1];
+  return labels.map(([key, value]) => `${key}=${value}`).join(", ");
+}
+
+/** The metric a PromQL query reads, for a chart whose series carry only labels; null when it reads several. */
+export function promqlMetric(query: string): string | null {
+  const bare = query
+    .replace(/\{[^}]*\}|\[[^\]]*\]|"[^"]*"/g, " ")
+    .replace(/\b(?:by|without|on|ignoring)\s*\([^)]*\)/g, " ");
+  const names = new Set(
+    [...bare.matchAll(/(?<![\w.])([A-Za-z_:][\w:]*)\s*(\()?/g)]
+      .filter(([, word, call]) => !call && !PROMQL_WORDS.has(word))
+      .map(([, word]) => word),
+  );
+  const [only] = names;
+  return names.size === 1 ? only : null;
 }
 
 /** The series the answer is about: the highest newest value, so one line carries the colour. */
@@ -90,7 +137,7 @@ export function chartOption(
       splitLine: { lineStyle: { color: colors.grid } },
     },
     series: chart.series.map((line, index) => ({
-      name: line.name,
+      name: seriesLabel(line.name),
       type: "line",
       showSymbol: false,
       z: index === lead ? 3 : 2,

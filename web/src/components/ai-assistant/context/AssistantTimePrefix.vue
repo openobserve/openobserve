@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="name"
         aria-haspopup="dialog"
         :aria-expanded="open"
-        class="shrink-0 motion-safe:transition-colors max-md:min-h-11 pointer-coarse:min-h-11"
+        :class="['shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
         data-test="assistant-context-chip-time"
       />
     </template>
@@ -152,6 +152,7 @@ import { computed, ref } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import {
+  CHIP_HIT_AREA_CLASS,
   composerPopoverClass,
   useComposerLayout,
 } from "@/components/ai-assistant/composer/composerUi";

@@ -341,7 +341,7 @@ describe("AssistantApprovalCard", () => {
     );
     await flushPromises();
     const diff = wrapper.get('[data-test="assistant-approval-diff"]');
-    expect(diff.text()).toContain("title");
+    expect(diff.text()).toContain("Title");
     expect(diff.get("s").text()).toBe("Old");
     expect(diff.get("s").classes()).toContain("text-text-secondary");
     const after = diff.get('[data-test="assistant-approval-diff-after"]');
@@ -462,6 +462,31 @@ describe("AssistantApprovalCard", () => {
     const destructive = mountCard(cardOf(DELETE_ONE, { grantable: true }));
     await openDetails(destructive);
     expect(destructive.find('[data-test="assistant-approval-scope"]').exists()).toBe(false);
+  });
+
+  it("N2: o2-ai's gathered MuteAlert card names both alerts, pluralises Approve and offers the scope", async () => {
+    // The frame o2-ai's build_multi_write_confirmation_event emits for two parallel MuteAlert calls.
+    const wrapper = mountCard(
+      cardOf({
+        type: "confirmation_required",
+        id: "apr_1",
+        tool: "MuteAlert",
+        kind: "update",
+        operation: "MuteAlert",
+        grantable: true,
+        message: 'The assistant wants to mute these 2 alerts: "latency_high", "checkout_5xx".',
+        targets: [
+          { type: "alert", id: "3LrpA", name: "latency_high", after: { minutes: 30 } },
+          { type: "alert", id: "3LrpB", name: "checkout_5xx", after: { minutes: 30 } },
+        ],
+        after: { minutes: 30 },
+        args: { minutes: 30, calls: [{ alert_id: "3LrpA" }, { alert_id: "3LrpB" }] },
+      }),
+    );
+    await flushPromises();
+    expect(wrapper.text()).toContain("Pause alerts latency_high, checkout_5xx");
+    expect(wrapper.get('[data-test="assistant-approval-approve"]').text()).toBe("Pause alerts");
+    expect(wrapper.find('[data-test="assistant-approval-scope"]').exists()).toBe(true);
   });
 
   it("offers an always scope only for a change to several targets, worded by the action", async () => {

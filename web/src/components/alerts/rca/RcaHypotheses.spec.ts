@@ -78,7 +78,7 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     );
 
     expect(groups(wrapper)).toEqual([
-      ["Explains the incident", ["Root cause", "Contributing", "Symptom"]],
+      ["Explains the incident", ["Confirmed", "Contributing", "Symptom"]],
       ["Not confirmed", ["Blocked"]],
       ["Ruled out", ["Ruled out", "Ruled out"]],
     ]);
@@ -110,12 +110,12 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     expect(wrapper.findAll("code").map((code) => code.text())).toContain("GET /api/data");
   });
 
-  it("frame C: Not confirmed first, and a root_cause hypothesis reads 'Root cause · not confirmed' (VE18)", () => {
+  it("frame C: Not confirmed first, and an unconfirmed root_cause hypothesis reads 'Likely', never 'Root cause'", () => {
     const wrapper = mountList(rcaRunSummaryInconclusive());
 
     expect(groups(wrapper)).toEqual([
       ["Not confirmed", ["Inconclusive", "Inconclusive"]],
-      ["Explains the incident", ["Root cause · not confirmed"]],
+      ["Explains the incident", ["Likely"]],
     ]);
     // A long status label wraps inside the status column instead of spilling over.
     const pill = wrapper.findComponent({ name: "RcaPill" });

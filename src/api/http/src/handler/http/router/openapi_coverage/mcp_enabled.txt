@@ -320,7 +320,6 @@ ent SetExperimentBaseline
 all SetFleetDesired
 all SetKVValue
 cloud SetPaidOverageStatus
-ent SetPasswordPolicy
 all SetSyntheticEnabled
 ent SharePlaygroundSnapshot
 all SkipFleetRolloutCollectors
@@ -405,5 +404,3 @@ all updateFunction
 all updatePipeline
 ent updateWorkflows
 ent update_prompt
-ent update_prompt_secret
-ent update_prompt_settings

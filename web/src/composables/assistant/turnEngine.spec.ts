@@ -1994,6 +1994,45 @@ describe("turnEngine: WP-06 outcomes, Regenerate and Edit and resend", () => {
     expect(tracked("ai_turn_sent").at(-1)?.[1]).toMatchObject({ input: "regenerate" });
   });
 
+  it("sends a message queued for the end of an answer the moment the turn is done, before its promise settles", async () => {
+    const h = setup();
+    h.type("first");
+    const first = h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "message_delta", content: "seven" }, { type: "complete", persisted: true });
+    h.end();
+    expect(h.session().turn.state).toBe("done");
+    // The composer queue's watcher fires here, synchronously, while the first send's promise is still in flight.
+    h.type("QUEUED-OK");
+    const queued = h.store.send(h.current.sid);
+    expect(queued).not.toBe(first);
+    await settle();
+    expect(h.sends).toHaveLength(2);
+    expect(h.last().req.message.text).toBe("QUEUED-OK");
+    await first;
+    // The first turn's late settle must not end the queued one.
+    expect(h.session().turn.state).not.toBe("done");
+  });
+
+  it("names the turn a regenerate versions, so the server links them and a reload keeps the versions", async () => {
+    const h = setup({ persistence: true });
+    h.type("why?");
+    const first = h.store.send(h.current.sid);
+    await settle();
+    const firstTurn = h.last().req.turnId;
+    expect(h.last().req.replacesTurnId).toBeUndefined();
+    h.feed(
+      { type: "message_delta", content: "first answer" },
+      { type: "complete", persisted: true },
+    );
+    h.end();
+    await first;
+    void h.store.regenerate(h.current.sid);
+    await settle();
+    expect(h.last().req.replacesTurnId).toBe(firstTurn);
+    expect(h.last().req.turnId).not.toBe(firstTurn);
+  });
+
   it("puts the previous answer back when a regenerate is refused", async () => {
     const h = setup();
     h.type("why?");

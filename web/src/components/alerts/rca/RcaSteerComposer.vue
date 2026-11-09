@@ -42,17 +42,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #strip>
         <AssistantComposerStrip :notice="notice" :sentence-id="noticeId">
+          <!-- One row only: a chip that would wrap is hidden whole; the touch padding keeps each chip's 44 px hit area inside the clip -->
           <div
-            class="flex min-w-0 items-center gap-1"
+            ref="chipRow"
+            class="relative flex h-6 min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-4 overflow-hidden max-md:h-11 max-md:py-2.5 pointer-coarse:h-11 pointer-coarse:py-2.5"
             role="group"
             :aria-label="t('alerts.incidents.rcaSteer.suggestions')"
+            data-test="rca-steer-chips"
           >
             <OButton
               v-for="chip in chips"
               :key="chip.id"
-              variant="ghost-subtle"
+              variant="ghost"
               size="chip"
-              class="bg-surface-subtle shrink-0"
+              :class="[
+                AGENT_PICKER_CLASS,
+                CHIP_HIT_AREA_CLASS,
+                'shrink-0',
+                overflowed.has(chip.id) && 'invisible',
+              ]"
+              :data-chip="chip.id"
               :disabled="sending"
               :data-test="`rca-steer-chip-${chip.id}`"
               @click="prefill(chip.label)"
@@ -119,17 +128,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import AssistantAgentPill from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
+import AssistantAgentPill, {
+  AGENT_PICKER_CLASS,
+} from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
 import AssistantComposerBottomRow, {
   ROUND_ACTION_CLASS,
 } from "@/components/ai-assistant/composer/AssistantComposerBottomRow.vue";
 import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
 import AssistantComposerStrip from "@/components/ai-assistant/composer/AssistantComposerStrip.vue";
 import { pickNotice, sentenceNotice } from "@/components/ai-assistant/composer/composerNotice";
+import { CHIP_HIT_AREA_CLASS } from "@/components/ai-assistant/composer/composerUi";
 import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -178,6 +190,31 @@ const chips = computed(() => [
   { id: "focus", label: t("alerts.incidents.rcaSteer.chipFocus") },
   { id: "changed", label: t("alerts.incidents.rcaSteer.chipChanged") },
 ]);
+
+const chipRow = ref<HTMLElement | null>(null);
+const overflowed = ref<ReadonlySet<string>>(new Set());
+let chipObserver: ResizeObserver | null = null;
+
+// A chip laid out below the first row did not fit beside the others.
+function measureChips(): void {
+  const row = chipRow.value;
+  if (!row) return;
+  const next = new Set<string>();
+  for (const el of row.querySelectorAll<HTMLElement>("[data-chip]"))
+    if (el.offsetTop >= el.offsetHeight && el.dataset.chip) next.add(el.dataset.chip);
+  const same =
+    next.size === overflowed.value.size && [...next].every((id) => overflowed.value.has(id));
+  if (!same) overflowed.value = next;
+}
+
+onMounted(() => {
+  measureChips();
+  if (typeof ResizeObserver === "undefined" || !chipRow.value) return;
+  chipObserver = new ResizeObserver(measureChips);
+  chipObserver.observe(chipRow.value);
+});
+
+onBeforeUnmount(() => chipObserver?.disconnect());
 
 // The strip says one thing: a refused send first, then the agent's open question; otherwise the suggestions show.
 const notice = computed(() =>

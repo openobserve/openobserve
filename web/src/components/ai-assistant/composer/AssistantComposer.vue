@@ -224,6 +224,7 @@ import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
+import { composerStripHoldsSees } from "@/components/ai-assistant/shell/headerSees";
 import { isCreditsRefusal } from "@/components/ai-assistant/turn/creditsRefusal";
 import {
   MAX_IMAGES,
@@ -233,9 +234,7 @@ import {
   assistantGoToAnswer,
   isLongPaste,
   isRunning,
-  markHintSeen,
   pastedTextChip,
-  readHints,
   readRecall,
   refreshPageContext,
   registerAssistantFocusTarget,
@@ -294,8 +293,9 @@ import {
   noteDraftCleared,
 } from "./composerUi";
 import { useAssistantVoice } from "./useAssistantVoice";
-import { useComposerQueue } from "./useComposerQueue";
+import { takeQueued, useComposerQueue } from "./useComposerQueue";
 import { useComposerWidth } from "./useComposerWidth";
+import { helpBrand } from "./voiceEngine";
 
 const props = withDefaults(defineProps<AssistantComposerProps>(), {
   density: "compact",
@@ -324,6 +324,7 @@ const noticeId = `assistant-composer-notice-${uid}`;
 
 // View state only; every draft write is a store action.
 const blockedLine = ref<I18nText | null>(null);
+const queueRefused = ref(false);
 const droppedImages = ref(0);
 const recallOpen = ref(false);
 const recallEntries = ref<RecallEntry[]>([]);
@@ -334,7 +335,6 @@ const prefillPending = ref<{ text: string; chips: ContextChip[]; homeStarter?: b
 );
 // The last long paste, offered back as plain text until the next edit or send (D4 decision 10).
 const pasteOffer = ref<{ chipId: string; text: string; at: number } | null>(null);
-const attachDismissed = ref(false);
 // An admin pressed a mic that is off in this browser; the strip offers Turn on until the next edit.
 const offOffer = ref(false);
 const now = ref(Date.now());
@@ -370,15 +370,8 @@ const stagedChips = computed(() =>
 );
 const attached = computed(() => stagedChips.value.length > 0 || images.value.length > 0);
 // With no chips the panel header carries the ⓘ, so the strip shows it only beside chips and never beside a notice.
-const chipsShown = computed(
-  () => images.value.length > 0 || stagedChips.value.some((chip) => chip.kind !== "time"),
-);
+const chipsShown = computed(() => composerStripHoldsSees(composer.value));
 const seesShown = computed(() => !notice.value && chipsShown.value);
-const attachNotice = computed(() => {
-  const key = store.state.userOrgKey;
-  if (!key || attachDismissed.value || !attached.value || replying.value) return false;
-  return !readHints(key).attachSaved;
-});
 // A bare `@` is an unfinished mention, not a question (CT-05).
 const hasContent = computed(() => /[^@\s]/.test(text.value) || attached.value);
 const storageBlocked = computed(() => store.drafts.storageBlocked.value);
@@ -435,8 +428,10 @@ const state = computed(() => {
   return hasContent.value ? "draft" : "empty";
 });
 
-// The reply and Other answer rows send while the turn waits, so Send keeps its place there.
-const showStop = computed(() => running.value && !elsewhere.value && !replying.value);
+// Reply rows send while the turn waits; an inert box shows Send off because the card is the way out (K7).
+const showStop = computed(
+  () => running.value && !elsewhere.value && !replying.value && !inertKind.value,
+);
 
 // After 30 s without a frame the answering line goes quiet; the clock runs only while a turn does.
 const clock = ref(Date.now());
@@ -680,7 +675,7 @@ const voiceNotice = computed<ComposerNotice | null>(() => {
   const line = voice.helperLine.value;
   if (!line) return null;
   if (voice.action.value === "how") {
-    const help = micHelpUrl(voice.brand());
+    const help = micHelpUrl(voice.brand() ?? helpBrand());
     return {
       id: "voice",
       tone: "warning",
@@ -769,7 +764,9 @@ const draftNotice = computed<ComposerNotice | null>(() => {
       id: "queued",
       tone: "info",
       title: t("assistant.composer.queued", { count: 1 }),
-      sentence: t("assistant.composer.queuedSentence"),
+      sentence: queueRefused.value
+        ? t("assistant.composer.queuedAlreadySentence")
+        : t("assistant.composer.queuedSentence"),
       links: [{ action: "editQueued", label: t("assistant.composer.queuedEdit") }],
     };
   const entry = liveSid.value ? store.entryNotice(liveSid.value) : null;
@@ -795,10 +792,6 @@ const offerNotice = computed<ComposerNotice | null>(() => {
       t("assistant.composer.imagesDropped", { count: droppedImages.value }, droppedImages.value),
       "info",
     );
-  if (attachNotice.value)
-    return sentenceNotice("attach", t("assistant.attach.saved"), "info", [
-      { action: "attachOk", label: t("assistant.attach.ok") },
-    ]);
   return null;
 });
 
@@ -1133,8 +1126,13 @@ function trySend(): void {
     .finally(refreshRecall);
 }
 
-// Enter while this tab's answer streams queues one message; a second one, or a run in another tab, waits instead.
+// Enter while this tab's answer streams queues one message; a second one is refused with both texts kept as they are.
 function queueOrHold(id: Sid): void {
+  if (!elsewhere.value && queue.queued.value) {
+    trackAssistant("ai_composer_enter_blocked", { reason: "running" });
+    queueRefused.value = true;
+    return say(t("assistant.composer.queuedAlreadySentence"));
+  }
   if (!elsewhere.value && hasContent.value && queue.enqueue(text.value)) {
     store.setDraft(id, { text: "" });
     return say(t("assistant.composer.queued", { count: 1 }));
@@ -1438,8 +1436,17 @@ function openHref(href: string | null): void {
   if (href) openTabWithoutOpener(href);
 }
 
+// With text in the field, Edit swaps it with the queued message, so neither is lost and nothing is joined.
 function editQueued(): void {
-  queue.edit();
+  const id = liveSid.value;
+  const typed = id ? (store.state.sessions[id]?.composer.text ?? "") : "";
+  queueRefused.value = false;
+  if (!id || !typed.trim()) return queue.edit();
+  const item = takeQueued(id);
+  if (!item) return;
+  queue.enqueue(typed);
+  store.setDraft(id, { text: item.text });
+  void nextTick(() => focusInput("end"));
 }
 
 function retryRefused(): void {
@@ -1453,7 +1460,7 @@ const NOTICE_HANDLERS: Record<NoticeAction, () => void> = {
   goToRequest: () => goToRequest(),
   replyCancel: () => leaveReply(),
   askAdmin: () => undefined,
-  micHelp: () => openHref(micHelpUrl(voice.brand())),
+  micHelp: () => openHref(micHelpUrl(voice.brand() ?? helpBrand())),
   voiceRetry: () => voice.retry(),
   turnOn: turnOnVoice,
   showRunning: () => emit("show-running"),
@@ -1463,19 +1470,11 @@ const NOTICE_HANDLERS: Record<NoticeAction, () => void> = {
   bringDraft: () => undoClear(),
   editQueued,
   pasteInline: () => pasteInline(),
-  attachOk: () => dismissAttachNotice(),
   startNew: () => startNew(),
 };
 
 function onNoticeAction(action: NoticeAction): void {
   NOTICE_HANDLERS[action]();
-}
-
-function dismissAttachNotice(): void {
-  attachDismissed.value = true;
-  const key = store.state.userOrgKey;
-  if (key) markHintSeen(key, "attachSaved");
-  void nextTick(() => focusInput("end"));
 }
 
 // The whole staged payload moves, so the new chat sends exactly what this one would have (S8).
@@ -1573,6 +1572,13 @@ watch(
     if (busyLeft.value > 0) busyTimer = setInterval(tick, 1_000);
   },
   { immediate: true },
+);
+
+watch(
+  () => queue.queued.value,
+  (item) => {
+    if (!item) queueRefused.value = false;
+  },
 );
 
 // The original chat keeps what was dictated: a switch, a hide or an org change settles there (`40` §1.8.3).

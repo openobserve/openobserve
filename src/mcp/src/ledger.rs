@@ -516,7 +516,19 @@ pub async fn finish(
         (_, _, Some(_)) if ok && plan.mutes => muted_downtime(response.as_ref()),
         _ => None,
     };
-    let recorded = recorded(plan, before, after, resource_id, (ok, status_code));
+    let (kind, org_id) = (plan.kind, plan.org_id.clone());
+    let mut recorded = recorded(plan, before, after, resource_id, (ok, status_code));
+    // A call on an object's sub-path, such as a mute, names the object by id only.
+    if let (Some(kind), Some(id), None) = (
+        kind,
+        recorded.resource_id.as_deref(),
+        &recorded.resource_name,
+    ) {
+        recorded.resource_name = match fetch(kind, &org_id, id, auth).await {
+            Snapshot::Found(object) => kind.object_name(&object),
+            _ => None,
+        };
+    }
     match RECORDER.get() {
         Some(recorder) if recorded.approval_id.is_some() => {
             recorder.record_approved(recorded).await;
@@ -1663,8 +1675,23 @@ mod tests {
         let planned = plan("o", &metadata, &arguments, Some(&approved)).unwrap();
         let before = planned.before(Some("Basic x")).await;
         finish(planned, before, 200, "{}", Some("Basic x")).await;
+        {
+            let rows = rows.0.lock().unwrap();
+            assert_eq!(rows.len(), 2, "stored before the MCP answer goes back");
+            assert_eq!(rows[1].approval_id.as_deref(), Some("ap1"));
+        }
+
+        let mute = tool("MuteAlert", "POST", MUTE_PATH, &[("alert_id", "path")]);
+        let arguments = json!({"org_id": "o", "alert_id": "a1", "request_body": {"minutes": 5}});
+        let planned = plan("o", &mute, &arguments, Some(&approved)).unwrap();
+        let before = planned.before(Some("Basic x")).await;
+        finish(planned, before, 201, r#"{"downtime_id":"dt1"}"#, None).await;
         let rows = rows.0.lock().unwrap();
-        assert_eq!(rows.len(), 2, "stored before the MCP answer goes back");
-        assert_eq!(rows[1].approval_id.as_deref(), Some("ap1"));
+        assert_eq!(rows[2].resource_id.as_deref(), Some("a1"));
+        assert_eq!(
+            rows[2].resource_name.as_deref(),
+            Some("cpu"),
+            "a mute names its alert"
+        );
     }
 }

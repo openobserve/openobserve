@@ -27,18 +27,21 @@ import {
   type PropType,
   type ShallowRef,
 } from "vue";
+import { useRouter } from "vue-router";
 
 import { gt } from "@/types/i18n";
 
 import {
   CLASSES,
   contentHash,
+  entityKindOf,
   EXTERNAL_REL,
   PART_CHARS,
   PART_LINES,
   parseBlock,
   parseUrl,
   plainResult,
+  PROSE_CLASSES,
   SAFE_DATA_IMAGE,
   SYNTAX_CLASSES,
   type MarkdownPart,
@@ -84,6 +87,9 @@ const BUMP_FRAME_PARTS = 24;
 
 // A code block's component costs more than its characters: its toolbar, copy button and highlight spans.
 const CODE_WEIGHT = 2_048;
+
+// A sentence stops at . ! or ? before a space or the end, so "1.5" and "a.b" never end it.
+const SENTENCE_STOP = /[.!?](?=\s|$)/;
 
 // Per tab (sessionStorage, which survives the tab's reload after a crash): the block the worker is parsing, and the one in flight at the last crash with its count (Q3).
 const PARSING_KEY = "o2.assistant.markdownParsing";
@@ -393,6 +399,8 @@ export const AssistantMarkdownPart = defineComponent({
     part: { type: Object as PropType<SlicedPart>, required: true },
     htmlClass: { type: String, default: "" },
     textClass: { type: String, default: "" },
+    /** The part opens the answer, so its first sentence is the lead; a plain fallback part stays one text node. */
+    lead: { type: Boolean, default: false },
     /** The part belongs to the streaming answer, which fills before anything else. */
     live: { type: Boolean, default: false },
   },
@@ -413,14 +421,52 @@ export const AssistantMarkdownPart = defineComponent({
         } else {
           node.className = props.htmlClass;
           delete node.dataset.test;
-          node.replaceChildren(sanitize(part.html));
+          const html = sanitize(part.html);
+          const first = [...html.childNodes].find((child) => !blankText(child));
+          if (props.lead && first instanceof HTMLParagraphElement) markLead(first);
+          node.replaceChildren(html);
         }
         if (announce) announceFill(node);
       },
     });
-    return () => h("div", { ref: el });
+    const router = useRouter();
+    // An entity link opens in the app without a reload; a modified click keeps the browser's new-tab behaviour.
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const href = (event.target as Element | null)
+        ?.closest?.("a[data-entity]")
+        ?.getAttribute("href");
+      if (!href || !router) return;
+      event.preventDefault();
+      const base = router.options.history.base;
+      void router
+        .push(base && href.startsWith(base) ? href.slice(base.length) || "/" : href)
+        .catch(() => undefined);
+    };
+    return () => h("div", { ref: el, onClick });
   },
 });
+
+/** Wraps the first sentence of `parent` in the lead span; a quote, list or heading first is no lead, and neither are later paragraphs. */
+export function markLead(parent: Node): void {
+  const doc = parent.ownerDocument ?? document;
+  const span = doc.createElement("span");
+  span.className = PROSE_CLASSES.lead;
+  span.dataset.test = "assistant-lead";
+  for (const child of [...parent.childNodes]) {
+    const end = sentenceEnd(child);
+    if (end === null) {
+      span.append(child);
+      continue;
+    }
+    if (child.nodeType === Node.TEXT_NODE && end < (child.textContent ?? "").length)
+      (child as Text).splitText(end);
+    span.append(child);
+    break;
+  }
+  if (span.textContent?.trim()) parent.insertBefore(span, parent.firstChild);
+}
 
 /** A code block: plain `<pre>` text first, the highlighted `OCodeBlock` in its own slice of the same queue (Z2). */
 export const AssistantMarkdownCode = defineComponent({
@@ -846,6 +892,18 @@ function sanitize(html: string): DocumentFragment {
   const fragment = DOMPurify.sanitize(html, { ...PURIFY, RETURN_DOM_FRAGMENT: true });
   fragment.querySelectorAll("a").forEach((link) => {
     const url = parseUrl(link.getAttribute("href"), origin);
+    // Only the renderer's entity link stays in app; it opens in place, so it takes no target.
+    if (
+      url?.origin === origin &&
+      link.getAttribute("class") === CLASSES.entityLink &&
+      entityKindOf(url)
+    ) {
+      link.removeAttribute("target");
+      link.removeAttribute("rel");
+      link.setAttribute("href", url.pathname + url.search + url.hash);
+      link.setAttribute("data-entity", entityKindOf(url)!);
+      return;
+    }
     if (!url || (url.protocol !== "http:" && url.protocol !== "https:") || url.origin === origin) {
       link.replaceWith(...Array.from(link.childNodes));
       return;
@@ -863,6 +921,7 @@ function sanitize(html: string): DocumentFragment {
     const slot = document.createElement("span");
     slot.setAttribute("data-claim", index);
     node.replaceWith(slot);
+    glueToWord(slot);
   });
   fragment.querySelectorAll("img").forEach((img) => {
     if (!SAFE_DATA_IMAGE.test(img.getAttribute("src") ?? "")) img.remove();
@@ -1032,4 +1091,34 @@ function workerParser(): MarkdownParser {
       pending = null;
     },
   };
+}
+
+// Where a node's first sentence ends, past its stop; null while the sentence goes on. An element is never split.
+function sentenceEnd(node: Node): number | null {
+  const text = node.textContent ?? "";
+  const stop = SENTENCE_STOP.exec(text);
+  if (!stop) return null;
+  return node.nodeType === Node.TEXT_NODE ? stop.index + 1 : text.length;
+}
+
+function blankText(node: Node): boolean {
+  return node.nodeType === Node.TEXT_NODE && !node.textContent?.trim();
+}
+
+// A chip wraps with the word it cites, so it never starts a line where it reads as that number's next digit.
+function glueToWord(slot: HTMLElement): void {
+  const before = slot.previousSibling;
+  if (before instanceof HTMLElement && before.getAttribute("class") === CLASSES.claimGlue) {
+    before.append(slot);
+    return;
+  }
+  if (before?.nodeType !== Node.TEXT_NODE) return;
+  const text = before.textContent ?? "";
+  const word = /\S{1,64}$/.exec(text)?.[0];
+  if (!word) return;
+  const glue = document.createElement("span");
+  glue.setAttribute("class", CLASSES.claimGlue);
+  before.textContent = text.slice(0, text.length - word.length);
+  slot.replaceWith(glue);
+  glue.append(word, slot);
 }

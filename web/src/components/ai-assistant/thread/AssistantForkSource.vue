@@ -126,6 +126,7 @@ export interface AssistantForkSourceProps {
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useQueryClient } from "@tanstack/vue-query";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
@@ -133,7 +134,10 @@ import { statusOfError } from "@/components/ai-assistant/share/chatShare";
 import { forkSeedOf } from "@/components/ai-assistant/shared/forkMemory";
 import { projectSharedRecord } from "@/components/ai-assistant/shared/sharedRecord";
 import AssistantTranscript from "@/components/ai-assistant/transcript/AssistantTranscript.vue";
-import { rememberedBranch } from "@/components/ai-assistant/transcript/useBranchChat";
+import {
+  openChatInPlace,
+  rememberedBranch,
+} from "@/components/ai-assistant/transcript/useBranchChat";
 import { useAssistantSession, useAssistantStore, type ForkSeed } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -153,6 +157,7 @@ const props = defineProps<AssistantForkSourceProps>();
 const { t } = useI18nTyped();
 const view = useAssistantSession(() => props.sid);
 const store = useAssistantStore();
+const router = useRouter();
 const queryClient = useQueryClient();
 const { mdUp } = useBreakpoint();
 
@@ -218,13 +223,13 @@ onMounted(async () => {
   }
 });
 
-// The source opens where this chat is; nothing in it re-runs.
+// The source opens where this chat is, and the full view's URL follows it; nothing in it re-runs.
 function openBranchSource(): void {
   const sid = branch.value?.sessionId;
   if (!sid) return;
-  void store
-    .openSession({ sid }, { focus: true })
-    .catch(() => toast({ variant: "error", message: t("assistant.history.openFailed") }));
+  void openChatInPlace(store, router, sid).catch(() =>
+    toast({ variant: "error", message: t("assistant.history.openFailed") }),
+  );
 }
 
 function sendAnyway(): void {

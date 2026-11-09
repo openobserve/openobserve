@@ -34,6 +34,7 @@ import {
   type StepResult,
 } from "./evidence";
 import { contextUsedKeys } from "./frames";
+import { approvalToolEntity } from "./approvalAnatomy";
 import type {
   ApprovalKind,
   ApprovalResultItem,
@@ -91,6 +92,10 @@ const MAX_TOTAL = 100_000;
 const MAX_IMPACT = 20;
 
 const MAX_LINE_CHARS = 300;
+
+const MAX_RESOLVED_ITEMS = 50;
+
+const RESOLVED_SCOPES: ReadonlySet<unknown> = new Set(["once", "chat", "always"]);
 
 const MAX_QUESTION_CHARS = 2_000;
 
@@ -190,7 +195,23 @@ export interface ResolvedBlockData {
   detail?: string;
   /** Read back from the stored chat: the reader's own decision, never one heard from another tab. */
   recorded?: boolean;
+  /** How long an approve was granted for, as the server stored it. */
+  scope?: ResolvedScope;
+  /** Each target's result, which a reopened chat reads from the stored resolution or the activity ledger. */
+  items?: ApprovalResultItem[];
+  /** A write the user's standing grant let run with no card before it (`by === "grant"`). */
+  grant?: ResolvedGrant;
 }
+
+/** The grant a `by: "grant"` resolution ran under; no `id` once it was revoked. */
+export interface ResolvedGrant {
+  id?: string;
+  tool: string;
+  operation?: string;
+  targets: ApprovalTarget[];
+}
+
+export type ResolvedScope = "once" | "chat" | "always";
 
 export type ResolvedOutcome = "approved" | "denied" | "failed" | "partial" | "skipped";
 
@@ -272,6 +293,8 @@ export interface StreamExtras {
   toolErrors: number;
   /** Validated against the roster by the engine; any text of the answer is never read for one. */
   handoffSuggested?: { agent: string; reason: string };
+  /** Changes a standing grant let run that no unreviewed notice counted yet, by resource type and source. */
+  grantedWrites?: Record<string, { tools: number; frames: number }>;
 }
 
 export type StreamEffect =
@@ -1136,9 +1159,52 @@ function typedResolved(state: StreamState, data: any, phase: StreamPhase): Strea
     ...(RESOLVED_OUTCOMES.has(data.outcome) && { outcome: data.outcome }),
     ...(SKIP_CODES.has(data.code) && { code: data.code }),
     ...(typeof data.detail === "string" && { detail: data.detail.slice(0, MAX_LINE_CHARS) }),
+    ...(RESOLVED_SCOPES.has(data.scope) && { scope: data.scope }),
+    ...resolvedItemsOf(data.items),
+    ...grantOf(data),
   };
   appendBlock(state, { type: "approval_result", resolved });
+  if (resolved.grant && resolved.approved) settleGrantedWrite(state, resolved.grant);
   return phase === "live" ? [{ kind: "approval_resolved", frame: data }] : [];
+}
+
+// A stored resolution's per-target results; a malformed item is dropped, never guessed.
+function resolvedItemsOf(raw: unknown): { items?: ApprovalResultItem[] } {
+  if (!Array.isArray(raw)) return {};
+  const items = raw.slice(0, MAX_RESOLVED_ITEMS).flatMap((item): ApprovalResultItem[] => {
+    if (!isRecord(item) || typeof item.name !== "string") return [];
+    const skipped = skippedApprovalItem(item);
+    const status = skipped?.status ?? (item.status === "failed" ? "failed" : "done");
+    if (!skipped && item.status !== "done" && item.status !== "failed") return [];
+    return [
+      {
+        type: typeof item.type === "string" ? item.type.slice(0, MAX_TOOL_CHARS) : "",
+        name: item.name.slice(0, MAX_LINE_CHARS),
+        status,
+        ...(typeof item.id === "string" && item.id && { id: item.id.slice(0, 200) }),
+        ...(typeof item.message === "string" && { message: item.message.slice(0, MAX_LINE_CHARS) }),
+        ...(typeof item.ledger_id === "string" && { ledgerId: item.ledger_id.slice(0, 200) }),
+        ...(item.undoable === true && { undoable: true }),
+        ...skipped,
+      },
+    ];
+  });
+  return items.length ? { items } : {};
+}
+
+// A write run under a standing grant names its tool and targets; the frame has no card to read them from.
+function grantOf(data: any): { grant?: ResolvedGrant } {
+  if (data.by !== "grant" || typeof data.tool !== "string" || !data.tool) return {};
+  const id = boundedId(typeof data.grant_id === "string" ? data.grant_id : undefined);
+  return {
+    grant: {
+      tool: data.tool.slice(0, MAX_TOOL_CHARS),
+      targets: targetsOf({ targets: Array.isArray(data.targets) ? data.targets : [] }, {}),
+      ...(id && { id }),
+      ...(typeof data.operation === "string" &&
+        data.operation && { operation: data.operation.slice(0, MAX_TOOL_CHARS) }),
+    },
+  };
 }
 
 /** A delete by kind, operation or tool name: never granted for longer than once, whatever the wire says. */
@@ -1253,7 +1319,17 @@ function targetsOf(data: any, args: Record<string, unknown>): ApprovalTarget[] {
     if (!name) return [];
     const id = boundedId(typeof target?.id === "string" ? target.id : undefined);
     const type = typeof target?.type === "string" ? target.type.slice(0, 40).toLowerCase() : "";
-    return [{ type: type || "object", name, ...(id && { id }) }];
+    return [
+      {
+        type: type || "object",
+        name,
+        ...(id && { id }),
+        ...(target?.after !== undefined && { after: boundedJson(target.after) }),
+        ...(target?.before !== undefined && { before: boundedJson(target.before) }),
+        ...(typeof target?.before_digest === "string" &&
+          DIGEST.test(target.before_digest) && { beforeDigest: target.before_digest }),
+      },
+    ];
   });
 }
 
@@ -1267,6 +1343,11 @@ function noteUnreviewed(
   const blocks = lastMessageOf(state)?.contentBlocks ?? [];
   if (blocks.some((block) => block.type === "approval")) return;
   const type = resourceType.slice(0, 40).toLowerCase() || "object";
+  const credit = state.extras?.grantedWrites?.[type];
+  if (credit && credit[source] > 0) {
+    credit[source] -= 1;
+    return;
+  }
   const known = blocks.find(
     (block) => block.policy?.kind === "unreviewed" && block.policy.resourceType === type,
   );
@@ -1284,6 +1365,27 @@ function noteUnreviewed(
   };
   if (known) known.policy = next;
   else if (blocks.length < MAX_STEPS) appendBlock(state, { type: "policy", policy: next });
+}
+
+// A write a standing grant let run was allowed by the user, so it leaves whichever notice counted it, or the next one that would.
+function settleGrantedWrite(state: StreamState, grant: ResolvedGrant): void {
+  const type = (grant.targets[0]?.type || approvalToolEntity(grant) || "object").toLowerCase();
+  const blocks = lastMessageOf(state)?.contentBlocks ?? [];
+  const index = blocks.findIndex(
+    (block) => block.policy?.kind === "unreviewed" && block.policy.resourceType === type,
+  );
+  const policy = blocks[index]?.policy;
+  const counted = { tools: policy?.tools ?? 0, frames: policy?.frames ?? 0 };
+  const extras = (state.extras ??= emptyExtras());
+  const credit = ((extras.grantedWrites ??= {})[type] ??= { tools: 0, frames: 0 });
+  for (const source of ["tools", "frames"] as const) {
+    if (counted[source] > 0) counted[source] -= 1;
+    else credit[source] += 1;
+  }
+  if (!policy) return;
+  const count = Math.max(counted.tools, counted.frames);
+  if (!count) blocks.splice(index, 1);
+  else blocks[index].policy = { ...policy, ...counted, count };
 }
 
 function heldByCard(state: StreamState, callId: string | undefined): boolean {

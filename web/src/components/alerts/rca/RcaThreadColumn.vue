@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <aside
     data-test="rca-thread-column"
     :data-variant="variant"
-    class="flex min-h-0 flex-col"
+    class="flex flex-col"
     :class="
       variant === 'inline'
-        ? 'flex-1'
-        : 'border-border-default bg-surface-panel flex-none border-t max-lg:h-144 lg:h-full lg:border-s lg:border-t-0'
+        ? 'flex-none'
+        : 'border-border-default bg-surface-panel min-h-0 flex-none border-t max-lg:h-144 lg:h-full lg:border-s lg:border-t-0'
     "
     :aria-label="t('alerts.incidents.rcaThread.title')"
   >
@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       ref="scrollArea"
-      class="flex min-h-0 flex-1 flex-col gap-3.5"
-      :class="variant === 'inline' ? '' : 'overflow-auto px-4 py-3.5'"
+      class="flex flex-col gap-3.5"
+      :class="variant === 'inline' ? 'flex-none' : 'min-h-0 flex-1 overflow-auto px-4 py-3.5'"
     >
       <!-- A finished run's activity folds into one line; the record above is the answer. -->
       <button
@@ -403,16 +403,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <RcaSteerComposer
-      v-if="runLive && canSteer && send"
-      ref="composer"
-      :run-id="thread?.run_id ?? ''"
-      :waiting-input="runState === 'waiting_input'"
-      :open-question="steering?.open_question ?? null"
-      :author-email="authorEmail"
-      :sending="sending"
-      :send="sendFromComposer"
-    />
+    <!-- Inline, the panel's scroller owns the pinned dock; the composer keeps its state here -->
+    <Teleport v-if="runLive && canSteer && send" :to="composerDock" :disabled="!composerDock">
+      <RcaSteerComposer
+        ref="composer"
+        :run-id="thread?.run_id ?? ''"
+        :waiting-input="runState === 'waiting_input'"
+        :open-question="steering?.open_question ?? null"
+        :author-email="authorEmail"
+        :sending="sending"
+        :send="sendFromComposer"
+      />
+    </Teleport>
     <!-- A finished run takes no messages: the closed line and the one Re-analyze replace the composer. -->
     <footer
       v-else-if="runState && !runLive"
@@ -523,6 +525,8 @@ const props = withDefaults(
     startLockedReason?: I18nText;
     /** A new run is being started. */
     reanalyzing?: boolean;
+    /** Inline: the element pinned to the bottom of the panel's scroller that holds the steer composer. */
+    composerDock?: HTMLElement | null;
   }>(),
   {
     canResume: false,
@@ -541,6 +545,7 @@ const props = withDefaults(
     variant: "column",
     startLockedReason: undefined,
     reanalyzing: false,
+    composerDock: null,
   },
 );
 

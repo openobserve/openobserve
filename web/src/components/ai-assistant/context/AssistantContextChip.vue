@@ -34,7 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-label="name"
       :aria-haspopup="popup && !inert ? 'dialog' : undefined"
       :aria-expanded="popup && !inert ? expanded : undefined"
-      class="max-w-full min-w-0 motion-safe:transition-colors max-md:min-h-11 pointer-coarse:min-h-11 [&>button]:-my-0.5"
+      :class="[
+        'max-w-full min-w-0 motion-safe:transition-colors [&>button]:-my-0.5',
+        inert ? '' : CHIP_HIT_AREA_CLASS,
+      ]"
       data-test="assistant-context-chip-button"
       @click="onClick"
       @keydown="onKeydown"
@@ -90,6 +93,7 @@ export interface AssistantContextChipEmits {
 import { computed } from "vue";
 
 import { chipGlyph } from "@/components/ai-assistant/common/glyphs";
+import { CHIP_HIT_AREA_CLASS } from "@/components/ai-assistant/composer/composerUi";
 import { chipSecondaryOf, chipStateOf } from "@/composables/assistant";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";

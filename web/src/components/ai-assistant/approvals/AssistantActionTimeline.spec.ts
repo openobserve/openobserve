@@ -16,7 +16,11 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 
+import { ledgerFromActivity } from "@/composables/assistant/historyRecords";
 import type { ActionLedgerEntry } from "@/composables/assistant/pure";
+import { approvalOf } from "@/composables/assistant/reducer";
+import type { ChatMessage } from "@/ts/interfaces/chat";
+import { raw } from "@/types/i18n";
 
 import AssistantActionTimeline from "./AssistantActionTimeline.vue";
 import { assistantApprovalsHostKey } from "./approvals.types";
@@ -68,6 +72,22 @@ describe("AssistantActionTimeline", () => {
     await expand(wrapper);
     expect(wrapper.get('[data-test="assistant-action-entry-c9:0"]').text()).toMatch(
       /^Deleted alert checkout-latency-old · approved by you · /,
+    );
+  });
+
+  it("B-approvals-rca-P3-3: calls a pause a pause, by its verb or, on an older entry, by its tool", async () => {
+    const { wrapper } = mountTimeline([
+      entry({ id: "p1", tool: "MuteAlert", op: "update", verb: "pause" }),
+      entry({ id: "p2", tool: "MuteAlert", op: "update" }),
+      entry({ id: "u1", tool: "UpdateAlert", op: "update" }),
+    ]);
+    await expand(wrapper);
+    for (const id of ["p1", "p2"])
+      expect(wrapper.get(`[data-test="assistant-action-entry-${id}"]`).text()).toMatch(
+        /^(Paused alert|assistant\.actions\.op\.pause) checkout-latency-old · approved by you/,
+      );
+    expect(wrapper.get('[data-test="assistant-action-entry-u1"]').text()).toMatch(
+      /^Updated alert checkout-latency-old/,
     );
   });
 
@@ -160,6 +180,62 @@ describe("AssistantActionTimeline", () => {
     await expand(wrapper);
     expect(wrapper.get('[data-test="assistant-action-entry-c9:0"]').text()).toMatch(
       /^Couldn't complete this: checkout-latency-old · error · /,
+    );
+  });
+  it("B-approvals-rca-V1: a reopened chat's undone update reads Restored, never 'Undo isn't available yet'", async () => {
+    // The card and the server's /ai/activity row of chat U, as the reopened chat reads them.
+    const card = approvalOf({
+      type: "confirmation_required",
+      call_id: "apr_0571448ac209ae1d1703",
+      kind: "update",
+      operation: "UpdateAlert",
+      tool: "UpdateAlert",
+      targets: [
+        {
+          type: "alert",
+          id: "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+          name: "ta_approvals_rca_update_target",
+        },
+      ],
+    });
+    const message: ChatMessage = {
+      role: "assistant",
+      content: raw(""),
+      contentBlocks: [
+        { type: "approval", approval: card },
+        {
+          type: "approval_result",
+          resolved: { id: card.id, approved: true, recorded: true, at: 1_794_240_993_000 },
+        },
+      ],
+    };
+    const ledger = ledgerFromActivity(
+      [message],
+      [
+        {
+          id: "3LsRsIUqfPV6lpNIYWwwn2iyx3d",
+          at: 1_794_240_993_504_594,
+          tool: "UpdateAlert",
+          target: {
+            type: "alert",
+            id: "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+            name: "ta_approvals_rca_update_target",
+          },
+          approval: { kind: "approved", by: "ta_rca2@example.com", id: "apr_0571448ac209ae1d1703" },
+          result: { state: "undone" },
+          undo: { available: false, until: 1_794_327_393_504_594, reason: "already_undone" },
+          chat_id: "01a1c118-7db5-72e6-b966-ebff23ab4ece",
+        },
+      ],
+    );
+    expect(ledger).toHaveLength(1);
+    const { wrapper } = mountTimeline(ledger);
+    await expand(wrapper);
+    expect(wrapper.get(`[data-test="assistant-action-entry-${ledger[0].id}"]`).text()).toContain(
+      "Restored",
+    );
+    expect(wrapper.get('[data-test="assistant-action-timeline-limits"]').text()).not.toContain(
+      "Undo isn't available yet",
     );
   });
 });

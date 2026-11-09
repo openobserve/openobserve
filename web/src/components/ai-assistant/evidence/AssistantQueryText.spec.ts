@@ -81,4 +81,21 @@ describe("AssistantQueryText", () => {
     await flushPromises();
     expect(wrapper.get('[data-test="q-copy"]').attributes("data-done")).toBeUndefined();
   });
+
+  it("B-conversation-20: says how many lines a capped block hides and opens it in place", async () => {
+    const text = Array.from({ length: 30 }, (_, i) => `.f${i} = to_int!(.v${i})`).join("\n");
+    const wrapper = mountText({ text, language: "vrl", chrome: true });
+    const toggle = wrapper.get('[data-test="q-expand"]');
+    const capped = () => wrapper.get('[data-test="q"]').html().includes("max-height");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    expect(capped()).toBe(true);
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+    expect(capped()).toBe(false);
+  });
+
+  it("B-conversation-20: offers no expand control for a block within the cap", () => {
+    const wrapper = mountText({ text: "SELECT 1", chrome: true });
+    expect(wrapper.find('[data-test="q-expand"]').exists()).toBe(false);
+  });
 });

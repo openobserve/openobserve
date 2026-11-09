@@ -168,7 +168,9 @@ describe("HomeNowRow", () => {
     expect(wrapper.get('[data-test="home-now-row-state"]').classes()).toContain(
       "@[40rem]/row:w-36",
     );
-    expect(wrapper.get('[data-test="home-now-row-changed"]').classes()).toContain("w-12");
+    expect(wrapper.get('[data-test="home-now-row-changed"]').classes()).toContain(
+      "@[40rem]/row:w-12",
+    );
     expect(wrapper.get('[data-test="home-now-row-actions"]').classes()).toContain(
       "@[40rem]/row:w-64",
     );
@@ -179,6 +181,16 @@ describe("HomeNowRow", () => {
     ).toBeLessThanOrEqual(1);
   });
 
+  it("on a narrow row shows the time and starts it and the actions under the name, not after the pill", () => {
+    const wrapper = mountRow({ row: alert });
+    const changed = wrapper.get('[data-test="home-now-row-changed"]').classes();
+    expect(changed).not.toContain("max-md:hidden");
+    expect(changed).toEqual(expect.arrayContaining(["basis-full", "ps-7"]));
+    const actions = wrapper.get('[data-test="home-now-row-actions"]').classes();
+    expect(actions).toEqual(expect.arrayContaining(["basis-full", "justify-start", "ps-7"]));
+    expect(wrapper.get('[data-test="home-now-row-state"]').classes()).not.toContain("ps-6");
+  });
+
   it("draws a flapping alert amber and a recovered one as a neutral outline, never green", () => {
     const recovered = { ...alert, state: "recovered" as const, count: 1 };
     const flapping = mountRow({
@@ -186,6 +198,7 @@ describe("HomeNowRow", () => {
       meta: { service: null, repeats: 3, flapping: true },
     });
     expect(flapping.get('[data-test="home-now-row-flapping"]').text()).toBe("Flapping · 1×");
+    expect(flapping.get('[data-test="home-state-mark"]').attributes("data-flapping")).toBe("true");
     expect(flapping.find('[data-test="home-now-row-recovered"]').exists()).toBe(false);
     const quiet = mountRow({ row: recovered });
     const tag = quiet.get('[data-test="home-now-row-recovered"]');

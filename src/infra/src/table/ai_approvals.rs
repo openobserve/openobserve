@@ -124,6 +124,33 @@ pub async fn decide_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
+/// Replaces the stored resolution of a card already decided as `decision.status`, never its status.
+pub async fn amend_resolution(
+    org_id: &str,
+    id: &str,
+    decision: &Decision<'_>,
+) -> Result<bool, errors::Error> {
+    amend_resolution_with(get_orm_client_rw().await, org_id, id, decision).await
+}
+
+pub async fn amend_resolution_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    decision: &Decision<'_>,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::Resolved, Expr::value(decision.resolved))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(id))
+        .filter(Column::Status.eq(decision.status))
+        .filter(Column::Status.ne(STATUS_PENDING))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected == 1)
+}
+
 /// Moves a pending card's expiry (microseconds) and stored frame to what o2-ai extended it to.
 pub async fn extend(
     org_id: &str,
@@ -310,6 +337,39 @@ mod tests {
         assert_eq!(row.status, STATUS_APPROVED);
         assert_eq!(row.scope.as_deref(), Some("chat"));
         assert!(get_with(&db, "globex", "apr_1").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn only_a_decided_cards_resolution_is_amended_and_its_status_kept() {
+        let db = db().await;
+        insert_pending_with(&db, &card("apr_1"), NOW).await.unwrap();
+        let stamped = Decision {
+            resolved: r#"{"approved":true,"outcomes":[{"ledger_id":"r1"}]}"#,
+            ..APPROVE
+        };
+        assert!(
+            !amend_resolution_with(&db, ORG, "apr_1", &stamped)
+                .await
+                .unwrap()
+        );
+        decide_with(&db, ORG, "apr_1", &APPROVE, NOW).await.unwrap();
+        let deny = Decision {
+            status: STATUS_DENIED,
+            ..stamped
+        };
+        assert!(
+            !amend_resolution_with(&db, ORG, "apr_1", &deny)
+                .await
+                .unwrap()
+        );
+        assert!(
+            amend_resolution_with(&db, ORG, "apr_1", &stamped)
+                .await
+                .unwrap()
+        );
+        let row = get_with(&db, ORG, "apr_1").await.unwrap().unwrap();
+        assert_eq!(row.status, STATUS_APPROVED);
+        assert_eq!(row.resolved.as_deref(), Some(stamped.resolved));
     }
 
     #[tokio::test]

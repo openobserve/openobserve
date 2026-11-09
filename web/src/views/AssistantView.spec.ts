@@ -27,7 +27,7 @@ import type { AssistantCapability, GateCode } from "@/composables/assistant";
 import { SHELL_ROUTE_CONTEXT } from "@/components/ai-assistant/shell/AssistantShell.vue";
 import { closeLockedPanel } from "@/components/ai-assistant/shell/lockedPanel";
 
-import AssistantView, { chatRef, viewFor } from "./AssistantView.vue";
+import AssistantView, { chatRef, RAIL_DEFAULT_REM, railPx, viewFor } from "./AssistantView.vue";
 
 const SID = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
 
@@ -116,6 +116,17 @@ describe("AssistantView", () => {
     expect(store.focusRequest.value?.target).toBe("composer");
     expect(wrapper.find('[data-test="assistant-shell-full"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-welcome"]').exists()).toBe(true);
+  });
+
+  it("opens the Threads rail at the board's width, not the layout's 230px default", async () => {
+    const { wrapper } = await setup();
+    await flushPromises();
+    const layout = wrapper.findComponent({ name: "OPageLayout" });
+    expect(layout.props("sidebarWidth")).toBe(railPx(RAIL_DEFAULT_REM));
+    expect(railPx(RAIL_DEFAULT_REM)).toBeGreaterThanOrEqual(340);
+    const [min, max] = layout.props("splitterLimits") as [number, number];
+    expect(min).toBeLessThan(railPx(RAIL_DEFAULT_REM));
+    expect(max).toBeGreaterThan(railPx(RAIL_DEFAULT_REM));
   });
 
   it("starts a new chat on the window the previous chat was asking about", async () => {
@@ -371,6 +382,15 @@ describe("AssistantView", () => {
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("home");
     expect(router.currentRoute.value.query.thread).toBeUndefined();
+  });
+
+  it("keeps the Home button to its icon on a phone, still named Home, so the thread title is not cut", async () => {
+    const { wrapper } = await setup("/assistant");
+    await flushPromises();
+    const back = wrapper.get('[data-test="assistant-view-back-home"]');
+    expect(back.attributes("aria-label")).toBe("Home");
+    expect(back.get("span.max-md\\:sr-only").text()).toBe("Home");
+    expect(back.classes()).toEqual(expect.arrayContaining(["max-md:min-h-11", "max-md:min-w-11"]));
   });
 
   it("focuses the hero's primary action only when the locked sidebar moved here", async () => {

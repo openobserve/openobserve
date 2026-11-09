@@ -1814,15 +1814,18 @@ async fn relay_confirm_answer(answered: &Answered<'_>, response_body: &str) -> R
         return (StatusCode::OK, axum::Json(answer)).into_response();
     }
     if !extends_only(request) {
+        let rows =
+            super::activity::record_confirm(org_id, session_id, caller, request, &answer).await;
+        let now = config::utils::time::now_micros();
+        super::activity::with_ledger_ids(&mut answer, &rows, now);
+        // The stored decision keeps each target's ledger row, so a reload offers its Undo.
+        super::activity::with_ledger_ids(&mut answer["resolved"], &rows, now);
         let resolved = &answer["resolved"];
         let tool = resolved["tool"]
             .as_str()
             .or_else(|| stored.and_then(|row| row.tool.as_deref()));
-        record_decision(org_id, resolved).await;
+        record_decision(org_id, resolved, true).await;
         super::grants::record_from_confirm(org_id, session_id, caller, resolved, tool).await;
-        let rows =
-            super::activity::record_confirm(org_id, session_id, caller, request, &answer).await;
-        super::activity::with_ledger_ids(&mut answer, &rows, config::utils::time::now_micros());
         // The chat index stops reporting the confirmation as pending.
         super::turn_marks::mark_answered(org_id, session_id, caller).await;
         record_turn_decision(org_id, session_id, caller, request).await;
@@ -1974,16 +1977,20 @@ fn already_decided(row: &ai_approvals::Model) -> Response {
     confirm_refusal(409, &upstream.to_string())
 }
 
-/// Stores the decision a `confirmation_resolved` frame reports; a decided card stays as it was.
+/// Stores a frame's decision; a decided card keeps its status, and `amend` replaces its resolution.
 #[cfg(feature = "enterprise")]
-async fn record_decision(org_id: &str, resolved: &Value) {
+async fn record_decision(org_id: &str, resolved: &Value, amend: bool) {
     let Some(id) = resolved["id"].as_str().filter(|id| id.starts_with("apr_")) else {
         return;
     };
     let text = resolved.to_string();
     let decision = super::turn_marks::decision_of(resolved, &text);
     let now = config::utils::time::now_micros();
-    if let Err(e) = ai_approvals::decide(org_id, id, &decision, now).await {
+    let stored = match ai_approvals::decide(org_id, id, &decision, now).await {
+        Ok(false) if amend => ai_approvals::amend_resolution(org_id, id, &decision).await,
+        decided => decided,
+    };
+    if let Err(e) = stored {
         log::warn!("[org_id:{org_id}] decision on approval {id} not stored: {e}");
     }
 }
@@ -2008,7 +2015,7 @@ async fn record_known_decision(org_id: &str, body: &str) {
             resolved[flag] = Value::Bool(true);
         }
     }
-    record_decision(org_id, &resolved).await;
+    record_decision(org_id, &resolved, false).await;
 }
 
 /// The relay gave up waiting; the decision may still have been applied, so it says 504.

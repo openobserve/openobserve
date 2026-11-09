@@ -1009,6 +1009,40 @@ describe("HomeView", () => {
         expect((await contextRegistry.getActiveContext())?.homeNoData).toBeUndefined();
       });
 
+      it("shows the first-run state in the AI tab of an empty org without the takeover flag", async () => {
+        flagged(true);
+        localStorage.removeItem("o2_home_active_tab");
+        setFlag(false);
+        store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+        orgData.initial = false;
+        // An org with no stream lands on Overview, so the AI tab is the one a link names.
+        await router.replace({ name: "home", query: { home_tab: "ai" } });
+        try {
+          wrapper = mountHome();
+          await resolveKey("k1");
+          await settleAsync();
+          expect(has("home-ai-first-run")).toBe(true);
+          expect(has("agent-home-first-run-stub")).toBe(true);
+          expect(has("home-ai-panel")).toBe(false);
+          expect((await contextRegistry.getActiveContext())?.homeNoData).toBe(true);
+        } finally {
+          orgData.initial = true;
+          await router.replace({ path: "/" }).catch(() => undefined);
+        }
+      });
+
+      it("keeps the normal AI tab for an org with data when the takeover flag is off", async () => {
+        flagged(true);
+        localStorage.removeItem("o2_home_active_tab");
+        setFlag(false);
+        store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+        wrapper = mountHome();
+        await resolveKey("k1");
+        await settleAsync();
+        expect(has("home-ai-first-run")).toBe(false);
+        expect(has("agent-home-first-run-stub")).toBe(false);
+      });
+
       it("keeps the launcher out of the v2-off hero", async () => {
         flagged(false);
         setFlag(true);

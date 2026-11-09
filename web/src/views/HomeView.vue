@@ -165,7 +165,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
           data-test="home-full-thread"
         >
+          <HomeThreadContext />
           <AssistantView :chat-id="threadId" class="h-full" />
+        </div>
+        <div
+          v-else-if="aiFirstRun"
+          class="min-h-0 flex-1 overflow-y-auto pt-2.5"
+          data-test="home-ai-first-run"
+        >
+          <HomeNoDataContext />
+          <AgentHomeFirstRun class="mb-4" />
         </div>
         <FirstDataPanel
           v-else-if="flagOn && isDataTab"
@@ -331,8 +340,12 @@ import { useThreadUrlSync } from "@/views/home/useThreadUrl";
 import { isFullConfigLoaded } from "@/services/config.queries";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { overviewFocusListening, requestOverviewFocus } from "@/composables/goto/goToRequests";
-import { useHomeContextProvider } from "@/composables/contextProviders/homeContextProvider";
+import {
+  useHomeContextProvider,
+  useHomeWindowProvider,
+} from "@/composables/contextProviders/homeContextProvider";
 import type { OverviewNowSnapshot } from "@/composables/contextProviders/types";
+import { DEFAULT_HOME_RANGE, homePeriodOf, readHomeUrl } from "@/views/home/homeUrl";
 
 // Past this the tabs show in their default order; a key that resolves later never reorders them.
 const HOME_PREFS_WAIT_MS = 1_500;
@@ -352,10 +365,29 @@ export const NO_DATA_SNAPSHOT: OverviewNowSnapshot = {
 const HomeNoDataContext = defineComponent({
   name: "HomeNoDataContext",
   setup() {
-    useHomeContextProvider(() => NO_DATA_SNAPSHOT, useStore());
+    const route = useRoute();
+    useHomeContextProvider(
+      () => NO_DATA_SNAPSHOT,
+      useStore(),
+      () => homePeriodOfRoute(route),
+    );
     return () => null;
   },
 });
+
+// A thread at Full density on Home keeps the window it had in a panel or window over Home.
+const HomeThreadContext = defineComponent({
+  name: "HomeThreadContext",
+  setup() {
+    const route = useRoute();
+    useHomeWindowProvider(useStore(), () => homePeriodOfRoute(route));
+    return () => null;
+  },
+});
+
+function homePeriodOfRoute(route: ReturnType<typeof useRoute>) {
+  return homePeriodOf(readHomeUrl(route.query).range ?? DEFAULT_HOME_RANGE);
+}
 
 /** One dynamic import per mount, shared by the gate and the tab prefs. */
 function loadAssistant() {
@@ -769,7 +801,7 @@ export default defineComponent({
       pinnedTabPending.value = true;
     }
 
-    const { hasAnyStream, isFetching } = useOrgHasUserData(
+    const { hasAnyStream, hasUserData, isFetching } = useOrgHasUserData(
       () => store.state.selectedOrganization?.identifier ?? "",
     );
     // O2's own streams count, so the _meta org keeps the assistant; a stale cached list may be out of date
@@ -929,6 +961,10 @@ export default defineComponent({
         activeHomeTab.value === "usage" ||
         (aiHome.value && threadId.value === null),
     );
+    // Without the takeover flag nothing else notices an empty org, so the AI tab reads the stream lists itself.
+    const aiFirstRun = computed(
+      () => !flagOn.value && aiHome.value && threadId.value === null && hasUserData.value === false,
+    );
     const arrived = ref<FirstEventResult>();
     const openArrived = () => {
       const r = arrived.value;
@@ -966,6 +1002,7 @@ export default defineComponent({
       onCloseTab,
       onTabChange,
       flagOn,
+      aiFirstRun,
       isDataTab,
       arrived,
       openArrived,
@@ -975,6 +1012,7 @@ export default defineComponent({
   },
   components: {
     HomeNoDataContext,
+    HomeThreadContext,
     AssistantView: defineAsyncComponent(() => import("@/views/AssistantView.vue")),
     AgentHomeFirstRun: defineAsyncComponent(() => import("@/views/home/AgentHomeFirstRun.vue")),
     AssistantHomeTab: defineAsyncComponent(() => import("@/views/home/AssistantHomeTab.vue")),

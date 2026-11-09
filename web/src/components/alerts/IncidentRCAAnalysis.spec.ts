@@ -515,8 +515,24 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(
         "Building on the previous report…",
       );
-      await byTest(wrapper, "rca-banner-cancel-btn").trigger("click");
-      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+      expect(byTest(wrapper, "rca-banner-cancel-btn").exists()).toBe(false);
+      expect(wrapper.emitted("cancel-rca")).toBeUndefined();
+    });
+
+    it("M: inside the assistant's thread the banner offers neither Follow in thread nor Cancel", async () => {
+      wrapper = mountPanel(
+        liveProps({
+          layout: "assistant",
+          rca: rcaSummary({ current_run: rcaRun({ mode: "build_on_previous" }) }),
+          reportRun: rcaRunItem(),
+          reportText: REPORT,
+        }),
+      );
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-reanalyzing-banner").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-follow-thread-btn").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-banner-cancel-btn").exists()).toBe(false);
     });
 
     it("M: a resumed run names the step it resumed from", async () => {
@@ -592,6 +608,10 @@ describe("IncidentRCAAnalysis", () => {
         "This analysis has been running unusually long and may have stopped. No new messages since 08:55:20 UTC. Cancel it and try again.",
       );
       await byTest(wrapper, "rca-stale-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toBeUndefined();
+      expect(document.body.textContent).toContain("Cancel run?");
+      (document.querySelector('[data-test="rca-cancel-confirm-btn"]') as HTMLElement).click();
+      await flushPromises();
       expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
     });
 
@@ -1362,6 +1382,29 @@ describe("IncidentRCAAnalysis", () => {
       await flushPromises();
 
       expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(true);
+    });
+
+    it("B-approvals-rca-P2-4: in the assistant the live composer sits in the sticky dock at the bottom of the panel's scroller", async () => {
+      wrapper = mountSteerable(liveProps({ layout: "assistant" }));
+      await flushPromises();
+
+      const dock = byTest(wrapper, "rca-steer-dock");
+      expect(dock.classes()).toEqual(expect.arrayContaining(["sticky", "bottom-0"]));
+      expect(dock.element.parentElement).toBe(byTest(wrapper, "rca-analysis-container").element);
+      expect(dock.find('[data-test="rca-steer-composer"]').exists()).toBe(true);
+      expect(
+        byTest(wrapper, "rca-thread-column").find('[data-test="rca-steer-composer"]').exists(),
+      ).toBe(false);
+    });
+
+    it("B-approvals-rca-P2-4: the incident page keeps the composer in its own column, with no dock", async () => {
+      wrapper = mountSteerable(liveProps({ layout: "page" }));
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-steer-dock").exists()).toBe(false);
+      expect(
+        byTest(wrapper, "rca-thread-column").find('[data-test="rca-steer-composer"]').exists(),
+      ).toBe(true);
     });
 
     it("SG37: a reader without RCA permission (no steering view) sees the thread and no composer", async () => {

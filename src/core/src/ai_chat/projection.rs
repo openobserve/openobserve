@@ -32,6 +32,9 @@ use regex::{NoExpand, Regex};
 
 const PLACEHOLDER_TITLE_PREFIXES: [&str; 2] = ["New session - ", "Child session - "];
 const INJECTED_KEY: &str = "o2_injected";
+// o2-ai's metadata on the user's own part: the asked window (ms) and the entry the turn came from.
+const ASKED_WINDOW_KEY: &str = "o2_window";
+const ASKED_ENTRY_KEY: &str = "o2_entry_kind";
 const ABORTED_ERROR: &str = "MessageAbortedError";
 const DEFAULT_TURN_ERROR: &str = "The assistant failed to respond";
 
@@ -633,6 +636,8 @@ struct Turn {
     created: Value,
     user_parts: Vec<(String, bool)>,
     images: Vec<Value>,
+    window: Option<Value>,
+    entry_kind: Option<String>,
     frames: Vec<Value>,
     state: StreamState,
     error: Option<String>,
@@ -657,7 +662,11 @@ impl Turn {
             match part.get("type").and_then(Value::as_str) {
                 Some("text") => {
                     let text = part.get("text").and_then(Value::as_str).unwrap_or_default();
-                    self.user_parts.push((text.to_string(), is_injected(part)));
+                    let injected = is_injected(part);
+                    if !injected {
+                        self.keep_asked(part);
+                    }
+                    self.user_parts.push((text.to_string(), injected));
                 }
                 Some("file")
                     if py_str(part.get("mime").unwrap_or(&Value::String(String::new())))
@@ -732,6 +741,25 @@ impl Turn {
         }
     }
 
+    fn keep_asked(&mut self, part: &Map<String, Value>) {
+        let Some(meta) = obj(part.get("metadata")) else {
+            return;
+        };
+        if let Some(window) = obj(meta.get(ASKED_WINDOW_KEY))
+            && window.get("from").is_some_and(Value::is_i64)
+            && window.get("to").is_some_and(Value::is_i64)
+        {
+            let mut kept = json!({"from": window["from"], "to": window["to"]});
+            if let Some(relative) = window.get("relative").and_then(Value::as_str) {
+                kept["relative"] = relative.chars().take(16).collect::<String>().into();
+            }
+            self.window = Some(kept);
+        }
+        if let Some(entry) = meta.get(ASKED_ENTRY_KEY).and_then(Value::as_str) {
+            self.entry_kind = Some(entry.chars().take(32).collect());
+        }
+    }
+
     fn user_text(&self) -> String {
         let joined = self
             .user_parts
@@ -762,10 +790,17 @@ impl Turn {
         };
         self.frames.push(json!({"type": terminal}));
         let text = self.user_text();
+        let mut user = json!({"text": text, "images": self.images});
+        if let Some(window) = self.window {
+            user["window"] = window;
+        }
+        if let Some(entry_kind) = self.entry_kind {
+            user["entry_kind"] = entry_kind.into();
+        }
         json!({
             "user_message_id": self.user_message_id,
             "created": self.created,
-            "user": {"text": text, "images": self.images},
+            "user": user,
             "frames": self.frames,
             "error": self.error,
             "first_seq": self.seqs.map(|(low, _)| low),
@@ -2540,6 +2575,32 @@ fn py_strip(text: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stored_turn_keeps_the_window_and_entry_it_was_asked_with() {
+        let parts = json!({
+            "p1": {"type": "text", "text": "[Context] page", "metadata": {
+                "o2_injected": true, "o2_window": {"from": 1, "to": 2}, "o2_entry_kind": "forged"}},
+            "p2": {"type": "text", "text": "why errors?", "metadata": {
+                "o2_window": {"from": 1_794_150_000_000_i64, "to": 1_794_236_400_000_i64, "relative": "24h"},
+                "o2_entry_kind": "home_launcher"}},
+        });
+        let mut turn = Turn::default();
+        turn.collect_user_parts(parts.as_object().unwrap());
+        let user = turn.into_value()["user"].clone();
+        assert_eq!(user["text"], "why errors?");
+        assert_eq!(
+            user["window"],
+            json!({"from": 1_794_150_000_000_i64, "to": 1_794_236_400_000_i64, "relative": "24h"})
+        );
+        assert_eq!(user["entry_kind"], "home_launcher");
+
+        let mut plain = Turn::default();
+        let bare = json!({"p": {"type": "text", "text": "hi", "metadata": {"o2_window": {"from": "x", "to": 2}}}});
+        plain.collect_user_parts(bare.as_object().unwrap());
+        let user = plain.into_value()["user"].clone();
+        assert!(user.get("window").is_none() && user.get("entry_kind").is_none());
+    }
 
     #[test]
     fn a_query_builder_turn_gets_its_end_frame_back_before_the_terminal() {

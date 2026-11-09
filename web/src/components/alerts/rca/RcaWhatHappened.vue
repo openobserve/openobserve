@@ -67,7 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="min-w-0 pb-3.5">
           <div class="flex flex-wrap items-center gap-2">
             <span
-              class="text-sm"
+              class="min-w-0 text-sm wrap-anywhere"
+              data-test="rca-timeline-text"
               :class="
                 entry.status === 'refuted'
                   ? 'text-text-secondary line-through'

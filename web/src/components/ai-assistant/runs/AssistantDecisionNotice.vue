@@ -15,92 +15,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <Teleport to="body">
-    <section
-      v-if="line"
-      :aria-label="t('assistant.notice.region', { product })"
-      data-assistant-surface
-      data-dd-privacy="mask"
-      ref="panel"
-      :class="[
-        'bg-surface-overlay rounded-surface fixed bottom-[calc(var(--o-assistant-inset-bottom,0)*0.0625rem+1rem)] z-5000 flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-2 border border-transparent p-3 shadow-lg',
-        side === 'start' ? 'start-4' : 'end-[calc(var(--o-notice-end,0)*0.0625rem+1rem)]',
-      ]"
-      :style="{ '--o-notice-end': String(drawerInsetEnd) }"
-      :data-side="side"
-      data-test="assistant-decision-notice"
+  <!-- In the header's flow, never floating over the page (BRIEF-R7 rule 3); a phone keeps the header button's light -->
+  <!-- The header shrinks only this strip; too narrow for Review, it steps aside and the header button's count stands in -->
+  <section
+    v-if="line"
+    ref="strip"
+    :aria-label="t('assistant.notice.region', { product })"
+    data-assistant-surface
+    data-dd-privacy="mask"
+    :class="[
+      'border-border-default bg-surface-base rounded-default hidden h-7.5 max-w-[26rem] min-w-0 shrink! items-center gap-2 overflow-hidden border ps-2 pe-0.5 md:inline-flex',
+      fits ? '' : 'invisible',
+    ]"
+    :data-fits="fits ? 'true' : 'false'"
+    data-test="assistant-decision-notice"
+  >
+    <AssistantStatusDot state="attention" class="shrink-0" data-keep />
+    <span
+      class="text-text-heading shrink-0 text-xs font-medium whitespace-nowrap"
+      data-keep
+      data-test="assistant-decision-notice-line"
+      >{{ line }}</span
     >
-      <div class="flex min-w-0 flex-col gap-0.5">
-        <p
-          class="text-text-heading flex min-w-0 items-center gap-2 text-sm font-medium"
-          data-test="assistant-decision-notice-line"
-        >
-          <AssistantStatusDot state="attention" />
-          <span class="min-w-0 break-words">{{ line }}</span>
-        </p>
-        <OText
-          v-if="subject"
-          variant="body"
-          as="p"
-          class="break-words"
-          data-test="assistant-decision-notice-chat"
-        >
-          {{ runTitle(subject, t) }}
-        </OText>
-        <OText
-          v-if="subject && (ask || clock || orgLabel)"
-          variant="meta"
-          as="p"
-          aria-live="off"
-          class="break-words"
-          data-test="assistant-decision-notice-request"
-        >
-          <template v-if="ask">{{ ask }}</template>
-          <template v-if="clock">
-            <template v-if="ask"> · </template>
-            <span
-              class="text-assistant-signal-attention tabular-nums"
-              data-test="assistant-decision-notice-clock"
-              >{{ clock }}</span
-            >
-          </template>
-          <template v-if="orgLabel">
-            <template v-if="ask || clock"> · </template>
-            <span data-test="assistant-decision-notice-org">{{ orgLabel }}</span>
-          </template>
-        </OText>
-      </div>
-      <div class="flex items-center justify-end gap-2">
-        <OButton
-          variant="ghost"
-          size="xs"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          data-test="assistant-decision-notice-hide"
-          @click="hide"
-        >
-          {{ t("assistant.notice.hide") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="xs"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          data-test="assistant-decision-notice-review"
-          @click="review"
-        >
-          {{ t("assistant.runs.review") }}
-        </OButton>
-      </div>
-    </section>
-  </Teleport>
+    <!-- The full title sizes the strip and is what is read aloud; the visible copy is cut at a word -->
+    <span
+      v-if="subject"
+      ref="chat"
+      class="relative min-w-0 shrink-[8] truncate text-xs text-transparent"
+      :title="ask ? String(ask) : undefined"
+      data-test="assistant-decision-notice-chat"
+      >{{ chatTitle
+      }}<span
+        aria-hidden="true"
+        class="text-text-secondary absolute inset-0 truncate"
+        data-test="assistant-decision-notice-chat-shown"
+        >{{ shownTitle ?? chatTitle }}</span
+      ></span
+    >
+    <span
+      v-if="clock"
+      class="text-assistant-signal-attention shrink-0 text-xs tabular-nums"
+      aria-live="off"
+      data-test="assistant-decision-notice-clock"
+      >{{ clock }}</span
+    >
+    <span
+      v-if="orgLabel"
+      class="text-text-secondary shrink-0 text-xs whitespace-nowrap"
+      data-test="assistant-decision-notice-org"
+      >{{ orgLabel }}</span
+    >
+    <OButton
+      variant="ghost-primary"
+      size="chip"
+      class="shrink-0"
+      data-keep
+      data-test="assistant-decision-notice-review"
+      @click="review"
+    >
+      {{ t("assistant.runs.review") }}
+    </OButton>
+    <OButton
+      variant="ghost"
+      size="chip"
+      class="shrink-0"
+      data-keep
+      data-test="assistant-decision-notice-hide"
+      @click="hide"
+    >
+      {{ t("assistant.notice.hide") }}
+    </OButton>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
-import { isFullThreadRoute } from "@/composables/assistant/pure";
+import { textMeasure, wordFit } from "@/components/ai-assistant/shell/wordFit";
 import {
   approvalClock,
   approvalDuration,
@@ -111,8 +105,6 @@ import {
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OText from "@/lib/core/Typography/OText.vue";
-import { drawerInsetEnd } from "@/lib/overlay/Drawer/drawerInset";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import { runRequest, runTitle } from "./runsText";
@@ -126,10 +118,10 @@ const WARN_FIRST_MS = 60_000;
 
 const WARN_LAST_MS = 20_000;
 
-// Unitless px, written by the tray band and the phone sheet.
-const INSET_VAR = "--o-assistant-inset-bottom";
-
 const SHARED_ROUTES: ReadonlySet<unknown> = new Set(["sharedChat", "publicSharedChat"]);
+
+/** Room the chat's title keeps beside the count, Review and Hide; below it the strip steps aside. */
+const MIN_TEXT_PX = 48;
 
 const emit = defineEmits<{
   /** One sentence for the header region, the notice's only voice. */
@@ -147,14 +139,17 @@ const vuex = useStore();
 const { lgUp } = useBreakpoint();
 const now = ref(Date.now());
 const modalOpen = ref(false);
-const panel = ref<HTMLElement | null>(null);
-const windowAtEnd = ref(false);
 const hiddenRequests = ref(new Set<string>());
 const warning = ref(new Set<string>());
 const warnedWindows = new Set<string>();
 const queue: I18nText[] = [];
 let gap: ReturnType<typeof setTimeout> | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
+const strip = ref<HTMLElement | null>(null);
+const chat = ref<HTMLElement | null>(null);
+const fits = ref(true);
+const shownTitle = ref<string | null>(null);
+let sizeObserver: ResizeObserver | null = null;
 
 const requestOf = (row: RunRow) => row.request ?? row.sid;
 const decisions = computed(() => runs.decisions.value);
@@ -185,11 +180,8 @@ const line = computed<I18nText | null>(() => {
     ? t("assistant.notice.decisionMany", { n: count })
     : t("assistant.notice.decision");
 });
-// The page area ends at the sidebar, and the full view and a focused window in the end corner push it to the start.
-const side = computed<"start" | "end">(() =>
-  isFullThreadRoute(route) || windowAtEnd.value ? "start" : "end",
-);
 const ask = computed(() => (subject.value ? runRequest(subject.value, t) : null));
+const chatTitle = computed(() => (subject.value ? String(runTitle(subject.value, t)) : ""));
 // The time joins the request at the warnings, in amber; the bare clock stays on the card.
 const clock = computed<string | null>(() => {
   const until = subject.value?.expiresAt;
@@ -240,29 +232,9 @@ function checkWarning(row: RunRow): void {
   speak(warningLine(row, left));
 }
 
-// A focused window never moves, so the notice yields the end corner while that window holds it.
-function focusedWindowAtEnd(): boolean {
-  const focused = store.state.shell.lastFocusedContainer;
-  const el = panel.value;
-  if (!focused || focused === "sidebar" || !el) return false;
-  const win = Array.from(document.querySelectorAll<HTMLElement>("[data-assistant-window]"))
-    .find((node) => node.dataset.assistantWindow === focused.window)
-    ?.getBoundingClientRect();
-  if (!win) return false;
-  const root = getComputedStyle(document.documentElement);
-  const gap = 16 + drawerInsetEnd.value;
-  const { offsetWidth: width, offsetHeight: height } = el;
-  const left = root.direction === "rtl" ? gap : window.innerWidth - gap - width;
-  const bottom = window.innerHeight - 16 - (Number(root.getPropertyValue(INSET_VAR)) || 0);
-  return (
-    win.left < left + width && win.right > left && win.top < bottom && win.bottom > bottom - height
-  );
-}
-
 function tick(): void {
   now.value = Date.now();
   modalOpen.value = !!document.querySelector('[data-o2-dialog][data-state="open"]');
-  windowAtEnd.value = focusedWindowAtEnd();
   decisions.value.forEach(checkWarning);
 }
 
@@ -310,7 +282,38 @@ watch(
   { immediate: true },
 );
 
+// Invisible keeps the strip's box, so its width still tells when the header has room again.
+function measureFit(el: HTMLElement): void {
+  const style = getComputedStyle(el);
+  const kept = [...el.querySelectorAll<HTMLElement>("[data-keep]")];
+  const gaps = (parseFloat(style.columnGap) || 0) * kept.length;
+  const padding =
+    (parseFloat(style.paddingInlineStart) || 0) + (parseFloat(style.paddingInlineEnd) || 0);
+  const need = kept.reduce((sum, node) => sum + node.offsetWidth, 0) + gaps + padding + MIN_TEXT_PX;
+  fits.value = el.clientWidth >= need;
+  fitTitle();
+}
+
+function fitTitle(): void {
+  const el = chat.value;
+  const measure = el ? textMeasure(el) : null;
+  shownTitle.value = el && measure ? wordFit(chatTitle.value, el.clientWidth, measure) : null;
+}
+
+watch([chatTitle, chat], () => void nextTick(fitTitle));
+
+watch(strip, (el) => {
+  sizeObserver?.disconnect();
+  sizeObserver = null;
+  fits.value = true;
+  if (!el || typeof ResizeObserver === "undefined") return;
+  sizeObserver = new ResizeObserver(() => measureFit(el));
+  sizeObserver.observe(el);
+  measureFit(el);
+});
+
 onBeforeUnmount(() => {
+  sizeObserver?.disconnect();
   if (timer) clearInterval(timer);
   if (gap) clearTimeout(gap);
 });

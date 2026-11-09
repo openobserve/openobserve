@@ -72,7 +72,7 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         class="font-semibold tracking-tight"
         data-test="solution-switcher"
       >
-        {{ t(current.labelKey) }}
+        <span class="max-md:sr-only">{{ t(current.labelKey) }}</span>
       </OButton>
     </template>
 

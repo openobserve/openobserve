@@ -262,7 +262,8 @@ pub struct SharedChat {
 pub struct ForkResponse {
     pub session_id: String,
     pub title: String,
-    /// `{owner_name, as_of, turns}`: the shared turns as this reader saw them, kept with the fork.
+    /// `{owner_name, title, as_of, turns}`: the shared turns as this reader saw them, kept with
+    /// the fork.
     #[schema(value_type = Object)]
     pub seed: Value,
 }
@@ -1178,7 +1179,7 @@ pub(super) async fn history_before(
     Ok(versioned_history(carried, own))
 }
 
-/// `{owner_name, as_of, turns}`: what `reader` sees of the share now, to keep with the fork.
+/// `{owner_name, title, as_of, turns}`: what `reader` sees of the share now, to keep with the fork.
 async fn fork_seed_of(
     share: &ShareModel,
     chat: &ChatModel,
@@ -1198,11 +1199,22 @@ async fn fork_seed_of(
     } else {
         now_micros()
     };
-    Ok(serde_json::json!({
-        "owner_name": owner_name(chat, false).await,
+    Ok(fork_seed(
+        owner_name(chat, false).await,
+        &chat.title,
+        as_of,
+        turns,
+    ))
+}
+
+// The fork's own title gains "(continued)" and may be renamed, so the source's is kept here.
+fn fork_seed(owner_name: Option<String>, title: &str, as_of: i64, turns: Vec<Value>) -> Value {
+    serde_json::json!({
+        "owner_name": owner_name,
+        "title": title,
         "as_of": as_of,
         "turns": turns,
-    }))
+    })
 }
 
 /// `{call_id: {reason, stream}}` of steps on streams `viewer` cannot read, one check per stream.
@@ -3009,6 +3021,20 @@ mod tests {
         assert_eq!(
             versioned_history(carried.clone(), Vec::new()),
             (carried, true)
+        );
+    }
+
+    #[test]
+    fn a_fork_seed_keeps_the_source_title_beside_its_turns() {
+        let seed = fork_seed(
+            Some("Conv Tester".into()),
+            "Run a SQL query",
+            7,
+            vec![json!({"turn_id": "t1"})],
+        );
+        assert_eq!(
+            seed,
+            json!({"owner_name": "Conv Tester", "title": "Run a SQL query", "as_of": 7, "turns": [{"turn_id": "t1"}]})
         );
     }
 

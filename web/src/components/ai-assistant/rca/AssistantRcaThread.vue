@@ -203,8 +203,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   close: [];
-  /** A new run was started from this thread. */
-  reanalyze: [];
+  /** A new run was started from this thread; the host follows `runId` from here on. */
+  reanalyze: [payload: { runId: string }];
 }>();
 
 const { t } = useI18nTyped();
@@ -238,12 +238,15 @@ const loadState = computed(() => {
 
 const rca = useIncidentRca(toRef(props, "org"), incident, ref(true));
 
-// The run asked for stays pinned; the newest run is followed live.
+// The run asked for stays pinned until this thread starts a newer one; the newest run is followed live.
+const pinnedRunId = ref(props.runId);
 watch(
-  [() => props.runId, () => rca.history.value.length] as const,
-  ([runId]) => rca.viewRun(runId),
-  { immediate: true },
+  () => props.runId,
+  (runId) => (pinnedRunId.value = runId),
 );
+watch([pinnedRunId, () => rca.history.value.length] as const, ([runId]) => rca.viewRun(runId), {
+  immediate: true,
+});
 
 const analysis = ref<InstanceType<typeof IncidentRCAAnalysis> | null>(null);
 
@@ -258,8 +261,12 @@ const finishedReport = computed(() => !rca.live.value && rca.reportText.value.le
 const readAloud = useReadAloud(() => rca.reportText.value);
 
 const reanalyze = async (options: RcaTriggerRequest) => {
+  const before = rca.summary.value?.run_id ?? null;
   await rca.trigger(options);
-  emit("reanalyze");
+  const runId = rca.summary.value?.run_id ?? null;
+  if (!runId || runId === before) return;
+  pinnedRunId.value = runId;
+  emit("reanalyze", { runId });
 };
 
 // Branch: a new chat with the report attached, through the one door every page uses.

@@ -114,7 +114,7 @@ describe("RcaVerdictCard", () => {
   });
 
   describe("TH40 banners", () => {
-    it("M (fresh): re-analyzing text, Follow in thread and Cancel", async () => {
+    it("M (fresh): re-analyzing text and Follow in thread; Cancel lives only behind ⋯", async () => {
       const wrapper = mountCard({
         cardState: "investigating",
         liveMode: "fresh",
@@ -123,15 +123,21 @@ describe("RcaVerdictCard", () => {
 
       expect(shownBanners(wrapper)).toEqual(["rca-reanalyzing-banner"]);
       expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe("Re-analyzing from scratch…");
-      expect(buttonTexts(wrapper, "rca-reanalyzing-banner")).toEqual([
-        "Follow in thread",
-        "Cancel",
-      ]);
+      expect(buttonTexts(wrapper, "rca-reanalyzing-banner")).toEqual(["Follow in thread"]);
 
       await byTest(wrapper, "rca-follow-thread-btn").trigger("click");
-      await byTest(wrapper, "rca-banner-cancel-btn").trigger("click");
       expect(wrapper.emitted("follow-thread")).toHaveLength(1);
-      expect(wrapper.emitted("cancel")).toHaveLength(1);
+      expect(wrapper.emitted("cancel")).toBeUndefined();
+    });
+
+    it("M in the thread: no Follow in thread, since the reader is already in it", () => {
+      const wrapper = mountCard({
+        cardState: "investigating",
+        liveMode: "fresh",
+        hasEarlierReport: true,
+        inThread: true,
+      });
+      expect(buttonTexts(wrapper, "rca-reanalyzing-banner")).toEqual([]);
     });
 
     it("M (build_on_previous): building text", () => {
@@ -438,6 +444,21 @@ describe("RcaVerdictCard", () => {
       expect(text(wrapper, "rca-verdict-state")).toBe("Blocked · waiting for an answer");
       expect(text(wrapper, "rca-verdict-headline")).toContain("Leading: ");
       expect(byTest(wrapper, "rca-verdict-band").exists()).toBe(false);
+    });
+
+    it("in the thread the verdict is one body-size semibold callout, never the page's 24 px heading", () => {
+      const wrapper = mountCard({
+        cardState: "analyzed",
+        summary: rcaRunSummary(),
+        inThread: true,
+      });
+
+      const classes = byTest(wrapper, "rca-verdict-headline").classes();
+      expect(classes).toEqual(
+        expect.arrayContaining(["text-sm", "font-semibold", "bg-status-info-bg"]),
+      );
+      expect(classes).not.toContain("text-2xl");
+      expect(classes).not.toContain("font-bold");
     });
 
     it("B: 'Root cause identified', band chip High with what the agent claimed and what the evidence allows, suspect change and impact (VE33, VE35)", async () => {

@@ -330,6 +330,47 @@ describe("markdown.ts strict profile", () => {
     expect(markdownToPlainText("Rose [^c1].")).toBe("Rose.");
   });
 
+  describe("numbers next to citation markers", () => {
+    it("never takes a digit of a number as a citation, whatever sits around the marker", () => {
+      const cases: [string, string][] = [
+        ["rows in this window: 1941[^call_a].", "1941"],
+        ["rows in this window: 194[^call_a].", "194"],
+        ["rows in this window: 1941 [^call_a].", "1941"],
+        ["rows: 1,941[^call_a] of 2,000.", "1,941"],
+        ["took 19.41 ms[^call_a].", "ms"],
+        ["status 502[^call_a][^call_b].", "502"],
+      ];
+      for (const [text, word] of cases) {
+        const wrapper = mountHtml(htmlOf(render(text).parts));
+        const glue = wrapper.element.querySelector("span.whitespace-nowrap");
+        expect(glue?.firstChild?.textContent, text).toBe(word);
+        expect(wrapper.element.textContent?.trim(), text).toBe(
+          text.replace(/[ \t]*\[\^call_[ab]\]/g, ""),
+        );
+      }
+      expect(render("A bare [^1941] position names no step.").claims).toEqual([]);
+      expect(markdownToPlainText("Only checkout: 1941[^call_a].")).toBe("Only checkout: 1941.");
+      expect(htmlOf(render("2^10 is 1024 and x[^ 1] stays").parts)).toContain("2^10 is 1024");
+    });
+
+    it("keeps a chip on the line of the number it cites, and a run of chips together", () => {
+      const wrapper = mountHtml(
+        htmlOf(render("Only checkout has error rows: 194[^call_a].").parts),
+      );
+      const glue = wrapper.element.querySelector("span.whitespace-nowrap")!;
+      expect(glue.textContent).toBe("194");
+      expect(glue.querySelector("span[data-claim]")?.getAttribute("data-claim")).toBe("0");
+      expect(glue.nextSibling?.textContent).toBe(".");
+      const run = mountHtml(htmlOf(render("Up 3[^c1][^c2][^c3].").parts));
+      const slots = Array.from(run.element.querySelectorAll("span[data-claim]"));
+      expect(slots).toHaveLength(3);
+      expect(slots.every((slot) => slot.parentElement?.className === "whitespace-nowrap")).toBe(
+        true,
+      );
+      expect(slots[1].previousSibling).toBe(slots[0]);
+    });
+  });
+
   it("gives the model's own slot characters no slot, and a non-numeric slot no attribute", () => {
     expect(htmlOf(render("A \uE0000\uE001 b").parts)).not.toContain("data-claim");
     const table = render("| a |\n| - |\n| `\uE0000\uE001` ![\uE0000\uE001](x) [^c1] |");
@@ -1597,6 +1638,37 @@ describe("assistant answer styling (K1, K2)", () => {
     ).toHaveLength(2);
   });
 
+  it("moves an entity link the model put on a later mention to the first plain mention (B-conversation-22)", () => {
+    const href = "http://localhost/web/logs?stream=checkout&org_identifier=default";
+    const parsed = parse(
+      `The \`checkout\` code span and checkout-api are not mentions. checkout fails first. Later [checkout](${href}) recovers.`,
+    );
+    const html = parsed.parts.map((part) => (part.kind === "html" ? part.html : "")).join("");
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    const anchors = [...root.querySelectorAll("a")];
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0].getAttribute("href")).toBe(href);
+    expect(anchors[0].className).toBe(CLASSES.entityLink);
+    expect(anchors[0].previousSibling?.textContent).toMatch(/not mentions\. $/);
+    expect(root.textContent?.trim()).toBe(
+      "The checkout code span and checkout-api are not mentions. checkout fails first. Later checkout recovers.",
+    );
+    expect(parsed.plain).toContain("Later checkout recovers.");
+  });
+
+  it("leaves an entity link alone when no plain mention comes before it", () => {
+    const href = "http://localhost/web/logs?stream=checkout";
+    const html = parse(`Errors rose in [checkout](${href}); checkout then recovered.`)
+      .parts.map((part) => (part.kind === "html" ? part.html : ""))
+      .join("");
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    expect([...root.querySelectorAll("a")].map((a) => a.nextSibling?.textContent)).toEqual([
+      "; checkout then recovered.",
+    ]);
+  });
+
   it("keeps status words plain in prose", () => {
     const html = htmlOf(
       render("The deploy failed, then recovered. Error rate is healthy again.").parts,
@@ -1619,9 +1691,7 @@ describe("assistant answer styling (K1, K2)", () => {
   });
 
   it("sets the lead semibold in the heading colour, in a 72ch tabular-figure column", () => {
-    expect(PROSE_CLASSES.leadHtml).toContain("[&_p:first-child]:font-semibold");
-    expect(PROSE_CLASSES.leadHtml).toContain("[&_p:first-child]:text-text-heading");
-    expect(PROSE_CLASSES.leadPlain.split(" ")).toEqual(
+    expect(PROSE_CLASSES.lead.split(" ")).toEqual(
       expect.arrayContaining(["font-semibold", "text-text-heading"]),
     );
     for (const cls of ["max-w-[72ch]", "tabular-nums", "leading-relaxed"]) {

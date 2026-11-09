@@ -15,8 +15,10 @@
 
 import { reactive, ref, type Ref } from "vue";
 import { useMutation } from "@tanstack/vue-query";
+import { useRouter, type Router } from "vue-router";
 
 import { useAssistantStore, type BranchedFromRef, type Sid } from "@/composables/assistant";
+import { fullThreadLocation, isFullThreadRoute } from "@/composables/assistant/pure";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { branchChatMutation, type BranchChatResponse } from "@/services/ai_chat_branch";
 import { trackAssistant } from "@/services/assistantAnalytics";
@@ -44,10 +46,23 @@ export function rememberedBranch(sid: Sid): BranchedFromRef | null {
   return branched.get(sid) ?? null;
 }
 
+/** Opens a chat where the current one shows; on the Full view `?thread=` follows it, so a reload and Back land on the right chat. */
+export async function openChatInPlace(
+  store: Pick<ReturnType<typeof useAssistantStore>, "openSession">,
+  router: Router | undefined,
+  sid: Sid,
+): Promise<void> {
+  await store.openSession({ sid }, { focus: true });
+  const route = router?.currentRoute.value;
+  if (router && route && isFullThreadRoute(route))
+    await router.push(fullThreadLocation(sid, route.query)).catch(() => undefined);
+}
+
 /** Branch in new chat: the server copies the turns up to this answer into a new chat, which then opens in place. */
 export function useBranchChat(org: () => string): BranchChat {
   const { t } = useI18nTyped();
   const store = useAssistantStore();
+  const router = useRouter();
   const pending = ref(false);
   const mutation = useMutation(() => branchChatMutation(org()));
 
@@ -67,9 +82,9 @@ export function useBranchChat(org: () => string): BranchChat {
       });
       trackAssistant("ai_branch", { result: "created" });
       // The branch exists even when it fails to open; it is then in the chat list, so this is not a branch failure.
-      await store
-        .openSession({ sid: created.session_id }, { focus: true })
-        .catch(() => toast({ variant: "error", message: t("assistant.history.openFailed") }));
+      await openChatInPlace(store, router, created.session_id).catch(() =>
+        toast({ variant: "error", message: t("assistant.history.openFailed") }),
+      );
       return created;
     } catch (err) {
       const status = (err as { response?: { status?: unknown } } | null)?.response?.status;

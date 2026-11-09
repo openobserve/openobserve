@@ -107,9 +107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-secondary shrink-0"
                   aria-hidden="true"
                 />
+                <!-- A phone's header button already carries this count, so the title keeps the room -->
                 <span
                   v-if="mark"
-                  class="text-text-body ms-1 inline-flex shrink-0 items-center gap-1 text-xs tabular-nums"
+                  class="text-text-body ms-1 inline-flex shrink-0 items-center gap-1 text-xs tabular-nums max-md:hidden"
                   :data-state="mark.signal"
                   data-test="assistant-title-mark"
                 >
@@ -121,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <AssistantTitleMenu
               :sid="sid"
-              :new-chat="placement === 'window' && !readonly"
+              :new-chat="newInMenu && !readonly"
               :actions-only="placement === 'full' && chatActions"
               @new="askNew"
               @open="openChat"
@@ -216,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex shrink-0 items-center gap-1">
         <AssistantIconButton
-          v-if="newShown && placement !== 'window'"
+          v-if="newShown && !newInMenu"
           :label="newLabel"
           :icon="assistantGlyph.newChat"
           data-test="assistant-thread-new"
@@ -320,6 +321,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { isElementTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -387,6 +389,11 @@ const describedBy = computed(() => (saveTag.value && !narrow.value ? saveTagId :
 const chatActions = computed(() => hasMessages.value && !readonly.value && !!props.sid);
 // Nothing to leave in an empty chat, and a read-only role cannot start one.
 const newShown = computed(() => !readonly.value && (hasMessages.value || chatsOpen.value));
+const { mdUp } = useBreakpoint();
+// A window, and the Full page on a phone, keep the bar's room for the title: New chat sits in the title menu.
+const newInMenu = computed(
+  () => props.placement === "window" || (props.placement === "full" && !mdUp.value),
+);
 const newLabel = computed<I18nText>(() =>
   object.value ? raw(object.value.newLabel) : t("assistant.thread.newChat"),
 );

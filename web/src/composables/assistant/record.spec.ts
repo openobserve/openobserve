@@ -15,7 +15,15 @@
 
 import { describe, expect, it } from "vitest";
 
-import { foldTurns, mergeIncremental, messagesFromTurns, type StoredTurn } from "./record";
+import { parseChatDetail } from "@/services/assistant";
+
+import {
+  foldTurns,
+  mergeIncremental,
+  messagesFromTurns,
+  projectRecord,
+  type StoredTurn,
+} from "./record";
 
 const t = ((key: string, params?: { message?: string }) =>
   params?.message ? `${key}: ${params.message}` : key) as any;
@@ -548,5 +556,55 @@ describe("foldTurns: replay phase", () => {
     expect(forged.contentBlocks ?? []).toEqual([]);
     expect(forged.content).toBe(text);
     expect(messagesFromTurns([{ user: { text: nonced }, frames: [] }], t)[0].content).toBe(nonced);
+  });
+});
+
+describe("projectRecord turn versions", () => {
+  // The turns `GET /ai/chats/{sid}` returns after a regenerate: the server marks the new turn `version_of` the old one.
+  const wire = {
+    session_id: "s1",
+    title: "Checkout",
+    created_at: 1,
+    updated_at: 1,
+    last_committed_seq: 9,
+    turns: [
+      {
+        turn_id: "t1",
+        user: { text: "why?" },
+        frames: [{ type: "message_delta", content: "first" }, { type: "complete" }],
+        status: "completed",
+        versions: [{ turn_id: "t2", created_at: 2 }],
+      },
+      {
+        turn_id: "t2",
+        version_of: "t1",
+        user: { text: "why?" },
+        frames: [{ type: "message_delta", content: "second" }, { type: "complete" }],
+        status: "completed",
+      },
+      {
+        turn_id: "t3",
+        user: { text: "and cart?" },
+        frames: [{ type: "message_delta", content: "cart" }, { type: "complete" }],
+        status: "completed",
+      },
+    ],
+  };
+
+  it("folds a regenerated turn into the turn it versions, newest answer shown", () => {
+    const turns = parseChatDetail(wire).turns ?? [];
+    const messages = projectRecord(turns, "owner", { timezone: "UTC", scrubModels: false });
+    expect(messages.map((m) => [m.role, String(m.content)])).toEqual([
+      ["user", "why?"],
+      ["assistant", "second"],
+      ["user", "and cart?"],
+      ["assistant", "cart"],
+    ]);
+    expect(messages[1].versions?.map((v) => String(v.content))).toEqual(["first"]);
+  });
+
+  it("keeps every attempt in an export, which lists turns as stored", () => {
+    const turns = parseChatDetail(wire).turns ?? [];
+    expect(projectRecord(turns, "export", { timezone: "UTC", scrubModels: true })).toHaveLength(6);
   });
 });

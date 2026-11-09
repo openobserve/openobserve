@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
             <img
               data-test="header-openobserve-logo"
-              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
+              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer object-contain object-left transition-opacity duration-200 hover:opacity-80 max-md:max-w-24"
               :src="
                 getImageURL(
                   isDark
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
+            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer object-contain object-left transition-opacity duration-200 hover:opacity-80 max-md:max-w-24"
             :src="
               getImageURL(
                 isDark
@@ -144,15 +144,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
-    <div v-if="securityAccess.canOpen.value" class="ms-3 flex shrink-0 items-center">
+    <!-- On a phone the switcher is the one item that may give way, so the assistant and account stay on screen -->
+    <div
+      v-if="securityAccess.canOpen.value"
+      class="ms-3 flex shrink-0 items-center max-md:ms-1 max-md:min-w-0 max-md:shrink max-md:overflow-hidden"
+      data-test="header-solution-switcher-slot"
+    >
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
     </div>
 
     <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
     <div class="min-w-0 flex-1" />
 
-    <!-- RIGHT SIDE: Controls -->
-    <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
+    <!-- RIGHT SIDE: Controls; from md up only the decision strip gives way, so no control is pushed off-screen -->
+    <div
+      class="group/header-right flex shrink-0 items-center justify-end gap-1 pe-3 *:shrink-0 md:min-w-0 md:shrink"
+      data-test="header-right"
+    >
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />
 
@@ -177,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- HEADER MENU: Contains all header navigation and user controls -->
-      <div class="header-menu flex items-center gap-x-2">
+      <div class="header-menu flex items-center gap-x-2 *:shrink-0 md:min-w-0 md:shrink!">
         <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ingestion_quota_used >= 85"
@@ -209,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'primary'
           "
           size="xs"
-          class="max-md:hidden"
+          :class="['max-lg:hidden', EDITION_YIELDS_TO_STRIP]"
           data-test="upgrade-to-enterprise-btn"
           @click="openEnterpriseDialog"
         >
@@ -233,7 +241,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="handleOrgSelection"
         />
 
-        <div class="header-utility-icons flex items-center gap-x-2">
+        <div
+          class="header-utility-icons flex items-center gap-x-2 *:shrink-0 md:min-w-0 md:shrink!"
+          data-test="header-utility-icons"
+        >
           <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
            Leads the utility-icon cluster, set off by a separator from the
            org selector so it reads as the primary action in this group.
@@ -537,6 +548,10 @@ import { featureLockedPath, menuState } from "@/utils/featureGate";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
 import { isAssistantV2 } from "@/composables/assistant/flags";
+
+// Below xl a waiting chat's header strip takes the static Edition badge's room before it would step aside.
+const EDITION_YIELDS_TO_STRIP =
+  "max-xl:group-has-[[data-test=assistant-decision-notice]]/header-right:hidden";
 
 export default defineComponent({
   name: "HeaderComponent",
@@ -882,6 +897,7 @@ export default defineComponent({
 
     return {
       securityAccess,
+      EDITION_YIELDS_TO_STRIP,
       assistantV2,
       isDark,
       t,

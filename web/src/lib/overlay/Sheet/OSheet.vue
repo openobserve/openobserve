@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-dd-privacy="privacy"
       :data-snap="snap"
       :class="[SHEET_BASE, SHEET_HEIGHT[snap]]"
+      :style="{ zIndex: sheetZIndex }"
     >
       <OButton
         v-if="peekRow"
@@ -130,6 +131,7 @@ function publishInset(): void {
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useSlots, watch } from "vue";
 import { useOverlayScope } from "@/lib/overlay/overlayScope";
+import { overlayLayerZIndex, useOverlayLayer } from "@/lib/overlay/Dialog/dialogStacking";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 
@@ -168,7 +170,7 @@ const ALIGN_FULL_SLACK_PX = 48;
 
 // The sheet sits above the keyboard and any anchored footer, so its offset and cap follow both.
 const SHEET_BASE = [
-  "fixed z-6000 flex flex-col overflow-hidden",
+  "fixed flex flex-col overflow-hidden",
   // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless offsets JS writes
   "start-[calc(var(--o-sheet-start,0)*1px)] end-[calc(var(--o-sheet-end,0)*1px)]",
   "rounded-t-surface border-border-default bg-surface-base border-t shadow-lg",
@@ -433,4 +435,7 @@ onBeforeUnmount(detach);
 
 // A scope that provides attributes (the assistant surface) keeps them on content teleported out of it.
 const overlayScope = useOverlayScope();
+
+// On the dialog ladder, so a confirm or menu opened from the sheet stacks above it and its scrim dims it.
+const sheetZIndex = overlayLayerZIndex(useOverlayLayer()).contentZIndex;
 </script>

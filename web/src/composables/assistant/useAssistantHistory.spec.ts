@@ -788,6 +788,251 @@ describe("useAssistantHistory reload", () => {
     });
   });
 
+  it("shows a branched chat's carried turns as its own, from the seed the read returns", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+    // The shape `GET /ai/chats/{sid}` returned for a fresh branch: no own turns, the cut in `seed.turns`.
+    const carried = (n: number) => ({
+      user_message_id: `msg_${n}`,
+      created: 1_794_222_602_989 + n,
+      user: { text: `question ${n}`, images: [] },
+      frames: [{ type: "message_delta", content: `answer ${n}` }, { type: "complete" }],
+      error: null,
+      turn_id: `src-t${n}`,
+      status: "completed",
+      error_code: null,
+      agent_type: "o2-ai",
+    });
+    const wire = {
+      ...detail([]),
+      last_committed_seq: -1,
+      branched_from: { session_id: "src-1", turn_id: "src-t2", title: "Checkout failures" },
+      active_turn: false,
+      pending_approval: false,
+      has_more: false,
+      seed: { owner_name: "Conv Tester", as_of: 1, turns: [carried(1), carried(2)] },
+    };
+    vi.spyOn(assistant, "getChat").mockResolvedValue(parseChatDetail(wire));
+    const fake = setup({ persistence: true }, [record(1, { serverBacked: true })]);
+    await flushPromises();
+    await fake.history.open({ sid });
+    const messages = fake.store.state.sessions[sid].messages;
+    expect(messages.map((m) => [m.role, String(m.content)])).toEqual([
+      ["user", "question 1"],
+      ["assistant", "answer 1"],
+      ["user", "question 2"],
+      ["assistant", "answer 2"],
+    ]);
+  });
+
+  describe("B-conversation-21: carried turns survive a reload answered not_modified", () => {
+    const carried = (n: number) => ({
+      user_message_id: `msg_${n}`,
+      created: 1_794_231_018_497 + n,
+      user: { text: `question ${n}`, images: [] },
+      frames: [{ type: "message_delta", content: `answer ${n}` }, { type: "complete" }],
+      error: null,
+      turn_id: `src-t${n}`,
+      status: "completed",
+      error_code: null,
+      agent_type: "o2-ai",
+    });
+    const fullRead = (over: Record<string, unknown>) => ({
+      ...detail([]),
+      last_committed_seq: -1,
+      agent_type: "o2-ai",
+      active_turn: false,
+      pending_approval: false,
+      pinned: false,
+      state_version: "-1.0.0.0.cbf29ce484222325",
+      not_modified: false,
+      has_more: false,
+      seed: {
+        owner_name: "Conv Tester",
+        as_of: 1_794_231_438_493_003,
+        turns: [carried(1), carried(2)],
+      },
+      approvals: [],
+      ...over,
+    });
+    // What `GET /ai/chats/{sid}?known_seq=-1&known_version=…` answers once the browser holds the chat.
+    const notModified = (over: Record<string, unknown>) => ({
+      ...fullRead(over),
+      not_modified: true,
+      partial_from_seq: null,
+      turns: null,
+      seed: null,
+      approvals: null,
+    });
+
+    async function openThenReload(over: Record<string, unknown>) {
+      vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+      const getChat = vi
+        .spyOn(assistant, "getChat")
+        .mockResolvedValue(parseChatDetail(fullRead(over)));
+      const first = setup({ persistence: true }, [record(1, { serverBacked: true })]);
+      await flushPromises();
+      await first.history.open({ sid });
+      await flushPromises();
+      getChat.mockResolvedValue(parseChatDetail(notModified(over)));
+      const reloaded = setup({ persistence: true }, [...first.db.rows.values()]);
+      await flushPromises();
+      await reloaded.history.open({ sid });
+      expect(getChat).toHaveBeenLastCalledWith(
+        expect.any(String),
+        sid,
+        expect.objectContaining({
+          seq: over.last_committed_seq ?? -1,
+          version: "-1.0.0.0.cbf29ce484222325",
+        }),
+      );
+      return reloaded.store.state.sessions[sid];
+    }
+
+    it("keeps a branch's carried turns", async () => {
+      const session = await openThenReload({
+        branched_from: { session_id: "src-1", turn_id: "src-t2", title: "Checkout failures" },
+      });
+      expect(session.messages.map((m) => [m.role, String(m.content)])).toEqual([
+        ["user", "question 1"],
+        ["assistant", "answer 1"],
+        ["user", "question 2"],
+        ["assistant", "answer 2"],
+      ]);
+      expect(session.messages.filter((m) => m.role === "user").every((m) => m.carried)).toBe(true);
+    });
+
+    it("keeps a share fork's source seed, with its owner and time", async () => {
+      const session = await openThenReload({ forked_from_share: "3LsRsoFNinRWZfgpIQxeiimjnHa" });
+      expect(session.messages).toHaveLength(0);
+      expect(session.record.seed).toMatchObject({
+        ownerName: "Conv Tester",
+        asOf: 1_794_231_438_493.003,
+      });
+      expect(session.record.seed?.turns).toHaveLength(2);
+    });
+
+    it("B-conversation-26: never probes the share by its id, which the shared read does not accept", async () => {
+      const session = await openThenReload({ forked_from_share: "3LsRsoFNinRWZfgpIQxeiimjnHa" });
+      expect(session.record.forkedFromShare).toBe("3LsRsoFNinRWZfgpIQxeiimjnHa");
+      expect(session.record.seed?.token).toBeUndefined();
+    });
+
+    it("B-conversation-27: heads the fork with the source's title, not its own (continued) one", async () => {
+      const source = "Run a SQL query listing the 20 most recent rows";
+      const session = await openThenReload({
+        forked_from_share: "3LsRsoFNinRWZfgpIQxeiimjnHa",
+        title: `${source} (continued)`,
+        seed: {
+          owner_name: "Conv Tester",
+          title: source,
+          as_of: 1_794_231_438_493_003,
+          turns: [carried(1), carried(2)],
+        },
+      });
+      expect(session.record.seed?.title).toBe(source);
+    });
+
+    it("keeps a door-seeded chat's turns, which the server sends as its own", async () => {
+      const session = await openThenReload({
+        seed: null,
+        last_committed_seq: 0,
+        turns: [carried(1)],
+      });
+      expect(session.messages.map((m) => String(m.content))).toEqual(["question 1", "answer 1"]);
+    });
+
+    it("sends no known_seq from a copy that holds no turns, so the read is never empty", async () => {
+      vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+      const getChat = vi
+        .spyOn(assistant, "getChat")
+        .mockResolvedValue(parseChatDetail(fullRead({ forked_from_share: "tok-1" })));
+      const fake = setup({ persistence: true }, [
+        record(1, { serverBacked: true, cachedLastSeq: -1 }),
+      ]);
+      await flushPromises();
+      await fake.history.open({ sid });
+      expect(getChat).toHaveBeenCalledWith(expect.any(String), sid, undefined);
+    });
+  });
+
+  describe("B-conversation-23 / B-shell3-6: a reopened chat keeps the window it asked over", () => {
+    const DAY = 86_400_000;
+    const asked = { from: 1_794_147_097_080, to: 1_794_147_097_080 + DAY };
+    const storedTurn = {
+      user_message_id: "msg_1",
+      created: asked.to,
+      user: { text: "Write a SQL query by level", images: [], window: asked },
+      frames: [
+        {
+          type: "message_delta",
+          content: "```sql\nSELECT level, COUNT(*) FROM t GROUP BY level\n```",
+        },
+        { type: "complete" },
+      ],
+      turn_id: "t-home",
+      status: "completed",
+    };
+
+    async function reopen(over: Record<string, unknown>) {
+      vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+      vi.spyOn(assistant, "getChat").mockResolvedValue(
+        parseChatDetail({ ...detail([storedTurn]), ...over }),
+      );
+      const fake = setup({ persistence: true }, [record(1, { serverBacked: true })]);
+      await flushPromises();
+      await fake.history.open({ sid });
+      return fake.store.state.sessions[sid];
+    }
+
+    it("gives the reopened question its stored window, so its query card keeps the range", async () => {
+      const session = await reopen({});
+      expect(session.messages.find((m) => m.role === "user")?.sentWindow).toEqual(asked);
+      expect(session.composer.timeOverride).toBeNull();
+    });
+
+    it("keeps a Home chat's relative window on the composer after a reload", async () => {
+      const session = await reopen({ origin: "home" });
+      expect(session.composer.timeOverride).toEqual({ ...asked, period: "24h" });
+    });
+
+    it("keeps it from this browser's own Home mark when the server names no origin", async () => {
+      writeAnnotation(
+        KEY,
+        sid,
+        "turn:t-home:window",
+        { window: asked, homeDefaultWindow: true },
+        1,
+      );
+      const session = await reopen({});
+      expect(session.composer.timeOverride).toEqual({ ...asked, period: "24h" });
+    });
+
+    it("keeps the stored relative period and Home entry in a fresh browser, even on a read without origin", async () => {
+      // The live read FX-BE recorded for a Home question (`p3_window.out`).
+      const window = { from: 1794148464840, to: 1794234864840, relative: "24h" };
+      const turn = {
+        ...storedTurn,
+        user: { ...storedTurn.user, window, entry_kind: "home_launcher" },
+      };
+      vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+      vi.spyOn(assistant, "getChat").mockResolvedValue(parseChatDetail(detail([turn])));
+      const fake = setup({ persistence: true }, [record(1, { serverBacked: true })]);
+      await flushPromises();
+      await fake.history.open({ sid });
+      const session = fake.store.state.sessions[sid];
+      expect(session.messages.find((m) => m.role === "user")?.sentWindow).toEqual({
+        from: window.from,
+        to: window.to,
+        period: "24h",
+      });
+      expect(session.composer.timeOverride).toEqual({
+        from: window.from,
+        to: window.to,
+        period: "24h",
+      });
+    });
+  });
+
   it("keeps model names on the owner's own reload, as the live answer showed them", async () => {
     vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
     vi.spyOn(assistant, "getChat").mockResolvedValue(
@@ -1211,6 +1456,37 @@ describe("useAssistantHistory reload of a chat waiting on an approval", () => {
       await flushPromises();
       return fake;
     }
+
+    it("rebuilds a pending card from its approval row when the stored turn never kept the frame", async () => {
+      // Chat 01a1c00b as `GET /ai/chats/{sid}` returned it: the turn has no card frame, only the row's `card` holds it.
+      const expiresAt = Date.now() + 600_000;
+      const card = {
+        ...queuedFrames(expiresAt)[0],
+        before: { name: "payment_errors" },
+        sealed: "s1:x",
+      };
+      const stored = queuedFrames(expiresAt).filter((f) => f.type !== "confirmation_required");
+      const wire = {
+        ...endedWaiting(expiresAt),
+        turns: [{ turn_id: "t1", user: { text: "mute it" }, frames: stored, status: "completed" }],
+        pending_approval_id: id,
+        approvals: [
+          {
+            id,
+            status: "pending",
+            scope: null,
+            card,
+            resolved: null,
+            expires_at: expiresAt * 1000,
+          },
+        ],
+      };
+      const fake = await reopen(parseChatDetail(wire));
+      const session = fake.store.state.sessions[sid];
+      expect(session.pendingApproval).toMatchObject({ id, turnId: "t1", expiresAt });
+      expect(cardBlock(fake)).toMatchObject({ id });
+      expect(cardBlock(fake)?.noDecision).toBeUndefined();
+    });
 
     it("restores the card as actionable while the server still holds it pending and unexpired", async () => {
       const expiresAt = Date.now() + 600_000;

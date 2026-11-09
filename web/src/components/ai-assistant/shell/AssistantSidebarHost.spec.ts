@@ -527,6 +527,25 @@ describe("opening and Follow in thread", () => {
     await flushPromises();
     expect(followedRcaRun().value).toBeNull();
   });
+
+  it("switches to the new run when the followed thread re-analyzes, instead of snapping back", async () => {
+    const { wrapper } = await setup();
+    const door = useRcaFollowOutside();
+    door.follow({ org: "default", incidentId: "inc-482", runId: "run-1" });
+    await vi.dynamicImportSettled();
+    await flushPromises();
+    const thread = wrapper.findComponent({ name: "AssistantRcaThread" });
+    expect(thread.props("runId")).toBe("run-1");
+    thread.vm.$emit("reanalyze", { runId: "run-2" });
+    await flushPromises();
+    expect(followedRcaRun().value).toEqual({
+      org: "default",
+      incidentId: "inc-482",
+      runId: "run-2",
+    });
+    expect(wrapper.findComponent({ name: "AssistantRcaThread" }).props("runId")).toBe("run-2");
+    stopFollowingRca();
+  });
 });
 
 // The follow door outside a component; it reads the same store the host does.

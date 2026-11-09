@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     role="group"
     :aria-label="t('assistant.message.actionsName')"
     :class="[
-      'flex shrink-0 items-center gap-1',
+      'relative flex shrink-0 items-center gap-1',
       isLast
         ? ''
         : 'opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100',
@@ -91,15 +91,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="branch"
       />
     </template>
+    <div
+      v-if="reader.state.value !== 'idle'"
+      class="pointer-events-none absolute inset-x-0 top-full"
+      data-test="assistant-msg-read-progress-slot"
+    >
+      <OProgressBar
+        :value="reader.progress.value / 100"
+        size="xs"
+        :aria-label="t('assistant.message.readingAloud')"
+        data-test="assistant-msg-read-progress"
+      />
+    </div>
   </div>
-  <OProgressBar
-    v-if="reader.state.value !== 'idle'"
-    :value="reader.progress.value / 100"
-    size="xs"
-    :aria-label="t('assistant.message.readingAloud')"
-    class="order-last basis-full"
-    data-test="assistant-msg-read-progress"
-  />
 </template>
 
 <script lang="ts">
@@ -142,12 +146,13 @@ import {
 import {
   assistantTranscriptHostKey,
   footerOf,
+  type FindingsData,
   turnLockKey,
   useTurnLock,
 } from "@/composables/assistant/pure";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 
 import { answerLink } from "./answerLink";
@@ -200,9 +205,12 @@ let linkTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Each block through the same worker path as its render; a block already rendered answers from cache, synchronously.
 function answerText(): string | Promise<string> {
-  const texts = (props.message.contentBlocks ?? [])
+  const blocks = props.message.contentBlocks ?? [];
+  const texts = blocks
     .filter((block) => block.type === "text" && block.text?.trim())
     .map((block) => block.text!);
+  // A findings-only answer has no prose, so its card's words are what Copy and Read aloud carry.
+  if (!texts.length) texts.push(...blocks.flatMap((block) => findingsText(block.findings)));
   const plains = (texts.length ? texts : [String(props.message.content ?? "")]).map(
     markdownToPlainText,
   );
@@ -275,6 +283,16 @@ function rerun(): void {
 function rerunFresh(): void {
   if (!props.fresh || lockedReason.value) return;
   void store.dispatch(props.sid, { kind: "rerun_now", turnId: props.fresh.turnId });
+}
+
+// The cause, the verified evidence and the next step, as the card shows them.
+function findingsText(findings: FindingsData | null | undefined): string[] {
+  if (!findings) return [];
+  const evidence = findings.evidence.map((item) => `- ${item.text}`).join("\n");
+  const next = findings.nextSteps.length
+    ? String(t("assistant.findings.next", { text: raw(findings.nextSteps.join("; ")) }))
+    : "";
+  return [findings.likelyCause, evidence, next].filter((part) => !!part.trim());
 }
 
 onBeforeUnmount(() => {

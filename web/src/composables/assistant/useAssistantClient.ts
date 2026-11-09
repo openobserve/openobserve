@@ -247,6 +247,7 @@ function wireBody(req: ClientSendRequest): Record<string, unknown> {
     ...(req.ephemeral && { ephemeral: true }),
     ...(req.attachments?.length && { attachments: req.attachments }),
     ...(req.replyToApproval && { reply_to_approval: req.replyToApproval }),
+    ...(req.replacesTurnId && { replaces_turn_id: req.replacesTurnId }),
     ...(req.agent && { agent: req.agent }),
     ...(req.handoffFrom && { handoff_from: req.handoffFrom }),
   };

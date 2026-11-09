@@ -109,14 +109,14 @@ describe("rcaSummary helpers", () => {
     });
   });
 
-  describe("rcaHypothesisStatusLabel (VE18)", () => {
+  describe("rcaHypothesisStatusLabel (FIX-R7B I1: 'Root cause' is the callout's words only)", () => {
     it.each([
-      ["root_cause_identified", "Root cause"],
-      ["multiple_root_causes", "Root cause"],
-      ["contributing_factor", "Root cause · not confirmed"],
-      ["inconclusive", "Root cause · not confirmed"],
-      ["blocked", "Root cause · not confirmed"],
-      [null, "Root cause · not confirmed"],
+      ["root_cause_identified", "Confirmed"],
+      ["multiple_root_causes", "Confirmed"],
+      ["contributing_factor", "Likely"],
+      ["inconclusive", "Likely"],
+      ["blocked", "Likely"],
+      [null, "Likely"],
     ] as const)("root_cause under %s reads %s", (outcome, label) => {
       expect(rcaHypothesisStatusLabel("root_cause", outcome)).toBe(label);
     });

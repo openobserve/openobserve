@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <AssistantContextSeesPopover
-    v-if="!hasChips"
+    v-if="!stripHoldsSees"
     :sid="sid"
     placement="bottom"
     data-test="assistant-shell-sees"
@@ -27,13 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
-import { useAssistantContext, useAssistantStore, type Sid } from "@/composables/assistant";
+import { useAssistantStore, type Sid } from "@/composables/assistant";
+
+import { composerStripHoldsSees } from "./headerSees";
 
 const props = defineProps<{ sid: Sid | null }>();
 
 const store = useAssistantStore();
-const context = useAssistantContext(() => props.sid, { store });
 
-// The composer's strip holds the ⓘ beside its chips; with no chip to sit beside, the header holds it.
-const hasChips = computed(() => context.chips.value.some(Boolean));
+// The time chip is always in the strip, so counting it would leave neither place with the ⓘ (B-shell-1).
+const stripHoldsSees = computed(() =>
+  composerStripHoldsSees(store.state.sessions[props.sid ?? ""]?.composer ?? null),
+);
 </script>

@@ -50,7 +50,8 @@ vi.mock("@/composables/assistant/pure", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant/pure")>()),
   validateProposal: vi.fn(async () => ({ status: "ok" })),
 }));
-vi.mock("./useInlineHelperSession", () => ({
+vi.mock("./useInlineHelperSession", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./useInlineHelperSession")>()),
   useInlineHelperSession: () => helper.current,
 }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
@@ -63,7 +64,10 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   useToast: () => ({ toast }),
 }));
 
+import { wireContextOf } from "@/composables/assistant/context/serialize";
+
 import InlineQueryHelper from "./InlineQueryHelper.vue";
+import { HELPER_SUPPRESSED_PAGE_KEYS } from "./useInlineHelperSession";
 
 function fakeSession() {
   const state = ref<any>({ kind: "idle" });
@@ -199,6 +203,21 @@ describe("InlineQueryHelper", () => {
     wrapper.unmount();
   });
 
+  it("puts the helper's stream on the wire in place of the page's suppressed one", async () => {
+    const wrapper = mountHelper({ stream: "ta_composer_logs", streamType: "logs" });
+    await wrapper.get('[data-test="inline-helper-prompt"] textarea').setValue("count per service");
+    await wrapper.get('[data-test="inline-helper-send"]').trigger("click");
+    const chips = helper.current.send.mock.calls[0][1].chips;
+    const wire = wireContextOf(
+      { currentPage: "logs", selectedStreams: ["ta_approvals_rca_logs"], streamType: "logs" },
+      { chips, timeOverride: null, removedPageKeys: [...HELPER_SUPPRESSED_PAGE_KEYS] },
+      { org: "default", now: 1_000_000 },
+    );
+    expect(wire.selectedStreams).toEqual(["ta_composer_logs"]);
+    expect(wire.streamType).toBe("logs");
+    wrapper.unmount();
+  });
+
   it("proposes as a diff, checks it, and reports it without a toast", async () => {
     const wrapper = mountHelper();
     await wrapper.get('[data-test="inline-helper-prompt"] textarea').setValue("errors");
@@ -215,6 +234,77 @@ describe("InlineQueryHelper", () => {
     );
     expect(track).toHaveBeenCalledWith("ai_nl_proposal", expect.anything());
     expect(toast).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("carries a pending proposal into the chat with the Query builder instead of losing it", async () => {
+    const wrapper = mountHelper();
+    await wrapper.get('[data-test="inline-helper-prompt"] textarea').setValue("count per service");
+    await wrapper.get('[data-test="inline-helper-send"]').trigger("click");
+    helper.current.set({ kind: "proposal", text: "SELECT service, count(*) FROM default" });
+    await flushPromises();
+    controller.current.pending.value = {
+      ...controller.current.pending.value,
+      before: "",
+      after: "SELECT service, count(*) FROM default",
+    };
+    await wrapper.get('[data-test="inline-helper-handoff"]').trigger("click");
+    await flushPromises();
+    const call = openAssistant.mock.calls[0] as unknown as [
+      {
+        agent?: string;
+        seed?: { user: { text: string }; frames: Record<string, unknown>[] }[];
+        payload: {
+          text?: string;
+          title?: unknown;
+          chips: { kind: string }[];
+          transcript?: { text: string }[];
+        };
+      },
+    ];
+    expect(call[0].agent).toBe("generate-query");
+    expect(call[0].payload.text).toBeUndefined();
+    expect(String(call[0].payload.title)).toBe("count per service");
+    expect(call[0].payload.transcript).toBeUndefined();
+    expect(call[0].seed).toHaveLength(1);
+    expect(call[0].seed![0].user.text).toBe("count per service");
+    expect(call[0].seed![0].frames.find((frame) => frame.type === "query")).toMatchObject({
+      language: "sql",
+      text: "SELECT service, count(*) FROM default",
+    });
+    expect(call[0].payload.chips.map((chip) => chip.kind)).toContain("query");
+    wrapper.unmount();
+  });
+
+  it("hands the chat the stream and window it wrote the SQL for, so the card states the range", async () => {
+    const wrapper = mountHelper({
+      stream: "k8s_logs",
+      timeRange: { from: 1_000, to: 2_000, period: "15m" },
+    } as Partial<InlineHostAdapter>);
+    await wrapper.get('[data-test="inline-helper-prompt"] textarea').setValue("count per service");
+    await wrapper.get('[data-test="inline-helper-send"]').trigger("click");
+    helper.current.set({ kind: "proposal", text: "SELECT service, count(*) FROM k8s_logs" });
+    await flushPromises();
+    controller.current.pending.value = {
+      ...controller.current.pending.value,
+      before: "",
+      after: "SELECT service, count(*) FROM k8s_logs",
+    };
+    await wrapper.get('[data-test="inline-helper-handoff"]').trigger("click");
+    await flushPromises();
+    const [args] = openAssistant.mock.calls[0] as unknown as [
+      { seed: { turn_id: string; frames: Record<string, unknown>[] }[] },
+    ];
+    const frames = args.seed[0].frames;
+    expect(frames[0]).toEqual({
+      type: "turn_started",
+      turn_id: args.seed[0].turn_id,
+      agent_type: "generate-query",
+    });
+    expect(frames.find((frame) => frame.type === "query")).toMatchObject({
+      stream: "k8s_logs",
+      time_range: { from: 1_000, to: 2_000 },
+    });
     wrapper.unmount();
   });
 

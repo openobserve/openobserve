@@ -58,7 +58,7 @@ import {
   type EffectsRunner,
   type TurnSource,
 } from "./effects";
-import { turnAnnotationKey } from "./evidence";
+import { footerOf, turnAnnotationKey } from "./evidence";
 import type { AssistantFrame } from "./frames";
 import { generateNavigationFromToolResult } from "./navigationRoutes";
 import { useAssistantName } from "./useAssistantName";
@@ -200,6 +200,8 @@ interface TurnRecord {
   consentRetried: boolean;
   /** The approval card this turn's prompt answers (Reply, Ask again). */
   replyToApproval?: string;
+  /** Regenerate: the stored turn whose answer this attempt versions; the server links them so a reload keeps the versions. */
+  replacesTurnId?: string;
   /** Fixed at the send, so a pick during the turn applies to the next one. */
   agent: { agent?: AgentId; handoffFrom?: AgentId };
   /** `turn_started` was read; a replayed one on a reconnect commits nothing twice. */
@@ -1017,6 +1019,7 @@ function defaultRequestBuilder(
       ...(rec?.replyToApproval && { replyToApproval: rec.replyToApproval }),
     };
     if (persisted) {
+      if (rec?.replacesTurnId) request.replacesTurnId = rec.replacesTurnId;
       const seq = session.record.cachedLastSeq;
       return typeof seq === "number" ? { ...request, knownSeq: seq } : request;
     }
@@ -1038,6 +1041,7 @@ function requestTurnOf(rec: TurnRecord, deps: TurnEngineDeps): RequestTurn {
     ...(capability.rcaChatMode?.() && { rcaChatMode: true }),
     now: deps.now(),
     ...(rec.replyToApproval && { replyToApproval: rec.replyToApproval }),
+    ...(rec.replacesTurnId && { replacesTurnId: rec.replacesTurnId }),
   };
 }
 
@@ -1218,6 +1222,11 @@ function queueAttempt(session: AssistantSession, rec: TurnRecord): void {
   const replaced = session.messages.splice(userIndex + 1);
   rec.replaced = replaced;
   const previous = replaced.filter((message) => message.role === "assistant");
+  const prompt = session.messages[userIndex];
+  // A branch's carried turn is the source chat's, so the server has no turn here to version.
+  const shown = previous.at(-1);
+  const versioned = footerOf(shown)?.serverTurnId ?? shown?.turnId ?? prompt?.turnId;
+  if (versioned && !prompt?.carried) rec.replacesTurnId = versioned;
   // An attempt that failed with nothing said is a banner, not an answer, so it never becomes a version.
   const versions = previous.flatMap((message) => [
     ...(message.versions ?? []),

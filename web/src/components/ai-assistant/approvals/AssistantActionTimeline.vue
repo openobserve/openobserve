@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ entry.text }}
             </span>
             <AssistantUndoControl
-              v-if="entry.entry.undoable && !readonly && sid"
+              v-if="(entry.entry.undoable || entry.entry.status === 'undone') && !readonly && sid"
               :entry="entry.entry"
               :sid="sid"
               test-id="assistant-action-undo"
@@ -80,6 +80,7 @@ import { computed } from "vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import {
+  approvalVerb,
   entityKeyOf,
   type ActionLedgerEntry,
   type PolicyBlockData,
@@ -110,14 +111,17 @@ const props = withDefaults(
 const { t } = useI18nTyped();
 
 const count = computed(() => props.entries.length + props.unreviewed.length);
-const anyUndoable = computed(() => props.entries.some((entry) => entry.undoable));
+// A reopened chat reads an undone entry as not undoable; it was, so the limits still apply.
+const anyUndoable = computed(() =>
+  props.entries.some((entry) => entry.undoable || entry.status === "undone"),
+);
 const anyApplied = computed(
   () => !!props.unreviewed.length || props.entries.some((entry) => entry.status !== "failed"),
 );
 
 const rows = computed(() =>
   props.entries.map((entry) => {
-    const operation = t(`assistant.actions.op.${entry.op}`, {
+    const operation = t(`assistant.actions.op.${opKey(entry)}`, {
       entity: t(`assistant.entity.${entityKeyOf(entry.resource.type)}`, 1),
     });
     const name = raw(entry.resource.name);
@@ -156,4 +160,11 @@ const unreviewedRows = computed(() =>
     });
   }),
 );
+
+// A pause or resume says so; an entry from before the verb was kept reads it from its tool.
+function opKey(entry: ActionLedgerEntry): ActionLedgerEntry["op"] | "pause" | "resume" {
+  const verb =
+    entry.verb ?? approvalVerb({ kind: "update", tool: entry.tool, targets: [], args: {} });
+  return verb === "pause" || verb === "resume" ? verb : entry.op;
+}
 </script>

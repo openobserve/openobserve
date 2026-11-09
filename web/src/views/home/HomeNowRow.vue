@@ -24,10 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-bucket="row.bucket"
   >
     <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 @[40rem]/row:flex-nowrap">
-      <HomeStateMark :bucket="row.bucket" />
-      <div
-        class="flex min-w-0 flex-1 basis-[calc(100%-2rem)] flex-col gap-0.5 @[40rem]/row:basis-0"
-      >
+      <HomeStateMark :bucket="row.bucket" :flapping="!!meta?.flapping" />
+      <div class="flex min-w-0 flex-1 basis-0 flex-col gap-0.5">
         <div class="flex min-w-0 items-baseline gap-1 text-sm">
           <OButton
             v-if="row.kind === 'service'"
@@ -58,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex shrink-0 items-center justify-end gap-2 ps-6 @[40rem]/row:w-36 @[40rem]/row:ps-0"
+        class="flex shrink-0 items-center justify-end gap-2 @[40rem]/row:w-36"
         data-test="home-now-row-state"
       >
         <template v-if="row.kind === 'service'">
@@ -111,14 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
       <span
-        class="text-text-secondary w-12 shrink-0 text-xs tabular-nums max-md:hidden"
+        class="text-text-secondary shrink-0 basis-full ps-7 text-xs tabular-nums @[40rem]/row:w-12 @[40rem]/row:basis-auto @[40rem]/row:ps-0"
         :title="changedTitle"
         data-test="home-now-row-changed"
         >{{ changedTime }}</span
       >
-      <!-- A narrow row gives the name its own line and puts the actions under it -->
+      <!-- A narrow row keeps the pill beside the name and starts the time and actions under the name -->
       <div
-        class="flex shrink-0 items-center justify-end gap-1 ps-6 @[40rem]/row:w-64 @[40rem]/row:ps-0"
+        class="flex shrink-0 basis-full flex-wrap items-center justify-start gap-1 ps-7 @[40rem]/row:w-64 @[40rem]/row:basis-auto @[40rem]/row:flex-nowrap @[40rem]/row:justify-end @[40rem]/row:ps-0"
         data-test="home-now-row-actions"
       >
         <OButton

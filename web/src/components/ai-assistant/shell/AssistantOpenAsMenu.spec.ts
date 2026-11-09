@@ -196,18 +196,18 @@ describe("Open as", () => {
     expect(store.state.shell.placement.kind).toBe("sidebar");
   });
 
-  it("names the moves Side panel, Pop out and Full page", async () => {
+  it("names the moves Side panel, Full page and Pop out, in the board's order", async () => {
     await setup({});
     const items = document.body.querySelectorAll('[role="menuitemradio"], [role="menuitem"]');
     expect([...items].map((el) => el.getAttribute("data-test"))).toEqual([
       "assistant-shell-place-sidebar",
-      "assistant-shell-place-window",
       "assistant-shell-place-full",
+      "assistant-shell-place-window",
     ]);
     expect([...items].map((el) => el.textContent?.trim())).toEqual([
       "Side panel",
-      "Pop out",
       "Full page",
+      "Pop out",
     ]);
     expect(document.body.querySelector('[role="separator"]')).toBeNull();
   });
@@ -243,6 +243,45 @@ describe("Open as", () => {
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-open-as-button"]').text()).toBe("Open as");
     wrapper.unmount();
+  });
+
+  it("drops the labelled button's word to assistive tech on a phone, keeping its name, so the title has room", async () => {
+    const router = fakeRouter();
+    await router.push("/logs");
+    const wrapper = mount(AssistantOpenAsMenu, {
+      props: { placement: "full", sid: null, labelled: true },
+      global: { plugins: [router, fakeVuex()] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const button = wrapper.get('[data-test="assistant-open-as-button"]');
+    expect(button.attributes("aria-label")).toBe("Open as");
+    expect(button.get("span.max-md\\:sr-only").text()).toBe("Open as");
+    expect(button.classes()).toContain("max-md:min-w-11");
+    wrapper.unmount();
+  });
+
+  it("drops the labelled button's chevron on a phone, so the bar keeps one 44px icon (B-shell3-7)", async () => {
+    const router = fakeRouter();
+    await router.push("/logs");
+    const mountMenu = () =>
+      mount(AssistantOpenAsMenu, {
+        props: { placement: "full", sid: null, labelled: true },
+        global: { plugins: [router, fakeVuex()] },
+        attachTo: document.body,
+      });
+    const wide = mountMenu();
+    await flushPromises();
+    const icons = (w: typeof wide) =>
+      w.get('[data-test="assistant-open-as-button"]').findAllComponents({ name: "OIcon" }).length;
+    const wideIcons = icons(wide);
+    wide.unmount();
+    lg.value = false;
+    const phone = mountMenu();
+    await flushPromises();
+    expect(icons(phone)).toBe(wideIcons - 1);
+    phone.unmount();
+    lg.value = true;
   });
 });
 

@@ -339,7 +339,6 @@ import {
   approvalObjectId,
   approvalFolderId,
   approvalTargetHref,
-  approvalUntil,
   approvalVerb,
   approvalVerbText,
   canAlwaysAllow,
@@ -367,6 +366,7 @@ import {
   approvalDiffRows,
   lowerFirst,
   panelDashboardId,
+  pauseUntil,
   readableCard,
 } from "./approvalText";
 import {
@@ -529,7 +529,7 @@ const nameUnknown = computed<I18nText | null>(() => {
 });
 
 const endAndScope = computed<I18nText | null>(() => {
-  const until = approvalUntil(props.card);
+  const until = pauseUntil(props.card);
   const folder = approvalFolderId(props.card);
   const name = folder ? (approvalsHost?.folderName?.(folder) ?? null) : null;
   const time = until === null ? null : raw(formatOrgTime(until));

@@ -16,7 +16,6 @@ import {
   watchEffect,
   useSlots,
   computed,
-  inject,
   provide,
   nextTick,
   useAttrs,
@@ -27,6 +26,7 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
+import { overlayLayerZIndex, useOverlayLayer } from "@/lib/overlay/Dialog/dialogStacking";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { useI18nTyped } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -198,9 +198,8 @@ function handleInteractOutside(e: Event) {
   }
 }
 
-// Stacking support: each nested ODrawer gets a higher z-index layer
-const drawerDepth = inject<number>("o2DrawerDepth", 0);
-provide("o2DrawerDepth", drawerDepth + 1);
+const { overlayZIndex: drawerScrimZ, contentZIndex: drawerContentZ } =
+  overlayLayerZIndex(useOverlayLayer());
 
 // Auto loading: an OForm nested in the body (linked via `form-id`) mirrors its
 // `isSubmitting` into this ref, so the footer Save button shows its spinner
@@ -208,8 +207,8 @@ provide("o2DrawerDepth", drawerDepth + 1);
 const formSubmitting = ref(false);
 provide(FORM_SUBMIT_STATE_KEY, formSubmitting);
 
-const overlayZIndex = computed(() => 5999 + drawerDepth * 1000);
-const contentZIndex = computed(() => 6000 + drawerDepth * 1000);
+const overlayZIndex = computed(() => drawerScrimZ);
+const contentZIndex = computed(() => drawerContentZ);
 
 // Header renders when there is a header slot, a title, any sub-slot, OR a visible close button.
 const hasHeader = computed(

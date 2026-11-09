@@ -14,12 +14,35 @@
   "persistence": true,
   "public_links": false,
   "retention_days": 90,
-  "agents": ["o2-ai", "sre"],
+  "agents": [
+    {
+      "id": "o2-ai",
+      "name": "O2-AI",
+      "purpose": "p",
+      "pickable": true,
+      "available": false,
+      "read_only": false,
+      "reason": "role"
+    },
+    {
+      "id": "sre",
+      "name": "SRE",
+      "purpose": "p",
+      "pickable": true,
+      "available": false,
+      "read_only": false,
+      "reason": "role"
+    }
+  ],
   "toolsets": [],
   "toolset_secret_merge": true,
   "policy_enforced": false,
-  "attachments": true,
-  "context_used": true,
+  "approval_extend_budgets": {
+    "user": 10,
+    "background": 3
+  },
+  "rca_chat_mode": true,
   "answer_locale": true,
-  "rca_chat_mode": true
+  "context_used": true,
+  "attachments": true
 }

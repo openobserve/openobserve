@@ -738,6 +738,17 @@ describe("RcaThreadColumn", () => {
       expect(byTest(wrapper, "rca-thread-entries").exists()).toBe(true);
     });
 
+    it("inline, it takes its content's height inside the panel's scroller, so the closed line never covers it", () => {
+      const wrapper = mountColumn({ ...SAVED, variant: "inline" });
+
+      const column = byTest(wrapper, "rca-thread-column");
+      const area = byTest(wrapper, "rca-thread-activity-toggle").element.parentElement!;
+      for (const el of [column.element, area])
+        expect(el.className.split(/\s+/)).not.toEqual(
+          expect.arrayContaining([expect.stringMatching(/^(flex-1|min-h-0)$/)]),
+        );
+    });
+
     it("inline, a live run keeps its steps open", () => {
       const wrapper = mountColumn({ variant: "inline" });
 

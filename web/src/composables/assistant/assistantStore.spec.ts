@@ -1524,6 +1524,21 @@ describe("draft restore after a reload (WP-05)", () => {
     expect(store.state.sessions[after].composer.timeOverride).toBeNull();
   });
 
+  it("keeps a Home launcher's sent window for the thread, which no page supplies any more", () => {
+    const { store } = makeStore();
+    const sent = { from: 1, to: 2, period: "24h" };
+    const home = store.startNewChat({
+      origin: { entryKind: "home_launcher", objectKind: "none", container: "full_view" },
+    });
+    store.setTimeOverride(home, sent);
+    store.keepThreadWindow(home, sent, true);
+    expect(store.state.sessions[home].composer.timeOverride).toEqual(sent);
+    const other = store.startNewChat({ origin: ORIGIN });
+    store.setTimeOverride(other, sent);
+    store.keepThreadWindow(other, sent, true);
+    expect(store.state.sessions[other].composer.timeOverride).toBeNull();
+  });
+
   it("starts a new chat without an Investigate door's window even before its first send", () => {
     const { store } = makeStore();
     const investigate = store.startNewChat({

@@ -50,20 +50,33 @@ type Lists = Record<OverviewRowKind, OverviewNowRow[]>;
 
 type RowOf<K extends OverviewRowKind> = Extract<OverviewNowRow, { kind: K }>;
 
+/** Home's relative range: the period it reads as and its length. */
+export type HomePeriod = { period: string; ms: number };
+
 /** The Home page context while the Overview (or its no-data layout) is mounted; reads the snapshot at each call. */
 export function createHomeContextProvider(
   snapshot: () => OverviewNowSnapshot,
   store: any,
+  period: () => HomePeriod | null = () => null,
 ): ContextProvider {
   return {
     getContext: () =>
-      homeContextOf(snapshot(), store?.state?.selectedOrganization?.identifier ?? ""),
+      homeContextOf(
+        snapshot(),
+        store?.state?.selectedOrganization?.identifier ?? "",
+        Date.now(),
+        period(),
+      ),
   };
 }
 
 /** Registers the Home provider as active, re-registers on every snapshot change and unregisters on unmount. */
-export function useHomeContextProvider(snapshot: () => OverviewNowSnapshot, store: any): void {
-  const provider = createHomeContextProvider(snapshot, store);
+export function useHomeContextProvider(
+  snapshot: () => OverviewNowSnapshot,
+  store: any,
+  period: () => HomePeriod | null = () => null,
+): void {
+  const provider = createHomeContextProvider(snapshot, store, period);
   watch(
     snapshot,
     () => {
@@ -75,20 +88,29 @@ export function useHomeContextProvider(snapshot: () => OverviewNowSnapshot, stor
   onBeforeUnmount(() => contextRegistry.unregister(HOME_CONTEXT_KEY));
 }
 
+/** Home's provider while a thread fills the Home route: only the route and Home's window, no Overview rows. */
+export function useHomeWindowProvider(store: any, period: () => HomePeriod | null): void {
+  contextRegistry.register(HOME_CONTEXT_KEY, {
+    getContext: () =>
+      homeWindowContextOf(
+        store?.state?.selectedOrganization?.identifier ?? "",
+        Date.now(),
+        null,
+        period(),
+      ),
+  });
+  contextRegistry.setActive(HOME_CONTEXT_KEY);
+  onBeforeUnmount(() => contextRegistry.unregister(HOME_CONTEXT_KEY));
+}
+
 /** The `PageContext` of one snapshot: capped lists in snake case, the selected row and the window in µs. */
 export function homeContextOf(
   snapshot: OverviewNowSnapshot,
   org: string,
   now: number = Date.now(),
+  period: HomePeriod | null = null,
 ): PageContext {
-  const context: PageContext = {
-    currentPage: "home",
-    routeName: "home",
-    ...(org && { organization_identifier: org }),
-    request_timestamp: now * 1000,
-  };
-  const { start, end } = snapshot.window;
-  if (end > start) context.timeRange = { type: "absolute", startTime: start, endTime: end };
+  const context = homeWindowContextOf(org, now, snapshot.window, period);
   if (snapshot.noData) return { ...context, homeNoData: true };
   context.page = "home_overview";
   const selected = selectedOf(snapshot);
@@ -105,6 +127,31 @@ export function homeContextOf(
   if (alerts.length > 0) context.overviewAlerts = alerts;
   if (meta) context.overviewServicesMeta = meta;
   if (selected) context.overviewSelected = selected;
+  return context;
+}
+
+/** Home's route and window; a relative range ends at send time, so it reads "Last 24 h" as the Home Ask chip does. */
+export function homeWindowContextOf(
+  org: string,
+  now: number,
+  window: { start: number; end: number } | null,
+  period: HomePeriod | null,
+): PageContext {
+  const context: PageContext = {
+    currentPage: "home",
+    routeName: "home",
+    ...(org && { organization_identifier: org }),
+    request_timestamp: now * 1000,
+  };
+  if (period)
+    context.timeRange = {
+      type: "relative",
+      relativeTimePeriod: period.period,
+      startTime: (now - period.ms) * 1000,
+      endTime: now * 1000,
+    };
+  else if (window && window.end > window.start)
+    context.timeRange = { type: "absolute", startTime: window.start, endTime: window.end };
   return context;
 }
 

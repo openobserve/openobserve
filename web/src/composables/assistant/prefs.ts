@@ -161,7 +161,6 @@ export interface HintPrefs {
   disclosure?: boolean;
   /** The dictation primer was accepted (`40` §1.8.2). */
   dictate?: boolean;
-  attachSaved?: boolean;
 }
 
 export interface PlacementPrefs {

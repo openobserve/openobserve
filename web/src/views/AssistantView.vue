@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :icon="view === 'shell' ? undefined : assistantGlyph.assistant"
     bleed
     title-data-test="assistant-view-title"
+    :sidebar-width="railPx(RAIL_DEFAULT_REM)"
     :splitter-limits="[railPx(RAIL_MIN_REM), railPx(RAIL_MAX_REM)]"
     :resizable="view === 'shell'"
   >
@@ -64,10 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="sm"
             :icon-left="assistantGlyph.back"
+            :aria-label="t('menu.home')"
+            class="max-md:min-h-11 max-md:min-w-11"
             data-test="assistant-view-back-home"
             @click="backToHome"
           >
-            {{ t("menu.home") }}
+            <!-- A phone keeps the header's room for the chat title -->
+            <span class="max-md:sr-only">{{ t("menu.home") }}</span>
           </OButton>
         </template>
       </AssistantShell>
@@ -107,9 +111,11 @@ export function viewFor(gate: GateCode, isAdmin: boolean): AssistantViewState {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** The rail's limits around the layout's default width; the splitter works in pixels of the root font size. */
+/** The rail's opening width and limits; the splitter works in pixels of the root font size. */
 export const RAIL_MIN_REM = 14;
-export const RAIL_MAX_REM = 24;
+// The layout's 230px default cuts the filter row and titles, so the rail opens at the Threads board's width.
+export const RAIL_DEFAULT_REM = 22;
+export const RAIL_MAX_REM = 26;
 
 export function railPx(rem: number): number {
   const root =

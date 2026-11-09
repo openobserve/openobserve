@@ -15,6 +15,7 @@
 
 import type { LocationQuery, LocationQueryRaw, Router } from "vue-router";
 
+import type { HomePeriod } from "@/composables/contextProviders/homeContextProvider";
 import type { HomeReturnState } from "@/composables/goto/homeReturn";
 
 const ROW_PATTERN = /^(incident|service|anomaly|alert):.+$/;
@@ -22,6 +23,18 @@ const PERIOD_PATTERN = /^\d+[smhdwM]$/;
 const INTEGER = /^\d+$/;
 const ORG_QUERY_KEY = "org_identifier";
 const OVERVIEW_KEYS = ["row", "period", "from", "to"] as const;
+
+const PERIOD_UNIT_MS: Record<string, number> = {
+  s: 1_000,
+  m: 60_000,
+  h: 3_600_000,
+  d: 86_400_000,
+  w: 604_800_000,
+  M: 2_592_000_000,
+};
+
+/** Home opens on the window its baselines are read against. */
+export const DEFAULT_HOME_RANGE: HomeRange = { type: "relative", period: "24h" };
 
 /** The Overview's range as the picker emits it; absolute bounds in microseconds. */
 export type HomeRange =
@@ -104,4 +117,15 @@ function sameQuery(a: LocationQuery, b: LocationQueryRaw): boolean {
   const keys = Object.keys(b);
   if (Object.keys(a).length !== keys.length) return false;
   return keys.every((key, index) => Object.keys(a)[index] === key && a[key] === b[key]);
+}
+
+/** Milliseconds of a relative period such as `15m` or `24h`; an unreadable one is 15 minutes. */
+export function periodToMs(period: string): number {
+  const match = /^(\d+)([smhdwM])$/.exec(period);
+  return match ? Number(match[1]) * PERIOD_UNIT_MS[match[2]] : 15 * 60_000;
+}
+
+/** The period the assistant reads a relative Home range as; `null` for an absolute one. */
+export function homePeriodOf(range: HomeRange): HomePeriod | null {
+  return range.type === "relative" ? { period: range.period, ms: periodToMs(range.period) } : null;
 }

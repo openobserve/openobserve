@@ -21,6 +21,7 @@ import {
   type AiEventProps,
   type LengthBucket,
 } from "@/services/assistantAnalytics";
+import { createSeededChat, type SeededChatRequest } from "@/services/ai_chat_seed";
 import { gt, raw, type I18nKey } from "@/types/i18n";
 
 import { defaultAgentFor, doorAgent } from "./agents";
@@ -46,6 +47,7 @@ import type {
   Sid,
 } from "./assistantStore.types";
 import type { TurnLockReason } from "./lifecycle";
+import { projectRecord, type StoredTurn } from "./record";
 import { getAssistantRuntime } from "./runtime";
 import { turnLockKey } from "./runtimeHandle";
 
@@ -115,6 +117,8 @@ export type OpenAssistantCall = (
 ) & {
   /** The `userOrgKey` the payload was built under; a stale tab's payload is refused. */
   userOrgKey?: string;
+  /** A finished answer the door hands over; the new chat shows it and the server stores it. */
+  seed?: StoredTurn[];
 };
 
 /** What the function reads besides its arguments, injected so the rule table is unit-tested. */
@@ -132,6 +136,8 @@ export interface OpenAssistantEnv {
   windowRect?(sid: Sid): DOMRect | null;
   /** The history rows of this user+org, so a reopened dock finds a chat no longer in memory. */
   historyRows?(): HistoryRow[];
+  /** Stores a door's seeded chat on the server; `createSeededChat` when absent. */
+  seedChat?(org: string, body: SeededChatRequest): Promise<unknown>;
 }
 
 type DoorTarget = Placement | { kind: "window"; sid: Sid };
@@ -192,8 +198,9 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
   // A door names only a thread it starts; staging into a chat already in use keeps that chat's title.
   const fresh = !plan.session || isBlank(plan.session);
   const sid = plan.session?.sid ?? createSession(store, args, container, plan.target);
-  applyDoorAgent(store, sid, args);
+  applyDoorAgent(store, sid, args, !plan.session);
   const staged = stagePayload(store, sid, args, plan, fresh);
+  if (!plan.session) storeSeed(env, sid, args);
   const wasVisible = store.anyContainerVisible();
   // Add to chat is non-destructive: it never opens a hidden container over the page; the door offers Open.
   if (!wasVisible && args.intent === "stage" && args.entryVerb === "add_to_chat") {
@@ -397,9 +404,15 @@ function dockOf(session: AssistantSession): string | null {
 }
 
 // A door picks only for a chat nobody has spoken in or picked for; without a roster the server keeps routing.
-function applyDoorAgent(store: OpenAssistantEnv["store"], sid: Sid, args: OpenAssistantArgs): void {
+function applyDoorAgent(
+  store: OpenAssistantEnv["store"],
+  sid: Sid,
+  args: OpenAssistantArgs,
+  created: boolean,
+): void {
   const session = store.state.sessions[sid];
-  if (!session || session.agentId || session.messages.length > 0) return;
+  // A transcript the door itself seeded into a chat it just made is not a turn anyone spoke in.
+  if (!session || session.agentId || (!created && session.messages.length > 0)) return;
   const agent = doorAgent(args.agent ?? defaultAgentFor(args), store.state.capability.agents);
   if (agent) store.pickAgent(sid, agent, "door");
 }
@@ -416,19 +429,40 @@ function createSession(
   target: DoorTarget,
 ): Sid {
   const transcript = args.payload?.transcript ?? [];
+  // A seed renders through the same projection as the server's copy, so a reload shows what the door showed.
+  const messages = args.seed?.length
+    ? projectRecord(args.seed, "owner", { timezone: "", scrubModels: false })
+    : transcript.map((m) => ({
+        role: m.role,
+        content: raw(m.text),
+        ...(m.agent && { agentId: m.agent }),
+      }));
   const sid = store.createSession({
     origin: { entryKind: args.entryKind, objectKind: args.objectKind, container },
     thread: "new",
     ...(target.kind === "window" && { detached: true }),
-    ...(transcript.length > 0 && {
-      messages: transcript.map((m) => ({ role: m.role, content: raw(m.text) })),
-    }),
+    ...(messages.length > 0 && { messages }),
   });
   const prompt = args.payload?.text?.trim();
   // The default title is the visible prompt, never the serialised chip (`00` §10.1).
   if (prompt && store.state.sessions[sid].title === null)
     store.setTitle(sid, raw(prompt.slice(0, DEFAULT_TITLE_CHARS)), "generated");
   return sid;
+}
+
+// Without this the seeded answer, title and agent live only in this tab; an older server just keeps them there.
+function storeSeed(env: OpenAssistantEnv, sid: Sid, args: OpenAssistantCall): void {
+  const org = env.currentOrg();
+  const session = env.store.state.sessions[sid];
+  if (!args.seed?.length || !org || !session) return;
+  const seed = env.seedChat ?? createSeededChat;
+  void seed(org, {
+    session_id: sid,
+    title: String(session.title ?? ""),
+    ...((session.agentId ?? args.agent) && { agent_type: session.agentId ?? args.agent }),
+    origin: args.entryKind,
+    turns: args.seed,
+  }).catch(() => undefined);
 }
 
 function stagePayload(

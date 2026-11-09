@@ -49,8 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           :name="glyph"
           size="sm"
-          class="text-text-secondary mt-0.5 shrink-0"
+          :class="[
+            'mt-0.5 shrink-0',
+            view.state === 'skipped' ? 'text-status-warning-text' : 'text-text-secondary',
+          ]"
           aria-hidden="true"
+          data-test="assistant-approval-result-glyph"
         />
         <p
           :class="[
@@ -60,7 +64,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="assistant-approval-result-line"
         >
           {{ line }}
+          <template v-if="standingAllowed">
+            {{ raw("·") }}
+            <span data-test="assistant-approval-result-always">{{ standingAllowed }}</span>
+          </template>
         </p>
+        <OBadge
+          v-if="view.state === 'skipped'"
+          variant="warning-soft"
+          size="xs"
+          shape="rounded"
+          class="mt-0.5 shrink-0"
+          data-test="assistant-approval-result-new"
+        >
+          {{ t("assistant.message.newTag") }}
+        </OBadge>
         <OText
           v-if="meta"
           variant="meta"
@@ -70,6 +88,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ meta }}
         </OText>
+        <OButton
+          v-if="standingAllowed && !revoked && live && revocable"
+          variant="ghost-primary"
+          size="chip"
+          class="shrink-0"
+          :loading="revoking"
+          :class="TOUCH_TARGET_CLASS"
+          data-test="assistant-approval-result-revoke"
+          @click="revoke"
+        >
+          {{ t("assistant.approval.revoke") }}
+        </OButton>
         <span v-if="undoEntry && sid" class="flex shrink-0 items-center gap-1.5 text-xs">
           <AssistantUndoControl
             :entry="undoEntry"
@@ -85,6 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ replyText }}
       </p>
+      <AssistantApprovalDiff
+        v-if="madeDiff.length"
+        class="ps-6"
+        :rows="madeDiff"
+        data-test="assistant-approval-result-diff"
+      />
       <ul
         v-if="rows.length"
         class="flex min-w-0 flex-col gap-0.5 ps-6"
@@ -99,7 +135,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           :data-test="`assistant-approval-result-item-${row.key}`"
         >
-          <span class="min-w-0 break-all">{{ row.text }}</span>
+          <span class="min-w-0 break-words">{{ row.text }}</span>
+          <AssistantUndoControl
+            v-if="row.undo && sid"
+            :entry="row.undo"
+            :sid="sid"
+            test-id="assistant-approval-result-undo"
+          />
         </li>
       </ul>
       <!-- C3: the object changed after the ask, so the diff is redrawn against it as it is now -->
@@ -117,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="assistant-approval-result-fresh-diff"
       />
       <OText
-        v-if="undoEntry && sid"
+        v-if="anyUndo && sid"
         variant="meta"
         as="p"
         class="ps-6 break-words"
@@ -126,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("assistant.actions.undoLimits") }}
       </OText>
       <p
-        v-if="alwaysAllowed"
+        v-if="alwaysAllowed && !standingAllowed"
         class="text-text-secondary flex flex-wrap items-center gap-x-1.5 ps-6 text-xs"
         data-test="assistant-approval-result-always"
       >
@@ -134,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="revoked">{{ t("assistant.grants.revoked") }}</template>
         <template v-else>
           {{ alwaysAllowed }}
-          <template v-if="live">
+          <template v-if="live && revocable">
             {{ raw("·") }}
             <OButton
               variant="ghost-primary"
@@ -203,8 +245,8 @@ const MAX_SPOKEN = 200;
 </script>
 
 <script setup lang="ts">
-import { MutationObserver } from "@tanstack/vue-query";
-import { computed, inject, nextTick, ref, watch } from "vue";
+import { MutationObserver, QueryObserver } from "@tanstack/vue-query";
+import { computed, inject, nextTick, onScopeDispose, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import AssistantErrorRow from "@/components/ai-assistant/common/AssistantErrorRow.vue";
@@ -222,23 +264,27 @@ import {
   approvalObjectId,
   approvalTargetHref,
   approvalToolEntity,
-  approvalUntil,
   approvalVerb,
   assistantEvidenceHostKey,
   assistantTranscriptHostKey,
   type ApprovalBlockData,
+  type ApprovalResult,
   type ApprovalResultItem,
   type AssistantTurnView,
   type ResolvedBlockData,
+  type ResolvedGrant,
   type Sid,
 } from "@/composables/assistant/pure";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
+import type { AssistantGrant } from "@/services/assistant_settings";
 import { assistantGrantsQuery, revokeGrantMutation } from "@/services/assistant_settings.queries";
+import { assistantSettingsKeys } from "@/services/assistant_settings.querykeys";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -251,6 +297,7 @@ import {
   approvalDiffRows,
   lowerFirst,
   panelDashboardId,
+  pauseUntil,
   readableCard,
   readableReason,
   statusReason,
@@ -275,6 +322,7 @@ const TIMED_STATES: ReadonlySet<ApprovalResultState> = new Set([
   "replied",
   "answered",
   "expired",
+  "standing",
 ]);
 
 const BY_YOU_STATES: ReadonlySet<ApprovalResultState> = new Set([
@@ -283,6 +331,9 @@ const BY_YOU_STATES: ReadonlySet<ApprovalResultState> = new Set([
   "partial",
   "skipped",
 ]);
+
+// The kinds a granted write can have; a grant never covers a delete, but the wire is read as it says.
+const GRANT_KINDS = ["create", "update", "delete"] as const;
 
 const RECORDED_STATE = {
   approved: "approved",
@@ -335,14 +386,41 @@ const turnRunning = computed(() => (session.value?.turn ? isRunning(session.valu
 const org = computed(() => session.value?.org ?? props.turn?.org ?? "");
 const resolved = computed(() => props.block?.resolved ?? null);
 const card = computed<ApprovalBlockData | null>(
-  () => props.card ?? props.block?.approval ?? approvalOf(resolved.value?.id) ?? null,
+  () =>
+    props.card ??
+    props.block?.approval ??
+    cardOf(resolved.value?.id) ??
+    grantedCard(resolved.value) ??
+    null,
 );
 const record = computed(() =>
   card.value ? approvalOutcomeOf(session.value, card.value.id) : { outcome: null, result: null },
 );
 
+// A reopened chat's per-target rows come with its stored resolution.
+const resolvedResult = computed<ApprovalResult | null>(() => {
+  const items = resolved.value?.items;
+  if (!items?.length) return null;
+  const done = items.filter((item) => item.status === "done").length;
+  const status =
+    done === items.length
+      ? "done"
+      : items.every((item) => item.status === "skipped")
+        ? "skipped"
+        : done
+          ? "partial"
+          : "failed";
+  return {
+    status,
+    items,
+    resolvedBy: resolved.value?.by ?? "",
+    resolvedAt: resolved.value?.at ?? 0,
+  };
+});
+
 const view = computed<ApprovalResultView | null>(() => {
-  const { outcome, result } = record.value;
+  const outcome = record.value.outcome;
+  const result = record.value.result ?? resolvedResult.value;
   if (props.state) return { state: props.state, outcome, result };
   if (resolved.value) {
     // A decision made in this tab already has its own record above.
@@ -353,7 +431,8 @@ const view = computed<ApprovalResultView | null>(() => {
     return {
       state,
       outcome: {
-        state,
+        // A grant is an approve the user gave once for every later call.
+        state: state === "standing" ? "approved" : state,
         at,
         ...(by && { by }),
         ...(state === "failed" && detail && { reason: detail }),
@@ -432,6 +511,9 @@ const line = computed<I18nText>(() => {
       return card.value?.noDecision
         ? t("assistant.approval.noDecision")
         : t("assistant.approval.result.unknown");
+    case "standing":
+      if (!card.value) return t("assistant.approval.result.standing");
+      return approvedLine() ?? doneLine();
     case "approved_elsewhere":
       return t("assistant.approval.result.approvedElsewhere", { time });
     case "declined_elsewhere":
@@ -450,12 +532,23 @@ const meta = computed<I18nText | null>(() => {
   return BY_YOU_STATES.has(current.state) ? t("assistant.approval.record.youAt", { time }) : time;
 });
 
-const undoEntry = computed(() => {
+const undoEntries = computed(() => {
   const id = card.value?.id;
-  if (!live.value || !id) return null;
-  const entries = (session.value?.ledger ?? []).filter((entry) => entry.approvalId === id);
-  return entries.length === 1 && entries[0].undoable ? entries[0] : null;
+  if (!live.value || !id) return [];
+  return (session.value?.ledger ?? []).filter((entry) => entry.approvalId === id);
 });
+
+// A record with rows carries each target's Undo on its row; without rows its one Undo, or its Restored, sits on the line.
+const undoEntry = computed(() => {
+  const entries = undoEntries.value;
+  if (rows.value.length || entries.length !== 1) return null;
+  // A reopened chat reads an undone row as no longer undoable, yet it still says Restored.
+  return entries[0].undoable || entries[0].status === "undone" ? entries[0] : null;
+});
+
+const anyUndo = computed(
+  () => !!undoEntry.value?.undoable || rows.value.some((row) => row.undo?.undoable === true),
+);
 
 const replyText = computed(() =>
   view.value?.state === "replied" && replyOf() ? raw(replyOf()) : null,
@@ -487,38 +580,129 @@ const freshDiff = computed(() => {
   return approvalDiffRows(t, card.value, item.before);
 });
 
-/** "Always allowed: …" under a write approved for every later call of its tool. */
-const alwaysAllowed = computed<I18nText | null>(() => {
-  const decision = view.value?.outcome?.decision;
+// What an applied update changed; a pause or resume already says its effect in the line.
+const madeDiff = computed(() => {
   const state = view.value?.state;
-  if (!decision?.approved || decision.scope !== "tool" || !card.value) return null;
-  if (state !== "done" && state !== "approved" && state !== "partial") return null;
-  const facts = cardFacts();
-  if (!facts) return null;
-  return t("assistant.approval.alwaysAllowed", { action: approvalActionPhrase(t, facts) });
+  const current = card.value;
+  if (state !== "done" && state !== "approved") return [];
+  if (!current || current.kind !== "update" || approvedLine()) return [];
+  return approvalDiffRows(t, current);
 });
 
-const revoking = ref(false);
-const revoked = ref(false);
+/** "Always allowed: …" under a write approved for every later call of its tool. */
+const alwaysAllowed = computed<I18nText | null>(() => {
+  const state = view.value?.state;
+  const facts = cardFacts();
+  if (!facts) return null;
+  if (state === "standing")
+    return resolved.value?.scope === "chat"
+      ? t("assistant.approval.allowedForChat", { action: approvalActionPhrase(t, facts) })
+      : t("assistant.approval.alwaysAllowed", { action: approvalActionPhrase(t, facts) });
+  const scope = madeGrantScope.value;
+  if (!scope) return null;
+  return scope === "chat"
+    ? t("assistant.approval.allowedForChat", { action: approvalActionPhrase(t, facts) })
+    : t("assistant.approval.alwaysAllowed", { action: approvalActionPhrase(t, facts) });
+});
 
-// The standing grant this approve made: the reader's own always grant for the card's tool.
+// The grant an approve made for later calls; a reopened chat has only the stored resolution's scope.
+const madeGrantScope = computed<"chat" | "always" | null>(() => {
+  const state = view.value?.state;
+  if (state !== "done" && state !== "approved" && state !== "partial") return null;
+  const decision = view.value?.outcome?.decision;
+  if (decision) {
+    if (!decision.approved) return null;
+    return decision.scope === "tool" ? "always" : decision.scope === "chat" ? "chat" : null;
+  }
+  const scope = resolved.value?.approved === true ? resolved.value.scope : undefined;
+  return scope === "always" || scope === "chat" ? scope : null;
+});
+
+// The reader's grants as the server lists them now; null until a settled read.
+const grants = shallowRef<AssistantGrant[] | null>(null);
+
+const madeGrant = computed(() =>
+  grants.value ? (grantMadeHere(grants.value) ?? null) : undefined,
+);
+
+// A granted write revokes the grant it ran under; one revoked since has no id left to revoke.
+const revocable = computed(() =>
+  view.value?.state === "standing"
+    ? !!grantOf(resolved.value)?.id
+    : !!card.value?.tool && madeGrant.value !== null,
+);
+
+const revoking = ref(false);
+const revokedHere = ref(false);
+// The server no longer lists the grant this approve made, so it was revoked since.
+const revoked = computed(() => revokedHere.value || madeGrant.value === null);
+
+let stopGrants: (() => void) | null = null;
+
+watch(
+  () => (live.value && madeGrantScope.value && card.value?.tool ? org.value : ""),
+  (current) => {
+    stopGrants?.();
+    stopGrants = null;
+    grants.value = null;
+    if (!current) return;
+    // A decision made in this tab stored its grant after any earlier read, so the list is read again.
+    if (view.value?.outcome?.decision)
+      void queryClient.invalidateQueries({ queryKey: assistantSettingsKeys.grants(current) });
+    const observer = new QueryObserver(queryClient, assistantGrantsQuery(current));
+    const report = () => {
+      const result = observer.getCurrentResult();
+      grants.value = result.isSuccess && !result.isFetching ? (result.data ?? []) : null;
+    };
+    stopGrants = observer.subscribe(report);
+    report();
+  },
+  { immediate: true },
+);
+
+onScopeDispose(() => stopGrants?.());
+
+// A granted write had no card, so what allowed it shares the record's line: "Paused alert x · Always allowed: pausing alerts".
+const standingAllowed = computed<I18nText | null>(() => {
+  if (view.value?.state !== "standing" || !alwaysAllowed.value) return null;
+  return revokedHere.value ? t("assistant.grants.revoked") : alwaysAllowed.value;
+});
+
+// A standing record revokes the grant it ran under; an approving one the grant it made.
 async function revoke(): Promise<void> {
-  const tool = card.value?.tool;
-  if (!tool || revoking.value || !org.value) return;
+  if (!card.value?.tool || revoking.value || !org.value) return;
   revoking.value = true;
   try {
-    const grants = await queryClient.fetchQuery(assistantGrantsQuery(org.value));
-    const grant = grants?.find((row) => row.tool === tool && row.scope === "always");
+    const id =
+      grantOf(resolved.value)?.id ??
+      madeGrant.value?.id ??
+      grantMadeHere(await queryClient.fetchQuery(assistantGrantsQuery(org.value)))?.id;
     // A record outlives any one page, so it runs the declared mutation on the app's client, not a hook.
-    if (grant)
-      await new MutationObserver(queryClient, revokeGrantMutation(org.value)).mutate(grant.id);
-    revoked.value = true;
+    if (id) await new MutationObserver(queryClient, revokeGrantMutation(org.value)).mutate(id);
+    revokedHere.value = true;
   } catch (error) {
     console.error("Failed to revoke the standing approval:", error);
     toast({ variant: "error", message: t("assistant.approval.revokeFailed") });
   } finally {
     revoking.value = false;
   }
+}
+
+// An admin lists every member's grants, so only the reader's own grant of this scope counts.
+function grantMadeHere(
+  rows: readonly AssistantGrant[] | null | undefined,
+): AssistantGrant | undefined {
+  const tool = card.value?.tool;
+  const scope = madeGrantScope.value;
+  if (!scope) return undefined;
+  const user = host?.currentUser();
+  return rows?.find(
+    (row) =>
+      row.tool === tool &&
+      row.scope === scope &&
+      (!user || row.granted_by === user) &&
+      (scope !== "chat" || row.chat_id === sid.value),
+  );
 }
 
 const back = computed(() =>
@@ -532,6 +716,7 @@ const glyph = computed<IconName>(() => {
     state === "done" ||
     state === "approved" ||
     state === "approved_elsewhere" ||
+    state === "standing" ||
     state === "answered"
   )
     return assistantGlyph.done;
@@ -552,6 +737,12 @@ const rows = computed(() => {
     return {
       key: item.id ?? `${index}`,
       failed: item.status !== "done",
+      undo:
+        item.status === "done"
+          ? (undoEntries.value.find((entry) =>
+              item.id ? entry.resource.id === item.id : entry.resource.name === item.name,
+            ) ?? null)
+          : null,
       text:
         item.status === "done"
           ? raw(item.name)
@@ -583,7 +774,7 @@ const action = computed<{
       label: t("assistant.approval.retry"),
       run: () => host.sendAgain(current, id),
     };
-  if (state === "approved" || state === "done" || state === "editing") {
+  if (state === "approved" || state === "done" || state === "editing" || state === "standing") {
     const href = targetHref();
     return href
       ? {
@@ -628,6 +819,7 @@ function cardFacts() {
 function targetHref(): string | null {
   const facts = cardFacts();
   if (!facts || facts.kind === "delete") return null;
+  if (total.value > 1) return listHref();
   const made = createdHref();
   if (made) return made;
   const dashboard = panelDashboardId(facts);
@@ -683,11 +875,35 @@ function listHref(): string | null {
     : null;
 }
 
-function approvalOf(id: string | undefined): ApprovalBlockData | null {
+function cardOf(id: string | undefined): ApprovalBlockData | null {
   if (!id) return null;
   for (const block of props.message?.contentBlocks ?? [])
     if (block.approval?.id === id) return block.approval;
   return null;
+}
+
+// The grant a `by: "grant"` resolution carries (handoff-FX-L5 §1); absent until the reducer keeps it.
+function grantOf(block: ResolvedBlockData | null | undefined): ResolvedGrant | undefined {
+  return block?.by === "grant" ? block.grant : undefined;
+}
+
+// A write run under a standing grant has no card; its frame names the tool and targets.
+function grantedCard(block: ResolvedBlockData | null): ApprovalBlockData | null {
+  const grant = grantOf(block);
+  if (!block || !grant?.tool) return null;
+  const kind = GRANT_KINDS.find((known) => known === grant.operation) ?? "update";
+  return {
+    id: block.id,
+    kind,
+    destructive: kind === "delete",
+    operation: grant.operation ?? "",
+    tool: grant.tool,
+    targets: grant.targets ?? [],
+    grantable: false,
+    editable: false,
+    question: "",
+    typed: true,
+  };
 }
 
 // An approval the server could not carry out changed nothing, wherever it was given; a reopened chat's decision is its own.
@@ -699,7 +915,8 @@ function resolvedState(
   if (block.answer !== undefined) return "answered";
   if (block.approved && (block.outcome === "failed" || block.outcome === "denied")) return "failed";
   if (block.approved && block.outcome === "skipped") return "skipped";
-  if (block.recorded && block.approved) return block.outcome === "partial" ? "approved" : "done";
+  if (block.approved && block.by === "grant") return "standing";
+  if (block.recorded && block.approved) return block.outcome === "partial" ? "partial" : "done";
   if (block.recorded) return "declined";
   return block.approved ? "approved_elsewhere" : "declined_elsewhere";
 }
@@ -734,13 +951,30 @@ function approvedLine(): I18nText | null {
   if (!facts) return null;
   const verb = approvalVerb(facts);
   if (verb !== "pause" && verb !== "resume") return null;
+  const until = pauseUntil(facts, view.value?.outcome?.at);
+  const time = until === null ? null : raw(formatOrgTime(until));
+  if (total.value > 1) return batchEffectLine(verb, facts, time);
   const noun = t(`assistant.entity.${approvalNoun(facts)}`, 1);
   const params = { entity: noun, name: raw(targetName()) };
-  const until = approvalUntil(facts, view.value?.outcome?.at);
   if (verb === "resume") return t("assistant.approval.record.resumed", params);
-  return until === null
+  return time === null
     ? t("assistant.approval.record.paused", params)
-    : t("assistant.approval.record.pausedUntil", { ...params, time: raw(formatOrgTime(until)) });
+    : t("assistant.approval.record.pausedUntil", { ...params, time });
+}
+
+// "Paused 2 alerts until 15:37": a batch says how many; its rows name them.
+function batchEffectLine(
+  verb: "pause" | "resume",
+  facts: NonNullable<ReturnType<typeof cardFacts>>,
+  time: I18nText | null,
+): I18nText {
+  const items = view.value?.result?.items;
+  const count = items?.length ? items.filter((item) => item.status === "done").length : total.value;
+  const params = { count, entity: t(`assistant.entity.${approvalNoun(facts)}`, count) };
+  if (verb === "resume") return t("assistant.approval.record.resumedCount", params, count);
+  return time === null
+    ? t("assistant.approval.record.pausedCount", params, count)
+    : t("assistant.approval.record.pausedCountUntil", { ...params, time }, count);
 }
 
 function doneLine(): I18nText {
@@ -770,10 +1004,19 @@ function doneLine(): I18nText {
   return t("assistant.approval.result.done.permission", { tool: raw(current.tool ?? "") });
 }
 
+// Before a reopened chat's per-target rows arrive, the stored resolution says only that part failed.
 function partialLine(): I18nText {
   const items = view.value?.result?.items ?? [];
+  if (!items.length) {
+    const reason = resolved.value?.detail?.trim();
+    return reason
+      ? t("assistant.approval.result.partialUnnamed", { reason: raw(reason) })
+      : t("assistant.approval.result.partialUnnamedPlain");
+  }
   const done = items.filter((item) => item.status === "done").length;
-  return t("assistant.approval.result.partial", {
+  const facts = cardFacts();
+  const verb = (facts && approvalVerb(facts)) ?? "change";
+  return t(`assistant.approval.result.partialBy.${verb}`, {
     done,
     total: items.length,
     failed: items.length - done,

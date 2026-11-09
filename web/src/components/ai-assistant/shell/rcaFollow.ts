@@ -37,6 +37,12 @@ export function stopFollowingRca(): void {
   followed.value = null;
 }
 
+/** Re-analyze started a new run on the followed incident, so the panel follows that run instead. */
+export function followNewRun(runId: string): void {
+  const current = followed.value;
+  if (current && current.runId !== runId) followed.value = { ...current, runId };
+}
+
 /** Follow in thread: the side panel opens on the run instead of starting another one. */
 export function useRcaFollow(): {
   follow(target: RcaFollowTarget, invoker?: HTMLElement | null): void;

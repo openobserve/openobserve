@@ -64,114 +64,150 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is-admin="capability.isAdmin"
         :context="{ org, feature: 'chat' }"
       />
-      <AssistantComposerFrame
-        v-else-if="layout !== 'chats'"
-        ref="input"
-        :model-value="shownText"
-        :state="goToOnly ? 'go_to' : (state ?? undefined)"
-        :trailing="voice.mine.value"
-        :disabled="state === 'loading' && !goToOnly"
-        :placeholder="placeholder"
-        :input-attrs="{
-          'aria-label': goToOnly
-            ? t('home.agent.goToName')
-            : t('assistant.welcome.launcher.inputName', { product }),
-          maxlength: MAX_LAUNCHER_CHARS,
-          enterkeyhint: 'send',
-          ...(goToShown && {
-            role: 'combobox',
-            'aria-haspopup': 'listbox',
-            'aria-expanded': 'true',
-            'aria-autocomplete': 'list',
-            'aria-controls': GO_TO_LISTBOX_ID,
-            'aria-activedescendant': results?.activeDescendant,
-          }),
-        }"
-        data-test="assistant-launcher-input"
-        @update:model-value="onInput"
-        @keydown="onKeydown"
-      >
-        <template v-if="!goToOnly" #strip>
-          <AssistantComposerStrip :notice="null">
-            <span class="flex min-w-0 items-center gap-1.5" data-test="assistant-launcher-chips">
-              <AssistantTimePrefix
-                :window="window"
-                :disabled="state === 'loading'"
-                align="start"
-                @change="onTimeChange"
-              />
-              <span
-                v-if="layout === 'overview' && (pageChips.length || ghostChips.length)"
-                class="flex min-w-0 items-center gap-1.5"
-                data-test="assistant-launcher-page-chips"
+      <div v-else-if="layout !== 'chats'" ref="field" class="relative min-w-0">
+        <AssistantMentionMenu
+          ref="mention"
+          :open="mentionAt !== null"
+          :query="mentionQuery"
+          :org="org"
+          :listbox-id="MENTION_LISTBOX_ID"
+          :sid="null"
+          :class="['md:z-30', mentionBelow && 'md:top-full! md:bottom-auto! md:mt-1! md:mb-0!']"
+          @select="pickMention"
+          @close="closeMention"
+        />
+        <AssistantComposerFrame
+          ref="input"
+          :model-value="shownText"
+          :state="goToOnly ? 'go_to' : (state ?? undefined)"
+          :trailing="voice.mine.value"
+          :disabled="fieldLoading && !goToOnly"
+          :placeholder="placeholder"
+          :input-attrs="{
+            'aria-label': goToOnly
+              ? t('home.agent.goToName')
+              : t('assistant.welcome.launcher.inputName', { product }),
+            maxlength: MAX_LAUNCHER_CHARS,
+            enterkeyhint: 'send',
+            ...(goToShown && {
+              role: 'combobox',
+              'aria-haspopup': 'listbox',
+              'aria-expanded': 'true',
+              'aria-autocomplete': 'list',
+              'aria-controls': GO_TO_LISTBOX_ID,
+              'aria-activedescendant': results?.activeDescendant,
+            }),
+            ...(mentionAt !== null && {
+              role: 'combobox',
+              'aria-haspopup': 'listbox',
+              'aria-expanded': 'true',
+              'aria-autocomplete': 'list',
+              'aria-controls': MENTION_LISTBOX_ID,
+              'aria-activedescendant': mention?.activeId,
+            }),
+          }"
+          data-test="assistant-launcher-input"
+          @update:model-value="onInput"
+          @keydown="onKeydown"
+        >
+          <template v-if="!goToOnly" #strip>
+            <AssistantComposerStrip :notice="null">
+              <AssistantChipTray
+                v-model:expanded="chipsExpanded"
+                :items="shownTrayChips"
+                :hidden-count="hiddenTrayChips"
+                data-test="assistant-launcher-chips"
               >
-                <AssistantContextChip
-                  v-for="chip in pageChips"
-                  :key="chip.id"
-                  :chip="chip"
-                  :popup="false"
-                  @open="showPageSection"
-                  @remove="removePageKey(chip)"
-                />
-                <AssistantContextChip
-                  v-for="chip in ghostChips"
-                  :key="chip.id"
-                  :chip="chip"
-                  state="ghost"
-                  :popup="false"
-                  @open="addBackPageKey(chip)"
-                />
-              </span>
-            </span>
-            <template #sees>
-              <AssistantContextSeesPopover :sid="null" hide-streams>
-                <template #trigger>
-                  <AssistantIconButton
-                    :label="t('assistant.context.title')"
-                    :icon="assistantGlyph.info"
-                    data-test="assistant-launcher-sees"
+                <template #leading>
+                  <AssistantTimePrefix
+                    :window="window"
+                    :disabled="fieldLoading"
+                    align="start"
+                    @change="onTimeChange"
                   />
                 </template>
-              </AssistantContextSeesPopover>
-            </template>
-          </AssistantComposerStrip>
-        </template>
-        <template #trailing>
-          <AssistantDictationWave :elapsed-ms="voice.elapsedMs.value" />
-        </template>
-        <template #bar>
-          <AssistantComposerBottomRow>
-            <template v-if="!goToOnly" #agent>
-              <AssistantAgentPill :agent="DEFAULT_AGENT" :disabled="state === 'loading'" />
-            </template>
-            <AssistantIconButton
-              v-if="text"
-              :label="t('assistant.welcome.launcher.clear')"
-              :icon="assistantGlyph.close"
-              data-test="assistant-launcher-clear"
-              @click="clear"
-            />
-            <AssistantDictateButton
-              v-if="!goToOnly && voice.mic.value !== 'none' && voice.mic.value !== 'off'"
-              :mic="voice.mic.value"
-              :pressed="voice.mine.value"
-              :disabled-reason="voice.helperLine.value ?? undefined"
-              @press="onMicPress"
-            />
-            <AssistantIconButton
-              v-if="!goToOnly"
-              variant="primary"
-              size="md"
-              :label="t('assistant.welcome.launcher.ask')"
-              :icon="assistantGlyph.send"
-              :disabled="state === 'loading' || !text.trim()"
-              :class="ROUND_ACTION_CLASS"
-              data-test="assistant-launcher-ask"
-              @click="ask(false)"
-            />
-          </AssistantComposerBottomRow>
-        </template>
-      </AssistantComposerFrame>
+                <template #chip="{ item }">
+                  <AssistantContextChip
+                    v-if="item.role === 'mention'"
+                    :chip="item.chip"
+                    compact
+                    :short-label="item.chip.short"
+                    :popup="false"
+                    data-test="assistant-launcher-mention-chip"
+                    @remove="removeMention(item.chip)"
+                  />
+                  <AssistantContextChip
+                    v-else-if="item.role === 'page'"
+                    :chip="item.chip"
+                    compact
+                    :short-label="item.chip.short"
+                    :popup="false"
+                    data-test="assistant-launcher-page-chip"
+                    @open="showPageSection"
+                    @remove="removePageKey(item.chip)"
+                  />
+                  <AssistantContextChip
+                    v-else
+                    :chip="item.chip"
+                    compact
+                    :short-label="item.chip.short"
+                    state="ghost"
+                    :popup="false"
+                    data-test="assistant-launcher-page-chip"
+                    @open="addBackPageKey(item.chip)"
+                  />
+                </template>
+              </AssistantChipTray>
+              <template #sees>
+                <AssistantContextSeesPopover :sid="null" hide-streams>
+                  <template #trigger>
+                    <AssistantIconButton
+                      :label="t('assistant.context.title')"
+                      :icon="assistantGlyph.info"
+                      data-test="assistant-launcher-sees"
+                    />
+                  </template>
+                </AssistantContextSeesPopover>
+              </template>
+            </AssistantComposerStrip>
+          </template>
+          <template #trailing>
+            <AssistantDictationWave :elapsed-ms="voice.elapsedMs.value" />
+          </template>
+          <template #bar>
+            <AssistantComposerBottomRow>
+              <template v-if="!goToOnly" #agent>
+                <AssistantAgentPill :agent="agent ?? DEFAULT_AGENT" :disabled="fieldLoading" />
+              </template>
+              <AssistantIconButton
+                v-if="text"
+                :label="t('assistant.welcome.launcher.clear')"
+                :icon="assistantGlyph.close"
+                data-test="assistant-launcher-clear"
+                @click="clear"
+              />
+              <AssistantDictateButton
+                v-if="!goToOnly && voice.mic.value !== 'none' && voice.mic.value !== 'off'"
+                :mic="voice.mic.value"
+                :pressed="voice.mine.value"
+                :disabled-reason="voice.helperLine.value ?? undefined"
+                @press="onMicPress"
+              />
+              <AssistantIconButton
+                v-if="!goToOnly"
+                variant="primary"
+                size="md"
+                :label="t('assistant.welcome.launcher.ask')"
+                :icon="assistantGlyph.send"
+                :disabled="fieldLoading || !text.trim()"
+                :class="ROUND_ACTION_CLASS"
+                data-test="assistant-launcher-ask"
+                @click="ask(false)"
+              />
+            </AssistantComposerBottomRow>
+          </template>
+        </AssistantComposerFrame>
+      </div>
       <div
         v-if="goToShown"
         class="border-border-default rounded-default bg-surface-base -mt-2 flex max-h-80 flex-col overflow-y-auto border border-[0.0625em] p-1"
@@ -233,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex min-h-7 min-w-0 items-center gap-2">
             <h3 class="text-text-secondary min-w-0 flex-1 ps-1.5 text-xs">
-              {{ t("assistant.welcome.launcher.recent") }}
+              {{ t("assistant.welcome.launcher.recentThreads") }}
             </h3>
             <OButton
               v-if="recent.length"
@@ -242,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="['shrink-0', TOUCH_TARGET_CLASS]"
               data-test="assistant-launcher-all-chats"
               @click="openFull"
-              >{{ t("assistant.welcome.launcher.allChats") }}</OButton
+              >{{ t("assistant.welcome.launcher.allThreads") }}</OButton
             >
           </div>
           <ul v-if="state === 'loading'" class="flex flex-col gap-3 pt-2">
@@ -277,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex min-h-7 items-center"
             data-test="assistant-launcher-recent-empty"
           >
-            {{ t("assistant.welcome.launcher.noRecent") }}
+            {{ t("assistant.welcome.launcher.noThreadsYet") }}
           </OText>
           <ul v-else class="flex flex-col">
             <li v-for="(row, index) in recent" :key="row.sid" class="min-w-0">
@@ -321,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { AgentId, Sid } from "@/composables/assistant";
+import type { AgentId, ContextChip, Sid } from "@/composables/assistant";
 
 // A door always starts a new chat with the default agent; the chat's own picker changes it later.
 const DEFAULT_AGENT: AgentId = "o2-ai";
@@ -344,6 +380,13 @@ const HIDDEN_GATES: ReadonlySet<string> = new Set([
   "not_configured",
   "off_for_org",
 ]);
+
+// A Home chip is the user's @ pick, a page chip, or a removed page chip offered back.
+interface TrayChip {
+  id: string;
+  chip: ContextChip;
+  role: "mention" | "page" | "ghost";
+}
 
 /** What the card renders for a gate; `null` renders nothing. */
 export function launcherState(gate: string): "loading" | "gate" | "ready" | null {
@@ -371,7 +414,13 @@ import {
 } from "@/components/ai-assistant/history/chatStatus";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
+import AssistantChipTray, {
+  useChipCollapse,
+} from "@/components/ai-assistant/context/AssistantChipTray.vue";
 import AssistantContextChip from "@/components/ai-assistant/context/AssistantContextChip.vue";
+import AssistantMentionMenu, {
+  type MentionOption,
+} from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
 import AssistantTimePrefix from "@/components/ai-assistant/context/AssistantTimePrefix.vue";
 import GoToResults from "@/components/goto/GoToResults.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
@@ -387,7 +436,6 @@ import {
   useAssistantStarters,
   useAssistantStore,
   type ComposerState,
-  type ContextChip,
   type Starter,
   type TimeWindow,
 } from "@/composables/assistant";
@@ -417,6 +465,7 @@ import AssistantComposerStrip from "@/components/ai-assistant/composer/Assistant
 import AssistantDictateButton from "@/components/ai-assistant/composer/AssistantDictateButton.vue";
 import AssistantDictationWave from "@/components/ai-assistant/composer/AssistantDictationWave.vue";
 import { useAssistantVoice } from "@/components/ai-assistant/composer/useAssistantVoice";
+import { useComposerWidth } from "@/components/ai-assistant/composer/useComposerWidth";
 
 import AssistantStarterRow from "./AssistantStarterRow.vue";
 import { starterIcon } from "./starterIcons";
@@ -438,6 +487,9 @@ const emit = defineEmits<{
 }>();
 
 const GO_TO_LISTBOX_ID = "assistant-launcher-go-to-listbox";
+const MENTION_LISTBOX_ID = "assistant-launcher-mention-listbox";
+// The menu's max height (20rem) plus the header's height.
+const MENTION_ROOM_PX = 400;
 
 // Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
 provideAssistantSurface();
@@ -456,6 +508,13 @@ const titleId = `assistant-launcher-title-${useId()}`;
 const text = ref("");
 const timeOverride = ref<ComposerState["timeOverride"]>(null);
 const input = ref<InstanceType<typeof AssistantComposerFrame> | null>(null);
+const mention = ref<InstanceType<typeof AssistantMentionMenu> | null>(null);
+const mentionAt = ref<number | null>(null);
+const mentionQuery = ref("");
+const mentionBelow = ref(false);
+// The launcher has no chat yet, so its @ picks wait here and go with the line it opens.
+const mentionChips = ref<ContextChip[]>([]);
+const agent = ref<AgentId | null>(null);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const state = computed(() => {
@@ -463,10 +522,13 @@ const state = computed(() => {
   return gated === "ready" && loading.value ? "loading" : gated;
 });
 const goToOnly = computed(() => props.layout === "overview" && props.goToOnly);
+// Starters refetch when the @ menu loads the same lists; only the gate may disable the field, or it drops focus.
+const fieldReady = computed(() => launcherState(capability.gate.value) === "ready");
+const fieldLoading = computed(() => capability.gate.value === "loading");
 // The card names itself with its heading; the Home layouts draw none, so they carry the name.
 const sectionName = computed(() => {
   if (props.layout === "card") return undefined;
-  if (props.layout === "chats") return t("assistant.welcome.launcher.recent");
+  if (props.layout === "chats") return t("assistant.welcome.launcher.recentThreads");
   return goToOnly.value
     ? t("home.agent.goToName")
     : t("assistant.welcome.launcher.inputName", { product });
@@ -503,13 +565,35 @@ const ghostChips = computed(() =>
 );
 watch(org, () => (removedPageKeys.value = []));
 
+// The Home field folds chips into "+N" at the composer's widths, so a phone never squashes them.
+const field = ref<HTMLElement | null>(null);
+const fieldWidth = useComposerWidth(field);
+const chipLayout = computed(() => ({
+  narrow: fieldWidth.narrow.value,
+  wide: fieldWidth.wide.value,
+}));
+const chipsExpanded = ref(false);
+const trayChips = computed<TrayChip[]>(() => [
+  ...mentionChips.value.map((chip) => ({ id: chip.id, chip, role: "mention" as const })),
+  ...pageChips.value.map((chip) => ({ id: chip.id, chip, role: "page" as const })),
+  ...ghostChips.value.map((chip) => ({ id: chip.id, chip, role: "ghost" as const })),
+]);
+const { shown: shownTrayChips, hiddenCount: hiddenTrayChips } = useChipCollapse(
+  trayChips,
+  chipLayout,
+  chipsExpanded,
+);
+
 const results = ref<InstanceType<typeof GoToResults> | null>(null);
 const goToActive = ref(-1);
 const { matches: goToMatches } = useGoToIndex(text, {
   canAsk: () => state.value === "ready" && !goToOnly.value,
   enabled: () => props.layout === "overview" && shown.value,
 });
-const goToShown = computed(() => props.layout === "overview" && text.value.trim() !== "");
+const goToShown = computed(
+  () => props.layout === "overview" && text.value.trim() !== "" && mentionAt.value === null,
+);
+const mentionsOn = computed(() => fieldReady.value && !goToOnly.value);
 const placeholder = computed(() =>
   goToOnly.value ? t("home.agent.goToPlaceholder") : t("assistant.composer.placeholderAt"),
 );
@@ -530,6 +614,84 @@ const shownText = computed(() => voice.shown(text.value));
 function onInput(value: string): void {
   text.value = value;
   voice.noteEdit(input.value?.textarea?.selectionStart ?? value.length);
+  void nextTick(detectMention);
+}
+
+// The same `@` rule as the composer: only at a word boundary, so `ops@acme.com` stays text.
+function detectMention(): void {
+  const target = input.value?.textarea;
+  if (!target || !mentionsOn.value) return closeMention();
+  const before = target.value.slice(0, target.selectionStart ?? 0);
+  const start = Math.max(before.lastIndexOf(" "), before.lastIndexOf("\n")) + 1;
+  const token = before.slice(start);
+  if (!token.startsWith("@") || /\s/.test(token)) return closeMention();
+  // The menu opens above as in the composer, unless the field sits too near the top to hold it.
+  if (mentionAt.value === null)
+    mentionBelow.value = target.getBoundingClientRect().top < MENTION_ROOM_PX;
+  mentionAt.value = start;
+  mentionQuery.value = token.slice(1);
+}
+
+function closeMention(): void {
+  mentionAt.value = null;
+  mentionQuery.value = "";
+}
+
+function pickMention(option: MentionOption): void {
+  const at = mentionAt.value;
+  closeMention();
+  if (at === null || text.value[at] !== "@") return;
+  if (option.agent) agent.value = option.agent;
+  else if (option.chip && !mixedStream(option.chip)) {
+    const chip = option.chip;
+    if (!mentionChips.value.some((held) => held.id === chip.id))
+      mentionChips.value = [...mentionChips.value, chip];
+  } else return;
+  const rest = text.value.slice(at).search(/\s/);
+  const end = rest === -1 ? text.value.length : at + rest;
+  text.value = text.value.slice(0, at) + text.value.slice(end);
+  void nextTick(() => {
+    input.value?.focus();
+    input.value?.textarea?.setSelectionRange(at, at);
+  });
+}
+
+// One stream type per request: a stream of another type than the one already held is refused.
+function mixedStream(chip: ContextChip): boolean {
+  if (chip.kind !== "stream") return false;
+  const held = mentionChips.value.find((other) => other.kind === "stream");
+  return !!held && (held.ref?.streamType ?? "logs") !== (chip.ref?.streamType ?? "logs");
+}
+
+function removeMention(chip: ContextChip): void {
+  mentionChips.value = mentionChips.value.filter((held) => held.id !== chip.id);
+}
+
+function mentionKey(event: KeyboardEvent): boolean {
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    mention.value?.move(event.key === "ArrowDown" ? 1 : -1);
+    return true;
+  }
+  if (event.key === "Enter" || event.key === "Tab") {
+    const option = mention.value?.current();
+    // An unmatched `@query` stays as text and is never sent as the question.
+    if (!option) {
+      if (event.key === "Enter") event.preventDefault();
+      return event.key === "Enter";
+    }
+    event.preventDefault();
+    if (option.action) mention.value?.choose(option);
+    else pickMention(option);
+    return true;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeMention();
+    return true;
+  }
+  return false;
 }
 
 function onMicPress(event: MouseEvent): void {
@@ -666,6 +828,7 @@ onBeforeUnmount(() => {
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.isComposing || event.keyCode === 229) return;
+  if (mentionAt.value !== null && mentionKey(event)) return;
   if (goToShown.value && !event.shiftKey && results.value?.onKeydown(event)) return;
   if (event.key === "Enter") {
     event.preventDefault();
@@ -685,7 +848,7 @@ function openFirstMatch(): void {
 
 // The launcher is a door, not a composer: the line goes to `/assistant` and nothing stays here (`70` §5 note 6).
 function ask(stage: boolean): void {
-  if (state.value !== "ready" || goToOnly.value) return;
+  if (!fieldReady.value || goToOnly.value) return;
   if (voice.mine.value) voice.stop("send");
   const line = text.value.trim();
   if (!line) return openFull();
@@ -693,7 +856,11 @@ function ask(stage: boolean): void {
   const overview = props.layout === "overview";
   const removed = overview ? removedPageKeys.value : [];
   const time = overview && props.pageRange ? props.pageRange : timeOverride.value;
+  const chips = mentionChips.value;
+  const picked = agent.value;
   if (overview) removedPageKeys.value = [];
+  mentionChips.value = [];
+  agent.value = null;
   void openAssistant({
     entryKind: "home_launcher",
     entryVerb: "ask",
@@ -701,9 +868,10 @@ function ask(stage: boolean): void {
     intent: stage ? "stage" : "send",
     thread: "new",
     container: overview && sidebarOpen.value ? "sidebar" : "full",
+    ...(picked && { agent: picked }),
     payload: {
       text: line,
-      chips: [],
+      chips,
       ...(time && { timeOverride: time }),
       ...(removed.length > 0 && { removedPageKeys: removed }),
     },

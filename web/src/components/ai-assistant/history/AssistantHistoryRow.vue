@@ -61,6 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @blur="chosen = false"
         >
           <span class="flex min-w-0 flex-1 items-center gap-2">
+            <!-- A fixed slot keeps every title on one edge whether or not its row has a light -->
+            <span
+              class="inline-flex w-4 shrink-0 justify-center"
+              data-test="assistant-history-row-light"
+              :data-signal="signal ?? undefined"
+            >
+              <AssistantStatusDot v-if="signal" :state="signal" />
+            </span>
             <OIcon
               v-if="agentIcon"
               :name="agentIcon"
@@ -71,8 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <span class="flex min-w-0 flex-1 flex-col">
               <!-- A chosen row moves as the list re-sorts, so its bubble would be left over the nav (X1) -->
+              <!-- The row is a button, whose nowrap would stop the 2-line clamp from wrapping or showing its ellipsis -->
               <OTruncatedText
-                class="text-text-body min-w-12"
+                class="text-text-body min-w-12 wrap-break-word whitespace-normal"
                 :lines="2"
                 :tooltip="chosen ? false : fullTitle"
                 >{{ row.title }}</OTruncatedText
@@ -81,6 +90,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ org }}
               </OText>
             </span>
+            <template v-if="visibility">
+              <OIcon
+                :name="visibility === 'public' ? assistantGlyph.shared : 'corporate-fare'"
+                size="xs"
+                class="text-text-secondary shrink-0"
+                aria-hidden="true"
+                data-test="assistant-history-row-shared"
+                :data-visibility="visibility"
+              />
+              <span class="sr-only"
+                >,
+                {{
+                  visibility === "public"
+                    ? t("assistant.history.sharedPublic")
+                    : t("assistant.share.sharedOrg")
+                }}</span
+              >
+            </template>
             <!-- The button is named by its content; these keep the spoken parts apart. -->
             <span class="sr-only">, </span>
             <template v-if="pending">
@@ -189,6 +216,8 @@ export interface AssistantHistoryRowProps {
   org?: string | null;
   /** The agent's glyph; only with two or more agents, then on every row. */
   agentIcon?: IconName | null;
+  /** How the owner shared the chat, when a live link points at it; the row alone does not know. */
+  sharedAs?: "org" | "public" | null;
   /** Why the chat cannot float here, when it cannot. */
   floatBlocked?: I18nText;
   pending: HistoryPending | null;
@@ -204,7 +233,8 @@ export interface AssistantHistoryRowProps {
   tag?: "li" | "div";
 }
 
-type RowAction = "float" | "stop" | "rename" | "pin" | "share" | "delete" | "deleteDraft";
+type RowAction =
+  "float" | "stop" | "rename" | "pin" | "share" | "export" | "delete" | "deleteDraft";
 
 const MAX_TITLE = 200;
 const COUNTER_FROM = 180;
@@ -220,6 +250,8 @@ const KEBAB_CLASS = [
 import { computed, nextTick, ref } from "vue";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
+import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -238,12 +270,21 @@ import { formatOrgTime, formatRelativeCompact } from "@/utils/formatters";
 
 import { chatStatusClass, chatStatusOf, chatStatusWord } from "./chatStatus";
 
+// The Threads board's lights; a draft is at rest, so it has none.
+const STATUS_SIGNALS: Partial<Record<ChatStatus, AssistantSignal>> = {
+  needs_you: "attention",
+  answering: "working",
+  failed: "failed",
+  expired: "failed",
+};
+
 const props = withDefaults(defineProps<AssistantHistoryRowProps>(), {
   status: undefined,
   expiresAt: null,
   now: undefined,
   org: null,
   agentIcon: null,
+  sharedAs: null,
   floatBlocked: undefined,
   readonly: false,
   timezone: undefined,
@@ -258,6 +299,7 @@ const emit = defineEmits<{
   float: [sid: Sid];
   stop: [sid: Sid];
   share: [sid: Sid];
+  export: [sid: Sid];
   delete: [sid: Sid];
   "delete-draft": [sid: Sid];
 }>();
@@ -282,6 +324,10 @@ let cancelled = false;
 
 const status = computed(() =>
   props.status === undefined ? chatStatusOf(props.row) : props.status,
+);
+const visibility = computed(() => props.row.share?.visibility ?? props.sharedAs);
+const signal = computed<AssistantSignal | null>(() =>
+  status.value ? (STATUS_SIGNALS[status.value] ?? null) : null,
 );
 const pendingText = computed(() =>
   props.pending ? t(`assistant.history.pending.${props.pending}`) : undefined,
@@ -320,6 +366,11 @@ const actions = computed<RowMenuAction[]>(() => {
     list.push({ id: "pin", label: pinLabel.value, icon: assistantGlyph.pin });
     list.push({ id: "share", label: t("assistant.share.share"), icon: assistantGlyph.share });
   }
+  list.push({
+    id: "export",
+    label: t("assistant.history.exportMarkdown"),
+    icon: assistantGlyph.download,
+  });
   if (!props.readonly)
     list.push({
       id: "delete",
@@ -372,6 +423,7 @@ function run(action: RowAction): void {
   else if (action === "float") emit("float", props.row.sid);
   else if (action === "stop") emit("stop", props.row.sid);
   else if (action === "share") emit("share", props.row.sid);
+  else if (action === "export") emit("export", props.row.sid);
   else if (action === "delete") emit("delete", props.row.sid);
   else emit("delete-draft", props.row.sid);
 }

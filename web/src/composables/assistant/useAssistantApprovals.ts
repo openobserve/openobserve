@@ -84,6 +84,8 @@ const ENTITY_KEYS: ReadonlySet<string> = new Set([
   "panel",
 ]);
 
+const MAX_HEADING_NAMES = 2;
+
 // The server keeps queued writes side by side; a newer permission or question replaces the older one there.
 const QUEUED_WRITE_KINDS: ReadonlySet<string> = new Set(["create", "update", "delete"]);
 
@@ -646,7 +648,7 @@ export function approvalHeading(
   }
   if (verb) {
     const text = approvalVerbText(t, card);
-    const name = approvalName(card);
+    const name = card.targets.length > 1 ? targetNames(t, card.targets) : approvalName(card);
     return name ? t("assistant.approval.named", { verb: text, name: raw(name) }) : text;
   }
   if (card.kind === "run_command")
@@ -660,7 +662,7 @@ export function approvalVerbText(
   card: Pick<ApprovalBlockData, "kind" | "targets" | "tool" | "args">,
 ): I18nText {
   const verb = approvalVerb(card) ?? "update";
-  const entity = t(`assistant.entity.${approvalNoun(card)}`, 1);
+  const entity = t(`assistant.entity.${approvalNoun(card)}`, card.targets.length > 1 ? 2 : 1);
   return t(`assistant.approval.verb.${verb}`, { entity });
 }
 
@@ -900,6 +902,18 @@ function decisionKind(
 function opOf(kind: ApprovalBlockData["kind"]): ApprovalOp {
   if (kind === "delete" || kind === "update" || kind === "create") return kind;
   return "run";
+}
+
+// "a, b and 3 more": a heading names the first targets of a gathered card, never ids.
+function targetNames(t: TranslateFn, targets: readonly { name: string }[]): string {
+  const shown = targets
+    .slice(0, MAX_HEADING_NAMES)
+    .map((target) => target.name)
+    .join(", ");
+  const rest = targets.length - MAX_HEADING_NAMES;
+  return rest > 0
+    ? `${shown} ${String(t("assistant.approval.moreTargets", { count: rest }))}`
+    : shown;
 }
 
 function namesOf(card: ApprovalBlockData, ids: string[]): string {

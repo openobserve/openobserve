@@ -14,6 +14,8 @@ pub struct Model {
     /// `approved` | `standing` | `none`.
     pub approval_kind: String,
     pub approved_by: Option<String>,
+    /// On a `standing` row, the scope of the grant it ran under: `chat` | `always`.
+    pub approval_scope: Option<String>,
     /// The member the assistant acted for.
     pub user_email: String,
     pub tool: String,

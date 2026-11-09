@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="section"
     data-test="rca-hypotheses"
     :aria-labelledby="headingId"
-    class="flex flex-col"
+    class="@container flex flex-col"
   >
     <div class="mb-1 flex items-baseline gap-2">
       <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-status="hypothesis.status"
           :data-hypothesis-id="hypothesis.id"
           tabindex="-1"
-          class="grid grid-cols-[8rem_minmax(0,1fr)_auto] items-start gap-x-3 px-3.5 py-2.5 transition-colors duration-700 outline-none"
+          class="grid grid-cols-1 items-start gap-x-3 gap-y-1.5 px-3.5 py-2.5 transition-colors duration-700 outline-none @xl:grid-cols-[8rem_minmax(0,1fr)_auto] @xl:gap-y-0"
           :class="{ 'bg-surface-tint-accent': highlighted === hypothesis.id }"
         >
           <!-- The status column wraps a long label ("Root cause · not confirmed"). -->
@@ -135,7 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="flex flex-wrap items-center justify-end gap-1 pt-px">
+          <!-- A narrow panel stacks pill, statement and chips; three columns only fit a wide one -->
+          <div
+            data-test="rca-hypothesis-side"
+            class="flex flex-wrap items-center justify-start gap-1 pt-px @xl:justify-end"
+          >
             <button
               v-for="number in hypothesis.evidence_numbers"
               :key="number"

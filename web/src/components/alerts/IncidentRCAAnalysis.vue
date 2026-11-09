@@ -126,7 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :refusal="refusal"
         :reanalyze-credit-cost="reanalyzeCreditCost"
         :start-locked-reason="startLockedReason"
-        @cancel="$emit('cancel-rca')"
+        :in-thread="layout === 'assistant'"
+        @cancel="cancelConfirmOpen = true"
         @follow-thread="followThread"
         @retry="$emit('trigger-rca', $event)"
         @show-unverified="evidenceList?.showUnverified()"
@@ -269,11 +270,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="layout === 'page' ? '' : 'px-4 pb-4'"
       :start-locked-reason="startLockedReason"
       :reanalyzing="triggering || resuming"
+      :composer-dock="composerDock"
       @retry="retryThread"
       @open-evidence="evidenceList?.openEntry($event)"
       @reanalyze-with="openGuidance"
     />
+    <!-- The live run's steer composer stays in view at the bottom of the panel's scroller -->
+    <div
+      v-if="layout !== 'page' && threadLive && canSteer"
+      ref="composerDock"
+      data-test="rca-steer-dock"
+      class="bg-surface-base sticky bottom-0 z-1 -mt-4 flex-none px-4"
+    />
 
+    <RcaCancelRunDialog
+      v-model:open="cancelConfirmOpen"
+      :incident-number="incidentNumber"
+      :cancelling="cancelling"
+      @confirm="$emit('cancel-rca')"
+    />
     <RcaGuidanceDialog
       v-model:open="guidanceOpen"
       :initial-guidance="guidanceText"
@@ -345,6 +360,7 @@ import RcaEvidenceList from "./rca/RcaEvidenceList.vue";
 import RcaHypotheses from "./rca/RcaHypotheses.vue";
 import RcaProposedActions from "./rca/RcaProposedActions.vue";
 import RcaThreadColumn from "./rca/RcaThreadColumn.vue";
+import RcaCancelRunDialog from "./rca/RcaCancelRunDialog.vue";
 import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";
 import RcaVerdictCard from "./rca/RcaVerdictCard.vue";
 import RcaWhatHappened from "./rca/RcaWhatHappened.vue";
@@ -709,7 +725,10 @@ const threadRunStats = computed<RcaRunStats | null>(() => {
 });
 
 const threadColumn = ref<InstanceType<typeof RcaThreadColumn> | null>(null);
+const composerDock = ref<HTMLElement | null>(null);
 const followThread = () => void threadColumn.value?.scrollToLatest();
+
+const cancelConfirmOpen = ref(false);
 
 // Steering: the rows, the open question and `can_steer` of the thread's run.
 // A sent row and a resumed run arrive on the live stream.

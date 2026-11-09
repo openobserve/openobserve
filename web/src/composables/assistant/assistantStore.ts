@@ -1115,8 +1115,14 @@ function createComposerSlice(core: StoreCore) {
       const session = core.session(sid);
       if (!session) return;
       const range = session.composer.timeOverride;
-      // A window picked while the page was read is the user's next one, so only the sent one goes.
-      if (pageHasRange && range && sameWindow(range, sent) && !ownsWindow(session))
+      // Only the sent window goes (a newer pick is the next one), and Home's stays: no page supplies it.
+      if (
+        pageHasRange &&
+        range &&
+        sameWindow(range, sent) &&
+        !ownsWindow(session) &&
+        session.origin.entryKind !== "home_launcher"
+      )
         session.composer.timeOverride = null;
       // Text typed while the page was read is queued for writing, so only an empty box drops the draft.
       if (session.composer.timeOverride || holdsInput(session.composer)) core.persistDraft(session);
@@ -1282,7 +1288,7 @@ function createComposerSlice(core: StoreCore) {
 
 function createTurnSlice(core: StoreCore) {
   const { deps } = core;
-  const inFlight = new Map<Sid, Promise<TurnTerminal>>();
+  const inFlight = new Map<Sid, { run: Promise<TurnTerminal>; before: TurnState | undefined }>();
   const settle = (
     sid: Sid,
     before: TurnState | undefined,
@@ -1292,6 +1298,7 @@ function createTurnSlice(core: StoreCore) {
     const session = core.session(sid);
     core.endedAt.set(sid, deps.now());
     if (!session) return terminal;
+    void deps.history.joinGrantedLedger?.(sid);
     // A terminal the engine already wrote for this turn wins; one left from an earlier turn does not.
     if (!isTerminal(session.turn) || toRaw(session.turn) === before) session.turn = terminal;
     // Completed blocks are immutable; later changes go to `annotations` (`00` §4.2 rule 10).
@@ -1307,15 +1314,27 @@ function createTurnSlice(core: StoreCore) {
     return terminal;
   };
   // `send` and `retry` share one guard, so a second start of either joins the running one.
-  const track = (sid: Sid, sent: DraftPayload | null, start: () => Promise<TurnTerminal>) => {
+  // A turn already ended only waits for its promise to settle, so a send queued on that end starts a new one.
+  const runningOf = (sid: Sid) => {
     const running = inFlight.get(sid);
+    const turn = core.session(sid)?.turn;
+    const ended = !!running && !!turn && isTerminal(turn) && toRaw(turn) !== running.before;
+    return ended ? undefined : running?.run;
+  };
+  const track = (sid: Sid, sent: DraftPayload | null, start: () => Promise<TurnTerminal>) => {
+    const running = runningOf(sid);
     if (running) return running;
     const turn = core.session(sid)?.turn;
     const before = turn && toRaw(turn);
-    const run = start()
-      .then((terminal) => settle(sid, before, sent, terminal))
-      .finally(() => inFlight.delete(sid));
-    inFlight.set(sid, run);
+    const run: Promise<TurnTerminal> = start()
+      // A send that took over after this turn ended owns the session's state now.
+      .then((terminal) =>
+        inFlight.get(sid)?.run === run ? settle(sid, before, sent, terminal) : terminal,
+      )
+      .finally(() => {
+        if (inFlight.get(sid)?.run === run) inFlight.delete(sid);
+      });
+    inFlight.set(sid, { run, before });
     return run;
   };
   const api: Pick<
@@ -1340,7 +1359,7 @@ function createTurnSlice(core: StoreCore) {
       if (!session || !core.writable(session)) return Promise.resolve(refusedUnknown());
       const locked = refusedByLock(core.turnLock(sid));
       if (locked) return Promise.resolve(locked);
-      const running = inFlight.get(sid);
+      const running = runningOf(sid);
       if (running) return running;
       // A new turn moves the conversation on, so a card still waiting is withdrawn first.
       if (session.pendingApproval) {

@@ -73,6 +73,13 @@ describe("RcaWhatHappened (03 VE31, VE36, VE-D4)", () => {
     ).toEqual([["1"], ["2"], []]);
   });
 
+  it("B-shell2-6: an entry's text may break inside a long id, so a phone-width row never clips it", () => {
+    const wrapper = mountTimeline(rcaRunSummary());
+
+    const text = rows(wrapper)[0].get('[data-test="rca-timeline-text"]');
+    expect(text.classes()).toEqual(expect.arrayContaining(["min-w-0", "wrap-anywhere"]));
+  });
+
   it("agent marks in an entry show as code and bold, never as raw markers", () => {
     const [first] = rcaRunSummary().timeline;
     const wrapper = mountTimeline(

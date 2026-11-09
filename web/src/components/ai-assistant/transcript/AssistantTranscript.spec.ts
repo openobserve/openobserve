@@ -448,6 +448,36 @@ describe("AssistantTranscript", () => {
     expect(wrapper.find('[data-test="actions-stub-bar"]').exists()).toBe(false);
   });
 
+  it("B-conversation-15: gives a findings-only answer, as the server stores it, its action row", async () => {
+    const findings = {
+      type: "findings",
+      likely_cause: "Shared db upstream is resetting connections, failing inventory and checkout",
+      confidence: "medium",
+      evidence: [{ text: "All 32 checkout 5xx name upstream inventory", kind: "inferred" }],
+      ruled_out: [],
+      unknowns: [],
+      next_steps: ["Check the db connection pool"],
+    };
+    const turn = {
+      turn_id: "t-find",
+      status: "completed",
+      created: 1,
+      user: { text: "Analyze the 5xx errors", images: [] },
+      frames: [
+        { type: "message_delta", content: "\n\n" },
+        findings,
+        { type: "follow_ups", items: ["Show db errors"] },
+        { type: "complete" },
+      ],
+    };
+    const messages = projectRecord([turn] as never, "owner", { timezone: "UTC" });
+    const { wrapper } = mountLive(liveSession(messages));
+    await flushPromises();
+    expect(
+      wrapper.find('[data-test="assistant-answer-t-find"] [data-test="actions-stub-bar"]').exists(),
+    ).toBe(true);
+  });
+
   it("switches the shown attempt through the version picker (`30` §8.2)", async () => {
     const latest = reply("second try");
     latest.versions = [reply("first try")];

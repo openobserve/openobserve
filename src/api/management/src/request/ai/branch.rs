@@ -177,7 +177,7 @@ pub async fn branch(
         agent_type: &row.agent_type,
         title: &title,
         seed: &seed,
-        branched_from: &branched_from,
+        branched_from: Some(&branched_from),
     };
     match ai_chat_sessions::insert_branch(&branch, now).await {
         Ok(_) => (

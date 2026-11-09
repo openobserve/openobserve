@@ -141,8 +141,8 @@ export interface ChatMessage {
   editedFrom?: number;
   /** The window a "Re-run for now" prompt evaluates, epoch ms. */
   rerunFor?: { from: number; to: number };
-  /** The page's absolute time window when the prompt was sent, epoch ms. */
-  sentWindow?: { from: number; to: number };
+  /** The page's absolute time window when the prompt was sent, epoch ms; `period` is the relative period it was picked as. */
+  sentWindow?: { from: number; to: number; period?: string };
   /** On a user message: the agent that answered its turn, as `turn_started` or the stored turn names it. */
   agentId?: "o2-ai" | "sre" | "generate-query";
   /** On a user message: the agent this turn took the chat from; the transcript writes the marker from it. */

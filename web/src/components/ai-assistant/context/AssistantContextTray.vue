@@ -15,72 +15,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    ref="root"
-    role="group"
-    :aria-label="t('assistant.context.trayLabel')"
-    data-test="assistant-context-tray"
-    data-dd-privacy="mask"
-    :data-collapsed="hiddenCount > 0 ? '' : undefined"
-    :class="['flex min-w-0 items-center gap-0.5', expanded ? 'overflow-x-auto' : '']"
+  <AssistantChipTray
+    ref="tray"
+    v-model:expanded="expanded"
+    :items="shownChips"
+    :hidden-count="hiddenCount"
   >
-    <AssistantTimePrefix
-      :window="context.window.value"
-      :page-window="pageWindow"
-      :timezone="timezone"
-      @change="applyTime"
-    />
-    <ul v-if="shownChips.length > 0" class="flex min-w-0 items-center gap-0.5">
-      <li v-for="chip in shownChips" :key="chip.id" class="max-w-40 min-w-0">
-        <AssistantChipPopover
-          :chip="chip"
-          :open="openId === chip.id"
-          :image-src="imageSrcOf(chip)"
-          :open-label="openLabelOf(chip)"
-          @update:open="(open) => (openId = open ? chip.id : null)"
-          @open-source="openSource(chip)"
-          @paste-inline="pasteInline(chip)"
-          @remove="remove(chip)"
-          @remove-row="(index) => removeRow(chip, index)"
-          @trim="(include) => trim(chip, include)"
-          @tab-out="tabOut(chip.id)"
-        >
-          <template #anchor>
-            <AssistantContextChip
-              :chip="chip"
-              compact
-              :short-label="chip.short"
-              :image-src="imageSrcOf(chip)"
-              :expanded="openId === chip.id"
-              @open="openChip(chip)"
-              @remove="remove(chip)"
-              @move="(direction) => move(chip.id, direction)"
-            />
-          </template>
-        </AssistantChipPopover>
-      </li>
-    </ul>
-    <OButton
-      v-if="hiddenCount > 0 || expanded"
-      variant="ghost"
-      size="chip"
-      :class="['text-text-secondary min-w-6 shrink-0 justify-center', TOUCH_TARGET_CLASS]"
-      :aria-expanded="expanded"
-      :aria-label="
-        expanded
-          ? t('assistant.context.fewerName')
-          : t('assistant.context.moreName', { count: hiddenCount }, hiddenCount)
-      "
-      data-test="assistant-context-more"
-      @click="expanded = !expanded"
-    >
-      {{
-        expanded
-          ? t("assistant.context.fewer")
-          : t("assistant.context.more", { count: hiddenCount })
-      }}
-    </OButton>
-  </div>
+    <template #leading>
+      <AssistantTimePrefix
+        :window="context.window.value"
+        :page-window="pageWindow"
+        :timezone="timezone"
+        @change="applyTime"
+      />
+    </template>
+    <template #chip="{ item }">
+      <AssistantChipPopover
+        :chip="item"
+        :open="openId === item.id"
+        :image-src="imageSrcOf(item)"
+        :open-label="openLabelOf(item)"
+        @update:open="(open) => (openId = open ? item.id : null)"
+        @open-source="openSource(item)"
+        @paste-inline="pasteInline(item)"
+        @remove="remove(item)"
+        @remove-row="(index) => removeRow(item, index)"
+        @trim="(include) => trim(item, include)"
+        @tab-out="tabOut(item.id)"
+      >
+        <template #anchor>
+          <AssistantContextChip
+            :chip="item"
+            compact
+            :short-label="item.short"
+            :image-src="imageSrcOf(item)"
+            :expanded="openId === item.id"
+            @open="openChip(item)"
+            @remove="remove(item)"
+            @move="(direction) => move(item.id, direction)"
+          />
+        </template>
+      </AssistantChipPopover>
+    </template>
+  </AssistantChipTray>
 </template>
 
 <script lang="ts">
@@ -90,11 +67,7 @@ export interface AssistantContextTrayProps {
   sid: Sid | null;
 }
 
-/** Chips shown before `+N`; the composer's width decides which. */
-export function trayChipLimit(layout: { narrow: boolean; wide: boolean }): number {
-  if (layout.narrow) return 0;
-  return layout.wide ? 3 : 1;
-}
+export { trayChipLimit } from "./AssistantChipTray.vue";
 </script>
 
 <script setup lang="ts">
@@ -102,7 +75,6 @@ import { computed, nextTick, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import { announceComposer, useComposerLayout } from "@/components/ai-assistant/composer/composerUi";
 import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
 import {
@@ -114,7 +86,6 @@ import {
   type ComposerState,
   type ContextChip,
 } from "@/composables/assistant";
-import OButton from "@/lib/core/Button/OButton.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatBytes } from "@/utils/formatters";
@@ -123,6 +94,7 @@ import { chipOpenQuery } from "@/composables/assistant/pure";
 import { explorerOf } from "@/utils/assistant/explorerRoutes";
 
 import AssistantChipPopover from "./AssistantChipPopover.vue";
+import AssistantChipTray, { useChipCollapse } from "./AssistantChipTray.vue";
 import AssistantContextChip from "./AssistantContextChip.vue";
 import AssistantTimePrefix from "./AssistantTimePrefix.vue";
 
@@ -135,7 +107,8 @@ const vuex = useStore();
 const context = useAssistantContext(() => props.sid, { store });
 const layout = useComposerLayout();
 const placement = useAssistantPlacement(store);
-const root = ref<HTMLElement | null>(null);
+const tray = ref<InstanceType<typeof AssistantChipTray> | null>(null);
+const root = computed<HTMLElement | null>(() => tray.value?.$el ?? null);
 const openId = ref<string | null>(null);
 const expanded = ref(false);
 
@@ -168,13 +141,7 @@ const allChips = computed(() => [
   ...context.chips.value.filter((chip) => chip.kind !== "time" && chip.provenance !== "page"),
   ...imageChips.value,
 ]);
-const shownChips = computed(() => {
-  if (expanded.value) return allChips.value;
-  return allChips.value.slice(0, trayChipLimit(layout.value));
-});
-const hiddenCount = computed(() =>
-  expanded.value ? 0 : allChips.value.length - shownChips.value.length,
-);
+const { shown: shownChips, hiddenCount } = useChipCollapse(allChips, layout, expanded);
 
 function changed(
   action: "remove" | "add_back" | "swap_time" | "trim",
