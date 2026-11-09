@@ -463,9 +463,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <!-- Configuration tab -->
-                  <div v-if="activeMainTab == 'configuration'">
-                    <div class="flex h-full w-full flex-col gap-4 overflow-y-auto p-4">
+                  <!-- Configuration tab: single scrollport so Keep/Drop rules stay reachable -->
+                  <div
+                    v-if="activeMainTab == 'configuration'"
+                    class="min-h-0 flex-1 overflow-y-auto p-4"
+                    data-test="schema-configuration-scroll"
+                  >
+                    <div class="flex w-full flex-col gap-4">
                       <!-- Configuration Settings Card -->
                       <div
                         class="rounded-default border-card-glass-border divide-card-glass-border divide-y border"
@@ -614,6 +618,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-model="enableDistinctFields"
                             @update:model-value="formDirtyFlag = true"
                           />
+                        </div>
+
+                        <div
+                          v-if="showProfilesIngestFilter"
+                          class="flex flex-col gap-3 p-3"
+                          data-test="profiles-ingest-filter"
+                        >
+                          <div class="flex flex-col gap-1">
+                            <label class="text-compact text-text-heading font-[500]">
+                              {{ t("logStream.profilesIngestFilter") }}
+                            </label>
+                            <small>{{ t("logStream.profilesIngestFilterHelp") }}</small>
+                          </div>
+                          <OToggleGroup
+                            data-test="profiles-ingest-filter-mode"
+                            :model-value="profilesIngestFilterMode"
+                            @update:model-value="setProfilesIngestFilterMode"
+                          >
+                            <OToggleGroupItem value="off" size="sm">
+                              {{ t("logStream.profilesIngestFilterOff") }}
+                            </OToggleGroupItem>
+                            <OToggleGroupItem value="keep" size="sm">
+                              {{ t("logStream.profilesIngestFilterKeep") }}
+                            </OToggleGroupItem>
+                            <OToggleGroupItem value="drop" size="sm">
+                              {{ t("logStream.profilesIngestFilterDrop") }}
+                            </OToggleGroupItem>
+                          </OToggleGroup>
+                          <div
+                            v-if="profilesIngestFilterMode !== 'off'"
+                            class="flex flex-col gap-2"
+                          >
+                            <div
+                              v-for="(rule, index) in profilesIngestFilterRules"
+                              :key="index"
+                              class="flex flex-wrap items-center gap-2"
+                            >
+                              <OSelect
+                                :model-value="rule.attribute"
+                                :options="profilesIngestFilterAttributes"
+                                label-key="label"
+                                value-key="value"
+                                size="sm"
+                                width="sm"
+                                :data-test="`profiles-ingest-filter-attribute-${index}`"
+                                @update:model-value="
+                                  (value) =>
+                                    updateProfilesIngestFilterRule(index, 'attribute', value)
+                                "
+                              />
+                              <OSelect
+                                :model-value="rule.op"
+                                :options="profilesIngestFilterOps"
+                                label-key="label"
+                                value-key="value"
+                                size="sm"
+                                width="xs"
+                                :data-test="`profiles-ingest-filter-op-${index}`"
+                                @update:model-value="
+                                  (value) => updateProfilesIngestFilterRule(index, 'op', value)
+                                "
+                              />
+                              <OInput
+                                :model-value="rule.value"
+                                size="sm"
+                                class="min-w-40 flex-1"
+                                :data-test="`profiles-ingest-filter-value-${index}`"
+                                @update:model-value="
+                                  (value) => updateProfilesIngestFilterRule(index, 'value', value)
+                                "
+                              />
+                              <OButton
+                                :aria-label="t('common.delete')"
+                                variant="ghost-destructive"
+                                size="icon-sm"
+                                icon-left="delete"
+                                class="shrink-0"
+                                :data-test="`profiles-ingest-filter-remove-${index}`"
+                                @click="removeProfilesIngestFilterRule(index)"
+                              />
+                            </div>
+                            <OButton
+                              variant="outline"
+                              size="sm"
+                              icon-left="add"
+                              class="self-start"
+                              data-test="profiles-ingest-filter-add"
+                              @click="addProfilesIngestFilterRule"
+                            >
+                              {{ t("logStream.profilesIngestFilterAdd") }}
+                            </OButton>
+                            <small
+                              v-if="profilesIngestFilterError"
+                              class="text-text-danger"
+                              data-test="profiles-ingest-filter-error"
+                            >
+                              {{ profilesIngestFilterError }}
+                            </small>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1025,6 +1128,35 @@ export default defineComponent({
     const pendingSelectedFields = ref<string[]>([]);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
+    type ProfilesIngestFilterRule = { attribute: string; op: string; value: string };
+    const emptyProfilesIngestFilterRule = (): ProfilesIngestFilterRule => ({
+      attribute: "service.name",
+      op: "eq",
+      value: "",
+    });
+    const profilesIngestFilterMode = ref("off");
+    // Separate drafts so opening Drop does not show the saved Keep rows (and vice versa).
+    const profilesIngestFilterKeepRules = ref<ProfilesIngestFilterRule[]>([]);
+    const profilesIngestFilterDropRules = ref<ProfilesIngestFilterRule[]>([]);
+    const profilesIngestFilterRules = computed({
+      get: () => {
+        if (profilesIngestFilterMode.value === "keep") {
+          return profilesIngestFilterKeepRules.value;
+        }
+        if (profilesIngestFilterMode.value === "drop") {
+          return profilesIngestFilterDropRules.value;
+        }
+        return [];
+      },
+      set: (rules: ProfilesIngestFilterRule[]) => {
+        if (profilesIngestFilterMode.value === "keep") {
+          profilesIngestFilterKeepRules.value = rules;
+        } else if (profilesIngestFilterMode.value === "drop") {
+          profilesIngestFilterDropRules.value = rules;
+        }
+      },
+    });
+    const profilesIngestFilterError = ref("");
 
     const streamOrgId = useOrgId();
     const updateStreamSettings = useMutation(() => updateStreamSettingsMutation(streamOrgId.value));
@@ -1316,6 +1448,59 @@ export default defineComponent({
     const markFormDirty = (..._args: unknown[]) => {
       formDirtyFlag.value = true;
     };
+    const showProfilesIngestFilter = computed(() => modelValue.stream_type === "profiles");
+    const profilesIngestFilterAttributes = computed(() => [
+      { label: t("logStream.profilesIngestFilterServiceName"), value: "service.name" },
+      {
+        label: t("logStream.profilesIngestFilterExecutable"),
+        value: "process.executable.name",
+      },
+    ]);
+    const profilesIngestFilterOps = computed(() => [
+      { label: t("logStream.profilesIngestFilterEquals"), value: "eq" },
+      { label: t("logStream.profilesIngestFilterRegex"), value: "regex" },
+    ]);
+    const setProfilesIngestFilterMode = (value: unknown) => {
+      profilesIngestFilterMode.value = typeof value === "string" && value ? value : "off";
+      profilesIngestFilterError.value = "";
+      markFormDirty();
+    };
+    const updateProfilesIngestFilterRule = (index: number, field: string, value: unknown) => {
+      const next = profilesIngestFilterRules.value.slice();
+      next[index] = { ...next[index], [field]: String(value ?? "") };
+      profilesIngestFilterRules.value = next;
+      profilesIngestFilterError.value = "";
+      markFormDirty();
+    };
+    const addProfilesIngestFilterRule = () => {
+      profilesIngestFilterRules.value = [
+        ...profilesIngestFilterRules.value,
+        emptyProfilesIngestFilterRule(),
+      ];
+      profilesIngestFilterError.value = "";
+      markFormDirty();
+    };
+    const removeProfilesIngestFilterRule = (index: number) => {
+      profilesIngestFilterRules.value = profilesIngestFilterRules.value.filter(
+        (_, ruleIndex) => ruleIndex !== index,
+      );
+      profilesIngestFilterError.value = "";
+      markFormDirty();
+    };
+    const profilesIngestFilterReady = () => {
+      const mode = profilesIngestFilterMode.value;
+      const rules = profilesIngestFilterRules.value;
+      if ((mode === "keep" || mode === "drop") && rules.length === 0) {
+        profilesIngestFilterError.value = t("logStream.profilesIngestFilterNeedsRule");
+        return false;
+      }
+      if (mode !== "off" && rules.some((rule) => !rule.value.trim())) {
+        profilesIngestFilterError.value = t("logStream.profilesIngestFilterNeedsValue");
+        return false;
+      }
+      profilesIngestFilterError.value = "";
+      return true;
+    };
     const deleteFields = async () => {
       loadingState.value = true;
       await deleteStreamFields
@@ -1490,6 +1675,17 @@ export default defineComponent({
       storeOriginalData.value = streamResponse.settings.store_original_data || false;
       enableDistinctFields.value = streamResponse.settings.enable_distinct_fields || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
+      const storedFilter = streamResponse.settings.profiles_ingest_filter;
+      const storedMode = storedFilter?.mode || "off";
+      const storedRules = (storedFilter?.rules || []).map((rule: any) => ({
+        attribute: rule.attribute || "service.name",
+        op: rule.op || "eq",
+        value: rule.value || "",
+      }));
+      profilesIngestFilterMode.value = storedMode;
+      profilesIngestFilterKeepRules.value = storedMode === "keep" ? storedRules : [];
+      profilesIngestFilterDropRules.value = storedMode === "drop" ? storedRules : [];
+      profilesIngestFilterError.value = "";
       const partitionLevelSettings = streamResponse.settings.partition_time_level;
       dynamicPartition.value = partitionLevelSettings?.dynamic ?? false;
       savedPartitionTimeLevel.value = partitionLevelSettings?.changes?.at(-1)?.level ?? "hourly";
@@ -1725,6 +1921,9 @@ export default defineComponent({
       if (added_part_keys.length > 0) {
         settings.partition_keys = settings.partition_keys.concat(added_part_keys);
       }
+      if (showProfilesIngestFilter.value && !profilesIngestFilterReady()) {
+        return;
+      }
       loadingState.value = true;
 
       newSchemaFieldsForm.reset({ newSchemaFields: [] });
@@ -1734,6 +1933,18 @@ export default defineComponent({
       selectedDateFields.value = [];
 
       let modifiedSettings = getUpdatedSettings(previousSchemaVersion, settings);
+      if (showProfilesIngestFilter.value) {
+        modifiedSettings.profiles_ingest_filter = {
+          mode: profilesIngestFilterMode.value,
+          rules:
+            profilesIngestFilterMode.value === "off"
+              ? []
+              : profilesIngestFilterRules.value.map((rule) => ({
+                  ...rule,
+                  value: rule.value.trim(),
+                })),
+        };
+      }
 
       // Add cross_links diff
       const prevCrossLinks = previousSchemaVersion?.cross_links || [];
@@ -2622,6 +2833,16 @@ export default defineComponent({
       deleteFields,
       markFormDirty,
       formDirtyFlag,
+      showProfilesIngestFilter,
+      profilesIngestFilterMode,
+      profilesIngestFilterRules,
+      profilesIngestFilterError,
+      profilesIngestFilterAttributes,
+      profilesIngestFilterOps,
+      setProfilesIngestFilterMode,
+      updateProfilesIngestFilterRule,
+      addProfilesIngestFilterRule,
+      removeProfilesIngestFilterRule,
       streamIndexType,
       disableOptions,
       loadingState,

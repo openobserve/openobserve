@@ -64,9 +64,8 @@ use crate::{
         stream::SchemaRecords,
     },
     ingestion::{
-        check_ingestion_allowed, get_stream_partition_keys, get_thread_id,
-        get_uds_and_original_data_streams, get_write_partition_key, newly_enabled_uds_fields,
-        repack_records, write_file,
+        check_ingestion_allowed, get_thread_id, get_uds_and_original_data_streams,
+        get_write_partition_key, newly_enabled_uds_fields, repack_records, write_file,
     },
 };
 
@@ -317,9 +316,13 @@ pub async fn handle_otlp_request(
     let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
-    let partition_keys =
-        get_stream_partition_keys(org_id, &StreamType::Profiles, &stream_name).await;
+    let settings = infra::schema::get_settings(org_id, &stream_name, StreamType::Profiles)
+        .await
+        .map(|settings| (*settings).clone())
+        .unwrap_or_default();
+    let partition_keys = settings.partition_keys.clone();
     let partition_time_level = get_partition_time_level(StreamType::Profiles);
+    let ingest_filter = profiles_ingest_filter(&user, &settings.profiles_ingest_filter);
 
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -327,7 +330,20 @@ pub async fn handle_otlp_request(
     let mut all_records: Vec<json::Map<String, json::Value>> = Vec::new();
 
     let dictionary = request.dictionary.as_ref();
+    let mut filtered_resources = 0_u64;
+    let mut filtered_profiles = 0_u64;
+    let mut filtered_samples = 0_u64;
     for resource_profile in &request.resource_profiles {
+        if let Some(filter) = ingest_filter.as_ref() {
+            let (service_name, executable) = resource_identity(resource_profile, dictionary);
+            if !filter.allows(service_name.as_deref(), executable.as_deref()) {
+                filtered_resources += 1;
+                let (profiles, samples) = resource_profile_counts(resource_profile);
+                filtered_profiles += profiles;
+                filtered_samples += samples;
+                continue;
+            }
+        }
         for scope_profile in &resource_profile.scope_profiles {
             for profile in &scope_profile.profiles {
                 let (records, rejected_samples) = build_sample_records(
@@ -342,6 +358,11 @@ pub async fn handle_otlp_request(
                 all_records.extend(records);
             }
         }
+    }
+    if filtered_resources > 0 {
+        log::info!(
+            "[PROFILES] ingest filter dropped resources={filtered_resources} profiles={filtered_profiles} samples={filtered_samples} org={org_id} stream={stream_name}"
+        );
     }
 
     #[cfg(feature = "vectorscan")]
@@ -588,6 +609,65 @@ async fn apply_redaction(
         }
     }
     records.extend(rows.into_iter().map(|(_, record)| record));
+}
+
+fn profiles_ingest_filter(
+    user: &IngestUser,
+    filter: &config::meta::stream::ProfilesIngestFilter,
+) -> Option<config::meta::stream::CompiledProfilesIngestFilter> {
+    if matches!(user, IngestUser::SystemJob(_)) {
+        return None;
+    }
+    if !filter.is_active() {
+        return None;
+    }
+    match filter.compile() {
+        Ok(compiled) => Some(compiled),
+        Err(err) => {
+            log::error!("[PROFILES] ingest filter failed to compile; dropping all profiles: {err}");
+            Some(config::meta::stream::CompiledProfilesIngestFilter::deny_all())
+        }
+    }
+}
+
+fn resource_identity(
+    resource_profile: &ResourceProfiles,
+    dictionary: Option<&ProfilesDictionary>,
+) -> (Option<String>, Option<String>) {
+    let Some(resource) = resource_profile.resource.as_ref() else {
+        return (None, None);
+    };
+    let mut service_name = None;
+    let mut executable = None;
+    for attr in &resource.attributes {
+        let Some(key) = resolve_key_value_key(attr, dictionary) else {
+            continue;
+        };
+        let Some(value) = resolve_key_value_string(attr, dictionary) else {
+            continue;
+        };
+        if value.is_empty() {
+            continue;
+        }
+        match key.as_str() {
+            "service.name" if service_name.is_none() => service_name = Some(value),
+            "process.executable.name" if executable.is_none() => executable = Some(value),
+            _ => {}
+        }
+    }
+    (service_name, executable)
+}
+
+fn resource_profile_counts(resource_profile: &ResourceProfiles) -> (u64, u64) {
+    let mut profiles = 0_u64;
+    let mut samples = 0_u64;
+    for scope_profile in &resource_profile.scope_profiles {
+        profiles += scope_profile.profiles.len() as u64;
+        for profile in &scope_profile.profiles {
+            samples += profile.samples.len() as u64;
+        }
+    }
+    (profiles, samples)
 }
 
 /// `rejected_profiles` counts whole OTLP Profile messages, not flattened samples.
@@ -2823,5 +2903,104 @@ mod tests {
                 .unwrap()
                 .contains("rejected")
         );
+    }
+
+    fn resource_with(attrs: &[(&str, &str)], samples: usize) -> ResourceProfiles {
+        ResourceProfiles {
+            resource: Some(opentelemetry_proto::tonic::resource::v1::Resource {
+                attributes: attrs
+                    .iter()
+                    .map(
+                        |(key, value)| opentelemetry_proto::tonic::common::v1::KeyValue {
+                            key: (*key).to_string(),
+                            value: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue((*value).to_string())),
+                            }),
+                            ..Default::default()
+                        },
+                    )
+                    .collect(),
+                ..Default::default()
+            }),
+            scope_profiles: vec![ScopeProfiles {
+                profiles: vec![Profile {
+                    samples: vec![Sample::default(); samples],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn ingest_filter_keeps_named_service_and_drops_unnamed_processes() {
+        let filter = config::meta::stream::ProfilesIngestFilter {
+            mode: "keep".to_string(),
+            rules: vec![config::meta::stream::ProfilesIngestFilterRule {
+                attribute: "service.name".to_string(),
+                op: "eq".to_string(),
+                value: "py-http".to_string(),
+            }],
+        }
+        .compile()
+        .unwrap();
+        let py = resource_with(&[("service.name", "py-http")], 2);
+        let bash = resource_with(&[("process.executable.name", "bash")], 3);
+        let (py_service, _) = resource_identity(&py, None);
+        let (bash_service, bash_exe) = resource_identity(&bash, None);
+        assert!(filter.allows(py_service.as_deref(), None));
+        assert!(!filter.allows(bash_service.as_deref(), bash_exe.as_deref()));
+        assert_eq!(resource_profile_counts(&bash), (1, 3));
+    }
+
+    #[test]
+    fn system_job_skips_the_profiles_ingest_filter() {
+        let filter = config::meta::stream::ProfilesIngestFilter {
+            mode: "keep".to_string(),
+            rules: vec![config::meta::stream::ProfilesIngestFilterRule {
+                attribute: "service.name".to_string(),
+                op: "eq".to_string(),
+                value: "py-http".to_string(),
+            }],
+        };
+        let skipped = profiles_ingest_filter(
+            &IngestUser::SystemJob(ingestion_common::SystemJobType::SelfReporting),
+            &filter,
+        );
+        assert!(skipped.is_none());
+        assert!(profiles_ingest_filter(&IngestUser::from_user_email("a@a.com"), &filter).is_some());
+    }
+
+    #[test]
+    fn inactive_profiles_ingest_filter_is_skipped() {
+        let off = config::meta::stream::ProfilesIngestFilter {
+            mode: "off".to_string(),
+            rules: Vec::new(),
+        };
+        assert!(profiles_ingest_filter(&IngestUser::from_user_email("a@a.com"), &off).is_none());
+        assert!(
+            profiles_ingest_filter(
+                &IngestUser::from_user_email("a@a.com"),
+                &config::meta::stream::ProfilesIngestFilter::default(),
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn broken_profiles_ingest_filter_denies_all() {
+        let broken = config::meta::stream::ProfilesIngestFilter {
+            mode: "keep".to_string(),
+            rules: vec![config::meta::stream::ProfilesIngestFilterRule {
+                attribute: "service.name".to_string(),
+                op: "regex".to_string(),
+                value: "(".to_string(),
+            }],
+        };
+        let compiled =
+            profiles_ingest_filter(&IngestUser::from_user_email("a@a.com"), &broken).unwrap();
+        assert!(!compiled.allows(Some("py-http"), None));
+        assert!(!compiled.allows(None, Some("bash")));
     }
 }
