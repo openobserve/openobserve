@@ -28,6 +28,7 @@ vi.mock("@/utils/rum/sessionReplayViews", () => ({
   createMultiViewDecoder: () => ({ push: () => ({ events: h.events }) }),
 }));
 vi.mock("@openobserve/rrweb-player/dist/style.css", () => ({}));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@openobserve/rrweb-player", () => ({
   default: class {
     iframe: HTMLIFrameElement;
@@ -126,6 +127,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import searchService from "@/services/search";
 import i18n from "@/locales";
 import { PAGE_LIST_LIMIT, RANKING_LIMIT } from "@/utils/rum/clickHeatmapQueries";
+import analytics from "@/services/product_analytics";
 
 const store = createStore({
   state: {
@@ -226,6 +228,9 @@ describe("ClickHeatmap", () => {
     await flushPromises();
 
     expect(ids().sort()).toEqual(["ranking", "replay-views", "replay-views", "totals"]);
+    expect(analytics.track).toHaveBeenCalledWith("rum_heatmap_device_changed", {
+      device: "phone",
+    });
   });
 
   it("says the element is missing, not the clicks, when clicks exist without targets", async () => {

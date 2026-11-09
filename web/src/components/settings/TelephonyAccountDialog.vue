@@ -75,6 +75,7 @@ import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { saveTelephonyMutation } from "@/services/oncall.queries";
+import analytics from "@/services/product_analytics";
 import type { OrgTelephonyView, PutTelephonyBody } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -165,6 +166,7 @@ async function submit(value: TelephonyForm) {
   };
   try {
     await save.mutateAsync(body);
+    analytics.track(props.mode === "connect" ? "telephony_connected" : "telephony_updated");
     emit("update:open", false);
   } catch (err) {
     if (isForbidden(err)) {

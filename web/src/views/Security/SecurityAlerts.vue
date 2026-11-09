@@ -5,6 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -137,6 +138,7 @@ const windowStartMs = computed(() => windowEndMs.value - windowMs.value);
 function onRange(value: unknown) {
   if (!value || (value === range.value && !customWindow.value)) return;
   range.value = value as RangeKey;
+  analytics.track("security_time_range_changed", { view: "alerts", range: range.value });
   customWindow.value = null;
   syncUrl();
   void fetchAll();
@@ -538,6 +540,7 @@ const sortedTotal = computed(() => sortedRows().length);
 const tab = ref("overview");
 
 function open(f: Firing) {
+  if (!selectedKey.value) analytics.track("security_detail_opened", { view: "alerts" });
   selectedKey.value = f.id;
 }
 function close() {

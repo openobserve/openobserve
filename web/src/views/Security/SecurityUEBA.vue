@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -397,6 +398,7 @@ watch(search, () => syncUrl());
 function onWindow(value: unknown) {
   if (!value || value === win.value) return;
   win.value = value as WindowKey;
+  analytics.track("security_time_range_changed", { view: "ueba", range: win.value });
   fullWindow.clear();
   closeDrawer();
   syncUrl();
@@ -651,6 +653,7 @@ function relocate() {
 watch(filtered, () => void nextTick(relocate));
 
 function openUser(r: UserRisk) {
+  if (!selected.value) analytics.track("security_detail_opened", { view: "ueba" });
   selected.value = r;
   syncUrl();
   relocate();

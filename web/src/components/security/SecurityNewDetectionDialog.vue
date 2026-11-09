@@ -23,6 +23,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import alertsService from "@/services/alerts";
+import analytics from "@/services/product_analytics";
 import { invalidateSiemDetections } from "@/composables/security/useSiemDetections";
 import destinationService from "@/services/alert_destination";
 import streamService from "@/services/stream";
@@ -314,6 +315,12 @@ async function save(value: NewDetectionForm) {
   });
   try {
     await alertsService.create_by_alert_id(props.orgId, payload);
+    analytics.track("security_detection_created", {
+      mode: mode.value,
+      source_type: draftSource.value?.id ?? "unknown",
+      mitre_techniques: rule.techniques.length,
+      from_preset: !!props.preset?.sigmaId,
+    });
     invalidateSiemDetections(props.orgId);
     toast({ variant: "success", message: t("siem.detections.created", { name: payload.name }) });
     emit("created", payload.name);

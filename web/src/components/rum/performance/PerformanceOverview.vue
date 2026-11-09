@@ -257,6 +257,7 @@ import type { RumTabDateTime } from "@/composables/rum/useRumPerformanceTab";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import analytics from "@/services/product_analytics";
 import {
   MIN_VIEWS,
   analyticsQuery,
@@ -320,12 +321,17 @@ const {
 const restored = stateFromQuery(route.query);
 filters.value = restored.filters;
 const percentile = ref<Percentile>(restored.percentile);
+watch(percentile, (p) => analytics.track("rum_performance_percentile_changed", { percentile: p }));
 
 // A filter on a column the stream lacks would only select nothing.
 const visibleFilters = computed(() => FILTERS.filter((f) => props.schema?.has(f.key)));
 
 const setFilter = (key: keyof OverviewFilters, value: unknown) => {
   filters.value = { ...filters.value, [key]: Array.isArray(value) ? value.map(String) : [] };
+  analytics.track("rum_performance_filter_applied", {
+    filter: key,
+    count: filters.value[key].length,
+  });
 };
 
 // Primitive keys, so a new object with the same range, schema or filters does not rerun the queries.

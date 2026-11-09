@@ -18,6 +18,9 @@ import { mount, flushPromises } from "@vue/test-utils";
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -219,6 +222,16 @@ describe("PlayerEventsSidebar", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find('[data-test="event-metadata"]').exists()).toBe(true);
+    });
+
+    it("tracks a sidebar tab switch with the tab name", async () => {
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.findComponent({ name: "AppTabs" }).vm.$emit("update:active-tab", "tags");
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("rum_session_sidebar_tab_switched", {
+        tab: "tags",
+      });
     });
 
     it("should switch back to breadcrumbs content when AppTabs emits update:active-tab with breadcrumbs", async () => {

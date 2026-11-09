@@ -154,6 +154,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteTelephonyMutation, telephonyQuery } from "@/services/oncall.queries";
+import analytics from "@/services/product_analytics";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import TelephonyAccountCard from "./TelephonyAccountCard.vue";
@@ -198,6 +199,7 @@ function openDialog(mode: TelephonyDialogMode) {
 async function disconnect() {
   try {
     await remove.mutateAsync();
+    analytics.track("telephony_disconnected");
   } catch (err) {
     if (isForbidden(err)) {
       readOnly.value = true;

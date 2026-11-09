@@ -454,6 +454,18 @@ describe("PlaygroundPage", () => {
     expect(analytics.track).toHaveBeenCalledWith("llm_playground_run_completed", { count: 1 });
   });
 
+  it("tracks copying a finished output", async () => {
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    const page = vm(await mountPage());
+    const variantId = page.draft.variants[0].id;
+    await page.onRunVariant(variantId);
+
+    await page.copyOutput(variantId, SINGLE_ROW_KEY);
+
+    expect(writeText).toHaveBeenCalledWith("an answer");
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_output_copied");
+  });
+
   it("hands the variant's config to the experiment form", async () => {
     const page = vm(await mountPage());
     page.draft.variants[0].messages[0].content = "You are terse.";
@@ -519,6 +531,54 @@ describe("PlaygroundPage", () => {
     await page.scoreAll();
     expect(scorePlayground).toHaveBeenCalledTimes(2);
     expect(scorePlayground.mock.calls[1][1].expectedOutput).toBe("the golden answer");
+  });
+
+  it("tracks a user-triggered score, never an auto-score after a run", async () => {
+    scorePlayground.mockResolvedValue([]);
+    const page = vm(await mountPage());
+    page.draft.scorerIds = ["scorer-1"];
+    page.draft.autoScore = true;
+    page.duplicate(page.draft.variants[0].id);
+
+    page.onRunAll();
+    await flushPromises();
+    expect(scorePlayground).toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalledWith("llm_playground_scored", expect.anything());
+
+    page.draft.expectedSingle = "golden";
+    await page.scoreAll();
+    expect(analytics.track).toHaveBeenCalledTimes(2);
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_scored", { variant_count: 2 });
+  });
+
+  it("counts only the variants that scored, and tracks nothing when none did", async () => {
+    scorePlayground.mockResolvedValue([]);
+    const page = vm(await mountPage());
+    page.draft.scorerIds = ["scorer-1"];
+    page.duplicate(page.draft.variants[0].id);
+    page.onRunAll();
+    await flushPromises();
+
+    scorePlayground.mockReset();
+    scorePlayground.mockRejectedValue(new Error("judge down"));
+    vi.mocked(analytics.track).mockClear();
+    await page.scoreAll();
+    expect(analytics.track).not.toHaveBeenCalledWith("llm_playground_scored", expect.anything());
+
+    scorePlayground.mockReset();
+    scorePlayground.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("judge down"));
+    await page.scoreAll();
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_scored", { variant_count: 1 });
+
+    vi.mocked(analytics.track).mockClear();
+    scorePlayground.mockReset();
+    scorePlayground.mockResolvedValue([]);
+    await page.scoreAll();
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_scored", { variant_count: 1 });
+
+    vi.mocked(analytics.track).mockClear();
+    await page.scoreAll();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   describe("opened from a managed prompt", () => {
