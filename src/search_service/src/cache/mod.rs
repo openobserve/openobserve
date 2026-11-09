@@ -64,10 +64,7 @@ use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    sql::{
-        RE_SELECT_FROM,
-        histogram::{is_histogram_output, pin_histogram_timezone},
-    },
+    sql::{RE_SELECT_FROM, histogram::pin_histogram_timezone},
 };
 
 pub mod cacher;
@@ -530,7 +527,6 @@ pub async fn search(
             c_resp.is_descending,
             req.clear_cache,
             is_histogram_non_ts_order,
-            c_resp.ts_offset,
         )
         .await;
     }
@@ -634,8 +630,6 @@ pub async fn prepare_cache_response(
         );
     }
 
-    let ts_offset = sql.histogram_offset;
-
     // calculate hash for the query with version (after normalizing histogram interval)
     let mut hash_body = vec![
         CACHE_VERSION.to_string(),
@@ -644,11 +638,6 @@ pub async fn prepare_cache_response(
     ];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
-    }
-    if let Some(offset) = ts_offset
-        && offset != 0
-    {
-        hash_body.push(format!("ts_offset={offset}"));
     }
     if !req.regions.is_empty() {
         hash_body.extend(req.regions.clone());
@@ -683,14 +672,7 @@ pub async fn prepare_cache_response(
         }
     }
 
-    // Only a histogram() output is in shifted time; an unresolvable column skips the cache.
-    let ts_offset = ts_offset.and_then(|offset| match offset {
-        0 => Some(0),
-        _ => is_histogram_output(&sql.sql, &ts_column)
-            .map(|shifted| if shifted { offset } else { 0 }),
-    });
-    // With the cache on, check_cache decides eligibility first and only then rewrites the SQL.
-    if !use_cache && ts_offset.is_none() {
+    if !use_cache && sql.histogram_offset != Some(0) {
         return Ok((
             MultiCachedQueryResponse {
                 order_by: sql.order_by,
@@ -701,7 +683,7 @@ pub async fn prepare_cache_response(
     }
 
     // #16175: sort, trim and cache checks compare ORDER BY with the column the hits carry
-    if ts_offset.is_some() {
+    if sql.histogram_offset.is_some() {
         sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
     }
 
@@ -731,7 +713,6 @@ pub async fn prepare_cache_response(
             &sql,
             &ts_column,
             is_descending,
-            ts_offset,
             &mut should_exec_query,
         )
         .await
@@ -744,7 +725,6 @@ pub async fn prepare_cache_response(
             order_by: sql.order_by,
             limit: sql.limit,
             file_path,
-            ts_offset: ts_offset.unwrap_or_default(),
             ..Default::default()
         }
     };
@@ -1072,7 +1052,6 @@ pub async fn write_results(
     is_descending: bool,
     clear_cache: bool,
     is_histogram_non_ts_order: bool,
-    ts_offset: i64,
 ) {
     if res.hits.is_empty() {
         return;
@@ -1084,7 +1063,6 @@ pub async fn write_results(
             req_query_start_time,
             req_query_end_time,
             interval * 1000 * 1000,
-            ts_offset,
         ),
         _ => (req_query_start_time, req_query_end_time, false),
     };
@@ -1132,14 +1110,12 @@ pub async fn write_results(
     let is_time_ordered = !is_histogram_non_ts_order;
     let (data_start_time, data_end_time) =
         extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
-    if data_start_time - ts_offset < accept_start_time
-        || data_end_time - ts_offset > accept_end_time
-    {
+    if data_start_time < accept_start_time || data_end_time > accept_end_time {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
                 && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
             {
-                let item_ts = hit_ts_datetime.timestamp_micros() - ts_offset;
+                let item_ts = hit_ts_datetime.timestamp_micros();
                 // only keep the records within the accept time range
                 item_ts >= accept_start_time && item_ts <= accept_end_time
             } else {
@@ -1214,19 +1190,14 @@ async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &Result
 }
 
 /// Shrinks `[start, end]` to whole `histogram()` buckets; the flag says whether the end moved.
-fn histogram_cacheable_range(
-    start: i64,
-    end: i64,
-    interval: i64,
-    ts_offset: i64,
-) -> (i64, i64, bool) {
-    let start_offset = histogram_bucket_offset(start + ts_offset, interval);
+fn histogram_cacheable_range(start: i64, end: i64, interval: i64) -> (i64, i64, bool) {
+    let start_offset = histogram_bucket_offset(start, interval);
     let start = if start_offset == 0 {
         start
     } else {
         start - start_offset + interval
     };
-    let end_offset = histogram_bucket_offset(end + ts_offset, interval);
+    let end_offset = histogram_bucket_offset(end, interval);
     if end_offset == 0 {
         (start, end, false)
     } else {
@@ -1550,7 +1521,7 @@ mod tests {
         ];
         for (start, end, interval, expected) in cases {
             assert_eq!(
-                histogram_cacheable_range(start, end, interval, 0),
+                histogram_cacheable_range(start, end, interval),
                 expected,
                 "start={start}, end={end}, interval={interval}"
             );

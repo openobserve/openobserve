@@ -60,7 +60,6 @@ pub struct CacheQueryRequest {
     pub is_aggregate: bool,
     pub ts_column: String,
     pub histogram_interval: i64,
-    pub ts_offset: i64,
     pub is_descending: bool,
     /// Flag indicating this is a histogram query with non-timestamp column ORDER BY.
     /// When true, cache file timestamps must be calculated by scanning all hits,
@@ -80,7 +79,6 @@ pub struct MultiCachedQueryResponse {
     pub limit: i64,
     pub took: usize,
     pub histogram_interval: i64,
-    pub ts_offset: i64,
     pub total_cache_duration: usize,
     pub is_aggregate: bool,
     pub file_path: String,
@@ -219,7 +217,6 @@ mod tests {
             is_aggregate: true,
             ts_column: "timestamp".to_string(),
             histogram_interval: 100,
-            ts_offset: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         };
@@ -245,7 +242,6 @@ mod tests {
             limit: 100,
             took: 50,
             histogram_interval: 1000,
-            ts_offset: 0,
             total_cache_duration: 2000,
             is_aggregate: true,
             file_path: "test.json".to_string(),

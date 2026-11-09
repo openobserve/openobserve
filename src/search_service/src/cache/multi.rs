@@ -92,7 +92,6 @@ mod tests {
             is_aggregate: false,
             ts_column: "_timestamp".to_string(),
             histogram_interval: 0,
-            ts_offset: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         }

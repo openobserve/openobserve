@@ -504,13 +504,9 @@ pub fn get_cache_file_path(file_path: &str, file_name: &str) -> String {
     format!("{STREAMING_AGGS_CACHE_DIR}/{file_path}/{file_name}")
 }
 
-/// `ts_offset` is the shared `histogram()` offset, which a request-level timezone sets outside the
-/// SQL.
-pub fn get_aggregation_cache_key_from_request(req: &SearchPartitionRequest, ts_offset: i64) -> u64 {
-    let origin_sql = req.sql.clone();
-
-    // Always present, so entries written before offsets were keyed are never read back.
-    let mut hash_body = vec![origin_sql, format!("ts_offset={ts_offset}")];
+pub fn get_aggregation_cache_key_from_request(req: &SearchPartitionRequest) -> u64 {
+    // Keep UTC entries separate from caches written before timezone eligibility was enforced.
+    let mut hash_body = vec!["aggregation-v2".to_string(), req.sql.clone()];
     if let Some(vrl_function) = &req.query_fn {
         hash_body.push(vrl_function.to_string());
     }
@@ -530,27 +526,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn timezone_aggregation_cache_key_includes_offset() {
+    fn timezone_aggregation_cache_key_excludes_legacy() {
         let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
             "sql": "SELECT count(*) AS cnt FROM t GROUP BY histogram(_timestamp, '1 day')",
             "start_time": 1,
             "end_time": 2,
         }))
         .unwrap();
-        let utc = get_aggregation_cache_key_from_request(&req, 0);
-        assert_eq!(utc, get_aggregation_cache_key_from_request(&req, 0));
+        let utc = get_aggregation_cache_key_from_request(&req);
+        assert_eq!(utc, get_aggregation_cache_key_from_request(&req));
         assert_ne!(
             utc,
             config::utils::hash::sum64(&req.sql),
             "legacy key must not match"
-        );
-        assert_ne!(
-            utc,
-            get_aggregation_cache_key_from_request(&req, 19_800_000_000)
-        );
-        assert_ne!(
-            get_aggregation_cache_key_from_request(&req, 19_800_000_000),
-            get_aggregation_cache_key_from_request(&req, -28_800_000_000)
         );
     }
 

@@ -49,7 +49,6 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     file_path: &str,
     responses: &[CachedQueryResponse],
     histogram_interval: i64, // microseconds; 0 for non-histogram queries
-    ts_offset: i64,
 ) -> Result<Vec<CachedQueryResponse>, String> {
     let components: Vec<&str> = file_path.split('/').collect();
     if components.len() < 3 {
@@ -86,7 +85,7 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
             .filter_map(|mut meta| {
                 meta.cached_response.hits.retain(|hit| {
                     let hit_ts = get_ts_value(&meta.ts_column, hit);
-                    hit_ts - ts_offset + histogram_interval > stream_min_ts
+                    hit_ts + histogram_interval > stream_min_ts
                 });
                 if meta.cached_response.hits.is_empty() {
                     None
@@ -130,7 +129,6 @@ pub async fn check_cache(
     sql: &Sql,
     result_ts_col: &str,
     is_descending: bool,
-    ts_offset: Option<i64>,
     should_exec_query: &mut bool,
 ) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
@@ -179,13 +177,12 @@ pub async fn check_cache(
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
 
-    // Mixed or unresolvable offsets skip the cache, after the normalized SQL is in place.
-    let Some(ts_offset) = ts_offset else {
+    if sql.histogram_offset != Some(0) {
         return MultiCachedQueryResponse {
             order_by: order_by.clone(),
             ..Default::default()
         };
-    };
+    }
 
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
@@ -202,7 +199,6 @@ pub async fn check_cache(
         trace_id: trace_id.to_string(),
         is_aggregate,
         is_descending,
-        ts_offset,
         ..Default::default()
     };
     if histogram_interval > 0 {
@@ -226,7 +222,6 @@ pub async fn check_cache(
                 is_aggregate,
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
-                ts_offset,
                 is_descending,
                 is_histogram_non_ts_order,
             },
@@ -243,7 +238,6 @@ pub async fn check_cache(
             file_path,
             &cached_responses,
             histogram_interval,
-            ts_offset,
         )
         .await
         {
@@ -313,7 +307,6 @@ pub async fn check_cache(
                 is_aggregate,
                 ts_column: result_ts_col.to_string(),
                 histogram_interval,
-                ts_offset,
                 is_descending,
                 is_histogram_non_ts_order,
             },
@@ -327,7 +320,6 @@ pub async fn check_cache(
                     file_path,
                     &[cached_resp.clone()],
                     histogram_interval,
-                    ts_offset,
                 )
                 .await
                 {
@@ -440,14 +432,8 @@ pub async fn get_cached_results(
             // check if the data is matching for histogram
             if cache_req.is_aggregate
                 && cache_req.histogram_interval > 0
-                && (histogram_bucket_offset(
-                    m.start_time + cache_req.ts_offset,
-                    cache_req.histogram_interval,
-                ) != 0
-                    || histogram_bucket_offset(
-                        m.end_time + cache_req.ts_offset,
-                        cache_req.histogram_interval,
-                    ) != 0)
+                && (histogram_bucket_offset(m.start_time, cache_req.histogram_interval) != 0
+                    || histogram_bucket_offset(m.end_time, cache_req.histogram_interval) != 0)
             {
                 return false;
             }
@@ -496,10 +482,8 @@ pub async fn get_cached_results(
     // filter data based on request time range
     let (hits_allowed_start_time, hits_allowed_end_time) =
         (cache_req.q_start_time, cache_req.q_end_time);
-    let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap())
-        - cache_req.ts_offset;
-    let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap())
-        - cache_req.ts_offset;
+    let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
+    let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
     let data_start_time = std::cmp::min(first_ts, last_ts);
     let data_end_time = std::cmp::max(first_ts, last_ts);
     // convert histogram interval to microseconds
@@ -507,7 +491,7 @@ pub async fn get_cached_results(
     // check if need to filter the data
     if data_start_time < cache_req.q_start_time || data_end_time > cache_req.q_end_time {
         cached_response.hits.retain(|hit| {
-            let hit_ts = get_ts_value(&cache_req.ts_column, hit) - cache_req.ts_offset;
+            let hit_ts = get_ts_value(&cache_req.ts_column, hit);
             hit_ts + histogram_interval < hits_allowed_end_time && hit_ts >= hits_allowed_start_time
         });
         // if the data is empty after filtering, return None
@@ -515,10 +499,8 @@ pub async fn get_cached_results(
             return None;
         }
         // reset the start and end time
-        let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap())
-            - cache_req.ts_offset;
-        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap())
-            - cache_req.ts_offset;
+        let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
+        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
         matching_meta.start_time = std::cmp::min(first_ts, last_ts);
         matching_meta.end_time = std::cmp::max(first_ts, last_ts) + histogram_interval;
     }
@@ -1348,7 +1330,7 @@ mod tests {
         ];
 
         let file_path = "test_org/logs/test_stream";
-        let result = invalidate_cached_response_by_stream_min_ts(file_path, &responses, 0, 0).await;
+        let result = invalidate_cached_response_by_stream_min_ts(file_path, &responses, 0).await;
         assert!(result.is_ok());
         let filtered_responses = result.unwrap();
         assert_eq!(filtered_responses.len(), 2);
@@ -1406,7 +1388,6 @@ mod tests {
             is_aggregate: false,
             ts_column: "_timestamp".to_string(),
             histogram_interval: 0,
-            ts_offset: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         };
@@ -1444,7 +1425,6 @@ mod tests {
             is_aggregate: true,
             ts_column: "_timestamp".to_string(),
             histogram_interval: thirty_days,
-            ts_offset: 0,
             is_descending: false,
             is_histogram_non_ts_order: false,
         };
@@ -1518,7 +1498,6 @@ mod tests {
             &sql,
             &result_ts_col,
             is_descending,
-            Some(0),
             &mut should_exec_query,
         )
         .await;

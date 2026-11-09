@@ -71,7 +71,9 @@ impl PartitionSqlContext {
                 && RESULT_ARRAY.is_match(&base64::decode_url(v).unwrap_or_else(|_| v.to_string()))
         });
 
+        // Non-UTC aggregates cannot share the persistent state that merges partition results.
         let use_single_partition = is_explain
+            || (is_streaming_agg && sql.histogram_offset != Some(0))
             || ((ts_column.is_none() || apply_over_hits)
                 && !(req.streaming_output && is_streaming_agg));
 
