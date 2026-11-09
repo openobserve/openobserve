@@ -97,8 +97,75 @@ function score(output, expected_output) {
   },
 ];
 
-const SCORE_SIGNATURE = /function\s+score\s*\(([^)]*)\)/;
+const SCORE_SIGNATURE = /^function\s+score\s*\(([^)]*)\)/;
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
+const IDENT_CHAR = /[\w$]/;
+/** A `/` after one of these opens a regex literal rather than a division. */
+const REGEX_PREFIX = "(,=:[!&|?{};+-*%<>~^";
+
+/** The index just past the string, template or regex literal opened at `start`. */
+function skipLiteral(source: string, start: number, quote: string): number {
+  let inClass = false;
+  for (let i = start + 1; i < source.length; i++) {
+    const c = source[i];
+    if (c === "\\") i++;
+    else if (c === "\n" && quote !== "`") return i + 1;
+    else if (c === "[" && quote === "/") inClass = true;
+    else if (c === "]" && quote === "/") inClass = false;
+    else if (c === quote && !inClass) return i + 1;
+  }
+  return source.length;
+}
+
+/**
+ * The parameter list of the last top-level `function score(...)`, skipping
+ * comments, strings, template and regex literals. Mirrors the backend's
+ * `score_signature` (scorers/code.rs).
+ */
+function scoreSignature(source: string): string | null {
+  let depth = 0;
+  let last: string | null = null;
+  let prev: string | null = null;
+  let i = 0;
+  while (i < source.length) {
+    const c = source[i];
+    const next = source[i + 1];
+    if (c === "/" && next === "/") {
+      const end = source.indexOf("\n", i);
+      i = end === -1 ? source.length : end;
+      continue;
+    }
+    if (c === "/" && next === "*") {
+      const end = source.indexOf("*/", i + 2);
+      i = end === -1 ? source.length : end + 2;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === "`") {
+      i = skipLiteral(source, i, c);
+      prev = c;
+      continue;
+    }
+    if (c === "/" && (prev === null || REGEX_PREFIX.includes(prev))) {
+      i = skipLiteral(source, i, "/");
+      prev = "/";
+      continue;
+    }
+    if (c === "{") depth++;
+    else if (c === "}") depth--;
+    else if (c === "f" && depth === 0 && (i === 0 || !IDENT_CHAR.test(source[i - 1]))) {
+      const match = SCORE_SIGNATURE.exec(source.slice(i));
+      if (match) {
+        last = match[1];
+        i += match[0].length;
+        prev = ")";
+        continue;
+      }
+    }
+    if (!/\s/.test(c)) prev = c;
+    i++;
+  }
+  return last;
+}
 
 /**
  * Parameter names of `function score(...)`, in order, or `null` when the source
@@ -106,9 +173,9 @@ const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
  * which rejects a scorer whose variables it cannot read.
  */
 export function scoreFunctionParams(source: string): string[] | null {
-  const match = SCORE_SIGNATURE.exec(source);
-  if (!match) return null;
-  const params = match[1]
+  const signature = scoreSignature(source);
+  if (signature === null) return null;
+  const params = signature
     .split(",")
     .map((param) => param.trim())
     .filter(Boolean);

@@ -121,4 +121,20 @@ describe("scoreFunctionParams", () => {
     expect(scoreFunctionParams("function score(a, limit = 5) {}")).toBeNull();
     expect(scoreFunctionParams("const score = (a) => a;")).toBeNull();
   });
+
+  it("reads the declared signature, not one in comments, strings or nested functions", () => {
+    for (const code of [
+      '/* usage: function score(expected) */\nfunction score(output) { return output === "x"; }',
+      "// function score(a, b = 2)\nfunction score(output) { return true; }",
+      "var doc = 'function score(expected)';\nfunction score(output) { return true; }",
+      "var doc = `function score(\n expected)`;\nfunction score(output) { return true; }",
+      "var re = /function score\\(expected\\)/;\nfunction score(output) { return re.test(output); }",
+      "function wrap() { function score(expected) {} }\nfunction score(output) { return 1 / 2; }",
+      "function score(expected) { return 1; }\nfunction score(output) { return 2; }",
+    ]) {
+      expect(scoreFunctionParams(code), code).toEqual(["output"]);
+    }
+    expect(scoreFunctionParams("// function score(output) {}")).toBeNull();
+    expect(scoreFunctionParams('var s = "function score(output)";')).toBeNull();
+  });
 });

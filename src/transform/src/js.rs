@@ -19,7 +19,7 @@ use std::{
 };
 
 use config::{meta::function::RESULT_ARRAY, stats::MemorySize, utils::json};
-use rquickjs::{CatchResultExt, Context, Runtime};
+use rquickjs::{CatchResultExt, CaughtError, Context, Runtime};
 
 thread_local! {
     /// Deadline for the eval running on this thread; the interrupt handler aborts once it passes.
@@ -27,6 +27,9 @@ thread_local! {
 
     /// Recently used contexts on this thread; one per org and function so no two share globals.
     static JS_CONTEXTS: RefCell<Vec<CachedJsContext>> = const { RefCell::new(Vec::new()) };
+
+    /// Runtime reused by Code scorer calls on this thread; each call gets its own context.
+    static SCORE_RUNTIME: RefCell<Option<Runtime>> = const { RefCell::new(None) };
 }
 
 /// Fallback when the configured limit is 0; every eval stays bounded (no unlimited option).
@@ -394,19 +397,44 @@ fn eval_js_fn(
 
 /// Runs a Code scorer: `source` declares `function score(...)`, which is called
 /// with `args` in parameter order. Returns what it returns, or an error for a
-/// forbidden pattern, a syntax or runtime error, or a broken time or memory limit.
+/// forbidden pattern, a syntax or runtime error, a non-finite number, or a
+/// broken time or memory limit.
+///
+/// Every call gets a fresh context, so nothing a call leaves on the built-ins
+/// (`Math.calls = ...`) is seen by the next one; only the runtime is reused.
+/// The org takes no part: no state outlives a call.
 pub fn run_score_fn(
-    org_id: &str,
+    _org_id: &str,
     source: &str,
     args: &[json::Value],
 ) -> Result<json::Value, String> {
     check_js_security(source).map_err(|e| e.to_string())?;
     let args =
         serde_json::to_string(args).map_err(|e| format!("Failed to serialize arguments: {e}"))?;
-    let context = cached_js_context(org_id, source)?;
+    let rt = score_runtime()?;
+    let context = Context::full(&rt).map_err(|e| format!("Failed to create JS context: {e}"))?;
     let result = eval_score_fn(&context, source, &args);
-    account_js_context(org_id, source, &context);
+    drop(context);
+    // A queued job keeps the dropped context alive, and a failed call may have
+    // left the heap full: start the next call on a new runtime.
+    if result.is_err() || rt.is_job_pending() {
+        SCORE_RUNTIME.with(|cached| cached.borrow_mut().take());
+    } else {
+        rt.run_gc();
+    }
     result
+}
+
+fn score_runtime() -> Result<Runtime, String> {
+    SCORE_RUNTIME.with(|cached| {
+        let mut cached = cached.borrow_mut();
+        if let Some(rt) = cached.as_ref() {
+            return Ok(rt.clone());
+        }
+        let rt = new_js_runtime()?;
+        *cached = Some(rt.clone());
+        Ok(rt)
+    })
 }
 
 fn eval_score_fn(context: &Context, source: &str, args: &str) -> Result<json::Value, String> {
@@ -414,7 +442,10 @@ fn eval_score_fn(context: &Context, source: &str, args: &str) -> Result<json::Va
         ctx.globals()
             .set("scoreArgs", args)
             .map_err(|e| format!("Failed to set arguments: {e}"))?;
-        // The IIFE keeps `score` out of the cached context's globals.
+        // JSON turns NaN and Infinity into null, so they are reported before
+        // serializing. QuickJS throws a bare null when it runs out of memory
+        // while building the error; a scorer that throws null itself is read
+        // the same way.
         let code = format!(
             r#"
                 (function() {{
@@ -422,8 +453,11 @@ fn eval_score_fn(context: &Context, source: &str, args: &str) -> Result<json::Va
                     if (typeof score !== 'function') {{
                         throw new TypeError('the code must declare function score(...)');
                     }}
-                    var out = JSON.stringify(score.apply(null, JSON.parse(scoreArgs)));
-                    return out === undefined ? 'null' : out;
+                    var value = score.apply(null, JSON.parse(scoreArgs));
+                    if (typeof value === 'number' && !isFinite(value)) {{
+                        return JSON.stringify({{ nonFinite: String(value) }});
+                    }}
+                    return JSON.stringify({{ value: value }});
                 }})();
             "#
         );
@@ -435,12 +469,36 @@ fn eval_score_fn(context: &Context, source: &str, args: &str) -> Result<json::Va
                 SCORE_FN_TIMEOUT.as_millis()
             ));
         }
-        let out = result.map_err(|e| e.to_string().trim().to_string())?;
-        serde_json::from_str(&out).map_err(|e| format!("Failed to read the score: {e}"))
+        let memory_error = || {
+            format!(
+                "Code scorer exceeded the {} MB memory limit",
+                JS_MEMORY_LIMIT_BYTES / (1024 * 1024)
+            )
+        };
+        let out = result.map_err(|e| match &e {
+            CaughtError::Value(value) if value.is_null() || value.is_undefined() => memory_error(),
+            CaughtError::Exception(exception)
+                if exception
+                    .message()
+                    .is_some_and(|message| message.contains("out of memory")) =>
+            {
+                memory_error()
+            }
+            CaughtError::Error(rquickjs::Error::Allocation) => memory_error(),
+            _ => e.to_string().trim().to_string(),
+        })?;
+        let out: json::Value =
+            serde_json::from_str(&out).map_err(|e| format!("Failed to read the score: {e}"))?;
+        if let Some(number) = out.get("nonFinite").and_then(|v| v.as_str()) {
+            return Err(format!(
+                "score() returned {number}: expected a finite number"
+            ));
+        }
+        Ok(out.get("value").cloned().unwrap_or(json::Value::Null))
     })
 }
 
-fn new_js_context() -> Result<Context, String> {
+fn new_js_runtime() -> Result<Runtime, String> {
     let rt = Runtime::new().map_err(|e| format!("Failed to create JS runtime: {e}"))?;
     rt.set_memory_limit(JS_MEMORY_LIMIT_BYTES);
     rt.set_max_stack_size(JS_MAX_STACK_SIZE_BYTES);
@@ -448,6 +506,11 @@ fn new_js_context() -> Result<Context, String> {
     rt.set_interrupt_handler(Some(Box::new(|| {
         JS_DEADLINE.with(|d| d.get().is_some_and(|deadline| Instant::now() >= deadline))
     })));
+    Ok(rt)
+}
+
+fn new_js_context() -> Result<Context, String> {
+    let rt = new_js_runtime()?;
     // Context::full still exposes eval and Function; only the source denylist keeps them out.
     Context::full(&rt).map_err(|e| format!("Failed to create JS context: {e}"))
 }
@@ -1293,6 +1356,67 @@ for (var i = 0; i < filtered.length; i++) {
             run_score_fn("score_org", "function score() { while (true) {} }", &[]).unwrap_err();
         assert!(looped.contains("time limit"), "{looped}");
         assert!(start.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn test_score_fn_calls_do_not_share_globals() {
+        let counter =
+            "function score(o) { Math.calls = (Math.calls || 0) + 1; return Math.calls; }";
+        for _ in 0..3 {
+            assert_eq!(
+                run_score_fn("score_org", counter, &[json!("x")]),
+                Ok(json!(1))
+            );
+        }
+        // A scorer that fills the heap a little each call never reaches the limit.
+        let hoard = "function score(o) { Math.buf = Math.buf || []; Math.buf.push('x'.repeat(1000000) + Math.buf.length); return Math.buf.length; }";
+        for _ in 0..20 {
+            assert_eq!(
+                run_score_fn("score_org", hoard, &[json!("x")]),
+                Ok(json!(1))
+            );
+        }
+    }
+
+    #[test]
+    fn test_score_fn_names_memory_and_non_finite_failures() {
+        let hog = "function score(o) { var a = []; for (var i = 0; i < 2000000; i++) a.push({k: i}); return a.length > 0; }";
+        let err = run_score_fn("score_org", hog, &[json!("x")]).unwrap_err();
+        assert_eq!(err, "Code scorer exceeded the 10 MB memory limit");
+        let big = run_score_fn(
+            "score_org",
+            "function score(o) { return 'x'.repeat(20 * 1024 * 1024).length; }",
+            &[json!("x")],
+        )
+        .unwrap_err();
+        assert_eq!(big, "Code scorer exceeded the 10 MB memory limit");
+        // The next call runs normally.
+        assert_eq!(
+            run_score_fn(
+                "score_org",
+                "function score(o) { return o; }",
+                &[json!("x")]
+            ),
+            Ok(json!("x"))
+        );
+
+        for (body, shown) in [
+            ("NaN", "NaN"),
+            ("1 / 0", "Infinity"),
+            ("-1 / 0", "-Infinity"),
+        ] {
+            let source = format!("function score(o) {{ return {body}; }}");
+            assert_eq!(
+                run_score_fn("score_org", &source, &[json!("x")]),
+                Err(format!(
+                    "score() returned {shown}: expected a finite number"
+                ))
+            );
+        }
+        assert_eq!(
+            run_score_fn("score_org", "function score(o) { }", &[]),
+            Ok(json!(null))
+        );
     }
 
     #[test]
