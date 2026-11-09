@@ -23,6 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="raw(drawerTitle)"
     @update:open="(v: boolean) => !v && onClose()"
   >
+    <template #header-start>
+      <slot name="header-start" />
+    </template>
     <template #header-left>
       <OIcon name="timeline" size="md" />
       <!-- Time Range Display: Inline chips -->
@@ -359,6 +362,7 @@ const AnalysisPage: FunctionalComponent = (_, { slots, attrs }) =>
           class: "border-card-glass-border px-page-edge flex shrink-0 items-center border-b py-1.5",
         },
         [
+          slots["header-start"]?.(),
           h(
             "span",
             {

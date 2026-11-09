@@ -48,6 +48,7 @@
       "alerts-ui-operations.spec.js",
       "alerts-destinations-prebuilt.spec.js",
       "alert-library.spec.js",
+      "alert-library-anomaly.spec.js",
       "alerts-composite-builder.spec.js",
       "alerts-composite-detail.spec.js",
       "alerts-composite-list.spec.js",
