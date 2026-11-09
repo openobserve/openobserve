@@ -26,7 +26,7 @@ use config::meta::alerts::{
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
-    sea_query::{Expr, JoinType, LockType, Query},
+    sea_query::{Expr, JoinType, LockType, Query, SimpleExpr},
 };
 use svix_ksuid::KsuidLike;
 
@@ -35,6 +35,12 @@ use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
+
+#[derive(Debug, sea_orm::FromQueryResult)]
+pub struct CorrelationCandidate {
+    pub id: String,
+    pub group_values: serde_json::Value,
+}
 
 /// One incident [auto_resolve_stale] resolved, with the downtime that muted it until then.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -98,8 +104,14 @@ fn new_incident(
 
 /// Get incident by ID
 pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    get_with(get_orm_client_ro().await, org_id, id).await
+}
 
+pub async fn get_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
     alert_incidents::Entity::find_by_id(id)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .one(client)
@@ -262,8 +274,8 @@ pub async fn add_alert_to_incident(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     // Lock the incident row first so that concurrent transactions serialise on
-    // it. Without this lock, two READ COMMITTED transactions can both read
-    // prior_count == 0 before either commits (the PK includes alert_fired_at,
+    // it. Without this lock, two READ COMMITTED transactions can both see
+    // no prior firing before either commits (the PK includes alert_fired_at,
     // so both inserts succeed), resulting in duplicate NewAlertTypeJoined
     // notifications. FOR UPDATE is a no-op on SQLite (file-level locking
     // already serialises writes there).
@@ -276,14 +288,18 @@ pub async fn add_alert_to_incident(
 
     // With the incident row locked, check whether this alert_id already
     // appears in the incident. Only one transaction can hold the lock at a
-    // time, so this count is stable until we commit.
-    let prior_count = alert_incident_alerts::Entity::find()
+    // time, so this check is stable until we commit.
+    let is_new_alert_type = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::AlertId)
         .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
         .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
-        .count(&txn)
+        .into_tuple::<String>()
+        // LIMIT 1: a long-firing alert links tens of thousands of rows to one incident.
+        .one(&txn)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    let is_new_alert_type = prior_count == 0;
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .is_none();
 
     // Insert alert link
     let alert_link = alert_incident_alerts::ActiveModel {
@@ -1203,52 +1219,18 @@ pub async fn update_incident_metadata(
     Ok(())
 }
 
-/// Find open incidents with optional filters (general-purpose function)
-///
-/// A flexible function for finding open incidents with various filters.
-/// Used for both hierarchical upgrade matching and RCA processing.
-///
-/// # Parameters
-/// - `org_id`: Organization ID (REQUIRED for multi-tenancy security)
-/// - `created_after`: Optional timestamp filter - only incidents created after this time (for
-///   time-window queries)
-/// - `limit`: Optional result limit (None = return all, Some(n) = limit to n results)
-///
-/// # Returns
-/// Open (non-resolved) incidents ordered by most recent first (by created_at)
-///
-/// # Examples
-/// ```
-/// // Hierarchical upgrade: Find incidents created in last 5 minutes
-/// let threshold = now - (5 * 60 * 1_000_000);
-/// let candidates = find_open_incidents_filtered(org_id, Some(threshold), Some(100)).await?;
-///
-/// // RCA: Get all open incidents for an org
-/// let all_open = find_open_incidents_filtered(org_id, None, None).await?;
-/// ```
-pub async fn find_open_incidents_filtered(
+pub async fn find_correlation_candidates(
     org_id: &str,
-    created_after: Option<i64>,
-    limit: Option<u64>,
-) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
+) -> Result<Vec<CorrelationCandidate>, errors::Error> {
+    find_correlation_candidates_with(get_orm_client_ro().await, org_id).await
+}
 
-    let mut query = alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::OrgId.eq(org_id))
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .order_by_desc(alert_incidents::Column::CreatedAt);
-
-    // Apply time filter if provided (for hierarchical upgrade time window)
-    if let Some(threshold) = created_after {
-        query = query.filter(alert_incidents::Column::CreatedAt.gte(threshold));
-    }
-
-    // Apply limit if provided (for performance)
-    if let Some(lim) = limit {
-        query = query.limit(lim);
-    }
-
-    query
+pub async fn find_correlation_candidates_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+) -> Result<Vec<CorrelationCandidate>, errors::Error> {
+    correlation_candidates_query(org_id)
+        .into_model::<CorrelationCandidate>()
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
@@ -1319,10 +1301,7 @@ pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
 
     let mut resolved_ids = Vec::new();
     loop {
-        // Find open/acknowledged incidents with last_alert_at older than threshold
-        let stale_incidents = alert_incidents::Entity::find()
-            .filter(alert_incidents::Column::Status.ne("resolved"))
-            .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+        let stale_incidents = stale_incidents_query(cutoff)
             .limit(PAGE_SIZE)
             .all(client)
             .await
@@ -1385,6 +1364,27 @@ fn containing_alerts(alert_ids: &[String]) -> sea_orm::Condition {
     )
 }
 
+fn correlation_candidates_query(org_id: &str) -> sea_orm::Select<alert_incidents::Entity> {
+    alert_incidents::Entity::find()
+        .select_only()
+        .columns([
+            alert_incidents::Column::Id,
+            alert_incidents::Column::GroupValues,
+        ])
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .order_by_desc(alert_incidents::Column::CreatedAt)
+}
+
+fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity> {
+    // Inlined, not bound: PostgreSQL's generic plan cannot match a bind to the partial index.
+    alert_incidents::Entity::find()
+        .filter(
+            Expr::col(alert_incidents::Column::Status).ne(SimpleExpr::Constant("resolved".into())),
+        )
+        .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::{Database, DatabaseConnection, Schema};
@@ -1412,6 +1412,48 @@ mod tests {
         assert!(
             sql.contains("GROUP BY \"alert_incident_alerts\".\"alert_id\""),
             "{sql}"
+        );
+    }
+
+    // A bound status would let PostgreSQL's generic plan skip the partial index.
+    #[test]
+    fn stale_incidents_query_inlines_the_resolved_status() {
+        use sea_orm::{DbBackend, QueryTrait};
+
+        let stmt = stale_incidents_query(100).build(DbBackend::Postgres);
+
+        assert!(
+            stmt.sql.contains(r#""status" <> 'resolved'"#),
+            "{}",
+            stmt.sql
+        );
+    }
+
+    #[tokio::test]
+    async fn stale_incidents_query_uses_the_unresolved_index() {
+        use sea_orm::QueryTrait;
+
+        let db = incidents_db().await;
+        crate::table::migration::create_alert_incidents_unresolved_index_for_test(&db)
+            .await
+            .unwrap();
+        let mut stmt = stale_incidents_query(100)
+            .limit(500)
+            .build(db.get_database_backend());
+        stmt.sql = format!("EXPLAIN QUERY PLAN {}", stmt.sql);
+
+        let plan = db
+            .query_all(stmt)
+            .await
+            .unwrap()
+            .iter()
+            .map(|row| row.try_get::<String>("", "detail").unwrap())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(
+            plan.contains("USING INDEX alert_incidents_unresolved_last_alert_idx"),
+            "{plan}"
         );
     }
 
@@ -2068,5 +2110,81 @@ mod tests {
             .unwrap();
         assert_eq!(row.status, "resolved");
         assert_eq!(row.muted_by_downtime_id, None);
+    }
+
+    #[tokio::test]
+    async fn correlation_candidates_project_all_unresolved_rows_in_newest_first_order() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE alert_incidents (id TEXT, org_id TEXT, status TEXT, group_values TEXT, created_at BIGINT)",
+        )
+        .await
+        .unwrap();
+        db.execute_unprepared(
+            r#"INSERT INTO alert_incidents VALUES
+                ('old', 'acme', 'open', '{"ns":"prod"}', 1),
+                ('resolved', 'acme', 'resolved', '{}', 5),
+                ('other', 'other', 'open', '{}', 6),
+                ('conflict', 'acme', 'open', '{"ns":"dev"}', 4),
+                ('acknowledged', 'acme', 'acknowledged', '{"ns":"prod","db":"redis"}', 3),
+                ('empty', 'acme', 'open', '{}', 2)"#,
+        )
+        .await
+        .unwrap();
+
+        let candidates = find_correlation_candidates_with(&db, "acme").await.unwrap();
+        assert_eq!(
+            candidates
+                .iter()
+                .map(|row| row.id.as_str())
+                .collect::<Vec<_>>(),
+            ["conflict", "acknowledged", "empty", "old"]
+        );
+        assert_eq!(candidates[0].group_values, serde_json::json!({"ns": "dev"}));
+        assert_eq!(candidates[2].group_values, serde_json::json!({}));
+        assert!(
+            find_correlation_candidates_with(&db, "absent")
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn correlation_candidates_propagate_database_errors() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        assert!(matches!(
+            find_correlation_candidates_with(&db, "acme").await,
+            Err(Error::DbError(DbError::SeaORMError(_)))
+        ));
+    }
+
+    #[test]
+    fn correlation_candidates_select_only_id_and_dimensions_without_json_predicates() {
+        use sea_orm::{DbBackend, QueryTrait};
+
+        for backend in [DbBackend::Sqlite, DbBackend::Postgres] {
+            let stmt = correlation_candidates_query("acme").build(backend);
+            assert!(
+                stmt.sql.starts_with(
+                    r#"SELECT "alert_incidents"."id", "alert_incidents"."group_values" FROM "alert_incidents" WHERE "#
+                ),
+                "{}",
+                stmt.sql
+            );
+            assert!(stmt.sql.contains(r#""org_id" = "#), "{}", stmt.sql);
+            assert!(stmt.sql.contains(r#""status" <> "#), "{}", stmt.sql);
+            assert!(
+                stmt.sql
+                    .ends_with(r#"ORDER BY "alert_incidents"."created_at" DESC"#),
+                "{}",
+                stmt.sql
+            );
+            assert!(!stmt.sql.contains("LIMIT"), "{}", stmt.sql);
+            assert!(!stmt.sql.contains("json"), "{}", stmt.sql);
+            assert!(!stmt.sql.contains("@>"), "{}", stmt.sql);
+            assert!(!stmt.sql.contains("<@"), "{}", stmt.sql);
+            assert_eq!(stmt.values.unwrap().0, ["acme".into(), "resolved".into()]);
+        }
     }
 }

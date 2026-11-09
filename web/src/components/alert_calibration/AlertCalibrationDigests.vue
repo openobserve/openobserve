@@ -214,6 +214,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
@@ -361,7 +362,9 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
 ]);
 
 const onScope = (value: unknown) => {
-  if (value) scope.value = value as Scope;
+  if (!value) return;
+  scope.value = value as Scope;
+  analytics.track("alert_calibration_runs_scope_changed", { scope: scope.value });
 };
 
 const open = (row: RunRow) =>

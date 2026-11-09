@@ -5,6 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -401,6 +402,7 @@ function syncIndex() {
 watch([filtered, selectedId], () => void nextTick(syncIndex));
 
 function openDrawer(row: Row) {
+  if (!selectedId.value) analytics.track("security_detail_opened", { view: "detections" });
   selectedId.value = row.id;
   router.replace({ query: { ...route.query, detection: row.id } });
 }

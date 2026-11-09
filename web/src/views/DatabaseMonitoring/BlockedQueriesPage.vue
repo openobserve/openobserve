@@ -473,6 +473,7 @@ import dbMonitoringService, {
   type BlockingChain,
   type BlockingSample,
 } from "@/services/db_monitoring";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
@@ -1039,6 +1040,7 @@ const windowMinutes = computed(() =>
 );
 
 const onRowAction = (id: string, row: BlockedRow) => {
+  analytics.track("dbm_row_action_clicked", { page: "blocked", action: id });
   if (id === "copy") {
     copyToClipboard(row.query ?? "", t);
     return;
@@ -1182,6 +1184,7 @@ const longestWaitBehind = (pid: number | null): number | null => {
 };
 
 const askAiForFix = (row: BlockedRow) => {
+  analytics.track("dbm_ai_fix_requested", { page: "blocked" });
   emit("sendToAiChat", {
     query: buildBlockingFixPrompt({
       query: row.query,

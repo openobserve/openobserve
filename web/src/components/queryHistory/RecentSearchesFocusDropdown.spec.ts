@@ -129,6 +129,44 @@ describe("RecentSearchesFocusDropdown placement at the caret", () => {
     expect(px(panel()!.style.top)).toBe(109);
   });
 
+  const avoidedControl = (box: CaretBox) => {
+    const el = document.createElement("div");
+    el.setAttribute("data-recent-searches-avoid", "");
+    el.getBoundingClientRect = rectOf(box);
+    document.body.appendChild(el);
+  };
+
+  it("slides right of a control it must not cover, such as the stream picker", async () => {
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(430);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(270);
+    avoidedControl({ left: 100, top: 135, right: 344, bottom: 170 });
+    mountDropdown(editorWithCaret(FIRST_LINE_CARET).anchor);
+    window.dispatchEvent(new Event("resize"));
+    await nextTick();
+    expect(px(panel()!.style.left)).toBe(344 + 8);
+    expect(px(panel()!.style.top)).toBe(FIRST_LINE_CARET.bottom);
+  });
+
+  it("stays at the caret when sliding clear of the control would leave the screen", async () => {
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(430);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(270);
+    avoidedControl({ left: 100, top: 135, right: 1200, bottom: 170 });
+    mountDropdown(editorWithCaret(FIRST_LINE_CARET).anchor);
+    window.dispatchEvent(new Event("resize"));
+    await nextTick();
+    expect(px(panel()!.style.left)).toBe(FIRST_LINE_CARET.left);
+  });
+
+  it("ignores a control the panel does not reach", async () => {
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(430);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(100);
+    avoidedControl({ left: 100, top: 600, right: 344, bottom: 640 });
+    mountDropdown(editorWithCaret(FIRST_LINE_CARET).anchor);
+    window.dispatchEvent(new Event("resize"));
+    await nextTick();
+    expect(px(panel()!.style.left)).toBe(FIRST_LINE_CARET.left);
+  });
+
   it("flips above the caret line only when there is no room below, never covering it", () => {
     const caret = { left: 200, top: 800, right: 202, bottom: 818 };
     mountDropdown(editorWithCaret(caret).anchor);

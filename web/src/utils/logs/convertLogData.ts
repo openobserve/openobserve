@@ -71,10 +71,9 @@ export const convertLogData = (
         },
       },
       splitNumber: 3,
+      minInterval: 1,
       axisLabel: {
-        formatter: function (value: any) {
-          return formatUnitValue(getUnitValue(value, "numbers", "", 2));
-        },
+        formatter: formatCountAxisLabel,
       },
     },
     toolbox: {
@@ -188,6 +187,9 @@ export const formatCount = (value: number): string => {
   if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
   return String(value);
 };
+
+export const formatCountAxisLabel = (value: number): string =>
+  Math.abs(value) < 1_000 ? String(value) : formatUnitValue(getUnitValue(value, "numbers", "", 2));
 
 // The applied theme writes the accent on <body> in dark mode and on <html> in light mode.
 const getThemeAccentColor = (isDarkMode: boolean): string => {
@@ -313,8 +315,9 @@ export const convertStackedLogData = (
         axisLine: { show: true },
         axisPointer: { label: { precision: 0 } },
         splitNumber: 3,
+        minInterval: 1,
         axisLabel: {
-          formatter: (value: number) => formatUnitValue(getUnitValue(value, "numbers", "", 2)),
+          formatter: formatCountAxisLabel,
         },
       },
       toolbox: {

@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { defineAsyncComponent, ref, computed, onMounted, watch } from "vue";
+import analytics from "@/services/product_analytics";
 import { useRoute, useRouter } from "vue-router";
 import type { AcceptableValue } from "reka-ui";
 import { useI18nTyped } from "@/types/i18n";
@@ -281,6 +282,7 @@ const layoutOptions = computed(() =>
 function onVizTypeChange(value: boolean | AcceptableValue | AcceptableValue[]) {
   if (value !== "tree" && value !== "graph") return;
   vizType.value = value;
+  analytics.track("llm_agent_graph_view_changed", { view: value });
   localStorage.setItem("agentGraph_visualizationType", value);
   // Mirror the SearchBar toolbar: each view has a sensible default layout.
   const nextLayout = value === "tree" ? "horizontal" : "force";

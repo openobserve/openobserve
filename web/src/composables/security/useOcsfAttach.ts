@@ -3,6 +3,7 @@
 import { ref } from "vue";
 
 import ocsfPacks, { type OcsfPack } from "@/services/ocsfPacks";
+import analytics from "@/services/product_analytics";
 import {
   consistencyState,
   entityFunctionName,
@@ -288,6 +289,11 @@ export async function attach(
     included,
   };
   await ocsfPacks.saveSetting(org, stream, setting);
+  analytics.track("security_source_pack_attached", {
+    source_type: pack.source_type,
+    kind: pack.kind,
+    pipeline_created: pipelineCreated,
+  });
   return { pipeline_id: setting.pipeline_id, pipeline_created: pipelineCreated, setting };
 }
 
@@ -328,6 +334,10 @@ export async function detach(
     };
     await ocsfPacks.saveSetting(org, stream, cleared);
   }
+  analytics.track("security_source_pack_detached", {
+    source_type: setting.source_type,
+    pipeline_skipped: pipelineSkipped,
+  });
 
   try {
     // The setting carries no pack kind, and the name must be derived exactly as attach did.

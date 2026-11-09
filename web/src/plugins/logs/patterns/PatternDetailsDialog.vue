@@ -398,6 +398,7 @@ import {
 } from "@/composables/useLogs/useTemplateTokenizer";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
+import analytics from "@/services/product_analytics";
 import { extractStatusFromTemplate } from "@/utils/logs/statusParser";
 import { compactCount } from "./patternUtils";
 import { PATTERN_VOLUME_CACHE, type PatternVolumeCache } from "./usePatternVolume";
@@ -460,6 +461,7 @@ const onExclude = () => {
 };
 const onCreateAlert = () => {
   if (!props.selectedPattern || alertsLocked.value) return;
+  analytics.track("log_patterns_alert_started");
   emit("create-alert", props.selectedPattern.pattern);
   emit("update:modelValue", false);
 };

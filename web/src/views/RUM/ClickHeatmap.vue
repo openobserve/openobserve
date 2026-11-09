@@ -694,6 +694,7 @@ import {
   type DeviceClass,
 } from "@/utils/rum/clickHeatmapQueries";
 import { rowScope, type AnalyticsScope } from "@/utils/rum/productAnalyticsQueries";
+import analytics from "@/services/product_analytics";
 
 interface ElementRow {
   selector: string;
@@ -1790,6 +1791,7 @@ function onDeviceChange(value: unknown) {
   syncHeatmapUrl();
   clearElementFilters();
   loadPage(false);
+  analytics.track("rum_heatmap_device_changed", { device: value });
 }
 
 function onPagePick(url: string) {
@@ -1799,6 +1801,7 @@ function onPagePick(url: string) {
   syncHeatmapUrl();
   clearElementFilters();
   loadPage();
+  analytics.track("rum_heatmap_page_selected");
 }
 
 function stopPageSearch() {
@@ -1993,6 +1996,7 @@ function rowTitle(row: ElementRow): string {
 
 function onModeChange(value: unknown) {
   if (value !== "heat" && value !== "markers" && value !== "both") return;
+  if (value !== viewMode.value) analytics.track("rum_heatmap_mode_changed", { mode: value });
   viewMode.value = value;
 }
 
