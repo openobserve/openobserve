@@ -23,7 +23,7 @@ use flight::profile::{NodeReport, NodeStatus};
 use parking_lot::Mutex;
 use tokio::sync::watch;
 
-/// How long a node keeps a finished run's report for its caller to fetch.
+/// The shortest a node keeps a finished run's report for its caller to fetch.
 const REPORT_TTL: Duration = Duration::from_secs(60);
 
 pub(super) static REPORTS: LazyLock<ReportRegistry> =
@@ -46,8 +46,13 @@ impl ReportRegistry {
         }
     }
 
-    /// Returns the slot a run reports into; the entry lives until fetched or `ttl` after the run.
+    #[cfg(test)]
     pub(super) fn open(&self, key: &str) -> ReportSlot {
+        self.open_for(key, Duration::ZERO)
+    }
+
+    /// The slot a run reports into, kept until fetched or the longer of `ttl` and `keep` after it.
+    pub(super) fn open_for(&self, key: &str, keep: Duration) -> ReportSlot {
         let report = Arc::new(watch::channel(None).0);
         self.entries
             .lock()
@@ -55,7 +60,7 @@ impl ReportRegistry {
         ReportSlot {
             entries: Arc::clone(&self.entries),
             key: key.to_string(),
-            ttl: self.ttl,
+            ttl: keep.max(self.ttl),
             report: Some(report),
         }
     }
@@ -147,5 +152,10 @@ mod tests {
         assert!(registry.fetch("done").await.is_none());
         running.complete(report(NodeStatus::Completed));
         assert!(registry.fetch("running").await.is_some());
+        registry
+            .open_for("slow-caller", ttl * 100)
+            .complete(report(NodeStatus::Completed));
+        tokio::time::sleep(ttl * 3).await;
+        assert!(registry.fetch("slow-caller").await.is_some());
     }
 }

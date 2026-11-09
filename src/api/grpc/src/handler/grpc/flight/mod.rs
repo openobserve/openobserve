@@ -184,10 +184,10 @@ impl FlightService for FlightServiceImpl {
             Status::internal(e.to_string())
         })?;
         // Opened only once the call returns a stream, which is when its caller expects a report.
-        let report = req
-            .search_info
-            .is_analyze
-            .then(|| RunReport::new(REPORTS.open(&trace_id), report_plan));
+        let report = req.search_info.is_analyze.then(|| {
+            let slot = REPORTS.open_for(&trace_id, std::time::Duration::from_secs(timeout));
+            RunReport::new(slot, report_plan)
+        });
 
         let mut stream = FlightEncoderStreamBuilder::new(session_guard, node_messages)
             .with_trace_id(trace_id.to_string())
