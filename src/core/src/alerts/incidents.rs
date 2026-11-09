@@ -1787,6 +1787,40 @@ impl Correlation {
     }
 }
 
+fn candidate_can_join(stored: &serde_json::Value, incoming: &HashMap<String, String>) -> bool {
+    use config::meta::alerts::incidents::DimensionRelationship;
+
+    let dimensions = serde_json::from_value(stored.clone()).unwrap_or_default();
+    matches!(
+        DimensionRelationship::check(&dimensions, incoming),
+        DimensionRelationship::Equal
+            | DimensionRelationship::NewIsSubset
+            | DimensionRelationship::NewIsSuperset
+    )
+}
+
+async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    incoming: &HashMap<String, String>,
+    candidates: Vec<infra::table::alert_incidents::CorrelationCandidate>,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, infra::errors::Error> {
+    for candidate in candidates {
+        if !candidate_can_join(&candidate.group_values, incoming) {
+            continue;
+        }
+        let Some(incident) =
+            infra::table::alert_incidents::get_with(client, org_id, &candidate.id).await?
+        else {
+            continue;
+        };
+        if incident.status != "resolved" && candidate_can_join(&incident.group_values, incoming) {
+            return Ok(Some(incident));
+        }
+    }
+    Ok(None)
+}
+
 /// Find an existing open incident or create a new one
 #[allow(clippy::too_many_arguments)]
 async fn find_or_create_incident(
@@ -1896,33 +1930,26 @@ async fn find_or_create_incident(
         }
     }
 
-    // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
+    // STEP 2: Venn diagram match against open incidents (for Primary/Secondary key types)
     //
-    // Load all open incidents and check for dimension compatibility.
     // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
     // PartialOverlap or Incompatible → skip (create new incident).
     if key_type != KeyType::AlertId {
-        let open_incidents =
-            infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
-
-        for existing in open_incidents {
+        let candidates = infra::table::alert_incidents::find_correlation_candidates(org_id).await?;
+        if let Some(existing) = select_correlation_candidate(
+            infra::db::get_orm_client_ro().await,
+            org_id,
+            group_values,
+            candidates,
+        )
+        .await?
+        {
             let existing_key_type = KeyType::from_stored(&existing.key_type);
 
             let existing_dims: HashMap<String, String> =
                 serde_json::from_value(existing.group_values.clone()).unwrap_or_default();
 
             let relationship = DimensionRelationship::check(&existing_dims, group_values);
-
-            let join_incident = matches!(
-                relationship,
-                DimensionRelationship::Equal
-                    | DimensionRelationship::NewIsSubset
-                    | DimensionRelationship::NewIsSuperset
-            );
-
-            if !join_incident {
-                continue;
-            }
 
             let mut merged_dims = existing_dims.clone();
             let dimensions_changed = merge_dimensions(&mut merged_dims, group_values, &existing.id);
@@ -3582,6 +3609,182 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn correlation_db() -> sea_orm::DatabaseConnection {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(alert_incidents::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        db
+    }
+
+    async fn store_correlation_incident(
+        db: &sea_orm::DatabaseConnection,
+        id: &str,
+        created_at: i64,
+        group_values: serde_json::Value,
+    ) -> infra::table::entity::alert_incidents::Model {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::ActiveModelTrait;
+
+        let mut row = incident(None);
+        row.id = id.to_string();
+        row.created_at = created_at;
+        row.group_values = group_values;
+        let active: alert_incidents::ActiveModel = row.into();
+        active.reset_all().insert(db).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_preserves_matching_and_legacy_fallbacks() {
+        use sea_orm::ConnectionTrait;
+
+        let incoming = HashMap::from([
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "a".to_string()),
+        ]);
+        let cases = [
+            Some(serde_json::json!({"ns": "prod", "cluster": "a"})),
+            Some(serde_json::json!({"ns": "prod"})),
+            Some(serde_json::json!({"ns": "prod", "cluster": "a", "pod": "p1"})),
+            Some(serde_json::json!({})),
+            Some(serde_json::json!({"ns": 1})),
+            Some(serde_json::Value::Null),
+            Some(serde_json::json!(["legacy"])),
+            None,
+        ];
+        for dimensions in cases {
+            let db = correlation_db().await;
+            if let Some(dimensions) = &dimensions {
+                store_correlation_incident(&db, "older", 1, dimensions.clone()).await;
+                store_correlation_incident(&db, "selected", 2, dimensions.clone()).await;
+            }
+            store_correlation_incident(&db, "conflicting", 3, serde_json::json!({"ns": "dev"}))
+                .await;
+            store_correlation_incident(
+                &db,
+                "partial",
+                4,
+                serde_json::json!({"ns": "prod", "db": "redis"}),
+            )
+            .await;
+            db.execute_unprepared(
+                "UPDATE alert_incidents SET topology_context = 'invalid JSON' WHERE id IN ('conflicting', 'partial')",
+            )
+            .await
+            .unwrap();
+            let candidates =
+                infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                    .await
+                    .unwrap();
+            let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+                .await
+                .unwrap();
+            assert_eq!(
+                found.as_ref().map(|row| row.id.as_str()),
+                dimensions.as_ref().map(|_| "selected"),
+                "stored dimensions: {dimensions:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_continues_after_stale_projected_matches() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+
+        let same = serde_json::json!({"ns": "prod", "cluster": "a"});
+        let incoming = serde_json::from_value(same.clone()).unwrap();
+        let changes = [
+            None,
+            Some(("default", "resolved", same.clone())),
+            Some(("other", "open", same.clone())),
+            Some(("default", "open", serde_json::json!({"ns": "dev"}))),
+            Some((
+                "default",
+                "open",
+                serde_json::json!({"ns": "prod", "db": "redis"}),
+            )),
+        ];
+        for change in changes {
+            let db = correlation_db().await;
+            store_correlation_incident(&db, "older", 1, same.clone()).await;
+            let newest = store_correlation_incident(&db, "newest", 2, same.clone()).await;
+            let candidates =
+                infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                    .await
+                    .unwrap();
+            if let Some((org, status, dimensions)) = change {
+                let mut active: alert_incidents::ActiveModel = newest.into();
+                active.org_id = Set(org.to_string());
+                active.status = Set(status.to_string());
+                active.group_values = Set(dimensions);
+                active.update(&db).await.unwrap();
+            } else {
+                alert_incidents::Entity::delete_by_id("newest")
+                    .exec(&db)
+                    .await
+                    .unwrap();
+            }
+            let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(found.id, "older");
+        }
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_returns_current_compatible_dimensions() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, Set};
+
+        let db = correlation_db().await;
+        let original = serde_json::json!({"ns": "prod", "cluster": "a", "pod": "p1"});
+        let current = serde_json::json!({"ns": "prod"});
+        let row = store_correlation_incident(&db, "newest", 1, original).await;
+        let candidates =
+            infra::table::alert_incidents::find_correlation_candidates_with(&db, "default")
+                .await
+                .unwrap();
+        let mut active: alert_incidents::ActiveModel = row.into();
+        active.group_values = Set(current.clone());
+        active.update(&db).await.unwrap();
+        let incoming = HashMap::from([
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "a".to_string()),
+        ]);
+        let found = select_correlation_candidate(&db, "default", &incoming, candidates)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.group_values, current);
+    }
+
+    #[tokio::test]
+    async fn correlation_selection_propagates_selected_lookup_errors() {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let incoming = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let candidates = vec![infra::table::alert_incidents::CorrelationCandidate {
+            id: "selected".to_string(),
+            group_values: serde_json::json!({"ns": "prod"}),
+        }];
+        assert!(matches!(
+            select_correlation_candidate(&db, "default", &incoming, candidates).await,
+            Err(infra::errors::Error::DbError(
+                infra::errors::DbError::SeaORMError(_)
+            ))
+        ));
+        assert!(
+            select_correlation_candidate(&db, "default", &incoming, Vec::new())
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
 
     #[cfg(feature = "enterprise")]
     #[test]
