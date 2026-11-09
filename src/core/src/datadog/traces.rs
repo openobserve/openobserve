@@ -92,8 +92,12 @@ fn tracer_payload_to_resource_spans(
 ) -> Result<Vec<ResourceSpans>, DatadogError> {
     let base = tracer_resource(tracer, agent);
     // Downstream trace ingest merges the resource into every span.
-    let spans = tracer.chunks.iter().map(|c| c.spans.len()).sum::<usize>();
-    budget.charge(RECORD_BYTES + resource_bytes(&base), spans)?;
+    let spans = tracer.chunks.iter().flat_map(|c| &c.spans);
+    budget.charge(RECORD_BYTES + resource_bytes(&base), spans.clone().count())?;
+    let nested = spans
+        .map(|s| s.span_events.len() + s.span_links.len())
+        .sum();
+    budget.charge(RECORD_BYTES, nested)?;
     let mut by_service: BTreeMap<String, Vec<Span>> = BTreeMap::new();
     for chunk in &tracer.chunks {
         let own = chunk_tid(&chunk.spans).map(|(_, upper)| upper);
@@ -665,6 +669,23 @@ mod tests {
     #[test]
     fn test_many_empty_spans_past_the_size_budget_are_rejected() {
         let mut t = tracer("", "", vec![DdSpan::default(); 200_000]);
+        t.language_name = String::new();
+        let body = AgentPayload {
+            tracer_payloads: vec![t],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let err = agent_payload_to_otlp(&body).unwrap_err();
+        assert!(err.to_string().contains("size budget"), "{err}");
+    }
+
+    #[test]
+    fn test_many_empty_span_events_past_the_size_budget_are_rejected() {
+        let span = DdSpan {
+            span_events: vec![SpanEvent::default(); 200_000],
+            ..Default::default()
+        };
+        let mut t = tracer("", "", vec![span]);
         t.language_name = String::new();
         let body = AgentPayload {
             tracer_payloads: vec![t],
