@@ -195,12 +195,9 @@ impl Sql {
             )));
         }
 
-        let pin_time = histogram::pin_reference_time(query.end_time);
         let mut timezone = query.timezone.clone();
-        histogram::pin_request_timezone(&mut timezone, pin_time);
         let histogram_offset =
-            histogram::pin_statement_timezones(&mut statement, timezone.as_deref(), pin_time)?
-                .offset;
+            histogram::pin_statement(&mut statement, &mut timezone, query.end_time)?.offset;
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits

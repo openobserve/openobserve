@@ -188,7 +188,7 @@ pub async fn process_search_stream_request(
         .sql
         .contains(config::utils::query_select_utils::O2_CUSTOM_SUFFIX);
     let needs_histogram = req.query.histogram_interval == 0
-        && req.query.sql.to_ascii_lowercase().contains("histogram");
+        && crate::sql::histogram::mentions_histogram(&req.query.sql);
 
     if has_custom_patterns || needs_histogram {
         match config::utils::query_select_utils::parse_and_replace_o2_custom_patterns(

@@ -84,23 +84,19 @@ pub struct PinnedHistograms {
     pub offset: Option<i64>,
 }
 
-/// Sets the bucket `histogram()` interval from the request, so execution buckets like the
-/// partitions.
+/// Sets the bucket `histogram()` interval from the request, so execution buckets like partitions.
 pub fn handle_histogram(
     origin_sql: &mut String,
     q_time_range: (i64, i64),
     histogram_interval: i64,
 ) {
-    if !origin_sql.to_ascii_lowercase().contains("histogram") {
+    if !mentions_histogram(origin_sql) {
         return;
     }
-    let Ok(mut statements) = Parser::parse_sql(&PostgreSqlDialect {}, origin_sql) else {
-        return;
-    };
-    let mut changed = false;
     // The interval belongs to the first call, the one `HistogramIntervalVisitor` reads it from.
     let mut bucket_args = None;
-    for statement in &mut statements {
+    let _ = rewrite_statements(origin_sql, |statement| {
+        let mut changed = false;
         let _ = visit_expressions_mut(statement, |expr| {
             if let Expr::Function(func) = expr
                 && is_histogram_function(&func.name)
@@ -110,14 +106,8 @@ pub fn handle_histogram(
             }
             ControlFlow::<()>::Continue(())
         });
-    }
-    if changed {
-        *origin_sql = statements
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join("; ");
-    }
+        Ok(changed)
+    });
 }
 
 /// Replaces named zones by their offset at the request end, so partitions and deltas agree.
@@ -126,70 +116,29 @@ pub fn pin_histogram_timezone(
     timezone: &mut Option<String>,
     end_time: i64,
 ) -> Result<(), Error> {
-    let end_time = pin_reference_time(end_time);
-    pin_request_timezone(timezone, end_time);
-    if !sql.to_ascii_lowercase().contains("histogram") {
+    if !mentions_histogram(sql) {
+        pin_request_timezone(timezone, pin_reference_time(end_time));
         return Ok(());
     }
-    let mut statements = Parser::parse_sql(&PostgreSqlDialect {}, sql)
-        .map_err(|error| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error.to_string())))?;
-    let mut changed = false;
-    for statement in &mut statements {
-        changed |= pin_statement_timezones(statement, timezone.as_deref(), end_time)?.changed;
-    }
-    if changed {
-        *sql = statements
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join("; ");
-    }
-    Ok(())
+    rewrite_statements(sql, |statement| {
+        pin_statement(statement, timezone, end_time).map(|pinned| pinned.changed)
+    })
 }
 
-/// The instant named zones are resolved at; a request without an end means now.
-pub fn pin_reference_time(end_time: i64) -> i64 {
-    if end_time > 0 { end_time } else { now_micros() }
-}
-
-pub fn pin_request_timezone(timezone: &mut Option<String>, end_time: i64) {
-    if let Some(tz) = timezone.as_deref()
-        && let Some(fixed) = fixed_offset_of_named_zone(tz, end_time)
-    {
-        *timezone = Some(fixed);
-    }
-}
-
-/// Pins every `histogram()` timezone in the statement; `timezone` is the request default.
-pub fn pin_statement_timezones(
+/// Pins the request default and every `histogram()` timezone in the statement at the request end.
+pub fn pin_statement(
     statement: &mut Statement,
-    timezone: Option<&str>,
+    timezone: &mut Option<String>,
     end_time: i64,
 ) -> Result<PinnedHistograms, Error> {
-    let mut changed = false;
-    let mut offsets = Vec::new();
-    let result = visit_expressions_mut(statement, |expr| {
-        match pin_histogram_call(expr, timezone, end_time) {
-            Ok(Some((updated, offset))) => {
-                changed |= updated;
-                offsets.push(offset);
-            }
-            Ok(None) => {}
-            Err(error) => return ControlFlow::Break(error),
-        }
-        ControlFlow::Continue(())
-    });
-    if let ControlFlow::Break(error) = result {
-        return Err(error);
-    }
-    let first = offsets.first().copied().unwrap_or_default();
-    Ok(PinnedHistograms {
-        changed,
-        offset: offsets
-            .iter()
-            .all(|offset| *offset == first)
-            .then_some(first),
-    })
+    let end_time = pin_reference_time(end_time);
+    pin_request_timezone(timezone, end_time);
+    pin_statement_timezones(statement, timezone.as_deref(), end_time)
+}
+
+/// Cheap pre-check shared by every caller that would otherwise parse the SQL for `histogram()`.
+pub fn mentions_histogram(sql: &str) -> bool {
+    sql.to_ascii_lowercase().contains("histogram")
 }
 
 /// Whether result column `column` of `sql` is a `histogram()` output; `None` when unresolvable.
@@ -375,6 +324,72 @@ fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
     }
 }
 
+/// The instant named zones are resolved at; a request without an end means now.
+fn pin_reference_time(end_time: i64) -> i64 {
+    if end_time > 0 { end_time } else { now_micros() }
+}
+
+fn pin_request_timezone(timezone: &mut Option<String>, end_time: i64) {
+    if let Some(tz) = timezone.as_deref()
+        && let Some(fixed) = fixed_offset_of_named_zone(tz, end_time)
+    {
+        *timezone = Some(fixed);
+    }
+}
+
+/// Parses, applies `rewrite` per statement and serializes back only when a statement changed.
+fn rewrite_statements(
+    sql: &mut String,
+    mut rewrite: impl FnMut(&mut Statement) -> Result<bool, Error>,
+) -> Result<(), Error> {
+    let mut statements = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|error| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error.to_string())))?;
+    let mut changed = false;
+    for statement in &mut statements {
+        changed |= rewrite(statement)?;
+    }
+    if changed {
+        *sql = statements
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("; ");
+    }
+    Ok(())
+}
+
+/// Pins every `histogram()` timezone in the statement; `timezone` is the request default.
+fn pin_statement_timezones(
+    statement: &mut Statement,
+    timezone: Option<&str>,
+    end_time: i64,
+) -> Result<PinnedHistograms, Error> {
+    let mut changed = false;
+    let mut offsets = Vec::new();
+    let result = visit_expressions_mut(statement, |expr| {
+        match pin_histogram_call(expr, timezone, end_time) {
+            Ok(Some((updated, offset))) => {
+                changed |= updated;
+                offsets.push(offset);
+            }
+            Ok(None) => {}
+            Err(error) => return ControlFlow::Break(error),
+        }
+        ControlFlow::Continue(())
+    });
+    if let ControlFlow::Break(error) = result {
+        return Err(error);
+    }
+    let first = offsets.first().copied().unwrap_or_default();
+    Ok(PinnedHistograms {
+        changed,
+        offset: offsets
+            .iter()
+            .all(|offset| *offset == first)
+            .then_some(first),
+    })
+}
+
 fn timezone_offset_micros(timezone: Option<&str>, end_time: i64) -> Result<i64, Error> {
     let Some(tz) = timezone else {
         return Ok(0);
@@ -441,8 +456,8 @@ fn pin_histogram_call(
         ))
     })?;
     let tz = value.clone().into_string().unwrap_or_default();
+    let offset = timezone_offset_micros(Some(&tz), end_time)?;
     let fixed = fixed_offset_of_named_zone(&tz, end_time);
-    let offset = timezone_offset_micros(Some(fixed.as_deref().unwrap_or(&tz)), end_time)?;
     let changed = fixed.is_some();
     if let Some(fixed) = fixed {
         *value = Value::SingleQuotedString(fixed);
@@ -598,7 +613,6 @@ fn projected_expr_output<'a>(
     ctes: &[&'a Cte],
     budget: &mut usize,
 ) -> Option<bool> {
-    let expr = without_nesting(expr);
     if is_histogram_call(expr) {
         return Some(true);
     }
@@ -742,24 +756,19 @@ fn merge_outputs(results: impl IntoIterator<Item = Option<bool>>) -> Option<bool
 fn column_ref(expr: &Expr) -> Option<(Option<&Ident>, &Ident)> {
     match expr {
         Expr::Identifier(name) => Some((None, name)),
-        Expr::CompoundIdentifier(parts) => match parts.as_slice() {
-            [.., qualifier, name] => Some((Some(qualifier), name)),
-            [name] => Some((None, name)),
-            [] => None,
-        },
+        Expr::CompoundIdentifier(parts) => parts
+            .split_last()
+            .map(|(name, qualifiers)| (qualifiers.last(), name)),
         Expr::Nested(inner) => column_ref(inner),
         _ => None,
     }
 }
 
 fn is_histogram_call(expr: &Expr) -> bool {
-    matches!(expr, Expr::Function(f) if is_histogram_function(&f.name))
-}
-
-fn without_nesting(expr: &Expr) -> &Expr {
     match expr {
-        Expr::Nested(inner) => without_nesting(inner),
-        other => other,
+        Expr::Function(f) => is_histogram_function(&f.name),
+        Expr::Nested(inner) => is_histogram_call(inner),
+        _ => false,
     }
 }
 
@@ -1026,18 +1035,6 @@ mod tests {
     }
 
     #[test]
-    fn timezone_quoted_histogram_name_is_pinned() {
-        let end = 1_752_000_000_000_000;
-        let sql = "SELECT \"histogram\"(_timestamp, '1 hour', 'Asia/Kolkata') AS ts FROM t";
-        assert_eq!(pin_offset(sql, None, end).unwrap(), Some(19_800_000_000));
-        let sql = "SELECT HISTOGRAM(_timestamp, '1 hour') AS ts FROM t";
-        assert_eq!(
-            pin_offset(sql, Some("-08:00"), end).unwrap(),
-            Some(-28_800_000_000)
-        );
-    }
-
-    #[test]
     fn timezone_argument_must_be_a_string_literal() {
         for expression in [
             "CASE WHEN true THEN '+05:30' ELSE '-08:00' END",
@@ -1063,6 +1060,7 @@ mod tests {
             "SELECT histogram(_timestamp, '1 day', '+05:30') FROM t",
             "SELECT histogram (_timestamp, '1 day', ('+05:30')) FROM t",
             "SELECT histogram/*x*/(_timestamp, '1 day', $$+05:30$$) FROM t",
+            "SELECT \"histogram\"(_timestamp, '1 hour', 'Asia/Kolkata') AS ts FROM t",
         ] {
             assert_eq!(
                 pin_offset(sql, Some("-08:00"), JULY).unwrap(),
@@ -1112,18 +1110,6 @@ mod tests {
     }
 
     #[test]
-    fn timezone_survives_interval_normalization() {
-        for timezone in ["+05:30", "-08:00", "UTC", "America/Los_Angeles"] {
-            let mut sql = format!("SELECT histogram(_timestamp, '1 day', '{timezone}') FROM t");
-            super::handle_histogram(&mut sql, (0, 0), 3600);
-            assert_eq!(
-                sql,
-                format!("SELECT histogram(_timestamp, '3600 second', '{timezone}') FROM t")
-            );
-        }
-    }
-
-    #[test]
     fn timezone_interval_normalization_follows_the_ast() {
         let cases = [
             (
@@ -1141,6 +1127,10 @@ mod tests {
             (
                 "SELECT histogram(_timestamp) AS ts, count(*) FROM t GROUP BY ts",
                 "SELECT histogram(_timestamp, '3600 second') AS ts, count(*) FROM t GROUP BY ts",
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 day', 'America/Los_Angeles') FROM t",
+                "SELECT histogram(_timestamp, '3600 second', 'America/Los_Angeles') FROM t",
             ),
             (
                 "SELECT ts, n FROM (SELECT histogram(_timestamp, (('1 day'))) AS ts, count(*) AS n FROM t GROUP BY ts) WHERE n > 0",

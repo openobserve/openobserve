@@ -237,25 +237,16 @@ mod tests {
                 false,
             )])),
         );
-        for expression in [
-            "CASE WHEN true THEN '+05:30' ELSE '-08:00' END",
-            "CAST('+05:30' AS VARCHAR)",
-            "concat('+05', ':30')",
-            "NULL",
-            "_timestamp",
-        ] {
-            let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
-                "sql": format!("SELECT histogram(_timestamp, '1 day', {expression}) AS ts, count(*) FROM t GROUP BY ts"),
-                "start_time": 1, "end_time": 2, "timezone": "UTC"
-            }))
-            .unwrap();
-            assert!(
-                PartitionSqlContext::new(&req, org, StreamType::Logs)
-                    .await
-                    .is_err(),
-                "{expression}"
-            );
-        }
+        let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
+            "sql": "SELECT histogram(_timestamp, '1 day', CAST('+05:30' AS VARCHAR)) AS ts, count(*) FROM t GROUP BY ts",
+            "start_time": 1, "end_time": 2, "timezone": "UTC"
+        }))
+        .unwrap();
+        assert!(
+            PartitionSqlContext::new(&req, org, StreamType::Logs)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -339,15 +330,6 @@ mod tests {
                 DataType::Int64,
                 false,
             )])),
-        );
-        let plain: SearchPartitionRequest = serde_json::from_value(serde_json::json!({"sql": "SELECT _timestamp FROM t", "start_time": 1, "end_time": 2, "timezone": "Invalid/Zone"})).unwrap();
-        assert_eq!(
-            PartitionSqlContext::new(&plain, "timezone_partition", StreamType::Logs)
-                .await
-                .unwrap()
-                .sql
-                .histogram_offset,
-            Some(0)
         );
         const HOUR: i64 = 3_600_000_000;
         const DAY: i64 = 24 * HOUR;

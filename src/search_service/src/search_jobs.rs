@@ -196,7 +196,7 @@ where
 // 2. write to database
 async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
     let stream_type = StreamType::from(job.stream_type.as_str());
-    let req = job_request(&job)?;
+    let req = job_request(job)?;
     let partition_req = SearchPartitionRequest::from(&req);
     let res = grpc_search_partition(
         &job.trace_id,

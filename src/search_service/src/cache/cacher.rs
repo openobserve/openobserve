@@ -130,7 +130,7 @@ pub async fn check_cache(
     sql: &Sql,
     result_ts_col: &str,
     is_descending: bool,
-    ts_offset: Option<i64>,
+    ts_offset: i64,
     should_exec_query: &mut bool,
 ) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
@@ -164,10 +164,6 @@ pub async fn check_cache(
         };
     }
 
-    // Note: Both result_ts_col refinement and SQL modification (adding _timestamp to SELECT)
-    // are now done in prepare_cache_response() before calling this function.
-    // just use the refined result_ts_col that was passed in.
-
     // Check ts_col again, if it is still empty, return default
     if result_ts_col.is_empty() {
         return MultiCachedQueryResponse {
@@ -178,22 +174,10 @@ pub async fn check_cache(
 
     let mut histogram_interval = -1;
     if is_aggregate && let Some(interval) = sql.histogram_interval {
-        // Note: handle_histogram is now called in prepare_cache_response() before hash computation
-        // to ensure consistent hashing. We just need to update req.query.sql with the normalized
-        // SQL.
+        // The query must run the SQL prepare_cache_response normalized and hashed.
         req.query.sql = origin_sql.to_owned();
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
-
-    let Some(ts_offset) = ts_offset else {
-        return MultiCachedQueryResponse {
-            order_by: order_by.clone(),
-            ..Default::default()
-        };
-    };
-
-    // Note: is_descending refinement for histogram queries is now done in prepare_cache_response()
-    // before calling this function, so we use the pre-refined value directly
 
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
@@ -1684,7 +1668,7 @@ mod tests {
             &sql,
             &result_ts_col,
             is_descending,
-            Some(0),
+            0,
             &mut should_exec_query,
         )
         .await;

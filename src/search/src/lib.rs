@@ -60,7 +60,6 @@ pub struct CacheQueryRequest {
     pub is_aggregate: bool,
     pub ts_column: String,
     pub histogram_interval: i64,
-    #[serde(default)]
     pub ts_offset: i64,
     pub is_descending: bool,
     /// Flag indicating this is a histogram query with non-timestamp column ORDER BY.
@@ -81,7 +80,6 @@ pub struct MultiCachedQueryResponse {
     pub limit: i64,
     pub took: usize,
     pub histogram_interval: i64,
-    #[serde(default)]
     pub ts_offset: i64,
     pub total_cache_duration: usize,
     pub is_aggregate: bool,

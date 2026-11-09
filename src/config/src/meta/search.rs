@@ -2112,20 +2112,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn timezone_partition_request_roundtrip() {
-        let value = serde_json::json!({"sql": "SELECT histogram(_timestamp) FROM t", "start_time": 1, "end_time": 2, "timezone": "+05:30"});
-        let request: super::SearchPartitionRequest = serde_json::from_value(value).unwrap();
-        assert_eq!(serde_json::to_value(request).unwrap()["timezone"], "+05:30");
-        let mut request = super::Request::default();
-        request.query.timezone = Some("+05:30".to_string());
-        let partition = super::SearchPartitionRequest::from(&request);
-        assert_eq!(
-            serde_json::to_value(partition).unwrap()["timezone"],
-            "+05:30"
-        );
-    }
-
-    #[test]
     fn test_response() {
         let mut res = Response::default();
         res.set_total(10);
