@@ -83,10 +83,9 @@ impl AggregateTopkExec {
         input: &Arc<dyn ExecutionPlan>,
         n_partitions: usize,
     ) -> Arc<PlanProperties> {
-        // A sort planned above may rely on a constant group key, and this node only drops rows
+        // Each partition only drops rows and re-sorts, so a sort above may rely on its constants
         let mut eq_properties = input.equivalence_properties().clone();
         eq_properties.clear_orderings();
-        eq_properties.clear_per_partition_constants();
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
         Arc::new(PlanProperties::new(
             eq_properties,
