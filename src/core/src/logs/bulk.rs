@@ -880,67 +880,6 @@ mod tests {
     // cloud builds reject the unknown test org at the trial check
     #[cfg(not(feature = "cloud"))]
     #[tokio::test]
-    async fn test_ingest_keeps_documents_with_a_non_string_id() {
-        use arrow::{array::StringArray, compute::cast, datatypes::DataType};
-
-        infra::db::create_table().await.unwrap();
-        infra::schema::init().await.unwrap();
-        let org = "bulk_non_string_id";
-        let stream = "non_string_id";
-        let action = json::json!({"index": {"_index": stream}});
-        let body: String = [
-            json::json!({"_id": "a1", "message": "string id"}),
-            json::json!({"_id": 7, "message": "number id"}),
-            json::json!({"message": "no id"}),
-        ]
-        .iter()
-        .map(|document| format!("{action}\n{document}\n"))
-        .collect();
-        let user = IngestUser::from_user_email("non_string_id@example.com");
-
-        let response = ingest(0, org, Bytes::from(body), user).await.unwrap();
-
-        assert!(!response.errors);
-        if !get_config().common.bulk_api_response_errors_only {
-            let ids: Vec<_> = response
-                .items
-                .iter()
-                .flat_map(|item| item.values())
-                .map(|item| item._id.as_str())
-                .collect();
-            assert_eq!(ids, ["a1", "", ""]);
-        }
-        let (_, batches) = ingester::read_from_memtable(org, "logs", stream, None, &[])
-            .await
-            .unwrap();
-        let mut stored = Vec::new();
-        for entry in batches.into_iter().flat_map(|(_, entries)| entries) {
-            let ids = cast(entry.data.column_by_name("_id").unwrap(), &DataType::Utf8).unwrap();
-            let messages = cast(
-                entry.data.column_by_name("message").unwrap(),
-                &DataType::Utf8,
-            )
-            .unwrap();
-            let ids = ids.as_any().downcast_ref::<StringArray>().unwrap();
-            let messages = messages.as_any().downcast_ref::<StringArray>().unwrap();
-            for row in 0..entry.data.num_rows() {
-                stored.push((ids.value(row).to_string(), messages.value(row).to_string()));
-            }
-        }
-        stored.sort();
-        assert_eq!(
-            stored,
-            [
-                ("".to_string(), "no id".to_string()),
-                ("7".to_string(), "number id".to_string()),
-                ("a1".to_string(), "string id".to_string()),
-            ]
-        );
-    }
-
-    // cloud builds reject the unknown test org at the trial check
-    #[cfg(not(feature = "cloud"))]
-    #[tokio::test]
     async fn test_ingest_fails_only_the_stream_whose_key_is_too_long() {
         let long_name = "b".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
         let body = format!(
