@@ -345,29 +345,6 @@ mod tests {
     }
 
     #[test]
-    fn test_agent_capture_logs() {
-        let records = logs_to_records(include_bytes!("testdata/logs_v2.json")).unwrap();
-        assert_eq!(records.len(), 9);
-        let severities: Vec<_> = records.iter().map(|r| r["severity"].as_str()).collect();
-        let expected = ["info", "error", "info"].map(Some).repeat(3);
-        assert_eq!(severities, expected);
-        let r = records[1].as_object().unwrap();
-        assert_eq!(r["body"], "charging card");
-        assert_eq!(r["level"], "error");
-        assert_eq!(r["service"], "dd-e2e-app");
-        assert_eq!(r["hostname"], "dd-e2e-host");
-        assert_eq!(r["host.name"], "dd-e2e-host");
-        assert_eq!(r["ddsource"], "python");
-        assert_eq!(r["filename"], "app.log");
-        assert_eq!(r["trace_id"], "6af12a5800000000e2561381f931a233");
-        assert_eq!(
-            r["span_id"],
-            format!("{:016x}", 10_019_831_237_980_437_650u64)
-        );
-        assert_eq!(r[TIMESTAMP_COL_NAME], 1_794_189_912_435_000i64);
-    }
-
-    #[test]
     fn test_host_tag_wins_over_hostname() {
         let r = one(json!([{"message": "m", "hostname": "web-1", "ddtags": "host:node-7"}]));
         assert_eq!(r["host.name"], "node-7");

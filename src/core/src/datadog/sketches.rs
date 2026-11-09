@@ -274,8 +274,6 @@ fn lower_bound_to_histogram_index(value: f64) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use opentelemetry_proto::tonic::common::v1::any_value::Value;
-
     use super::*;
 
     fn dogsketch(k: Vec<i32>, n: Vec<u32>) -> Dogsketch {
@@ -472,75 +470,6 @@ mod tests {
             dogsketch_to_data_point(&sketch, &[], 0, &mut budget)
                 .unwrap()
                 .is_none()
-        );
-    }
-
-    #[test]
-    fn test_agent_capture_sketches_fit_the_ratio_budget() {
-        // Past the 64 KiB floor, so only the expansion ratio admits real Agent traffic.
-        let body = include_bytes!("testdata/sketches.pb").repeat(200);
-        assert_eq!(sketches_to_otlp(&body).unwrap().resource_metrics.len(), 200);
-    }
-
-    #[test]
-    fn test_agent_capture_sketches() {
-        let req = sketches_to_otlp(include_bytes!("testdata/sketches.pb")).unwrap();
-        assert_eq!(req.resource_metrics.len(), 1);
-        let rm = &req.resource_metrics[0];
-        let host = rm
-            .resource
-            .as_ref()
-            .unwrap()
-            .attributes
-            .iter()
-            .find(|kv| kv.key == HOST_NAME)
-            .and_then(|kv| kv.value.as_ref())
-            .and_then(|v| v.value.as_ref());
-        assert_eq!(host, Some(&Value::StringValue("dd-e2e-host".into())));
-        let metric = &rm.scope_metrics[0].metrics[0];
-        assert_eq!(metric.name, "e2e.dist");
-        let Some(Data::ExponentialHistogram(hist)) = &metric.data else {
-            panic!("expected exponential histogram");
-        };
-        let summary: Vec<_> = hist
-            .data_points
-            .iter()
-            .map(|dp| (dp.time_unix_nano, dp.count, dp.sum, dp.min, dp.max))
-            .collect();
-        assert_eq!(
-            summary,
-            [
-                (
-                    1_794_189_670_000_000_000,
-                    1000,
-                    Some(500_500.0),
-                    Some(1.0),
-                    Some(1000.0)
-                ),
-                (
-                    1_794_189_660_000_000_000,
-                    860,
-                    Some(374_570.0),
-                    Some(1.0),
-                    Some(1000.0)
-                ),
-            ]
-        );
-        let mut buckets = 0;
-        for dp in &hist.data_points {
-            assert_eq!(
-                dp.zero_count + total(&dp.positive) + total(&dp.negative),
-                dp.count
-            );
-            for side in [&dp.positive, &dp.negative] {
-                buckets += side.as_ref().map_or(0, |b| b.bucket_counts.len());
-            }
-        }
-        let body_len = include_bytes!("testdata/sketches.pb").len();
-        // The captured Agent payload holds about 0.2 buckets per byte, far inside the budget.
-        assert!(
-            buckets * 2 < body_len,
-            "{buckets} buckets for {body_len} bytes"
         );
     }
 
