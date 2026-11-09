@@ -347,19 +347,22 @@ mod tests {
     use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 
     use super::*;
-    use crate::datafusion::{
-        context::SearchContextBuilder,
-        datasource::empty_table::NewEmptyTable,
-        distributed::{
-            codec::get_physical_extension_codec, remote_scan::remote_scan_exec::RemoteScanExec,
+    use crate::{
+        datafusion::{
+            context::SearchContextBuilder,
+            datasource::empty_table::NewEmptyTable,
+            distributed::{
+                codec::get_physical_extension_codec, remote_scan::remote_scan_exec::RemoteScanExec,
+            },
+            optimizer::rewrite_histogram::RewriteHistogram,
+            physical_optimizer::{
+                context::{RemoteScanContext, StreamingAggregationContext},
+                remote_scan::RemoteScanRule,
+            },
+            physical_plan::streaming_aggs_exec::registry,
+            udf::time::histogram,
         },
-        optimizer::rewrite_histogram::RewriteHistogram,
-        physical_optimizer::{
-            context::{RemoteScanContext, StreamingAggregationContext},
-            remote_scan::RemoteScanRule,
-        },
-        physical_plan::streaming_aggs_exec::registry,
-        udf::time::histogram,
+        sql::visitor::streaming_aggregate::matches_streaming_aggregate_pattern,
     };
 
     const MINUTE_MICROS: i64 = 60_000_000;
@@ -887,26 +890,44 @@ mod tests {
     async fn test_every_rule_keeps_constants_for_shortened_sorts() {
         let queries = [
             // Values API query: the filter makes the group key constant and shortens the sort
-            "SELECT event_name AS zo_sql_key, COUNT(*) AS zo_sql_num FROM t \
-                WHERE event_name = '500' GROUP BY zo_sql_key \
-                ORDER BY zo_sql_num DESC, zo_sql_key ASC LIMIT 21",
-            "SELECT event_name, k8s_cluster, COUNT(*) AS c FROM t WHERE event_name = '500' \
-                GROUP BY event_name, k8s_cluster ORDER BY c DESC, event_name, k8s_cluster LIMIT 21",
+            (
+                "SELECT event_name AS zo_sql_key, COUNT(*) AS zo_sql_num FROM t \
+                    WHERE event_name = '500' GROUP BY zo_sql_key \
+                    ORDER BY zo_sql_num DESC, zo_sql_key ASC LIMIT 21",
+                true,
+            ),
+            (
+                "SELECT event_name, k8s_cluster, COUNT(*) AS c FROM t WHERE event_name = '500' \
+                    GROUP BY event_name, k8s_cluster \
+                    ORDER BY c DESC, event_name, k8s_cluster LIMIT 21",
+                true,
+            ),
             // Broadcast join: constant on the probe side
-            "SELECT a.k8s_cluster, a.value FROM t a WHERE a.k8s_cluster = 'x' AND a.k8s_cluster IN \
-                (SELECT k8s_cluster FROM t GROUP BY k8s_cluster ORDER BY count(*) DESC LIMIT 10) \
-                ORDER BY a.k8s_cluster, a.value DESC LIMIT 21",
+            (
+                "SELECT a.k8s_cluster, a.value FROM t a WHERE a.k8s_cluster = 'x' \
+                    AND a.k8s_cluster IN (SELECT k8s_cluster FROM t GROUP BY k8s_cluster \
+                    ORDER BY count(*) DESC LIMIT 10) \
+                    ORDER BY a.k8s_cluster, a.value DESC LIMIT 21",
+                false,
+            ),
             // Broadcast join: constant on the build side
-            "SELECT b.k, a.value FROM t a JOIN (SELECT k8s_cluster AS k, COUNT(*) AS c FROM t \
-                WHERE k8s_cluster = 'x' GROUP BY k8s_cluster ORDER BY c DESC LIMIT 10) b \
-                ON a.k8s_cluster = b.k ORDER BY b.k, a.value DESC LIMIT 21",
+            (
+                "SELECT b.k, a.value FROM t a JOIN (SELECT k8s_cluster AS k, COUNT(*) AS c FROM t \
+                    WHERE k8s_cluster = 'x' GROUP BY k8s_cluster ORDER BY c DESC LIMIT 10) b \
+                    ON a.k8s_cluster = b.k ORDER BY b.k, a.value DESC LIMIT 21",
+                false,
+            ),
         ];
         let check = SanityCheckPlan::new();
         let options = datafusion::config::ConfigOptions::default();
         let mut failures = vec![];
-        for sql in queries {
+        for (sql, streamable) in queries {
+            // Mirrors is_streaming_aggregate, so a plan production never builds is not tested
+            let gate = config::utils::sql::is_simple_aggregate_query(sql).unwrap()
+                || matches_streaming_aggregate_pattern(sql).unwrap();
+            assert_eq!(gate, streamable, "{sql}");
             for is_leader in [false, true] {
-                for streaming in [false, true] {
+                for streaming in [false, streamable] {
                     for use_index in [false, true] {
                         let plan = plan_with_every_rule(sql, is_leader, streaming, use_index)
                             .await
