@@ -33,7 +33,7 @@ use proto::datadog_agentpayload::{
 use serde::Deserialize;
 
 use super::{
-    DatadogError, ExpansionBudget, attributes_bytes, resource_bytes,
+    DatadogError, ExpansionBudget, RECORD_BYTES, attributes_bytes, resource_bytes,
     tags::{HOST_NAME, SplitTags, key_value, resource, string_kv, to_key_values},
 };
 
@@ -113,6 +113,7 @@ fn series_to_resource_metrics(
     series: MetricSeries,
     budget: &mut ExpansionBudget,
 ) -> Result<Option<ResourceMetrics>, DatadogError> {
+    budget.charge(RECORD_BYTES, 1)?;
     let metric_type = match MetricType::try_from(series.r#type) {
         Ok(MetricType::Gauge) => "gauge",
         Ok(MetricType::Count) => "count",
@@ -283,6 +284,16 @@ mod tests {
             5000
         ];
         let body = MetricPayload { series: vec![many] }.encode_to_vec();
+        let err = series_to_otlp(&body).unwrap_err();
+        assert!(err.to_string().contains("size budget"), "{err}");
+    }
+
+    #[test]
+    fn test_many_empty_series_past_the_size_budget_are_rejected() {
+        let body = MetricPayload {
+            series: vec![MetricSeries::default(); 200_000],
+        }
+        .encode_to_vec();
         let err = series_to_otlp(&body).unwrap_err();
         assert!(err.to_string().contains("size budget"), "{err}");
     }

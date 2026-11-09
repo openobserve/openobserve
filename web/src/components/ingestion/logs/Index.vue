@@ -225,6 +225,7 @@ export default defineComponent({
       "syslogNg",
       "splunkHec",
       "loongcollector",
+      "datadogAgentLogs",
     ];
 
     onBeforeMount(() => {

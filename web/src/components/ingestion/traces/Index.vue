@@ -112,7 +112,7 @@ export default defineComponent({
     );
 
     onMounted(() => {
-      const ingestRoutes = ["tracesOTLP"];
+      const ingestRoutes = ["tracesOTLP", "datadogAgentTraces"];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
           name: router.currentRoute.value.name,

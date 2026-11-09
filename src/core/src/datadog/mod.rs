@@ -35,6 +35,8 @@ const EXPANSION_FACTOR: usize = 32;
 const MIN_BUDGET_BODY: usize = 64 * 1024;
 /// Approximate in-memory size of one attribute entry besides its key and value text.
 const ENTRY_BYTES: usize = 64;
+/// Approximate in-memory size of one translated resource, metric or span besides its attributes.
+const RECORD_BYTES: usize = 256;
 
 /// A Datadog payload that cannot be decoded; the caller answers it with 400.
 #[derive(Debug, thiserror::Error)]

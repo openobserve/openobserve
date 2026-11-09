@@ -174,6 +174,7 @@ export default defineComponent({
         "otelCollector",
         "telegraf",
         "cloudwatchMetrics",
+        "datadogAgentMetrics",
       ];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({

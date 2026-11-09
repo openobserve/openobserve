@@ -32,7 +32,7 @@ use proto::datadog_agentpayload::{
 };
 
 use super::{
-    DatadogError, ExpansionBudget, attributes_bytes,
+    DatadogError, ExpansionBudget, RECORD_BYTES, attributes_bytes,
     metrics::{resource_metrics, seconds_to_nanos},
     resource_bytes,
     tags::{HOST_NAME, SplitTags, to_key_values},
@@ -110,6 +110,7 @@ fn sketch_to_resource_metrics(
     sketch: Sketch,
     budget: &mut ExpansionBudget,
 ) -> Result<ResourceMetrics, DatadogError> {
+    budget.charge(RECORD_BYTES, 1)?;
     let tags = SplitTags::from_tags(sketch.tags.iter().map(String::as_str));
     let mut resource_attrs = tags.resource;
     if !sketch.host.is_empty() {
@@ -518,7 +519,7 @@ mod tests {
         );
     }
 
-    // The per-key loop the table replaced, kept to prove the table changes no bucket count.
+    // Reference implementation that proves `KEY_SHARES` yields the same bucket counts.
     fn distribute_directly(key: i32, count: u64, side: &mut BTreeMap<i32, u64>) {
         let lower = sketch_lower_bound(key);
         let upper = sketch_lower_bound(key.abs() + 1);

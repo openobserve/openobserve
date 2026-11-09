@@ -36,7 +36,7 @@ use proto::datadog_trace::{
 };
 
 use super::{
-    DatadogError, ExpansionBudget, resource_bytes,
+    DatadogError, ExpansionBudget, RECORD_BYTES, resource_bytes,
     tags::{
         DEPLOYMENT_ENVIRONMENT_NAME, HOST_NAME, SERVICE_NAME, key_value, resource, resource_key,
         string_kv,
@@ -102,7 +102,7 @@ fn tracer_payload_to_resource_spans(
     }
     // Downstream trace ingest merges the resource into every span.
     let spans = tracer.chunks.iter().map(|c| c.spans.len()).sum::<usize>();
-    budget.charge(resource_bytes(&base), spans)?;
+    budget.charge(RECORD_BYTES + resource_bytes(&base), spans)?;
     Ok(by_service
         .into_iter()
         .map(|(service, spans)| {
@@ -653,6 +653,19 @@ mod tests {
         t.tags = (0..50)
             .map(|i| (format!("tag{i}"), "v".repeat(50)))
             .collect();
+        let body = AgentPayload {
+            tracer_payloads: vec![t],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let err = agent_payload_to_otlp(&body).unwrap_err();
+        assert!(err.to_string().contains("size budget"), "{err}");
+    }
+
+    #[test]
+    fn test_many_empty_spans_past_the_size_budget_are_rejected() {
+        let mut t = tracer("", "", vec![DdSpan::default(); 200_000]);
+        t.language_name = String::new();
         let body = AgentPayload {
             tracer_payloads: vec![t],
             ..Default::default()
