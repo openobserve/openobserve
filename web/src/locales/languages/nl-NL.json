@@ -7711,6 +7711,25 @@
       "tlsBody": "Het token is een bearer-credential die via plaintext HTTP opnieuw kan worden gebruikt, dus beëindig TLS bij {brand} ({setting}, standaard uitgeschakeld) of bij een vertrouwde proxy ervoor."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Verstuur logs, metrieken en traces van een bestaande {product} naar deze organisatie door de configuratie ervan te wijzigen. Je applicaties en tracers blijven ongewijzigd.",
+      "envTitle": "Agentconfiguratie",
+      "envBody": "Stel deze omgevingsvariabelen in op de {product} en herstart deze. Vereist {product} {version} of later.",
+      "tokenBody": "De API-sleutel moet een ingestietoken van de organisatie zijn, die begint met {prefix}. Deze organisatie heeft geen ingeschakelde ingestietoken, dus het fragment toont je passcode, die wordt geweigerd. Maak een ingestietoken aan en selecteer deze hier.",
+      "tokenLink": "Ingestietokens openen",
+      "featuresOffBody": "De regels na de URL's schakelen Agent-functies uit die met dezelfde sleutel naar de eigen servers van {vendor} verzenden. {setting} houdt ook {component} uitgeschakeld, dat nieuwere Agent-versies uitvoeren en dat het pad in deze URL's niet behoudt.",
+      "logsTitle": "Logs",
+      "logsBody": "Logverzameling is standaard uitgeschakeld in de {product}. Stel {setting} in en configureer je logbronnen.",
+      "dualTitle": "Behoud je huidige bestemming",
+      "dualBody": "Om naast een bestaande bestemming naar deze organisatie te verzenden, behoud je de huidige URL's en API-sleutel en voeg je in plaats daarvan deze regels toe aan {file}. Logs hebben {setting} nodig, omdat extra log-eindpunten anders TCP gebruiken.",
+      "metricsTitle": "Metrieken opvragen",
+      "metricsTypes": "Elke reeks wordt opgeslagen als een gauge met de waarde die de Agent heeft verzonden, gelabeld met {typeField} en {intervalField}.",
+      "metricsCount": "Count-reeksen bevatten het aantal per flush-interval. Tel ze op met {promql} in PromQL of {sql} in SQL.",
+      "metricsRate": "Rate-reeksen zijn per seconde. Vermenigvuldig de waarde met {intervalField} om het aantal voor het interval te herstellen.",
+      "metricsCounterFns": "PromQL {rate} en {increase} verwachten cumulatieve tellers, dus ze geven geen zinvolle resultaten op deze reeksen.",
+      "metricsSketch": "Distributies worden opgeslagen als histogram-buckets, en percentielen worden geschat op basis van die buckets. Een hogere ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA geeft fijnere buckets en nauwkeurigere percentielen, ten koste van meer opgeslagen rijen."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU-exporter"
   },

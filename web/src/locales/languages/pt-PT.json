@@ -7711,6 +7711,25 @@
       "tlsBody": "O token é uma credencial bearer que pode ser reproduzida sobre HTTP em texto simples, pelo que deve terminar o TLS no {brand} ({setting}, desativado por predefinição) ou num proxy confiável à sua frente."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Envie logs, métricas e traces de um {product} existente para esta organização alterando a respetiva configuração. As suas aplicações e os seus tracers permanecem como estão.",
+      "envTitle": "Configuração do agente",
+      "envBody": "Defina estas variáveis de ambiente no {product} e reinicie-o. Requer {product} {version} ou posterior.",
+      "tokenBody": "A chave API tem de ser um token de ingestão da organização, que começa por {prefix}. Esta organização não tem nenhum token de ingestão ativado, pelo que o excerto mostra o seu código de acesso, que é rejeitado. Crie um token de ingestão e, em seguida, selecione-o aqui.",
+      "tokenLink": "Abrir tokens de ingestão",
+      "featuresOffBody": "As linhas depois dos URLs desativam funcionalidades do Agent que enviam para os próprios servidores da {vendor} com a mesma chave. {setting} também mantém {component} desativado, um componente que as versões mais recentes do Agent executam e que não preserva o caminho nestes URLs.",
+      "logsTitle": "Logs",
+      "logsBody": "A recolha de logs está desativada por predefinição no {product}. Defina {setting} e configure as suas fontes de logs.",
+      "dualTitle": "Manter o destino atual",
+      "dualBody": "Para enviar para esta organização juntamente com um destino existente, mantenha os URLs e a chave API atuais e adicione estas entradas a {file} em alternativa. Os logs precisam de {setting}, porque, caso contrário, os endpoints de logs adicionais utilizam TCP.",
+      "metricsTitle": "Consultar métricas",
+      "metricsTypes": "Cada série é armazenada como um gauge com o valor enviado pelo Agent, etiquetada com {typeField} e {intervalField}.",
+      "metricsCount": "As séries de contagem contêm a contagem de cada intervalo de flush. Some-as com {promql} em PromQL ou {sql} em SQL.",
+      "metricsRate": "As séries de taxa são por segundo. Multiplique o valor por {intervalField} para recuperar a contagem do intervalo.",
+      "metricsCounterFns": "As funções {rate} e {increase} do PromQL esperam contadores cumulativos, pelo que não produzem resultados significativos nestas séries.",
+      "metricsSketch": "As distribuições são armazenadas como buckets de histograma, e os percentis são estimados a partir desses buckets. Um valor mais elevado de ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA origina buckets mais finos e percentis mais precisos, à custa de mais linhas armazenadas."
+    },
     "gpu": "GPU",
     "gpuExporter": "Exportador de GPU"
   },

@@ -95,6 +95,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
         :label="t('ingestion.metrics.awsCloudwatchMetrics')"
       />
+      <ORouteTab
+        name="datadogAgentMetrics"
+        data-test="ingestion-metrics-tab-datadogagent"
+        :to="{
+          name: 'datadogAgentMetrics',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/pipeline/datadog.png')"
+        :label="t('ingestion.datadogAgentTab')"
+      />
     </template>
 
     <div class="h-full w-full">

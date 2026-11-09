@@ -8174,6 +8174,7 @@ dependencies = [
  "db",
  "flate2",
  "hashbrown 0.17.1",
+ "http-body-util",
  "infra",
  "ingestion-common",
  "log",

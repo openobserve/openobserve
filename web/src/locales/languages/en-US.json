@@ -7711,6 +7711,25 @@
       "tlsBody": "The token is a bearer credential that is replayable over plaintext HTTP, so terminate TLS at {brand} ({setting}, disabled by default) or at a trusted proxy in front of it."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Send logs, metrics and traces from an existing {product} to this organization by changing its configuration. Your applications and tracers stay as they are.",
+      "envTitle": "Agent configuration",
+      "envBody": "Set these environment variables on the {product} and restart it. Requires {product} {version} or later.",
+      "tokenBody": "The API key must be an organization ingestion token, which starts with {prefix}. This organization has no enabled ingestion token, so the snippet shows your passcode, which is rejected. Create an ingestion token, then select it here.",
+      "tokenLink": "Open ingestion tokens",
+      "featuresOffBody": "The lines after the URLs turn off Agent features that send to {vendor}'s own servers with the same key. {setting} also keeps {component} off, which newer Agent versions run and which does not keep the path in these URLs.",
+      "logsTitle": "Logs",
+      "logsBody": "Log collection is off by default in the {product}. Set {setting} and configure your log sources.",
+      "dualTitle": "Keep your current destination",
+      "dualBody": "To send to this organization alongside an existing destination, keep the current URLs and API key and add these entries to {file} instead. Logs need {setting}, because additional log endpoints use TCP otherwise.",
+      "metricsTitle": "Querying metrics",
+      "metricsTypes": "Every series is stored as a gauge with the value the Agent sent, labelled with {typeField} and {intervalField}.",
+      "metricsCount": "Count series hold the count for each flush interval. Add them up with {promql} in PromQL or {sql} in SQL.",
+      "metricsRate": "Rate series are per second. Multiply the value by {intervalField} to recover the count for the interval.",
+      "metricsCounterFns": "PromQL {rate} and {increase} expect cumulative counters, so they do not give meaningful results on these series.",
+      "metricsSketch": "Distributions are stored as histogram buckets, and percentiles are estimated from those buckets. A higher ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA gives finer buckets and more precise percentiles, at the cost of more stored rows."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU exporter"
   },

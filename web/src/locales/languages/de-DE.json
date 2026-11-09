@@ -7711,6 +7711,25 @@
       "tlsBody": "Der Token ist ein Bearer-Anmeldedatenwert, der über unverschlüsseltes HTTP wiederverwendet werden kann. Beenden Sie daher TLS bei {brand} ({setting}, standardmäßig deaktiviert) oder bei einem vertrauenswürdigen Proxy davor."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Senden Sie Logs, Metriken und Traces von einem vorhandenen {product} an diese Organisation, indem Sie dessen Konfiguration ändern. Ihre Anwendungen und Tracer bleiben unverändert.",
+      "envTitle": "Agent-Konfiguration",
+      "envBody": "Legen Sie diese Umgebungsvariablen auf dem {product} fest und starten Sie ihn neu. Erfordert {product} {version} oder höher.",
+      "tokenBody": "Der API-Schlüssel muss ein Datenerfassungs-Token der Organisation sein, das mit {prefix} beginnt. Diese Organisation hat kein aktiviertes Datenerfassungs-Token, daher zeigt der Ausschnitt Ihren Passcode, der abgelehnt wird. Erstellen Sie ein Datenerfassungs-Token und wählen Sie es dann hier aus.",
+      "tokenLink": "Datenerfassungs-Token öffnen",
+      "featuresOffBody": "Die Zeilen nach den URLs deaktivieren Agent-Funktionen, die mit demselben Schlüssel an die eigenen Server von {vendor} senden. {setting} hält außerdem {component} deaktiviert, das neuere Agent-Versionen ausführen und das den Pfad in diesen URLs nicht beibehält.",
+      "logsTitle": "Logs",
+      "logsBody": "Die Log-Erfassung ist im {product} standardmäßig deaktiviert. Legen Sie {setting} fest und konfigurieren Sie Ihre Log-Quellen.",
+      "dualTitle": "Behalten Sie Ihr aktuelles Ziel bei",
+      "dualBody": "Um zusätzlich zu einem vorhandenen Ziel an diese Organisation zu senden, behalten Sie die aktuellen URLs und den API-Schlüssel bei und fügen Sie diese Einträge stattdessen zu {file} hinzu. Logs benötigen {setting}, da zusätzliche Log-Endpunkte sonst TCP verwenden.",
+      "metricsTitle": "Metriken abfragen",
+      "metricsTypes": "Jede Serie wird als Gauge mit dem vom Agent gesendeten Wert gespeichert und mit {typeField} und {intervalField} gekennzeichnet.",
+      "metricsCount": "Count-Serien enthalten die Anzahl für jedes Flush-Intervall. Summieren Sie sie mit {promql} in PromQL oder {sql} in SQL.",
+      "metricsRate": "Rate-Serien sind pro Sekunde. Multiplizieren Sie den Wert mit {intervalField}, um die Anzahl für das Intervall zu erhalten.",
+      "metricsCounterFns": "PromQL {rate} und {increase} erwarten kumulative Zähler und liefern daher auf diesen Serien keine aussagekräftigen Ergebnisse.",
+      "metricsSketch": "Verteilungen werden als Histogramm-Buckets gespeichert, und Perzentile werden aus diesen Buckets geschätzt. Ein höherer ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA liefert feinere Buckets und präzisere Perzentile – auf Kosten von mehr gespeicherten Zeilen."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU-Exporter"
   },

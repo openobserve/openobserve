@@ -7711,6 +7711,25 @@
       "tlsBody": "權杖是持有人憑證，可透過純文字 HTTP 重送，因此請在 {brand} 終止 TLS（{setting}，預設為停用），或在其前方的受信任 Proxy 終止 TLS。"
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "透過變更現有 {product} 的設定，將其日誌、指標與追蹤傳送到此組織。您的應用程式與追蹤器維持不變。",
+      "envTitle": "Agent 設定",
+      "envBody": "在 {product} 上設定這些環境變數並重新啟動。需要 {product} {version} 或更新版本。",
+      "tokenBody": "API 金鑰必須是組織資料擷取權杖，其開頭為 {prefix}。此組織沒有已啟用的資料擷取權杖，因此程式碼片段會顯示您的通行碼，而該通行碼會遭到拒絕。建立資料擷取權杖，然後在此選取。",
+      "tokenLink": "開啟資料擷取權杖",
+      "featuresOffBody": "The lines after the URLs turn off Agent features that send to {vendor}'s own servers with the same key. {setting} also keeps {component} off, which newer Agent versions run and which does not keep the path in these URLs.",
+      "logsTitle": "日誌",
+      "logsBody": "在 {product} 中，日誌收集預設為關閉。請設定 {setting} 並配置您的日誌來源。",
+      "dualTitle": "保留您目前的目標",
+      "dualBody": "若要同時傳送到此組織與現有目標，請保留目前的 URL 與 API 金鑰，並改為將這些項目新增到 {file}。日誌需要 {setting}，否則額外的日誌端點會使用 TCP。",
+      "metricsTitle": "查詢指標",
+      "metricsTypes": "每個序列都會儲存為 gauge，其值為 Agent 傳送的值，並以 {typeField} 和 {intervalField} 標記。",
+      "metricsCount": "Count 序列會保存每個 flush 間隔的計數。請在 PromQL 中使用 {promql}，或在 SQL 中使用 {sql} 將它們加總。",
+      "metricsRate": "Rate 序列以每秒為單位。將值乘以 {intervalField}，即可還原該間隔的計數。",
+      "metricsCounterFns": "PromQL 的 {rate} 和 {increase} 預期的是累計計數器，因此對這些序列不會產生有意義的結果。",
+      "metricsSketch": "分佈會儲存為直方圖桶，百分位數則根據這些桶估算。較高的 ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA 會提供更細緻的桶與更精確的百分位數，代價是儲存更多資料列。"
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU 匯出器"
   },

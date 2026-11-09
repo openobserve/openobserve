@@ -29,6 +29,7 @@ pub mod background_access;
 pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
+pub mod datadog;
 pub mod db_monitoring;
 #[cfg(feature = "enterprise")]
 pub mod downtimes;
