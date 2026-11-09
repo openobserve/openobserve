@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <CodeQueryEditor
                 :ref="(el: any) => setEditorRef(traceIndex, 0, el)"
                 :editor-id="`source-frame-${traceIndex}-0`"
-                :query="stackTrace.stack[0].source_info.source"
+                :query="snippetText(stackTrace.stack[0].source_info.source)"
                 :read-only="true"
                 language="javascript"
                 style="height: 12.5rem"
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <CodeQueryEditor
                     :ref="(el: any) => setEditorRef(traceIndex, frameIndex + 1, el)"
                     :editor-id="`source-frame-${traceIndex}-${frameIndex + 1}`"
-                    :query="frame.source_info.source"
+                    :query="snippetText(frame.source_info.source)"
                     :read-only="true"
                     language="javascript"
                     style="height: 12.5rem"
@@ -425,6 +425,14 @@ const setEditorRef = (traceIndex: number, frameIndex: number, el: any) => {
   }
 };
 
+// CodeQueryEditor trims the text it is created with but not new text on a live editor, so a
+// snippet's leading blank lines are left out here to give both the same line numbers.
+const leadingBlankLines = (source: string) =>
+  source.slice(0, source.length - source.trimStart().length).split("\n").length - 1;
+
+const snippetText = (source: string) =>
+  source.split("\n").slice(leadingBlankLines(source)).join("\n");
+
 const highlightErrorLine = (traceIndex: number, frameIndex: number) => {
   const key = getFrameKey(traceIndex, frameIndex);
   const editorComponent = editorRefs.value[key];
@@ -441,12 +449,11 @@ const highlightErrorLine = (traceIndex: number, frameIndex: number) => {
   if (!frame?.source_info) return;
 
   // Calculate the relative line number within the displayed source snippet
-  const { stack_line, source_line_start } = frame.source_info;
+  const { source, stack_line, source_line_start } = frame.source_info;
 
-  // Monaco editor is 1-indexed
-  // The source snippet starts at source_line_start and the error is at stack_line
-  // Relative position = stack_line - source_line_start + 1
-  const relativeLineNumber = stack_line - source_line_start;
+  // source_line_start is the 0-based index of the snippet's first line and stack_line is 1-based,
+  // so their difference is already Monaco's 1-based line number
+  const relativeLineNumber = stack_line - source_line_start - leadingBlankLines(source);
 
   // Use the decorateRanges method to highlight the error line
   if (editorComponent.decorateRanges) {

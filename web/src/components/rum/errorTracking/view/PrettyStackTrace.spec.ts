@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import PrettyStackTrace from "@/components/rum/errorTracking/view/PrettyStackTrace.vue";
 import sourcemapsService from "@/services/sourcemaps";
@@ -39,7 +39,7 @@ const nullFrames = {
   data: { stacktrace: [{ error: "boom", stack: [{ line: "a", source_info: null }] }] },
 };
 
-function mountPretty(source: string) {
+function mountPretty(source: string, editor: object = { template: "<div />" }) {
   return mount(PrettyStackTrace, {
     props: {
       error_stack: [
@@ -54,7 +54,7 @@ function mountPretty(source: string) {
         OButton: { template: "<button><slot /></button>" },
         OIcon: { template: "<i />" },
         OSpinner: { template: "<i />" },
-        CodeQueryEditor: { template: "<div />" },
+        CodeQueryEditor: editor,
       },
     },
   });
@@ -105,5 +105,80 @@ describe("PrettyStackTrace mobile sources", () => {
     expect(wrapper.find(UNAVAILABLE).exists()).toBe(true);
     expect(wrapper.find(MOBILE).exists()).toBe(false);
     expect(sourcemapsService.translateStackTrace).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PrettyStackTrace highlighted line", () => {
+  const ERROR_LINE = '    throw new Error("boom");';
+  const decorateRanges = vi.fn();
+  const EditorStub = { props: ["query"], methods: { decorateRanges }, template: "<div />" };
+
+  // The 11 lines the server sends around the error, which is the fifth of them.
+  const sourceInfo = (top: string[]) => ({
+    source: [
+      ...top,
+      ...Array(4 - top.length).fill("const before = 1;"),
+      ERROR_LINE,
+      ...Array(6).fill("const after = 2;"),
+    ].join("\n"),
+    source_line_start: 6,
+    source_line_end: 16,
+    stack_line: 11,
+    stack_col: 17,
+  });
+
+  const frame = (top: string[]) => ({
+    line: "at boom @ a.tsx:11:17",
+    source_info: sourceInfo(top),
+  });
+
+  const translatesTo = (stack: object[]) =>
+    translateStackTrace.mockResolvedValue({ data: { stacktrace: [{ error: "boom", stack }] } });
+
+  // The real editor trims the text it is created with and writes new text to a live editor as is.
+  const expectErrorLineHighlighted = (query: string) => {
+    const [{ startLine, endLine }] = decorateRanges.mock.calls.at(-1)![0];
+    expect(endLine).toBe(startLine);
+    expect(query.trim().split("\n")[startLine - 1].trim()).toBe(ERROR_LINE.trim());
+    expect(query.split("\n")[startLine - 1].trim()).toBe(ERROR_LINE.trim());
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    translateStackTrace.mockReset();
+    decorateRanges.mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ["no blank line", []],
+    ["one blank line", [""]],
+    ["two blank lines", ["", ""]],
+    ["a whitespace-only line", ["   "]],
+    ["only blank lines above the error", ["", "", "", ""]],
+  ])("highlights the error line when the snippet starts with %s", async (name, top) => {
+    translatesTo([frame(top)]);
+    // the translation cache is keyed on the stack, which is built from this name
+    const wrapper = mountPretty(`browser ${name}`, EditorStub);
+    await flushPromises();
+    vi.advanceTimersByTime(500);
+
+    expectErrorLineHighlighted(wrapper.findComponent(EditorStub).props("query") as string);
+  });
+
+  it("highlights the error line in a collapsed frame too", async () => {
+    translatesTo([frame([]), frame([""])]);
+    const wrapper = mountPretty("browser collapsed frame", EditorStub);
+    await flushPromises();
+
+    await wrapper.find(".show-more-button").trigger("click");
+    await wrapper.find(".collapsed-frame-header").trigger("click");
+    await flushPromises();
+    vi.advanceTimersByTime(500);
+
+    expectErrorLineHighlighted(wrapper.findAllComponents(EditorStub)[1].props("query") as string);
   });
 });
