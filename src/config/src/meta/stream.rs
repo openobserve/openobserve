@@ -1026,6 +1026,8 @@ pub struct UpdateStreamSettings {
     pub is_llm_stream: Option<bool>,
     #[serde(default)]
     pub security: Option<SecuritySourceSetting>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profiles_ingest_filter: Option<ProfilesIngestFilter>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -1164,6 +1166,218 @@ impl TimeRange {
     }
 }
 
+/// Per-stream profiles ingest filter. `mode` is `off`, `keep`, or `drop`.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema, PartialEq)]
+pub struct ProfilesIngestFilter {
+    #[serde(default)]
+    pub mode: String,
+    #[serde(default)]
+    pub rules: Vec<ProfilesIngestFilterRule>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema, PartialEq)]
+pub struct ProfilesIngestFilterRule {
+    #[serde(default)]
+    pub attribute: String,
+    #[serde(default)]
+    pub op: String,
+    #[serde(default)]
+    pub value: String,
+}
+
+const PROFILE_FILTER_SERVICE: &str = "service.name";
+const PROFILE_FILTER_EXECUTABLE: &str = "process.executable.name";
+
+impl ProfilesIngestFilter {
+    /// True when the stored value is not the implicit "keep everything" default.
+    pub fn is_active(&self) -> bool {
+        self.mode != "off" && !self.mode.is_empty() || !self.rules.is_empty()
+    }
+
+    /// Reject a filter that would drop an entire stream by accident or fail to compile.
+    pub fn validate(&self) -> Result<(), String> {
+        let mode = if self.mode.is_empty() {
+            "off"
+        } else {
+            self.mode.as_str()
+        };
+        match mode {
+            "off" => {
+                if !self.rules.is_empty() {
+                    return Err("profiles ingest filter mode off cannot include rules".to_string());
+                }
+            }
+            "keep" | "drop" => {
+                if self.rules.is_empty() {
+                    return Err(
+                        "profiles ingest filter keep or drop requires at least one rule"
+                            .to_string(),
+                    );
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "profiles ingest filter mode must be off, keep, or drop, got {mode}"
+                ));
+            }
+        }
+        for rule in &self.rules {
+            if rule.attribute != PROFILE_FILTER_SERVICE
+                && rule.attribute != PROFILE_FILTER_EXECUTABLE
+            {
+                return Err(format!(
+                    "profiles ingest filter attribute must be {PROFILE_FILTER_SERVICE} or {PROFILE_FILTER_EXECUTABLE}"
+                ));
+            }
+            if rule.value.is_empty() {
+                return Err("profiles ingest filter rule value must not be empty".to_string());
+            }
+            match rule.op.as_str() {
+                "eq" => {}
+                "regex" => {
+                    regex::Regex::new(&rule.value)
+                        .map_err(|e| format!("profiles ingest filter regex is invalid: {e}"))?;
+                }
+                _ => {
+                    return Err("profiles ingest filter op must be eq or regex".to_string());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Compile regexes once per request. The result is not serialized.
+    pub fn compile(&self) -> Result<CompiledProfilesIngestFilter, String> {
+        self.validate()?;
+        let mode = match if self.mode.is_empty() {
+            "off"
+        } else {
+            self.mode.as_str()
+        } {
+            "off" => CompiledFilterMode::Off,
+            "keep" => CompiledFilterMode::Keep,
+            "drop" => CompiledFilterMode::Drop,
+            _ => return Err("profiles ingest filter mode is invalid".to_string()),
+        };
+        let mut rules = Vec::with_capacity(self.rules.len());
+        for rule in &self.rules {
+            let attribute = if rule.attribute == PROFILE_FILTER_SERVICE {
+                CompiledFilterAttr::ServiceName
+            } else {
+                CompiledFilterAttr::Executable
+            };
+            let compiled = match rule.op.as_str() {
+                "eq" => CompiledFilterRule::Eq {
+                    attribute,
+                    value: rule.value.clone(),
+                },
+                "regex" => CompiledFilterRule::Regex {
+                    attribute,
+                    pattern: regex::Regex::new(&rule.value)
+                        .map_err(|e| format!("profiles ingest filter regex is invalid: {e}"))?,
+                },
+                _ => return Err("profiles ingest filter op must be eq or regex".to_string()),
+            };
+            rules.push(compiled);
+        }
+        Ok(CompiledProfilesIngestFilter { mode, rules })
+    }
+}
+
+impl MemorySize for ProfilesIngestFilter {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ProfilesIngestFilter>()
+            + self.mode.mem_size()
+            + self
+                .rules
+                .iter()
+                .map(|rule| {
+                    std::mem::size_of::<ProfilesIngestFilterRule>()
+                        + rule.attribute.mem_size()
+                        + rule.op.mem_size()
+                        + rule.value.mem_size()
+                })
+                .sum::<usize>()
+    }
+}
+
+enum CompiledFilterMode {
+    Off,
+    Keep,
+    Drop,
+}
+
+enum CompiledFilterAttr {
+    ServiceName,
+    Executable,
+}
+
+enum CompiledFilterRule {
+    Eq {
+        attribute: CompiledFilterAttr,
+        value: String,
+    },
+    Regex {
+        attribute: CompiledFilterAttr,
+        pattern: regex::Regex,
+    },
+}
+
+/// In-memory form of a profiles ingest filter. Not stored.
+pub struct CompiledProfilesIngestFilter {
+    mode: CompiledFilterMode,
+    rules: Vec<CompiledFilterRule>,
+}
+
+impl CompiledProfilesIngestFilter {
+    /// Keep-mode with no rules: nothing matches, so every resource is denied.
+    pub fn deny_all() -> Self {
+        Self {
+            mode: CompiledFilterMode::Keep,
+            rules: Vec::new(),
+        }
+    }
+
+    /// Whether this resource's raw service name and executable name should be ingested.
+    pub fn allows(&self, service_name: Option<&str>, executable: Option<&str>) -> bool {
+        let service_name = non_empty(service_name);
+        let executable = non_empty(executable);
+        let matched = self
+            .rules
+            .iter()
+            .any(|rule| rule.matches(service_name, executable));
+        match self.mode {
+            CompiledFilterMode::Off => true,
+            CompiledFilterMode::Keep => matched,
+            CompiledFilterMode::Drop => !matched,
+        }
+    }
+}
+
+impl CompiledFilterRule {
+    fn matches(&self, service_name: Option<&str>, executable: Option<&str>) -> bool {
+        let (attribute, equals, pattern) = match self {
+            CompiledFilterRule::Eq { attribute, value } => (attribute, Some(value.as_str()), None),
+            CompiledFilterRule::Regex { attribute, pattern } => (attribute, None, Some(pattern)),
+        };
+        let candidate = match attribute {
+            CompiledFilterAttr::ServiceName => service_name,
+            CompiledFilterAttr::Executable => executable,
+        };
+        let Some(candidate) = candidate else {
+            return false;
+        };
+        if let Some(value) = equals {
+            return candidate == value;
+        }
+        pattern.is_some_and(|pattern| pattern.is_match(candidate))
+    }
+}
+
+fn non_empty(value: Option<&str>) -> Option<&str> {
+    value.filter(|value| !value.is_empty())
+}
+
 #[derive(Clone, Debug, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
     #[serde(default)]
@@ -1215,6 +1429,8 @@ pub struct StreamSettings {
     pub index_fields_updated_at: HashMap<String, i64>,
     #[serde(default)]
     pub security: Option<SecuritySourceSetting>,
+    #[serde(default)]
+    pub profiles_ingest_filter: ProfilesIngestFilter,
 }
 
 impl Default for StreamSettings {
@@ -1243,6 +1459,7 @@ impl Default for StreamSettings {
             cross_links: Vec::new(),
             storage_type: StorageType::Normal,
             security: None,
+            profiles_ingest_filter: ProfilesIngestFilter::default(),
         }
     }
 }
@@ -1341,6 +1558,11 @@ impl Serialize for StreamSettings {
         match self.security.as_ref() {
             Some(security) => state.serialize_field("security", security)?,
             None => state.skip_field("security")?,
+        }
+        if self.profiles_ingest_filter.is_active() {
+            state.serialize_field("profiles_ingest_filter", &self.profiles_ingest_filter)?;
+        } else {
+            state.skip_field("profiles_ingest_filter")?;
         }
         state.end()
     }
@@ -1518,6 +1740,11 @@ impl From<&str> for StreamSettings {
                 .inspect_err(|e| log::warn!("ignoring unreadable stream security setting: {e}"))
                 .ok()
         });
+        let profiles_ingest_filter = settings
+            .get("profiles_ingest_filter")
+            .cloned()
+            .and_then(|v| json::from_value(v).ok())
+            .unwrap_or_default();
         Self {
             partition_keys,
             full_text_search_keys,
@@ -1542,6 +1769,7 @@ impl From<&str> for StreamSettings {
             cross_links,
             storage_type,
             security,
+            profiles_ingest_filter,
         }
     }
 }
@@ -1564,6 +1792,7 @@ impl MemorySize for StreamSettings {
                 .map(|(k, v)| k.mem_size() + v.mem_size())
                 .sum::<usize>()
             + self.security.mem_size()
+            + self.profiles_ingest_filter.mem_size()
     }
 }
 
@@ -3014,5 +3243,80 @@ mod tests {
         // the stored form stays lenient so a rollback can still read a newer record
         let stored: DataRetentionDefaults = serde_json::from_str(r#"{"future": 7}"#).unwrap();
         assert_eq!(stored, DataRetentionDefaults::default());
+    }
+
+    fn filter(mode: &str, rules: &[(&str, &str, &str)]) -> ProfilesIngestFilter {
+        ProfilesIngestFilter {
+            mode: mode.to_string(),
+            rules: rules
+                .iter()
+                .map(|(attribute, op, value)| ProfilesIngestFilterRule {
+                    attribute: attribute.to_string(),
+                    op: op.to_string(),
+                    value: value.to_string(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn profiles_ingest_filter_rejects_empty_and_invalid_rules() {
+        assert!(filter("off", &[]).validate().is_ok());
+        assert!(filter("keep", &[]).validate().is_err());
+        assert!(filter("drop", &[]).validate().is_err());
+        assert!(
+            filter("off", &[("service.name", "eq", "py-http")])
+                .validate()
+                .is_err()
+        );
+        assert!(
+            filter("keep", &[("service.name", "eq", "")])
+                .validate()
+                .is_err()
+        );
+        assert!(
+            filter("keep", &[("process.pid", "eq", "1")])
+                .validate()
+                .is_err()
+        );
+        assert!(
+            filter("keep", &[("service.name", "regex", "(")])
+                .validate()
+                .is_err()
+        );
+        assert!(
+            filter("keep", &[("service.name", "eq", "py-http")])
+                .validate()
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn profiles_ingest_filter_matches_service_and_executable() {
+        let keep = filter("keep", &[("service.name", "eq", "py-http")])
+            .compile()
+            .unwrap();
+        assert!(keep.allows(Some("py-http"), None));
+        assert!(!keep.allows(None, Some("bash")));
+        assert!(!keep.allows(Some(""), Some("bash")));
+
+        let drop = filter("drop", &[("process.executable.name", "eq", "bash")])
+            .compile()
+            .unwrap();
+        assert!(!drop.allows(None, Some("bash")));
+        assert!(drop.allows(None, Some("python")));
+
+        let regex = filter("keep", &[("process.executable.name", "regex", "^python")])
+            .compile()
+            .unwrap();
+        assert!(regex.allows(None, Some("python3.11")));
+        assert!(!regex.allows(Some("py-http"), None));
+        let unanchored = filter("keep", &[("process.executable.name", "regex", "python")])
+            .compile()
+            .unwrap();
+        assert!(unanchored.allows(None, Some("mypython")));
+
+        assert!(filter("off", &[]).compile().unwrap().allows(None, None));
+        assert!(!CompiledProfilesIngestFilter::deny_all().allows(Some("py-http"), Some("bash")));
     }
 }

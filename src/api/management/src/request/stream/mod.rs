@@ -59,7 +59,7 @@ use crate::common::{
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces, profiles. Defaults to logs."),
         ("keyword" = Option<String>, Query, description = "Keyword filter for field names (default: empty)"),
         ("offset" = Option<u32>, Query, description = "Pagination offset (default: 0)"),
         ("limit" = Option<u32>, Query, description = "Pagination limit (default: 0 = all)"),
@@ -168,7 +168,7 @@ pub async fn schema(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces, profiles. Defaults to logs."),
     ),
     request_body(content = inline(StreamCreate), description = "Stream create", content_type = "application/json"),
     responses(
@@ -223,7 +223,7 @@ pub async fn create(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces, profiles. Defaults to logs."),
     ),
     request_body(content = inline(UpdateStreamSettings), description = "Stream settings", content_type = "application/json"),
     responses(
@@ -285,7 +285,7 @@ pub async fn update_settings(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces, profiles. Defaults to logs."),
     ),
     request_body(content = inline(StreamUpdateFields), description = "Update stream fields to a specific data type", content_type = "application/json"),
     responses(
@@ -354,7 +354,7 @@ pub async fn update_fields(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces, profiles. Defaults to logs."),
     ),
     request_body(content = inline(StreamDeleteFields), description = "Stream delete fields", content_type = "application/json"),
     responses(
@@ -407,7 +407,7 @@ pub async fn delete_fields(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces, profiles. Defaults to logs."),
         ("delete_all" = bool, Query, description = "Delete all related feature resources"),
     ),
     responses(
@@ -459,7 +459,7 @@ pub async fn delete(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces, profiles. Defaults to logs."),
         ("keyword" = Option<String>, Query, description = "Keyword"),
         ("offset" = Option<u32>, Query, description = "Offset"),
         ("limit" = Option<u32>, Query, description = "Limit"),
@@ -753,7 +753,7 @@ fn stream_comparator(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces, profiles. Defaults to logs."),
         ("ts" = Option<i64>, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
     ),
     responses(
@@ -828,7 +828,7 @@ pub async fn delete_stream_cache(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces, profiles. Defaults to logs."),
         ("start" = i64, Query, description = "Start timestamp in microseconds"),
         ("end" = i64, Query, description = "End timestamp in microseconds"),
     ),

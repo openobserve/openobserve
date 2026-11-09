@@ -550,6 +550,11 @@ pub async fn update_stream_settings(
     if let Some(v) = new_settings.security {
         settings.security = Some(v);
     }
+    if stream_type == StreamType::Profiles
+        && let Some(filter) = new_settings.profiles_ingest_filter
+    {
+        settings.profiles_ingest_filter = filter;
+    }
 
     // partition_keys: remove-then-add, dedup (by `field`) deferred to normalize.
     if !new_settings.partition_keys.remove.is_empty() {

@@ -278,6 +278,14 @@ fn validate_stream_settings(
         ));
     }
 
+    if stream_type == StreamType::Profiles {
+        if let Err(message) = settings.profiles_ingest_filter.validate() {
+            return Err(StreamSettingsError::BadRequest(message));
+        }
+    } else {
+        settings.profiles_ingest_filter = Default::default();
+    }
+
     Ok(())
 }
 
@@ -1498,5 +1506,39 @@ mod tests {
         let stream_type = StreamType::Logs;
         let value_iter = record_val.into_iter();
         infer_json_schema_from_map("test", stream_type, value_iter).unwrap();
+    }
+
+    #[test]
+    fn validate_stream_settings_rejects_invalid_profiles_ingest_filter() {
+        use config::meta::stream::{ProfilesIngestFilter, ProfilesIngestFilterRule};
+
+        let mut settings = StreamSettings {
+            profiles_ingest_filter: ProfilesIngestFilter {
+                mode: "keep".to_string(),
+                rules: vec![ProfilesIngestFilterRule {
+                    attribute: "service.name".to_string(),
+                    op: "regex".to_string(),
+                    value: "(".to_string(),
+                }],
+            },
+            ..Default::default()
+        };
+        let err = validate_stream_settings("org", "s", StreamType::Profiles, &mut settings)
+            .expect_err("invalid regex must be rejected");
+        assert!(matches!(err, StreamSettingsError::BadRequest(_)));
+
+        let mut logs = StreamSettings {
+            profiles_ingest_filter: ProfilesIngestFilter {
+                mode: "keep".to_string(),
+                rules: vec![ProfilesIngestFilterRule {
+                    attribute: "service.name".to_string(),
+                    op: "eq".to_string(),
+                    value: "svc".to_string(),
+                }],
+            },
+            ..Default::default()
+        };
+        validate_stream_settings("org", "s", StreamType::Logs, &mut logs).unwrap();
+        assert!(!logs.profiles_ingest_filter.is_active());
     }
 }
