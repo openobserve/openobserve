@@ -570,7 +570,8 @@ async fn write_logs(
             .and_then(|order| order.accepted.pop_front());
         let doc_id = record_val
             .get("_id")
-            .map(|v| v.as_str().unwrap().to_string());
+            .and_then(Value::as_str)
+            .map(String::from);
 
         // validate record
         if let Some(delta) = schema_evolution.types_delta.as_ref() {
