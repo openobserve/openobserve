@@ -23,4 +23,9 @@ describe("solutionModeForPath", () => {
     expect(solutionModeForPath("/alert-destinations", "security")).toBe("security");
     expect(solutionModeForPath("/settings", "observability")).toBe("observability");
   });
+
+  it("keeps a user who may not open Security in observability, wherever they land", () => {
+    expect(solutionModeForPath("/security/events", "observability", false)).toBe("observability");
+    expect(solutionModeForPath("/settings/general", "security", false)).toBe("observability");
+  });
 });

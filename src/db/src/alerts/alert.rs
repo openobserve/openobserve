@@ -20,7 +20,7 @@ use config::{
     meta::{
         alerts::{
             FrequencyType,
-            alert::{Alert, ListAlertsParams},
+            alert::{Alert, ListAlertsParams, is_siem_detection},
         },
         folder::{DEFAULT_FOLDER, Folder},
         stream::StreamType,
@@ -539,15 +539,22 @@ pub async fn resolve_siem_alert_ids(org_id: &str) -> Vec<String> {
     alerts_cacher
         .iter()
         .filter(|(key, _)| key.starts_with(&prefix))
-        .filter(|(_, (_, alert))| {
-            alert
-                .context_attributes
-                .as_ref()
-                .and_then(|attrs| attrs.get("siem"))
-                .is_some_and(|v| v == "true")
-        })
+        .filter(|(_, (_, alert))| is_siem_detection(alert.context_attributes.as_ref()))
         .filter_map(|(_, (_, alert))| alert.id.map(|id| id.to_string()))
         .collect()
+}
+
+/// Whether any of `alert_ids` is a cached SIEM detection of the org, by keyed lookup.
+pub async fn any_siem_alert<'a>(
+    org_id: &str,
+    alert_ids: impl IntoIterator<Item = &'a str>,
+) -> bool {
+    let alerts_cacher = ALERTS.read().await;
+    alert_ids.into_iter().any(|id| {
+        alerts_cacher
+            .get(&cache_alert_key(org_id, id))
+            .is_some_and(|(_, alert)| is_siem_detection(alert.context_attributes.as_ref()))
+    })
 }
 
 /// Distinct tags in an org with occurrence counts, for the facet endpoint

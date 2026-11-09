@@ -1,9 +1,9 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Counted with one GROUP BY per stream and kind; the same value in two streams is one entity. -->
+<!-- The server counts each stream and kind with one GROUP BY; the same value in two streams is one entity. -->
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
@@ -27,6 +27,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -37,33 +38,23 @@ import SecurityRecordDrawer, {
 } from "@/components/security/SecurityRecordDrawer.vue";
 import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
-import {
-  createLimiter,
-  runPool,
-  runSql,
-  useSecurityStreamPlans,
-} from "@/composables/security/useSecurityStreamPlans";
+import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
+import { forbiddenReason, isForbiddenError } from "@/composables/security/useSecurityAccess";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
+import { useSecurityStreamPlans } from "@/composables/security/useSecurityStreamPlans";
 import { useTableRowNavigation } from "@/composables/security/useTableRowNavigation";
-import {
-  ENTITY_KINDS,
-  LARGE_STREAM_SLICE_US,
-  SIGNAL_THRESHOLDS,
-  entityAggSql,
-  entitySignals,
-  entityTimelineSql,
-  estimateRowsInWindow,
-  failureRate,
-  mergeEntities,
-  relatedSql,
-  shouldLimitWindow,
-  type AggHit,
-  type EntityKind,
+import { ENTITY_KINDS, type EntityKind } from "@/utils/security/streamPlan";
+import { histogramInterval, histogramKeyToMs } from "@/utils/security/eventQuery";
+import { huntLinkQuery } from "@/utils/security/huntLink";
+import securityInvestigate, {
+  type EntitiesResponse,
   type EntityRow,
   type EntitySignal,
-  type StreamPlan,
-} from "@/utils/security/entities";
-import { histogramInterval, histogramKeyToMs } from "@/utils/security/eventQuery";
-import { severityRailColor, type SeverityTone } from "@/utils/security/severity";
+  type NodeCase,
+  type RiskGraph,
+  type ScoredEntity,
+} from "@/services/securityInvestigate";
+import { severityRailColor } from "@/utils/security/severity";
 import { b64EncodeUnicode, formatCompactCount, formatEventCount } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
@@ -118,140 +109,90 @@ const {
   unreadable,
   loading: plansLoading,
   error: plansError,
+  failure: plansFailure,
   load: loadPlans,
 } = useSecurityStreamPlans();
 
-/** Rows per stream and kind; past this the page says it is showing the top. */
+/** Rows the server reads per stream and kind; past this the page says it is showing the top. */
 const ENTITY_LIMIT = 500;
 type StreamStatus = "loading" | "done" | "failed";
 
-interface StreamRun {
-  plan: StreamPlan;
-  startUs: number;
-  endUs: number;
-  /** Estimated rows over the full window, set when the run was cut to the last hour. */
-  limitedRows: number | null;
-  hits: Partial<Record<EntityKind, AggHit[]>>;
-  pending: number;
-  failed: boolean;
-  partial: boolean;
-  ctrl: AbortController;
-}
-
-const rowsByKind = ref<Record<EntityKind, EntityRow[]>>({ user: [], ip: [], host: [] });
-const cappedKinds = ref<Set<EntityKind>>(new Set());
-const failedStreams = ref<string[]>([]);
-/** Streams whose answer the engine marked partial or whose functions errored. */
-const partialStreams = ref<string[]>([]);
-const streamStatus = ref<Record<string, StreamStatus>>({});
-const limitedStreams = ref<{ stream: string; rows: number }[]>([]);
-const lastRunAt = ref<number | null>(null);
-/** Some query of the current run has answered, so the table has something to show. */
-const answered = ref(false);
-/** A refresh is between its start and its last answer, plan stage included. */
-const running = ref(false);
-const loading = computed(
-  () =>
-    running.value || plansLoading.value || Object.values(streamStatus.value).includes("loading"),
+const result = shallowRef<EntitiesResponse | null>(null);
+/** The entity request itself failed; per-stream failures are in the result. */
+const runError = ref("");
+const runFailure = shallowRef<unknown>(null);
+/** A refusal from the plan stage or the entity read; the server's 403 names the streams it could not read. */
+const refusal = computed(
+  () => [plansFailure.value, runFailure.value].find((e) => isForbiddenError(e)) ?? null,
 );
+const accessDenials = computed(() =>
+  refusal.value ? [viewDenial("streams", "list", failedRequests(refusal.value))] : [],
+);
+const lastRunAt = ref<number | null>(null);
+/** Some run has answered, so the table has something to show. */
+const answered = ref(false);
+/** A refresh is between its start and its answer, plan stage included. */
+const running = ref(false);
+const loading = computed(() => running.value || plansLoading.value);
 let seq = 0;
-let runs = new Map<string, StreamRun>();
 let controller: AbortController | null = null;
-/** Every page query, drawer included, shares these slots. */
-const limit = createLimiter();
 /** Large streams the user chose to read over the whole window; reset with the range. */
 const fullWindow = new Set<string>();
 
-/** Queues one stream's aggregates; each answer is merged into the table as it lands. */
-function startRun(plan: StreamPlan, mine: number, signal: AbortSignal) {
-  const end = windowEndUs.value;
-  const estimate = estimateRowsInWindow(plan.volume, windowStartUs.value, end);
-  const limited = !fullWindow.has(plan.stream) && shouldLimitWindow(estimate, windowUs.value);
-  const ctrl = new AbortController();
-  signal.addEventListener("abort", () => ctrl.abort(), { once: true });
-  const jobs = ENTITY_KINDS.flatMap((k) => {
-    const sql = entityAggSql(plan, k, ENTITY_LIMIT);
-    return sql ? [{ k, sql }] : [];
-  });
-  const run: StreamRun = {
-    plan,
-    startUs: limited ? end - LARGE_STREAM_SLICE_US : windowStartUs.value,
-    endUs: end,
-    limitedRows: limited && jobs.length ? estimate : null,
-    hits: {},
-    pending: jobs.length,
-    failed: false,
-    partial: false,
-    ctrl,
-  };
-  runs.get(plan.stream)?.ctrl.abort();
-  runs.set(plan.stream, run);
-  return jobs.map(
-    ({ k, sql }) =>
-      () =>
-        limit(async () => {
-          try {
-            const res = await runSql(orgId.value, sql, run.startUs, run.endUs, -1, {
-              signal: ctrl.signal,
-            });
-            if (res.partial || res.functionError) run.partial = true;
-            run.hits[k] = res.hits as unknown as AggHit[];
-          } catch {
-            run.failed = true;
-          }
-          run.pending -= 1;
-          if (mine !== seq || runs.get(plan.stream) !== run) return;
-          if (!run.pending) {
-            answered.value = true;
-            publishRows();
-          }
-          publishStatus();
-        }),
-  );
-}
-
-function publishStatus() {
+const rowsByKind = computed<Record<EntityKind, ScoredEntity[]>>(() => ({
+  user: result.value?.user.rows ?? [],
+  ip: result.value?.ip.rows ?? [],
+  host: result.value?.host.rows ?? [],
+}));
+const cappedKinds = computed(() => new Set(ENTITY_KINDS.filter((k) => result.value?.[k].capped)));
+const failedStreams = computed(() =>
+  [
+    ...new Set([
+      ...unreadable.value,
+      ...(result.value?.streams.filter((s) => s.failed).map((s) => s.stream) ?? []),
+    ]),
+  ].sort(),
+);
+/** Streams whose answer the engine marked partial or whose functions errored. */
+const partialStreams = computed(() =>
+  (result.value?.streams.filter((s) => s.partial).map((s) => s.stream) ?? []).sort(),
+);
+const streamStatus = computed<Record<string, StreamStatus>>(() => {
   const status: Record<string, StreamStatus> = {};
+  for (const s of result.value?.streams ?? []) status[s.stream] = s.failed ? "failed" : "done";
+  if (running.value) for (const plan of plans.value) status[plan.stream] = "loading";
   for (const name of unreadable.value) status[name] = "failed";
-  for (const [stream, run] of runs) {
-    status[stream] = run.pending ? "loading" : run.failed ? "failed" : "done";
-  }
-  streamStatus.value = status;
-  limitedStreams.value = [...runs.values()]
-    .filter((r) => r.limitedRows !== null)
-    .map((r) => ({ stream: r.plan.stream, rows: r.limitedRows! }))
-    .sort((a, b) => a.stream.localeCompare(b.stream));
+  return status;
+});
+const limitedStreams = computed(() =>
+  (result.value?.streams ?? [])
+    .filter((s) => s.limitedRows != null)
+    .map((s) => ({ stream: s.stream, rows: s.limitedRows! }))
+    .sort((a, b) => a.stream.localeCompare(b.stream)),
+);
+
+function entitiesRequest() {
+  return {
+    startTime: windowStartUs.value,
+    endTime: windowEndUs.value,
+    plans: plans.value,
+    fullWindow: [...fullWindow],
+  };
 }
 
-function publishRows() {
-  const perKind: Record<EntityKind, { plan: StreamPlan; hits: AggHit[] }[]> = {
-    user: [],
-    ip: [],
-    host: [],
-  };
-  const capped = new Set<EntityKind>();
-  const failed = new Set<string>(unreadable.value);
-  const partial = new Set<string>();
-  for (const [stream, run] of runs) {
-    for (const k of ENTITY_KINDS) {
-      const hits = run.hits[k];
-      if (!hits) continue;
-      if (hits.length >= ENTITY_LIMIT) capped.add(k);
-      perKind[k].push({ plan: run.plan, hits });
-    }
-    if (run.failed) failed.add(stream);
-    if (run.partial) partial.add(stream);
-  }
-  rowsByKind.value = {
-    user: mergeEntities(perKind.user),
-    ip: mergeEntities(perKind.ip),
-    host: mergeEntities(perKind.host),
-  };
-  cappedKinds.value = capped;
-  failedStreams.value = [...failed].sort();
-  partialStreams.value = [...partial].sort();
-  if (pendingEntity.value && allRows.value.some((r) => r.value === pendingEntity.value)) {
-    restorePending();
+/** Reads every planned stream's entities; the server merges and scores them. */
+async function runEntities(mine: number, signal: AbortSignal) {
+  try {
+    const res = await securityInvestigate.entities(orgId.value, entitiesRequest(), signal);
+    if (mine !== seq) return;
+    result.value = res.data;
+    runError.value = "";
+    runFailure.value = null;
+    answered.value = true;
+  } catch (e: any) {
+    if (mine !== seq || signal.aborted) return;
+    runFailure.value = e;
+    runError.value = e?.response?.data?.message ?? e?.message ?? "";
   }
 }
 
@@ -262,25 +203,47 @@ async function refresh() {
   const ctrl = new AbortController();
   controller = ctrl;
   windowEndUs.value = Date.now() * 1000;
-  streamStatus.value = {};
-  limitedStreams.value = [];
   answered.value = false;
   running.value = true;
+  runFailure.value = null;
   await loadPlans(orgId.value, windowStartUs.value, windowEndUs.value, { signal: ctrl.signal });
   if (mine !== seq) return;
-  for (const run of runs.values()) run.ctrl.abort();
-  runs = new Map();
-  const tasks = plans.value.flatMap((plan) => startRun(plan, mine, ctrl.signal));
-  publishStatus();
-  await runPool(tasks);
+  if (plans.value.length) await runEntities(mine, ctrl.signal);
+  else result.value = null;
   if (mine !== seq) return;
-  publishRows();
-  publishStatus();
   running.value = false;
   lastRunAt.value = Date.now();
   if (pendingEntity.value) restorePending();
   else reopenSelected();
+  if (view.value === "graph") void loadGraph();
 }
+
+// ── Risk graph: real co-occurrence and SIEM cases only ──────────────────────
+const riskGraph = shallowRef<RiskGraph>({ nodes: [], edges: [], total: 0 });
+const graphLoading = ref(false);
+const graphFailed = ref<string[]>([]);
+let graphSeq = 0;
+
+async function loadGraph() {
+  if (!orgId.value || plansLoading.value) return;
+  const mine = ++graphSeq;
+  graphLoading.value = true;
+  try {
+    const res = await securityInvestigate.graph(orgId.value, entitiesRequest(), controller?.signal);
+    if (mine !== graphSeq) return;
+    riskGraph.value = res.data;
+    graphFailed.value = res.data.failedStreams;
+  } catch {
+    if (mine !== graphSeq) return;
+    graphFailed.value = plans.value.map((p) => p.stream).sort();
+  } finally {
+    if (mine === graphSeq) graphLoading.value = false;
+  }
+}
+
+watch(view, (v) => {
+  if (v === "graph" && !graphLoading.value) void loadGraph();
+});
 
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
@@ -293,6 +256,9 @@ const notices = computed<SecurityNotice[]>(() => {
       ? t("siem.entities.partialStreams", { streams: partialStreams.value.join(", ") })
       : "",
   ].filter(Boolean);
+  if (view.value === "graph" && graphFailed.value.length) {
+    partial.push(t("siem.entities.failedStreams", { streams: graphFailed.value.join(", ") }));
+  }
   if (partial.length) {
     out.push({
       key: "partial",
@@ -331,14 +297,13 @@ const notices = computed<SecurityNotice[]>(() => {
 
 /** Re-reads one large stream over the whole window instead of its last hour. */
 async function runFullWindow(stream: string) {
-  const plan = plans.value.find((p) => p.stream === stream);
-  if (!plan || !controller || plansLoading.value) return;
+  if (!controller || plansLoading.value || running.value) return;
   fullWindow.add(stream);
-  const mine = seq;
-  const tasks = startRun(plan, mine, controller.signal);
-  publishStatus();
-  await runPool(tasks);
+  const mine = ++seq;
+  running.value = true;
+  await runEntities(mine, controller.signal);
   if (mine !== seq) return;
+  running.value = false;
   lastRunAt.value = Date.now();
   reopenSelected();
 }
@@ -354,6 +319,7 @@ function reopenSelected() {
 onMounted(() => void refresh());
 onBeforeUnmount(() => {
   seq += 1;
+  graphSeq += 1;
   detailSeq += 1;
   controller?.abort();
   detailController?.abort();
@@ -380,24 +346,19 @@ function onKind(value: string | number) {
 }
 watch(search, () => syncUrl());
 
-interface Row extends EntityRow {
-  signals: EntitySignal[];
-  tone: SeverityTone;
-}
+type Row = ScoredEntity;
 
-function toneFor(signals: EntitySignal[]): SeverityTone {
-  if (signals.includes("failures")) return "high";
-  if (signals.includes("spread")) return "medium";
-  if (signals.includes("external")) return "low";
-  return "info";
-}
+/** Peer count that counts as unusually spread out for this kind, relative to its peers. */
+const spreadAt = computed(() => result.value?.[kind.value].spreadAt ?? 5);
+
+/** Failure share over the events that could have reported one. */
+const failureRate = (r: EntityRow) => (r.failureEvents ? r.failures / r.failureEvents : 0);
 
 // A stream still loading may hold the events that keep a rate or spread under its threshold.
 const allRows = computed<Row[]>(() =>
-  rowsByKind.value[kind.value].map((r) => {
-    const signals = loading.value ? [] : entitySignals(kind.value, r);
-    return { ...r, signals, tone: toneFor(signals) };
-  }),
+  rowsByKind.value[kind.value].map((r) =>
+    loading.value ? { ...r, signals: [], tone: "info" as const } : r,
+  ),
 );
 
 const filteredRows = computed(() => {
@@ -405,7 +366,7 @@ const filteredRows = computed(() => {
   return allRows.value.filter(
     (r) =>
       (signalFilter.value === "all" || r.signals.includes(signalFilter.value)) &&
-      (!needle || r.value.toLowerCase().includes(needle)),
+      (!needle || [r.value, ...r.aliases].some((v) => v.toLowerCase().includes(needle))),
   );
 });
 
@@ -470,7 +431,13 @@ const columns = computed<OTableColumnDef<Row>[]>(() => [
 ]);
 
 const counts = computed(() => {
-  const c = { failures: 0, spread: 0, external: 0 };
+  const c: Record<EntitySignal, number> = {
+    failures: 0,
+    fail_then_success: 0,
+    open_case: 0,
+    spread: 0,
+    external: 0,
+  };
   for (const r of allRows.value) for (const s of r.signals) c[s] += 1;
   return c;
 });
@@ -520,19 +487,27 @@ function onStat(key: string) {
   signalFilter.value = key === "all" || signalFilter.value === key ? "all" : (key as EntitySignal);
 }
 
+/** The server's failure-signal bar, for the chip's explanation. */
+const FAILURE_SIGNAL = { ratePct: 20, minFailures: 5 };
+
 const SIGNAL_TAG: Record<EntitySignal, BadgeVariant> = {
   failures: "error-soft",
+  fail_then_success: "error-soft",
+  open_case: "orange-soft",
   spread: "amber-soft",
   external: "blue-soft",
 };
 function signalHint(sig: EntitySignal): I18nText {
   if (sig === "failures")
     return t("siem.entities.signalHint.failures", {
-      rate: Math.round(SIGNAL_THRESHOLDS.failureRate * 100),
-      n: SIGNAL_THRESHOLDS.minFailures,
+      rate: FAILURE_SIGNAL.ratePct,
+      n: FAILURE_SIGNAL.minFailures,
     });
+  if (sig === "fail_then_success")
+    return t("siem.entities.signalHint.fail_then_success", { n: FAILURE_SIGNAL.minFailures });
+  if (sig === "open_case") return t("siem.entities.signalHint.open_case");
   if (sig === "spread")
-    return t(`siem.entities.signalHint.spread.${kind.value}`, { n: SIGNAL_THRESHOLDS.spread });
+    return t(`siem.entities.signalHint.spread.${kind.value}`, { n: spreadAt.value });
   return t("siem.entities.signalHint.external");
 }
 
@@ -567,9 +542,8 @@ function step(delta: number) {
   const next = nav.neighbour(selected.value, delta);
   if (next) openEntity(next);
 }
-function onGraphNodeSelect(value: string) {
-  const row = filteredRows.value.find((r) => r.value === value);
-  if (row) openEntity(row);
+function onGraphNodeSelect(nodeKind: EntityKind, value: string) {
+  pivotTo(nodeKind, value);
 }
 /** Opens the entity named in the URL once rows are in. */
 function restorePending() {
@@ -614,12 +588,12 @@ const related = ref<Record<EntityKind, { value: string; n: number; fail: number 
   ip: [],
   host: [],
 });
+const cases = ref<NodeCase[]>([]);
 const detailLoading = ref(false);
 /** Streams whose drawer queries failed; shown in the drawer, not swallowed. */
 const detailFailed = ref<string[]>([]);
 let detailSeq = 0;
 let detailController: AbortController | null = null;
-const RELATED_LIMIT = 10;
 
 async function loadDetail(row: Row) {
   const mine = ++detailSeq;
@@ -628,83 +602,51 @@ async function loadDetail(row: Row) {
   detailLoading.value = true;
   timeline.value = [];
   related.value = { user: [], ip: [], host: [] };
-  const k = kind.value;
+  cases.value = [];
   const start = windowStartUs.value;
   const end = windowEndUs.value;
-  const interval = histogramInterval((end - start) / 1000);
-  const inStreams = plans.value.filter((p) => row.streams.includes(p.stream));
-
-  const buckets = new Map<number, { ok: number; failed: number }>();
-  const rel: Record<EntityKind, Map<string, { n: number; fail: number }>> = {
-    user: new Map(),
-    ip: new Map(),
-    host: new Map(),
-  };
-  const jobs: { stream: string; run: () => Promise<void> }[] = [];
-  for (const plan of inStreams) {
-    // A large stream's drawer reads the same slice its table row was counted over.
-    const run = runs.get(plan.stream);
-    const from = run?.startUs ?? start;
-    const to = run?.endUs ?? end;
-    const tl = entityTimelineSql(plan, k, row.value, interval.sql);
-    if (tl) {
-      jobs.push({
-        stream: plan.stream,
-        run: async () => {
-          const { hits } = await runSql(orgId.value, tl, from, to, -1, { signal });
-          for (const h of hits) {
-            const ts = histogramKeyToMs(h.zo_ts);
-            if (ts === null) continue;
-            const n = Number(h.zo_n ?? 0);
-            const f = Number(h.zo_fail ?? 0);
-            const b = buckets.get(ts) ?? { ok: 0, failed: 0 };
-            b.ok += n - f;
-            b.failed += f;
-            buckets.set(ts, b);
-          }
-        },
-      });
+  try {
+    const res = await securityInvestigate.detail(
+      orgId.value,
+      {
+        startTime: start,
+        endTime: end,
+        plans: plans.value.filter((p) => row.streams.includes(p.stream)),
+        fullWindow: [...fullWindow],
+        kind: kind.value,
+        values: row.aliases.length ? row.aliases : [row.value],
+        interval: histogramInterval((end - start) / 1000).sql,
+      },
+      signal,
+    );
+    if (mine !== detailSeq) return;
+    const buckets = new Map<number, { ok: number; failed: number }>();
+    for (const b of res.data.timeline) {
+      const ts = histogramKeyToMs(b.key);
+      if (ts === null) continue;
+      const cur = buckets.get(ts) ?? { ok: 0, failed: 0 };
+      buckets.set(ts, { ok: cur.ok + b.ok, failed: cur.failed + b.failed });
     }
-    for (const other of ENTITY_KINDS.filter((x) => x !== k)) {
-      const sql = relatedSql(plan, k, row.value, other, RELATED_LIMIT);
-      if (!sql) continue;
-      jobs.push({
-        stream: plan.stream,
-        run: async () => {
-          const { hits } = await runSql(orgId.value, sql, from, to, -1, { signal });
-          for (const h of hits) {
-            const v = String(h.zo_value ?? "");
-            if (!v) continue;
-            const cur = rel[other].get(v) ?? { n: 0, fail: 0 };
-            rel[other].set(v, {
-              n: cur.n + Number(h.zo_n ?? 0),
-              fail: cur.fail + Number(h.zo_fail ?? 0),
-            });
-          }
-        },
-      });
-    }
+    timeline.value = [...buckets.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([ts, c]) => ({ ts, counts: { ok: c.ok, failed: c.failed } }));
+    related.value = {
+      user: res.data.related.user ?? [],
+      ip: res.data.related.ip ?? [],
+      host: res.data.related.host ?? [],
+    };
+    detailFailed.value = res.data.failedStreams;
+    cases.value = res.data.cases ?? [];
+  } catch {
+    if (mine !== detailSeq || signal.aborted) return;
+    detailFailed.value = [...row.streams].sort();
+  } finally {
+    if (mine === detailSeq) detailLoading.value = false;
   }
-  const settled = await runPool(jobs.map((j) => () => limit(j.run)));
-  const failed = new Set<string>();
-  settled.forEach((r, i) => r.status === "rejected" && failed.add(jobs[i].stream));
-  if (mine !== detailSeq) return;
-  detailFailed.value = [...failed].sort();
-  timeline.value = [...buckets.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([ts, c]) => ({ ts, counts: { ok: c.ok, failed: c.failed } }));
-  related.value = Object.fromEntries(
-    ENTITY_KINDS.map((x) => [
-      x,
-      [...rel[x].entries()]
-        .map(([value, c]) => ({ value, ...c }))
-        .sort((a, b) => b.n - a.n)
-        .slice(0, RELATED_LIMIT),
-    ]),
-  ) as typeof related.value;
-  detailLoading.value = false;
 }
 
+/** Counterparts the server returns per kind. */
+const RELATED_LIMIT = 10;
 const relatedKinds = computed(() => ENTITY_KINDS.filter((x) => x !== kind.value));
 const relatedCount = computed(() =>
   relatedKinds.value.reduce((sum, x) => sum + related.value[x].length, 0),
@@ -723,6 +665,12 @@ const drawerTabs = computed<RecordTab[]>(() => [
     label: t("siem.entities.tab.sources"),
     icon: "database",
     count: selected.value?.streams.length ?? null,
+  },
+  {
+    name: "cases",
+    label: t("siem.entities.tab.cases"),
+    icon: "assignment",
+    count: cases.value.length || null,
   },
 ]);
 
@@ -759,11 +707,30 @@ const chartSeries = computed(() => [
   },
 ]);
 
+/** Every included source at once, matching each alias of this entity. */
+function huntLink() {
+  if (!selected.value) return null;
+  return {
+    path: "/security/events",
+    query: {
+      org_identifier: orgId.value,
+      period: range.value,
+      ...huntLinkQuery({
+        kind: kind.value,
+        value: selected.value.value,
+        aliases: selected.value.aliases,
+      }),
+    },
+  };
+}
+
 /** Events for this entity in one stream, filtered to it, over this page's window. */
 function eventsLink(stream: string) {
   const plan = plans.value.find((p) => p.stream === stream);
   const column = plan?.columns[kind.value];
   if (!selected.value || !column) return null;
+  // One filter value cannot match several spellings; the cross-source hunt can.
+  if (selected.value.aliases.length > 1) return huntLink();
   return {
     path: "/security/events",
     query: {
@@ -772,7 +739,9 @@ function eventsLink(stream: string) {
       period: range.value,
       filters:
         b64EncodeUnicode(
-          JSON.stringify([{ field: column, op: "=", value: selected.value.value }]),
+          JSON.stringify([
+            { field: column, op: "=", value: selected.value.aliases[0] ?? selected.value.value },
+          ]),
         ) ?? "",
     },
   };
@@ -781,6 +750,24 @@ function openEvents(stream: string) {
   const link = eventsLink(stream);
   if (link) router.push(link);
 }
+function huntInEvents() {
+  const link = huntLink();
+  if (link) router.push(link);
+}
+function openCase(id: string) {
+  router.push({ path: "/security/cases", query: { org_identifier: orgId.value, case: id } });
+}
+
+/** Case priority tone: P1 and P2 are urgent, P3 elevated, anything else quiet. */
+const CASE_TAG: Record<string, BadgeVariant> = {
+  P1: "error-soft",
+  P2: "error-soft",
+  P3: "orange-soft",
+  P4: "default-soft",
+};
+
+/** Raw spellings that differ from the canonical value, so the stored value stays visible. */
+const otherAliases = (r: EntityRow) => r.aliases.filter((a) => a !== r.value);
 
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
@@ -885,8 +872,15 @@ const noSources = computed(
         /></OTag>
       </div>
 
+      <SecurityAccessLock
+        v-if="accessDenials.length"
+        :denials="accessDenials"
+        :reason="raw(forbiddenReason(refusal))"
+        size="hero"
+        data-test="security-entities-access-lock"
+      />
       <OEmptyState
-        v-if="noSources"
+        v-else-if="noSources"
         size="hero"
         icon="database"
         :title="t('siem.entities.noSources')"
@@ -894,8 +888,8 @@ const noSources = computed(
       />
       <SecurityRiskGraph
         v-else-if="view === 'graph'"
-        :rows="filteredRows"
-        :kind="kind"
+        :graph="riskGraph"
+        :loading="graphLoading || loading"
         data-test="security-entities-risk-graph"
         @node-select="onGraphNodeSelect"
       />
@@ -907,7 +901,7 @@ const noSources = computed(
         :columns="columns"
         row-key="value"
         :loading="tableLoading"
-        :error="plansError || null"
+        :error="plansError || runError || null"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
         :show-global-filter="false"
@@ -954,6 +948,15 @@ const noSources = computed(
               :class="{ 'font-mono': kind !== 'user' }"
               >{{ row.value }}</span
             >
+            <OTag
+              v-if="otherAliases(row).length"
+              variant="default-soft"
+              size="xs"
+              class="shrink-0"
+              :data-test="`security-entities-aliases-${row.value}`"
+              >{{ t("siem.entities.aliasCount", otherAliases(row).length)
+              }}<OTooltip :content="raw(row.aliases.join(', '))"
+            /></OTag>
           </div>
         </template>
         <template #cell-signals="{ row }">
@@ -1083,6 +1086,15 @@ const noSources = computed(
             )
           }}<OTooltip :content="signalHint(sig)"
         /></OTag>
+        <OTag
+          v-for="alias in otherAliases(selected)"
+          :key="alias"
+          variant="default-soft"
+          size="sm"
+          class="font-mono"
+          :data-test="`security-entity-drawer-alias-${alias}`"
+          >{{ alias }}<OTooltip :content="t('siem.entities.aliasHint')"
+        /></OTag>
         <OTag v-if="selected.peers" variant="default-soft" size="sm">
           {{ t(`siem.entities.peersChip.${PEER_LABEL[kind]}`, selected.peers) }}
         </OTag>
@@ -1184,6 +1196,46 @@ const noSources = computed(
         </template>
       </template>
 
+      <template #tab-cases>
+        <div v-if="detailLoading" class="flex justify-center py-8"><OSpinner size="sm" /></div>
+        <div
+          v-else-if="cases.length"
+          class="border-border-default rounded-surface overflow-hidden border"
+          data-test="security-entity-drawer-cases"
+        >
+          <div
+            v-for="c in cases"
+            :key="c.id"
+            class="group border-border-subtle hover:bg-surface-subtle focus-visible:ring-accent flex cursor-pointer items-center gap-3 border-b px-3 py-2 outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-inset"
+            role="link"
+            tabindex="0"
+            :data-test="`security-entity-drawer-case-${c.id}`"
+            @click="openCase(c.id)"
+            @keydown.enter="openCase(c.id)"
+            @keydown.space.prevent="openCase(c.id)"
+          >
+            <OTag :variant="CASE_TAG[c.severity] ?? 'default-soft'" size="xs">{{
+              raw(c.severity || "P3")
+            }}</OTag>
+            <OTruncatedText class="text-text-heading flex-1 text-sm">{{ c.title }}</OTruncatedText>
+            <OTag :variant="c.open ? 'orange-soft' : 'default-soft'" size="xs">{{
+              c.open ? t("siem.entities.caseOpen") : t("siem.entities.caseResolved")
+            }}</OTag>
+            <OIcon
+              name="chevron-right"
+              size="sm"
+              class="text-text-secondary opacity-0 group-hover:opacity-100 max-md:opacity-100"
+            />
+          </div>
+        </div>
+        <span
+          v-else
+          class="text-text-secondary text-xs"
+          data-test="security-entity-drawer-no-cases"
+          >{{ t("siem.entities.noCases") }}</span
+        >
+      </template>
+
       <template #tab-sources>
         <div class="border-border-default rounded-surface overflow-hidden border">
           <div
@@ -1222,7 +1274,7 @@ const noSources = computed(
           size="sm-action"
           icon-left="manage-search"
           data-test="security-entity-drawer-open-events"
-          @click="openEvents(selected.streams[0])"
+          @click="huntInEvents"
         >
           {{ t("siem.entities.huntInEvents") }}
         </OButton>
