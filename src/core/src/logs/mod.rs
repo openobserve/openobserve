@@ -22,7 +22,7 @@ use std::{
 #[cfg(feature = "cloud")]
 use ::stream::get_stream;
 use arrow_schema::{DataType, Field};
-use bulk::SCHEMA_CONFORMANCE_FAILED;
+use bulk::{BulkResponseOrder, SCHEMA_CONFORMANCE_FAILED};
 use chrono::Utc;
 use config::{
     META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config,
@@ -66,6 +66,15 @@ pub mod otlp;
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
 pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
+
+/// `(action, index, doc_id)` of a `_bulk` action line; `Err` says why its metadata is invalid.
+type BulkAction<'a> =
+    Result<(&'a str, &'a str, Option<&'a str>), (&'a str, Option<&'a str>, &'static str)>;
+
+struct WriteLogsContext<'a> {
+    is_derived: bool,
+    response_order: Option<&'a mut BulkResponseOrder>,
+}
 
 /// No association names `_all_values`, so the scan leaves its stale pre-redaction text.
 #[cfg(feature = "vectorscan")]
@@ -123,22 +132,19 @@ fn all_values_of(record: &Map<String, Value>, max_len: usize) -> String {
     values.join(" ")
 }
 
-fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
+fn parse_bulk_index(v: &Value) -> Option<BulkAction<'_>> {
     let local_val = v.as_object()?;
-    for action in BULK_OPERATORS {
-        if let Some(val) = local_val.get(action) {
-            let Some(local_val) = val.as_object() else {
-                log::warn!("Invalid bulk index action: {action}");
-                continue;
-            };
-            let Some(index) = local_val.get("_index").and_then(|v| v.as_str()) else {
-                continue;
-            };
-            let doc_id = local_val.get("_id").and_then(|v| v.as_str());
-            return Some((action, index, doc_id));
-        };
-    }
-    None
+    let (action, val) = BULK_OPERATORS
+        .iter()
+        .find_map(|action| local_val.get(*action).map(|val| (*action, val)))?;
+    let Some(local_val) = val.as_object() else {
+        return Some(Err((action, None, "action metadata must be a JSON object")));
+    };
+    let doc_id = local_val.get("_id").and_then(|v| v.as_str());
+    let Some(index) = local_val.get("_index").and_then(|v| v.as_str()) else {
+        return Some(Err((action, doc_id, "action metadata must name an _index")));
+    };
+    Some(Ok((action, index, doc_id)))
 }
 
 pub fn cast_to_type(
@@ -264,6 +270,7 @@ async fn write_logs_by_stream(
     byte_size_by_stream: HashMap<String, usize>,
     derived_streams: HashSet<String>,
     mut columnar: Option<columnar::JsonColumnar>,
+    mut response_order: Option<&mut BulkResponseOrder>,
 ) -> Result<bool> {
     let mut stream_skipped = false;
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
@@ -277,7 +284,14 @@ async fn write_logs_by_stream(
         // before the new-stream hooks, so a stream that cannot be stored is never announced
         if let Err(e) = schema::check_stream_key_len(org_id, StreamType::Logs, &stream_name) {
             let columnar = columnar.take_if(|c| c.stream_name() == stream_name);
-            reject_stream_rows(&stream_name, &json_data, columnar, status, &e.to_string());
+            reject_stream_rows(
+                &stream_name,
+                &json_data,
+                columnar,
+                status,
+                &e.to_string(),
+                response_order.as_deref_mut(),
+            );
             continue;
         }
 
@@ -323,7 +337,10 @@ async fn write_logs_by_stream(
             status,
             json_data,
             columnar.take_if(|c| c.stream_name() == stream_name),
-            derived_streams.contains(&stream_name),
+            WriteLogsContext {
+                is_derived: derived_streams.contains(&stream_name),
+                response_order: response_order.as_deref_mut(),
+            },
         )
         .await?;
 
@@ -384,6 +401,7 @@ fn reject_stream_rows(
     columnar: Option<columnar::JsonColumnar>,
     status: &mut IngestionStatus,
     reason: &str,
+    response_order: Option<&mut BulkResponseOrder>,
 ) {
     match status {
         IngestionStatus::Record(status) => {
@@ -392,13 +410,22 @@ fn reject_stream_rows(
             status.error = reason.to_string();
         }
         IngestionStatus::Bulk(bulk_res) => {
+            let positions: Vec<usize> = response_order
+                .map(|order| {
+                    order
+                        .accepted
+                        .drain(..)
+                        .chain(order.columnar.drain(..))
+                        .collect()
+                })
+                .unwrap_or_default();
             let doc_ids = json_data
                 .iter()
                 .map(|(_, record)| record.get("_id").and_then(Value::as_str).map(String::from))
                 .chain(columnar.into_iter().flat_map(|mut c| c.take_bulk_ids()));
-            for doc_id in doc_ids {
+            for (doc_id, position) in doc_ids.zip(bulk::padded_positions(positions)) {
                 bulk_res.errors = true;
-                bulk::add_record_status(
+                if let Some(item) = bulk::add_record_status(
                     stream_name.to_string(),
                     doc_id,
                     String::new(),
@@ -406,7 +433,9 @@ fn reject_stream_rows(
                     bulk_res,
                     Some(bulk::STREAM_NAME_TOO_LONG.to_string()),
                     Some(reason.to_string()),
-                );
+                ) {
+                    item.request_position = position;
+                }
             }
         }
     }
@@ -419,8 +448,12 @@ async fn write_logs(
     status: &mut IngestionStatus,
     mut json_data: Vec<(i64, Map<String, Value>)>,
     columnar: Option<columnar::JsonColumnar>,
-    is_derived: bool,
+    context: WriteLogsContext<'_>,
 ) -> Result<RequestStats> {
+    let WriteLogsContext {
+        is_derived,
+        mut response_order,
+    } = context;
     let cfg = get_config();
     let log_ingest_errors = ingestion_log_enabled().await;
     // get schema and stream settings
@@ -532,6 +565,9 @@ async fn write_logs(
     let mut partition_memo = PartitionMemo::new(&partition_keys, partition_time_level);
 
     for (timestamp, mut record_val) in json_data {
+        let response_position = response_order
+            .as_mut()
+            .and_then(|order| order.accepted.pop_front());
         let doc_id = record_val
             .get("_id")
             .map(|v| v.as_str().unwrap().to_string());
@@ -584,7 +620,7 @@ async fn write_logs(
                             ])
                             .inc();
                         log_failed_record(log_ingest_errors, &record_val, &e.to_string());
-                        bulk::add_record_status(
+                        if let Some(item) = bulk::add_record_status(
                             stream_name.to_string(),
                             doc_id,
                             "".to_string(),
@@ -592,7 +628,9 @@ async fn write_logs(
                             bulk_res,
                             Some(bulk::SCHEMA_CONFORMANCE_FAILED.to_string()),
                             Some(e.to_string()),
-                        );
+                        ) {
+                            item.request_position = response_position;
+                        }
                     }
                 }
                 continue;
@@ -679,6 +717,7 @@ async fn write_logs(
                         "index".to_string(),
                         stream_name,
                         doc_id.unwrap_or_default(),
+                        response_position,
                     ));
                 }
             }
@@ -687,7 +726,7 @@ async fn write_logs(
 
     let mut entries = schema_records_to_entries(org_id, stream_name, write_buf);
     if let Some(columnar) = columnar {
-        entries.extend(columnar_entries(org_id, status, columnar)?);
+        entries.extend(columnar_entries(org_id, status, columnar, response_order)?);
     }
     let writer =
         ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
@@ -720,12 +759,19 @@ fn columnar_entries(
     org_id: &str,
     status: &mut IngestionStatus,
     mut columnar: columnar::JsonColumnar,
+    response_order: Option<&mut BulkResponseOrder>,
 ) -> Result<Vec<ingester::Entry>> {
     match status {
         IngestionStatus::Record(status) => status.successful += columnar.rows() as u32,
         IngestionStatus::Bulk(bulk_res) => {
-            let doc_ids = columnar.take_bulk_ids();
-            bulk::add_success_items(columnar.stream_name(), doc_ids, bulk_res);
+            let positions = response_order
+                .map(|order| std::mem::take(&mut order.columnar))
+                .unwrap_or_default();
+            let rows = columnar
+                .take_bulk_ids()
+                .into_iter()
+                .zip(bulk::padded_positions(positions));
+            bulk::add_success_items(columnar.stream_name(), rows, bulk_res);
         }
     }
     columnar.into_entries(org_id)
@@ -821,7 +867,7 @@ mod tests {
         ];
 
         let mut record = IngestionStatus::Record(ingestion_common::RecordStatus::default());
-        reject_stream_rows("s", &rows, None, &mut record, "too long");
+        reject_stream_rows("s", &rows, None, &mut record, "too long", None);
         let IngestionStatus::Record(status) = record else {
             unreachable!()
         };
@@ -833,7 +879,7 @@ mod tests {
             errors: false,
             items: vec![],
         });
-        reject_stream_rows("s", &rows, None, &mut bulk, "too long");
+        reject_stream_rows("s", &rows, None, &mut bulk, "too long", None);
         let IngestionStatus::Bulk(bulk) = bulk else {
             unreachable!()
         };
@@ -847,6 +893,94 @@ mod tests {
         let error = bulk.items[0]["index"].error.as_ref().unwrap();
         assert_eq!(error.err_type, bulk::STREAM_NAME_TOO_LONG);
         assert_eq!(error.reason, "too long");
+    }
+
+    #[test]
+    fn test_bulk_columnar_positions_follow_response_mode() {
+        let schema =
+            arrow_schema::Schema::new(vec![Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)]);
+        let mut columnar =
+            columnar::JsonColumnar::for_schema("s", &schema, 0, (0, i64::MAX), false).unwrap();
+        assert!(columnar.parse_bulk_line(b"{}", None));
+        let mut order = BulkResponseOrder {
+            columnar: vec![2],
+            ..Default::default()
+        };
+        let mut status = IngestionStatus::Bulk(ingestion_common::BulkResponse {
+            took: 0,
+            errors: false,
+            items: vec![],
+        });
+        let entries = columnar_entries("o", &mut status, columnar, Some(&mut order)).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].data.is_empty());
+        assert_eq!(entries[0].batch.as_ref().unwrap().num_rows(), 1);
+        let IngestionStatus::Bulk(response) = status else {
+            unreachable!()
+        };
+        assert!(order.columnar.is_empty());
+        if get_config().common.bulk_api_response_errors_only {
+            assert!(response.items.is_empty());
+        } else {
+            assert_eq!(response.items.len(), 1);
+            assert_eq!(response.items[0]["index"].request_position, Some(2));
+        }
+    }
+
+    #[test]
+    fn test_bulk_rejected_mixed_rows_keep_request_positions() {
+        let schema = arrow_schema::Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("_id", DataType::Utf8, true),
+            Field::new("message", DataType::Utf8, true),
+        ]);
+        let mut columnar =
+            columnar::JsonColumnar::for_schema("s", &schema, 0, (0, i64::MAX), false).unwrap();
+        let mut rows = Vec::new();
+        let mut order = BulkResponseOrder::default();
+        for (position, id) in ["a", "b", "c", "d", "e"].into_iter().enumerate() {
+            let record = if position % 2 == 0 {
+                json!({"message": "known"})
+            } else {
+                json!({"message": "new", "new_field": true})
+            };
+            if columnar.parse_bulk_line(record.to_string().as_bytes(), Some(id)) {
+                order.columnar.push(position);
+            } else {
+                order.accepted.push_back(position);
+                rows.push((0, json!({"_id": id}).as_object().unwrap().clone()));
+            }
+        }
+        assert_eq!(columnar.rows(), 3);
+        let mut status = IngestionStatus::Bulk(ingestion_common::BulkResponse {
+            took: 0,
+            errors: false,
+            items: vec![],
+        });
+        reject_stream_rows(
+            "s",
+            &rows,
+            Some(columnar),
+            &mut status,
+            "too long",
+            Some(&mut order),
+        );
+        let IngestionStatus::Bulk(mut response) = status else {
+            unreachable!()
+        };
+        bulk::restore_response_order(&mut response.items);
+        let ids: Vec<&str> = response
+            .items
+            .iter()
+            .map(|item| item["index"]._id.as_str())
+            .collect();
+        assert_eq!(ids, ["a", "b", "c", "d", "e"]);
+        assert!(
+            response
+                .items
+                .iter()
+                .all(|item| item["index"].error.is_some())
+        );
     }
 
     #[test]
@@ -877,9 +1011,7 @@ mod tests {
     #[test]
     fn test_parse_bulk_index_index_action() {
         let v = json!({"index": {"_index": "my-stream", "_id": "doc1"}});
-        let result = parse_bulk_index(&v);
-        assert!(result.is_some());
-        let (action, index, doc_id) = result.unwrap();
+        let (action, index, doc_id) = parse_bulk_index(&v).unwrap().unwrap();
         assert_eq!(action, "index");
         assert_eq!(index, "my-stream");
         assert_eq!(doc_id, Some("doc1"));
@@ -888,9 +1020,7 @@ mod tests {
     #[test]
     fn test_parse_bulk_index_create_action_no_doc_id() {
         let v = json!({"create": {"_index": "my-stream"}});
-        let result = parse_bulk_index(&v);
-        assert!(result.is_some());
-        let (action, index, doc_id) = result.unwrap();
+        let (action, index, doc_id) = parse_bulk_index(&v).unwrap().unwrap();
         assert_eq!(action, "create");
         assert_eq!(index, "my-stream");
         assert!(doc_id.is_none());
@@ -904,10 +1034,23 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_bulk_index_missing_index_skips_action() {
-        let v = json!({"index": {"_id": "doc1"}});
-        let result = parse_bulk_index(&v);
-        assert!(result.is_none());
+    fn test_parse_bulk_index_malformed_action_is_an_error() {
+        for (v, expected) in [
+            (
+                json!({"index": {"_id": "doc1"}}),
+                ("index", Some("doc1"), "action metadata must name an _index"),
+            ),
+            (
+                json!({"create": {"_index": 5}}),
+                ("create", None, "action metadata must name an _index"),
+            ),
+            (
+                json!({"update": "my-stream"}),
+                ("update", None, "action metadata must be a JSON object"),
+            ),
+        ] {
+            assert_eq!(parse_bulk_index(&v), Some(Err(expected)), "{v}");
+        }
     }
 
     #[test]

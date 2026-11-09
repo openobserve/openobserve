@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     io::{BufRead, Cursor, Read},
     sync::{LazyLock, Mutex},
     time::{Duration, Instant},
@@ -58,8 +58,10 @@ use prost::Message;
 use transform::TRANSFORM_FAILED;
 
 use super::{
-    IngestJsonData, bulk::TS_PARSE_FAILED, columnar::JsonColumnar, ingestion_log_enabled,
-    log_failed_record,
+    IngestJsonData,
+    bulk::{BulkResponseOrder, TS_PARSE_FAILED},
+    columnar::JsonColumnar,
+    ingestion_log_enabled, log_failed_record,
 };
 use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
@@ -90,6 +92,8 @@ struct FinalizeRecordContext<'a> {
     dbm_enabled: bool,
     stream_status: &'a mut StreamStatus,
     json_data_by_stream: &'a mut LogDataByStream,
+    /// A `_bulk` record's request position, and the accepted positions it joins once buffered.
+    bulk_position: Option<(&'a mut VecDeque<usize>, usize)>,
 }
 
 /// Why a record could not be prepared for writing.
@@ -203,18 +207,20 @@ pub async fn ingest(
         extend_json,
         is_derived,
         None,
+        None,
     )
     .await
 }
 
 /// Ingests one stream's `_bulk` records beside the rows its data lines already built.
-pub async fn ingest_bulk(
+pub(super) async fn ingest_bulk(
     thread_id: usize,
     org_id: &str,
     stream_name: &str,
     records: Vec<json::Value>,
     plan: Option<BulkPlan>,
     user: IngestUser,
+    response_order: &mut BulkResponseOrder,
 ) -> Result<IngestionResponse> {
     ingest_inner(
         thread_id,
@@ -225,6 +231,7 @@ pub async fn ingest_bulk(
         None,
         false,
         plan,
+        Some(response_order),
     )
     .await
 }
@@ -278,6 +285,7 @@ async fn ingest_inner(
     extend_json: Option<&HashMap<String, serde_json::Value>>,
     is_derived: bool,
     bulk_plan: Option<BulkPlan>,
+    response_order: Option<&mut BulkResponseOrder>,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
@@ -377,6 +385,11 @@ async fn ingest_inner(
         mut streams_need_original_map,
         mut streams_need_all_values_map,
     } = needs;
+    // Pipeline outputs have no per-record provenance, so their items carry no request position.
+    let mut response_order = response_order.filter(|_| executable_pipelines.is_empty());
+    let mut bulk_positions = response_order
+        .as_deref_mut()
+        .map(|order| (order.records.iter().copied(), &mut order.accepted));
     let mut pipeline_inputs = Vec::new();
     let mut original_options = Vec::new();
     // with pipeline, we need to store original if any of the destinations requires original
@@ -462,6 +475,9 @@ async fn ingest_inner(
     let mut json_data_by_stream: LogDataByStream = HashMap::new();
     let mut size_by_stream = HashMap::new();
     for ret in data.iter() {
+        let input_position = bulk_positions
+            .as_mut()
+            .and_then(|(records, _)| records.next());
         let mut item = match ret {
             Ok(item) => item,
             Err(IngestionError::PayloadTooLarge(e)) => {
@@ -528,6 +544,10 @@ async fn ingest_inner(
                 dbm_enabled: dbm_gate,
                 stream_status: &mut stream_status,
                 json_data_by_stream: &mut json_data_by_stream,
+                bulk_position: bulk_positions
+                    .as_mut()
+                    .map(|(_, accepted)| &mut **accepted)
+                    .zip(input_position),
             },
         ) {
             continue;
@@ -799,6 +819,7 @@ async fn ingest_inner(
                         dbm_enabled: dbm_gate,
                         stream_status: &mut stream_status,
                         json_data_by_stream: &mut json_data_by_stream,
+                        bulk_position: None,
                     },
                 );
             }
@@ -904,6 +925,7 @@ async fn ingest_inner(
             size_by_stream,
             derived_streams,
             columnar,
+            response_order,
         )
         .await;
         match status {
@@ -911,7 +933,7 @@ async fn ingest_inner(
                 stream_status.status = status;
             }
             IngestionStatus::Bulk(items) => {
-                stream_status.items = items.items;
+                stream_status.items.extend(items.items);
             }
         };
         match write_result {
@@ -1089,6 +1111,11 @@ fn finalize_and_buffer_record(
     original_data: Option<String>,
     ctx: &mut FinalizeRecordContext<'_>,
 ) -> bool {
+    let bulk_doc_id = ctx
+        .bulk_position
+        .as_ref()
+        .and_then(|_| item.get("_id")?.as_str())
+        .map(String::from);
     let (mut res, timestamp) = match prepare_record(item, ctx.flatten_level, ctx.min_ts, ctx.max_ts)
     {
         Ok(v) => v,
@@ -1096,6 +1123,13 @@ fn finalize_and_buffer_record(
             ctx.stream_status.status.failed += 1;
             ctx.stream_status.status.error = e.to_string();
             log::error!("Record flattening error: {e}");
+            reject_bulk_record(
+                ctx,
+                bulk_doc_id,
+                None,
+                crate::logs::bulk::SCHEMA_CONFORMANCE_FAILED,
+                e.to_string(),
+            );
             return false;
         }
         Err(PrepareRecordError::Timestamp(res, e)) => {
@@ -1109,6 +1143,13 @@ fn finalize_and_buffer_record(
                 ])
                 .inc();
             log_failed_record(ctx.log_ingestion_errors, &res, &e.to_string());
+            reject_bulk_record(
+                ctx,
+                bulk_doc_id,
+                Some(res),
+                crate::logs::bulk::TS_PARSE_FAILED,
+                e.to_string(),
+            );
             return false;
         }
     };
@@ -1116,6 +1157,13 @@ fn finalize_and_buffer_record(
         json::Value::Object(val) => val,
         _ => {
             ctx.stream_status.status.failed += 1;
+            reject_bulk_record(
+                ctx,
+                bulk_doc_id,
+                None,
+                crate::logs::bulk::SCHEMA_CONFORMANCE_FAILED,
+                "record is not a JSON object".to_string(),
+            );
             return false;
         }
     };
@@ -1191,7 +1239,35 @@ fn finalize_and_buffer_record(
             );
         }
     };
+    if let Some((accepted, position)) = ctx.bulk_position.as_mut() {
+        accepted.push_back(*position);
+    }
     true
+}
+
+/// Answers a `_bulk` record finalization refused with a failed item at its request position.
+fn reject_bulk_record(
+    ctx: &mut FinalizeRecordContext<'_>,
+    doc_id: Option<String>,
+    value: Option<json::Value>,
+    failure_type: &str,
+    reason: String,
+) {
+    let Some((_, position)) = ctx.bulk_position.as_ref() else {
+        return;
+    };
+    let mut item = crate::logs::bulk::failed_item(
+        "index".to_string(),
+        ctx.stream_name.to_string(),
+        doc_id.unwrap_or_default(),
+        value,
+        failure_type.to_string(),
+        reason,
+    );
+    for failed in item.values_mut() {
+        failed.request_position = Some(*position);
+    }
+    ctx.stream_status.items.push(item);
 }
 
 struct IngestionDataIterator(IngestionDataIter);
@@ -2258,5 +2334,54 @@ mod tests {
         let (needs, columnar) = request_needs(stream.clone(), None).await;
         assert!(columnar.is_none());
         assert!(needs.executable_pipelines.is_empty());
+    }
+
+    #[test]
+    fn test_bulk_rejected_finalized_records_answer_at_their_positions() {
+        let mut accepted_positions = VecDeque::new();
+        let mut stream_status = StreamStatus::new("s");
+        let mut buffered = LogDataByStream::new();
+        let schema_map = HashMap::new();
+        let settings = HashMap::new();
+        for (position, record, accepted) in [
+            (0, json::json!({"_timestamp": 1000000000000000_i64}), true),
+            (1, json::json!({"_id": "b", "_timestamp": "invalid"}), false),
+            (2, json::json!({"_timestamp": 1000000000000001_i64}), true),
+        ] {
+            assert_eq!(
+                finalize_and_buffer_record(
+                    record,
+                    None,
+                    &mut FinalizeRecordContext {
+                        stream_name: "s",
+                        org_id: "o",
+                        flatten_level: 0,
+                        min_ts: 1,
+                        max_ts: i64::MAX,
+                        index_all_max_value_length: 0,
+                        user_defined_schema_map: &schema_map,
+                        streams_need_original_map: &settings,
+                        streams_need_all_values_map: &settings,
+                        need_usage_report: false,
+                        log_ingestion_errors: false,
+                        dbm_enabled: false,
+                        stream_status: &mut stream_status,
+                        json_data_by_stream: &mut buffered,
+                        bulk_position: Some((&mut accepted_positions, position)),
+                    }
+                ),
+                accepted,
+            );
+        }
+        assert_eq!(accepted_positions, [0, 2]);
+        assert_eq!(buffered["s"].0.len(), 2);
+        assert_eq!(stream_status.status.failed, 1);
+        let [rejected] = stream_status.items.as_slice() else {
+            panic!("one failed item expected, got {:?}", stream_status.items);
+        };
+        let rejected = &rejected["index"];
+        assert_eq!(rejected.request_position, Some(1));
+        assert_eq!(rejected._id, "b");
+        assert_eq!(rejected.error.as_ref().unwrap().err_type, TS_PARSE_FAILED);
     }
 }
