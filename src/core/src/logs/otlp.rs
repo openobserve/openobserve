@@ -1110,6 +1110,45 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_logs_accepts_a_non_string_id_attribute() {
+        infra::db::create_table().await.unwrap();
+        infra::schema::init().await.unwrap();
+        // inside the ingestion window, so the records reach the write path
+        let now = chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64;
+        let record = |attributes| LogRecord {
+            time_unix_nano: now,
+            body: Some(AnyValue {
+                value: Some(StringValue("a log".to_string())),
+            }),
+            attributes,
+            ..Default::default()
+        };
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![record(vec![]), record(vec![kv("_id", IntValue(7))])],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+
+        let result = handle_request(
+            0,
+            "test_org_id",
+            request,
+            Some("test_non_string_id"),
+            "a@a.com",
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
     #[tokio::test]
     async fn test_handle_logs_refuses_internal_streams() {
         for stream in ["_o2_ai_chat_events"] {
