@@ -1380,7 +1380,9 @@ for (var i = 0; i < filtered.length; i++) {
 
     #[test]
     fn test_score_fn_names_memory_and_non_finite_failures() {
-        let hog = "function score(o) { var a = []; for (var i = 0; i < 2000000; i++) a.push({k: i}); return a.length > 0; }";
+        // Large chunks per iteration, so a slow runner reaches the memory limit well inside the
+        // time limit.
+        let hog = "function score(o) { var a = []; for (var i = 0; i < 100000; i++) a.push(new Array(10000).fill(i)); return a.length > 0; }";
         let err = run_score_fn("score_org", hog, &[json!("x")]).unwrap_err();
         assert_eq!(err, "Code scorer exceeded the 10 MB memory limit");
         let big = run_score_fn(
