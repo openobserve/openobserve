@@ -136,6 +136,57 @@ export interface PackRecordItem {
   /** Library alert this Use all copy came from. */
   copyOf?: string;
   stream?: string;
+  /** Library content hash this alert was installed or last updated from. */
+  libraryHash?: string;
+  /** Updatable fields as the library shipped them, the base of a field-by-field merge. */
+  base?: Record<string, unknown>;
+  /** The last applied update, kept so Revert can restore the version before it. */
+  update?: PackAppliedUpdate;
+  /** Panel content hashes right after the pack wrote them, so a repair can tell user edits. */
+  panelHashes?: Record<string, string>;
+}
+
+export type PackUpdateOutcome = "updated" | "kept";
+
+/** One field that differs between the user's alert and the new library version. */
+export interface PackUpdateRow {
+  field: string;
+  installed: unknown;
+  yours: unknown;
+  library: unknown;
+  outcome: PackUpdateOutcome;
+}
+
+/** One alert's pending update: the merged body and the rows the drawer lists. */
+export interface PackUpdate {
+  itemId: string;
+  name: string;
+  fromHash: string;
+  hash: string;
+  rows: PackUpdateRow[];
+  /** The installed fields the check merged from; null when nobody can tell. */
+  base: Record<string, unknown> | null;
+  /** The alert as the new library version would install it here. */
+  next: Record<string, any>;
+}
+
+export interface PackAppliedUpdate {
+  fromHash: string;
+  fromBase?: Record<string, unknown>;
+  rows: PackUpdateRow[];
+}
+
+/** A stream renamed after install, repointed in place and undoable for a day. */
+export interface PackLaterRepair {
+  from: string;
+  to: string;
+  /** Microseconds; starts the Undo window. */
+  at: number;
+  /** Panel ids rewritten, keyed by dashboard item id. */
+  panels: Record<string, string[]>;
+  alerts: string[];
+  /** The record's repairs before this one, restored by Undo. */
+  repairsBefore: PackRepair[];
 }
 
 export interface PackInstallRecord {
@@ -155,6 +206,7 @@ export interface PackInstallRecord {
   folderName?: string;
   /** Someone chose Keep off, so Home stops reminding. */
   keptOff?: boolean;
+  laterRepair?: PackLaterRepair;
 }
 
 export interface PackKeptItem {

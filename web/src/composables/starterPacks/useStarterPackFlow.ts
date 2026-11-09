@@ -44,6 +44,15 @@ export type PackPreviewState = "idle" | "loading" | "ready" | "error";
 const countsAsItem = (item: PackRecordItem) => item.kind !== "folder";
 const notSkipped = (item: PackRecordItem) => item.status !== "skipped";
 
+export const isOrgAdmin = (state: Record<string, any>): boolean => {
+  const role = String(state.userInfo?.role ?? state.currentuser?.role ?? "").toLowerCase();
+  return state.zoConfig?.is_org_admin === true || role === "admin" || role === "root";
+};
+
+/** Admins and whoever set the pack up may change what it installed. */
+export const canManageInstall = (state: Record<string, any>, record: PackInstallRecord | null) =>
+  isOrgAdmin(state) || (!!record?.installedBy && record.installedBy === state.userInfo?.email);
+
 const newestRecord = (rows: PackInstallRecord[]): PackInstallRecord | null => {
   const live = rows.filter((row) => row.status !== "removed");
   const unfinished = live.find((row) => row.status !== "complete");
@@ -83,13 +92,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const clock = setInterval(() => (nowUs.value = Date.now() * 1000), CLOCK_TICK_MS);
   onScopeDispose(() => clearInterval(clock));
 
-  const email = computed<string>(() => store.state.userInfo?.email ?? "");
-  const isAdmin = computed(() => {
-    const role = String(
-      store.state.userInfo?.role ?? store.state.currentuser?.role ?? "",
-    ).toLowerCase();
-    return store.state.zoConfig?.is_org_admin === true || role === "admin" || role === "root";
-  });
+  const isAdmin = computed(() => isOrgAdmin(store.state));
   const licensed = computed(
     () => featureState(store.state.zoConfig?.features, KUBERNETES_FEATURE) === "enabled",
   );
@@ -116,10 +119,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     const at = record.value?.installedAt;
     return at ? Math.max(0, at + UNDO_WINDOW_US - nowUs.value) : 0;
   });
-  const canManage = computed(
-    () =>
-      isAdmin.value || (!!record.value?.installedBy && record.value.installedBy === email.value),
-  );
+  const canManage = computed(() => canManageInstall(store.state, record.value));
   const canUndo = computed(() => canManage.value && undoLeftUs.value > 0);
 
   const readAlertsOn = async () => {
