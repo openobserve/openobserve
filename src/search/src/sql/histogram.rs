@@ -91,7 +91,31 @@ pub fn pin_statement(
 ) -> Result<PinnedHistograms, Error> {
     let end_time = pin_reference_time(end_time);
     pin_request_timezone(timezone, end_time);
-    pin_statement_timezones(statement, timezone.as_deref(), end_time)
+    let timezone = timezone.as_deref();
+    let mut changed = false;
+    let mut offsets = Vec::new();
+    let result = visit_expressions_mut(statement, |expr| {
+        match pin_histogram_call(expr, timezone, end_time) {
+            Ok(Some((updated, offset))) => {
+                changed |= updated;
+                offsets.push(offset);
+            }
+            Ok(None) => {}
+            Err(error) => return ControlFlow::Break(error),
+        }
+        ControlFlow::Continue(())
+    });
+    if let ControlFlow::Break(error) = result {
+        return Err(error);
+    }
+    let first = offsets.first().copied().unwrap_or_default();
+    Ok(PinnedHistograms {
+        changed,
+        offset: offsets
+            .iter()
+            .all(|offset| *offset == first)
+            .then_some(first),
+    })
 }
 
 /// Cheap pre-check shared by every caller that would otherwise parse the SQL for `histogram()`.
@@ -303,38 +327,6 @@ fn rewrite_statements(
             .join("; ");
     }
     Ok(())
-}
-
-/// Pins every `histogram()` timezone in the statement; `timezone` is the request default.
-fn pin_statement_timezones(
-    statement: &mut Statement,
-    timezone: Option<&str>,
-    end_time: i64,
-) -> Result<PinnedHistograms, Error> {
-    let mut changed = false;
-    let mut offsets = Vec::new();
-    let result = visit_expressions_mut(statement, |expr| {
-        match pin_histogram_call(expr, timezone, end_time) {
-            Ok(Some((updated, offset))) => {
-                changed |= updated;
-                offsets.push(offset);
-            }
-            Ok(None) => {}
-            Err(error) => return ControlFlow::Break(error),
-        }
-        ControlFlow::Continue(())
-    });
-    if let ControlFlow::Break(error) = result {
-        return Err(error);
-    }
-    let first = offsets.first().copied().unwrap_or_default();
-    Ok(PinnedHistograms {
-        changed,
-        offset: offsets
-            .iter()
-            .all(|offset| *offset == first)
-            .then_some(first),
-    })
 }
 
 fn timezone_offset_micros(timezone: Option<&str>, end_time: i64) -> Result<i64, Error> {
