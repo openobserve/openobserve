@@ -26,8 +26,8 @@ use config::{
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
     ast::{
-        Cte, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, Ident, ObjectName, Query,
-        Select, SelectItem, SelectItemQualifiedWildcardKind, SetExpr, Statement, TableAlias,
+        Cte, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, Ident, ObjectName,
+        Query, Select, SelectItem, SelectItemQualifiedWildcardKind, SetExpr, Statement, TableAlias,
         TableFactor, Value, visit_expressions, visit_expressions_mut,
     },
     dialect::PostgreSqlDialect,
@@ -84,7 +84,8 @@ pub struct PinnedHistograms {
     pub offset: Option<i64>,
 }
 
-/// Sets every `histogram()` interval from the request, so execution buckets like the partitions.
+/// Sets the bucket `histogram()` interval from the request, so execution buckets like the
+/// partitions.
 pub fn handle_histogram(
     origin_sql: &mut String,
     q_time_range: (i64, i64),
@@ -97,9 +98,16 @@ pub fn handle_histogram(
         return;
     };
     let mut changed = false;
+    // The interval belongs to the first call, the one `HistogramIntervalVisitor` reads it from.
+    let mut bucket_args = None;
     for statement in &mut statements {
         let _ = visit_expressions_mut(statement, |expr| {
-            changed |= set_histogram_interval(expr, q_time_range, histogram_interval);
+            if let Expr::Function(func) = expr
+                && is_histogram_function(&func.name)
+                && bucket_args.get_or_insert_with(|| func.args.clone()) == &func.args
+            {
+                changed |= set_histogram_interval(func, q_time_range, histogram_interval);
+            }
             ControlFlow::<()>::Continue(())
         });
     }
@@ -377,16 +385,10 @@ fn timezone_offset_micros(timezone: Option<&str>, end_time: i64) -> Result<i64, 
 }
 
 fn set_histogram_interval(
-    expr: &mut Expr,
+    func: &mut Function,
     q_time_range: (i64, i64),
     histogram_interval: i64,
 ) -> bool {
-    let Expr::Function(func) = expr else {
-        return false;
-    };
-    if !is_histogram_function(&func.name) {
-        return false;
-    }
     let FunctionArguments::List(list) = &mut func.args else {
         return false;
     };
@@ -1145,8 +1147,20 @@ mod tests {
                 "SELECT ts, n FROM (SELECT histogram(_timestamp, '3600 second') AS ts, count(*) AS n FROM t GROUP BY ts) WHERE n > 0",
             ),
             (
-                "SELECT histogram(_timestamp, '1 day') AS a, histogram(_timestamp, '2 day') AS b FROM t GROUP BY a, b",
+                "SELECT histogram(_timestamp, '1 day') AS a, histogram(_timestamp, '1 day') AS b FROM t GROUP BY a, b",
                 "SELECT histogram(_timestamp, '3600 second') AS a, histogram(_timestamp, '3600 second') AS b FROM t GROUP BY a, b",
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 day') AS a, histogram(_timestamp, '2 day') AS b FROM t GROUP BY a, b",
+                "SELECT histogram(_timestamp, '3600 second') AS a, histogram(_timestamp, '2 day') AS b FROM t GROUP BY a, b",
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour', '+05:30') AS h, count(*) FROM t WHERE histogram(_timestamp, '1 day', '+05:30') = to_timestamp_micros(1767225600000000) GROUP BY h",
+                "SELECT histogram(_timestamp, '3600 second', '+05:30') AS h, count(*) FROM t WHERE histogram(_timestamp, '1 day', '+05:30') = to_timestamp_micros(1767225600000000) GROUP BY h",
+            ),
+            (
+                "SELECT histogram(_timestamp) AS h, count(*) FROM t WHERE histogram(_timestamp, '1 day') = to_timestamp_micros(1767225600000000) GROUP BY h",
+                "SELECT histogram(_timestamp, '3600 second') AS h, count(*) FROM t WHERE histogram(_timestamp, '1 day') = to_timestamp_micros(1767225600000000) GROUP BY h",
             ),
         ];
         for (input, expected) in cases {
