@@ -20,6 +20,9 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import AlertCalibrationDigestDetail from "./AlertCalibrationDigestDetail.vue";
 import type { RunRow } from "./digests";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const DAY_MICROS = 86_400_000_000;
 const NOW = Date.now() * 1000;
@@ -107,6 +110,11 @@ describe("AlertCalibrationDigestDetail view in logs", () => {
         query: expect.objectContaining({ stream_type: "logs" }),
       }),
     );
+    expect(analytics.track).toHaveBeenCalledWith("alert_calibration_digest_logs_opened");
+    (wrapper.vm as any).onRuleFilter("failure");
+    expect(analytics.track).toHaveBeenCalledWith("alert_calibration_rule_filtered", {
+      rule: "failure",
+    });
     wrapper.unmount();
   });
 });

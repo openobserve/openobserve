@@ -284,6 +284,7 @@ import {
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { ingestionTokensQuery } from "@/services/organizations.queries";
+import analytics from "@/services/product_analytics";
 import { ref, computed, defineComponent, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -529,6 +530,7 @@ export default defineComponent({
       loading.value = true;
       try {
         await setIngestionTokenEnabled.mutateAsync({ name, enabled });
+        analytics.track(enabled ? "ingestion_token_enabled" : "ingestion_token_disabled");
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({
@@ -567,6 +569,9 @@ export default defineComponent({
           name,
           action: generate ? "generate" : "revoke",
         });
+        analytics.track(
+          generate ? "ingestion_splunk_token_generated" : "ingestion_splunk_token_revoked",
+        );
         await fetchTokens();
         toast({
           variant: "success",

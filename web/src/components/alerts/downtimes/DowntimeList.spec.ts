@@ -23,6 +23,9 @@ import type { DowntimeListItem, DowntimeListResponse } from "@/services/downtime
 import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // The route guard opens this page only with downtimes on.
 vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
@@ -310,6 +313,19 @@ describe("DowntimeList", () => {
     await flushPromises();
     expect(wrapper.router.currentRoute.value.query.status).toBe("scheduled");
     expect(total()).toContain("1");
+    wrapper.unmount();
+  });
+
+  it("tracks the status and type filters a user picks", async () => {
+    vi.mocked(downtimes.list).mockResolvedValue(page([row()]) as never);
+    const wrapper = await mountList();
+    vi.mocked(analytics.track).mockClear();
+    await wrapper.get('[data-test="downtime-summary-scheduled"]').trigger("click");
+    (wrapper.vm as any).onTypeChange("recurring");
+    expect(vi.mocked(analytics.track).mock.calls).toEqual([
+      ["downtime_list_filtered", { filter: "status", value: "scheduled" }],
+      ["downtime_list_filtered", { filter: "type", value: "recurring" }],
+    ]);
     wrapper.unmount();
   });
 

@@ -5,6 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -204,6 +205,7 @@ onBeforeUnmount(() => {
 function onRangeChange(value: unknown) {
   if (!value || value === range.value) return;
   range.value = value as RangeKey;
+  analytics.track("security_time_range_changed", { view: "intel", range: range.value });
   syncUrl();
   void runSweep();
 }
@@ -343,7 +345,10 @@ const tab = ref<"matches" | "indicators" | "coverage">(
 const search = ref("");
 const typeFilter = ref<IndicatorType | "all">("all");
 const expiryFilter = ref(false);
-watch(tab, () => syncUrl());
+watch(tab, (value) => {
+  syncUrl();
+  analytics.track("security_tab_switched", { view: "intel", tab: value });
+});
 
 const TYPE_ICON: Record<IndicatorType, IconName> = {
   ip: "lan",
@@ -592,6 +597,7 @@ const selectedRowId = computed(() => (selected.value ? uidOf(selected.value) : "
 const selectedMatch = computed(() => (selected.value ? matchesFor(selected.value) : null));
 
 function openIndicator(i: Indicator) {
+  if (!selected.value) analytics.track("security_detail_opened", { view: "intel" });
   selected.value = i;
   drawerTab.value = matchesFor(i) ? "sightings" : "details";
   syncUrl();

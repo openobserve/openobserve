@@ -5,6 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -115,6 +116,7 @@ function copyLink() {
   }
   navigator.clipboard.writeText(props.shareUrl).then(
     () => {
+      analytics.track("security_link_copied");
       linkCopied.value = true;
       setTimeout(() => (linkCopied.value = false), 1600);
     },

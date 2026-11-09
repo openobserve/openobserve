@@ -1,4 +1,5 @@
 import http from "./http";
+import analytics from "./product_analytics";
 
 const rate_limit = {
   getApiLimits: (org_identifier: string, interval?: string) => {
@@ -38,14 +39,24 @@ const rate_limit = {
     if (interval) {
       url += `&interval=${interval}`;
     }
-    return http().put(url, data);
+    return http()
+      .put(url, data)
+      .then((res) => {
+        analytics.track("rate_limit_updated", { update_type, interval });
+        return res;
+      });
   },
   download_template: (org_identifier: string) => {
     let url = `/api/_meta/ratelimit/download_template`;
     if (org_identifier) {
       url += `?org_id=${org_identifier}`;
     }
-    return http().get(url);
+    return http()
+      .get(url)
+      .then((res) => {
+        analytics.track("rate_limit_template_downloaded");
+        return res;
+      });
   },
   upload_template: (org_identifier: string, file: any) => {
     let url = `/api/_meta/ratelimit/upload`;
@@ -54,11 +65,16 @@ const rate_limit = {
     }
     const formData = new FormData();
     formData.append("rules", JSON.stringify(file));
-    return http().put(url, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    return http()
+      .put(url, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      })
+      .then((res) => {
+        analytics.track("rate_limit_template_uploaded");
+        return res;
+      });
   },
   getModules: (org_identifier: string) => {
     let url = `/api/_meta/ratelimit/api_modules`;

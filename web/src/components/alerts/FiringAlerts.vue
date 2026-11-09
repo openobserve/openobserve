@@ -284,6 +284,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { useOrgId } from "@/composables/query";
 import { ackAlertsMutation } from "@/services/alerts.queries";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { formatInZone } from "@/utils/oncall";
 import {
@@ -425,6 +426,7 @@ const rowClass = (row: FiringRow) =>
   row.alert_id === selectedAlertId.value ? "bg-table-row-selected-bg" : "";
 
 const openAlert = (row: FiringRow) => {
+  analytics.track("alert_firing_detail_opened");
   void router.replace({ query: { ...route.query, alert: row.alert_id } });
 };
 const closeAlert = () => {
@@ -476,7 +478,9 @@ const clearFilters = () => {
 };
 
 const selectState = (value: unknown) => {
-  if (value) state.value = value as FiringState;
+  if (!value) return;
+  state.value = value as FiringState;
+  analytics.track("alert_firing_state_filtered", { state: state.value });
 };
 
 watch(state, () => (selectedIds.value = []));

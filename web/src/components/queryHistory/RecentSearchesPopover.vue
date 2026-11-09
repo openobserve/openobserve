@@ -244,6 +244,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import RecentSearchesDetails from "./RecentSearchesDetails.vue";
+import analytics from "@/services/product_analytics";
 
 const ROW_ACTIVE_CLASSES =
   "border-s-2 border-transparent data-[highlighted]:border-accent data-[highlighted]:bg-select-item-selected-bg";
@@ -355,8 +356,14 @@ const focusHeldRow = () => {
 // Shift loads without running; a failed row always loads, since running it again fails again.
 const pick = (entry: QueryHistoryEntry, event: MouseEvent | KeyboardEvent, failed: boolean) => {
   const when = defaultRestoreTime(entry, Date.now(), zone.value);
-  if (failed || event.shiftKey) emit("load", entry, when);
-  else emit("run", entry, when);
+  const run = !failed && !event.shiftKey;
+  analytics.track("search_history_entry_restored", {
+    source: entry.source,
+    run,
+    surface: "quick_list",
+  });
+  if (run) emit("run", entry, when);
+  else emit("load", entry, when);
 };
 
 const rows = () => [...(rootRef.value?.querySelectorAll<HTMLElement>("[data-recent-row]") ?? [])];

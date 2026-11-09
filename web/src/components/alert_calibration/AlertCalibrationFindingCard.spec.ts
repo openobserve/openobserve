@@ -13,11 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import type { FindingRecord } from "./digests";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const finding = (overrides: Partial<FindingRecord> = {}): FindingRecord => ({
   _timestamp: 1,
@@ -110,5 +114,31 @@ describe("AlertCalibrationFindingCard", () => {
       finding({ rule_id: "noise", alert_name: "cpu", actions: "RaiseThreshold" }),
     );
     expect(wrapper.find('[data-test="alert-calibration-finding-lag-row"]').exists()).toBe(false);
+  });
+
+  it("tracks opening the flagged alert with its rule", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: { template: "<div />" } },
+        {
+          path: "/alerts/detail/:alert_id",
+          name: "alertDetail",
+          component: { template: "<div />" },
+        },
+      ],
+    });
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const wrapper = mount(AlertCalibrationFindingCard, {
+      props: { finding: finding({ rule_id: "failure", alert_id: "a1" }) },
+      global: { plugins: [store, router] },
+    });
+    await wrapper.find('[data-test="alert-calibration-finding-open-alert"]').trigger("click");
+    expect(open).toHaveBeenCalled();
+    expect(analytics.track).toHaveBeenCalledWith("alert_calibration_finding_alert_opened", {
+      rule: "failure",
+      source: "digest",
+    });
+    open.mockRestore();
   });
 });

@@ -322,6 +322,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -746,6 +747,10 @@ export default defineComponent({
         queryObject["fn_editor"] = "false";
       }
 
+      analytics.track("search_history_query_reapplied", {
+        stream_type: queryObject.stream_type,
+        has_function: queryObject["fn_editor"] === "true",
+      });
       router.push({
         path: "/logs",
         query: queryObject,
@@ -760,6 +765,7 @@ export default defineComponent({
         org_identifier: row.org_id,
       };
 
+      analytics.track("search_history_inspector_opened");
       router.push({
         path: "/logs/inspector",
         query: queryObject,

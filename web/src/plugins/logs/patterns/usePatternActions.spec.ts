@@ -102,8 +102,11 @@ vi.mock("./patternUtils", async (importOriginal) => {
   };
 });
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 // -- Import after mocks --
 import { usePatternActions } from "./usePatternActions";
+import analytics from "@/services/product_analytics";
 import { extractConstantsFromPattern } from "./patternUtils";
 
 describe("usePatternActions", () => {
@@ -129,6 +132,7 @@ describe("usePatternActions", () => {
 
       expect(selectedPattern.value).toEqual({ pattern, index: 0 });
       expect(showPatternDetails.value).toBe(true);
+      expect(analytics.track).toHaveBeenCalledWith("log_patterns_detail_opened");
     });
   });
 
@@ -222,6 +226,10 @@ describe("usePatternActions", () => {
       addPatternToSearch({ template: "User <*> from <:IP>" }, "exclude");
 
       expect(mockSearchObj.data.stream.addToFilter).toBe("NOT match_all('User logged in')");
+      expect(analytics.track).toHaveBeenCalledWith("log_patterns_filter_applied", {
+        action: "exclude",
+        target: "pattern",
+      });
     });
 
     it("should wrap multiple clauses with NOT (...) for exclude action", () => {
@@ -243,6 +251,7 @@ describe("usePatternActions", () => {
 
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(mockSearchObj.data.stream.addToFilter).toBe("");
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 
@@ -253,6 +262,10 @@ describe("usePatternActions", () => {
       addWildcardValueToSearch("192.168.1.1", "include");
 
       expect(mockSearchObj.data.stream.addToFilter).toBe("match_all('192.168.1.1')");
+      expect(analytics.track).toHaveBeenCalledWith("log_patterns_filter_applied", {
+        action: "include",
+        target: "wildcard_value",
+      });
       expect(mockSearchObj.meta.logsVisualizeToggle).toBe("logs");
     });
 

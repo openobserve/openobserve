@@ -285,6 +285,9 @@ import i18n from "@/locales";
 import enUS from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
+import settingsService from "@/services/settings";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { gt } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { getDashboard } from "@/utils/commons.ts";
@@ -1737,6 +1740,50 @@ describe("ViewDashboard", () => {
       wrapper.findComponent(ShareButton).vm.$emit("shorten:error", { error: "x" });
 
       expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    describe("home unpin", () => {
+      const pinThis = () => {
+        useHomeDashboard(gt).homeDashboard.value = {
+          dashboardId: "test-dashboard-1",
+          folderId: "default",
+          label: "Pinned",
+        };
+      };
+
+      afterEach(() => {
+        useHomeDashboard(gt).homeDashboard.value = null;
+      });
+
+      it("tracks home_dashboard_unpinned once the pin is cleared", async () => {
+        vi.spyOn(settingsService, "deleteOrgSetting").mockResolvedValueOnce({} as any);
+        wrapper = createWrapper();
+        await flushPromises();
+        pinThis();
+
+        await wrapper.vm.toggleHomeDashboard();
+
+        expect(analytics.track).toHaveBeenCalledWith("home_dashboard_unpinned", {
+          source: "dashboard_view",
+        });
+      });
+
+      it("does not track an unpin the server refused", async () => {
+        vi.spyOn(settingsService, "deleteOrgSetting").mockRejectedValueOnce({
+          response: { status: 500 },
+        });
+        wrapper = createWrapper();
+        await flushPromises();
+        pinThis();
+
+        await wrapper.vm.toggleHomeDashboard();
+
+        expect(useHomeDashboard(gt).homeDashboard.value?.dashboardId).toBe("test-dashboard-1");
+        expect(analytics.track).not.toHaveBeenCalledWith(
+          "home_dashboard_unpinned",
+          expect.anything(),
+        );
+      });
     });
   });
 

@@ -613,6 +613,7 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useOrgId } from "@/composables/query";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -835,6 +836,7 @@ const typeOptions = computed<{ value: TypeFilter; label: I18nText; icon: IconNam
 
 const onTypeChange = (value: unknown) => {
   typeFilter.value = (value as TypeFilter) || "all";
+  analytics.track("downtime_list_filtered", { filter: "type", value: typeFilter.value });
 };
 
 const onFolderChange = (folderId: string) => {
@@ -975,6 +977,7 @@ const summaryStats = computed<StatItem[]>(() => {
 
 const onStatSelect = (key: string) => {
   statFilter.value = key === "total" || statFilter.value === key ? null : (key as StatKey);
+  analytics.track("downtime_list_filtered", { filter: "status", value: statFilter.value ?? "all" });
 };
 
 const onEmptyAction = (id?: string) => {

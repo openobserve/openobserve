@@ -32,6 +32,9 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => panelApi),
 }));
 
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: analytics }));
+
 describe("LabelFilterEditor", () => {
   let wrapper: any;
 
@@ -458,6 +461,9 @@ describe("LabelFilterEditor", () => {
         op: "=",
         value: "",
         group: 3,
+      });
+      expect(analytics.track).toHaveBeenCalledWith("promql_builder_label_filter_added", {
+        new_group: true,
       });
     });
 

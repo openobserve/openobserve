@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -70,6 +71,7 @@ const range = ref<RangeKey>(
 function onRangeChange(value: unknown) {
   if (!value || value === range.value) return;
   range.value = value as RangeKey;
+  analytics.track("security_time_range_changed", { view: "mitre", range: range.value });
   router.replace({ query: { ...route.query, period: range.value } });
   void loadHistory();
 }
@@ -317,6 +319,7 @@ const selectedIndex = computed(() => {
 const drawerTab = ref("detections");
 
 function openCell(cell: TechniqueCell) {
+  if (!selectedId.value) analytics.track("security_detail_opened", { view: "mitre" });
   selectedId.value = cell.id;
 }
 function step(delta: number) {

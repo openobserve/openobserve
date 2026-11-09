@@ -19,6 +19,7 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { gt, raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -174,8 +175,10 @@ const viewOptions = computed(() =>
 const onAddCluster = () =>
   router.push({ name: "ingestFromKubernetes", query: { org_identifier: orgId.value } });
 
-const onCluster = (value: unknown) =>
-  replace({ ...state.value, cluster: value ? String(value) : null, details: null });
+const onCluster = (value: unknown) => {
+  analytics.track("infra_k8s_cluster_switched", { cleared: !value });
+  return replace({ ...state.value, cluster: value ? String(value) : null, details: null });
+};
 
 // Fills, groups and label keys differ per entity, so an entity change starts from its defaults.
 const onUpdate = (patch: Partial<K8sUrlState>) => {
@@ -198,16 +201,25 @@ const sameDetails = (a: DetailsRef | null, b: DetailsRef) =>
 // Clicking the row whose drawer is open closes it, as in Lens.
 const onOpen = (details: DetailsRef) => {
   if (sameDetails(state.value.details, details)) closeDetails();
-  else push(withDetails(state.value, details));
+  else {
+    push(withDetails(state.value, details));
+    analytics.track("infra_k8s_details_opened", { kind: details.kind });
+  }
 };
 
-const onDrawerLink = (details: DetailsRef) => push(withDetails(state.value, details));
+const onDrawerLink = (details: DetailsRef) => {
+  analytics.track("infra_k8s_details_opened", { kind: details.kind });
+  return push(withDetails(state.value, details));
+};
 
 const closeDetails = () => replace({ ...state.value, details: null });
 
 const onNavigate = (next: K8sUrlState) => push(next);
 
-const onView = (view: View) => push(withView(state.value, view));
+const onView = (view: View) => {
+  analytics.track("infra_k8s_view_changed", { view });
+  return push(withView(state.value, view));
+};
 
 const onPatch = (patch: Partial<K8sUrlState>) =>
   push({ ...withView(state.value, patch.view ?? state.value.view), ...patch });
@@ -292,6 +304,10 @@ const onDateChange = (date: {
     relative: date.valueType !== "absolute",
   };
   if (date.userChangedValue === false) return;
+  analytics.track("infra_time_range_changed", {
+    page: "kubernetes",
+    type: date.valueType === "absolute" ? "absolute" : "relative",
+  });
   const oneDay =
     date.valueType === "relative" && Math.abs(date.endTime - date.startTime - DAY_US) < 60_000_000;
   lastKnown.value = lastKnown.value && oneDay;
@@ -435,8 +451,12 @@ const openTraces = async (ref: DetailsRef) => {
 
 const onAction = (type: K8sAction, ref: DetailsRef) => {
   if ((type === "metrics" || type === "traces") && isLocked(type)) return;
-  if (type === "details") onDrawerLink(ref);
-  else if (type === "logs") dock.value = openTab(dock.value, type, ref);
+  if (type === "details") {
+    onDrawerLink(ref);
+    return;
+  }
+  analytics.track("infra_k8s_action_clicked", { action: type, kind: ref.kind });
+  if (type === "logs") dock.value = openTab(dock.value, type, ref);
   else if (type === "yaml") dock.value = openTab(dock.value, type, ref, dockRowOf(ref));
   else if (type === "metrics") {
     router.push(

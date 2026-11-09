@@ -5,6 +5,9 @@ import SearchSchedulersList from "./SearchSchedulersList.vue";
 import searchService from "@/services/search";
 import { useRouter } from "vue-router";
 import { nextTick } from "vue";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock config
 vi.mock("@/aws-exports", () => ({
@@ -260,6 +263,7 @@ describe("SearchSchedulersList Component", () => {
         org_identifier: "test-org",
         jobId: "123",
       });
+      expect(analytics.track).toHaveBeenCalledWith("search_job_deleted");
     });
   });
 
@@ -303,6 +307,10 @@ describe("SearchSchedulersList Component", () => {
       await wrapper.vm.fetchSearchResults(mockRow);
       await flushPromises();
       await nextTick();
+
+      expect(analytics.track).toHaveBeenCalledWith("search_job_results_opened", {
+        stream_type: "logs",
+      });
 
       expect(routerPushMock).toHaveBeenCalledWith({
         path: "/logs",

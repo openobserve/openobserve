@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ocsfPacks from "@/services/ocsfPacks";
+import analytics from "@/services/product_analytics";
 import {
   attach,
   detach,
@@ -27,6 +28,8 @@ vi.mock("@/services/ocsfPacks", () => ({
     saveSetting: vi.fn(),
   },
 }));
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const svc = ocsfPacks as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
@@ -161,6 +164,11 @@ describe("attach (R11)", () => {
     expect(svc.saveSetting.mock.invocationCallOrder[0]).toBeGreaterThan(
       svc.createPipeline.mock.invocationCallOrder[0],
     );
+    expect(analytics.track).toHaveBeenCalledWith("security_source_pack_attached", {
+      source_type: "entity",
+      kind: "entity",
+      pipeline_created: true,
+    });
   });
 
   it("extends an existing pipeline without creating a second one", async () => {
@@ -235,6 +243,7 @@ describe("attach (R11)", () => {
 
     await expect(attach("org1", "web", PACK)).rejects.toBeDefined();
     expect(svc.saveSetting).not.toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   it("treats a 400 as a lost race only when a realtime pipeline now exists (F2)", async () => {
@@ -357,6 +366,10 @@ describe("detach (R12)", () => {
       pack_version: 0,
       source_type: "entity",
       included: true,
+    });
+    expect(analytics.track).toHaveBeenCalledWith("security_source_pack_detached", {
+      source_type: "entity",
+      pipeline_skipped: false,
     });
   });
 

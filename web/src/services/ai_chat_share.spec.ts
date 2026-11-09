@@ -16,13 +16,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import aiChatShare from "./ai_chat_share";
 import http from "./http";
+import analytics from "./product_analytics";
 
 vi.mock("./http", () => ({ default: vi.fn() }));
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("ai_chat_share service", () => {
   let api: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     api = {
       get: vi.fn().mockResolvedValue({ data: {} }),
       post: vi.fn().mockResolvedValue({ data: {} }),
@@ -86,6 +89,43 @@ describe("ai_chat_share service", () => {
       { headers: { "Content-Type": "application/json" } },
     );
     expect(api.get).toHaveBeenCalledWith("/api/public/ai_chats/tok", { params: undefined });
+  });
+
+  it("tracks share writes and forks with their settings once they succeed", async () => {
+    await aiChatShare.create("org1", "sess-1", {
+      mode: "live",
+      visibility: "public",
+      expires_in_secs: 3600,
+      redact_tools: true,
+    });
+    await aiChatShare.update("org1", "sh1", { refresh_snapshot: true });
+    await aiChatShare.revoke("org1", "sh1");
+    await aiChatShare.fork("org1", "tok");
+    expect(analytics.track).toHaveBeenCalledWith("shared_chat_created", {
+      mode: "live",
+      visibility: "public",
+      redact_tools: true,
+    });
+    expect(analytics.track).toHaveBeenCalledWith("shared_chat_updated", {
+      mode: undefined,
+      refresh_snapshot: true,
+      expiry_changed: false,
+      redact_tools: undefined,
+    });
+    expect(analytics.track).toHaveBeenCalledWith("shared_chat_revoked");
+    expect(analytics.track).toHaveBeenCalledWith("shared_chat_forked");
+  });
+
+  it("does not track a share that the server refused", async () => {
+    api.post.mockRejectedValueOnce(new Error("403"));
+    await expect(
+      aiChatShare.create("org1", "sess-1", {
+        mode: "snapshot",
+        visibility: "org",
+        redact_tools: false,
+      }),
+    ).rejects.toThrow();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   it("encodes path segments", async () => {

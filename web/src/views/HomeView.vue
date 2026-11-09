@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align="left"
           reorderable
           data-test="home-tab-bar"
+          @change="onTabChange"
           @reorder="onTabReorder"
         >
           <OTab
@@ -276,6 +277,7 @@ import SampleDataHomeBanner from "@/components/sampleData/SampleDataHomeBanner.v
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import analytics from "@/services/product_analytics";
 
 export default defineComponent({
   name: "PageHome",
@@ -344,11 +346,12 @@ export default defineComponent({
     // gone" path (onPinnedUnavailable) and the deliberate close (onCloseTab).
     function removeHomePin() {
       const org = store.state.selectedOrganization?.identifier;
-      clearHomeDashboard(org);
+      const cleared = clearHomeDashboard(org);
       // Active tab no longer exists in the recomputed set → fall back to first.
       if (!DEFAULT_TABS.value.find((tb) => tb.id === activeHomeTab.value)) {
         activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
       }
+      return cleared;
     }
 
     let verifyingPin = false;
@@ -384,7 +387,16 @@ export default defineComponent({
     function onCloseTab(id: string) {
       if (!id.startsWith("dash:")) return;
       // Deliberate unpin — no error toast.
-      removeHomePin();
+      void removeHomePin().then(() => {
+        // A failed clear restores the pin, so only a cleared one counts.
+        if (!homeDashboard.value)
+          analytics.track("home_dashboard_unpinned", { source: "home_tab" });
+      });
+    }
+
+    function onTabChange(id: string | number) {
+      const tab = String(id).startsWith("dash:") ? "dashboard" : String(id);
+      analytics.track("home_tab_switched", { tab });
     }
 
     function loadTabOrder() {
@@ -596,6 +608,7 @@ export default defineComponent({
       onPinnedLabel,
       onPinnedUnavailable,
       onCloseTab,
+      onTabChange,
       flagOn,
       isDataTab,
       arrived,

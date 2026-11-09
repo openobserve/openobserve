@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -76,6 +77,7 @@ const windowStartMs = computed(() => windowEndMs.value - windowMs.value);
 function onRangeChange(value: unknown) {
   if (!value || value === range.value) return;
   range.value = value as RangeKey;
+  analytics.track("security_time_range_changed", { view: "overview", range: range.value });
   router.replace({ query: { ...route.query, period: range.value } });
   void refresh();
 }
