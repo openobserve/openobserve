@@ -461,6 +461,8 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     await pm.serviceGraphPage.expectOperationsSectionVisible();
     testLogger.info('Operations section is visible');
 
+    // The operations rows load after the section shows, so poll instead of counting once.
+    await expect.poll(() => pm.serviceGraphPage.getOperationsTableRowCount(), { timeout: 15000 }).toBeGreaterThan(0);
     const rowCount = await pm.serviceGraphPage.getOperationsTableRowCount();
     testLogger.info(`Operations table row count: ${rowCount}`);
     expect(rowCount).toBeGreaterThan(0);
