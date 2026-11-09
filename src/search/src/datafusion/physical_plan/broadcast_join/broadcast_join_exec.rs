@@ -24,7 +24,7 @@ use datafusion::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
+    physical_expr::{Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, PlanProperties,
         execute_stream,
@@ -62,9 +62,7 @@ impl BroadcastJoinExec {
         cluster: String,
         path: String,
     ) -> Self {
-        let schema = hash_join.schema();
-        let partition = hash_join.output_partitioning().partition_count();
-        let cache = Self::compute_properties(Arc::clone(&schema), partition);
+        let cache = Self::compute_properties(&hash_join);
         BroadcastJoinExec {
             trace_id,
             left,
@@ -77,8 +75,10 @@ impl BroadcastJoinExec {
         }
     }
 
-    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> Arc<PlanProperties> {
-        let eq_properties = EquivalenceProperties::new(schema);
+    // Each output partition passes one partition of the join through unchanged.
+    fn compute_properties(hash_join: &Arc<dyn ExecutionPlan>) -> Arc<PlanProperties> {
+        let eq_properties = hash_join.properties().eq_properties.clone();
+        let n_partitions = hash_join.output_partitioning().partition_count();
         let output_partitioning = Partitioning::UnknownPartitioning(n_partitions);
         Arc::new(PlanProperties::new(
             eq_properties,
