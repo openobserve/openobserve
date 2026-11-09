@@ -34,6 +34,7 @@ const PACK = {
   alerts: ["a1"],
   savedViews: [],
   dashboards: [],
+  nativeView: { feature: "kubernetes_monitoring", route: "infraKubernetes" },
 } as unknown as StarterPack;
 
 const record = (over: Partial<PackInstallRecord> = {}): PackInstallRecord => ({
@@ -50,7 +51,7 @@ const record = (over: Partial<PackInstallRecord> = {}): PackInstallRecord => ({
   ...over,
 });
 
-const setup = (state: Record<string, unknown> = {}) => {
+const setup = (state: Record<string, unknown> = {}, pack: StarterPack = PACK) => {
   const store = createStore({
     state: { userInfo: { email: "me@x", role: "editor" }, zoConfig: { features: {} }, ...state },
   });
@@ -58,7 +59,7 @@ const setup = (state: Record<string, unknown> = {}) => {
   mount(
     defineComponent({
       setup() {
-        flow = useStarterPackFlow("org", PACK);
+        flow = useStarterPackFlow("org", pack);
         return () => null;
       },
     }),
@@ -165,6 +166,18 @@ describe("useStarterPackFlow", () => {
     expect(fake.push).toHaveBeenCalledWith({
       name: "viewDashboard",
       query: { org_identifier: "org", dashboard: "d1", folder: "fd", pack: "kubernetes" },
+    });
+  });
+
+  it("lands a pack without a built-in view on its dashboard whatever the plan", async () => {
+    fake.installPack.mockResolvedValue(record({ packId: "hosts" }));
+    const flow = setup({}, { ...PACK, id: "hosts", nativeView: undefined });
+    await flow.install();
+    expect(flow.licensed.value).toBe(false);
+    await flow.land();
+    expect(fake.push).toHaveBeenCalledWith({
+      name: "viewDashboard",
+      query: { org_identifier: "org", dashboard: "d1", folder: "fd", pack: "hosts" },
     });
   });
 

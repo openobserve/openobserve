@@ -37,6 +37,7 @@ export function usePackUpdates(org: string, flow: StarterPackFlow) {
     () =>
       STARTER_PACKS_ENABLED &&
       !flow.licensed.value &&
+      !!flow.pack.nativeView &&
       flow.pack.dashboards.length > 0 &&
       !!flow.record.value &&
       !flow.record.value.items.some(({ kind, id }) => kind === "dashboard" && id),

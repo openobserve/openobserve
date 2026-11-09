@@ -26,6 +26,9 @@ export const PACK = {
   alerts: ["a1", "a2"],
   savedViews: [{ id: "v1", name: "Events" }],
   folder: { name: "Kubernetes", description: "" },
+  nativeView: { feature: "kubernetes_monitoring", route: "infraKubernetes" },
+  clusterScoped: true,
+  collectorRoute: "ingestFromKubernetes",
 };
 
 /** A flow double whose state a spec sets directly. */

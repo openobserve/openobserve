@@ -13,19 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { raw, type useI18nTyped } from "@/types/i18n";
+import { raw, type I18nText, type useI18nTyped } from "@/types/i18n";
 
 type Translate = ReturnType<typeof useI18nTyped>["t"];
 
 /** The one alert scope line every pack surface shows (D16). */
 export const packNote = (
   t: Translate,
-  { licensed, alerts, views }: { licensed: boolean; alerts: number; views: number },
-) =>
-  t(licensed ? "starterPacks.bannerNote" : "starterPacks.bannerNoteUnlicensed", {
+  {
+    licensed,
+    alerts,
+    views,
+    title,
+    native,
+  }: { licensed: boolean; alerts: number; views: number; title: I18nText; native: boolean },
+) => {
+  const counts = {
     alerts: t("starterPacks.countAlerts", { count: alerts }, alerts),
     views: t("starterPacks.countViews", { count: views }, views),
-  });
+  };
+  // A pack with no built-in view has no plan variant, and no views clause when it ships none.
+  if (!native && !views) return t("starterPacks.bannerNotePlain", { alerts: counts.alerts, title });
+  return licensed && native
+    ? t("starterPacks.bannerNote", counts)
+    : t("starterPacks.bannerNoteUnlicensed", { ...counts, title });
+};
 
 export const packScopeValue = (t: Translate, clusters: string[]) =>
   clusters.length

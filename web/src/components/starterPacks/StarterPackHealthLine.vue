@@ -21,15 +21,18 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { readQuery } from "@/composables/query/readQuery";
 import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
+import type { StarterPack } from "@/composables/starterPacks/types";
 import { usePackHealth } from "@/composables/starterPacks/usePackHealth";
 import { alertsByTagsQuery } from "@/services/alerts.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-const props = defineProps<{ org: string }>();
+const props = withDefaults(defineProps<{ org: string; pack?: StarterPack }>(), {
+  pack: () => KUBERNETES_PACK,
+});
 
 const { t } = useI18nTyped();
 const router = useRouter();
-const pack = KUBERNETES_PACK;
+const pack = props.pack;
 const health = usePackHealth(props.org);
 const ready = ref(false);
 
@@ -44,9 +47,7 @@ const since = computed(() => {
   return at ? new Date(at / 1000).toLocaleString() : "";
 });
 const collector = () =>
-  router
-    .push({ name: "ingestFromKubernetes", query: { org_identifier: props.org } })
-    .catch(() => {});
+  router.push({ name: pack.collectorRoute, query: { org_identifier: props.org } }).catch(() => {});
 </script>
 
 <template>
@@ -60,6 +61,7 @@ const collector = () =>
     {{ t("starterPacks.health.line", { title: t(pack.titleKey), since: raw(since) }) }}
     <template #actions>
       <OButton
+        v-if="pack.collectorRoute"
         variant="ghost-primary"
         size="sm-action"
         data-test="starter-pack-page-check-collector-link"

@@ -15031,7 +15031,12 @@
       "itemsInstalled": "{made} of {total} items installed",
       "itemsFailed": "{count} item could not be created | {count} items could not be created",
       "manage": "Manage",
-      "openDashboard": "Open dashboard"
+      "openDashboard": "Open dashboard",
+      "rawLogs": "Looks like Nginx logs in {stream}, stored as plain text · Parsing support comes later"
+    },
+    "hosts": {
+      "title": "Hosts",
+      "description": "The host metrics dashboard and alerts for servers and virtual machines."
     },
     "kubernetes": {
       "title": "Kubernetes",
@@ -15047,7 +15052,7 @@
       "roleEvents": "Kubernetes events",
       "flavourOtel": "OpenTelemetry"
     },
-    "setUp": "Set up Kubernetes monitoring",
+    "setUp": "Set up {title} monitoring",
     "checking": "Checking what fits…",
     "details": "What gets created",
     "library": "Browse the Library",
@@ -15055,7 +15060,8 @@
     "copyLink": "Copy link for an admin",
     "retryCheck": "Try the pack check again",
     "bannerNote": "A starter pack sets up the Kubernetes view, {alerts} and {views}. Alerts stay off until you turn them on. You can undo the setup for 24 hours.",
-    "bannerNoteUnlicensed": "A starter pack sets up a Kubernetes dashboard, {alerts} and {views}. Alerts stay off until you turn them on. You can undo the setup for 24 hours.",
+    "bannerNoteUnlicensed": "A starter pack sets up a {title} dashboard, {alerts} and {views}. Alerts stay off until you turn them on. You can undo the setup for 24 hours.",
+    "bannerNotePlain": "A starter pack sets up a {title} dashboard and {alerts}. Alerts stay off until you turn them on. You can undo the setup for 24 hours.",
     "countAlerts": "{count} alert | {count} alerts",
     "countViews": "{count} saved view | {count} saved views",
     "offline": "Using the pack built into this version.",
@@ -15102,12 +15108,12 @@
       "typeSavedView": "saved search"
     },
     "home": {
-      "title": "Your Kubernetes data is ready to monitor",
+      "title": "Your {title} data is ready to monitor",
       "notNow": "Not now",
       "hideForMe": "Hide for me",
       "hideForEveryone": "Hide for everyone",
-      "hidden": "Kubernetes pack hidden for you",
-      "hiddenForEveryone": "Kubernetes pack hidden for everyone",
+      "hidden": "{title} pack hidden for you",
+      "hiddenForEveryone": "{title} pack hidden for everyone",
       "showForEveryone": "Show for everyone",
       "hideFailed": "Couldn't change that setting. Try again.",
       "showAgain": "Show again",
@@ -15115,7 +15121,7 @@
       "error": "Couldn't check your data for packs",
       "alertsOnLabel": "Alerts on",
       "alertsOnValue": "{on} of {total}",
-      "reminder": "{count} Kubernetes alert is off | {count} Kubernetes alerts are off",
+      "reminder": "{count} {title} alert is off | {count} {title} alerts are off",
       "turnOn": "Turn on alerts",
       "viewPack": "View pack",
       "keepOff": "Keep off",
@@ -15123,12 +15129,11 @@
     },
     "drawer": {
       "title": "What gets created",
-      "subtitle": "Kubernetes",
-      "packTitle": "Kubernetes pack",
+      "packTitle": "{title} pack",
       "view": "Kubernetes view",
       "viewPath": "Infrastructure › Kubernetes",
       "viewInPlan": "Already in your plan",
-      "dashboard": "Kubernetes dashboard",
+      "dashboard": "{title} dashboard",
       "dashboardNote": "Opens after setup",
       "panelsFit": "{count} panel fits your data. Opens after setup. | {count} panels fit your data. Opens after setup.",
       "alerts": "Alerts, off until you turn them on",
@@ -15156,7 +15161,7 @@
       "reasonNoFlavour": "{name}: not available for your metric names yet"
     },
     "progress": {
-      "title": "Setting up Kubernetes monitoring",
+      "title": "Setting up {title} monitoring",
       "summary": "{made} of {total} created",
       "summaryRetry": "{made} of {total} created · {failed} to retry",
       "created": "Created",
@@ -15174,10 +15179,10 @@
       "installError": "Setup didn't finish. Try again."
     },
     "landing": {
-      "set": "Kubernetes monitoring is set up · {count} alert off | Kubernetes monitoring is set up · {count} alerts off",
-      "setAllOn": "Kubernetes monitoring is set up",
+      "set": "{title} monitoring is set up · {count} alert off | {title} monitoring is set up · {count} alerts off",
+      "setAllOn": "{title} monitoring is set up",
       "partial": "{count} alert off · {failed} not created | {count} alerts off · {failed} not created",
-      "readOnly": "{count} Kubernetes alert is off. Only the person who set this up or an admin can undo this. | {count} Kubernetes alerts are off. Only the person who set this up or an admin can undo this.",
+      "readOnly": "{count} {title} alert is off. Only the person who set this up or an admin can undo this. | {count} {title} alerts are off. Only the person who set this up or an admin can undo this.",
       "undoLeft": "Undo setup · {hours} h left",
       "undoLeftSoon": "Undo setup · under 1 h left",
       "undo": "Undo setup",
@@ -15190,7 +15195,7 @@
       "seeWhich": "See which",
       "available": "available for {hours} h",
       "availableSoon": "available for under 1 h",
-      "watching": "{on} Kubernetes alerts are watching · {off} left off"
+      "watching": "{on} {title} alerts are watching · {off} left off"
     },
     "undo": {
       "title": "Undo setup?",

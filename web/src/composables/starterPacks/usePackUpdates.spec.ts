@@ -35,9 +35,15 @@ vi.mock("./useStarterPacks", () => ({
 import type { StarterPackFlow } from "./useStarterPackFlow";
 import { usePackUpdates } from "./usePackUpdates";
 
-const flowWith = (licensed: boolean, dashboardId?: string) =>
+const flowWith = (licensed: boolean, dashboardId?: string, native = true) =>
   ({
-    pack: { id: "kubernetes", dashboards: [{ id: "overview" }] },
+    pack: {
+      id: "kubernetes",
+      dashboards: [{ id: "overview" }],
+      nativeView: native
+        ? { feature: "kubernetes_monitoring", route: "infraKubernetes" }
+        : undefined,
+    },
     licensed: ref(licensed),
     record: shallowRef({
       packId: "kubernetes",
@@ -61,6 +67,13 @@ describe("usePackUpdates plan change", () => {
     gate.on = true;
     expect(usePackUpdates("org", flowWith(true)).needsDashboard.value).toBe(false);
     expect(usePackUpdates("org", flowWith(false, "d1")).needsDashboard.value).toBe(false);
+  });
+
+  it("never offers it for a pack with no built-in view, such as Hosts without its dashboard", () => {
+    gate.on = true;
+    expect(usePackUpdates("org", flowWith(false, undefined, false)).needsDashboard.value).toBe(
+      false,
+    );
   });
 
   it("does nothing with the constant off", async () => {

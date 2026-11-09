@@ -104,7 +104,8 @@ interface FoundItem {
 
 interface PackItemAdapter {
   lookup: () => Promise<FoundItem | null>;
-  create: () => Promise<void>;
+  /** False when someone else's import already held it, so the pack must not own it. */
+  create: () => Promise<boolean | void>;
   /** The user-editable body the source hash covers. */
   snapshot: (found: FoundItem) => Promise<unknown>;
   remove: (found: FoundItem) => Promise<void>;
@@ -163,6 +164,9 @@ const copyItemId = (copyOf: string, stream: string) => `${copyOf}@${stream}`;
 const flavourAlert = (pack: StarterPack, flavourId: string | undefined, alertId: string) =>
   pack.flavours?.find(({ id }) => id === flavourId)?.alerts[alertId];
 
+const isShared = (pack: StarterPack, { kind, itemId }: PackRecordItem) =>
+  kind === "dashboard" && !!pack.dashboards.find(({ id }) => id === itemId)?.shared;
+
 const packItems = (pack: StarterPack, copies: PackPreview["copies"] = []): PackRecordItem[] => {
   const pending = { status: "pending" } as const;
   const alertRows = pack.alerts.flatMap((itemId) => {
@@ -176,8 +180,12 @@ const packItems = (pack: StarterPack, copies: PackPreview["copies"] = []): PackR
       stream,
     }));
   });
+  // Shared dashboards live where their importer puts them, so they need no pack folder.
+  const folders = FOLDER_TYPES.filter(
+    (type) => type === "alerts" || pack.dashboards.some(({ shared }) => !shared),
+  );
   return [
-    ...FOLDER_TYPES.map((itemId) => ({ ...pending, kind: "folder" as const, itemId })),
+    ...folders.map((itemId) => ({ ...pending, kind: "folder" as const, itemId })),
     ...pack.dashboards.map(({ id }) => ({ ...pending, kind: "dashboard" as const, itemId: id })),
     ...alertRows,
     ...pack.savedViews.map(({ id }) => ({ ...pending, kind: "savedView" as const, itemId: id })),
@@ -267,6 +275,15 @@ export function useStarterPacks(org: string) {
     adaptation: PackAdaptation,
   ): PackItemAdapter => {
     const dashboard = pack.dashboards.find((candidate) => candidate.id === itemId)!;
+    const snapshot: PackItemAdapter["snapshot"] = async ({ id, folderId }) =>
+      dashboardBody(await readQuery(dashboardDetailQuery(org, id, folderId!), true));
+    const remove: PackItemAdapter["remove"] = async ({ id, folderId }) => {
+      await deleteDashboard.mutateAsync({ dashboardId: id, folderId: folderId! });
+    };
+    const { shared } = dashboard;
+    if (shared) {
+      return { lookup: () => shared.find(org), create: () => shared.create(org), snapshot, remove };
+    }
     return {
       lookup: async () => {
         const folderId = folderIdOf(items, "dashboards");
@@ -284,11 +301,8 @@ export function useStarterPacks(org: string) {
           folderId: folderIdOf(items, "dashboards")!,
         });
       },
-      snapshot: async ({ id, folderId }) =>
-        dashboardBody(await readQuery(dashboardDetailQuery(org, id, folderId!), true)),
-      remove: async ({ id, folderId }) => {
-        await deleteDashboard.mutateAsync({ dashboardId: id, folderId: folderId! });
-      },
+      snapshot,
+      remove,
     };
   };
 
@@ -480,7 +494,9 @@ export function useStarterPacks(org: string) {
       }),
     );
     const { flavours, unsupported } = pickFlavours(pack, alerts, streams);
-    const docs = await Promise.all(pack.dashboards.map((dashboard) => dashboard.load()));
+    // A shared dashboard is imported as its importer ships it, so the plan never rewrites it.
+    const adaptable = pack.dashboards.filter(({ shared }) => !shared);
+    const docs = await Promise.all(adaptable.map((dashboard) => dashboard.load()));
     const sources = await readBindingSources(org, [pack]);
     const plan = await planAdaptation({
       pack,
@@ -544,7 +560,8 @@ export function useStarterPacks(org: string) {
     const panels = { kept: 0, dropped: 0 };
     const noFit = new Set<string>();
     for (const dashboard of pack.dashboards) {
-      const fit = await fitPackDashboard(dashboard, { repairs, bindings }).catch((error) => {
+      const adaptation = dashboard.shared ? NO_ADAPTATION : { repairs, bindings };
+      const fit = await fitPackDashboard(dashboard, adaptation).catch((error) => {
         if (error instanceof StreamRewriteError) return { doc: {}, kept: 0, dropped: 1 };
         throw error;
       });
@@ -628,14 +645,18 @@ export function useStarterPacks(org: string) {
     const adapter = adapterFor(pack, item, items, entries, adaptation, record.flavours);
     try {
       let found = await adapter.lookup();
+      // Another surface made it first, so the pack links it and never deletes it.
+      if (found && isShared(pack, item)) return { ...item, ...found, status: "existing" };
+      let made: boolean | void = true;
       if (!found) {
         // A create that errored may still have committed, so only the lookup after it decides.
-        await adapter.create().catch((error) => {
+        made = await adapter.create().catch((error) => {
           if (error instanceof StreamRewriteError) throw error;
         });
         found = await adapter.lookup();
       }
       if (!found) return { ...item, status: "failed" };
+      if (made === false) return { ...item, ...found, status: "existing" };
       const body = (await adapter.snapshot(found)) as Record<string, any>;
       const settled = { ...item, ...found, status: "created" as const };
       return { ...settled, sourceHash: contentHash(body), ...updateMarks(item, body, entries) };
