@@ -24,12 +24,14 @@ import { featureState } from "@/utils/featureGate";
 import {
   StarterPackPermissionError,
   leftOutIds,
+  type PackChoices,
   type PackInstallRecord,
   type PackPreview,
   type PackRecordItem,
   type PackRemovalResult,
   type StarterPack,
 } from "./types";
+import { RESERVED_FIELD } from "./packBinding";
 import { useStarterPacks } from "./useStarterPacks";
 
 export const UNDO_WINDOW_US = 24 * 60 * 60 * 1_000_000;
@@ -75,6 +77,8 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const removal = shallowRef<PackRemovalResult | null>(null);
   const removalFailed = ref(false);
   const alertsOn = ref(0);
+  let previewRun = 0;
+  const choices = ref<PackChoices>({ streams: {}, fields: {} });
   const nowUs = ref(Date.now() * 1000);
   const clock = setInterval(() => (nowUs.value = Date.now() * 1000), CLOCK_TICK_MS);
   onScopeDispose(() => clearInterval(clock));
@@ -148,13 +152,36 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   };
 
   const loadPreview = async () => {
+    previewRun += 1;
+    const run = previewRun;
     previewState.value = "loading";
     try {
-      preview.value = await previewPack(pack);
+      const next = await previewPack(pack, choices.value);
+      if (run !== previewRun) return;
+      preview.value = next;
       previewState.value = "ready";
     } catch {
-      previewState.value = "error";
+      if (run === previewRun) previewState.value = "error";
     }
+  };
+
+  /** Records one answer; the next preview redoes the plan, so counts and rows stay one source. */
+  const chooseStream = (want: string, choice: PackChoices["streams"][string]) => {
+    choices.value = { ...choices.value, streams: { ...choices.value.streams, [want]: choice } };
+    return loadPreview();
+  };
+
+  /** One name means one meaning, so a change reaches every stream that has the column. */
+  const chooseField = (field: string, to: string) => {
+    if (to === RESERVED_FIELD) return Promise.resolve();
+    const fields = { ...choices.value.fields };
+    for (const { stream, from } of preview.value?.bindings ?? []) {
+      if (from === field && preview.value?.columns[stream]?.includes(to)) {
+        fields[`${stream}/${from}`] = to;
+      }
+    }
+    choices.value = { ...choices.value, fields };
+    return loadPreview();
   };
 
   const nameOf = (itemId: string) => preview.value?.names[itemId] ?? itemId;
@@ -210,11 +237,14 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     installFailed.value = false;
     forbidden.value = false;
     try {
-      const plan = preview.value ?? (await previewPack(pack));
+      const plan = preview.value ?? (await previewPack(pack, choices.value));
       const exclude = leftOutIds(plan);
       const done = await installPack(pack, {
         exclude,
         repairs: plan.repairs,
+        bindings: plan.bindings,
+        flavours: plan.flavours,
+        copies: plan.copies,
         folderName,
         onProgress: (next) => (record.value = { ...next, items: [...next.items] }),
       });
@@ -264,6 +294,8 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     busy,
     canManage,
     canUndo,
+    chooseField,
+    chooseStream,
     dashboardCount,
     failed,
     forbidden,

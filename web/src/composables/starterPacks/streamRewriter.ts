@@ -92,7 +92,7 @@ const refusal = (error: any, query: string): unknown => {
 
 const nameMap = (renames: StreamRename[]) => new Map(renames.map(({ from, to }) => [from, to]));
 
-const closingOf = (text: string, from: number, open: string, close: string): number => {
+export const closingOf = (text: string, from: number, open: string, close: string): number => {
   let depth = 0;
   for (let index = from; index < text.length; index += 1) {
     if (text[index] === '"' || text[index] === "'") {
@@ -107,7 +107,7 @@ const closingOf = (text: string, from: number, open: string, close: string): num
   return text.length;
 };
 
-function endOfString(text: string, from: number): number {
+export function endOfString(text: string, from: number): number {
   for (let index = from + 1; index < text.length; index += 1) {
     if (text[index] === "\\") index += 1;
     else if (text[index] === text[from]) return index;
@@ -269,7 +269,7 @@ export const rewritePromql = async (
   return result;
 };
 
-const maskVariables = (sql: string) => {
+export const maskVariables = (sql: string) => {
   const found: string[] = [];
   const masked = sql.replace(VARIABLE, (variable) => `o2var${found.push(variable) - 1}mask`);
   return { masked, unmask: (text: string) => text.replace(MASK, (_all, at) => found[Number(at)]) };
@@ -332,6 +332,29 @@ export const clusterMatcher = (label: string, clusters: string[]) =>
 const withoutPromqlLimit = (query: string, matcher: string) =>
   query.split(`{${matcher}}`).join("").split(`${matcher},`).join("");
 
+const withMatcher = async (
+  query: string,
+  tokens: MetricToken[],
+  matcher: string,
+  checks: RewriteChecks,
+): Promise<string> => {
+  if (!tokens.length || tokens.some(({ quoted }) => quoted)) throw new StreamRewriteError(query);
+  const result = [...tokens]
+    .sort((left, right) => right.start - left.start)
+    .reduce((text, { start, end, name }) => {
+      const rest = text.slice(end);
+      const brace = rest.match(/^\s*\{\s*(\}?)/);
+      if (!brace) return `${text.slice(0, end)}{${matcher}}${rest}`;
+      const separator = brace[1] ? "" : ",";
+      const inner = rest.slice(brace[0].length - brace[1].length);
+      return `${text.slice(0, start)}${name}{${matcher}${separator}${inner}`;
+    }, query);
+  await checks.promql(result).catch((error) => {
+    throw refusal(error, result);
+  });
+  return result;
+};
+
 /** Sets the clusters of every selector (D16), replacing only the limit the pack wrote before. */
 export const limitPromqlClusters = async (
   query: string,
@@ -344,22 +367,19 @@ export const limitPromqlClusters = async (
   const base = previous.length ? withoutPromqlLimit(query, clusterMatcher(label, previous)) : query;
   const tokens = await checkedTokens(base, checks);
   if (!clusters.length) return base;
-  const matcher = clusterMatcher(label, clusters);
-  if (!tokens.length || tokens.some(({ quoted }) => quoted)) throw new StreamRewriteError(base);
-  const result = [...tokens]
-    .sort((left, right) => right.start - left.start)
-    .reduce((text, { start, end, name }) => {
-      const rest = text.slice(end);
-      const brace = rest.match(/^\s*\{\s*(\}?)/);
-      if (!brace) return `${text.slice(0, end)}{${matcher}}${rest}`;
-      const separator = brace[1] ? "" : ",";
-      const inner = rest.slice(brace[0].length - brace[1].length);
-      return `${text.slice(0, start)}${name}{${matcher}${separator}${inner}`;
-    }, base);
-  await checks.promql(result).catch((error) => {
-    throw refusal(error, result);
-  });
-  return result;
+  return withMatcher(base, tokens, clusterMatcher(label, clusters), checks);
+};
+
+/** Adds a chosen filter to the selectors of one shared stream only. */
+export const filterPromqlStream = async (
+  query: string,
+  stream: string,
+  label: string,
+  value: string,
+  checks: RewriteChecks,
+): Promise<string> => {
+  const tokens = (await checkedTokens(query, checks)).filter(({ name }) => name === stream);
+  return tokens.length ? withMatcher(query, tokens, clusterMatcher(label, [value]), checks) : query;
 };
 
 const sqlLimit = (parser: any, column: string, clusters: string[]) => {
@@ -414,7 +434,13 @@ export const limitSqlClusters = async (
   return result;
 };
 
-const checkSql = async (sql: string, streamType: string, checks: RewriteChecks) => {
+export const checkPromql = async (query: string, checks: RewriteChecks) => {
+  await checks.promql(query).catch((error) => {
+    throw refusal(error, query);
+  });
+};
+
+export const checkSql = async (sql: string, streamType: string, checks: RewriteChecks) => {
   await checks.sql(sql, streamType).catch((error) => {
     throw refusal(error, sql);
   });

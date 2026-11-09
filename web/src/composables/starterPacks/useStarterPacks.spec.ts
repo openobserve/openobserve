@@ -270,6 +270,29 @@ describe("useStarterPacks", () => {
       expect(record.repairs).toEqual(repairs);
     });
 
+    it("records bindings and writes one tagged alert copy per Use all stream", async () => {
+      const record = await packs().installPack(
+        { ...PACK, alerts: ["k8s/one"] },
+        {
+          repairs: [{ from: "s", to: "a", also: ["b"] }],
+          bindings: [{ stream: "a", from: "x", to: "y", tier: "alias" }],
+          copies: [
+            { copyOf: "k8s/one", stream: "a" },
+            { copyOf: "k8s/one", stream: "b" },
+          ],
+        },
+      );
+      expect(fake.state.alerts.map((alert) => alert.stream_name)).toEqual(["a", "b"]);
+      expect(fake.state.alerts[1].tags).toContain("stream:b");
+      expect(record.bindings?.[0].to).toBe("y");
+      expect(record.items.filter(({ copyOf }) => copyOf === "k8s/one")).toHaveLength(2);
+    });
+
+    it("repoints the saved view at the repaired stream", async () => {
+      await packs().installPack(PACK, { repairs: [{ from: "e", to: "renamed" }] });
+      expect(JSON.stringify(fake.state.views[0])).toContain("renamed");
+    });
+
     it("skips an alert the rewrite cannot check and finishes the rest", async () => {
       fake.state.parseFails = 400;
       const record = await packs().installPack(PACK, { repairs });
@@ -508,6 +531,59 @@ describe("useStarterPacks", () => {
       library.matcher = false;
       expect(live).not.toContain("k8s/one");
       expect(old).toContain("k8s/one");
+    });
+
+    it("takes a flavour's query when its data is here, and says when none exists", async () => {
+      library.lastIngested = Date.now() * 1000;
+      const preview = await packs().previewPack({
+        ...PACK,
+        alerts: ["k8s/two", "k8s/one"],
+        flavours: [
+          {
+            id: "otel",
+            titleKey: "starterPacks.kubernetes.title",
+            detect: ["kube_present"],
+            alerts: { "k8s/two": { promql: "kube_present", streams: ["kube_present"] } },
+          },
+        ],
+      });
+      library.lastIngested = 0;
+      expect(preview.flavours).toEqual({ "k8s/two": "otel" });
+      expect(preview.notIncluded.map(({ itemId }) => itemId)).not.toContain("k8s/two");
+    });
+
+    it("takes the first usable flavour and does not call the alert unsupported", async () => {
+      library.lastIngested = Date.now() * 1000;
+      const flavour = {
+        titleKey: "starterPacks.kubernetes.title",
+        detect: ["kube_present"],
+      } as const;
+      const usable = { "k8s/two": { promql: "kube_present", streams: ["kube_present"] } };
+      const preview = await packs().previewPack({
+        ...PACK,
+        alerts: ["k8s/two"],
+        flavours: [
+          { ...flavour, id: "first", alerts: usable },
+          { ...flavour, id: "second", alerts: usable },
+          { ...flavour, id: "third", alerts: {} },
+        ],
+      });
+      library.lastIngested = 0;
+      expect(preview.flavours).toEqual({ "k8s/two": "first" });
+      expect(preview.notIncluded.some(({ reason }) => reason === "no_flavour")).toBe(false);
+    });
+
+    it("lists a left-out alert once, with its plain title, across Use all copies", async () => {
+      const api = packs();
+      library.matcher = false;
+      const preview = await api.previewPack({
+        ...PACK,
+        alerts: ["k8s/two"],
+        savedViews: [],
+        dashboards: [],
+        flavours: [],
+      });
+      expect(preview.notIncluded.filter(({ itemId }) => itemId === "k8s/two")).toHaveLength(1);
     });
 
     it("names items and gives a reason for each one left out, creating nothing", async () => {

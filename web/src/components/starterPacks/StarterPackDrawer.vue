@@ -30,6 +30,7 @@ import { packScope, packScopeValue } from "@/composables/starterPacks/packCopy";
 import type { PackItemKind, PackNotIncludedReason } from "@/composables/starterPacks/types";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import StarterPackInstallDialog from "./StarterPackInstallDialog.vue";
+import StarterPackAdaptedRows from "./StarterPackAdaptedRows.vue";
 import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
 
 const props = defineProps<{
@@ -45,6 +46,7 @@ const router = useRouter();
 const REASON_KEYS: Record<PackNotIncludedReason, I18nKey> = {
   already_have: "starterPacks.drawer.reasonAlreadyHave",
   no_data: "starterPacks.drawer.reasonNoData",
+  no_flavour: "starterPacks.drawer.reasonNoFlavour",
   unavailable: "starterPacks.drawer.reasonUnavailable",
   needs_plan: "starterPacks.drawer.reasonNeedsPlan",
 };
@@ -348,6 +350,8 @@ const askConfirm = (mode: "undo" | "remove") => {
           <OText variant="meta">{{ row.text }}</OText>
         </div>
       </section>
+
+      <StarterPackAdaptedRows :flow="flow" />
 
       <section class="flex flex-col" data-test="starter-pack-drawer-reach">
         <OText variant="section" class="pb-1">{{ t("starterPacks.manifest.adapted") }}</OText>

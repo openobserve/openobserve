@@ -63,10 +63,72 @@ export const KUBERNETES_PACK: StarterPack = {
   bundledAlerts: bundledAlerts as PackBundledAlert[],
   aliases: [
     ["k8s_cluster", "k8s_cluster_name", "cluster", "cluster_name"],
-    ["k8s_namespace_name", "k8s_namespace", "namespace"],
-    ["k8s_pod_name", "k8s_pod", "pod"],
-    ["k8s_node_name", "k8s_node", "node"],
-    ["k8s_container_name", "k8s_container", "container"],
+    [
+      "k8s_namespace_name",
+      "k8s_namespace",
+      "namespace",
+      "body_k8s_namespace_name",
+      "body_namespace",
+    ],
+    ["k8s_pod_name", "k8s_pod", "pod", "body_k8s_pod_name", "body_pod"],
+    ["k8s_node_name", "k8s_node", "node", "body_k8s_node_name", "body_node"],
+    [
+      "k8s_container_name",
+      "k8s_container",
+      "container",
+      "body_k8s_container_name",
+      "body_container",
+    ],
+    ["kind", "body_kind"],
+    ["reason", "body_reason"],
+    ["message", "body_message", "body_note"],
+  ],
+  aliasTitles: {
+    k8s_cluster: "starterPacks.kubernetes.fieldCluster",
+    k8s_namespace_name: "starterPacks.kubernetes.fieldNamespace",
+    k8s_pod_name: "starterPacks.kubernetes.fieldPod",
+    k8s_node_name: "starterPacks.kubernetes.fieldNode",
+    k8s_container_name: "starterPacks.kubernetes.fieldContainer",
+    kind: "starterPacks.kubernetes.fieldKind",
+    reason: "starterPacks.kubernetes.fieldReason",
+    message: "starterPacks.kubernetes.fieldMessage",
+  },
+  roles: [
+    {
+      id: "events",
+      titleKey: "starterPacks.kubernetes.roleEvents",
+      stream: "k8s_events",
+      fields: ["kind", "reason", "message", "k8s_namespace_name"],
+      identity: [
+        { field: "instrumentation_library_name", pattern: "k8sobjects|k8s_events|k8sevents" },
+        { field: "service_name", pattern: "k8s[-_]?events" },
+        { field: "container_image_name", pattern: "event-exporter" },
+      ],
+    },
+  ],
+  flavours: [
+    {
+      id: "opentelemetry",
+      titleKey: "starterPacks.kubernetes.flavourOtel",
+      detect: ["k8s_pod_phase", "k8s_node_allocatable_cpu", "k8s_container_cpu_request"],
+      alerts: {
+        "k8s/cluster_cpu_capacity_high": {
+          promql:
+            "clamp_max(floor(sum by(k8s_cluster)(k8s_container_cpu_request) / on(k8s_cluster) sum by(k8s_cluster)(k8s_node_allocatable_cpu) * 10000) / 100, 100)",
+          streams: ["k8s_container_cpu_request", "k8s_node_allocatable_cpu"],
+        },
+        "k8s/cluster_memory_capacity_high": {
+          promql:
+            "clamp_max(floor(sum by(k8s_cluster)(k8s_container_memory_request) / on(k8s_cluster) sum by(k8s_cluster)(k8s_node_allocatable_memory) * 10000) / 100, 100)",
+          streams: ["k8s_container_memory_request", "k8s_node_allocatable_memory"],
+        },
+        "k8s/cluster_pod_count_high": {
+          promql:
+            "floor(count by(k8s_cluster) (k8s_pod_phase) / sum by(k8s_cluster) (k8s_node_allocatable_pods) * 10000) / 100",
+          streams: ["k8s_pod_phase", "k8s_node_allocatable_pods"],
+        },
+      },
+    },
   ],
   savedViews: [
     {
