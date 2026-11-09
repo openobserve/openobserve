@@ -792,8 +792,8 @@ mod tests {
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
     }
 
-    #[test]
-    fn oss_openapi_initializes_mcp_tools() {
+    #[tokio::test]
+    async fn oss_openapi_initializes_mcp_tools() {
         let api = crate::handler::http::router::openapi::ApiDoc::openapi();
 
         openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
@@ -840,6 +840,40 @@ mod tests {
             "GetDbMonitoringBadges",
         ] {
             assert!(tools.iter().all(|tool| tool.name != name), "{name}");
+        }
+        for (name, fields) in [
+            ("UserUpdate", &["first_name", "new_password", "role"][..]),
+            ("CreateAlert", &["name", "folder_id"][..]),
+        ] {
+            let tool = tools.iter().find(|tool| tool.name == name).unwrap();
+            let body = &tool.input_schema["properties"]["request_body"];
+            for field in fields {
+                assert!(
+                    body["properties"].get(field).is_some(),
+                    "{name} cannot express {field}"
+                );
+            }
+        }
+
+        let user_update = openobserve_mcp::tools::get_tool_metadata("UserUpdate").unwrap();
+        for body in [
+            serde_json::json!({"first_name": "name"}),
+            serde_json::json!({"role": "admin"}),
+        ] {
+            let arguments = serde_json::json!({
+                "org_id": "default",
+                "email_id": "user@example.com",
+                "request_body": body,
+            });
+            let result = openobserve_mcp::tools::get_shared_http_client()
+                .execute_tool_call(&user_update, &arguments)
+                .await;
+            if let Err(error) = result {
+                assert!(
+                    !format!("{error:?}").starts_with("Validation"),
+                    "UserUpdate refused {body}: {error}"
+                );
+            }
         }
     }
 

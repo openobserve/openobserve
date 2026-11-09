@@ -867,6 +867,7 @@ use crate::{
             openobserve_api_management::request::query_history::QueryHistoryListResponse,
             openobserve_api_management::request::query_history::QueryHistoryClearResponse,
             meta::user::UpdateUser,
+            meta::user::UpdateUserRole,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
             meta::user::UserOrgRole,
