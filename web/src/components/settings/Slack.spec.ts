@@ -34,7 +34,12 @@ import { axiosReply } from "@/test/unit/helpers/mockService";
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 
 vi.mock("@/services/slack", () => ({
-  default: { listInstallations: vi.fn(), getPrerequisites: vi.fn(), listOncallUnlinked: vi.fn() },
+  default: {
+    listInstallations: vi.fn(),
+    getPrerequisites: vi.fn(),
+    listOncallUnlinked: vi.fn(),
+    getInsightsSettings: vi.fn(),
+  },
 }));
 
 const stub = (name: string, props: string[] = []) => ({
@@ -57,6 +62,7 @@ const STUBS = {
   SlackUninstallDialog: stub("SlackUninstallDialog", ["open", "mode", "installation"]),
   SlackOrgAccess: stub("SlackOrgAccess", ["installation"]),
   SlackSwitchAllCard: stub("SlackSwitchAllCard", ["installation"]),
+  SlackInsightsSection: stub("SlackInsightsSection", ["installations"]),
 };
 
 const switchOrg = async (store: ReturnType<typeof makeSlackStore>, identifier: string) => {
@@ -83,6 +89,8 @@ beforeEach(() => {
     ok({ installations: [], available: [] }) as any,
   );
   vi.mocked(slack.listOncallUnlinked).mockResolvedValue(axiosReply({ members: [] }));
+  vi.mocked(slack.getInsightsSettings).mockRejectedValue(axiosError(404));
+  queryClient.clear();
 });
 
 afterEach(() => {
@@ -443,5 +451,161 @@ describe("Slack settings: several workspaces (R-89)", () => {
       instance,
     );
     expect(outside.findComponent({ name: "SlackOrgAccess" }).exists()).toBe(false);
+  });
+});
+
+describe("Slack settings: General and AutoObserve sections (S7)", () => {
+  const oneWorkspace = () =>
+    vi
+      .mocked(slack.listInstallations)
+      .mockReturnValue(ok({ installations: [installationView()] }) as any);
+  const settingsOn = () =>
+    vi.mocked(slack.getInsightsSettings).mockReturnValue(
+      ok({
+        channel: null,
+        digest_time: "09:00",
+        digest_time_zone: null,
+        post_trial_findings: false,
+        revision: 0,
+      }) as any,
+    );
+  const sections = (w: ReturnType<typeof mountSlack>) => ({
+    bar: w.find('[data-test="slack-section-bar"]'),
+    general: w.find('[data-test="slack-section-general-heading"]'),
+    insights: w.find('[data-test-stub="SlackInsightsSection"]'),
+  });
+
+  it("shows the section bar, the General heading and AutoObserve after General", async () => {
+    oneWorkspace();
+    settingsOn();
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    const { bar, general, insights } = sections(w);
+    expect(bar.exists()).toBe(true);
+    expect(bar.text()).toContain("On this page");
+    expect(bar.findAll("button").map((b) => b.text())).toEqual(["General", "AutoObserve"]);
+    expect(general.text()).toContain("General");
+    expect(insights.exists()).toBe(true);
+    const html = w.html();
+    expect(html.indexOf("SlackWorkspaceCard")).toBeLessThan(html.indexOf("SlackInsightsSection"));
+    expect(slack.getInsightsSettings).toHaveBeenCalledWith("acme");
+  });
+
+  it("is today's page when the server answers that insights are off", async () => {
+    oneWorkspace();
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    const { bar, general, insights } = sections(w);
+    expect(bar.exists()).toBe(false);
+    expect(general.exists()).toBe(false);
+    expect(insights.exists()).toBe(false);
+    expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(true);
+  });
+
+  it("is today's page in an OSS build and never asks for the settings", async () => {
+    config.isEnterprise = "false";
+    oneWorkspace();
+    settingsOn();
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    expect(sections(w).bar.exists()).toBe(false);
+    expect(sections(w).insights.exists()).toBe(false);
+    expect(slack.getInsightsSettings).not.toHaveBeenCalled();
+  });
+
+  it("adds nothing with no workspace connected (D8)", async () => {
+    settingsOn();
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    expect(w.find('[data-test-stub="SlackConnectEmpty"]').exists()).toBe(true);
+    expect(sections(w).bar.exists()).toBe(false);
+    expect(slack.getInsightsSettings).not.toHaveBeenCalled();
+  });
+
+  it("keeps the AutoObserve section, with its own load error, when the read fails", async () => {
+    oneWorkspace();
+    vi.mocked(slack.getInsightsSettings).mockRejectedValue(axiosError(400));
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    expect(sections(w).bar.exists()).toBe(true);
+    expect(sections(w).insights.exists()).toBe(true);
+  });
+
+  it("holds the page loader until the settings answer, so nothing moves in", async () => {
+    oneWorkspace();
+    let answer: (value: unknown) => void = () => {};
+    vi.mocked(slack.getInsightsSettings).mockReturnValue(
+      new Promise((resolve) => (answer = resolve)) as any,
+    );
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(false);
+    answer({
+      data: { channel: null, digest_time: "09:00", post_trial_findings: false, revision: 0 },
+    });
+    await flushPromises();
+    expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(true);
+    expect(sections(w).bar.exists()).toBe(true);
+  });
+
+  describe("Go to Reinstall (F3)", () => {
+    const card = {
+      name: "SlackWorkspaceCard",
+      props: ["installation", "isCloud"],
+      template: `<div data-test-stub="SlackWorkspaceCard" :data-installation="installation.id">
+        <button v-if="!installation.credentials_readable" data-test="slack-credentials-reinstall" />
+        <button v-if="!installation.managed" data-test="slack-reinstall" />
+      </div>`,
+    };
+    const mountWith = async (installations: ReturnType<typeof installationView>[]) => {
+      vi.mocked(slack.listInstallations).mockReturnValue(ok({ installations }) as any);
+      settingsOn();
+      const w = mount(Slack, {
+        attachTo: document.body,
+        global: {
+          plugins: [i18n, makeSlackStore({ slack_enabled: true })],
+          stubs: { ...STUBS, SlackWorkspaceCard: card },
+        },
+      });
+      await flushPromises();
+      return w;
+    };
+    const goTo = async (w: Awaited<ReturnType<typeof mountWith>>, id: string) => {
+      w.findComponent({ name: "SlackInsightsSection" }).vm.$emit("reinstall", id);
+      await flushPromises();
+    };
+    const focused = () => document.activeElement?.getAttribute("data-test");
+    const shown = (w: Awaited<ReturnType<typeof mountWith>>) =>
+      w.find('[data-test-stub="SlackWorkspaceCard"]').attributes("data-installation");
+
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn();
+    });
+
+    afterEach(() => {
+      document.body.innerHTML = "";
+    });
+
+    it("switches to the affected workspace and focuses its Reinstall", async () => {
+      const w = await mountWith([
+        installationView({ team_name: "demo-workspace" }),
+        installationView({ id: "inst-2", team_name: "demo-workspace-eu", status: "revoked" }),
+      ]);
+      const before = shown(w);
+      await goTo(w, "inst-2");
+      expect(before).not.toBe("inst-2");
+      expect(shown(w)).toBe("inst-2");
+      expect(focused()).toBe("slack-reinstall");
+      w.unmount();
+    });
+
+    it("focuses the credentials Reinstall when Cloud cannot read the credentials", async () => {
+      const w = await mountWith([
+        installationView({ status: "revoked", credentials_readable: false }),
+      ]);
+      await goTo(w, "inst-1");
+      expect(focused()).toBe("slack-credentials-reinstall");
+      w.unmount();
+    });
   });
 });

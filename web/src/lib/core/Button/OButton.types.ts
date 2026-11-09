@@ -55,6 +55,7 @@ export type ButtonVariant =
   | "banner-dismiss"
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
   | "pricing-chip"
+  | "section-chip"
   // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)
   | "outline-primary"
   // Dashed outline "add tile" — transparent bg, dashed muted border + muted icon.
