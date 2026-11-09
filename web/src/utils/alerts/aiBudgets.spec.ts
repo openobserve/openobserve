@@ -18,6 +18,7 @@ import {
   budgetAlertPayload,
   budgetAlertUpdate,
   budgetFromAlert,
+  budgetMissingField,
   budgetNameTaken,
   budgetReading,
   budgetSpend,
@@ -137,6 +138,17 @@ describe("budgets (AIO-38)", () => {
     expect(budgetNameTaken("omp-monthly", others, "omp-monthly")).toBe(false);
     expect(budgetNameTaken("omp-day", others, "omp-monthly")).toBe(true);
     expect(budgetNameTaken("omp-monthly", others)).toBe(true);
+  });
+
+  // A stream without the scope's column fails the budget's query; the dialog says so instead.
+  it("names the scope's column when the stream has not received it", () => {
+    const fields = [{ name: "trace_id" }, { name: "gen_ai_agent_name" }, { name: "user_id" }];
+    expect(budgetMissingField("agent", fields)).toBeNull();
+    expect(budgetMissingField("user", fields)).toBeNull();
+    expect(budgetMissingField("oneUser", fields)).toBeNull();
+    expect(budgetMissingField("feature", fields)).toBe("feature_name");
+    expect(budgetMissingField("session", fields)).toBe("gen_ai_conversation_id");
+    expect(budgetMissingField("model", [])).toBe("gen_ai_response_model");
   });
 
   // Pre-multi-alert budgets have no aggregation, so an edit has nowhere to move the limit.

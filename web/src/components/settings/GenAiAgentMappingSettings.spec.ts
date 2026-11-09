@@ -23,11 +23,16 @@ import type { GenAiAgentMappingConfig } from "@/services/gen-ai-agent-mapping.se
 
 const mockGet = vi.fn();
 const mockSave = vi.fn();
+const mockListAgents = vi.fn();
+const mockStripHarness = vi.fn();
+const mockSearch = vi.fn();
+const mockToast = vi.fn();
 
 vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
   default: {
     get: (...args: unknown[]) => mockGet(...args),
-    listAgents: async () => ({ agents: [] }),
+    listAgents: (...args: unknown[]) => mockListAgents(...args),
+    stripHarness: (...args: unknown[]) => mockStripHarness(...args),
     emptyConfig: () => config([]),
   },
   fetchDefaultGenAiAgentMapping: async () => config(["default.agent"]),
@@ -36,6 +41,15 @@ vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
 vi.mock("@/services/gen-ai-agent-mapping.queries", () => ({
   saveGenAiAgentMappingMutation: () => ({ mutationFn: (body: unknown) => mockSave(body) }),
   clearGenAiAgentRegistryMutation: () => ({ mutationFn: async () => ({}) }),
+}));
+
+vi.mock("@/services/search", () => ({
+  default: { search: (...args: unknown[]) => mockSearch(...args) },
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  toast: (...args: unknown[]) => mockToast(...args),
 }));
 
 function config(agentNameFields: string[]): GenAiAgentMappingConfig {
@@ -69,6 +83,11 @@ describe("GenAiAgentMappingSettings", () => {
   beforeEach(() => {
     mockGet.mockReset();
     mockSave.mockReset();
+    mockListAgents.mockReset();
+    mockListAgents.mockResolvedValue({ agents: [] });
+    mockStripHarness.mockReset();
+    mockSearch.mockReset();
+    mockToast.mockReset();
   });
 
   // Before, a failed read seeded an empty form that Save would write over the stored mapping.
@@ -133,6 +152,68 @@ describe("GenAiAgentMappingSettings", () => {
       expect.objectContaining({
         harness_patterns: [{ agent: "omp", patterns: ["tag environment_context", "tag job"] }],
       }),
+    );
+  });
+
+  describe("Test on recent sessions", () => {
+    const message = "<env>\nos: linux\n</env>\nreal ask";
+    const draft = "regex (?s)<env>.*?</env>";
+
+    async function testDraft() {
+      mockGet.mockResolvedValue({
+        ...config(["my.agent"]),
+        harness_patterns: [{ agent: "omp", patterns: ["tag job"] }],
+      });
+      const wrapper = await mountPage();
+      mockListAgents.mockResolvedValue({
+        agents: [{ name: "omp", source_stream: "default", source_stream_type: "traces" }],
+      });
+      mockSearch.mockResolvedValue({
+        data: { hits: [{ input: JSON.stringify([{ role: "user", content: message }]) }] },
+      });
+      await wrapper.find('[data-test="gen-ai-harness-patterns-0"] textarea').setValue(draft);
+      await wrapper.find('[data-test="gen-ai-harness-test-0"]').trigger("click");
+      await flushPromises();
+      return wrapper;
+    }
+
+    // The server runs the draft, so a Rust-only pattern such as `(?s)` matches here as in the list.
+    it("runs the draft patterns on the server", async () => {
+      mockStripHarness.mockResolvedValue([{ text: "real ask", hidden: 1, only: null }]);
+      const wrapper = await testDraft();
+      expect(mockStripHarness).toHaveBeenCalledWith(expect.any(String), [draft], [message]);
+      const result = wrapper.find('[data-test="gen-ai-harness-result-0"]');
+      expect(result.text()).toContain("1 of 1 recent sessions match");
+      const [before, after] = result.findAll("pre");
+      expect(before.text()).toContain("os: linux");
+      expect(after.text()).toBe("real ask");
+    });
+
+    it("shows the server's message for a pattern it rejects and drops the earlier result", async () => {
+      mockStripHarness.mockResolvedValueOnce([{ text: "real ask", hidden: 1, only: null }]);
+      const wrapper = await testDraft();
+      expect(wrapper.find('[data-test="gen-ai-harness-result-0"]').exists()).toBe(true);
+      const error = "invalid regex in 'regex (': unclosed group";
+      mockStripHarness.mockRejectedValueOnce({ response: { data: { message: error } } });
+      await wrapper.find('[data-test="gen-ai-harness-test-0"]').trigger("click");
+      await flushPromises();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: error }),
+      );
+      expect(wrapper.find('[data-test="gen-ai-harness-result-0"]').exists()).toBe(false);
+    });
+  });
+
+  it("shows the server's message when save rejects a pattern", async () => {
+    mockGet.mockResolvedValue(config(["my.agent"]));
+    const error = "invalid regex in 'regex (': unclosed group";
+    mockSave.mockRejectedValue({ response: { data: { message: error } } });
+    const wrapper = await mountPage();
+    await wrapper.find('[data-test="gen-ai-agent-name-fields-input"] input').setValue("other");
+    await saveButton(wrapper).trigger("click");
+    await flushPromises();
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: error }),
     );
   });
 });

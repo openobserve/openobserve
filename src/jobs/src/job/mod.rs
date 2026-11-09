@@ -1255,10 +1255,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::health::register_budget_transition(
-            |org_id, job_id, pause| {
+            |org_id, job_id, pause_at_spend| {
                 Box::pin(async move {
                     openobserve_core::llm_evaluations::eval_jobs::transition_for_budget(
-                        &org_id, &job_id, pause,
+                        &org_id,
+                        &job_id,
+                        pause_at_spend,
                     )
                     .await
                     .map(|_| ())

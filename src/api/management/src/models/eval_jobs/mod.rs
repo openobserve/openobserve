@@ -98,7 +98,8 @@ pub struct EvalJobResponseBody {
     pub trace_config: Option<TraceEvalConfig>,
     #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
-    /// `pausedAt` is set while the budget holds the job paused; `liftedUntil` while it is lifted.
+    /// `pausedAt` and `pausedSpendUsd` are set while the budget holds the job paused;
+    /// `liftedUntil` while it is lifted.
     #[schema(value_type = Option<Object>)]
     pub budget: Option<EvalJobBudget>,
     #[schema(value_type = String)]
@@ -498,7 +499,7 @@ mod tests {
             "streamType": "traces",
             "filterCondition": {},
             "scorers": ["a"],
-            "budget": {"dailyUsd": 5, "onReach": "pause", "pausedAt": 1, "liftedUntil": 2},
+            "budget": {"dailyUsd": 5, "onReach": "pause", "pausedAt": 1, "pausedSpendUsd": 6, "liftedUntil": 2},
             "samplingMode": "rate",
             "samplingValue": 0.1
         }"#;
@@ -506,7 +507,14 @@ mod tests {
         let job = infra::table::online_eval_jobs::OnlineEvalJob::try_from(body).unwrap();
         let budget = job.budget.clone().unwrap();
         assert_eq!(budget.daily_usd, 5.0);
-        assert_eq!((budget.paused_at, budget.lifted_until), (None, None));
+        assert_eq!(
+            (
+                budget.paused_at,
+                budget.paused_spend_usd,
+                budget.lifted_until
+            ),
+            (None, None, None)
+        );
 
         let response = serde_json::to_value(EvalJobResponseBody::from(job)).unwrap();
         assert_eq!(

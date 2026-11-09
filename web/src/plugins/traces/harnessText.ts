@@ -16,9 +16,10 @@
 /**
  * Harness text (AIO-22): the wrapper a coding agent puts around its user's
  * request (`<system-reminder>`, `<job>`), hidden when sessions are read. Per
- * agent, from GenAI Agent Mapping. Mirrors `strip_harness` in
- * src/config/src/meta/gen_ai.rs, which hides it in the Sessions list; this copy
- * serves the turn previews, which are built from the spans in the browser.
+ * agent, from GenAI Agent Mapping. The server hides it everywhere
+ * (`strip_harness` in src/config/src/meta/gen_ai.rs): the Sessions list in its
+ * query, the turn previews and the settings test through
+ * `genAiAgentMappingService.stripHarness`, so a pattern means the same in each.
  */
 
 export interface HarnessPatternRule {
@@ -26,6 +27,7 @@ export interface HarnessPatternRule {
   patterns: string[];
 }
 
+/** Mirrors the backend `HarnessStripped`. */
 export interface HarnessStripped {
   text: string;
   hidden: number;
@@ -40,44 +42,6 @@ export const DEFAULT_HARNESS_PATTERNS = [
   "tag command-message",
   "tag local-command-stdout",
 ];
-
-const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** `tag <name>` or `regex <expr>`; anything else (or a bad regex) is null. */
-export function compileHarnessPattern(pattern: string): { re: RegExp; label: string } | null {
-  const p = pattern.trim();
-  if (p.startsWith("tag ")) {
-    const tag = p.slice(4).trim();
-    if (!/^[\w.:-]+$/.test(tag)) return null;
-    const t = escapeRegex(tag);
-    return { re: new RegExp(`<${t}\\b[^>]*>[\\s\\S]*?</${t}\\s*>`, "g"), label: tag };
-  }
-  if (p.startsWith("regex ")) {
-    try {
-      return { re: new RegExp(p.slice(6).trim(), "g"), label: "regex" };
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-export function stripHarness(text: string, patterns: string[]): HarnessStripped {
-  let out = text;
-  let hidden = 0;
-  let first: string | null = null;
-  for (const compiled of patterns.map(compileHarnessPattern)) {
-    if (!compiled) continue;
-    const n = out.match(compiled.re)?.length ?? 0;
-    if (n > 0) {
-      hidden += n;
-      first ??= compiled.label;
-      out = out.replace(compiled.re, "");
-    }
-  }
-  const trimmed = out.trim();
-  return { text: trimmed, hidden, only: !trimmed && hidden > 0 ? first : null };
-}
 
 /** The patterns saved for one agent, or none. */
 export function patternsForAgent(rules: HarnessPatternRule[] | undefined, agent: string | null) {

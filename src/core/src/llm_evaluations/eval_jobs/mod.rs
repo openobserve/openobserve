@@ -275,6 +275,22 @@ pub async fn prepare_job_update(
         Some(budget) => Some(budget.with_server_state_of(existing.budget.as_ref())),
         None => existing.budget.clone(),
     };
+    // Raising a budget-paused job's limit above the spend it paused at resumes it, and the new
+    // limit applies for the rest of the day.
+    let resumes = existing.status == "paused"
+        && job
+            .budget
+            .as_ref()
+            .is_some_and(|budget| budget.allows_resume());
+    let status = if resumes {
+        let now_us = config::utils::time::now_micros();
+        job.budget = job
+            .budget
+            .map(|budget| budget.after_transition("active", None, now_us));
+        "active"
+    } else {
+        existing.status.as_str()
+    };
 
     job.apply_target_scope_defaults();
     job.normalize_sampling()
@@ -285,15 +301,15 @@ pub async fn prepare_job_update(
         .map_err(EvalJobError::InvalidJob)?;
     validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
-    if existing.status == "active" {
+    if status == "active" {
         job.validate_for_activation()
             .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     }
 
     // Preserve identity & lifecycle fields from the existing row.
+    job.status = status.to_string();
     job.id = existing.id;
     job.org_id = existing.org_id;
-    job.status = existing.status.clone();
     job.pipeline_id = existing.pipeline_id.clone();
     job.created_at = existing.created_at;
     job.version = existing.version + 1;
@@ -382,31 +398,30 @@ pub async fn transition_status(
     job_id: &str,
     new_status: &str,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
-    transition(org_id, job_id, new_status, false).await
+    transition(org_id, job_id, new_status, None).await
 }
 
-/// The health pass's budget enforcement (AIO-24): pause a job whose spend reached its budget,
-/// or resume it once a new UTC day starts.
+/// The health pass's budget enforcement (AIO-24): `Some(spend)` pauses a job whose spend for
+/// the day reached its budget; `None` resumes it once a new UTC day starts.
 #[tracing::instrument()]
 pub async fn transition_for_budget(
     org_id: &str,
     job_id: &str,
-    pause: bool,
+    pause_at_spend: Option<f64>,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
-    transition(
-        org_id,
-        job_id,
-        if pause { "paused" } else { "active" },
-        pause,
-    )
-    .await
+    let new_status = if pause_at_spend.is_some() {
+        "paused"
+    } else {
+        "active"
+    };
+    transition(org_id, job_id, new_status, pause_at_spend).await
 }
 
 async fn transition(
     org_id: &str,
     job_id: &str,
     new_status: &str,
-    for_budget: bool,
+    budget_spend: Option<f64>,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let job = get_job(org_id, job_id).await?;
     let target = check_transition(org_id, &job, new_status).await?;
@@ -414,7 +429,7 @@ async fn transition(
         .await
         .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
     let budget = job.budget.clone().map(|budget| {
-        budget.after_transition(new_status, for_budget, config::utils::time::now_micros())
+        budget.after_transition(new_status, budget_spend, config::utils::time::now_micros())
     });
 
     // Persist the new status (and any pipeline_id allocated by reconcile).

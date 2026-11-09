@@ -1017,7 +1017,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, onMounted, nextTick, computed, defineAsyncComponent } from "vue";
+import { ref, reactive, onMounted, nextTick, computed, defineAsyncComponent, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import useSmartBack from "@/composables/useSmartBack";
 import { useStore } from "vuex";
@@ -1031,7 +1031,7 @@ import {
   type TurnDetail,
 } from "./composables/useSessions";
 import { buildTurnDetail } from "./threadView.utils";
-import { patternsForAgent, stripHarness, type HarnessPatternRule } from "./harnessText";
+import { patternsForAgent, type HarnessPatternRule, type HarnessStripped } from "./harnessText";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1507,33 +1507,27 @@ const expandedTurns = reactive<Record<string, boolean>>({});
 // the transcript can never disagree. Spans are grouped by `trace_id`; the
 // per-trace projection lives in `threadView.utils` alongside ThreadView's, so
 // the two views classify spans identically.
-const turnDetailsByTrace = computed<Record<string, TurnDetail & { harnessHidden?: number }>>(() => {
+const rawTurnDetails = computed<Record<string, TurnDetail>>(() => {
   const byTrace: Record<string, any[]> = {};
   for (const s of sessionSpans.value) {
     const tid = String(s.trace_id || "");
     if (!tid) continue;
     (byTrace[tid] ||= []).push(s);
   }
-
-  const patterns = patternsForAgent(harnessRules.value, sessionAgent.value);
+  const out: Record<string, TurnDetail> = {};
+  for (const tid of Object.keys(byTrace)) out[tid] = buildTurnDetail(tid, byTrace[tid]);
+  return out;
+});
+// The same, with harness text hidden in the user message (AIO-22).
+const turnDetailsByTrace = computed<Record<string, TurnDetail & { harnessHidden?: number }>>(() => {
   const out: Record<string, TurnDetail & { harnessHidden?: number }> = {};
-  for (const tid of Object.keys(byTrace)) {
-    const detail = buildTurnDetail(tid, byTrace[tid]);
-    const content = detail.userMessage?.content;
-    const stripped =
-      patterns.length && content && !revealedHarness.value.has(tid)
-        ? stripHarness(content, patterns)
-        : null;
+  for (const [tid, detail] of Object.entries(rawTurnDetails.value)) {
+    const stripped = hiddenHarness(tid, detail.userMessage?.content);
     out[tid] =
-      stripped?.hidden && detail.userMessage
+      stripped && detail.userMessage
         ? {
             ...detail,
-            userMessage: {
-              ...detail.userMessage,
-              content: stripped.text
-                ? raw(stripped.text)
-                : t("readableSessions.onlyHarness", { tag: `<${stripped.only}>` }),
-            },
+            userMessage: { ...detail.userMessage, content: harnessLabel(stripped) },
             harnessHidden: stripped.hidden,
           }
         : detail;
@@ -1619,6 +1613,56 @@ const sessionAgent = ref<string | null>(null);
 function revealHarness(traceId: string) {
   revealedHarness.value = new Set(revealedHarness.value).add(traceId);
 }
+// The server hides the text with the code the Sessions list uses, so a pattern
+// means the same in both. Results are kept per message text for the current
+// patterns; until they arrive, or if the request fails, turns show everything.
+const harnessPatterns = computed(() => patternsForAgent(harnessRules.value, sessionAgent.value));
+const harnessStripped = ref<Map<string, HarnessStripped>>(new Map());
+const harnessRequested = new Set<string>();
+let harnessPatternsKey = "";
+const harnessTexts = computed(() => {
+  const texts = new Set<string>();
+  for (const tr of traces.value) if (tr.turnUserMessage) texts.add(tr.turnUserMessage);
+  for (const d of Object.values(rawTurnDetails.value))
+    if (d.userMessage?.content) texts.add(d.userMessage.content);
+  return [...texts];
+});
+watch([harnessPatterns, harnessTexts], async ([patterns, texts]) => {
+  const key = JSON.stringify(patterns);
+  if (key !== harnessPatternsKey) {
+    harnessPatternsKey = key;
+    harnessStripped.value = new Map();
+    harnessRequested.clear();
+  }
+  if (!patterns.length) return;
+  const missing = texts.filter((text) => !harnessRequested.has(text));
+  if (!missing.length) return;
+  missing.forEach((text) => harnessRequested.add(text));
+  try {
+    const results = await genAiAgentMappingService.stripHarness(
+      store.state.selectedOrganization?.identifier ?? "",
+      patterns,
+      missing,
+    );
+    if (key !== harnessPatternsKey) return;
+    const next = new Map(harnessStripped.value);
+    missing.forEach((text, i) => next.set(text, results[i]));
+    harnessStripped.value = next;
+  } catch {
+    // Turns keep their full text.
+  }
+});
+// What the server hid in a turn's message, unless nothing was hidden or the turn shows it all.
+function hiddenHarness(traceId: string, text: string | undefined) {
+  if (!text || revealedHarness.value.has(traceId)) return null;
+  const stripped = harnessStripped.value.get(text);
+  return stripped?.hidden ? stripped : null;
+}
+function harnessLabel(stripped: HarnessStripped) {
+  return stripped.text
+    ? raw(stripped.text)
+    : t("readableSessions.onlyHarness", { tag: `<${stripped.only}>` });
+}
 // Looked up only once some agent has patterns and the turns are known.
 async function loadSessionAgent() {
   if (!harnessRules.value.length || !traces.value.length) return;
@@ -1631,13 +1675,8 @@ async function loadSessionAgent() {
 }
 // The turn row's title, with harness text hidden like the turn body.
 function turnTitle(tr: SessionTraceRow) {
-  const patterns = patternsForAgent(harnessRules.value, sessionAgent.value);
-  if (!tr.turnUserMessage || !patterns.length || revealedHarness.value.has(tr.traceId))
-    return raw(tr.turnUserMessage || "—");
-  const stripped = stripHarness(tr.turnUserMessage, patterns);
-  return stripped.text
-    ? raw(stripped.text)
-    : t("readableSessions.onlyHarness", { tag: `<${stripped.only}>` });
+  const stripped = hiddenHarness(tr.traceId, tr.turnUserMessage);
+  return stripped ? harnessLabel(stripped) : raw(tr.turnUserMessage || "—");
 }
 // Enterprise only; elsewhere the request fails and previews stay as they are.
 genAiAgentMappingService

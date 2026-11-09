@@ -179,6 +179,9 @@ pub struct EvalJobBudget {
     /// When the health pass paused the job for this budget, in microseconds. Server-owned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paused_at: Option<i64>,
+    /// The day's judge spend when the health pass paused the job, in USD. Server-owned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_spend_usd: Option<f64>,
     /// "Resume until 00:00 UTC": the budget does not apply before this time, in microseconds.
     /// Server-owned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -189,22 +192,44 @@ impl EvalJobBudget {
     /// A request sets the limit and action only; the pause state stays the stored job's.
     pub fn with_server_state_of(mut self, stored: Option<&EvalJobBudget>) -> Self {
         self.paused_at = stored.and_then(|b| b.paused_at);
+        self.paused_spend_usd = stored.and_then(|b| b.paused_spend_usd);
         self.lifted_until = stored.and_then(|b| b.lifted_until);
         self
     }
 
-    /// The budget once the job moves to `new_status`. Only a budget pause records `paused_at`,
-    /// so a job the user paused never resumes on its own. Resuming a job the same UTC day its
-    /// budget paused it lifts the budget until 00:00 UTC; the next day's resume does not.
-    pub fn after_transition(mut self, new_status: &str, for_budget: bool, now_us: i64) -> Self {
+    /// A job this budget paused may run again once its limit is above the spend it paused at.
+    pub fn allows_resume(&self) -> bool {
+        self.paused_spend_usd
+            .is_some_and(|spent| self.daily_usd > spent)
+    }
+
+    /// The budget once the job moves to `new_status`. `budget_spend` is the day's spend when
+    /// the budget pauses the job; only that pause records `paused_at`, so a job the user paused
+    /// never resumes on its own. Resuming a job the same UTC day its budget paused it lifts the
+    /// budget until 00:00 UTC, unless the limit is now above the spend it paused at: then the
+    /// budget keeps applying. The next day's resume does not lift it either.
+    pub fn after_transition(
+        mut self,
+        new_status: &str,
+        budget_spend: Option<f64>,
+        now_us: i64,
+    ) -> Self {
         match new_status {
-            "paused" => self.paused_at = for_budget.then_some(now_us),
+            "paused" => {
+                self.paused_at = budget_spend.map(|_| now_us);
+                self.paused_spend_usd = budget_spend;
+                // The budget only pauses a job it is not lifted for, so any lift has ended.
+                if budget_spend.is_some() {
+                    self.lifted_until = None;
+                }
+            }
             "active" => {
                 let today = utc_day_start_us(now_us);
-                if self.paused_at.is_some_and(|at| at >= today) {
+                if self.paused_at.is_some_and(|at| at >= today) && !self.allows_resume() {
                     self.lifted_until = Some(today + DAY_US);
                 }
                 self.paused_at = None;
+                self.paused_spend_usd = None;
             }
             _ => {}
         }
@@ -1376,6 +1401,7 @@ mod tests {
             daily_usd: 5.0,
             on_reach: BudgetAction::Pause,
             paused_at,
+            paused_spend_usd: None,
             lifted_until: None,
         }
     }
@@ -1391,38 +1417,104 @@ mod tests {
     #[test]
     fn test_budget_pause_state_follows_transitions() {
         let now = 10 * DAY + 5;
-        // Only the budget pause records when it paused, so only it resumes on its own.
+        // Only the budget pause records when and at what spend it paused, so only it resumes
+        // on its own. It ends a lift that has run out.
+        let mut expired_lift = budget(None);
+        expired_lift.lifted_until = Some(10 * DAY);
+        let paused = expired_lift.after_transition("paused", Some(6.21), now);
         assert_eq!(
-            budget(None).after_transition("paused", true, now).paused_at,
-            Some(now)
+            (
+                paused.paused_at,
+                paused.paused_spend_usd,
+                paused.lifted_until
+            ),
+            (Some(now), Some(6.21), None)
         );
+        let mut lifted = budget(None);
+        lifted.lifted_until = Some(11 * DAY);
+        let user_paused = lifted.after_transition("paused", None, now);
         assert_eq!(
-            budget(Some(1))
-                .after_transition("paused", false, now)
-                .paused_at,
-            None
+            (user_paused.paused_at, user_paused.paused_spend_usd),
+            (None, None)
         );
+        assert_eq!(user_paused.lifted_until, Some(11 * DAY));
 
-        // Resumed the day it paused: the budget is lifted until 00:00 UTC.
-        let same_day = budget(Some(10 * DAY + 1)).after_transition("active", false, now);
-        assert_eq!(same_day.paused_at, None);
+        // Resumed the day it paused, still over its limit: the budget is lifted until 00:00 UTC.
+        let same_day = budget(None)
+            .after_transition("paused", Some(6.21), 10 * DAY + 1)
+            .after_transition("active", None, now);
+        assert_eq!(
+            (same_day.paused_at, same_day.paused_spend_usd),
+            (None, None)
+        );
         assert_eq!(same_day.lifted_until, Some(11 * DAY));
+        // A pause recorded without its spend is lifted the same way.
+        let unknown_spend = budget(Some(10 * DAY + 1)).after_transition("active", None, now);
+        assert_eq!(unknown_spend.lifted_until, Some(11 * DAY));
 
         // The next day's resume starts a fresh day under the budget.
-        let next_day = budget(Some(9 * DAY + 1)).after_transition("active", false, now);
+        let next_day = budget(None)
+            .after_transition("paused", Some(6.21), 9 * DAY + 1)
+            .after_transition("active", None, now);
         assert_eq!(next_day.paused_at, None);
         assert_eq!(next_day.lifted_until, None);
     }
 
     #[test]
+    fn test_raised_budget_resumes_under_the_new_limit() {
+        let now = 10 * DAY + 5;
+        let paused = budget(None).after_transition("paused", Some(6.21), 10 * DAY + 1);
+        assert!(!paused.allows_resume());
+
+        // Raised above the spend it paused at: it may run, and the new limit applies today.
+        let mut raised = budget(None);
+        raised.daily_usd = 20.0;
+        let raised = raised.with_server_state_of(Some(&paused));
+        assert!(raised.allows_resume());
+        let resumed = raised.after_transition("active", None, now);
+        assert_eq!(
+            (
+                resumed.paused_at,
+                resumed.paused_spend_usd,
+                resumed.lifted_until
+            ),
+            (None, None, None)
+        );
+
+        // Raised only to the spend: it stays paused, and a resume lifts the budget.
+        let mut matched = budget(None);
+        matched.daily_usd = 6.21;
+        let matched = matched.with_server_state_of(Some(&paused));
+        assert!(!matched.allows_resume());
+        assert_eq!(
+            matched.after_transition("active", None, now).lifted_until,
+            Some(11 * DAY)
+        );
+
+        // A job the user paused never resumes on a budget edit.
+        let mut user_paused = budget(None);
+        user_paused.daily_usd = 20.0;
+        assert!(!user_paused.allows_resume());
+    }
+
+    #[test]
     fn test_request_budget_keeps_the_stored_pause_state() {
         let mut stored = budget(Some(7));
+        stored.paused_spend_usd = Some(6.0);
         stored.lifted_until = Some(9);
         let mut incoming = budget(Some(1));
+        incoming.paused_spend_usd = Some(1.0);
         incoming.daily_usd = 10.0;
         let merged = incoming.with_server_state_of(Some(&stored));
         assert_eq!(merged.daily_usd, 10.0);
-        assert_eq!((merged.paused_at, merged.lifted_until), (Some(7), Some(9)));
+        assert_eq!(
+            (
+                merged.paused_at,
+                merged.paused_spend_usd,
+                merged.lifted_until
+            ),
+            (Some(7), Some(6.0), Some(9))
+        );
         assert_eq!(budget(Some(1)).with_server_state_of(None).paused_at, None);
     }
 

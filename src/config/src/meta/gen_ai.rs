@@ -154,6 +154,8 @@ pub enum SessionTitleMode {
 const MAX_HARNESS_RULES: usize = 50;
 const MAX_HARNESS_PATTERNS: usize = 20;
 const MAX_HARNESS_PATTERN_LEN: usize = 300;
+/// Texts one [`HarnessStripRequest`] may carry; the web client sends larger sets in batches.
+pub const MAX_HARNESS_STRIP_TEXTS: usize = 500;
 
 /// A compiled harness pattern and the label shown for what it hid (the tag name).
 pub type CompiledHarnessPattern = (regex::Regex, String);
@@ -164,6 +166,16 @@ pub fn compile_harness_patterns(patterns: &[String]) -> Vec<CompiledHarnessPatte
         .iter()
         .filter_map(|p| parse_harness_pattern(p).ok())
         .collect()
+}
+
+/// What save accepts: a `tag ` or `regex ` pattern within the length limit.
+fn check_harness_pattern(pattern: &str) -> Result<CompiledHarnessPattern, String> {
+    if pattern.len() > MAX_HARNESS_PATTERN_LEN {
+        return Err(format!(
+            "harness pattern '{pattern}' cannot exceed {MAX_HARNESS_PATTERN_LEN} characters"
+        ));
+    }
+    parse_harness_pattern(pattern)
 }
 
 fn parse_harness_pattern(pattern: &str) -> Result<CompiledHarnessPattern, String> {
@@ -182,7 +194,8 @@ fn parse_harness_pattern(pattern: &str) -> Result<CompiledHarnessPattern, String
         return Ok((re, tag.to_string()));
     }
     if let Some(expr) = pattern.strip_prefix("regex ") {
-        let re = regex::Regex::new(expr.trim()).map_err(|e| format!("invalid regex: {e}"))?;
+        let re = regex::Regex::new(expr.trim())
+            .map_err(|e| format!("invalid regex in '{pattern}': {e}"))?;
         return Ok((re, "regex".to_string()));
     }
     Err(format!(
@@ -191,13 +204,60 @@ fn parse_harness_pattern(pattern: &str) -> Result<CompiledHarnessPattern, String
 }
 
 /// What hiding harness text left of one message.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct HarnessStripped {
     pub text: String,
     /// Blocks hidden.
     pub hidden: usize,
     /// Set when the message was nothing but harness text: what hid it.
     pub only: Option<String>,
+}
+
+/// One agent's patterns, saved or a draft, and the messages to hide them in. Session Detail
+/// and the settings test hide harness text with this, so it matches the Sessions list.
+#[derive(Debug, Clone, Default, Deserialize, ToSchema)]
+pub struct HarnessStripRequest {
+    #[serde(default)]
+    pub patterns: Vec<String>,
+    #[serde(default)]
+    pub texts: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct HarnessStripResponse {
+    /// One per text, in request order.
+    pub results: Vec<HarnessStripped>,
+}
+
+impl HarnessStripRequest {
+    /// Rejects patterns save would reject, so a draft fails here as it would on save.
+    pub fn strip(&self) -> Result<HarnessStripResponse, String> {
+        let patterns: Vec<&str> = self
+            .patterns
+            .iter()
+            .map(|p| p.trim())
+            .filter(|p| !p.is_empty())
+            .collect();
+        if patterns.len() > MAX_HARNESS_PATTERNS {
+            return Err(format!(
+                "harness patterns cannot exceed {MAX_HARNESS_PATTERNS}"
+            ));
+        }
+        if self.texts.len() > MAX_HARNESS_STRIP_TEXTS {
+            return Err(format!("texts cannot exceed {MAX_HARNESS_STRIP_TEXTS}"));
+        }
+        let compiled = patterns
+            .into_iter()
+            .map(check_harness_pattern)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(HarnessStripResponse {
+            results: self
+                .texts
+                .iter()
+                .map(|t| strip_harness(t, &compiled))
+                .collect(),
+        })
+    }
 }
 
 pub fn strip_harness(text: &str, patterns: &[CompiledHarnessPattern]) -> HarnessStripped {
@@ -309,12 +369,7 @@ fn normalize_harness_rules(
             ));
         }
         for p in &rule.patterns {
-            if p.len() > MAX_HARNESS_PATTERN_LEN {
-                return Err(format!(
-                    "harness pattern '{p}' cannot exceed {MAX_HARNESS_PATTERN_LEN} characters"
-                ));
-            }
-            parse_harness_pattern(p)?;
+            check_harness_pattern(p)?;
         }
     }
     Ok(rules)
@@ -430,7 +485,46 @@ mod tests {
         assert!(ok.is_all_empty(), "harness patterns are read-time only");
         assert!(config("glob *").normalize_and_validate().is_err());
         assert!(config("tag <bad>").normalize_and_validate().is_err());
-        assert!(config("regex (").normalize_and_validate().is_err());
+        let err = config("regex (?<").normalize_and_validate().unwrap_err();
+        assert!(err.contains("invalid regex in 'regex (?<'"), "{err}");
+    }
+
+    #[test]
+    fn strip_request_runs_rust_regex_syntax() {
+        let request = |patterns: &[&str], texts: &[&str]| HarnessStripRequest {
+            patterns: patterns.iter().map(|p| p.to_string()).collect(),
+            texts: texts.iter().map(|t| t.to_string()).collect(),
+        };
+        // Inline flags, which a browser RegExp rejects.
+        let out = request(
+            &["regex (?s)<env>.*?</env>", " ", "regex (?i)^caveat:[^\\n]*"],
+            &[
+                "<env>\nos: linux\n</env>\nFix the build.",
+                "CAVEAT: generated\nreal ask",
+                "<env>a</env><env>b</env>",
+                "plain",
+            ],
+        )
+        .strip()
+        .unwrap();
+        let texts: Vec<_> = out.results.iter().map(|r| r.text.as_str()).collect();
+        assert_eq!(texts, ["Fix the build.", "real ask", "", "plain"]);
+        let hidden: Vec<_> = out.results.iter().map(|r| r.hidden).collect();
+        assert_eq!(hidden, [1, 1, 2, 0]);
+        assert_eq!(out.results[2].only.as_deref(), Some("regex"));
+
+        let err = request(&["regex ("], &["x"]).strip().unwrap_err();
+        assert!(err.starts_with("invalid regex in 'regex ('"), "{err}");
+        assert!(request(&["glob *"], &["x"]).strip().is_err());
+        let too_many = vec![String::new(); MAX_HARNESS_STRIP_TEXTS + 1];
+        assert!(
+            HarnessStripRequest {
+                patterns: vec!["tag job".to_string()],
+                texts: too_many,
+            }
+            .strip()
+            .is_err()
+        );
     }
 
     #[test]

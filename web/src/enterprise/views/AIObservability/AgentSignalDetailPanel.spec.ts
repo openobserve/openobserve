@@ -12,6 +12,7 @@ import {
   failureTracesSql,
 } from "./agentClimbFilter";
 import { explainSignalPrompt } from "./agentSignalPrompt";
+import { UNSET } from "@/enterprise/composables/useAgentScope";
 
 const mockSearch = vi.fn();
 vi.mock("@/services/search", () => ({
@@ -105,6 +106,16 @@ describe("buildAgentClimbFilter", () => {
     expect(sql).toContain("c.gen_ai_agent_env = 'o''reilly'");
     expect(sql).toContain("c.gen_ai_agent_version = '1''0'");
   });
+
+  it("pins a variant's missing env to not set, beside its version", () => {
+    const sql = buildAgentClimbFilter(CALLER_EXPR, "research-agent", {
+      env: UNSET,
+      version: "2.3.0",
+    });
+    expect(sql).toBe(
+      `${CALLER_EXPR} = 'research-agent' AND c.gen_ai_agent_version = '2.3.0' AND (c.gen_ai_agent_env IS NULL OR c.gen_ai_agent_env = '')`,
+    );
+  });
 });
 
 describe("errorDetailExpr", () => {
@@ -159,6 +170,15 @@ describe("explainSignalPrompt failure evidence", () => {
   it("does not add the all-classes qualifier to other signals", () => {
     const prompt = explainSignalPrompt({ signalType: "cost", agent: "a" }, evidence);
     expect(prompt).not.toMatch(/all of this agent's failure classes/);
+  });
+
+  it("names a variant's missing env in the prompt", () => {
+    const prompt = explainSignalPrompt(
+      { signalType: "loop", agent: "a", tool: "web_search" },
+      { ...evidence, env: UNSET, version: "2.3.0" },
+    );
+    expect(prompt).toContain("Agent no env, version 2.3.0.");
+    expect(prompt).not.toContain(UNSET);
   });
 });
 

@@ -124,6 +124,18 @@ export function budgetNameTaken(
   return budgets.some((b) => budgetAlertName(b.name) === want);
 }
 
+/**
+ * The scope's column when the stream's schema lacks it, else null. A stream that never received
+ * the column cannot be budgeted on it: the budget's query names the column, and the alert fails.
+ */
+export function budgetMissingField(
+  scope: BudgetScope,
+  fields: readonly { name: string }[],
+): string | null {
+  const col = BUDGET_COLUMNS[scope];
+  return fields.some((f) => f.name === col) ? null : col;
+}
+
 /** The budget's alert, tagged so the Budgets page finds it. */
 export function budgetAlertPayload(
   b: BudgetDef,

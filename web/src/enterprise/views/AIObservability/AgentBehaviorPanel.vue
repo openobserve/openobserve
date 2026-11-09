@@ -57,9 +57,29 @@
         class="min-h-0 flex-1"
         show-index
         pagination="client"
+        row-key="id"
+        expansion="multiple"
+        :get-row-expansion-enabled="(r: LoopRow) => r.variants.length > 1"
         :empty-message="loopsEmptyMessage"
         @row-click="(r: any) => openDetail('loop', r)"
       >
+        <!-- An (agent, tool) seen in more than one env/version: its variants,
+             each opening the drawer on that variant alone. -->
+        <template #expansion="{ row }">
+          <OTable
+            :data="row.variants"
+            :columns="variantColumns"
+            :default-columns="false"
+            :frame="false"
+            :fill-height="false"
+            :show-global-filter="false"
+            :row-class="loopRowClass"
+            row-key="id"
+            pagination="none"
+            :data-test="`agent-behavior-loop-variants-${row.agent}-${row.tool}`"
+            @row-click="(v: any) => openDetail('loop', v)"
+          />
+        </template>
         <!-- Repeated tool calls for this agent and tool, prefilled (AIO-20). -->
         <template #cell-actions="{ row }">
           <span @click.stop>
@@ -117,8 +137,8 @@
       :source-stream="sourceStream"
       :start-time="startTime"
       :end-time="endTime"
-      :agent-env="agentEnv"
-      :agent-version="agentVersion"
+      :agent-env="detailScope.env"
+      :agent-version="detailScope.version"
       explainable
       @send-to-ai-chat="(value: unknown, append?: boolean) => emit('sendToAiChat', value, append)"
     />
@@ -142,7 +162,13 @@ import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import AiAlertPackDialog from "@/components/alerts/AiAlertPackDialog.vue";
 import { buildAiPrefill } from "@/utils/alerts/prefill/fromAi";
 import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
-import { matchesAgentScope } from "./agentScope";
+import {
+  buildLoopRows,
+  countAgents,
+  matchesAgentScope,
+  type DrillScope,
+  type LoopRow,
+} from "./agentScope";
 
 const props = defineProps<{
   startTime?: number;
@@ -175,14 +201,24 @@ const openDetail = (signalType: "loop" | "failure" | "cost", row: Record<string,
   detailOpen.value = true;
 };
 
+// The drawer's env/version: a variant row's own; otherwise the page's agent scope.
+const detailScope = computed<DrillScope>(
+  () =>
+    detailRow.value?.scope ?? {
+      env: props.agentEnv ?? null,
+      version: props.agentVersion ?? null,
+    },
+);
+
 // Highlight the row whose drawer is currently open, so the relationship
 // "this row → this drawer" is visible at a glance (rather than a drawer that
-// seems disconnected from the table).
+// seems disconnected from the table). A loop row is an (agent, tool) or one of
+// its env/version variants, each with its own id.
 const isActiveRow = (type: "loop" | "failure", row: any): boolean => {
   const d = detailRow.value;
   if (!detailOpen.value || !d || d.signalType !== type) return false;
-  if ((d.agentRaw ?? null) !== (row.agentRaw ?? null)) return false;
-  return type === "loop" ? d.tool === row.tool : d.failClass === row.failClass;
+  if (type === "loop") return d.id === row.id;
+  return (d.agentRaw ?? null) === (row.agentRaw ?? null) && d.failClass === row.failClass;
 };
 const loopRowClass = (row: any) => (isActiveRow("loop", row) ? "bg-table-row-selected-bg" : "");
 const failureRowClass = (row: any) =>
@@ -199,26 +235,9 @@ const scopedSignals = computed(() => {
   );
 });
 
-/** Loop rows: rank (agent, tool) by calls-per-trace ratio. */
-const loopRows = computed(() =>
-  scopedSignals.value
-    .filter((s) => s.signal_type === "loop")
-    .map((s) => ({
-      // `agent` is the DISPLAY string (may be the "(unknown agent)" fallback);
-      // `agentRaw` is the real value the drill-down must query on (null when the
-      // rollup couldn't resolve an agent — the drawer then drops the agent
-      // filter rather than searching for the literal fallback string).
-      agent: s.agent_name ?? t("aiObservability.behavior.unknownAgent"),
-      agentRaw: s.agent_name ?? null,
-      tool: s.tool_name ?? "",
-      calls: s.calls ?? 0,
-      traces: s.distinct_traces ?? 0,
-      ratio:
-        s.distinct_traces && s.distinct_traces > 0
-          ? Math.round(((s.calls ?? 0) / s.distinct_traces) * 100) / 100
-          : 0,
-    }))
-    .sort((a, b) => b.ratio - a.ratio),
+/** Loop rows: one per (agent, tool) over the range, ranked by calls per trace. */
+const loopRows = computed<LoopRow[]>(() =>
+  buildLoopRows(scopedSignals.value, t("aiObservability.behavior.unknownAgent")),
 );
 
 // Scope-aware empty text — when a single agent is selected, say so (and how to
@@ -255,7 +274,6 @@ const failureRows = computed(() =>
 const behaviorStats = computed<StatItem[]>(() => {
   const loops = loopRows.value;
   const failures = failureRows.value;
-  const agents = new Set([...loops, ...failures].map((r) => r.agentRaw).filter(Boolean));
   const totalFailures = failures.reduce((sum, f) => sum + (f.count || 0), 0);
   const has = loops.length + failures.length > 0;
   const v = (n: number): string | number => (has ? n : "—");
@@ -263,7 +281,7 @@ const behaviorStats = computed<StatItem[]>(() => {
     {
       key: "loops",
       label: t("aiObservability.behavior.summaryLoops"),
-      value: v(loops.length),
+      value: v(countAgents(loops)),
       icon: "restart-alt",
       tone: "warning",
       dataTest: "agent-behavior-summary-loops",
@@ -279,7 +297,7 @@ const behaviorStats = computed<StatItem[]>(() => {
     {
       key: "agents",
       label: t("aiObservability.behavior.summaryAgents"),
-      value: v(agents.size),
+      value: v(countAgents([...loops, ...failures])),
       icon: "smart-toy",
       tone: "primary",
       dataTest: "agent-behavior-summary-agents",
@@ -287,21 +305,8 @@ const behaviorStats = computed<StatItem[]>(() => {
   ];
 });
 
-const loopColumns = computed<OTableColumnDef[]>(() => [
-  {
-    id: "agent",
-    header: t("aiObservability.behavior.colAgent"),
-    accessorKey: "agent",
-    meta: { align: "left", autoWidth: true },
-    sortable: true,
-  },
-  {
-    id: "tool",
-    header: t("aiObservability.behavior.colTool"),
-    accessorKey: "tool",
-    meta: { align: "left", autoWidth: true },
-    sortable: true,
-  },
+// Calls/trace, calls and traces: the same for an (agent, tool) row and its variants.
+const loopMetricColumns = computed<OTableColumnDef[]>(() => [
   {
     id: "ratio",
     header: t("aiObservability.behavior.colRatio"),
@@ -323,7 +328,49 @@ const loopColumns = computed<OTableColumnDef[]>(() => [
     meta: { align: "right" },
     sortable: true,
   },
+]);
+
+const loopColumns = computed<OTableColumnDef[]>(() => [
+  {
+    id: "agent",
+    header: t("aiObservability.behavior.colAgent"),
+    accessorKey: "agent",
+    meta: { align: "left", autoWidth: true },
+    sortable: true,
+  },
+  {
+    id: "tool",
+    header: t("aiObservability.behavior.colTool"),
+    accessorKey: "tool",
+    meta: { align: "left", autoWidth: true },
+    sortable: true,
+  },
+  ...loopMetricColumns.value,
   { id: "actions", header: raw(""), size: 56, meta: { align: "right" }, sortable: false },
+]);
+
+const variantColumns = computed<OTableColumnDef[]>(() => [
+  {
+    id: "env",
+    header: t("aiObservability.scope.env"),
+    accessorKey: "env",
+    meta: {
+      align: "left",
+      autoWidth: true,
+      format: (v: string | null) => v ?? t("traces.agentNoEnv"),
+    },
+  },
+  {
+    id: "version",
+    header: t("aiObservability.scope.version"),
+    accessorKey: "version",
+    meta: {
+      align: "left",
+      autoWidth: true,
+      format: (v: string | null) => v ?? t("traces.agentNoVersion"),
+    },
+  },
+  ...loopMetricColumns.value,
 ]);
 
 const packOpen = ref(false);

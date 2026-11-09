@@ -19,8 +19,10 @@ import {
   backfillRequests,
   backfillTargetsSql,
   backfillWindowUs,
+  budgetPauseFacts,
   estimateJobSpend,
   formatUsd,
+  isBudgetLifted,
   isBudgetPaused,
   judgeHistorySql,
   matchedPerDaySql,
@@ -30,6 +32,7 @@ import {
   utcDayStartMs,
   type JudgeHistory,
 } from "./evalSpend";
+import type { EvalJob, EvalJobBudget } from "@/services/online-evals.service";
 
 const judge = (scorerId: string, priced: number, cost: number): JudgeHistory => ({
   scorerId,
@@ -284,6 +287,42 @@ describe("spend SQL and budget state (AIO-24)", () => {
     expect(isBudgetPaused(job)).toBe(true);
     expect(isBudgetPaused({ ...job, budget: { dailyUsd: 5, onReach: "pause" } })).toBe(false);
     expect(isBudgetPaused({ ...job, status: "active" })).toBe(false);
+  });
+
+  const budgetJob = (status: EvalJob["status"], budget: EvalJobBudget): EvalJob => ({
+    id: "j1",
+    name: "j1",
+    stream: "default",
+    scorers: [],
+    status,
+    version: 1,
+    budget,
+  });
+
+  it("states the spend a job paused at, not a budget edited since", () => {
+    const pausedAt = Date.UTC(2026, 10, 9, 20, 19) * 1000;
+    const job = budgetJob("paused", {
+      dailyUsd: 20,
+      onReach: "pause",
+      pausedAt,
+      pausedSpendUsd: 6.21,
+    });
+    expect(budgetPauseFacts(job, Date.UTC(2026, 10, 9, 20, 30))).toEqual({
+      amount: "$6.21",
+      time: "20:19",
+      hours: 3,
+      minutes: 30,
+    });
+  });
+
+  it("shows a lift only while it lasts on an active job", () => {
+    const now = Date.UTC(2026, 10, 9, 21);
+    const midnight = Date.UTC(2026, 10, 10);
+    const lifted = { dailyUsd: 5, onReach: "pause", liftedUntil: midnight * 1000 } as const;
+    expect(isBudgetLifted(budgetJob("active", lifted), now)).toBe(true);
+    expect(isBudgetLifted(budgetJob("active", lifted), midnight)).toBe(false);
+    expect(isBudgetLifted(budgetJob("paused", lifted), now)).toBe(false);
+    expect(isBudgetLifted(budgetJob("active", { dailyUsd: 5, onReach: "pause" }), now)).toBe(false);
   });
 
   it("formats day amounts and sub-cent amounts", () => {

@@ -192,12 +192,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="draft.scope"
           :options="SCOPES.map((s) => ({ value: s, label: t(`aiBudgets.scopes.${s}`) }))"
           :label="t('aiBudgets.limits')"
+          :error="!!missingField"
+          :error-message="
+            missingField
+              ? t('aiBudgets.fieldMissing', { stream: draft.stream, field: missingField })
+              : undefined
+          "
           data-test="ai-budgets-scope"
         />
         <!-- The agents, features or models the stream has seen; one not seen
              yet (a feature before it ships) can still be typed in. -->
         <OSelect
-          v-if="!isEach(draft.scope)"
+          v-if="!isEach(draft.scope) && !missingField"
           v-model="draft.value"
           :options="valueSelectOptions"
           :label="t(`aiBudgets.scopes.${draft.scope}`)"
@@ -275,6 +281,7 @@ import {
   budgetAlertPayload,
   budgetAlertUpdate,
   budgetFromAlert,
+  budgetMissingField,
   budgetNameTaken,
   budgetReading,
   budgetSql,
@@ -357,17 +364,24 @@ const valueSelectOptions = computed(() =>
   ).map((v) => ({ value: v, label: raw(v) })),
 );
 const valueOptionsLoading = ref(false);
+// The scope's column when the budget's stream has not received it; Create stays off.
+const missingField = ref<string | null>(null);
 let valueSeq = 0;
 async function loadValueOptions() {
   const mine = ++valueSeq;
   valueOptions.value = [];
-  if (!dialogOpen.value || !draft.stream || isEach(draft.scope)) return;
+  missingField.value = null;
+  if (!dialogOpen.value || !draft.stream) return;
   const col = BUDGET_COLUMNS[draft.scope];
   valueOptionsLoading.value = true;
   try {
     // A column the stream never received is not in its schema, and a query naming it fails.
-    const schema = await getStream(draft.stream, "traces", true).catch(() => null);
-    if (!(schema?.schema ?? []).some((f: any) => f.name === col)) return;
+    // Read fresh, as a cached schema can predate the column. An unread schema blocks nothing:
+    // the save refuses a missing column too.
+    const schema = await getStream(draft.stream, "traces", true, true).catch(() => null);
+    if (mine !== valueSeq || !schema) return;
+    missingField.value = budgetMissingField(draft.scope, schema.schema ?? []);
+    if (missingField.value || isEach(draft.scope)) return;
     const now = Date.now() * 1000;
     const hits = (await executeQuery(
       `SELECT ${col} AS v, COUNT(*) AS n FROM "${draft.stream}" WHERE ${col} IS NOT NULL AND ${col} != '' GROUP BY ${col} ORDER BY n DESC LIMIT 200`,
@@ -397,6 +411,7 @@ const canCreate = computed(
   () =>
     !!draft.name.trim() &&
     !nameTaken.value &&
+    !missingField.value &&
     draft.limitUsd > 0 &&
     (isEach(draft.scope) || !!draft.value.trim()) &&
     !!draft.stream,

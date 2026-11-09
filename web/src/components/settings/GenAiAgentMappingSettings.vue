@@ -335,7 +335,7 @@ import {
   coverageSql,
   type AttributionDim,
 } from "@/plugins/traces/llmAttribution";
-import { DEFAULT_HARNESS_PATTERNS, stripHarness } from "@/plugins/traces/harnessText";
+import { DEFAULT_HARNESS_PATTERNS } from "@/plugins/traces/harnessText";
 import { messagesFromInput } from "@/plugins/traces/threadView.utils";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -550,8 +550,15 @@ const testRule = async (i: number) => {
     const firsts = hits
       .map((h) => messagesFromInput(h.input).find((m) => m.role === "user")?.content ?? "")
       .filter(Boolean);
-    const patterns = textToLines(rule.patternsText);
-    const stripped = firsts.map((text) => ({ text, out: stripHarness(text, patterns) }));
+    // The server runs the patterns, so the result matches the Sessions list.
+    const results = firsts.length
+      ? await genAiAgentMappingService.stripHarness(
+          orgId.value,
+          textToLines(rule.patternsText),
+          firsts,
+        )
+      : [];
+    const stripped = firsts.map((text, k) => ({ text, out: results[k] }));
     const hit = stripped.find((s) => s.out.hidden > 0);
     testResults.value = {
       ...testResults.value,
@@ -563,9 +570,15 @@ const testRule = async (i: number) => {
       },
     };
   } catch (error: any) {
+    // A failed run must not leave the previous pattern's result on screen.
+    const { [i]: _stale, ...rest } = testResults.value;
+    testResults.value = rest;
     toast({
       variant: "error",
-      message: error?.message || t("readableSessions.settings.testFailed"),
+      message:
+        error?.response?.data?.message ||
+        error?.message ||
+        t("readableSessions.settings.testFailed"),
     });
   } finally {
     testing.value = null;

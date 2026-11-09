@@ -145,12 +145,13 @@
         :runs="group.rows"
         :baseline="group.baseline"
         :policies="policies"
+        :shared-cases="sharedCases"
       />
 
       <!-- Five rows then scroll inside the group: the header row is h-9 and the
            body rows are OTable's normal density, so one dataset with many runs
            can't push every other group off the page. Re-runs are tree parents:
-           the latest run is the row, its earlier re-runs expand under it. -->
+           the newest completed run is the row, the others expand under it. -->
       <OTable
         v-if="isGroupExpanded(group.id)"
         :data="group.rows"
@@ -231,23 +232,33 @@
         <template #cell-vsBaseline="{ row }">
           <div
             v-if="outcomeOf(row)"
-            class="flex min-w-0 items-center gap-2"
+            class="flex min-w-0 flex-col"
             :data-test="`ai-experiment-outcome-${row.id}`"
           >
-            <OTag size="sm" :variant="OUTCOME_BADGES[outcomeOf(row)!.outcome]">
-              {{ t(`experimentsAtScale.outcome.${outcomeOf(row)!.outcome}`) }}
-            </OTag>
-            <OTruncatedText
-              v-if="outcomeOf(row)!.outcome !== 'unchanged'"
+            <div class="flex min-w-0 items-center gap-2">
+              <OTag size="sm" :variant="OUTCOME_BADGES[outcomeOf(row)!.outcome]">
+                {{ t(`experimentsAtScale.outcome.${outcomeOf(row)!.outcome}`) }}
+              </OTag>
+              <OTruncatedText
+                v-if="outcomeOf(row)!.outcome !== 'unchanged'"
+                class="text-text-secondary text-xs"
+              >
+                {{
+                  t("experimentsAtScale.headline", {
+                    score: outcomeOf(row)!.headline.name,
+                    delta: signedPoints(outcomeOf(row)!.headline.delta),
+                  })
+                }}
+              </OTruncatedText>
+            </div>
+            <span
+              v-if="outcomeOf(row)!.cases"
               class="text-text-secondary text-xs"
+              :data-test="`ai-experiment-cases-${row.id}`"
             >
-              {{
-                t("experimentsAtScale.headline", {
-                  score: outcomeOf(row)!.headline.name,
-                  delta: signedPoints(outcomeOf(row)!.headline.delta),
-                })
-              }}
-            </OTruncatedText>
+              {{ sharedCasesLabel(outcomeOf(row)!.cases!) }}
+              <OTooltip :content="t('experimentsAtScale.sharedCasesTooltip')" />
+            </span>
           </div>
           <span v-else class="text-text-secondary">{{ raw("—") }}</span>
         </template>
@@ -282,12 +293,7 @@
               class="text-text-secondary text-xs"
               :data-test="`ai-experiment-spread-${row.id}-${name}`"
             >
-              {{
-                t("experimentsAtScale.spread", {
-                  count: foldSize(row),
-                  range: foldSpread(row, name),
-                })
-              }}
+              {{ t("experimentsAtScale.spread", foldSpread(row, name)!) }}
             </span>
           </div>
         </template>
@@ -319,6 +325,18 @@
               <OTruncatedText v-if="visibleStatusReason(row)" class="text-text-secondary text-xs">
                 {{ raw(visibleStatusReason(row)) }}
               </OTruncatedText>
+              <span
+                v-if="newerIncompleteRuns.get(row.id)"
+                class="text-text-secondary shrink-0 text-xs"
+                :data-test="`ai-experiment-newer-rerun-${row.id}`"
+              >
+                {{
+                  t("experimentsAtScale.newerRerun", {
+                    status: statusVariant(newerIncompleteRuns.get(row.id)!.status, "eval").label,
+                  })
+                }}
+                <OTooltip :content="t('experimentsAtScale.newerRerunTooltip')" />
+              </span>
             </template>
           </div>
         </template>
@@ -455,7 +473,10 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LlmDataset } from "@/services/llm-datasets.service";
-import { cloneExperimentMutation } from "@/services/llm-experiments.queries";
+import {
+  cloneExperimentMutation,
+  experimentCompareQuery,
+} from "@/services/llm-experiments.queries";
 import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import {
@@ -486,8 +507,10 @@ import {
   foldReruns,
   parseGroupBy,
   parseGroupSort,
+  sameCases,
   scorePolicies,
-  scoreSpreadLabel,
+  scoreSpread,
+  sharedCaseComparison,
   signedPoints,
   sortByRegressions,
   type BaselineOutcome,
@@ -497,6 +520,7 @@ import {
   type RunComparison,
   type RunFold,
   type ScorePolicy,
+  type SharedCaseComparison,
 } from "@/enterprise/views/AIObservability/experimentScale";
 import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
 import { queryClient } from "@/composables/query/queryClient";
@@ -707,13 +731,17 @@ function toggleGroup(groupId: string) {
 const baselines = computed(
   () => new Map(props.experiments.filter(isBaseline).map((row) => [row.datasetId, row])),
 );
-// Each run against its own dataset's baseline.
+// Each run against its own dataset's baseline; a run on other cases than the
+// baseline by Compare's answer over the cases both ran.
 const comparisons = computed(() => {
   const result = new Map<string, RunComparison | null>();
   for (const group of groups.value) {
     const baseline = baselines.value.get(group.datasetId) ?? null;
     for (const run of group.experiments) {
-      result.set(run.id, compareToBaseline(run, baseline, policies.value));
+      result.set(
+        run.id,
+        compareToBaseline(run, baseline, policies.value, sharedCases.value.get(run.id)),
+      );
     }
   }
   return result;
@@ -737,7 +765,7 @@ const datasetRows = computed<DatasetRow[]>(() =>
     };
   }),
 );
-// A folded row's earlier re-runs, by the latest run's id: its tree children.
+// A folded row's other re-runs, by the row's run id: its tree children.
 const earlierRuns = computed(
   () =>
     new Map(
@@ -745,6 +773,17 @@ const earlierRuns = computed(
         group.folds
           .filter((fold) => fold.earlier.length)
           .map((fold) => [fold.latest.id, fold.earlier] as const),
+      ),
+    ),
+);
+// A newer re-run that did not complete, by the row's run id: the row says so.
+const newerIncompleteRuns = computed(
+  () =>
+    new Map(
+      datasetRows.value.flatMap((group) =>
+        group.folds.flatMap((fold) =>
+          fold.newerIncomplete ? [[fold.latest.id, fold.newerIncomplete] as const] : [],
+        ),
       ),
     ),
 );
@@ -757,13 +796,23 @@ function deltaOf(run: LlmExperiment, scorerName: string) {
   return outcomeOf(run)?.deltas.get(scorerName) ?? null;
 }
 
+function sharedCasesLabel(cases: NonNullable<RunComparison["cases"]>) {
+  return cases.excluded
+    ? t(
+        "experimentsAtScale.sharedCasesExcluded",
+        { count: cases.shared, excluded: cases.excluded },
+        cases.shared,
+      )
+    : t("experimentsAtScale.sharedCases", { count: cases.shared }, cases.shared);
+}
+
 function foldSize(run: LlmExperiment) {
   return 1 + (earlierRuns.value.get(run.id)?.length ?? 0);
 }
 
 function foldSpread(run: LlmExperiment, scorerName: string) {
   const earlier = earlierRuns.value.get(run.id);
-  return earlier ? scoreSpreadLabel([run, ...earlier], scorerName) : null;
+  return earlier ? scoreSpread([run, ...earlier], scorerName) : null;
 }
 
 function ciGroupLabel(section: CiGroup) {
@@ -791,6 +840,45 @@ const groups = computed(() =>
     props.fixedDatasetId || datasetFilter.value,
     nameSearch.value,
   ),
+);
+
+// Runs on another dataset version or filter than their baseline ran other
+// cases, so only Compare, which pairs cases, can judge them. One cached Compare
+// per such run; same-case runs keep the list's own summaries, so the common
+// case costs no extra request.
+const sharedCasePairs = computed(() =>
+  groups.value.flatMap((group) => {
+    const baseline = baselines.value.get(group.datasetId);
+    if (baseline?.status !== "completed") return [];
+    return group.experiments
+      .filter(
+        (run) => run.id !== baseline.id && run.status === "completed" && !sameCases(run, baseline),
+      )
+      .map((run) => ({ baselineId: baseline.id, candidateId: run.id }));
+  }),
+);
+const sharedCases = ref(new Map<string, SharedCaseComparison>());
+watch(
+  [() => props.orgId, sharedCasePairs],
+  async ([orgId, pairs], _, onCleanup) => {
+    let stale = false;
+    onCleanup(() => (stale = true));
+    const loaded = await Promise.all(
+      pairs.map(async ({ baselineId, candidateId }) => {
+        try {
+          const comparison = await queryClient.fetchQuery(
+            experimentCompareQuery(orgId, baselineId, candidateId),
+          );
+          return [[candidateId, sharedCaseComparison(comparison)] as const];
+        } catch {
+          // The run keeps no verdict ("—"), the same as a run with nothing to compare.
+          return [];
+        }
+      }),
+    );
+    if (!stale) sharedCases.value = new Map(loaded.flat());
+  },
+  { immediate: true },
 );
 const selectedExperiments = computed(() =>
   props.experiments.filter(({ id }) => selectedIds.value.includes(id)),

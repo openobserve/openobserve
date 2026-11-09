@@ -168,6 +168,8 @@ export interface EvalJobBudget {
   onReach: EvalBudgetAction;
   /** Server-set while the budget holds the job paused, microseconds since epoch. */
   pausedAt?: number | null;
+  /** Server-set with `pausedAt`: the day's judge spend when the budget paused the job, in USD. */
+  pausedSpendUsd?: number | null;
   /** Server-set after "Resume until 00:00 UTC": the budget is lifted until then (µs). */
   liftedUntil?: number | null;
 }

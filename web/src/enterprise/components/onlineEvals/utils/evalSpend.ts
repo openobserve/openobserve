@@ -344,6 +344,25 @@ export function backfillRequests(
 export const isBudgetPaused = (job: EvalJob): boolean =>
   job.status === "paused" && !!job.budget?.pausedAt;
 
+/** "Resume until 00:00 UTC" lifted the budget, and the lift has not run out. */
+export const isBudgetLifted = (job: EvalJob, nowMs: number): boolean =>
+  job.status === "active" && (job.budget?.liftedUntil ?? 0) / 1000 > nowMs;
+
+/**
+ * What the budget-pause banner states: the spend the job paused at (never a budget edited
+ * since), the UTC time it paused, and the time left until 00:00 UTC.
+ */
+export function budgetPauseFacts(job: EvalJob, nowMs: number) {
+  const left = utcDayStartMs(nowMs) + DAY_MS - nowMs;
+  const budget = job.budget;
+  return {
+    amount: formatUsd(budget?.pausedSpendUsd ?? budget?.dailyUsd ?? 0),
+    time: new Date((budget?.pausedAt ?? 0) / 1000).toISOString().slice(11, 16),
+    hours: Math.floor(left / 3_600_000),
+    minutes: Math.floor((left % 3_600_000) / 60_000),
+  };
+}
+
 /** "$0.38" for day amounts; sub-cent values keep two significant digits. */
 export function formatUsd(value: number): string {
   if (value > 0 && value < 0.01) return `$${value.toPrecision(2)}`;

@@ -44,8 +44,8 @@
               {{ headline }}
             </p>
             <OAgentBadges
-              :env="agentEnv"
-              :version="agentVersion"
+              :env="agentEnv === UNSET ? t('traces.agentNoEnv') : agentEnv"
+              :version="agentVersion === UNSET ? t('traces.agentNoVersion') : agentVersion"
               data-test="agent-signal-detail-badges"
             />
           </div>
@@ -211,6 +211,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { explainSignalPrompt } from "./agentSignalPrompt";
+import { UNSET } from "@/enterprise/composables/useAgentScope";
 
 interface SignalRow {
   signalType: "loop" | "failure" | "cost";
@@ -235,6 +236,7 @@ const props = defineProps<{
   sourceStream?: string;
   startTime?: number;
   endTime?: number;
+  /** The variant the drill-down narrows to: null = any, UNSET = not set. */
   agentEnv?: string | null;
   agentVersion?: string | null;
   /** Offer "Explain with O2 AI"; only where the host page forwards `sendToAiChat`. */

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { UNSET } from "@/enterprise/composables/useAgentScope";
+
 /**
  * The question "Explain with O2 AI" hands to the AI panel for one Agent Behavior
  * signal (AIO-36). It carries the evidence the drill-down drawer already loaded,
@@ -36,6 +38,7 @@ export interface SignalForPrompt {
 
 export interface PromptEvidence {
   stream: string;
+  /** The drill-down's env/version; UNSET = the variant has none. */
   env?: string | null;
   version?: string | null;
   startTime?: number;
@@ -69,7 +72,10 @@ function subject(s: SignalForPrompt, agent: string): string {
 
 export function explainSignalPrompt(s: SignalForPrompt, e: PromptEvidence): string {
   const agent = s.agent || "unknown";
-  const variant = [e.env && `env ${e.env}`, e.version && `version ${e.version}`]
+  const variant = [
+    e.env && (e.env === UNSET ? "no env" : `env ${e.env}`),
+    e.version && (e.version === UNSET ? "no version" : `version ${e.version}`),
+  ]
     .filter(Boolean)
     .join(", ");
   const [from, to] = [e.startTime, e.endTime].map((us) =>

@@ -191,13 +191,21 @@
             {{ t("evalSpend.list.unpriced", { n: unpricedCalls(row) }, unpricedCalls(row)) }}
             <OTooltip :content="t('evalSpend.list.unpricedHint')" />
           </router-link>
-          <span
-            v-else
-            class="tabular-nums"
-            :class="{ 'text-status-error-text': overBudget(row) }"
-            :data-test="`eval-job-list-${row.name}-spend`"
-          >
-            {{ spendText(row) }}
+          <span v-else class="inline-flex items-center gap-1.5">
+            <span
+              class="tabular-nums"
+              :class="{ 'text-status-error-text': overBudget(row) }"
+              :data-test="`eval-job-list-${row.name}-spend`"
+            >
+              {{ spendText(row) }}
+            </span>
+            <span
+              v-if="budgetLifted(row)"
+              class="text-text-secondary"
+              :data-test="`eval-job-list-${row.name}-budget-lifted`"
+            >
+              {{ t("evalSpend.list.liftedUntil") }}
+            </span>
           </span>
         </template>
 
@@ -361,11 +369,12 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import { pricingGapsRoute } from "@/plugins/traces/llmDataTrust.utils";
 import {
+  budgetPauseFacts,
   evaluatorFields,
   formatUsd,
+  isBudgetLifted,
   isBudgetPaused,
   loadSpendToday,
-  utcDayStartMs,
   type JobSpend,
 } from "./utils/evalSpend";
 import type { SpendError } from "@/utils/alerts/aiBudgets";
@@ -806,16 +815,11 @@ function spendText(row: EvalJob): string {
 const budgetPausedRows = computed(() => props.rows.filter(isBudgetPaused));
 
 function budgetPausedText(row: EvalJob): I18nText {
-  const now = Date.now();
-  const left = utcDayStartMs(now) + 24 * 60 * 60 * 1000 - now;
-  const pausedAt = new Date((row.budget?.pausedAt ?? 0) / 1000);
-  return t("evalSpend.list.banner", {
-    name: row.name,
-    amount: formatUsd(row.budget?.dailyUsd ?? 0),
-    time: pausedAt.toISOString().slice(11, 16),
-    hours: Math.floor(left / 3_600_000),
-    minutes: Math.floor((left % 3_600_000) / 60_000),
-  });
+  return t("evalSpend.list.banner", { name: row.name, ...budgetPauseFacts(row, Date.now()) });
+}
+
+function budgetLifted(row: EvalJob): boolean {
+  return isBudgetLifted(row, Date.now());
 }
 
 useShortcuts([

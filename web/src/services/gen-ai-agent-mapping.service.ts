@@ -9,7 +9,7 @@ import { gt } from "@/types/i18n";
 
 import http from "./http";
 import analytics from "./product_analytics";
-import type { HarnessPatternRule } from "@/plugins/traces/harnessText";
+import type { HarnessPatternRule, HarnessStripped } from "@/plugins/traces/harnessText";
 import { RETENTION_MS } from "@/plugins/traces/versionCompare/constants";
 
 /** One arm (A or B) of a version-compare request — mirrors the backend
@@ -132,6 +132,9 @@ export interface ClearGenAiAgentRegistryResponse {
   cleared_buffer_count: number;
 }
 
+/** Texts per strip request: the backend's `MAX_HARNESS_STRIP_TEXTS`. */
+export const HARNESS_STRIP_BATCH = 500;
+
 const emptyConfig = (): GenAiAgentMappingConfig => ({
   agent_name_fields: [],
   agent_id_fields: [],
@@ -231,6 +234,29 @@ const genAiAgentMappingService = {
     );
     analytics.track("gen_ai_agent_mapping_saved");
     return normalizeConfig(response.data);
+  },
+  /**
+   * Hides harness text with the server's patterns engine, the one the Sessions
+   * list uses. Results are in `texts` order. A bad pattern rejects with the
+   * server's 400 message.
+   */
+  stripHarness: async (
+    orgIdentifier: string,
+    patterns: string[],
+    texts: string[],
+  ): Promise<HarnessStripped[]> => {
+    const batches: string[][] = [];
+    for (let i = 0; i < texts.length; i += HARNESS_STRIP_BATCH)
+      batches.push(texts.slice(i, i + HARNESS_STRIP_BATCH));
+    const responses = await Promise.all(
+      batches.map((batch) =>
+        http().post<{ results: HarnessStripped[] }>(
+          `/api/${orgIdentifier}/settings/gen_ai/harness_strip`,
+          { patterns, texts: batch },
+        ),
+      ),
+    );
+    return responses.flatMap((r) => r.data.results);
   },
   // Reaches back to the page start so every version the Version dropdown lists is offered as a compare slot.
   listVersionsForCompare: async (

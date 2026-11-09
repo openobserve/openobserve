@@ -37,11 +37,13 @@ const cloneExperiment = vi.fn();
 const setBaseline = vi.fn();
 const clearBaseline = vi.fn();
 const toast = vi.fn();
+const compareExperiments = vi.fn();
 vi.mock("@/services/llm-experiments.service", () => ({
   default: {
     clone: (...a: any[]) => cloneExperiment(...a),
     setBaseline: (...a: any[]) => setBaseline(...a),
     clearBaseline: (...a: any[]) => clearBaseline(...a),
+    compare: (...a: any[]) => compareExperiments(...a),
   },
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => toast(...a) }));
@@ -803,6 +805,116 @@ describe("ExperimentBrowser", () => {
       "experimentsAtScale.foldCount 2",
     );
     expect(wrapper.get('[data-test="ai-experiment-spread-r2-leak"]').text()).toContain("27–32%");
+  });
+
+  // C2-X3: qa2-base pinned at dataset version 10, qa2-dsv11 run on version 11
+  // with one new case it fails. The ten shared cases are unchanged.
+  it("judges a run on a newer dataset version over the cases it shares with the baseline", async () => {
+    compareExperiments.mockResolvedValue({
+      counts: { commonRows: 10, new: 1, missing: 0 },
+      dimensions: [
+        {
+          kind: "score",
+          name: "leak",
+          gating: true,
+          comparableRowCount: 10,
+          orientedDelta: 0,
+          delta: 0,
+        },
+      ],
+    });
+    const base = makeExperiment({
+      id: "qa2-base",
+      name: "qa2-base",
+      createdAt: 1,
+      isBaseline: true,
+      datasetVersion: 10,
+      scoreSummaries: leak(17),
+    });
+    // Its own means include the failing new case, so alone they read as a regression.
+    const dsv11 = makeExperiment({
+      id: "qa2-dsv11",
+      name: "qa2-dsv11",
+      createdAt: 2,
+      datasetVersion: 11,
+      scoreSummaries: leak(23),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, dsv11], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(compareExperiments).toHaveBeenCalledWith("acme", "qa2-base", "qa2-dsv11");
+    expect(wrapper.get('[data-test="ai-experiment-outcome-qa2-dsv11"]').text()).toContain(
+      "experimentsAtScale.outcome.unchanged",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-cases-qa2-dsv11"]').text()).toContain(
+      "experimentsAtScale.sharedCasesExcluded 10 1",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-delta-qa2-dsv11-leak"]').text()).toContain("0.0");
+    expect(wrapper.find('[data-test="ai-experiment-trend-point-qa2-dsv11"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="ai-experiment-trend-regressed"]').text()).toBe(
+      "experimentsAtScale.regressedCount 0",
+    );
+  });
+
+  // C2-X4: four completed re-runs of qa2-flaky on PR 108, then a cancelled fifth.
+  it("keeps the newest completed re-run's verdict when a newer re-run was cancelled", async () => {
+    route.query = { group: "pr", sort: "regressions" };
+    const flaky = (
+      id: string,
+      createdAt: number,
+      trueCount: number,
+      status: "completed" | "cancelled" = "completed",
+    ) =>
+      makeExperiment({
+        id,
+        name: "qa2-flaky",
+        createdAt,
+        status,
+        metadata: { "git.commit": "108aaaa", "git.pr": 108 },
+        scoreSummaries: status === "completed" ? leak(trueCount) : [],
+      });
+    const base = makeExperiment({
+      id: "flaky-base",
+      name: "flaky-base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [
+          base,
+          flaky("f1", 2, 17),
+          flaky("f2", 3, 18),
+          flaky("f3", 4, 16),
+          flaky("f4", 5, 23),
+          flaky("f5", 6, 0, "cancelled"),
+        ],
+        datasets: [] as any,
+        syncUrl: true,
+      },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="ai-experiment-row-f5"]').exists()).toBe(false);
+    const outcome = wrapper.get('[data-test="ai-experiment-outcome-f4"]').text();
+    expect(outcome).toContain("experimentsAtScale.outcome.regressed");
+    expect(outcome).toContain("leak −10.7");
+    expect(wrapper.get('[data-test="ai-experiment-newer-rerun-f4"]').text()).toContain(
+      "experimentsAtScale.newerRerun Cancelled",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-spread-f4-leak"]').text()).toContain(
+      "experimentsAtScale.spread 4 ",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-ci-group-pr:108"]').text()).toContain(
+      "experimentsAtScale.regressedCount 1",
+    );
+    expect(wrapper.find('[data-test="ai-experiment-trend-point-f4"]').exists()).toBe(true);
   });
 
   it("groups by pull request from the URL and writes the sort back to it", async () => {

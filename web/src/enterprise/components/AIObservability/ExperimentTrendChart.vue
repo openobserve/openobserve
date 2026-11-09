@@ -108,13 +108,16 @@ import {
   trendScores,
   type BaselineOutcome,
   type ScorePolicy,
+  type SharedCaseComparison,
 } from "@/enterprise/views/AIObservability/experimentScale";
 
 const props = defineProps<{
-  /** One run per re-run fold: the latest stands for it, as in the table. */
+  /** One run per re-run fold: the newest completed one stands for it, as in the table. */
   runs: LlmExperiment[];
   baseline: LlmExperiment;
   policies: Map<string, ScorePolicy>;
+  /** Compare over the shared cases, by run id, for runs on other cases than the baseline. */
+  sharedCases: Map<string, SharedCaseComparison>;
 }>();
 
 const { t } = useI18nTyped();
@@ -153,7 +156,9 @@ const options = computed(() =>
 );
 
 const trend = computed(() =>
-  scoreName.value ? scoreTrend(props.runs, props.baseline, scoreName.value, props.policies) : null,
+  scoreName.value
+    ? scoreTrend(props.runs, props.baseline, scoreName.value, props.policies, props.sharedCases)
+    : null,
 );
 
 const domain = computed(() => {

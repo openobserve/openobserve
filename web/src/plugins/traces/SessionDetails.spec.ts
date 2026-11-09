@@ -11,6 +11,7 @@ const mockFetchTurnDetail = vi.fn();
 const mockFetchSessionSpans = vi.fn();
 const mockFetchSessionAgent = vi.fn();
 const mockMappingGet = vi.fn();
+const mockStripHarness = vi.fn();
 const mockRouterPush = vi.fn();
 const mockRouterBack = vi.fn();
 
@@ -34,7 +35,10 @@ vi.mock("./composables/useSessions", () => ({
 }));
 
 vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
-  default: { get: (...args: unknown[]) => mockMappingGet(...args) },
+  default: {
+    get: (...args: unknown[]) => mockMappingGet(...args),
+    stripHarness: (...args: unknown[]) => mockStripHarness(...args),
+  },
 }));
 
 vi.mock("./TurnPreviewCard.vue", () => ({
@@ -626,11 +630,19 @@ describe("SessionDetails — turn rows", () => {
     );
   });
 
+  // The server hides the text (the Sessions list's Rust regex), so a pattern a
+  // browser RegExp rejects, like the inline flag `(?s)`, still works here.
   it("hides the agent's harness text in the turn title and body (AIO-22)", async () => {
-    const message = "<system-reminder>context</system-reminder>\nFix the login bug";
-    mockMappingGet.mockResolvedValue({
-      harness_patterns: [{ agent: "omp", patterns: ["tag system-reminder"] }],
-    });
+    const message = "<env>\nos: linux\n</env>\nFix the login bug";
+    const patterns = ["regex (?s)<env>.*?</env>"];
+    mockMappingGet.mockResolvedValue({ harness_patterns: [{ agent: "omp", patterns }] });
+    mockStripHarness.mockImplementation(async (_org: string, _p: string[], texts: string[]) =>
+      texts.map((text) =>
+        text === message
+          ? { text: "Fix the login bug", hidden: 1, only: null }
+          : { text, hidden: 0, only: null },
+      ),
+    );
     mockFetchSessionAgent.mockResolvedValue("omp");
     mockFetchSession.mockResolvedValue({
       detail: makeDetail(),
@@ -641,16 +653,39 @@ describe("SessionDetails — turn rows", () => {
     ]);
 
     const wrapper = await mountComponent();
+    expect(mockStripHarness).toHaveBeenCalledWith("test-org", patterns, [message]);
     const header = wrapper.find(turnHeaderSelector());
     expect(header.text()).toContain("Fix the login bug");
-    expect(header.text()).not.toContain("system-reminder");
+    expect(header.text()).not.toContain("os: linux");
 
     await header.trigger("click");
     await flushPromises();
     const body = wrapper.find(turnBodySelector());
     expect(body.text()).toContain("Fix the login bug");
-    expect(body.text()).not.toContain("context");
-    expect(wrapper.find('[data-test="session-turn-harness-trace-xyz"]').exists()).toBe(true);
+    expect(body.text()).not.toContain("os: linux");
+    const hidden = wrapper.find('[data-test="session-turn-harness-trace-xyz"]');
+    expect(hidden.text()).toContain('readableSessions.hidden{"n":1}');
+
+    // Show puts the text back for that turn.
+    await hidden.trigger("click");
+    expect(wrapper.find(turnBodySelector()).text()).toContain("os: linux");
+  });
+
+  it("shows the full message when the server cannot hide harness text", async () => {
+    const message = "<env>x</env>\nFix the login bug";
+    mockMappingGet.mockResolvedValue({
+      harness_patterns: [{ agent: "omp", patterns: ["regex (?s)<env>.*?</env>"] }],
+    });
+    mockStripHarness.mockRejectedValue(new Error("network"));
+    mockFetchSessionAgent.mockResolvedValue("omp");
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail(),
+      traces: [makeTrace({ turnUserMessage: message })],
+    });
+    mockFetchSessionSpans.mockResolvedValue([]);
+
+    const wrapper = await mountComponent();
+    expect(wrapper.find(turnHeaderSelector()).text()).toContain("<env>x</env>");
   });
 
   it("uses the full trace ID in the row test hook", async () => {

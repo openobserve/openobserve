@@ -15,9 +15,11 @@
 
 // The Experiments list at scale: runs grouped by their CI metadata, re-runs
 // folded, and each run judged against its dataset's baseline by the rule
-// Compare uses (score_policy.rs + comparison.rs), from the list's own summaries.
+// Compare uses (score_policy.rs + comparison.rs), from the list's own summaries;
+// a run on other cases than its baseline is judged by Compare itself, over the
+// cases both ran.
 
-import type { LlmExperiment } from "@/services/llm-experiments.service";
+import type { ExperimentComparison, LlmExperiment } from "@/services/llm-experiments.service";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import {
   dataTypeOf,
@@ -152,37 +154,50 @@ export interface RunComparison {
   worst: ScoreDelta;
   /** The move the outcome is named for: the worst, or the best when improved. */
   headline: ScoreDelta;
+  /** Set when the run and its baseline ran different cases and only the shared ones were compared. */
+  cases: { shared: number; excluded: number } | null;
 }
 
 function policyOf(score: ExperimentScoreSummary, policies: Map<string, ScorePolicy>) {
   return score.scoreConfigId ? (policies.get(score.scoreConfigId) ?? null) : null;
 }
 
-/**
- * Score columns only vote, as in Compare: latency and cost never count. A run
- * with no score that has a policy on both sides gets no outcome, the same as
- * Compare's inconclusive.
- */
-export function compareToBaseline(
-  run: LlmExperiment,
-  baseline: LlmExperiment | null,
-  policies: Map<string, ScorePolicy>,
-): RunComparison | null {
-  if (!baseline || run.id === baseline.id) return null;
-  // Partial summaries of a live run would read as moves that are not there yet.
-  if (run.status !== "completed" || baseline.status !== "completed") return null;
-  const reference = new Map(experimentEvidence(baseline).scores.map((s) => [s.name, s]));
-  const deltas = new Map<string, ScoreDelta>();
-  for (const score of experimentEvidence(run).scores) {
-    const other = reference.get(score.name);
-    const policy = policyOf(score, policies);
-    if (!other || !policy) continue;
-    const candidate = scoreMeasure(score, policy);
-    const base = scoreMeasure(other, policy);
-    if (candidate === null || base === null) continue;
-    const delta = orientedDelta(policy, base, candidate);
-    deltas.set(score.name, { name: score.name, delta, outcome: classify(delta) });
+/** Same dataset version and filter: both runs ran the same cases, so their means compare directly. */
+export function sameCases(run: LlmExperiment, baseline: LlmExperiment): boolean {
+  return (
+    run.datasetVersion === baseline.datasetVersion &&
+    JSON.stringify(run.datasetFilter ?? null) === JSON.stringify(baseline.datasetFilter ?? null)
+  );
+}
+
+/** Compare's answer over the cases a run and its baseline both ran, per score. */
+export interface SharedCaseComparison {
+  shared: number;
+  /** Cases only one side ran: new in the run, or missing from it. */
+  excluded: number;
+  /** `delta` oriented so positive is better; `change` raw, in the score's own measure. */
+  scores: Map<string, { delta: number; change: number }>;
+}
+
+/** Only voting score dimensions with paired evidence, the ones Compare's own verdict rests on. */
+export function sharedCaseComparison(comparison: ExperimentComparison): SharedCaseComparison {
+  const scores = new Map<string, { delta: number; change: number }>();
+  for (const dimension of comparison.dimensions) {
+    if (dimension.kind !== "score" || !dimension.gating || !dimension.comparableRowCount) continue;
+    if (dimension.orientedDelta === null || dimension.delta === null) continue;
+    scores.set(dimension.name, { delta: dimension.orientedDelta, change: dimension.delta });
   }
+  return {
+    shared: comparison.counts.commonRows,
+    excluded: comparison.counts.new + comparison.counts.missing,
+    scores,
+  };
+}
+
+function verdict(
+  deltas: Map<string, ScoreDelta>,
+  cases: RunComparison["cases"],
+): RunComparison | null {
   if (!deltas.size) return null;
   const ranked = [...deltas.values()].sort((left, right) => left.delta - right.delta);
   const worst = ranked[0];
@@ -193,7 +208,47 @@ export function compareToBaseline(
       : best.outcome === "improved"
         ? "improved"
         : "unchanged";
-  return { outcome, deltas, worst, headline: outcome === "improved" ? best : worst };
+  return { outcome, deltas, worst, headline: outcome === "improved" ? best : worst, cases };
+}
+
+/**
+ * Score columns only vote, as in Compare: latency and cost never count. A run
+ * with no score that has a policy on both sides gets no outcome, the same as
+ * Compare's inconclusive.
+ *
+ * A run on another dataset version or filter than its baseline ran other
+ * cases, so its means are not comparable: it is judged by `shared`, Compare's
+ * answer over the cases both ran, and has no outcome until that arrives.
+ */
+export function compareToBaseline(
+  run: LlmExperiment,
+  baseline: LlmExperiment | null,
+  policies: Map<string, ScorePolicy>,
+  shared?: SharedCaseComparison | null,
+): RunComparison | null {
+  if (!baseline || run.id === baseline.id) return null;
+  // Partial summaries of a live run would read as moves that are not there yet.
+  if (run.status !== "completed" || baseline.status !== "completed") return null;
+  const deltas = new Map<string, ScoreDelta>();
+  if (!sameCases(run, baseline)) {
+    if (!shared) return null;
+    for (const [name, { delta }] of shared.scores) {
+      deltas.set(name, { name, delta, outcome: classify(delta) });
+    }
+    return verdict(deltas, { shared: shared.shared, excluded: shared.excluded });
+  }
+  const reference = new Map(experimentEvidence(baseline).scores.map((s) => [s.name, s]));
+  for (const score of experimentEvidence(run).scores) {
+    const other = reference.get(score.name);
+    const policy = policyOf(score, policies);
+    if (!other || !policy) continue;
+    const candidate = scoreMeasure(score, policy);
+    const base = scoreMeasure(other, policy);
+    if (candidate === null || base === null) continue;
+    const delta = orientedDelta(policy, base, candidate);
+    deltas.set(score.name, { name: score.name, delta, outcome: classify(delta) });
+  }
+  return verdict(deltas, null);
 }
 
 /** "−10.7" from −0.107: a fraction as signed points, with a real minus sign. */
@@ -204,17 +259,22 @@ export function signedPoints(delta: number): string {
 }
 
 export interface RunFold {
+  /** The run that stands for the fold: the newest completed one, else the newest. */
   latest: LlmExperiment;
   /** The fold's other runs, newest first. */
   earlier: LlmExperiment[];
+  /** The newest run, when it is newer than `latest` and did not complete (cancelled, failed or still going). */
+  newerIncomplete: LlmExperiment | null;
 }
 
 /**
- * Runs with one name on one commit are re-runs; they fold into the latest.
- * The latest, not the mean, stands for the fold everywhere (delta, outcome,
- * trend point): it is the run CI gated on last, and a mean would smooth a
- * flaky run into a value no run produced. The spread keeps the variance in view.
- * The baseline never folds, and a run without a commit has nothing to fold on.
+ * Runs with one name on one commit are re-runs; they fold into the newest
+ * completed one. It, not the mean, stands for the fold everywhere (delta,
+ * outcome, sort, trend point): it is the last verdict CI got, and a mean would
+ * smooth a flaky run into a value no run produced. A newer re-run that was
+ * cancelled or failed has no verdict, so it does not hide that one. The spread
+ * keeps the variance in view. The baseline never folds, and a run without a
+ * commit has nothing to fold on.
  */
 export function foldReruns(runs: LlmExperiment[]): RunFold[] {
   const folds = new Map<string, LlmExperiment[]>();
@@ -224,13 +284,24 @@ export function foldReruns(runs: LlmExperiment[]): RunFold[] {
     folds.set(key, [...(folds.get(key) ?? []), run]);
   }
   return [...folds.values()].map((members) => {
-    const [latest, ...earlier] = [...members].sort((a, b) => b.createdAt - a.createdAt);
-    return { latest, earlier };
+    const newestFirst = [...members].sort((a, b) => b.createdAt - a.createdAt);
+    const latest = newestFirst.find((run) => run.status === "completed") ?? newestFirst[0];
+    return {
+      latest,
+      earlier: newestFirst.filter((run) => run !== latest),
+      newerIncomplete: newestFirst[0] === latest ? null : newestFirst[0],
+    };
   });
 }
 
-/** "27–32%" for a boolean score across a fold's completed runs; categorical scores show counts instead. */
-export function scoreSpreadLabel(runs: LlmExperiment[], name: string): string | null {
+/**
+ * "27–32%" for a boolean score across a fold's completed runs, with how many
+ * runs it spans; categorical scores show counts instead.
+ */
+export function scoreSpread(
+  runs: LlmExperiment[],
+  name: string,
+): { count: number; range: string } | null {
   const values: number[] = [];
   let percent = false;
   for (const run of runs) {
@@ -245,9 +316,10 @@ export function scoreSpreadLabel(runs: LlmExperiment[], name: string): string | 
   }
   if (values.length < 2) return null;
   const [min, max] = [Math.min(...values), Math.max(...values)];
-  return percent
+  const range = percent
     ? `${Math.round(min * 100)}–${Math.round(max * 100)}%`
     : `${min.toFixed(3)}–${max.toFixed(3)}`;
+  return { count: values.length, range };
 }
 
 /**
@@ -373,12 +445,18 @@ export function trendScores(
   });
 }
 
-/** One point per (folded) completed run, oldest first, judged against the baseline's band. */
+/**
+ * One point per (folded) completed run, oldest first, judged against the
+ * baseline's band. A run on other cases than the baseline is plotted by its
+ * move over the cases both ran, from `shared` (keyed by run id), and is left
+ * out until that comparison arrives.
+ */
 export function scoreTrend(
   runs: LlmExperiment[],
   baseline: LlmExperiment,
   name: string,
   policies: Map<string, ScorePolicy>,
+  shared: Map<string, SharedCaseComparison>,
 ): ScoreTrend | null {
   const reference = experimentEvidence(baseline).scores.find((score) => score.name === name);
   const policy = reference ? policyOf(reference, policies) : null;
@@ -387,10 +465,20 @@ export function scoreTrend(
   const points: TrendPoint[] = [];
   for (const run of [...runs].sort((a, b) => a.createdAt - b.createdAt)) {
     if (run.status !== "completed") continue;
-    const score = experimentEvidence(run).scores.find((entry) => entry.name === name);
-    const value = score ? scoreMeasure(score, policy) : null;
-    if (value === null) continue;
-    const outcome = classify(orientedDelta(policy, base, value));
+    let value: number | null;
+    let outcome: BaselineOutcome;
+    if (sameCases(run, baseline)) {
+      const score = experimentEvidence(run).scores.find((entry) => entry.name === name);
+      value = score ? scoreMeasure(score, policy) : null;
+      if (value === null) continue;
+      outcome = classify(orientedDelta(policy, base, value));
+    } else {
+      const move = shared.get(run.id)?.scores.get(name);
+      if (!move) continue;
+      // The baseline's value plus the shared-case change: the point sits where its verdict says.
+      value = base + move.change;
+      outcome = classify(move.delta);
+    }
     points.push({ id: run.id, name: run.name, createdAt: run.createdAt, value, outcome });
   }
   return {

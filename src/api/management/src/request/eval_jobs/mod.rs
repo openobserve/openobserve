@@ -189,7 +189,7 @@ pub async fn get_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Res
     tag = "EvalJobs",
     operation_id = "UpdateEvalJob",
     summary = "Update eval job",
-    description = "Updates the editable fields of an online eval job and bumps its version. The associated pipeline is re-reconciled if the job is active.",
+    description = "Updates the editable fields of an online eval job and bumps its version. The associated pipeline is re-reconciled if the job is active. Raising the daily budget of a job its budget paused above the spend it paused at resumes the job.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -215,9 +215,9 @@ pub async fn update_eval_job(
         Err(err) => return MetaHttpResponse::bad_request(err),
     };
     #[cfg(feature = "enterprise")]
-    let scorers_changed = match eval_jobs::get_job(&org_id, &job_id).await {
-        Ok(existing) => existing.scorers != job.scorers,
-        Err(_) => true,
+    let (scorers_changed, was_paused) = match eval_jobs::get_job(&org_id, &job_id).await {
+        Ok(existing) => (existing.scorers != job.scorers, existing.status == "paused"),
+        Err(_) => (true, false),
     };
     #[cfg(feature = "enterprise")]
     if scorers_changed && let Err(resp) = limit_scorers(&job.scorers) {
@@ -232,8 +232,12 @@ pub async fn update_eval_job(
     if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
         return resp;
     }
+    // Raising the budget of a job its budget paused resumes it: an activation, so the
+    // activation's scorer check applies too.
     #[cfg(feature = "enterprise")]
-    if scorers_changed
+    let resumes = was_paused && job.status == "active";
+    #[cfg(feature = "enterprise")]
+    if (scorers_changed || resumes)
         && let Err(resp) = guard_scorers(&org_id, &user_email.user_id, &job.scorers).await
     {
         return resp;

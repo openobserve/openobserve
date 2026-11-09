@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import type { ExperimentScoreSummary, LlmExperiment } from "@/services/llm-experiments.service";
+import type {
+  ExperimentComparison,
+  ExperimentScoreSummary,
+  LlmExperiment,
+} from "@/services/llm-experiments.service";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import {
   ciGroupKey,
@@ -24,10 +28,12 @@ import {
   gitMeta,
   noiseBand,
   orientedDelta,
+  sameCases,
   scorePolicies,
   scorePolicy,
-  scoreSpreadLabel,
+  scoreSpread,
   scoreTrend,
+  sharedCaseComparison,
   signedPoints,
   sortByRegressions,
   trendScores,
@@ -149,6 +155,78 @@ describe("compare to baseline", () => {
     expect(compareToBaseline(run("q", 2, [quality(0.4)]), baseline, policies)).toBeNull();
     expect(compareToBaseline(run("x", 2, [bool(23, 33)]), null, policies)).toBeNull();
   });
+
+  describe("a run on other cases than the baseline", () => {
+    // qa2-base pinned at dataset version 10; qa2-dsv11 ran version 11, with one
+    // new case it fails. The ten shared cases score the same as the baseline.
+    const base = run("qa2-base", 1, [quality(0.8)], { isBaseline: true, datasetVersion: 10 });
+    const dsv11 = run("qa2-dsv11", 2, [quality(0.727)], { datasetVersion: 11 });
+    const dimension = (overrides: Record<string, unknown>) => ({
+      id: "score:quality",
+      name: "quality",
+      kind: "score",
+      gating: true,
+      comparableRowCount: 10,
+      orientedDelta: 0,
+      delta: 0,
+      ...overrides,
+    });
+    const compared = (dimensions: Record<string, unknown>[]) =>
+      sharedCaseComparison({
+        counts: { commonRows: 10, new: 1, missing: 0 },
+        dimensions,
+      } as unknown as ExperimentComparison);
+    const unchanged = compared([
+      dimension({}),
+      // Neither cost, a descriptive score, nor a one-sided one votes.
+      dimension({ id: "cost", name: "cost", kind: "cost", orientedDelta: -0.5, delta: 1 }),
+      dimension({ id: "score:tone", name: "tone", gating: false, orientedDelta: null }),
+      dimension({ id: "score:leak", name: "leak", comparableRowCount: 0, orientedDelta: null }),
+    ]);
+
+    it("judges it over the shared cases only, and says how many were left out", () => {
+      expect(sameCases(dsv11, base)).toBe(false);
+      expect(sameCases({ ...dsv11, datasetVersion: 10 }, base)).toBe(true);
+      expect(sameCases({ ...base, id: "f", datasetFilter: { tags: ["x"] } }, base)).toBe(false);
+      // Its means include the new failing case, so alone they would read as a regression.
+      expect(
+        compareToBaseline({ ...dsv11, datasetVersion: 10 }, base, policies)!.headline,
+      ).toMatchObject({ name: "quality", outcome: "regressed" });
+
+      expect([...unchanged.scores.keys()]).toEqual(["quality"]);
+      const result = compareToBaseline(dsv11, base, policies, unchanged)!;
+      expect(result.outcome).toBe("unchanged");
+      expect(result.cases).toEqual({ shared: 10, excluded: 1 });
+      // A same-case run keeps the summary path and has nothing left out.
+      expect(compareToBaseline({ ...dsv11, datasetVersion: 10 }, base, policies)!.cases).toBeNull();
+    });
+
+    it("has no verdict until Compare answers, and takes a regression from it", () => {
+      expect(compareToBaseline(dsv11, base, policies)).toBeNull();
+      const regressed = compared([dimension({ orientedDelta: -0.1, delta: -0.1 })]);
+      const result = compareToBaseline(dsv11, base, policies, regressed)!;
+      expect(result.outcome).toBe("regressed");
+      expect(signedPoints(result.headline.delta)).toBe("−10.0");
+    });
+
+    it("plots it on the trend by its shared-case move, and leaves it out before Compare answers", () => {
+      const plotted = scoreTrend(
+        [base, dsv11],
+        base,
+        "quality",
+        policies,
+        new Map([[dsv11.id, unchanged]]),
+      )!;
+      expect(plotted.points.map((p) => [p.id, p.value, p.outcome])).toEqual([
+        ["qa2-base", 0.8, "unchanged"],
+        ["qa2-dsv11", 0.8, "unchanged"],
+      ]);
+      expect(plotted.regressed).toBe(0);
+      expect(
+        scoreTrend([base, dsv11], base, "quality", policies, new Map())!.points.map((p) => p.id),
+      ).toEqual(["qa2-base"]);
+    });
+  });
 });
 
 describe("re-runs and CI groups", () => {
@@ -180,7 +258,60 @@ describe("re-runs and CI groups", () => {
       ["loose-1", []],
       ["loose-2", []],
     ]);
-    expect(scoreSpreadLabel([rerun("c", 3, 15), rerun("b", 2, 18)], "disclosure")).toBe("27–32%");
+    expect(scoreSpread([rerun("c", 3, 15), rerun("b", 2, 18)], "disclosure")).toEqual({
+      count: 2,
+      range: "27–32%",
+    });
+  });
+
+  it("keeps the newest completed re-run's verdict when a newer one was cancelled", () => {
+    const cancelled = makeExperiment({
+      ...rerun("r5", 5, 0),
+      status: "cancelled",
+      executionStatus: "cancelled",
+      scoreSummaries: [],
+    });
+    const quiet = run("pr169", 6, [bool(17, 39)], { metadata: git("7c01b55", { "git.pr": 169 }) });
+    const runs = [
+      rerun("r1", 1, 17),
+      rerun("r2", 2, 18),
+      rerun("r3", 3, 16),
+      rerun("r4", 4, 23),
+      cancelled,
+      quiet,
+      baseline,
+    ];
+    const folds = foldReruns(runs);
+    const flaky = folds[0];
+
+    expect(flaky.latest.id).toBe("r4");
+    expect(flaky.newerIncomplete?.id).toBe("r5");
+    expect(flaky.earlier.map(({ id }) => id)).toEqual(["r5", "r3", "r2", "r1"]);
+    // Four values in the spread, not the fold's five runs.
+    expect(scoreSpread([flaky.latest, ...flaky.earlier], "disclosure")?.count).toBe(4);
+
+    const comparisons = new Map(runs.map((r) => [r.id, compareToBaseline(r, baseline, policies)]));
+    expect(signedPoints(comparisons.get(flaky.latest.id)!.headline.delta)).toBe("−10.7");
+    expect(sortByRegressions(folds, comparisons).map((f) => f.latest.id)).toEqual([
+      "main-9f2e1a0",
+      "r4",
+      "pr169",
+    ]);
+    const groups = ciGroups(folds, "pr", "regressions", comparisons);
+    expect(groups.map((g) => g.key)).toEqual(["pr:172", "pr:169", "none"]);
+    expect(groups[0]).toMatchObject({ regressed: 1, runCount: 5 });
+    const trend = scoreTrend(
+      folds.map((fold) => fold.latest),
+      baseline,
+      "disclosure",
+      policies,
+      new Map(),
+    )!;
+    expect(trend.points.find((point) => point.id === "r4")?.outcome).toBe("regressed");
+
+    // A fold with no completed run still shows its newest.
+    const [alone] = foldReruns([cancelled]);
+    expect([alone.latest.id, alone.newerIncomplete]).toEqual(["r5", null]);
   });
 
   it("groups by PR, falls back to the branch, and puts runs without metadata in one group", () => {
@@ -235,7 +366,7 @@ describe("trend", () => {
       run("live", 4, [bool(1, 1)], { status: "running" }),
       baseline,
     ];
-    const trend = scoreTrend(runs, baseline, "disclosure", policies)!;
+    const trend = scoreTrend(runs, baseline, "disclosure", policies, new Map())!;
 
     expect(trend.points.map((p) => [p.id, p.outcome])).toEqual([
       ["main-9f2e1a0", "unchanged"],

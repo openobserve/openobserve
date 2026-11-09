@@ -31497,6 +31497,7 @@
     "name": "Name",
     "limits": "What it limits",
     "noValues": "Nothing seen in this stream in the last 30 days. Type a value to budget it.",
+    "fieldMissing": "Stream {stream} has no field {field} yet. Budgets can only be scoped to fields that exist in the stream.",
     "limit": "Limit (USD)",
     "period": "Period",
     "periods": { "day": "Day", "month": "Month", "hour": "Hour" },
@@ -31712,9 +31713,14 @@
     },
     "headline": "{score} {delta} pts",
     "deltaTooltip": "{delta} pts against the baseline. A move past {threshold} pts counts, the same rule as Compare.",
+    "sharedCases": "Over {count} shared case | Over {count} shared cases",
+    "sharedCasesExcluded": "Over {count} shared case · {excluded} excluded | Over {count} shared cases · {excluded} excluded",
+    "sharedCasesTooltip": "This run and the baseline ran different dataset versions or filters, so it is judged only on the cases both ran.",
     "foldCount": "× {count}",
-    "foldTooltip": "{count} runs of this name on one commit. The latest stands for them; expand to see each.",
+    "foldTooltip": "{count} runs of this name on one commit. The latest completed one stands for them; expand to see each.",
     "spread": "{count} runs: {range}",
+    "newerRerun": "Latest re-run: {status}",
+    "newerRerunTooltip": "The newest re-run did not complete, so this row shows the latest completed run.",
     "trendTitle": "Trend against the baseline",
     "trendScore": "Score",
     "trendShareOption": "{score} · % healthy",
@@ -31845,7 +31851,8 @@
       "pausedBudget": "Paused · budget",
       "resumeToday": "Resume until 00:00 UTC",
       "editBudget": "Edit budget",
-      "banner": "{name} paused at its {amount} daily budget at {time} UTC. It resumes at 00:00 UTC, in {hours} h {minutes} m."
+      "banner": "{name} paused at {time} UTC when today's judge spend reached {amount}. It resumes at 00:00 UTC, in {hours} h {minutes} m.",
+      "liftedUntil": "Budget lifted until 00:00 UTC"
     },
     "oneClick": {
       "budget": "Pauses at a {amount} daily budget.",

@@ -14,34 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { compileHarnessPattern, patternsForAgent, stripHarness } from "./harnessText";
+import { patternsForAgent } from "./harnessText";
 
-describe("stripHarness (AIO-22)", () => {
+describe("patternsForAgent (AIO-22)", () => {
   const patterns = ["tag system-reminder", "tag job"];
-
-  it("hides wrapper blocks and keeps the request", () => {
-    const out = stripHarness(
-      "<system-reminder>\nctx\n</system-reminder>\nFix the durations.",
-      patterns,
-    );
-    expect(out).toEqual({ text: "Fix the durations.", hidden: 1, only: null });
-  });
-
-  it("names the tag when the message was only harness text", () => {
-    expect(stripHarness('<job id="7">nightly</job>', patterns)).toEqual({
-      text: "",
-      hidden: 1,
-      only: "job",
-    });
-  });
-
-  it("supports regex patterns and ignores invalid ones", () => {
-    expect(stripHarness("Caveat: x\nreal ask", ["regex Caveat:[^\\n]*", "regex ("]).text).toBe(
-      "real ask",
-    );
-    expect(compileHarnessPattern("tag <bad>")).toBeNull();
-    expect(compileHarnessPattern("glob *")).toBeNull();
-  });
 
   it("keeps one agent's patterns off another agent", () => {
     const rules = [{ agent: "omp", patterns }];
