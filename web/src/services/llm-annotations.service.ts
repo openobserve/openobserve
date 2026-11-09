@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "@/services/http";
-import { publicVotePath } from "@/enterprise/components/onlineEvals/utils/feedbackCollect";
 import analytics from "./product_analytics";
 
 // ─── LLM Annotation · Direct annotation ─────────────────────────────────────
@@ -75,41 +74,6 @@ const llmAnnotationsService = {
         : [],
       annotatedAt: Number(data.annotatedAt ?? data.annotated_at ?? 0),
     };
-  },
-
-  /**
-   * End-user feedback (AIO-40): mint, as the signed-in user, the token an
-   * app's server would mint, then post one vote with it the way the app's
-   * browser would — a plain `fetch` with no session, so a refused token is
-   * a 401 for this call only, not a sign-out. `stream` is the trace stream
-   * the snippet shows; empty when the org has none, which a test vote allows.
-   */
-  async sendTestFeedbackVote(
-    orgId: string,
-    scoreConfig: string,
-    userId: string,
-    stream: string,
-  ): Promise<void> {
-    const api = http();
-    const res = await api.post(`/api/${orgId}/annotations/token`, {
-      scope: "trace",
-      traceId: `test-vote-${Date.now()}`,
-      stream: stream || undefined,
-      scoreConfig,
-      userId,
-      test: true,
-    });
-    const vote = await fetch(
-      `${api.defaults.baseURL ?? ""}${publicVotePath(orgId)}?token=${encodeURIComponent(res.data?.token ?? "")}`,
-      {
-        method: "POST",
-        body: JSON.stringify({ value: true, comment: "Test vote from OpenObserve" }),
-      },
-    );
-    if (!vote.ok) {
-      const body = await vote.json().catch(() => ({}));
-      throw new Error(body?.message || body?.error || `HTTP ${vote.status}`);
-    }
   },
 };
 

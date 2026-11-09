@@ -211,9 +211,6 @@ const hasLoadedOnce = ref(false);
 // than showing the previous org's sessions).
 const lastRunAt = ref<number | null>(null);
 const loadedOrg = ref<string | null>(null);
-// The stream the current rows came from: session ids are only unique within a
-// stream, so per-session lookups (feedback) are scoped to it.
-const loadedStream = ref("");
 // Shared pagination so the page/size the user was on is preserved across the
 // unmount/remount cycle and stays in sync with the restored rows.
 const currentPage = ref(1);
@@ -366,7 +363,6 @@ export function useSessions() {
       // refreshed" label accurate and to invalidate the cache on org switch.
       lastRunAt.value = Date.now();
       loadedOrg.value = orgId;
-      loadedStream.value = streamName;
     } catch (e: any) {
       if (seq !== fetchSeq) return;
       // axios error shape — surface the server's message if present.
@@ -710,7 +706,6 @@ export function useSessions() {
     hasLoadedOnce,
     lastRunAt,
     loadedOrg,
-    loadedStream,
     currentPage,
     rowsPerPage,
     searchKeyword,

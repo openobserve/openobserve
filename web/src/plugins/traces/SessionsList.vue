@@ -294,40 +294,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`sessions-list-status-${row.sessionId}`"
         />
       </template>
-
-      <!-- Feedback (AIO-40): a complaint outranks praise, with its comment. -->
-      <template #cell-feedback="{ row }">
-        <span
-          v-if="sessionFeedback[row.sessionId]?.notHelpful"
-          class="text-status-error-text inline-flex min-w-0 items-center gap-1 text-xs"
-          :data-test="`sessions-list-feedback-${row.sessionId}`"
-        >
-          <OIcon name="thumb-down-off-alt" size="xs" />
-          {{ t("endUserFeedback.notHelpful") }}
-          <span
-            v-if="sessionFeedback[row.sessionId].notHelpful > 1"
-            class="text-2xs tabular-nums"
-            >{{ sessionFeedback[row.sessionId].notHelpful }}</span
-          >
-          <span
-            v-if="sessionFeedback[row.sessionId].comment"
-            class="text-text-secondary truncate"
-            :title="sessionFeedback[row.sessionId].comment ?? undefined"
-            >{{
-              t("endUserFeedback.quoted", { comment: sessionFeedback[row.sessionId].comment ?? "" })
-            }}</span
-          >
-        </span>
-        <span
-          v-else-if="sessionFeedback[row.sessionId]?.helpful"
-          class="text-status-success-text inline-flex items-center gap-1 text-xs"
-          :data-test="`sessions-list-feedback-${row.sessionId}`"
-        >
-          <OIcon name="thumb-up-off-alt" size="xs" />
-          {{ t("endUserFeedback.helpfulVote") }}
-        </span>
-        <span v-else class="text-text-muted text-xs">{{ t("endUserFeedback.noVote") }}</span>
-      </template>
     </OTable>
   </div>
 </template>
@@ -372,8 +338,6 @@ import type { SessionSortField, SessionSortOrder } from "@/services/sessions";
 import { buildAgentSessionFilter } from "./llmAgentFilter";
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import LLMCostCell from "./LLMCostCell.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useSessionFeedback } from "./sessionFeedback";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
@@ -406,7 +370,6 @@ const {
   hasLoadedOnce,
   lastRunAt,
   loadedOrg,
-  loadedStream,
   currentPage,
   rowsPerPage,
   searchKeyword,
@@ -420,12 +383,6 @@ const {
   fetchPage,
   cancelAll,
 } = useSessions();
-// End-user votes for this page's sessions (AIO-40), one `_llm_scores` query per page.
-const sessionFeedback = useSessionFeedback(
-  sessions,
-  () => loadedStream.value,
-  () => props.startTime,
-);
 
 const urlScope = readUrlScope(route.query);
 // Search deep-link: `?keyword=<term>`. Read once at setup, like the scope.
@@ -740,19 +697,6 @@ const tableColumns = computed(() =>
       hideable: true,
       meta: { align: "left", disableCellAction: true },
     },
-    // A Feedback column once any session on the page has an end-user vote (AIO-40).
-    ...(Object.keys(sessionFeedback.value).length
-      ? [
-          {
-            id: "feedback",
-            header: t("endUserFeedback.column"),
-            size: 200,
-            sortable: false,
-            hideable: true,
-            meta: { align: "left" as const, disableCellAction: true },
-          },
-        ]
-      : []),
     {
       id: "lastSeenNanos",
       header: t("traces.sessionsList.columns.lastActivity"),
@@ -921,7 +865,6 @@ async function loadSessions(
     // The empty list is now this org's: without the stamp, the cache guard
     // would serve it to the previous org on the way back (G2-12).
     loadedOrg.value = orgId;
-    loadedStream.value = "";
     loading.value = false; // nothing to fetch — release the held skeleton
     return;
   }

@@ -4,7 +4,6 @@ GET /.well-known/oauth-authorization-server | unauthenticated, outside the /api 
 GET /api/status_pages_public/{slug} | unauthenticated; handler applies its own per-IP limit
 GET /api/status_pages_public/{slug}/badge.svg | unauthenticated; handler applies its own per-IP limit
 GET /api/status_pages_public/{slug}/feed.xml | unauthenticated; handler applies its own per-IP limit
-POST /api/v2/{org_id}/annotations/public | unauthenticated; handler applies its own per-IP limit
 POST /api/v2/{org_id}/incidents/events | ingest callback authenticated by an integration token
 POST /api/v2/{org_id}/incidents/events/{token} | ingest callback authenticated by an integration token
 POST /api/{org_id}/_bulk | ingest route, kept out of the API rate-limit groups

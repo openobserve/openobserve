@@ -31775,27 +31775,6 @@
       }
     }
   },
-  "endUserFeedback": {
-    "tab": "Collect from your app",
-    "intro": "Let your app's users rate its answers. Your server mints a short-lived token for each trace and user; the browser posts the vote with it, so the browser never holds a credential.",
-    "serverStep": "1. Your server asks for a token",
-    "serverHint": "Use a service account that can create Score Configs. stream must be the trace stream that holds the trace, or the vote shows on the wrong session. The token is valid for 15 minutes, for one trace, this Score Config and one user.",
-    "browserStep": "2. The browser sends the vote",
-    "browserHint": "value is true for Helpful and false for Not helpful. comment is optional, up to 1,000 characters. A changed vote replaces the earlier one.",
-    "checking": "Checking for votes…",
-    "lastVote": "Last vote {time}",
-    "votes": "{n} vote in 24 hours | {n} votes in 24 hours",
-    "helpful": "{pct}% helpful",
-    "noVotes": "No votes in the last 24 hours",
-    "sendTestVote": "Send a test vote",
-    "testVoteSent": "Test vote recorded",
-    "testVoteFailed": "Failed to send a test vote",
-    "column": "Feedback",
-    "notHelpful": "Not helpful",
-    "helpfulVote": "Helpful",
-    "noVote": "No vote",
-    "quoted": "“{comment}”"
-  },
   "evalSpend": {
     "cost": {
       "title": "Cost",

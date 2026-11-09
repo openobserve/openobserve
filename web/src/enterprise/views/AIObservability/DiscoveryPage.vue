@@ -230,12 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-quality="{ row }">
-          <DiscoveryQualityCell
-            :quality="row.quality"
-            :issue-count="row.issueCount"
-            :not-helpful="row.notHelpful"
-            :feedback-comment="row.feedbackComment"
-          />
+          <DiscoveryQualityCell :quality="row.quality" :issue-count="row.issueCount" />
         </template>
 
         <template #cell-inQueue="{ row }">

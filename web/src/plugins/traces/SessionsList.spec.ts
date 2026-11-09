@@ -26,7 +26,6 @@ const mockSortOrder = ref<"asc" | "desc">("desc");
 // Applied search term — module-scoped in the real composable, like the pagination.
 const mockSearchKeyword = ref("");
 const mockSearchUser = ref("");
-const mockLoadedStream = ref("");
 const mockAgents = ref<any[]>([]);
 const mockAgentsLoaded = ref(false);
 const mockAgentsError = ref<"forbidden" | "failed" | null>(null);
@@ -57,7 +56,6 @@ vi.mock("./composables/useSessions", () => ({
     hasLoadedOnce: mockHasLoadedOnce,
     lastRunAt: mockLastRunAt,
     loadedOrg: mockLoadedOrg,
-    loadedStream: mockLoadedStream,
     currentPage: mockCurrentPage,
     rowsPerPage: mockRowsPerPage,
     searchKeyword: mockSearchKeyword,
@@ -72,12 +70,6 @@ vi.mock("./composables/useSessions", () => ({
     cancelAll: mockCancelAll,
   })),
 }));
-
-// The Feedback column reads `_llm_scores`; no votes keeps it hidden here.
-vi.mock("./sessionFeedback", async () => {
-  const { ref } = await import("vue");
-  return { useSessionFeedback: () => ref({}) };
-});
 
 const mockGetStreams = vi.fn();
 vi.mock("@/composables/useStreams", () => ({
@@ -865,7 +857,6 @@ describe("SessionsList — org round trip through an org without trace streams",
     // The list was filled for org-a.
     mockHasLoadedOnce.value = true;
     mockLoadedOrg.value = "org-a";
-    mockLoadedStream.value = "test-stream";
     mockSessions.value = [makeSession()];
 
     // org-b has no trace streams: the load ends with an empty list.

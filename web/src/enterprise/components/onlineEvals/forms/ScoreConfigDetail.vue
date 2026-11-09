@@ -237,9 +237,6 @@
             </li>
           </ul>
         </template>
-
-        <!-- ─────────── COLLECT FROM YOUR APP TAB (AIO-40) ─────────── -->
-        <ScoreConfigFeedbackTab v-else-if="activeTab === 'collect'" :row="row" />
       </div>
     </div>
   </ODrawer>
@@ -256,7 +253,6 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
-import ScoreConfigFeedbackTab from "./ScoreConfigFeedbackTab.vue";
 
 const props = defineProps<{
   row: ScoreConfig;
@@ -279,7 +275,7 @@ function handleOpenChange(value: boolean) {
   open.value = value;
   if (!value) emit("close");
 }
-type TabId = "overview" | "versions" | "usedBy" | "collect";
+type TabId = "overview" | "versions" | "usedBy";
 const activeTab = ref<TabId>("overview");
 
 function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
@@ -373,16 +369,6 @@ const tabs = computed(() => [
     label: t("onlineEvals.scoreConfig.detail.tabs.usedBy"),
     count: usedByScorers.value.length,
   },
-  // End-user votes are Helpful / Not helpful, so only a Boolean config collects them.
-  ...(dataType.value === "boolean"
-    ? [
-        {
-          id: "collect" as TabId,
-          label: t("endUserFeedback.tab"),
-          count: null as number | null,
-        },
-      ]
-    : []),
 ]);
 
 function scorerTypeOf(s: Scorer): "llm_judge" | "remote" {

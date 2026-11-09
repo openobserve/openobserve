@@ -18,7 +18,7 @@ use openobserve_core::llm_evaluations::annotations::{
     AnnotationScoreInput, AnnotationTargetMetadata, CreateAnnotation, PreparedAnnotation,
 };
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -80,61 +80,6 @@ pub struct AnnotateResponseBody {
     pub annotated_at: i64,
 }
 
-/// What an app's server sends to mint one end-user feedback token (AIO-40).
-#[derive(Clone, Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FeedbackTokenRequestBody {
-    /// Only `trace`: one token is one vote on one trace.
-    #[schema(value_type = String)]
-    pub scope: LlmScoreTargetScope,
-    pub trace_id: String,
-    /// Score Config name. The first vote for an unknown name creates a Boolean config.
-    pub score_config: String,
-    /// The app's own end-user id, bound into the token so a browser cannot vote as someone else.
-    pub user_id: String,
-    /// Conversation id, so the vote shows on the session in Sessions.
-    #[serde(default)]
-    pub session_id: Option<String>,
-    /// Trace stream that holds the trace. Defaults to `default`. Mint returns 400 when the
-    /// stream does not exist, except for `test` tokens.
-    #[serde(default)]
-    pub stream: Option<String>,
-    /// Tags the Score as a setup test. A test token rates a synthetic trace, so mint skips the
-    /// trace-stream check.
-    #[serde(default)]
-    pub test: bool,
-}
-
-#[derive(Clone, Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FeedbackTokenResponseBody {
-    pub token: String,
-    /// Seconds.
-    pub expires_in: i64,
-}
-
-#[derive(Clone, Debug, Deserialize, IntoParams)]
-pub struct FeedbackVoteQuery {
-    /// Token minted by `POST /api/{org_id}/annotations/token`.
-    pub token: String,
-}
-
-/// One vote from the browser. The token says whose vote it is and on what.
-#[derive(Clone, Debug, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct FeedbackVoteRequestBody {
-    /// A value matching the Score Config type; `true`/`false` for a Boolean config.
-    pub value: serde_json::Value,
-    #[serde(default)]
-    pub comment: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FeedbackVoteResponseBody {
-    pub score_id: String,
-}
-
 impl From<AnnotationScoreRequestBody> for AnnotationScoreInput {
     fn from(value: AnnotationScoreRequestBody) -> Self {
         Self {
@@ -163,7 +108,6 @@ impl From<AnnotateRequestBody> for CreateAnnotation {
             target_metadata: value.target_metadata.unwrap_or_default().into(),
             metadata: value.metadata,
             review: None,
-            feedback: false,
         }
     }
 }

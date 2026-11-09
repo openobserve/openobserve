@@ -277,12 +277,11 @@ describe("useSessions — fetchPage: search", () => {
   // The Users page's "Sessions" link: that user only, not a substring match.
   it("sends an exact user as userId, apart from the keyword", async () => {
     mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
-    const { fetchPage, loadedStream } = useSessions();
+    const { fetchPage } = useSessions();
     await fetchPage("qa_stream", 1000, 2000, 0, 25, "", { user: " qa-u1 " });
     expect(mockSessionsList).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "qa-u1", keyword: undefined }),
     );
-    expect(loadedStream.value).toBe("qa_stream");
   });
 
   it("drops a late response from a superseded run (last request wins)", async () => {
