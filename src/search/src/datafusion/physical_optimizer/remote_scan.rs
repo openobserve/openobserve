@@ -233,20 +233,6 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             if !visitor.has_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let input = node.children()[0];
-                // A partial reduce or round-robin here would lose the order this node keeps
-                if let Some(repartition) = node.downcast_ref::<RepartitionExec>().filter(|_| {
-                    node.maintains_input_order()[0] && input.output_ordering().is_some()
-                }) {
-                    let remote_scan = Arc::new(RemoteScanExec::new(
-                        merge_sorted_partitions(input.clone()),
-                        self.remote_scan_nodes.get_remote_node(&table_name),
-                    )?);
-                    let merged =
-                        RepartitionExec::try_new(remote_scan, repartition.partitioning().clone())?
-                            .with_preserve_order();
-                    self.is_changed = true;
-                    return Ok(Transformed::yes(Arc::new(merged)));
-                }
                 let remote_scan_input =
                     wrap_partial_reduce(self.partial_reduce_enabled, input.clone())?;
                 let remote_scan_or_partial_reduce: Arc<dyn ExecutionPlan> =
@@ -317,7 +303,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     } else {
                         let table_name = visitor.table_name.clone().unwrap();
                         let remote_scan = Arc::new(RemoteScanExec::new(
-                            merge_sorted_partitions(child.clone()),
+                            child.clone(),
                             self.remote_scan_nodes.get_remote_node(&table_name),
                         )?);
                         new_children.push(remote_scan);
@@ -332,20 +318,11 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             }
         } else if node.name() == "HashJoinExec" {
             let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
-            let maintained = node.maintains_input_order();
-            for (child, keeps_order) in node.children().into_iter().zip(maintained) {
+            for child in node.children() {
                 let mut visitor = TableNameVisitor::new();
                 child.visit(&mut visitor)?;
                 if !visitor.has_remote_scan {
                     let table_name = visitor.table_name.clone().unwrap();
-                    // A round-robin here would lose the order a sort above relies on
-                    if keeps_order && child.output_ordering().is_some() {
-                        new_children.push(Arc::new(RemoteScanExec::new(
-                            merge_sorted_partitions(child.clone()),
-                            self.remote_scan_nodes.get_remote_node(&table_name),
-                        )?));
-                        continue;
-                    }
                     let remote_scan = Arc::new(RemoteScanExec::new(
                         child.clone(),
                         self.remote_scan_nodes.get_remote_node(&table_name),
@@ -448,17 +425,6 @@ pub fn wrap_partial_reduce_for_aggregate(
         reduce_input,
         agg.input_schema(),
     )?) as Arc<dyn ExecutionPlan>)
-}
-
-// Followers stream all partitions at once, so only a single partition arrives sorted.
-fn merge_sorted_partitions(plan: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
-    match plan.output_ordering() {
-        Some(ordering) if plan.output_partitioning().partition_count() > 1 => {
-            let fetch = plan.fetch();
-            Arc::new(SortPreservingMergeExec::new(ordering.clone(), plan).with_fetch(fetch))
-        }
-        _ => plan,
-    }
 }
 
 fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
@@ -572,7 +538,6 @@ mod tests {
     use super::*;
     use crate::datafusion::{
         datasource::empty_table::NewEmptyTable, distributed::codec::get_physical_extension_codec,
-        sort_order::FileSortOrder,
     };
 
     #[test]
@@ -1003,32 +968,15 @@ mod tests {
         });
     }
 
-    fn three_remote_nodes() -> Arc<RemoteScanNodes> {
-        use tracing_opentelemetry::OpenTelemetrySpanExt;
-        let mut file_id_lists = HashMap::new();
-        file_id_lists.insert(TableReference::from("t"), vec![]);
-        let nodes = (0..3)
-            .map(|_| Arc::new(config::meta::cluster::Node::default()) as Arc<dyn NodeInfo>)
-            .collect();
-        Arc::new(RemoteScanNodes::new(
-            Request::default(),
-            nodes,
-            file_id_lists,
-            HashMap::new(),
-            false,
-            tracing::Span::current().context(),
-            None,
-        ))
+    // Follows Sql::resolve, which declares the files' order only for plain scans.
+    fn sort_order_for(sql: &str) -> crate::datafusion::sort_order::FileSortOrder {
+        crate::datafusion::sort_order::FileSortOrder::from_sorted_by_time(
+            !config::utils::sql::is_complex_query(sql).unwrap(),
+        )
     }
 
     async fn cluster_plan(sql: &str) -> (SessionContext, Arc<dyn ExecutionPlan>) {
-        cluster_plan_with_sort_order(sql, FileSortOrder::TimestampDesc).await
-    }
-
-    async fn cluster_plan_with_sort_order(
-        sql: &str,
-        sort_order: FileSortOrder,
-    ) -> (SessionContext, Arc<dyn ExecutionPlan>) {
+        use tracing_opentelemetry::OpenTelemetrySpanExt;
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("k8s_cluster", DataType::Utf8, true),
@@ -1037,8 +985,22 @@ mod tests {
             Field::new("event_name", DataType::Utf8, true),
             Field::new("value", DataType::Int64, true),
         ]));
+        let mut file_id_lists = HashMap::new();
+        file_id_lists.insert(TableReference::from("t"), vec![]);
+        let nodes = (0..3)
+            .map(|_| Arc::new(config::meta::cluster::Node::default()) as Arc<dyn NodeInfo>)
+            .collect();
+        let remote_scan_nodes = Arc::new(RemoteScanNodes::new(
+            Request::default(),
+            nodes,
+            file_id_lists,
+            HashMap::new(),
+            false,
+            tracing::Span::current().context(),
+            None,
+        ));
         let rule = RemoteScanRule {
-            remote_scan_nodes: three_remote_nodes(),
+            remote_scan_nodes,
             single_node_optimizer_enable: false,
         };
         let state = SessionStateBuilder::new()
@@ -1050,7 +1012,7 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let table = NewEmptyTable::new("t", schema)
             .with_partitions(4)
-            .with_sort_order(sort_order);
+            .with_sort_order(sort_order_for(sql));
         ctx.register_table("t", Arc::new(table)).unwrap();
         let logical = ctx.state().create_logical_plan(sql).await.unwrap();
         let plan = ctx.state().create_physical_plan(&logical).await.unwrap();
@@ -1142,149 +1104,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cluster_union_order_by_plans_are_sane() {
+    async fn test_cluster_union_and_join_plans_sort_on_the_leader() {
         for sql in [
             "SELECT _timestamp, event_name FROM t WHERE value >= 30 \
                 UNION ALL SELECT _timestamp, event_name FROM t WHERE value < 0 \
                 ORDER BY _timestamp DESC LIMIT 10",
-            "SELECT event_name, value, 'a' AS origin FROM t WHERE value > 1 \
-                UNION ALL SELECT event_name, value, 'b' AS origin FROM t WHERE value < 0 \
-                ORDER BY origin, value DESC LIMIT 15",
-        ] {
-            assert_cluster_plan_is_sane(sql).await;
-        }
-    }
-
-    #[tokio::test]
-    async fn test_cluster_subquery_order_by_plans_are_sane() {
-        for sql in [
             "SELECT event_name, _timestamp FROM t WHERE event_name IN \
-                (SELECT event_name FROM t ORDER BY event_name LIMIT 5) \
-                ORDER BY _timestamp DESC LIMIT 100",
-            "SELECT a.event_name, a._timestamp FROM t a JOIN \
-                (SELECT k8s_cluster FROM t WHERE substr(k8s_cluster, 0, 2) = 'p') b \
-                ON a.k8s_cluster = b.k8s_cluster ORDER BY a._timestamp DESC LIMIT 100",
+                (SELECT event_name FROM t) ORDER BY _timestamp DESC LIMIT 100",
+            "SELECT a.event_name, _timestamp FROM t a JOIN \
+                (SELECT k8s_cluster FROM t WHERE value > 1) b \
+                ON a.k8s_cluster = b.k8s_cluster ORDER BY _timestamp DESC LIMIT 100",
+            // Broadcast join: an aggregate with a limit on the build side
+            "SELECT a.event_name, _timestamp FROM t a WHERE a.k8s_cluster IN \
+                (SELECT k8s_cluster FROM t GROUP BY k8s_cluster ORDER BY count(*) DESC LIMIT 10) \
+                ORDER BY _timestamp DESC LIMIT 21",
         ] {
             assert_cluster_plan_is_sane(sql).await;
-        }
-    }
-
-    fn sorted_scan(partitions: usize) -> Arc<dyn ExecutionPlan> {
-        scan(partitions, FileSortOrder::TimestampDesc)
-    }
-
-    fn scan(partitions: usize, sort_order: FileSortOrder) -> Arc<dyn ExecutionPlan> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("_timestamp", DataType::Int64, false),
-            Field::new("k8s_cluster", DataType::Utf8, true),
-        ]));
-        Arc::new(
-            NewEmptyExec::new(
-                "t",
-                Arc::clone(&schema),
-                None,
-                &[],
-                None,
-                sort_order,
-                schema,
-            )
-            .with_partitions(partitions),
-        )
-    }
-
-    fn rewrite_and_check_sanity(plan: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
-        let mut rewriter = RemoteScanRewriter::new(three_remote_nodes());
-        let plan = plan.rewrite(&mut rewriter).unwrap().data;
-        datafusion::physical_optimizer::sanity_checker::SanityCheckPlan::new()
-            .optimize(plan, &datafusion::config::ConfigOptions::default())
-            .unwrap()
-    }
-
-    fn collect_left_join_over(probe: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
-        use datafusion::{
-            common::{JoinType, NullEquality},
-            physical_expr::expressions::Column,
-            physical_plan::joins::{HashJoinExec, PartitionMode},
-        };
-        let on = (
-            Arc::new(Column::new("k8s_cluster", 1)) as _,
-            Arc::new(Column::new("k8s_cluster", 1)) as _,
-        );
-        let join = HashJoinExec::try_new(
-            Arc::new(CoalescePartitionsExec::new(scan(4, FileSortOrder::None))),
-            probe,
-            vec![on],
-            None,
-            &JoinType::Inner,
-            None,
-            PartitionMode::CollectLeft,
-            NullEquality::NullEqualsNothing,
-            false,
-        )
-        .unwrap();
-        Arc::new(join)
-    }
-
-    #[test]
-    fn test_ordered_join_probe_reads_remote_scan_directly() {
-        let join = collect_left_join_over(sorted_scan(4));
-        let ordering = join.output_ordering().unwrap().clone();
-        let plan = Arc::new(SortPreservingMergeExec::new(ordering, join));
-        let plan = rewrite_and_check_sanity(plan);
-        let probe = plan.children()[0].children()[1];
-        assert_eq!(probe.name(), "RemoteScanExec");
-        assert_eq!(probe.children()[0].name(), "SortPreservingMergeExec");
-    }
-
-    #[test]
-    fn test_unsorted_join_probe_keeps_round_robin_fan_out() {
-        let plan = rewrite_and_check_sanity(collect_left_join_over(scan(4, FileSortOrder::None)));
-        let probe = plan.children()[1];
-        assert_eq!(probe.name(), "RepartitionExec");
-        assert_eq!(probe.children()[0].name(), "RemoteScanExec");
-        assert_ne!(
-            probe.children()[0].children()[0].name(),
-            "SortPreservingMergeExec"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_unsorted_union_children_are_not_merged() {
-        let sql = "SELECT _timestamp, event_name FROM t WHERE value >= 30 \
-            UNION ALL SELECT _timestamp, event_name FROM t WHERE value < 0";
-        let (_, plan) = cluster_plan_with_sort_order(sql, FileSortOrder::None).await;
-        plan.apply(|node| {
-            if node.downcast_ref::<RemoteScanExec>().is_some() {
-                assert_ne!(node.children()[0].name(), "SortPreservingMergeExec");
-            }
-            Ok(TreeNodeRecursion::Continue)
-        })
-        .unwrap();
-    }
-
-    #[test]
-    fn test_ordered_repartition_merges_remote_streams() {
-        let scan = sorted_scan(1);
-        let ordering = scan.output_ordering().unwrap().clone();
-        let repartition = RepartitionExec::try_new(scan, Partitioning::RoundRobinBatch(4)).unwrap();
-        let plan = Arc::new(SortPreservingMergeExec::new(
-            ordering,
-            Arc::new(repartition),
-        ));
-        let plan = rewrite_and_check_sanity(plan);
-        let repartition = plan.children()[0];
-        assert_eq!(repartition.children()[0].name(), "RemoteScanExec");
-    }
-
-    #[test]
-    fn test_unordered_repartition_keeps_round_robin_fan_out() {
-        let repartition =
-            RepartitionExec::try_new(sorted_scan(4), Partitioning::RoundRobinBatch(8)).unwrap();
-        let plan = rewrite_and_check_sanity(Arc::new(repartition));
-        let fan_out = plan.children()[0]
-            .downcast_ref::<RepartitionExec>()
+            let (_, plan) = cluster_plan(sql).await;
+            let mut sorted_below_merge = false;
+            plan.apply(|node| {
+                sorted_below_merge |= node.downcast_ref::<SortExec>().is_some_and(|sort| {
+                    sort.expr().iter().any(|e| {
+                        e.expr
+                            .downcast_ref::<datafusion::physical_expr::expressions::Column>()
+                            .is_some_and(|c| c.name() == "_timestamp")
+                    })
+                });
+                Ok(TreeNodeRecursion::Continue)
+            })
             .unwrap();
-        assert!(!fan_out.preserve_order());
-        assert_eq!(fan_out.children()[0].name(), "RemoteScanExec");
+            assert!(sorted_below_merge, "{sql}");
+        }
     }
 }

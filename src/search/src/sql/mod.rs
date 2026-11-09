@@ -87,7 +87,7 @@ pub struct Sql {
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
     pub timezone: Option<String>,
-    pub sorted_by_time: bool, // if only order by _timestamp
+    pub sorted_by_time: bool, // if a plain scan only orders by _timestamp
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
 }
 
@@ -235,9 +235,7 @@ impl Sql {
         {
             order_by.push((TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc));
         }
-        let need_sort_by_time = order_by.len() == 1
-            && order_by[0].0 == TIMESTAMP_COL_NAME
-            && order_by[0].1 == OrderBy::Desc
+        let need_sort_by_time = can_use_time_order(&statement, &order_by)
             && !total_schemas.iter().any(|(stream, _)| {
                 matches!(stream.get_stream_type(stream_type), StreamType::Metrics)
             });
@@ -400,6 +398,14 @@ impl std::fmt::Display for Sql {
     }
 }
 
+// A follower interleaves its partitions, so only a plain scan can rely on the files' time order.
+fn can_use_time_order(statement: &Statement, order_by: &[(String, OrderBy)]) -> bool {
+    !is_complex_query_stmt(statement)
+        && order_by.len() == 1
+        && order_by[0].0 == TIMESTAMP_COL_NAME
+        && order_by[0].1 == OrderBy::Desc
+}
+
 fn is_read_only_sql_statement(statement: &Statement) -> bool {
     match statement {
         Statement::Query(_) => true,
@@ -497,6 +503,39 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap()
+    }
+
+    #[test]
+    fn test_can_use_time_order_only_for_plain_scans() {
+        let time_desc = [(TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc)];
+        assert!(can_use_time_order(
+            &parse_one("SELECT * FROM t ORDER BY _timestamp DESC LIMIT 10"),
+            &time_desc
+        ));
+        for sql in [
+            "SELECT a FROM t UNION ALL SELECT a FROM t ORDER BY _timestamp DESC LIMIT 10",
+            "SELECT t.a FROM t JOIN u ON t.a = u.a ORDER BY _timestamp DESC LIMIT 10",
+            "SELECT a FROM t WHERE a IN (SELECT a FROM u) ORDER BY _timestamp DESC LIMIT 10",
+            "SELECT a FROM t WHERE EXISTS (SELECT 1 FROM u) ORDER BY _timestamp DESC LIMIT 10",
+        ] {
+            assert!(!can_use_time_order(&parse_one(sql), &time_desc), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_can_use_time_order_needs_exactly_time_descending() {
+        let plain = parse_one("SELECT * FROM t");
+        for order_by in [
+            vec![],
+            vec![(TIMESTAMP_COL_NAME.to_string(), OrderBy::Asc)],
+            vec![("a".to_string(), OrderBy::Desc)],
+            vec![
+                (TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc),
+                ("a".to_string(), OrderBy::Asc),
+            ],
+        ] {
+            assert!(!can_use_time_order(&plain, &order_by), "{order_by:?}");
+        }
     }
 
     #[test]
