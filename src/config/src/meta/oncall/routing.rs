@@ -310,7 +310,7 @@ impl OwnershipRule {
                 return Err(OwnershipError::WildcardMatchesEverything(k.clone()));
             }
             // Only the final character may be a `*`; more would be a pattern language this is not.
-            if v.trim_end_matches('*').contains('*') {
+            if v.strip_suffix('*').unwrap_or(v).contains('*') {
                 return Err(OwnershipError::WildcardNotTrailing(k.clone()));
             }
         }
@@ -590,17 +590,24 @@ pub fn resolve_owner_ranked<'a>(
     rules
         .iter()
         .filter(|rule| rule.validate().is_ok() && rule.matches(dims))
-        .max_by(|a, b| {
-            a.specificity()
-                .cmp(&b.specificity())
-                // Then how fine the claim is: a service beats a cluster, not merely a longer name.
-                .then_with(|| a.finest_depth(depths).cmp(&b.finest_depth(depths)))
-                // Then exactness (§7): a wildcard outranks a shallower rule, never an exact one.
-                .then_with(|| a.exact_dimensions().cmp(&b.exact_dimensions()))
-                .then_with(|| a.literal_chars().cmp(&b.literal_chars()))
-                .then_with(|| b.path().cmp(&a.path()))
-                .then_with(|| b.id.cmp(&a.id))
-        })
+        .max_by(|a, b| compare_precedence(a, b, depths))
+}
+
+/// `Greater` when `a` outranks `b`; routing and every rule list share this one ordering.
+pub fn compare_precedence(
+    a: &OwnershipRule,
+    b: &OwnershipRule,
+    depths: &DimensionDepth,
+) -> std::cmp::Ordering {
+    a.specificity()
+        .cmp(&b.specificity())
+        // Then how fine the claim is: a service beats a cluster, not merely a longer name.
+        .then_with(|| a.finest_depth(depths).cmp(&b.finest_depth(depths)))
+        // Then exactness (§7): a wildcard outranks a shallower rule, never an exact one.
+        .then_with(|| a.exact_dimensions().cmp(&b.exact_dimensions()))
+        .then_with(|| a.literal_chars().cmp(&b.literal_chars()))
+        .then_with(|| b.path().cmp(&a.path()))
+        .then_with(|| b.id.cmp(&a.id))
 }
 
 /// The full routing decision, in the order §5 specifies.
@@ -886,6 +893,31 @@ mod tests {
                 resolve_owner(&rules, &record).unwrap().team_id,
                 "payments",
                 "the unranked entry point has to agree, or the two disagree by default",
+            );
+        }
+
+        /// The rules table numbers rules by this ordering, so it has to put service above cluster.
+        #[test]
+        fn test_the_shared_ordering_ranks_service_over_cluster_as_routing_does() {
+            let cluster = rule(
+                "r_cluster",
+                "platform",
+                &[("k8s-cluster", "production-us-east")],
+            );
+            let service = rule("r_svc", "payments", &[("service", "pay")]);
+            let record = dims(&[("k8s-cluster", "production-us-east"), ("service", "pay")]);
+            let depths = DimensionDepth::shipped_default();
+            assert_eq!(
+                compare_precedence(&service, &cluster, &depths),
+                std::cmp::Ordering::Greater
+            );
+            let mut listed = vec![cluster.clone(), service.clone()];
+            listed.sort_by(|a, b| compare_precedence(b, a, &depths));
+            let winner = resolve_owner_ranked(&listed, &record, &depths).unwrap();
+            assert_eq!(winner.id, "r_svc");
+            assert_eq!(
+                listed[0].id, winner.id,
+                "the first listed rule is the one that pages"
             );
         }
 
@@ -1581,6 +1613,30 @@ mod tests {
             Err(OwnershipError::WildcardNotTrailing("host".into()))
         );
         assert!(resolve_owner(&[interior], &dims(&[("host", "db-x-01")])).is_none());
+    }
+
+    /// `pair_matches` strips one trailing `*`, so a value with two could be stored and never match.
+    #[test]
+    fn test_a_value_holds_at_most_one_star_and_only_last() {
+        let not_trailing = || Err(OwnershipError::WildcardNotTrailing("host".into()));
+        let cases = [
+            ("db-*", Ok(())),
+            ("db", Ok(())),
+            ("db-**", not_trailing()),
+            ("**", not_trailing()),
+            ("a*b", not_trailing()),
+            (
+                "*",
+                Err(OwnershipError::WildcardMatchesEverything("host".into())),
+            ),
+        ];
+        for (value, want) in cases {
+            assert_eq!(
+                rule("r", "t", &[("host", value)]).validate(),
+                want,
+                "{value}"
+            );
+        }
     }
 
     /// The queue is worked by writing the rule that was missing, so a wildcard
