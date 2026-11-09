@@ -69,11 +69,13 @@ the Free Software Foundation, either version 3 of the License, or
 
       <OPageHeader
         v-if="hideTabBar && embeddedHeader && activeTab !== 'quality'"
-        :title="raw(embeddedHeader.title)"
-        :subtitle="raw(embeddedHeader.subtitle)"
-        :icon="embeddedHeader.icon"
+        :title="sectionHeader?.title ?? raw(embeddedHeader.title)"
+        :subtitle="sectionHeader?.subtitle ?? raw(embeddedHeader.subtitle)"
+        :icon="sectionHeader?.icon ?? embeddedHeader.icon"
+        :tabs-below="hasTabs"
         class="border-border-default shrink-0 border-b"
       >
+        <template v-if="hasTabs" #tabs><AiSectionTabs /></template>
         <template v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'" #actions>
           <ODropdown side="bottom" align="end">
             <template #trigger>
@@ -464,6 +466,8 @@ import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
 import ImportScorer from "./onlineEvals/ImportScorer.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import AiSectionTabs from "@/enterprise/components/AIObservability/AiSectionTabs.vue";
+import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSectionTabs";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -508,6 +512,7 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18nTyped();
+const { hasTabs, header: sectionHeader } = useAiSectionTabs();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));

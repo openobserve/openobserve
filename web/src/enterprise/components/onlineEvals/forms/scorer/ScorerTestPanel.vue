@@ -103,6 +103,12 @@
               </dt>
               <dd class="text-text-body m-0">{{ latencyLabel }}</dd>
             </template>
+            <template v-if="free">
+              <dt class="text-text-secondary font-medium">{{ t("codeScorer.resultCost") }}</dt>
+              <dd class="text-text-body m-0" data-test="scorer-test-cost">
+                {{ t("codeScorer.resultCostFree") }}
+              </dd>
+            </template>
             <template v-if="modelLabel">
               <dt class="text-text-secondary font-medium">
                 {{ t("onlineEvals.scorer.testPanel.resultModel") }}
@@ -183,6 +189,8 @@ const props = defineProps<{
   result: ScorerTestResult | null;
   errorMessage: string | null;
   canRun: boolean;
+  /** A Code scorer runs in the sandbox, so every run costs $0. */
+  free?: boolean;
 }>();
 
 const emit = defineEmits<{

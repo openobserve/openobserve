@@ -21,7 +21,7 @@
       <OStatStrip :items="behaviorStats" :loading="tableLoading" />
     </div>
     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
-         panels (LLMErrorTable) so the whole page reads as one surface. -->
+         panels (LLMTopErrorsTable) so the whole page reads as one surface. -->
     <div
       class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
       data-test="agent-behavior-loops-card"
@@ -31,7 +31,20 @@
         :hint="t('aiObservability.behavior.loopsHint')"
         icon="restart-alt"
         tone="warning"
-      />
+      >
+        <!-- AIO-20: the ai-agents alert pack, in one screen. -->
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="notifications-active"
+            data-test="agent-behavior-install-ai-alerts"
+            @click="packOpen = true"
+          >
+            {{ t("aiAlertPack.open") }}
+          </OButton>
+        </template>
+      </PanelSectionHeader>
       <OTable
         data-test="agent-behavior-loops-table"
         :data="loopRows"
@@ -46,7 +59,19 @@
         pagination="client"
         :empty-message="loopsEmptyMessage"
         @row-click="(r: any) => openDetail('loop', r)"
-      />
+      >
+        <!-- Repeated tool calls for this agent and tool, prefilled (AIO-20). -->
+        <template #cell-actions="{ row }">
+          <span @click.stop>
+            <CreateAlertAction
+              variant="icon"
+              source="ai"
+              :build="() => loopAlert(row)"
+              :data-test="`agent-behavior-loop-create-alert-${row.agent}-${row.tool}`"
+            />
+          </span>
+        </template>
+      </OTable>
     </div>
 
     <!-- Failure taxonomy -->
@@ -94,13 +119,16 @@
       :end-time="endTime"
       :agent-env="agentEnv"
       :agent-version="agentVersion"
+      explainable
+      @send-to-ai-chat="(value: unknown, append?: boolean) => emit('sendToAiChat', value, append)"
     />
+    <AiAlertPackDialog v-model:open="packOpen" :default-stream="sourceStream" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -109,6 +137,10 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 import PanelSectionHeader from "./PanelSectionHeader.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import AiAlertPackDialog from "@/components/alerts/AiAlertPackDialog.vue";
+import { buildAiPrefill } from "@/utils/alerts/prefill/fromAi";
 import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
 import { matchesAgentScope } from "./agentScope";
 
@@ -123,6 +155,7 @@ const props = defineProps<{
   agentVersion?: string | null;
   scopeReady?: boolean;
 }>();
+const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -290,7 +323,17 @@ const loopColumns = computed<OTableColumnDef[]>(() => [
     meta: { align: "right" },
     sortable: true,
   },
+  { id: "actions", header: raw(""), size: 56, meta: { align: "right" }, sortable: false },
 ]);
+
+const packOpen = ref(false);
+const loopAlert = (row: { agentRaw: string | null; tool: string }) =>
+  buildAiPrefill({
+    kind: "repeated_tool_calls",
+    stream: props.sourceStream ?? "",
+    agent: row.agentRaw,
+    tool: row.tool || null,
+  });
 
 const failureColumns = computed<OTableColumnDef[]>(() => [
   {
@@ -318,8 +361,11 @@ const failureColumns = computed<OTableColumnDef[]>(() => [
 
 const tableLoading = computed(() => loading.value || props.scopeReady === false);
 
+// A stream, org or range change refetches; only the latest call's answer lands.
+let seq = 0;
 const fetchSignals = async () => {
   if (!orgId.value || !props.sourceStream) return;
+  const mine = ++seq;
   loading.value = true;
   try {
     const res = await agentSignalsService.getAgentSignals(orgId.value, {
@@ -327,13 +373,15 @@ const fetchSignals = async () => {
       end_time: props.endTime,
       source_stream: props.sourceStream,
     });
-    signals.value = res.data?.signals ?? [];
+    if (mine === seq) signals.value = res.data?.signals ?? [];
   } catch {
     // Feature may be disabled (403) or stream not present yet — show empty state.
-    signals.value = [];
+    if (mine === seq) signals.value = [];
   } finally {
-    loading.value = false;
-    lastRunAt.value = Date.now();
+    if (mine === seq) {
+      loading.value = false;
+      lastRunAt.value = Date.now();
+    }
   }
 };
 

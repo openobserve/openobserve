@@ -1,13 +1,14 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for ScorerFormPage.vue (online-evals scorer create/edit
-// page, llm_judge + remote variants).
+// page, llm_judge + remote + code variants).
 //
 // Validation timing is owned by OForm (submit-then-change); this file only
 // describes WHAT is valid. The @submit payload carries RAW values, so the
 // component trims/coerces at save.
 
 import { z } from "zod";
+import { scoreFunctionParams } from "../utils/codeScorerStarters";
 
 // Required free-text field: non-blank after trimming, without transforming the
 // stored value (keeps typing intact; the component trims at save).
@@ -37,7 +38,7 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
       // ── Identity ────────────────────────────────────────────────────────
       name: requiredText(t("onlineEvals.scorer.validation.nameRequired")),
       // Discriminator — seeded once, drives the conditional requireds below.
-      scorerType: z.enum(["llm_judge", "remote"]).default("llm_judge"),
+      scorerType: z.enum(["llm_judge", "remote", "code"]).default("llm_judge"),
       description: z.string().optional().default(""),
       // Optional — a scorer with no score config is a valid server-side entity
       // (`produces_score_config_id: Option<String>` with #[serde(default)]). The
@@ -105,6 +106,16 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
             code: z.ZodIssueCode.custom,
             path: ["providerId"],
             message: t("onlineEvals.scorer.validation.providerRequired"),
+          });
+        }
+      } else if (val.scorerType === "code") {
+        // The variables are the `score` parameters; the backend refuses a
+        // function whose parameters it cannot read.
+        if (scoreFunctionParams(val.template) === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["template"],
+            message: t("codeScorer.signatureRequired"),
           });
         }
       } else if (val.scorerType === "remote") {

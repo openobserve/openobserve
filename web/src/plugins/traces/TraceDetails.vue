@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -123,6 +123,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="errorSpans.length">
                 <div class="bg-text-label h-4 w-px py-0" />
                 <TraceErrorSpansMenu :errors="errorSpans" compact @select="selectErrorSpan" />
+              </template>
+              <template v-if="traceIssueList.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <button
+                  type="button"
+                  class="inline-flex"
+                  data-test="trace-details-issues-count"
+                  @click="openIssue(traceIssueList[0].lastSpanId)"
+                >
+                  <OTag type="logsResultChip" value="warn" size="sm" class="py-1!">
+                    <span>{{
+                      t("traceIssues.count", { n: traceIssueList.length }, traceIssueList.length)
+                    }}</span>
+                  </OTag>
+                </button>
               </template>
             </div>
           </template>
@@ -346,6 +361,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <TraceErrorSpansMenu :errors="errorSpans" @select="selectErrorSpan" />
                 </span>
               </template>
+              <template v-if="traceIssueList.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <button
+                  type="button"
+                  class="me-[0.85rem] inline-flex"
+                  data-test="trace-details-issues-count"
+                  @click="openIssue(traceIssueList[0].lastSpanId)"
+                >
+                  <OTag type="logsResultChip" value="warn">
+                    <span>{{
+                      t("traceIssues.count", { n: traceIssueList.length }, traceIssueList.length)
+                    }}</span>
+                  </OTag>
+                </button>
+              </template>
             </div>
           </div>
 
@@ -444,6 +474,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               data-test="trace-details-critical-path-toggle"
               @update:model-value="setShowCriticalPath"
+            />
+            <OSwitch
+              v-if="activeTab === 'waterfall'"
+              :model-value="showLanes"
+              :label="t('requestTimeline.logsAndMetrics')"
+              size="sm"
+              data-test="trace-details-lanes-toggle"
+              @update:model-value="lanesOverride = $event === true"
             />
             <OButton
               v-if="activeTab === 'waterfall' && askAiVisible"
@@ -651,6 +689,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width: isSidebarOpen ? leftWidth + 'px' : '100%',
                 }"
               >
+                <OBanner
+                  v-for="sentence in timeHeadlines"
+                  :key="sentence"
+                  variant="info"
+                  dense
+                  class="mx-2 mb-1 shrink-0"
+                  data-test="trace-details-time-headline"
+                >
+                  {{ sentence }}
+                </OBanner>
                 <TraceHeader
                   data-test="trace-details-header"
                   :baseTracePosition="baseTracePosition"
@@ -696,6 +744,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :hoveredSpanId="hoveredSpanId"
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
                         :showCriticalPath="showCriticalPath"
+                        :issue-spans="issueSpanLabels"
+                        @open-issue="openIssue"
                         @toggle-collapse="toggleSpanCollapse"
                         @select-span="updateSelectedSpan"
                         @select-span-event="onSelectSpanEvent"
@@ -708,6 +758,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
+                <!-- Same axis as the bars, so hidden with them while a span is open. -->
+                <TraceLanes
+                  v-if="showLanes && !(isSidebarOpen && (selectedSpanId || showTraceDetails))"
+                  class="[scrollbar-gutter:stable] overflow-y-hidden"
+                  :spans="effectiveSpanList"
+                  :stream-name="currentTraceStreamName"
+                  :axis-start-us="baseTracePosition.startTimeUs"
+                  :axis-duration-us="baseTracePosition.durationUs"
+                  :label-width="leftWidth"
+                  @open-logs="openLogsAt($event.spanId, $event.timestampUs)"
+                />
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
@@ -721,11 +782,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="treeSidebarRef"
                   data-test="trace-details-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
+                  :logs-at-us="logsAtUs"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
+                  :issues="traceIssueList"
+                  @open-issue="openIssue"
                   :activeTab="sidebarActiveTab"
                   :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
@@ -792,6 +856,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
+                  :issues="traceIssueList"
+                  @open-issue="openIssue"
                   :activeTab="sidebarActiveTab"
                   :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
@@ -869,11 +935,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <TraceDetailsSidebar
                   data-test="trace-details-thread-sidebar"
                   :span="spanMap[selectedSpanId as string]"
+                  :logs-at-us="logsAtUs"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
+                  :issues="traceIssueList"
+                  @open-issue="openIssue"
                   :activeTab="sidebarActiveTab"
                   :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
@@ -1130,7 +1199,14 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
-import { spanTimeBounds } from "./threadView.utils";
+import { hasLLMPayload, spanTimeBounds } from "./threadView.utils";
+import {
+  attributeSteps,
+  attributionSentence,
+  headlineSteps,
+  REQUEST_TIMELINE_KEY,
+} from "./timeAttribution";
+import { traceIssues } from "./traceIssues";
 import {
   computeCriticalPathForRoots,
   toCriticalPathNode,
@@ -1167,6 +1243,7 @@ const FlameGraphView = defineAsyncComponent(() => import("@/components/traces/Fl
 
 // Import ThreadView (LLM Thread tab)
 const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
+const TraceLanes = defineAsyncComponent(() => import("./TraceLanes.vue"));
 const ManualEvaluationDialog = defineAsyncComponent(
   () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
 );
@@ -1223,6 +1300,10 @@ const DEFAULT_TRACE_TAB: TraceTabValue = "waterfall";
 
 const LS_TRACE_TAB_ORDER_KEY = "o2_trace_tab_order";
 const LS_TRACE_ACTIVE_TAB_KEY = "o2_trace_active_tab";
+// LLM traces remember their own tab and default to Thread (AIO-21), so a
+// Waterfall saved from plain traces does not hide the conversation view.
+const LS_LLM_TRACE_ACTIVE_TAB_KEY = "o2_llm_trace_active_tab";
+const DEFAULT_LLM_TRACE_TAB: TraceTabValue = "thread";
 const LS_TRACE_CRITICAL_PATH_KEY = "o2_trace_critical_path";
 const LS_TRACE_GRAPH_VIEW_KEY = "o2_trace_graph_view";
 
@@ -1261,14 +1342,14 @@ function loadTraceTabOrder(): TraceTabValue[] {
   return [...defaults];
 }
 
-function loadTraceActiveTab(): TraceTabValue {
+function loadTraceActiveTab(llm = false): TraceTabValue {
   try {
-    const saved = localStorage.getItem(LS_TRACE_ACTIVE_TAB_KEY);
+    const saved = localStorage.getItem(llm ? LS_LLM_TRACE_ACTIVE_TAB_KEY : LS_TRACE_ACTIVE_TAB_KEY);
     if (saved && isKnownTraceTab(saved)) return saved;
   } catch {
     // Ignore — fall through to the default tab.
   }
-  return DEFAULT_TRACE_TAB;
+  return llm ? DEFAULT_LLM_TRACE_TAB : DEFAULT_TRACE_TAB;
 }
 
 function loadTraceCriticalPath(): boolean {
@@ -1309,6 +1390,11 @@ export default defineComponent({
     spanListProp: {
       type: Array as PropType<any[]>,
       default: () => [],
+    },
+    // Embedded: the span to select on open (e.g. the scored span).
+    spanIdProp: {
+      type: String,
+      default: "",
     },
     startTimeProp: {
       type: Number,
@@ -1391,6 +1477,7 @@ export default defineComponent({
     ODrawer,
     OIcon,
     ThreadView,
+    TraceLanes,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
@@ -1880,6 +1967,23 @@ export default defineComponent({
       return spans.some((span: any) => isLLMTrace(span));
     });
 
+    // An LLM trace opens on its own tab only when it has a conversation to show.
+    // With message capture off (the OTel default) the Thread would be empty, so
+    // it opens and remembers its tab like a plain trace. Every Thread turn is a
+    // span with a payload, so this also covers "buildTraceGroup has a turn".
+    const hasLLMContent = computed(
+      () => hasLLMSpans.value && effectiveSpanList.value.some((span: any) => hasLLMPayload(span)),
+    );
+
+    // AIO-37: where each LLM or tool step spent its time, shared with the Thread view.
+    const timeSteps = computed(() => attributeSteps(effectiveSpanList.value ?? []));
+    const timeHeadlines = computed(() =>
+      headlineSteps(timeSteps.value).map((step) => attributionSentence(step, t)),
+    );
+    // The lanes follow the trace kind until the user flips the switch.
+    const lanesOverride = ref<boolean | null>(null);
+    const showLanes = computed(() => lanesOverride.value ?? hasLLMSpans.value);
+
     const hasPreviewableSpans = computed(() => {
       const spans = effectiveSpanList.value;
       if (!spans || spans.length === 0) return false;
@@ -2145,6 +2249,15 @@ export default defineComponent({
      * last viewed "thread" on an LLM trace and then opens a plain HTTP trace.
      * Fall back to the default view rather than rendering an empty body.
      */
+    // Once the spans say whether this trace has a conversation, open that kind's tab.
+    watch(
+      hasLLMContent,
+      (llm) => {
+        activeTab.value = loadTraceActiveTab(llm);
+      },
+      { immediate: true },
+    );
+
     watch(
       traceTabs,
       (tabs) => {
@@ -2229,6 +2342,7 @@ export default defineComponent({
         if (props.mode === "embedded" && newTraceId && shouldFetchData.value) {
           resetTraceDetails();
           setupTraceDetails();
+          if (props.spanIdProp) updateSelectedSpan(props.spanIdProp);
         }
       },
     );
@@ -2281,7 +2395,10 @@ export default defineComponent({
       // Remember the last view so reopening a trace lands where the user left
       // off, rather than resetting to the default every time.
       try {
-        localStorage.setItem(LS_TRACE_ACTIVE_TAB_KEY, tab);
+        localStorage.setItem(
+          hasLLMContent.value ? LS_LLM_TRACE_ACTIVE_TAB_KEY : LS_TRACE_ACTIVE_TAB_KEY,
+          tab,
+        );
       } catch {
         // Storage unavailable — selection still applies for this session.
       }
@@ -2441,8 +2558,9 @@ export default defineComponent({
       serviceDetectionConfig.value = keyFields["traces"]?.service_detection ?? null;
 
       const params = router.currentRoute.value.query;
-      if (params.span_id) {
-        updateSelectedSpan(params.span_id as string);
+      const initialSpanId = props.mode === "embedded" ? props.spanIdProp : params.span_id;
+      if (initialSpanId) {
+        updateSelectedSpan(initialSpanId as string);
       }
       nextTick(() => {
         updateHeight();
@@ -2522,6 +2640,7 @@ export default defineComponent({
       // survive to hijack the next selection.
       const pending = pendingSidebarTab.value;
       pendingSidebarTab.value = null;
+      if (pending?.tab !== "correlated-logs") logsAtUs.value = null;
 
       // A marker-driven Events view is scoped to its own span. Once the
       // selection moves elsewhere it no longer applies, so retire it and let
@@ -2542,7 +2661,9 @@ export default defineComponent({
       if (
         !oldSpanId ||
         leavingMarkerEvents ||
-        (sidebarActiveTab.value === "preview" && !canPreview)
+        (sidebarActiveTab.value === "preview" && !canPreview) ||
+        (sidebarActiveTab.value === "issues" &&
+          !traceIssueList.value.some((i) => i.evidence.includes(newSpanId)))
       ) {
         sidebarActiveTab.value = canPreview ? "preview" : "attributes";
       }
@@ -2560,6 +2681,8 @@ export default defineComponent({
      * @param newParams - object containing new parameters
      */
     const updateUrlQueryParams = (newParams: any) => {
+      // Embedded on another page (an AI Observability drawer): its URL is not ours.
+      if (props.mode === "embedded") return;
       router.replace({
         query: {
           ...router.currentRoute.value.query, // keep existing params
@@ -2762,6 +2885,13 @@ export default defineComponent({
     };
 
     const showTraceDetailsError = () => {
+      if (props.mode === "embedded") {
+        // The host page stays put; the notice is enough.
+        showErrorNotification(
+          t("traces.traceDetails.traceNotFound", { traceId: effectiveTraceId.value }),
+        );
+        return;
+      }
       showErrorNotification(
         t("traces.traceDetails.traceNotFound", {
           traceId: router.currentRoute.value.query.trace_id,
@@ -3410,7 +3540,39 @@ export default defineComponent({
     const onSidebarTabChange = (tab: string) => {
       sidebarActiveTab.value = tab;
       markerEventsSpanId.value = null;
+      logsAtUs.value = null;
     };
+
+    // AIO-33: the pack's tool rules over this trace's spans. The header count,
+    // the chip on the last evidence span and the Issues tab read this list.
+    const traceIssueList = computed(() => traceIssues(effectiveSpanList.value ?? []));
+    const issueSpanLabels = computed(() =>
+      Object.fromEntries(
+        traceIssueList.value.map((i) => [i.lastSpanId, t(`traceIssues.rules.${i.rule}`)]),
+      ),
+    );
+    const openIssue = (spanId: string) => {
+      pendingSidebarTab.value = { spanId, tab: "issues" };
+      updateSelectedSpan(spanId);
+      sidebarActiveTab.value = "issues";
+    };
+
+    // A lane tick opens its span's Logs tab ending at the tick, so its line leads.
+    const logsAtUs = ref<number | null>(null);
+    const openLogsAt = (spanId: string, timestampUs: number) => {
+      pendingSidebarTab.value = { spanId, tab: "correlated-logs" };
+      updateSelectedSpan(spanId);
+      sidebarActiveTab.value = "correlated-logs";
+      logsAtUs.value = timestampUs;
+    };
+
+    provide(REQUEST_TIMELINE_KEY, {
+      steps: computed(() => new Map(timeSteps.value.map((step) => [step.spanId, step]))),
+      spans: effectiveSpanList,
+      streamName: currentTraceStreamName,
+      openLogsAt,
+      openInWaterfall: (spanId: string) => updateSelectedSpan(spanId, true),
+    });
 
     const updateSelectedSpan = (spanId: string, swichToWaterfall: boolean = false) => {
       hoveredSpanId.value = ""; // clear any hover state on click
@@ -3580,6 +3742,11 @@ export default defineComponent({
       askAiVisible,
       relayToAiChat,
       explainTrace,
+      timeHeadlines,
+      lanesOverride,
+      showLanes,
+      logsAtUs,
+      openLogsAt,
       traceGraphView,
       setTraceGraphView,
       traceGraphSearch,
@@ -3722,6 +3889,9 @@ export default defineComponent({
       // New header computed properties
       errorSpans,
       selectErrorSpan,
+      traceIssueList,
+      issueSpanLabels,
+      openIssue,
       rootServiceName,
       traceStartTime,
       canManualEvaluate,

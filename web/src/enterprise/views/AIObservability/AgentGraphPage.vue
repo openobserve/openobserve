@@ -202,6 +202,7 @@ import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
+import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
@@ -232,7 +233,6 @@ const {
   timeRange,
   applyRelative,
   onDateChange: onDateStateChange,
-  mountResolve,
 } = useAiDateController({ urlSync: false });
 
 const ServiceGraph = defineAsyncComponent(() => import("@/plugins/traces/ServiceGraph.vue"));
@@ -396,13 +396,19 @@ function syncScopeUrl() {
   const agent = selectedAgent.value
     ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
     : null;
-  const query = scopeUrlQuery(route.query, {
-    mode: filterMode.value,
-    explicit: modeExplicit.value,
-    stream: activeStream.value,
-    agent,
+  void replaceRouteQuery(router, route, (current) => {
+    const next = scopeUrlQuery(current, {
+      mode: filterMode.value,
+      explicit: modeExplicit.value,
+      stream: activeStream.value,
+      agent,
+    });
+    // An org switch puts the new org in the store before the route; building on
+    // the route alone would write the previous org back.
+    const org = store.state.selectedOrganization?.identifier;
+    if (org && next.org_identifier != null) next.org_identifier = org;
+    return next;
   });
-  router.replace({ query }).catch(() => {});
 }
 
 // A toggle click is an explicit choice: kept in the URL and remembered for the
@@ -466,10 +472,6 @@ function onDateChange(value: any) {
 }
 
 onMounted(() => {
-  // Resolve the shared range to an absolute window on mount (re-anchoring a
-  // relative range to "now"), so the graph and agent list query the same window
-  // the other AI tabs use. urlSync:false → no URL read, resolve from shared state.
-  mountResolve();
   loadAgents();
 });
 </script>

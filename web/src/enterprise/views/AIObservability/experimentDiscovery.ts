@@ -16,7 +16,8 @@
 import type { LlmExperiment } from "@/services/llm-experiments.service";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
-export type ExperimentScoreSummary =
+/** `scoreConfigId` is the key to the config's health policy, which decides a move against the baseline. */
+export type ExperimentScoreSummary = { scoreConfigId: string | null } & (
   | { name: string; kind: "numeric"; value: number; sampleCount: number }
   | {
       name: string;
@@ -30,7 +31,8 @@ export type ExperimentScoreSummary =
       kind: "categorical";
       values: Array<{ value: string; count: number }>;
       sampleCount: number;
-    };
+    }
+);
 
 export interface ExperimentEvidence {
   completedSlots: number;
@@ -99,8 +101,10 @@ export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidenc
     const aggregate = summary.value as Record<string, unknown> | null;
     if (!aggregate) continue;
     const name = summary.scoreConfigName || summary.name;
+    const scoreConfigId = summary.scoreConfigId;
     if (aggregate.kind === "numeric") {
       scores.push({
+        scoreConfigId,
         name,
         kind: "numeric",
         value: Number(aggregate.mean ?? 0),
@@ -108,6 +112,7 @@ export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidenc
       });
     } else if (aggregate.kind === "boolean") {
       scores.push({
+        scoreConfigId,
         name,
         kind: "boolean",
         trueCount: Number(aggregate.trueCount ?? aggregate.true_count ?? 0),
@@ -117,6 +122,7 @@ export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidenc
     } else if (aggregate.kind === "categorical") {
       const counts = (aggregate.counts ?? {}) as Record<string, number>;
       scores.push({
+        scoreConfigId,
         name,
         kind: "categorical",
         values: Object.entries(counts).map(([value, count]) => ({ value, count: Number(count) })),

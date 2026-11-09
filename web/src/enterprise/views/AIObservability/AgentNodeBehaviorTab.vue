@@ -121,6 +121,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
+import { formatTokens } from "@/utils/llmUtils";
 import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
 
 const props = defineProps<{
@@ -179,12 +180,16 @@ const failureRows = computed(() =>
 
 /** Cost is a headline summary, not a table (design §2). */
 const costSummary = computed(() => {
-  const c = mySignals.value.find((s) => s.signal_type === "cost");
-  if (!c) return null;
+  // One cost row per hourly window × env × version: total them over the range.
+  const rows = mySignals.value.filter((s) => s.signal_type === "cost");
+  if (!rows.length) return null;
+  const hasCost = rows.some((s) => s.cost != null);
+  const sum = (key: "cost" | "tokens" | "errors") =>
+    rows.reduce((acc, s) => acc + Number(s[key] ?? 0), 0);
   return {
-    cost: c.cost != null ? `$${Number(c.cost).toFixed(2)}` : "—",
-    tokens: c.tokens ?? 0,
-    errors: c.errors ?? 0,
+    cost: hasCost ? `$${sum("cost").toFixed(2)}` : "—",
+    tokens: formatTokens(sum("tokens")),
+    errors: sum("errors"),
   };
 });
 
@@ -234,7 +239,10 @@ const failureColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
+// Picking another node or range refetches; only the latest call's answer lands.
+let seq = 0;
 const fetchSignals = async () => {
+  const mine = ++seq;
   if (!orgId.value || !props.sourceStream || !props.agentName) {
     signals.value = [];
     return;
@@ -245,9 +253,11 @@ const fetchSignals = async () => {
       end_time: props.endTime,
       source_stream: props.sourceStream,
     });
+    if (mine !== seq) return;
     signals.value = res.data?.signals ?? [];
     disabledHint.value = "";
   } catch {
+    if (mine !== seq) return;
     // 403 = feature/flag off for this deployment, or stream absent — name the
     // config choice rather than showing a blank tab (design FR-6.5).
     signals.value = [];

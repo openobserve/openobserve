@@ -90,6 +90,7 @@
         :agent-version="filterMode === 'agent' ? selectedAgent?.version : null"
         :start-time="timeRange.startTime"
         :end-time="timeRange.endTime"
+        @send-to-ai-chat="(value: unknown, append?: boolean) => emit('sendToAiChat', value, append)"
       />
     </div>
   </AiPageShell>
@@ -115,10 +116,13 @@ import {
   scopeUrlQuery,
   type ScopeMode,
 } from "@/enterprise/composables/useAgentScope";
+import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 
 defineOptions({ name: "AgentBehaviorPage" });
+// "Explain with O2 AI" in the drill-down drawer; the AI shell forwards it to the chat panel.
+const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
 
 const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);
@@ -134,7 +138,6 @@ const {
   timeRange,
   applyRelative,
   onDateChange: onDateStateChange,
-  mountResolve,
   DEFAULT_RELATIVE,
 } = useAiDateController({ urlSync: false });
 
@@ -201,13 +204,19 @@ function syncScopeUrl() {
   const agent = selectedAgent.value
     ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
     : null;
-  const query = scopeUrlQuery(route.query, {
-    mode: filterMode.value,
-    explicit: modeExplicit.value,
-    stream: activeStream.value,
-    agent,
+  void replaceRouteQuery(router, route, (current) => {
+    const next = scopeUrlQuery(current, {
+      mode: filterMode.value,
+      explicit: modeExplicit.value,
+      stream: activeStream.value,
+      agent,
+    });
+    // An org switch puts the new org in the store before the route; building on
+    // the route alone would write the previous org back.
+    const org = store.state.selectedOrganization?.identifier;
+    if (org && next.org_identifier != null) next.org_identifier = org;
+    return next;
   });
-  router.replace({ query }).catch(() => {});
 }
 
 // A toggle click is an explicit choice: kept in the URL and remembered for the
@@ -287,8 +296,5 @@ function onDateChange(value: unknown) {
   if ((value as { userChangedValue?: boolean } | null)?.userChangedValue === true) settleScope();
 }
 
-onMounted(() => {
-  mountResolve();
-  settleScope();
-});
+onMounted(settleScope);
 </script>

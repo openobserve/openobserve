@@ -1274,6 +1274,8 @@ pub struct ApiDoc;
     openobserve_api_management::request::annotation_queues::review_annotation_queue_item,
     openobserve_api_management::request::annotation_queues::update_annotation_queue,
     openobserve_api_management::request::annotations::annotate_target,
+    openobserve_api_management::request::annotations::mint_feedback_token,
+    openobserve_api_management::request::annotations::post_feedback_vote,
     openobserve_api_management::request::datasets::create_dataset,
     openobserve_api_management::request::datasets::delete_dataset,
     openobserve_api_management::request::datasets::delete_dataset_item,

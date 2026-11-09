@@ -57,7 +57,7 @@ use openobserve_api_search::{
 };
 use openobserve_core::auth::{AuthExtractor, org_from_path, routed_path};
 use tower_http::{
-    cors::{AllowOrigin, CorsLayer},
+    cors::{AllowCredentials, AllowOrigin, CorsLayer},
     decompression::RequestDecompressionLayer,
 };
 use utoipa::OpenApi;
@@ -153,7 +153,11 @@ pub fn cors_layer() -> CorsLayer {
         // We extract only the scheme+host+port from each URL (ignoring any path) because the Origin
         // header per RFC 6454 never carries a path component.  This prevents prefix-match bypasses
         // like https://app.example.com.evil.com when the allowed URL is https://app.example.com.
-        .allow_origin(AllowOrigin::predicate(|origin, _parts| {
+        .allow_origin(AllowOrigin::predicate(|origin, parts| {
+            // An end user's browser posts feedback votes from the customer's own app.
+            if is_public_vote_path(parts.uri.path()) {
+                return true;
+            }
             let cfg = config::get_config();
             let web_url = cfg.common.web_url.trim_end_matches('/');
             if is_origin_allowed(origin.as_bytes(), web_url) {
@@ -171,8 +175,19 @@ pub fn cors_layer() -> CorsLayer {
             }
             false
         }))
-        .allow_credentials(true)
+        // Never credentialed on the vote route, so opening its origins exposes no session.
+        .allow_credentials(AllowCredentials::predicate(|_origin, parts| {
+            !is_public_vote_path(parts.uri.path())
+        }))
         .max_age(Duration::from_secs(3600))
+}
+
+/// `POST /api/v2/{org_id}/annotations/public`: the token in its query is the only
+/// credential, so any origin may call it, without cookies.
+fn is_public_vote_path(path: &str) -> bool {
+    path.strip_prefix("/api/v2/")
+        .and_then(|rest| rest.strip_suffix("/annotations/public"))
+        .is_some_and(|org| !org.is_empty() && !org.contains('/'))
 }
 
 /// Returns `true` if `request_origin` should be permitted for CORS.
@@ -1181,6 +1196,18 @@ pub fn basic_routes() -> Router {
         router = router.merge(public);
     }
 
+    // End-user feedback votes (AIO-40) come from an app's browser with no
+    // session: the signed token in the query is the credential, checked in the
+    // handler like the on-call ack link.
+    #[cfg(feature = "enterprise")]
+    {
+        router = router.route(
+            "/api/v2/{org_id}/annotations/public",
+            post(annotations::post_feedback_vote)
+                .layer(DefaultBodyLimit::max(annotations::FEEDBACK_MAX_BODY_BYTES)),
+        );
+    }
+
     // Unauthenticated like status pages: the share token is checked in the handler.
     #[cfg(feature = "enterprise")]
     if get_config().public_ai_chat.enabled {
@@ -1846,6 +1873,8 @@ fn service_route_table() -> Router {
 
                 // On-demand human annotation from Discovery
                 .route("/{org_id}/annotations", post(annotations::annotate_target))
+                // End-user feedback (AIO-40): an app's server mints the token its browser votes with.
+                .route("/{org_id}/annotations/token", post(annotations::mint_feedback_token))
 
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
@@ -5237,6 +5266,87 @@ mod tests {
                 allowed.split(',').any(|h| h.trim() == name),
                 "{name} missing from access-control-allow-headers: {allowed}"
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn public_vote_route_answers_any_origin_without_credentials() {
+        const APP: &str = "https://customer.example";
+        const VOTE: &str = "/api/v2/default/annotations/public?token=fbt_x";
+        let app = Router::new()
+            .route(
+                "/api/v2/{org_id}/annotations/public",
+                axum::routing::post(|| async { "ok" }),
+            )
+            .route(
+                "/api/{org_id}/annotations",
+                axum::routing::post(|| async { "ok" }),
+            )
+            .layer(cors_layer());
+        let send = |method: Method, uri: &str, origin: &str| {
+            let mut req = Request::builder()
+                .method(method.clone())
+                .uri(uri)
+                .header(header::ORIGIN, origin);
+            if method == Method::OPTIONS {
+                req = req
+                    .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                    .header(header::ACCESS_CONTROL_REQUEST_HEADERS, "content-type");
+            }
+            app.clone().oneshot(req.body(Body::empty()).unwrap())
+        };
+        let allow_origin = |resp: &Response| {
+            resp.headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .map(|v| v.to_str().unwrap().to_string())
+        };
+        let credentialed = |resp: &Response| {
+            resp.headers()
+                .contains_key(header::ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        };
+
+        for method in [Method::OPTIONS, Method::POST] {
+            let resp = send(method.clone(), VOTE, APP).await.unwrap();
+            assert_eq!(allow_origin(&resp).as_deref(), Some(APP), "{method}");
+            assert!(!credentialed(&resp), "{method}");
+        }
+        // The vote route's preflight lets the app send JSON with a Content-Type.
+        let preflight = send(Method::OPTIONS, VOTE, APP).await.unwrap();
+        let allowed = preflight.headers()[header::ACCESS_CONTROL_ALLOW_HEADERS]
+            .to_str()
+            .unwrap()
+            .to_ascii_lowercase();
+        assert!(allowed.contains("content-type"), "{allowed}");
+
+        // Every other route stays closed to the foreign origin...
+        for method in [Method::OPTIONS, Method::POST] {
+            let resp = send(method.clone(), "/api/default/annotations", APP)
+                .await
+                .unwrap();
+            assert_eq!(allow_origin(&resp), None, "{method}");
+        }
+        // ...and credentialed for the web UI's own origin (ZO_WEB_URL's scheme://host[:port]).
+        let web_url = config::get_config().common.web_url.clone();
+        let (scheme, rest) = web_url.split_once("://").expect("ZO_WEB_URL is a URL");
+        let web = format!("{scheme}://{}", rest.split('/').next().unwrap_or_default());
+        let resp = send(Method::POST, "/api/default/annotations", &web)
+            .await
+            .unwrap();
+        assert_eq!(allow_origin(&resp).as_deref(), Some(web.as_str()));
+        assert!(credentialed(&resp));
+    }
+
+    #[test]
+    fn public_vote_path_matches_only_the_vote_route() {
+        assert!(is_public_vote_path("/api/v2/default/annotations/public"));
+        for path in [
+            "/api/v2//annotations/public",
+            "/api/v2/a/b/annotations/public",
+            "/api/default/annotations/public",
+            "/api/v2/default/annotations",
+            "/api/v2/default/annotations/public/x",
+        ] {
+            assert!(!is_public_vote_path(path), "{path}");
         }
     }
 

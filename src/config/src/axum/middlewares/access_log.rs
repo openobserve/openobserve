@@ -681,6 +681,18 @@ mod tests {
     }
 
     #[test]
+    fn feedback_vote_tokens_never_reach_the_access_log() {
+        assert_eq!(
+            mask_log_url("/api/v2/default/annotations/public?token=fbt_eyJvcmc.abc"),
+            "/api/v2/default/annotations/public?token=…"
+        );
+        assert_eq!(
+            mask_log_url("/api/default/annotations?token=x"),
+            "/api/default/annotations?token=x"
+        );
+    }
+
+    #[test]
     fn test_log_formatting_patterns() {
         // Test that common format contains expected patterns
         let common_format =

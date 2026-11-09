@@ -34,7 +34,7 @@ describe("useAIObservabilityRouteChildren — online evaluations gate", () => {
       "aiQueueWorkbench",
       "aiDatasets",
       "aiDatasetDetail",
-      "aiPlayground",
+      "aiEvaluations",
       "aiExperiments",
       "aiExperimentCreate",
       "aiExperimentCompare",
@@ -43,19 +43,27 @@ describe("useAIObservabilityRouteChildren — online evaluations gate", () => {
       "aiRemoteTaskCreate",
       "aiRemoteTaskEdit",
       "aiRemoteTaskDetail",
-      "aiEvaluations",
+      "aiPlayground",
+      // `/providers` is registered only with evaluations on.
+      "llmProviders",
     ]);
   });
 
-  it("leaves Monitor and Prompts alone — their APIs do not depend on evaluations", () => {
+  it("leaves Monitor, Prompts, Agent Mapping and Model Pricing alone — their APIs do not depend on evaluations", () => {
     expect(namesWhere(false)).toEqual([
       "aiLLMInsights",
       "aiSessions",
+      "aiUsers",
+      "aiBudgets",
       "aiAgentGraph",
       "aiAgentBehavior",
       "aiPrompts",
       "aiPromptCreate",
       "aiPromptVersionCreate",
+      "modelPricing",
+      "modelPricingGaps",
+      "modelPricingEditor",
+      "genAiAgentMapping",
     ]);
   });
 });

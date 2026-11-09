@@ -9,6 +9,7 @@ import { gt } from "@/types/i18n";
 
 import http from "./http";
 import analytics from "./product_analytics";
+import type { HarnessPatternRule } from "@/plugins/traces/harnessText";
 import { RETENTION_MS } from "@/plugins/traces/versionCompare/constants";
 
 /** One arm (A or B) of a version-compare request — mirrors the backend
@@ -96,6 +97,17 @@ export interface GenAiAgentMappingConfig {
   agent_id_fields: string[];
   env_fields: string[];
   version_fields: string[];
+  /** Per-agent harness text hidden when sessions are read (AIO-22). */
+  harness_patterns: HarnessPatternRule[];
+  session_title: "off" | "first_request";
+  /** Cost attribution fallbacks copied to user.id / feature.name / tenant.id at ingest (AIO-27). */
+  attribution_fields: AttributionFields;
+}
+
+export interface AttributionFields {
+  user: string[];
+  feature: string[];
+  tenant: string[];
 }
 
 export interface GenAiAgentListItem {
@@ -125,7 +137,13 @@ const emptyConfig = (): GenAiAgentMappingConfig => ({
   agent_id_fields: [],
   env_fields: [],
   version_fields: [],
+  harness_patterns: [],
+  session_title: "off",
+  attribution_fields: { user: [], feature: [], tenant: [] },
 });
+
+const stringList = (value: any): string[] =>
+  Array.isArray(value) ? value.filter((field: any) => typeof field === "string") : [];
 
 const normalizeConfig = (value: any): GenAiAgentMappingConfig => ({
   agent_name_fields: Array.isArray(value?.agent_name_fields)
@@ -140,6 +158,20 @@ const normalizeConfig = (value: any): GenAiAgentMappingConfig => ({
   version_fields: Array.isArray(value?.version_fields)
     ? value.version_fields.filter((field: any) => typeof field === "string")
     : [],
+  harness_patterns: Array.isArray(value?.harness_patterns)
+    ? value.harness_patterns
+        .filter((r: any) => typeof r?.agent === "string" && Array.isArray(r?.patterns))
+        .map((r: any) => ({
+          agent: r.agent,
+          patterns: r.patterns.filter((p: any) => typeof p === "string"),
+        }))
+    : [],
+  session_title: value?.session_title === "first_request" ? "first_request" : "off",
+  attribution_fields: {
+    user: stringList(value?.attribution_fields?.user),
+    feature: stringList(value?.attribution_fields?.feature),
+    tenant: stringList(value?.attribution_fields?.tenant),
+  },
 });
 
 export async function fetchDefaultGenAiAgentMapping(): Promise<GenAiAgentMappingConfig> {
@@ -147,9 +179,7 @@ export async function fetchDefaultGenAiAgentMapping(): Promise<GenAiAgentMapping
     credentials: "omit",
   });
   if (!response.ok) {
-    throw new Error(
-      gt("settings.genAiAgentMapping.defaultsFetchFailed", { status: response.status }),
-    );
+    throw new Error(gt("genAiAgentMapping.defaultsFetchFailed", { status: response.status }));
   }
 
   return normalizeConfig(await response.json());

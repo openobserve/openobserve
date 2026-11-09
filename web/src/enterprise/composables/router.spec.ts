@@ -56,7 +56,16 @@ describe("enterprise routes: allowOnEmptyData", () => {
 });
 
 describe("enterprise routes: ai_observability license", () => {
-  it.each(["/ai/llm-insights", "/ai/sessions", "/ai/session-details"])(
+  it.each([
+    "/ai/llm-insights",
+    "/ai/sessions",
+    "/ai/session-details",
+    "/ai/llm-providers",
+    "/ai/model-pricing",
+    "/ai/model-pricing/gaps",
+    "/ai/model-pricing/edit",
+    "/ai/agent-mapping",
+  ])(
     "tags %s with meta.licenseFeature so a locked license renders it locked",
     (path) => {
       expect(resolveMeta(path).licenseFeature).toBe("ai_observability");

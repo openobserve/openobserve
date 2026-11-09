@@ -14,8 +14,10 @@ import {
   compactSql,
   pickInterval,
   llmCallUsageSum,
+  ERROR_MESSAGE_SQL,
   type LLMPanelDef,
 } from "./llmInsightsPanels";
+import { buildLLMPanelSchema } from "../llmPanelSchema";
 
 describe("renderPanelSql", () => {
   // The placeholders are global — every occurrence must be replaced, not
@@ -300,41 +302,99 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     }
   });
 
-  // Horizontal-bar panels render top-N — they must declare seriesField
-  // (categories) and a value source: either a single `valueField` (bar
-  // lengths) or a `series[]` of grouped value columns (e.g. p50/p90/p95/p99).
-  it("horizontal-bar panels declare seriesField and a value source", () => {
-    const bars = LLM_INSIGHTS_PANELS.filter((p) => p.type === "horizontal-bar");
-    expect(bars.length).toBeGreaterThan(0);
-    for (const p of bars) {
-      expect(p.query.seriesField, `panel ${p.id} missing seriesField`).toBeTruthy();
-      const hasValue = !!p.query.valueField || (p.series?.length ?? 0) > 0;
-      expect(hasValue, `panel ${p.id} missing valueField/series`).toBe(true);
-    }
+  // Health first, then what breaks, then what it costs; one-column panels in
+  // pairs, so every row is full.
+  it("orders the panels health, errors, cost, two to a row", () => {
+    expect(LLM_INSIGHTS_PANELS.map((p) => p.id)).toEqual([
+      "traces-over-time",
+      "latency-trend",
+      "top-errors",
+      "failing-tools",
+      "cost-trend",
+      "token-trend",
+    ]);
+    expect(LLM_INSIGHTS_PANELS.every((p) => p.layout.colSpan === 1)).toBe(true);
   });
 
-  // Table panels MUST declare columns; the renderer iterates `panel.columns`
-  // and would render an empty table without them.
-  it("table panels declare a columns array", () => {
-    const tables = LLM_INSIGHTS_PANELS.filter((p) => p.type === "table");
-    expect(tables.length).toBeGreaterThan(0);
-    for (const p of tables) {
-      expect(p.columns, `panel ${p.id} missing columns`).toBeTruthy();
-      expect((p.columns as any[]).length).toBeGreaterThan(0);
-    }
+  // Traffic and errors in one chart, counted as the KPI strip counts them, so
+  // the bars add up to the Traces tile and the red part to its errored traces.
+  it("traces-over-time stacks OK and errored traces, clicked as such", () => {
+    const traces = LLM_INSIGHTS_PANELS.find((p) => p.id === "traces-over-time")!;
+    expect(traces.type).toBe("stacked-bar");
+    const sql = compactSql(traces.query.sql);
+    const errored = "approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')";
+    expect(sql).toContain(`approx_distinct(trace_id) - ${errored} as ok`);
+    expect(sql).toContain(`${errored} as errored`);
+    expect(traces.query.measures?.map((m) => [m.field, m.errored])).toEqual([
+      ["ok", false],
+      ["errored", true],
+    ]);
+    expect(traces.query.measures?.every((m) => m.color)).toBe(true);
+    // The dashboards stack a breakdown only: the measures share a stack group.
+    const schema = buildLLMPanelSchema({ panel: traces, sql: "", stream: "s", t: (k) => k });
+    expect(
+      schema.config.override_config.map((o: any) => [
+        o.field.value,
+        o.config.find((c: any) => c.type === "stack_group")?.value,
+      ]),
+    ).toEqual([
+      ["aiObservability.panels.tracesOverTime.ok", "total"],
+      ["aiObservability.panels.tracesOverTime.errored", "total"],
+    ]);
   });
 
-  // Latency by model renders grouped bars — one Y series per percentile.
-  // Each series must declare a field/label/color so the chart + legend render.
-  it("latency-by-model declares grouped percentile series", () => {
-    const latency = LLM_INSIGHTS_PANELS.find((p) => p.id === "latency-by-model");
-    expect(latency).toBeTruthy();
-    expect(latency!.series?.length ?? 0).toBeGreaterThan(1);
-    for (const s of latency!.series!) {
-      expect(s.field).toBeTruthy();
-      expect(s.label).toBeTruthy();
-      expect(s.color).toBeTruthy();
+  // What fails, by message: the rows the errors chart cannot show.
+  it("top-errors groups errored spans by message, most traces first", () => {
+    const top = LLM_INSIGHTS_PANELS.find((p) => p.id === "top-errors")!;
+    expect(top.type).toBe("error-table");
+    expect(top.drill).toEqual({ seriesSql: ERROR_MESSAGE_SQL, errored: true });
+    const sql = compactSql(top.query.sql);
+    expect(sql).toContain(`${ERROR_MESSAGE_SQL} as message`);
+    for (const alias of ["as operation", "as operations", "as traces", "as last_seen"]) {
+      expect(sql).toContain(alias);
     }
+    expect(sql).toContain("WHERE span_status = 'ERROR'");
+    expect(sql).toMatch(/ORDER BY traces DESC LIMIT 10$/);
+  });
+
+  // Latency over time: p95 per model per bucket, a line each (a percentile
+  // of two models does not add up, so never stacked).
+  it("latency-trend is each model's p95 per time bucket, not stacked", () => {
+    const latency = LLM_INSIGHTS_PANELS.find((p) => p.id === "latency-trend");
+    expect(latency?.type).toBe("line");
+    expect(latency?.query).toMatchObject({
+      timeField: "ts",
+      seriesField: "model",
+      valueField: "p95",
+      valueFormat: "latency-ms",
+    });
+    const sql = compactSql(latency!.query.sql);
+    expect(sql).toContain("histogram(_timestamp, '{{interval}}') as ts");
+    expect(sql).toContain("approx_percentile_cont(duration, 0.95)");
+  });
+
+  // Tokens over time are split by direction, not by model: input and output
+  // stacked, so a bucket's height is its total.
+  it("token-trend stacks input and output tokens per bucket", () => {
+    const tokens = LLM_INSIGHTS_PANELS.find((p) => p.id === "token-trend")!;
+    expect(tokens.type).toBe("stacked-bar");
+    expect(tokens.query.seriesField).toBeUndefined();
+    expect(tokens.query.measures?.map((m) => m.field)).toEqual(["input_tokens", "output_tokens"]);
+    const sql = compactSql(tokens.query.sql);
+    expect(sql).toContain("THEN gen_ai_usage_input_tokens ELSE 0 END");
+    expect(sql).toContain("THEN gen_ai_usage_output_tokens ELSE 0 END");
+  });
+
+  // A table, not bars: the 10 tools with the most failed calls, with what the
+  // table shows for each (calls for the rate, traces, last failure).
+  it("failing-tools ranks the 10 tools with the most failed calls", () => {
+    const tools = LLM_INSIGHTS_PANELS.find((p) => p.id === "failing-tools")!;
+    expect(tools.type).toBe("tool-table");
+    const sql = compactSql(tools.query.sql);
+    for (const alias of ["as tool", "as failures", "as calls", "as traces", "as last_failed"]) {
+      expect(sql).toContain(alias);
+    }
+    expect(sql).toMatch(/ORDER BY failures DESC LIMIT 10$/);
   });
 
   // Every panel that groups by model must exclude spans with no model.
@@ -343,13 +403,7 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
   // as "unknown" made that synthetic bucket outrank the real models on
   // both the span-count and the (always-zero) token panels.
   it("model-grouped panels filter out spans with no model", () => {
-    const modelPanels = [
-      "cost-trend",
-      "token-trend",
-      "latency-by-model",
-      "spans-by-model",
-      "tokens-by-model",
-    ];
+    const modelPanels = ["cost-trend", "latency-trend"];
     for (const id of modelPanels) {
       const panel = LLM_INSIGHTS_PANELS.find((p: LLMPanelDef) => p.id === id);
       expect(panel, `panel ${id} not found`).toBeTruthy();
@@ -361,16 +415,6 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
         "'unknown'",
       );
     }
-  });
-
-  // The "Recent errors" table renders an Operation column and a Trace ID
-  // (View) link. Both are required for the panel's UX to be useful.
-  it("recent-errors panel exposes operation + trace_id columns", () => {
-    const recentErrors = LLM_INSIGHTS_PANELS.find((p: LLMPanelDef) => p.id === "recent-errors");
-    expect(recentErrors).toBeTruthy();
-    const fields = recentErrors!.columns!.map((c) => c.field);
-    expect(fields).toContain("operation");
-    expect(fields).toContain("trace_id");
   });
 });
 

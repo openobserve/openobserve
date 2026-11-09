@@ -19,7 +19,7 @@ use std::{
 };
 
 use config::{meta::function::RESULT_ARRAY, stats::MemorySize, utils::json};
-use rquickjs::{Context, Runtime};
+use rquickjs::{CatchResultExt, Context, Runtime};
 
 thread_local! {
     /// Deadline for the eval running on this thread; the interrupt handler aborts once it passes.
@@ -41,6 +41,10 @@ const JS_MEMORY_LIMIT_BYTES: usize = 10 * 1024 * 1024;
 const JS_CONTEXT_CACHE_BUDGET_BYTES: usize = 32 * 1024 * 1024;
 
 const JS_MAX_STACK_SIZE_BYTES: usize = 512 * 1024;
+
+/// Per-call budget for a Code scorer: a check runs once per scored span, so it
+/// gets far less than a transform.
+const SCORE_FN_TIMEOUT: Duration = Duration::from_millis(100);
 
 /// Compiled JS function configuration
 #[derive(Clone, Debug)]
@@ -100,7 +104,58 @@ fn compile_js_function_inner(
     if func.trim().is_empty() {
         return Err(std::io::Error::other("JavaScript function cannot be empty"));
     }
+    check_js_security(func)?;
 
+    // Strip #ResultArray# marker for compilation validation
+    // The marker is invalid JS syntax (# is not a comment in JS)
+    // We keep it in storage but remove it for compilation check
+    let func_for_compilation = strip_result_array_marker(func);
+
+    // Detect if this is a ResultArray function to use appropriate variable name
+    // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single object)
+    // Only match #ResultArray# at the start of the function (not in comments)
+    let is_result_array = RESULT_ARRAY.is_match(func);
+    let var_name = if is_result_array { "rows" } else { "row" };
+    let test_value = if is_result_array { "[]" } else { "{}" };
+
+    // Execute against empty input so an obvious infinite loop is rejected at save, not at runtime.
+    let context = new_js_context().map_err(std::io::Error::other)?;
+    context.with(|ctx| {
+        let test_code = format!(
+            r#"
+                (function() {{
+                    const {} = {};
+                    try {{
+                        {}
+                    }} catch(e) {{
+                    }}
+                    return JSON.stringify({{ success: true }});
+                }})();
+                "#,
+            var_name, test_value, func_for_compilation
+        );
+
+        let guard = JsDeadlineGuard::new(timeout);
+        let eval_result = ctx.eval::<String, _>(test_code);
+        if guard.expired() {
+            return Err(std::io::Error::other(
+                "JavaScript function exceeded the execution time limit (possible infinite loop)",
+            ));
+        }
+        // error here would mean there was some syntax error, which should be propagated
+        let _: String = eval_result
+            .map_err(|e| std::io::Error::other(format!("JavaScript syntax error: {}", e)))?;
+
+        let params = vec!["row".to_string()];
+        Ok(JSRuntimeConfig {
+            function: func.to_string(), // Store original with marker
+            params,
+        })
+    })
+}
+
+/// Rejects source that names an API the sandbox must not reach.
+fn check_js_security(func: &str) -> Result<(), std::io::Error> {
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::auth::js_security;
@@ -152,53 +207,7 @@ fn compile_js_function_inner(
             }
         }
     }
-
-    // Strip #ResultArray# marker for compilation validation
-    // The marker is invalid JS syntax (# is not a comment in JS)
-    // We keep it in storage but remove it for compilation check
-    let func_for_compilation = strip_result_array_marker(func);
-
-    // Detect if this is a ResultArray function to use appropriate variable name
-    // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single object)
-    // Only match #ResultArray# at the start of the function (not in comments)
-    let is_result_array = RESULT_ARRAY.is_match(func);
-    let var_name = if is_result_array { "rows" } else { "row" };
-    let test_value = if is_result_array { "[]" } else { "{}" };
-
-    // Execute against empty input so an obvious infinite loop is rejected at save, not at runtime.
-    let context = new_js_context().map_err(std::io::Error::other)?;
-    context.with(|ctx| {
-        let test_code = format!(
-            r#"
-                (function() {{
-                    const {} = {};
-                    try {{
-                        {}
-                    }} catch(e) {{
-                    }}
-                    return JSON.stringify({{ success: true }});
-                }})();
-                "#,
-            var_name, test_value, func_for_compilation
-        );
-
-        let guard = JsDeadlineGuard::new(timeout);
-        let eval_result = ctx.eval::<String, _>(test_code);
-        if guard.expired() {
-            return Err(std::io::Error::other(
-                "JavaScript function exceeded the execution time limit (possible infinite loop)",
-            ));
-        }
-        // error here would mean there was some syntax error, which should be propagated
-        let _: String = eval_result
-            .map_err(|e| std::io::Error::other(format!("JavaScript syntax error: {}", e)))?;
-
-        let params = vec!["row".to_string()];
-        Ok(JSRuntimeConfig {
-            function: func.to_string(), // Store original with marker
-            params,
-        })
-    })
+    Ok(())
 }
 
 /// Strip #ResultArray# and #ResultArray#SkipVRL# markers from JS function
@@ -380,6 +389,54 @@ fn eval_js_fn(
                 (row, Some(error_msg))
             }
         }
+    })
+}
+
+/// Runs a Code scorer: `source` declares `function score(...)`, which is called
+/// with `args` in parameter order. Returns what it returns, or an error for a
+/// forbidden pattern, a syntax or runtime error, or a broken time or memory limit.
+pub fn run_score_fn(
+    org_id: &str,
+    source: &str,
+    args: &[json::Value],
+) -> Result<json::Value, String> {
+    check_js_security(source).map_err(|e| e.to_string())?;
+    let args =
+        serde_json::to_string(args).map_err(|e| format!("Failed to serialize arguments: {e}"))?;
+    let context = cached_js_context(org_id, source)?;
+    let result = eval_score_fn(&context, source, &args);
+    account_js_context(org_id, source, &context);
+    result
+}
+
+fn eval_score_fn(context: &Context, source: &str, args: &str) -> Result<json::Value, String> {
+    context.with(|ctx| {
+        ctx.globals()
+            .set("scoreArgs", args)
+            .map_err(|e| format!("Failed to set arguments: {e}"))?;
+        // The IIFE keeps `score` out of the cached context's globals.
+        let code = format!(
+            r#"
+                (function() {{
+                    {source}
+                    if (typeof score !== 'function') {{
+                        throw new TypeError('the code must declare function score(...)');
+                    }}
+                    var out = JSON.stringify(score.apply(null, JSON.parse(scoreArgs)));
+                    return out === undefined ? 'null' : out;
+                }})();
+            "#
+        );
+        let guard = JsDeadlineGuard::new(SCORE_FN_TIMEOUT);
+        let result = ctx.eval::<String, _>(code).catch(&ctx);
+        if guard.expired() {
+            return Err(format!(
+                "Code scorer exceeded the {} ms time limit",
+                SCORE_FN_TIMEOUT.as_millis()
+            ));
+        }
+        let out = result.map_err(|e| e.to_string().trim().to_string())?;
+        serde_json::from_str(&out).map_err(|e| format!("Failed to read the score: {e}"))
     })
 }
 
@@ -1182,6 +1239,60 @@ for (var i = 0; i < filtered.length; i++) {
             "org B must not see org A's changes"
         );
         assert_eq!(calls("reuse_a"), json!(2), "org A's context must be reused");
+    }
+
+    #[test]
+    fn test_score_fn_returns_the_function_result() {
+        let is_json = "function score(output) { try { JSON.parse(output); return true; } catch (e) { return false; } }";
+        assert_eq!(
+            run_score_fn("score_org", is_json, &[json!(r#"{"a": 1}"#)]),
+            Ok(json!(true))
+        );
+        assert_eq!(
+            run_score_fn("score_org", is_json, &[json!("Sure! {\"a\": 1}")]),
+            Ok(json!(false))
+        );
+        let ratio = "function score(a, b) { return Number(a) / Number(b); }";
+        assert_eq!(
+            run_score_fn("score_org", ratio, &[json!("3"), json!("4")]),
+            Ok(json!(0.75))
+        );
+        // A declared parameter with no value arrives as null, not as an error.
+        assert_eq!(
+            run_score_fn(
+                "score_org",
+                "function score(x) { return x; }",
+                &[json!(null)]
+            ),
+            Ok(json!(null))
+        );
+    }
+
+    #[test]
+    fn test_score_fn_reports_errors_instead_of_a_score() {
+        let thrown = run_score_fn(
+            "score_org",
+            "function score(o) { throw new Error('bad input'); }",
+            &[json!("x")],
+        )
+        .unwrap_err();
+        assert!(thrown.contains("bad input"), "{thrown}");
+
+        let syntax = run_score_fn("score_org", "function score(o) { return (; }", &[]).unwrap_err();
+        assert!(syntax.contains("unexpected token"), "{syntax}");
+
+        let missing = run_score_fn("score_org", "var x = 1;", &[]).unwrap_err();
+        assert!(missing.contains("function score"), "{missing}");
+
+        let forbidden =
+            run_score_fn("score_org", "function score() { return eval('1'); }", &[]).unwrap_err();
+        assert!(forbidden.contains("forbidden pattern"), "{forbidden}");
+
+        let start = Instant::now();
+        let looped =
+            run_score_fn("score_org", "function score() { while (true) {} }", &[]).unwrap_err();
+        assert!(looped.contains("time limit"), "{looped}");
+        assert!(start.elapsed() < Duration::from_secs(2));
     }
 
     #[test]

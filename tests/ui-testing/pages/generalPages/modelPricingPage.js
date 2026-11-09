@@ -1,8 +1,8 @@
 // modelPricingPage.js — Page object for Settings > Model Pricing
 // Feature: Enterprise/Cloud only — the route isn't registered on the OSS build (see useManagementRoutes.ts).
 // Routes:
-//   List:   /web/settings/model_pricing?org_identifier={org}
-//   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}
+//   List:   /web/ai/model-pricing?org_identifier={org}
+//   Editor: /web/ai/model-pricing/edit?org_identifier={org}&id={id}
 
 import { expect } from '@playwright/test';
 import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
@@ -146,7 +146,7 @@ export class ModelPricingPage {
     async gotoModelPricingPage() {
         const org = process.env['ORGNAME'] || 'default';
         await this.page.goto(
-            `${process.env['ZO_BASE_URL']}/web/settings/model_pricing?org_identifier=${org}`
+            `${process.env['ZO_BASE_URL']}/web/ai/model-pricing?org_identifier=${org}`
         );
         await this.listTitle.waitFor({ state: 'visible', timeout: 15000 });
     }
@@ -154,7 +154,7 @@ export class ModelPricingPage {
     async gotoEditorCreate() {
         const org = process.env['ORGNAME'] || 'default';
         await this.page.goto(
-            `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}`
+            `${process.env['ZO_BASE_URL']}/web/ai/model-pricing/edit?org_identifier=${org}`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
     }
@@ -162,7 +162,7 @@ export class ModelPricingPage {
     async gotoEditorDuplicate(modelId) {
         const org = process.env['ORGNAME'] || 'default';
         await this.page.goto(
-            `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}&id=${modelId}&duplicate=true`
+            `${process.env['ZO_BASE_URL']}/web/ai/model-pricing/edit?org_identifier=${org}&id=${modelId}&duplicate=true`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
         await this.waitForEditorHydrated();
@@ -171,7 +171,7 @@ export class ModelPricingPage {
     async gotoEditorEdit(modelId) {
         const org = process.env['ORGNAME'] || 'default';
         await this.page.goto(
-            `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}&id=${modelId}`
+            `${process.env['ZO_BASE_URL']}/web/ai/model-pricing/edit?org_identifier=${org}&id=${modelId}`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
         await this.waitForEditorHydrated();

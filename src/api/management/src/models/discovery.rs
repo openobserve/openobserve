@@ -74,6 +74,10 @@ pub struct DiscoveryItemResponseBody {
     /// two or more unhealthy dimensions.
     pub quality: String,
     pub issue_count: usize,
+    /// The newest end-user vote on this target is Not helpful.
+    pub not_helpful: bool,
+    /// That vote's comment, when the user left one.
+    pub feedback_comment: Option<String>,
     /// Scope-specific display fields hydrated from the target trace stream.
     pub context: Option<serde_json::Value>,
     /// Visible Annotation Queue memberships for this target.
@@ -119,6 +123,8 @@ impl From<DiscoveryItem> for DiscoveryItemResponseBody {
             source_stream: value.source_stream,
             quality: value.quality.as_str().to_string(),
             issue_count: value.issue_count,
+            not_helpful: value.not_helpful,
+            feedback_comment: value.feedback_comment,
             context: value.context,
             queues: value
                 .queues
@@ -220,6 +226,8 @@ mod tests {
                 source_stream: "traces".to_string(),
                 quality: DiscoveryQuality::Issue,
                 issue_count: 1,
+                not_helpful: false,
+                feedback_comment: None,
                 context: Some(serde_json::json!({
                     "input": "question",
                     "serviceName": "api",

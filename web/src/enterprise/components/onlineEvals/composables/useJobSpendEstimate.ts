@@ -1,0 +1,199 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// The job form's cost estimate (AIO-24): matched targets per day over the last
+// week, what each selected judge cost per call over the same week, and the
+// matched targets in the backfill window. The queries are debounced like the
+// matched-targets preview. A failed or impossible traffic query (session scope
+// on a stream without a session column) leaves the counts unknown, never 0.
+
+import { computed, onUnmounted, ref, watch, type Ref } from "vue";
+import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
+import type { EvalTargetScope } from "@/services/online-evals.service";
+import {
+  ESTIMATE_DAYS,
+  backfillWindowUs,
+  estimateJobSpend,
+  judgeHistorySql,
+  matchedPerDaySql,
+  parseJudgeHistory,
+  type JudgeHistory,
+} from "../utils/evalSpend";
+import { matchedSinceSql } from "../utils/jobWorkload";
+
+const DEBOUNCE_MS = 400;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function useJobSpendEstimate(opts: {
+  stream: Ref<string>;
+  where: Ref<string>;
+  ready: Ref<boolean>;
+  scope: Ref<EvalTargetScope>;
+  /** Field names of the stream's schema; null while it loads. */
+  fields: Ref<readonly string[] | null>;
+  /** Entity ids of the selected LLM-judge scorers. */
+  judgeIds: Ref<string[]>;
+  rate: Ref<number>;
+  /** Days the backfill reaches back; 0 or absent = no backfill to count. */
+  backfillDays?: Ref<number>;
+}) {
+  const { executeQueryOnce } = useLLMStreamQuery();
+  const dailyCounts = ref<number[] | null>([]);
+  const history = ref<JudgeHistory[]>([]);
+  const backfillMatched = ref<number | null>(0);
+  const loadingTraffic = ref(false);
+  const loadingJudges = ref(false);
+  const loadingBackfill = ref(false);
+
+  const lastWeek = () => {
+    const end = Date.now();
+    return { startUs: (end - ESTIMATE_DAYS * DAY_MS) * 1000, endUs: end * 1000 };
+  };
+
+  // A session count waits for the schema that names its column.
+  const fieldsPending = () => opts.scope.value === "session" && !opts.fields.value;
+
+  async function loadTraffic() {
+    loadingTraffic.value = false;
+    if (!opts.stream.value || !opts.ready.value) {
+      dailyCounts.value = [];
+      return;
+    }
+    if (fieldsPending()) {
+      dailyCounts.value = [];
+      loadingTraffic.value = true;
+      return;
+    }
+    const sql = matchedPerDaySql(
+      opts.stream.value,
+      opts.where.value,
+      opts.scope.value,
+      opts.fields.value ?? [],
+    );
+    if (!sql) {
+      dailyCounts.value = null;
+      return;
+    }
+    const { startUs, endUs } = lastWeek();
+    loadingTraffic.value = true;
+    try {
+      const rows = await executeQueryOnce(sql, startUs, endUs, "traces");
+      dailyCounts.value = rows.map((r: any) => Number(r.cnt) || 0);
+    } catch (err) {
+      console.warn("[JobSpendEstimate:traffic] failed", err);
+      dailyCounts.value = null;
+    } finally {
+      loadingTraffic.value = false;
+    }
+  }
+
+  // No `_evaluator` stream, or no priced call yet (the cost column appears with
+  // the first one), fails the query: either way there is nothing to estimate from.
+  async function loadJudges() {
+    if (!opts.judgeIds.value.length) {
+      history.value = [];
+      return;
+    }
+    const { startUs, endUs } = lastWeek();
+    loadingJudges.value = true;
+    try {
+      const rows = await executeQueryOnce(
+        judgeHistorySql(opts.judgeIds.value),
+        startUs,
+        endUs,
+        "traces",
+      );
+      history.value = parseJudgeHistory(rows);
+    } catch {
+      history.value = [];
+    } finally {
+      loadingJudges.value = false;
+    }
+  }
+
+  // The same window and target count `runBackfill` queues from, so the
+  // estimate and the queue agree.
+  async function loadBackfill() {
+    const days = opts.backfillDays?.value ?? 0;
+    loadingBackfill.value = false;
+    if (!days || !opts.stream.value || !opts.ready.value) {
+      backfillMatched.value = 0;
+      return;
+    }
+    if (fieldsPending()) {
+      backfillMatched.value = 0;
+      loadingBackfill.value = true;
+      return;
+    }
+    const sql = matchedSinceSql(
+      opts.stream.value,
+      opts.where.value,
+      opts.scope.value,
+      opts.fields.value ?? [],
+    );
+    if (!sql) {
+      backfillMatched.value = null;
+      return;
+    }
+    const { startUs, endUs } = backfillWindowUs(days, Date.now());
+    loadingBackfill.value = true;
+    try {
+      const rows = await executeQueryOnce(sql, startUs, endUs, "traces");
+      backfillMatched.value = Number(rows?.[0]?.cnt) || 0;
+    } catch (err) {
+      console.warn("[JobSpendEstimate:backfill] failed", err);
+      backfillMatched.value = null;
+    } finally {
+      loadingBackfill.value = false;
+    }
+  }
+
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  const debounced = (fn: () => Promise<void>, slot: number) => () => {
+    clearTimeout(timers[slot]);
+    timers[slot] = setTimeout(() => void fn(), DEBOUNCE_MS);
+  };
+  watch([opts.stream, opts.where, opts.ready, opts.scope, opts.fields], debounced(loadTraffic, 0), {
+    immediate: true,
+  });
+  watch(() => opts.judgeIds.value.join(","), debounced(loadJudges, 1), { immediate: true });
+  watch(
+    [
+      opts.stream,
+      opts.where,
+      opts.ready,
+      opts.scope,
+      opts.fields,
+      () => opts.backfillDays?.value ?? 0,
+    ],
+    debounced(loadBackfill, 2),
+    { immediate: true },
+  );
+  onUnmounted(() => timers.forEach(clearTimeout));
+
+  const estimate = computed(() =>
+    estimateJobSpend({
+      dailyCounts: dailyCounts.value,
+      rate: opts.rate.value,
+      judgeIds: opts.judgeIds.value,
+      history: history.value,
+    }),
+  );
+  const loading = computed(
+    () => loadingTraffic.value || loadingJudges.value || loadingBackfill.value,
+  );
+
+  return { estimate, backfillMatched, loading };
+}

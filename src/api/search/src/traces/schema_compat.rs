@@ -238,11 +238,6 @@ impl ValidatedLlmSchema {
             has_operation_name: false,
         }
     }
-
-    /// [`usage_sum_expr`] for this stream's layout.
-    pub(super) fn usage_sum(&self, column: &str) -> String {
-        usage_sum_expr(column, self.has_operation_name)
-    }
 }
 
 /// Error returned when a required LLM field is missing from the stream schema.

@@ -76,8 +76,10 @@ export function dimensionLabel(
 
 /**
  * What a side actually reads as. A categorical score is a policy-derived rank on
- * the wire and a boolean is 0/1, so rendering the raw scalar makes `0 → 1` mean
- * three different things with no way to tell them apart.
+ * the wire and a boolean is its healthy share, so the raw scalar makes `0 → 1`
+ * mean three different things with no way to tell them apart. The label carries
+ * the original value; a boolean without one has mixed trials, so it reads as
+ * the share it is rather than as a true/false the trials did not agree on.
  */
 export function dimensionSideValue(
   dimension: Pick<
@@ -90,7 +92,6 @@ export function dimensionSideValue(
   if (label) return raw(label);
   const value = side === "baseline" ? dimension.baseline : dimension.candidate;
   if (value === null || value === undefined) return raw("—");
-  if (dimension.dataType === "boolean") return raw(value ? "true" : "false");
   return raw(formatNumber(value));
 }
 
