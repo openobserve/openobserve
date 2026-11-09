@@ -864,7 +864,7 @@ mod tests {
 
     #[test]
     fn test_agent_captures_fit_the_ratio_budget() {
-        // Repeated past the 64 KiB floor, so the 32x ratio alone must admit real Agent traffic.
+        // Past the 64 KiB floor, so only the expansion ratio admits real Agent traffic.
         for capture in [
             &include_bytes!("testdata/traces_legacy_v05.pb")[..],
             &include_bytes!("testdata/traces_idx_v1.pb")[..],

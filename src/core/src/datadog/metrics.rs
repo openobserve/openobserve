@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_agent_capture_series_fits_the_ratio_budget() {
-        // Repeated past the 64 KiB floor, so the 32x ratio alone must admit real Agent traffic.
+        // Past the 64 KiB floor, so only the expansion ratio admits real Agent traffic.
         let body = include_bytes!("testdata/series_v2.pb").repeat(200);
         assert_eq!(series_to_otlp(&body).unwrap().resource_metrics.len(), 1400);
     }
