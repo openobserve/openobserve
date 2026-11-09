@@ -1,0 +1,262 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import type { BulkKind, FolderRef, ReviewGroup, ReviewRow } from "./useBulkReview";
+
+// Lists name three items, then "and N more".
+const LIST_NAMES = 3;
+
+export type FailureReason =
+  | { code: "forbidden"; folder: string }
+  | { code: "duplicate"; name: string; folder: string }
+  | { code: "timeout" | "invalid" | "missing" | "server" };
+
+const list = (locale: string, items: string[]): string =>
+  new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items);
+
+const number = (locale: string, value: number): string =>
+  new Intl.NumberFormat(locale).format(Math.round(value));
+
+/** Joins names with the locale's "and", naming three before "and N more". */
+export const nameList = (t: TranslateFn, locale: string, names: string[]): string =>
+  names.length <= LIST_NAMES + 1
+    ? list(locale, names)
+    : list(locale, [
+        ...names.slice(0, LIST_NAMES),
+        t("insight.bulk.more", { count: names.length - LIST_NAMES }),
+      ]);
+
+/** "folder ingest" or "folders ingest and ops". */
+export const whereFolders = (t: TranslateFn, locale: string, folders: FolderRef[]): I18nText =>
+  folders.length === 1
+    ? t("insight.bulk.whereFolder", { folder: folders[0].name })
+    : t("insight.bulk.whereFolders", {
+        folders: nameList(
+          t,
+          locale,
+          folders.map((f) => f.name),
+        ),
+      });
+
+export const titleOf = (t: TranslateFn, kind: BulkKind, count: number): I18nText =>
+  t(`insight.bulk.title.${kind}`, { count }, count);
+
+const durationOf = (t: TranslateFn, minutes: number): I18nText =>
+  minutes % 60 === 0
+    ? t("insight.bulk.hours", { count: minutes / 60 }, minutes / 60)
+    : t("insight.bulk.minutes", { count: minutes });
+
+const commonPeriod = (rows: ReviewRow[]): number | null => {
+  const counts = new Map<number, number>();
+  for (const row of rows) {
+    const minutes = row.prefill?.periodMinutes;
+    if (minutes) counts.set(minutes, (counts.get(minutes) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+};
+
+/** The rule line under the title; the period is the one most rows use. */
+export const ruleOf = (t: TranslateFn, kind: BulkKind, rows: ReviewRow[]): I18nText => {
+  const minutes = commonPeriod(rows);
+  const rule =
+    kind === "no_data" || kind === "source"
+      ? minutes
+        ? t(`insight.bulk.rule.${kind}`, { duration: durationOf(t, minutes) })
+        : ""
+      : t(`insight.bulk.rule.${kind}`);
+  return raw([rule, t("insight.bulk.ruleTail")].filter(Boolean).join(" "));
+};
+
+/** The service name, with its cluster and namespace only when another row shares the name. */
+export const serviceLabel = (t: TranslateFn, row: ReviewRow, all: ReviewRow[]): I18nText => {
+  const twins = all.filter((r) => r.service === row.service);
+  if (twins.length < 2) return raw(row.service);
+  const where = [row.cluster ?? "", row.namespace ?? t("insight.bulk.noNamespace")].filter(Boolean);
+  return raw(`${row.service} · ${where.join(" / ")}`);
+};
+
+/** Why a row cannot be ticked: its stream fields, or a builder that could not make the alert. */
+export const blockLine = (t: TranslateFn, row: ReviewRow): I18nText => {
+  const block = row.block;
+  if (!block) return t("insight.bulk.cantBuild");
+  if (block.code === "checking") return t("insight.bulk.block.checking");
+  if (block.code === "schemaFailed") {
+    return t("insight.bulk.block.schemaFailed", { stream: row.stream.name });
+  }
+  return t(`insight.bulk.block.noField.${block.part}`, {
+    stream: row.stream.name,
+    value: block.value,
+  });
+};
+
+export const firesWhenOf = (t: TranslateFn, kind: BulkKind, row: ReviewRow): I18nText => {
+  const minutes = row.prefill?.periodMinutes;
+  if (!row.prefill || !minutes) return raw("");
+  if (kind === "errors" && row.row.usually) {
+    return t("insight.bulk.firesWhen.errors", { count: row.row.usually * 3 });
+  }
+  if (kind === "latency" && row.row.inputs?.p95Ms) {
+    return t("insight.bulk.firesWhen.latency", { value: `${row.row.inputs.p95Ms * 2} ms` });
+  }
+  const key = row.stream.type === "traces" ? "noSpans" : "noRows";
+  return t(`insight.bulk.firesWhen.${key}`, { duration: durationOf(t, minutes) });
+};
+
+export const usuallyOf = (t: TranslateFn, locale: string, row: ReviewRow): I18nText =>
+  row.row.usually === null
+    ? raw("")
+    : t("insight.bulk.usually", { rate: number(locale, row.row.usually) });
+
+/** "ingest team", "No team yet", a folder name or a cluster. */
+export const groupTitle = (t: TranslateFn, group: ReviewGroup): I18nText => {
+  if (group.kind === "team") {
+    return group.name ? t("insight.bulk.teamName", { team: group.name }) : t("insight.bulk.noTeam");
+  }
+  if (group.kind === "cluster") return group.name ? raw(group.name) : t("insight.bulk.noCluster");
+  return raw(group.name ?? "");
+};
+
+/** "folder ingest · notifies ingest-oncall · 5", with the tick count when some are unticked. */
+export const groupMeta = (
+  t: TranslateFn,
+  locale: string,
+  group: ReviewGroup,
+  ticked: number,
+): I18nText[] => {
+  const parts: I18nText[] = [];
+  if (group.kind !== "folder") {
+    if (group.folders.length > 1) {
+      parts.push(t("insight.bulk.folders", { count: group.folders.length }));
+    } else {
+      const key = group.usesDefault ? "insight.bulk.folderDefault" : "insight.bulk.folder";
+      parts.push(t(key, { folder: group.folders[0]?.name ?? "" }));
+    }
+  }
+  parts.push(
+    group.destinations.length
+      ? t("insight.bulk.notifies", { destinations: nameList(t, locale, group.destinations) })
+      : t("insight.bulk.notifiesNone"),
+  );
+  const creatable = group.rows.filter((r) => r.prefill && !r.locked).length;
+  parts.push(
+    ticked === creatable || group.locked
+      ? raw(number(locale, group.rows.length))
+      : t("insight.bulk.ticked", { ticked, count: group.rows.length }),
+  );
+  return parts;
+};
+
+export const lockedLine = (t: TranslateFn, group: ReviewGroup): I18nText =>
+  t("insight.bulk.locked", { folder: group.folders.map((f) => f.name).join(", ") });
+
+export const copyRequestLabel = (t: TranslateFn, group: ReviewGroup): I18nText =>
+  t("insight.bulk.copyRequest", { team: groupTitle(t, group) });
+
+/** The text a user pastes to the folder's admins. */
+export const requestText = (
+  t: TranslateFn,
+  locale: string,
+  group: ReviewGroup,
+  all: ReviewRow[],
+): I18nText =>
+  t(
+    "insight.bulk.request",
+    {
+      count: group.rows.length,
+      folder: group.folders.map((f) => f.name).join(", "),
+      services: list(
+        locale,
+        group.rows.map((r) => serviceLabel(t, r, all)),
+      ),
+    },
+    group.rows.length,
+  );
+
+/** The neutral banner: how many the user can add, and which folders refuse the rest. */
+export const rightsBanner = (
+  t: TranslateFn,
+  locale: string,
+  rows: ReviewRow[],
+): I18nText | null => {
+  const locked = rows.filter((r) => r.locked);
+  if (locked.length === 0) return null;
+  const folders = [...new Map(locked.map((r) => [r.folder.id, r.folder])).values()];
+  return t(
+    "insight.bulk.rights",
+    {
+      can: rows.length - locked.length,
+      total: rows.length,
+      locked: locked.length,
+      where: whereFolders(t, locale, folders),
+    },
+    locked.length,
+  );
+};
+
+/** "8 alerts will be created: 5 in folder ingest, 3 in folder ops." */
+export const footerOf = (
+  t: TranslateFn,
+  locale: string,
+  counts: { folder: FolderRef; count: number }[],
+): I18nText => {
+  const total = counts.reduce((sum, c) => sum + c.count, 0);
+  if (total === 0) return t("insight.bulk.footerNone");
+  if (counts.length === 1) {
+    return t(
+      "insight.bulk.footer",
+      { count: total, where: whereFolders(t, locale, [counts[0].folder]) },
+      total,
+    );
+  }
+  const named = counts.length <= LIST_NAMES + 1 ? counts : counts.slice(0, LIST_NAMES);
+  const rest = counts.slice(named.length);
+  const parts = named.map((c) =>
+    t("insight.bulk.footerPart", { count: c.count, folder: c.folder.name }),
+  );
+  if (rest.length) {
+    parts.push(
+      t("insight.bulk.footerRest", {
+        count: rest.reduce((sum, c) => sum + c.count, 0),
+        folders: rest.length,
+      }),
+    );
+  }
+  return t("insight.bulk.footerSplit", { count: total, parts: parts.join(", ") });
+};
+
+export const reasonOf = (t: TranslateFn, reason: FailureReason): I18nText => {
+  if (reason.code === "forbidden")
+    return t("insight.bulk.reason.forbidden", { folder: reason.folder });
+  if (reason.code === "duplicate") {
+    return t("insight.bulk.reason.duplicate", { name: reason.name, folder: reason.folder });
+  }
+  return t(`insight.bulk.reason.${reason.code}`);
+};
+
+export const failureLine = (t: TranslateFn, service: string, reason: FailureReason): I18nText =>
+  t("insight.bulk.failure", { service, reason: reasonOf(t, reason) });
+
+export const partialBanner = (t: TranslateFn, failed: number, total: number): I18nText =>
+  t("insight.bulk.partial", { failed, total }, failed);
+
+export const createdLine = (t: TranslateFn, locale: string, folders: FolderRef[], count: number) =>
+  t("insight.bulk.createdIn", { count, where: whereFolders(t, locale, folders) }, count);
+
+/** The success toast, saying until when Undo works. */
+export const toastOf = (t: TranslateFn, locale: string, folders: FolderRef[], count: number) =>
+  raw(
+    `${t("insight.bulk.toast", { count, where: whereFolders(t, locale, folders) }, count)} ${t("insight.bulk.undoHint")}`,
+  );

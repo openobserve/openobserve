@@ -34074,6 +34074,116 @@
       "openInLogs": "Opens Logs on {stream}, from an hour before its last data.",
       "openInLogsRun": "Opens Logs on {stream} over the window the last run checked.",
       "openInLogsHour": "Opens Logs on {stream} for the last hour."
+    },
+    "bulk": {
+      "title": {
+        "no_data": "Add {count} no-data alert | Add {count} no-data alerts",
+        "source": "Add {count} no-data alert | Add {count} no-data alerts",
+        "errors": "Add {count} errors alert | Add {count} errors alerts",
+        "latency": "Add {count} latency alert | Add {count} latency alerts"
+      },
+      "rule": {
+        "no_data": "Each fires when its service sends no rows for {duration}.",
+        "source": "Each fires when its source sends no rows for {duration}.",
+        "errors": "Each fires when its service logs more than 3 times its usual errors in an hour.",
+        "latency": "Each fires when its service's p95 latency passes twice its usual value."
+      },
+      "ruleTail": "Untick any you don't want. Nothing is saved until you click Create.",
+      "groupBy": "Group by",
+      "groupByOption": {
+        "team": "Team",
+        "folder": "Folder",
+        "cluster": "Cluster"
+      },
+      "groupHint": "Folder and destination come from each team. Change them per group.",
+      "column": {
+        "service": "Service",
+        "stream": "Stream",
+        "firesWhen": "Fires when",
+        "usually": "Usually"
+      },
+      "tickGroup": "Tick every alert in {group}",
+      "tickRow": "Tick {service}",
+      "teamName": "{team} team",
+      "noTeam": "No team yet",
+      "noTeamWhy": "No owner is known for these, so they use the org default.",
+      "chooseFolder": "Choose a folder",
+      "noCluster": "No cluster",
+      "noNamespace": "no namespace",
+      "folder": "folder {folder}",
+      "folderDefault": "folder {folder} (org default)",
+      "folders": "{count} folders",
+      "notifies": "notifies {destinations}",
+      "notifiesNone": "notifies no one",
+      "ticked": "{ticked} of {count} ticked",
+      "change": "Change folder or destination",
+      "changeFolder": "Folder",
+      "changeDestinations": "Destinations",
+      "changeDone": "Done",
+      "showGroup": "Show all {count}",
+      "hideGroup": "Hide",
+      "locked": "You can't write to folder {folder}. Its admins can add these.",
+      "copyRequest": "Copy request for {team}",
+      "request": "Please add {count} no-data alert in folder {folder}: {services}. AutoObserve found that nothing alerts if it stops sending. | Please add {count} no-data alerts in folder {folder}: {services}. AutoObserve found that nothing alerts if they stop sending.",
+      "requestCopied": "Request copied",
+      "rights": "You can add {can} of {total}. {locked} is in {where}, where you can't write. It stays in the list so you can send the request to its admins. | You can add {can} of {total}. {locked} are in {where}, where you can't write. They stay in the list so you can send the request to its admins.",
+      "firesWhen": {
+        "noRows": "no rows for {duration}",
+        "noSpans": "no spans for {duration}",
+        "errors": "errors above {count} an hour",
+        "latency": "p95 above {value}"
+      },
+      "minutes": "{count} min",
+      "hours": "{count} hour | {count} hours",
+      "usually": "{rate} an hour",
+      "unsureTail": "Unticked: check before adding.",
+      "cantBuild": "AutoObserve can't build this alert. Open the service to add it by hand.",
+      "block": {
+        "checking": "Checking the stream's fields…",
+        "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",
+        "noField": {
+          "service": "Stream {stream} has no service field, so this alert can't be limited to {value}.",
+          "cluster": "Stream {stream} has no cluster field, so this alert can't be limited to cluster {value}.",
+          "namespace": "Stream {stream} has no namespace field, so this alert can't be limited to namespace {value}."
+        }
+      },
+      "whereFolder": "folder {folder}",
+      "whereFolders": "folders {folders}",
+      "footer": "{count} alert will be created in {where}. | {count} alerts will be created in {where}.",
+      "footerSplit": "{count} alerts will be created: {parts}.",
+      "footerPart": "{count} in folder {folder}",
+      "footerRest": "{count} in {folders} more folders",
+      "footerOrigin": "Each description says it came from an AutoObserve suggestion.",
+      "footerNone": "Nothing is ticked, so nothing will be created.",
+      "create": "Create {count} alert | Create {count} alerts",
+      "cancel": "Cancel",
+      "close": "Close",
+      "status": {
+        "queued": "Waiting",
+        "creating": "Creating",
+        "created": "Created",
+        "failed": "Not created"
+      },
+      "partial": "{failed} of {total} alerts wasn't created. | {failed} of {total} alerts weren't created.",
+      "createdIn": "{count} was created in {where}. | {count} were created in {where}.",
+      "failure": "{service}: {reason}.",
+      "reason": {
+        "forbidden": "you can't write to folder {folder}",
+        "duplicate": "an alert named {name} already exists in folder {folder}",
+        "timeout": "the server didn't answer in time",
+        "invalid": "the server refused it as invalid",
+        "missing": "its stream or folder no longer exists",
+        "server": "the server failed while saving it"
+      },
+      "retryOne": "Retry {service}",
+      "retryAll": "Retry {count}",
+      "openExisting": "Open the existing alert",
+      "toast": "{count} alert created in {where}. | {count} alerts created in {where}.",
+      "undoHint": "Undo works until you leave this page.",
+      "undo": "Undo",
+      "undone": "{count} alert removed. | {count} alerts removed.",
+      "undoFailed": "{failed} of {total} alerts couldn't be removed. Remove them from Alerts.",
+      "more": "{count} more"
     }
   }
 }

@@ -402,6 +402,62 @@ export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
   return data;
 };
 
+/** A raw-SQL threshold the form must inject with the (async) SQL parser before seeding. */
+export const prefillSqlHaving = (
+  prefill: AlertPrefill,
+): { column: string; operator: string; value: number } | null => {
+  const having = prefill.meta?.sqlHaving as
+    { column: string; operator: string; value: number } | undefined;
+  return having?.column ? having : null;
+};
+
+/** Seeds a form value from a prefill, the one mapping the alert form and the bulk review share. */
+export const seedFormFromPrefill = (
+  data: any,
+  prefill: AlertPrefill,
+  opts: { sql: string; floorMinutes: number },
+): { aggregation: boolean; vrl: boolean } => {
+  if (prefill.name) data.name = prefill.name;
+  data.stream_type = prefill.streamType || data.stream_type;
+  data.stream_name = prefill.streamName;
+
+  if (prefill.queryType === "promql") {
+    applyPromqlPrefill(data, prefill);
+  } else if (prefill.queryType === "custom" && prefill.conditions) {
+    data.query_condition.type = "custom";
+    data.query_condition.conditions = cloneDeep(prefill.conditions);
+  } else {
+    data.query_condition.type = "sql";
+    data.query_condition.sql = opts.sql;
+  }
+
+  if (prefill.aggregation) data.query_condition.aggregation = cloneDeep(prefill.aggregation);
+  if (getAlertSource(prefill.source).metaSettings) applyMetaSettings(data, prefill.meta);
+  if (prefill.vrlFunction) data.query_condition.vrl_function = prefill.vrlFunction;
+
+  if (prefill.periodMinutes) data.trigger_condition.period = prefill.periodMinutes;
+  // The source's own schedule wins; the org's minimum evaluation frequency is the only floor.
+  if (prefill.frequencyMinutes) {
+    data.trigger_condition.frequency = Math.max(opts.floorMinutes, prefill.frequencyMinutes);
+  }
+  if (prefill.silenceMinutes !== undefined) data.trigger_condition.silence = prefill.silenceMinutes;
+  if (prefill.timezone) data.trigger_condition.timezone = prefill.timezone;
+
+  // With a threshold inside the query (HAVING / promql condition) the trigger only needs one row.
+  const hasQueryThreshold =
+    !!prefill.promqlCondition ||
+    !!prefill.meta?.sqlHaving ||
+    (!!prefill.aggregation && !getAlertSource(prefill.source).aggregationIsSeed);
+  if (prefill.triggerThreshold !== undefined) {
+    data.trigger_condition.threshold = prefill.triggerThreshold;
+    if (prefill.triggerOperator) data.trigger_condition.operator = prefill.triggerOperator;
+  } else if (hasQueryThreshold) {
+    data.trigger_condition.threshold = 1;
+    data.trigger_condition.operator = ">=";
+  }
+  return { aggregation: !!prefill.aggregation, vrl: !!prefill.vrlFunction };
+};
+
 // ─── Composable ─────────────────────────────────────────────────────────────
 
 export interface AlertFormProps {
@@ -1851,80 +1907,27 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         await Promise.resolve(updateStreams(false)).catch(() => undefined);
       }
 
-      if (prefill.queryType === "promql") {
-        applyPromqlPrefill(data, prefill);
-      } else if (prefill.queryType === "custom" && prefill.conditions) {
-        data.query_condition.type = "custom";
-        data.query_condition.conditions = cloneDeep(prefill.conditions);
-      } else {
-        data.query_condition.type = "sql";
-        let sql = prefill.sql ?? "";
-
-        // A raw-SQL threshold arrives as meta.sqlHaving because injecting it
-        // needs the SQL parser, which is async and lives here rather than in the
-        // (pure, synchronous) adapters.
-        const sqlHaving = prefill.meta?.sqlHaving as
-          { column: string; operator: string; value: number } | undefined;
-        if (sql && sqlHaving?.column) {
-          if (!parser) await importSqlParser();
-          sql = addHavingClauseToQuery(
-            sql,
-            sqlHaving.column,
-            sqlHaving.operator,
-            sqlHaving.value,
-            parser,
-          );
-        }
-
-        data.query_condition.sql = sql;
+      let sql = prefill.sql ?? "";
+      const sqlHaving = prefillSqlHaving(prefill);
+      // Only the SQL branch of seedFormFromPrefill reads the query, so only it needs the parser.
+      const seedsSql =
+        prefill.queryType !== "promql" && !(prefill.queryType === "custom" && prefill.conditions);
+      if (seedsSql && sql && sqlHaving) {
+        if (!parser) await importSqlParser();
+        sql = addHavingClauseToQuery(
+          sql,
+          sqlHaving.column,
+          sqlHaving.operator,
+          sqlHaving.value,
+          parser,
+        );
       }
-
-      if (prefill.aggregation) {
-        isAggregationEnabled.value = true;
-        data.query_condition.aggregation = cloneDeep(prefill.aggregation);
-      }
-
-      if (getAlertSource(prefill.source).metaSettings) applyMetaSettings(data, prefill.meta);
-
-      if (prefill.vrlFunction) {
-        showVrlFunction.value = true;
-        data.query_condition.vrl_function = prefill.vrlFunction;
-      }
-
-      if (prefill.periodMinutes) {
-        data.trigger_condition.period = prefill.periodMinutes;
-      }
-      if (prefill.frequencyMinutes) {
-        // The source's own schedule wins. The only floor is the org's minimum
-        // evaluation frequency, which is the rule the schema enforces on save;
-        // clamping to the form's DEFAULT instead (as this used to) silently
-        // overrode a curated alert that runs every minute with "every ten".
-        const floorMinutes = Math.max(1, Math.ceil(minAutoRefreshInterval() / 60));
-        data.trigger_condition.frequency = Math.max(floorMinutes, prefill.frequencyMinutes);
-      }
-      if (prefill.silenceMinutes !== undefined) {
-        data.trigger_condition.silence = prefill.silenceMinutes;
-      }
-      if (prefill.timezone) {
-        data.trigger_condition.timezone = prefill.timezone;
-      }
-
-      // A source that carries a real trigger says so explicitly, and is believed.
-      // Otherwise: with a threshold expressed inside the query (HAVING / promql
-      // condition), the trigger itself only needs "at least one row came back".
-      const hasQueryThreshold =
-        !!prefill.promqlCondition ||
-        !!prefill.meta?.sqlHaving ||
-        (!!prefill.aggregation && !getAlertSource(prefill.source).aggregationIsSeed);
-      if (prefill.triggerThreshold !== undefined) {
-        data.trigger_condition.threshold = prefill.triggerThreshold;
-        if (prefill.triggerOperator) {
-          data.trigger_condition.operator = prefill.triggerOperator;
-        }
-      } else if (hasQueryThreshold) {
-        data.trigger_condition.threshold = 1;
-        data.trigger_condition.operator = ">=";
-      }
+      const seeded = seedFormFromPrefill(data, prefill, {
+        sql,
+        floorMinutes: Math.max(1, Math.ceil(minAutoRefreshInterval() / 60)),
+      });
+      if (seeded.aggregation) isAggregationEnabled.value = true;
+      if (seeded.vrl) showVrlFunction.value = true;
 
       resetForm(data);
 

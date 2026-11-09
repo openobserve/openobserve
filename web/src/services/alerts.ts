@@ -181,17 +181,20 @@ const alerts = {
         return res;
       });
   },
-  delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
+  delete_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    folder_id?: any,
+    options?: { silentForbidden?: boolean },
+  ) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http()
-      .delete(url)
-      .then((res) => {
-        analytics.track("alert_deleted", { count: 1 });
-        return res;
-      });
+    return (options ? http().delete(url, options) : http().delete(url)).then((res) => {
+      analytics.track("alert_deleted", { count: 1 });
+      return res;
+    });
   },
   toggle_state_by_alert_id: (
     org_identifier: string,
