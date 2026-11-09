@@ -127,6 +127,18 @@ pub fn active_for_alert_group(
     )
 }
 
+#[cfg(not(feature = "enterprise"))]
+pub fn active_for_alert_group(
+    _org: &str,
+    _alert_id: &str,
+    _folder_id: &str,
+    _dims: &HashMap<String, String>,
+    _group_key: &str,
+    _now: i64,
+) -> Option<ActiveDowntime> {
+    None
+}
+
 /// The group key decides only for a multi-alert, whose groups a downtime can name.
 #[cfg(feature = "enterprise")]
 pub fn active_for_alert_key(
