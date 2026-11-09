@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- Triage state lives on the case, not here: a firing is a fact about one evaluation. -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -33,17 +33,26 @@ import SecurityRecordDrawer, {
 } from "@/components/security/SecurityRecordDrawer.vue";
 import SecurityKeyValues, { type KeyValueRow } from "@/components/security/SecurityKeyValues.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
+import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
+import { failedRequests, viewDenial, type AccessDenial } from "@/composables/useAccessStore";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { useAlertHistoryWindow } from "@/composables/security/useAlertHistoryWindow";
+import { useAlertTriage } from "@/composables/security/useAlertTriage";
+import { isForbiddenError, useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import { useAlertHistorySummary } from "@/composables/security/useAlertHistorySummary";
 import { isErrorOutcome, isFiringOutcome } from "@/utils/alerts/runOutcome";
 import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { useSiemDetections, type DetectionRow } from "@/composables/security/useSiemDetections";
-import { whereOfDetectionSql } from "@/utils/security/detection";
+import { sigmaMetadata, whereOfDetectionSql } from "@/utils/security/detection";
 import { bucketMsFor, bucketize } from "@/utils/security/history";
 import {
   summarizeError,
   STATUS_VARIANT,
+  evidenceSummary,
+  evidenceValueField,
   firingKey,
   firingStatus,
   toneOfHistoryLevel,
@@ -64,8 +73,10 @@ import {
   type SeverityTone,
 } from "@/utils/security/severity";
 import { normalizeTactic, techniqueUrl } from "@/utils/security/mitre";
-import { parseSigmaRule } from "@/utils/security/sigma";
-import { bestMatch } from "@/utils/security/classify";
+import { fetchSourceMatch } from "@/services/securitySources.queries";
+import { detectionEvidenceQuery } from "@/services/securitySigma.queries";
+import type { EvidenceGroup } from "@/services/securitySigma";
+import { useQueryClient } from "@tanstack/vue-query";
 import { normalizeEvents } from "@/utils/security/normalize";
 import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
 
@@ -149,6 +160,9 @@ const {
   byId,
   siemRows,
   loading: rulesLoading,
+  error: rulesError,
+  forbidden: rulesForbidden,
+  failure: rulesFailure,
   load: loadDetections,
   loadFull: loadFullDetection,
 } = useSiemDetections();
@@ -158,7 +172,19 @@ const summary = useAlertHistorySummary();
 const history = computed(() => historyWindow.rows.value as FiringRow[]);
 const historyTotal = computed(() => historyWindow.total.value);
 const loading = computed(() => historyWindow.loading.value);
-const error = computed(() => historyWindow.error.value || summary.error.value);
+const error = computed(() => rulesError.value || historyWindow.error.value || summary.error.value);
+// Without the alerts read an empty table would claim there are no detections or firings.
+const denials = computed(() =>
+  rulesForbidden.value || historyWindow.forbidden.value || summary.forbidden.value
+    ? [
+        viewDenial(
+          "alerts",
+          "list",
+          failedRequests(rulesFailure.value, historyWindow.failure.value, summary.failure.value),
+        ),
+      ]
+    : [],
+);
 const lastRunAt = ref<number | null>(null);
 const summaryAt = ref<number | null>(null);
 
@@ -579,9 +605,7 @@ const shareUrl = computed(() => {
 
 const sigma = computed(() => {
   const yaml = selected.value?.detection?.meta.sigmaYaml;
-  if (!yaml) return null;
-  const parsed = parseSigmaRule(yaml);
-  return parsed.ok ? parsed.rule : null;
+  return yaml ? sigmaMetadata(yaml) : null;
 });
 
 const whereSql = computed(() =>
@@ -716,25 +740,86 @@ const tactics = computed(() =>
     .filter((x): x is NonNullable<typeof x> => !!x),
 );
 
+type EvidenceEvent = ReturnType<typeof normalizeEvents>[number];
+interface ShownGroup {
+  key: string;
+  label: string;
+  range: string;
+  events: EvidenceEvent[];
+  /** The column a value-count rule counted, so each row says which value it contributed. */
+  valueField: string | null;
+}
 const evidence = ref<ReturnType<typeof normalizeEvents>>([]);
+/** Set when the server returned the firing's own groups; each lists only the rows that fired it. */
+const evidenceGroups = ref<ShownGroup[]>([]);
+const evidenceGroupSql = ref("");
 const evidenceCount = ref<number | null>(null);
 const evidenceLoading = ref(false);
 const evidenceError = ref("");
+const evidenceDenials = ref<AccessDenial[]>([]);
 let evidenceSeq = 0;
+const queryClient = useQueryClient();
+const shownEvidenceSql = computed(() => evidenceGroupSql.value || evidenceSql.value);
+
+function groupLabel(group: EvidenceGroup): string {
+  return Object.entries(group.values ?? {})
+    .map(([k, v]) => `${k}=${v ?? "—"}`)
+    .join(" · ");
+}
+
+/** Shows the firing's stored groups from the server; false when it has none, so the window query runs. */
+async function loadFiredGroups(f: NonNullable<typeof selected.value>): Promise<boolean> {
+  const alertId = f.detection?.alert.id;
+  if (!alertId || !f.row.timestamp) return false;
+  const evidenceResult = await queryClient
+    .fetchQuery(
+      detectionEvidenceQuery(orgId.value, String(alertId), {
+        firing_time: f.row.timestamp,
+        start_time: f.row.start_time,
+        end_time: f.row.end_time,
+      }),
+    )
+    .catch(() => null);
+  if (!evidenceResult || evidenceResult.error || !evidenceResult.groups.length) return false;
+  const first = evidenceResult.groups.find((g) => g.rows.length)?.rows[0];
+  const match = first
+    ? await fetchSourceMatch(orgId.value, Object.keys(first), first).catch(() => null)
+    : null;
+  const source = match?.classification?.source ?? null;
+  const fmt = (us: number) => new Date(us / 1000).toLocaleString();
+  evidenceGroups.value = evidenceResult.groups.map((g, i) => ({
+    key: `${i}`,
+    label: groupLabel(g),
+    range: `${fmt(g.first_seen)} → ${fmt(g.last_seen)}`,
+    events: normalizeEvents(g.rows, source),
+    valueField: evidenceValueField(g.sql),
+  }));
+  evidenceGroupSql.value = evidenceResult.groups[0]?.sql ?? "";
+  evidenceCount.value = evidenceResult.correlation
+    ? evidenceResult.groups.reduce((n, g) => n + g.rows.length, 0)
+    : evidenceResult.groups.reduce((n, g) => n + (g.event_count || g.rows.length), 0);
+  return true;
+}
 
 async function loadEvidence() {
   // Bumped before any early return, so a previous firing's response never lands in this one.
   const mine = ++evidenceSeq;
   const f = selected.value;
   evidence.value = [];
+  evidenceGroups.value = [];
+  evidenceGroupSql.value = "";
   evidenceCount.value = null;
   evidenceError.value = "";
+  evidenceDenials.value = [];
   evidenceLoading.value = false;
   if (!f || !evidenceSql.value || !f.row.start_time || !f.row.end_time) return;
   evidenceLoading.value = true;
   const run = (sql: string, size: number) =>
     runSql(orgId.value, sql, f.row.start_time, f.row.end_time, size);
   try {
+    const fired = await loadFiredGroups(f);
+    if (mine !== evidenceSeq) return;
+    if (fired) return;
     // A separate COUNT: the rows query's `total` is capped at its own page size.
     const [rows, count] = await Promise.all([
       run(evidenceSql.value, 10),
@@ -745,11 +830,20 @@ async function loadEvidence() {
     ]);
     if (mine !== evidenceSeq) return;
     const hits = rows.hits;
-    const source = hits.length ? bestMatch(Object.keys(hits[0]), { sample: hits[0] }) : null;
-    evidence.value = normalizeEvents(hits, source?.source ?? null);
+    const match = hits.length
+      ? await fetchSourceMatch(orgId.value, Object.keys(hits[0]), hits[0]).catch(() => null)
+      : null;
+    if (mine !== evidenceSeq) return;
+    evidence.value = normalizeEvents(hits, match?.classification?.source ?? null);
     evidenceCount.value = Number(count.hits[0]?.zo_n ?? hits.length);
   } catch (e: any) {
     if (mine !== evidenceSeq) return;
+    if (isForbiddenError(e)) {
+      evidenceDenials.value = [
+        viewDenial("streams", "list", [`POST /api/${orgId.value}/_search_stream`]),
+      ];
+      return;
+    }
     evidenceError.value =
       e?.response?.data?.message ??
       e?.response?.data?.error ??
@@ -766,9 +860,7 @@ watch(
   { immediate: true },
 );
 
-function evidenceSummary(ev: (typeof evidence.value)[number]): string {
-  return [ev.actor, ev.srcIp, ev.activity || ev.operation, ev.message].filter(Boolean).join(" · ");
-}
+const evidenceField = computed(() => evidenceValueField(evidenceSql.value));
 
 /** Opens the Events page on this detection's matches over the firing window. */
 function investigate() {
@@ -780,11 +872,103 @@ function investigate() {
       org_identifier: orgId.value,
       stream: detectionStream.value,
       sql_mode: "true",
-      query: b64EncodeUnicode(evidenceSql.value) ?? "",
+      query: b64EncodeUnicode(shownEvidenceSql.value) ?? "",
       from: String(f.row.start_time),
       to: String(f.row.end_time),
     },
   });
+}
+
+// ── Triage: every action lands on the case the firing belongs to ─────────────
+const { canTriage } = useSecurityAccess();
+const triageIds = computed(() => [
+  ...new Set(
+    filtered.value
+      .filter((f) => isSignal(f) && f.detection?.alert.id)
+      .map((f) => String(f.detection!.alert.id)),
+  ),
+]);
+const triage = useAlertTriage(orgId, triageIds, canTriage);
+const selectedCase = computed(() => {
+  const id = selected.value?.detection?.alert.id;
+  return id ? (triage.caseByAlert.value[String(id)] ?? null) : null;
+});
+const canTriageSelected = computed(
+  () => canTriage.value && !!selected.value?.detection && isSignal(selected.value),
+);
+const attachOptions = computed(() =>
+  triage.openCases.value
+    .filter((c) => c.id !== selectedCase.value?.id)
+    .map((c) => ({ label: raw(c.title || c.id), value: c.id })),
+);
+const triaging = ref(false);
+const note = ref("");
+const selectedIds = ref<string[]>([]);
+const isRowSelectable = (f: Firing) => canTriage.value && !!f.detection && isSignal(f);
+
+function firingOf(f: Firing) {
+  return { alert_id: String(f.detection!.alert.id), fired_at: f.row.timestamp };
+}
+
+async function runTriage(action: () => Promise<unknown>, done: I18nText) {
+  triaging.value = true;
+  try {
+    await action();
+    toast({ variant: "success", message: done });
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: raw(e?.response?.data?.message) || t("siem.alerts.triage.failed"),
+    });
+  } finally {
+    triaging.value = false;
+  }
+}
+
+function acknowledgeCase() {
+  const c = selectedCase.value;
+  if (c) void runTriage(() => triage.acknowledge(c.id), t("siem.alerts.triage.acknowledged"));
+}
+
+function addNote() {
+  const c = selectedCase.value;
+  const f = selected.value;
+  const text = note.value.trim();
+  if (!c || !f || !text) return;
+  void runTriage(async () => {
+    await triage.addNote(c.id, f.name, text);
+    note.value = "";
+  }, t("siem.alerts.triage.noted"));
+}
+
+function promoteSelected() {
+  const f = selected.value;
+  if (f?.detection)
+    void runTriage(() => triage.promote([firingOf(f)]), t("siem.alerts.triage.caseOpened"));
+}
+
+function attachTo(caseId: unknown) {
+  const f = selected.value;
+  if (f?.detection && caseId)
+    void runTriage(
+      () => triage.promote([firingOf(f)], String(caseId)),
+      t("siem.alerts.triage.attached"),
+    );
+}
+
+function promoteChecked() {
+  const rows = filtered.value.filter((f) => selectedIds.value.includes(f.id) && isRowSelectable(f));
+  if (!rows.length) return;
+  void runTriage(async () => {
+    await triage.promote(rows.map(firingOf));
+    selectedIds.value = [];
+  }, t("siem.alerts.triage.caseOpened"));
+}
+
+function openCase() {
+  const c = selectedCase.value;
+  if (!c) return;
+  router.push({ path: "/security/cases", query: { org_identifier: orgId.value, case: c.id } });
 }
 
 function openDetection() {
@@ -874,6 +1058,9 @@ onUnmounted(() => {
         :data="filtered"
         :columns="columns"
         row-key="id"
+        :selection="canTriage ? 'multiple' : undefined"
+        v-model:selected-ids="selectedIds"
+        :is-row-selectable="isRowSelectable"
         :loading="(loading || rulesLoading) && !history.length"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
@@ -888,6 +1075,18 @@ onUnmounted(() => {
         @row-click="open"
         @sort-change="sortTick++"
       >
+        <template v-if="canTriage" #selection-actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="library-add"
+            :loading="triaging"
+            data-test="security-alerts-promote-selected"
+            @click="promoteChecked"
+          >
+            {{ t("siem.alerts.triage.createCase") }}
+          </OButton>
+        </template>
         <template #toolbar>
           <div class="flex w-full flex-wrap items-center gap-3">
             <div class="w-72">
@@ -983,17 +1182,22 @@ onUnmounted(() => {
         </template>
 
         <template #empty>
+          <SecurityAccessLock
+            v-if="denials.length"
+            :denials="denials"
+            data-test="security-alerts-access-lock"
+          />
           <OEmptyState
-            v-if="!loading"
+            v-else-if="!loading"
             size="block"
             icon="task-alt"
             :title="
-              !siemRows.length && !rulesLoading
+              !siemRows.length && !rulesLoading && !rulesError
                 ? t('siem.alerts.noDetections')
                 : t('siem.alerts.empty')
             "
             :description="
-              !siemRows.length && !rulesLoading
+              !siemRows.length && !rulesLoading && !rulesError
                 ? t('siem.alerts.noDetectionsHint')
                 : t('siem.alerts.emptyHint')
             "
@@ -1047,6 +1251,32 @@ onUnmounted(() => {
       </template>
 
       <template #tab-overview>
+        <section
+          v-if="canTriageSelected && selectedCase"
+          class="flex flex-col gap-2"
+          data-test="security-alerts-drawer-note"
+        >
+          <OTextarea
+            v-model="note"
+            :placeholder="t('siem.alerts.triage.notePlaceholder')"
+            :rows="2"
+            autogrow
+            data-test="security-alerts-drawer-note-text"
+          />
+          <div class="flex justify-end">
+            <OButton
+              variant="outline"
+              size="sm"
+              icon-left="send"
+              :loading="triaging"
+              :disabled="!note.trim()"
+              data-test="security-alerts-drawer-note-post"
+              @click="addNote"
+            >
+              {{ t("siem.alerts.triage.addNote") }}
+            </OButton>
+          </div>
+        </section>
         <OBanner v-if="selected.row.error" variant="error-soft" icon="error-outline" dense>
           {{ summarizeError(selected.row.error) }}
         </OBanner>
@@ -1126,11 +1356,59 @@ onUnmounted(() => {
               {{ t("siem.alerts.investigate") }}
             </OButton>
           </div>
-          <OBanner v-if="evidenceError" variant="error-soft" icon="error-outline" dense>
+          <SecurityAccessLock
+            v-if="evidenceDenials.length"
+            :denials="evidenceDenials"
+            data-test="security-alerts-evidence-access-lock"
+          />
+          <OBanner v-else-if="evidenceError" variant="error-soft" icon="error-outline" dense>
             {{ evidenceError }}
           </OBanner>
           <div
-            v-if="evidence.length"
+            v-if="evidenceGroups.length"
+            class="flex flex-col gap-3"
+            data-test="security-alerts-drawer-evidence-groups"
+          >
+            <section
+              v-for="group in evidenceGroups"
+              :key="group.key"
+              class="border-border-default rounded-surface overflow-hidden border"
+              data-test="security-alerts-drawer-evidence-group"
+            >
+              <div
+                class="border-border-subtle bg-surface-subtle flex flex-col gap-0.5 border-b px-3 py-2"
+              >
+                <span v-if="group.label" class="text-text-heading font-mono text-xs">{{
+                  group.label
+                }}</span>
+                <span class="text-text-secondary text-2xs">{{ group.range }}</span>
+              </div>
+              <div
+                v-for="(ev, i) in group.events"
+                :key="i"
+                class="border-border-subtle flex items-start gap-3 border-b px-3 py-2 last:border-b-0"
+              >
+                <OTag variant="primary-soft" size="xs" class="shrink-0">{{
+                  ev.className || t("siem.drawer.eyebrow")
+                }}</OTag>
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-text-heading truncate text-xs">{{
+                    evidenceSummary(ev, group.valueField) || "—"
+                  }}</span>
+                  <span class="text-text-secondary text-2xs font-mono">{{
+                    ev.time ? new Date(ev.time).toLocaleString() : "—"
+                  }}</span>
+                </div>
+              </div>
+              <span
+                v-if="!group.events.length"
+                class="text-text-secondary block px-3 py-2 text-xs"
+                >{{ t("siem.alerts.evidenceAgedOut") }}</span
+              >
+            </section>
+          </div>
+          <div
+            v-else-if="evidence.length"
             class="border-border-default rounded-surface overflow-hidden border"
             data-test="security-alerts-drawer-evidence"
           >
@@ -1144,7 +1422,7 @@ onUnmounted(() => {
               }}</OTag>
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-text-heading truncate text-xs">{{
-                  evidenceSummary(ev) || "—"
+                  evidenceSummary(ev, evidenceField) || "—"
                 }}</span>
                 <span class="text-text-secondary text-2xs font-mono">{{
                   ev.time ? new Date(ev.time).toLocaleString() : "—"
@@ -1152,14 +1430,21 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          <span v-else-if="!evidenceLoading && !evidenceError" class="text-text-secondary text-xs">
+          <span
+            v-else-if="!evidenceLoading && !evidenceError && !evidenceDenials.length"
+            class="text-text-secondary text-xs"
+          >
             {{ isFiringStatus ? t("siem.alerts.evidenceAgedOut") : t("siem.alerts.evidenceNone") }}
           </span>
           <section class="flex flex-col gap-1.5">
             <h3 class="text-text-secondary text-xs font-semibold tracking-wide uppercase">
               {{ t("siem.alerts.query") }}
             </h3>
-            <OCodeBlock :code="evidenceSql" lang="sql" data-test="security-alerts-drawer-sql" />
+            <OCodeBlock
+              :code="shownEvidenceSql"
+              lang="sql"
+              data-test="security-alerts-drawer-sql"
+            />
           </section>
         </template>
       </template>
@@ -1190,6 +1475,53 @@ onUnmounted(() => {
       </template>
 
       <template #footer>
+        <template v-if="canTriageSelected">
+          <div v-if="attachOptions.length" class="w-56">
+            <OSelect
+              :aria-label="t('siem.aria.addToCase')"
+              :model-value="null"
+              :options="attachOptions"
+              :placeholder="t('siem.alerts.triage.addToCase')"
+              :disabled="triaging"
+              size="sm"
+              data-test="security-alerts-drawer-attach"
+              @update:model-value="attachTo"
+            />
+          </div>
+          <OButton
+            v-if="selectedCase"
+            variant="outline"
+            size="sm-action"
+            icon-left="folder-open"
+            data-test="security-alerts-drawer-open-case"
+            @click="openCase"
+          >
+            {{ t("siem.alerts.triage.openCase") }}
+          </OButton>
+          <OButton
+            v-if="selectedCase?.status === 'open'"
+            variant="outline"
+            size="sm-action"
+            icon-left="visibility"
+            :loading="triaging"
+            data-test="security-alerts-drawer-acknowledge"
+            @click="acknowledgeCase"
+          >
+            {{ t("siem.alerts.triage.acknowledge") }}
+          </OButton>
+          <OButton
+            v-if="!selectedCase"
+            variant="outline"
+            size="sm-action"
+            icon-left="library-add"
+            :loading="triaging"
+            data-test="security-alerts-drawer-create-case"
+            @click="promoteSelected"
+          >
+            {{ t("siem.alerts.triage.createCase") }}
+          </OButton>
+        </template>
+        <div class="flex-1" />
         <OButton
           variant="outline"
           size="sm-action"

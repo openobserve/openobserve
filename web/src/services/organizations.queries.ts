@@ -44,7 +44,15 @@ export const myOrganizationsQuery = () =>
 export const orgSettingsQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.settings(org),
-    queryFn: async () => (await organizations.get_organization_settings(org)).data,
+    queryFn: async () => {
+      try {
+        return (await organizations.get_organization_settings(org)).data;
+      } catch (e: any) {
+        // A role without the settings grant gets 403 for good; cached as "none" so every page load stops asking.
+        if (e?.response?.status === 403 || e?.response?.status === 404) return null;
+        throw e;
+      }
+    },
     staleTime: NORMAL_STALE_TIME,
   });
 

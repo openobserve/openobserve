@@ -20,6 +20,8 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
+import { failedRequests, viewDenial, type AccessDenial } from "@/composables/useAccessStore";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
@@ -31,21 +33,32 @@ import SecurityRecordDrawer, {
   type RecordTab,
 } from "@/components/security/SecurityRecordDrawer.vue";
 import SecurityKeyValues from "@/components/security/SecurityKeyValues.vue";
+import SecurityCaseCloseDialog from "@/components/security/SecurityCaseCloseDialog.vue";
+import SecurityCaseSettingsDialog from "@/components/security/SecurityCaseSettingsDialog.vue";
+import securityCases from "@/services/securityCases";
+import { orgUsersQuery } from "@/services/users.queries";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
+import { useQuery } from "@tanstack/vue-query";
 import incidentsService, { type Incident, type IncidentWithAlerts } from "@/services/incidents";
 import { readableAlertName } from "@/utils/security/detection";
 import { useRcaTrigger } from "@/composables/useRcaTrigger";
 import { isLiveRca } from "@/utils/incidents/rcaCell";
 import { useSiemDetections } from "@/composables/security/useSiemDetections";
+import { isForbiddenError, useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import {
   CASE_STATUSES,
   STATUS_VARIANT,
   TRANSITIONS,
+  activitySpan,
   caseDetections,
   caseFirings,
+  firingRange,
   groupValueRows,
+  timeToClose,
   toTimeline,
   toneOfPriority,
   type CaseStatus,
+  type CaseVerdict,
   type TimelineEntry,
 } from "@/utils/security/cases";
 import {
@@ -58,6 +71,7 @@ import { formatEventCount } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { canTriage, canAdmin } = useSecurityAccess();
 const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
@@ -91,6 +105,8 @@ const totals = ref<Record<CaseStatus, number | null>>({
 });
 const loading = ref(false);
 const error = ref("");
+// A 403 body is plain text, so it would read "Request failed with status code 403"; the table locks instead.
+const caseDenials = ref<AccessDenial[]>([]);
 let listSeq = 0;
 let totalsSeq = 0;
 
@@ -121,6 +137,7 @@ async function fetchCases() {
   const mine = ++listSeq;
   loading.value = true;
   error.value = "";
+  caseDenials.value = [];
   try {
     const res = await incidentsService.list(
       orgId.value,
@@ -137,7 +154,9 @@ async function fetchCases() {
     if (mine !== listSeq) return;
     cases.value = [];
     total.value = 0;
-    error.value = e?.response?.data?.message ?? e?.message ?? t("siem.cases.loadError");
+    if (isForbiddenError(e))
+      caseDenials.value = [viewDenial("incidents", "list", failedRequests(e))];
+    else error.value = e?.response?.data?.message ?? e?.message ?? t("siem.cases.loadError");
   } finally {
     if (mine === listSeq) loading.value = false;
   }
@@ -348,9 +367,9 @@ const shareUrl = computed(() => {
 
 const tone = computed(() => toneOfPriority(summary.value?.severity));
 
-function duration(from?: number, to?: number): string {
-  if (!from || !to || to <= from) return "—";
-  const mins = Math.round((to - from) / 60_000_000);
+function duration(span: number | null): string {
+  if (!span) return "—";
+  const mins = Math.max(1, Math.round(span / 60_000_000));
   if (mins < 60) return t("siem.cases.durationMinutes", { n: mins });
   const hours = Math.round(mins / 60);
   return hours < 48
@@ -373,8 +392,11 @@ const facts = computed<RecordFact[]>(() => {
     },
     {
       label: t("siem.cases.fact.duration"),
-      value: duration(c.first_alert_at, c.resolved_at ?? c.last_alert_at),
+      value: duration(activitySpan(c)),
     },
+    ...(c.resolved_at
+      ? [{ label: t("siem.cases.fact.timeToClose"), value: duration(timeToClose(c)) }]
+      : []),
   ];
 });
 
@@ -434,6 +456,7 @@ const TIMELINE_VARIANT: Record<
   comment: "primary",
   title: "muted",
   assignment: "muted",
+  evidence: "primary",
   analysis: "info",
   other: "muted",
 };
@@ -455,6 +478,68 @@ async function setStatus(status: CaseStatus) {
     // The server filters by status, so re-ask rather than patch: a closed case must leave "New".
     void fetchCases();
     void fetchTotals();
+    if (stillOpen(id)) void loadDetail(id);
+  } catch (e: any) {
+    toast({ variant: "error", message: e?.response?.data?.message ?? t("siem.cases.updateError") });
+  } finally {
+    updating.value = false;
+  }
+}
+
+const closeOpen = ref(false);
+const settingsOpen = ref(false);
+
+function onTransition(next: CaseStatus) {
+  if (next === "resolved") closeOpen.value = true;
+  else void setStatus(next);
+}
+
+async function closeCase(verdict: CaseVerdict, reason: string): Promise<boolean> {
+  const c = summary.value;
+  if (!c) return false;
+  const id = c.id;
+  try {
+    await securityCases.close(orgId.value, id, verdict, reason);
+    toast({
+      variant: "success",
+      message: t("siem.cases.statusChanged", { status: t("siem.caseStatus.resolved") }),
+    });
+    void fetchCases();
+    void fetchTotals();
+    if (stillOpen(id)) void loadDetail(id);
+    return true;
+  } catch (e: any) {
+    toast({ variant: "error", message: e?.response?.data?.message ?? t("siem.cases.updateError") });
+    return false;
+  }
+}
+
+const orgUsers = useQuery(() =>
+  Object.assign(orgUsersQuery(orgId.value), { enabled: !!orgId.value && canTriage.value }),
+);
+const { optionOf } = useOrgUserNames();
+// OSelect reads "" as no selection and renders a blank trigger, so "nobody" is the null option.
+const assigneeOptions = computed(() => [
+  { label: t("siem.cases.unassigned"), value: null },
+  ...((orgUsers.data.value ?? []) as Array<{ email: string }>).map((u) => optionOf(u.email)),
+]);
+async function setAssignee(value: unknown) {
+  const c = summary.value;
+  const assignee = String(value ?? "");
+  if (!c || assignee === (c.assigned_to ?? "")) return;
+  updating.value = true;
+  const id = c.id;
+  try {
+    await securityCases.assign(orgId.value, id, assignee);
+    cases.value = cases.value.map((row) =>
+      row.id === id ? { ...row, assigned_to: assignee || undefined } : row,
+    );
+    toast({
+      variant: "success",
+      message: assignee
+        ? t("siem.cases.assignedTo", { to: assignee })
+        : t("siem.cases.unassignedToast"),
+    });
     if (stillOpen(id)) void loadDetail(id);
   } catch (e: any) {
     toast({ variant: "error", message: e?.response?.data?.message ?? t("siem.cases.updateError") });
@@ -622,13 +707,7 @@ function openAlerts() {
   const c = selectedId.value ? summary.value : null;
   const top = c ? detections.value[0]?.alertName : undefined;
   const SLACK_US = 5 * 60_000_000;
-  const window =
-    c && c.first_alert_at && c.last_alert_at
-      ? {
-          from: String(c.first_alert_at - SLACK_US),
-          to: String((c.resolved_at ?? c.last_alert_at) + SLACK_US),
-        }
-      : { period: "7d" };
+  const window = (c && firingRange(siemTriggers.value, c, SLACK_US)) ?? { period: "7d" };
   router.push({
     path: "/security/alerts",
     query: { org_identifier: orgId.value, ...window, ...(top ? { q: top } : {}) },
@@ -651,6 +730,18 @@ onMounted(() => {
     bleed
     title-data-test="security-cases-title"
   >
+    <template v-if="canAdmin" #actions>
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        icon-left="settings"
+        :aria-label="t('siem.cases.settings.open')"
+        data-test="security-cases-settings"
+        @click="settingsOpen = true"
+      >
+        <OTooltip side="bottom" :content="t('siem.cases.settings.open')" />
+      </OButton>
+    </template>
     <div class="flex min-h-0 flex-1 flex-col">
       <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
         <SecurityNotices :notices="notices" data-test="security-cases-notices" />
@@ -716,9 +807,21 @@ onMounted(() => {
         </template>
         <template #cell-title="{ row }">
           <div class="flex min-w-0 flex-col">
-            <span class="text-text-heading truncate font-medium">{{
-              row.title || t("siem.overview.untitledCase")
-            }}</span>
+            <span class="flex min-w-0 items-center gap-1.5">
+              <span class="text-text-heading truncate font-medium">{{
+                row.title || t("siem.overview.untitledCase")
+              }}</span>
+              <OTag
+                v-if="row.historical"
+                variant="default-soft"
+                icon="history"
+                size="xs"
+                class="shrink-0"
+                :data-test="`security-cases-historical-${row.id}`"
+                >{{ t("siem.cases.historical")
+                }}<OTooltip :content="t('siem.cases.historicalHint')"
+              /></OTag>
+            </span>
             <span class="text-text-secondary text-2xs truncate font-mono">{{ row.id }}</span>
           </div>
         </template>
@@ -742,8 +845,13 @@ onMounted(() => {
         </template>
 
         <template #empty>
+          <SecurityAccessLock
+            v-if="caseDenials.length"
+            :denials="caseDenials"
+            data-test="security-cases-access-lock"
+          />
           <OEmptyState
-            v-if="!loading"
+            v-else-if="!loading"
             size="block"
             icon="task-alt"
             :title="t('siem.cases.empty')"
@@ -786,6 +894,14 @@ onMounted(() => {
         <OTag :variant="STATUS_VARIANT[summary.status as CaseStatus]" size="sm">{{
           t(`siem.caseStatus.${summary.status}`)
         }}</OTag>
+        <OTag
+          v-if="summary.historical"
+          variant="default-soft"
+          icon="history"
+          size="sm"
+          data-test="security-cases-drawer-historical"
+          >{{ t("siem.cases.historical") }}<OTooltip :content="t('siem.cases.historicalHint')"
+        /></OTag>
         <OTag v-if="summary.assigned_to" variant="default-soft" icon="person" size="sm">{{
           summary.assigned_to
         }}</OTag>
@@ -906,7 +1022,7 @@ onMounted(() => {
       </template>
 
       <template #tab-timeline>
-        <div class="flex flex-col gap-2">
+        <div v-if="canTriage" class="flex flex-col gap-2">
           <OTextarea
             v-model="comment"
             :placeholder="t('siem.cases.commentPlaceholder')"
@@ -974,6 +1090,7 @@ onMounted(() => {
           <span class="text-text-secondary text-xs">{{ t("siem.cases.analysisHint") }}</span>
           <div class="flex-1" />
           <OButton
+            v-if="canTriage"
             variant="outline"
             size="sm"
             icon-left="psychology"
@@ -1000,14 +1117,27 @@ onMounted(() => {
       </template>
 
       <template v-if="summary" #footer>
-        <div class="w-44">
+        <div v-if="canTriage" class="w-44">
           <OSelect
+            :aria-label="t('siem.aria.casePriority')"
             :model-value="summary.severity"
             :options="priorityOptions"
             :disabled="updating"
             size="sm"
             data-test="security-cases-drawer-priority"
             @update:model-value="setPriority"
+          />
+        </div>
+        <div v-if="canTriage" class="w-56">
+          <OSelect
+            :aria-label="t('siem.aria.caseAssignee')"
+            :model-value="summary.assigned_to || null"
+            :options="assigneeOptions"
+            :disabled="updating"
+            searchable
+            size="sm"
+            data-test="security-cases-drawer-assignee"
+            @update:model-value="setAssignee"
           />
         </div>
         <div class="flex-1" />
@@ -1020,18 +1150,22 @@ onMounted(() => {
         >
           {{ t("siem.cases.viewFirings") }}
         </OButton>
-        <OButton
-          v-for="next in TRANSITIONS[summary.status as CaseStatus]"
-          :key="next"
-          :variant="next === TRANSITIONS[summary.status as CaseStatus][0] ? 'primary' : 'outline'"
-          size="sm-action"
-          :loading="updating"
-          :data-test="`security-cases-drawer-status-${next}`"
-          @click="setStatus(next)"
-        >
-          {{ t(`siem.cases.transition.${next}`) }}
-        </OButton>
+        <template v-if="canTriage">
+          <OButton
+            v-for="next in TRANSITIONS[summary.status as CaseStatus]"
+            :key="next"
+            :variant="next === TRANSITIONS[summary.status as CaseStatus][0] ? 'primary' : 'outline'"
+            size="sm-action"
+            :loading="updating"
+            :data-test="`security-cases-drawer-status-${next}`"
+            @click="onTransition(next)"
+          >
+            {{ t(`siem.cases.transition.${next}`) }}
+          </OButton>
+        </template>
       </template>
     </SecurityRecordDrawer>
+    <SecurityCaseCloseDialog v-model:open="closeOpen" :close="closeCase" />
+    <SecurityCaseSettingsDialog v-if="canAdmin" v-model:open="settingsOpen" />
   </OPageLayout>
 </template>

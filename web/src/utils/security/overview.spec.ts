@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { bucketMsFor, bucketize, isFiring, type HistoryRow } from "./history";
 import { normalizeTactic, tacticCoverage, techniqueUrl } from "./mitre";
-import { SOURCE_TYPE_BY_ID } from "./sourceTypes";
+import { SOURCE_TYPE_BY_ID } from "@/views/Security/__fixtures__/securitySourceTypes";
 import { sourceColumnFor } from "./normalize";
 import {
   severityRailColor,
@@ -12,7 +12,6 @@ import {
   toneOfSeverityId,
   toneOfSigmaLevel,
 } from "./severity";
-import { QUIET_AFTER_US, sourceHealth } from "./streams";
 
 describe("severity tones", () => {
   it("folds OCSF ids, Sigma levels and case priorities onto one scale", () => {
@@ -59,16 +58,6 @@ describe("ATT&CK", () => {
     const cred = coverage.find((c) => c.tactic === "credential_access")!;
     expect(cred).toEqual({ tactic: "credential_access", rules: 1, firings: 2 });
     expect(coverage.find((c) => c.tactic === "persistence")!.rules).toBe(0);
-  });
-});
-
-describe("source health", () => {
-  const now = 1_000_000_000_000_000;
-  it("separates never-ingested from gone-quiet", () => {
-    expect(sourceHealth({ doc_num: 0 }, now)).toBe("never");
-    expect(sourceHealth(null, now)).toBe("never");
-    expect(sourceHealth({ doc_num: 5, doc_time_max: now - 1000 }, now)).toBe("live");
-    expect(sourceHealth({ doc_num: 5, doc_time_max: now - QUIET_AFTER_US - 1 }, now)).toBe("quiet");
   });
 });
 

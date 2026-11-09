@@ -2,10 +2,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import { bestMatch } from "./classify";
 import { NORMALIZED_COLUMNS } from "./ocsf";
 import { buildFacets, normalizeEvent, normalizeEvents, populatedColumns } from "./normalize";
-import { SOURCE_TYPE_BY_ID } from "./sourceTypes";
+import { SOURCE_TYPE_BY_ID } from "@/views/Security/__fixtures__/securitySourceTypes";
 
 const cloudtrail = {
   eventTime: "2026-08-18T09:00:00Z",
@@ -39,12 +38,12 @@ const nginx = (status: number) => ({
   host: "app.example.com",
 });
 
-const sourceFor = (sample: Record<string, unknown>) =>
-  bestMatch(Object.keys(sample), { sample })!.source;
+/** The source type the server classifies each sample as. */
+const sourceFor = (id: string) => SOURCE_TYPE_BY_ID.get(id)!;
 
 describe("normalizeEvent", () => {
   it("puts a CloudTrail row in the shared columns", () => {
-    const event = normalizeEvent(cloudtrail, sourceFor(cloudtrail));
+    const event = normalizeEvent(cloudtrail, sourceFor("aws_cloudtrail"));
 
     expect(event.classUid).toBe(6003);
     expect(event.className).toBe("API Activity");
@@ -58,23 +57,23 @@ describe("normalizeEvent", () => {
   });
 
   it("reads outcome from whatever the source calls it", () => {
-    expect(normalizeEvent(okta("SUCCESS"), sourceFor(okta("SUCCESS"))).statusId).toBe(1);
-    expect(normalizeEvent(okta("FAILURE"), sourceFor(okta("FAILURE"))).statusId).toBe(2);
+    expect(normalizeEvent(okta("SUCCESS"), sourceFor("okta_system_log")).statusId).toBe(1);
+    expect(normalizeEvent(okta("FAILURE"), sourceFor("okta_system_log")).statusId).toBe(2);
     // CloudTrail has no outcome field; an errorCode is the failure.
-    expect(normalizeEvent(cloudtrail, sourceFor(cloudtrail)).statusId).toBe(2);
+    expect(normalizeEvent(cloudtrail, sourceFor("aws_cloudtrail")).statusId).toBe(2);
     // HTTP is numeric, and the split is at 400.
-    expect(normalizeEvent(nginx(200), sourceFor(nginx(200))).statusId).toBe(1);
-    expect(normalizeEvent(nginx(401), sourceFor(nginx(401))).statusId).toBe(2);
+    expect(normalizeEvent(nginx(200), sourceFor("webserver_access")).statusId).toBe(1);
+    expect(normalizeEvent(nginx(401), sourceFor("webserver_access")).statusId).toBe(2);
   });
 
   it("derives severity only where the source carries none", () => {
-    const failedLogin = normalizeEvent(okta("FAILURE"), sourceFor(okta("FAILURE")));
-    const goodLogin = normalizeEvent(okta("SUCCESS"), sourceFor(okta("SUCCESS")));
+    const failedLogin = normalizeEvent(okta("FAILURE"), sourceFor("okta_system_log"));
+    const goodLogin = normalizeEvent(okta("SUCCESS"), sourceFor("okta_system_log"));
 
     // A failed authentication outranks a failed request of any other kind.
     expect(failedLogin.severityId).toBe(3);
     expect(goodLogin.severityId).toBe(1);
-    expect(normalizeEvent(nginx(500), sourceFor(nginx(500))).severityId).toBe(2);
+    expect(normalizeEvent(nginx(500), sourceFor("webserver_access")).severityId).toBe(2);
   });
 
   it("never overrides a severity the source states itself", () => {
@@ -86,15 +85,15 @@ describe("normalizeEvent", () => {
       src_ip: "10.0.0.15",
       dest_ip: "203.0.113.42",
     };
-    expect(normalizeEvent(ids, sourceFor(ids)).severityId).toBe(5);
+    expect(normalizeEvent(ids, sourceFor("ids_alert")).severityId).toBe(5);
   });
 
   it("maps log level words onto the OCSF scale", () => {
     const app = { _timestamp: 1, message: "boom", level: "error", service: "checkout" };
-    expect(normalizeEvent(app, sourceFor(app)).severityId).toBe(4);
+    expect(normalizeEvent(app, sourceFor("syslog_generic")).severityId).toBe(4);
 
     const warn = { ...app, level: "warning" };
-    expect(normalizeEvent(warn, sourceFor(warn)).severityId).toBe(3);
+    expect(normalizeEvent(warn, sourceFor("syslog_generic")).severityId).toBe(3);
   });
 
   it("brings timestamps of any precision to milliseconds", () => {
@@ -111,7 +110,7 @@ describe("normalizeEvent", () => {
 
   it("leaves a column empty rather than inventing a value", () => {
     const sparse = { _timestamp: 1, eventName: "GetObject", eventSource: "s3.amazonaws.com" };
-    const event = normalizeEvent(sparse, sourceFor(sparse));
+    const event = normalizeEvent(sparse, sourceFor("aws_cloudtrail"));
 
     expect(event.actor).toBe("");
     expect(event.srcIp).toBe("");
@@ -119,7 +118,7 @@ describe("normalizeEvent", () => {
   });
 
   it("keeps the original row for the detail view", () => {
-    const event = normalizeEvent(cloudtrail, sourceFor(cloudtrail));
+    const event = normalizeEvent(cloudtrail, sourceFor("aws_cloudtrail"));
     expect(event.raw).toBe(cloudtrail);
   });
 
@@ -132,7 +131,7 @@ describe("normalizeEvent", () => {
       sourceIPs: ["10.0.0.15", "10.0.0.16"],
       "responseStatus.code": 403,
     };
-    const event = normalizeEvent(k8sAudit, sourceFor(k8sAudit));
+    const event = normalizeEvent(k8sAudit, sourceFor("k8s_audit"));
 
     expect(event.srcIp).toBe("10.0.0.15, 10.0.0.16");
     expect(event.actor).toBe("system:serviceaccount:prod:deployer");
@@ -149,7 +148,7 @@ describe("normalizeEvent", () => {
       "src_endpoint.ip": "10.0.0.15",
       "metadata.product.name": "CoreDNS",
     };
-    const event = normalizeEvent(native, sourceFor(native));
+    const event = normalizeEvent(native, sourceFor("ocsf_native"));
 
     expect(event.classUid).toBe(4003);
     expect(event.className).toBe("DNS Activity");
@@ -160,7 +159,7 @@ describe("normalizeEvent", () => {
 
 describe("populatedColumns", () => {
   it("keeps only the columns this source actually fills", () => {
-    const events = normalizeEvents([cloudtrail], sourceFor(cloudtrail));
+    const events = normalizeEvents([cloudtrail], sourceFor("aws_cloudtrail"));
     const columns = populatedColumns(events, NORMALIZED_COLUMNS);
 
     expect(columns).toContain("actor");
@@ -180,7 +179,7 @@ describe("populatedColumns", () => {
 describe("buildFacets", () => {
   it("summarises what is on screen", () => {
     const rows = [okta("FAILURE"), okta("FAILURE"), okta("SUCCESS")];
-    const events = normalizeEvents(rows, sourceFor(rows[0]));
+    const events = normalizeEvents(rows, sourceFor("okta_system_log"));
     const facets = buildFacets(events);
 
     expect(facets.severity.find((s) => s.id === 3)?.count).toBe(2);
@@ -190,7 +189,10 @@ describe("buildFacets", () => {
   });
 
   it("orders severity worst first", () => {
-    const events = normalizeEvents([okta("SUCCESS"), okta("FAILURE")], sourceFor(okta("SUCCESS")));
+    const events = normalizeEvents(
+      [okta("SUCCESS"), okta("FAILURE")],
+      sourceFor("okta_system_log"),
+    );
     expect(buildFacets(events).severity[0].id).toBe(3);
   });
 });
@@ -219,5 +221,49 @@ describe("OCSF-native status", () => {
       ocsf,
     );
     expect(event.statusId).toBe(2);
+  });
+});
+
+describe("Windows Security outcome", () => {
+  // As the server catalog defines it: failed logons and lockouts by event code, 4776 by its NTSTATUS.
+  const windows = {
+    ...SOURCE_TYPE_BY_ID.get("windows_security")!,
+    failureWhen: {
+      field: "EventID|event_id",
+      codes: [4625, 4740, 4771],
+      statusCodes: [4776],
+      status: "Status|status",
+      keywords: "Keywords",
+    },
+  };
+  const row = (extra: Record<string, unknown>) => ({
+    _timestamp: 1787065456851000,
+    computer: "WIN-FIN-07",
+    targetusername: "Administrator",
+    ...extra,
+  });
+
+  it("reads a failed logon (4625) as a failure and derives Medium for authentication", () => {
+    const event = normalizeEvent(row({ eventid: 4625, status: "0xC000006D" }), windows);
+    expect(event.statusId).toBe(2);
+    expect(event.severityId).toBe(3);
+  });
+
+  it("fails 4776 only with a non-zero status", () => {
+    expect(normalizeEvent(row({ eventid: 4776, status: "0xC0000064" }), windows).statusId).toBe(2);
+    expect(normalizeEvent(row({ eventid: 4776, status: "0x0" }), windows).statusId).toBe(1);
+  });
+
+  it("reads an audit failure keyword on any event code", () => {
+    expect(
+      normalizeEvent(row({ eventid: 4688, keywords: "Audit Failure" }), windows).statusId,
+    ).toBe(2);
+    expect(
+      normalizeEvent(row({ eventid: 4624, keywords: "Audit Success" }), windows).statusId,
+    ).toBe(1);
+  });
+
+  it("keeps the server's severity over the derived one", () => {
+    expect(normalizeEvent(row({ eventid: 4625 }), windows, 4).severityId).toBe(4);
   });
 });

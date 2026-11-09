@@ -6,12 +6,15 @@ import analytics from "@/services/product_analytics";
 import jsTransformService from "@/services/jstransform";
 import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import streamService from "@/services/stream";
+import { classifyValues } from "@/services/securityIntel";
 import {
   INTEL_COLUMNS,
+  indicatorCell,
   indicatorToRow,
   indicatorsToCsv,
   isBlankRow,
   isIntelTable,
+  removalCells,
   rowColumns,
   rowToIndicator,
   rowsToCsv,
@@ -72,18 +75,22 @@ const threatIntel = {
       run(`SELECT COUNT(*) AS zo_n FROM ${name}`, 1),
     ]);
     const raw: Record<string, unknown>[] = rows.hits;
+    const classified = await classifyValues(
+      orgId,
+      raw.map((row) => (isBlankRow(row) ? "" : indicatorCell(row))),
+    );
     const indicators: Indicator[] = [];
     let skipped = 0;
     let blank = 0;
-    for (const row of raw) {
+    raw.forEach((row, index) => {
       if (isBlankRow(row)) {
         blank += 1;
-        continue;
+        return;
       }
-      const parsed = rowToIndicator(row, table);
+      const parsed = rowToIndicator(row, table, classified[index] ?? null);
       if (parsed) indicators.push(parsed);
       else skipped += 1;
-    }
+    });
     const columns = rowColumns(raw);
     return {
       raw,
@@ -142,7 +149,8 @@ const threatIntel = {
     if (read.rowCount !== read.raw.length) {
       throw new RemoveRefused("partial", read.rowCount);
     }
-    const { kept, removed } = rowsWithout(read.raw, target);
+    const classified = await classifyValues(orgId, removalCells(read.raw));
+    const { kept, removed } = rowsWithout(read.raw, target, classified);
     if (!removed) throw new RemoveRefused("notFound", 0);
     const columns = read.columns.length ? read.columns : [...INTEL_COLUMNS];
     await uploadCsv(orgId, target.table, rowsToCsv(columns, kept), false);

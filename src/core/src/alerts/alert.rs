@@ -403,6 +403,24 @@ impl ManualTrigger {
     }
 }
 
+/// Plans `sql` over the last minute, so a query that cannot run is refused with the engine's error.
+pub async fn plan_sql(org_id: &str, stream_type: StreamType, sql: &str) -> Result<(), String> {
+    let end_time = config::utils::time::now_micros();
+    let query = SearchQuery {
+        sql: sql.to_string(),
+        start_time: end_time - 60_000_000,
+        end_time,
+        ..Default::default()
+    };
+    let sql = Sql::new(&query, org_id, stream_type, None)
+        .await
+        .map_err(|e| e.to_string())?;
+    get_result_schema(sql, false, false)
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 pub async fn save(
     org_id: &str,
     stream_name: &str,
@@ -2606,6 +2624,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             None,
             None,
             None,
+            None,
         )
         .await
         {
@@ -2742,6 +2761,7 @@ async fn suppressed_manual_trigger(
         now,
         None,
         &downtime,
+        None,
     )
     .await;
     count_suppressed_run(&alert.org_id, "alerts");
