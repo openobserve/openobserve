@@ -34,6 +34,7 @@ the Free Software Foundation, either version 3 of the License, or
       :mode="formPage.mode"
       :row="jobFormRow"
       :scorers="scorers"
+      :focus-budget="route.query.section === 'budget'"
       @saved="handleSaved"
       @persisted="reloadLists()"
       @cancel="closeFormPage"
@@ -165,10 +166,12 @@ the Free Software Foundation, either version 3 of the License, or
         v-if="activeTab === 'quality'"
         :score-configs="scoreConfigs"
         :configs-loading="isLoading"
+        :configs-forbidden="!!scoreConfigsForbidden"
         :date-window="qualityDateWindow"
         :agent-params="qualityAgentParams"
         :enabled="qualityScopeReady"
         @status="(status) => (qualityStatus = status)"
+        @created="reloadLists(true)"
       >
         <template #header-actions>
           <!-- Last-refreshed indicator + labeled primary Refresh button, matching the other AI pages. -->
@@ -292,7 +295,7 @@ the Free Software Foundation, either version 3 of the License, or
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
             @view="(row: EvalJob) => openJobView(row)"
-            @edit="(row: EvalJob) => openEditDialog(row)"
+            @edit="(row: EvalJob, section?: 'budget') => openEditDialog(row, section)"
             @activate="(row: EvalJob) => activateJob(row)"
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
@@ -928,6 +931,7 @@ function clearRouteAction() {
   delete query.action;
   delete query.id;
   delete query.scorer_type;
+  delete query.section;
   router.replace({ name: route.name as string, query }).catch(() => {});
 }
 
@@ -939,9 +943,9 @@ function openCreateDialog() {
   pushRouteAction({ action: "add", id: undefined });
 }
 
-function openEditDialog(row: AnyRow) {
+function openEditDialog(row: AnyRow, section?: "budget") {
   viewRow.value = null;
-  pushRouteAction({ action: "update", id: rowIdOf(row) });
+  pushRouteAction({ action: "update", id: rowIdOf(row), section });
 }
 
 function closeDialog() {

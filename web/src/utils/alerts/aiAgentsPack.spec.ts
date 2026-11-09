@@ -112,6 +112,14 @@ describe("ai-agents pack (AIO-20)", () => {
     );
     expect(prefill.sql).not.toMatch(/WHERE gen_ai_agent_name = 'a' GROUP BY trace_id/);
   });
+
+  it("says an unscoped cost alert has one row per model, the others one per agent", () => {
+    const cost = buildAiPrefill({ kind: "cost", stream: "s" });
+    expect(cost.sql).toContain("GROUP BY gen_ai_response_model");
+    expect(cost.warnings.map((w) => w.key)).toEqual(["aiAllAgentsByModel"]);
+    const failures = buildAiPrefill({ kind: "failure_rate", stream: "s" });
+    expect(failures.warnings.map((w) => w.key)).toEqual(["aiAllAgents"]);
+  });
 });
 
 describe("ai-agents pack: eval job templates (AIO-25)", () => {

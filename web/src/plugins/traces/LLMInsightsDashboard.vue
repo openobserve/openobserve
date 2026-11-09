@@ -563,6 +563,7 @@ import {
 } from "@/enterprise/composables/useAgentScope";
 import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import { buildAgentTraceFilter } from "./llmAgentFilter";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -880,13 +881,27 @@ const compareVersionList = ref<GenAiAgentListItem[]>([]);
 const compareInitialPair = ref<{ a: string; b: string } | null>(null);
 const versionCompare = useVersionCompare();
 
-// Cheap pre-check from the already-loaded cascade `versions` list (scoped to
-// the page window) — good enough to gate the entry button without an extra
-// network call on every render. The wide-window list (loaded on entry) is the
-// source of truth for the compare bar's own options.
+// Cheap pre-check from the already-loaded agents list (scoped to the page
+// window) — good enough to gate the entry button without an extra network call
+// on every render. It counts only the effective stream's versions, as the
+// compare arms do (see enterCompareMode); a version seen only in another
+// stream would open the view with an empty Version B. The wide-window list
+// (loaded on entry) is the source of truth for the compare bar's own options.
 const canCompare = computed(() => {
-  const real = versions.value.filter((v) => v.value !== "__unset__");
-  return real.length >= 2 && !!selectedAgentName.value;
+  if (!selectedAgentName.value) return false;
+  const unsetEnv = selectedEnv.value === "__unset__";
+  const inStream = new Set(
+    agents.value
+      .filter(
+        (a) =>
+          a.version &&
+          a.name === selectedAgentName.value &&
+          a.source_stream === effectiveStream.value &&
+          (unsetEnv ? !a.env : !selectedEnv.value || a.env === selectedEnv.value),
+      )
+      .map((a) => a.version),
+  );
+  return inStream.size >= 2;
 });
 
 // Exposed to the parent (LLMInsightsPage) so the page-level date-picker can be
@@ -1132,17 +1147,23 @@ function onDrill(d: LLMPanelDrill) {
     d.atMicros !== null
       ? d.atMicros + autoHistogramBucketMicros(props.startTime, props.endTime)
       : props.endTime;
+  // The series past the top N fold into "others": no one value selects them.
+  if (d.panel.query.topSeries?.others && d.series === "others") return;
+  // Usage with no model (agent span only) lists those traces, not a model.
+  const agentOnly = d.panel.id === "cost-trend" && d.series === t("llmAttribution.unattributed");
   // A measure says what its series lists: the OK or the errored part of a bar.
   const measure = d.panel.query.measures?.find((m) => t(m.labelKey) === d.series);
   // The title names the series; the only empty one is the Top errors row with no message.
   const series = d.series || t("aiObservability.panels.topErrors.noMessage");
+  const bySeries = !!drill.seriesSql && !agentOnly;
   openTraceList(
     {
       startTime: Math.max(start, props.startTime),
       endTime: Math.min(end, props.endTime),
-      seriesSql: drill.seriesSql,
-      seriesValue: drill.seriesSql ? (d.series ?? undefined) : undefined,
+      seriesSql: bySeries ? drill.seriesSql : undefined,
+      seriesValue: bySeries ? (d.series ?? undefined) : undefined,
       errored: measure?.errored ?? drill.errored,
+      ...(agentOnly ? { agentOnly: true } : {}),
     },
     t("llmInsightsDrill.title", { panel: t(d.panel.titleKey), series }),
   );
@@ -1161,10 +1182,12 @@ function openTraceListInTraces() {
   const where = [
     scopeClause.value,
     sel.seriesSql && sel.seriesValue !== undefined
-      ? `${sel.seriesSql} = '${sel.seriesValue.replace(/'/g, "''")}'`
+      ? `${sel.seriesSql} = ${sqlLiteral(sel.seriesValue)}`
       : "",
     // A span filter cannot say "no errored span in the trace", so OK traces open unfiltered.
     sel.errored ? "span_status = 'ERROR'" : "",
+    // Nor "usage only on the agent span": the agent spans are where that usage is.
+    sel.agentOnly ? "gen_ai_operation_name = 'invoke_agent'" : "",
   ]
     .filter(Boolean)
     .join(" AND ");
@@ -1368,14 +1391,17 @@ const kpiCards = computed<KpiCard[]>(() => {
   // data health check finds unpriced tokens the tile reads as a lower bound
   // ("≥ $X"), or "cost unknown" when none of the window's tokens were priced,
   // with the token count under it.
-  // The check reads the whole window, not the filters, so under a filter a
-  // recorded cost is shown as it is and the count is labelled as the window's.
+  // The check reads the whole window, not the filters, so under a filter the
+  // count is labelled as the window's, and a recorded cost is shown as it is. A
+  // filter that matches no tokens costs $0.00; only filtered tokens with no cost
+  // at all read as "cost unknown".
   const u = unpriced.value;
-  const windowOnly = hasActiveFilters.value && kpi.value.totalCost > 0;
+  const windowOnly = hasActiveFilters.value;
+  const filteredPriced = kpi.value.totalCost > 0 || kpi.value.totalTokens === 0;
   const kind = costKind(
     kpi.value.totalCost,
     kpi.value.totalTokens,
-    windowOnly ? 0 : (u?.tokens ?? 0),
+    windowOnly && filteredPriced ? 0 : (u?.tokens ?? 0),
   );
   const costCard: KpiCard = {
     id: "cost",

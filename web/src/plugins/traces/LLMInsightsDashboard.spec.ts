@@ -1030,6 +1030,18 @@ describe("LLMInsightsDashboard — Total Cost tile", () => {
     expect(text).toContain("llmDataTrust.cost.unknown");
   });
 
+  it("under a filter that matches no tokens, reads $0.00, not 'cost unknown'", async () => {
+    mockRouteQuery.q = "tenant_id = 'nope'";
+    const text = await costTileText(0, 0, 1_300_000);
+    expect(text).not.toContain("llmDataTrust.cost.unknown");
+    expect(text).toContain("$0.00");
+  });
+
+  it("shows sub-cent spend with LLM precision, not $0.00", async () => {
+    const text = await costTileText(0.00063, 1000, 0);
+    expect(text).toContain("$0.0006");
+  });
+
   it("reads the server's uncapped unpriced tokens, not the sum of the listed models", async () => {
     mockKpi.value = {
       ...mockKpi.value,

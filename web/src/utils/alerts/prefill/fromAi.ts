@@ -71,7 +71,10 @@ export const buildAiPrefill = (input: AiPrefillInput): AlertPrefill => {
     triggerThreshold: 1,
     triggerOperator: ">=",
     // Without an agent the alert covers the whole stream; it still runs, so say so.
-    warnings: input.agent ? [] : [warn("aiAllAgents", "info")],
+    // The cost template groups by model, the others by agent.
+    warnings: input.agent
+      ? []
+      : [warn(input.kind === "cost" ? "aiAllAgentsByModel" : "aiAllAgents", "info")],
     meta: { kind: input.kind, agent: input.agent ?? null, tool: input.tool ?? null },
   };
 };

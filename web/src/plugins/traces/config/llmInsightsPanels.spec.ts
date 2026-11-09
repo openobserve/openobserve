@@ -176,6 +176,47 @@ describe("renderPanelSql", () => {
     );
     expect(sql).not.toContain("\n");
   });
+
+  it("scopes every marked WHERE of a UNION, not just the first", () => {
+    const ctx = { stream: "s", startTime: 0, endTime: 1, interval: "1 hour" };
+    const tpl =
+      "SELECT a FROM {{stream}} WHERE x = 1{{scope}} GROUP BY a " +
+      "UNION ALL SELECT a FROM {{stream}} WHERE y = 1{{scope}} GROUP BY a";
+    const scoped = renderPanelSql(tpl, { ...ctx, agentFilter: "agent = 'a' OR b = 1" });
+    expect(scoped.match(/AND \(agent = 'a' OR b = 1\)/g)).toHaveLength(2);
+    expect(renderPanelSql(tpl, ctx)).not.toContain("{{scope}}");
+    expect(renderPanelSql(tpl, ctx)).not.toContain("AND");
+  });
+});
+
+describe("cost and token trends add up to the tiles", () => {
+  const render = (id: string) =>
+    renderPanelSql(LLM_INSIGHTS_PANELS.find((p) => p.id === id)!.query.sql, {
+      stream: "s",
+      startTime: 0,
+      endTime: 1,
+      interval: "1 hour",
+      agentFilter: "gen_ai_agent_name = 'a'",
+      unattributedLabel: "Unattributed",
+    });
+
+  it("adds the traces whose cost is only on their agent span as an Unattributed series", () => {
+    const sql = render("cost-trend");
+    expect(sql).toContain("UNION ALL");
+    expect(sql).toContain("'Unattributed' as model");
+    // Judged per trace (not per bucket), so a split trace never counts twice.
+    expect(sql).toContain("MIN(_timestamp) as first_ts");
+    expect(sql).toContain("GROUP BY trace_id HAVING");
+    // The agent scope applies to both halves.
+    expect(sql.match(/AND \(gen_ai_agent_name = 'a'\)/g)).toHaveLength(2);
+  });
+
+  it("adds agent-span-only tokens to the token trend", () => {
+    const sql = render("token-trend");
+    expect(sql).toContain("UNION ALL");
+    expect(sql).toContain("gen_ai_operation_name = 'invoke_agent' THEN gen_ai_usage_input_tokens");
+    expect(sql.match(/AND \(gen_ai_agent_name = 'a'\)/g)).toHaveLength(2);
+  });
 });
 
 describe("compactSql", () => {
@@ -415,6 +456,26 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
         "'unknown'",
       );
     }
+  });
+
+  it("per-model trends keep the top 10 models; cost folds the rest, latency drops it", () => {
+    const schemaOf = (id: string) =>
+      buildLLMPanelSchema({
+        panel: LLM_INSIGHTS_PANELS.find((p) => p.id === id)!,
+        sql: "",
+        stream: "s",
+        t: (k) => k,
+      });
+    expect(schemaOf("cost-trend").config).toMatchObject({
+      top_results: 10,
+      top_results_others: true,
+    });
+    // Percentiles of several models do not add up into an "others" line.
+    expect(schemaOf("latency-trend").config).toMatchObject({
+      top_results: 10,
+      top_results_others: false,
+    });
+    expect(schemaOf("token-trend").config.top_results).toBeUndefined();
   });
 });
 

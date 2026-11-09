@@ -24,6 +24,7 @@ import type { EvalBudgetAction, EvalJob, EvalTargetScope } from "@/services/onli
 import { countExpression, quoteIdent } from "../composables/useJobMatchedTargets";
 import StreamService from "@/services/stream";
 import { spendError, type SpendError } from "@/utils/alerts/aiBudgets";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 /** Every new job starts with this budget, per UTC day. */
 export const DEFAULT_DAILY_BUDGET_USD = 5;
@@ -32,25 +33,28 @@ export const DEFAULT_BUDGET_ACTION: EvalBudgetAction = "pause";
 export const ESTIMATE_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const quote = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
 /** 00:00 UTC of the day `atMs` falls in. */
 export const utcDayStartMs = (atMs: number): number => atMs - (((atMs % DAY_MS) + DAY_MS) % DAY_MS);
 
 /**
- * Matched targets per day over the estimate window, at the job's own scope;
- * null when the stream (with schema `fields`) cannot be counted at it.
+ * Matched targets per rolling 24 h over the estimate window, at the job's own
+ * scope; null when the stream (with schema `fields`) cannot be counted at it.
+ * Days count from `windowStartUs`, not from 00:00 UTC: UTC buckets cut the
+ * first and the current day short, and averaging those undercounts a day.
  */
 export function matchedPerDaySql(
   stream: string,
   where: string,
   scope: EvalTargetScope,
   fields: readonly string[],
+  windowStartUs: number,
 ): string | null {
   const count = countExpression(scope, fields);
   if (!count) return null;
+  const start = Math.floor(windowStartUs);
   return [
-    `SELECT histogram(_timestamp, '1 day') AS day, ${count} AS cnt`,
+    `SELECT (_timestamp - ${start}) / ${DAY_MS * 1000} AS day, ${count} AS cnt`,
     `FROM ${quoteIdent(stream)}`,
     where.trim() ? `WHERE ${where.trim()}` : "",
     "GROUP BY day ORDER BY day",
@@ -66,7 +70,7 @@ export function judgeHistorySql(scorerIds: string[]): string {
     "  COUNT(gen_ai_usage_cost) AS priced, SUM(gen_ai_usage_cost) AS cost,",
     "  AVG(TRY_CAST(attributes_total_tokens AS DOUBLE)) AS tokens, MAX(attributes_model) AS model",
     'FROM "_evaluator"',
-    `WHERE attributes_scorer_id IN (${scorerIds.map(quote).join(", ")})`,
+    `WHERE attributes_scorer_id IN (${scorerIds.map(sqlLiteral).join(", ")})`,
     "  AND attributes_status = 'success'",
     "GROUP BY attributes_scorer_id",
   ].join("\n");
@@ -107,7 +111,7 @@ export function spendTodaySql(jobIds: string[], cols: SpendColumns): string {
     "SELECT attributes_job_id AS job_id,",
     `  ${cols.cost ? "SUM(gen_ai_usage_cost)" : "0"} AS spend, ${unpriced} AS unpriced`,
     'FROM "_evaluator"',
-    `WHERE attributes_job_id IN (${jobIds.map(quote).join(", ")})`,
+    `WHERE attributes_job_id IN (${jobIds.map(sqlLiteral).join(", ")})`,
     "GROUP BY attributes_job_id",
   ].join("\n");
 }
@@ -207,6 +211,12 @@ export interface SpendEstimate {
   tokensPerTarget: number | null;
   /** The judge model, when every judge in the job uses one. */
   model: string | null;
+  /**
+   * Why the judge cost is unknown: a judge made calls none of which was priced
+   * (`unpriced`, fixed in Model Pricing), or a judge made no call to go on yet
+   * (`noCalls`). Null when every judge's cost is known.
+   */
+  judgeGap: "unpriced" | "noCalls" | null;
 }
 
 /**
@@ -240,6 +250,11 @@ export function estimateJobSpend(opts: {
     busiestDayUsd: knowable ? perTargetUsd! * opts.rate * Math.max(0, ...(counts ?? [])) : null,
     tokensPerTarget: tokens.every((n) => n != null) ? tokens.reduce((a, b) => a! + b!, 0)! : null,
     model: models.length === 1 ? (models[0] as string) : null,
+    judgeGap: judges.some((h) => h && h.calls > 0 && h.priced === 0)
+      ? "unpriced"
+      : judges.some((h) => !h || h.calls === 0)
+        ? "noCalls"
+        : null,
   };
 }
 

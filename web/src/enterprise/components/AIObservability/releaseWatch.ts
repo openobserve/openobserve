@@ -23,6 +23,7 @@
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { TRACE_ERRORED_SQL } from "@/plugins/traces/llmTraceOutcome";
 import { buildAgentTraceFilter } from "@/plugins/traces/llmAgentFilter";
+import { traceUsageSum } from "@/plugins/traces/llmAttribution";
 
 export const WATCH_WINDOW_US = 3 * 3_600_000_000;
 /** The card starts once the new version has this many sessions in its window. */
@@ -46,9 +47,17 @@ export function versionWindowSql(stream: string, v: GenAiAgentListItem): string 
     `SELECT COUNT(*) AS traces, SUM(failed) AS failed, COUNT(DISTINCT session) AS sessions, ` +
     `SUM(cost) AS cost, approx_percentile_cont(duration_us, 0.95) AS p95_us FROM (` +
     `SELECT trace_id, ${TRACE_ERRORED_SQL} AS failed, MAX(gen_ai_conversation_id) AS session, ` +
-    `COALESCE(SUM(gen_ai_usage_cost), 0) AS cost, (MAX(end_time) - MIN(start_time)) / 1000 AS duration_us ` +
+    `${traceUsageSum("gen_ai_usage_cost")} AS cost, (MAX(end_time) - MIN(start_time)) / 1000 AS duration_us ` +
     `FROM "${stream}" WHERE ${buildAgentTraceFilter(v, stream)} GROUP BY trace_id)`
   );
+}
+
+/**
+ * The localStorage key that mutes one release: the same agent and version in
+ * another org, stream or env is a different release and stays visible.
+ */
+export function releaseWatchMuteKey(org: string, stream: string, v: GenAiAgentListItem): string {
+  return `o2_release_watch_muted:${JSON.stringify([org, stream, v.id ?? v.name, v.env ?? "", v.version ?? ""])}`;
 }
 
 /** The failing traces' error messages, for classes the new version introduced. */

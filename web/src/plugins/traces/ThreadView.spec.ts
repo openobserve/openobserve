@@ -188,21 +188,52 @@ describe("ThreadView", () => {
       expect(text).toContain("1");
     });
 
-    it("should display Tools count equal to the number of tool-call spans", () => {
+    const toolChipValue = () => wrapper.find(".thread-chip--tools .thread-chip__value").text();
+
+    it("should display Tools count equal to the number of tool cards", () => {
       const llm = makeLLMSpan();
       const tool = makeToolSpan();
       wrapper = mountThreadView({ spans: [llm, tool] });
-      const text = wrapper.find(".thread-summary").text();
-      expect(text).toContain("Tools");
-      expect(text).toContain("1");
+      expect(toolChipValue()).toBe("1");
+      expect(wrapper.findAll(".thread-tool-row")).toHaveLength(1);
+    });
+
+    // C2-08: the chip counts the cards drawn, including calls with no tool span.
+    it("counts tool calls recorded without a tool span, as the cards do", () => {
+      const llm = makeLLMSpan({
+        gen_ai_output_messages: JSON.stringify([
+          {
+            role: "assistant",
+            parts: [
+              { type: "tool_call", id: "c1", name: "search_web", arguments: {} },
+              { type: "tool_call", id: "c2", name: "read_file", arguments: {} },
+            ],
+          },
+        ]),
+      });
+      wrapper = mountThreadView({ spans: [llm] });
+      expect(wrapper.findAll(".thread-tool-row")).toHaveLength(2);
+      expect(toolChipValue()).toBe("2");
+    });
+
+    // C2-08: a tool span that wraps the only model call starts before it.
+    it("shows and counts a tool span that starts before the first model call", () => {
+      const llm = makeLLMSpan({ reference_parent_span_id: "outer" });
+      const outer = makeToolSpan({
+        span_id: "outer",
+        tool_name: "outer_task",
+        start_time: BASE_TIME_NS - 200_000_000,
+      });
+      const inner = makeToolSpan({ span_id: "inner", tool_name: "inner_lookup" });
+      wrapper = mountThreadView({ spans: [llm, outer, inner] });
+      const names = wrapper.findAll(".thread-tool-row__name").map((n) => n.text());
+      expect(names).toEqual(["outer_task", "inner_lookup"]);
+      expect(toolChipValue()).toBe("2");
     });
 
     it("should display zero Tools when no tool spans are present", () => {
       wrapper = mountThreadView({ spans: [makeLLMSpan()] });
-      const chips = wrapper.findAll(".thread-chip");
-      const toolChip = chips.find((c) => c.text().includes("Tools"));
-      expect(toolChip).toBeDefined();
-      expect(toolChip!.text()).toContain("0");
+      expect(toolChipValue()).toBe("0");
     });
 
     it("should display the dominant model name in the Model chip", () => {
@@ -489,6 +520,9 @@ describe("ThreadView", () => {
       expect(row.text()).toContain("grep");
       expect(wrapper.find(".thread-pill").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("Called grep");
+      // C2-08: no span means no result was recorded, not an empty result.
+      expect(wrapper.text()).toContain("No result recorded");
+      expect(wrapper.text()).not.toContain("(empty)");
     });
 
     it("should emit span-selected with the tool span_id when the view button is clicked", async () => {

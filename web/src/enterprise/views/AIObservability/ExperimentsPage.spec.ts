@@ -258,4 +258,57 @@ describe("ExperimentsPage live rows", () => {
     wrapper.unmount();
     vi.useRealTimers();
   });
+
+  // C2-X9: an SDK run whose process died stays "running" until its 24 h deadline.
+  it("backs off while a live row does not move, and pauses while the tab is hidden", async () => {
+    vi.useFakeTimers();
+    queryClient.clear();
+    const service = (await import("@/services/llm-experiments.service")).default;
+    const stuck = makeExperiment({
+      id: "sdk",
+      status: "running",
+      executionProgress: { completed: 3, total: 10, skipped: 0 },
+    });
+    (service.list as any).mockReset().mockResolvedValue([stuck]);
+    route.query = {};
+    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(false);
+
+    const wrapper = mount(ExperimentsPage, {
+      global: {
+        stubs: {
+          OPageLayout: { template: `<main><slot /></main>` },
+          ExperimentBrowser: true,
+          OEmptyState: true,
+        },
+      },
+    });
+    await flushPromises();
+    const calls = () => (service.list as any).mock.calls.length;
+    const afterMount = calls();
+
+    // 5 s, then 10 s, then 20 s: nothing moved between reads.
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(calls()).toBe(afterMount + 1);
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(calls()).toBe(afterMount + 1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(calls()).toBe(afterMount + 2);
+
+    // Hidden: the pending read still lands, then nothing more is scheduled.
+    hidden.mockReturnValue(true);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(calls()).toBe(afterMount + 3);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(calls()).toBe(afterMount + 3);
+
+    // Shown again: one read at once.
+    hidden.mockReturnValue(false);
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flushPromises();
+    expect(calls()).toBe(afterMount + 4);
+
+    wrapper.unmount();
+    hidden.mockRestore();
+    vi.useRealTimers();
+  });
 });

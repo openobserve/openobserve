@@ -70,17 +70,18 @@ export function useJobSpendEstimate(opts: {
       loadingTraffic.value = true;
       return;
     }
+    const { startUs, endUs } = lastWeek();
     const sql = matchedPerDaySql(
       opts.stream.value,
       opts.where.value,
       opts.scope.value,
       opts.fields.value ?? [],
+      startUs,
     );
     if (!sql) {
       dailyCounts.value = null;
       return;
     }
-    const { startUs, endUs } = lastWeek();
     loadingTraffic.value = true;
     try {
       const rows = await executeQueryOnce(sql, startUs, endUs, "traces");

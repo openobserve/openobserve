@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :row-key="rowKey"
         :loading="showSkeleton"
         :error="error ? t('emptyState.loadError.title') : null"
+        :forbidden="forbidden"
         pagination="none"
         sorting="client"
         :default-columns="false"
@@ -246,6 +247,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 const props = defineProps<{
   models: UnpricedModel[];
@@ -257,6 +259,8 @@ const props = defineProps<{
   fetching: boolean;
   /** The last read failed: the load-error state, whose Retry emits `refresh`. */
   error: boolean;
+  /** The read was denied: the no-access state (a license denial names its features). */
+  forbidden?: ForbiddenState;
   /** A read for the current stream succeeded, so zero rows means everything is priced. */
   loaded: boolean;
   lastRunAt: number;
@@ -286,7 +290,7 @@ const noStreams = computed(() => props.streamsLoaded && !props.streams.length);
 // Until the stream list and a read resolve there is nothing to judge, so the
 // skeleton holds instead of a premature "everything is priced".
 const showSkeleton = computed(
-  () => !props.error && !noStreams.value && (props.loading || !props.loaded),
+  () => !props.error && !props.forbidden && !noStreams.value && (props.loading || !props.loaded),
 );
 
 const bannerText = computed(() =>

@@ -74,46 +74,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <OTable
-        :data="rows"
-        :columns="columns"
-        row-key="user_id"
-        :loading="loading"
-        :show-global-filter="false"
-        pagination="client"
-        class="min-h-0 flex-1"
-        :empty-message="failed ? t('llmAttribution.loadFailed') : t('llmAttribution.users.empty')"
-        data-test="ai-users-table"
+      <div
+        v-if="noStream"
+        class="text-compact text-text-secondary flex flex-1 flex-col items-center justify-center gap-1"
+        data-test="ai-users-no-stream"
       >
-        <template #cell-cost="{ row }">{{ `$${Number(row.cost).toFixed(2)}` }}</template>
-        <template #cell-tokens="{ row }">{{ formatTokens(Number(row.tokens)) }}</template>
-        <template #cell-failure_rate="{ row }">
-          {{ Number(row.failure_rate).toFixed(1) }}%
-        </template>
-        <template #cell-last_seen="{ row }">
-          {{ timestampToTimezoneDate(Number(row.last_seen), timezone, "yyyy-MM-dd HH:mm") }}
-        </template>
-        <template #cell-actions="{ row }">
-          <OButton
-            variant="outline"
-            size="xs"
-            :data-test="`ai-users-sessions-${row.user_id}`"
-            @click="openSessions(row.user_id)"
-          >
-            {{ t("llmAttribution.users.sessions") }}
-          </OButton>
-        </template>
-      </OTable>
-      <span class="text-2xs text-text-secondary" data-test="ai-users-count">
-        {{ t("llmAttribution.users.count", { n: rows.length }) }}
-      </span>
+        <span class="text-text-heading font-semibold">{{
+          t("llmAttribution.users.noStream")
+        }}</span>
+        <span>{{ t("llmAttribution.users.noStreamHint") }}</span>
+      </div>
+      <template v-else>
+        <OTable
+          :data="rows"
+          :columns="columns"
+          row-key="user_id"
+          :loading="loading"
+          :show-global-filter="false"
+          pagination="client"
+          class="min-h-0 flex-1"
+          :empty-message="
+            failed ? t('llmAttribution.users.loadFailed') : t('llmAttribution.users.empty')
+          "
+          data-test="ai-users-table"
+        >
+          <template #cell-cost="{ row }">
+            <LLMCostCell
+              :cost="Number(row.cost) || 0"
+              :tokens="Number(row.tokens) || 0"
+              :unpriced-tokens="Number(row.unpriced) || 0"
+              scope="row"
+              :stream="stream"
+              :time-window="{ start: timeRange.startTime, end: timeRange.endTime }"
+              :format="(c: number) => `$${formatCost(c)}`"
+            />
+          </template>
+          <template #cell-tokens="{ row }">{{ formatTokens(Number(row.tokens)) }}</template>
+          <template #cell-failure_rate="{ row }">
+            {{ Number(row.failure_rate).toFixed(1) }}%
+          </template>
+          <template #cell-last_seen="{ row }">
+            {{ timestampToTimezoneDate(Number(row.last_seen), timezone, "yyyy-MM-dd HH:mm") }}
+          </template>
+          <template #cell-actions="{ row }">
+            <OButton
+              variant="outline"
+              size="xs"
+              :title="tenant ? t('llmAttribution.users.sessionsNoTenant') : undefined"
+              :data-test="`ai-users-sessions-${row.user_id}`"
+              @click="openSessions(row.user_id)"
+            >
+              {{ t("llmAttribution.users.sessions") }}
+            </OButton>
+          </template>
+        </OTable>
+        <span
+          v-if="!failed && !loading"
+          class="text-2xs text-text-secondary"
+          data-test="ai-users-count"
+        >
+          {{
+            rows.length >= USERS_LIMIT
+              ? t("llmAttribution.users.capped", { n: USERS_LIMIT })
+              : t("llmAttribution.users.count", { n: rows.length }, rows.length)
+          }}
+        </span>
+      </template>
     </div>
   </AiPageShell>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
@@ -126,8 +159,9 @@ import { useAiDateController } from "@/enterprise/composables/useAiDateControlle
 import { useLlmPageScope } from "@/enterprise/composables/useLlmPageScope";
 import useStreams from "@/composables/useStreams";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
-import { ATTRIBUTION_COLUMNS, usersSql } from "@/plugins/traces/llmAttribution";
-import { formatTokens } from "@/utils/llmUtils";
+import { ATTRIBUTION_COLUMNS, USERS_LIMIT, usersSql } from "@/plugins/traces/llmAttribution";
+import LLMCostCell from "@/plugins/traces/LLMCostCell.vue";
+import { formatCost, formatTokens } from "@/utils/llmUtils";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 
 defineOptions({ name: "AIUsersPage" });
@@ -135,6 +169,7 @@ defineOptions({ name: "AIUsersPage" });
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
 const { getStream } = useStreams(t);
 const { executeQuery } = useLLMStreamQuery();
 const {
@@ -152,19 +187,31 @@ const {
   scope,
   load: loadScope,
 } = useLlmPageScope(t);
+// A stream from the URL is kept when the org still has it (the loader checks).
+stream.value = typeof route.query.stream === "string" ? route.query.stream : "";
 
+const queryString = (v: unknown) => (typeof v === "string" ? v : "");
 const timezone = computed(() => store.state.timezone || "UTC");
 const rows = ref<any[]>([]);
 const loading = ref(false);
 const failed = ref(false);
 const lastRunAt = ref<number | null>(null);
 const hasTenant = ref(false);
-const tenant = ref<string | null>(null);
-const search = ref("");
+// Filters start from the URL, so a reload or a tab switch keeps them.
+const tenant = ref<string | null>(queryString(route.query.tenant) || null);
+const search = ref(queryString(route.query.q));
+// Set when the scope has loaded; the filter watchers reload only after that.
+const ready = ref(false);
 let seq = 0;
 
+// The org has no LLM trace stream at all: nothing to instrument with user.id yet.
+const noStream = computed(() => ready.value && !availableStreams.value.length);
+
+// Tenants seen on the last load that was not narrowed to one tenant, so picking one
+// keeps the others on offer; the picked one stays listed even when it came from the URL.
+const knownTenants = ref<string[]>([]);
 const tenantOptions = computed(() =>
-  [...new Set(rows.value.map((r) => r.tenant).filter(Boolean))].map((v) => ({
+  [...new Set([...knownTenants.value, ...(tenant.value ? [tenant.value] : [])])].map((v) => ({
     value: v,
     label: raw(v),
   })),
@@ -231,8 +278,10 @@ const columns: OTableColumnDef[] = [
 
 async function reload() {
   const { startTime, endTime } = timeRange.value;
-  await loadScope(startTime, endTime);
-  if (!stream.value) return;
+  if (!stream.value) {
+    rows.value = [];
+    return;
+  }
   const mine = ++seq;
   loading.value = true;
   failed.value = false;
@@ -240,21 +289,27 @@ async function reload() {
     const schema = await getStream(stream.value, "traces", true).catch(() => null);
     const names = new Set((schema?.schema ?? []).map((f: any) => f.name));
     if (!names.has(ATTRIBUTION_COLUMNS.user)) {
-      rows.value = [];
+      if (mine === seq) rows.value = [];
       return;
     }
     hasTenant.value = names.has(ATTRIBUTION_COLUMNS.tenant);
+    const narrowed = !!tenant.value || !!search.value.trim();
     const hits = (await executeQuery(
       usersSql(stream.value, {
         scope: scope.value,
         tenantColumn: hasTenant.value ? ATTRIBUTION_COLUMNS.tenant : null,
         tenant: tenant.value ?? undefined,
         search: search.value.trim() || undefined,
+        hasCostStatus: names.has("gen_ai_usage_cost_status"),
       }),
       startTime,
       endTime,
     )) as any[];
-    if (mine === seq) rows.value = hits;
+    if (mine !== seq) return;
+    rows.value = hits;
+    if (!narrowed) {
+      knownTenants.value = [...new Set(hits.map((r) => r.tenant).filter(Boolean))] as string[];
+    }
   } catch (e) {
     if (mine !== seq) return;
     rows.value = [];
@@ -268,40 +323,89 @@ async function reload() {
   }
 }
 
+/**
+ * Loads the streams and agents for the window, then the users once. The filter
+ * watchers stay quiet while the scope settles (the stream picked on load, an
+ * agent dropped by it), so one load runs one users query, not one per change.
+ */
+async function loadAll() {
+  ready.value = false;
+  const { startTime, endTime } = timeRange.value;
+  await loadScope(startTime, endTime);
+  const urlAgent = queryString(route.query.agent);
+  if (urlAgent && agentNames.value.includes(urlAgent)) agentName.value = urlAgent;
+  await nextTick();
+  ready.value = true;
+  syncUrl();
+  await reload();
+}
+
 /** Refresh re-anchors a relative window to now, as the other AI pages do. */
 function refresh() {
   if (dateState.value.valueType === "relative") {
     applyRelative(dateState.value.relativeTimePeriod ?? DEFAULT_RELATIVE);
   }
-  reload();
+  loadAll();
 }
 
+// The page's filters in the URL, beside the date controller's period.
+function syncUrl() {
+  const query = { ...route.query };
+  const set = (key: string, value: string | null | undefined) => {
+    if (value) query[key] = value;
+    else delete query[key];
+  };
+  set("stream", stream.value);
+  set("agent", agentName.value);
+  set("tenant", tenant.value);
+  set("q", search.value.trim());
+  if (JSON.stringify(query) !== JSON.stringify(route.query)) router.replace({ query });
+}
+
+/**
+ * The user's sessions, under the same agent scope as the row. Sessions has no
+ * tenant filter; the button's tooltip says so while one is set.
+ */
 function openSessions(user: string) {
   router.push({
     name: "aiSessions",
     query: {
       org_identifier: store.state.selectedOrganization?.identifier,
-      type: "stream",
-      stream: stream.value,
+      ...(agentName.value
+        ? { type: "agent", agent: agentName.value }
+        : { type: "stream", stream: stream.value }),
       user,
     },
   });
 }
 
+// The picker replays the range in force when it mounts; only a new range reloads.
 async function onDateChange(value: any) {
-  onDateStateChange(value);
+  if (!onDateStateChange(value)) return;
   await nextTick();
-  reload();
+  loadAll();
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 watch(search, () => {
+  if (!ready.value) return;
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(reload, 300);
+  searchTimer = setTimeout(() => {
+    syncUrl();
+    reload();
+  }, 300);
 });
 // A tenant was picked from the previous stream's rows; it does not carry over.
-watch(stream, () => (tenant.value = null));
-watch([stream, agentName, tenant], reload);
+watch(stream, () => {
+  if (!ready.value) return;
+  tenant.value = null;
+  knownTenants.value = [];
+});
+watch([stream, agentName, tenant], () => {
+  if (!ready.value) return;
+  syncUrl();
+  reload();
+});
 
-onMounted(reload);
+onMounted(loadAll);
 </script>

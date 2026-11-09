@@ -42,7 +42,7 @@ vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
 vi.mock("./TurnPreviewCard.vue", () => ({
   default: {
     name: "TurnPreviewCard",
-    props: ["turn", "index", "cachePct", "side"],
+    props: ["turn", "index", "cachePct", "side", "userText"],
     template: `<span data-test="turn-preview-stub"><slot /></span>`,
   },
 }));
@@ -50,7 +50,7 @@ vi.mock("./TurnPreviewCard.vue", () => ({
 vi.mock("./SessionRibbon.vue", () => ({
   default: {
     name: "SessionRibbon",
-    props: ["traces", "cachePct"],
+    props: ["traces", "cachePct", "turnOffset", "userText"],
     emits: ["jump"],
     template: `<div data-test="session-ribbon-stub" />`,
   },
@@ -627,6 +627,40 @@ describe("SessionDetails — turn rows", () => {
     );
   });
 
+  it("keeps each turn's session number when older turns load (S3V-02)", async () => {
+    const t1 = makeTrace({ traceId: "t1", startTimeMicros: 1700000001000000000 });
+    const t2 = makeTrace({ traceId: "t2", startTimeMicros: 1700000002000000000 });
+    const t3 = makeTrace({ traceId: "t3", startTimeMicros: 1700000003000000000 });
+    mockFetchSession.mockResolvedValueOnce({
+      detail: makeDetail({ turns: 3 }),
+      traces: [t3],
+      hasOlder: true,
+    });
+    mockFetchSession.mockResolvedValueOnce({
+      detail: makeDetail({ turns: 3 }),
+      traces: [t1, t2, t3],
+      hasOlder: false,
+    });
+
+    const wrapper = await mountComponent();
+    // Only the newest turn is loaded: it is turn 3 of 3, not turn 1.
+    expect(wrapper.find(turnRowSelector("t3")).attributes("id")).toBe("turn-3");
+    expect(wrapper.findComponent({ name: "SessionRibbon" }).props("turnOffset")).toBe(2);
+
+    await wrapper.find("[data-test='session-load-older-turns-btn']").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(turnRowSelector("t3")).attributes("id")).toBe("turn-3");
+    expect(wrapper.find(turnRowSelector("t1")).attributes("id")).toBe("turn-1");
+    const ribbon = wrapper.findComponent({ name: "SessionRibbon" });
+    expect(ribbon.props("turnOffset")).toBe(0);
+    // A jump by session turn number opens that turn.
+    ribbon.vm.$emit("jump", 2);
+    await flushPromises();
+    expect(wrapper.find(turnBodySelector("t2")).exists()).toBe(true);
+    expect(wrapper.find(turnBodySelector("t3")).exists()).toBe(false);
+  });
+
   // The server hides the text (the Sessions list's Rust regex), so a pattern a
   // browser RegExp rejects, like the inline flag `(?s)`, still works here.
   it("hides the agent's harness text in the turn title and body (AIO-22)", async () => {
@@ -661,10 +695,15 @@ describe("SessionDetails — turn rows", () => {
     expect(body.text()).not.toContain("os: linux");
     const hidden = wrapper.find('[data-test="session-turn-harness-trace-xyz"]');
     expect(hidden.text()).toContain('readableSessions.hidden{"n":1}');
+    // The ribbon's hover card hides it too.
+    const ribbon = wrapper.findComponent({ name: "SessionRibbon" });
+    const [turn] = ribbon.props("traces");
+    expect(ribbon.props("userText")(turn)).toBe("Fix the login bug");
 
     // Show puts the text back for that turn.
     await hidden.trigger("click");
     expect(wrapper.find(turnBodySelector()).text()).toContain("os: linux");
+    expect(ribbon.props("userText")(turn)).toBeUndefined();
   });
 
   // TS-13 / S3-04: the agent comes from the turns already loaded, with no query
@@ -884,6 +923,111 @@ describe("SessionDetails — session span derived counts", () => {
     const body = wrapper.find(turnBodySelector());
     expect(body.text()).not.toContain("traces.sessionDetail.stats.llmCalls");
     expect(body.text()).not.toContain("traces.sessionDetail.stats.toolCalls");
+  });
+
+  it("counts tool calls found only in the LLM output, with no tool span (G3-T6)", async () => {
+    const toolCallOutput = (id: string) =>
+      JSON.stringify([
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [{ id, type: "function", function: { name: "grep", arguments: "{}" } }],
+        },
+      ]);
+    mockFetchSessionSpans.mockResolvedValue([
+      makeSpan({ span_id: "llm-1", gen_ai_output_messages: toolCallOutput("c1") }),
+    ]);
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    const calls = wrapper.findComponent({ name: "ThreadToolCalls" }).props("toolCalls");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ gen_ai_tool_name: "grep", synthetic: true });
+    expect(wrapper.find(turnBodySelector()).text()).toContain(
+      "1 traces.sessionDetail.stats.toolCalls",
+    );
+    const rail = wrapper.find("[data-test='session-rail']").text();
+    expect(rail).toContain("grep");
+    expect(rail).not.toContain("traces.sessionDetail.rail.noTools");
+  });
+
+  it("does not double-count a payload tool call that has its own tool span", async () => {
+    mockFetchSessionSpans.mockResolvedValue([
+      makeSpan({
+        span_id: "llm-1",
+        gen_ai_output_messages: JSON.stringify([
+          {
+            role: "assistant",
+            tool_calls: [{ id: "c1", function: { name: "grep", arguments: "{}" } }],
+          },
+        ]),
+      }),
+      makeSpan({
+        span_id: "tool-1",
+        gen_ai_operation_name: "execute_tool",
+        gen_ai_tool_name: "grep",
+        gen_ai_tool_call_id: "c1",
+      }),
+    ]);
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    const calls = wrapper.findComponent({ name: "ThreadToolCalls" }).props("toolCalls");
+    expect(calls.map((c: { span_id: string }) => c.span_id)).toEqual(["tool-1"]);
+  });
+});
+
+describe("SessionDetails — span fetch failure (G4-08)", () => {
+  it("shows an error with Retry on the turn and in Tool Hotspots, not 'not captured'", async () => {
+    mockFetchSessionSpans.mockRejectedValue(new Error("500"));
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    const body = wrapper.find(turnBodySelector());
+    expect(body.text()).toContain("traces.sessionDetail.spansFailed");
+    expect(body.text()).not.toContain("traces.sessionDetail.noUserMessage");
+    const caption = wrapper.find("[data-test='session-tool-hotspots-failed']");
+    expect(caption.text()).toContain('traces.sessionDetail.rail.toolsFailed{"n":1}');
+    expect(wrapper.text()).not.toContain("traces.sessionDetail.rail.noTools");
+
+    mockFetchSessionSpans.mockResolvedValue([makeSpan()]);
+    await wrapper.find("[data-test='session-turn-spans-retry-trace-xyz']").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(turnBodySelector()).text()).toContain("Hello");
+    expect(wrapper.find("[data-test='session-turn-spans-error-trace-xyz']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='session-tool-hotspots-failed']").exists()).toBe(false);
+  });
+
+  it("marks only the older turns whose span fetch failed after Load Older Turns", async () => {
+    const newer = makeTrace({ traceId: "t-new", startTimeMicros: 1700000002000000000 });
+    const older = makeTrace({ traceId: "t-old", startTimeMicros: 1700000001000000000 });
+    mockFetchSession.mockResolvedValueOnce({
+      detail: makeDetail({ turns: 2 }),
+      traces: [newer],
+      hasOlder: true,
+    });
+    mockFetchSession.mockResolvedValueOnce({
+      detail: makeDetail({ turns: 2 }),
+      traces: [older, newer],
+      hasOlder: false,
+    });
+    mockFetchSessionSpans
+      .mockResolvedValueOnce([makeSpan({ trace_id: "t-new" })])
+      .mockRejectedValue(new Error("500"));
+
+    const wrapper = await mountComponent();
+    await wrapper.find("[data-test='session-load-older-turns-btn']").trigger("click");
+    await flushPromises();
+    await expandTurn(wrapper, "t-new");
+    await expandTurn(wrapper, "t-old");
+
+    expect(wrapper.find("[data-test='session-turn-spans-error-t-old']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='session-turn-spans-error-t-new']").exists()).toBe(false);
+    expect(wrapper.find(turnBodySelector("t-new")).text()).toContain("Hello");
   });
 });
 

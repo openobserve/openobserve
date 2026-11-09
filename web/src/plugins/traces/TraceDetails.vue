@@ -241,9 +241,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Embedded (logs) header -->
         <header
           v-else
-          class="bg-surface-base flex! h-auto items-center justify-between py-0.5 ps-1"
+          class="bg-surface-base flex! h-auto items-center justify-between gap-x-3 py-0.5 ps-1"
         >
-          <div class="flex w-fit! items-center space-x-4">
+          <!-- Shrinks with the host (a drawer, not the viewport): the counts wrap to a second row instead of running past the edge. -->
+          <div class="flex min-w-0 flex-1 items-center space-x-4">
             <!-- Back button -->
             <OButton
               v-if="isStandaloneMode && showBackButton"
@@ -261,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
 
-            <div class="flex w-full min-w-0 items-center gap-2.5!">
+            <div class="flex w-full min-w-0 flex-wrap items-center gap-x-2.5! gap-y-1">
               <!-- Operation Name -->
               <OTruncatedText
                 as="div"
@@ -379,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="flex w-fit! items-center justify-end space-x-3">
+          <div class="flex w-fit! shrink-0 items-center justify-end space-x-3">
             <!-- Apply filters button (standalone mode, right side) -->
             <OButton
               v-if="isStandaloneMode && areFiltersAdded"
@@ -690,14 +691,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <OBanner
-                  v-for="sentence in timeHeadlines"
-                  :key="sentence"
+                  v-for="headline in timeHeadlines"
+                  :key="headline.key"
                   variant="info"
                   dense
                   class="mx-2 mb-1 shrink-0"
                   data-test="trace-details-time-headline"
                 >
-                  {{ sentence }}
+                  {{ headline.text }}
                 </OBanner>
                 <TraceHeader
                   data-test="trace-details-header"
@@ -1202,8 +1203,8 @@ import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTra
 import { hasLLMPayload, spanTimeBounds } from "./threadView.utils";
 import {
   attributeSteps,
-  attributionSentence,
   headlineSteps,
+  mergedHeadlines,
   REQUEST_TIMELINE_KEY,
 } from "./timeAttribution";
 import { traceIssues } from "./traceIssues";
@@ -1977,9 +1978,7 @@ export default defineComponent({
 
     // AIO-37: where each LLM or tool step spent its time, shared with the Thread view.
     const timeSteps = computed(() => attributeSteps(effectiveSpanList.value ?? []));
-    const timeHeadlines = computed(() =>
-      headlineSteps(timeSteps.value).map((step) => attributionSentence(step, t)),
-    );
+    const timeHeadlines = computed(() => mergedHeadlines(headlineSteps(timeSteps.value), t));
     // The lanes follow the trace kind until the user flips the switch.
     const lanesOverride = ref<boolean | null>(null);
     const showLanes = computed(() => lanesOverride.value ?? hasLLMSpans.value);
@@ -2344,6 +2343,16 @@ export default defineComponent({
           setupTraceDetails();
           if (props.spanIdProp) updateSelectedSpan(props.spanIdProp);
         }
+      },
+    );
+
+    // A host that moves to another span of the same trace (e.g. Previous /
+    // Next score) changes only spanIdProp; the trace watcher above misses it.
+    watch(
+      () => props.spanIdProp,
+      (newSpanId) => {
+        if (props.mode !== "embedded" || !newSpanId) return;
+        if (newSpanId !== selectedSpanId.value) updateSelectedSpan(newSpanId);
       },
     );
 
@@ -3637,6 +3646,9 @@ export default defineComponent({
         org_identifier: effectiveOrgIdentifier.value,
         tab: originSearchTab(),
       };
+      // Land the new tab on the span selected here (the Thread/Waterfall
+      // choice already carries over through the remembered last tab).
+      if (selectedSpanId.value) query.span_id = selectedSpanId.value;
 
       // Add log_stream parameter for correlation navigation
       // Priority: correlatedLogStream prop > query parameter

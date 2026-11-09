@@ -269,6 +269,17 @@ describe("LLMInsightsDashboard — version compare entry", () => {
     expect(btn.exists()).toBe(false);
   });
 
+  it("hides the compare entry when the other version is only in another stream", async () => {
+    const elsewhere = { ...AGENT_V14, id: "x2", source_stream: "other" };
+    mockListAgents.mockResolvedValue({ agents: [AGENT_V15, elsewhere] });
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    expect(wrapper.find('[data-test="llm-insights-compare-entry"]').exists()).toBe(false);
+  });
+
   it("passes the page start to the compare version list so it is never narrower than the page", async () => {
     const wrapper = mountDashboard();
     await flushPromises();

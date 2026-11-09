@@ -26,7 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     size="md"
-    :title="t('oneClickEval.title', { agent: agentLabel })"
+    :title="
+      agentLabel ? t('oneClickEval.title', { agent: agentLabel }) : t('oneClickEval.titleAll')
+    "
     :sub-title="t('oneClickEval.subtitle')"
     :primary-button-label="t('oneClickEval.start')"
     :primary-button-disabled="!canStart"
@@ -92,6 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </section>
 
+      <span
+        v-if="!loading && !streams.length"
+        class="text-2xs text-text-error"
+        data-test="one-click-eval-no-stream"
+      >
+        {{ t("oneClickEval.noStream") }}
+      </span>
       <div class="grid grid-cols-2 gap-3">
         <OSelect
           v-model="selectedStream"
@@ -108,7 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="text-2xs text-text-secondary" data-test="one-click-eval-estimate">
         <template v-if="tracesPerDay">
-          {{ t("oneClickEval.estimate", { n: Math.round(tracesPerDay * rate).toLocaleString() }) }}
+          {{
+            t(
+              "oneClickEval.estimate",
+              { traces: Math.round(tracesPerDay * rate).toLocaleString() },
+              Math.round(tracesPerDay * rate),
+            )
+          }}
         </template>
         <template v-if="!judgeUnpriced">
           {{ t("evalSpend.oneClick.budget", { amount: formatUsd(DEFAULT_DAILY_BUDGET_USD) }) }}
@@ -185,6 +200,7 @@ import {
   type CatalogScorer,
 } from "@/services/online-evals-catalog.service";
 import { entityId, providerTypeOf } from "./utils/evalEntity";
+import { extractTemplateVariables } from "./utils/evalFormat";
 import { TRACE_COMPLETION_WINDOW_DEFAULTS } from "./utils/completionWindow";
 import {
   buildOneClickJob,
@@ -389,19 +405,23 @@ async function start() {
   creating.value = true;
   try {
     const picked = judges.value.filter((j) => selected.value.has(j.name));
-    const scorers: Scorer[] = [];
+    const scorers: { id: string; variables: string[] }[] = [];
     let firstConfigId = "";
     for (const judge of picked) {
       const config = await ensureScoreConfig(judge.requiredScoreConfigName);
       firstConfigId ||= entityId(config);
-      scorers.push(await ensureScorer(judge, entityId(config)));
+      const scorer = await ensureScorer(judge, entityId(config));
+      scorers.push({
+        id: entityId(scorer),
+        variables: scorer.variables ?? extractTemplateVariables(judge.scorer.template),
+      });
     }
     const job = await onlineEvalsService.jobs.create(
       org(),
       buildOneClickJob({
         agent: props.agent ?? null,
         stream: selectedStream.value,
-        scorerIds: scorers.map((s) => entityId(s)),
+        scorers,
         judgeNames: picked.map((j) => j.name),
         rate: rate.value,
         completion: TRACE_COMPLETION_WINDOW_DEFAULTS,
@@ -417,7 +437,7 @@ async function start() {
         org_identifier: org(),
         tab: "quality",
         config: firstConfigId,
-        ...(props.agent ? { agent: props.agent } : {}),
+        ...(props.agent ? { type: "agent", agent: props.agent } : {}),
       },
     });
   } catch (e: any) {
@@ -440,9 +460,18 @@ function openFullForm() {
   });
 }
 
+// The providers page comes back here once the provider is saved, and the
+// dialog reopens (`one_click`), so the picked judges are the only thing lost.
 function addProvider() {
   emit("update:open", false);
-  router.push({ name: "llmProviders", query: { org_identifier: org(), action: "add" } });
+  const back = router.resolve({
+    path: router.currentRoute.value.path,
+    query: { ...router.currentRoute.value.query, one_click: "1" },
+  }).fullPath;
+  router.push({
+    name: "llmProviders",
+    query: { org_identifier: org(), action: "add", return_to: back },
+  });
 }
 
 watch(

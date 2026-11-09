@@ -122,7 +122,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :actions="search.trim() || tileFilter ? undefined : emptyActions"
             @action="onEmptyAction"
           />
-          <OneClickEvalDialog v-model:open="oneClickOpen" :agent="scopeAgent" />
+          <OneClickEvalDialog
+            v-model:open="oneClickOpen"
+            :agent="scopeAgent"
+            @created="emit('created')"
+          />
         </div>
       </template>
 
@@ -216,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -262,6 +266,8 @@ const emit = defineEmits<{
   (e: "update:tileFilter", value: QualityTileFilter | null): void;
   (e: "open", row: QualityRow, only: QualityOnly): void;
   (e: "retry"): void;
+  /** One-click created a score config, scorer and job: the lists are stale. */
+  (e: "created"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -374,6 +380,18 @@ function openConfig(row: QualityRow) {
 const oneClickOpen = ref(false);
 const scopeAgent = computed(() =>
   typeof route.query.agent === "string" && route.query.agent ? route.query.agent : null,
+);
+// Back from adding a provider for it (`one_click`): the dialog reopens once.
+watch(
+  () => route.query.one_click,
+  (flag) => {
+    if (flag !== "1") return;
+    oneClickOpen.value = true;
+    const query = { ...route.query };
+    delete query.one_click;
+    router.replace({ query }).catch(() => {});
+  },
+  { immediate: true },
 );
 const emptyActions = computed<EmptyStateAction[]>(() => [
   {

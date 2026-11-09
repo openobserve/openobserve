@@ -23,10 +23,13 @@ import {
   budgetReading,
   budgetSpend,
   budgetSql,
+  budgetSummarySql,
+  formatBudgetUsd,
   budgetState,
   isLegacyBudgetAlert,
   mergeLegacyBudgets,
   spendError,
+  warningValue,
   type BudgetDef,
 } from "./aiBudgets";
 
@@ -66,10 +69,11 @@ describe("budgets (AIO-38)", () => {
     expect(sql).toContain(
       "WHERE feature_name = 'deep-research' GROUP BY feature_name ORDER BY spent DESC",
     );
-    const perSession = budgetSql({ ...feature, scope: "session", value: "", period: "hour" }, 100);
+    const perSession = budgetSql({ ...feature, scope: "session", value: "", period: "hour" });
     expect(perSession).toContain(
-      "WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' GROUP BY gen_ai_conversation_id ORDER BY spent DESC LIMIT 100",
+      "WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' GROUP BY gen_ai_conversation_id ORDER BY spent DESC",
     );
+    expect(perSession).not.toContain("LIMIT");
   });
 
   // W3-01: the agent name or user is often only on the root/agent span, the cost on its children.
@@ -85,10 +89,12 @@ describe("budgets (AIO-38)", () => {
     expect(budgetSql({ ...feature, scope: "user", value: "" })).toContain(
       "SELECT trace_id, MAX(user_id) AS user_id, COALESCE(",
     );
-    // A model is on each LLM call: spend stays per span.
-    expect(budgetSql({ ...feature, scope: "model", value: "gpt-4o" })).toBe(
-      "SELECT gen_ai_response_model, SUM(gen_ai_usage_cost) AS spent FROM \"default\" WHERE gen_ai_response_model = 'gpt-4o' GROUP BY gen_ai_response_model ORDER BY spent DESC",
-    );
+    // A model is on each LLM call: spend stays per span, over LLM calls only, so an agent
+    // span carrying the model does not count its children's cost again.
+    const model = budgetSql({ ...feature, scope: "model", value: "gpt-4o" });
+    expect(model).not.toContain("SUM(gen_ai_usage_cost)");
+    expect(model).toContain("THEN gen_ai_usage_cost ELSE 0 END) AS spent");
+    expect(model).toContain("WHERE gen_ai_response_model = 'gpt-4o'");
   });
 
   it("is one alert, warning at 80% and critical at 100% of each key's spend, readable back", () => {
@@ -116,11 +122,37 @@ describe("budgets (AIO-38)", () => {
     expect(budgetState(100, 400)).toBe("under");
     expect(budgetState(330, 400)).toBe("warning");
     expect(budgetState(412, 400)).toBe("over");
-    const each = budgetSpend({ ...feature, scope: "user", limitUsd: 25 }, [
-      { budget_key: "a", spent: 30 },
-      { budget_key: "b", spent: 10 },
+    const eachUser = { ...feature, scope: "user" as const, value: "", limitUsd: 25 };
+    const each = budgetSpend(eachUser, [
+      { key_count: 240, over_count: 130, spent: 4000, largest: 30 },
     ]);
-    expect(each).toEqual({ spent: 40, over: 1, largest: 30, keys: 2 });
+    expect(each).toEqual({ spent: 4000, over: 130, largest: 30, keys: 240 });
+    expect(budgetSpend(eachUser, [])).toEqual({ spent: 0, over: 0, largest: 0, keys: 0 });
+  });
+
+  // B-10: a per-key budget counts every key, not the first page of them.
+  it("summarises a per-key budget over all its keys", () => {
+    const sql = budgetSummarySql({ ...feature, scope: "user", value: "", limitUsd: 25 });
+    expect(sql).toMatch(
+      /^SELECT COUNT\(\*\) AS key_count, SUM\(CASE WHEN spent >= 25 THEN 1 ELSE 0 END\) AS over_count, SUM\(spent\) AS spent, MAX\(spent\) AS largest FROM \(SELECT user_id, SUM\(cost\) AS spent FROM \(/,
+    );
+    expect(sql).not.toContain("LIMIT");
+  });
+
+  // W3-04: 80% of a sub-cent limit, rounded to 4 decimals, landed on the limit and was refused.
+  it("keeps the warning below the limit for sub-cent limits, without float noise", () => {
+    expect(warningValue(0.0001)).toBe(0.00008);
+    expect(warningValue(0.0002)).toBe(0.00016);
+    expect(warningValue(0.3)).toBe(0.24);
+    expect(warningValue(400)).toBe(320);
+  });
+
+  // W3-V1: a sub-cent spend read "$0.00" next to a "$0.0003" limit.
+  it("shows sub-cent amounts with their digits, cents otherwise", () => {
+    expect(formatBudgetUsd(0.00044)).toBe("$0.00044");
+    expect(formatBudgetUsd(0.0003)).toBe("$0.0003");
+    expect(formatBudgetUsd(0)).toBe("$0.00");
+    expect(formatBudgetUsd(29.114)).toBe("$29.11");
   });
 
   // Two alerts of one name both fire and cannot be told apart on the page.

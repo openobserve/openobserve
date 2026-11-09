@@ -158,7 +158,7 @@
                 size="sm"
                 icon-left="add"
                 data-test="gen-ai-harness-add-agent"
-                @click="harnessRules.push({ agent: '', patternsText: '' })"
+                @click="addHarnessRule"
               >
                 {{ t("readableSessions.settings.addAgent") }}
               </OButton>
@@ -166,7 +166,7 @@
 
             <div
               v-for="(rule, i) in harnessRules"
-              :key="i"
+              :key="rule.id"
               class="rounded-default border-border-default flex flex-col gap-2 border p-3"
               :data-test="`gen-ai-harness-rule-${i}`"
             >
@@ -176,6 +176,8 @@
                   :label="t('readableSessions.settings.agent')"
                   :placeholder="raw('omp')"
                   class="max-w-64"
+                  :error="duplicateAgents.has(rule.agent.trim())"
+                  :error-message="t('readableSessions.settings.duplicateAgent')"
                   :data-test="`gen-ai-harness-agent-${i}`"
                 />
                 <OButton
@@ -189,10 +191,10 @@
                 <OButton
                   variant="outline"
                   size="sm"
-                  :loading="testing === i"
+                  :loading="testing === rule.id"
                   :disabled="!rule.agent.trim()"
                   :data-test="`gen-ai-harness-test-${i}`"
-                  @click="testRule(i)"
+                  @click="testRule(rule.id)"
                 >
                   {{ t("readableSessions.settings.test") }}
                 </OButton>
@@ -203,7 +205,7 @@
                   icon-left="delete"
                   :aria-label="t('readableSessions.settings.remove')"
                   :data-test="`gen-ai-harness-remove-${i}`"
-                  @click="harnessRules.splice(i, 1)"
+                  @click="removeHarnessRule(rule.id)"
                 />
               </div>
               <OTextarea
@@ -217,26 +219,26 @@
               />
               <!-- Before / after on recent sessions of this agent, with the draft patterns. -->
               <div
-                v-if="testResults[i]"
+                v-if="shownResults[rule.id]"
                 class="bg-surface-subtle rounded-default flex flex-col gap-2 p-2"
                 :data-test="`gen-ai-harness-result-${i}`"
               >
                 <span class="text-2xs text-text-secondary">
                   {{
                     t("readableSessions.settings.matches", {
-                      matched: testResults[i].matched,
-                      total: testResults[i].total,
+                      matched: shownResults[rule.id].matched,
+                      total: shownResults[rule.id].total,
                     })
                   }}
                 </span>
-                <div v-if="testResults[i].before" class="grid grid-cols-2 gap-2">
+                <div v-if="shownResults[rule.id].before" class="grid grid-cols-2 gap-2">
                   <div class="flex min-w-0 flex-col gap-1">
                     <span class="text-2xs text-text-secondary font-semibold">
                       {{ t("readableSessions.settings.before") }}
                     </span>
                     <pre
                       class="text-2xs text-text-body max-h-32 overflow-auto whitespace-pre-wrap"
-                      >{{ testResults[i].before }}</pre>
+                      >{{ shownResults[rule.id].before }}</pre>
                   </div>
                   <div class="flex min-w-0 flex-col gap-1">
                     <span class="text-2xs text-text-secondary font-semibold">
@@ -244,7 +246,7 @@
                     </span>
                     <pre
                       class="text-2xs text-text-body max-h-32 overflow-auto whitespace-pre-wrap"
-                      >{{ testResults[i].after }}</pre>
+                      >{{ shownResults[rule.id].after }}</pre>
                   </div>
                 </div>
               </div>
@@ -289,7 +291,7 @@
           size="sm-action"
           class="ms-auto"
           :loading="saving"
-          :disabled="!isDirty"
+          :disabled="!isDirty || duplicateAgents.size > 0"
           @click="saveConfig"
         >
           {{ t("common.save") }}
@@ -337,6 +339,7 @@ import {
 } from "@/plugins/traces/llmAttribution";
 import { DEFAULT_HARNESS_PATTERNS } from "@/plugins/traces/harnessText";
 import { messagesFromInput } from "@/plugins/traces/threadView.utils";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -422,7 +425,35 @@ const identityText = ref<Record<IdentityKey, string>>({
 // setDraft: "Apply defaults" and the default seeding only cover the field lists.
 // Patterns stay as typed (one per line) and are parsed on read, so a trailing
 // newline or space survives while typing.
-const harnessRules = ref<Array<{ agent: string; patternsText: string }>>([]);
+// Each row has a stable id, so a test result stays with its row when another is removed.
+type HarnessRow = { id: number; agent: string; patternsText: string };
+let nextHarnessRowId = 0;
+const harnessRow = (agent = "", patternsText = ""): HarnessRow => ({
+  id: nextHarnessRowId++,
+  agent,
+  patternsText,
+});
+const harnessRules = ref<HarnessRow[]>([]);
+const addHarnessRule = () => {
+  harnessRules.value.push(harnessRow());
+};
+const removeHarnessRule = (id: number) => {
+  harnessRules.value = harnessRules.value.filter((r) => r.id !== id);
+  const { [id]: _removed, ...rest } = testResults.value;
+  testResults.value = rest;
+};
+// Agents named on more than one row. Save refuses them, as the server does: two
+// rules for one agent would hide different text in the list and in Session Detail.
+const duplicateAgents = computed(() => {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const r of harnessRules.value) {
+    const agent = r.agent.trim();
+    if (agent && seen.has(agent)) duplicates.add(agent);
+    seen.add(agent);
+  }
+  return duplicates;
+});
 const sessionTitle = ref<GenAiAgentMappingConfig["session_title"]>("off");
 const sessionTitleOptions = [
   { value: "off", label: t("readableSessions.settings.titleOff") },
@@ -499,70 +530,98 @@ const loadCoverage = async () => {
   }
 };
 
-const testing = ref<number | null>(null);
-const testResults = ref<
-  Record<number, { matched: number; total: number; before: string; after: string }>
->({});
+// The session columns a traces stream may group by, the Sessions list's first.
+const SESSION_COLUMNS = ["gen_ai_conversation_id", "session_id", "llm_session_id"];
+const RECENT_SESSIONS = 15;
 
-// The draft patterns on this agent's last day of first messages: how many match,
-// and before / after for the first that does. Spans are not changed.
-const testRule = async (i: number) => {
-  const rule = harnessRules.value[i];
-  if (!orgId.value || !rule?.agent.trim()) return;
-  testing.value = i;
+type HarnessTestResult = {
+  // What was tested, so the result hides once the row's agent or patterns change.
+  agent: string;
+  patterns: string;
+  matched: number;
+  total: number;
+  before: string;
+  after: string;
+};
+const testing = ref<number | null>(null);
+// By row id.
+const testResults = ref<Record<number, HarnessTestResult>>({});
+const patternsKey = (text: string) => textToLines(text).join("\n");
+const shownResults = computed(() => {
+  const shown: Record<number, HarnessTestResult> = {};
+  for (const r of harnessRules.value) {
+    const result = testResults.value[r.id];
+    if (result?.agent === r.agent.trim() && result.patterns === patternsKey(r.patternsText)) {
+      shown[r.id] = result;
+    }
+  }
+  return shown;
+});
+
+// The most recent sessions of this agent in one stream over the last day: the
+// first message of each, newest session first.
+const recentFirstMessages = async (stream: string, agent: string, start: number, end: number) => {
+  const schema = await getStream(stream, "traces", true).catch(() => null);
+  const names = new Set((schema?.schema ?? []).map((f: { name: string }) => f.name));
+  const sessionColumn = SESSION_COLUMNS.find((c) => names.has(c));
+  if (!sessionColumn) return [];
+  const res = await searchService.search({
+    org_identifier: orgId.value,
+    query: {
+      query: {
+        sql: `SELECT FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) AS input, MAX(start_time) AS last_start FROM "${stream}" WHERE gen_ai_agent_name = ${sqlLiteral(agent)} AND gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '' AND "${sessionColumn}" IS NOT NULL GROUP BY "${sessionColumn}" ORDER BY MAX(start_time) DESC LIMIT ${RECENT_SESSIONS}`,
+        start_time: start,
+        end_time: end,
+        from: 0,
+        size: RECENT_SESSIONS,
+      },
+    },
+    page_type: "traces",
+  });
+  return (res.data?.hits ?? []) as Array<{ input: unknown; last_start: number }>;
+};
+
+// The draft patterns on this agent's most recent sessions of the last day: how
+// many first messages match, and before / after for the first that does. Spans
+// are not changed.
+const testRule = async (id: number) => {
+  const rule = harnessRules.value.find((r) => r.id === id);
+  const agent = rule?.agent.trim();
+  if (!orgId.value || !rule || !agent) return;
+  const patterns = patternsKey(rule.patternsText);
+  testing.value = id;
   try {
-    const agents = await genAiAgentMappingService.listAgents(
-      orgId.value,
-      (Date.now() - 86_400_000) * 1000,
-      Date.now() * 1000,
-    );
+    const now = Date.now() * 1000;
+    const start = now - 86_400_000_000;
+    const agents = await genAiAgentMappingService.listAgents(orgId.value, start, now);
     // Every stream the agent was seen in: the registry has a row per stream and version.
     const streams = [
       ...new Set(
         agents.agents
-          .filter((a) => a.name === rule.agent.trim() && a.source_stream)
+          .filter((a) => a.name === agent && a.source_stream)
           .map((a) => a.source_stream as string),
       ),
     ];
-    const now = Date.now() * 1000;
-    const hits: any[] = (
-      await Promise.all(
-        streams.map(
-          async (stream) =>
-            (
-              await searchService.search({
-                org_identifier: orgId.value,
-                query: {
-                  query: {
-                    sql: `SELECT gen_ai_conversation_id, FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) AS input FROM "${stream}" WHERE gen_ai_agent_name = '${rule.agent.trim().replace(/'/g, "''")}' AND gen_ai_input_messages IS NOT NULL AND gen_ai_conversation_id IS NOT NULL GROUP BY gen_ai_conversation_id LIMIT 15`,
-                    start_time: now - 86_400_000_000,
-                    end_time: now,
-                    from: 0,
-                    size: 15,
-                  },
-                },
-                page_type: "traces",
-              })
-            ).data?.hits ?? [],
-        ),
-      )
-    ).flat();
+    const hits = (await Promise.all(streams.map((s) => recentFirstMessages(s, agent, start, now))))
+      .flat()
+      .sort((a, b) => Number(b.last_start) - Number(a.last_start))
+      .slice(0, RECENT_SESSIONS);
     const firsts = hits
       .map((h) => messagesFromInput(h.input).find((m) => m.role === "user")?.content ?? "")
       .filter(Boolean);
     // The server runs the patterns, so the result matches the Sessions list.
     const results = firsts.length
-      ? await genAiAgentMappingService.stripHarness(
-          orgId.value,
-          textToLines(rule.patternsText),
-          firsts,
-        )
+      ? await genAiAgentMappingService.stripHarness(orgId.value, textToLines(patterns), firsts)
       : [];
     const stripped = firsts.map((text, k) => ({ text, out: results[k] }));
     const hit = stripped.find((s) => s.out.hidden > 0);
+    // The row was removed while the test ran.
+    if (!harnessRules.value.some((r) => r.id === id)) return;
     testResults.value = {
       ...testResults.value,
-      [i]: {
+      [id]: {
+        agent,
+        patterns,
         matched: stripped.filter((s) => s.out.hidden > 0).length,
         total: stripped.length,
         before: hit?.text ?? "",
@@ -571,7 +630,7 @@ const testRule = async (i: number) => {
     };
   } catch (error: any) {
     // A failed run must not leave the previous pattern's result on screen.
-    const { [i]: _stale, ...rest } = testResults.value;
+    const { [id]: _stale, ...rest } = testResults.value;
     testResults.value = rest;
     toast({
       variant: "error",
@@ -617,10 +676,10 @@ const draftConfig = (): GenAiAgentMappingConfig => ({
 });
 
 const setReadRules = (config: GenAiAgentMappingConfig) => {
-  harnessRules.value = config.harness_patterns.map((r) => ({
-    agent: r.agent,
-    patternsText: r.patterns.join("\n"),
-  }));
+  harnessRules.value = config.harness_patterns.map((r) =>
+    harnessRow(r.agent, r.patterns.join("\n")),
+  );
+  testResults.value = {};
   sessionTitle.value = config.session_title;
   attributionText.value = {
     user: listToText(config.attribution_fields.user),
@@ -730,7 +789,7 @@ const clearAgentRegistry = async () => {
 };
 
 const saveConfig = async () => {
-  if (!orgId.value) return;
+  if (!orgId.value || duplicateAgents.value.size) return;
 
   saving.value = true;
   try {

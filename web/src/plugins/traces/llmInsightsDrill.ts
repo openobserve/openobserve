@@ -22,8 +22,10 @@
  */
 
 import { TRACE_ERROR_SPANS_SQL, TRACE_ERRORED_SQL } from "./llmTraceOutcome";
-import { MODEL_SERIES_SQL, type LLMPanelDef } from "./config/llmInsightsPanels";
-import { ATTRIBUTION_COLUMNS } from "./llmAttribution";
+import { agentFallbackUsage, MODEL_SERIES_SQL, type LLMPanelDef } from "./config/llmInsightsPanels";
+import { ATTRIBUTION_COLUMNS, traceUsageSum } from "./llmAttribution";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 
 /** A clicked chart point: the series value and, on a time axis, the bucket start (µs). */
 export interface LLMPanelDrill {
@@ -32,15 +34,13 @@ export interface LLMPanelDrill {
   atMicros: number | null;
 }
 
-const quote = (value: string) => `'${value.replace(/'/g, "''")}'`;
-
 /** The span column a page click filters on (a model series, a Cost by row). */
 export const FILTER_COLUMNS = { model: MODEL_SERIES_SQL, ...ATTRIBUTION_COLUMNS } as const;
 export type FilterDim = keyof typeof FILTER_COLUMNS;
 
 /** `column = 'value'`, as the search bar would hold it. */
 export function equalsClause(dim: FilterDim, value: string): string {
-  return `${FILTER_COLUMNS[dim]} = ${quote(value)}`;
+  return `${FILTER_COLUMNS[dim]} = ${sqlLiteral(value)}`;
 }
 
 /**
@@ -72,9 +72,24 @@ export interface TraceListSelection {
   seriesValue?: string;
   /** true: only traces with an errored span; false: only traces without one. */
   errored?: boolean;
+  /**
+   * Only traces whose cost is on their agent span alone: the cost trend's
+   * unattributed series, which no model value can select.
+   */
+  agentOnly?: boolean;
 }
 
 export const TRACE_LIST_LIMIT = 50;
+
+/**
+ * The trace list's row time: the time alone inside one calendar day, with the
+ * date when the window spans several, so rows from different days differ.
+ */
+export function traceRowTimeFormat(sel: TraceListSelection | null, timezone: string): string {
+  if (!sel) return "HH:mm:ss";
+  const day = (us: number) => timestampToTimezoneDate(us, timezone, "yyyy-MM-dd");
+  return day(sel.startTime) === day(sel.endTime) ? "HH:mm:ss" : "MMM d HH:mm:ss";
+}
 
 /**
  * The newest matching traces, one row each, with their errored span count.
@@ -85,7 +100,7 @@ export function traceListSql(stream: string, sel: TraceListSelection, scope: str
   const having: string[] = [];
   const series =
     sel.seriesSql && sel.seriesValue !== undefined
-      ? `${sel.seriesSql} = ${quote(sel.seriesValue)}`
+      ? `${sel.seriesSql} = ${sqlLiteral(sel.seriesValue)}`
       : "";
   if (series && sel.errored) {
     having.push(`max(CASE WHEN ${series} AND span_status = 'ERROR' THEN 1 ELSE 0 END) = 1`);
@@ -94,11 +109,12 @@ export function traceListSql(stream: string, sel: TraceListSelection, scope: str
   } else if (sel.errored !== undefined) {
     having.push(`${TRACE_ERRORED_SQL} = ${sel.errored ? 1 : 0}`);
   }
+  if (sel.agentOnly) having.push(`${agentFallbackUsage("gen_ai_usage_cost")} > 0`);
   return [
     "SELECT trace_id, MIN(_timestamp) AS ts, MAX(end_time) - MIN(start_time) AS duration_ns,",
     "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC)",
     "FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') AS input,",
-    "MAX(gen_ai_response_model) AS model, COALESCE(SUM(gen_ai_usage_cost), 0) AS cost,",
+    `MAX(gen_ai_response_model) AS model, ${traceUsageSum("gen_ai_usage_cost")} AS cost,`,
     `${TRACE_ERROR_SPANS_SQL} AS error_spans`,
     `FROM "${stream}"`,
     scope ? `WHERE ${scope}` : "",

@@ -142,6 +142,8 @@ describe("experiment discovery", () => {
           kind: "numeric",
           value: 0.75,
           sampleCount: 2,
+          errorCount: 0,
+          pendingCount: 0,
         },
         {
           key: "approved",
@@ -152,6 +154,8 @@ describe("experiment discovery", () => {
           trueCount: 1,
           falseCount: 1,
           sampleCount: 2,
+          errorCount: 0,
+          pendingCount: 0,
         },
         {
           key: "label",
@@ -164,6 +168,8 @@ describe("experiment discovery", () => {
             { value: "bad", count: 1 },
           ],
           sampleCount: 3,
+          errorCount: 0,
+          pendingCount: 0,
         },
       ],
     });

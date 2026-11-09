@@ -27,6 +27,7 @@
 import type { I18nKey } from "@/types/i18n";
 import { SEVERITY_TO_PRIORITY, type LibrarySeverity } from "@/constants/alertLibrary";
 import { TRACE_ERRORED_SQL } from "@/plugins/traces/llmTraceOutcome";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 export const AI_PACK_ID = "ai-agents";
 export const AI_PACK_FOLDER = "AI agents";
@@ -35,7 +36,6 @@ export const LLM_SCORES_STREAM = "_llm_scores";
 /** One span per judge call, with the job, status and error kind (AIO-25). */
 export const EVALUATOR_STREAM = "_evaluator";
 
-const quote = (value: string) => `'${value.replace(/'/g, "''")}'`;
 const and = (scope: string) => (scope ? ` AND ${scope}` : "");
 
 /** One alert's query and schedule. */
@@ -63,9 +63,9 @@ export function agentToolScope(
 ): string {
   return [
     agent
-      ? `trace_id IN (SELECT trace_id FROM "${stream}" WHERE gen_ai_agent_name = ${quote(agent)})`
+      ? `trace_id IN (SELECT trace_id FROM "${stream}" WHERE gen_ai_agent_name = ${sqlLiteral(agent)})`
       : "",
-    tool ? `gen_ai_tool_name = ${quote(tool)}` : "",
+    tool ? `gen_ai_tool_name = ${sqlLiteral(tool)}` : "",
   ]
     .filter(Boolean)
     .join(" AND ");
@@ -158,7 +158,7 @@ export function scoresStoppedSql(opts: { jobId?: string | null; minScores?: numb
     `to_timestamp_micros(_timestamp) >= now() - INTERVAL '${interval}'`;
   return (
     `SELECT job_id, count(*) AS scores_24h FROM "${LLM_SCORES_STREAM}" ` +
-    `WHERE job_id ${jobId ? `= ${quote(jobId)}` : "IS NOT NULL"} AND ${ONLINE_SCORES_SQL} ` +
+    `WHERE job_id ${jobId ? `= ${sqlLiteral(jobId)}` : "IS NOT NULL"} AND ${ONLINE_SCORES_SQL} ` +
     `GROUP BY job_id ` +
     `HAVING count(CASE WHEN ${since("30 minutes")} THEN 1 END) = 0 ` +
     `AND count(CASE WHEN NOT (${since("23 hours")}) THEN 1 END) >= ${minScores}`
@@ -176,7 +176,7 @@ export function judgeErrorRateSql(
     `SELECT attributes_job_id AS job_id, count(*) AS calls, ${errorPct} AS error_pct ` +
     `FROM "${EVALUATOR_STREAM}" WHERE attributes_scorer_id IS NOT NULL AND attributes_scorer_id != '' ` +
     `AND attributes_status IN ('success', 'error', 'timeout')` +
-    `${jobId ? ` AND attributes_job_id = ${quote(jobId)}` : ""} ` +
+    `${jobId ? ` AND attributes_job_id = ${sqlLiteral(jobId)}` : ""} ` +
     `GROUP BY attributes_job_id HAVING count(*) >= ${minCalls} AND ${errorPct} > ${maxErrorPct}`
   );
 }
@@ -188,7 +188,7 @@ export interface AiPackRule {
   kind: "rule" | "template";
   titleKey: I18nKey;
   whenKey: I18nKey;
-  /** Shown instead of "Runs now" while the data it reads is missing. */
+  /** Shown instead of "Runs now" for a rule without a query (see ruleWaitsKey). */
   waitsKey?: I18nKey;
   spec?: (stream: string) => AiAlertSpec;
 }
@@ -295,7 +295,6 @@ export const AI_AGENTS_PACK: AiPackRule[] = [
     kind: "template",
     titleKey: "aiAlertPack.rules.evaluatorLag.title",
     whenKey: "aiAlertPack.rules.evaluatorLag.when",
-    waitsKey: "aiAlertPack.waits.scores",
     spec: () => ({
       name: "ai_evaluator_lag",
       streamName: LLM_SCORES_STREAM,
@@ -312,7 +311,6 @@ export const AI_AGENTS_PACK: AiPackRule[] = [
     kind: "template",
     titleKey: "evalWorkload.pack.scoresStopped.title",
     whenKey: "evalWorkload.pack.scoresStopped.when",
-    waitsKey: "aiAlertPack.waits.scores",
     // The period reaches back a day for the hour the job scored yesterday.
     spec: () => ({
       name: "ai_eval_scores_stopped",
@@ -330,7 +328,6 @@ export const AI_AGENTS_PACK: AiPackRule[] = [
     kind: "template",
     titleKey: "evalWorkload.pack.judgeErrorRate.title",
     whenKey: "evalWorkload.pack.judgeErrorRate.when",
-    waitsKey: "aiAlertPack.waits.scores",
     spec: () => ({
       name: "ai_eval_judge_error_rate",
       streamName: EVALUATOR_STREAM,
@@ -359,6 +356,19 @@ export function ruleReadiness(
   if (!rule.spec) return "waits";
   const spec = rule.spec(stream);
   return streams.has(streamKey(spec.streamType, spec.streamName)) ? "ready" : "needs-data";
+}
+
+/**
+ * What a rule that does not run now waits for: its own `waitsKey` when it has
+ * no query, else the stream its query reads (a trace stream, the evaluator's
+ * spans or the scores).
+ */
+export function ruleWaitsKey(rule: AiPackRule, stream: string): I18nKey {
+  if (!rule.spec) return rule.waitsKey ?? "aiAlertPack.waits.perConfig";
+  const { streamName } = rule.spec(stream);
+  if (streamName === LLM_SCORES_STREAM) return "aiAlertPack.waits.scores";
+  if (streamName === EVALUATOR_STREAM) return "aiAlertPack.waits.evaluator";
+  return "aiAlertPack.waits.traceStream";
 }
 
 /** Alert names are per org: a pack installed on a second stream names that stream. */

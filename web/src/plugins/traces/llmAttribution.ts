@@ -26,7 +26,13 @@
  */
 
 import { TRACE_ERRORED_SQL } from "./llmTraceOutcome";
-import { llmCallUsageSum, MODEL_SERIES_SQL } from "./config/llmInsightsPanels";
+import {
+  agentFallbackUsage,
+  agentSpanUsage,
+  llmCallUsageSum,
+  MODEL_SERIES_SQL,
+} from "./config/llmInsightsPanels";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 export const ATTRIBUTION_COLUMNS = {
   tenant: "tenant_id",
@@ -45,10 +51,6 @@ export const ATTRIBUTION_ATTRIBUTES: Record<AttributionDim, string> = {
 
 const where = (scope: string) => (scope ? ` WHERE ${scope}` : "");
 
-/** The largest `invoke_agent` span's usage: the outermost agent's rollup. */
-const agentSpanUsage = (column: string) =>
-  `MAX(CASE WHEN gen_ai_operation_name = 'invoke_agent' THEN ${column} END)`;
-
 /**
  * One trace's usage, the rule every Insights, Users and Sessions total uses
  * (the backend's session totals mirror it): the sum over its LLM-call spans,
@@ -64,10 +66,17 @@ const traceUsage =
   `${traceUsageSum("gen_ai_usage_cost")} AS cost, ` +
   `${traceUsageSum("gen_ai_usage_total_tokens")} AS tokens`;
 
-/** The agent-span usage `traceUsageSum` falls back to; 0 when the LLM calls carry usage. */
-const agentFallbackUsage = (column: string) =>
-  `CASE WHEN COALESCE(${llmCallUsageSum(column)}, 0) = 0 ` +
-  `THEN COALESCE(${agentSpanUsage(column)}, 0) ELSE 0 END`;
+/**
+ * Tokens on LLM calls that had no price (ingest marks them
+ * `gen_ai_usage_cost_status = 'unpriced'`), so a row's cost reads as a lower
+ * bound or unknown, not as a free $0. "0" on a stream without the status column.
+ */
+export const unpricedTokensSum = (hasCostStatus: boolean) =>
+  hasCostStatus
+    ? `COALESCE(${llmCallUsageSum(
+        "CASE WHEN gen_ai_usage_cost_status = 'unpriced' THEN gen_ai_usage_total_tokens ELSE 0 END",
+      )}, 0)`
+    : "0";
 
 /** How many attributed values the rows query fetches (the panel shows the top few). */
 const TOP_VALUES = 50;
@@ -88,19 +97,26 @@ function attributionSql(grouped: string): AttributionSql {
     // The search layer ignores an ORDER BY on an expression (rows come back sorted by `v`), so the
     // unattributed-first key is projected as a column and sorted by its alias.
     rows:
-      `SELECT v, cost, tokens, traces, CASE WHEN v = '' THEN 0 ELSE 1 END AS unattributed_last ` +
+      `SELECT v, cost, tokens, traces, unpriced, CASE WHEN v = '' THEN 0 ELSE 1 END AS unattributed_last ` +
       `FROM (${grouped}) ORDER BY unattributed_last, cost DESC LIMIT ${TOP_VALUES + 1}`,
     totals:
       `SELECT COUNT(*) FILTER (WHERE v != '') AS n_values, SUM(cost) AS cost, ` +
-      `SUM(tokens) AS tokens, SUM(traces) AS traces FROM (${grouped})`,
+      `SUM(tokens) AS tokens, SUM(traces) AS traces, SUM(unpriced) AS unpriced FROM (${grouped})`,
   };
 }
 
 /** Cost, tokens and traces per value; spans with no value land in the '' row. */
-export function costByDimensionSql(stream: string, column: string, scope: string): AttributionSql {
+export function costByDimensionSql(
+  stream: string,
+  column: string,
+  scope: string,
+  hasCostStatus = false,
+): AttributionSql {
   return attributionSql(
-    `SELECT v, SUM(cost) AS cost, SUM(tokens) AS tokens, COUNT(*) AS traces FROM (` +
-      `SELECT trace_id, COALESCE(MAX(${column}), '') AS v, ${traceUsage} ` +
+    `SELECT v, SUM(cost) AS cost, SUM(tokens) AS tokens, COUNT(*) AS traces, ` +
+      `SUM(unpriced) AS unpriced FROM (` +
+      `SELECT trace_id, COALESCE(MAX(${column}), '') AS v, ${traceUsage}, ` +
+      `${unpricedTokensSum(hasCostStatus)} AS unpriced ` +
       `FROM "${stream}"${where(scope)} GROUP BY trace_id) ` +
       `GROUP BY v`,
   );
@@ -113,20 +129,26 @@ export function costByDimensionSql(stream: string, column: string, scope: string
  * has no LLM call to take a model from, so that usage lands in the '' row,
  * shown as unattributed like the other dimensions' spans with no value.
  */
-export function costByModelSql(stream: string, scope: string): AttributionSql {
+export function costByModelSql(
+  stream: string,
+  scope: string,
+  hasCostStatus = false,
+): AttributionSql {
   const scoped = scope ? ` AND (${scope})` : "";
   const cost = "gen_ai_usage_cost";
   const tokens = "gen_ai_usage_total_tokens";
   return attributionSql(
-    `SELECT v, SUM(cost) AS cost, SUM(tokens) AS tokens, COUNT(DISTINCT trace_id) AS traces FROM (` +
+    `SELECT v, SUM(cost) AS cost, SUM(tokens) AS tokens, COUNT(DISTINCT trace_id) AS traces, ` +
+      `SUM(unpriced) AS unpriced FROM (` +
       `SELECT trace_id, ${MODEL_SERIES_SQL} AS v, ` +
       `COALESCE(${llmCallUsageSum(cost)}, 0) AS cost, ` +
-      `COALESCE(${llmCallUsageSum(tokens)}, 0) AS tokens ` +
+      `COALESCE(${llmCallUsageSum(tokens)}, 0) AS tokens, ` +
+      `${unpricedTokensSum(hasCostStatus)} AS unpriced ` +
       `FROM "${stream}" WHERE ${MODEL_SERIES_SQL} IS NOT NULL${scoped} ` +
       `GROUP BY trace_id, ${MODEL_SERIES_SQL} ` +
       `UNION ALL ` +
       `SELECT trace_id, '' AS v, ${agentFallbackUsage(cost)} AS cost, ` +
-      `${agentFallbackUsage(tokens)} AS tokens ` +
+      `${agentFallbackUsage(tokens)} AS tokens, 0 AS unpriced ` +
       `FROM "${stream}"${where(scope)} GROUP BY trace_id ` +
       `HAVING ${agentFallbackUsage(cost)} > 0 OR ${agentFallbackUsage(tokens)} > 0) ` +
       `GROUP BY v`,
@@ -138,6 +160,8 @@ export interface AttributionRow {
   cost: number;
   tokens: number;
   traces: number;
+  /** Tokens on unpriced LLM calls: the cost is a lower bound (or unknown) when above 0. */
+  unpriced: number;
   share: number;
 }
 
@@ -147,6 +171,7 @@ export interface AttributionTotals {
   cost: unknown;
   tokens: unknown;
   traces: unknown;
+  unpriced?: unknown;
 }
 
 /**
@@ -155,7 +180,7 @@ export interface AttributionTotals {
  * the whole-window `totals`, so values past the fetched rows still count.
  */
 export function toAttributionRows(
-  hits: Array<{ v: unknown; cost: unknown; tokens: unknown; traces: unknown }>,
+  hits: Array<{ v: unknown; cost: unknown; tokens: unknown; traces: unknown; unpriced?: unknown }>,
   totals: AttributionTotals | null | undefined,
   limit = 5,
 ): {
@@ -170,6 +195,7 @@ export function toAttributionRows(
     cost: Number(h.cost) || 0,
     tokens: Number(h.tokens) || 0,
     traces: Number(h.traces) || 0,
+    unpriced: Number(h.unpriced) || 0,
     share: 0,
   }));
   const total = Number(totals?.cost) || 0;
@@ -177,7 +203,7 @@ export function toAttributionRows(
   const attributed = all.filter((r) => r.value);
   const rows = attributed.slice(0, limit).map(withShare);
   const unattributedRow = all.find((r) => !r.value);
-  const sum = (key: "cost" | "tokens" | "traces") =>
+  const sum = (key: "cost" | "tokens" | "traces" | "unpriced") =>
     rows.reduce((s, r) => s + r[key], 0) + (unattributedRow?.[key] ?? 0);
   const moreCount = (Number(totals?.n_values) || 0) - rows.length;
   const more =
@@ -187,6 +213,7 @@ export function toAttributionRows(
           cost: Math.max(0, total - sum("cost")),
           tokens: Math.max(0, (Number(totals?.tokens) || 0) - sum("tokens")),
           traces: Math.max(0, (Number(totals?.traces) || 0) - sum("traces")),
+          unpriced: Math.max(0, (Number(totals?.unpriced) || 0) - sum("unpriced")),
           share: 0,
         })
       : null;
@@ -205,25 +232,39 @@ export function toAttributionRows(
  */
 export function usersSql(
   stream: string,
-  opts: { scope: string; tenantColumn: string | null; tenant?: string; search?: string },
+  opts: {
+    scope: string;
+    tenantColumn: string | null;
+    tenant?: string;
+    search?: string;
+    hasCostStatus?: boolean;
+  },
 ): string {
   const tenantExpr = opts.tenantColumn ? `MAX(${opts.tenantColumn})` : "''";
   const filters = ["user_id IS NOT NULL", "user_id != ''"];
-  if (opts.tenant) filters.push(`tenant = '${opts.tenant.replace(/'/g, "''")}'`);
+  if (opts.tenant) filters.push(`tenant = ${sqlLiteral(opts.tenant)}`);
   if (opts.search) {
-    filters.push(`user_id LIKE '%${opts.search.replace(/'/g, "''").replace(/[%_]/g, "\\$&")}%'`);
+    // Case-insensitive, as the other search boxes: both sides lowercased.
+    // `\`, `%` and `_` are escaped so the term matches literally.
+    const term = opts.search.toLowerCase().replace(/[\\%_]/g, "\\$&");
+    filters.push(`LOWER(user_id) LIKE ${sqlLiteral(`%${term}%`)}`);
   }
   return (
     `SELECT user_id, MAX(tenant) AS tenant, COUNT(DISTINCT session) AS sessions, ` +
-    `SUM(tokens) AS tokens, SUM(cost) AS cost, 100.0 * SUM(failed) / COUNT(*) AS failure_rate, ` +
+    `SUM(tokens) AS tokens, SUM(cost) AS cost, SUM(unpriced) AS unpriced, ` +
+    `100.0 * SUM(failed) / COUNT(*) AS failure_rate, ` +
     `MAX(last_ts) AS last_seen FROM (` +
     `SELECT trace_id, MAX(user_id) AS user_id, ${tenantExpr} AS tenant, ` +
     `MAX(gen_ai_conversation_id) AS session, ${traceUsage}, ` +
+    `${unpricedTokensSum(!!opts.hasCostStatus)} AS unpriced, ` +
     `${TRACE_ERRORED_SQL} AS failed, MAX(_timestamp) AS last_ts ` +
     `FROM "${stream}"${where(opts.scope)} GROUP BY trace_id) ` +
-    `WHERE ${filters.join(" AND ")} GROUP BY user_id ORDER BY cost DESC LIMIT 200`
+    `WHERE ${filters.join(" AND ")} GROUP BY user_id ORDER BY cost DESC LIMIT ${USERS_LIMIT}`
   );
 }
+
+/** The most users the Users page lists (by cost); a full page means there may be more. */
+export const USERS_LIMIT = 200;
 
 /** Share of traces carrying each column (the coverage that says a breakdown can be trusted). */
 export function coverageSql(stream: string, columns: string[], scope: string): string {

@@ -101,13 +101,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="release-watch-introduced"
     >
       {{
-        t("releaseWatch.introduced", {
-          cls: introduced[0].cls,
-          n: introduced[0].traces,
-          prev: pair!.prev.version,
-        })
+        t(
+          "releaseWatch.introduced",
+          { cls: introduced[0].cls, n: introduced[0].traces, prev: pair!.prev.version },
+          introduced[0].traces,
+        )
       }}
     </span>
+  </div>
+  <div
+    v-else-if="mutedVisible"
+    class="text-2xs text-text-secondary flex items-center gap-2"
+    data-test="release-watch-muted"
+  >
+    <OIcon name="rocket-launch" size="sm" />
+    <span>{{
+      t("releaseWatch.muted", { agent: pair!.next.name, version: pair!.next.version })
+    }}</span>
+    <OButton variant="ghost" size="sm" data-test="release-watch-unmute" @click="unmute">
+      {{ t("releaseWatch.unmute") }}
+    </OButton>
   </div>
 </template>
 
@@ -122,6 +135,7 @@ import useStreams from "@/composables/useStreams";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
+import { formatCost } from "@/utils/llmUtils";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import {
   WATCH_MIN_SESSIONS,
@@ -133,6 +147,7 @@ import {
   versionFailuresSql,
   versionWindowSql,
   watchPair,
+  releaseWatchMuteKey,
   type WatchMetric,
   type WindowMeasures,
 } from "./releaseWatch";
@@ -155,19 +170,25 @@ const introduced = ref<Array<{ cls: string; traces: number }>>([]);
 const muted = ref(false);
 let seq = 0;
 
-const muteKey = () => `o2_release_watch_muted:${pair.value?.next.name}:${pair.value?.next.version}`;
+const muteKey = () =>
+  pair.value
+    ? releaseWatchMuteKey(
+        store.state.selectedOrganization?.identifier ?? "",
+        props.stream,
+        pair.value.next,
+      )
+    : "";
 const regressions = computed(() => metrics.value.filter((m) => m.verdict === "regressed").length);
-const visible = computed(
-  () =>
-    !!pair.value &&
-    !!measures.value &&
-    measures.value.next.sessions >= WATCH_MIN_SESSIONS &&
-    !muted.value,
+const shown = computed(
+  () => !!pair.value && !!measures.value && measures.value.next.sessions >= WATCH_MIN_SESSIONS,
 );
+const visible = computed(() => shown.value && !muted.value);
+// A muted release keeps a one-line note with Unmute, so the mute can be undone.
+const mutedVisible = computed(() => shown.value && muted.value);
 
 function format(id: WatchMetric["id"], v: number) {
   if (id === "failureRate") return raw(`${v.toFixed(1)}%`);
-  if (id === "costPerSession") return raw(`$${v.toFixed(2)}`);
+  if (id === "costPerSession") return raw(`$${formatCost(v)}`);
   return raw(formatTimeWithSuffix(v));
 }
 
@@ -177,6 +198,15 @@ function mute() {
     localStorage.setItem(muteKey(), "1");
   } catch {
     // Storage unavailable: the mute lasts for this view.
+  }
+}
+
+function unmute() {
+  muted.value = false;
+  try {
+    localStorage.removeItem(muteKey());
+  } catch {
+    // Storage unavailable: nothing was stored.
   }
 }
 
@@ -233,6 +263,7 @@ watch(
       p?.prev.env,
       p?.prev.version,
       props.stream,
+      store.state.selectedOrganization?.identifier,
     ]);
   },
   load,

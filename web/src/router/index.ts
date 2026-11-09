@@ -85,7 +85,9 @@ export default function (store: any) {
     // here — per navigation — keeps it in the current locale. `gt` (not `t`)
     // because a navigation guard runs outside any component setup. `title` is the
     // English literal fallback the routes not yet migrated to `titleKey` still carry.
-    const routeTitle = to.meta?.titleKey ? gt(to.meta.titleKey) : to.meta?.title;
+    // A route several rail items share titles each `?tab=` by its own item.
+    const titleKey = to.meta?.titleKeyByTab?.[to.query?.tab] ?? to.meta?.titleKey;
+    const routeTitle = titleKey ? gt(titleKey) : to.meta?.title;
     if (routeTitle) {
       // The brand prefix is a product noun, never translated; the page name is.
       document.title = `OpenObserve - ${routeTitle}`;

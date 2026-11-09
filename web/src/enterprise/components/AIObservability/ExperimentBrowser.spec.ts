@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import ExperimentBrowser from "./ExperimentBrowser.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { makeExperiment } from "@/enterprise/views/AIObservability/experimentTestFixtures";
 import type { ExperimentScoreSummary } from "@/services/llm-experiments.service";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -54,6 +55,7 @@ vi.mock("@/services/online-evals.service", () => ({
     scoreConfigs: {
       list: async () => [
         { entityId: "cfg-leak", dataType: "boolean", healthyThreshold: { healthy_value: false } },
+        { entityId: "cfg-latency", dataType: "numeric", healthyThreshold: { direction: "lte" } },
       ],
     },
   },
@@ -962,6 +964,15 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.get('[data-test="ai-experiment-spread-f4-leak"]').text()).toContain(
       "experimentsAtScale.spread 4 ",
     );
+    // One count everywhere: the four settled runs; the cancelled one is named beside them.
+    const fold = wrapper.get('[data-test="ai-experiment-fold-f4"]');
+    expect(fold.text()).toContain("experimentsAtScale.foldCount 4");
+    expect(fold.findComponent(OTooltip).props("content")).toContain(
+      "experimentsAtScale.incomplete.cancelled 1",
+    );
+    const section = wrapper.get('[data-test="ai-experiment-ci-group-pr:108"]').text();
+    expect(section).toContain("experimentsAtScale.groupRuns 4");
+    expect(section).toContain("experimentsAtScale.incomplete.cancelled 1");
     expect(wrapper.get('[data-test="ai-experiment-ci-group-pr:108"]').text()).toContain(
       "experimentsAtScale.regressedCount 1",
     );
@@ -993,5 +1004,160 @@ describe("ExperimentBrowser", () => {
     await wrapper.get('[data-test="ai-experiment-sort"]').setValue("regressions");
     await flushPromises();
     expect(replace).toHaveBeenLastCalledWith({ query: { group: "pr", sort: "regressions" } });
+  });
+
+  // C2-X5: qa2-partial, whose tone Scorer errored on 5 of 10 rows.
+  it("judges a run whose scorer failed on some rows by its other scores, and marks the failed one", async () => {
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const tone = makeScoreSummary({
+      name: "tone",
+      sampleCount: 5,
+      errorCount: 5,
+      value: { kind: "numeric", mean: 0.5 },
+    });
+    const partial = makeExperiment({
+      id: "partial",
+      name: "partial",
+      createdAt: 2,
+      status: "scoring_failed",
+      scoreSummaries: [...leak(23), tone],
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, partial], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="ai-experiment-outcome-partial"]').text()).toContain(
+      "experimentsAtScale.outcome.regressed",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-score-errors-partial-tone"]').text()).toContain(
+      "experimentsAtScale.scoreErrors 5",
+    );
+    expect(wrapper.find('[data-test="ai-experiment-score-errors-partial-leak"]').exists()).toBe(
+      false,
+    );
+  });
+
+  // C2-X6: unranged qa2-latency (lte), baseline 100, run 0.
+  it("reads an unranged score's move as a percent of the baseline, not points", async () => {
+    const latency = (mean: number) => [
+      makeScoreSummary({
+        name: "latency",
+        scoreConfigId: "cfg-latency",
+        value: { kind: "numeric", mean },
+      }),
+    ];
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: latency(100),
+    });
+    const fast = makeExperiment({
+      id: "fast",
+      name: "fast",
+      createdAt: 2,
+      scoreSummaries: latency(0),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, fast], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="ai-experiment-outcome-fast"]').text()).toContain(
+      "experimentsAtScale.headlineRelative latency +100.0",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-delta-fast-latency"]').text()).toContain(
+      "+100.0%",
+    );
+  });
+
+  // C2-X8: qa2-allerr, every task errored, then finalized.
+  it("says how many tasks failed on a completed run and refuses it as the baseline", async () => {
+    const allErr = makeExperiment({
+      id: "allerr",
+      name: "allerr",
+      createdAt: 1,
+      status: "completed",
+      taskOutcomes: { total: 10, succeeded: 0, failed: 10, pending: 0, skipped: 0 },
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [allErr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="ai-experiment-task-failures-allerr"]').text()).toContain(
+      "experimentsAtScale.tasksFailed 10 10",
+    );
+    expect(
+      wrapper.get('[data-test="ai-experiment-baseline-allerr"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  // B-16: the row numbers follow the data, so the data must be in section order.
+  it("hands the table its rows in the order the sections show them", async () => {
+    route.query = { group: "pr" };
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [
+          makeExperiment({ id: "pr1", name: "pr1", createdAt: 1, metadata: { "git.pr": "1" } }),
+          makeExperiment({ id: "hand", name: "hand", createdAt: 3 }),
+          makeExperiment({ id: "pr2", name: "pr2", createdAt: 2, metadata: { "git.pr": "2" } }),
+        ],
+        datasets: [] as any,
+        syncUrl: true,
+      },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const table = wrapper.findComponent(stubs.OTable);
+    expect(table.props("sectionOrder")).toEqual(["pr:2", "pr:1", "none"]);
+    expect((table.props("data") as { id: string }[]).map(({ id }) => id)).toEqual([
+      "pr2",
+      "pr1",
+      "hand",
+    ]);
+  });
+
+  // B-17: CI re-runs minutes apart read "Nov 6 … Nov 6" without the time.
+  it("adds the time to the trend axis when its first and last runs share a day", async () => {
+    const day = new Date(2026, 10, 6, 10, 0).getTime();
+    const base = makeExperiment({
+      id: "base",
+      name: "base",
+      createdAt: day,
+      isBaseline: true,
+      scoreSummaries: leak(17),
+    });
+    const pr = makeExperiment({
+      id: "pr",
+      name: "pr",
+      createdAt: day + 30 * 60_000,
+      scoreSummaries: leak(23),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, pr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const axis = wrapper
+      .findAll('[data-test="ai-experiment-trend"] text')
+      .filter((text) => text.attributes("y") === "136")
+      .map((text) => text.text());
+    expect(axis).toHaveLength(2);
+    expect(axis[0]).not.toBe(axis[1]);
   });
 });

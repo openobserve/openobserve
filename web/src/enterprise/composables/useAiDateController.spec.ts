@@ -10,7 +10,6 @@
 //   • writeToUrl: router.replace with period (relative) / from,to (absolute);
 //     no replace when the URL already holds it; the store's org over the route's
 //   • onDateChange: relative vs absolute paths, both write URL, report a change
-//   • urlSync:false → readFromUrl returns false, writeToUrl is a no-op
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { defineComponent, h, onMounted, ref } from "vue";
@@ -142,16 +141,10 @@ describe("useAiDateController — resolves on construction", () => {
     expect(c.dateState.value.relativeTimePeriod).toBe("1h");
   });
 
-  it("writes URL after resolving from shared state when urlSync is enabled", () => {
+  it("writes URL after resolving from shared state", () => {
     resolveAiDateWindowMock.mockReturnValue(null);
     useAiDateController();
     expect(lastWrittenQuery()).toEqual({ period: "15m" });
-  });
-
-  it("does not write URL after resolving when urlSync is disabled", () => {
-    resolveAiDateWindowMock.mockReturnValue(null);
-    useAiDateController({ urlSync: false });
-    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it("an invalid URL period falls back to shared state and is rewritten", () => {
@@ -303,13 +296,6 @@ describe("useAiDateController — readFromUrl", () => {
     const c = created();
     expect(c.readFromUrl()).toBe(false);
   });
-
-  it("returns false when urlSync is disabled even with {from,to} present", () => {
-    routeQuery.from = "1000";
-    routeQuery.to = "2000";
-    const c = created({ urlSync: false });
-    expect(c.readFromUrl()).toBe(false);
-  });
 });
 
 describe("useAiDateController — writeToUrl", () => {
@@ -355,18 +341,6 @@ describe("useAiDateController — writeToUrl", () => {
     expect(query?.to).toBe("2000");
     expect(query?.period).toBeUndefined();
   });
-
-  it("is a no-op when urlSync is disabled", () => {
-    const c = created({ urlSync: false });
-    c.dateState.value = {
-      valueType: "relative",
-      startTime: null,
-      endTime: null,
-      relativeTimePeriod: "1h",
-    };
-    c.writeToUrl();
-    expect(replaceMock).not.toHaveBeenCalled();
-  });
 });
 
 describe("useAiDateController — onDateChange", () => {
@@ -409,5 +383,15 @@ describe("useAiDateController — onDateChange", () => {
     expect(c.onDateChange({ valueType: "relative", relativeTimePeriod: "15m" })).toBe(false);
     c.onDateChange({ startTime: 5, endTime: 9 });
     expect(c.onDateChange({ startTime: 5, endTime: 9 })).toBe(false);
+  });
+
+  it("keeps a sub-second deep link when the picker echoes it back rounded to the second", () => {
+    routeQuery.from = "1730000000123456";
+    routeQuery.to = "1730003600987654";
+    const c = created();
+    expect(c.onDateChange({ startTime: 1730000000000000, endTime: 1730003600000000 })).toBe(false);
+    expect(c.timeRange.value).toEqual({ startTime: 1730000000123456, endTime: 1730003600987654 });
+    // A real move of a second or more is a new range.
+    expect(c.onDateChange({ startTime: 1730000060000000, endTime: 1730003600000000 })).toBe(true);
   });
 });

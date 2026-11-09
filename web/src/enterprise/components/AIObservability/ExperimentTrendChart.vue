@@ -39,7 +39,10 @@
         {{ t("experimentsAtScale.improvedCount", { count: trend.improved }) }}
       </span>
     </div>
+    <!-- The coordinate space is the measured width, so the plot spans the
+         section at 1 unit = 1 px and the text keeps its size. -->
     <svg
+      ref="svg"
       :viewBox="`0 0 ${W} ${H}`"
       preserveAspectRatio="xMinYMid meet"
       role="img"
@@ -61,7 +64,7 @@
           <text :x="X0 - 6" :y="y(tick) + 3" text-anchor="end">{{ format(tick) }}</text>
         </template>
         <text :x="X0" :y="H - 4">{{ dateLabel(trend.points[0].createdAt) }}</text>
-        <text :x="X1" :y="H - 4" text-anchor="end">
+        <text v-if="trend.points.length > 1" :x="X1" :y="H - 4" text-anchor="end">
           {{ dateLabel(trend.points[trend.points.length - 1].createdAt) }}
         </text>
       </g>
@@ -98,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { LlmExperiment } from "@/services/llm-experiments.service";
@@ -123,13 +126,28 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 
-// The SVG's own coordinate space; CSS sets the size, the text stays legible.
-const W = 640;
+// The SVG's own coordinate space; its width follows the element's, so CSS
+// stretches nothing and the text stays legible.
+const DEFAULT_W = 640;
 const H = 140;
 const X0 = 48;
-const X1 = W - 8;
 const Y_TOP = 8;
 const Y_BOTTOM = H - 22;
+
+const svg = ref<SVGSVGElement | null>(null);
+const W = ref(DEFAULT_W);
+const X1 = computed(() => W.value - 8);
+let observer: ResizeObserver | undefined;
+watch(svg, (element) => {
+  observer?.disconnect();
+  if (!element || typeof ResizeObserver === "undefined") return;
+  observer = new ResizeObserver(([entry]) => {
+    const width = Math.round(entry.contentRect.width);
+    if (width > X0 * 2) W.value = width;
+  });
+  observer.observe(element);
+});
+onBeforeUnmount(() => observer?.disconnect());
 
 const POINT_TONE: Record<BaselineOutcome, string> = {
   regressed: "text-status-error-text",
@@ -186,7 +204,7 @@ function y(value: number) {
 
 function x(index: number) {
   const count = trend.value!.points.length;
-  return count > 1 ? X0 + (index * (X1 - X0)) / (count - 1) : (X0 + X1) / 2;
+  return count > 1 ? X0 + (index * (X1.value - X0)) / (count - 1) : (X0 + X1.value) / 2;
 }
 
 const ticks = computed(() => [domain.value.min, domain.value.max]);
@@ -198,8 +216,21 @@ function format(value: number) {
   return raw(trend.value!.share ? `${(value * 100).toFixed(1)}%` : value.toFixed(3));
 }
 
+// Re-runs minutes apart share a day, so the axis then says the time as well:
+// "Nov 6 … Nov 6" named one day twice.
 function dateLabel(ms: number) {
-  return raw(new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short" }));
+  const points = trend.value!.points;
+  const sameDay =
+    new Date(points[0].createdAt).toDateString() ===
+    new Date(points[points.length - 1].createdAt).toDateString();
+  return raw(
+    new Date(ms).toLocaleString(
+      undefined,
+      sameDay
+        ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
+        : { day: "numeric", month: "short" },
+    ),
+  );
 }
 
 const noiseLabel = computed(() => {

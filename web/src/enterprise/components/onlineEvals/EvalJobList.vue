@@ -82,7 +82,7 @@
                   variant="ghost"
                   size="sm"
                   :data-test="`eval-job-budget-edit-${row.name}`"
-                  @click="$emit('edit', row)"
+                  @click="$emit('edit', row, 'budget')"
                 >
                   {{ t("evalSpend.list.editBudget") }}
                 </OButton>
@@ -181,16 +181,31 @@
               "
             />
           </span>
-          <router-link
-            v-else-if="unpricedCalls(row)"
-            :to="pricingRoute"
-            class="text-accent font-semibold no-underline hover:underline"
-            :data-test="`eval-job-list-${row.name}-spend`"
-            @click.stop
-          >
-            {{ t("evalSpend.list.unpriced", { n: unpricedCalls(row) }, unpricedCalls(row)) }}
-            <OTooltip :content="t('evalSpend.list.unpricedHint')" />
-          </router-link>
+          <span v-else-if="unpricedCalls(row)" class="inline-flex items-center gap-1.5">
+            <router-link
+              :to="pricingRoute"
+              class="font-semibold no-underline hover:underline"
+              :class="overBudget(row) ? 'text-status-error-text' : 'text-accent'"
+              :data-test="`eval-job-list-${row.name}-spend`"
+              @click.stop
+            >
+              {{
+                t(
+                  "evalSpend.list.unpriced",
+                  { spent: spendText(row), n: unpricedCalls(row) },
+                  unpricedCalls(row),
+                )
+              }}
+              <OTooltip :content="t('evalSpend.list.unpricedHint')" />
+            </router-link>
+            <span
+              v-if="budgetLifted(row)"
+              class="text-text-secondary"
+              :data-test="`eval-job-list-${row.name}-budget-lifted`"
+            >
+              {{ t("evalSpend.list.liftedUntil") }}
+            </span>
+          </span>
           <span v-else class="inline-flex items-center gap-1.5">
             <span
               class="tabular-nums"
@@ -397,7 +412,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
-  (e: "edit", row: EvalJob): void;
+  /** `section` scrolls the form to it: the banner's Edit budget opens at the budget. */
+  (e: "edit", row: EvalJob, section?: "budget"): void;
   (e: "view", row: EvalJob): void;
   (e: "delete", row: EvalJob): void;
   (e: "activate", row: EvalJob): void;
@@ -464,7 +480,8 @@ const columns = computed(() =>
       header: t("onlineEvals.job.columns.status"),
       accessorFn: (row: EvalJob) => statusOf(row),
       sortable: true,
-      size: COL.status,
+      // Wide enough for "Paused · budget".
+      size: COL.dateAbsolute,
       meta: { align: "left" },
     },
     {

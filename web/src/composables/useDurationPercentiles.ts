@@ -5,6 +5,7 @@ import type { TranslateFn } from "@/types/i18n";
 import store from "@/stores";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import { rewriteWhereLiterals, type LiteralNode } from "@/utils/traces/sqlLiteralRewrite";
 
 export interface DurationPercentiles {
   p25: number | null;
@@ -66,9 +67,10 @@ export type ParseDurationResult = string | { error: string };
  * Converts duration comparisons in a WHERE clause that carry human-readable
  * unit suffixes back to raw microseconds.
  *
- * Parses the clause into a SQL AST, walks the tree to locate duration binary
- * expressions whose right-hand side is a quoted string (e.g. `'1.50ms'`),
- * mutates each node to a numeric literal, then re-serialises with sqlify.
+ * Parses the clause into a SQL AST, walks the tree to locate duration
+ * comparisons (including BETWEEN) whose operand is a quoted string (e.g.
+ * `'1.50ms'`), and splices the numeric value over just those literals in the
+ * original text; everything else in the clause is kept byte-for-byte.
  *
  * Tolerates optional whitespace between the number and unit, and accepts all
  * common unit aliases (e.g. "second", "seconds", "sec", "secs" → s).
@@ -81,6 +83,7 @@ export type ParseDurationResult = string | { error: string };
  *   `duration >= '1.50 ms'`     →  `duration >= 1500`
  *   `duration >= '2 seconds'`   →  `duration >= 2000000`
  *   `duration >= '1.50m'`       →  `duration >= 90000000`
+ *   `duration BETWEEN '1ms' AND '2s'` → `duration BETWEEN 1000 AND 2000000`
  *   `duration >= '5 lightyears'` → `{ error: 'Unknown duration unit: "lightyears"' }`
  */
 export const parseDurationWhereClause = (
@@ -91,57 +94,52 @@ export const parseDurationWhereClause = (
   if (!parser || !whereClause.trim()) return whereClause;
 
   try {
-    const fullSql = `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
-    const ast = parser.astify(fullSql);
-
     let unknownUnit: string | null = null;
-    let rewritten = false;
 
-    const processNode = (node: any) => {
-      if (!node || node.type !== "binary_expr" || unknownUnit) return;
+    const result = rewriteWhereLiterals(whereClause, parser, streamName, (where) => {
+      const replacements = new Map<LiteralNode, string>();
 
-      if (
-        (node.left?.column === "duration" || node.left?.column?.expr?.value === "duration") &&
-        (node.right?.type === "single_quote_string" || node.right?.type === "string")
-      ) {
-        const strVal = String(node.right.value).trim();
+      const convert = (strNode: any) => {
+        if (unknownUnit) return;
+        if (strNode?.type !== "single_quote_string" && strNode?.type !== "string") return;
+        const strVal = String(strNode.value).trim();
         // Allow optional whitespace between number and unit; unit may be multi-char.
         const match = strVal.match(/^(\d+(?:\.\d+)?)\s*([a-zµ]+)$/i);
-        if (match) {
-          const rawUnit = match[2].toLowerCase();
-          const canonicalUnit = UNIT_ALIASES[rawUnit];
-          if (!canonicalUnit) {
-            unknownUnit = rawUnit;
-            return;
-          }
-          const num = parseFloat(match[1]);
-          const us = Math.round(num * (DURATION_UNIT_MULTIPLIERS[canonicalUnit] ?? 1));
-          // Mutate the AST node in place — replace quoted string with a numeric literal.
-          node.right = { type: "number", value: us };
-          rewritten = true;
+        if (!match) return;
+        const rawUnit = match[2].toLowerCase();
+        const canonicalUnit = UNIT_ALIASES[rawUnit];
+        if (!canonicalUnit) {
+          unknownUnit = rawUnit;
+          return;
         }
-      }
+        const num = parseFloat(match[1]);
+        const us = Math.round(num * (DURATION_UNIT_MULTIPLIERS[canonicalUnit] ?? 1));
+        replacements.set(strNode, String(us));
+      };
 
-      processNode(node.left);
-      processNode(node.right);
-    };
+      const processNode = (node: any) => {
+        if (!node || node.type !== "binary_expr" || unknownUnit) return;
 
-    processNode(ast.where);
+        if (node.left?.column === "duration" || node.left?.column?.expr?.value === "duration") {
+          if (node.right?.type === "expr_list" && Array.isArray(node.right.value)) {
+            node.right.value.forEach(convert);
+          } else {
+            convert(node.right);
+          }
+        }
+
+        processNode(node.left);
+        processNode(node.right);
+      };
+
+      processNode(where);
+      return replacements;
+    });
 
     if (unknownUnit !== null) {
       return { error: `Unknown duration unit: "${unknownUnit}"` };
     }
-
-    // Nothing to convert: keep the clause as written. Re-serialising would
-    // rewrite quoted identifiers ("default" → `default`), which the backend
-    // rejects.
-    if (!rewritten) return whereClause;
-
-    // Re-serialise the mutated AST and extract only the WHERE clause; sqlify
-    // quotes identifiers with backticks, the backend expects double quotes.
-    const resultSql: string = parser.sqlify(ast);
-    const whereMatch = resultSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
-    return whereMatch ? whereMatch[1].trim().replace(/`/g, '"') : whereClause;
+    return result ?? whereClause;
   } catch {
     return whereClause;
   }

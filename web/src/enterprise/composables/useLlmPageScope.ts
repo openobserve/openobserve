@@ -20,6 +20,7 @@ import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
 import { useLlmTraceStreams } from "./useLlmTraceStreams";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 /**
  * Stream + agent scope for the lighter AI pages (Users, Issues, Budgets): an
@@ -57,8 +58,8 @@ export function useLlmPageScope(t: TranslateFn) {
     if (agentName.value && !agentNames.value.includes(agentName.value)) agentName.value = null;
   });
   const scope = computed(() =>
-    agentName.value ? `gen_ai_agent_name = '${agentName.value.replace(/'/g, "''")}'` : "",
+    agentName.value ? `gen_ai_agent_name = ${sqlLiteral(agentName.value)}` : "",
   );
 
-  return { stream, agentName, availableStreams, agentNames, scope, load };
+  return { stream, agentName, agents, availableStreams, agentNames, scope, load };
 }

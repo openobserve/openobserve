@@ -22,6 +22,7 @@
 
 import type { EvalTargetScope } from "@/services/online-evals.service";
 import { countExpression, quoteIdent } from "../composables/useJobMatchedTargets";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 const MINUTE_US = 60_000_000;
 /** Bucket widths the charts step through, smallest first. */
@@ -44,7 +45,6 @@ export function workloadBucket(startUs: number, endUs: number) {
   return BUCKETS.find((b) => minutes / b.minutes <= MAX_BUCKETS) ?? BUCKETS[BUCKETS.length - 1];
 }
 
-const quote = (value: string) => `'${value.replace(/'/g, "''")}'`;
 const SCORER_ROWS =
   "attributes_scorer_id IS NOT NULL AND attributes_scorer_id != '' " +
   "AND attributes_status IN ('success', 'error', 'timeout')";
@@ -55,7 +55,7 @@ export function scoreSeriesSql(jobId: string, interval: string): string {
     `SELECT histogram(_timestamp, '${interval}') AS bucket, count(*) AS scores,`,
     "  approx_percentile_cont(_timestamp - ref_timestamp, 0.95) AS lag_p95_us",
     'FROM "_llm_scores"',
-    `WHERE job_id = ${quote(jobId)} AND (status IS NULL OR status = 'success')`,
+    `WHERE job_id = ${sqlLiteral(jobId)} AND (status IS NULL OR status = 'success')`,
     "GROUP BY bucket ORDER BY bucket",
   ].join("\n");
 }
@@ -73,24 +73,45 @@ export function judgeOutcomeSql(jobId: string, interval: string, withKind = true
     `SELECT histogram(_timestamp, '${interval}') AS bucket,`,
     `  CASE WHEN attributes_status = 'success' THEN '' ELSE ${failure} END AS kind, count(*) AS calls`,
     'FROM "_evaluator"',
-    `WHERE attributes_job_id = ${quote(jobId)} AND ${SCORER_ROWS}`,
+    `WHERE attributes_job_id = ${sqlLiteral(jobId)} AND ${SCORER_ROWS}`,
     "GROUP BY bucket, kind ORDER BY bucket",
   ].join("\n");
 }
 
-/** Judge spend per bucket, in USD. */
-export function judgeSpendSql(jobId: string, interval: string): string {
+/**
+ * Judge spend per bucket, in USD, with its unpriced calls. The cost-status
+ * column appears with a stream's first priced or unpriced call, so
+ * `withStatus: false` reads the cost alone.
+ */
+export function judgeSpendSql(jobId: string, interval: string, withStatus = true): string {
+  const unpriced = withStatus
+    ? "SUM(CASE WHEN gen_ai_usage_cost_status = 'unpriced' THEN 1 ELSE 0 END)"
+    : "0";
   return [
-    `SELECT histogram(_timestamp, '${interval}') AS bucket, sum(gen_ai_usage_cost) AS cost`,
+    `SELECT histogram(_timestamp, '${interval}') AS bucket, sum(gen_ai_usage_cost) AS cost,`,
+    `  ${unpriced} AS unpriced`,
     'FROM "_evaluator"',
-    `WHERE attributes_job_id = ${quote(jobId)}`,
+    `WHERE attributes_job_id = ${sqlLiteral(jobId)}`,
     "GROUP BY bucket ORDER BY bucket",
   ].join("\n");
 }
 
+/**
+ * Spend points from `judgeSpendSql` rows. A bucket whose calls were all
+ * unpriced has no known spend, so it plots as a gap, never as $0.
+ */
+export function spendPoints(
+  rows: { bucket: unknown; cost?: unknown; unpriced?: unknown }[],
+): [number, number | null][] {
+  return rows.map((r) => {
+    const unknown = r.cost == null && Number(r.unpriced) > 0;
+    return [bucketMs(r.bucket), unknown ? null : Number(r.cost) || 0];
+  });
+}
+
 /** The newest score the job wrote. */
 export function lastScoreSql(jobId: string): string {
-  return `SELECT max(_timestamp) AS last_us FROM "_llm_scores" WHERE job_id = ${quote(jobId)}`;
+  return `SELECT max(_timestamp) AS last_us FROM "_llm_scores" WHERE job_id = ${sqlLiteral(jobId)}`;
 }
 
 /**

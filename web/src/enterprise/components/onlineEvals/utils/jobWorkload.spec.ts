@@ -22,6 +22,7 @@ import {
   matchedSinceSql,
   scoreSeriesSql,
   scoresStopped,
+  spendPoints,
   stoppedSinceUs,
   workloadBucket,
 } from "./jobWorkload";
@@ -48,7 +49,23 @@ describe("workload series (AIO-25)", () => {
       "CASE WHEN attributes_status = 'success' THEN '' ELSE COALESCE(attributes_error_kind, attributes_status) END",
     );
     expect(judgeOutcomeSql("j1", "1 hour", false)).not.toContain("attributes_error_kind");
-    expect(judgeSpendSql("j1", "1 hour")).toContain("sum(gen_ai_usage_cost) AS cost");
+    expect(judgeSpendSql("j1", "1 hour")).toContain("gen_ai_usage_cost_status = 'unpriced'");
+    expect(judgeSpendSql("j1", "1 hour", false)).not.toContain("gen_ai_usage_cost_status");
+  });
+
+  it("plots a bucket of only unpriced judge calls as unknown, never as $0", () => {
+    const t = 1_000_000_000_000_000;
+    expect(
+      spendPoints([
+        { bucket: t, cost: null, unpriced: 13 },
+        { bucket: t + 600_000_000, cost: 0.25, unpriced: 2 },
+        { bucket: t + 1_200_000_000, cost: null, unpriced: 0 },
+      ]),
+    ).toEqual([
+      [1_000_000_000_000, null],
+      [1_000_000_600_000, 0.25],
+      [1_000_001_200_000, 0],
+    ]);
   });
 
   it("turns outcome rows into an error rate per kind", () => {

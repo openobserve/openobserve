@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   compareWindows,
+  releaseWatchMuteKey,
   errorClass,
   introducedClasses,
   versionFailuresSql,
@@ -54,6 +55,21 @@ describe("release watch (AIO-39)", () => {
     expect(versionFailuresSql("s", noEnv, true)).toMatch(envNull);
     expect(versionWindowSql("s", prod)).not.toMatch(envNull);
     expect(versionFailuresSql("s", prod, true)).toContain("'production'");
+  });
+
+  it("counts a trace's cost once, by the per-trace usage rule, not every span", () => {
+    const sql = versionWindowSql("s", { name: "qa", version: "2.0" } as GenAiAgentListItem);
+    expect(sql).not.toContain("SUM(gen_ai_usage_cost)");
+    expect(sql).toContain("gen_ai_operation_name = 'invoke_agent'");
+  });
+
+  it("mutes a release only in its own org, stream and env", () => {
+    const v = { name: "bot", version: "1.4.1", env: "production" } as GenAiAgentListItem;
+    const key = releaseWatchMuteKey("default", "s", v);
+    expect(releaseWatchMuteKey("default", "s", { ...v })).toBe(key);
+    expect(releaseWatchMuteKey("team3", "s", v)).not.toBe(key);
+    expect(releaseWatchMuteKey("default", "other", v)).not.toBe(key);
+    expect(releaseWatchMuteKey("default", "s", { ...v, env: "staging" })).not.toBe(key);
   });
 
   it("calls a failure-rate rise a regression only beyond noise and 10%", () => {

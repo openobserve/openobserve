@@ -127,6 +127,34 @@ export function orientedDelta(policy: ScorePolicy, baseline: number, candidate: 
   return baseline === 0 ? Math.sign(raw) : raw / Math.abs(baseline);
 }
 
+/** An unranged numeric score moves relative to its baseline's value, so its delta reads as a percent, not points. */
+export function isRelative(policy: ScorePolicy | null | undefined): boolean {
+  return policy?.kind === "numeric" && policy.span === null;
+}
+
+/**
+ * A run whose scores are final: completed, or scored with some Scorer errors
+ * (`scoring_failed` is terminal, as Compare treats it). The latter's clean
+ * scores still vote; an errored or unfinished one does not (`isCleanScore`).
+ */
+export function isSettled(run: LlmExperiment): boolean {
+  return run.status === "completed" || run.status === "scoring_failed";
+}
+
+/** Every row of the score was scored: no Scorer error and nothing pending. */
+export function isCleanScore(score: Pick<ExperimentScoreSummary, "errorCount" | "pendingCount">) {
+  return !score.errorCount && !score.pendingCount;
+}
+
+/** The run's score columns that cannot vote, because a Scorer failed or has not finished on a row. */
+function uncleanKeys(run: LlmExperiment): Set<string> {
+  return new Set(
+    experimentEvidence(run)
+      .scores.filter((score) => !isCleanScore(score))
+      .map((score) => score.key),
+  );
+}
+
 /** The values a run can take and still be within noise: the threshold in the score's own units. */
 export function noiseBand(policy: ScorePolicy, baseline: number): [number, number] {
   const scale = policy.kind === "numeric" ? (policy.span ?? Math.abs(baseline)) : 1;
@@ -149,7 +177,9 @@ function classify(delta: number): BaselineOutcome {
 export type ScoreColumn = Pick<ExperimentScoreSummary, "key" | "name" | "clientScorerKey">;
 
 export interface ScoreDelta extends ScoreColumn {
+  /** Oriented so positive is better: a share of the range (points), or of the baseline when `relative`. */
   delta: number;
+  relative: boolean;
   outcome: BaselineOutcome;
 }
 
@@ -186,8 +216,14 @@ export interface SharedCaseComparison {
   shared: number;
   /** Cases only one side ran: new in the run, or missing from it. */
   excluded: number;
-  /** By score column key. `delta` oriented so positive is better; `change` raw, in the score's own measure. */
-  scores: Map<string, ScoreColumn & { delta: number; change: number }>;
+  /**
+   * By score column key. `delta` oriented so positive is better; `change` raw,
+   * in the score's own measure; `scoreConfigId` names the health policy.
+   */
+  scores: Map<
+    string,
+    ScoreColumn & { delta: number; change: number; scoreConfigId: string | null }
+  >;
 }
 
 /** Compare names a client dimension `<client key> · client` (comparison.rs `score_dimension_key`). */
@@ -218,6 +254,7 @@ export function sharedCaseComparison(comparison: ExperimentComparison): SharedCa
       ...column,
       delta: dimension.orientedDelta,
       change: dimension.delta,
+      scoreConfigId: dimension.scoreConfigId || null,
     });
   }
   return {
@@ -247,7 +284,8 @@ function verdict(
 /**
  * Score columns only vote, as in Compare: latency and cost never count. A run
  * with no score that has a policy on both sides gets no outcome, the same as
- * Compare's inconclusive.
+ * Compare's inconclusive. A settled run whose Scorer failed on some rows votes
+ * with its other scores; the failed one does not.
  *
  * A run on another dataset version or filter than its baseline ran other
  * cases, so its means are not comparable: it is judged by `shared`, Compare's
@@ -261,12 +299,20 @@ export function compareToBaseline(
 ): RunComparison | null {
   if (!baseline || run.id === baseline.id) return null;
   // Partial summaries of a live run would read as moves that are not there yet.
-  if (run.status !== "completed" || baseline.status !== "completed") return null;
+  if (!isSettled(run) || baseline.status !== "completed") return null;
   const deltas = new Map<string, ScoreDelta>();
+  const unclean = uncleanKeys(run);
   if (!sameCases(run, baseline)) {
     if (!shared) return null;
     for (const [key, move] of shared.scores) {
-      deltas.set(key, { ...scoreColumn(move), delta: move.delta, outcome: classify(move.delta) });
+      if (unclean.has(key)) continue;
+      const relative = isRelative(move.scoreConfigId ? policies.get(move.scoreConfigId) : null);
+      deltas.set(key, {
+        ...scoreColumn(move),
+        delta: move.delta,
+        relative,
+        outcome: classify(move.delta),
+      });
     }
     return verdict(deltas, { shared: shared.shared, excluded: shared.excluded });
   }
@@ -275,12 +321,17 @@ export function compareToBaseline(
   for (const score of experimentEvidence(run).scores) {
     const other = reference.get(score.key);
     const policy = policyOf(score, policies);
-    if (!other || !policy) continue;
+    if (!other || !policy || unclean.has(score.key)) continue;
     const candidate = scoreMeasure(score, policy);
     const base = scoreMeasure(other, policy);
     if (candidate === null || base === null) continue;
     const delta = orientedDelta(policy, base, candidate);
-    deltas.set(score.key, { ...scoreColumn(score), delta, outcome: classify(delta) });
+    deltas.set(score.key, {
+      ...scoreColumn(score),
+      delta,
+      relative: isRelative(policy),
+      outcome: classify(delta),
+    });
   }
   return verdict(deltas, null);
 }
@@ -292,18 +343,23 @@ export function signedPoints(delta: number): string {
   return delta > 0 ? `+${points}` : points.replace("-", "−");
 }
 
+/** A move as the list prints it: signed points, or a percent of the baseline for an unranged score. */
+export function signedDelta(move: Pick<ScoreDelta, "delta" | "relative">): string {
+  return move.relative ? `${signedPoints(move.delta)}%` : signedPoints(move.delta);
+}
+
 export interface RunFold {
-  /** The run that stands for the fold: the newest completed one, else the newest. */
+  /** The run that stands for the fold: the newest settled one, else the newest. */
   latest: LlmExperiment;
   /** The fold's other runs, newest first. */
   earlier: LlmExperiment[];
-  /** The newest run, when it is newer than `latest` and did not complete (cancelled, failed or still going). */
+  /** The newest run, when it is newer than `latest` and did not settle (cancelled, failed or still going). */
   newerIncomplete: LlmExperiment | null;
 }
 
 /**
  * Runs with one name on one commit are re-runs; they fold into the newest
- * completed one. It, not the mean, stands for the fold everywhere (delta,
+ * settled one. It, not the mean, stands for the fold everywhere (delta,
  * outcome, sort, trend point): it is the last verdict CI got, and a mean would
  * smooth a flaky run into a value no run produced. A newer re-run that was
  * cancelled or failed has no verdict, so it does not hide that one. The spread
@@ -319,7 +375,7 @@ export function foldReruns(runs: LlmExperiment[]): RunFold[] {
   }
   return [...folds.values()].map((members) => {
     const newestFirst = [...members].sort((a, b) => b.createdAt - a.createdAt);
-    const latest = newestFirst.find((run) => run.status === "completed") ?? newestFirst[0];
+    const latest = newestFirst.find(isSettled) ?? newestFirst[0];
     return {
       latest,
       earlier: newestFirst.filter((run) => run !== latest),
@@ -328,9 +384,39 @@ export function foldReruns(runs: LlmExperiment[]): RunFold[] {
   });
 }
 
+/** Why a run has no verdict: it was cancelled, it failed, or it is still going. */
+export type IncompleteKind = "cancelled" | "failed" | "inProgress";
+
+export function incompleteKind(run: LlmExperiment): IncompleteKind | null {
+  if (isSettled(run)) return null;
+  if (run.status === "cancelled") return "cancelled";
+  return run.status === "failed" || run.status === "execution_failed" ? "failed" : "inProgress";
+}
+
 /**
- * "27–32%" for a boolean score across a fold's completed runs, with how many
- * runs it spans; categorical scores show counts instead.
+ * How many runs carry a verdict, and why the others do not. Fold badges and
+ * section headers count `settled`, the runs the spread and the verdict come
+ * from, and name the rest beside it.
+ */
+export interface RunTally {
+  settled: number;
+  incomplete: Record<IncompleteKind, number>;
+}
+
+export function tallyRuns(runs: LlmExperiment[]): RunTally {
+  const tally: RunTally = { settled: 0, incomplete: { cancelled: 0, failed: 0, inProgress: 0 } };
+  for (const run of runs) {
+    const kind = incompleteKind(run);
+    if (kind) tally.incomplete[kind] += 1;
+    else tally.settled += 1;
+  }
+  return tally;
+}
+
+/**
+ * "27–32%" for a boolean score across a fold's settled runs, with how many
+ * runs it spans; categorical scores show counts instead. Runs that agree read
+ * as one value ("80%"), not a range from a value to itself.
  */
 export function scoreSpread(
   runs: LlmExperiment[],
@@ -339,21 +425,22 @@ export function scoreSpread(
   const values: number[] = [];
   let percent = false;
   for (const run of runs) {
-    if (run.status !== "completed") continue;
+    if (!isSettled(run)) continue;
     const score = experimentEvidence(run).scores.find((entry) => entry.key === key);
-    if (score?.kind === "boolean" && score.trueCount + score.falseCount > 0) {
+    if (!score || !isCleanScore(score)) continue;
+    if (score.kind === "boolean" && score.trueCount + score.falseCount > 0) {
       percent = true;
       values.push(score.trueCount / (score.trueCount + score.falseCount));
-    } else if (score?.kind === "numeric" && score.sampleCount > 0) {
+    } else if (score.kind === "numeric" && score.sampleCount > 0) {
       values.push(score.value);
     }
   }
   if (values.length < 2) return null;
-  const [min, max] = [Math.min(...values), Math.max(...values)];
-  const range = percent
-    ? `${Math.round(min * 100)}–${Math.round(max * 100)}%`
-    : `${min.toFixed(3)}–${max.toFixed(3)}`;
-  return { count: values.length, range };
+  const [low, high] = [Math.min(...values), Math.max(...values)].map((value) =>
+    percent ? String(Math.round(value * 100)) : value.toFixed(3),
+  );
+  const range = low === high ? low : `${low}–${high}`;
+  return { count: values.length, range: percent ? `${range}%` : range };
 }
 
 /**
@@ -373,7 +460,8 @@ export interface CiGroup {
   key: string;
   kind: "pr" | "branch" | "commit" | null;
   value: string | null;
-  runCount: number;
+  /** Every run in the section, re-runs included: settled ones and why the rest have no verdict. */
+  runs: RunTally;
   /** Set when every run in the group shares it. */
   branch: string | null;
   commit: string | null;
@@ -426,7 +514,7 @@ export function ciGroups(
       key,
       kind: key === NO_CI_GROUP ? null : (key.slice(0, split) as CiGroup["kind"]),
       value: key === NO_CI_GROUP ? null : key.slice(split + 1),
-      runCount: runs.length,
+      runs: tallyRuns(runs),
       branch: shared(runs.map((run) => gitMeta(run, "branch"))),
       commit: shared(runs.map((run) => gitMeta(run, "commit"))),
       regressed: outcomes.filter((c) => c?.outcome === "regressed").length,
@@ -480,10 +568,11 @@ export function trendScores(
 }
 
 /**
- * One point per (folded) completed run, oldest first, judged against the
- * baseline's band. A run on other cases than the baseline is plotted by its
- * move over the cases both ran, from `shared` (keyed by run id), and is left
- * out until that comparison arrives.
+ * One point per (folded) settled run, oldest first, judged against the
+ * baseline's band; a run whose Scorer failed on a row of this score has none.
+ * A run on other cases than the baseline is plotted by its move over the cases
+ * both ran, from `shared` (keyed by run id), and is left out until that
+ * comparison arrives.
  */
 export function scoreTrend(
   runs: LlmExperiment[],
@@ -498,7 +587,7 @@ export function scoreTrend(
   if (!policy || base === null) return null;
   const points: TrendPoint[] = [];
   for (const run of [...runs].sort((a, b) => a.createdAt - b.createdAt)) {
-    if (run.status !== "completed") continue;
+    if (!isSettled(run) || uncleanKeys(run).has(key)) continue;
     let value: number | null;
     let outcome: BaselineOutcome;
     if (sameCases(run, baseline)) {

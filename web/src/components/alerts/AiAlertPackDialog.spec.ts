@@ -47,11 +47,17 @@ vi.mock("vuex", () => ({
   }),
 }));
 
-vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({
+    t: (key: string, params?: object) =>
+      params && typeof params === "object" ? `${key} ${JSON.stringify(params)}` : key,
+  }),
+}));
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AiAlertPackDialog from "./AiAlertPackDialog.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const ODialogStub = {
   props: ["open", "primaryButtonLabel", "primaryButtonDisabled"],
@@ -138,6 +144,22 @@ describe("AiAlertPackDialog — each rule waits for its own stream", () => {
     await flushPromises();
     expect(createdNames()).toContain("ai_eval_judge_error_rate");
   });
+
+  it("says what each missing stream is: a trace stream, evaluator spans or scores", async () => {
+    listByFolderId.mockResolvedValue(installed());
+    streamLists.traces = [];
+    const wrapper = await mountDialog();
+    const badge = (id: string) => wrapper.find(`[data-test="ai-alert-pack-rule-${id}"]`).text();
+
+    expect(badge("repeated_tool_calls")).toContain("aiAlertPack.waits.traceStream");
+    expect(badge("cost")).toContain("aiAlertPack.waits.traceStream");
+    expect(badge("eval_judge_error_rate")).toContain("aiAlertPack.waits.evaluator");
+    expect(badge("evaluator_lag")).toContain("aiAlertPack.waits.scores");
+    // No trace stream: guidance instead of a summary of alerts it cannot add.
+    expect(wrapper.find('[data-test="ai-alert-pack-no-trace-stream"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="ai-alert-pack-summary"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="primary"]').attributes("disabled")).toBeDefined();
+  });
 });
 
 describe("AiAlertPackDialog — after a partial install", () => {
@@ -158,6 +180,8 @@ describe("AiAlertPackDialog — after a partial install", () => {
     await wrapper.find('[data-test="primary"]').trigger("click");
     await flushPromises();
     expect(createdNames()).toEqual(["ai_hourly_cost"]);
+    // The toast names the server's reason beside the rule.
+    expect(JSON.stringify(vi.mocked(toast).mock.calls[0])).toContain("boom");
     expect(
       wrapper
         .find('[data-test="ai-alert-pack-rule-failure_rate"]')

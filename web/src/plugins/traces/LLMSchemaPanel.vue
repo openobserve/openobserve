@@ -134,7 +134,7 @@ const displaySubtitle = computed(() => (props.panel.subtitleKey ? t(props.panel.
 // (Decision D8). No `pickInterval` needed.
 const sql = computed(() => {
   const autoBucketSql = props.panel.query.sql.replace(
-    /histogram\((_timestamp),\s*'\{\{interval\}\}'\)/g,
+    /histogram\((_timestamp|first_ts),\s*'\{\{interval\}\}'\)/g,
     "histogram($1)",
   );
   let rendered = renderPanelSql(autoBucketSql, {
@@ -143,6 +143,7 @@ const sql = computed(() => {
     endTime: props.endTime,
     interval: "",
     agentFilter: props.agentFilter,
+    unattributedLabel: t("llmAttribution.unattributed"),
   });
 
   // Bar panels declare a top-N cap (the legacy renderer sliced client-side).

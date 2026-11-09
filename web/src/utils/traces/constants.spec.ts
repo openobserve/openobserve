@@ -174,18 +174,18 @@ describe("traces/constants", () => {
 
       it("should replace span_kind='Server' with the numeric key using AST path", () => {
         const result = parseSpanKindWhereClause("span_kind='Server'", parser);
-        // sqlify adds spaces around the operator
-        expect(result).toBe("span_kind = '2'");
+        // Only the converted literal changes; spacing is kept as written.
+        expect(result).toBe("span_kind='2'");
       });
 
       it("should replace label case-insensitively when parser is provided", () => {
         const result = parseSpanKindWhereClause("span_kind='server'", parser);
-        expect(result).toBe("span_kind = '2'");
+        expect(result).toBe("span_kind='2'");
       });
 
       it("should preserve the != operator and replace the label with the numeric key", () => {
         const result = parseSpanKindWhereClause("span_kind!='Client'", parser);
-        expect(result).toBe("span_kind != '3'");
+        expect(result).toBe("span_kind!='3'");
       });
 
       it("should replace both sides of a compound OR clause", () => {
@@ -193,7 +193,7 @@ describe("traces/constants", () => {
           "(span_kind='SERVER' OR span_kind='internal')",
           parser,
         );
-        expect(result).toBe("(span_kind = '2' OR span_kind = '1')");
+        expect(result).toBe("(span_kind='2' OR span_kind='1')");
       });
 
       it("should leave an unknown label value unchanged", () => {
@@ -236,6 +236,18 @@ describe("traces/constants", () => {
       it("should replace all labels in an IN clause with their numeric keys", () => {
         const result = parseSpanKindWhereClause("span_kind IN ('Server', 'Client')", parser);
         expect(result).toBe("span_kind IN ('2', '3')");
+      });
+
+      it.each([
+        String.raw`path = 'C:\new\temp'`,
+        String.raw`msg = 'tab\there'`,
+        String.raw`v = 'a\b'`,
+        "note = 'it''s'",
+        "str_match(body, '```')",
+        "`svc` = 'x'",
+      ])("should leave other literals byte-identical: %s", (other) => {
+        const result = parseSpanKindWhereClause(`${other} AND span_kind = 'Server'`, parser);
+        expect(result).toBe(`${other} AND span_kind = '2'`);
       });
     });
   });

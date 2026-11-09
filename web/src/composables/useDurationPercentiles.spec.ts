@@ -196,8 +196,24 @@ describe("parseDurationWhereClause", () => {
         "x",
       );
       // service_name is preserved; duration is converted to 1500 microseconds
-      expect(result).toContain("service_name = 'svc-a'");
-      expect(result).toContain("duration >= 1500");
+      expect(result).toBe("service_name='svc-a' AND duration >= 1500");
+    });
+
+    it("should convert both bounds of a BETWEEN", () => {
+      const result = parseDurationWhereClause("duration BETWEEN '1ms' AND '2s'", p, "x");
+      expect(result).toBe("duration BETWEEN 1000 AND 2000000");
+    });
+
+    it.each([
+      String.raw`path = 'C:\new\temp'`,
+      String.raw`msg = 'tab\there'`,
+      String.raw`v = 'a\b'`,
+      "note = 'it''s'",
+      "str_match(body, '```')",
+      "`svc` = 'x'",
+    ])("should leave other literals byte-identical: %s", (other) => {
+      const result = parseDurationWhereClause(`${other} AND duration > '1ms'`, p, "x");
+      expect(result).toBe(`${other} AND duration > 1000`);
     });
   });
 

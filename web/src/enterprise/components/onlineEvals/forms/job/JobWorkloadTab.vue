@@ -61,6 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-wrap items-baseline gap-x-2">
           <span class="text-compact text-text-heading font-semibold">{{ chart.title }}</span>
           <span class="text-2xs text-text-secondary">{{ chart.note }}</span>
+          <span
+            v-if="chart.id === 'spend' && budgetLifted"
+            class="text-2xs text-text-secondary"
+            data-test="eval-job-workload-spend-lifted"
+          >
+            {{ t("evalSpend.list.liftedUntil") }}
+          </span>
           <router-link
             v-if="
               chart.id === 'spend' &&
@@ -127,14 +134,23 @@ import type { EvalJob } from "@/services/online-evals.service";
 import StreamService from "@/services/stream";
 import { targetScopeOf, valueOf } from "../../utils/evalEntity";
 import { errorKindLabel, relativeTime } from "../../utils/evalFormat";
+import { timestampToTimezoneDate } from "@/utils/timezone";
+import { escapeHtml } from "@/utils/html";
 import { normalizeJobFilterCondition } from "../../utils/jobFilter";
-import { evaluatorFields, formatUsd, loadSpendToday, type JobSpend } from "../../utils/evalSpend";
+import {
+  evaluatorFields,
+  formatUsd,
+  isBudgetLifted,
+  loadSpendToday,
+  type JobSpend,
+} from "../../utils/evalSpend";
 import type { SpendError } from "@/utils/alerts/aiBudgets";
 import {
   bucketMs,
   errorSeries,
   judgeOutcomeSql,
   judgeSpendSql,
+  spendPoints,
   lastScoreSql,
   matchedSinceSql,
   scoreSeriesSql,
@@ -166,6 +182,11 @@ const { executeQueryOnce } = useLLMStreamQuery();
 
 const ERROR_RATE_ALERT_PCT = 20;
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Times read in the app's time zone, as the other AI panels show them.
+const timezone = computed(() => store.state.timezone || "UTC");
+const zoned = (ms: number, format: string) => timestampToTimezoneDate(ms, timezone.value, format);
+/** One series' entry in an axis tooltip, as ECharts passes it. */
+type TooltipPoint = { marker: string; seriesName?: string; value?: Point };
 
 const lag = ref<Point[]>([]);
 const throughput = ref<Point[]>([]);
@@ -198,7 +219,9 @@ async function loadSeries() {
     query(judgeOutcomeSql(id, interval), startUs, endUs).then(
       (rows) => rows ?? query(judgeOutcomeSql(id, interval, false), startUs, endUs),
     ),
-    query(judgeSpendSql(id, interval), startUs, endUs),
+    query(judgeSpendSql(id, interval), startUs, endUs).then(
+      (rows) => rows ?? query(judgeSpendSql(id, interval, false), startUs, endUs),
+    ),
   ]);
   lag.value = (scores ?? []).map((r: any) => [
     bucketMs(r.bucket),
@@ -206,7 +229,7 @@ async function loadSeries() {
   ]);
   throughput.value = (scores ?? []).map((r: any) => [bucketMs(r.bucket), Number(r.scores) || 0]);
   errors.value = errorSeries(outcomes ?? []);
-  spend.value = (cost ?? []).map((r: any) => [bucketMs(r.bucket), Number(r.cost) || 0]);
+  spend.value = spendPoints(cost ?? []);
 }
 
 async function loadToday() {
@@ -274,10 +297,9 @@ watch(
 const stoppedText = computed(() => {
   const s = stopped.value;
   if (!s) return "";
-  const since = new Date(s.sinceUs / 1000);
   const parts = [
     t("evalWorkload.stopped.text", {
-      time: since.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      time: zoned(s.sinceUs / 1000, "HH:mm"),
       ago: relativeTime(s.sinceUs / 1000, t),
       n: s.matched.toLocaleString(),
       scope: t(`evalSpend.cost.scopes.${scope.value}`),
@@ -304,6 +326,7 @@ function lineOptions(opts: {
   void store.state.theme;
   const text = chartColor("--color-text-secondary");
   const grid = chartColor("--color-border-subtle");
+  const multiDay = props.dateWindow.endUs - props.dateWindow.startUs > 2 * DAY_MS * 1000;
   const series: any[] = opts.series.map((s) => ({
     name: s.name,
     type: s.type ?? "line",
@@ -350,13 +373,28 @@ function lineOptions(opts: {
       trigger: "axis",
       confine: true,
       textStyle: { fontSize: 12 },
-      valueFormatter: (v: number | null) => (v == null ? "—" : opts.format(v)),
+      formatter: (params: TooltipPoint | TooltipPoint[]) => {
+        const points = Array.isArray(params) ? params : [params];
+        if (!points.length) return "";
+        const lines = points.map((p) => {
+          const v = p.value?.[1];
+          const value = v == null ? "—" : opts.format(v);
+          return `${p.marker}${escapeHtml(String(p.seriesName ?? ""))} <b>${escapeHtml(value)}</b>`;
+        });
+        const at = Number(points[0].value?.[0]) || 0;
+        return [escapeHtml(zoned(at, "yyyy-MM-dd HH:mm")), ...lines].join("<br/>");
+      },
     },
     xAxis: {
       type: "time",
       min: props.dateWindow.startUs / 1000,
       max: props.dateWindow.endUs / 1000,
-      axisLabel: { color: text, fontSize: 10, hideOverlap: true },
+      axisLabel: {
+        color: text,
+        fontSize: 10,
+        hideOverlap: true,
+        formatter: (ms: number) => zoned(ms, multiDay ? "LLL d" : "HH:mm"),
+      },
       axisLine: { lineStyle: { color: grid } },
       splitLine: { show: false },
     },
@@ -373,6 +411,9 @@ function lineOptions(opts: {
 
 const sum = (points: Point[]) => points.reduce((total, [, v]) => total + (v ?? 0), 0);
 
+// "Resume until 00:00 UTC" lifted the budget, as the job list marks it.
+const budgetLifted = computed(() => isBudgetLifted(props.row, Date.now()));
+
 // Unpriced judge calls leave today's spend unknown, and the budget blind to them.
 function spendNote(per: string, budget: number | undefined) {
   const today = spendToday.value;
@@ -382,7 +423,7 @@ function spendNote(per: string, budget: number | undefined) {
   if (today.unpricedCalls) {
     return t(
       "evalWorkload.spend.noteUnpriced",
-      { per, n: today.unpricedCalls },
+      { per, today: formatUsd(today.usd), n: today.unpricedCalls },
       today.unpricedCalls,
     );
   }

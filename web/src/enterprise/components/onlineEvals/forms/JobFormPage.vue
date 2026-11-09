@@ -202,6 +202,7 @@
           </section>
 
           <JobCostSection
+            ref="costSection"
             :estimate="spend.estimate.value"
             :loading="spend.loading.value"
             :rate="samplingRate"
@@ -412,6 +413,8 @@ const props = defineProps<{
   mode: "create" | "edit";
   row: EvalJob | null;
   scorers: Scorer[];
+  /** Opened from a budget-paused job's Edit budget: the form starts at the cost section. */
+  focusBudget?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -664,10 +667,16 @@ async function loadStreamFields() {
   streamFieldsLoaded.value = true;
 }
 
+const costSection = ref<{ $el?: HTMLElement } | null>(null);
+
 onMounted(async () => {
   void loadTraceStreams();
   void loadStreamFields();
   await jobDraft.start();
+  if (props.focusBudget) {
+    await nextTick();
+    costSection.value?.$el?.scrollIntoView?.({ block: "start" });
+  }
 });
 
 const samplingModeOptions = computed(() => [

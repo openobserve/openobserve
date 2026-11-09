@@ -1366,13 +1366,12 @@ fn normalize_session_search_term(raw: Option<&String>) -> Option<String> {
 /// Case-insensitive substring predicate on one span column.
 ///
 /// `str_match_ignore_case` takes the term as literal text — unlike `LIKE` it
-/// has no wildcards, so `%` and `_` need no escaping — and a backslash is not
-/// an escape in the SQL dialect either. The only character that must be
-/// escaped is the single quote closing the literal.
+/// has no wildcards, so `%` and `_` need no escaping. The literal itself comes
+/// from `quote_sql_string`, which keeps a `\'` in the term from closing it.
 fn session_search_predicate(column: &str, term: &str) -> String {
     format!(
-        "str_match_ignore_case({column}, '{}')",
-        term.replace('\'', "''")
+        "str_match_ignore_case({column}, {})",
+        config::utils::sql::quote_sql_string(term)
     )
 }
 
@@ -1490,10 +1489,12 @@ impl LatestSessionSearch {
                 None => format!("({user})"),
             }
         });
-        let user = self
-            .user_id
-            .as_deref()
-            .map(|user| format!("{user_col} = '{}'", user.replace('\'', "''")));
+        let user = self.user_id.as_deref().map(|user| {
+            format!(
+                "{user_col} = {}",
+                config::utils::sql::quote_sql_string(user)
+            )
+        });
         keyword.into_iter().chain(user).collect()
     }
 }
@@ -1677,7 +1678,7 @@ fn build_latest_sessions_sql(
     let user_id_col = validated.columns.user_id;
     let session_ids_sql = session_ids
         .iter()
-        .map(|session_id| format!("'{}'", session_id.replace('\'', "''")))
+        .map(|session_id| config::utils::sql::quote_sql_string(session_id))
         .collect::<Vec<_>>()
         .join(",");
 
@@ -1784,13 +1785,19 @@ fn build_latest_sessions_sql(
     .collect();
     let stream_ident = traces::session::quote_identifier(stream_name);
     // Picks the agent's harness patterns when the session is read (AIO-22).
-    let (agent_name_expr, session_agent_name_expr) = if validated.has_gen_ai {
+    let (agent_name_expr, session_agent_name_expr) = if validated.has_gen_ai
+        && validated.has_input_messages
+    {
+        let present = format!("{input_messages_col} IS NOT NULL AND {input_messages_col} != ''");
         (
-            "max(gen_ai_agent_name) as agent_name, ",
-            "max(agent_name) as agent_name, ",
+            format!("{} as agent_name, ", trace_agent_expr(&present)),
+            "FIRST_VALUE(agent_name ORDER BY first_message_time ASC) \
+                 FILTER (WHERE gen_ai_input_messages IS NOT NULL) as agent_name, "
+                .to_string(),
         )
     } else {
-        ("", "")
+        // No first message, so no harness text to hide.
+        (String::new(), String::new())
     };
 
     // The usage rule holds per trace, so the inner query applies it per trace
@@ -1848,19 +1855,24 @@ impl SessionReadRules {
     async fn for_org(org_id: &str) -> Self {
         let config = db::system_settings::get_saved_gen_ai_agent_mapping_config(org_id).await;
         Self {
-            harness: config
-                .harness_patterns
-                .iter()
-                .map(|r| {
-                    (
-                        r.agent.clone(),
-                        config::meta::gen_ai::compile_harness_patterns(&r.patterns),
-                    )
-                })
-                .collect(),
+            harness: harness_by_agent(&config.harness_patterns),
             title: config.session_title,
         }
     }
+}
+
+/// Each agent's compiled patterns. Save refuses a duplicate agent; for one stored
+/// before that, the first rule wins, as in Session Detail (`patternsForAgent`).
+fn harness_by_agent(
+    rules: &[config::meta::gen_ai::HarnessPatternRule],
+) -> HashMap<String, Vec<config::meta::gen_ai::CompiledHarnessPattern>> {
+    let mut harness = HashMap::with_capacity(rules.len());
+    for r in rules {
+        harness
+            .entry(r.agent.clone())
+            .or_insert_with(|| config::meta::gen_ai::compile_harness_patterns(&r.patterns));
+    }
+    harness
 }
 
 const FIRST_MESSAGE_LEN: usize = 400;
@@ -2602,7 +2614,9 @@ mod tests {
             "sum(gen_ai_unpriced_tokens) as gen_ai_unpriced_tokens",
             "array_distinct(flatten(array_agg(gen_ai_unpriced_models))) as gen_ai_unpriced_models",
             "array_distinct(flatten(array_agg(user_ids))) as user_ids",
-            "max(agent_name) as agent_name",
+            // TS-13: the agent of the trace the first message came from.
+            "FIRST_VALUE(agent_name ORDER BY first_message_time ASC) \
+             FILTER (WHERE gen_ai_input_messages IS NOT NULL) as agent_name",
             "FIRST_VALUE(gen_ai_input_messages ORDER BY first_message_time ASC)",
         ] {
             assert!(per_session.contains(rollup), "{rollup}: {per_session}");
@@ -2611,10 +2625,39 @@ mod tests {
             "sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count",
             "array_agg(DISTINCT user_id)",
             "as first_message_time",
-            "max(gen_ai_agent_name) as agent_name",
+            // TS-13: the agent of the span the first message is read from, else
+            // the earliest span naming one; never the largest name.
+            "COALESCE(FIRST_VALUE(NULLIF(gen_ai_agent_name, '') ORDER BY start_time ASC) \
+             FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != ''), \
+             FIRST_VALUE(gen_ai_agent_name ORDER BY start_time ASC) \
+             FILTER (WHERE gen_ai_agent_name IS NOT NULL AND gen_ai_agent_name != '')) \
+             as agent_name",
         ] {
             assert!(per_trace.contains(per_trace_value), "{per_trace_value}");
         }
+        assert!(!sql.contains("max(gen_ai_agent_name)"), "{sql}");
+        assert!(!sql.contains("max(agent_name)"), "{sql}");
+    }
+
+    // A2-04: a duplicate stored before save refused it reads as Session Detail
+    // reads it, first rule first.
+    #[test]
+    fn harness_by_agent_keeps_the_first_rule_for_an_agent() {
+        let rule = |agent: &str, pattern: &str| config::meta::gen_ai::HarnessPatternRule {
+            agent: agent.to_string(),
+            patterns: vec![pattern.to_string()],
+        };
+        let harness = harness_by_agent(&[
+            rule("omp", "tag a"),
+            rule("omp", "tag b"),
+            rule("task", "tag c"),
+        ]);
+        assert_eq!(harness.len(), 2);
+        let labels = |agent: &str| -> Vec<String> {
+            harness[agent].iter().map(|(_, l)| l.clone()).collect()
+        };
+        assert_eq!(labels("omp"), ["a"]);
+        assert_eq!(labels("task"), ["c"]);
     }
 
     #[test]

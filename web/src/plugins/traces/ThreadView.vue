@@ -359,7 +359,6 @@ import {
   getModel,
   getCost,
   getTokens,
-  classify,
   buildTraceGroup,
   spanTimeBounds,
   type Message,
@@ -469,11 +468,11 @@ const showSystemFull = ref(false);
 const summary = computed(() => {
   const all = props.spans || [];
   const allTurnSpans = traceGroups.value.flatMap((g) => g.turns.map((t) => t.span));
-  // Tool spans, plus the cards for tool calls the SDK recorded without a span.
-  const toolCount =
-    all.filter((s) => classify(s) === "tool_call").length +
-    traceGroups.value.flatMap((g) => g.turns.flatMap((t) => t.toolCalls)).filter((c) => c.synthetic)
-      .length;
+  // The cards shown: attached tool spans plus calls the SDK recorded without a span.
+  const toolCount = traceGroups.value.reduce(
+    (n, g) => n + g.turns.reduce((m, t) => m + t.toolCalls.length, 0),
+    0,
+  );
 
   let totalCost = 0;
   for (const t of allTurnSpans) totalCost += getCost(t);

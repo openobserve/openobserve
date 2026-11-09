@@ -34,8 +34,10 @@ import {
   scoreSpread,
   scoreTrend,
   sharedCaseComparison,
+  signedDelta,
   signedPoints,
   sortByRegressions,
+  tallyRuns,
   trendScores,
 } from "./experimentScale";
 import { clientScoreKey } from "./experimentDiscovery";
@@ -318,6 +320,14 @@ describe("re-runs and CI groups", () => {
       count: 2,
       range: "27–32%",
     });
+    // B-15: runs that agree read as one value, not "0.800–0.800".
+    expect(scoreSpread([rerun("c", 3, 16), rerun("b", 2, 16)], "disclosure")).toEqual({
+      count: 2,
+      range: "29%",
+    });
+    expect(
+      scoreSpread([run("q2", 2, [quality(0.8)]), run("q1", 1, [quality(0.8)])], "quality"),
+    ).toEqual({ count: 2, range: "0.800" });
   });
 
   it("keeps the newest completed re-run's verdict when a newer one was cancelled", () => {
@@ -355,7 +365,11 @@ describe("re-runs and CI groups", () => {
     ]);
     const groups = ciGroups(folds, "pr", "regressions", comparisons);
     expect(groups.map((g) => g.key)).toEqual(["pr:172", "pr:169", "none"]);
-    expect(groups[0]).toMatchObject({ regressed: 1, runCount: 5 });
+    // The section counts the four settled runs and names the cancelled one.
+    expect(groups[0]).toMatchObject({
+      regressed: 1,
+      runs: { settled: 4, incomplete: { cancelled: 1, failed: 0, inProgress: 0 } },
+    });
     const trend = scoreTrend(
       folds.map((fold) => fold.latest),
       baseline,
@@ -368,6 +382,26 @@ describe("re-runs and CI groups", () => {
     // A fold with no completed run still shows its newest.
     const [alone] = foldReruns([cancelled]);
     expect([alone.latest.id, alone.newerIncomplete]).toEqual(["r5", null]);
+  });
+
+  it("tallies settled runs apart from cancelled, failed and unfinished ones", () => {
+    const at = (status: LlmExperiment["status"]) => makeExperiment({ status });
+    expect(
+      tallyRuns([
+        at("completed"),
+        at("scoring_failed"),
+        at("cancelled"),
+        at("execution_failed"),
+        at("scoring"),
+        at("pending"),
+      ]),
+    ).toEqual({ settled: 2, incomplete: { cancelled: 1, failed: 1, inProgress: 2 } });
+  });
+
+  it("lets a newer scoring_failed re-run stand for its fold", () => {
+    const partial = makeExperiment({ ...rerun("r3", 3, 10), status: "scoring_failed" });
+    const [fold] = foldReruns([rerun("r1", 1, 17), partial]);
+    expect([fold.latest.id, fold.newerIncomplete]).toEqual(["r3", null]);
   });
 
   it("groups by PR, falls back to the branch, and puts runs without metadata in one group", () => {
@@ -436,5 +470,76 @@ describe("trend", () => {
       { key: "disclosure", name: "disclosure", clientScorerKey: null, share: true },
       { key: "severity", name: "severity", clientScorerKey: null, share: true },
     ]);
+  });
+});
+
+// C2-X5: `scoring_failed` is terminal; a Scorer that errored on some rows must
+// not blank the verdict on every other score.
+describe("partly failed scoring", () => {
+  const failedSeverity = { ...severity({ none: 20, full: 30 }), errorCount: 5 };
+  const partial = run("partial", 2, [bool(10, 46), failedSeverity], { status: "scoring_failed" });
+
+  it("votes with the clean scores and leaves the errored one out", () => {
+    const result = compareToBaseline(partial, baseline, policies)!;
+    expect(result.outcome).toBe("improved");
+    expect([...result.deltas.keys()]).toEqual(["disclosure"]);
+    expect(compareToBaseline({ ...partial, status: "execution_failed" }, baseline, policies)).toBe(
+      null,
+    );
+  });
+
+  it("leaves the errored score out of a shared-case verdict too", () => {
+    const move = (key: string, delta: number) => ({
+      key,
+      name: key,
+      clientScorerKey: null,
+      delta,
+      change: delta,
+      scoreConfigId: `cfg-${key}`,
+    });
+    const shared = {
+      shared: 40,
+      excluded: 2,
+      scores: new Map([
+        ["disclosure", move("disclosure", 0.1)],
+        ["severity", move("severity", -0.3)],
+      ]),
+    };
+    const other = { ...partial, datasetVersion: baseline.datasetVersion + 1 };
+    const result = compareToBaseline(other, baseline, policies, shared)!;
+    expect(result.outcome).toBe("improved");
+    expect([...result.deltas.keys()]).toEqual(["disclosure"]);
+  });
+
+  it("plots the run on its clean scores only", () => {
+    const points = (key: string) =>
+      scoreTrend([partial], baseline, key, policies, new Map())!.points.map(({ id }) => id);
+    expect(points("disclosure")).toEqual(["partial"]);
+    expect(points("severity")).toEqual([]);
+  });
+});
+
+// C2-X6: an unranged numeric score moves relative to its baseline.
+describe("delta units", () => {
+  it("prints an unranged numeric move as a percent of the baseline, and a ranged one as points", () => {
+    const latency = (mean: number) => summary("latency", { kind: "numeric", mean });
+    const unranged = scorePolicies([
+      { entityId: "cfg-latency", dataType: "numeric", healthyThreshold: { direction: "lte" } },
+    ] as unknown as ScoreConfig[]);
+    const relative = compareToBaseline(
+      run("fast", 2, [latency(0)]),
+      run("slow", 1, [latency(100)]),
+      unranged,
+    )!;
+    expect(relative.headline).toMatchObject({ relative: true, outcome: "improved" });
+    expect(signedDelta(relative.headline)).toBe("+100.0%");
+
+    const ranged = compareToBaseline(
+      run("pr", 2, [quality(0.7)]),
+      run("base", 1, [quality(0.8)]),
+      policies,
+    )!;
+    expect(ranged.headline.relative).toBe(false);
+    expect(signedDelta(ranged.headline)).toBe("−10.0");
   });
 });

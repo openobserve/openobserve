@@ -168,23 +168,38 @@ pub fn compile_harness_patterns(patterns: &[String]) -> Vec<CompiledHarnessPatte
         .collect()
 }
 
-/// What save accepts: a `tag ` or `regex ` pattern within the length limit.
+/// What save accepts: a `tag ` or `regex ` pattern within the length limit that
+/// cannot match empty text (it would hide nothing but still count as hidden).
 fn check_harness_pattern(pattern: &str) -> Result<CompiledHarnessPattern, String> {
     if pattern.len() > MAX_HARNESS_PATTERN_LEN {
         return Err(format!(
             "harness pattern '{pattern}' cannot exceed {MAX_HARNESS_PATTERN_LEN} characters"
         ));
     }
-    parse_harness_pattern(pattern)
+    let compiled = parse_harness_pattern(pattern)?;
+    if compiled.0.is_match("") {
+        return Err(format!(
+            "regex in '{pattern}' matches empty text; it must match at least one character"
+        ));
+    }
+    Ok(compiled)
 }
 
 fn parse_harness_pattern(pattern: &str) -> Result<CompiledHarnessPattern, String> {
+    // Save trims patterns, so `regex ` arrives as `regex`.
+    match pattern.trim() {
+        "tag" => return Err("tag pattern is empty".to_string()),
+        "regex" => return Err("regex pattern is empty".to_string()),
+        _ => {}
+    }
     if let Some(tag) = pattern.strip_prefix("tag ") {
         let tag = tag.trim();
-        if tag.is_empty()
-            || !tag
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | ':' | '.'))
+        if tag.is_empty() {
+            return Err("tag pattern is empty".to_string());
+        }
+        if !tag
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | ':' | '.'))
         {
             return Err(format!("invalid tag name in '{pattern}'"));
         }
@@ -194,8 +209,12 @@ fn parse_harness_pattern(pattern: &str) -> Result<CompiledHarnessPattern, String
         return Ok((re, tag.to_string()));
     }
     if let Some(expr) = pattern.strip_prefix("regex ") {
-        let re = regex::Regex::new(expr.trim())
-            .map_err(|e| format!("invalid regex in '{pattern}': {e}"))?;
+        let expr = expr.trim();
+        if expr.is_empty() {
+            return Err("regex pattern is empty".to_string());
+        }
+        let re =
+            regex::Regex::new(expr).map_err(|e| format!("invalid regex in '{pattern}': {e}"))?;
         return Ok((re, "regex".to_string()));
     }
     Err(format!(
@@ -265,7 +284,8 @@ pub fn strip_harness(text: &str, patterns: &[CompiledHarnessPattern]) -> Harness
     let mut hidden = 0;
     let mut first = None;
     for (re, label) in patterns {
-        let n = re.find_iter(&out).count();
+        // Empty matches remove nothing, so they are not blocks hidden.
+        let n = re.find_iter(&out).filter(|m| !m.is_empty()).count();
         if n > 0 {
             hidden += n;
             first.get_or_insert_with(|| label.clone());
@@ -361,7 +381,14 @@ fn normalize_harness_rules(
             "harness_patterns cannot exceed {MAX_HARNESS_RULES} agents"
         ));
     }
+    let mut agents = HashSet::new();
     for rule in &rules {
+        if !agents.insert(rule.agent.as_str()) {
+            return Err(format!(
+                "harness_patterns contains duplicate agent '{}'",
+                rule.agent
+            ));
+        }
         if rule.patterns.len() > MAX_HARNESS_PATTERNS {
             return Err(format!(
                 "harness patterns for '{}' cannot exceed {MAX_HARNESS_PATTERNS}",
@@ -487,6 +514,99 @@ mod tests {
         assert!(config("tag <bad>").normalize_and_validate().is_err());
         let err = config("regex (?<").normalize_and_validate().unwrap_err();
         assert!(err.contains("invalid regex in 'regex (?<'"), "{err}");
+    }
+
+    // TS-14: a regex that can match empty text would count blocks it never hid.
+    #[test]
+    fn harness_patterns_that_match_empty_text_hide_and_count_nothing() {
+        let patterns = compile_harness_patterns(&["regex x*".to_string()]);
+        let none = strip_harness("abc", &patterns);
+        assert_eq!(
+            (none.text.as_str(), none.hidden, none.only),
+            ("abc", 0, None)
+        );
+        let some = strip_harness("axxbx", &patterns);
+        assert_eq!((some.text.as_str(), some.hidden), ("ab", 2));
+
+        let config = |p: &str| GenAiAgentMappingConfig {
+            harness_patterns: vec![HarnessPatternRule {
+                agent: "omp".to_string(),
+                patterns: vec![p.to_string()],
+            }],
+            ..Default::default()
+        };
+        for p in ["regex x*", "regex ^", "regex (?m)$"] {
+            let err = config(p).normalize_and_validate().unwrap_err();
+            assert!(err.contains("matches empty text"), "{p}: {err}");
+            let err = HarnessStripRequest {
+                patterns: vec![p.to_string()],
+                texts: vec!["abc".to_string()],
+            }
+            .strip()
+            .unwrap_err();
+            assert!(err.contains("matches empty text"), "{p}: {err}");
+        }
+        assert!(config("regex x+").normalize_and_validate().is_ok());
+    }
+
+    // A2-04: an empty expression says so, not that the prefix is missing.
+    #[test]
+    fn harness_pattern_with_an_empty_expression_says_it_is_empty() {
+        let save = |p: &str| {
+            GenAiAgentMappingConfig {
+                harness_patterns: vec![HarnessPatternRule {
+                    agent: "omp".to_string(),
+                    patterns: vec![p.to_string()],
+                }],
+                ..Default::default()
+            }
+            .normalize_and_validate()
+            .unwrap_err()
+        };
+        assert_eq!(save("regex "), "regex pattern is empty");
+        assert_eq!(save("regex"), "regex pattern is empty");
+        assert_eq!(save("tag  "), "tag pattern is empty");
+        let strip = |p: &str| {
+            HarnessStripRequest {
+                patterns: vec![p.to_string()],
+                texts: vec!["x".to_string()],
+            }
+            .strip()
+            .unwrap_err()
+        };
+        assert_eq!(strip("regex   "), "regex pattern is empty");
+        assert_eq!(strip("tag "), "tag pattern is empty");
+        assert_eq!(
+            parse_harness_pattern("regex   ").unwrap_err(),
+            "regex pattern is empty"
+        );
+    }
+
+    // A2-04: two rules for one agent made the list and Session Detail hide different text.
+    #[test]
+    fn harness_rules_refuse_a_duplicate_agent() {
+        let rule = |agent: &str, patterns: &[&str]| HarnessPatternRule {
+            agent: agent.to_string(),
+            patterns: patterns.iter().map(|p| p.to_string()).collect(),
+        };
+        let config = |rules: Vec<HarnessPatternRule>| GenAiAgentMappingConfig {
+            harness_patterns: rules,
+            ..Default::default()
+        };
+        let err = config(vec![rule("omp", &["tag a"]), rule(" omp ", &["tag b"])])
+            .normalize_and_validate()
+            .unwrap_err();
+        assert_eq!(err, "harness_patterns contains duplicate agent 'omp'");
+        // A rule with no patterns is dropped on save, so it is no duplicate.
+        let ok = config(vec![rule("omp", &["tag a"]), rule("omp", &[" "])])
+            .normalize_and_validate()
+            .unwrap();
+        assert_eq!(ok.harness_patterns, vec![rule("omp", &["tag a"])]);
+        assert!(
+            config(vec![rule("omp", &["tag a"]), rule("task", &["tag a"])])
+                .normalize_and_validate()
+                .is_ok()
+        );
     }
 
     #[test]

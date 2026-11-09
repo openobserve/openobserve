@@ -270,6 +270,7 @@ describe("normalizeRole", () => {
     ["model", "assistant"], // Vertex / older Gemini
     ["ai", "assistant"], // LangChain
     ["function", "tool"], // OpenAI function-calling era
+    ["developer", "system"], // OpenAI Responses API
   ])('maps alias "%s" to "%s"', (input, expected) => {
     expect(normalizeRole(input)).toBe(expected);
   });
@@ -412,6 +413,17 @@ describe("extractContent", () => {
   // through the Thread tab's actual entry point so a regression is caught here too.
   it("renders a `thinking`-typed part", () => {
     expect(extractContent([{ type: "thinking", content: "let me check" }])).toBe("let me check");
+  });
+
+  // C2-05: Anthropic extended thinking is the model's scratchpad, not its reply.
+  it("leaves Anthropic thinking and redacted_thinking blocks out of the text", () => {
+    expect(
+      extractContent([
+        { type: "thinking", thinking: "The image is red.", signature: "sig" },
+        { type: "redacted_thinking", data: "abc" },
+        { type: "text", text: "It's a red square." },
+      ]),
+    ).toBe("It's a red square.");
   });
 
   it("renders a tool_call_response part via its `result` field", () => {
@@ -1280,6 +1292,315 @@ describe("SDK tool-call payload shapes", () => {
       [],
       ["Cold, -3°C in Oslo."],
     ]);
+  });
+  // C2-05 (T2): Anthropic content blocks with no execute_tool span.
+  it("reads an Anthropic thinking + text + tool_use turn as a bubble and a card", () => {
+    const g = buildTraceGroup([
+      makeSpan({
+        span_id: "llm",
+        gen_ai_operation_name: "chat",
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "What is this?" }]),
+        gen_ai_output_messages: JSON.stringify([
+          {
+            role: "assistant",
+            content: [
+              { type: "thinking", thinking: "A red square.", signature: "s" },
+              { type: "text", text: "It's a red square. Let me search the docs." },
+              { type: "tool_use", id: "toolu_01", name: "search_docs", input: { q: "red" } },
+            ],
+          },
+        ]),
+        start_time: 100,
+        end_time: 200,
+      }),
+    ])!;
+    expect(g.turns[0].assistant.map((m) => m.content)).toEqual([
+      "It's a red square. Let me search the docs.",
+    ]);
+    expect(g.turns[0].toolCalls).toMatchObject([
+      { gen_ai_tool_name: "search_docs", gen_ai_tool_call_id: "toolu_01", synthetic: true },
+    ]);
+  });
+
+  // G3-T2: one call written as a tool_use block and again in tool_calls.
+  it("draws one card for a call listed under the same id in content and tool_calls", () => {
+    const output = JSON.stringify([
+      {
+        role: "assistant",
+        content: [{ type: "tool_use", id: "toolu_dup", name: "grep", input: { q: "x" } }],
+        tool_calls: [
+          {
+            id: "toolu_dup",
+            type: "function",
+            function: { name: "grep", arguments: '{"q":"x"}' },
+          },
+        ],
+      },
+    ]);
+    expect(toolCallParts(output)).toEqual([
+      { id: "toolu_dup", name: "grep", arguments: { q: "x" } },
+    ]);
+    const g = buildTraceGroup([
+      makeSpan({
+        span_id: "llm",
+        gen_ai_operation_name: "chat",
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "find x" }]),
+        gen_ai_output_messages: output,
+        start_time: 100,
+        end_time: 200,
+      }),
+    ])!;
+    expect(g.turns[0].toolCalls).toHaveLength(1);
+  });
+
+  it("keys id-less calls apart from calls with an id", () => {
+    const g = buildTraceGroup([
+      makeSpan({
+        span_id: "llm",
+        gen_ai_operation_name: "chat",
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "go" }]),
+        gen_ai_output_messages: JSON.stringify([
+          {
+            role: "assistant",
+            tool_calls: [
+              { function: { name: "a", arguments: "{}" } },
+              { id: "0", function: { name: "b", arguments: "{}" } },
+              { function: { name: "c", arguments: "{}" } },
+            ],
+          },
+        ]),
+        start_time: 100,
+        end_time: 200,
+      }),
+    ])!;
+    const keys = g.turns[0].toolCalls.map((c) => c.span_id);
+    expect(keys).toHaveLength(3);
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  // C2-08 (T9): `outer_task` wraps the only chat and starts 0.2 s before it.
+  it("attaches a tool span that starts before the first turn to that turn", () => {
+    const chat = {
+      gen_ai_operation_name: "chat",
+      gen_ai_input_messages: JSON.stringify([{ role: "user", content: "look it up" }]),
+      gen_ai_output_messages: JSON.stringify([{ role: "assistant", content: "done" }]),
+    };
+    const outer = makeSpan({
+      span_id: "outer",
+      gen_ai_operation_name: "execute_tool",
+      gen_ai_tool_name: "outer_task",
+      start_time: 80,
+      end_time: 1000,
+    });
+    // Inner tool found by time window.
+    const byWindow = buildTraceGroup([
+      makeSpan({ span_id: "llm", reference_parent_span_id: "outer", start_time: 100, ...chat }),
+      outer,
+      makeSpan({ span_id: "inner", gen_ai_operation_name: "execute_tool", start_time: 300 }),
+    ])!;
+    expect(byWindow.turns[0].toolCalls.map((c) => c.span_id)).toEqual(["outer", "inner"]);
+    // Inner tool hangs off the chat span by parent.
+    const byParent = buildTraceGroup([
+      makeSpan({ span_id: "llm", reference_parent_span_id: "outer", start_time: 100, ...chat }),
+      outer,
+      makeSpan({
+        span_id: "inner",
+        reference_parent_span_id: "llm",
+        gen_ai_operation_name: "execute_tool",
+        start_time: 300,
+      }),
+    ])!;
+    expect(byParent.turns[0].toolCalls.map((c) => c.span_id)).toEqual(["outer", "inner"]);
+  });
+});
+
+describe("provider-native payloads", () => {
+  // G3-T1: a LangChain ChatGeneration keeps its own text next to the message object.
+  it.each([
+    ["minimal", [{ text: "visible answer", message: { id: "m1", meta: true } }], "visible answer"],
+    [
+      "LangChain ChatGeneration",
+      [
+        {
+          text: "LCEL is the LangChain Expression Language.",
+          type: "ChatGeneration",
+          message: {
+            lc: 1,
+            type: "constructor",
+            id: ["langchain", "schema", "messages", "AIMessage"],
+            kwargs: { content: "LCEL is …", type: "ai" },
+          },
+        },
+      ],
+      "LCEL is the LangChain Expression Language.",
+    ],
+  ])("reads a %s record's own text, not the message it wraps", (_shape, output, expected) => {
+    expect(messagesFromOutput(JSON.stringify(output))).toEqual([
+      { role: "assistant", content: expected, sig: `assistant::${expected}` },
+    ]);
+  });
+
+  // G3-T4: OpenAI Responses API input and output items.
+  it("reads an OpenAI Responses trace: developer prompt, function_call card, no raw items", () => {
+    const developer = { role: "developer", content: "You are a search bot." };
+    const user = { role: "user", content: [{ type: "input_text", text: "Find LCEL docs" }] };
+    const reasoning = { type: "reasoning", id: "rs_1", summary: [] };
+    const call = {
+      type: "function_call",
+      id: "fc_1",
+      call_id: "call_r1",
+      name: "search",
+      arguments: '{"q":"LCEL"}',
+    };
+    const g = buildTraceGroup([
+      makeSpan({
+        span_id: "llm-1",
+        gen_ai_operation_name: "chat",
+        gen_ai_input_messages: JSON.stringify([developer, user]),
+        gen_ai_output_messages: JSON.stringify([reasoning, call]),
+        start_time: 100,
+        end_time: 200,
+      }),
+      makeSpan({
+        span_id: "llm-2",
+        gen_ai_operation_name: "chat",
+        gen_ai_input_messages: JSON.stringify([
+          developer,
+          user,
+          reasoning,
+          call,
+          { type: "function_call_output", call_id: "call_r1", output: '{"hits":3}' },
+        ]),
+        gen_ai_output_messages: JSON.stringify([
+          {
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: "Here are the LCEL docs." }],
+          },
+        ]),
+        start_time: 300,
+        end_time: 400,
+      }),
+    ])!;
+    expect(g.systemPrompt).toBe("You are a search bot.");
+    expect(g.userQuery).toBe("Find LCEL docs");
+    expect(g.turns.map((t) => t.assistant.map((m) => m.content))).toEqual([
+      [],
+      ["Here are the LCEL docs."],
+    ]);
+    expect(g.turns.map((t) => t.followupUsers)).toEqual([[], []]);
+    expect(g.turns[0].toolCalls).toMatchObject([
+      { gen_ai_tool_name: "search", gen_ai_tool_call_id: "call_r1", synthetic: true },
+    ]);
+  });
+
+  // G3-T5: the cheap, unambiguous provider envelopes.
+  it("surfaces an Anthropic or Bedrock top-level system prompt", () => {
+    expect(
+      messagesFromInput(
+        JSON.stringify({ system: "Be terse.", messages: [{ role: "user", content: "hi" }] }),
+      ).map((m) => [m.role, m.content]),
+    ).toEqual([
+      ["system", "Be terse."],
+      ["user", "hi"],
+    ]);
+    expect(
+      messagesFromInput(
+        JSON.stringify({
+          system: [{ text: "Be kind." }],
+          messages: [{ role: "user", content: [{ text: "hello" }] }],
+        }),
+      ).map((m) => [m.role, m.content]),
+    ).toEqual([
+      ["system", "Be kind."],
+      ["user", "hello"],
+    ]);
+  });
+
+  it("reads LangChain constructor and dict messages, one list per prompt", () => {
+    const lc = (cls: string, kwargs: Record<string, unknown>) => ({
+      lc: 1,
+      type: "constructor",
+      id: ["langchain", "schema", "messages", cls],
+      kwargs,
+    });
+    expect(
+      messagesFromInput(
+        JSON.stringify([
+          [lc("SystemMessage", { content: "Be brief." }), lc("HumanMessage", { content: "hi" })],
+        ]),
+      ).map((m) => [m.role, m.content]),
+    ).toEqual([
+      ["system", "Be brief."],
+      ["user", "hi"],
+    ]);
+    expect(
+      messagesFromInput(
+        JSON.stringify({
+          messages: [[{ type: "human", data: { content: "hey", type: "human" } }]],
+        }),
+      ).map((m) => [m.role, m.content]),
+    ).toEqual([["user", "hey"]]);
+    const aiWithCall = lc("AIMessage", {
+      content: "",
+      tool_calls: [{ name: "lookup", args: { q: 1 }, id: "call_lc", type: "tool_call" }],
+    });
+    expect(messagesFromOutput(JSON.stringify([aiWithCall]))).toEqual([]);
+    expect(toolCallParts(JSON.stringify([aiWithCall]))).toEqual([
+      { id: "call_lc", name: "lookup", arguments: { q: 1 } },
+    ]);
+  });
+
+  it("reads a Gemini candidates response with text and a functionCall", () => {
+    const output = JSON.stringify({
+      candidates: [
+        {
+          content: {
+            role: "model",
+            parts: [
+              { text: "Checking the weather." },
+              { functionCall: { name: "get_weather", args: { city: "Rome" } } },
+            ],
+          },
+          finishReason: "STOP",
+        },
+      ],
+    });
+    expect(messagesFromOutput(output).map((m) => [m.role, m.content])).toEqual([
+      ["assistant", "Checking the weather."],
+    ]);
+    expect(toolCallParts(output)).toEqual([
+      { id: "", name: "get_weather", arguments: { city: "Rome" } },
+    ]);
+  });
+
+  it("reads a Bedrock Converse output message with text and toolUse", () => {
+    const output = JSON.stringify({
+      output: {
+        message: {
+          role: "assistant",
+          content: [
+            { text: "Let me look." },
+            { toolUse: { toolUseId: "tooluse_1", name: "lookup", input: { id: 7 } } },
+          ],
+        },
+      },
+      stopReason: "tool_use",
+    });
+    expect(messagesFromOutput(output).map((m) => [m.role, m.content])).toEqual([
+      ["assistant", "Let me look."],
+    ]);
+    expect(toolCallParts(output)).toEqual([
+      { id: "tooluse_1", name: "lookup", arguments: { id: 7 } },
+    ]);
+  });
+
+  it("reads LlamaIndex blocks", () => {
+    expect(
+      messagesFromInput(
+        JSON.stringify([{ role: "user", blocks: [{ block_type: "text", text: "Summarise" }] }]),
+      ).map((m) => [m.role, m.content]),
+    ).toEqual([["user", "Summarise"]]);
   });
 });
 

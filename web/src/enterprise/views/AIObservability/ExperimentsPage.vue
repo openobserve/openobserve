@@ -106,23 +106,65 @@ function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string
 
 // A running row's slot count moves without Refresh: while any row is live the
 // list re-reads itself quietly. A failed poll stops it until the next refresh.
+// A run that stops moving backs the poll off to once a minute: an SDK run whose
+// process died stays "running" until its 24 h deadline. A hidden tab does not
+// poll; showing it again re-reads at once.
 const LIVE_STATUSES = new Set(["pending", "running", "scoring"]);
 const LIVE_POLL_MS = 5_000;
+const LIVE_POLL_MAX_MS = 60_000;
 let livePoll: ReturnType<typeof setTimeout> | undefined;
-watch(experiments, (rows) => {
+let pollDelay = LIVE_POLL_MS;
+let lastProgress = "";
+
+function liveProgress(rows: LlmExperiment[]) {
+  return rows
+    .filter((row) => LIVE_STATUSES.has(row.status))
+    .map(
+      (row) =>
+        `${row.id}:${row.status}:${row.executionProgress?.completed ?? 0}:${row.scoringProgress?.completed ?? 0}`,
+    )
+    .join("|");
+}
+
+function scheduleLivePoll(rows: LlmExperiment[]) {
   clearTimeout(livePoll);
-  if (!rows.some((row) => LIVE_STATUSES.has(row.status))) return;
-  livePoll = setTimeout(async () => {
-    const opts = experimentsListQuery(orgId.value);
-    try {
-      experiments.value = await queryClient.fetchQuery({ ...opts, staleTime: 0 });
-      lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
-    } catch {
-      // Refresh still reports the error; a background poll should not toast every 5 s.
-    }
-  }, LIVE_POLL_MS);
+  const progress = liveProgress(rows);
+  pollDelay =
+    progress && progress === lastProgress
+      ? Math.min(pollDelay * 2, LIVE_POLL_MAX_MS)
+      : LIVE_POLL_MS;
+  lastProgress = progress;
+  if (!progress || document.hidden) return;
+  livePoll = setTimeout(pollLive, pollDelay);
+}
+
+async function pollLive() {
+  const opts = experimentsListQuery(orgId.value);
+  const before = experiments.value;
+  try {
+    experiments.value = await queryClient.fetchQuery({ ...opts, staleTime: 0 });
+    lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
+  } catch {
+    // Refresh still reports the error; a background poll should not toast on every read.
+    return;
+  }
+  // Structural sharing hands back the same array when nothing changed, which
+  // the watch below never sees; that is the stuck run the back-off is for.
+  if (experiments.value === before) scheduleLivePoll(before);
+}
+
+watch(experiments, scheduleLivePoll);
+
+function onVisibilityChange() {
+  if (document.hidden || !liveProgress(experiments.value)) return;
+  clearTimeout(livePoll);
+  void pollLive();
+}
+onMounted(() => document.addEventListener("visibilitychange", onVisibilityChange));
+onBeforeUnmount(() => {
+  clearTimeout(livePoll);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
 });
-onBeforeUnmount(() => clearTimeout(livePoll));
 
 // `force` reaches the server: the mount may serve the cached list, but Refresh and post-write reloads must not.
 async function refresh(force = false) {

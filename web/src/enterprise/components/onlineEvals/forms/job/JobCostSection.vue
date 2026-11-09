@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-heading text-lg leading-none font-bold tabular-nums">{{
             tile.value
           }}</span>
-          <span v-if="tile.id === 'perDay' && cannotEstimate" class="text-2xs">
+          <span v-if="tile.id === 'perDay' && unpricedJudge" class="text-2xs">
             <router-link
               :to="pricingRoute"
               class="text-accent font-semibold no-underline hover:underline"
@@ -128,7 +128,13 @@ const props = defineProps<{
 const { t } = useI18nTyped();
 const ACTIONS: EvalBudgetAction[] = ["pause", "keep_running"];
 
-const cannotEstimate = computed(() => props.hasJudges && props.estimate.perTargetUsd == null);
+// A judge whose calls were all unpriced needs a price; one that never ran has nothing to go on yet.
+const unpricedJudge = computed(
+  () =>
+    props.hasJudges &&
+    props.estimate.perTargetUsd == null &&
+    props.estimate.judgeGap === "unpriced",
+);
 const pricingRoute = computed(() => pricingGapsRoute("_evaluator", props.orgId));
 const count = (n: number) => Math.round(n).toLocaleString();
 
@@ -163,7 +169,9 @@ const tiles = computed<{ id: string; label: I18nText; value: string; note?: I18n
         ? t("evalSpend.cost.noJudge")
         : e.busiestDayUsd != null
           ? t("evalSpend.cost.busiest", { amount: formatUsd(e.busiestDayUsd) })
-          : undefined,
+          : e.perTargetUsd == null && e.judgeGap === "noCalls"
+            ? t("evalSpend.cost.noCalls")
+            : undefined,
     },
     {
       id: "perTarget",

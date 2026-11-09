@@ -1518,6 +1518,18 @@ describe("TraceDetails", () => {
 
       expect(embeddedWrapper.vm.effectiveTraceId).toBe("new-trace-id");
     });
+
+    it("selects a new spanIdProp within the same trace", async () => {
+      const [first, second] = tracesMockData.tracesDetails.traceSpans.hits;
+      await embeddedWrapper.setProps({ spanIdProp: first.span_id });
+      await flushPromises();
+      expect(embeddedWrapper.vm.selectedSpanId).toBe(first.span_id);
+
+      await embeddedWrapper.setProps({ spanIdProp: second.span_id });
+      await flushPromises();
+      expect(embeddedWrapper.vm.selectedSpanId).toBe(second.span_id);
+      expect(embeddedWrapper.emitted("spanSelected")?.at(-1)?.[0]?.span_id).toBe(second.span_id);
+    });
   });
 
   describe("Props: UI visibility controls", () => {
@@ -3415,6 +3427,23 @@ describe("TraceDetails", () => {
           query: expect.objectContaining({ tab: "traces" }),
         }),
       );
+      windowOpenSpy.mockRestore();
+      resolveSpy.mockRestore();
+    });
+
+    it("opens the full view on the selected span, and on none when nothing is selected", () => {
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const resolveSpy = vi.spyOn(router, "resolve").mockReturnValue({ href: "/full" } as any);
+      const queryOf = () => resolveSpy.mock.calls.at(-1)?.[0] as any;
+
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "";
+      wrapper.vm.handleExpandToFullView();
+      expect(queryOf().query).not.toHaveProperty("span_id");
+
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "span-b";
+      wrapper.vm.handleExpandToFullView();
+      expect(queryOf().query.span_id).toBe("span-b");
+
       windowOpenSpy.mockRestore();
       resolveSpy.mockRestore();
     });

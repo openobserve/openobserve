@@ -2025,10 +2025,11 @@ defineExpose({
           v-if="showError"
           :message="props.error ?? ''"
           @retry="
+            emit('retry');
             emit('pagination-change', {
               page: pagination.currentPage.value,
               size: pagination.pageSize.value,
-            })
+            });
           "
         >
           <template v-if="slots.error" #default="errProps">

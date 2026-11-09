@@ -54,15 +54,19 @@ const PROMPT_EVIDENCE_LIMIT = 5;
 /** Raw errors can be long JSON blobs; the prompt needs their gist. */
 const PROMPT_MESSAGE_MAX = 300;
 
+/** "1 trace", "12 traces"; "? traces" when the count is unknown. */
+const count = (n: number | undefined, noun: string): string =>
+  `${n ?? "?"} ${n === 1 ? noun : `${noun}s`}`;
+
 function subject(s: SignalForPrompt, agent: string): string {
   if (s.signalType === "loop") {
     return (
       `agent "${agent}" calls the tool "${s.tool ?? ""}" ${s.ratio ?? "?"} times per trace ` +
-      `(${s.calls ?? "?"} calls over ${s.traces ?? "?"} traces)`
+      `(${count(s.calls, "call")} over ${count(s.traces, "trace")})`
     );
   }
   if (s.signalType === "failure") {
-    return `agent "${agent}" fails with "${s.failClass ?? "an error"}" (${s.count ?? "?"} errors)`;
+    return `agent "${agent}" fails with "${s.failClass ?? "an error"}" (${count(s.count, "error")})`;
   }
   return (
     `what drives the cost of agent "${agent}": $${s.cost ?? 0} on ${s.tokens ?? 0} tokens, ` +

@@ -14,13 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { AgentSignalRecord } from "@/services/agent_signals";
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { UNSET } from "@/enterprise/composables/useAgentScope";
 
 /**
  * Predicate: does signal `s` match the selected agent scope (name + env +
- * version)? `env`/`version` narrow the match ONLY when the selected variant
- * has them (null = don't constrain) — mirrors buildAgentTraceFilter's guards,
- * and keeps agents without env/version behaving exactly as before.
+ * version)? `env`/`version` narrow the match only when set: null = don't
+ * constrain, UNSET = the signal must have no value for that dimension. Mirrors
+ * buildAgentClimbFilter, so the table and the drill-down count the same spans.
  *
  * Colocated here (rather than inline in AgentBehaviorPanel.vue's
  * `<script setup>`) so it can be unit tested directly without mounting the
@@ -31,13 +32,33 @@ export const matchesAgentScope = (
   s: Pick<AgentSignalRecord, "agent_name" | "gen_ai_agent_env" | "gen_ai_agent_version">,
   scope: { name: string; env?: string | null; version?: string | null },
 ): boolean => {
-  const env = scope.env ?? null;
-  const ver = scope.version ?? null;
+  const dim = (want: string | null | undefined, have: string | null | undefined) =>
+    want == null || (want === UNSET ? !have : have === want);
   return (
     (s.agent_name ?? "") === scope.name &&
-    (env == null || (s.gen_ai_agent_env ?? null) === env) &&
-    (ver == null || (s.gen_ai_agent_version ?? null) === ver)
+    dim(scope.env, s.gen_ai_agent_env) &&
+    dim(scope.version, s.gen_ai_agent_version)
   );
+};
+
+/**
+ * The page-level scope of the selected agent variant, for matchesAgentScope
+ * and the drill-down. A missing env or version becomes UNSET ("not set") when
+ * another variant of the same agent in the same stream has one, so "(No env)"
+ * excludes the production signals. When none has it, it stays null
+ * (unconstrained): the stream may not have the column at all.
+ */
+export const selectedAgentScope = (
+  agent: GenAiAgentListItem | null | undefined,
+  agents: ReadonlyArray<GenAiAgentListItem>,
+): { name: string; env: string | null; version: string | null } | null => {
+  if (!agent) return null;
+  const siblings = agents.filter(
+    (a) => a.name === agent.name && a.source_stream === agent.source_stream,
+  );
+  const pin = (value: string | null | undefined, key: "env" | "version") =>
+    value || (siblings.some((a) => !!a[key]) ? UNSET : null);
+  return { name: agent.name, env: pin(agent.env, "env"), version: pin(agent.version, "version") };
 };
 
 /**
@@ -81,6 +102,28 @@ const ratioOf = (calls: number, traces: number): number =>
 const byRatio = (a: LoopTotals, b: LoopTotals) => b.ratio - a.ratio;
 
 /**
+ * Sets each variant's drill-down scope. A variant without env or version is
+ * told apart from its siblings by "not set", so that dimension is pinned to
+ * UNSET. One all variants lack stays open: the stream may not have the column.
+ */
+const pinVariantScopes = <
+  V extends { env: string | null; version: string | null; scope: DrillScope },
+>(
+  variants: V[],
+): V[] => {
+  const varies = (key: "env" | "version") => new Set(variants.map((v) => v[key])).size > 1;
+  const pinEnv = varies("env");
+  const pinVersion = varies("version");
+  for (const v of variants) {
+    v.scope = {
+      env: v.env ?? (pinEnv ? UNSET : null),
+      version: v.version ?? (pinVersion ? UNSET : null),
+    };
+  }
+  return variants;
+};
+
+/**
  * Loop signals as one row per (agent, tool), ranked by calls/trace. The rollup
  * writes a record per hourly window, env and version, so calls and traces are
  * summed over the range and calls/trace is derived from the sums. Each row
@@ -119,20 +162,8 @@ export const buildLoopRows = (signals: AgentSignalRecord[], unknownAgent: string
   }
   return [...groups]
     .map(([id, byVariant]) => {
-      const variants = [...byVariant.values()];
-      // A variant without env or version is told apart from its siblings by
-      // "not set", so that dimension is pinned. One all variants lack stays open:
-      // the stream may not have the column at all.
-      const varies = (key: "env" | "version") => new Set(variants.map((v) => v[key])).size > 1;
-      const pinEnv = varies("env");
-      const pinVersion = varies("version");
-      for (const v of variants) {
-        v.ratio = ratioOf(v.calls, v.traces);
-        v.scope = {
-          env: v.env ?? (pinEnv ? UNSET : null),
-          version: v.version ?? (pinVersion ? UNSET : null),
-        };
-      }
+      const variants = pinVariantScopes([...byVariant.values()]);
+      for (const v of variants) v.ratio = ratioOf(v.calls, v.traces);
       const calls = variants.reduce((sum, v) => sum + v.calls, 0);
       const traces = variants.reduce((sum, v) => sum + v.traces, 0);
       const { agent, agentRaw, tool } = variants[0];
@@ -148,6 +179,86 @@ export const buildLoopRows = (signals: AgentSignalRecord[], unknownAgent: string
       };
     })
     .sort(byRatio);
+};
+
+interface FailureTotals {
+  /** Row identity, for the table's row key and the selected-row highlight. */
+  id: string;
+  /** Display name; may be the "(unknown agent)" fallback. */
+  agent: string;
+  /** The real agent name the drill-down queries on; null when the rollup had none. */
+  agentRaw: string | null;
+  failClass: string;
+  count: number;
+}
+
+/** One env/version variant of an agent's failure class. */
+export interface FailureVariantRow extends FailureTotals {
+  env: string | null;
+  version: string | null;
+  /** Drill-down scope: exactly this variant. */
+  scope: DrillScope;
+}
+
+/** One failure class of an agent over the whole range, across its variants. */
+export interface FailureRow extends FailureTotals {
+  /** Most frequent first; more than one makes the row expandable. */
+  variants: FailureVariantRow[];
+}
+
+const byCount = (a: FailureTotals, b: FailureTotals) => b.count - a.count;
+
+/**
+ * Failure signals as one row per (agent, class), most frequent first. Like
+ * loops, the rollup writes a record per hourly window, env and version; the
+ * counts are summed over the range, and each row keeps its env/version
+ * variants, summed the same way.
+ */
+export const buildFailureRows = (
+  signals: AgentSignalRecord[],
+  unknownAgent: string,
+): FailureRow[] => {
+  const groups = new Map<string, Map<string, FailureVariantRow>>();
+  for (const s of signals) {
+    if (s.signal_type !== "failure") continue;
+    const agentRaw = s.agent_name ?? null;
+    const failClass = s.fail_class ?? "unclassified";
+    const env = s.gen_ai_agent_env ?? null;
+    const version = s.gen_ai_agent_version ?? null;
+    const rowId = JSON.stringify([agentRaw, failClass]);
+    const variantId = JSON.stringify([agentRaw, failClass, env, version]);
+    let variants = groups.get(rowId);
+    if (!variants) groups.set(rowId, (variants = new Map()));
+    let v = variants.get(variantId);
+    if (!v) {
+      v = {
+        id: variantId,
+        agent: agentRaw ?? unknownAgent,
+        agentRaw,
+        failClass,
+        env,
+        version,
+        count: 0,
+        scope: { env, version },
+      };
+      variants.set(variantId, v);
+    }
+    v.count += s.count ?? 0;
+  }
+  return [...groups]
+    .map(([id, byVariant]) => {
+      const variants = pinVariantScopes([...byVariant.values()]);
+      const { agent, agentRaw, failClass } = variants[0];
+      return {
+        id,
+        agent,
+        agentRaw,
+        failClass,
+        count: variants.reduce((sum, v) => sum + v.count, 0),
+        variants: variants.sort(byCount),
+      };
+    })
+    .sort(byCount);
 };
 
 /** Distinct named agents among Behavior rows (the "(unknown agent)" rows excluded). */

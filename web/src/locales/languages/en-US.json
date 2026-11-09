@@ -13668,6 +13668,7 @@
         "dbmLockSampling": "Lock activity is sampled on an interval, so contention that started and cleared between two samples was never recorded. A quiet alert is not proof there was no blocking.",
         "dbmNoInstance": "No single database instance was identified, so this alert watches every instance of this engine.",
         "aiAllAgents": "No agent was in scope, so this alert watches every agent on the stream, one row per agent.",
+        "aiAllAgentsByModel": "No agent was in scope, so this alert watches every agent on the stream, one row per model.",
         "rumFunnelSnapshot": "This alert keeps a copy of the funnel's SQL. Later edits to the funnel or its named events do not change it.",
         "rumFunnelSteps": "A funnel needs at least two steps before it can alert on conversion.",
         "textFilterDropped": "Your search filter was not carried over because this stream has no full-text search (FTS) fields. Add it to the alert query if you need it.",
@@ -16748,7 +16749,8 @@
         "toolHotspots": "Tool Hotspots",
         "call": "{n} call | {n} calls",
         "usedIn": "Used In",
-        "noTools": "No Tool Calls In This Session"
+        "noTools": "No Tool Calls In This Session",
+        "toolsFailed": "Leaves out {n} turn whose spans failed to load | Leaves out {n} turns whose spans failed to load"
       },
       "kpi": {
         "turns": "Turns",
@@ -16790,6 +16792,7 @@
       "statusOk": "Ok",
       "statusError": "Error",
       "noUserMessage": "No user message captured for this turn.",
+      "spansFailed": "This turn's spans failed to load.",
       "noAssistantMessage": "No assistant response captured for this turn.",
       "roles": {
         "user": "User",
@@ -17027,6 +17030,7 @@
       "arguments": "Arguments",
       "result": "Result",
       "empty": "(empty)",
+      "noResult": "No result recorded",
       "showJson": "Show all {n} lines"
     },
     "threadView": {
@@ -20070,7 +20074,7 @@
         "producesEmpty": "This scorer doesn't write to any Score Config.",
         "promptSection": "Judge Prompt",
         "requestTemplateSection": "Request Template",
-        "variablesSuffix": "variables",
+        "variablesSuffix": "variable | variables",
         "outputSchemaSection": "Output Schema",
         "usedByIntro": "Jobs and experiments that reference this scorer.",
         "usedByEmpty": "No jobs or experiments reference this scorer yet.",
@@ -20279,6 +20283,8 @@
         "emptySuffix": " to the scorer template to test with sample fields.",
         "runButton": "Run test",
         "disabledHint": "Fill in name, provider, template, and every variable value to run a test.",
+        "disabledHintCode": "Fill in name, the score function, and every variable value to run a test.",
+        "emptyCode": "Give function score(...) parameters, for example function score(output), to test it with sample values.",
         "stateRunning": "Running scorer test...",
         "successHeader": "Success",
         "errorHeader": "Test failed",
@@ -20474,7 +20480,7 @@
         }
       },
       "inputMapping": {
-        "title": "Prompt variables",
+        "title": "Scorer variables",
         "hint": {
           "span": "Map each variable to a span attribute.",
           "trace": "Map each variable to a system-provided value or span attribute.",
@@ -20488,7 +20494,7 @@
         },
         "selectScorers": "Select scorers to configure their mappings.",
         "noVariables": "This scorer has no template variables to map.",
-        "variableCount": "{count} variables",
+        "variableCount": "{count} variable | {count} variables",
         "systemProvided": {
           "about": "About system-provided values",
           "title": "{scope} system values",
@@ -31390,8 +31396,9 @@
       "help": "Text matching these patterns is hidden in session titles, first messages and turn previews. Stored spans are not changed.",
       "addAgent": "Add agent",
       "agent": "Agent",
+      "duplicateAgent": "This agent has another row. Keep one row per agent.",
       "patterns": "Wrapper patterns, one per line",
-      "patternsHelp": "tag <name> hides <name>…</name> blocks; regex <expression> hides matches.",
+      "patternsHelp": "tag {'<'}name{'>'} hides {'<'}name{'>'}…{'<'}/name{'>'} blocks; regex {'<'}expression{'>'} hides matches.",
       "codingAgentDefaults": "Coding-agent defaults",
       "test": "Test on recent sessions",
       "remove": "Remove agent",
@@ -31470,7 +31477,12 @@
       "sessions": "Sessions",
       "sessionsCol": "Sessions",
       "lastSeen": "Last seen",
-      "count": "{n} users · sorted by cost"
+      "count": "{n} user · sorted by cost | {n} users · sorted by cost",
+      "capped": "Top {n} users by cost. Search or filter to find others.",
+      "loadFailed": "Could not load users",
+      "noStream": "No LLM traces yet",
+      "noStreamHint": "Send traces from an LLM app to this organization to see its users here.",
+      "sessionsNoTenant": "Sessions has no tenant filter: it lists all of this user's sessions."
     }
   },
   "aiBudgets": {
@@ -31494,8 +31506,9 @@
     "noAccess": "No access to {stream}",
     "legacyEdit": "Created before one-alert budgets. Delete and re-create it to edit.",
     "empty": "No budgets yet. A budget warns at 80% and signals at 100%.",
+    "noStream": "No LLM trace stream in this organization yet. A budget reads spend from one: send LLM traces first.",
     "signalNote": "A budget is one alert: warning at 80%, critical at 100%. Point it at your gateway's webhook (LiteLLM, Portkey) and stop calls on critical. OpenObserve never blocks a call.",
-    "unpriced": "{n} calls have no price this month. They are not counted in any budget.",
+    "unpriced": "{n} call has no price this month. It is not counted in any budget. | {n} calls have no price this month. They are not counted in any budget.",
     "name": "Name",
     "limits": "What it limits",
     "noValues": "Nothing seen in this stream in the last 30 days. Type a value to budget it.",
@@ -31511,8 +31524,8 @@
       "model": "Model",
       "session": "Session burn rate"
     },
-    "eachScope": "{scope} · per {period}",
-    "valueScope": "{scope} = {value} · per {period}",
+    "eachScope": "{scope} · per {period} · {stream}",
+    "valueScope": "{scope} = {value} · per {period} · {stream}",
     "spentOf": "{spent} / {limit} · {pct}%",
     "spentEach": "{limit} each · {over} of {keys} over · largest {largest}",
     "destination": "Destination",
@@ -31542,15 +31555,18 @@
       "nochange": "no change",
       "indicative": "indicative"
     },
-    "introduced": "Introduced: {cls} in {n} traces. Not seen in {prev}.",
+    "introduced": "Introduced: {cls} in {n} trace. Not seen in {prev}. | Introduced: {cls} in {n} traces. Not seen in {prev}.",
     "openCompare": "Open compare",
-    "mute": "Mute this version"
+    "mute": "Mute this version",
+    "muted": "Release watch muted for {agent} {version}.",
+    "unmute": "Unmute"
   },
   "aiAlertPack": {
     "open": "Catch loops and errors",
     "title": "Install AI agent alerts",
     "subtitle": "Alert pack ai-agents · reads the gen_ai spans of the stream you pick",
     "stream": "Trace stream",
+    "noTraceStream": "No trace stream yet. Send gen_ai spans to a trace stream, then install the alerts that read it.",
     "destination": "Destination",
     "noDestination": "No destination (add one later)",
     "reliabilityRules": "Reliability rules · one row per trace, agent and tool",
@@ -31560,16 +31576,18 @@
     "summary": "Adds {n} alert to the folder {folder}. The other {waiting} wait for their data and are not installed yet. | Adds {n} alerts to the folder {folder}. The other {waiting} wait for their data and are not installed yet.",
     "installed": "Installed",
     "allInstalled": "All installed",
-    "skipped": "{n} is already installed for {stream} and is skipped. | {n} are already installed for {stream} and are skipped.",
-    "nothingToAdd": "Every alert that can run is installed for {stream}. The other {waiting} wait for their data.",
+    "skipped": "{n} is already installed and is skipped. | {n} are already installed and are skipped.",
+    "nothingToAdd": "Every alert that can run is already installed. The other {waiting} wait for their data.",
     "folderDescription": "Alerts from the ai-agents pack",
-    "installedAll": "Installed {n} alerts in {folder}",
-    "installedSome": "Installed {n} alerts. Not installed: {failed}",
+    "installedAll": "Installed {n} alert in {folder} | Installed {n} alerts in {folder}",
+    "installedSome": "Installed {n} alert. Not installed: {failed} | Installed {n} alerts. Not installed: {failed}",
     "installFailed": "Could not install the alerts: {reason}",
     "waits": {
       "trustabl": "Waits for trustabl.* fields",
       "binding": "Waits for a binding event",
       "scores": "Waits for scores",
+      "traceStream": "Waits for a trace stream",
+      "evaluator": "Waits for evaluator spans",
       "perConfig": "Set up per config on Quality"
     },
     "rules": {
@@ -31609,6 +31627,8 @@
   },
   "oneClickEval": {
     "title": "Evaluate {agent}",
+    "titleAll": "Evaluate traces",
+    "noStream": "No LLM trace stream in this organization yet. Send LLM traces, then evaluate them here.",
     "subtitle": "Creates a scorer, a score config and a sampled job",
     "start": "Start evaluating",
     "fullForm": "Open full job form",
@@ -31624,14 +31644,14 @@
     "addProvider": "Add provider",
     "stream": "Trace stream",
     "sample": "Sample",
-    "estimate": "≈ {n} traces a day are scored",
+    "estimate": "≈ {traces} trace a day is scored. | ≈ {traces} traces a day are scored.",
     "mapping": "Field mapping, automatic",
     "mappingInput": "the root LLM call's input",
     "mappingOutput": "the root LLM call's output",
     "created": "Started {name}. Scores appear as traces complete.",
     "failed": "Could not start the evaluation: {reason}",
     "evaluate": "Evaluate {agent}…",
-    "anAgent": "an agent",
+    "anAgent": "your traces",
     "emptyActionDesc": "Pick a built-in judge; the scorer, score config and a sampled job are created for you",
     "manual": "Set up a job manually"
   },
@@ -31669,8 +31689,11 @@
     "causeBareGroup": "{time} of it was {count} calls to {name}.",
     "selfModel": "All of it was the model call.",
     "selfWork": "The step itself held the time, not a child span.",
+    "sameSteps": "{count} identical steps, each: {sentence}",
     "logsAndMetrics": "Logs and metrics",
     "locked": "Correlated logs, metrics and pod state need an enterprise license.",
+    "lanesEmpty": "No correlated logs or metrics for these services.",
+    "lanesFailed": "Could not load correlated logs or metrics.",
     "logsLane": "Logs {services}",
     "podLane": "Pod {pod}",
     "podHealthy": "healthy",
@@ -31714,15 +31737,28 @@
       "unchanged": "Within noise"
     },
     "headline": "{score} {delta} pts",
+    "headlineRelative": "{score} {delta}%",
     "deltaTooltip": "{delta} pts against the baseline. A move past {threshold} pts counts, the same rule as Compare.",
+    "deltaTooltipRelative": "{delta}% of the baseline's value. This score has no range, so a move past {threshold}% of the baseline counts, the same rule as Compare.",
     "sharedCases": "Over {count} shared case | Over {count} shared cases",
     "sharedCasesExcluded": "Over {count} shared case · {excluded} excluded | Over {count} shared cases · {excluded} excluded",
     "sharedCasesTooltip": "This run and the baseline ran different dataset versions or filters, so it is judged only on the cases both ran.",
     "foldCount": "× {count}",
-    "foldTooltip": "{count} runs of this name on one commit. The latest completed one stands for them; expand to see each.",
+    "foldTooltip": "{count} run of this name on one commit finished, and it stands for the others; expand to see each. | {count} runs of this name on one commit finished. The latest one stands for them and the spread covers them; expand to see each.",
+    "foldTooltipIncomplete": "{counted} Not counted: {incomplete}.",
+    "withIncomplete": "{runs} ({incomplete})",
+    "incomplete": {
+      "cancelled": "{count} cancelled",
+      "failed": "{count} failed",
+      "inProgress": "{count} in progress"
+    },
     "spread": "{count} runs: {range}",
     "newerRerun": "Latest re-run: {status}",
     "newerRerunTooltip": "The newest re-run did not complete, so this row shows the latest completed run.",
+    "scoreErrors": "{count} row errored | {count} rows errored",
+    "scoreErrorsTooltip": "The scorer failed on these rows. The value covers the other rows, and this score casts no vote against the baseline.",
+    "tasksFailed": "{count} of {total} task failed | {count} of {total} tasks failed",
+    "baselineTaskFailures": "{count} task failed in this run, and a baseline must have none. | {count} tasks failed in this run, and a baseline must have none.",
     "trendTitle": "Trend against the baseline",
     "trendScore": "Score",
     "trendShareOption": "{score} · % healthy",
@@ -31758,6 +31794,9 @@
     "libraryGroup": "Code checks",
     "libraryGroupNote": "No provider · $0 a run",
     "libraryJudgeGroup": "LLM judge scorers from the catalog",
+    "replaceTitle": "Replace your function?",
+    "replaceMessage": "The {starter} starter replaces the function you edited.",
+    "replaceConfirm": "Replace",
     "starters": {
       "json_is_valid": {
         "title": "JSON is valid",
@@ -31805,6 +31844,7 @@
       "perDay": "Judge cost a day",
       "cannot": "Cannot estimate",
       "noJudge": "No LLM judge in this job",
+      "noCalls": "No judge calls yet to estimate from",
       "busiest": "Busiest day {amount}",
       "perTarget": "Per {scope}",
       "tokens": "≈ {tokens} tokens to {model}"
@@ -31812,7 +31852,7 @@
     "budget": {
       "enabled": "Limit daily judge spend",
       "label": "Daily budget, all regions",
-      "help": "Org default {amount}. Resets at 00:00 UTC.",
+      "help": "New jobs start at {amount}. Resets at 00:00 UTC.",
       "validation": "Enter a budget above 0",
       "onReach": "When the budget is reached",
       "actions": {
@@ -31838,8 +31878,8 @@
       "spendUnknownHint": "Could not read today's judge spend.",
       "spendNoAccess": "No access",
       "spendNoAccessHint": "You cannot read the _evaluator stream, so today's judge spend is unknown.",
-      "unpriced": "Unpriced · {n} call | Unpriced · {n} calls",
-      "unpricedHint": "The judge model has no price, so today's spend is unknown and the daily budget cannot pause this job. Set a price in Model Pricing.",
+      "unpriced": "≥ {spent} · {n} unpriced call | ≥ {spent} · {n} unpriced calls",
+      "unpricedHint": "Some judge calls have no price, so today's spend is at least the priced part shown, and the daily budget cannot count the unpriced calls. Set a price in Model Pricing.",
       "pausedBudget": "Paused · budget",
       "resumeToday": "Resume until 00:00 UTC",
       "editBudget": "Edit budget",
@@ -31877,7 +31917,7 @@
       "title": "Judge spend",
       "note": "per {per} · {today} today",
       "noteBudget": "per {per} · {today} today of {budget}",
-      "noteUnpriced": "per {per} · unpriced · {n} call today: spend unknown, the budget cannot pause this job | per {per} · unpriced · {n} calls today: spend unknown, the budget cannot pause this job",
+      "noteUnpriced": "per {per} · ≥ {today} today · {n} unpriced call the budget cannot count | per {per} · ≥ {today} today · {n} unpriced calls the budget cannot count",
       "noteUnknown": "per {per} · today's spend could not be read",
       "noteNoAccess": "per {per} · no access to _evaluator: today's spend is unknown",
       "notePending": "per {per}"
@@ -31907,6 +31947,7 @@
       "unknownTooltip": "Cost unknown. No price for {models}: none of the {tokens} tokens in this {scope} has a cost.",
       "scopeSession": "session",
       "scopeTrace": "trace",
+      "scopeRow": "row",
       "unknownModel": "an unnamed model",
       "addPrice": "Add a price"
     },

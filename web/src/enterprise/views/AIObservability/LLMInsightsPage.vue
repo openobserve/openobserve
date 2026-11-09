@@ -53,7 +53,7 @@ const { t } = useI18nTyped();
 // Shared across LLM Insights, LLM Sessions, and Quality — picking a window
 // on any of the three lands on the other two (singleton ref + localStorage
 // persistence). See useAiDateRange.ts for the contract. LLM Insights syncs its
-// date to the URL (urlSync:true) so deep-/share-links reproduce the exact view.
+// date to the URL so deep-/share-links reproduce the exact view.
 const {
   dateState,
   timeRange,

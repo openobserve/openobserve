@@ -10,6 +10,7 @@ import {
   errorDetailExpr,
   failureErrorsSql,
   failureTracesSql,
+  loopTracesSql,
 } from "./agentClimbFilter";
 import { explainSignalPrompt } from "./agentSignalPrompt";
 import { UNSET } from "@/enterprise/composables/useAgentScope";
@@ -147,6 +148,13 @@ describe("failure drill-down SQL", () => {
     expect(sql).toContain("COUNT(DISTINCT c.span_id) AS spans");
     expect(sql).not.toContain("COUNT(*)");
   });
+
+  it("counts a loop's distinct tool spans per trace, so a re-exported trace is not multiplied", () => {
+    const sql = loopTracesSql("s", joins, "1=1", "o'k");
+    expect(sql).toContain("COUNT(DISTINCT c.span_id) AS repeats");
+    expect(sql).toContain("c.gen_ai_tool_name = 'o''k'");
+    expect(sql).not.toContain("COUNT(*)");
+  });
 });
 
 describe("explainSignalPrompt failure evidence", () => {
@@ -179,6 +187,14 @@ describe("explainSignalPrompt failure evidence", () => {
     );
     expect(prompt).toContain("Agent no env, version 2.3.0.");
     expect(prompt).not.toContain(UNSET);
+  });
+
+  it("counts one trace in the singular", () => {
+    const prompt = explainSignalPrompt(
+      { signalType: "loop", agent: "a", tool: "t", calls: 12, traces: 1, ratio: 12 },
+      evidence,
+    );
+    expect(prompt).toContain("(12 calls over 1 trace)");
   });
 });
 
@@ -242,5 +258,7 @@ describe("AgentSignalDetailPanel — late responses", () => {
     const sent = JSON.stringify(wrapper.emitted("sendToAiChat"));
     expect(sent).toContain("support-trace");
     expect(sent).not.toContain("research-trace");
+    // The drawer closes so the chat panel beneath it shows the answer.
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
   });
 });

@@ -182,11 +182,11 @@ function decodeAnyValue(value: unknown): unknown {
 /**
  * Map raw role strings to the canonical 5-value union we render against.
  * Common SDK aliases: "human" → user, "model"/"ai" → assistant,
- * "function" → tool.
+ * "function" → tool, OpenAI Responses "developer" → system.
  */
 export function normalizeRole(raw: unknown): Role {
   const r = String(raw ?? "").toLowerCase();
-  if (r === "system") return "system";
+  if (r === "system" || r === "developer") return "system";
   if (r === "user" || r === "human") return "user";
   if (r === "assistant" || r === "model" || r === "ai") return "assistant";
   if (r === "tool" || r === "function") return "tool";
@@ -201,13 +201,15 @@ export function normalizeRole(raw: unknown): Role {
  *   - Vertex/ADK `parts` arrays
  *   - generic `{text}` / `{content}` objects
  *
- * OTel GenAI v5 `reasoning`/`tool_call`/`tool_call_response`/`server_tool_call*`
+ * OTel GenAI v5 `reasoning`/`tool_call_response`/`server_tool_call_response`
  * parts render as text, including real-world SDK field-name aliases
  * (`thinking`/`result`) that don't match the spec's own names — kept in
- * sync with LLMContentRenderer.vue via genAiParts.ts. `blob`/`file`/`uri`
- * stay suppressed (first-class rendering elsewhere), and any part type that
- * yields no text (unrecognised, or recognised but empty) falls back to a
- * `[type]` marker instead of vanishing.
+ * sync with LLMContentRenderer.vue via genAiParts.ts. Tool calls of every
+ * shape are left out (drawn as cards, see `toolCallParts`), as are Anthropic
+ * extended-thinking blocks (`{type: "thinking", thinking}`, `redacted_thinking`).
+ * `blob`/`file`/`uri` stay suppressed (first-class rendering elsewhere), and
+ * any part type that yields no text (unrecognised, or recognised but empty)
+ * falls back to a `[type]` marker instead of vanishing.
  *
  * @example extractContent("hello")                 // "hello"
  * @example extractContent([{ text: "a" },
@@ -228,6 +230,9 @@ export function extractContent(content: unknown): string {
         // The Thread view draws tool calls as cards (see toolCallParts), not as
         // "Called name(...)" text inside the assistant bubble.
         if (isToolCallRecord(part) || part.type === "server_tool_call") return "";
+        // Anthropic extended thinking is the model's scratchpad, not its reply.
+        if (part.type === "redacted_thinking") return "";
+        if (part.type === "thinking" && typeof part.thinking === "string") return "";
 
         const genAiText = extractGenAiPartText(part);
         if (genAiText != null) return genAiText;
@@ -258,18 +263,32 @@ export function extractContent(content: unknown): string {
 }
 
 /**
- * Find the array of messages inside an SDK request envelope. Supports:
+ * Find the array of messages inside an SDK envelope. Supports:
  *   1. Flat OTEL array       — [{role, content}, ...]
  *   2. Wrapped messages key  — {messages: [...]}
  *   3. Vertex/ADK request    — {model, config, contents: [...]}
+ *   4. Gemini response       — {candidates: [{content: {role, parts}}]}
+ *   5. Bedrock Converse      — {output: {message: {role, content}}}
+ *   6. LangChain             — [[message, ...]] (one list per prompt) and
+ *                              {generations: [[generation, ...]]}
  */
 export function resolveMessageArray(parsed: unknown): unknown[] {
   if (!parsed) return [];
-  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed)) return flattenBatches(parsed);
   if (!isRecord(parsed)) return [];
-  if (Array.isArray(parsed.messages)) return parsed.messages;
+  if (Array.isArray(parsed.messages)) return flattenBatches(parsed.messages);
   if (Array.isArray(parsed.contents)) return parsed.contents;
+  if (Array.isArray(parsed.candidates)) {
+    return parsed.candidates.map((c) => (isRecord(c) && isRecord(c.content) ? c.content : c));
+  }
+  if (Array.isArray(parsed.generations)) return flattenBatches(parsed.generations);
+  if (isRecord(parsed.output) && isRecord(parsed.output.message)) return [parsed.output.message];
   return [];
+}
+
+/** LangChain records one list per prompt of a batch: `[[m1, m2], …]` reads as `[m1, m2, …]`. */
+function flattenBatches(arr: unknown[]): unknown[] {
+  return arr.length > 0 && arr.every((item) => Array.isArray(item)) ? arr.flat() : arr;
 }
 
 function anyValueToText(value: unknown): string {
@@ -287,36 +306,102 @@ function anyValueToText(value: unknown): string {
   }
 }
 
-/** OpenInference wraps each message as `{message: {role, content, tool_calls}}`. */
-function unwrapMessage(value: unknown): unknown {
-  return isRecord(value) && isRecord(value.message) && !("role" in value) ? value.message : value;
+const MESSAGE_CONTENT_KEYS = ["content", "text", "parts", "contents", "blocks"];
+
+/** Does the record carry its own message body (LlamaIndex writes `blocks`)? */
+function hasMessageContent(record: UnknownRecord): boolean {
+  return MESSAGE_CONTENT_KEYS.some((key) => key in record);
+}
+
+/**
+ * The message a record wraps: OpenInference `{message: {role, content,
+ * tool_calls}}`, LangChain ChatGeneration `{text, message}`, LlamaIndex
+ * ChatResponse `{message, raw}`.
+ */
+function wrappedMessage(value: unknown): UnknownRecord | null {
+  return isRecord(value) && isRecord(value.message) && !("role" in value) ? value.message : null;
+}
+
+/**
+ * A LangChain message as a plain `{role, content, tool_calls}` record: the
+ * serialized constructor `{lc, type: "constructor", id: [..., "AIMessage"],
+ * kwargs}` and the `messages_to_dict` form `{type: "human", data}`. Any other
+ * value is returned as is.
+ */
+function fromLangChain(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+  if (value.type === "constructor" && "lc" in value && isRecord(value.kwargs)) {
+    const kwargs = value.kwargs;
+    const className = Array.isArray(value.id) ? String(value.id[value.id.length - 1] ?? "") : "";
+    return {
+      ...kwargs,
+      role: kwargs.role ?? kwargs.type ?? className.replace(/Message(Chunk)?$/, ""),
+    };
+  }
+  if (isRecord(value.data) && !("role" in value) && normalizeRole(value.type) !== "unknown") {
+    return { ...value.data, role: value.data.role ?? value.type };
+  }
+  return value;
+}
+
+/**
+ * The message a value stands for. A record that wraps a message but has its
+ * own text (a ChatGeneration) reads as that text, not as the wrapped message.
+ */
+function toMessage(value: unknown): unknown {
+  const wrapped = wrappedMessage(value);
+  return fromLangChain(wrapped && !hasMessageContent(value as UnknownRecord) ? wrapped : value);
+}
+
+/** Keys under which SDKs nest one tool call: OpenInference, Gemini, Vertex/ADK and Bedrock. */
+const TOOL_CALL_WRAPPERS = ["tool_call", "functionCall", "function_call", "toolUse"];
+
+function toolCallWrapper(value: UnknownRecord): UnknownRecord | null {
+  for (const key of TOOL_CALL_WRAPPERS) {
+    const call = value[key];
+    if (isRecord(call)) return call;
+  }
+  return null;
 }
 
 /**
  * A record that is itself one tool call: a semconv `tool_call` part, an
- * Anthropic `tool_use` block or a Vercel AI SDK `{toolCallId, toolName}` entry.
+ * Anthropic `tool_use` block, an OpenAI Responses `function_call` item, a
+ * Vercel AI SDK `{toolCallId, toolName}` entry, or a part wrapping a call
+ * (Gemini `functionCall`, Vertex/ADK `function_call`, Bedrock `toolUse`).
  */
 function isToolCallRecord(value: UnknownRecord): boolean {
   return (
-    value.type === "tool_call" || value.type === "tool_use" || typeof value.toolName === "string"
+    value.type === "tool_call" ||
+    value.type === "tool_use" ||
+    value.type === "function_call" ||
+    typeof value.toolName === "string" ||
+    toolCallWrapper(value) !== null
   );
 }
 
 function messageFromAnyValue(value: unknown, defaultRole: Role): Message | null {
-  const unwrapped = unwrapMessage(value);
+  const unwrapped = toMessage(value);
   const record = isRecord(unwrapped) ? unwrapped : null;
-  const role = normalizeRole(record?.role ?? defaultRole);
-  const hasMessageContent =
-    record !== null &&
-    ("content" in record || "text" in record || "parts" in record || "contents" in record);
-  // A tool call, or a message carrying only tool calls, is drawn as a tool card.
-  if (record && !hasMessageContent && (isToolCallRecord(record) || "tool_calls" in record)) {
+  // OpenAI Responses items that are not chat messages: a tool's result (shown
+  // on its card) and the model's reasoning summary.
+  if (
+    record &&
+    (record.type === "function_call_output" ||
+      (record.type === "reasoning" && Array.isArray(record.summary)))
+  ) {
     return null;
   }
-  const rawContent = hasMessageContent
-    ? (record.content ?? record.text ?? record.parts ?? record.contents)
+  const role = normalizeRole(record?.role ?? defaultRole);
+  const hasContent = record !== null && hasMessageContent(record);
+  // A tool call, or a message carrying only tool calls, is drawn as a tool card.
+  if (record && !hasContent && (isToolCallRecord(record) || "tool_calls" in record)) {
+    return null;
+  }
+  const rawContent = hasContent
+    ? (record.content ?? record.text ?? record.parts ?? record.contents ?? record.blocks)
     : unwrapped;
-  const content = hasMessageContent ? extractContent(rawContent) : anyValueToText(rawContent);
+  const content = hasContent ? extractContent(rawContent) : anyValueToText(rawContent);
 
   if (!content.trim()) return null;
   return { role, content, sig: `${role}::${content}` };
@@ -325,10 +410,10 @@ function messageFromAnyValue(value: unknown, defaultRole: Role): Message | null 
 /**
  * Convert the raw input payload into a normalised `Message[]`.
  *
- * Vertex/ADK's `config.system_instruction` is surfaced as a synthetic
- * `role: "system"` message even though the SDK doesn't put it in the
- * messages array — without this, Vertex traces would have no system
- * prompt panel.
+ * A system prompt kept outside the messages array is surfaced as a synthetic
+ * `role: "system"` message — Vertex/ADK's `config.system_instruction`, Gemini
+ * REST's `systemInstruction` and the Anthropic/Bedrock top-level `system` —
+ * without this, those traces would have no system prompt panel.
  */
 export function messagesFromInput(raw: unknown): Message[] {
   const parsed = decodeAnyValue(raw);
@@ -337,14 +422,20 @@ export function messagesFromInput(raw: unknown): Message[] {
   const arr = resolveMessageArray(parsed);
   const messages: Message[] = [];
   const config = isRecord(parsed) && isRecord(parsed.config) ? parsed.config : null;
-  const sysInstruction = config?.system_instruction;
-  const systemContent = anyValueToText(sysInstruction);
-  if (systemContent.trim()) {
-    messages.push({
-      role: "system",
-      content: systemContent,
-      sig: `system::${systemContent}`,
-    });
+  const envelope = isRecord(parsed) && !("role" in parsed) ? parsed : null;
+  for (const source of [
+    config?.system_instruction,
+    envelope?.systemInstruction,
+    envelope?.system,
+  ]) {
+    const systemContent = anyValueToText(source);
+    if (systemContent.trim()) {
+      messages.push({
+        role: "system",
+        content: systemContent,
+        sig: `system::${systemContent}`,
+      });
+    }
   }
 
   if (arr.length) {
@@ -439,15 +530,18 @@ export interface ToolCallPart {
 /**
  * One tool call in any of the shapes SDKs write: OpenAI `{id, function: {name,
  * arguments}}`, OpenInference's `{tool_call: {…}}` wrapper around it, flat
- * `{id, name, arguments}` (semconv parts, Traceloop/OpenLLMetry), Anthropic
- * `{type: "tool_use", id, name, input}` and Vercel AI SDK `{toolCallId,
- * toolName, args | input}`.
+ * `{id, name, arguments}` (semconv parts, Traceloop/OpenLLMetry, LangChain),
+ * Anthropic `{type: "tool_use", id, name, input}`, OpenAI Responses
+ * `{type: "function_call", call_id, name, arguments}`, Vercel AI SDK
+ * `{toolCallId, toolName, args | input}`, Gemini `{functionCall: {name, args}}`
+ * and Bedrock `{toolUse: {toolUseId, name, input}}`.
  */
 function toolCallFrom(value: UnknownRecord): ToolCallPart {
-  const call = isRecord(value.tool_call) ? value.tool_call : value;
+  const call = toolCallWrapper(value) ?? value;
   const fn = isRecord(call.function) ? call.function : null;
   return {
-    id: String(call.id ?? call.toolCallId ?? ""),
+    // Responses `id` names the output item; `call_id` is what the tool span carries.
+    id: String(call.call_id ?? call.id ?? call.toolCallId ?? call.toolUseId ?? ""),
     name: String(fn?.name ?? call.name ?? call.toolName ?? ""),
     arguments: fn ? fn.arguments : (call.arguments ?? call.args ?? call.input),
   };
@@ -456,7 +550,9 @@ function toolCallFrom(value: UnknownRecord): ToolCallPart {
 /**
  * The tool calls an LLM turn asked for, in order: tool-call parts of its output
  * messages, their `tool_calls` entries, and output entries that are themselves
- * tool calls (Vercel AI SDK `ai.response.toolCalls`). See `toolCallFrom`.
+ * tool calls (Vercel AI SDK `ai.response.toolCalls`). See `toolCallFrom`. A call
+ * written twice under one id (a `tool_use` block also listed in `tool_calls`)
+ * is listed once.
  *
  * @example toolCallParts('[{"role":"assistant","parts":[{"type":"tool_call","id":"c1","name":"grep","arguments":{"q":"x"}}]}]')
  *   // [{ id: "c1", name: "grep", arguments: { q: "x" } }]
@@ -466,20 +562,29 @@ export function toolCallParts(raw: unknown): ToolCallPart[] {
   if (parsed == null) return [];
   const messages = resolveMessageArray(parsed);
   const out: ToolCallPart[] = [];
+  const seenIds = new Set<string>();
+  const add = (value: unknown) => {
+    if (!isRecord(value)) return;
+    const call = toolCallFrom(value);
+    if (call.id) {
+      if (seenIds.has(call.id)) return;
+      seenIds.add(call.id);
+    }
+    out.push(call);
+  };
   for (const value of messages.length ? messages : [parsed]) {
-    const m = unwrapMessage(value);
+    // The calls sit on the wrapped message, also when the wrapper keeps its own text.
+    const m = fromLangChain(wrappedMessage(value) ?? value);
     if (!isRecord(m)) continue;
     if (isToolCallRecord(m)) {
-      out.push(toolCallFrom(m));
+      add(m);
       continue;
     }
     const parts = Array.isArray(m.parts) ? m.parts : Array.isArray(m.content) ? m.content : [];
     for (const p of parts) {
-      if (isRecord(p) && isToolCallRecord(p)) out.push(toolCallFrom(p));
+      if (isRecord(p) && isToolCallRecord(p)) add(p);
     }
-    for (const c of Array.isArray(m.tool_calls) ? m.tool_calls : []) {
-      if (isRecord(c)) out.push(toolCallFrom(c));
-    }
+    for (const c of Array.isArray(m.tool_calls) ? m.tool_calls : []) add(c);
   }
   return out;
 }
@@ -497,7 +602,8 @@ function withUnmatchedToolCalls(turnSpan: any, spans: any[]): any[] {
     // A call without a name has nothing to show on a card.
     .filter((c) => c.name && !ids.has(c.id) && (c.id || !spans.length))
     .map((c, i) => ({
-      span_id: `tool-call:${turnSpan.span_id}:${c.id || i}`,
+      // An id is unique within the turn (see toolCallParts); an index keys an id-less call.
+      span_id: `tool-call:${turnSpan.span_id}:${c.id ? `id:${c.id}` : `#${i}`}`,
       gen_ai_tool_name: c.name,
       gen_ai_tool_call_id: c.id,
       gen_ai_tool_call_arguments: c.arguments,
@@ -564,7 +670,8 @@ export interface TraceGroup {
  *   2. Attach tool spans to their parent turn by `reference_parent_span_id`.
  *      If no spans match (some SDKs flatten the parent chain), fall back
  *      to a time-window match: tools whose `start_time` is between this
- *      turn and the next.
+ *      turn and the next. A tool span that starts before the first turn and
+ *      hangs off no turn (it wraps the first model call) goes to turn 0.
  *   3. Resolve the trace's "system prompt" + "user query" from turn 0's
  *      input. Filter agent-injection look-alikes.
  *   4. For each subsequent turn, find genuine new user messages (dedup
@@ -612,6 +719,15 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
     historicalUserCount++;
   }
 
+  // Tool spans that start before the first model call (they wrap it) and hang
+  // off no turn by parent: no turn's window would hold them, so turn 0 does.
+  const firstStart = Number(llmTurns[0].start_time);
+  const turnIds = new Set(llmTurns.map((s) => String(s.span_id)));
+  const leadingTools = toolSpans.filter(
+    (t) =>
+      Number(t.start_time) < firstStart && !turnIds.has(String(t.reference_parent_span_id || "")),
+  );
+
   const seenRealUserSigs = new Set<string>();
   const turns: Turn[] = llmTurns.map((turnSpan, i) => {
     const turnId = String(turnSpan.span_id);
@@ -626,6 +742,7 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
         return ts >= start && ts < end;
       });
     }
+    if (i === 0) attached = [...leadingTools, ...attached];
 
     const inputMessages = messagesFromInput(getInputRaw(turnSpan));
     const followupUsers: Message[] = [];

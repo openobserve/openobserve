@@ -238,12 +238,38 @@ export function attributeSteps(spans: Span[]): StepAttribution[] {
         : null,
     });
   }
+  // A trace that is one model call and nothing else: "All of it was the model
+  // call" says nothing the span bar does not, so it is not called out (C2-06).
+  // A failed call still is.
+  const only = steps.length === 1 ? steps[0] : null;
+  if (only && only.kind === "llm" && !only.cause && !only.failed) {
+    only.slow = false;
+    only.headline = false;
+  }
   return steps.sort((a, b) => a.startUs - b.startUs);
 }
 
 /** The slow steps named above the waterfall, longest first. */
 export function headlineSteps(steps: StepAttribution[]): StepAttribution[] {
   return steps.filter((s) => s.headline).sort((a, b) => b.durationUs - a.durationUs);
+}
+
+/** Headline sentences, identical ones (parallel copies of one step) said once, keyed by span. */
+export function mergedHeadlines(
+  steps: StepAttribution[],
+  t: TranslateFn,
+): { key: string; text: I18nText }[] {
+  const groups = new Map<string, { key: string; sentence: I18nText; count: number }>();
+  for (const step of steps) {
+    const sentence = attributionSentence(step, t);
+    const group = groups.get(sentence);
+    if (group) group.count += 1;
+    else groups.set(sentence, { key: step.spanId, sentence, count: 1 });
+  }
+  return [...groups.values()].map(({ key, sentence, count }) => ({
+    key,
+    text: count > 1 ? t("requestTimeline.sameSteps", { count, sentence }) : sentence,
+  }));
 }
 
 /** The span and every span under it. */
@@ -317,8 +343,11 @@ export function attributionSentence(step: StepAttribution, t: TranslateFn): I18n
 }
 
 /**
- * First time (µs) in [fromUs, toUs] at which a restart counter rose, from
- * Prometheus matrix series (`values: [seconds, "count"][]`); null when none did.
+ * When a restart counter first rose in [fromUs, toUs], from Prometheus matrix
+ * series (`values: [seconds, "count"][]`); null when it did not. The restart
+ * happened between the sample before the rise and the rise, so the earlier
+ * sample's time (no earlier than fromUs) is returned: on a coarse grid the
+ * rising sample can land after the trace although the restart was inside it.
  */
 export function firstRestartUs(
   series: { values?: [number | string, string][] }[],
@@ -332,7 +361,8 @@ export function firstRestartUs(
       if (atUs < fromUs || atUs > toUs || !(Number(values[i][1]) > Number(values[i - 1][1]))) {
         continue;
       }
-      if (first === null || atUs < first) first = atUs;
+      const sinceUs = Math.max(fromUs, Number(values[i - 1][0]) * 1_000_000);
+      if (first === null || sinceUs < first) first = sinceUs;
     }
   }
   return first;

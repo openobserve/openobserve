@@ -23,11 +23,13 @@ import { describe, it, expect, vi } from "vitest";
 import { defineComponent, h } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import {
+  buildFailureRows,
   buildLoopRows,
   countAgents,
   matchesAgentScope,
   type DrillScope,
   type LoopRow,
+  selectedAgentScope,
 } from "./agentScope";
 import { UNSET } from "@/enterprise/composables/useAgentScope";
 
@@ -168,6 +170,100 @@ describe("buildLoopRows", () => {
   it("labels a signal without an agent but keeps its raw value null", () => {
     const [row] = buildLoopRows([loopSignal(null, "t", null, null, 2, 1)], "(unknown agent)");
     expect([row.agent, row.agentRaw]).toEqual(["(unknown agent)", null]);
+  });
+});
+
+const failureSignal = (
+  agent: string | null,
+  failClass: string | null,
+  env: string | null,
+  count: number,
+  _timestamp = 1,
+) => ({
+  _timestamp,
+  org_id: "default",
+  source_stream: "default",
+  signal_type: "failure",
+  agent_name: agent,
+  gen_ai_agent_env: env,
+  fail_class: failClass,
+  count,
+});
+
+describe("buildFailureRows", () => {
+  it("merges windows and variants into one row per agent and class", () => {
+    const rows = buildFailureRows(
+      [
+        failureSignal("omp", "timeout", null, 2, 1),
+        failureSignal("omp", "timeout", "production", 3, 1),
+        failureSignal("omp", "timeout", "production", 4, 2),
+        failureSignal("omp", "rate_limit", null, 8),
+        failureSignal("bot", "timeout", null, 1),
+        failureSignal(null, null, null, 1),
+        loopSignal("omp", "bash", null, null, 9, 1),
+      ],
+      "(unknown agent)",
+    );
+    expect(rows.map((r) => [r.agent, r.agentRaw, r.failClass, r.count])).toEqual([
+      ["omp", "omp", "timeout", 9],
+      ["omp", "omp", "rate_limit", 8],
+      ["bot", "bot", "timeout", 1],
+      ["(unknown agent)", null, "unclassified", 1],
+    ]);
+    expect(new Set(rows.map((r) => r.id)).size).toBe(4);
+  });
+
+  it("keeps each env variant, summed over its windows, with the missing env pinned", () => {
+    const [timeout, single] = buildFailureRows(
+      [
+        failureSignal("omp", "timeout", null, 2, 1),
+        failureSignal("omp", "timeout", "production", 3, 1),
+        failureSignal("omp", "timeout", "production", 4, 2),
+        failureSignal("bot", "timeout", null, 1, 1),
+        failureSignal("bot", "timeout", null, 1, 2),
+      ],
+      "(unknown agent)",
+    );
+    expect(timeout.variants.map((v) => [v.env, v.count, v.scope])).toEqual([
+      ["production", 7, { env: "production", version: null }],
+      [null, 2, { env: UNSET, version: null }],
+    ]);
+    // One variant (merged over two windows): nothing to expand.
+    expect([single.count, single.variants.length]).toEqual([2, 1]);
+  });
+});
+
+describe("selectedAgentScope", () => {
+  const agent = (env: string | null, version: string | null, source_stream = "default") => ({
+    name: "research-agent",
+    source_stream,
+    source_stream_type: "traces",
+    env,
+    version,
+  });
+
+  it("pins a missing env to not set when a sibling variant has one, so production is excluded", () => {
+    const noEnv = agent(null, "2.3.0");
+    const scope = selectedAgentScope(noEnv, [noEnv, agent("production", "2.3.0")])!;
+    expect(scope).toEqual({ name: "research-agent", env: UNSET, version: "2.3.0" });
+    const signal = (env: string | null) => ({
+      agent_name: "research-agent",
+      gen_ai_agent_env: env,
+      gen_ai_agent_version: "2.3.0",
+    });
+    expect(matchesAgentScope(signal(null), scope)).toBe(true);
+    expect(matchesAgentScope(signal(""), scope)).toBe(true);
+    expect(matchesAgentScope(signal("production"), scope)).toBe(false);
+  });
+
+  it("leaves a dimension open when no variant in the stream has it", () => {
+    const a = agent(null, "1.0");
+    expect(selectedAgentScope(a, [a, agent("production", "1.0", "other")])).toEqual({
+      name: "research-agent",
+      env: null,
+      version: "1.0",
+    });
+    expect(selectedAgentScope(null, [a])).toBeNull();
   });
 });
 

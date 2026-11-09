@@ -89,17 +89,14 @@ pub async fn get_agent_signals(
         let src = src.replace('\'', "");
         filters.push_str(&format!(" AND source_stream = '{src}'"));
     }
-    let sql = format!(
-        "SELECT * FROM \"{stream_name}\" \
-         WHERE _timestamp >= {start_time} AND _timestamp < {end_time} AND {filters} \
-         ORDER BY _timestamp DESC LIMIT 10000"
-    );
-
     // If the stream doesn't exist yet (feature never ran), return an empty list.
-    let schema = infra::schema::get(&org_id, stream_name, StreamType::Logs).await;
-    if schema.is_err() {
+    let Ok(schema) = infra::schema::get(&org_id, stream_name, StreamType::Logs).await else {
         return MetaHttpResponse::json(serde_json::json!({ "signals": [] }));
-    }
+    };
+    let fields: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+    let Some(sql) = signals_rollup_sql(start_time, end_time, &filters, &fields) else {
+        return MetaHttpResponse::json(serde_json::json!({ "signals": [] }));
+    };
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -161,6 +158,67 @@ pub async fn get_agent_signals(
     axum::extract::Query(_query): axum::extract::Query<AgentSignalsQuery>,
 ) -> HttpResponse {
     MetaHttpResponse::forbidden("Not Supported")
+}
+
+/// Columns a signal row is identified by over a range (each hourly window
+/// writes one row per combination). `org_id` is filtered to one value.
+#[cfg(any(feature = "enterprise", test))]
+const SIGNAL_DIMENSIONS: [&str; 7] = [
+    "source_stream",
+    "signal_type",
+    "agent_name",
+    "gen_ai_agent_env",
+    "gen_ai_agent_version",
+    "tool_name",
+    "fail_class",
+];
+
+/// Additive measures, summed over the range's windows.
+#[cfg(any(feature = "enterprise", test))]
+const SIGNAL_MEASURES: [&str; 6] = [
+    "count",
+    "calls",
+    "distinct_traces",
+    "cost",
+    "tokens",
+    "errors",
+];
+
+/// The range read: one row per signal identity (dimensions present in the
+/// stream), its measures summed over every hourly window in the range, so a
+/// long range is counted in full rather than cut to its newest raw rows.
+/// Columns the stream lacks are left out, since naming one fails the query.
+/// `None` when the stream has no `signal_type` column (nothing written yet).
+#[cfg(any(feature = "enterprise", test))]
+fn signals_rollup_sql(
+    start_time: i64,
+    end_time: i64,
+    filters: &str,
+    fields: &[&str],
+) -> Option<String> {
+    if !fields.contains(&"signal_type") {
+        return None;
+    }
+    let dims: Vec<String> = SIGNAL_DIMENSIONS
+        .iter()
+        .filter(|d| fields.contains(*d))
+        .map(|d| format!("\"{d}\""))
+        .collect();
+    let mut select = dims.clone();
+    select.extend(
+        SIGNAL_MEASURES
+            .iter()
+            .filter(|m| fields.contains(*m))
+            .map(|m| format!("SUM(\"{m}\") AS \"{m}\"")),
+    );
+    select.push("MAX(_timestamp) AS _timestamp".to_string());
+    Some(format!(
+        "SELECT {} FROM \"_agent_signals\" \
+         WHERE _timestamp >= {start_time} AND _timestamp < {end_time} AND {filters} \
+         GROUP BY {} LIMIT 10000",
+        select.join(", "),
+        dims.join(", ")
+    ))
 }
 
 /// How far back (µs) to read a version's rollup rows from `_agent_signals`.
@@ -582,6 +640,37 @@ mod compare_tests {
             start_time: 0,
             end_time: 0,
         }
+    }
+
+    #[test]
+    fn signals_rollup_sql_sums_windows_per_identity_over_present_columns() {
+        let fields = [
+            "_timestamp",
+            "org_id",
+            "source_stream",
+            "signal_type",
+            "agent_name",
+            "tool_name",
+            "calls",
+            "distinct_traces",
+            "count",
+        ];
+        let sql = signals_rollup_sql(1, 2, "org_id = 'o'", &fields).unwrap();
+        assert!(sql.contains(
+            "GROUP BY \"source_stream\", \"signal_type\", \"agent_name\", \"tool_name\" LIMIT"
+        ));
+        assert!(sql.contains("SUM(\"calls\") AS \"calls\""));
+        assert!(sql.contains("SUM(\"count\") AS \"count\""));
+        // Columns the stream lacks are never named.
+        assert!(!sql.contains("gen_ai_agent_env"));
+        assert!(!sql.contains("cost"));
+        assert!(!sql.contains("SELECT *"));
+        assert!(sql.contains("_timestamp >= 1 AND _timestamp < 2 AND org_id = 'o'"));
+    }
+
+    #[test]
+    fn signals_rollup_sql_is_none_before_any_signal_is_written() {
+        assert!(signals_rollup_sql(1, 2, "1=1", &["_timestamp", "org_id"]).is_none());
     }
 
     #[test]

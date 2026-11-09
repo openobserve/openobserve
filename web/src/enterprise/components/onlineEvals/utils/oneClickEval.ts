@@ -16,6 +16,7 @@
 import type { EvalJobPayload } from "@/services/online-evals.service";
 import type { CompletionWindowDefaults } from "./completionWindow";
 import { DEFAULT_BUDGET_ACTION, DEFAULT_DAILY_BUDGET_USD } from "./evalSpend";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 /** Built-in catalog judges the one-click dialog offers (AIO-23), in order. */
 export const ONE_CLICK_JUDGES = ["hallucination", "answer_relevance", "helpfulness", "toxicity"];
@@ -25,14 +26,17 @@ export const ONE_CLICK_MAPPING = { input: "{{input}}", output: "{{output}}" } as
 
 /** SQL WHERE body of the one-click job's filter, for the traffic estimate. */
 export function oneClickWhere(agent: string | null): string {
-  return agent ? `gen_ai_agent_name = '${agent.replace(/'/g, "''")}'` : "";
+  return agent ? `gen_ai_agent_name = ${sqlLiteral(agent)}` : "";
 }
 
-/** A sampled, trace-scoped job for one agent (or the whole stream). */
+/**
+ * A sampled, trace-scoped job for one agent (or the whole stream). Each scorer
+ * maps only the variables its template uses.
+ */
 export function buildOneClickJob(opts: {
   agent: string | null;
   stream: string;
-  scorerIds: string[];
+  scorers: { id: string; variables: readonly string[] }[];
   judgeNames: string[];
   rate: number;
   completion: CompletionWindowDefaults;
@@ -63,8 +67,15 @@ export function buildOneClickJob(opts: {
           },
         }
       : { type: "all" },
-    scorers: opts.scorerIds.map((id) => ({ id, version: null })),
-    inputMapping: Object.fromEntries(opts.scorerIds.map((id) => [id, { ...ONE_CLICK_MAPPING }])),
+    scorers: opts.scorers.map(({ id }) => ({ id, version: null })),
+    inputMapping: Object.fromEntries(
+      opts.scorers.map(({ id, variables }) => [
+        id,
+        Object.fromEntries(
+          Object.entries(ONE_CLICK_MAPPING).filter(([name]) => variables.includes(name)),
+        ),
+      ]),
+    ),
     spanSelectors: [],
     spanSelectorBindings: {},
     traceConfig: {

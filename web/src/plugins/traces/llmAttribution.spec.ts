@@ -85,7 +85,7 @@ describe("cost attribution (AIO-27)", () => {
   it("fetches the top values plus unattributed, and totals over every value", () => {
     for (const sql of [costByDimensionSql("s", "user_id", ""), costByModelSql("s", "")]) {
       expect(sql.rows).toMatch(
-        /^SELECT v, cost, tokens, traces, CASE WHEN v = '' THEN 0 ELSE 1 END AS unattributed_last FROM \(/,
+        /^SELECT v, cost, tokens, traces, unpriced, CASE WHEN v = '' THEN 0 ELSE 1 END AS unattributed_last FROM \(/,
       );
       expect(sql.rows).toMatch(/\) ORDER BY unattributed_last, cost DESC LIMIT 51$/);
       expect(sql.totals).toMatch(/^SELECT COUNT\(\*\) FILTER \(WHERE v != ''\) AS n_values/);
@@ -134,10 +134,43 @@ describe("cost attribution (AIO-27)", () => {
     expect(out.attributedShare).toBe(0.9);
   });
 
-  it("lists users without a tenant column and escapes the search", () => {
-    const sql = usersSql("s", { scope: "", tenantColumn: null, search: "u_1%" });
+  it("lists users without a tenant column and escapes the search, ignoring case", () => {
+    const sql = usersSql("s", { scope: "", tenantColumn: null, search: "U_1%" });
     expect(sql).toContain("'' AS tenant");
-    expect(sql).toContain("user_id LIKE '%u\\_1\\%%'");
+    expect(sql).toContain("LOWER(user_id) LIKE '%u\\_1\\%%'");
+  });
+
+  it("matches a backslash in the search literally instead of escaping the next character", () => {
+    const sql = usersSql("s", { scope: "", tenantColumn: null, search: "a\\" });
+    // `a\` must become the LIKE pattern `%a\\%`, not `%a\%` (which matches a literal `%`).
+    expect(sql).toContain("LOWER(user_id) LIKE '%a\\\\%'");
+  });
+
+  it("counts unpriced LLM-call tokens per row only when the stream has the status column", () => {
+    const withStatus = usersSql("s", { scope: "", tenantColumn: null, hasCostStatus: true });
+    expect(withStatus).toContain("gen_ai_usage_cost_status = 'unpriced'");
+    expect(withStatus).toContain("SUM(unpriced) AS unpriced");
+    expect(usersSql("s", { scope: "", tenantColumn: null })).not.toContain("cost_status");
+    for (const sql of [
+      costByDimensionSql("s", "user_id", "", true),
+      costByModelSql("s", "", true),
+    ]) {
+      expect(sql.rows).toContain("gen_ai_usage_cost_status = 'unpriced'");
+      expect(sql.totals).toContain("SUM(unpriced) AS unpriced");
+    }
+  });
+
+  it("carries unpriced tokens into the more row from the whole-window totals", () => {
+    const out = toAttributionRows(
+      [
+        { v: "a", cost: 1, tokens: 10, traces: 1, unpriced: 4 },
+        { v: "b", cost: 1, tokens: 10, traces: 1, unpriced: 0 },
+      ],
+      { n_values: 2, cost: 2, tokens: 20, traces: 2, unpriced: 6 },
+      1,
+    );
+    expect(out.rows[0].unpriced).toBe(4);
+    expect(out.more?.unpriced).toBe(2);
   });
 
   it("counts the traces carrying each column, and still counts traces when the stream has none", () => {

@@ -88,6 +88,7 @@
           :loading="loading"
           :loading-reset-key="row"
           :error="queryError"
+          @retry="fetchDetails"
           :empty-message="t('aiObservability.behavior.detail.noErrors')"
           :default-columns="false"
           :frame="false"
@@ -140,6 +141,7 @@
           :loading="loading"
           :loading-reset-key="row"
           :error="queryError"
+          @retry="fetchDetails"
           :empty-message="t('aiObservability.behavior.detail.noTraces')"
           :default-columns="false"
           :frame="false"
@@ -200,12 +202,12 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import searchService from "@/services/search";
 import { errorMessage } from "@/services/alert_calibration";
 import useStreams from "@/composables/useStreams";
-import { escapeSingleQuotes } from "@/utils/queryUtils";
 import {
   buildAgentClimbFilter,
   errorDetailExpr,
   failureErrorsSql,
   failureTracesSql,
+  loopTracesSql,
 } from "./agentClimbFilter";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -560,11 +562,10 @@ const fetchDetails = async () => {
       }));
     } else if (r.signalType === "loop") {
       // Worst traces first — ranked by how many times the tool repeated.
-      traces = (
-        await runQuery(
-          `SELECT c.trace_id AS trace_id, COUNT(*) AS repeats FROM "${s}" AS c ${joins} WHERE c.gen_ai_tool_name = '${escapeSingleQuotes(r.tool ?? "")}' AND c.gen_ai_operation_name = 'execute_tool' AND ${af} GROUP BY c.trace_id ORDER BY repeats DESC LIMIT 50`,
-        )
-      ).map((h: any) => ({ trace_id: h.trace_id, repeats: h.repeats }));
+      traces = (await runQuery(loopTracesSql(s, joins, af, r.tool ?? ""))).map((h: any) => ({
+        trace_id: h.trace_id,
+        repeats: h.repeats,
+      }));
     } else {
       // Cost outliers — the traces driving this agent's spend.
       traces = (
@@ -610,8 +611,10 @@ function explain() {
             : `${row.spans} error spans`,
     })),
   });
-  // A new question, sent at once; the same hand-off the Issues page used.
+  // A new question, sent at once; the same hand-off the Issues page used. The
+  // drawer closes so the chat panel, which opens beneath it, is visible.
   emit("sendToAiChat", { query: raw(prompt), autoSend: true }, false);
+  emit("update:open", false);
 }
 
 // Open the trace in a NEW tab so the drawer + Agent Behavior page stay put —

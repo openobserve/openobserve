@@ -195,7 +195,7 @@
               }}
               <OTag v-if="variables.length" type="fieldTag" value="soft">
                 {{ variables.length }}
-                {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
+                {{ t("onlineEvals.scorer.detail.variablesSuffix", variables.length) }}
               </OTag>
             </h4>
             <pre class="sd-code text-text-heading" data-test="scorer-detail-template">{{

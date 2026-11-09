@@ -56,4 +56,20 @@ describe("issues on one trace (AIO-33)", () => {
     ]);
     expect(traceIssues([call(1, "db"), call(2, "db", true)])).toEqual([]);
   });
+
+  it("counts a tool per calling agent, as the alert groups by agent", () => {
+    // Two agents, 6 grep calls each: 12 in the trace, but no agent reaches 10.
+    const spans = Array.from({ length: 12 }, (_, i) => ({
+      ...call(i, "grep"),
+      gen_ai_agent_name: i % 2 ? "coder" : "planner",
+    }));
+    expect(traceIssues(spans)).toEqual([]);
+    const one = [
+      ...spans,
+      ...[20, 21, 22, 23].map((i) => ({ ...call(i, "grep"), gen_ai_agent_name: "coder" })),
+    ];
+    expect(traceIssues(one)).toEqual([
+      expect.objectContaining({ rule: "repeated_tool_calls", agent: "coder", calls: 10 }),
+    ]);
+  });
 });

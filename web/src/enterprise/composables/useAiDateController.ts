@@ -16,11 +16,8 @@
 // (e.g. in the page's `onMounted`) let the replay carry the previous visit's
 // range into the URL and the picker label while the data used the link's.
 //
-// URL sync boundary: SessionsPage / LLMInsightsPage sync their date to the URL
-// (deep-links reproduce the exact view). AgentGraph / AgentBehaviorPage do NOT
-// — they resolve from shared state on mount but keep no from/to/period URL. Pass
-// `urlSync: false` for those so `readFromUrl` returns false and `writeToUrl`
-// is a no-op, preserving their prior behavior.
+// URL sync: every AI page keeps its range in the URL (`period`, or `from`/`to`),
+// so deep-links reproduce the exact view.
 
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -43,9 +40,8 @@ function normalizePeriod(raw: string): string | null {
   return resolveCalendarPeriod(raw) ? raw : null;
 }
 
-export function useAiDateController(opts: { defaultRelative?: string; urlSync?: boolean } = {}) {
+export function useAiDateController(opts: { defaultRelative?: string } = {}) {
   const DEFAULT_RELATIVE = opts.defaultRelative ?? "15m";
-  const urlSync = opts.urlSync ?? true;
 
   const route = useRoute();
   const router = useRouter();
@@ -69,10 +65,8 @@ export function useAiDateController(opts: { defaultRelative?: string; urlSync?: 
 
   // URL ↔ shared date sync. URL wins over shared state on mount so deep-links
   // reproduce the exact saved view, but shared state is the cross-page memory
-  // when no URL hint is present. When `urlSync` is off there is no URL to read.
+  // when no URL hint is present.
   function readFromUrl(): boolean {
-    if (!urlSync) return false;
-
     const fromRaw = route.query.from;
     const toRaw = route.query.to;
     const periodRaw = route.query.period;
@@ -107,8 +101,6 @@ export function useAiDateController(opts: { defaultRelative?: string; urlSync?: 
   // still names the previous org while the store holds the one the page shows.
   // Writing on that route must not put the previous org back.
   function writeToUrl() {
-    if (!urlSync) return;
-
     void replaceRouteQuery(router, route, (next) => {
       const org = store.state.selectedOrganization?.identifier;
       if (org && next.org_identifier != null) next.org_identifier = org;
@@ -133,7 +125,7 @@ export function useAiDateController(opts: { defaultRelative?: string; urlSync?: 
     const before = selectionKey();
     if (value?.valueType === "relative" && value.relativeTimePeriod) {
       applyRelative(value.relativeTimePeriod);
-    } else {
+    } else if (!sameToTheSecond(value)) {
       dateState.value = {
         valueType: "absolute",
         startTime: value.startTime,
@@ -144,6 +136,18 @@ export function useAiDateController(opts: { defaultRelative?: string; urlSync?: 
     }
     writeToUrl();
     return selectionKey() !== before;
+  }
+
+  // The picker keeps whole seconds, so a deep link with sub-second from/to comes
+  // back from its mount replay slightly moved. That echo is the same selection:
+  // keep the link's exact range rather than re-fetching on the rounded one.
+  function sameToTheSecond(value: { startTime?: unknown; endTime?: unknown }): boolean {
+    const s = dateState.value;
+    return (
+      s.valueType === "absolute" &&
+      Math.abs(Number(value?.startTime) - Number(s.startTime)) < 1_000_000 &&
+      Math.abs(Number(value?.endTime) - Number(s.endTime)) < 1_000_000
+    );
   }
 
   // A relative range is the same selection whatever "now" it was anchored to.

@@ -62,6 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-alert-pack-destination"
         />
       </div>
+      <span
+        v-if="!loading && !streams.length"
+        class="text-compact text-text-secondary"
+        data-test="ai-alert-pack-no-trace-stream"
+      >
+        {{ t("aiAlertPack.noTraceStream") }}
+      </span>
 
       <section v-for="group in groups" :key="group.kind" class="flex flex-col gap-1">
         <span class="text-compact text-text-heading font-medium">{{ group.label }}</span>
@@ -87,15 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             {{
-              readiness(rule) === "ready"
-                ? t("aiAlertPack.runsNow")
-                : t(rule.waitsKey ?? "aiAlertPack.waits.scores")
+              readiness(rule) === "ready" ? t("aiAlertPack.runsNow") : t(ruleWaitsKey(rule, stream))
             }}
           </OBadge>
         </div>
       </section>
 
-      <span class="text-2xs text-text-secondary" data-test="ai-alert-pack-summary">
+      <span v-if="stream" class="text-2xs text-text-secondary" data-test="ai-alert-pack-summary">
         {{
           toInstall.length
             ? t(
@@ -108,12 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 toInstall.length,
               )
             : t("aiAlertPack.nothingToAdd", {
-                stream,
                 waiting: AI_AGENTS_PACK.length - ready.length,
               })
         }}
         <template v-if="toInstall.length && skipped">
-          {{ t("aiAlertPack.skipped", { n: skipped, stream }, skipped) }}
+          {{ t("aiAlertPack.skipped", { n: skipped }, skipped) }}
         </template>
       </span>
     </div>
@@ -139,6 +143,7 @@ import {
   aiPackAlertPayload,
   packAlertName,
   ruleReadiness,
+  ruleWaitsKey,
   streamKey,
   type AiPackRule,
 } from "@/utils/alerts/aiAgentsPack";
@@ -298,8 +303,10 @@ async function install() {
         installedAlerts.value = new Set(installedAlerts.value).add(
           alertKey(spec.streamName, packAlertName(spec, stream.value)),
         );
-      } catch {
-        failed.push(t(rule.titleKey));
+      } catch (e) {
+        // Name the server's reason (e.g. "Stream _evaluator not found").
+        const reason = errorMessage(e);
+        failed.push(reason ? `${t(rule.titleKey)} (${reason})` : t(rule.titleKey));
       }
     }
   } catch (e) {
@@ -316,8 +323,8 @@ async function install() {
   toast({
     variant: failed.length ? "warning" : "success",
     message: failed.length
-      ? t("aiAlertPack.installedSome", { n: installed, failed: failed.join(", ") })
-      : t("aiAlertPack.installedAll", { n: installed, folder: AI_PACK_FOLDER }),
+      ? t("aiAlertPack.installedSome", { n: installed, failed: failed.join(", ") }, installed)
+      : t("aiAlertPack.installedAll", { n: installed, folder: AI_PACK_FOLDER }, installed),
   });
   if (installed) emit("installed", installed);
   if (!failed.length) emit("update:open", false);

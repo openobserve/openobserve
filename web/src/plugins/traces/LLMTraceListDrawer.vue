@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ row.question || row.trace_id }}
             </OTruncatedText>
             <span class="text-2xs text-text-secondary">
-              {{ timestampToTimezoneDate(row.ts, timezone, "HH:mm:ss") }}
+              {{ timestampToTimezoneDate(row.ts, timezone, rowTimeFormat) }}
               <template v-if="row.model"> · {{ row.model }}</template>
             </span>
           </div>
@@ -96,7 +96,12 @@ import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
 import { messagesFromInput } from "./threadView.utils";
 import { traceStatus } from "./llmTraceOutcome";
 import { MODEL_SERIES_SQL } from "./config/llmInsightsPanels";
-import { TRACE_LIST_LIMIT, traceListSql, type TraceListSelection } from "./llmInsightsDrill";
+import {
+  TRACE_LIST_LIMIT,
+  traceListSql,
+  traceRowTimeFormat,
+  type TraceListSelection,
+} from "./llmInsightsDrill";
 
 const props = defineProps<{
   open: boolean;
@@ -117,6 +122,7 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const store = useStore();
 const timezone = computed(() => store.state.timezone || "UTC");
+const rowTimeFormat = computed(() => traceRowTimeFormat(props.selection, timezone.value));
 const { executeQuery, cancelAll } = useLLMStreamQuery();
 
 const rows = ref<any[]>([]);

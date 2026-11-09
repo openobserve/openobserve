@@ -314,6 +314,7 @@
                 :time-range="sidePanelTimeRange"
                 :visible="showSidePanel"
                 :stream-filter="selectedStreamFilter"
+                :agent-scope="agentScope"
                 :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
@@ -481,6 +482,16 @@ export default defineComponent({
     },
     agentEnv: {
       type: String as PropType<string | null>,
+      default: null,
+    },
+    // Agent-mode selection for the node drawer's Behavior tab (env/version may
+    // be UNSET = not set); null outside Agent mode.
+    agentScope: {
+      type: Object as PropType<{
+        name: string;
+        env: string | null;
+        version: string | null;
+      } | null>,
       default: null,
     },
     // Optional external time window (Agent Graph page owns its own date picker

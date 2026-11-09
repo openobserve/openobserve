@@ -20,7 +20,7 @@
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
-import { nextTick, reactive } from "vue";
+import { defineComponent, h, nextTick, reactive, type Component, type SetupContext } from "vue";
 
 let mockIsEnterprise = "false";
 let mockIsCloud = "false";
@@ -419,5 +419,45 @@ describe("AIObservabilityShell — enterprise/cloud builds with online evaluatio
     mockIsEnterprise = "false";
     const wrapper = await mountShell();
     expect(itemsOf(wrapper).map((i) => i.key)).toEqual(ALL_ITEM_KEYS);
+  });
+});
+
+describe("AIObservabilityShell — Explain questions from the routed page", () => {
+  async function mountWithPage(page: Component) {
+    // Imported per test like mountShell, after vi.resetModules.
+    const Index = (await import("./Index.vue")).default;
+    return mount(Index, {
+      global: {
+        stubs: {
+          SectionRail: SectionRailStub,
+          OPageLayout: { template: '<div><slot name="sidebar" /><slot /></div>' },
+          RouterView: {
+            setup:
+              (_: unknown, { slots }: SetupContext) =>
+              () =>
+                slots.default?.({ Component: h(page) }),
+          },
+        },
+      },
+    });
+  }
+
+  it("forwards a page's question to the main layout", async () => {
+    const AskingPage = defineComponent({
+      emits: ["sendToAiChat"],
+      template: `<button data-test="ask" @click="$emit('sendToAiChat', 'why?', true)" />`,
+    });
+    const wrapper = await mountWithPage(AskingPage);
+    await wrapper.find('[data-test="ask"]').trigger("click");
+    expect(wrapper.emitted("sendToAiChat")).toEqual([["why?", true]]);
+  });
+
+  it("passes no listener to a fragment-root page that does not ask, so Vue does not warn", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const FragmentPage = defineComponent({ template: "<i data-test='a' /><i />" });
+    const wrapper = await mountWithPage(FragmentPage);
+    expect(wrapper.find('[data-test="a"]').exists()).toBe(true);
+    expect(warn.mock.calls.flat().join(" ")).not.toMatch(/Extraneous non-emits event listeners/);
+    warn.mockRestore();
   });
 });

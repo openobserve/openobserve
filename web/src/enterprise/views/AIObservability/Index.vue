@@ -101,18 +101,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <section class="flex h-full min-h-0 min-w-0 flex-col">
       <div class="min-h-0 flex-1 overflow-y-auto">
         <OnlineEvalsDisabled v-if="onlineEvalsRouteOff" />
-        <!-- Pages hand questions to the O2 AI panel (AIO-36 "Explain"); MainLayout listens here. -->
-        <router-view
-          v-else
-          @send-to-ai-chat="(...args: unknown[]) => emit('sendToAiChat', ...args)"
-        />
+        <!-- Pages hand questions to the O2 AI panel (AIO-36 "Explain"); MainLayout listens here.
+             Only a page that declares the event gets the listener: on the others it is an
+             extraneous attribute, which Vue warns about on a fragment-root page. -->
+        <router-view v-else v-slot="{ Component }">
+          <component :is="Component" v-bind="aiChatListener(Component)" />
+        </router-view>
       </div>
     </section>
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, provide, ref, watch } from "vue";
+import { computed, provide, ref, watch, type VNode } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -143,6 +144,13 @@ import OnlineEvalsDisabled from "@/components/OnlineEvalsDisabled.vue";
 import { AI_SECTION_TABS } from "@/enterprise/components/AIObservability/aiSectionTabs";
 
 const emit = defineEmits<{ (e: "sendToAiChat", ...args: unknown[]): void }>();
+
+const forwardToAiChat = (...args: unknown[]) => emit("sendToAiChat", ...args);
+function aiChatListener(page: VNode | undefined) {
+  const emits = (page?.type as { emits?: string[] | Record<string, unknown> } | undefined)?.emits;
+  const declared = Array.isArray(emits) ? emits.includes("sendToAiChat") : !!emits?.sendToAiChat;
+  return declared ? { onSendToAiChat: forwardToAiChat } : {};
+}
 
 /** The same mark the primary nav uses for this module, so the collapsed rail
  *  still says which module it belongs to. */

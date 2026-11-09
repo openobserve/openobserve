@@ -13,15 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { escapeSingleQuotes } from "@/utils/queryUtils";
-
 export type LikePosition = "start" | "end" | "contains";
 
-// The backend parses these filter strings with sqlparser-rs's PostgreSqlDialect,
-// which does not support backslash string-literal escapes — doubling an embedded
-// single quote is the only escaping a '...' literal needs or accepts.
-export const sqlLiteral = (value: unknown): string =>
-  `'${escapeSingleQuotes(String(value ?? ""))}'`;
+// The backend parses these strings with sqlparser-rs's PostgreSqlDialect,
+// which has no backslash escapes, so doubling `'` is enough for one parse. The
+// search service then re-serialises the parsed SQL, and that writes a `'` that
+// follows a `\` or another `'` without doubling it: `a\'b` would come back as
+// `'a\'b'`, which ends the literal after `a\`. Such a value is split at those
+// spots into literals joined with `||` (same rule as Rust's `quote_sql_string`).
+export const sqlLiteral = (value: unknown): string => {
+  const pieces = String(value ?? "")
+    .split(/(?<=[\\'])(?=')/)
+    .map((piece) => `'${piece.replace(/'/g, "''")}'`);
+  return pieces.length > 1 ? `(${pieces.join(" || ")})` : pieces[0];
+};
 
 // The SQL parser returns a quoted literal's value with its doubled quotes intact.
 export const unescapeSqlLiteral = (value: unknown): string => String(value).replace(/''/g, "'");
@@ -65,15 +70,15 @@ export const sqlIn = (fieldName: string, values: unknown[]): string =>
 export const escapeLikeWildcards = (value: string): string => value.replace(/[\\%_]/g, "\\$&");
 
 const likePattern = (value: unknown, position: LikePosition, escapeWildcards: boolean): string => {
-  const text = String(value ?? "");
-  const escaped = escapeSingleQuotes(escapeWildcards ? escapeLikeWildcards(text) : text);
+  const raw = String(value ?? "");
+  const text = escapeWildcards ? escapeLikeWildcards(raw) : raw;
   switch (position) {
     case "start":
-      return `${escaped}%`;
+      return `${text}%`;
     case "end":
-      return `%${escaped}`;
+      return `%${text}`;
     default:
-      return `%${escaped}%`;
+      return `%${text}%`;
   }
 };
 
@@ -84,7 +89,7 @@ export const sqlLike = (
   negate = false,
   escapeWildcards = false,
 ): string =>
-  `${fieldName} ${negate ? "NOT LIKE" : "LIKE"} '${likePattern(value, position, escapeWildcards)}'`;
+  `${fieldName} ${negate ? "NOT LIKE" : "LIKE"} ${sqlLiteral(likePattern(value, position, escapeWildcards))}`;
 
 export const sqlIsNull = (fieldName: string, negate = false): string =>
   `${fieldName} ${negate ? "IS NOT" : "IS"} NULL`;

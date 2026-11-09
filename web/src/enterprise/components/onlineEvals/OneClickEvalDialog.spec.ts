@@ -27,7 +27,15 @@ const { push, executeQueryOnce, pricingTest } = vi.hoisted(() => ({
   pricingTest: vi.fn(),
 }));
 
-vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+vi.mock("vue-router", () => ({
+  useRouter: () => ({
+    push,
+    currentRoute: { value: { path: "/ai/evaluations", query: { tab: "quality" } } },
+    resolve: (to: { path: string; query: Record<string, string> }) => ({
+      fullPath: `${to.path}?${new URLSearchParams(to.query)}`,
+    }),
+  }),
+}));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/plugins/traces/composables/useLLMStreamQuery", () => ({
   useLLMStreamQuery: () => ({ executeQueryOnce }),
@@ -128,7 +136,8 @@ describe("OneClickEvalDialog", () => {
     });
   });
 
-  it("sends Add provider to the LLM Providers page", async () => {
+  // J2-06: after saving the provider the user comes back to the reopened dialog.
+  it("sends Add provider to the LLM Providers page with a way back to the dialog", async () => {
     await mountDialog();
 
     (
@@ -137,7 +146,11 @@ describe("OneClickEvalDialog", () => {
 
     expect(push).toHaveBeenCalledWith({
       name: "llmProviders",
-      query: { org_identifier: "default", action: "add" },
+      query: {
+        org_identifier: "default",
+        action: "add",
+        return_to: "/ai/evaluations?tab=quality&one_click=1",
+      },
     });
   });
 });

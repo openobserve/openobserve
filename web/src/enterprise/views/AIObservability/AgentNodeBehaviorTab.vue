@@ -109,6 +109,8 @@
       :source-stream="sourceStream"
       :start-time="startTime"
       :end-time="endTime"
+      :agent-env="nodeScope.env"
+      :agent-version="nodeScope.version"
     />
   </div>
 </template>
@@ -123,6 +125,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 import { formatTokens } from "@/utils/llmUtils";
 import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
+import { buildFailureRows, buildLoopRows, matchesAgentScope } from "./agentScope";
 
 const props = defineProps<{
   /** The clicked agent's resolved name (from the graph node identity). */
@@ -130,6 +133,8 @@ const props = defineProps<{
   sourceStream?: string;
   startTime?: number;
   endTime?: number;
+  /** Agent Graph's Agent-mode selection; applies when it is this node's agent. */
+  agentScope?: { name: string; env: string | null; version: string | null } | null;
 }>();
 
 const { t } = useI18nTyped();
@@ -143,39 +148,28 @@ const detailRow = ref<any>(null);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 
-/** Only this agent's signals — the drawer/page already resolve agent names the
- *  same way, so a name match is the scoping key (see design §4b id-vs-name note). */
-const mySignals = computed(() =>
-  signals.value.filter((s) => (s.agent_name ?? "") === props.agentName),
+/** The page's Agent-mode env/version when the clicked node is that agent;
+ *  otherwise open (null). UNSET = "not set". */
+const nodeScope = computed(() =>
+  props.agentScope && props.agentScope.name === props.agentName
+    ? { env: props.agentScope.env, version: props.agentScope.version }
+    : { env: null, version: null },
 );
 
+/** Only this agent's signals, narrowed to the page's env/version — the drawer
+ *  and page resolve agent names the same way, so a name match is the scoping
+ *  key (see design §4b id-vs-name note). */
+const mySignals = computed(() =>
+  signals.value.filter((s) => matchesAgentScope(s, { name: props.agentName, ...nodeScope.value })),
+);
+
+// One row per tool / failure class over the range, as on the Agent Behavior page.
 const loopRows = computed(() =>
-  mySignals.value
-    .filter((s) => s.signal_type === "loop")
-    .map((s) => ({
-      agent: props.agentName,
-      agentRaw: s.agent_name ?? props.agentName ?? null,
-      tool: s.tool_name ?? "",
-      calls: s.calls ?? 0,
-      traces: s.distinct_traces ?? 0,
-      ratio:
-        s.distinct_traces && s.distinct_traces > 0
-          ? Math.round(((s.calls ?? 0) / s.distinct_traces) * 100) / 100
-          : 0,
-    }))
-    .sort((a, b) => b.ratio - a.ratio),
+  buildLoopRows(mySignals.value, t("aiObservability.behavior.unknownAgent")),
 );
 
 const failureRows = computed(() =>
-  mySignals.value
-    .filter((s) => s.signal_type === "failure")
-    .map((s) => ({
-      agent: props.agentName,
-      agentRaw: s.agent_name ?? props.agentName ?? null,
-      failClass: s.fail_class ?? "unclassified",
-      count: s.count ?? 0,
-    }))
-    .sort((a, b) => b.count - a.count),
+  buildFailureRows(mySignals.value, t("aiObservability.behavior.unknownAgent")),
 );
 
 /** Cost is a headline summary, not a table (design §2). */

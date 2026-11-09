@@ -5,8 +5,8 @@
       :org-id="orgId"
       :mode="formPage.mode"
       :row="formPage.row"
-      @saved="handleSaved"
-      @cancel="closeForm"
+      @saved="leaveForm"
+      @cancel="leaveForm"
     />
 
     <OPageLayout
@@ -226,6 +226,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
+import { isSameOriginRedirect } from "@/utils/safeUrl";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -397,15 +398,20 @@ function openEdit(row: Provider) {
   pushRouteAction({ action: "update", id: String(row.id) });
 }
 
-function closeForm() {
-  formPage.value = null;
-  clearRouteAction();
+// Saved (the save mutation's `invalidates` already refetches the list) or
+// cancelled. A caller that sent the user here to add a provider (the one-click
+// evaluate dialog) passes `return_to`; closing the form goes back there. Only an
+// in-app path is followed.
+function returnTarget(): string | null {
+  const to = route.query.return_to;
+  return typeof to === "string" && to.startsWith("/") && isSameOriginRedirect(to) ? to : null;
 }
 
-// The save mutation's `invalidates` already refetches the list.
-function handleSaved() {
+function leaveForm() {
   formPage.value = null;
-  clearRouteAction();
+  const to = returnTarget();
+  if (to) router.push(to).catch(() => {});
+  else clearRouteAction();
 }
 
 function syncFromRoute() {

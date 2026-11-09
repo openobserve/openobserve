@@ -71,6 +71,12 @@ export interface LLMPanelQuery {
    * - "cost": prefix with `$` and use 2-decimal precision in tooltips.
    */
   valueFormat?: LLMValueFormat;
+  /**
+   * Keep only the `n` series with the largest window total (a stream can carry
+   * dozens of models). `others` folds the rest into one "others" series, for
+   * values that add up (cost); percentiles do not, so latency drops the rest.
+   */
+  topSeries?: { n: number; others: boolean };
 }
 
 export interface LLMPanelLayout {
@@ -121,6 +127,7 @@ const baseFilter = `gen_ai_operation_name IS NOT NULL`;
 const COST_FIELD = `gen_ai_usage_cost`;
 const INPUT_TOKENS_FIELD = `gen_ai_usage_input_tokens`;
 const OUTPUT_TOKENS_FIELD = `gen_ai_usage_output_tokens`;
+const TOTAL_TOKENS_FIELD = `gen_ai_usage_total_tokens`;
 const MODEL_FIELD = `gen_ai_response_model`;
 const OBSERVATION_TYPE_FIELD = `gen_ai_operation_name`;
 
@@ -154,6 +161,37 @@ export function llmCallUsageSum(column: string): string {
   const ops = GENERATION_GEN_AI_OPERATIONS.map((op) => `'${op}'`).join(", ");
   const predicate = `(${OBSERVATION_TYPE_FIELD} IS NULL OR ${OBSERVATION_TYPE_FIELD} IN (${ops}))`;
   return `SUM(CASE WHEN ${predicate} THEN ${column} ELSE 0 END)`;
+}
+
+/** The largest `invoke_agent` span's usage: the outermost agent's rollup. */
+export const agentSpanUsage = (column: string) =>
+  `MAX(CASE WHEN ${OBSERVATION_TYPE_FIELD} = 'invoke_agent' THEN ${column} END)`;
+
+/**
+ * Inside `GROUP BY trace_id`: the agent-span usage a trace's total falls back
+ * to when none of its LLM calls carries any (`traceUsageSum`), else 0. That
+ * usage has no LLM call to take a model from, so per-model views show it as
+ * unattributed.
+ */
+export const agentFallbackUsage = (column: string) =>
+  `CASE WHEN COALESCE(${llmCallUsageSum(column)}, 0) = 0 ` +
+  `THEN COALESCE(${agentSpanUsage(column)}, 0) ELSE 0 END`;
+
+/**
+ * The traces whose usage is only on their agent span, one row each, placed in
+ * the bucket of their first span. A trace is judged whole, not per bucket, so a
+ * trace whose agent span and LLM calls fall in different buckets never counts
+ * twice. Its first span's time is projected as `first_ts` (the search layer
+ * forbids aliasing `_timestamp`), which the outer `histogram(first_ts, …)` buckets.
+ */
+function agentOnlyTracesSql(columns: Array<[string, string]>, havingColumn: string): string {
+  const projected = columns.map(([col, alias]) => `${agentFallbackUsage(col)} as ${alias}`);
+  return `
+    SELECT trace_id, MIN(_timestamp) as first_ts, ${projected.join(", ")}
+    FROM {{stream}}
+    WHERE trace_id IS NOT NULL{{scope}}
+    GROUP BY trace_id
+    HAVING ${agentFallbackUsage(havingColumn)} > 0`;
 }
 
 // Top to bottom: is it healthy (traffic with its errors, latency), what is
@@ -232,6 +270,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       // The alias is the axis label; the unit formatter adds ms / s.
       valueField: "p95",
       valueFormat: "latency-ms",
+      topSeries: { n: 10, others: false },
     },
   },
   {
@@ -303,21 +342,31 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     query: {
       // Cost field populated by the backend extractor from
       // gen_ai.usage.cost / Langfuse cost_details — same source the Traces
-      // tab uses.
+      // tab uses. Each model's LLM-call cost per bucket, plus the traces whose
+      // cost is only on their agent span as the unattributed series, so the
+      // bars add up to the Total Cost tile (the rule of `traceUsageSum`).
       sql: `
-        SELECT
-          histogram(_timestamp, '{{interval}}') as ts,
-          ${MODEL_FIELD} as model,
-          COALESCE(${llmCallUsageSum(COST_FIELD)}, 0) as cost
-        FROM {{stream}}
-        WHERE ${modelScopedFilter}
-        GROUP BY ts, ${MODEL_FIELD}
+        SELECT ts, model, SUM(cost) as cost
+        FROM (
+          SELECT
+            histogram(_timestamp, '{{interval}}') as ts,
+            ${MODEL_FIELD} as model,
+            COALESCE(${llmCallUsageSum(COST_FIELD)}, 0) as cost
+          FROM {{stream}}
+          WHERE ${modelScopedFilter}{{scope}}
+          GROUP BY ts, ${MODEL_FIELD}
+          UNION ALL
+          SELECT histogram(first_ts, '{{interval}}') as ts, {{unattributed}} as model, cost
+          FROM (${agentOnlyTracesSql([[COST_FIELD, "cost"]], COST_FIELD)})
+        )
+        GROUP BY ts, model
         ORDER BY ts
       `,
       timeField: "ts",
       seriesField: "model",
       valueField: "cost",
       valueFormat: "cost",
+      topSeries: { n: 10, others: true },
     },
   },
   {
@@ -330,14 +379,28 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     drill: {},
     query: {
       // Input and output tokens of LLM calls per bucket, stacked: together they
-      // are the bucket's total.
+      // are the bucket's total. A trace whose tokens are only on its agent span
+      // counts those, as the Total Tokens tile does.
       sql: `
-        SELECT
-          histogram(_timestamp, '{{interval}}') as ts,
-          COALESCE(${llmCallUsageSum(INPUT_TOKENS_FIELD)}, 0) as input_tokens,
-          COALESCE(${llmCallUsageSum(OUTPUT_TOKENS_FIELD)}, 0) as output_tokens
-        FROM {{stream}}
-        WHERE ${baseFilter}
+        SELECT ts, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens
+        FROM (
+          SELECT
+            histogram(_timestamp, '{{interval}}') as ts,
+            COALESCE(${llmCallUsageSum(INPUT_TOKENS_FIELD)}, 0) as input_tokens,
+            COALESCE(${llmCallUsageSum(OUTPUT_TOKENS_FIELD)}, 0) as output_tokens
+          FROM {{stream}}
+          WHERE ${baseFilter}{{scope}}
+          GROUP BY ts
+          UNION ALL
+          SELECT histogram(first_ts, '{{interval}}') as ts, input_tokens, output_tokens
+          FROM (${agentOnlyTracesSql(
+            [
+              [INPUT_TOKENS_FIELD, "input_tokens"],
+              [OUTPUT_TOKENS_FIELD, "output_tokens"],
+            ],
+            TOTAL_TOKENS_FIELD,
+          )})
+        )
         GROUP BY ts
         ORDER BY ts
       `,
@@ -360,6 +423,9 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
  *   {{endTime}}    → numeric microseconds, unquoted
  *   {{interval}}   → bucket width string ("5 minutes", "1 hour", etc.) — used
  *                                    only inside `histogram(_timestamp, '…')`
+ *   {{scope}}      → ` AND (<agentFilter>)`, or nothing: a template with several
+ *                                    WHEREs (a UNION) marks each one to scope
+ *   {{unattributed}} → the quoted series name for usage with no model
  *
  * @example
  *   renderPanelSql(
@@ -378,15 +444,24 @@ export function renderPanelSql(
     // Bare agent predicate (no leading AND). Empty = "All Agents".
     // Auto-spliced into each panel's WHERE (see below).
     agentFilter?: string;
+    /** Translated name of the series for usage with no model ({{unattributed}}). */
+    unattributedLabel?: string;
   },
 ): string {
+  const marked = sql.includes("{{scope}}");
   const rendered = sql
     .replace(/\{\{stream\}\}/g, `"${ctx.stream}"`)
     .replace(/\{\{startTime\}\}/g, String(ctx.startTime))
     .replace(/\{\{endTime\}\}/g, String(ctx.endTime))
-    .replace(/\{\{interval\}\}/g, ctx.interval);
+    .replace(/\{\{interval\}\}/g, ctx.interval)
+    // Function replacers: a `$` in a user's filter or label is not a replacement pattern.
+    .replace(/\{\{scope\}\}/g, () => (ctx.agentFilter ? ` AND (${ctx.agentFilter})` : ""))
+    .replace(
+      /\{\{unattributed\}\}/g,
+      () => `'${(ctx.unattributedLabel ?? "Unattributed").replace(/'/g, "''")}'`,
+    );
 
-  if (!ctx.agentFilter) return compactSql(rendered);
+  if (!ctx.agentFilter || marked) return compactSql(rendered);
 
   // Append the agent predicate to the query's WHERE clause. Every panel has
   // exactly one flat WHERE, so we splice ` AND

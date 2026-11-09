@@ -27,6 +27,9 @@ const mockListAgents = vi.fn();
 const mockStripHarness = vi.fn();
 const mockSearch = vi.fn();
 const mockToast = vi.fn();
+const mockGetStream = vi.fn();
+/** The part of a `searchService.search` call the tests read. */
+type SearchArgs = { query: { query: { sql: string } } };
 
 vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
   default: {
@@ -45,6 +48,10 @@ vi.mock("@/services/gen-ai-agent-mapping.queries", () => ({
 
 vi.mock("@/services/search", () => ({
   default: { search: (...args: unknown[]) => mockSearch(...args) },
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: (...args: unknown[]) => mockGetStream(...args) }),
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
@@ -88,6 +95,10 @@ describe("GenAiAgentMappingSettings", () => {
     mockStripHarness.mockReset();
     mockSearch.mockReset();
     mockToast.mockReset();
+    mockGetStream.mockReset();
+    mockGetStream.mockResolvedValue({
+      schema: [{ name: "gen_ai_conversation_id" }, { name: "gen_ai_input_messages" }],
+    });
   });
 
   // Before, a failed read seeded an empty form that Save would write over the stored mapping.
@@ -202,6 +213,151 @@ describe("GenAiAgentMappingSettings", () => {
       );
       expect(wrapper.find('[data-test="gen-ai-harness-result-0"]').exists()).toBe(false);
     });
+
+    const omp = "<job>nightly</job>\nomp ask";
+    const task = "<job>sub</job>\ntask ask";
+    async function mountTwoRows() {
+      mockGet.mockResolvedValue({
+        ...config(["my.agent"]),
+        harness_patterns: [
+          { agent: "omp", patterns: ["tag job"] },
+          { agent: "task", patterns: ["tag job"] },
+        ],
+      });
+      const wrapper = await mountPage();
+      mockListAgents.mockResolvedValue({
+        agents: [
+          { name: "omp", source_stream: "default", source_stream_type: "traces" },
+          { name: "task", source_stream: "default", source_stream_type: "traces" },
+        ],
+      });
+      mockSearch.mockImplementation(async ({ query }: SearchArgs) => ({
+        data: {
+          hits: [
+            {
+              input: JSON.stringify([
+                { role: "user", content: query.query.sql.includes("'task'") ? task : omp },
+              ]),
+            },
+          ],
+        },
+      }));
+      mockStripHarness.mockImplementation(async (_org: string, _p: string[], texts: string[]) =>
+        texts.map((t) => ({ text: t.split("\n")[1], hidden: 1, only: null })),
+      );
+      return wrapper;
+    }
+    const runTest = async (wrapper: VueWrapper, i: number) => {
+      await wrapper.find(`[data-test="gen-ai-harness-test-${i}"]`).trigger("click");
+      await flushPromises();
+    };
+    const resultText = (wrapper: VueWrapper, i: number) => {
+      const result = wrapper.find(`[data-test="gen-ai-harness-result-${i}"]`);
+      return result.exists() ? result.text() : null;
+    };
+
+    // TS-11: results were keyed by row index, so the next row inherited a removed row's result.
+    it("keeps a result with its row when another row is removed", async () => {
+      const wrapper = await mountTwoRows();
+      await runTest(wrapper, 0);
+      expect(resultText(wrapper, 0)).toContain("omp ask");
+      await wrapper.find('[data-test="gen-ai-harness-remove-0"]').trigger("click");
+      expect(resultText(wrapper, 0)).toBeNull();
+
+      await runTest(wrapper, 0);
+      expect(resultText(wrapper, 0)).toContain("task ask");
+    });
+
+    it("keeps the later row's result when an earlier row is removed", async () => {
+      const wrapper = await mountTwoRows();
+      await runTest(wrapper, 1);
+      await wrapper.find('[data-test="gen-ai-harness-remove-0"]').trigger("click");
+      expect(resultText(wrapper, 0)).toContain("task ask");
+    });
+
+    it("drops a result once the row's patterns or agent change", async () => {
+      const wrapper = await mountTwoRows();
+      await runTest(wrapper, 0);
+      await runTest(wrapper, 1);
+      await wrapper.find('[data-test="gen-ai-harness-defaults-0"]').trigger("click");
+      expect(resultText(wrapper, 0)).toBeNull();
+      expect(resultText(wrapper, 1)).toContain("task ask");
+
+      const patterns1 = wrapper.find('[data-test="gen-ai-harness-patterns-1"] textarea');
+      // Only a blank line added: still the same patterns.
+      await patterns1.setValue("tag job\n");
+      expect(resultText(wrapper, 1)).toContain("task ask");
+      await wrapper.find('[data-test="gen-ai-harness-agent-1"] input').setValue("task2");
+      expect(resultText(wrapper, 1)).toBeNull();
+    });
+
+    // TS-11: the query hard-coded gen_ai_conversation_id and took any 15 sessions.
+    it("groups by the stream's session column and takes the newest sessions", async () => {
+      mockGet.mockResolvedValue({
+        ...config(["my.agent"]),
+        harness_patterns: [{ agent: "omp", patterns: ["tag job"] }],
+      });
+      const wrapper = await mountPage();
+      mockListAgents.mockResolvedValue({
+        agents: [
+          { name: "omp", source_stream: "older", source_stream_type: "traces" },
+          { name: "omp", source_stream: "newer", source_stream_type: "traces" },
+          { name: "omp", source_stream: "no_sessions", source_stream_type: "traces" },
+        ],
+      });
+      mockGetStream.mockImplementation(async (stream: string) => ({
+        schema:
+          stream === "no_sessions"
+            ? [{ name: "gen_ai_input_messages" }]
+            : [{ name: "session_id" }, { name: "gen_ai_input_messages" }],
+      }));
+      const hit = (content: string, lastStart: number) => ({
+        input: JSON.stringify([{ role: "user", content }]),
+        last_start: lastStart,
+      });
+      mockSearch.mockImplementation(async ({ query }: SearchArgs) => ({
+        data: {
+          hits: query.query.sql.includes('"older"') ? [hit("old", 1)] : [hit("new", 2)],
+        },
+      }));
+      mockStripHarness.mockResolvedValue([
+        { text: "new", hidden: 0, only: null },
+        { text: "old", hidden: 0, only: null },
+      ]);
+      await runTest(wrapper, 0);
+
+      expect(mockSearch).toHaveBeenCalledTimes(2);
+      for (const [{ query }] of mockSearch.mock.calls as [SearchArgs][]) {
+        expect(query.query.sql).toContain('GROUP BY "session_id" ORDER BY MAX(start_time) DESC');
+        expect(query.query.sql).not.toContain("gen_ai_conversation_id");
+      }
+      expect(mockStripHarness).toHaveBeenCalledWith(
+        expect.any(String),
+        ["tag job"],
+        ["new", "old"],
+      );
+      expect(resultText(wrapper, 0)).toContain("0 of 2 recent sessions match");
+    });
+  });
+
+  // A2-04: two rows for one agent saved two rules that the list and Session Detail read differently.
+  it("refuses to save two rows for the same agent", async () => {
+    mockGet.mockResolvedValue({
+      ...config(["my.agent"]),
+      harness_patterns: [{ agent: "omp", patterns: ["tag job"] }],
+    });
+    const wrapper = await mountPage();
+    await wrapper.find('[data-test="gen-ai-harness-add-agent"]').trigger("click");
+    await wrapper.find('[data-test="gen-ai-harness-agent-1"] input').setValue(" omp ");
+    await wrapper.find('[data-test="gen-ai-harness-patterns-1"] textarea').setValue("tag x");
+    expect(saveButton(wrapper).attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="gen-ai-harness-agent-1"]').text()).toContain(
+      "This agent has another row",
+    );
+
+    await wrapper.find('[data-test="gen-ai-harness-agent-1"] input').setValue("task");
+    expect(saveButton(wrapper).attributes("disabled")).toBeUndefined();
+    expect(wrapper.text()).not.toContain("This agent has another row");
   });
 
   it("shows the server's message when save rejects a pattern", async () => {

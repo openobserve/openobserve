@@ -37,9 +37,12 @@
         v-else
         class="eval-test-panel__empty text-text-secondary border-border-default rounded-default bg-surface-base [&_code]:text-text-body border px-3 py-2.5 text-xs [&_code]:font-mono [&_code]:font-semibold"
       >
-        {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="raw('{{ input }}')" />{{
-          t("onlineEvals.scorer.testPanel.emptySuffix")
-        }}
+        <template v-if="free">{{ t("onlineEvals.scorer.testPanel.emptyCode") }}</template>
+        <template v-else>
+          {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="raw('{{ input }}')" />{{
+            t("onlineEvals.scorer.testPanel.emptySuffix")
+          }}
+        </template>
       </div>
 
       <!-- Run -->
@@ -49,7 +52,7 @@
           size="sm-action"
           :loading="state === 'running'"
           :disabled="state === 'running' || !canRun"
-          :title="canRun ? undefined : t('onlineEvals.scorer.testPanel.disabledHint')"
+          :title="canRun ? undefined : disabledHint"
           data-test="scorer-test-run-btn"
           @click="$emit('run')"
         >
@@ -60,7 +63,7 @@
           class="text-2xs text-text-secondary italic"
           data-test="scorer-test-disabled-hint"
         >
-          {{ t("onlineEvals.scorer.testPanel.disabledHint") }}
+          {{ disabledHint }}
         </span>
       </div>
 
@@ -199,6 +202,12 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+// A Code scorer has no provider and no template variables to fill in.
+const disabledHint = computed(() =>
+  props.free
+    ? t("onlineEvals.scorer.testPanel.disabledHintCode")
+    : t("onlineEvals.scorer.testPanel.disabledHint"),
+);
 
 function updateInput(variable: string, value: string) {
   emit("update:inputs", { ...props.inputs, [variable]: value });

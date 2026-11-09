@@ -23,6 +23,7 @@ vi.mock("vue-i18n", () => ({
 }));
 
 import AgentNodeBehaviorTab from "./AgentNodeBehaviorTab.vue";
+import type { FailureRow, LoopRow } from "./agentScope";
 
 const cost = (agent: string, c: number, tokens: number, errors = 0) => ({
   signal_type: "cost",
@@ -53,6 +54,73 @@ describe("AgentNodeBehaviorTab — cost headline", () => {
     expect(summary.cost).toBe("$3.75");
     expect(summary.tokens).toBe("2.5K");
     expect(summary.errors).toBe(3);
+  });
+
+  it("follows the page's Agent-mode env when the node is that agent", async () => {
+    mockGetAgentSignals.mockReset().mockResolvedValue({
+      data: {
+        signals: [
+          { ...cost("support-bot", 0.01, 1000), gen_ai_agent_env: "production" },
+          { ...cost("support-bot", 0.03, 5000, 1), gen_ai_agent_env: null },
+        ],
+      },
+    });
+    const mountFor = (agentScope: object) =>
+      mount(AgentNodeBehaviorTab, {
+        props: { agentName: "support-bot", sourceStream: "default", agentScope },
+        global: { stubs: { OTable: true, OTag: true, AgentSignalDetailPanel: true } },
+      });
+    const prod = mountFor({ name: "support-bot", env: "production", version: null });
+    const other = mountFor({ name: "research-agent", env: "production", version: null });
+    await flushPromises();
+
+    expect((prod.vm as any).costSummary).toMatchObject({ cost: "$0.01", errors: 0 });
+    // Another agent's selection leaves this node unscoped.
+    expect((other.vm as any).costSummary).toMatchObject({ cost: "$0.04", errors: 1 });
+  });
+});
+
+describe("AgentNodeBehaviorTab — loop and failure rows", () => {
+  it("lists one row per tool and failure class over the range, not per rollup record", async () => {
+    const loop = (calls: number, traces: number, env: string | null) => ({
+      signal_type: "loop",
+      agent_name: "support-bot",
+      gen_ai_agent_env: env,
+      tool_name: "refund_order",
+      calls,
+      distinct_traces: traces,
+    });
+    const failure = (count: number, env: string | null) => ({
+      signal_type: "failure",
+      agent_name: "support-bot",
+      gen_ai_agent_env: env,
+      fail_class: "timeout",
+      count,
+    });
+    mockGetAgentSignals.mockReset().mockResolvedValue({
+      data: {
+        signals: [
+          loop(4, 2, null),
+          loop(1, 1, null),
+          loop(5, 1, "production"),
+          failure(2, null),
+          failure(3, "production"),
+          { ...failure(7, null), agent_name: "other-bot" },
+        ],
+      },
+    });
+    const wrapper = mount(AgentNodeBehaviorTab, {
+      props: { agentName: "support-bot", sourceStream: "default", startTime: 1, endTime: 2 },
+      global: { stubs: { OTable: true, OTag: true, AgentSignalDetailPanel: true } },
+    });
+    await flushPromises();
+
+    // Script-setup state; the component exposes nothing.
+    const vm = wrapper.vm as unknown as { loopRows: LoopRow[]; failureRows: FailureRow[] };
+    expect(vm.loopRows.map((r) => [r.tool, r.calls, r.traces, r.ratio])).toEqual([
+      ["refund_order", 10, 4, 2.5],
+    ]);
+    expect(vm.failureRows.map((r) => [r.failClass, r.count])).toEqual([["timeout", 5]]);
   });
 });
 

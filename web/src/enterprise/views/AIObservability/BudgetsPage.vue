@@ -51,13 +51,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm"
           icon-left="add"
-          :disabled="!!forbidden"
+          :disabled="noStream || !!forbidden"
           data-test="ai-budgets-new"
           @click="openNew"
         >
           {{ t("aiBudgets.new") }}
         </OButton>
       </div>
+
+      <!-- Spend is read from an LLM trace stream; without one nothing can be budgeted. -->
+      <OBanner
+        v-if="noStream"
+        variant="info"
+        icon="info"
+        dense
+        text-size="small"
+        data-test="ai-budgets-no-stream"
+      >
+        {{ t("aiBudgets.noStream") }}
+      </OBanner>
 
       <!-- One compact line, as the page's other notes: the message, then its action. -->
       <OBanner
@@ -69,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         text-size="small"
         data-test="ai-budgets-unpriced"
       >
-        {{ t("aiBudgets.unpriced", { n: unpricedTraces }) }}
+        {{ t("aiBudgets.unpriced", { n: unpricedTraces }, unpricedTraces) }}
         <template #actions>
           <OButton
             variant="outline"
@@ -289,6 +301,8 @@ import {
   budgetNameTaken,
   budgetReading,
   budgetSql,
+  budgetSummarySql,
+  formatBudgetUsd,
   isEach,
   isLegacyBudgetAlert,
   mergeLegacyBudgets,
@@ -333,6 +347,9 @@ const lastRunAt = ref<number | null>(null);
 const unpricedTraces = ref(0);
 // The user cannot read alert folders, where budgets are stored.
 const forbidden = ref<ForbiddenState>(false);
+// Set once the stream list is read: the org has no LLM trace stream to budget.
+const streamsLoaded = ref(false);
+const noStream = computed(() => streamsLoaded.value && !availableStreams.value.length);
 // The month the banner counted over; the gaps page lists the same window
 // (it defaults to the last 24 hours, which missed older unpriced calls).
 const unpricedWindow = ref<TimeWindow | null>(null);
@@ -437,26 +454,32 @@ const columns: OTableColumnDef[] = [
 
 function scopeLabel(b: BudgetDef) {
   const period = t(`aiBudgets.periods.${b.period}`);
+  // The table lists every stream's budgets: each row names the stream it reads.
   return isEach(b.scope)
-    ? t("aiBudgets.eachScope", { scope: t(`aiBudgets.scopes.${b.scope}`), period })
+    ? t("aiBudgets.eachScope", {
+        scope: t(`aiBudgets.scopes.${b.scope}`),
+        period,
+        stream: b.stream,
+      })
     : t("aiBudgets.valueScope", {
         scope: t(`aiBudgets.scopes.${b.scope}`),
         value: b.value,
         period,
+        stream: b.stream,
       });
 }
 
 function spentLabel(r: Row) {
   return isEach(r.scope)
     ? t("aiBudgets.spentEach", {
-        limit: `$${r.limitUsd}`,
+        limit: formatBudgetUsd(r.limitUsd),
         over: r.over,
         keys: r.keys,
-        largest: `$${r.shown.toFixed(2)}`,
+        largest: formatBudgetUsd(r.shown),
       })
     : t("aiBudgets.spentOf", {
-        spent: `$${r.spent.toFixed(2)}`,
-        limit: `$${r.limitUsd}`,
+        spent: formatBudgetUsd(r.spent),
+        limit: formatBudgetUsd(r.limitUsd),
         pct: r.limitUsd > 0 ? Math.round((r.spent / r.limitUsd) * 100) : 0,
       });
 }
@@ -469,11 +492,9 @@ function stateVariant(r: Row): BadgeVariant {
 
 function stateLabel(r: Row) {
   if (!r.state) return t("aiBudgets.states.unknown");
-  return t(
-    `aiBudgets.states.${r.state}`,
-    { n: r.over },
-    r.state === "over" && isEach(r.scope) ? r.over : 0,
-  );
+  // "N over" counts keys of a per-key budget; a one-value budget is just "Over".
+  const n = r.state === "over" && isEach(r.scope) ? r.over : 0;
+  return t(`aiBudgets.states.${r.state}`, { n }, n);
 }
 
 // A plain-text error body (the alerts API's 422) is the message itself.
@@ -497,6 +518,7 @@ async function folderId(create: boolean): Promise<string | null> {
 
 async function reload() {
   await loadScope(timeRange.value.startTime, timeRange.value.endTime);
+  streamsLoaded.value = true;
   loading.value = true;
   forbidden.value = false;
   try {
@@ -536,7 +558,7 @@ async function reload() {
     rows.value = await Promise.all(
       defs.map(async (b) => {
         const result = await executeQuery(
-          budgetSql(b, 100),
+          isEach(b.scope) ? budgetSummarySql(b) : budgetSql(b),
           now - PERIOD_MINUTES[b.period] * 60_000_000,
           now,
         ).then((hits) => hits as BudgetRow[], spendError);

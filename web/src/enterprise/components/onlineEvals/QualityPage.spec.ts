@@ -44,7 +44,7 @@ import QualityPage from "./QualityPage.vue";
 
 const TableStub = defineComponent({
   name: "QualityConfigsTable",
-  props: ["rows", "tiles", "search"],
+  props: ["rows", "tiles", "search", "forbidden"],
   emits: ["open", "update:search"],
   template: `<div data-test="table-stub">{{ rows.length }} rows</div>`,
 });
@@ -129,6 +129,23 @@ describe("QualityPage", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="table-stub"]').text()).toBe("2 rows");
     expect(wrapper.find('[data-test="detail-stub"]').exists()).toBe(false);
+  });
+
+  it("shows no access, not 'no score configs yet', when the config list is denied and nothing is shared", async () => {
+    list.mockResolvedValue([]);
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.findComponent(TableStub).props("forbidden")).toBe(false);
+    await wrapper.setProps({ configsForbidden: true });
+    expect(wrapper.findComponent(TableStub).props("forbidden")).toBe(true);
+  });
+
+  it("still lists the configs shared with a user whose config list is denied", async () => {
+    const wrapper = mountPage();
+    await wrapper.setProps({ configsForbidden: true });
+    await flushPromises();
+    expect(wrapper.findComponent(TableStub).props("forbidden")).toBe(false);
+    expect(wrapper.find('[data-test="table-stub"]').text()).toBe("2 rows");
   });
 
   it("keeps the config search across a visit to a config's detail", async () => {

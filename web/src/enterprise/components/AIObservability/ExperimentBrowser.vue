@@ -221,10 +221,8 @@
               variant="default-soft"
               :data-test="`ai-experiment-fold-${experiment.id}`"
             >
-              {{ t("experimentsAtScale.foldCount", { count: foldSize(experiment) }) }}
-              <OTooltip
-                :content="t('experimentsAtScale.foldTooltip', { count: foldSize(experiment) })"
-              />
+              {{ t("experimentsAtScale.foldCount", { count: foldTally(experiment).settled }) }}
+              <OTooltip :content="foldTooltip(experiment)" />
             </OTag>
           </div>
         </template>
@@ -244,10 +242,15 @@
                 class="text-text-secondary text-xs"
               >
                 {{
-                  t("experimentsAtScale.headline", {
-                    score: scoreColumnLabel(outcomeOf(row)!.headline, t),
-                    delta: signedPoints(outcomeOf(row)!.headline.delta),
-                  })
+                  t(
+                    outcomeOf(row)!.headline.relative
+                      ? "experimentsAtScale.headlineRelative"
+                      : "experimentsAtScale.headline",
+                    {
+                      score: scoreColumnLabel(outcomeOf(row)!.headline, t),
+                      delta: signedPoints(outcomeOf(row)!.headline.delta),
+                    },
+                  )
                 }}
               </OTruncatedText>
             </div>
@@ -277,13 +280,18 @@
                 :variant="OUTCOME_BADGES[deltaOf(row, column.key)!.outcome]"
                 :data-test="`ai-experiment-delta-${row.id}-${column.key}`"
               >
-                {{ raw(signedPoints(deltaOf(row, column.key)!.delta)) }}
+                {{ raw(signedDelta(deltaOf(row, column.key)!)) }}
                 <OTooltip
                   :content="
-                    t('experimentsAtScale.deltaTooltip', {
-                      delta: signedPoints(deltaOf(row, column.key)!.delta),
-                      threshold: COMPARISON_THRESHOLD * 100,
-                    })
+                    t(
+                      deltaOf(row, column.key)!.relative
+                        ? 'experimentsAtScale.deltaTooltipRelative'
+                        : 'experimentsAtScale.deltaTooltip',
+                      {
+                        delta: signedPoints(deltaOf(row, column.key)!.delta),
+                        threshold: COMPARISON_THRESHOLD * 100,
+                      },
+                    )
                   "
                 />
               </OTag>
@@ -295,15 +303,28 @@
             >
               {{ t("experimentsAtScale.spread", foldSpread(row, column.key)!) }}
             </span>
+            <span
+              v-if="scoreErrors(row, column.key)"
+              class="text-status-error-text text-xs"
+              :data-test="`ai-experiment-score-errors-${row.id}-${column.key}`"
+            >
+              {{
+                t(
+                  "experimentsAtScale.scoreErrors",
+                  { count: scoreErrors(row, column.key) },
+                  scoreErrors(row, column.key),
+                )
+              }}
+              <OTooltip :content="t('experimentsAtScale.scoreErrorsTooltip')" />
+            </span>
           </div>
         </template>
 
         <template #cell-status="{ row }">
-          <div
-            class="flex min-w-0 items-center gap-2"
-            :data-test="`ai-experiment-status-${row.id}`"
-          >
-            <template v-if="row.status === 'running'">
+          <!-- Notes sit on their own line under the chip: beside it, a 200 px
+               column cut "Latest re-run: Cancelled" to "Latest re-run: Can…". -->
+          <div class="flex min-w-0 flex-col" :data-test="`ai-experiment-status-${row.id}`">
+            <div v-if="row.status === 'running'" class="flex min-w-0 items-center gap-2">
               <OProgressBar
                 size="sm"
                 class="min-w-0 flex-1"
@@ -313,21 +334,36 @@
               <span class="text-text-secondary shrink-0 text-xs tabular-nums">
                 {{ progressLabel(row) }}
               </span>
-            </template>
+            </div>
             <template v-else>
-              <OTag
-                size="sm"
-                :variant="statusVariant(row.status, 'eval').variant"
-                :data-test="`ai-experiment-status-chip-${row.id}`"
+              <div class="flex min-w-0 items-center gap-2">
+                <OTag
+                  size="sm"
+                  :variant="statusVariant(row.status, 'eval').variant"
+                  :data-test="`ai-experiment-status-chip-${row.id}`"
+                >
+                  {{ statusVariant(row.status, "eval").label }}
+                </OTag>
+                <OTruncatedText v-if="visibleStatusReason(row)" class="text-text-secondary text-xs">
+                  {{ raw(visibleStatusReason(row)) }}
+                </OTruncatedText>
+              </div>
+              <span
+                v-if="taskFailures(row)"
+                class="text-status-error-text text-xs"
+                :data-test="`ai-experiment-task-failures-${row.id}`"
               >
-                {{ statusVariant(row.status, "eval").label }}
-              </OTag>
-              <OTruncatedText v-if="visibleStatusReason(row)" class="text-text-secondary text-xs">
-                {{ raw(visibleStatusReason(row)) }}
-              </OTruncatedText>
+                {{
+                  t(
+                    "experimentsAtScale.tasksFailed",
+                    { count: taskFailures(row), total: row.taskOutcomes?.total ?? 0 },
+                    taskFailures(row),
+                  )
+                }}
+              </span>
               <span
                 v-if="newerIncompleteRuns.get(row.id)"
-                class="text-text-secondary shrink-0 text-xs"
+                class="text-text-secondary text-xs"
                 :data-test="`ai-experiment-newer-rerun-${row.id}`"
               >
                 {{
@@ -353,10 +389,7 @@
           <!-- No gap: icon-sm buttons are square hit targets that already carry
                their own whitespace, the same as the Alerts row actions. -->
           <div class="flex items-center">
-            <OTooltip
-              :content="t('aiObservability.experiments.baselineRequiresCompleted')"
-              :disabled="canSetBaseline(row)"
-            >
+            <OTooltip :content="baselineBlockedReason(row)" :disabled="canSetBaseline(row)">
               <OButton
                 size="icon-sm"
                 variant="ghost"
@@ -506,20 +539,24 @@ import {
   ciGroups,
   compareToBaseline,
   foldReruns,
+  isSettled,
   parseGroupBy,
   parseGroupSort,
   sameCases,
   scorePolicies,
   scoreSpread,
   sharedCaseComparison,
+  signedDelta,
   signedPoints,
   sortByRegressions,
+  tallyRuns,
   type BaselineOutcome,
   type CiGroup,
   type ExperimentGroupBy,
   type ExperimentGroupSort,
   type RunComparison,
   type RunFold,
+  type RunTally,
   type ScoreColumn,
   type ScorePolicy,
   type SharedCaseComparison,
@@ -760,8 +797,19 @@ const comparisons = computed(() => {
 const datasetRows = computed<DatasetRow[]>(() =>
   groups.value.map((group) => {
     const unsorted = foldReruns(group.experiments);
-    const folds =
+    const sorted =
       groupSort.value === "regressions" ? sortByRegressions(unsorted, comparisons.value) : unsorted;
+    const sections = ciGroups(sorted, groupBy.value, groupSort.value, comparisons.value);
+    // The row numbers follow the data's order, so the data takes the order the
+    // sections show; otherwise grouped rows read "02, 03, 04, 01".
+    const sectionIndex = new Map(sections.map((section, index) => [section.key, index]));
+    const folds = sections.length
+      ? [...sorted].sort(
+          (left, right) =>
+            (sectionIndex.get(ciGroupKey(left.latest, groupBy.value) ?? "") ?? 0) -
+            (sectionIndex.get(ciGroupKey(right.latest, groupBy.value) ?? "") ?? 0),
+        )
+      : sorted;
     return {
       id: `dataset:${group.datasetId}`,
       isGroup: true as const,
@@ -772,7 +820,7 @@ const datasetRows = computed<DatasetRow[]>(() =>
       baseline: baselines.value.get(group.datasetId) ?? null,
       folds,
       rows: folds.map((fold) => fold.latest),
-      sections: ciGroups(folds, groupBy.value, groupSort.value, comparisons.value),
+      sections,
     };
   }),
 );
@@ -817,13 +865,44 @@ function sharedCasesLabel(cases: NonNullable<RunComparison["cases"]>) {
     : t("experimentsAtScale.sharedCases", { count: cases.shared }, cases.shared);
 }
 
-function foldSize(run: LlmExperiment) {
-  return 1 + (earlierRuns.value.get(run.id)?.length ?? 0);
+const INCOMPLETE_KINDS = ["cancelled", "failed", "inProgress"] as const;
+
+// Counts are of settled runs, the ones the verdict and the spread come from;
+// the rest are named beside them: "4 runs (1 cancelled)".
+function incompleteText(tally: RunTally): I18nText | null {
+  const rest = INCOMPLETE_KINDS.filter((kind) => tally.incomplete[kind]).map((kind) =>
+    t(`experimentsAtScale.incomplete.${kind}`, { count: tally.incomplete[kind] }),
+  );
+  return rest.length ? raw(rest.join(", ")) : null;
+}
+
+function foldTally(run: LlmExperiment) {
+  return tallyRuns([run, ...(earlierRuns.value.get(run.id) ?? [])]);
+}
+
+// The badge stays "× 4" so the name keeps its width; the tooltip names the
+// re-runs it does not count.
+function foldTooltip(run: LlmExperiment) {
+  const tally = foldTally(run);
+  const counted = t("experimentsAtScale.foldTooltip", { count: tally.settled }, tally.settled);
+  const incomplete = incompleteText(tally);
+  return incomplete
+    ? t("experimentsAtScale.foldTooltipIncomplete", { counted, incomplete })
+    : counted;
 }
 
 function foldSpread(run: LlmExperiment, scoreKey: string) {
   const earlier = earlierRuns.value.get(run.id);
   return earlier ? scoreSpread([run, ...earlier], scoreKey) : null;
+}
+
+// Rows a Scorer failed on: the value covers the other rows, and the score casts no verdict.
+function scoreErrors(run: LlmExperiment, scoreKey: string) {
+  return evidence(run).scores.find((entry) => entry.key === scoreKey)?.errorCount ?? 0;
+}
+
+function taskFailures(run: LlmExperiment) {
+  return run.taskOutcomes?.failed ?? 0;
 }
 
 function ciGroupLabel(section: CiGroup) {
@@ -835,8 +914,14 @@ function ciGroupLabel(section: CiGroup) {
 
 // "12 runs · all on commit 303cfc8" says the group is re-runs of one change.
 function ciGroupDetail(section: CiGroup) {
-  const runs = t("experimentsAtScale.groupRuns", { count: section.runCount }, section.runCount);
-  if (section.commit && section.kind !== "commit" && section.runCount > 1) {
+  const { settled, incomplete } = section.runs;
+  const total = settled + incomplete.cancelled + incomplete.failed + incomplete.inProgress;
+  const settledRuns = t("experimentsAtScale.groupRuns", { count: settled }, settled);
+  const rest = incompleteText(section.runs);
+  const runs = rest
+    ? t("experimentsAtScale.withIncomplete", { runs: settledRuns, incomplete: rest })
+    : settledRuns;
+  if (section.commit && section.kind !== "commit" && total > 1) {
     return t("experimentsAtScale.groupCommit", { runs, commit: section.commit.slice(0, 7) });
   }
   if (section.branch && section.kind === "pr") {
@@ -862,9 +947,7 @@ const sharedCasePairs = computed(() =>
     const baseline = baselines.value.get(group.datasetId);
     if (baseline?.status !== "completed") return [];
     return group.experiments
-      .filter(
-        (run) => run.id !== baseline.id && run.status === "completed" && !sameCases(run, baseline),
-      )
+      .filter((run) => run.id !== baseline.id && isSettled(run) && !sameCases(run, baseline))
       .map((run) => ({ baselineId: baseline.id, candidateId: run.id }));
   }),
 );
@@ -1038,10 +1121,18 @@ function isBaseline(experiment: LlmExperiment) {
 
 // A baseline is the fixed reference every later run gets compared against, so
 // it must point at a run with final results — pending/running/failed/cancelled
-// runs have nothing stable to pin. Already-baseline experiments can still be
-// cleared regardless of status: unpinning is always safe.
+// runs have nothing stable to pin, and the server refuses a run with any task
+// error (baseline.rs). Already-baseline experiments can still be cleared
+// regardless of status: unpinning is always safe.
 function canSetBaseline(experiment: LlmExperiment) {
-  return experiment.isBaseline || experiment.status === "completed";
+  return experiment.isBaseline || (experiment.status === "completed" && !taskFailures(experiment));
+}
+
+function baselineBlockedReason(experiment: LlmExperiment) {
+  const failed = taskFailures(experiment);
+  return experiment.status === "completed" && failed
+    ? t("experimentsAtScale.baselineTaskFailures", { count: failed }, failed)
+    : t("aiObservability.experiments.baselineRequiresCompleted");
 }
 
 // The clone is a new row the list this returns to would otherwise miss.

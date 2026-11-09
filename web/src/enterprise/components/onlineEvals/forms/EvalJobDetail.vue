@@ -328,6 +328,20 @@
               >
                 {{ samplingValue }}
               </dd>
+
+              <dt class="text-text-secondary text-xs font-semibold">
+                {{ t("evalSpend.budget.label") }}
+              </dt>
+              <dd
+                class="text-compact text-text-body m-0 wrap-break-word"
+                data-test="eval-job-detail-budget"
+              >
+                {{
+                  row.budget
+                    ? `${formatUsd(row.budget.dailyUsd)} · ${t(`evalSpend.budget.actions.${row.budget.onReach}.label`)}`
+                    : "—"
+                }}
+              </dd>
             </dl>
           </section>
 
@@ -532,6 +546,7 @@ import type {
 } from "@/services/online-evals.service";
 import { entityId, targetScopeOf } from "../utils/evalEntity";
 import { relativeTime } from "../utils/evalFormat";
+import { formatUsd } from "../utils/evalSpend";
 import { normalizeJobFilterCondition } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import { useEvalJobRuns, type JobRunRow, type JobRunsWindow } from "../composables/useEvalJobRuns";

@@ -129,9 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows="visibleRows"
           :tiles="tiles"
           :loading="listQuery.isPending.value || configsLoading"
-          :forbidden="listStatus === 403"
+          :forbidden="tableForbidden"
           :load-error="!!listQuery.error.value && listStatus !== 403"
           @open="openConfig"
+          @created="emit('created')"
           @retry="retryList"
         />
       </section>
@@ -179,6 +180,8 @@ import QualityConfigDetail from "./quality/QualityConfigDetail.vue";
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
   configsLoading: boolean;
+  /** The score config list was denied; Quality then lists only configs shared with the user. */
+  configsForbidden?: boolean;
   dateWindow: DateWindow;
   agentParams: QualityAgentParams;
   /** False until the agent list first loads, so a deep-linked agent is applied before the first request. */
@@ -188,6 +191,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** Oldest data time and fetch state of the reads on screen, for the header's last-refreshed label. */
   (e: "status", status: { updatedAt: number | null; fetching: boolean }): void;
+  /** One-click created a score config, scorer and job: the evaluation lists are stale. */
+  (e: "created"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -202,6 +207,11 @@ const { listQuery, rows, visibleRows, tiles, tileFilter, listStatus } = useQuali
   agentParams: toRef(props, "agentParams"),
   enabled: toRef(props, "enabled"),
 });
+// The quality read answers a user without score config read with an empty list, not a 403,
+// so a denied config list with nothing visible is the no-access state, not "no configs yet".
+const tableForbidden = computed(
+  () => listStatus.value === 403 || (!!props.configsForbidden && rows.value.length === 0),
+);
 // The table unmounts while a config is open, so the page keeps its search, as it keeps the tile filter.
 const search = ref("");
 

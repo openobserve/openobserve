@@ -119,6 +119,13 @@ export function buildLLMPanelSchema(opts: {
       // already labelled by their axis + title.
       show_legends: !!breakdownName || multiSeries,
       legends_position: "bottom",
+      // Many models: the top N by window total, the rest folded or dropped.
+      ...(breakdownName && panel.query.topSeries
+        ? {
+            top_results: panel.query.topSeries.n,
+            top_results_others: panel.query.topSeries.others,
+          }
+        : {}),
       // "numbers" → compact K/M/B/T suffixes (3.5M); "milliseconds" → ms/s/m
       // (65.3 s); cost → currency-dollar ($). "short" is NOT a valid OO unit and
       // silently falls through to the raw value (3500000.00).

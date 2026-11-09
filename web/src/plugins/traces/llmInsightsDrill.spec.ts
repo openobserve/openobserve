@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { addSearchClause, equalsClause, searchFilterSql, traceListSql } from "./llmInsightsDrill";
+import {
+  addSearchClause,
+  equalsClause,
+  searchFilterSql,
+  traceListSql,
+  traceRowTimeFormat,
+} from "./llmInsightsDrill";
 import { autoHistogramBucketMicros } from "./config/llmInsightsPanels";
 
 const HOUR = 3_600_000_000;
@@ -88,6 +94,31 @@ describe("traceListSql", () => {
 
   it("has no HAVING for a whole-window list", () => {
     expect(traceListSql("s", { startTime: 0, endTime: 1 }, "")).not.toContain("HAVING");
+  });
+
+  it("costs each trace by the per-trace usage rule, not the sum over every span", () => {
+    const sql = traceListSql("s", { startTime: 0, endTime: 1 }, "");
+    expect(sql).not.toContain("SUM(gen_ai_usage_cost)");
+    expect(sql).toContain("gen_ai_operation_name = 'invoke_agent'");
+  });
+
+  it("lists only agent-span-only traces for the cost trend's unattributed series", () => {
+    const sql = traceListSql("s", { startTime: 0, endTime: 1, agentOnly: true }, "");
+    expect(sql).toMatch(/HAVING CASE WHEN COALESCE\(SUM\(.*\), 0\) = 0 THEN .* > 0/);
+  });
+});
+
+describe("traceRowTimeFormat", () => {
+  // 2026-11-05 22:00 UTC, in µs.
+  const t0 = Date.UTC(2026, 10, 5, 22) * 1000;
+  it("dates the rows when the window spans more than one calendar day", () => {
+    expect(traceRowTimeFormat({ startTime: t0, endTime: t0 + HOUR }, "UTC")).toBe("HH:mm:ss");
+    expect(traceRowTimeFormat({ startTime: t0, endTime: t0 + 3 * HOUR }, "UTC")).toBe(
+      "MMM d HH:mm:ss",
+    );
+    expect(traceRowTimeFormat({ startTime: t0, endTime: t0 + 7 * 24 * HOUR }, "UTC")).toBe(
+      "MMM d HH:mm:ss",
+    );
   });
 });
 

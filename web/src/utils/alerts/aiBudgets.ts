@@ -29,6 +29,8 @@
 
 import { SEVERITY_TO_PRIORITY } from "@/constants/alertLibrary";
 import { traceUsageSum } from "@/plugins/traces/llmAttribution";
+import { llmCallUsageSum } from "@/plugins/traces/config/llmInsightsPanels";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 export const BUDGET_PACK = "ai-budgets";
 
@@ -65,8 +67,6 @@ export const PERIOD_MINUTES: Record<BudgetPeriod, number> = {
   month: 43200,
 };
 
-const quote = (v: string) => `'${v.replace(/'/g, "''")}'`;
-
 /** Ratio of the limit at which a budget turns warning; critical is the limit itself. */
 export const WARN_RATIO = 0.8;
 
@@ -81,9 +81,9 @@ export const WARN_RATIO = 0.8;
  * its spans carry (`MAX`), as Users does. A model is set on each LLM call, so model budgets stay
  * per span.
  */
-export function budgetSql(b: BudgetDef, limit?: number): string {
+export function budgetSql(b: BudgetDef): string {
   const col = BUDGET_COLUMNS[b.scope];
-  const tail = `GROUP BY ${col} ORDER BY spent DESC${limit ? ` LIMIT ${limit}` : ""}`;
+  const tail = `GROUP BY ${col} ORDER BY spent DESC`;
   const cost = `${traceUsageSum("gen_ai_usage_cost")} AS cost`;
   if (isEach(b.scope)) {
     return (
@@ -92,9 +92,10 @@ export function budgetSql(b: BudgetDef, limit?: number): string {
       `WHERE ${col} IS NOT NULL AND ${col} != '' ${tail}`
     );
   }
-  const match = `${col} = ${quote(b.value)}`;
+  const match = `${col} = ${sqlLiteral(b.value)}`;
   if (b.scope === "model") {
-    return `SELECT ${col}, SUM(gen_ai_usage_cost) AS spent FROM "${b.stream}" WHERE ${match} ${tail}`;
+    // Only LLM calls: an agent span carrying the model repeats its children's cost.
+    return `SELECT ${col}, ${llmCallUsageSum("gen_ai_usage_cost")} AS spent FROM "${b.stream}" WHERE ${match} ${tail}`;
   }
   // Every trace with a span carrying the value counts whole, as the agent pack's scope does: a
   // sub-agent's budget sees the traces it ran in even when another agent's name is on the root.
@@ -162,7 +163,7 @@ export function budgetAlertPayload(
         group_by: [],
         function: "count",
         having: { column: "spent", operator: ">=", value: b.limitUsd, ignore_case: false },
-        warning_value: +(b.limitUsd * WARN_RATIO).toFixed(4),
+        warning_value: warningValue(b.limitUsd),
         multi_alert: true,
       },
       promql: null,
@@ -326,9 +327,42 @@ export function budgetState(spent: number, limit: number): BudgetState {
   return spent >= WARN_RATIO * limit ? "warning" : "under";
 }
 
-/** One row of {@link budgetSql}. */
+/**
+ * The warning threshold of a limit: 80% of it, with float noise trimmed. Never
+ * rounded to a fixed number of decimals, which lifts a sub-cent limit's warning
+ * onto the limit itself and the backend refuses it.
+ */
+export function warningValue(limitUsd: number): number {
+  return +(limitUsd * WARN_RATIO).toPrecision(12);
+}
+
+/**
+ * A budget amount in USD: cents, or two significant digits below a cent, so a
+ * sub-cent spend never reads $0.00 next to a sub-cent limit.
+ */
+export function formatBudgetUsd(value: number): string {
+  if (value > 0 && value < 0.01) return `$${+value.toPrecision(2)}`;
+  return `$${value.toFixed(2)}`;
+}
+
+/**
+ * The spend of a per-key budget over every key, not one page of them: how many
+ * keys spent, how many are at or over the limit, their total and the largest.
+ */
+export function budgetSummarySql(b: BudgetDef): string {
+  return (
+    `SELECT COUNT(*) AS key_count, ` +
+    `SUM(CASE WHEN spent >= ${b.limitUsd} THEN 1 ELSE 0 END) AS over_count, ` +
+    `SUM(spent) AS spent, MAX(spent) AS largest FROM (${budgetSql(b)})`
+  );
+}
+
+/** One row of {@link budgetSql}, or for a per-key budget the row of {@link budgetSummarySql}. */
 export interface BudgetRow {
   spent?: unknown;
+  key_count?: unknown;
+  over_count?: unknown;
+  largest?: unknown;
 }
 
 /** Spend of a budget from its rows: the total, or the largest key and how many keys are over. */
@@ -340,12 +374,12 @@ export function budgetSpend(
     const spent = Number(rows[0]?.spent) || 0;
     return { spent, over: spent >= b.limitUsd ? 1 : 0, largest: spent, keys: 1 };
   }
-  const spends = rows.map((r) => Number(r.spent) || 0);
+  const r = rows[0];
   return {
-    spent: spends.reduce((s, v) => s + v, 0),
-    over: spends.filter((v) => v >= b.limitUsd).length,
-    largest: Math.max(0, ...spends),
-    keys: spends.length,
+    spent: Number(r?.spent) || 0,
+    over: Number(r?.over_count) || 0,
+    largest: Number(r?.largest) || 0,
+    keys: Number(r?.key_count) || 0,
   };
 }
 

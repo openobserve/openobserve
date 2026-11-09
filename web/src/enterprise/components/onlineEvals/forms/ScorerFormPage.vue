@@ -45,7 +45,9 @@
                 <OFormInput
                   name="name"
                   :label="t('onlineEvals.scorer.nameLabel')"
-                  :placeholder="raw('faithfulness_judge')"
+                  :placeholder="
+                    raw(formValues.scorerType === 'code' ? 'json_is_valid' : 'faithfulness_judge')
+                  "
                   size="sm"
                   required
                   :disabled="mode === 'edit'"
@@ -790,6 +792,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import onlineEvalsService, {
   type ExtraMetadataField,
   type Provider,
@@ -838,6 +841,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const { confirm } = useConfirmDialog();
 const saveScorer = useMutation(() => saveScorerMutation(props.orgId));
 const CodeEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -891,17 +895,38 @@ const starterOptions = computed(() =>
   })),
 );
 
-// Picking a starter replaces the function; a blank name/description takes the
-// starter's so the scorer is ready to save.
-function applyStarter(key: unknown) {
+// Picking a starter replaces the function, after asking when the function holds
+// the user's own edits. A blank name takes the starter's key; a blank
+// description, or one a starter filled in, takes the new starter's, so the
+// scorer is ready to save and never describes another check.
+async function applyStarter(key: unknown) {
   const starter = CODE_SCORER_STARTERS.find((s) => s.key === key);
   if (!starter) return;
+  const current = formValues.value.template?.trim() ?? "";
+  const edited = !!current && !CODE_SCORER_STARTERS.some((s) => s.source.trim() === current);
+  if (
+    edited &&
+    !(await confirm({
+      title: t("codeScorer.replaceTitle"),
+      message: t("codeScorer.replaceMessage", {
+        starter: t(`codeScorer.starters.${starter.key}.title`),
+      }),
+      confirmLabel: t("codeScorer.replaceConfirm"),
+      cancelLabel: t("common.cancel"),
+    }))
+  ) {
+    return;
+  }
   starterKey.value = starter.key;
   form.setFieldValue("template", starter.source);
   if (props.mode === "create" && !formValues.value.name?.trim()) {
     form.setFieldValue("name", starter.key);
   }
-  if (!formValues.value.description?.trim()) {
+  const description = formValues.value.description?.trim() ?? "";
+  const starterDescription = CODE_SCORER_STARTERS.some(
+    (s) => t(`codeScorer.starters.${s.key}.description`) === description,
+  );
+  if (!description || starterDescription) {
     form.setFieldValue("description", t(`codeScorer.starters.${starter.key}.description`));
   }
 }

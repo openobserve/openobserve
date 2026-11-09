@@ -86,8 +86,8 @@
         :scope-ready="scopeReady"
         :source-stream="scopeReady ? effectiveStream : ''"
         :agent-filter="agentFilter"
-        :agent-env="filterMode === 'agent' ? selectedAgent?.env : null"
-        :agent-version="filterMode === 'agent' ? selectedAgent?.version : null"
+        :agent-env="panelScope.env"
+        :agent-version="panelScope.version"
         :start-time="timeRange.startTime"
         :end-time="timeRange.endTime"
         @send-to-ai-chat="(value: unknown, append?: boolean) => emit('sendToAiChat', value, append)"
@@ -119,6 +119,7 @@ import {
 import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
+import { selectedAgentScope } from "./agentScope";
 
 defineOptions({ name: "AgentBehaviorPage" });
 // "Explain with O2 AI" in the drill-down drawer; the AI shell forwards it to the chat panel.
@@ -130,16 +131,15 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-// Shared with LLM Insights / Sessions / Quality — see useAiDateRange.ts.
-// Agent Behavior has no from/to/period URL sync (urlSync:false), matching its
-// prior behavior of resolving from shared state only.
+// Shared with LLM Insights / Sessions / Quality — see useAiDateRange.ts. The
+// range is kept in the URL (`period` or `from`/`to`), so a shared link opens it.
 const {
   dateState,
   timeRange,
   applyRelative,
   onDateChange: onDateStateChange,
   DEFAULT_RELATIVE,
-} = useAiDateController({ urlSync: false });
+} = useAiDateController();
 
 // The scope in the URL (`type`, `stream`, `agent`, `env`, `version`) wins over
 // the defaults, so a link shared from any Monitor page opens the same agent
@@ -198,6 +198,16 @@ const {
 // Kept page-local: Behavior passes the agent NAME to its panel.
 const agentFilter = computed(() =>
   filterMode.value === "agent" ? (selectedAgent.value?.name ?? "") : "",
+);
+
+// The selected variant's env/version for the panel ("(No env)" pinned to UNSET
+// when a sibling variant has an env); null leaves a dimension open.
+const panelScope = computed(
+  () =>
+    (filterMode.value === "agent" && selectedAgentScope(selectedAgent.value, agents.value)) || {
+      env: null,
+      version: null,
+    },
 );
 
 function syncScopeUrl() {

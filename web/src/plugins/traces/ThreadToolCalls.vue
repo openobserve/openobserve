@@ -191,7 +191,8 @@ function resultText(tool: any): string {
   return (
     formatToolPayload(getOutputRaw(tool) || tool.gen_ai_tool_call_result) ||
     tool.status_message ||
-    t("traces.threadToolCalls.empty")
+    // A call with no tool span never had a result recorded; it did not return nothing.
+    (tool.synthetic ? t("traces.threadToolCalls.noResult") : t("traces.threadToolCalls.empty"))
   );
 }
 

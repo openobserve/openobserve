@@ -22,6 +22,7 @@ import { type GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service
 import type { AgentsLoadError } from "@/enterprise/composables/useAgentScope";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 import { compactSql } from "../config/llmInsightsPanels";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { unpricedFields } from "../llmDataTrust.utils";
 
 export interface SessionDetail {
@@ -610,8 +611,6 @@ export function useSessions() {
         otherOps: [],
       };
     }
-    const safeId = traceId.replace(/'/g, "''");
-
     // Fetch all gen_ai spans for this trace in one query. No
     // gen_ai_input_messages IS NOT NULL filter, so the LLM/tool call badge
     // counts can be computed client-side from the same result set rather than
@@ -625,7 +624,7 @@ export function useSessions() {
         gen_ai_operation_name,
         start_time
       FROM "${streamName}"
-      WHERE trace_id = '${safeId}'
+      WHERE trace_id = ${sqlLiteral(traceId)}
         AND gen_ai_operation_name IS NOT NULL
       ORDER BY start_time ASC
       LIMIT 50
@@ -660,7 +659,7 @@ export function useSessions() {
     if (!streamName || !turns.length || !startTime || !endTime) return [];
     const pages = await Promise.all(
       chunkTurnsBySpans(turns).map(({ traceIds, limit }) => {
-        const inList = traceIds.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",");
+        const inList = traceIds.map(sqlLiteral).join(",");
         const sql = compactSql(`
           SELECT
             span_id, trace_id, operation_name, gen_ai_operation_name,

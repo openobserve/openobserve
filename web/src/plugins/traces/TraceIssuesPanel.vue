@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-3 p-1" data-test="trace-issues-panel">
     <section
       v-for="issue in issues"
-      :key="issue.rule + issue.tool"
+      :key="`${issue.rule}-${issue.agent ?? ''}-${issue.tool}`"
       class="rounded-default border-border-default flex flex-col gap-2 border p-3"
       :data-test="`trace-issue-${issue.rule}-${issue.tool}`"
     >
@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-compact text-text-heading font-semibold">{{
           t(`traceIssues.rules.${issue.rule}`)
         }}</span>
+        <span v-if="issue.agent" class="text-2xs text-text-secondary">{{ issue.agent }}</span>
       </div>
       <span class="text-compact text-text-body">{{ sentence(issue) }}</span>
       <div class="flex flex-wrap items-center gap-x-2 gap-y-1">

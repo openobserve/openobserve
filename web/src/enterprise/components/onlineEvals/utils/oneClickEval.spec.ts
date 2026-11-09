@@ -23,7 +23,7 @@ describe("buildOneClickJob (AIO-23)", () => {
     const job: any = buildOneClickJob({
       agent: "research-agent",
       stream: "default",
-      scorerIds: ["sc1"],
+      scorers: [{ id: "sc1", variables: ["input", "output"] }],
       judgeNames: ["hallucination"],
       rate: 0.1,
       completion,
@@ -39,11 +39,30 @@ describe("buildOneClickJob (AIO-23)", () => {
     expect(job.budget).toEqual({ dailyUsd: 5, onReach: "pause" });
   });
 
+  // E19: toxicity reads only {{output}}; an input mapping showed it as "2 variables".
+  it("maps only the variables each scorer's template uses", () => {
+    const job: any = buildOneClickJob({
+      agent: null,
+      stream: "llm",
+      scorers: [
+        { id: "tox", variables: ["output"] },
+        { id: "hal", variables: ["input", "output", "context"] },
+      ],
+      judgeNames: ["toxicity", "hallucination"],
+      rate: 1,
+      completion,
+    });
+    expect(job.inputMapping).toEqual({
+      tox: { output: "{{output}}" },
+      hal: { input: "{{input}}", output: "{{output}}" },
+    });
+  });
+
   it("covers the whole stream without an agent", () => {
     const job: any = buildOneClickJob({
       agent: null,
       stream: "llm",
-      scorerIds: [],
+      scorers: [],
       judgeNames: [],
       rate: 1,
       completion,

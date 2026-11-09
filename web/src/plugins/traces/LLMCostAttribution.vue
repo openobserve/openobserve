@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="none"
         :empty-message="failed ? t('llmAttribution.loadFailed') : t('llmAttribution.empty')"
         data-test="llm-cost-attribution-table"
+        :row-class="(row: Row) => (row.kind === 'value' ? '' : '!cursor-default')"
         @row-click="onRowClick"
       >
         <template #cell-value="{ row }">
@@ -104,7 +105,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
         </template>
-        <template #cell-cost="{ row }">{{ `$${row.cost.toFixed(2)}` }}</template>
+        <template #cell-cost="{ row }">
+          <LLMCostCell
+            :cost="row.cost"
+            :tokens="row.tokens"
+            :unpriced-tokens="row.unpriced"
+            scope="row"
+            :stream="stream"
+            :time-window="{ start: startTime, end: endTime }"
+            :format="(c: number) => `$${formatCost(c)}`"
+          />
+        </template>
         <template #cell-share="{ row }">
           <span class="text-text-secondary">{{ `${(row.share * 100).toFixed(0)}%` }}</span>
         </template>
@@ -132,7 +143,9 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import LLMPanelCard from "./LLMPanelCard.vue";
 import useStreams from "@/composables/useStreams";
-import { formatTokens } from "@/utils/llmUtils";
+import { formatCost, formatTokens } from "@/utils/llmUtils";
+import LLMCostCell from "./LLMCostCell.vue";
+import { costKind } from "./llmDataTrust.utils";
 import {
   classicColorPaletteLightTheme,
   getDistinctSeriesColors,
@@ -213,6 +226,7 @@ type Row = {
   share: number;
   tokens: number;
   traces: number;
+  unpriced: number;
 };
 const tableRows = computed<Row[]>(() => {
   const r = result.value;
@@ -274,10 +288,22 @@ const segments = computed<SegmentedBarSegment[]>(() =>
     })),
 );
 
+// The total reads as a lower bound ("≥ $x") or unknown when some tokens had no price.
+const totalText = computed(() => {
+  const total = `$${formatCost(result.value.total)}`;
+  const kind = costKind(
+    result.value.total,
+    Number(totals.value?.tokens) || 0,
+    Number(totals.value?.unpriced) || 0,
+  );
+  if (kind === "partial") return t("llmDataTrust.cost.atLeast", { cost: total });
+  if (kind === "unknown") return t("llmDataTrust.cost.unknown");
+  return total;
+});
 const summary = computed(() =>
   hits.value.length
     ? t("llmAttribution.summary", {
-        total: `$${result.value.total.toFixed(2)}`,
+        total: totalText.value,
         share: (result.value.attributedShare * 100).toFixed(0),
         dim: t(`llmAttribution.dims.${dim.value}`).toLowerCase(),
       })
@@ -314,6 +340,7 @@ async function loadSchema() {
 
 async function load() {
   const column = FILTER_COLUMNS[dim.value];
+  const hasCostStatus = schemaColumns.value.has("gen_ai_usage_cost_status");
   // Bump first, so a query still in flight for the previous dimension cannot land.
   const mine = ++seq;
   if (!props.stream || !schemaColumns.value.has(column)) {
@@ -327,8 +354,8 @@ async function load() {
   try {
     const sql =
       dim.value === "model"
-        ? costByModelSql(props.stream, props.scope)
-        : costByDimensionSql(props.stream, column, props.scope);
+        ? costByModelSql(props.stream, props.scope, hasCostStatus)
+        : costByDimensionSql(props.stream, column, props.scope, hasCostStatus);
     const [rows, sums] = (await Promise.all([
       executeQuery(sql.rows, props.startTime, props.endTime),
       executeQuery(sql.totals, props.startTime, props.endTime),

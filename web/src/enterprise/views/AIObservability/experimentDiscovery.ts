@@ -24,7 +24,9 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
  * Scorer's Score Config, and (Score Config, client key) for a dimension the
  * customer's own code reported, which `clientScorerKey` marks. `name` is the
  * Score Config name either way. `scoreConfigId` is the key to the config's
- * health policy, which decides a move against the baseline.
+ * health policy, which decides a move against the baseline. `errorCount` and
+ * `pendingCount` are the rows a platform Scorer failed on or has not scored
+ * yet; client dimensions arrive already scored, so they carry 0.
  */
 export type ExperimentScoreSummary = {
   key: string;
@@ -32,6 +34,8 @@ export type ExperimentScoreSummary = {
   scoreConfigId: string | null;
   clientScorerKey: string | null;
   sampleCount: number;
+  errorCount: number;
+  pendingCount: number;
 } & (
   | { kind: "numeric"; value: number }
   | { kind: "boolean"; trueCount: number; falseCount: number }
@@ -111,7 +115,13 @@ export interface ExperimentDatasetGroup {
 
 type ScoreIdentity = Pick<
   ExperimentScoreSummary,
-  "key" | "name" | "scoreConfigId" | "clientScorerKey" | "sampleCount"
+  | "key"
+  | "name"
+  | "scoreConfigId"
+  | "clientScorerKey"
+  | "sampleCount"
+  | "errorCount"
+  | "pendingCount"
 >;
 
 /** The browse table's shape of one type-aware aggregate; null when there is none yet. */
@@ -149,6 +159,8 @@ function clientScoreSummary(summary: ExperimentClientScoreSummary): ExperimentSc
       scoreConfigId: summary.scoreConfigId || null,
       clientScorerKey: summary.clientScorerKey,
       sampleCount: summary.sampleCount,
+      errorCount: 0,
+      pendingCount: 0,
     },
     summary.value,
   );
@@ -170,6 +182,8 @@ export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidenc
         scoreConfigId: summary.scoreConfigId,
         clientScorerKey: null,
         sampleCount: summary.sampleCount,
+        errorCount: summary.errorCount,
+        pendingCount: summary.pendingCount,
       },
       summary.value,
     );

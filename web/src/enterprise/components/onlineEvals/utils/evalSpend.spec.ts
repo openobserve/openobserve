@@ -75,6 +75,15 @@ describe("eval spend estimate (AIO-24)", () => {
     }
   });
 
+  // E16: "Set a price" is the fix only for a judge whose calls were unpriced.
+  it("tells a judge with unpriced calls from one that has not run yet", () => {
+    const gap = (history: JudgeHistory[]) =>
+      estimateJobSpend({ dailyCounts: [10], rate: 1, judgeIds: ["a"], history }).judgeGap;
+    expect(gap([{ ...judge("a", 0, 0), calls: 40 }])).toBe("unpriced");
+    expect(gap([])).toBe("noCalls");
+    expect(gap([judge("a", 3, 0.3)])).toBeNull();
+  });
+
   it("leaves unknown traffic unknown, never $0", () => {
     const e = estimateJobSpend({
       dailyCounts: null,
@@ -103,11 +112,13 @@ describe("eval spend estimate (AIO-24)", () => {
 });
 
 describe("spend SQL and budget state (AIO-24)", () => {
-  it("counts matched targets per day at the job's scope", () => {
-    const sql = matchedPerDaySql("default", "", "trace", []);
+  // E14: UTC day buckets cut the first and the current day short, undercounting a day.
+  it("counts matched targets per rolling 24 h from the window start, at the job's scope", () => {
+    const sql = matchedPerDaySql("default", "", "trace", [], 1_700_000_000_000_000);
     expect(sql).toContain(
-      `SELECT histogram(_timestamp, '1 day') AS day, COUNT(DISTINCT "trace_id")`,
+      `SELECT (_timestamp - 1700000000000000) / 86400000000 AS day, COUNT(DISTINCT "trace_id")`,
     );
+    expect(sql).not.toContain("histogram");
     expect(sql).not.toContain("WHERE");
   });
 

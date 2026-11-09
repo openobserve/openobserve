@@ -16,8 +16,10 @@
 /**
  * Issues on one trace (AIO-33): the ai-agents pack's tool rules run over the
  * trace's loaded spans, so the trace header, the chip on the evidence span and
- * the Issues tab agree with what the alert fires on. One issue per tool: when
- * both rules match, "Repeated tool calls" covers the failing calls too.
+ * the Issues tab agree with what the alert fires on. Calls are grouped per
+ * (span-local agent, tool), as the alert's SQL groups them. One issue per
+ * (agent, tool): when both rules match, "Repeated tool calls" covers the
+ * failing calls too.
  *
  * ponytail: the pack's default thresholds; a threshold tuned in the alert is not
  * read back here. Read it from the installed alert if they drift apart.
@@ -29,6 +31,8 @@ export type TraceIssueRule = "repeated_tool_calls" | "repeated_failing_tool_call
 
 export interface TraceIssue {
   rule: TraceIssueRule;
+  /** The calling span's own `gen_ai_agent_name`; null when the spans carry none. */
+  agent: string | null;
   tool: string;
   calls: number;
   errors: number;
@@ -43,13 +47,17 @@ export function traceIssues(
   spans: any[],
   thresholds = { calls: REPEATED_TOOL_MIN_CALLS, failing: FAILING_TOOL_MIN_CALLS },
 ): TraceIssue[] {
-  const byTool = new Map<string, any[]>();
+  const groups = new Map<string, { agent: string | null; tool: string; calls: any[] }>();
   for (const s of spans) {
     if (s?.gen_ai_operation_name !== "execute_tool" || !s.gen_ai_tool_name) continue;
-    byTool.set(s.gen_ai_tool_name, [...(byTool.get(s.gen_ai_tool_name) ?? []), s]);
+    const agent: string | null = s.gen_ai_agent_name || null;
+    const key = JSON.stringify([agent, s.gen_ai_tool_name]);
+    let g = groups.get(key);
+    if (!g) groups.set(key, (g = { agent, tool: s.gen_ai_tool_name, calls: [] }));
+    g.calls.push(s);
   }
   const issues: TraceIssue[] = [];
-  for (const [tool, calls] of byTool) {
+  for (const { agent, tool, calls } of groups.values()) {
     calls.sort((a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0));
     const failed = calls.filter((s) => s.span_status === "ERROR");
     const repeated = calls.length >= thresholds.calls;
@@ -57,6 +65,7 @@ export function traceIssues(
     const evidence = (repeated ? calls : failed).map((s) => String(s.span_id));
     issues.push({
       rule: repeated ? "repeated_tool_calls" : "repeated_failing_tool_calls",
+      agent,
       tool,
       calls: calls.length,
       errors: failed.length,

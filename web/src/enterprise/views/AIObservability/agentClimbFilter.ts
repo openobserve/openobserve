@@ -1,4 +1,4 @@
-import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { UNSET } from "@/enterprise/composables/useAgentScope";
 
 /**
@@ -17,10 +17,10 @@ export const buildAgentClimbFilter = (
   agent: string | undefined,
   variant: { env?: string | null; version?: string | null } = {},
 ): string => {
-  const clauses = [agent ? `${callerExpr} = '${escapeSingleQuotes(agent)}'` : "1=1"];
+  const clauses = [agent ? `${callerExpr} = ${sqlLiteral(agent)}` : "1=1"];
   const pin = (column: string, value?: string | null) => {
     if (value === UNSET) clauses.push(`(${column} IS NULL OR ${column} = '')`);
-    else if (value) clauses.push(`${column} = '${escapeSingleQuotes(value)}'`);
+    else if (value) clauses.push(`${column} = ${sqlLiteral(value)}`);
   };
   pin("c.gen_ai_agent_version", variant.version);
   pin("c.gen_ai_agent_env", variant.env);
@@ -65,3 +65,16 @@ export const failureErrorsSql = (
 
 export const failureTracesSql = (stream: string, joins: string, agentFilter: string): string =>
   `SELECT c.trace_id AS trace_id, COUNT(DISTINCT c.span_id) AS spans FROM "${stream}" AS c ${joins} WHERE c.span_status = 'ERROR' AND ${agentFilter} GROUP BY c.trace_id ORDER BY spans DESC LIMIT 50`;
+
+/**
+ * The loop drill-down: each trace's calls of `tool` by the agent, worst first.
+ * Distinct span ids, so a trace exported twice (or a duplicated ancestor in the
+ * LEFT JOINs) does not multiply the repeats.
+ */
+export const loopTracesSql = (
+  stream: string,
+  joins: string,
+  agentFilter: string,
+  tool: string,
+): string =>
+  `SELECT c.trace_id AS trace_id, COUNT(DISTINCT c.span_id) AS repeats FROM "${stream}" AS c ${joins} WHERE c.gen_ai_tool_name = ${sqlLiteral(tool)} AND c.gen_ai_operation_name = 'execute_tool' AND ${agentFilter} GROUP BY c.trace_id ORDER BY repeats DESC LIMIT 50`;

@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :agent-id="filterMode === 'agent' ? (selectedAgent?.id ?? null) : null"
       :agent-name="filterMode === 'agent' ? (selectedAgent?.name ?? null) : null"
       :agent-env="filterMode === 'agent' ? (selectedAgent?.env ?? null) : null"
+      :agent-scope="nodeBehaviorScope"
       :viz-type="vizType"
       :layout-type="layoutType"
       hide-stream-selector
@@ -215,6 +216,7 @@ import {
   scopeUrlQuery,
   type ScopeMode,
 } from "@/enterprise/composables/useAgentScope";
+import { selectedAgentScope } from "./agentScope";
 
 defineOptions({ name: "AIAgentGraphPage" });
 
@@ -225,15 +227,15 @@ const router = useRouter();
 
 // Shared AI-module date range — the same singleton LLM Insights / Sessions /
 // Agent Behavior use, so picking a time on any AI tab lands on all of them.
-// Agent Graph has no from/to/period URL sync (urlSync:false), matching its
-// prior behavior of resolving from shared state only. `timeRange` is the
-// resolved absolute window (µs) the graph + agent-list queries read.
+// The range is kept in the URL (`period` or `from`/`to`), so a shared link
+// opens it. `timeRange` is the resolved absolute window (µs) the graph +
+// agent-list queries read.
 const {
   dateState,
   timeRange,
   applyRelative,
   onDateChange: onDateStateChange,
-} = useAiDateController({ urlSync: false });
+} = useAiDateController();
 
 const ServiceGraph = defineAsyncComponent(() => import("@/plugins/traces/ServiceGraph.vue"));
 
@@ -370,6 +372,14 @@ const {
   // must resolve an agent from env + name alone (auto-pick the first version).
   versionAgnostic: true,
   t,
+});
+
+// The node drawer's Behavior tab follows the Agent-mode env ("(No env)" pinned
+// to UNSET). Version stays open: this page hides the version picker.
+const nodeBehaviorScope = computed(() => {
+  const scope =
+    filterMode.value === "agent" ? selectedAgentScope(selectedAgent.value, agents.value) : null;
+  return scope && { ...scope, version: null };
 });
 
 // Nothing to graph in the current org / time window: no agent to pick in Agent

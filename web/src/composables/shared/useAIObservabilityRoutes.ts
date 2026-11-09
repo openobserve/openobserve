@@ -563,6 +563,7 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
       component: section.component!,
       meta: {
         titleKey: section.metaTitleKey ?? section.labelKey,
+        titleKeyByTab: titleKeysByTab(section.routeName),
         keepAlive: false,
         requiresOnlineEvals: !!section.featureKey && !!ONLINE_EVAL_FEATURE_KEYS[section.featureKey],
       },
@@ -588,6 +589,21 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
     }
   }
   return children;
+}
+
+/**
+ * The tab title of each `?tab=` of a route several rail items share (Scorers
+ * and Evaluations both live on `aiEvaluations`): the rail item's label, as the
+ * rail and page header read. The router uses it over `titleKey`.
+ */
+function titleKeysByTab(routeName: string): Record<string, I18nKey> | undefined {
+  const entries = AI_OBSERVABILITY_SECTIONS.filter(
+    (section) => section.routeName === routeName && section.tabQuery,
+  ).map((section): [string, I18nKey] => [
+    section.tabQuery!,
+    section.tabOf ? AI_OBSERVABILITY_TABBED_ITEMS[section.tabOf].labelKey : section.labelKey,
+  ]);
+  return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
 /** The `ai` shell route itself — same `component`/guard in every edition. */

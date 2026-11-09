@@ -22,6 +22,7 @@ import {
   criticalPathServices,
   firstRestartUs,
   headlineSteps,
+  mergedHeadlines,
   subtreeOf,
 } from "./timeAttribution";
 
@@ -142,12 +143,30 @@ describe("attributeSteps", () => {
     const steps = attributeSteps([
       span("root", "", 0, 3, { gen_ai_operation_name: "invoke_agent" }),
       span("chat gpt-4o", "root", 0.2, 2.7, chat),
+      span("search", "root", 2.75, 2.9, tool("search")),
     ]);
     const [step] = headlineSteps(steps);
     expect(step).toMatchObject({ spanId: "chat gpt-4o", kind: "llm", cause: null });
     expect(attributionSentence(step, t)).toBe(
       "chat gpt-4o took 2.50s. All of it was the model call.",
     );
+  });
+
+  it("does not call out a trace that is one healthy model call", () => {
+    const steps = attributeSteps([
+      span("root", "", 0, 3, { gen_ai_operation_name: "invoke_agent" }),
+      span("chat gpt-4o", "root", 0.2, 2.7, chat),
+    ]);
+    expect(steps).toHaveLength(1);
+    expect(steps[0]).toMatchObject({ slow: false, headline: false });
+    expect(headlineSteps(steps)).toEqual([]);
+  });
+
+  it("still calls out that one model call when it failed", () => {
+    const steps = attributeSteps([
+      span("chat gpt-4o", "", 0, 1.5, { ...chat, span_status: "ERROR" }),
+    ]);
+    expect(headlineSteps(steps).map((s) => s.spanId)).toEqual(["chat gpt-4o"]);
   });
 
   it("names the innermost slow step and the deepest span when durations nest equally", () => {
@@ -207,6 +226,30 @@ describe("subtreeOf", () => {
   });
 });
 
+describe("mergedHeadlines", () => {
+  it("says identical parallel steps once, keyed by a span id", () => {
+    const steps = headlineSteps(
+      attributeSteps([
+        span("root", "", 0, 9.2, { gen_ai_operation_name: "invoke_agent" }),
+        span("a", "root", 0.1, 9.1, { ...tool("search"), operation_name: "search" }),
+        span("b", "root", 0.1, 9.1, { ...tool("search"), operation_name: "search" }),
+      ]),
+    );
+    expect(steps).toHaveLength(2);
+    const headlines = mergedHeadlines(steps, t);
+    expect(headlines).toHaveLength(1);
+    expect(["a", "b"]).toContain(headlines[0].key);
+    expect(headlines[0].text).toBe(
+      "2 identical steps, each: search took 9.00s. The step itself held the time, not a child span.",
+    );
+  });
+
+  it("keeps different sentences apart", () => {
+    const headlines = mergedHeadlines(headlineSteps(attributeSteps(supportBot)), t);
+    expect(headlines.map((h) => h.key)).toEqual(["lookup"]);
+  });
+});
+
 describe("firstRestartUs", () => {
   const series = [
     {
@@ -218,11 +261,32 @@ describe("firstRestartUs", () => {
     },
   ];
 
-  it("finds the first sample where the count rose inside the window", () => {
-    expect(firstRestartUs(series, 100 * US, 200 * US)).toBe(130 * US);
+  it("dates the rise to the sample before it, the earliest the restart can have been", () => {
+    expect(firstRestartUs(series, 100 * US, 200 * US)).toBe(115 * US);
   });
 
   it("ignores a rise outside the window", () => {
     expect(firstRestartUs(series, 100 * US, 120 * US)).toBeNull();
+  });
+
+  it("places a restart inside the trace when the 15 s grid puts the rise after it", () => {
+    // The OOMKilled trace: spans 1793230296.5–1793230329.95, samples at :320 and :335.
+    const atUs = firstRestartUs(
+      [
+        {
+          values: [
+            [1793230320, "2"],
+            [1793230335, "3"],
+          ],
+        },
+      ],
+      1793230296.5 * US,
+      1793230329.95 * US + 60 * US,
+    );
+    expect(atUs).toBe(1793230320 * US);
+  });
+
+  it("never dates a restart before the window", () => {
+    expect(firstRestartUs(series, 120 * US, 200 * US)).toBe(120 * US);
   });
 });

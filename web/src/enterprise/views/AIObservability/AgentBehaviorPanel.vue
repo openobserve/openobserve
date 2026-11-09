@@ -117,9 +117,29 @@
         class="min-h-0 flex-1"
         show-index
         pagination="client"
+        row-key="id"
+        expansion="multiple"
+        :get-row-expansion-enabled="(r: FailureRow) => r.variants.length > 1"
         :empty-message="failuresEmptyMessage"
         @row-click="(r: any) => openDetail('failure', r)"
       >
+        <!-- An (agent, class) seen in more than one env/version: its variants,
+             each opening the drawer on that variant alone. -->
+        <template #expansion="{ row }">
+          <OTable
+            :data="row.variants"
+            :columns="failureVariantColumns"
+            :default-columns="false"
+            :frame="false"
+            :fill-height="false"
+            :show-global-filter="false"
+            :row-class="failureRowClass"
+            row-key="id"
+            pagination="none"
+            :data-test="`agent-behavior-failure-variants-${row.agent}-${row.failClass}`"
+            @row-click="(v: any) => openDetail('failure', v)"
+          />
+        </template>
         <template #cell-failClass="{ row }">
           <OTag variant="warning-soft" size="sm">{{ row.failClass }}</OTag>
         </template>
@@ -163,10 +183,12 @@ import AiAlertPackDialog from "@/components/alerts/AiAlertPackDialog.vue";
 import { buildAiPrefill } from "@/utils/alerts/prefill/fromAi";
 import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
 import {
+  buildFailureRows,
   buildLoopRows,
   countAgents,
   matchesAgentScope,
   type DrillScope,
+  type FailureRow,
   type LoopRow,
 } from "./agentScope";
 
@@ -212,13 +234,11 @@ const detailScope = computed<DrillScope>(
 
 // Highlight the row whose drawer is currently open, so the relationship
 // "this row → this drawer" is visible at a glance (rather than a drawer that
-// seems disconnected from the table). A loop row is an (agent, tool) or one of
-// its env/version variants, each with its own id.
+// seems disconnected from the table). A row is an (agent, tool) loop or an
+// (agent, class) failure, or one of its env/version variants, each with its own id.
 const isActiveRow = (type: "loop" | "failure", row: any): boolean => {
   const d = detailRow.value;
-  if (!detailOpen.value || !d || d.signalType !== type) return false;
-  if (type === "loop") return d.id === row.id;
-  return (d.agentRaw ?? null) === (row.agentRaw ?? null) && d.failClass === row.failClass;
+  return !!detailOpen.value && !!d && d.signalType === type && d.id === row.id;
 };
 const loopRowClass = (row: any) => (isActiveRow("loop", row) ? "bg-table-row-selected-bg" : "");
 const failureRowClass = (row: any) =>
@@ -256,17 +276,9 @@ const failuresEmptyMessage = computed(() =>
     : t("aiObservability.behavior.noFailures"),
 );
 
-/** Failure rows: per (agent, class) with count. */
-const failureRows = computed(() =>
-  scopedSignals.value
-    .filter((s) => s.signal_type === "failure")
-    .map((s) => ({
-      agent: s.agent_name ?? t("aiObservability.behavior.unknownAgent"),
-      agentRaw: s.agent_name ?? null,
-      failClass: s.fail_class ?? "unclassified",
-      count: s.count ?? 0,
-    }))
-    .sort((a, b) => b.count - a.count),
+/** Failure rows: one per (agent, class) over the range, most frequent first. */
+const failureRows = computed<FailureRow[]>(() =>
+  buildFailureRows(scopedSignals.value, t("aiObservability.behavior.unknownAgent")),
 );
 
 // Summary strip — at-a-glance behaviour signals. Loops draw attention (warning),
@@ -349,7 +361,8 @@ const loopColumns = computed<OTableColumnDef[]>(() => [
   { id: "actions", header: raw(""), size: 56, meta: { align: "right" }, sortable: false },
 ]);
 
-const variantColumns = computed<OTableColumnDef[]>(() => [
+// Env and version of a variant row, shared by the loop and failure variants.
+const variantScopeColumns = computed<OTableColumnDef[]>(() => [
   {
     id: "env",
     header: t("aiObservability.scope.env"),
@@ -370,6 +383,10 @@ const variantColumns = computed<OTableColumnDef[]>(() => [
       format: (v: string | null) => v ?? t("traces.agentNoVersion"),
     },
   },
+]);
+
+const variantColumns = computed<OTableColumnDef[]>(() => [
+  ...variantScopeColumns.value,
   ...loopMetricColumns.value,
 ]);
 
@@ -397,13 +414,20 @@ const failureColumns = computed<OTableColumnDef[]>(() => [
     meta: { align: "left", autoWidth: true },
     sortable: true,
   },
-  {
-    id: "count",
-    header: t("aiObservability.behavior.colCount"),
-    accessorKey: "count",
-    meta: { align: "right" },
-    sortable: true,
-  },
+  failureCountColumn.value,
+]);
+
+const failureCountColumn = computed<OTableColumnDef>(() => ({
+  id: "count",
+  header: t("aiObservability.behavior.colCount"),
+  accessorKey: "count",
+  meta: { align: "right" },
+  sortable: true,
+}));
+
+const failureVariantColumns = computed<OTableColumnDef[]>(() => [
+  ...variantScopeColumns.value,
+  failureCountColumn.value,
 ]);
 
 const tableLoading = computed(() => loading.value || props.scopeReady === false);
