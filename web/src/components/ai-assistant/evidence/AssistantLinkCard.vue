@@ -196,15 +196,22 @@ const otherOrg = computed(() => {
   const current = evidence?.currentOrg();
   return !!org && !!current && org !== current;
 });
-const canOpen = computed(() => props.openable && !otherOrg.value);
+const sessionOrg = computed(() =>
+  props.sid && evidence ? (evidence.session(props.sid)?.org ?? "") : "",
+);
+// An explorer target names its org; with none known it would open on an empty org.
+const orgUnknown = computed(() => {
+  const query = props.link?.route.query ?? {};
+  return "org_identifier" in query && !query.org_identifier && !sessionOrg.value;
+});
+const canOpen = computed(() => props.openable && !otherOrg.value && !orgUnknown.value);
 const showOpen = computed(() => live.value);
 const showNewTab = computed(() => !opensElsewhere.value);
 
 const href = computed(() => {
   if (!props.link || !router) return undefined;
   const query = { ...(props.link.route.query ?? {}) };
-  if (props.sid && evidence)
-    query.org_identifier = evidence.session(props.sid)?.org ?? query.org_identifier;
+  if (sessionOrg.value) query.org_identifier = sessionOrg.value;
   return router.resolve({
     name: props.link.route.name,
     params: props.link.route.params ?? {},

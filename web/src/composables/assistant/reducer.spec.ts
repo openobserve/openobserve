@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -1180,6 +1183,31 @@ describe("reduce: typed phases (live)", () => {
     expect(odd.resolved?.outcome).toBeUndefined();
   });
 
+  it("reads every field of a recorded o2-ai confirmation_resolved frame (WC-3)", () => {
+    const recorded = JSON.parse(
+      readFileSync(join(__dirname, "__fixtures__", "frames", "confirmation_resolved.json"), "utf8"),
+    ).frame;
+    const state = makeState({ messages: [assistant()] });
+    reduce(state, parseFrame(JSON.stringify(recorded)), live());
+    const [result] = blocksOf(state).filter((b) => b.type === "approval_result");
+    expect(result.resolved).toMatchObject({
+      id: recorded.id,
+      approved: true,
+      scope: "once",
+      outcome: "skipped",
+      code: "changed_since",
+      detail: recorded.detail,
+    });
+    expect(result.resolved?.items).toEqual([
+      expect.objectContaining({
+        type: "alert",
+        name: recorded.items[0].name,
+        status: "skipped",
+        code: "changed_since",
+      }),
+    ]);
+  });
+
   // FX-BE pass 3: an approve that ran stores one object per target; a deny keeps the decided ids.
   const ranItems = [
     {
@@ -1726,6 +1754,21 @@ describe("reduce: approval cards", () => {
       question: "Delete?",
       targets: [{ type: "alert", id: "2Yx9alert", name: "checkout-latency-old" }],
     });
+  });
+
+  it("keeps each gathered target's position key, so two panels of one dashboard stay apart (O2AI-02)", () => {
+    const card = approvalOf({
+      tool: "o2_UpdatePanels",
+      kind: "update",
+      targets: [
+        { key: "call_7:0", type: "panel", name: "CPU", id: "dash-1" },
+        { key: "call_7:1", type: "panel", name: "Mem", id: "dash-1" },
+      ],
+    });
+    expect(card.targets.map((target) => [target.key, target.id])).toEqual([
+      ["call_7:0", "dash-1"],
+      ["call_7:1", "dash-1"],
+    ]);
   });
 
   it("takes the kind from the wire, a CLI command or the fallback, never from a tool-name prefix", () => {

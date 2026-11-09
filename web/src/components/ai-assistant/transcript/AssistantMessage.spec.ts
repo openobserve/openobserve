@@ -364,7 +364,9 @@ describe("AssistantMessage", () => {
       `[checkout_5xx](/web/alerts/detail/a1?org_identifier=default). [checkout](${o}/web/traces?org_identifier=default&tab=services-catalog&service=checkout) again; `,
       `[settings](/web/settings) is no entity.`,
     ].join("");
-    const wrapper = mountMessage(answer([{ type: "text", text }]));
+    const wrapper = mountMessage(answer([{ type: "text", text }]), {
+      turn: { prompt: user(), org: "chat-org" } as never,
+    });
     const links = wrapper.findAll("a[data-entity]");
     expect(links.map((a) => [a.text(), a.attributes("data-entity")])).toEqual([
       ["checkout", "service"],
@@ -373,7 +375,7 @@ describe("AssistantMessage", () => {
       ["checkout_5xx", "alert"],
     ]);
     expect(links[1].attributes("href")).toBe(
-      "/web/logs?org_identifier=default&stream_type=logs&stream=ta_logs",
+      "/web/logs?stream=ta_logs&stream_type=logs&period=15m&type=ai_chat_query&org_identifier=chat-org",
     );
     expect(links[0].attributes("target")).toBeUndefined();
     for (const link of links) expect(link.find("span").classes()).toContain("bg-current");

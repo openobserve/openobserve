@@ -113,7 +113,7 @@ function seedMentionGroups(): void {
   queryClient.setQueryData(streamKeys.nameList("default", "logs"), [{ name: "checkout" }]);
   queryClient.setQueryData(streamKeys.nameList("default", "metrics"), []);
   queryClient.setQueryData(streamKeys.nameList("default", "traces"), []);
-  queryClient.setQueryData(alertKeys.list("default", "default", undefined, undefined), []);
+  queryClient.setQueryData(alertKeys.list("default", "", undefined, undefined), []);
   queryClient.setQueryData(pipelineKeys.list("default"), []);
   queryClient.setQueryData(dashboardKeys.byFolder("default", "default"), []);
 }
@@ -1306,19 +1306,61 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
   });
 
   it("sends the queued message when the answer ends, and drops the held reason (U8)", async () => {
-    const { wrapper, store, sid, textarea } = setup();
+    const { wrapper, store, sid, textarea, send } = setup();
     const resend = vi.spyOn(store, "resend").mockResolvedValue(undefined as never);
+    const sent: string[] = [];
+    send.mockImplementation(async (id) => {
+      sent.push(store.state.sessions[id].composer.text);
+      store.setDraft(id, { text: "" });
+      return { state: "done", saved: "server" };
+    });
     store.state.sessions[sid].turn = { state: "responding" } as never;
     await type(textarea(), "next");
     await textarea().trigger("keydown", { key: "Enter" });
     await textarea().trigger("keydown", { key: "Enter" });
     store.state.sessions[sid].turn = { state: "done", saved: "server" };
     await flushPromises();
-    expect(resend).toHaveBeenCalledTimes(1);
-    expect(resend).toHaveBeenCalledWith(sid, expect.objectContaining({ text: "next" }), "typed");
+    expect(sent).toEqual(["next"]);
+    expect(resend).not.toHaveBeenCalled();
     expect(store.state.sessions[sid].composer.text).toBe("");
     expect(wrapper.find('[data-notice="queued"]').exists()).toBe(false);
     expect(wrapper.find('[data-notice="blocked"]').exists()).toBe(false);
+  });
+
+  it("Q1: a queued message keeps its staged chip and time window, and the next draft does not inherit the chip", async () => {
+    const { store, sid, textarea, send } = setup();
+    const window = { from: 1_700_000_000_000_000, to: 1_700_000_900_000_000 };
+    const sent: { text: string; chips: string[]; timeOverride: unknown }[] = [];
+    send.mockImplementation(async (id) => {
+      const { text, chips, timeOverride } = store.state.sessions[id].composer;
+      sent.push({ text, chips: chips.map((chip) => chip.id), timeOverride });
+      return { state: "done", saved: "server" };
+    });
+    store.state.sessions[sid].turn = { state: "responding" } as never;
+    store.addChip(sid, ROW);
+    store.setDraft(sid, { timeOverride: window });
+    await type(textarea(), "why this row?");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.chips.map((chip) => chip.id)).not.toContain("row-1");
+    expect(queuedOf(sid)?.snapshot.chips.map((chip) => chip.id)).toContain("row-1");
+    store.state.sessions[sid].turn = { state: "done", saved: "server" };
+    await flushPromises();
+    expect(sent).toEqual([
+      { text: "why this row?", chips: expect.arrayContaining(["row-1"]), timeOverride: window },
+    ]);
+  });
+
+  it("Q3: a queued message waits in the field instead of sending while the chat's access is lost", async () => {
+    const { store, sid, textarea, send, wrapper } = setup();
+    store.state.sessions[sid].turn = { state: "responding" } as never;
+    await type(textarea(), "next");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await wrapper.setProps({ accessLost: true });
+    store.state.sessions[sid].turn = { state: "done", saved: "server" };
+    await flushPromises();
+    expect(send).not.toHaveBeenCalled();
+    expect(store.state.sessions[sid].composer.text).toBe("next");
   });
 
   it("Edit takes the queued message back into the field", async () => {

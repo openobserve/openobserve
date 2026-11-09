@@ -4,7 +4,7 @@
   const SCENARIOS = window.__O2MOCK_SCENARIOS__ || {};
   const HTTP_SCENARIOS = window.__O2MOCK_HTTP_SCENARIOS__ || {};
   const mock = (window.__o2mock = window.__o2mock || {});
-  // tailEnabled, envelopeEnabled, lifecycleFramesEnabled, cancelDelayMs, cancelStatus, confirmStatus, confirmDelayMs, confirmFail (item names /confirm fails), confirmUndoable (items the server can undo).
+  // tailEnabled, envelopeEnabled, lifecycleFramesEnabled, cancelDelayMs, cancelStatus, confirmStatus, confirmDelayMs, confirmFail (item names /confirm fails), confirmUndoable (items the server can undo), confirmGrant (the `grant` a scoped approve answers).
   mock.knobs = { ...(window.__O2MOCK_KNOBS__ || {}), ...(mock.knobs || {}) };
   // The last streamed turn, so the tail route can resume it.
   mock.lastTurn = null;
@@ -26,7 +26,9 @@
     const card = (scenario.frames || []).find((frame) => frame.type === "confirmation_required");
     const items = card?.tool === "o2_delete" ? card.args?.items || [] : null;
     if (!body.approved) return { status, body: items ? { approved: false, deleted: false, count: 0 } : { approved: false, kind: "opencode_permission" } };
-    if (!items) return { status, body: { approved: true, replied: true, kind: "opencode_permission" } };
+    // OSS reports whether a chat or always approve stored its grant (`grant.stored`); `confirmGrant` sets that answer.
+    const grant = body.scope && mock.knobs.confirmGrant ? { grant: mock.knobs.confirmGrant } : {};
+    if (!items) return { status, body: { approved: true, replied: true, kind: "opencode_permission", ...grant } };
     const failed = new Set(mock.knobs.confirmFail || []);
     const results = items.map((item) => ({
       resource: item.name,

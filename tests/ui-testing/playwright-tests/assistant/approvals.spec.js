@@ -333,4 +333,53 @@ test.describe("assistant approval cards", () => {
     expect((await confirmations(page))[0].approved).toBe(false);
     await expect(assistant.container()).toBeVisible();
   });
+
+  test.describe("always-allow scope and its grant", () => {
+    const grantRow = () => ({
+      id: "gr_e2e_mute",
+      tool: "MuteAlert",
+      operation: "MuteAlert",
+      scope: "always",
+      granted_by: harness.ENV.user,
+      granted_at: Date.now() * 1000,
+    });
+    const always = () => assistant.approvalResult().locator('[data-test="assistant-approval-result-always"]');
+    const revoke = () => assistant.approvalResult().locator('[data-test="assistant-approval-result-revoke"]');
+
+    async function approveAlways(page, grant) {
+      // A server that budgets approvals lets a card offer a scope; the grant list is read from GET /ai/grants.
+      state.capabilitiesEnabled = true;
+      state.capabilities = { approval_extend_budgets: true };
+      state.grantsEnabled = true;
+      await ask(page, "mute_two_grantable", "pause the noisy alerts");
+      await harness.setKnobs(page, { confirmGrant: grant });
+      const scope = assistant.approval().locator('[data-test="assistant-approval-scope-trigger"]');
+      await scope.click();
+      await page.locator('[data-test="assistant-approval-scope-option"][data-test-value="tool"]').click();
+      await approve().click();
+      await expect.poll(async () => (await confirmations(page)).at(-1)).toMatchObject({ approved: true, scope: "always" });
+    }
+
+    test("APPR-20 an always approve lists its grant with Revoke, which sends the DELETE", { tag: ["@mock"] }, async ({ page }) => {
+      state.grants = [grantRow()];
+      await approveAlways(page, { stored: true, scope: "always", id: "gr_e2e_mute" });
+      await expect(always()).toContainText("Always allowed:");
+      const deleted = page.waitForRequest(
+        (req) => req.method() === "DELETE" && /\/ai\/grants\/gr_e2e_mute$/.test(new URL(req.url()).pathname),
+      );
+      await revoke().click();
+      await deleted;
+      await expect(always()).toHaveText("Approval revoked. The assistant will ask next time.");
+      expect(state.log).toContain("REVOKE grant gr_e2e_mute");
+    });
+
+    test("APPR-21 a grant the server refuses reads as not saved, with no Revoke", { tag: ["@mock"] }, async ({ page }) => {
+      state.grants = [];
+      await approveAlways(page, { stored: false, scope: "always", reason: "read_only" });
+      await expect(always()).toHaveAttribute("data-grant", "not_stored");
+      await expect(always()).toContainText("wasn't saved for later");
+      await expect(revoke()).toHaveCount(0);
+      expect(state.log.some((line) => line.startsWith("REVOKE"))).toBe(false);
+    });
+  });
 });

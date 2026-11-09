@@ -40,6 +40,8 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantStore: () => ({ openSession }),
 }));
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 const created = {
   session_id: "new-1",
   title: "Branch of Checkout failures",
@@ -96,7 +98,7 @@ describe("useBranchChat", () => {
     const result = await branch.branch({ sid: "s 1", turnId: "t2", version: 1 });
     expect(post).toHaveBeenCalledWith(
       "/api/default/ai/chats/s%201/branch",
-      { turn_id: "t2", version: 1 },
+      { turn_id: "t2", version: 1, session_id: expect.stringMatching(UUID) },
       { headers: { "Content-Type": "application/json" } },
     );
     expect(openSession).toHaveBeenCalledWith({ sid: "new-1" }, { focus: true });
@@ -107,7 +109,19 @@ describe("useBranchChat", () => {
 
   it("sends no version when none is given", async () => {
     await withBranch().branch({ sid: "s1", turnId: "t2" });
-    expect(post.mock.calls[0][1]).toEqual({ turn_id: "t2" });
+    expect(post.mock.calls[0][1]).toEqual({
+      turn_id: "t2",
+      session_id: expect.stringMatching(UUID),
+    });
+  });
+
+  it("picks a new chat id per click, so a resent request cannot make a second branch (R6)", async () => {
+    const branch = withBranch();
+    await branch.branch({ sid: "s1", turnId: "t2" });
+    await branch.branch({ sid: "s1", turnId: "t2" });
+    const [first, second] = post.mock.calls.map(([, body]) => body.session_id);
+    expect(first).toMatch(UUID);
+    expect(second).not.toBe(first);
   });
 
   it("toasts and opens nothing when the server refuses (409 turn not finished)", async () => {

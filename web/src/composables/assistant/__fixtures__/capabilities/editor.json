@@ -1,7 +1,8 @@
 {
   "health": {
     "status": "ok",
-    "checked_at": "2026-10-15T10:00:00Z"
+    "checked_at": "2026-10-15T10:00:00Z",
+    "approvals_enforced": true
   },
   "model": "default",
   "agent_version": "1.42.0",

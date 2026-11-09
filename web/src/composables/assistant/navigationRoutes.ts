@@ -348,8 +348,8 @@ export function buildNavigationRoute(action: NavigationActionLike, org: string):
   }
 }
 
-/** A resolved same-origin href as a card target for an allowlisted route, ids rebuilt; explorer links never run. */
-export function rebuildMarkdownTarget(resolved: ResolvedLink): LinkTarget | null {
+/** A resolved same-origin href as a card target for an allowlisted route, ids rebuilt; explorer links never run. `org` is the chat's org. */
+export function rebuildMarkdownTarget(resolved: ResolvedLink, org = ""): LinkTarget | null {
   const name = typeof resolved.name === "string" ? resolved.name : "";
   const query = resolved.query ?? {};
   const explorer = EXPLORER_OF_ROUTE[name];
@@ -362,7 +362,7 @@ export function rebuildMarkdownTarget(resolved: ResolvedLink): LinkTarget | null
       ...stringField("stream", idText(firstOf(query.stream))),
       ...stringField("streamType", streamTypeOf(firstOf(query.stream_type)) ?? explorer),
       ...rangeOf(firstOf(query.from), firstOf(query.to)),
-      org: "",
+      org,
     });
   }
   if (!(MARKDOWN_LINK_ROUTES as readonly string[]).includes(name)) return null;

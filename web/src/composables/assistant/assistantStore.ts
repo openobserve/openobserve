@@ -360,6 +360,9 @@ interface StoreCore {
   focusRequest: Ref<FocusRequest | null>;
   /** Sids of this tab's windows, most recently focused first. */
   windowRecency: Sid[];
+  /** Bumped by every activation and every open, so a slow open never takes focus back from a later one. */
+  activeSeq: number;
+  openSeq: number;
   /** Every user+org this store was bound to, for the sign-out purge. */
   identities: Set<string>;
   signOutKeys(): Promise<string[]>;
@@ -602,6 +605,8 @@ function createCore(
     restoredDrafts: reactive(new Map<Sid, { imageCount: number }>()),
     focusRequest: shallowRef<FocusRequest | null>(null),
     windowRecency: [],
+    activeSeq: 0,
+    openSeq: 0,
     identities: new Set(),
     signOutKeys: options.signOutKeys ?? (async () => []),
     session: (sid) => (sid ? state.sessions[sid] : undefined),
@@ -643,6 +648,7 @@ function createCore(
     },
     setActive(sid) {
       if (sid && !state.sessions[sid]) return;
+      core.activeSeq += 1;
       state.shell.activeSid = sid;
       if (sid) {
         state.recent = [sid, ...state.recent.filter((id) => id !== sid)];
@@ -723,6 +729,7 @@ function createSessionSlice(core: StoreCore) {
       return sid;
     },
     async openSession(target, opts) {
+      const ticket = takeOpenTicket(core);
       const known =
         "sid" in target
           ? core.session(target.sid)
@@ -742,6 +749,7 @@ function createSessionSlice(core: StoreCore) {
         const sid = await deps.history.open(target);
         core.released.delete(sid);
         restoreStoredDraft(core, sid);
+        if (superseded(core, ticket)) return sid;
         removeWindow(core, sid);
         core.setActive(sid);
         if (opts?.focus) requestFocus(core);
@@ -749,7 +757,7 @@ function createSessionSlice(core: StoreCore) {
       } catch (err) {
         if (!known) throw err;
         known.record.historyUnavailable = true;
-        core.setActive(known.sid);
+        if (!superseded(core, ticket)) core.setActive(known.sid);
         return known.sid;
       }
     },
@@ -1035,8 +1043,9 @@ function createWindowSlice(core: StoreCore) {
       else supersedeFocus(core);
     },
     async openInWindow(windowSid, target) {
+      const ticket = takeOpenTicket(core);
       const sid = await loadChat(core, target);
-      if (sid === windowSid) return sid;
+      if (sid === windowSid || superseded(core, ticket)) return sid;
       if (windowOf(state.shell, sid)) {
         showWindow(core, sid, "composer");
         return sid;
@@ -1410,7 +1419,8 @@ function createTurnSlice(core: StoreCore) {
       );
     },
     resend(sid, snapshot, input, opts) {
-      if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      const session = core.session(sid);
+      if (!session || !core.writable(session)) return Promise.resolve(refusedUnknown());
       const locked = refusedByLock(core.turnLock(sid));
       if (locked) return Promise.resolve(locked);
       const reply = opts?.replyToApproval;
@@ -1963,6 +1973,16 @@ function leavePrimary(core: StoreCore): void {
   shell.sidebarCapRem = null;
   core.setActive(null);
   core.persistPlacement();
+}
+
+function takeOpenTicket(core: StoreCore): { open: number; active: number } {
+  core.openSeq += 1;
+  return { open: core.openSeq, active: core.activeSeq };
+}
+
+// A newer open, or any activation since this open began, owns the focus now.
+function superseded(core: StoreCore, ticket: { open: number; active: number }): boolean {
+  return core.openSeq !== ticket.open || core.activeSeq !== ticket.active;
 }
 
 async function loadChat(core: StoreCore, target: { sid: Sid } | { chatId: number }): Promise<Sid> {

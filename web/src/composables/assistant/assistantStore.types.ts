@@ -346,6 +346,8 @@ export interface QuestionOption {
 export type ApprovalScope = "once" | "chat" | "tool";
 
 export interface ApprovalTarget {
+  /** `<card id>:<position>`, unique within the card; the selection key, since `id` can repeat or be absent. */
+  key?: string;
   type: string;
   id?: string;
   name: string;
@@ -451,6 +453,8 @@ export interface ApprovalOutcome {
     | "expired"
     | "withdrawn"
     | "delivery_failed"
+    /** Another `/confirm` of this card is being decided now; never stored, the chat is re-read for how it ends. */
+    | "deciding"
     | "unconfirmed"
     | "approved_elsewhere"
     | "declined_elsewhere";
@@ -462,6 +466,8 @@ export interface ApprovalOutcome {
   by?: string;
   /** Why a decision came to nothing, in the server's words from `detail`. */
   reason?: string;
+  /** The server refused or failed to store the grant an approve asked for. */
+  grant?: { stored: false; reason?: string };
 }
 
 /** A mutation this chat made (AA-10); undo only where the object's API allows it. */

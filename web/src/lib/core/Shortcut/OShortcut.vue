@@ -21,6 +21,7 @@ const resolvedKeys = computed<string | string[]>(() => {
 /** Token → display symbol. Modifier glyphs are platform-aware. */
 const SYMBOLS: Record<string, string> = {
   ctrl: isMac ? "⌘" : "Ctrl",
+  control: isMac ? "⌃" : "Ctrl",
   cmd: "⌘",
   meta: isMac ? "⌘" : "Win",
   shift: isMac ? "⇧" : "Shift",

@@ -26,7 +26,7 @@ import {
   sessionHints,
   type HistoryCtx,
 } from "./historyContext";
-import { LOCAL_CAP, type LocalRecord, type LocalTurn } from "./historyDb";
+import { LOCAL_CAP, SERVER_CACHE_CAP, type LocalRecord, type LocalTurn } from "./historyDb";
 import type { StoredTurn } from "./record";
 import { isTerminal } from "./turnStates";
 
@@ -66,7 +66,8 @@ export async function saveSession(
   ctx.notSavedSids.delete(sid);
   if (record.userOrgKey) ctx.rememberKey(record.userOrgKey);
   const isNew = !ctx.localById.value.has(written.id);
-  await ctx.reloadLocal();
+  if (server) await keepWritten(written, ctx);
+  else await ctx.reloadLocal();
   if (isNew && !server) ctx.postChanged(sid, "create");
   return server ? "server" : "local";
 }
@@ -109,7 +110,27 @@ export async function writeCache(
     return;
   }
   ctx.rememberKey(userOrgKey);
-  await ctx.reloadLocal();
+  if (ctx.serverMode()) await keepWritten(written, ctx);
+  else await ctx.reloadLocal();
+}
+
+// One row changed, so the list is patched rather than re-read; past the cap the oldest unopened server chats go.
+async function keepWritten(written: LocalRecord, ctx: HistoryCtx): Promise<void> {
+  if (!ctx.localLoaded.value || written.userOrgKey !== ctx.key()) return ctx.reloadLocal();
+  const rows = [...ctx.local.value.filter((row) => row.id !== written.id), written];
+  const cached = rows.filter((row) => row.serverBacked);
+  const excess = cached.length - SERVER_CACHE_CAP;
+  const victims =
+    excess > 0
+      ? cached
+          .filter((row) => !row.liveTurnId && !(row.sessionId && ctx.session(row.sessionId)))
+          .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
+          .slice(0, excess)
+      : [];
+  const gone = new Set(victims.map((row) => row.id));
+  ctx.local.value = rows.filter((row) => !gone.has(row.id));
+  if (!victims.length || !written.userOrgKey) return;
+  await ctx.deps.db.remove([...gone], written.userOrgKey).catch(() => ctx.noteStorageFailure());
 }
 
 // Prune-on-save: the oldest unpinned chat goes and Undo keeps it for 10 s; nothing is pruned on read.

@@ -225,6 +225,14 @@ describe("AssistantApprovalResult", () => {
     expect(expired.host.askAgain).toHaveBeenCalledWith(expired.evidence.sid, "c9");
   });
 
+  it("says a card another decision holds is already being decided, with no Send again (O2AI-01)", () => {
+    const { wrapper } = mountRecord({ outcome: { state: "deciding", at: 1 } });
+    expect(line(wrapper)).toBe(
+      "This request is already being decided in another tab. Checking how it ends…",
+    );
+    expect(wrapper.find('[data-test="assistant-approval-result-send-again"]').exists()).toBe(false);
+  });
+
   it("names a refusal the server explained", () => {
     const { wrapper } = mountRecord({ outcome: { state: "failed", at: 1, httpStatus: 403 } });
     expect(line(wrapper)).toBe(
@@ -887,6 +895,79 @@ describe("AssistantApprovalResult", () => {
       expect(grants).toHaveBeenCalled();
       expect(revoke).toHaveBeenCalledWith(expect.any(String), "g1");
       expect(always.text()).toBe("Approval revoked. The assistant will ask next time.");
+    });
+
+    const adaGrant = (over: Record<string, unknown> = {}) => ({
+      id: "g1",
+      tool: "UpdateAlert",
+      operation: "",
+      scope: "always",
+      granted_by: "ada@example.com",
+      granted_at: 1,
+      ...over,
+    });
+    const approvedAlways = {
+      outcome: {
+        state: "done" as const,
+        at: 1,
+        decision: { approved: true as const, scope: "tool" as const },
+      },
+    };
+
+    it("W2: offers no Revoke and claims no grant while the grants list is still loading", async () => {
+      vi.spyOn(assistantSettings, "grants").mockReturnValue(new Promise(() => {}));
+      const revoke = vi.spyOn(assistantSettings, "revokeGrant");
+      const { wrapper } = mountRecord(approvedAlways, { blocks: [updateBlock] });
+      await flushPromises();
+      expect(wrapper.find('[data-test="assistant-approval-result-revoke"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="assistant-approval-result-always"]').exists()).toBe(false);
+      expect(revoke).not.toHaveBeenCalled();
+    });
+
+    it("W2: a revoke the server refuses keeps the grant line", async () => {
+      vi.spyOn(assistantSettings, "grants").mockResolvedValue([adaGrant()]);
+      vi.spyOn(assistantSettings, "revokeGrant").mockRejectedValue(new Error("500"));
+      const { wrapper } = mountRecord(approvedAlways, { blocks: [updateBlock] });
+      await flushPromises();
+      await wrapper.get('[data-test="assistant-approval-result-revoke"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.get('[data-test="assistant-approval-result-always"]').text()).toContain(
+        "Always allowed: updating alerts",
+      );
+    });
+
+    it("W3: an always approve the server never stored says so, not revoked", async () => {
+      vi.spyOn(assistantSettings, "grants").mockResolvedValue([]);
+      const { wrapper } = mountRecord(approvedAlways, { blocks: [updateBlock] });
+      await flushPromises();
+      const always = wrapper.get('[data-test="assistant-approval-result-always"]');
+      expect(always.attributes("data-grant")).toBe("not_stored");
+      expect(always.text()).not.toContain("revoked");
+      expect(wrapper.find('[data-test="assistant-approval-result-revoke"]').exists()).toBe(false);
+    });
+
+    it("W3: the server's refusal of the grant wins over any listed grant", async () => {
+      vi.spyOn(assistantSettings, "grants").mockResolvedValue([adaGrant()]);
+      const { wrapper } = mountRecord(
+        { outcome: { ...approvedAlways.outcome, grant: { stored: false, reason: "read-only" } } },
+        { blocks: [updateBlock] },
+      );
+      await flushPromises();
+      expect(
+        wrapper.get('[data-test="assistant-approval-result-always"]').attributes("data-grant"),
+      ).toBe("not_stored");
+    });
+
+    it("W3: the reader's grant matches whatever case the server stored the email in", async () => {
+      vi.spyOn(assistantSettings, "grants").mockResolvedValue([
+        adaGrant({ granted_by: "Ada@Example.com" }),
+      ]);
+      const { wrapper } = mountRecord(approvedAlways, { blocks: [updateBlock] });
+      await flushPromises();
+      expect(wrapper.get('[data-test="assistant-approval-result-always"]').text()).toContain(
+        "Always allowed: updating alerts",
+      );
+      expect(wrapper.find('[data-test="assistant-approval-result-revoke"]').exists()).toBe(true);
     });
 
     it("a once approve has no always line", () => {

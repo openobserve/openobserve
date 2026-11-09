@@ -112,4 +112,14 @@ describe("AssistantIconButton", () => {
     expect(wrapper.find('[aria-live="polite"]').text()).toBe("Link copied");
     expect(mountButton().get("button").attributes("data-done")).toBeUndefined();
   });
+
+  it("A1: keeps its live region mounted before the action finishes, so the confirmation is announced", async () => {
+    const wrapper = mountButton({ label: raw("Share link"), confirms: true });
+    const live = wrapper.get('[aria-live="polite"]');
+    expect(live.text()).toBe("");
+    await wrapper.setProps({ done: raw("Link copied") });
+    expect(wrapper.get('[aria-live="polite"]').element).toBe(live.element);
+    expect(live.text()).toBe("Link copied");
+    expect(mountButton().find('[aria-live="polite"]').exists()).toBe(false);
+  });
 });

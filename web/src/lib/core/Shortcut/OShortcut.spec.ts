@@ -33,6 +33,18 @@ describe("OShortcut", () => {
     });
   });
 
+  describe("registry ids (K1)", () => {
+    it("shows a Mac binding that is not the Ctrl→⌘ swap as bound, with ⌃ for Control", () => {
+      wrapper = mount(OShortcut, { props: { id: "editorTabFocusMode" } });
+      expect(wrapper.find("kbd").text()).toBe("⌃⇧M");
+    });
+
+    it("keeps the plain Ctrl→⌘ swap for an ordinary pair", () => {
+      wrapper = mount(OShortcut, { props: { id: "assistantHelper" } });
+      expect(wrapper.find("kbd").text()).toBe("⌘I");
+    });
+  });
+
   describe("array rendering", () => {
     it("should render one keycap per array element, symbolised", () => {
       wrapper = mount(OShortcut, { props: { keys: ["ctrl", "k"] } });

@@ -28,6 +28,7 @@ import { applyAction, createActionDispatcher } from "../registry";
 import {
   approvalAnnotationKey,
   approvalResultOf,
+  approvalTargetKey,
   canAlwaysAllow,
   confirmBodyOf,
   recordedLedger,
@@ -751,5 +752,73 @@ describe("alert lists after an applied write (J4-8)", () => {
     expect(writesAlert(approvalOf({ tool: "EnableAlert", args: { value: false } }))).toBe(true);
     expect(writesAlert(approvalOf({ kind: "permission", tool: "o2_search_alerts" }))).toBe(false);
     expect(writesAlert(approvalOf({ kind: "create", tool: "CreateDashboard" }))).toBe(false);
+  });
+
+  describe("W3: a grant the server did not store", () => {
+    const CREATE = {
+      type: "confirmation_required",
+      tool: "CreateAlert",
+      id: "apr_8322fe27c073007f4499",
+      kind: "create",
+      operation: "CreateAlert",
+      destructive: false,
+      grantable: true,
+      targets: [{ type: "alert", name: "payment_errors" }],
+    };
+
+    it("keeps the server's refusal of the grant on the outcome", async () => {
+      const { sid, env, session, dispatcher } = withCard(CREATE);
+      env.confirm.mockResolvedValueOnce({
+        approved: true,
+        resolved: { outcome: "approved" },
+        grant: { stored: false, reason: "read-only tools are never granted" },
+      });
+      await dispatcher.approvals(sid, {
+        kind: "approval",
+        approvalId: CREATE.id,
+        decision: { approved: true, scope: "tool" },
+      });
+      expect(session.annotations[approvalAnnotationKey(CREATE.id)].approvalOutcome).toMatchObject({
+        state: "approved",
+        grant: { stored: false, reason: "read-only tools are never granted" },
+      });
+    });
+
+    it("adds no grant to an outcome whose grant was stored", async () => {
+      const { sid, env, session, dispatcher } = withCard(CREATE);
+      env.confirm.mockResolvedValueOnce({ approved: true, grant: { stored: true } });
+      await dispatcher.approvals(sid, {
+        kind: "approval",
+        approvalId: CREATE.id,
+        decision: { approved: true, scope: "tool" },
+      });
+      const outcome = session.annotations[approvalAnnotationKey(CREATE.id)].approvalOutcome;
+      expect(outcome).not.toHaveProperty("grant");
+    });
+  });
+
+  it("O2AI-02: matches a row to its target by position key when two targets share a name", () => {
+    const targets = [
+      { key: "apr_1:0", type: "panel", name: "CPU", id: "dash-1" },
+      { key: "apr_1:1", type: "panel", name: "CPU", id: "dash-2" },
+    ];
+    const result = approvalResultOf(
+      { targets },
+      {
+        items: [
+          { key: "apr_1:1", name: "CPU", type: "panel", status: "done", id: "" },
+          { key: "apr_1:0", name: "CPU", type: "panel", status: "done", id: "" },
+        ],
+      },
+      "a@b.c",
+      1,
+    );
+    expect(result?.items.map((item) => item.id)).toEqual(["dash-2", "dash-1"]);
+  });
+
+  it("O2AI-02: a target's selection key is its position key, else its id or name", () => {
+    expect(approvalTargetKey({ key: "apr_1:0", id: "dash-1", name: "CPU" })).toBe("apr_1:0");
+    expect(approvalTargetKey({ id: "dash-1", name: "CPU" })).toBe("dash-1");
+    expect(approvalTargetKey({ name: "CPU" })).toBe("CPU");
   });
 });

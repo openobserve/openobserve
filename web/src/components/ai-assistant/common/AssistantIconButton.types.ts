@@ -42,6 +42,8 @@ export interface AssistantIconButtonProps {
   on?: boolean;
   /** Confirms a finished action in place ("Link copied"): a check, this text and the success colour, with `data-done`. */
   done?: I18nText;
+  /** Set on a button that will show `done`, so its announcement region is in place before the text arrives. */
+  confirms?: boolean;
   dataTest: string;
 }
 

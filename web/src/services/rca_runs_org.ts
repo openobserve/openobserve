@@ -35,6 +35,8 @@ export interface OrgRcaRun {
 export interface OrgRcaRunsResponse {
   runs: OrgRcaRun[];
   has_more: boolean;
+  /** The next page's `before`; the last run's id is not a valid cursor. */
+  next_before?: string | null;
 }
 
 /** The list's filters; every one is optional and `limit` is 1 to 100. */

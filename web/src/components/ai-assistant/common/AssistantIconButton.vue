@@ -34,10 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ]"
     @click="emit('click', $event)"
   >
-    <template v-if="done">
-      <OIcon :name="assistantGlyph.done" size="sm" />
-      <span aria-live="polite">{{ done }}</span>
-    </template>
+    <OIcon v-if="done" :name="assistantGlyph.done" size="sm" />
     <span v-else-if="badge" class="relative inline-flex">
       <OIcon :name="icon" size="sm" />
       <span
@@ -48,6 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </span>
     <OIcon v-else :name="icon" size="sm" />
+    <!-- A live region mounted with its text is often not announced, so a confirming button keeps it mounted -->
+    <span v-if="confirms || done" aria-live="polite" :class="done ? '' : 'sr-only'">{{
+      done ?? ""
+    }}</span>
     <OIcon v-if="chevron" :name="assistantGlyph.expand" size="xs" />
     <template v-if="unavailable" #unavailable-reason>{{ disabledReason }}</template>
     <!-- An open menu or popover covers what the tooltip would say, so the tooltip waits (D2) -->
@@ -91,6 +92,7 @@ const props = withDefaults(defineProps<AssistantIconButtonProps>(), {
   chevron: false,
   on: false,
   done: undefined,
+  confirms: false,
 });
 
 const emit = defineEmits<AssistantIconButtonEmits>();

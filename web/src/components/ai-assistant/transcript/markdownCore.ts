@@ -227,6 +227,19 @@ const ENTITY_GLYPHS: Readonly<Record<EntityKind, string>> = {
   alert: CLASSES.entityAlert,
 };
 
+// The only params an entity link keeps; a model-written `query`, `type` or org must never reach a page that runs URL queries.
+const ENTITY_PARAMS: Readonly<Record<EntityKind, readonly string[]>> = {
+  stream: ["stream", "stream_type", "period", "from", "to"],
+  service: ["tab", "service", "stream"],
+  dashboard: ["dashboard", "folder", "tab"],
+  alert: ["folder"],
+};
+
+// Mirrors `AI_CHAT_QUERY` in utils/assistant/explorerRoutes.ts, which this worker module cannot import without pulling in i18n.
+const STREAM_LINK_TYPE = "ai_chat_query";
+
+const STREAM_LINK_PERIOD = "15m";
+
 // A quote opening with one of these bold labels is that kind of callout; any other quote is a neutral note.
 const CALLOUT_LABELS: readonly [CalloutKind, RegExp][] = [
   ["cause", /^(?:root cause|likely cause|cause)\b/i],
@@ -501,9 +514,9 @@ export function parseBlock(request: ParseRequest): ParseResult {
   };
   try {
     const open = request.state === "open";
-    // Only a streaming block closes its own unterminated fence; a completed one is lexed exactly as sent (X11).
     // The model's own slot characters go before lexing, so no code span or alt text can forge a slot.
     const source = withoutFootnotes(request.text.replace(SLOT_CHARS, ""));
+    // Only a streaming block closes its own unterminated fence; a completed one is lexed exactly as sent (X11).
     const repaired = open ? repairFence(source) : { text: source, open: false };
     const tokens = instance().lexer(repaired.text);
     // Markers come out of prose only; code keeps `[^0-9]` and every other bracket as written.
@@ -986,10 +999,31 @@ export function entityKindOf(url: URL): EntityKind | null {
 
 // An in-app link with its type's glyph, on the object's first mention only (K2).
 function entityLinkHtml(url: URL, kind: EntityKind, label: string): string {
-  const attr = escapeAttr(url.href);
-  if (attr.length > MAX_URL_CHARS || linked.has(url.href)) return `<span>${label}</span>`;
-  linked.add(url.href);
+  const href = url.origin + entityHref(url, kind);
+  const attr = escapeAttr(href);
+  if (attr.length > MAX_URL_CHARS || linked.has(href)) return `<span>${label}</span>`;
+  linked.add(href);
   return `<a href="${attr}" class="${CLASSES.entityLink}"><span class="${ENTITY_GLYPHS[kind]}"></span>${label}</a>`;
+}
+
+/** An entity link's in-app href rebuilt from its identifying params only; `org` pins the org, and a stream link only re-applies. */
+export function entityHref(url: URL, kind: EntityKind, org = ""): string {
+  const params = new URLSearchParams();
+  for (const key of ENTITY_PARAMS[kind]) {
+    const value = url.searchParams.get(key);
+    if (value) params.set(key, value);
+  }
+  if (kind === "stream") {
+    if (!params.get("from") || !params.get("to")) {
+      params.delete("from");
+      params.delete("to");
+      if (!params.get("period")) params.set("period", STREAM_LINK_PERIOD);
+    }
+    params.set("type", STREAM_LINK_TYPE);
+  }
+  if (org) params.set("org_identifier", org);
+  const search = params.toString();
+  return search ? `${url.pathname}?${search}` : url.pathname;
 }
 
 /** An href as a URL against the page origin, or `null`; the sanitiser re-checks links with it. */

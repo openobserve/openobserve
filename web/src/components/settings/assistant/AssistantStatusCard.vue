@@ -290,6 +290,13 @@ const rows = computed<StatusRow[]>(() => {
     label: t("assistant.settings.status.lastError"),
     value: lastErrorText(),
   });
+  if (health?.approvalsEnforced === false) {
+    list.push({
+      id: "approvals",
+      label: t("assistant.settings.status.approvals"),
+      value: t("assistant.settings.status.approvalsNotEnforced"),
+    });
+  }
   if (kind !== "unsupported" && health?.checkedAt) {
     list.push({
       id: "checked",

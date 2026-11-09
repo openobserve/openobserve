@@ -16,7 +16,8 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildNavigationRoute } from "@/composables/assistant/pure";
+import { buildNavigationRoute, rebuildMarkdownTarget } from "@/composables/assistant/pure";
+import { b64EncodeUnicode } from "@/utils/formatters";
 
 import { fakeEvidence } from "../__tests__/fakeEvidence";
 import { fakeRouter } from "../__tests__/fakeAssistant";
@@ -26,6 +27,7 @@ const routes = [
   { path: "/dashboards/view", name: "viewDashboard", component: { render: () => null } },
   { path: "/traces", name: "traces", component: { render: () => null } },
   { path: "/ingestion", name: "ingestion", component: { render: () => null } },
+  { path: "/logs", name: "logs", component: { render: () => null } },
 ];
 
 const logs = buildNavigationRoute(
@@ -170,6 +172,16 @@ describe("AssistantLinkCard", () => {
     expect(other.wrapper.find('[data-test="assistant-link-card-new-tab"]').exists()).toBe(false);
     const closed = mountCard({ link: dashboard, readonly: true, openable: false }, false);
     expect(closed.wrapper.find('[data-test^="assistant-link-card-"][href]').exists()).toBe(false);
+  });
+
+  it("offers no Open for a Markdown Logs link on a page that knows no org (WT-04)", () => {
+    const resolved = { name: "logs", query: { sql: b64EncodeUnicode("select 1"), stream: "a" } };
+    const orgless = rebuildMarkdownTarget(resolved);
+    const { wrapper } = mountCard({ link: orgless, readonly: true, source: "markdown" }, false);
+    expect(wrapper.find('[data-test^="assistant-link-card-"][href]').exists()).toBe(false);
+    const known = mountCard({ link: rebuildMarkdownTarget(resolved, "acme") }, false);
+    const href = known.wrapper.get('[data-test="assistant-link-card-new-tab"]').attributes("href");
+    expect(href).toContain("org_identifier=acme");
   });
 
   it("captions a Markdown link so it never looks like a tool navigation", () => {

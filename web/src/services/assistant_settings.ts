@@ -51,7 +51,12 @@ export type CapabilityTestResult = ToolsetTestResult;
 
 /** The capabilities fields Settings renders, checked and bounded; a wrong type reads as not reported. */
 export interface CapabilityStatus {
-  health: { status: string; lastError?: string; checkedAt?: number } | null;
+  health: {
+    status: string;
+    lastError?: string;
+    checkedAt?: number;
+    approvalsEnforced?: boolean;
+  } | null;
   model?: string;
   agentVersion?: string;
   provider?: string;
@@ -143,6 +148,9 @@ export function parseCapabilityStatus(body: unknown): CapabilityStatus | null {
             status: health.status.slice(0, MAX_LABEL),
             lastError: clip(health.last_error, MAX_TEXT),
             checkedAt: time(health.checked_at),
+            ...(typeof health.approvals_enforced === "boolean" && {
+              approvalsEnforced: health.approvals_enforced,
+            }),
           }
         : null,
     model: clip(body.model, MAX_LABEL),

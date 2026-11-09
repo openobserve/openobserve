@@ -19,6 +19,7 @@ use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job, utils::time::n
 
 const SWEEP_INTERVAL_SECS: u64 = 3600;
 const MICROS_PER_DAY: i64 = 86_400 * 1_000_000;
+const ACCESS_REQUEST_KEEP_DAYS: i64 = 30;
 
 pub fn run() {
     if !LOCAL_NODE.is_scheduler() {
@@ -38,6 +39,12 @@ pub fn run() {
             Ok(0) => {}
             Ok(n) => log::info!("[AI_ACTIONS_REAPER] removed {n} expired turn mark(s)"),
             Err(e) => log::error!("[AI_ACTIONS_REAPER] turn mark sweep failed: {e}"),
+        }
+        let requests_cutoff = now.saturating_sub(ACCESS_REQUEST_KEEP_DAYS * MICROS_PER_DAY);
+        match infra::table::ai_access_requests::delete_before(requests_cutoff).await {
+            Ok(0) => {}
+            Ok(n) => log::info!("[AI_ACTIONS_REAPER] removed {n} old access request(s)"),
+            Err(e) => log::error!("[AI_ACTIONS_REAPER] access request sweep failed: {e}"),
         }
         let Some(cutoff) = cutoff(now, get_config().limit.ai_actions_retention_days) else {
             continue;

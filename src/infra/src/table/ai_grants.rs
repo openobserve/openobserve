@@ -15,7 +15,10 @@
 
 //! Service layer for `ai_grants`, standing approvals a member gave the assistant.
 
-use sea_orm::{ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
+    sea_query::{Expr, Func},
+};
 
 pub use super::entity::ai_grants::Model;
 use super::{entity::ai_grants::*, fit};
@@ -183,6 +186,31 @@ pub async fn delete_with<C: ConnectionTrait>(
     Ok(result.rows_affected > 0)
 }
 
+/// Removes `user_email`'s grants, whatever its case, in `org_id` or every org it leaves.
+pub async fn delete_for_member(
+    org_id: Option<&str>,
+    user_email: &str,
+) -> Result<u64, errors::Error> {
+    delete_for_member_with(get_orm_client_rw().await, org_id, user_email).await
+}
+
+pub async fn delete_for_member_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+    user_email: &str,
+) -> Result<u64, errors::Error> {
+    let mut delete = Entity::delete_many();
+    if let Some(org_id) = org_id {
+        delete = delete.filter(Column::OrgId.eq(org_id));
+    }
+    let result = delete
+        .filter(Expr::expr(Func::lower(Expr::col(Column::UserEmail))).eq(user_email.to_lowercase()))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
 /// Remove every row of `org_id`, for the org's deletion; returns how many.
 pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
     delete_by_org_with(get_orm_client_rw().await, org_id).await
@@ -273,5 +301,39 @@ mod tests {
         assert!(!delete_with(&db, "other", &g.id).await.unwrap());
         assert!(delete_with(&db, "o", &g.id).await.unwrap());
         assert!(get_with(&db, "o", &g.id).await.unwrap().is_none());
+    }
+    #[tokio::test]
+    async fn a_member_who_leaves_the_org_takes_no_grant_back_with_them() {
+        let db = db().await;
+        insert_with(&db, &grant("A@x", SCOPE_ALWAYS, None), 1)
+            .await
+            .unwrap();
+        insert_with(&db, &grant("a@x", SCOPE_CHAT, Some("c1")), 2)
+            .await
+            .unwrap();
+        let kept = insert_with(&db, &grant("b@x", SCOPE_ALWAYS, None), 3)
+            .await
+            .unwrap();
+        assert_eq!(
+            delete_for_member_with(&db, Some("other"), "a@x")
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            delete_for_member_with(&db, Some("o"), "a@X").await.unwrap(),
+            2
+        );
+        assert!(
+            active_for_turn_with(&db, "o", "a@x", Some("c1"))
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let left = list_with(&db, "o", None).await.unwrap();
+        assert_eq!(
+            left.into_iter().map(|g| g.id).collect::<Vec<_>>(),
+            [kept.id]
+        );
     }
 }

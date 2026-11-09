@@ -12580,8 +12580,6 @@
           "ruledOut": "Elendi"
         },
         "status": {
-          "rootCause": "Kök neden",
-          "rootCauseNotConfirmed": "Kök neden · doğrulanmadı",
           "contributing": "Katkıda bulunan",
           "symptom": "Semptom",
           "ruledOut": "Elendi",

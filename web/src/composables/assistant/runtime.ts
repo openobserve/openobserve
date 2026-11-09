@@ -38,6 +38,7 @@ import { contextRegistry } from "@/composables/contextProviders/registry";
 import { queryClient } from "@/composables/query/queryClient";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import useBreakpoint from "@/composables/useBreakpoint";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 import { registerSessionConsentSurface } from "@/composables/usePaidOverageConsent";
 import assistantService, {
   type AssistantCapabilitiesResponse,
@@ -47,7 +48,6 @@ import assistantService, {
 } from "@/services/assistant";
 import type { PaidOverageFeature } from "@/services/paidOverage";
 import { paidOverageQuery, setPaidOverageMutation } from "@/services/paidOverage.queries";
-import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { gt } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -60,12 +60,14 @@ import { assistantKeys } from "@/services/assistant.querykeys";
 import { aiChatShareKeys } from "@/services/ai_chat_share.querykeys";
 import type { TelemetryContextGetters, TelemetryRole } from "@/services/assistantAnalytics";
 import { orgTimeZone } from "@/utils/formatters";
+import { generateTraceContext } from "@/utils/zincutils";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 
 import { requestDashboardDraft } from "./actions/appliers/drafts";
 import { pruneQueryRuns } from "./actions/appliers/query";
 import { registerBuiltInAppliers } from "./actions/appliers";
 import { createActionDispatcher, type ActionEnv } from "./actions/registry";
+import { streamSearch } from "./actions/streamSearch";
 import { createApprovalKeepAlive, type ApprovalKeepAlive } from "./approvalKeepAlive";
 import {
   containerOf,
@@ -544,6 +546,7 @@ function actionEnv(
   hosts: () => HostRegistry,
 ): ActionEnv {
   const client = useAssistantClient();
+  const streaming = useHttpStreaming();
   return {
     store,
     router: () => context.value?.router ?? null,
@@ -557,25 +560,7 @@ function actionEnv(
     t: gt,
     openTab: openTabWithoutOpener,
     copy: (text) => copyToClipboard(text, gt, { silent: true }),
-    async search(request) {
-      const response = await searchService.search({
-        org_identifier: request.org,
-        query: {
-          query: {
-            sql: request.sql,
-            start_time: request.startTime,
-            end_time: request.endTime,
-            from: 0,
-            size: request.size,
-            quick_mode: false,
-          },
-        },
-        page_type: request.streamType,
-        signal: request.signal,
-        silentForbidden: true,
-      });
-      return (response?.data ?? {}) as Record<string, unknown>;
-    },
+    search: (request) => streamSearch(streaming, request, generateTraceContext().traceId),
     feedback: (org, sid, body) => client.feedback(org, sid, body),
     confirm: (org, sid, body, timeoutMs) => client.confirm(org, sid, body, timeoutMs),
     undo: (org, ledgerId) => assistantService.undo(org, ledgerId),

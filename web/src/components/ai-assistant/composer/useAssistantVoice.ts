@@ -45,6 +45,7 @@ import {
   languageEndonym,
   serviceVendor,
   speechLang,
+  watchMicLifted,
   type VoiceBrand,
   type VoiceEngine,
   type VoiceMeter,
@@ -341,6 +342,8 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
   }
 
   function fail(current: VoiceRun, code: VoiceErrorCode): void {
+    // A denial the user lifts in the site settings, or a dismissed prompt, un-crosses the mic without a reload.
+    if (code === "mic_denied" && !state.denied) watchMicLifted(() => (state.denied = false));
     if (code === "mic_denied") state.denied = true;
     if (code === "language_unsupported") state.languageRefused = true;
     finish(current, { kind: "error", code });
@@ -362,8 +365,14 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
     if (current.results === 0 && state.elapsedMs >= SILENCE_MS) failSilent(current);
   }
 
+  // Continuous recognisers end on their own after a pause or at a vendor cap; what was heard is kept as a stop.
+  function endHeard(current: VoiceRun): void {
+    finish(current, { kind: "stopped", reason: "other", words: 0 });
+  }
+
   function onError(current: VoiceRun, code: string): void {
     if (code === "aborted") return;
+    if (current.results > 0 && code === "no-speech") return endHeard(current);
     if (current.results > 0) return fail(current, "stt_unavailable");
     if (code === "not-allowed") return fail(current, "mic_denied");
     if (code === "audio-capture") return fail(current, "no_mic");
@@ -396,7 +405,7 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
         },
         onEnd() {
           if (!live()) return;
-          if (current.results > 0) fail(current, "stt_unavailable");
+          if (current.results > 0) endHeard(current);
           else failSilent(current);
         },
       },

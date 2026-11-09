@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 use super::incidents::{RCA_RUNS_DEFAULT_LIMIT, RCA_RUNS_MAX_LIMIT};
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, request::security};
 
 const STATE_FAILED: &str = "failed";
 const STATE_REFUSED: &str = "refused";
@@ -92,6 +92,8 @@ pub struct OrgRcaRun {
 pub struct OrgRcaRunsResponse {
     pub runs: Vec<OrgRcaRun>,
     pub has_more: bool,
+    /// The `before` of the next page; set whenever `has_more` is, even on a page with no runs
+    pub next_before: Option<String>,
 }
 
 /// Which of a failed run's outcomes the `state` filter keeps.
@@ -110,7 +112,7 @@ enum Refusal {
     tag = "Incidents",
     operation_id = "ListOrgRcaRuns",
     summary = "List the analysis runs of the org's incidents",
-    description = "Returns the analysis runs of every incident in the org, newest first, without report text. Filter by `state`, `trigger` and `since`; page with `before` set to the last run id of the previous page. A run refused before it started (run limit, missing credentials, agent unavailable) lists as `refused`, not `failed`.",
+    description = "Returns the analysis runs of every incident in the org, newest first, without report text. Filter by `state`, `trigger` and `since`; page with `before` set to the previous page's `next_before`. Runs of security cases list only for members with Security read access. A run refused before it started (run limit, missing credentials, agent unavailable) lists as `refused`, not `failed`.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -135,19 +137,21 @@ pub async fn list_org_rca_runs(
     if !can_list_incidents(&org_id, &user_email.user_id).await {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
-    let (filter, refusal) = match filter_of(&query) {
+    let (mut filter, refusal) = match filter_of(&query) {
         Ok(found) => found,
         Err(e) => return MetaHttpResponse::bad_request(e),
     };
+    filter.cases = security::visible_cases(&org_id, &user_email.user_id).await;
     let keep = |run: &runs_table::Model| match refusal {
         Refusal::Any => true,
         Refusal::Only => refused(run),
         Refusal::Never => !refused(run),
     };
     match runs_table::list_for_org(&org_id, &filter, keep).await {
-        Ok((runs, has_more)) => MetaHttpResponse::json(OrgRcaRunsResponse {
+        Ok((runs, next_before)) => MetaHttpResponse::json(OrgRcaRunsResponse {
             runs: runs.into_iter().map(row_of).collect(),
-            has_more,
+            has_more: next_before.is_some(),
+            next_before,
         }),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -210,6 +214,7 @@ fn filter_of(query: &OrgRcaRunsQuery) -> Result<(OrgRunsFilter<'_>, Refusal), St
             .limit
             .unwrap_or(RCA_RUNS_DEFAULT_LIMIT)
             .clamp(1, RCA_RUNS_MAX_LIMIT),
+        cases: Default::default(),
     };
     Ok((filter, refusal))
 }

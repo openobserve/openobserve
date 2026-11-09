@@ -191,6 +191,8 @@ pub struct Health {
     pub checked_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<LastError>,
+    /// False without `O2_AI_INTERNAL_SECRET`: every change the assistant attempts is refused.
+    pub approvals_enforced: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -464,6 +466,7 @@ impl HealthCache {
             status,
             checked_at: rfc3339(checked_at),
             last_error: self.last_error.clone(),
+            approvals_enforced: openobserve_mcp::approval::enforced(),
         };
         let facts = self.org_facts.get(org_id).unwrap_or(&self.facts);
         (health, facts.clone())
@@ -1109,6 +1112,7 @@ mod tests {
             status: HealthStatus::Ok,
             checked_at: "2026-10-15T10:00:00Z".to_string(),
             last_error: None,
+            approvals_enforced: true,
         };
         let facts = AgentFacts {
             model: Some("default".to_string()),

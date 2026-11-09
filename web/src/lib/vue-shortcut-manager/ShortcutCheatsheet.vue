@@ -229,7 +229,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useShortcut } from "./composables";
-import { SHORTCUT_REGISTRY, SHORTCUT_MODULES } from "./shortcutRegistry";
+import { SHORTCUT_REGISTRY, SHORTCUT_MODULES, platformDisplay } from "./shortcutRegistry";
 import type { ShortcutEntry, ShortcutCapabilities } from "./shortcutRegistry";
 import { isMacOS } from "@/utils/keyboardShortcuts";
 import config from "@/aws-exports";
@@ -324,12 +324,9 @@ const LABEL_PARAMS: Partial<Record<string, Record<string, I18nText>>> = {
   "shortcuts.actions.assistantOpen": useAssistantName(),
 };
 
-/**
- * Cheatsheet display combo. Always the Windows/common form — `sym()` renders
- * `ctrl`→`⌘` on Mac, so we never need the explicit `keyForMac` here.
- */
+/** Cheatsheet display combo; `sym()` renders `ctrl`→`⌘` and `control`→`⌃` on Mac. */
 function entryDisplay(e: ShortcutEntry): string {
-  return e.display ?? e.keyForWindows ?? e.key ?? "";
+  return e.display ?? (e.keyForWindows ? platformDisplay(e, isMacOS()) : (e.key ?? ""));
 }
 
 const allModules = computed<DisplayModule[]>(() => {
@@ -521,6 +518,7 @@ function formatKey(key: string): string[] {
 function sym(k: string): string {
   const mac = isMacOS();
   if (k === "ctrl" && mac) return "⌘";
+  if (k === "control") return mac ? "⌃" : "Ctrl";
   if (k === "alt" && mac) return "⌥";
   if ((k === "delete" || k === "del") && mac) return "⌫";
   // ⇧ is a Mac glyph; spell it out on Windows/Linux.

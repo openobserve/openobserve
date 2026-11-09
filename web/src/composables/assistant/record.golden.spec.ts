@@ -157,12 +157,13 @@ describe("record goldens", () => {
       expect(exported).toEqual(reload);
     });
 
-    it("matches the server projection once it is captured", () => {
-      const server = rustSnapshot.cases[name];
-      if (server === undefined) return;
-      const viewer = project(input, AUDIENCES[1]);
-      expect(viewer, "projection drift: see B-10").toEqual(server);
-    });
+    const server = rustSnapshot.cases[name];
+    if (server === undefined) it.todo("matches the server projection once B-10 captures it");
+    else
+      it("matches the server projection", () => {
+        const viewer = project(input, AUDIENCES[1]);
+        expect(viewer, "projection drift: see B-10").toEqual(server);
+      });
   });
 
   it("never leaves a replayed card pending in any audience", () => {

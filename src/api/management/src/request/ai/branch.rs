@@ -27,7 +27,7 @@ use infra::table::{
     ai_chat_sessions::{self, Model as ChatModel, NewBranch},
     ai_chat_turns::{self, Model as TurnRecord},
 };
-use openobserve_core::ai_chat::admission::resolve_owner;
+use openobserve_core::ai_chat::admission::{normalize_uuid, resolve_owner};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -57,6 +57,9 @@ pub struct BranchRequest {
     /// 1-based, oldest first, among the original turn and its regenerations; absent: the newest.
     #[serde(default)]
     pub version: Option<u32>,
+    /// A UUID the client picks for the new chat, so a retried POST returns the branch it made.
+    #[serde(default)]
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -133,6 +136,16 @@ pub async fn branch(
         Ok(row) => row,
         Err(resp) => return resp,
     };
+    if let Some(new_id) = &req.session_id {
+        match ai_chat_sessions::get(&org_id, new_id).await {
+            Ok(Some(made)) => return retried(&made, &owner),
+            Ok(None) => {}
+            Err(e) => {
+                log::error!("[AI-CHAT] cannot read chat {org_id}/{new_id}: {e}");
+                return unavailable();
+            }
+        }
+    }
     let records = match ai_chat_turns::list_for_session(&org_id, &row.session_id).await {
         Ok(records) => records,
         Err(e) => {
@@ -167,7 +180,10 @@ pub async fn branch(
         title: row.title.clone(),
     };
     let title = branch_title(&row.title);
-    let new_id = uuid::Uuid::now_v7().to_string();
+    let new_id = req
+        .session_id
+        .clone()
+        .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
     let branched_from = serde_json::json!(source);
     let branch = NewBranch {
         org_id: &org_id,
@@ -189,10 +205,14 @@ pub async fn branch(
             }),
         )
             .into_response(),
-        Err(e) => {
-            log::error!("[AI-CHAT] cannot branch {org_id}/{session_id} into {new_id}: {e}");
-            unavailable()
-        }
+        // A concurrent retry of the same POST inserted it first.
+        Err(e) => match ai_chat_sessions::get(&org_id, &new_id).await {
+            Ok(Some(made)) if req.session_id.is_some() => retried(&made, &owner),
+            _ => {
+                log::error!("[AI-CHAT] cannot branch {org_id}/{session_id} into {new_id}: {e}");
+                unavailable()
+            }
+        },
     }
 }
 
@@ -206,7 +226,34 @@ async fn read_request(in_req: axum::extract::Request) -> Result<BranchRequest, R
     if req.turn_id.is_empty() || req.turn_id.chars().count() > MAX_TURN_ID_CHARS {
         return Err(error::invalid_request("Invalid turn_id"));
     }
+    req.session_id = match req.session_id.as_deref() {
+        None => None,
+        Some(id) => {
+            Some(normalize_uuid(id).ok_or_else(|| error::invalid_request("Invalid session_id"))?)
+        }
+    };
     Ok(req)
+}
+
+/// The caller's own branch under a retried id answers 200; any other chat is not theirs to see.
+fn retried(made: &ChatModel, owner: &str) -> Response {
+    let source = made
+        .branched_from
+        .as_deref()
+        .and_then(|from| serde_json::from_str::<BranchSource>(from).ok());
+    match source {
+        Some(branched_from)
+            if made.user_id == owner && made.status == ai_chat_sessions::STATUS_ACTIVE =>
+        {
+            let made = BranchResponse {
+                session_id: made.session_id.clone(),
+                title: made.title.clone(),
+                branched_from,
+            };
+            (StatusCode::OK, Json(made)).into_response()
+        }
+        _ => error::not_found("Unknown conversation"),
+    }
 }
 
 /// The source's turns as its owner reads them: the turns it carries first, then its own.
@@ -538,6 +585,80 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&source).unwrap(),
             json!({"session_id": "s", "turn_id": "t", "title": "x"})
+        );
+    }
+
+    fn made(user_id: &str, branched_from: Option<&str>) -> ChatModel {
+        ChatModel {
+            org_id: "org".into(),
+            session_id: "0199e7b2-6f0c-7a3e-a1b2-c3d4e5f60718".into(),
+            user_id: user_id.into(),
+            user_email: "a@x".into(),
+            opencode_session_id: None,
+            agent_type: "o2-ai".into(),
+            title: "Branch of p99".into(),
+            title_source: ai_chat_sessions::TITLE_FROM_USER.into(),
+            status: ai_chat_sessions::STATUS_ACTIVE.into(),
+            created_at: 1,
+            updated_at: 1,
+            first_event_at: None,
+            last_event_at: None,
+            last_committed_seq: ai_chat_sessions::NO_SEQ,
+            session_epoch: 1,
+            last_turn_id: None,
+            forked_from_share: None,
+            fork_seed_seq: None,
+            replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
+            branched_from: branched_from.map(str::to_string),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_retried_branch_returns_the_one_already_made() {
+        let from = r#"{"session_id":"s","turn_id":"t","title":"p99"}"#;
+        let again = retried(&made("alice", Some(from)), "alice");
+        assert_eq!(again.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(again.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["session_id"], "0199e7b2-6f0c-7a3e-a1b2-c3d4e5f60718");
+        assert_eq!(body["branched_from"]["turn_id"], "t");
+        assert_eq!(
+            retried(&made("bob", Some(from)), "alice").status(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            retried(&made("alice", None), "alice").status(),
+            StatusCode::NOT_FOUND,
+            "a seeded chat under that id is no branch"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_branch_id_must_be_a_uuid() {
+        let request = |body: &str| {
+            axum::extract::Request::builder()
+                .body(axum::body::Body::from(body.to_string()))
+                .unwrap()
+        };
+        let req = read_request(request(
+            r#"{"turn_id":"t","session_id":"0199E7B2-6F0C-7A3E-A1B2-C3D4E5F60718"}"#,
+        ))
+        .await
+        .unwrap();
+        assert_eq!(
+            req.session_id.as_deref(),
+            Some("0199e7b2-6f0c-7a3e-a1b2-c3d4e5f60718")
+        );
+        assert!(
+            read_request(request(r#"{"turn_id":"t","session_id":"nope"}"#))
+                .await
+                .is_err()
         );
     }
 }

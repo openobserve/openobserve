@@ -98,12 +98,12 @@ function mountHtml(html: string) {
   });
 }
 
-const parse = (text: string) =>
+const parse = (text: string, origin = "http://localhost") =>
   parseBlock({
     blockId: "p",
     text,
     state: "closed",
-    origin: "http://localhost",
+    origin,
     imageRemoved: "x",
   });
 
@@ -1648,13 +1648,50 @@ describe("assistant answer styling (K1, K2)", () => {
     root.innerHTML = html;
     const anchors = [...root.querySelectorAll("a")];
     expect(anchors).toHaveLength(1);
-    expect(anchors[0].getAttribute("href")).toBe(href);
+    expect(anchors[0].getAttribute("href")).toBe(
+      "http://localhost/web/logs?stream=checkout&period=15m&type=ai_chat_query",
+    );
     expect(anchors[0].className).toBe(CLASSES.entityLink);
     expect(anchors[0].previousSibling?.textContent).toMatch(/not mentions\. $/);
     expect(root.textContent?.trim()).toBe(
       "The checkout code span and checkout-api are not mentions. checkout fails first. Later checkout recovers.",
     );
     expect(parsed.plain).toContain("Later checkout recovers.");
+  });
+
+  it("rebuilds a model-written stream link without its query, run type or org, pinned to the chat's org (WT-01)", () => {
+    const sql = btoa("SELECT * FROM secrets");
+    const href = `${window.location.origin}/web/logs?stream=checkout&stream_type=logs&query=${sql}&sql_mode=true&type=rca_evidence_query&org_identifier=other&from=1&to=2`;
+    const html = htmlOf(parse(`Errors rose in [checkout](${href}).`, window.location.origin).parts);
+    const wrapper = mount(AssistantMarkdownPart, {
+      props: { part: { kind: "html", key: "m", html }, org: "chat-org" },
+      attachTo: document.body,
+    });
+    const link = wrapper.get("a[data-entity]");
+    const params = new URL(link.attributes("href")!, "http://localhost").searchParams;
+    expect(link.attributes("data-entity")).toBe("stream");
+    expect(Object.fromEntries(params)).toEqual({
+      stream: "checkout",
+      stream_type: "logs",
+      from: "1",
+      to: "2",
+      type: "ai_chat_query",
+      org_identifier: "chat-org",
+    });
+    wrapper.unmount();
+  });
+
+  it("keeps only a dashboard link's identifying params and pins the chat's org (WT-01)", () => {
+    const href = `${window.location.origin}/web/dashboards/view?dashboard=d1&folder=f1&org_identifier=other&var-q=1&type=search_scheduler`;
+    const html = htmlOf(parse(`See [latency](${href}).`, window.location.origin).parts);
+    const wrapper = mount(AssistantMarkdownPart, {
+      props: { part: { kind: "html", key: "m", html }, org: "chat-org" },
+      attachTo: document.body,
+    });
+    expect(wrapper.get("a[data-entity]").attributes("href")).toBe(
+      "/web/dashboards/view?dashboard=d1&folder=f1&org_identifier=chat-org",
+    );
+    wrapper.unmount();
   });
 
   it("leaves an entity link alone when no plain mention comes before it", () => {

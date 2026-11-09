@@ -23,6 +23,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { branchChatMutation, type BranchChatResponse } from "@/services/ai_chat_branch";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
+import { getUUID } from "@/utils/uuid";
 
 export interface BranchInput {
   sid: Sid;
@@ -74,6 +75,7 @@ export function useBranchChat(org: () => string): BranchChat {
         sessionId: input.sid,
         turnId: input.turnId,
         ...(input.version !== undefined && { version: input.version }),
+        newSessionId: getUUID(),
       });
       branched.set(created.session_id, {
         sessionId: created.branched_from.session_id,

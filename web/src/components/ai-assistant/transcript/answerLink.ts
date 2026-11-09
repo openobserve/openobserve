@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isOutOfDate, shareLinkOf } from "@/components/ai-assistant/share/chatShare";
 import { AI_HOME_TAB, HOME_TAB_QUERY_KEY, THREAD_QUERY_KEY } from "@/composables/assistant/pure";
+import type { ShareView } from "@/services/ai_chat_share";
 import { getPath } from "@/utils/queryUtils";
 
 export interface AnswerLinkInput {
@@ -40,6 +42,21 @@ export function answerTurnOf(hash: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/** The link of a chat's share that still opens and holds the whole chat, or null; a stale snapshot may lack the answer. */
+export function activeShareUrl(
+  shares: readonly ShareView[] | undefined,
+  lastSeq: number | null,
+  nowMicros: number = Date.now() * 1000,
+): string | null {
+  const share = shares?.find(
+    (item) =>
+      !!shareLinkOf(item) &&
+      (item.expires_at === null || item.expires_at > nowMicros) &&
+      !isOutOfDate(item, lastSeq),
+  );
+  return share ? shareLinkOf(share) : null;
 }
 
 /** A link to one answer: the chat's share page when it has one, else the thread on Home; opening it never runs a query. */

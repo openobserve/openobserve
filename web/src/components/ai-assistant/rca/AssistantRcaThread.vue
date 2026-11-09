@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('assistant.message.shareAnswer')"
             :icon="assistantGlyph.shareLink"
             :done="linkCopied ? t('assistant.message.linkCopied') : undefined"
+            confirms
             data-test="assistant-rca-thread-share"
             @click="shareLink"
           />
@@ -238,15 +239,14 @@ const loadState = computed(() => {
 
 const rca = useIncidentRca(toRef(props, "org"), incident, ref(true));
 
-// The run asked for stays pinned until this thread starts a newer one; the newest run is followed live.
-const pinnedRunId = ref(props.runId);
+// The host keys this thread by run, so a newer run started here mounts a fresh thread pinned to it.
 watch(
-  () => props.runId,
-  (runId) => (pinnedRunId.value = runId),
+  [() => props.runId, () => rca.history.value.length] as const,
+  ([runId]) => rca.viewRun(runId),
+  {
+    immediate: true,
+  },
 );
-watch([pinnedRunId, () => rca.history.value.length] as const, ([runId]) => rca.viewRun(runId), {
-  immediate: true,
-});
 
 const analysis = ref<InstanceType<typeof IncidentRCAAnalysis> | null>(null);
 
@@ -265,7 +265,6 @@ const reanalyze = async (options: RcaTriggerRequest) => {
   await rca.trigger(options);
   const runId = rca.summary.value?.run_id ?? null;
   if (!runId || runId === before) return;
-  pinnedRunId.value = runId;
   emit("reanalyze", { runId });
 };
 

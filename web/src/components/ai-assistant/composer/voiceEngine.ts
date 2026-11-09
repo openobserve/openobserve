@@ -110,6 +110,27 @@ const SERVICE_VENDORS: Record<NonNullable<VoiceBrand>, string> = {
   safari: "Apple",
 };
 
+/** Calls `onLifted` once the browser's microphone permission is no longer denied; a no-op where it cannot be read. */
+export function watchMicLifted(onLifted: () => void): void {
+  let query: Promise<PermissionStatus> | undefined;
+  try {
+    query = navigator.permissions?.query({ name: "microphone" as PermissionName });
+  } catch {
+    return;
+  }
+  void query
+    ?.then((status) => {
+      const check = () => {
+        if (status.state === "denied") return;
+        status.onchange = null;
+        onLifted();
+      };
+      status.onchange = check;
+      check();
+    })
+    .catch(() => undefined);
+}
+
 /** The `lang` a browser recogniser takes for a UI locale (`40` §1.8.5). */
 export function speechLang(localeTag: string): string {
   return SPEECH_TAGS[localeTag] ?? localeTag;

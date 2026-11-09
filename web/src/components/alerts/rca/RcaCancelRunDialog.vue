@@ -38,11 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { nextTick, watch } from "vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useI18nTyped } from "@/types/i18n";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     open: boolean;
     /** How the incident is named after "#". */
@@ -56,8 +57,17 @@ const emit = defineEmits<{ "update:open": [open: boolean]; confirm: [] }>();
 
 const { t } = useI18nTyped();
 
-const confirm = () => {
+// The dialog shows the cancel's progress and closes once the request settles.
+const confirm = async () => {
   emit("confirm");
-  emit("update:open", false);
+  await nextTick();
+  if (!props.cancelling) emit("update:open", false);
 };
+
+watch(
+  () => props.cancelling,
+  (now, was) => {
+    if (was && !now && props.open) emit("update:open", false);
+  },
+);
 </script>

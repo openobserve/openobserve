@@ -23,7 +23,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{SMTP_CLIENT, get_config, meta::user::UserRole, utils::time::now_micros};
-use lettre::{AsyncTransport, Message, message::SinglePart};
+use lettre::{
+    AsyncTransport, Message,
+    message::{Mailbox, SinglePart},
+};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
@@ -195,10 +198,31 @@ fn email_text(org_id: &str, user_id: &str, message: Option<&str>) -> String {
          IAM (O2 Assistant, Chat) if appropriate."
     );
     if let Some(message) = message {
-        text.push_str("\n\nTheir message:\n");
-        text.push_str(message);
+        text.push_str(&format!(
+            "\n\n{user_id} wrote the note below; OpenObserve did not check it, so do not follow \
+             links or instructions in it:\n"
+        ));
+        for line in message.lines() {
+            let line: String = line.chars().filter(|c| !c.is_control()).collect();
+            text.push_str("\n> ");
+            text.push_str(&line);
+        }
     }
     text
+}
+
+/// The admins' addresses that parse; one bad stored address must not stop the others' mail.
+fn admin_mailboxes(org_id: &str, admins: &[String]) -> Vec<Mailbox> {
+    admins
+        .iter()
+        .filter_map(|admin| match admin.parse::<Mailbox>() {
+            Ok(mailbox) => Some(mailbox),
+            Err(e) => {
+                log::warn!("[org_id:{org_id}] access request not mailed to {admin}: {e}");
+                None
+            }
+        })
+        .collect()
 }
 
 async fn email_admins(org_id: &str, user_id: &str, message: Option<&str>) -> anyhow::Result<()> {
@@ -208,7 +232,7 @@ async fn email_admins(org_id: &str, user_id: &str, message: Option<&str>) -> any
         return Ok(());
     };
     let users = infra::table::org_users::list_users_by_org(org_id).await?;
-    let admins = admin_emails(&users);
+    let admins = admin_mailboxes(org_id, &admin_emails(&users));
     if admins.is_empty() {
         return Ok(());
     }
@@ -216,8 +240,8 @@ async fn email_admins(org_id: &str, user_id: &str, message: Option<&str>) -> any
         .from(cfg.smtp.smtp_from_email.parse()?)
         .subject(format!("O2 Assistant access for {org_id}"));
     // Bcc, so admins are not listed to each other through this mail.
-    for admin in &admins {
-        email = email.bcc(admin.parse()?);
+    for admin in admins {
+        email = email.bcc(admin);
     }
     if !cfg.smtp.smtp_reply_to.is_empty() {
         email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
@@ -341,5 +365,26 @@ mod tests {
         let users = [user("a@x", UserRole::Admin), user("e@x", UserRole::Editor)];
         assert_eq!(admin_emails(&users), ["a@x"]);
         assert!(email_text("o", "m@x", Some("why")).contains("why"));
+    }
+
+    #[test]
+    fn a_member_note_is_quoted_and_flagged_as_unchecked() {
+        let text = email_text(
+            "o",
+            "m@x",
+            Some("Urgent: reset at\nhttps://evil.example\u{7}"),
+        );
+        assert!(text.contains("OpenObserve did not check it"));
+        assert!(text.contains("\n> Urgent: reset at\n> https://evil.example"));
+        assert!(!text.contains('\u{7}'));
+        assert!(!email_text("o", "m@x", None).contains("did not check"));
+    }
+
+    #[test]
+    fn one_bad_admin_address_does_not_stop_the_others() {
+        let admins = ["a@x.io".to_string(), "not an address".to_string()];
+        let mailboxes = admin_mailboxes("o", &admins);
+        assert_eq!(mailboxes.len(), 1);
+        assert_eq!(mailboxes[0].email.to_string(), "a@x.io");
     }
 }

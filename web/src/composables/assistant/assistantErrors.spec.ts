@@ -203,6 +203,32 @@ describe("toAssistantError: the B-01 envelope", () => {
   });
 });
 
+// The ENT `error` frame: `code` is the ledger code, the stored original moved to `error_code` (R10).
+describe("toAssistantError: ENT error frames carry the ledger code", () => {
+  const frame = (code: string, stored: string, message = "x") => ({
+    type: "error",
+    code,
+    error_code: stored,
+    error: message,
+    message,
+    turn_id: "t1",
+    retryable: code === "agent_unavailable",
+    recoverable: code === "agent_unavailable",
+    action: code === "agent_unavailable" ? "retry" : "none",
+  });
+
+  it.each([
+    ["agent_unavailable", "agent_unreachable", "agent_unavailable"],
+    ["agent_unavailable", "turn_timeout", "agent_unavailable"],
+    ["persistence_failed", "lease_lost", "persistence_failed"],
+    ["turn_busy", "turn_in_progress", "turn_busy"],
+    ["stale_epoch", "epoch_out_of_range", "stale_epoch"],
+    ["session_owner_unavailable", "session_owner_unavailable", "session_owner_unavailable"],
+  ] as const)("reads %s (stored %s) as %s", (code, stored, expected) => {
+    expect(toAssistantError(frame(code, stored)).code).toBe(expected);
+  });
+});
+
 describe("toAssistantError: status beats body", () => {
   it("reads a 403 as permission_denied whatever the body says (constraint 12)", () => {
     const error = toAssistantError({

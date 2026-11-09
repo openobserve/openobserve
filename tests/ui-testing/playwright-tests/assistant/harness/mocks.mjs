@@ -267,6 +267,34 @@ export const SCENARIOS = {
     ],
     delayMs: 40,
   },
+  // o2-ai's gathered MuteAlert card (build_multi_write_confirmation_event): grantable, so it offers a scope.
+  mute_two_grantable: {
+    frames: [
+      f.status(),
+      f.title("Pause two alerts"),
+      ...chunk("I can pause both noisy alerts for 30 minutes.").map(f.delta),
+      {
+        type: "confirmation_required",
+        id: "apr_e2e_mute",
+        tool: "MuteAlert",
+        kind: "update",
+        operation: "MuteAlert",
+        grantable: true,
+        destructive: false,
+        message: 'The assistant wants to mute these 2 alerts: "latency_high", "checkout_5xx".',
+        targets: [
+          { key: "apr_e2e_mute:0", type: "alert", id: "3LrpA", name: "latency_high", after: { minutes: 30 } },
+          { key: "apr_e2e_mute:1", type: "alert", id: "3LrpB", name: "checkout_5xx", after: { minutes: 30 } },
+        ],
+        after: { minutes: 30 },
+        args: { minutes: 30, calls: [{ alert_id: "3LrpA" }, { alert_id: "3LrpB" }] },
+      },
+      { waitForConfirm: true },
+      ...chunk("Paused.").map(f.delta),
+      f.complete(),
+    ],
+    delayMs: 40,
+  },
   // A CLI toolset command that needs confirmation (agent/clis/handler.py).
   command_card: {
     frames: [

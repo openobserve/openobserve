@@ -244,6 +244,9 @@ describe("AssistantRcaThread (C5)", () => {
     await flushPromises();
 
     expect(wrapper!.emitted("reanalyze")).toEqual([[{ runId: "run-2" }]]);
+    // The host follows the named run, as AssistantSidebarHost does by re-keying the thread.
+    await wrapper!.setProps({ runId: "run-2" });
+    await flushPromises();
     expect(byTest("rca-thread-final-note").exists()).toBe(false);
   });
 

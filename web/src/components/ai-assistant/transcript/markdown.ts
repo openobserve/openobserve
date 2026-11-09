@@ -34,6 +34,7 @@ import { gt } from "@/types/i18n";
 import {
   CLASSES,
   contentHash,
+  entityHref,
   entityKindOf,
   EXTERNAL_REL,
   PART_CHARS,
@@ -403,6 +404,8 @@ export const AssistantMarkdownPart = defineComponent({
     lead: { type: Boolean, default: false },
     /** The part belongs to the streaming answer, which fills before anything else. */
     live: { type: Boolean, default: false },
+    /** The chat's org, pinned on every entity link so a link never switches org. */
+    org: { type: String, default: "" },
   },
   setup(props) {
     const el = ref<HTMLElement | null>(null);
@@ -421,7 +424,7 @@ export const AssistantMarkdownPart = defineComponent({
         } else {
           node.className = props.htmlClass;
           delete node.dataset.test;
-          const html = sanitize(part.html);
+          const html = sanitize(part.html, props.org);
           const first = [...html.childNodes].find((child) => !blankText(child));
           if (props.lead && first instanceof HTMLParagraphElement) markLead(first);
           node.replaceChildren(html);
@@ -887,21 +890,18 @@ function samePart(a: MarkdownPart, b: MarkdownPart): boolean {
 }
 
 // The renderer's own rules again, on whatever came back: http(s) to other origins only, and only the renderer's classes (X8).
-function sanitize(html: string): DocumentFragment {
+function sanitize(html: string, org: string): DocumentFragment {
   const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost";
   const fragment = DOMPurify.sanitize(html, { ...PURIFY, RETURN_DOM_FRAGMENT: true });
   fragment.querySelectorAll("a").forEach((link) => {
     const url = parseUrl(link.getAttribute("href"), origin);
     // Only the renderer's entity link stays in app; it opens in place, so it takes no target.
-    if (
-      url?.origin === origin &&
-      link.getAttribute("class") === CLASSES.entityLink &&
-      entityKindOf(url)
-    ) {
+    const kind = url?.origin === origin ? entityKindOf(url) : null;
+    if (url && kind && link.getAttribute("class") === CLASSES.entityLink) {
       link.removeAttribute("target");
       link.removeAttribute("rel");
-      link.setAttribute("href", url.pathname + url.search + url.hash);
-      link.setAttribute("data-entity", entityKindOf(url)!);
+      link.setAttribute("href", entityHref(url, kind, org));
+      link.setAttribute("data-entity", kind);
       return;
     }
     if (!url || (url.protocol !== "http:" && url.protocol !== "https:") || url.origin === origin) {

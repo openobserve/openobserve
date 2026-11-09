@@ -194,6 +194,20 @@ describe("sessions", () => {
     });
   });
 
+  it("refuses a resend into a chat of another user+org, never reaching the engine (Q3)", async () => {
+    const { store, deps } = makeStore();
+    const sid = newSession(store);
+    store.state.sessions[sid].userOrgKey = "someone-else";
+    const send = vi.spyOn(deps.engine, "send");
+    const snapshot = { text: "why 5xx?" } as never;
+    await expect(store.resend(sid, snapshot, { text: "why 5xx?" } as never)).resolves.toMatchObject(
+      {
+        state: "refused",
+      },
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("opens a known session without a load and loads an unknown one through history", async () => {
     const open = vi.fn().mockResolvedValue("loaded");
     const { store } = makeStore({ history: { ...inertAssistantDeps().history, open } });
@@ -205,6 +219,32 @@ describe("sessions", () => {
     await expect(store.openSession({ chatId: 42 })).resolves.toBe("loaded");
     expect(open).toHaveBeenCalledWith({ chatId: 42 });
     await expect(makeStore().store.openSession({ chatId: 7 })).rejects.toThrow();
+  });
+
+  it("keeps a chat opened from cache in front when an earlier server read lands after it (WC-1)", async () => {
+    let land!: () => void;
+    const gate = new Promise<void>((resolve) => (land = resolve));
+    const { store } = makeStore({
+      history: {
+        ...inertAssistantDeps().history,
+        open: vi.fn(async () => {
+          await gate;
+          const cached = store.state.sessions[b];
+          store.state.sessions.slow = { ...cached, sid: "slow", chatId: 42 };
+          return "slow";
+        }),
+      },
+    });
+    const b = newSession(store);
+    store.setActive(null);
+    const slow = store.openSession({ chatId: 42 }, { focus: true });
+    await store.openSession({ sid: b });
+    expect(store.state.shell.activeSid).toBe(b);
+    const focusBefore = store.focusRequest.value?.seq ?? 0;
+    land();
+    await expect(slow).resolves.toBe("slow");
+    expect(store.state.shell.activeSid).toBe(b);
+    expect(store.focusRequest.value?.seq ?? 0).toBe(focusBefore);
   });
 
   it("drops a session with its draft and its active slot", async () => {

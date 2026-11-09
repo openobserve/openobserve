@@ -1319,8 +1319,10 @@ function targetsOf(data: any, args: Record<string, unknown>): ApprovalTarget[] {
     if (!name) return [];
     const id = boundedId(typeof target?.id === "string" ? target.id : undefined);
     const type = typeof target?.type === "string" ? target.type.slice(0, 40).toLowerCase() : "";
+    const key = typeof target?.key === "string" && target.key ? target.key.slice(0, 200) : "";
     return [
       {
+        ...(key && { key }),
         type: type || "object",
         name,
         ...(id && { id }),
