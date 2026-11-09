@@ -15032,7 +15032,32 @@
       "itemsFailed": "{count} item could not be created | {count} items could not be created",
       "manage": "Manage",
       "openDashboard": "Open dashboard",
-      "rawLogs": "Looks like Nginx logs in {stream}, stored as plain text · Parsing support comes later"
+      "rawLogs": "Looks like Nginx logs in {stream}, stored as plain text",
+      "parse": "Parse these logs",
+      "parsing": "Parsing new Nginx logs in {stream}",
+      "parsingIncomplete": "Parsing for {stream} was not fully set up"
+    },
+    "parse": {
+      "title": "Parse Nginx logs in {stream}?",
+      "confirm": "Parse new logs",
+      "previewNote": "Fields added to {count} of your records. The original line stays as it is.",
+      "adds": "Adds {fields}",
+      "addsNothing": "Adds nothing to this line",
+      "unparsed": "These records don't parse as a supported Nginx format, so there is nothing to add.",
+      "loadFailed": "Couldn't preview the parser on this stream",
+      "readersTitle": "What reads this stream",
+      "noReaders": "No dashboard, alert, saved view or pipeline reads this stream.",
+      "readerDashboard": "Dashboard {name}",
+      "readerAlert": "Alert {name}",
+      "readerSavedView": "Saved view {name}",
+      "readerPipeline": "Pipeline {name}",
+      "blocked": "This stream already has a realtime pipeline, so parsing can't be added. Add the parser to that pipeline instead.",
+      "newDataOnly": "Applies to new data only. Records already stored stay as they are.",
+      "undoNote": "Undo stops the parsing. Records parsed until then keep their added fields.",
+      "undo": "Undo",
+      "undoTitle": "Stop parsing?",
+      "undoRemoves": "Removes the parsing pipeline and its function.",
+      "undoFailed": "Couldn't remove the parsing pipeline or its function"
     },
     "hosts": {
       "title": "Hosts",
