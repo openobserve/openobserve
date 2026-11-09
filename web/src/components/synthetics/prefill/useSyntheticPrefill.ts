@@ -26,6 +26,7 @@ import type {
   SyntheticsLocation,
 } from "@/types/synthetics";
 import { locationLiveStatus } from "@/utils/synthetics/locationLiveStatus";
+import { isInternalUrl } from "@/utils/synthetics/syntheticPrefill";
 import { takeSyntheticPrefill, type SyntheticPrefillInput } from "./syntheticPrefillContract";
 
 export const CHIP_FIELDS = ["folder", "tags", "url", "locations", "destinations"] as const;
@@ -57,7 +58,7 @@ export interface PreSaveRun {
 }
 
 export interface LocationNote {
-  key: "public" | "private";
+  key: "public" | "private" | "reach";
   label: I18nText;
   text: I18nText;
 }
@@ -92,6 +93,8 @@ interface ViewContext {
   chosenLocations: ReadonlySet<string>;
   description: I18nText;
   preSaveRun: PreSaveRun | null;
+  /** Lists that loaded, so the form's values in them are known to exist. */
+  confirmed: ReadonlySet<PrefillList>;
   unconfirmed?: ReadonlySet<PrefillList>;
 }
 
@@ -105,19 +108,9 @@ export function readSyntheticPrefill(gate: GateInput): SyntheticPrefillInput | n
   return open ? takeSyntheticPrefill() : null;
 }
 
-/** True for addresses only reachable inside a network: cluster DNS, single-label hosts, private IPv4. */
-export function isInternalHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (!h.includes(".") || h === "localhost") return true;
-  if (/(\.svc|\.cluster\.local|\.internal|\.local)$/.test(h) || h.includes(".svc.")) return true;
-  return /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
-}
-
+/** U0's evidence is the only source of reach; without it the reach is unknown. */
 export function reachOf(prefill: SyntheticPrefillInput): Reach | null {
-  if (prefill.evidence?.reach) return prefill.evidence.reach;
-  const parsed = prefill.url ? hostOf(prefill.url) : null;
-  if (parsed) return isInternalHost(parsed.hostname) ? "private" : "public";
-  return prefill.service.cluster ? "private" : null;
+  return prefill.evidence?.reach ?? null;
 }
 
 export function chipFieldsOf(prefill: SyntheticPrefillInput): Set<ChipField> {
@@ -160,16 +153,12 @@ export function applySyntheticPrefill(
 export function pickPrefillLocations(
   ids: string[],
   locations: SyntheticsLocation[],
-  reach: Reach | null,
+  url: string,
 ): string[] {
+  const internal = !!url && isInternalUrl(url);
   return locations
     .filter((l) => ids.includes(l.id))
-    .filter((l) => {
-      const isPrivate = l.kind === "private";
-      if (reach === "private") return isPrivate && l.status === "online";
-      if (reach === "public") return !isPrivate;
-      return !isPrivate || l.status === "online";
-    })
+    .filter((l) => (l.kind === "private" ? l.status === "online" : !internal))
     .map((l) => l.id);
 }
 
@@ -209,8 +198,8 @@ export function buildSyntheticPrefillView(
     connecting: ctx.t("synthetics.prefill.connecting"),
     runsPerDay: runsLine(check, ctx),
     alertLine: alertLine(check, ctx),
-    afterRuns: afterRuns(check, ctx),
-    afterNotify: afterNotify(check, ctx),
+    afterRuns: afterRuns(prefill, check, ctx),
+    afterNotify: afterNotify(prefill, check, ctx),
     preSaveRun: ctx.preSaveRun,
   };
 }
@@ -240,15 +229,15 @@ export function useSyntheticPrefill(options: {
     : raw("");
   const chosenLocations = shallowRef<ReadonlySet<string> | null>(null);
   const unconfirmed = shallowRef<ReadonlySet<PrefillList>>(new Set());
-  const settled = new Set<PrefillList>();
+  const confirmed = shallowRef<ReadonlySet<PrefillList>>(new Set());
 
   function apply(check: ProtocolCheck): ProtocolCheck {
     return prefill ? applySyntheticPrefill(check, prefill, description) : check;
   }
 
   function settle(list: PrefillList): boolean {
-    if (!prefill || settled.has(list)) return false;
-    settled.add(list);
+    if (!prefill || confirmed.value.has(list)) return false;
+    confirmed.value = new Set([...confirmed.value, list]);
     if (unconfirmed.value.has(list)) {
       unconfirmed.value = new Set([...unconfirmed.value].filter((l) => l !== list));
     }
@@ -261,7 +250,7 @@ export function useSyntheticPrefill(options: {
     locations: SyntheticsLocation[],
   ): ProtocolCheck | null {
     if (!prefill || !settle("locations")) return null;
-    const ids = pickPrefillLocations(prefill.locations, locations, reachOf(prefill));
+    const ids = pickPrefillLocations(prefill.locations, locations, prefill.url);
     chosenLocations.value = new Set(ids);
     // A draft restore or an edit before the list landed owns the field now.
     if (!sameSet(check.locations, prefill.locations)) return null;
@@ -280,7 +269,7 @@ export function useSyntheticPrefill(options: {
 
   /** A failed load leaves the suggestions in place but unconfirmed until a later load succeeds. */
   function markUnconfirmed(list: PrefillList): void {
-    if (!prefill || settled.has(list) || unconfirmed.value.has(list)) return;
+    if (!prefill || confirmed.value.has(list) || unconfirmed.value.has(list)) return;
     unconfirmed.value = new Set([...unconfirmed.value, list]);
   }
 
@@ -307,6 +296,7 @@ export function useSyntheticPrefill(options: {
         chosenLocations: chosenLocations.value ?? new Set(),
         description,
         preSaveRun: options.preSaveRun ?? null,
+        confirmed: confirmed.value,
         unconfirmed: unconfirmed.value,
       });
     });
@@ -357,8 +347,10 @@ function urlNote(prefill: SyntheticPrefillInput, check: ProtocolCheck, ctx: View
   const from = prefill.evidence?.urlFrom;
   const parsed = hostOf(prefill.url);
   if (!from || !parsed || check.url !== prefill.url) return undefined;
+  const reach = reachOf(prefill);
+  if (!reach) return undefined;
   const source = ctx.t(`synthetics.prefill.source.${from}`);
-  if (reachOf(prefill) !== "private") {
+  if (reach === "public") {
     return ctx.t("synthetics.prefill.urlNotePublic", { service, source });
   }
   const route = parsed.pathname || "/";
@@ -439,27 +431,45 @@ function locationNotes(prefill: SyntheticPrefillInput, check: ProtocolCheck, ctx
   const publicLabel = t("synthetics.locations.publicTitle");
   const privateLabel = t("synthetics.locations.privateTitle");
   const reach = reachOf(prefill);
-  if (reach === "private") {
-    const cluster = prefill.service.cluster;
-    const definition =
-      cluster && ctx.chosenLocations.size > 0
-        ? t("synthetics.prefill.privateDefinitionWhere", { service, cluster })
-        : t("synthetics.prefill.privateDefinition");
-    return [
-      {
-        key: "public",
-        label: publicLabel,
-        text: t("synthetics.prefill.publicSkipped", { service }),
-      },
-      { key: "private", label: privateLabel, text: definition },
-    ] satisfies LocationNote[];
+  const { selected } = selectedKinds(check, ctx.locations);
+  const privateChosen = selected.filter((l) => l.kind === "private");
+  const publicChosen = selected.length > privateChosen.length;
+  const notes: LocationNote[] = [];
+  if (!reach) {
+    notes.push({
+      key: "reach",
+      label: t("synthetics.locations.title"),
+      text: t("synthetics.prefill.reachUnknown", { service }),
+    });
   }
-  if (reach !== "public") return [];
-  const notes: LocationNote[] = [
-    { key: "private", label: privateLabel, text: t("synthetics.prefill.privateSkipped") },
-  ];
+  if (!publicChosen && reach === "private") {
+    notes.push({
+      key: "public",
+      label: publicLabel,
+      text: t("synthetics.prefill.publicSkipped", { service }),
+    });
+  } else if (!publicChosen && reach === "public" && privateChosen.length > 0) {
+    notes.push({
+      key: "public",
+      label: publicLabel,
+      text: t("synthetics.prefill.publicSkippedAgent", { service }),
+    });
+  }
+  if (privateChosen.length > 0 || reach === "private") {
+    notes.push({
+      key: "private",
+      label: privateLabel,
+      text: privateDefinition(prefill, privateChosen, ctx),
+    });
+  } else if (reach === "public") {
+    notes.push({
+      key: "private",
+      label: privateLabel,
+      text: t("synthetics.prefill.privateSkipped"),
+    });
+  }
   const regions = check.locations.length;
-  if (ctx.preSaveRun && regions > 1) {
+  if (reach === "public" && publicChosen && ctx.preSaveRun && regions > 1) {
     const quorum = Math.min(ctx.preSaveRun.quorum, regions);
     notes.push({
       key: "public",
@@ -468,6 +478,30 @@ function locationNotes(prefill: SyntheticPrefillInput, check: ProtocolCheck, ctx
     });
   }
   return notes;
+}
+
+/** Names the service's cluster only when a chosen agent is one AutoObserve picked there. */
+function privateDefinition(
+  prefill: SyntheticPrefillInput,
+  privateChosen: SyntheticsLocation[],
+  ctx: ViewContext,
+): I18nText {
+  const service = prefill.service.name;
+  const cluster = prefill.service.cluster;
+  const suggestedHere = privateChosen.some((l) => ctx.chosenLocations.has(l.id));
+  return cluster && suggestedHere
+    ? ctx.t("synthetics.prefill.privateDefinitionWhere", { service, cluster })
+    : ctx.t("synthetics.prefill.privateDefinition");
+}
+
+/** A list still holding AutoObserve's values before it loaded can only be stated as a suggestion. */
+function isSuggestionOnly(
+  list: PrefillList,
+  current: string[],
+  suggested: string[],
+  ctx: ViewContext,
+): boolean {
+  return !ctx.confirmed.has(list) && suggested.length > 0 && sameSet(current, suggested);
 }
 
 function selectedKinds(check: ProtocolCheck, locations: SyntheticsLocation[]) {
@@ -495,7 +529,11 @@ function alertLine(check: ProtocolCheck, ctx: ViewContext): I18nText {
   return ctx.t("synthetics.prefill.alertLine", { count: fails }, fails);
 }
 
-function afterRuns(check: ProtocolCheck, ctx: ViewContext): I18nText {
+function afterRuns(
+  prefill: SyntheticPrefillInput,
+  check: ProtocolCheck,
+  ctx: ViewContext,
+): I18nText {
   const { t } = ctx;
   const { selected, allPublic, count } = selectedKinds(check, ctx.locations);
   const minutes = intervalMinutes(check.schedule);
@@ -508,10 +546,17 @@ function afterRuns(check: ProtocolCheck, ctx: ViewContext): I18nText {
   if (count === 1 && selected.length === 1) where = selected[0].label;
   else if (allPublic) where = t("synthetics.prefill.after.publicRegions", { count }, count);
   else where = t("synthetics.prefill.after.locations", { count }, count);
-  return t("synthetics.prefill.after.runs", { every, where });
+  const key = isSuggestionOnly("locations", check.locations, prefill.locations, ctx)
+    ? "runsSuggested"
+    : "runs";
+  return t(`synthetics.prefill.after.${key}`, { every, where });
 }
 
-function afterNotify(check: ProtocolCheck, ctx: ViewContext): I18nText {
+function afterNotify(
+  prefill: SyntheticPrefillInput,
+  check: ProtocolCheck,
+  ctx: ViewContext,
+): I18nText {
   const { t } = ctx;
   const fails = check.alertIfFails ?? 1;
   const destinations = check.notifications.destinations;
@@ -519,6 +564,9 @@ function afterNotify(check: ProtocolCheck, ctx: ViewContext): I18nText {
     return t("synthetics.prefill.after.notifyNone", { count: fails }, fails);
   }
   const named = { count: fails, destinations: listText(destinations, ctx) };
+  if (isSuggestionOnly("destinations", destinations, prefill.destinations, ctx)) {
+    return t("synthetics.prefill.after.notifySuggested", named, fails);
+  }
   const total = check.locations.length;
   if (ctx.preSaveRun && total > 1) {
     const quorum = Math.min(ctx.preSaveRun.quorum, total);

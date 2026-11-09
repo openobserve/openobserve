@@ -15,10 +15,15 @@
 
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
+
 import i18n from "@/locales";
 import { raw, type TranslateFn } from "@/types/i18n";
 import type { ProtocolCheck } from "@/types/synthetics";
+import type { NotifyPick } from "@/utils/alerts/prefill/fromAutoObserve";
+import { syntheticPrefillFor } from "@/utils/synthetics/syntheticPrefill";
 import {
   blankHttpCheck as blankCheck,
   internalPrefill,
@@ -35,7 +40,6 @@ import {
   applySyntheticPrefill,
   buildSyntheticPrefillView,
   chipFieldsOf,
-  isInternalHost,
   pickPrefillLocations,
   reachOf,
   readSyntheticPrefill,
@@ -50,16 +54,17 @@ function viewFor(prefill: SyntheticPrefillInput, check: ProtocolCheck, extra = {
     t,
     locale: "en-us",
     locations,
-    chosenLocations: new Set(pickPrefillLocations(prefill.locations, locations, reachOf(prefill))),
+    chosenLocations: new Set(pickPrefillLocations(prefill.locations, locations, prefill.url)),
     description: DESCRIPTION,
     preSaveRun: null,
+    confirmed: new Set(["locations", "destinations"] as const),
     ...extra,
   });
 }
 
 function prefilledCheck(prefill: SyntheticPrefillInput) {
   const check = applySyntheticPrefill(blankCheck(), prefill, DESCRIPTION);
-  const ids = pickPrefillLocations(prefill.locations, locations, reachOf(prefill));
+  const ids = pickPrefillLocations(prefill.locations, locations, prefill.url);
   return { ...check, locations: ids };
 }
 
@@ -161,26 +166,19 @@ describe("prefill rules", () => {
     expect([...chipFieldsOf(some)]).toEqual(["folder"]);
   });
 
-  it.each([
-    ["svc-c.ns-a.svc.cluster.local", true],
-    ["svc-c", true],
-    ["10.2.3.4", true],
-    ["172.20.0.1", true],
-    ["checkout.demo.test", false],
-    ["8.8.8.8", false],
-  ])("treats %s as internal: %s", (host, internal) => {
-    expect(isInternalHost(host)).toBe(internal);
-  });
-
   it("picks only the ready private location for an internal service", () => {
     expect(
-      pickPrefillLocations(["cluster-k-agents", "us-east", "dc-east"], locations, "private"),
+      pickPrefillLocations(
+        ["cluster-k-agents", "us-east", "dc-east"],
+        locations,
+        internalPrefill.url,
+      ),
     ).toEqual(["cluster-k-agents"]);
   });
 
   it("picks the public regions for a public address and never an unknown id", () => {
     expect(
-      pickPrefillLocations([...publicPrefill.locations, "made-up"], locations, "public"),
+      pickPrefillLocations([...publicPrefill.locations, "made-up"], locations, publicPrefill.url),
     ).toEqual(["us-east", "eu-west", "ap-south"]);
   });
 
@@ -261,7 +259,7 @@ describe("prefill view copy", () => {
   });
 
   it("drops the counts it has no evidence for", () => {
-    const bare = { ...internalPrefill, evidence: undefined };
+    const bare = { ...internalPrefill, evidence: { reach: "private" as const } };
     const view = viewFor(bare, prefilledCheck(bare));
     expect(view.notes.folder).toBe("Where svc-c's alerts live.");
     expect(view.notes.destinations).toBe(
@@ -330,5 +328,127 @@ describe("prefill view when the org's lists fail to load", () => {
   it("warns about nothing while the lists load or after they do", () => {
     const view = viewFor(internalPrefill, prefilledCheck(internalPrefill));
     expect(view.unconfirmed).toEqual({});
+  });
+});
+
+describe("aligned with U0's prefill contract", () => {
+  const PUBLIC_SKIPPED_AGENT =
+    "Not selected: a private location runs this check; add a public one to also check checkout from the internet.";
+  const REACH_UNKNOWN =
+    "AutoObserve can't tell whether svc-c is reachable from the internet, so choose the locations: a public one fails every run if it isn't.";
+
+  it("keeps no host check of its own", async () => {
+    const mod: Record<string, unknown> = await import("./useSyntheticPrefill");
+    expect(mod.isInternalHost).toBeUndefined();
+  });
+
+  it("keeps a suggested location only if it can reach the URL, judged by U0's isInternalUrl", () => {
+    const all = ["cluster-k-agents", "us-east", "dc-east"];
+    expect(pickPrefillLocations(all, locations, internalPrefill.url)).toEqual(["cluster-k-agents"]);
+    expect(pickPrefillLocations(all, locations, "http://shop.svc.example.com/health")).toEqual([
+      "us-east",
+      "cluster-k-agents",
+    ]);
+  });
+
+  it("reads reach from the evidence block only, never from the URL or the cluster", () => {
+    expect(reachOf(internalPrefill)).toBe("private");
+    expect(reachOf(publicPrefill)).toBe("public");
+    expect(reachOf({ ...internalPrefill, evidence: { urlFrom: "traces" } })).toBeNull();
+    expect(reachOf({ ...internalPrefill, url: "", evidence: undefined })).toBeNull();
+  });
+
+  it("quotes U0's counts and URL source, and drops the URL note without the reach behind it", () => {
+    const prefill = syntheticPrefillFor(
+      { name: "svc-c", cluster: "cluster-k", namespace: "ns-a" },
+      {
+        locations,
+        address: { url: internalPrefill.url, from: "logs" },
+        team: {
+          name: "ops",
+          folderId: "ops",
+          folderName: "ops",
+          source: "folder",
+          alertCount: 4,
+          reason: raw(""),
+        },
+        notify: { destinations: ["ops-webhook"], reason: raw(""), alertCount: 2 } as NotifyPick,
+      },
+    )!;
+    const view = viewFor(prefill, prefilledCheck(prefill));
+    expect(view.notes.folder).toBe("Where svc-c's 4 alerts live.");
+    expect(view.notes.url).toBe(
+      "From svc-c's logs: in-cluster address, port 8080 and the health route /healthz.",
+    );
+    expect(view.notes.destinations).toBe(
+      "svc-c's 2 alerts notify ops-webhook. Change it if your team uses another.",
+    );
+    const noReach = { ...prefill, evidence: { ...prefill.evidence, reach: undefined } };
+    expect(viewFor(noReach, prefilledCheck(noReach)).notes.url).toBeUndefined();
+  });
+
+  it("treats a missing reach as unknown: keeps the suggested public region and asks the user to choose", () => {
+    const unknown: SyntheticPrefillInput = {
+      ...internalPrefill,
+      url: "",
+      locations: ["us-east"],
+      evidence: { folderAlerts: 3, destinationAlerts: 3 },
+    };
+    const check = prefilledCheck(unknown);
+    expect(check.locations).toEqual(["us-east"]);
+    const view = viewFor(unknown, check);
+    expect(view.locationNotes.map((n) => [n.key, n.text])).toEqual([["reach", REACH_UNKNOWN]]);
+    expect(view.where).toBe("cluster-k / ns-a");
+  });
+
+  it("words the location notes from the chosen locations, not from reach alone", () => {
+    const viaAgent: SyntheticPrefillInput = {
+      ...publicPrefill,
+      locations: ["cluster-k-agents"],
+      service: { ...publicPrefill.service, cluster: "cluster-k" },
+    };
+    const check = prefilledCheck(viaAgent);
+    expect(check.locations).toEqual(["cluster-k-agents"]);
+    const definitionHere =
+      "A private location is an agent inside your network that runs checks. checkout runs in cluster-k, and these agents run there too.";
+    expect(viewFor(viaAgent, check).locationNotes.map((n) => [n.key, n.text])).toEqual([
+      ["public", PUBLIC_SKIPPED_AGENT],
+      ["private", definitionHere],
+    ]);
+    const both = { ...check, locations: ["us-east", "cluster-k-agents"] };
+    expect(viewFor(viaAgent, both).locationNotes.map((n) => [n.key, n.text])).toEqual([
+      ["private", definitionHere],
+    ]);
+  });
+
+  it("words unconfirmed locations and destinations in the After you save summary as suggestions", () => {
+    const check = applySyntheticPrefill(blankCheck(), internalPrefill, DESCRIPTION);
+    const failed = viewFor(internalPrefill, check, {
+      locations: [],
+      confirmed: new Set(),
+      unconfirmed: new Set(["locations", "destinations"]),
+    });
+    expect(failed.afterRuns).toBe(
+      "The check will run every 5 minutes from 2 locations if you keep the suggestion.",
+    );
+    expect(failed.afterNotify).toBe(
+      "If 2 runs in a row fail, ops-webhook will be notified if you keep the suggestion.",
+    );
+    const loading = viewFor(internalPrefill, check, { confirmed: new Set() });
+    expect(loading.afterRuns).toContain("if you keep the suggestion");
+    expect(loading.afterNotify).toContain("if you keep the suggestion");
+  });
+
+  it("states the summary as fact once the lists confirm it, or once the user changed the field", () => {
+    const check = prefilledCheck(internalPrefill);
+    const confirmed = viewFor(internalPrefill, check);
+    expect(confirmed.afterRuns).toBe("The check runs every 5 minutes from cluster-k agents.");
+    expect(confirmed.afterNotify).toBe("If 2 runs in a row fail, ops-webhook is notified.");
+    const edited = viewFor(
+      internalPrefill,
+      { ...check, notifications: { destinations: ["pager"] } },
+      { confirmed: new Set(["locations"]), unconfirmed: new Set(["destinations"]) },
+    );
+    expect(edited.afterNotify).toBe("If 2 runs in a row fail, pager is notified.");
   });
 });

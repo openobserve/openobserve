@@ -38,8 +38,8 @@ const prefillBase = {
   intervalMinutes: 5,
   destinations: ['ops-webhook'],
   suggested: ['folder', 'tags', 'url', 'locations', 'destinations'],
-  evidence: { urlFrom: 'traces', folderAlerts: 3, destinationAlerts: 3 },
 };
+const counts = { folderAlerts: 3, destinationAlerts: 3 };
 
 function internalPrefill(ctx) {
   return {
@@ -50,6 +50,7 @@ function internalPrefill(ctx) {
     locations: [ctx.privateId],
     tags: ['service:svc-c', 'namespace:ns-a', 'cluster:cluster-k'],
     service: { name: 'svc-c', cluster: 'cluster-k', namespace: 'ns-a' },
+    evidence: { reach: 'private', urlFrom: 'traces', ...counts },
   };
 }
 
@@ -62,11 +63,17 @@ function publicPrefill(ctx) {
     locations: ctx.publicIds,
     tags: ['service:checkout', 'namespace:shop', 'cluster:cluster-p'],
     service: { name: 'checkout', cluster: 'cluster-p', namespace: 'shop' },
+    evidence: { reach: 'public', urlFrom: 'traces', ...counts },
   };
 }
 
 function unknownUrlPrefill(ctx) {
-  return { ...internalPrefill(ctx), name: 'svc-x health', url: '', service: { name: 'svc-x', cluster: 'cluster-k', namespace: 'ns-a' }, tags: ['service:svc-x', 'namespace:ns-a', 'cluster:cluster-k'] };
+  return { ...internalPrefill(ctx), name: 'svc-x health', url: '', service: { name: 'svc-x', cluster: 'cluster-k', namespace: 'ns-a' }, tags: ['service:svc-x', 'namespace:ns-a', 'cluster:cluster-k'], evidence: counts };
+}
+
+// U0 picks the service's ready in-cluster agent even for a public address.
+function publicViaAgentPrefill(ctx) {
+  return { ...publicPrefill(ctx), locations: [ctx.privateId], service: { name: 'checkout', cluster: 'cluster-k', namespace: 'shop' } };
 }
 
 // Seeds once per tab, so a reload shows what the form does with an already-read prefill.
@@ -179,6 +186,34 @@ test.describe('Synthetic check form from AutoObserve', { tag: ['@synthetics', '@
       "svc-x's URL isn't in its traces or logs, so you enter it; location, folder and destination are filled in.",
     );
     await expect(page.locator('[data-test="synthetics-prefill-note-url"] [data-test="synthetics-prefill-suggested-chip"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="synthetics-prefill-location-note-reach"]')).toContainText(
+      "AutoObserve can't tell whether svc-x is reachable from the internet, so choose the locations: a public one fails every run if it isn't.",
+    );
+    await expect(page.locator('[data-test="synthetics-prefill-location-note-public"]')).toHaveCount(0);
+  });
+
+  test('a prefill without evidence quotes no counts and leaves the reach to the user', async ({ page }) => {
+    test.skip(!EXPECT_PREFILL, 'OSS build');
+    const { evidence: _evidence, ...bare } = internalPrefill(ctx);
+    await seed(page, bare);
+    await openForm(page);
+    await expect(page.locator('[data-test="synthetics-prefill-note-folder"]')).toHaveText(/Where svc-c's alerts live\./);
+    await expect(page.locator('[data-test="synthetics-prefill-note-destinations"]')).toContainText("svc-c's alerts notify ops-webhook.");
+    await expect(page.locator('[data-test="synthetics-prefill-note-url"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="synthetics-prefill-location-note-reach"]')).toBeVisible();
+    await expect(page.locator('[data-test="synthetics-prefill-location-note-public"]')).toHaveCount(0);
+  });
+
+  test('a public address checked from the in-cluster agent keeps the agent and says why public is not selected', async ({ page }) => {
+    test.skip(!EXPECT_PREFILL, 'OSS build');
+    await seed(page, publicViaAgentPrefill(ctx));
+    await openForm(page);
+    await expect(page.locator(`[data-test="synthetics-prefill-location-chip-${ctx.privateId}"]`)).toBeVisible();
+    await expect(page.locator('[data-test="synthetics-prefill-location-note-public"]')).toHaveText(
+      /Not selected: a private location runs this check; add a public one to also check checkout from the internet\./,
+    );
+    await expect(page.locator('[data-test="synthetics-prefill-location-note-private"]')).not.toContainText('Not selected');
+    await expect(page.locator('[data-test="synthetics-prefill-after-save-runs"]')).toHaveText('The check runs every 5 minutes from cluster-k agents.');
   });
 
   test('a destination the org no longer has is dropped before saving', async ({ page }) => {
@@ -203,10 +238,17 @@ test.describe('Synthetic check form from AutoObserve', { tag: ['@synthetics', '@
     await expect(page.locator('[data-test="synthetics-prefill-unconfirmed-destinations"]')).toHaveText(
       "Destinations didn't load, so the suggested ones aren't confirmed. Refresh the list before you save.",
     );
+    await expect(page.locator('[data-test="synthetics-prefill-after-save-runs"]')).toHaveText(
+      'The check will run every 5 minutes from 1 location if you keep the suggestion.',
+    );
+    await expect(page.locator('[data-test="synthetics-prefill-after-save-notify"]')).toHaveText(
+      'If 2 runs in a row fail, ops-webhook will be notified if you keep the suggestion.',
+    );
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     await page.locator('[data-test="synthetics-check-locations-refresh-btn"]').click();
     await expect(page.locator('[data-test="synthetics-prefill-unconfirmed-locations"]')).toHaveCount(0);
     await expect(page.locator(`[data-test="synthetics-prefill-location-chip-${ctx.privateId}"]`)).toBeVisible();
+    await expect(page.locator('[data-test="synthetics-prefill-after-save-runs"]')).toHaveText('The check runs every 5 minutes from cluster-k agents.');
   });
 
   test('a reload shows the plain form, because the prefill is read once', async ({ page }) => {

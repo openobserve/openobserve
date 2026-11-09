@@ -13,63 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The one swap point for U0's `utils/synthetics/syntheticPrefill.ts`; once it lands this file re-exports it.
+import {
+  takeSyntheticPrefill as takeStoredPrefill,
+  type SyntheticPrefillInput,
+} from "@/utils/synthetics/syntheticPrefill";
 
-export const SYNTHETIC_PREFILL_KEY = "o2:syntheticPrefill";
+export {
+  SYNTHETIC_PREFILL_KEY,
+  writeSyntheticPrefill,
+  type SyntheticPrefill,
+  type SyntheticPrefillEvidence,
+  type SyntheticPrefillInput,
+  type SyntheticPrefillService,
+} from "@/utils/synthetics/syntheticPrefill";
 
-export interface SyntheticPrefillService {
-  name: string;
-  cluster: string | null;
-  namespace: string | null;
-}
-
-export interface SyntheticPrefill {
-  version: 1;
-  source: "autoobserve";
-  sourceLabel: string;
-  name: string;
-  folder: string;
-  type: "http";
-  url: string;
-  method: "GET";
-  locations: string[];
-  destinations: string[];
-  intervalMinutes: 5;
-  tags: string[];
-  /** Only the fields AutoObserve inferred; the form marks exactly these as Suggested. */
-  suggested: (keyof SyntheticPrefill)[];
-  service: SyntheticPrefillService;
-}
-
-/** Facts behind the field notes; each is optional so a missing one drops its clause, never the field. */
-export interface SyntheticPrefillEvidence {
-  reach?: "private" | "public";
-  urlFrom?: "traces" | "logs";
-  folderAlerts?: number;
-  destinationAlerts?: number;
-}
-
-export type SyntheticPrefillInput = SyntheticPrefill & { evidence?: SyntheticPrefillEvidence };
-
-export function writeSyntheticPrefill(prefill: SyntheticPrefillInput): void {
-  try {
-    sessionStorage.setItem(SYNTHETIC_PREFILL_KEY, JSON.stringify(prefill));
-  } catch {
-    // A full or unavailable sessionStorage opens the plain form, which is still correct.
-  }
-}
-
-/** Reads the stored prefill and clears it, so a reload or a second visit shows the plain form. */
+/** U0's read-once take, narrowed to a prefill whose lists the form can fill without a guard per field. */
 export function takeSyntheticPrefill(): SyntheticPrefillInput | null {
-  try {
-    const stored = sessionStorage.getItem(SYNTHETIC_PREFILL_KEY);
-    sessionStorage.removeItem(SYNTHETIC_PREFILL_KEY);
-    if (!stored) return null;
-    const parsed: unknown = JSON.parse(stored);
-    return isSyntheticPrefill(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  const stored = takeStoredPrefill();
+  return stored && isSyntheticPrefill(stored) ? stored : null;
 }
 
 function isStringList(value: unknown): value is string[] {
@@ -80,8 +41,6 @@ function isSyntheticPrefill(value: unknown): value is SyntheticPrefillInput {
   const p = value as Partial<SyntheticPrefillInput> | null;
   return (
     !!p &&
-    p.version === 1 &&
-    p.source === "autoobserve" &&
     p.type === "http" &&
     typeof p.name === "string" &&
     typeof p.folder === "string" &&

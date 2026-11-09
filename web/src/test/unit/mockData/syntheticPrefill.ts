@@ -33,7 +33,7 @@ export const internalPrefill: SyntheticPrefillInput = {
   tags: ["service:svc-c", "namespace:ns-a", "cluster:cluster-k"],
   suggested: ["folder", "tags", "url", "locations", "destinations"],
   service: { name: "svc-c", cluster: "cluster-k", namespace: "ns-a" },
-  evidence: { urlFrom: "traces", folderAlerts: 3, destinationAlerts: 3 },
+  evidence: { reach: "private", urlFrom: "traces", folderAlerts: 3, destinationAlerts: 3 },
 };
 
 export const publicPrefill: SyntheticPrefillInput = {
@@ -43,6 +43,7 @@ export const publicPrefill: SyntheticPrefillInput = {
   locations: ["us-east", "eu-west", "ap-south"],
   tags: ["service:checkout", "namespace:shop", "cluster:cluster-p"],
   service: { name: "checkout", cluster: "cluster-p", namespace: "shop" },
+  evidence: { reach: "public", urlFrom: "traces", folderAlerts: 3, destinationAlerts: 3 },
 };
 
 export const prefillLocations = [

@@ -33,7 +33,6 @@ import {
   applySyntheticPrefill,
   buildSyntheticPrefillView,
   pickPrefillLocations,
-  reachOf,
   type PreSaveRun,
 } from "./useSyntheticPrefill";
 import CheckDetails from "@/components/synthetics/configure/CheckDetails.vue";
@@ -45,7 +44,7 @@ const t = i18n.global.t as unknown as TranslateFn;
 const DESCRIPTION = raw("Created from an AutoObserve suggestion for svc-c on Nov 6.");
 
 function setup(prefill: SyntheticPrefillInput, preSaveRun: PreSaveRun | null = null) {
-  const ids = pickPrefillLocations(prefill.locations, prefillLocations, reachOf(prefill));
+  const ids = pickPrefillLocations(prefill.locations, prefillLocations, prefill.url);
   const check: ProtocolCheck = {
     ...applySyntheticPrefill(blankHttpCheck(), prefill, DESCRIPTION),
     locations: ids,
@@ -57,6 +56,7 @@ function setup(prefill: SyntheticPrefillInput, preSaveRun: PreSaveRun | null = n
     chosenLocations: new Set(ids),
     description: DESCRIPTION,
     preSaveRun,
+    confirmed: new Set(["locations", "destinations"] as const),
   });
   return {
     check,
@@ -211,6 +211,7 @@ describe("configure sections when the org's lists fail to load", () => {
       chosenLocations: new Set(),
       description: DESCRIPTION,
       preSaveRun: null,
+      confirmed: new Set(),
       unconfirmed: new Set(["locations", "destinations"]),
     });
     return {

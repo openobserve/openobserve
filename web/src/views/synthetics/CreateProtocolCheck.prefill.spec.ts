@@ -328,6 +328,12 @@ describe("CreateProtocolCheck reconciling an AutoObserve prefill with the org", 
       "Destinations didn't load, so the suggested ones aren't confirmed. Refresh the list before you save.",
     );
     expect(text(wrapper, "probe-note-destinations")).toBe("");
+    expect(text(wrapper, "synthetics-prefill-after-save")).toContain(
+      "ops-webhook will be notified if you keep the suggestion.",
+    );
+    expect(text(wrapper, "synthetics-prefill-after-save")).toContain(
+      "The check will run every 5 minutes from 2 locations if you keep the suggestion.",
+    );
 
     mocks.destinations.mockResolvedValue({ data: [] });
     probe(wrapper).vm.$emit("refresh-locations");
@@ -337,6 +343,7 @@ describe("CreateProtocolCheck reconciling an AutoObserve prefill with the org", 
     expect(checkOf(wrapper).notifications.destinations).toEqual([]);
     expect(text(wrapper, "probe-unconfirmed-locations")).toBe("");
     expect(text(wrapper, "probe-unconfirmed-destinations")).toBe("");
+    expect(text(wrapper, "synthetics-prefill-after-save")).not.toContain("if you keep");
   });
 
   it("keeps locations chosen before the list lands instead of narrowing them to the suggestion", async () => {

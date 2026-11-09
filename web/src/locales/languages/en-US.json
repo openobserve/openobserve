@@ -22338,6 +22338,8 @@
         "destinations": "Destinations didn't load, so the suggested ones aren't confirmed. Refresh the list before you save."
       },
       "publicSkipped": "Not selected: {service} isn't reachable from the internet, so a public location would fail every run.",
+      "publicSkippedAgent": "Not selected: a private location runs this check; add a public one to also check {service} from the internet.",
+      "reachUnknown": "AutoObserve can't tell whether {service} is reachable from the internet, so choose the locations: a public one fails every run if it isn't.",
       "privateSkipped": "Not selected: the address is public, so no agent inside your network is needed.",
       "privateDefinition": "A private location is an agent inside your network that runs checks.",
       "privateDefinitionWhere": "A private location is an agent inside your network that runs checks. {service} runs in {cluster}, and these agents run there too.",
@@ -22356,6 +22358,7 @@
       "after": {
         "title": "After you save",
         "runs": "The check runs {every} from {where}.",
+        "runsSuggested": "The check will run {every} from {where} if you keep the suggestion.",
         "noLocation": "The check runs {every} once you pick a location.",
         "everyMinutes": "every minute | every {count} minutes",
         "onSchedule": "on its schedule",
@@ -22368,6 +22371,7 @@
         "notify": "If a run fails, {destinations} is notified. | If {count} runs in a row fail, {destinations} is notified.",
         "notifyMany": "If a run fails, {destinations} are notified. | If {count} runs in a row fail, {destinations} are notified.",
         "notifyNone": "If a run fails, no one is notified until you choose a destination. | If {count} runs in a row fail, no one is notified until you choose a destination.",
+        "notifySuggested": "If a run fails, {destinations} will be notified if you keep the suggestion. | If {count} runs in a row fail, {destinations} will be notified if you keep the suggestion.",
         "notifyQuorum": "If {quorum} of the {total} locations fail {count} runs in a row, {destinations} is notified.",
         "back": "Back to {link} after saving.",
         "backLink": "{service} in AutoObserve"
