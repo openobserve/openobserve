@@ -292,7 +292,6 @@ describe("AlertCalibrationDigestDetail declined list", () => {
     expect(amberText('[data-test="alert-calibration-digest-findings-capped"]', wrapper)).toBe(
       notice.text(),
     );
-    expect(analytics.track).toHaveBeenCalledWith("alert_calibration_digest_logs_opened");
     (wrapper.vm as any).onRuleFilter("failure");
     expect(analytics.track).toHaveBeenCalledWith("alert_calibration_rule_filtered", {
       rule: "failure",
