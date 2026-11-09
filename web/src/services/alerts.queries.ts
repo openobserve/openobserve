@@ -42,9 +42,12 @@ export const alertsListQuery = (
   query?: string,
   alertType?: string,
   options?: { silentForbidden?: boolean },
+  withDependencies = false,
 ) =>
   queryOptions({
-    queryKey: alertKeys.list(org, folderId, query, alertType),
+    queryKey: withDependencies
+      ? [...alertKeys.list(org, folderId, query, alertType), "dependencies"]
+      : alertKeys.list(org, folderId, query, alertType),
     queryFn: async (): Promise<any[]> => {
       const args = [
         1,
@@ -57,9 +60,12 @@ export const alertsListQuery = (
         query ?? "",
         alertType ?? "",
       ] as const;
+      // Only an opted-in caller pays for the destination and template names.
       const res = await (options
-        ? alerts.listByFolderId(...args, undefined, options)
-        : alerts.listByFolderId(...args));
+        ? alerts.listByFolderId(...args, withDependencies || undefined, options)
+        : withDependencies
+          ? alerts.listByFolderId(...args, true)
+          : alerts.listByFolderId(...args));
       const list = res.data?.list ?? [];
       // Rows stay the cached shape every patch edits; each one carries that its live fields are unknown.
       return res.data?.status_unavailable
