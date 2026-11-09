@@ -130,6 +130,10 @@ pub enum Error {
     MemoryCircuitBreakerError {},
     #[snafu(display("DiskCircuitBreakerError"))]
     DiskCircuitBreakerError {},
+    #[snafu(display("Writer {key} closed by flush again during retry"))]
+    WriterClosedError {
+        key: String,
+    },
     ExternalError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
@@ -145,6 +149,7 @@ impl Error {
             } | Error::MemoryTableOverflowError {}
                 | Error::MemoryCircuitBreakerError {}
                 | Error::DiskCircuitBreakerError {}
+                | Error::WriterClosedError { .. }
         )
     }
 }
@@ -162,6 +167,12 @@ mod tests {
             .is_overload()
         );
         assert!(Error::MemoryTableOverflowError {}.is_overload());
+        assert!(
+            Error::WriterClosedError {
+                key: "org/logs".to_string()
+            }
+            .is_overload()
+        );
         assert!(
             !Error::ExternalError {
                 source: "disk failure".into()

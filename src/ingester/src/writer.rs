@@ -17,7 +17,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc, LazyLock as Lazy,
-        atomic::{AtomicI64, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
     },
 };
 
@@ -60,6 +60,8 @@ pub struct Writer {
     next_seq: AtomicU64,
     created_at: AtomicI64,
     write_queue: Arc<mpsc::Sender<(WriterSignal, crate::ProcessedBatch, bool)>>,
+    // set by flush under the WAL write lock; writes must check it under that lock
+    closed: AtomicBool,
 }
 
 // check total memtable size
@@ -316,6 +318,7 @@ impl Writer {
             next_seq,
             created_at: AtomicI64::new(now),
             write_queue: Arc::new(tx),
+            closed: AtomicBool::new(false),
         };
         let writer = Arc::new(writer);
         let writer_clone = writer.clone();
@@ -485,8 +488,36 @@ impl Writer {
     }
 
     async fn consume_processed(&self, batch: crate::ProcessedBatch, fsync: bool) -> Result<()> {
-        if batch.entries.is_empty() {
+        let Some(batch) = self.try_consume(batch, fsync).await? else {
             return Ok(());
+        };
+        log::warn!(
+            "[INGESTER:MEM:{}] writer {} closed by flush, retrying on the live writer",
+            self.idx,
+            self.get_key_str()
+        );
+        if self
+            .live_writer()
+            .await
+            .try_consume(batch, fsync)
+            .await?
+            .is_some()
+        {
+            return Err(Error::WriterClosedError {
+                key: self.get_key_str(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Writes the batch, or hands it back untouched when flush already closed this writer.
+    async fn try_consume(
+        &self,
+        batch: crate::ProcessedBatch,
+        fsync: bool,
+    ) -> Result<Option<crate::ProcessedBatch>> {
+        if batch.entries.is_empty() {
+            return Ok(None);
         }
         // Check rotation
         self.rotate(batch.entries_wal_size, batch.entries_arrow_size)
@@ -499,6 +530,9 @@ impl Writer {
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
+        if self.closed.load(Ordering::Acquire) {
+            return Ok(Some(batch));
+        }
         for entry in batch.bytes_entries {
             if entry.is_empty() {
                 continue;
@@ -506,9 +540,8 @@ impl Writer {
             wal.write(&entry).context(WalSnafu)?;
             tokio::task::coop::consume_budget().await;
         }
-        drop(wal);
 
-        // Write into Memtable - pure IO, no CPU-intensive processing
+        // WAL lock stays held so flush cannot swap the memtable between the WAL and memtable writes
         let start = std::time::Instant::now();
         let mut mem = self.memtable.write().await;
         let mem_lock_time = start.elapsed().as_millis() as f64;
@@ -526,12 +559,19 @@ impl Writer {
 
         // Check fsync
         if fsync {
-            let mut wal = self.wal.write().await;
             wal.sync().context(WalSnafu)?;
-            drop(wal);
         }
+        drop(wal);
 
-        Ok(())
+        Ok(None)
+    }
+
+    /// The writer currently registered for this key, created if flush removed it.
+    async fn live_writer(&self) -> Arc<Writer> {
+        let mut rw = WRITERS[self.idx].write().await;
+        rw.entry(self.key.clone())
+            .or_insert_with(|| Writer::new(self.idx, self.key.clone()))
+            .clone()
     }
 
     // rotate is used to rotate the wal and memtable if the size exceeds the threshold
@@ -551,10 +591,11 @@ impl Writer {
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
-        // check again to avoid race condition
-        if !self
-            .should_rotate(wal.size(), entry_bytes_size, entry_batch_size)
-            .await
+        // check again to avoid race condition; a flushed WAL path is already in IMMUTABLES
+        if self.closed.load(Ordering::Acquire)
+            || !self
+                .should_rotate(wal.size(), entry_bytes_size, entry_batch_size)
+                .await
         {
             return Ok(());
         }
@@ -625,6 +666,7 @@ impl Writer {
 
         // rotation wal
         let mut wal = self.wal.write().await;
+        self.closed.store(true, Ordering::Release);
         wal.sync().context(WalSnafu)?;
         let path = wal.path().clone();
         drop(wal);
@@ -749,5 +791,129 @@ mod tests {
         let key = WriterKey::new_replay("abc", "xyz");
         let min_expected = std::mem::size_of::<WriterKey>() + "abc".len() + "xyz".len();
         assert_eq!(key.mem_size(), min_expected);
+    }
+
+    fn race_entry(org_id: &str, stream: &str, schema: &Arc<Schema>, rows: usize) -> Entry {
+        let ts = Utc::now().timestamp_micros();
+        Entry {
+            org_id: Arc::from(org_id),
+            stream: Arc::from(stream),
+            schema: Some(schema.clone()),
+            schema_key: Arc::from("race_schema"),
+            partition_key: Arc::from("2026/11/09/00"),
+            data: (0..rows)
+                .map(|i| Arc::new(serde_json::json!({"_timestamp": ts, "v": i as i64})))
+                .collect(),
+            data_size: 0,
+            batch: None,
+        }
+    }
+
+    async fn count_visible_rows(org_id: &str, stream_type: &str, stream: &str) -> usize {
+        let (ids, mem) = read_from_memtable(org_id, stream_type, stream, None, &[])
+            .await
+            .unwrap();
+        let (_, imm) = crate::immutable::read_from_immutable(
+            "test",
+            org_id,
+            stream_type,
+            stream,
+            None,
+            &[],
+            &ids,
+        )
+        .await
+        .unwrap();
+        mem.iter()
+            .chain(imm.iter())
+            .flat_map(|(_, batches)| batches.iter())
+            .map(|b| b.data.num_rows())
+            .sum()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_flush_all_does_not_lose_concurrent_writes() {
+        let org_id = format!("flush_race_{}", Utc::now().timestamp_micros());
+        let stream_type = "logs";
+        let stream = "race_stream";
+        let schema = Arc::new(Schema::new(vec![
+            arrow_schema::Field::new("_timestamp", arrow_schema::DataType::Int64, false),
+            arrow_schema::Field::new("v", arrow_schema::DataType::Int64, false),
+        ]));
+        let acked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let rejected = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        let flusher = {
+            let done = done.clone();
+            tokio::spawn(async move {
+                let mut flushes = 0usize;
+                while !done.load(Ordering::Acquire) {
+                    flush_all().await.unwrap();
+                    flushes += 1;
+                    tokio::task::yield_now().await;
+                }
+                flushes
+            })
+        };
+
+        let mut tasks = Vec::new();
+        for task in 0..8usize {
+            let (org_id, schema) = (org_id.clone(), schema.clone());
+            let (acked, rejected) = (acked.clone(), rejected.clone());
+            tasks.push(tokio::spawn(async move {
+                for i in 0..200usize {
+                    let rows = 1 + (task + i) % 5;
+                    let w = get_writer(0, &org_id, stream_type, stream).await;
+                    tokio::task::yield_now().await;
+                    let entry = race_entry(&org_id, stream, &schema, rows);
+                    match w.write_batch(vec![entry], false).await {
+                        Ok(()) => acked.fetch_add(rows, Ordering::SeqCst),
+                        Err(Error::WriterClosedError { .. }) => {
+                            rejected.fetch_add(rows, Ordering::SeqCst)
+                        }
+                        Err(e) => panic!("unexpected write error: {e}"),
+                    };
+                }
+            }));
+        }
+        for t in tasks {
+            t.await.unwrap();
+        }
+        done.store(true, Ordering::Release);
+        let flushes = flusher.await.unwrap();
+
+        let acked = acked.load(Ordering::SeqCst);
+        let visible = count_visible_rows(&org_id, stream_type, stream).await;
+        println!(
+            "flushes={flushes} acked={acked} rejected={} visible={visible}",
+            rejected.load(Ordering::SeqCst)
+        );
+        assert!(flushes > 0);
+        assert!(acked > 0);
+        assert_eq!(visible, acked, "acknowledged rows must stay readable");
+    }
+
+    #[tokio::test]
+    async fn test_rotate_after_flush_keeps_flushed_rows() {
+        let org_id = format!("flush_rotate_{}", Utc::now().timestamp_micros());
+        let stream_type = "logs";
+        let stream = "rotate_stream";
+        let schema = Arc::new(Schema::new(vec![
+            arrow_schema::Field::new("_timestamp", arrow_schema::DataType::Int64, false),
+            arrow_schema::Field::new("v", arrow_schema::DataType::Int64, false),
+        ]));
+        let writer = Writer::new(0, WriterKey::new(0, org_id.as_str(), stream_type));
+        let entry = race_entry(&org_id, stream, &schema, 7);
+        writer.write_batch_synced(vec![entry]).await.unwrap();
+        writer.flush().await.unwrap();
+        assert!(
+            writer
+                .should_rotate(writer.wal.read().await.size(), 1 << 40, 0)
+                .await,
+            "rotate must reach its closed check"
+        );
+        writer.rotate(1 << 40, 0).await.unwrap();
+        assert_eq!(count_visible_rows(&org_id, stream_type, stream).await, 7);
     }
 }
