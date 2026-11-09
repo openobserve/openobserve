@@ -256,8 +256,6 @@ pub fn generate_physical_optimizer_rules(
     rules.push(Arc::new(EnsureCooperative::new()));
     // Must be near the end: later plan changes break the dynamic filters' source references
     rules.push(Arc::new(FilterPushdown::new_post_optimization()));
-    // Only validates the plan as left by the rules above it, not the custom rules below
-    rules.push(Arc::new(SanityCheckPlan::new()));
 
     // *********** custom rules ***********
     rules.push(Arc::new(JoinReorderRule::new()));
@@ -292,6 +290,9 @@ pub fn generate_physical_optimizer_rules(
         rules.push(Arc::new(SharedSubplanRule::new()));
     }
     // ************************************
+
+    // Validates the final plan, so custom rules cannot break order or distribution requirements
+    rules.push(Arc::new(SanityCheckPlan::new()));
 
     rules
 }
@@ -684,9 +685,11 @@ mod tests {
         let upstream = PhysicalOptimizer::new()
             .rules
             .iter()
+            .filter(|rule| rule.name() != "SanityCheckPlan")
             .map(|rule| format!("{rule:?}"))
             .collect::<Vec<_>>();
         let rules = generate_physical_optimizer_rules(&Request::default(), &test_sql(), vec![]);
+        assert_eq!(rules.last().unwrap().name(), "SanityCheckPlan");
         // Debug, not name(): both OutputRequirements modes share one name.
         let ours = rules[..upstream.len()]
             .iter()
@@ -810,7 +813,6 @@ mod tests {
             "PushdownSort",
             "EnsureCooperative",
             "FilterPushdown(Post)",
-            "SanityCheckPlan",
             "JoinReorderRule",
             "RemoteScanRule",
             "AggregateTopkRule",
@@ -820,6 +822,7 @@ mod tests {
         if config::get_config().search.feature_shared_cte_enabled {
             expected.push("SharedSubplanRule");
         }
+        expected.push("SanityCheckPlan");
         let actual = ctx
             .state()
             .physical_optimizers()
@@ -861,8 +864,10 @@ mod tests {
             use_index,
             ..Request::default()
         };
+        let sorted_by_time = !config::utils::sql::is_complex_query(sql).unwrap();
         let meta = Sql {
             limit: 21,
+            sorted_by_time,
             ..test_sql()
         };
         let ctx = SearchContextBuilder::new()
@@ -880,14 +885,15 @@ mod tests {
             .unwrap();
         let table = NewEmptyTable::new("t", schema)
             .with_partitions(4)
-            .with_sort_order(crate::datafusion::sort_order::FileSortOrder::TimestampDesc);
+            .with_sort_order(
+                crate::datafusion::sort_order::FileSortOrder::from_sorted_by_time(sorted_by_time),
+            );
         ctx.register_table("t", Arc::new(table))?;
         create_physical_plan(&ctx, sql, false).await
     }
 
-    // Runs the check itself because SanityCheckPlan precedes the custom rules in the rule list.
     #[tokio::test]
-    async fn test_every_rule_keeps_constants_for_shortened_sorts() {
+    async fn test_every_rule_keeps_query_plans_valid() {
         let queries = [
             // Values API query: the filter makes the group key constant and shortens the sort
             (
@@ -917,9 +923,80 @@ mod tests {
                     ON a.k8s_cluster = b.k ORDER BY b.k, a.value DESC LIMIT 21",
                 false,
             ),
+            (
+                "SELECT _timestamp, event_name FROM t ORDER BY _timestamp DESC LIMIT 21",
+                false,
+            ),
+            (
+                "SELECT _timestamp, event_name FROM t ORDER BY _timestamp ASC, event_name LIMIT 21",
+                false,
+            ),
+            (
+                "SELECT _timestamp, event_name FROM t WHERE value > 1 \
+                    UNION ALL SELECT _timestamp, event_name FROM t WHERE value < 1 \
+                    ORDER BY _timestamp DESC LIMIT 21",
+                false,
+            ),
+            (
+                "SELECT event_name, value, 'a' AS origin FROM t WHERE value > 1 \
+                    UNION ALL SELECT event_name, value, 'b' AS origin FROM t WHERE value < 0 \
+                    ORDER BY origin, value DESC LIMIT 21",
+                false,
+            ),
+            (
+                "SELECT event_name, _timestamp FROM t WHERE event_name IN \
+                    (SELECT event_name FROM t) ORDER BY _timestamp DESC LIMIT 21",
+                false,
+            ),
+            (
+                "SELECT a.event_name, a._timestamp FROM t a JOIN t b \
+                    ON a.k8s_cluster = b.k8s_cluster ORDER BY a._timestamp DESC LIMIT 21",
+                false,
+            ),
+            // Broadcast join ordered by the probe side
+            (
+                "SELECT a.event_name, _timestamp FROM t a WHERE a.k8s_cluster IN \
+                    (SELECT k8s_cluster FROM t GROUP BY k8s_cluster ORDER BY count(*) DESC LIMIT 10) \
+                    ORDER BY _timestamp DESC LIMIT 21",
+                false,
+            ),
+            (
+                "SELECT _timestamp, count(*) AS c FROM t GROUP BY _timestamp \
+                    ORDER BY _timestamp DESC LIMIT 21",
+                true,
+            ),
+            (
+                "SELECT DISTINCT _timestamp, event_name FROM t ORDER BY _timestamp DESC LIMIT 21",
+                true,
+            ),
+            (
+                "SELECT _timestamp, count(*) AS c FROM t GROUP BY _timestamp HAVING count(*) > 1 \
+                    ORDER BY _timestamp DESC LIMIT 21",
+                true,
+            ),
+            (
+                "WITH c AS (SELECT _timestamp, event_name FROM t) \
+                    SELECT * FROM c ORDER BY _timestamp DESC LIMIT 21",
+                false,
+            ),
+            (
+                "SELECT * FROM (SELECT _timestamp, event_name FROM t) \
+                    ORDER BY _timestamp DESC LIMIT 21",
+                false,
+            ),
+            (
+                "SELECT _timestamp, ROW_NUMBER() OVER (ORDER BY _timestamp DESC) AS rn FROM t \
+                    ORDER BY _timestamp DESC LIMIT 21",
+                false,
+            ),
+            // A CTE read twice goes through SharedSubplanRule
+            (
+                "WITH c AS (SELECT event_name FROM t WHERE value > 1) \
+                    SELECT a.event_name FROM c a JOIN c b ON a.event_name = b.event_name \
+                    ORDER BY a.event_name LIMIT 21",
+                false,
+            ),
         ];
-        let check = SanityCheckPlan::new();
-        let options = datafusion::config::ConfigOptions::default();
         let mut failures = vec![];
         for (sql, streamable) in queries {
             // Mirrors is_streaming_aggregate, so a plan production never builds is not tested
@@ -929,9 +1006,7 @@ mod tests {
             for is_leader in [false, true] {
                 for streaming in [false, streamable] {
                     for use_index in [false, true] {
-                        let plan = plan_with_every_rule(sql, is_leader, streaming, use_index)
-                            .await
-                            .and_then(|plan| check.optimize(plan, &options));
+                        let plan = plan_with_every_rule(sql, is_leader, streaming, use_index).await;
                         if let Err(e) = plan {
                             failures.push(format!(
                                 "leader={is_leader} streaming={streaming} index={use_index}: {sql}\n{e}"
