@@ -206,6 +206,7 @@
             :loading="spend.loading.value"
             :rate="samplingRate"
             :scope="formValues.targetScope"
+            :budget-enabled="formValues.budgetEnabled"
             :has-judges="judgeIds.length > 0"
             :org-id="orgId"
           />
@@ -723,6 +724,7 @@ function initForm(row: EvalJob | null): JobForm {
       samplingMode: "rate",
       samplingValue: "0.1",
       filterGroup: initFilterGroup(row),
+      budgetEnabled: true,
       dailyBudgetUsd: DEFAULT_DAILY_BUDGET_USD,
       budgetAction: DEFAULT_BUDGET_ACTION,
     };
@@ -743,7 +745,9 @@ function initForm(row: EvalJob | null): JobForm {
     samplingMode: samplingModeOf(row),
     samplingValue: samplingRateForForm(valueOf(row, "samplingValue", "sampling_value")),
     filterGroup: initFilterGroup(row),
-    // A job saved before budgets shows, and on save gets, the default budget.
+    // A job without a budget (removed, or saved before budgets) stays without one until the
+    // user sets one; the limit field then starts at the default.
+    budgetEnabled: row.budget != null,
     dailyBudgetUsd: row.budget?.dailyUsd ?? DEFAULT_DAILY_BUDGET_USD,
     budgetAction: row.budget?.onReach ?? DEFAULT_BUDGET_ACTION,
   };
@@ -951,8 +955,10 @@ async function onSubmit(value: JobForm) {
         value.samplingMode === "all"
           ? null
           : parseSamplingRate(value.samplingValue ?? "", t("onlineEvals.job.samplingValueLabel")),
-      // Inputs hand numbers over as text; the schema checked they parse.
-      budget: { dailyUsd: Number(value.dailyBudgetUsd), onReach: value.budgetAction },
+      // Inputs hand numbers over as text; the schema checked they parse. `null` removes it.
+      budget: value.budgetEnabled
+        ? { dailyUsd: Number(value.dailyBudgetUsd), onReach: value.budgetAction }
+        : null,
     };
 
     if (props.mode === "edit" && props.row) {

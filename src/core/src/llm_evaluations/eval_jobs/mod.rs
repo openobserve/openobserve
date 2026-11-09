@@ -253,35 +253,38 @@ pub async fn update_job(
     org_id: &str,
     job_id: &str,
     job: table::online_eval_jobs::OnlineEvalJob,
+    budget: table::online_eval_jobs::BudgetPatch,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
-    let job = prepare_job_update(org_id, job_id, job).await?;
+    let job = prepare_job_update(org_id, job_id, job, budget).await?;
     store_job_update(job).await
 }
 
 /// Runs every check [`update_job`] makes, so a caller can refuse the edit before it is stored.
+/// `budget` says what the request asks of the stored budget; `job.budget` is ignored.
 #[tracing::instrument(skip(job))]
 pub async fn prepare_job_update(
     org_id: &str,
     job_id: &str,
     mut job: table::online_eval_jobs::OnlineEvalJob,
+    budget: table::online_eval_jobs::BudgetPatch,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let existing = table::online_eval_jobs::get_by_org(job_id, org_id)
         .await?
         .ok_or(EvalJobError::NotFound)?;
 
     job.input_mapping = merge_input_mapping(existing.input_mapping.clone(), job.input_mapping);
-    // A client that predates budgets sends none; the stored one keeps applying.
-    job.budget = match job.budget.take() {
-        Some(budget) => Some(budget.with_server_state_of(existing.budget.as_ref())),
-        None => existing.budget.clone(),
-    };
+    job.budget = budget.apply(existing.budget.as_ref());
     // Raising a budget-paused job's limit above the spend it paused at resumes it, and the new
-    // limit applies for the rest of the day.
+    // limit applies for the rest of the day. Removing the budget that paused it (only that
+    // pause records `paused_at`) resumes it too.
     let resumes = existing.status == "paused"
-        && job
-            .budget
-            .as_ref()
-            .is_some_and(|budget| budget.allows_resume());
+        && match &job.budget {
+            Some(budget) => budget.allows_resume(),
+            None => existing
+                .budget
+                .as_ref()
+                .is_some_and(|b| b.paused_at.is_some()),
+        };
     let status = if resumes {
         let now_us = config::utils::time::now_micros();
         job.budget = job

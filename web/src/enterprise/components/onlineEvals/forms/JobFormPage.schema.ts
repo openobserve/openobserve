@@ -57,11 +57,9 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
       samplingValue: z.string().optional().default(""),
       // Not validated: an empty filter is valid, since a job may match every span.
       filterGroup: z.any(),
-      // Daily judge spend limit (AIO-24).
-      dailyBudgetUsd: z.coerce
-        .number()
-        .positive(t("evalSpend.budget.validation"))
-        .default(DEFAULT_DAILY_BUDGET_USD),
+      // Daily judge spend limit (AIO-24); a job may have none.
+      budgetEnabled: z.boolean().default(true),
+      dailyBudgetUsd: z.coerce.number().default(DEFAULT_DAILY_BUDGET_USD),
       budgetAction: z.enum(["pause", "keep_running"]).default(DEFAULT_BUDGET_ACTION),
     })
     .superRefine((val, ctx) => {
@@ -71,6 +69,15 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
           code: z.ZodIssueCode.custom,
           path: ["samplingValue"],
           message: t("onlineEvals.job.validation.samplingValueRequired"),
+        });
+      }
+
+      // The limit is only checked when the job has a budget.
+      if (val.budgetEnabled && !(val.dailyBudgetUsd > 0)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["dailyBudgetUsd"],
+          message: t("evalSpend.budget.validation"),
         });
       }
 

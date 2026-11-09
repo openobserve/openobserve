@@ -31810,6 +31810,7 @@
       "tokens": "≈ {tokens} tokens to {model}"
     },
     "budget": {
+      "enabled": "Limit daily judge spend",
       "label": "Daily budget, all regions",
       "help": "Org default {amount}. Resets at 00:00 UTC.",
       "validation": "Enter a budget above 0",

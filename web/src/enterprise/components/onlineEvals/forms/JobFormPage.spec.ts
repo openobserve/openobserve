@@ -505,6 +505,28 @@ describe("JobFormPage", () => {
       expect(payload.budget).toEqual({ dailyUsd: 12, onReach: "keep_running" });
     });
 
+    it("removes the budget when the limit is switched off, and keeps a budgetless job so (E13)", async () => {
+      wrapper = createWrapper({
+        mode: "edit",
+        row: { ...editRow, budget: { dailyUsd: 12, onReach: "keep_running" } },
+      });
+      setField(wrapper, "scorerIds", ["s1"]);
+      setField(wrapper, "samplingMode", "all");
+      setField(wrapper, "budgetEnabled", false);
+      // A limit the switch hides is not checked.
+      setField(wrapper, "dailyBudgetUsd", 0);
+      await submit(wrapper);
+      expect((onlineEvalsService.jobs.update as any).mock.calls[0][2].budget).toBeNull();
+
+      wrapper.unmount();
+      vi.mocked(onlineEvalsService.jobs.update).mockClear();
+      wrapper = createWrapper({ mode: "edit", row: { ...editRow, budget: null } });
+      setField(wrapper, "scorerIds", ["s1"]);
+      setField(wrapper, "samplingMode", "all");
+      await submit(wrapper);
+      expect((onlineEvalsService.jobs.update as any).mock.calls[0][2].budget).toBeNull();
+    });
+
     // A draft has never run, so editing one offers the same explicit choice as
     // create: keep it a draft, or promote it. `editRow` has no status → draft.
     it("offers the Save & Activate choice (both buttons) when editing a draft", () => {

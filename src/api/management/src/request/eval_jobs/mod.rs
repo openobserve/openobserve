@@ -210,6 +210,7 @@ pub async fn update_eval_job(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<EvalJobRequestBody>,
 ) -> Response {
+    let budget = body.budget_patch();
     let job = match infra::table::online_eval_jobs::OnlineEvalJob::try_from(body) {
         Ok(job) => job,
         Err(err) => return MetaHttpResponse::bad_request(err),
@@ -224,7 +225,7 @@ pub async fn update_eval_job(
         return resp;
     }
     #[cfg(feature = "enterprise")]
-    let job = match eval_jobs::prepare_job_update(&org_id, &job_id, job).await {
+    let job = match eval_jobs::prepare_job_update(&org_id, &job_id, job, budget).await {
         Ok(job) => job,
         Err(err) => return err.into(),
     };
@@ -232,8 +233,8 @@ pub async fn update_eval_job(
     if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
         return resp;
     }
-    // Raising the budget of a job its budget paused resumes it: an activation, so the
-    // activation's scorer check applies too.
+    // Raising or removing the budget of a job its budget paused resumes it: an activation, so
+    // the activation's scorer check applies too.
     #[cfg(feature = "enterprise")]
     let resumes = was_paused && job.status == "active";
     #[cfg(feature = "enterprise")]
@@ -245,7 +246,7 @@ pub async fn update_eval_job(
     #[cfg(feature = "enterprise")]
     let updated = eval_jobs::store_job_update(job).await;
     #[cfg(not(feature = "enterprise"))]
-    let updated = eval_jobs::update_job(&org_id, &job_id, job).await;
+    let updated = eval_jobs::update_job(&org_id, &job_id, job, budget).await;
     match updated {
         Ok(j) => {
             let resp: EvalJobResponseBody = j.into();

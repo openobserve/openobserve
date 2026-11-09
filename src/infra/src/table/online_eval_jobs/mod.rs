@@ -158,7 +158,7 @@ pub fn utc_day_start_us(at_us: i64) -> i64 {
 }
 
 /// What the health pass does once a job's judge spend for the day reaches its budget.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BudgetAction {
     /// Pause until 00:00 UTC; the first health pass of the next day resumes the job.
@@ -169,7 +169,7 @@ pub enum BudgetAction {
 }
 
 /// A job's daily judge spend limit (AIO-24). One budget covers all regions.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EvalJobBudget {
     /// Judge spend allowed per UTC day, in USD.
@@ -186,6 +186,43 @@ pub struct EvalJobBudget {
     /// Server-owned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lifted_until: Option<i64>,
+}
+
+/// What a job update asks of its budget.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BudgetPatch {
+    /// The request has no `budget`: the stored one keeps applying.
+    Keep,
+    /// `"budget": null`: the job has no budget.
+    Clear,
+    /// A new limit; an omitted action keeps the stored one (`pause` when there is none).
+    Set {
+        daily_usd: f64,
+        on_reach: Option<BudgetAction>,
+    },
+}
+
+impl BudgetPatch {
+    /// The job's budget after the update. A new limit keeps the stored pause state.
+    pub fn apply(self, stored: Option<&EvalJobBudget>) -> Option<EvalJobBudget> {
+        match self {
+            Self::Keep => stored.cloned(),
+            Self::Clear => None,
+            Self::Set {
+                daily_usd,
+                on_reach,
+            } => Some(
+                EvalJobBudget {
+                    daily_usd,
+                    on_reach: on_reach.or(stored.map(|b| b.on_reach)).unwrap_or_default(),
+                    paused_at: None,
+                    paused_spend_usd: None,
+                    lifted_until: None,
+                }
+                .with_server_state_of(stored),
+            ),
+        }
+    }
 }
 
 impl EvalJobBudget {
@@ -1498,24 +1535,40 @@ mod tests {
     }
 
     #[test]
-    fn test_request_budget_keeps_the_stored_pause_state() {
+    fn test_budget_patch_keeps_clears_or_sets_over_the_stored_budget() {
         let mut stored = budget(Some(7));
+        stored.on_reach = BudgetAction::KeepRunning;
         stored.paused_spend_usd = Some(6.0);
         stored.lifted_until = Some(9);
-        let mut incoming = budget(Some(1));
-        incoming.paused_spend_usd = Some(1.0);
-        incoming.daily_usd = 10.0;
-        let merged = incoming.with_server_state_of(Some(&stored));
-        assert_eq!(merged.daily_usd, 10.0);
+
+        assert_eq!(BudgetPatch::Keep.apply(Some(&stored)), Some(stored.clone()));
+        assert_eq!(BudgetPatch::Keep.apply(None), None);
+        assert_eq!(BudgetPatch::Clear.apply(Some(&stored)), None);
+
+        // A new limit keeps the stored pause state, and an omitted action the stored one.
+        let set = |on_reach| BudgetPatch::Set {
+            daily_usd: 10.0,
+            on_reach,
+        };
+        let merged = set(None).apply(Some(&stored)).unwrap();
         assert_eq!(
             (
+                merged.daily_usd,
+                merged.on_reach,
                 merged.paused_at,
                 merged.paused_spend_usd,
                 merged.lifted_until
             ),
-            (Some(7), Some(6.0), Some(9))
+            (10.0, BudgetAction::KeepRunning, Some(7), Some(6.0), Some(9))
         );
-        assert_eq!(budget(Some(1)).with_server_state_of(None).paused_at, None);
+        let paused = set(Some(BudgetAction::Pause)).apply(Some(&stored)).unwrap();
+        assert_eq!(paused.on_reach, BudgetAction::Pause);
+        // A first budget pauses by default and has no pause state.
+        let first = set(None).apply(None).unwrap();
+        assert_eq!(
+            (first.on_reach, first.paused_at, first.lifted_until),
+            (BudgetAction::Pause, None, None)
+        );
     }
 
     #[test]

@@ -56,7 +56,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-3.5 max-[68.75rem]:grid-cols-1">
+      <OFormSwitch
+        name="budgetEnabled"
+        :label="t('evalSpend.budget.enabled')"
+        size="sm"
+        data-test="job-form-budget-enabled"
+      />
+      <div v-if="budgetEnabled" class="grid grid-cols-2 gap-3.5 max-[68.75rem]:grid-cols-1">
         <OFormInput
           name="dailyBudgetUsd"
           :label="t('evalSpend.budget.label')"
@@ -99,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import { formatTokens } from "@/utils/llmUtils";
@@ -114,6 +121,8 @@ const props = defineProps<{
   /** Whether any selected scorer is an LLM judge; other scorers cost nothing. */
   hasJudges: boolean;
   orgId: string;
+  /** Whether the job has a daily budget; without one the limit fields are hidden. */
+  budgetEnabled: boolean;
 }>();
 
 const { t } = useI18nTyped();
