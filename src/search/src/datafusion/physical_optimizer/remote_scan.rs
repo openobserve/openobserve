@@ -221,10 +221,115 @@ impl RemoteScanRewriter {
             partial_reduce_enabled: cfg.search.feature_partial_reduce_enabled,
         }
     }
+
+    fn to_followers(&self, plan: Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>> {
+        let mut visitor = TableNameVisitor::new();
+        plan.visit(&mut visitor)?;
+        let table_name = visitor.table_name.clone().unwrap();
+        let remote_scan =
+            RemoteScanExec::new(plan, self.remote_scan_nodes.get_remote_node(&table_name))?;
+        Ok(Arc::new(remote_scan))
+    }
+
+    fn union_child_to_followers(
+        &self,
+        child: &Arc<dyn ExecutionPlan>,
+        keep_order: bool,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        // For sort, we should add a SortPreservingMergeExec
+        if let Some(sort) = child.downcast_ref::<SortExec>() {
+            let sort_merge = SortPreservingMergeExec::new(
+                LexOrdering::new(sort.expr().to_vec()).unwrap(),
+                Arc::new(sort.clone()),
+            )
+            .with_fetch(sort.fetch());
+            return self.to_followers(Arc::new(sort_merge));
+        }
+        if keep_order {
+            return self.to_followers(merge_sorted_partitions(Arc::clone(child)));
+        }
+        self.to_followers(Arc::clone(child))
+    }
+
+    // Sends the parts of `plan` an ancestor needs sorted, which f_up cannot tell apart on its own.
+    fn keep_order_below(&mut self, plan: Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>> {
+        let maintained = plan.maintains_input_order();
+        let children = plan.children().into_iter().cloned().collect::<Vec<_>>();
+        let mut new_children = Vec::with_capacity(children.len());
+        for (child, keeps_order) in children.iter().zip(&maintained) {
+            new_children.push(if *keeps_order {
+                self.keep_order_below(Arc::clone(child))?
+            } else {
+                Arc::clone(child)
+            });
+        }
+        let plan = with_changed_children(plan, new_children)?;
+        let mut new_children = Vec::with_capacity(maintained.len());
+        match plan.name() {
+            "UnionExec" => {
+                for child in plan.children() {
+                    if has_remote_scan_boundary(child)? {
+                        return Ok(plan);
+                    }
+                }
+                for (child, keeps_order) in plan.children().into_iter().zip(&maintained) {
+                    new_children.push(self.union_child_to_followers(child, *keeps_order)?);
+                }
+            }
+            "HashJoinExec" => {
+                for (child, keeps_order) in plan.children().into_iter().zip(&maintained) {
+                    new_children.push(if *keeps_order && !has_remote_scan_boundary(child)? {
+                        self.to_followers(merge_sorted_partitions(Arc::clone(child)))?
+                    } else {
+                        Arc::clone(child)
+                    });
+                }
+            }
+            "RepartitionExec" if maintained[0] => {
+                let input = plan.children()[0];
+                if has_remote_scan_boundary(input)? {
+                    return Ok(plan);
+                }
+                let repartition = plan.downcast_ref::<RepartitionExec>().unwrap();
+                let remote_scan = self.to_followers(merge_sorted_partitions(Arc::clone(input)))?;
+                let merged =
+                    RepartitionExec::try_new(remote_scan, repartition.partitioning().clone())?
+                        .with_preserve_order();
+                self.is_changed = true;
+                return Ok(Arc::new(merged));
+            }
+            _ => return Ok(plan),
+        }
+        let new_plan = with_changed_children(Arc::clone(&plan), new_children)?;
+        self.is_changed |= !Arc::ptr_eq(&new_plan, &plan);
+        Ok(new_plan)
+    }
 }
 
 impl TreeNodeRewriter for RemoteScanRewriter {
     type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_down(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
+        // A follower's plan runs as it is sent, so nothing below a remote scan is rewritten
+        if node.name() == "RemoteScanExec" {
+            return Ok(Transformed::new(node, false, TreeNodeRecursion::Jump));
+        }
+        let children = node.children().into_iter().cloned().collect::<Vec<_>>();
+        let mut new_children = Vec::with_capacity(children.len());
+        for (child, required) in children.iter().zip(node.required_input_ordering()) {
+            new_children.push(if required.is_some() {
+                self.keep_order_below(Arc::clone(child))?
+            } else {
+                Arc::clone(child)
+            });
+        }
+        let new_node = with_changed_children(Arc::clone(&node), new_children)?;
+        Ok(if Arc::ptr_eq(&new_node, &node) {
+            Transformed::no(node)
+        } else {
+            Transformed::yes(new_node)
+        })
+    }
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
         if node.name() == "RepartitionExec" || node.name() == "CoalescePartitionsExec" {
@@ -282,32 +387,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             if !visitor.has_remote_scan {
                 let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
                 for child in node.children() {
-                    let mut visitor = TableNameVisitor::new();
-                    child.visit(&mut visitor)?;
-                    // For sort, we should add a SortPreservingMergeExec
-                    if child.name() == "SortExec" {
-                        let table_name = visitor.table_name.clone().unwrap();
-                        let sort = child.downcast_ref::<SortExec>().unwrap();
-                        let sort_merge = Arc::new(
-                            SortPreservingMergeExec::new(
-                                LexOrdering::new(sort.expr().to_vec()).unwrap(),
-                                Arc::new(sort.clone()),
-                            )
-                            .with_fetch(sort.fetch()),
-                        );
-                        let remote_scan = Arc::new(RemoteScanExec::new(
-                            sort_merge,
-                            self.remote_scan_nodes.get_remote_node(&table_name),
-                        )?);
-                        new_children.push(remote_scan);
-                    } else {
-                        let table_name = visitor.table_name.clone().unwrap();
-                        let remote_scan = Arc::new(RemoteScanExec::new(
-                            child.clone(),
-                            self.remote_scan_nodes.get_remote_node(&table_name),
-                        )?);
-                        new_children.push(remote_scan);
-                    }
+                    new_children.push(self.union_child_to_followers(child, false)?);
                 }
                 let new_node = node.replace_children(
                     new_children,
@@ -425,6 +505,50 @@ pub fn wrap_partial_reduce_for_aggregate(
         reduce_input,
         agg.input_schema(),
     )?) as Arc<dyn ExecutionPlan>)
+}
+
+// True when f_up already places a remote scan inside `plan`, so it must not be sent as a whole.
+fn has_remote_scan_boundary(plan: &Arc<dyn ExecutionPlan>) -> Result<bool> {
+    plan.exists(|node| {
+        Ok(matches!(
+            node.name(),
+            "RemoteScanExec"
+                | "RepartitionExec"
+                | "CoalescePartitionsExec"
+                | "SortPreservingMergeExec"
+                | "UnionExec"
+                | "HashJoinExec"
+        ))
+    })
+}
+
+// Followers stream all partitions at once, so only a single partition arrives sorted.
+fn merge_sorted_partitions(plan: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+    match plan.output_ordering() {
+        Some(ordering) if plan.output_partitioning().partition_count() > 1 => {
+            let fetch = plan.fetch();
+            Arc::new(SortPreservingMergeExec::new(ordering.clone(), plan).with_fetch(fetch))
+        }
+        _ => plan,
+    }
+}
+
+fn with_changed_children(
+    plan: Arc<dyn ExecutionPlan>,
+    new_children: Vec<Arc<dyn ExecutionPlan>>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let unchanged = plan
+        .children()
+        .into_iter()
+        .zip(&new_children)
+        .all(|(old, new)| Arc::ptr_eq(old, new));
+    if unchanged {
+        return Ok(plan);
+    }
+    plan.replace_children(
+        new_children,
+        ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+    )
 }
 
 fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
@@ -968,8 +1092,25 @@ mod tests {
         });
     }
 
-    async fn cluster_plan(sql: &str) -> (SessionContext, Arc<dyn ExecutionPlan>) {
+    fn three_remote_nodes() -> Arc<RemoteScanNodes> {
         use tracing_opentelemetry::OpenTelemetrySpanExt;
+        let mut file_id_lists = HashMap::new();
+        file_id_lists.insert(TableReference::from("t"), vec![]);
+        let nodes = (0..3)
+            .map(|_| Arc::new(config::meta::cluster::Node::default()) as Arc<dyn NodeInfo>)
+            .collect();
+        Arc::new(RemoteScanNodes::new(
+            Request::default(),
+            nodes,
+            file_id_lists,
+            HashMap::new(),
+            false,
+            tracing::Span::current().context(),
+            None,
+        ))
+    }
+
+    async fn cluster_plan(sql: &str) -> (SessionContext, Arc<dyn ExecutionPlan>) {
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("k8s_cluster", DataType::Utf8, true),
@@ -978,22 +1119,8 @@ mod tests {
             Field::new("event_name", DataType::Utf8, true),
             Field::new("value", DataType::Int64, true),
         ]));
-        let mut file_id_lists = HashMap::new();
-        file_id_lists.insert(TableReference::from("t"), vec![]);
-        let nodes = (0..3)
-            .map(|_| Arc::new(config::meta::cluster::Node::default()) as Arc<dyn NodeInfo>)
-            .collect();
-        let remote_scan_nodes = Arc::new(RemoteScanNodes::new(
-            Request::default(),
-            nodes,
-            file_id_lists,
-            HashMap::new(),
-            false,
-            tracing::Span::current().context(),
-            None,
-        ));
         let rule = RemoteScanRule {
-            remote_scan_nodes,
+            remote_scan_nodes: three_remote_nodes(),
             single_node_optimizer_enable: false,
         };
         let state = SessionStateBuilder::new()
@@ -1055,10 +1182,7 @@ mod tests {
                 .into_iter()
                 .zip(node.required_input_ordering())
             {
-                // A merge over a remote scan trusts each follower's stream to be sorted.
-                let Some(required) =
-                    required.filter(|_| child.downcast_ref::<RemoteScanExec>().is_none())
-                else {
+                let Some(required) = required else {
                     continue;
                 };
                 let (alternatives, _) = required.into_alternatives();
@@ -1071,5 +1195,144 @@ mod tests {
             Ok(TreeNodeRecursion::Continue)
         })
         .unwrap();
+    }
+
+    async fn assert_cluster_plan_is_sane(sql: &str) {
+        let (ctx, plan) = cluster_plan(sql).await;
+        let check = datafusion::physical_optimizer::sanity_checker::SanityCheckPlan::new();
+        if let Err(e) = check.optimize(Arc::clone(&plan), ctx.state().config_options()) {
+            panic!(
+                "{sql}: {e}\n{}",
+                datafusion::physical_plan::displayable(plan.as_ref()).indent(false)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_order_by_limit_plans_are_sane() {
+        for sql in [
+            "SELECT _timestamp, value FROM t ORDER BY value DESC LIMIT 10",
+            "SELECT _timestamp, event_name FROM t ORDER BY _timestamp ASC LIMIT 10",
+            "SELECT _timestamp, event_name FROM t ORDER BY _timestamp ASC, event_name LIMIT 15",
+            "SELECT _timestamp, event_name FROM t WHERE value IS NOT NULL ORDER BY value DESC",
+            "SELECT event_name, _timestamp FROM t WHERE substr(event_name, 0, 2) = 'ap' \
+                ORDER BY _timestamp DESC LIMIT 50000",
+            "SELECT event_name, count(*) AS c FROM t GROUP BY event_name ORDER BY c DESC LIMIT 10",
+        ] {
+            assert_cluster_plan_is_sane(sql).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_union_order_by_plans_are_sane() {
+        for sql in [
+            "SELECT _timestamp, event_name FROM t WHERE value >= 30 \
+                UNION ALL SELECT _timestamp, event_name FROM t WHERE value < 0 \
+                ORDER BY _timestamp DESC LIMIT 10",
+            "SELECT event_name, value, 'a' AS origin FROM t WHERE value > 1 \
+                UNION ALL SELECT event_name, value, 'b' AS origin FROM t WHERE value < 0 \
+                ORDER BY origin, value DESC LIMIT 15",
+        ] {
+            assert_cluster_plan_is_sane(sql).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_subquery_order_by_plans_are_sane() {
+        for sql in [
+            "SELECT event_name, _timestamp FROM t WHERE event_name IN \
+                (SELECT event_name FROM t ORDER BY event_name LIMIT 5) \
+                ORDER BY _timestamp DESC LIMIT 100",
+            "SELECT a.event_name, a._timestamp FROM t a JOIN \
+                (SELECT k8s_cluster FROM t WHERE substr(k8s_cluster, 0, 2) = 'p') b \
+                ON a.k8s_cluster = b.k8s_cluster ORDER BY a._timestamp DESC LIMIT 100",
+        ] {
+            assert_cluster_plan_is_sane(sql).await;
+        }
+    }
+
+    fn sorted_scan(partitions: usize) -> Arc<dyn ExecutionPlan> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("k8s_cluster", DataType::Utf8, true),
+        ]));
+        Arc::new(
+            NewEmptyExec::new(
+                "t",
+                Arc::clone(&schema),
+                None,
+                &[],
+                None,
+                crate::datafusion::sort_order::FileSortOrder::TimestampDesc,
+                schema,
+            )
+            .with_partitions(partitions),
+        )
+    }
+
+    fn rewrite_and_check_sanity(plan: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+        let mut rewriter = RemoteScanRewriter::new(three_remote_nodes());
+        let plan = plan.rewrite(&mut rewriter).unwrap().data;
+        datafusion::physical_optimizer::sanity_checker::SanityCheckPlan::new()
+            .optimize(plan, &datafusion::config::ConfigOptions::default())
+            .unwrap()
+    }
+
+    #[test]
+    fn test_ordered_join_probe_reads_remote_scan_directly() {
+        use datafusion::{
+            common::{JoinType, NullEquality},
+            physical_expr::expressions::Column,
+            physical_plan::joins::{HashJoinExec, PartitionMode},
+        };
+        let on = (
+            Arc::new(Column::new("k8s_cluster", 1)) as _,
+            Arc::new(Column::new("k8s_cluster", 1)) as _,
+        );
+        let join = HashJoinExec::try_new(
+            Arc::new(CoalescePartitionsExec::new(sorted_scan(4))),
+            sorted_scan(4),
+            vec![on],
+            None,
+            &JoinType::Inner,
+            None,
+            PartitionMode::CollectLeft,
+            NullEquality::NullEqualsNothing,
+            false,
+        )
+        .unwrap();
+        let join: Arc<dyn ExecutionPlan> = Arc::new(join);
+        let ordering = join.output_ordering().unwrap().clone();
+        let plan = Arc::new(SortPreservingMergeExec::new(ordering, join));
+        let plan = rewrite_and_check_sanity(plan);
+        let join = plan.children()[0].downcast_ref::<HashJoinExec>().unwrap();
+        assert_eq!(join.right().name(), "RemoteScanExec");
+        assert_eq!(join.right().children()[0].name(), "SortPreservingMergeExec");
+    }
+
+    #[test]
+    fn test_ordered_repartition_merges_remote_streams() {
+        let scan = sorted_scan(1);
+        let ordering = scan.output_ordering().unwrap().clone();
+        let repartition = RepartitionExec::try_new(scan, Partitioning::RoundRobinBatch(4)).unwrap();
+        let plan = Arc::new(SortPreservingMergeExec::new(
+            ordering,
+            Arc::new(repartition),
+        ));
+        let plan = rewrite_and_check_sanity(plan);
+        let repartition = plan.children()[0];
+        assert_eq!(repartition.children()[0].name(), "RemoteScanExec");
+    }
+
+    #[test]
+    fn test_unordered_repartition_keeps_round_robin_fan_out() {
+        let repartition =
+            RepartitionExec::try_new(sorted_scan(4), Partitioning::RoundRobinBatch(8)).unwrap();
+        let plan = rewrite_and_check_sanity(Arc::new(repartition));
+        let fan_out = plan.children()[0]
+            .downcast_ref::<RepartitionExec>()
+            .unwrap();
+        assert!(!fan_out.preserve_order());
+        assert_eq!(fan_out.children()[0].name(), "RemoteScanExec");
     }
 }
