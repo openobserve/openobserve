@@ -14,24 +14,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // The job form's cost estimate (AIO-24): matched targets per day over the last
-// week, what each selected judge cost per call over the same week, and the
-// matched targets in the backfill window. The queries are debounced like the
-// matched-targets preview. A failed or impossible traffic query (session scope
-// on a stream without a session column) leaves the counts unknown, never 0.
+// week and what each selected judge cost per call over the same week. The
+// queries are debounced like the matched-targets preview. A failed or
+// impossible traffic query (session scope on a stream without a session
+// column) leaves the counts unknown, never 0.
 
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { EvalTargetScope } from "@/services/online-evals.service";
 import {
   ESTIMATE_DAYS,
-  backfillWindowUs,
   estimateJobSpend,
   judgeHistorySql,
   matchedPerDaySql,
   parseJudgeHistory,
   type JudgeHistory,
 } from "../utils/evalSpend";
-import { matchedSinceSql } from "../utils/jobWorkload";
 
 const DEBOUNCE_MS = 400;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,16 +44,12 @@ export function useJobSpendEstimate(opts: {
   /** Entity ids of the selected LLM-judge scorers. */
   judgeIds: Ref<string[]>;
   rate: Ref<number>;
-  /** Days the backfill reaches back; 0 or absent = no backfill to count. */
-  backfillDays?: Ref<number>;
 }) {
   const { executeQueryOnce } = useLLMStreamQuery();
   const dailyCounts = ref<number[] | null>([]);
   const history = ref<JudgeHistory[]>([]);
-  const backfillMatched = ref<number | null>(0);
   const loadingTraffic = ref(false);
   const loadingJudges = ref(false);
-  const loadingBackfill = ref(false);
 
   const lastWeek = () => {
     const end = Date.now();
@@ -123,43 +117,6 @@ export function useJobSpendEstimate(opts: {
     }
   }
 
-  // The same window and target count `runBackfill` queues from, so the
-  // estimate and the queue agree.
-  async function loadBackfill() {
-    const days = opts.backfillDays?.value ?? 0;
-    loadingBackfill.value = false;
-    if (!days || !opts.stream.value || !opts.ready.value) {
-      backfillMatched.value = 0;
-      return;
-    }
-    if (fieldsPending()) {
-      backfillMatched.value = 0;
-      loadingBackfill.value = true;
-      return;
-    }
-    const sql = matchedSinceSql(
-      opts.stream.value,
-      opts.where.value,
-      opts.scope.value,
-      opts.fields.value ?? [],
-    );
-    if (!sql) {
-      backfillMatched.value = null;
-      return;
-    }
-    const { startUs, endUs } = backfillWindowUs(days, Date.now());
-    loadingBackfill.value = true;
-    try {
-      const rows = await executeQueryOnce(sql, startUs, endUs, "traces");
-      backfillMatched.value = Number(rows?.[0]?.cnt) || 0;
-    } catch (err) {
-      console.warn("[JobSpendEstimate:backfill] failed", err);
-      backfillMatched.value = null;
-    } finally {
-      loadingBackfill.value = false;
-    }
-  }
-
   const timers: ReturnType<typeof setTimeout>[] = [];
   const debounced = (fn: () => Promise<void>, slot: number) => () => {
     clearTimeout(timers[slot]);
@@ -169,18 +126,6 @@ export function useJobSpendEstimate(opts: {
     immediate: true,
   });
   watch(() => opts.judgeIds.value.join(","), debounced(loadJudges, 1), { immediate: true });
-  watch(
-    [
-      opts.stream,
-      opts.where,
-      opts.ready,
-      opts.scope,
-      opts.fields,
-      () => opts.backfillDays?.value ?? 0,
-    ],
-    debounced(loadBackfill, 2),
-    { immediate: true },
-  );
   onUnmounted(() => timers.forEach(clearTimeout));
 
   const estimate = computed(() =>
@@ -191,9 +136,7 @@ export function useJobSpendEstimate(opts: {
       history: history.value,
     }),
   );
-  const loading = computed(
-    () => loadingTraffic.value || loadingJudges.value || loadingBackfill.value,
-  );
+  const loading = computed(() => loadingTraffic.value || loadingJudges.value);
 
-  return { estimate, backfillMatched, loading };
+  return { estimate, loading };
 }

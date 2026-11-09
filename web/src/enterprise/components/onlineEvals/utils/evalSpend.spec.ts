@@ -15,10 +15,6 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  backfillEstimate,
-  backfillRequests,
-  backfillTargetsSql,
-  backfillWindowUs,
   budgetPauseFacts,
   estimateJobSpend,
   formatUsd,
@@ -103,76 +99,6 @@ describe("eval spend estimate (AIO-24)", () => {
         { scorer_id: "a", calls: "4", priced: "4", cost: "0.2", tokens: null, model: "" },
       ]),
     ).toEqual([{ scorerId: "a", calls: 4, priced: 4, cost: 0.2, tokens: null, model: null }]);
-  });
-});
-
-describe("backfill (AIO-24)", () => {
-  it("estimates the window's matched targets once, capped at what today's budget pays for", () => {
-    expect(backfillEstimate({ matched: 700, rate: 0.5, perTargetUsd: 0.01, budgetUsd: 5 })).toEqual(
-      { targets: 350, usd: 3.5, cap: null },
-    );
-    expect(
-      backfillEstimate({ matched: 1000, rate: 1, perTargetUsd: 0.01, budgetUsd: 5 }),
-    ).toMatchObject({ targets: 1000, cap: 500 });
-    expect(backfillEstimate({ matched: 400, rate: 1, perTargetUsd: null, budgetUsd: 5 })).toEqual({
-      targets: 400,
-      usd: null,
-      cap: null,
-    });
-  });
-
-  it("counts no more than the backfill reads and queues", () => {
-    // 10,000 rows read at 5%, and never past 1,000 targets.
-    expect(
-      backfillEstimate({ matched: 50_000, rate: 0.05, perTargetUsd: null, budgetUsd: 5 }).targets,
-    ).toBe(500);
-    expect(
-      backfillEstimate({ matched: 5_000, rate: 1, perTargetUsd: null, budgetUsd: 5 }).targets,
-    ).toBe(1000);
-  });
-
-  it("reaches back the whole window, up to now", () => {
-    const now = 10 * 24 * 3_600_000;
-    expect(backfillWindowUs(1, now)).toEqual({
-      startUs: (now - 24 * 3_600_000) * 1000,
-      endUs: now * 1000,
-    });
-  });
-
-  it("samples rows at the rate up to the cap, padding the window for whole targets", () => {
-    const rows = [
-      { target_id: "t1", trace_id: "t1", start_ns: 5_000_000_000, end_ns: 6_000_000_000 },
-      { target_id: "t2", trace_id: "t2", start_ns: 7_000_000_000, end_ns: 8_000_000_000 },
-      { target_id: "t3", trace_id: "t3", start_ns: 9_000_000_000, end_ns: 9_500_000_000 },
-    ];
-    const draws = [0.05, 0.9, 0.05];
-    const requests = backfillRequests(rows, "trace", {
-      rate: 0.1,
-      cap: 5,
-      padUs: 1000,
-      random: () => draws.shift()!,
-    });
-    expect(requests.map((r) => r.targetId)).toEqual(["t1", "t3"]);
-    expect(requests[0]).toMatchObject({
-      traceId: "t1",
-      spanId: null,
-      sessionId: null,
-      startTime: 5_000_000 - 1 - 1000,
-      endTime: 6_000_000 + 1 + 1000,
-    });
-    expect(backfillRequests(rows, "session", { rate: 1, cap: 1, padUs: 0 })).toEqual([
-      expect.objectContaining({ targetId: "t1", sessionId: "t1", traceId: "t1" }),
-    ]);
-  });
-
-  it("groups matched spans into targets at the job's scope", () => {
-    const fields = ["gen_ai_conversation_id"];
-    const sql = backfillTargetsSql("llm", "gen_ai_agent_name = 'a'", "session", fields, 50);
-    const id = `NULLIF("gen_ai_conversation_id", '')`;
-    expect(sql).toContain(`SELECT ${id} AS target_id`);
-    expect(sql).toContain(`WHERE ${id} IS NOT NULL AND (gen_ai_agent_name = 'a')`);
-    expect(sql).toContain(`GROUP BY ${id}\nLIMIT 50`);
-    expect(backfillTargetsSql("llm", "", "session", ["trace_id"], 50)).toBeNull();
   });
 });
 

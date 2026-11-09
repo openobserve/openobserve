@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   The job form's Cost section (AIO-24): what the job would score and spend a
-  day, its daily budget and what happens when it is reached, and an optional
-  backfill with its own estimate. The budget fields are the parent form's
-  (`dailyBudgetUsd`, `budgetAction`, `backfillDays`), bound by name.
+  day, and its daily budget and what happens when it is reached. The budget
+  fields are the parent form's (`dailyBudgetUsd`, `budgetAction`), bound by name.
 -->
 <template>
   <section
@@ -92,52 +91,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ORadio>
         </OFormRadioGroup>
       </div>
-
-      <div v-if="showBackfill" class="grid grid-cols-2 gap-3.5 max-[68.75rem]:grid-cols-1">
-        <OFormSelect
-          name="backfillDays"
-          :label="t('evalSpend.backfill.label')"
-          :options="backfillOptions"
-          :help-text="backfillHelp"
-          size="md"
-          data-test="job-form-backfill-select"
-        />
-      </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import { formatTokens } from "@/utils/llmUtils";
 import { pricingGapsRoute } from "@/plugins/traces/llmDataTrust.utils";
 import type { EvalBudgetAction, EvalTargetScope } from "@/services/online-evals.service";
-import {
-  BACKFILL_DAY_OPTIONS,
-  DEFAULT_DAILY_BUDGET_USD,
-  backfillEstimate,
-  formatUsd,
-  type SpendEstimate,
-} from "../../utils/evalSpend";
+import { DEFAULT_DAILY_BUDGET_USD, formatUsd, type SpendEstimate } from "../../utils/evalSpend";
 
 const props = defineProps<{
   estimate: SpendEstimate;
-  /** Matched targets in the backfill window; null when unknown. */
-  backfillMatched: number | null;
   loading: boolean;
   rate: number;
   scope: EvalTargetScope;
   /** Whether any selected scorer is an LLM judge; other scorers cost nothing. */
   hasJudges: boolean;
-  budgetUsd: number;
-  backfillDays: number;
-  /** Backfill runs once, on activation, so it is offered only before then. */
-  showBackfill: boolean;
   orgId: string;
 }>();
 
@@ -194,38 +169,5 @@ const tiles = computed<{ id: string; label: I18nText; value: string; note?: I18n
           : undefined,
     },
   ];
-});
-
-const backfillOptions = computed(() =>
-  BACKFILL_DAY_OPTIONS.map((days) => ({
-    value: days,
-    label: days
-      ? t("evalSpend.backfill.pastDays", { count: days }, days)
-      : t("evalSpend.backfill.off"),
-  })),
-);
-
-const backfillHelp = computed<I18nText>(() => {
-  const days = Number(props.backfillDays) || 0;
-  if (!days) return t("evalSpend.backfill.help");
-  if (props.backfillMatched == null) return t("evalSpend.cost.cannot");
-  const b = backfillEstimate({
-    matched: props.backfillMatched,
-    rate: props.rate,
-    perTargetUsd: props.estimate.perTargetUsd,
-    budgetUsd: props.budgetUsd,
-  });
-  const parts = [
-    t("evalSpend.backfill.targets", {
-      n: count(b.targets),
-      scope: t(`evalSpend.cost.scopes.${props.scope}`),
-    }),
-    b.usd == null
-      ? t("evalSpend.cost.cannot")
-      : t("evalSpend.backfill.cost", { amount: formatUsd(b.usd) }),
-    t("evalSpend.backfill.countsToday"),
-  ];
-  if (b.cap != null) parts.push(t("evalSpend.backfill.capped", { n: count(b.cap) }));
-  return raw(parts.join(" · "));
 });
 </script>

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // @vitest-environment jsdom
-import { computed, defineComponent, h, ref, type Ref } from "vue";
+import { computed, defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useJobSpendEstimate } from "./useJobSpendEstimate";
@@ -26,9 +26,8 @@ vi.mock("@/plugins/traces/composables/useLLMStreamQuery", () => ({
 }));
 
 const NOW = 30 * 24 * 3_600_000;
-const DAY_US = 24 * 3_600_000_000;
 
-describe("useJobSpendEstimate backfill count", () => {
+describe("useJobSpendEstimate", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -37,52 +36,13 @@ describe("useJobSpendEstimate backfill count", () => {
 
   afterEach(() => vi.useRealTimers());
 
-  it("counts the matched targets over exactly the window the backfill queues from", async () => {
-    executeQueryOnce.mockImplementation(async (sql: string) =>
-      sql.includes("histogram") ? [{ cnt: 400 }] : [{ cnt: 66 }],
-    );
-    let backfillMatched!: Ref<number | null>;
-    const backfillDays = ref(1);
-    mount(
-      defineComponent({
-        setup() {
-          ({ backfillMatched } = useJobSpendEstimate({
-            stream: ref("llm"),
-            where: ref("gen_ai_agent_name = 'a'"),
-            ready: ref(true),
-            scope: computed(() => "trace" as const),
-            fields: ref<string[]>([]),
-            judgeIds: ref<string[]>([]),
-            rate: ref(1),
-            backfillDays,
-          }));
-          return () => h("div");
-        },
-      }),
-    );
-    await vi.advanceTimersByTimeAsync(400);
-
-    const backfill = executeQueryOnce.mock.calls.find(([sql]) => !sql.includes("histogram"))!;
-    expect(backfill[0]).toContain('COUNT(DISTINCT "trace_id") AS cnt FROM "llm"');
-    expect(backfill[0]).toContain("gen_ai_agent_name = 'a'");
-    // Runs once the 400 ms debounce has passed: the last day up to then.
-    const endUs = (NOW + 400) * 1000;
-    expect(backfill.slice(1, 3)).toEqual([endUs - DAY_US, endUs]);
-    expect(backfillMatched.value).toBe(66);
-
-    backfillDays.value = 0;
-    await vi.advanceTimersByTimeAsync(400);
-    expect(backfillMatched.value).toBe(0);
-  });
-
   it("leaves the estimate unknown, not 0, when the traffic query fails", async () => {
     executeQueryOnce.mockRejectedValue(new Error("400"));
     let estimate!: ReturnType<typeof useJobSpendEstimate>["estimate"];
-    let backfillMatched!: Ref<number | null>;
     mount(
       defineComponent({
         setup() {
-          ({ estimate, backfillMatched } = useJobSpendEstimate({
+          ({ estimate } = useJobSpendEstimate({
             stream: ref("llm"),
             where: ref(""),
             ready: ref(true),
@@ -90,7 +50,6 @@ describe("useJobSpendEstimate backfill count", () => {
             fields: ref<string[]>([]),
             judgeIds: ref<string[]>([]),
             rate: ref(1),
-            backfillDays: ref(1),
           }));
           return () => h("div");
         },
@@ -98,7 +57,6 @@ describe("useJobSpendEstimate backfill count", () => {
     );
     await vi.advanceTimersByTimeAsync(400);
     expect(estimate.value.matchedPerDay).toBeNull();
-    expect(backfillMatched.value).toBeNull();
   });
 
   it("cannot estimate sessions on a stream without a session column, and does not query", async () => {

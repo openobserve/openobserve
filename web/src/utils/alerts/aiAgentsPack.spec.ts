@@ -122,7 +122,7 @@ describe("ai-agents pack: eval job templates (AIO-25)", () => {
     );
     // Annotation and feedback scores carry the target's time: review latency is not lag.
     expect(sql).toContain("source_type IN ('llm_judge', 'code', 'remote')");
-    // So does a backfill or re-evaluation; rows without a producer are online scores.
+    // So does a manual re-evaluation; rows without a producer are online scores.
     expect(sql).toContain("(task_producer IS NULL OR task_producer != 'manual')");
   });
 

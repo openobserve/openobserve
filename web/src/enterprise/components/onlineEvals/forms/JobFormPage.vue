@@ -203,14 +203,10 @@
 
           <JobCostSection
             :estimate="spend.estimate.value"
-            :backfill-matched="spend.backfillMatched.value"
             :loading="spend.loading.value"
             :rate="samplingRate"
             :scope="formValues.targetScope"
             :has-judges="judgeIds.length > 0"
-            :budget-usd="Number(formValues.dailyBudgetUsd) || 0"
-            :backfill-days="Number(formValues.backfillDays) || 0"
-            :show-backfill="showActivateChoice"
             :org-id="orgId"
           />
 
@@ -352,11 +348,11 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
-import onlineEvalsService, {
-  type EvalJob,
-  type EvalTargetScope,
-  type Scorer,
-  type SpanSelector,
+import type {
+  EvalJob,
+  EvalTargetScope,
+  Scorer,
+  SpanSelector,
 } from "@/services/online-evals.service";
 import { saveEvalJobMutation, setJobActiveMutation } from "@/services/online-evals.service.queries";
 import { useMutation } from "@tanstack/vue-query";
@@ -404,17 +400,7 @@ import JobInputMapping from "./job/JobInputMapping.vue";
 import JobPreviewPanel from "./job/JobPreviewPanel.vue";
 import JobCostSection from "./job/JobCostSection.vue";
 import { useJobSpendEstimate } from "../composables/useJobSpendEstimate";
-import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
-import {
-  DEFAULT_BUDGET_ACTION,
-  DEFAULT_DAILY_BUDGET_USD,
-  backfillEstimate,
-  BACKFILL_MAX_ROWS,
-  BACKFILL_MAX_TARGETS,
-  backfillRequests,
-  backfillTargetsSql,
-  backfillWindowUs,
-} from "../utils/evalSpend";
+import { DEFAULT_BUDGET_ACTION, DEFAULT_DAILY_BUDGET_USD } from "../utils/evalSpend";
 import { makeJobFormSchema, type JobForm } from "./JobFormPage.schema";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
@@ -597,7 +583,6 @@ const spend = useJobSpendEstimate({
   fields: streamFieldNames,
   judgeIds,
   rate: samplingRate,
-  backfillDays: computed(() => Number(formValues.value.backfillDays) || 0),
 });
 
 const { getStreams, getStream } = useStreams(t);
@@ -740,7 +725,6 @@ function initForm(row: EvalJob | null): JobForm {
       filterGroup: initFilterGroup(row),
       dailyBudgetUsd: DEFAULT_DAILY_BUDGET_USD,
       budgetAction: DEFAULT_BUDGET_ACTION,
-      backfillDays: 0,
     };
   }
   const targetScope = targetScopeOf(row);
@@ -762,7 +746,6 @@ function initForm(row: EvalJob | null): JobForm {
     // A job saved before budgets shows, and on save gets, the default budget.
     dailyBudgetUsd: row.budget?.dailyUsd ?? DEFAULT_DAILY_BUDGET_USD,
     budgetAction: row.budget?.onReach ?? DEFAULT_BUDGET_ACTION,
-    backfillDays: 0,
   };
 }
 
@@ -985,7 +968,6 @@ async function onSubmit(value: JobForm) {
             variant: "success",
             message: t("onlineEvals.job.savedAndActivated"),
           });
-          void runBackfill(props.row.id, value);
         } catch (activateErr: any) {
           // Config saved but activation failed — surface the activation error
           // specifically so the user knows the edit landed but it's still a draft.
@@ -1008,7 +990,6 @@ async function onSubmit(value: JobForm) {
             variant: "success",
             message: t("onlineEvals.job.createdAndActivated"),
           });
-          void runBackfill(created.id, value);
         } catch (activateErr: any) {
           // Job was created but activation failed — surface the activation
           // error specifically so the user knows the job exists but is still a draft.
@@ -1034,62 +1015,6 @@ async function onSubmit(value: JobForm) {
     showError(err, t("onlineEvals.job.saveError"));
   } finally {
     activateOnSave.value = false;
-  }
-}
-
-const BACKFILL_CONCURRENCY = 4;
-const { executeQueryOnce } = useLLMStreamQuery();
-
-/**
- * Scores the last N days' matched targets once, at the job's sample rate and
- * within today's budget, through the manual evaluation endpoint. It keeps
- * running after the form closes and reports in a toast.
- */
-// ponytail: browser-driven and capped at BACKFILL_MAX_TARGETS; closing the tab stops it. Move to a
-// server-side backfill task when backfills must survive the tab or exceed the cap.
-async function runBackfill(jobId: string, value: JobForm) {
-  const days = Number(value.backfillDays) || 0;
-  const rate = samplingRate.value;
-  if (!days || !rate) return;
-  const scope = value.targetScope as EvalTargetScope;
-  const estimate = backfillEstimate({
-    // Unknown matched targets: the row limit still bounds what is read.
-    matched: spend.backfillMatched.value ?? BACKFILL_MAX_ROWS,
-    rate,
-    perTargetUsd: spend.estimate.value.perTargetUsd,
-    budgetUsd: Number(value.dailyBudgetUsd),
-  });
-  const cap = Math.min(estimate.cap ?? Number.MAX_SAFE_INTEGER, BACKFILL_MAX_TARGETS);
-  const { startUs, endUs } = backfillWindowUs(days, Date.now());
-  const sql = backfillTargetsSql(
-    value.stream,
-    filterWhere.value,
-    scope,
-    streamFieldNames.value ?? [],
-    Math.min(Math.ceil(cap / rate), BACKFILL_MAX_ROWS),
-  );
-  try {
-    if (!sql) throw new Error("no session column");
-    const rows = await executeQueryOnce(sql, startUs, endUs, "traces");
-    // Trace and session judges read the whole target, not only the spans that matched.
-    const padUs = scope === "span" ? 0 : (Number(value.maxAgeSecs) || 0) * 1_000_000;
-    const queue = backfillRequests(rows, scope, { rate, cap, padUs });
-    const total = queue.length;
-    let failed = 0;
-    const worker = async () => {
-      for (let next = queue.shift(); next; next = queue.shift()) {
-        await onlineEvalsService.jobs.manualEval(props.orgId, jobId, next).catch(() => failed++);
-      }
-    };
-    await Promise.all(Array.from({ length: BACKFILL_CONCURRENCY }, worker));
-    toast({
-      variant: failed ? "warning" : "success",
-      message: failed
-        ? t("evalSpend.backfill.queuedSome", { n: total - failed, failed })
-        : t("evalSpend.backfill.queued", { n: total }),
-    });
-  } catch (err: any) {
-    showError(err, t("evalSpend.backfill.failed"));
   }
 }
 </script>

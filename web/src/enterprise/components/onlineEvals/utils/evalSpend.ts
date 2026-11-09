@@ -14,23 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Eval spend guard (AIO-24): the job form's cost estimate, the daily budget and
- * its backfill. A judge's cost per call comes from its own `_evaluator` spans,
+ * Eval spend guard (AIO-24): the job form's cost estimate and the daily budget.
+ * A judge's cost per call comes from its own `_evaluator` spans,
  * which the LLM processor priced at ingest — the same table real calls use. A
  * judge with no priced call has no estimate: it is never counted as $0.
  */
 
-import type {
-  EvalBudgetAction,
-  EvalJob,
-  EvalTargetScope,
-  ManualEvalJobPayload,
-} from "@/services/online-evals.service";
-import {
-  countExpression,
-  quoteIdent,
-  targetIdExpression,
-} from "../composables/useJobMatchedTargets";
+import type { EvalBudgetAction, EvalJob, EvalTargetScope } from "@/services/online-evals.service";
+import { countExpression, quoteIdent } from "../composables/useJobMatchedTargets";
 import StreamService from "@/services/stream";
 import { spendError, type SpendError } from "@/utils/alerts/aiBudgets";
 
@@ -39,7 +30,6 @@ export const DEFAULT_DAILY_BUDGET_USD = 5;
 export const DEFAULT_BUDGET_ACTION: EvalBudgetAction = "pause";
 /** The estimate reads this many days of matched traffic and judge calls. */
 export const ESTIMATE_DAYS = 7;
-export const BACKFILL_DAY_OPTIONS = [0, 1, 3, 7] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const quote = (value: string) => `'${value.replace(/'/g, "''")}'`;
@@ -251,93 +241,6 @@ export function estimateJobSpend(opts: {
     tokensPerTarget: tokens.every((n) => n != null) ? tokens.reduce((a, b) => a! + b!, 0)! : null,
     model: models.length === 1 ? (models[0] as string) : null,
   };
-}
-
-/** The backfill reads at most this many matched rows and queues at most this many targets. */
-export const BACKFILL_MAX_ROWS = 10_000;
-export const BACKFILL_MAX_TARGETS = 1000;
-
-/** The backfill's query window (µs): the last `days` days up to now. */
-export function backfillWindowUs(days: number, nowMs: number): { startUs: number; endUs: number } {
-  return { startUs: (nowMs - days * DAY_MS) * 1000, endUs: nowMs * 1000 };
-}
-
-/**
- * A one-time backfill of the `matched` targets in its window, at the job's
- * sample rate and within the row and target limits it queues by. It counts
- * toward today's budget, so it never queues more targets than the budget pays
- * for; past that the budget would pause the job with the rest of the backfill
- * still queued.
- */
-export function backfillEstimate(opts: {
-  matched: number;
-  rate: number;
-  perTargetUsd: number | null;
-  budgetUsd: number;
-}): { targets: number; usd: number | null; cap: number | null } {
-  const targets = Math.min(
-    Math.round(Math.min(opts.matched, BACKFILL_MAX_ROWS) * opts.rate),
-    BACKFILL_MAX_TARGETS,
-  );
-  const perTarget = opts.perTargetUsd;
-  const cap = perTarget ? Math.floor(opts.budgetUsd / perTarget) : null;
-  return {
-    targets,
-    usd: perTarget == null ? null : perTarget * targets,
-    cap: cap != null && cap < targets ? cap : null,
-  };
-}
-
-/**
- * Up to `limit` matched targets with the time range their spans cover
- * (nanoseconds); null when the stream (with schema `fields`) has no id at `scope`.
- */
-export function backfillTargetsSql(
-  stream: string,
-  where: string,
-  scope: EvalTargetScope,
-  fields: readonly string[],
-  limit: number,
-): string | null {
-  const id = targetIdExpression(scope, fields);
-  if (!id) return null;
-  return [
-    `SELECT ${id} AS target_id, MAX(trace_id) AS trace_id,`,
-    "  MIN(start_time) AS start_ns, MAX(end_time) AS end_ns",
-    `FROM ${quoteIdent(stream)}`,
-    `WHERE ${id} IS NOT NULL${where.trim() ? ` AND (${where.trim()})` : ""}`,
-    `GROUP BY ${id}`,
-    `LIMIT ${limit}`,
-  ].join("\n");
-}
-
-/**
- * Manual evaluation requests for a sample of the backfill rows. The window is
- * padded by `padUs` on each side: the rows only cover the spans that matched
- * the filter, and a trace or session judge reads the whole target.
- */
-export function backfillRequests(
-  rows: any[],
-  scope: EvalTargetScope,
-  opts: { rate: number; cap: number; padUs: number; random?: () => number },
-): ManualEvalJobPayload[] {
-  const random = opts.random ?? Math.random;
-  const out: ManualEvalJobPayload[] = [];
-  for (const row of rows) {
-    if (out.length >= opts.cap) break;
-    const targetId = String(row.target_id ?? "");
-    if (!targetId || random() >= opts.rate) continue;
-    out.push({
-      targetId,
-      startTime: Math.max(0, Math.floor(Number(row.start_ns) / 1000) - 1 - opts.padUs),
-      endTime: Math.ceil(Number(row.end_ns) / 1000) + 1 + opts.padUs,
-      spanId: scope === "span" ? targetId : null,
-      traceId: scope === "session" ? (row.trace_id ?? null) : scope === "trace" ? targetId : null,
-      sessionId: scope === "session" ? targetId : null,
-      reason: "backfill",
-    });
-  }
-  return out;
 }
 
 /** Paused by its budget, as opposed to by a user. */

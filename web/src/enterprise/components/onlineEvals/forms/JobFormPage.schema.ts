@@ -57,13 +57,12 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
       samplingValue: z.string().optional().default(""),
       // Not validated: an empty filter is valid, since a job may match every span.
       filterGroup: z.any(),
-      // Daily judge spend limit (AIO-24); a backfill runs once, on activation.
+      // Daily judge spend limit (AIO-24).
       dailyBudgetUsd: z.coerce
         .number()
         .positive(t("evalSpend.budget.validation"))
         .default(DEFAULT_DAILY_BUDGET_USD),
       budgetAction: z.enum(["pause", "keep_running"]).default(DEFAULT_BUDGET_ACTION),
-      backfillDays: z.coerce.number().int().min(0).default(0),
     })
     .superRefine((val, ctx) => {
       // Sampling value is required unless the mode is "all" (which ignores it).

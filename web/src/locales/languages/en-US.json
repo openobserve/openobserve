@@ -31821,19 +31821,6 @@
         }
       }
     },
-    "backfill": {
-      "label": "Backfill",
-      "off": "Off",
-      "pastDays": "Past {count} day | Past {count} days",
-      "help": "Scores matched targets from before the job started, once, when it is activated.",
-      "targets": "≈ {n} {scope} once",
-      "cost": "about {amount}",
-      "countsToday": "counts toward today's budget",
-      "capped": "capped at {n} to fit the budget",
-      "queued": "Backfill queued {n} evaluations",
-      "queuedSome": "Backfill queued {n} evaluations; {failed} could not be queued",
-      "failed": "The backfill could not start"
-    },
     "preview": {
       "note": "Updates as you change the filter, sampling or scorers.",
       "estimating": "Estimating cost…",

@@ -123,8 +123,8 @@ export function costSql(stream: string, opts: { maxUsd?: number; scope?: string 
 }
 
 /**
- * Scores the eval scheduler wrote on its own. A manual run (a backfill or a
- * re-evaluation) scores old targets on purpose and on demand, so it says
+ * Scores the eval scheduler wrote on its own. A manual run (a re-evaluation)
+ * scores old targets on purpose and on demand, so it says
  * nothing about live scoring. Rows from before `task_producer` existed are
  * online scores.
  */
