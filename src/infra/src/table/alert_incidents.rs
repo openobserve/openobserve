@@ -36,6 +36,12 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
+#[derive(Debug, sea_orm::FromQueryResult)]
+pub struct CorrelationCandidate {
+    pub id: String,
+    pub group_values: serde_json::Value,
+}
+
 /// One incident [auto_resolve_stale] resolved, with the downtime that muted it until then.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AutoResolved {
@@ -98,8 +104,14 @@ fn new_incident(
 
 /// Get incident by ID
 pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    get_with(get_orm_client_ro().await, org_id, id).await
+}
 
+pub async fn get_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
     alert_incidents::Entity::find_by_id(id)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .one(client)
@@ -1203,15 +1215,18 @@ pub async fn update_incident_metadata(
     Ok(())
 }
 
-/// The newest open incident whose group values contain or are contained in `group_values`.
 pub async fn find_correlation_candidates(
     org_id: &str,
-    group_values: &HashMap<String, String>,
-) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
-    // Every row the filter keeps is joinable and correlation joins the first, so one is enough.
-    correlation_candidates_query(client.get_database_backend(), org_id, group_values)
-        .limit(1)
+) -> Result<Vec<CorrelationCandidate>, errors::Error> {
+    find_correlation_candidates_with(get_orm_client_ro().await, org_id).await
+}
+
+pub async fn find_correlation_candidates_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+) -> Result<Vec<CorrelationCandidate>, errors::Error> {
+    correlation_candidates_query(org_id)
+        .into_model::<CorrelationCandidate>()
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
@@ -1348,32 +1363,15 @@ fn containing_alerts(alert_ids: &[String]) -> sea_orm::Condition {
     )
 }
 
-fn correlation_candidates_query(
-    backend: sea_orm::DbBackend,
-    org_id: &str,
-    group_values: &HashMap<String, String>,
-) -> sea_orm::Select<alert_incidents::Entity> {
-    let dims = serde_json::Value::Object(
-        group_values
-            .iter()
-            .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-            .collect(),
-    );
-    let nested = match backend {
-        sea_orm::DbBackend::Postgres => Expr::cust_with_values(
-            r#"("alert_incidents"."group_values" @> $1::jsonb OR "alert_incidents"."group_values" <@ $2::jsonb)"#,
-            [dims.clone(), dims],
-        ),
-        // SQLite has no JSON containment operator, so it is checked pair by pair both ways.
-        _ => Expr::cust_with_values(
-            r#"(NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE n.key = e.key AND n.value = e.value)) OR NOT EXISTS (SELECT 1 FROM json_each(?) AS n WHERE NOT EXISTS (SELECT 1 FROM json_each("alert_incidents"."group_values") AS e WHERE e.key = n.key AND e.value = n.value)))"#,
-            [dims.clone(), dims],
-        ),
-    };
+fn correlation_candidates_query(org_id: &str) -> sea_orm::Select<alert_incidents::Entity> {
     alert_incidents::Entity::find()
+        .select_only()
+        .columns([
+            alert_incidents::Column::Id,
+            alert_incidents::Column::GroupValues,
+        ])
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(nested)
         .order_by_desc(alert_incidents::Column::CreatedAt)
 }
 
@@ -2063,108 +2061,78 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn correlation_candidates_are_exactly_the_open_incidents_a_firing_can_join() {
-        use config::meta::alerts::incidents::DimensionRelationship;
-        use sea_orm::DbBackend;
+    async fn correlation_candidates_project_all_unresolved_rows_in_newest_first_order() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE alert_incidents (id TEXT, org_id TEXT, status TEXT, group_values TEXT, created_at BIGINT)",
+        )
+        .await
+        .unwrap();
+        db.execute_unprepared(
+            r#"INSERT INTO alert_incidents VALUES
+                ('old', 'acme', 'open', '{"ns":"prod"}', 1),
+                ('resolved', 'acme', 'resolved', '{}', 5),
+                ('other', 'other', 'open', '{}', 6),
+                ('conflict', 'acme', 'open', '{"ns":"dev"}', 4),
+                ('acknowledged', 'acme', 'acknowledged', '{"ns":"prod","db":"redis"}', 3),
+                ('empty', 'acme', 'open', '{}', 2)"#,
+        )
+        .await
+        .unwrap();
 
-        let db = incidents_db().await;
-        let dims = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
-            pairs
+        let candidates = find_correlation_candidates_with(&db, "acme").await.unwrap();
+        assert_eq!(
+            candidates
                 .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect()
-        };
-        let stored = [
-            dims(&[]),
-            dims(&[("ns", "prod")]),
-            dims(&[("ns", "prod"), ("cluster", "a")]),
-            dims(&[("ns", "prod"), ("cluster", "a"), ("pod", "p1")]),
-            dims(&[("ns", "dev")]),
-            dims(&[("ns", "prod"), ("db", "redis")]),
-            dims(&[("cluster", "a")]),
-            dims(&[("k.e\"y", "v\"1")]),
-        ];
-        let mut open = Vec::new();
-        for (i, group_values) in stored.iter().enumerate() {
-            for (org, status) in [("acme", "open"), ("acme", "resolved"), ("other", "open")] {
-                let mut incident = new_incident(
-                    org,
-                    "P2",
-                    serde_json::to_value(group_values).unwrap(),
-                    "service",
-                    1,
-                    None,
-                    None,
-                );
-                incident.status = Set(status.to_string());
-                incident.created_at = Set(i as i64);
-                let incident = incident.insert(&db).await.unwrap();
-                if (org, status) == ("acme", "open") {
-                    open.push(incident);
-                }
-            }
-        }
+                .map(|row| row.id.as_str())
+                .collect::<Vec<_>>(),
+            ["conflict", "acknowledged", "empty", "old"]
+        );
+        assert_eq!(candidates[0].group_values, serde_json::json!({"ns": "dev"}));
+        assert_eq!(candidates[2].group_values, serde_json::json!({}));
+        assert!(
+            find_correlation_candidates_with(&db, "absent")
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
 
-        let firings = [
-            dims(&[("ns", "prod")]),
-            dims(&[("ns", "prod"), ("cluster", "a")]),
-            dims(&[("cluster", "a"), ("pod", "p1")]),
-            dims(&[("ns", "staging")]),
-            dims(&[("k.e\"y", "v\"1"), ("ns", "prod")]),
-            dims(&[
-                ("ns", "prod"),
-                ("cluster", "a"),
-                ("pod", "p1"),
-                ("db", "redis"),
-            ]),
-        ];
-        for firing in firings {
-            let expected: Vec<String> = open
-                .iter()
-                .rev()
-                .filter(|incident| {
-                    let existing: HashMap<String, String> =
-                        serde_json::from_value(incident.group_values.clone()).unwrap();
-                    matches!(
-                        DimensionRelationship::check(&existing, &firing),
-                        DimensionRelationship::Equal
-                            | DimensionRelationship::NewIsSubset
-                            | DimensionRelationship::NewIsSuperset
-                    )
-                })
-                .map(|incident| incident.id.clone())
-                .collect();
-            let found: Vec<String> =
-                correlation_candidates_query(DbBackend::Sqlite, "acme", &firing)
-                    .all(&db)
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .map(|incident| incident.id)
-                    .collect();
-            assert_eq!(found, expected, "firing {firing:?}");
-        }
+    #[tokio::test]
+    async fn correlation_candidates_propagate_database_errors() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        assert!(matches!(
+            find_correlation_candidates_with(&db, "acme").await,
+            Err(Error::DbError(DbError::SeaORMError(_)))
+        ));
     }
 
     #[test]
-    fn correlation_candidates_bind_the_firing_dims_to_both_containment_operators() {
+    fn correlation_candidates_select_only_id_and_dimensions_without_json_predicates() {
         use sea_orm::{DbBackend, QueryTrait};
 
-        let firing = HashMap::from([("ns".to_string(), "prod".to_string())]);
-        let stmt = correlation_candidates_query(DbBackend::Postgres, "acme", &firing)
-            .build(DbBackend::Postgres);
-
-        assert!(
-            stmt.sql.contains(
-                r#"("alert_incidents"."group_values" @> $3::jsonb OR "alert_incidents"."group_values" <@ $4::jsonb)"#
-            ),
-            "{}",
-            stmt.sql
-        );
-        let dims = sea_orm::Value::Json(Some(Box::new(serde_json::json!({"ns": "prod"}))));
-        assert_eq!(
-            stmt.values.unwrap().0,
-            ["acme".into(), "resolved".into(), dims.clone(), dims]
-        );
+        for backend in [DbBackend::Sqlite, DbBackend::Postgres] {
+            let stmt = correlation_candidates_query("acme").build(backend);
+            assert!(
+                stmt.sql.starts_with(
+                    r#"SELECT "alert_incidents"."id", "alert_incidents"."group_values" FROM "alert_incidents" WHERE "#
+                ),
+                "{}",
+                stmt.sql
+            );
+            assert!(stmt.sql.contains(r#""org_id" = "#), "{}", stmt.sql);
+            assert!(stmt.sql.contains(r#""status" <> "#), "{}", stmt.sql);
+            assert!(
+                stmt.sql
+                    .ends_with(r#"ORDER BY "alert_incidents"."created_at" DESC"#),
+                "{}",
+                stmt.sql
+            );
+            assert!(!stmt.sql.contains("LIMIT"), "{}", stmt.sql);
+            assert!(!stmt.sql.contains("json"), "{}", stmt.sql);
+            assert!(!stmt.sql.contains("@>"), "{}", stmt.sql);
+            assert!(!stmt.sql.contains("<@"), "{}", stmt.sql);
+            assert_eq!(stmt.values.unwrap().0, ["acme".into(), "resolved".into()]);
+        }
     }
 }
