@@ -30,6 +30,7 @@ vi.mock("@/composables/useAnnouncementBanners", async (importOriginal) => ({
 }));
 
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
+import RcaCancelRunDialog from "./rca/RcaCancelRunDialog.vue";
 import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
@@ -257,11 +258,11 @@ describe("IncidentRCAAnalysis", () => {
     it("a past run stays readable while Re-analyze locks", async () => {
       wrapper = mountPanel(completedProps());
       await flushPromises();
-      const button = byTest(wrapper, "rca-reanalyze-btn");
+      const button = byTest(wrapper, "rca-thread-reanalyze");
 
       expect(button.attributes("disabled")).toBeDefined();
       expect(button.find(".lock-chip").exists()).toBe(true);
-      expect(reasonOf("rca-reanalyze-btn")).toBe(LOCK);
+      expect(reasonOf("rca-thread-reanalyze")).toBe(LOCK);
       await button.trigger("click");
       expect(byTest(wrapper, "rca-guidance-dialog").exists()).toBe(false);
       expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
@@ -699,7 +700,7 @@ describe("IncidentRCAAnalysis", () => {
       const dialog = wrapper.findComponent(RcaGuidanceDialog);
       expect(dialog.props("open")).toBe(false);
 
-      await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
+      await byTest(wrapper, "rca-thread-reanalyze").trigger("click");
       expect(dialog.props("open")).toBe(true);
       expect(dialog.props("canBuildOnPrevious")).toBe(true);
       expect(wrapper.emitted("trigger-rca")).toBeUndefined();
@@ -709,7 +710,18 @@ describe("IncidentRCAAnalysis", () => {
       await showPanel(liveProps());
 
       await byTest(wrapper, "rca-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toBeUndefined();
+      wrapper.findComponent(RcaCancelRunDialog).vm.$emit("confirm");
       expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+    });
+
+    it("a finished run shows Re-analyze once, in the thread's closed line", async () => {
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-reanalyze-btn").exists()).toBe(false);
+      expect(wrapper.findAll('[data-test="rca-thread-reanalyze"]')).toHaveLength(1);
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
     });
   });
 
@@ -1517,7 +1529,10 @@ describe("IncidentRCAAnalysis", () => {
       const dialog = byTest(wrapper, "rca-guidance-dialog");
       expect((dialog.find("textarea").element as HTMLTextAreaElement).value).toBe("Check PR #812");
       expect(dialog.text()).toContain("Creates a new report version. This one stays as is.");
-      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+      const guidance = wrapper
+        .findAllComponents(ODialogStub)
+        .find((stub) => stub.attributes("data-test") === "rca-guidance-dialog");
+      await guidance?.vm.$emit("click:primary");
       expect(wrapper.emitted("trigger-rca")).toEqual([
         [{ buildOnPrevious: false, guidance: "Check PR #812" }],
       ]);
@@ -1526,7 +1541,7 @@ describe("IncidentRCAAnalysis", () => {
     it("frame I: Re-analyze opens the dialog empty", async () => {
       await showSteerable(completedProps());
 
-      await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
+      await byTest(wrapper, "rca-thread-reanalyze").trigger("click");
 
       const dialog = byTest(wrapper, "rca-guidance-dialog");
       expect((dialog.find("textarea").element as HTMLTextAreaElement).value).toBe("");
@@ -1545,7 +1560,7 @@ describe("IncidentRCAAnalysis", () => {
         "The agent waits until 09:23 UTC for an answer, then closes the run as Blocked.",
       );
       expect(byTest(wrapper, "rca-thread-question-status").text()).toBe("Waiting for an answer");
-      expect(byTest(wrapper, "rca-steer-question").text()).toContain("Agent asks:");
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(true);
     });
 
     it.each([
@@ -1724,14 +1739,17 @@ describe("IncidentRCAAnalysis", () => {
       });
 
       it("the thread of a run Resume can continue is not called final; a picked earlier run's is", async () => {
-        await showPanel(failedProps({ resumeRunId: "run-2" }));
-        expect(byTest(wrapper, "rca-thread-final-note").text()).toBe(
+        wrapper = mountPanel(failedProps({ resumeRunId: "run-2" }));
+        await flushPromises();
+        expect(byTest(wrapper, "rca-thread-final-text").text()).toBe(
           "This run stopped before it finished. Resume run continues from the last finished step.",
         );
 
         await wrapper.setProps({ viewedRun: rcaRunItem(), threadRunId: "run-1" });
         await flushPromises();
-        expect(byTest(wrapper, "rca-thread-final-note").text()).toContain("This report is final");
+        expect(byTest(wrapper, "rca-thread-final-text").text()).toBe(
+          "This run no longer takes messages. Re-analyze to start a new version.",
+        );
       });
 
       it("the resume_run blind spot of the latest run emits resume-rca", async () => {

@@ -73,7 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <div
     v-else-if="errorRow"
-    class="@container flex min-w-0 flex-col gap-1"
+    :class="[
+      'rounded-surface @container flex min-w-0 flex-col gap-1 p-3',
+      kind === 'refused' ? 'bg-status-warning-bg' : 'bg-status-error-bg',
+    ]"
     data-test="assistant-turn-outcome"
     :data-kind="kind"
     :data-code="code"
@@ -85,7 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span
         :id="titleId"
-        class="block min-w-0 break-words"
+        :class="[
+          'block min-w-0 font-semibold break-words',
+          kind === 'refused' ? 'text-status-warning-text' : 'text-status-error-text',
+        ]"
         data-test="assistant-turn-outcome-title"
       >
         {{ title }}

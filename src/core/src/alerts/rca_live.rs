@@ -1150,6 +1150,7 @@ pub(crate) mod tests {
             pinned_at: None,
             seed: None,
             search_text: None,
+            branched_from: None,
         };
         session_rows::ActiveModel::from(row)
             .reset_all()

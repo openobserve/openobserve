@@ -74,6 +74,14 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
     };
   },
 }));
+// Its context read builds the app runtime, which would replace the handle a spec installs; AssistantHeaderSees.spec covers it.
+vi.mock("./AssistantHeaderSees.vue", () => ({
+  default: {
+    name: "AssistantHeaderSees",
+    props: ["sid"],
+    template: '<span data-test="assistant-shell-sees-host" />',
+  },
+}));
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
   toast: vi.fn(),
@@ -169,7 +177,7 @@ describe("AssistantShell states", () => {
     expect(root(wrapper).attributes("data-state")).toBe("gate");
     expect(wrapper.find('[data-gate="no_permission"][data-size="inline"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-shell-close"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-open-as-button"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-composer"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-welcome"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-shell-title"]').exists()).toBe(false);
@@ -192,7 +200,9 @@ describe("AssistantShell states", () => {
   it("moves the locked sidebar to the full view's hero and closes the panel", async () => {
     openLockedPanel(null);
     const { wrapper, router } = setup({}, "no_permission");
-    await wrapper.get('[data-test="assistant-layout-button"]').trigger("keydown", { key: "Enter" });
+    await wrapper
+      .get('[data-test="assistant-open-as-button"]')
+      .trigger("keydown", { key: "Enter" });
     await flushPromises();
     document.querySelector<HTMLElement>('[data-test="assistant-shell-open-in-full-view"]')?.click();
     await flushPromises();
@@ -329,9 +339,10 @@ describe("AssistantShell states", () => {
 });
 
 describe("AssistantShell chrome and focus", () => {
-  it("keeps one 40 px bar with the density switch and close in the sidebar, and 44 px in the sheet", () => {
+  it("keeps one 40 px bar with Open as and close in the sidebar, and 44 px in the sheet", () => {
     const { wrapper } = setup();
-    expect(wrapper.find('[data-test="assistant-density-switch"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-open-as-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-density-switch"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-shell-close"]').attributes("aria-label")).toBe(
       "Close O2 Assistant",
@@ -339,7 +350,7 @@ describe("AssistantShell chrome and focus", () => {
     expect(wrapper.get('[data-test="assistant-shell-chrome"]').classes()).toContain("h-10");
     document.body.innerHTML = "";
     const sheet = setup({ sheet: true }).wrapper;
-    expect(sheet.find('[data-test="assistant-layout-button"]').exists()).toBe(false);
+    expect(sheet.find('[data-test="assistant-open-as-button"]').exists()).toBe(false);
     expect(sheet.get('[data-test="assistant-shell-chrome"]').classes()).toContain("h-11");
     document.body.innerHTML = "";
     const docked = setup({ placement: "docked" }).wrapper;
@@ -349,7 +360,7 @@ describe("AssistantShell chrome and focus", () => {
 
   it("leaves the full page by navigating, so it has no ×", () => {
     const { wrapper } = setup({ placement: "full" });
-    expect(wrapper.find('[data-test="assistant-density-switch"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="assistant-open-as-button"]').text()).toBe("Open as");
     expect(wrapper.find('[data-test="assistant-shell-close"]').exists()).toBe(false);
   });
 
@@ -509,6 +520,10 @@ describe("AssistantShell mounted after the open", () => {
 });
 
 describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
+  // A live composer left mounted keeps reacting to the next test's chat of the same id.
+  const mounted: { unmount(): void }[] = [];
+  afterEach(() => mounted.splice(0).forEach((wrapper) => wrapper.unmount()));
+
   function live(props: Partial<AssistantShellProps> = {}) {
     fake.current = fakeAssistant();
     const wrapper = mount(AssistantShell, {
@@ -516,6 +531,7 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
       global: { plugins: [fakeRouter(), fakeVuex()] },
       attachTo: document.body,
     });
+    mounted.push(wrapper);
     return { wrapper, store: fake.current.store };
   }
 
@@ -525,6 +541,18 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     expect(wrapper.find('[data-test="assistant-context-tray"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-composer-root"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-context-disclosure"]').exists()).toBe(false);
+  });
+
+  it("sweeps the composer border once on the open that shows the panel, never on a mount already open", async () => {
+    const { wrapper, store } = live();
+    await flushPromises();
+    const frame = () => wrapper.get('[data-test="assistant-composer-frame"]');
+    expect(frame().classes()).not.toContain("assistant-sweep");
+    store.close("close");
+    await flushPromises();
+    store.open({ kind: "sidebar" }, { focus: "none" });
+    await flushPromises();
+    expect(frame().classes()).toContain("assistant-sweep");
   });
 
   it("puts focus in the composer textbox at the end on an explicit open", async () => {
@@ -553,13 +581,10 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     await flushPromises();
     const next = store.state.shell.activeSid;
     expect(next).not.toBe(first);
-    expect(wrapper.get('[data-test="assistant-composer-cleared"]').text()).toContain(
-      "New chat. Your draft stayed in the previous chat",
-    );
+    expect(wrapper.find('[data-notice="cleared"]').exists()).toBe(true);
     expect(store.state.sessions[first].composer.text).toBe("keep me");
     expect(store.state.sessions[next].composer.text).toBe("");
-    const bring = wrapper.get('[data-test="assistant-composer-undo"]');
-    expect(bring.text()).toBe("Bring it here");
+    const bring = wrapper.get('[data-test="assistant-composer-notice-bringDraft"]');
     await bring.trigger("click");
     expect(store.state.sessions[next].composer.text).toBe("keep me");
     expect(store.state.sessions[first].composer.text).toBe("");
@@ -575,10 +600,10 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     vm.$.setupState.newChat();
     await flushPromises();
     const next = store.state.shell.activeSid!;
-    expect(wrapper.find('[data-test="assistant-composer-cleared"]').exists()).toBe(true);
+    expect(wrapper.find('[data-notice="cleared"]').exists()).toBe(true);
     store.setTimeOverride(next, { from: 0, to: 1, period: "1h" });
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-composer-cleared"]').exists()).toBe(false);
+    expect(wrapper.find('[data-notice="cleared"]').exists()).toBe(false);
     expect(store.state.sessions[next].composer.timeOverride?.period).toBe("1h");
   });
 });
@@ -621,29 +646,25 @@ describe("WP-06 conversation wiring", () => {
     },
   ];
 
-  it("renders the transcript in ③ and Go to answer in the strip once the finished answer scrolls away (X-28)", async () => {
+  it("renders the transcript in ③ with no strip of its own between it and the composer", async () => {
     const { wrapper } = live({ state: "done", saved: "server" }, MESSAGES);
     await flushPromises();
     expect(wrapper.find('section[role="log"]').exists()).toBe(true);
     const transcript = wrapper.findComponent({ name: "AssistantTranscript" });
-    transcript.vm.$emit("answer-visible", true);
-    await flushPromises();
-    expect(wrapper.find('[data-test="assistant-strip-go-to-answer"]').exists()).toBe(false);
     transcript.vm.$emit("answer-visible", false);
     await flushPromises();
-    await wrapper.get('[data-test="assistant-strip-go-to-answer"]').trigger("click");
-    expect(document.activeElement?.getAttribute("data-test")).toBe("assistant-answer-t1");
+    expect(wrapper.find('[data-test="assistant-status-strip"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-strip-go-to-answer"]').exists()).toBe(false);
   });
 
-  it("offers Jump to latest with the unseen count once following stops (EB-11)", async () => {
+  it("leaves Jump to latest to the transcript's own pill once following stops (EB-11)", async () => {
     const { wrapper, store, sid } = live({ state: "responding.writing" }, MESSAGES);
     store.setFollow(sid, false);
     store.state.sessions[sid].ui.unseen = 2;
     await flushPromises();
-    const jump = wrapper.get('[data-test="assistant-scroll-latest"]');
-    expect(jump.text()).toBe("Jump to latest · 2 new");
-    expect(jump.attributes("aria-label")).toBe("Jump to latest, 2 new");
-    await jump.trigger("click");
+    expect(wrapper.find('[data-test="assistant-scroll-latest"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test$="jump-latest"]')).toHaveLength(1);
+    await wrapper.get('[data-test="assistant-transcript-jump-latest"]').trigger("click");
     expect(store.state.sessions[sid].ui.follow).toBe(true);
   });
 
@@ -1046,9 +1067,11 @@ describe("AssistantShell decision cards", () => {
       .element.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
     await flushPromises();
     expect(decide).toHaveBeenCalledWith(sid, { approved: false, reason: "deny" }, "t1:1");
-    wrapper
-      .get('[data-test="assistant-approval-reply"]')
-      .element.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    await wrapper.get('[data-test="assistant-approval-more"]').trigger("click");
+    await flushPromises();
+    document.body
+      .querySelector<HTMLElement>('[data-test="assistant-approval-reply"]')!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
     await flushPromises();
     expect(store.state.sessions[sid].composer).toMatchObject({
       mode: "reply",
@@ -1212,7 +1235,7 @@ describe("AssistantShell history states", () => {
     expect(header.find('[data-test="assistant-thread-title-button"]').exists()).toBe(true);
   });
 
-  it("orders the bar title, +, density, close once a turn exists, and drops + from an empty chat", async () => {
+  it("orders the bar title, +, Open as, close once a turn exists, and drops + from an empty chat", async () => {
     const { wrapper, store } = setup();
     const sid = open(store);
     store.state.sessions[sid].messages.length = 0;
@@ -1223,11 +1246,11 @@ describe("AssistantShell history states", () => {
         .findAll("[data-test]")
         .map((el) => el.attributes("data-test"))
         .filter((id) =>
-          /^assistant-(thread-(title-button|new)|density-switch|shell-close)$/.test(id ?? ""),
+          /^assistant-(thread-(title-button|new)|open-as-button|shell-close)$/.test(id ?? ""),
         );
     expect(order()).toEqual([
       "assistant-thread-title-button",
-      "assistant-density-switch",
+      "assistant-open-as-button",
       "assistant-shell-close",
     ]);
     store.state.sessions[sid].messages.push({ role: "user", content: raw("q") });
@@ -1235,12 +1258,12 @@ describe("AssistantShell history states", () => {
     expect(order()).toEqual([
       "assistant-thread-title-button",
       "assistant-thread-new",
-      "assistant-density-switch",
+      "assistant-open-as-button",
       "assistant-shell-close",
     ]);
   });
 
-  it("reaches Float from the bar's density switch", async () => {
+  it("reaches Pop out from the bar's Open as menu", async () => {
     fake.current = fakeAssistant();
     const { store } = fake.current;
     open(store);
@@ -1254,7 +1277,10 @@ describe("AssistantShell history states", () => {
       attachTo: document.body,
     });
     await flushPromises();
-    await wrapper.get('[data-test="assistant-density-float"]').trigger("click");
+    await wrapper.get('[data-test="assistant-open-as-button"]').trigger("click");
+    await flushPromises();
+    document.body.querySelector<HTMLElement>('[data-test="assistant-shell-place-window"]')!.click();
+    await flushPromises();
     expect(store.windowOf(sid)).toMatchObject({ state: "open" });
     expect(store.state.shell.placement.kind).toBe("hidden");
   });
@@ -1408,36 +1434,19 @@ describe("AssistantShell history states", () => {
     expect(wrapper.find('[data-test="assistant-transcript"]').exists()).toBe(true);
   });
 
-  it("puts history unavailable before the credit notice, which shows once history is back", async () => {
-    creditUsage.current = { mode: "free", credits_used: 75, credits_limit: 100 };
+  it("shows no credit notice or meter, whatever the usage, once history is back (no credits-used numbers)", async () => {
+    creditUsage.current = { mode: "free", credits_used: 90, credits_limit: 100 };
     const { wrapper, store } = setup({}, "available", { edition: "cloud" });
     const sid = open(store);
     store.state.sessions[sid].record.historyUnavailable = true;
     await flushPromises();
     const row = wrapper.get('[data-test="assistant-shell-notice-row"]');
     expect(row.find('[data-test="assistant-shell-history-unavailable"]').exists()).toBe(true);
-    expect(row.find('[data-test="assistant-credit-notice"]').exists()).toBe(false);
     store.state.sessions[sid].record.historyUnavailable = false;
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-shell-history-unavailable"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="assistant-credit-notice"]').exists()).toBe(true);
-    creditUsage.current = null;
-  });
-
-  it("keeps history unavailable first when credits are used up, and the used-up notice follows once history is back", async () => {
-    creditUsage.current = { mode: "free", credits_used: 100, credits_limit: 100 };
-    const { wrapper, store } = setup({}, "available", { edition: "cloud" });
-    store.state.capability.creditMode = "exhausted";
-    const sid = open(store);
-    store.state.sessions[sid].record.historyUnavailable = true;
-    await flushPromises();
-    const row = wrapper.get('[data-test="assistant-shell-notice-row"]');
-    expect(row.find('[data-test="assistant-shell-history-unavailable"]').exists()).toBe(true);
-    expect(row.find('[data-test="assistant-credit-notice"]').exists()).toBe(false);
-    store.state.sessions[sid].record.historyUnavailable = false;
-    await flushPromises();
-    expect(wrapper.get('[data-test="assistant-credit-notice"]').text()).toContain("90");
-    store.state.capability.creditMode = undefined;
+    expect(wrapper.find('[data-test="assistant-credit-notice"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-credit-meter"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("90");
     creditUsage.current = null;
   });
 

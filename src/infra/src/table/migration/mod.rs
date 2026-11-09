@@ -287,9 +287,7 @@ mod m20261216_000001_rename_user_default_folders;
 mod m20261217_000001_add_alert_incidents_unresolved_index;
 mod m20261218_000001_add_security_case_to_alert_incidents;
 mod m20261219_000001_add_historical_to_alert_incidents;
-mod m20261220_000001_create_service_identity_tables;
-mod m20261221_000001_add_last_detection_at_to_alert_incidents;
-mod m20261222_000001_incident_membership_and_catalog_cleanup;
+mod m20261218_000001_ai_chat_sessions_branched_from;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -936,6 +934,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261021_000005_create_ai_chat_imports::Migration),
             Box::new(m20261021_000006_create_paid_overage_attribution::Migration),
             Box::new(m20261021_000007_create_ai_approvals::Migration),
+            Box::new(m20261218_000001_ai_chat_sessions_branched_from::Migration),
         ]
     }
 }
@@ -1066,6 +1065,7 @@ mod tests {
         (154, "m20261021_000006_create_paid_overage_attribution"),
         (155, "m20261021_000007_create_ai_approvals"),
         (156, "m20261030_000001_add_agent_to_ai_chat_turns"),
+        (157, "m20261218_000001_ai_chat_sessions_branched_from"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1303,6 +1303,10 @@ mod tests {
             (
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261021_000001_add_history_to_ai_chat_sessions",
+            ),
+            (
+                "m20261021_000001_add_history_to_ai_chat_sessions",
+                "m20261218_000001_ai_chat_sessions_branched_from",
             ),
         ] {
             assert!(

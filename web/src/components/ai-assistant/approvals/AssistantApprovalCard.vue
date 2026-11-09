@@ -97,6 +97,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="assistant-approval-command"
         >{{ card.command }}</code
       >
+      <AssistantApprovalDiff
+        v-if="diff.length && !replying"
+        :rows="diff"
+        data-test="assistant-approval-diff"
+      />
       <OText
         v-if="gateLine"
         variant="body"
@@ -169,57 +174,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <!-- The buttons stay while the decision is on its way, so focus stays where it was -->
-      <div v-else class="text-text-heading -ms-2.5 flex min-w-0 flex-wrap items-center gap-2">
-        <template v-if="!replying">
-          <OButton
-            ref="denyButton"
-            variant="ghost-neutral"
-            size="xs"
+      <div
+        v-else
+        class="text-text-heading flex min-w-0 flex-wrap items-center gap-2"
+        data-test="assistant-approval-footer"
+      >
+        <!-- The rest sits in ⋯ at the start, opening upward, so it never covers Deny or Approve -->
+        <ODropdown v-if="menuItems.length" side="top" align="start">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              :disabled="sending"
+              focusable-unavailable
+              :class="TOUCH_TARGET_CLASS"
+              :aria-label="t('assistant.approval.more')"
+              data-test="assistant-approval-more"
+            >
+              <OIcon :name="assistantGlyph.more" size="sm" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-for="item in menuItems"
+            :key="item.id"
+            :icon-left="item.icon"
             :disabled="sending"
-            focusable-unavailable
-            :class="TOUCH_TARGET_CLASS"
-            data-test="assistant-approval-deny"
-            @click="
-              (event: MouseEvent) => act(event, () => decide({ approved: false, reason: 'deny' }))
-            "
+            :data-test="`assistant-approval-${item.id}`"
+            @select="item.run"
           >
-            {{ t("assistant.approval.deny") }}
-          </OButton>
-          <OButton
-            variant="ghost-neutral"
-            size="xs"
-            :disabled="sending"
-            focusable-unavailable
-            :class="TOUCH_TARGET_CLASS"
-            data-test="assistant-approval-reply"
-            @click="(event: MouseEvent) => act(event, () => emit('reply'))"
-          >
-            {{ t("assistant.approval.reply") }}
-          </OButton>
-          <OButton
-            v-if="planned && card.editable && !gated"
-            variant="ghost"
-            size="xs"
-            :disabled="sending"
-            focusable-unavailable
-            :class="TOUCH_TARGET_CLASS"
-            data-test="assistant-approval-edit"
-            @click="(event: MouseEvent) => act(event, edit)"
-          >
-            {{ t("assistant.approval.edit") }}
-          </OButton>
-        </template>
+            {{ item.label }}
+          </ODropdownItem>
+        </ODropdown>
+        <span class="flex-1" />
         <OButton
-          v-if="moreTime"
-          variant="ghost"
+          v-if="!replying"
+          ref="denyButton"
+          variant="outline"
           size="xs"
           :disabled="sending"
           focusable-unavailable
           :class="TOUCH_TARGET_CLASS"
-          data-test="assistant-approval-extend"
-          @click="(event: MouseEvent) => act(event, () => emit('extend'))"
+          data-test="assistant-approval-deny"
+          @click="
+            (event: MouseEvent) => act(event, () => decide({ approved: false, reason: 'deny' }))
+          "
         >
-          {{ t("assistant.approval.moreTime") }}
+          {{ t("assistant.approval.deny") }}
         </OButton>
         <!-- A gated server can't apply the change, so finishing in the editor is the one way forward -->
         <OButton
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="sending"
           :loading="sending && pressed === 'finish'"
           focusable-unavailable
-          :class="['ms-auto', TOUCH_TARGET_CLASS]"
+          :class="TOUCH_TARGET_CLASS"
           data-test="assistant-approval-finish-in"
           @click="(event: MouseEvent) => act(event, editInEditor)"
         >
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="sending || nothingSelected"
           :loading="sending && pressed === 'approve'"
           focusable-unavailable
-          :class="['ms-auto', TOUCH_TARGET_CLASS]"
+          :class="TOUCH_TARGET_CLASS"
           data-test="assistant-approval-approve"
           @click="(event: MouseEvent) => act(event, approve)"
         >
@@ -287,22 +287,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OText>
             </li>
           </ul>
-          <ODescriptionList
-            v-if="diff.length"
-            dense
-            class="w-full min-w-0"
-            data-test="assistant-approval-diff"
-          >
-            <ODescriptionItem v-for="row in diff" :key="row.field" :label="row.field">
-              <span class="font-mono text-xs break-all">
-                <template v-if="row.before">
-                  <s class="text-text-secondary">{{ row.before }}</s>
-                  {{ raw("→") }}
-                </template>
-                {{ row.value }}
-              </span>
-            </ODescriptionItem>
-          </ODescriptionList>
           <ul
             v-if="impact.length"
             class="text-text-body flex min-w-0 list-disc flex-col gap-0.5 ps-4 text-xs"
@@ -321,31 +305,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="w-full"
             data-test="assistant-approval-args"
           />
-          <OButton
-            v-if="editor && !gated"
-            variant="ghost"
-            size="xs"
-            :icon-left="assistantGlyph.newTab"
-            :disabled="sending"
-            focusable-unavailable
-            :class="['-ms-2.5', TOUCH_TARGET_CLASS]"
-            data-test="assistant-approval-finish-in"
-            @click="(event: MouseEvent) => act(event, editInEditor)"
-          >
-            {{ t("assistant.approval.finishIn", { editor: editorLabel }) }}
-          </OButton>
         </div>
       </OCollapsible>
     </section>
   </div>
 </template>
-
-<script lang="ts">
-function valueText(value: unknown): string {
-  if (value === undefined) return "—";
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-</script>
 
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
@@ -366,14 +330,12 @@ import {
 } from "@/composables/assistant";
 import {
   approvalClock,
-  approvalDiff,
   approvalDuration,
   approvalEditor,
   approvalEntity,
   approvalHeading,
   approvalName,
   approvalNoun,
-  approvalNotifies,
   approvalObjectId,
   approvalFolderId,
   approvalTargetHref,
@@ -391,14 +353,22 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
-import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgTime } from "@/utils/formatters";
 
+import AssistantApprovalDiff from "./AssistantApprovalDiff.vue";
 import AssistantPlanBlock from "./AssistantPlanBlock.vue";
-import { lowerFirst, panelDashboardId, readableCard } from "./approvalText";
+import {
+  approvalActionPhrase,
+  approvalDiffRows,
+  lowerFirst,
+  panelDashboardId,
+  readableCard,
+} from "./approvalText";
 import {
   assistantApprovalsHostKey,
   type ApprovalCardDecision,
@@ -544,20 +514,7 @@ const impact = computed(() => {
     : lines;
 });
 
-const diff = computed(() => {
-  const changed = approvalDiff(props.card);
-  const unknown = t("assistant.approval.currentUnknown");
-  const rows = (changed?.rows ?? []).map((row) => {
-    const value = raw(valueText(row.after));
-    if (props.card.kind === "create") return { field: raw(row.field), value, before: null };
-    const before = "before" in row ? valueText(row.before) : changed?.oneSided ? unknown : null;
-    return { field: raw(row.field), value, before: before === null ? null : raw(before) };
-  });
-  const notifies = approvalNotifies(props.card);
-  return notifies
-    ? [...rows, { field: t("assistant.approval.notifies"), value: raw(notifies), before: null }]
-    : rows;
-});
+const diff = computed(() => approvalDiffRows(t, props.card));
 
 // The name could not be resolved, so the id is said once here and never in the heading (D3-n).
 const nameUnknown = computed<I18nText | null>(() => {
@@ -617,7 +574,9 @@ const scopeOptions = computed(() =>
         { label: t("assistant.approval.scope.once"), value: "once" },
         { label: t("assistant.approval.scope.chat"), value: "chat" },
         {
-          label: t("assistant.approval.scope.tool", { tool: raw(props.card.tool) }),
+          label: t("assistant.approval.alwaysFor", {
+            action: approvalActionPhrase(t, props.card),
+          }),
           value: "tool",
         },
       ]
@@ -627,12 +586,45 @@ const scopeOptions = computed(() =>
 const hasDetails = computed(
   () =>
     !question.value &&
-    (diff.value.length > 0 ||
-      impact.value.length > 0 ||
-      (!!editor.value && !gated) ||
-      !!props.card.args ||
+    (impact.value.length > 0 ||
+      (!!props.card.args && !diff.value.length) ||
       (!planned.value && allTargets.value.length > 1)),
 );
+
+// Reply, Edit, More time and Finish in the editor: the secondary ways forward, in ⋯.
+const menuItems = computed(() => {
+  const items: { id: string; label: I18nText; icon: IconName; run: () => void }[] = [];
+  if (!replying.value) {
+    items.push({
+      id: "reply",
+      label: t("assistant.approval.reply"),
+      icon: assistantGlyph.thread,
+      run: () => emit("reply"),
+    });
+    if (planned.value && props.card.editable && !gated)
+      items.push({
+        id: "edit",
+        label: t("assistant.approval.edit"),
+        icon: assistantGlyph.edit,
+        run: edit,
+      });
+  }
+  if (moreTime.value)
+    items.push({
+      id: "extend",
+      label: t("assistant.approval.moreTime"),
+      icon: assistantGlyph.queue,
+      run: () => emit("extend"),
+    });
+  if (!replying.value && editor.value && !gated)
+    items.push({
+      id: "finish-in",
+      label: t("assistant.approval.finishIn", { editor: editorLabel.value }),
+      icon: assistantGlyph.newTab,
+      run: editInEditor,
+    });
+  return items;
+});
 
 const approveLabel = computed(() => {
   const verb = approvalVerb(props.card);

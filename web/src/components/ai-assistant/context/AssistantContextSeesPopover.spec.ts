@@ -52,7 +52,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-async function openPopover(shared = false) {
+async function openPopover(shared = false, extra: { props?: object; slots?: object } = {}) {
   fake.current = fakeAssistant();
   const store = fake.current.store;
   const sid = store.createSession({
@@ -68,7 +68,8 @@ async function openPopover(shared = false) {
       count: 1,
     };
   const wrapper = mount(AssistantContextSeesPopover, {
-    props: { sid },
+    props: { sid, ...extra.props },
+    slots: extra.slots,
     global: { plugins: [fakeRouter(), fakeVuex()] },
     attachTo: document.body,
   });
@@ -128,5 +129,16 @@ describe("AssistantContextSeesPopover", () => {
     expect(trigger.attributes("aria-label")).toBe("What the assistant sees");
     expect(trigger.classes()).toContain("max-md:min-h-11");
     expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+  });
+
+  it("takes the C5 placement and a detail slot, for the steer and composer ⓘ", async () => {
+    const { wrapper, panel } = await openPopover(false, {
+      props: { placement: "bottom" },
+      slots: { detail: '<p data-test="sees-detail">Sending as a.rao</p>' },
+    });
+    expect(wrapper.findComponent({ name: "OPopover" }).props("side")).toBe("bottom");
+    expect(panel()!.querySelector('[data-test="sees-detail"]')?.textContent).toBe(
+      "Sending as a.rao",
+    );
   });
 });

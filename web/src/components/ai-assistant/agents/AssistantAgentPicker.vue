@@ -15,25 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <AssistantAgentPill v-if="!shown" :agent="shownAgent" :disabled="disabled" />
   <ODropdown
-    v-if="shown"
+    v-else
     v-model:open="menuOpen"
     side="top"
-    align="end"
+    align="start"
     privacy="mask"
     :content-class="composerPopoverClass(layout.tight)"
   >
     <template #trigger>
-      <AssistantIconButton
-        variant="primary"
-        :label="t('assistant.agent.picker.choose')"
-        :icon="assistantGlyph.expand"
-        :no-tooltip="menuOpen"
+      <OButton
+        variant="ghost-subtle"
+        size="xs"
+        :disabled="disabled"
         :data-pending="pending ? '' : undefined"
-        class="md:w-5!"
+        :class="[AGENT_PILL_CLASS, TOUCH_TARGET_CLASS]"
         data-test="assistant-agent-picker"
         @keydown.up.prevent="menuOpen = true"
-      />
+      >
+        <OIcon :name="agentGlyph[shownAgent]" size="xs" class="text-ai-accent" />
+        <span class="truncate" data-test="assistant-agent-picker-name">{{
+          agentName(shownAgent, t)
+        }}</span>
+        <OIcon :name="assistantGlyph.expand" size="xs" class="text-text-secondary" />
+      </OButton>
     </template>
     <ODropdownGroup :label="t('assistant.agent.picker.heading')">
       <template v-if="sharedPolicy" #label-action>
@@ -66,12 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ row.name }}</span
             >
             <span
-              v-if="row.askAdmin || row.reason || row.clause"
+              v-if="row.askAdmin || row.reason"
               class="text-text-secondary min-w-0 text-xs"
               data-test="assistant-agent-option-clause"
-              >{{
-                row.askAdmin ? t("assistant.agent.unavailable.short") : (row.reason ?? row.clause)
-              }}</span
+              >{{ row.askAdmin ? t("assistant.agent.unavailable.short") : row.reason }}</span
             >
           </span>
           <template v-if="row.id === shownAgent" #icon-right>
@@ -97,12 +101,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODropdown>
 </template>
 
+<script lang="ts">
+import type { AgentId, Sid } from "@/composables/assistant";
+
+export interface AssistantAgentPickerProps {
+  sid: Sid | null;
+  /** Inert composer: the pill shows but does not open. */
+  disabled?: boolean;
+}
+</script>
+
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 
-import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { agentGlyph, assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import AssistantAgentPill, {
+  AGENT_PILL_CLASS,
+} from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
 import {
   announceComposer,
@@ -113,9 +130,7 @@ import {
   useAssistantCapability,
   useAssistantPlacement,
   useAssistantStore,
-  type AgentId,
   type CapabilityAgent,
-  type Sid,
 } from "@/composables/assistant";
 import {
   agentName,
@@ -131,17 +146,18 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
-import { agentRowClause, sharedAgentPolicy } from "./agentClause";
+import { sharedAgentPolicy } from "./agentClause";
 
 interface Row {
   id: AgentId;
   name: I18nText;
-  clause: I18nText | null;
   reason: I18nText | null;
   askAdmin: boolean;
 }
 
-const props = defineProps<{ sid: Sid | null }>();
+const props = withDefaults(defineProps<AssistantAgentPickerProps>(), {
+  disabled: false,
+});
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();
@@ -168,7 +184,6 @@ const rows = computed<Row[]>(() =>
     return {
       id: agent.id,
       name: agentName(agent.id, t),
-      clause: agentRowClause(agent, !!sharedPolicy.value, t),
       reason: agentReason(agent, refusal, t),
       askAdmin: refusal ? refusal === "agent_not_permitted" : isRoleLocked(agent),
     };

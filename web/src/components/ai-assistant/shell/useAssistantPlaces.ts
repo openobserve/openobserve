@@ -55,7 +55,7 @@ export function placementMode(placement: AssistantPlacementName, sheet: boolean)
   return sheet ? "sheet" : "sidebar";
 }
 
-/** The moves a container offers: Panel, Float, Full and its editor's dock, by viewport and placement. */
+/** The Open as moves a container offers: Side panel, Pop out, Full page and its editor's dock, by viewport and placement. */
 export function useAssistantPlaces(input: () => AssistantPlacesInput): {
   places: ComputedRef<AssistantPlace[]>;
 } {
@@ -87,21 +87,21 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
     const { placement, sheet } = input();
     const sidebar: AssistantPlace = {
       id: "sidebar",
-      label: t("assistant.shell.placeSidebar"),
+      label: t("assistant.shell.sidePanel"),
       checked: placement === "sidebar",
       disabled: false,
       run: toSidebar,
     };
     const window: AssistantPlace = {
       id: "window",
-      label: t("assistant.shell.placeWindow"),
+      label: t("assistant.shell.popOut"),
       checked: placement === "window",
       disabled: atCap.value && placement !== "window",
       run: toWindow,
     };
     const full: AssistantPlace = {
       id: "full",
-      label: t("assistant.shell.placeFull"),
+      label: t("assistant.shell.fullPage"),
       checked: placement === "full",
       disabled: false,
       run: toFull,

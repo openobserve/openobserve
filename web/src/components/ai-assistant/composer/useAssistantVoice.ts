@@ -201,7 +201,6 @@ export interface VoiceComposerOptions {
   /** True on a touch device below `md`, which uses the keyboard's own dictation key. */
   touch(): boolean;
   say(line: I18nText): void;
-  focusField(): void;
 }
 
 export interface VoiceComposer {
@@ -226,13 +225,14 @@ export interface VoiceComposer {
   anchor: ComputedRef<number>;
   /** The textbox's value: the draft with the tail shown in place. */
   shown(text: string): string;
-  primerOpen: Ref<boolean>;
+  /** This dictation is the user's first in this org, so the placeholder teaches how to send. */
+  firstUse: Ref<boolean>;
+  /** The browser brand whose help page explains a blocked microphone. */
+  brand(): VoiceBrand;
   sentence: ComputedRef<I18nText | null>;
   /** Saves the opt-in, which makes the mic live in place. */
   turnOn(): void;
   press(via: VoiceVia): void;
-  acceptPrimer(): void;
-  declinePrimer(): void;
   retry(): void;
   stop(reason: VoiceStopReason): void;
   noteEdit(caret: number): void;
@@ -628,10 +628,9 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
   const controller = voiceController();
   const state = controller.state;
   const id = Symbol("assistantComposerVoice");
-  const primerOpen = ref(false);
+  const firstUse = ref(false);
   const lastError = ref<VoiceErrorCode | null>(null);
   const enterHint = ref(false);
-  let pendingVia: VoiceVia = "mic";
   let composingHere = false;
   let sid: Sid | null = null;
   let enterTimer: ReturnType<typeof setTimeout> | null = null;
@@ -747,25 +746,14 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
     void controller.start(target, via);
   }
 
+  // No primer: the first dictation starts at once and its placeholder says how to send.
   function press(via: VoiceVia): void {
     if (mine.value) return controller.stop("mic");
     if (mic.value !== "live" || composingHere) return;
     const key = store.state.userOrgKey;
-    if (key && readHints(key).dictate) return begin(via);
-    pendingVia = via;
-    primerOpen.value = true;
-  }
-
-  function acceptPrimer(): void {
-    const key = store.state.userOrgKey;
-    if (key) markHintSeen(key, "dictate");
-    primerOpen.value = false;
-    begin(pendingVia);
-  }
-
-  function declinePrimer(): void {
-    primerOpen.value = false;
-    options.focusField();
+    firstUse.value = !!key && !readHints(key).dictate;
+    if (key && firstUse.value) markHintSeen(key, "dictate");
+    begin(via);
   }
 
   function turnOn(): void {
@@ -823,12 +811,11 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
       const at = Math.min(state.anchor, text.length);
       return text.slice(0, at) + state.tail + text.slice(at);
     },
-    primerOpen,
+    firstUse,
+    brand,
     sentence: availability.sentence,
     turnOn,
     press,
-    acceptPrimer,
-    declinePrimer,
     retry: () => press("mic"),
     stop: stopMine,
     noteEdit,

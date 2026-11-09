@@ -25,6 +25,7 @@ import {
 } from "@/composables/assistant/pure";
 import { approvalOf } from "@/composables/assistant/reducer";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
+import assistantSettings from "@/services/assistant_settings";
 import { raw } from "@/types/i18n";
 
 import { fakeEvidence } from "../__tests__/fakeEvidence";
@@ -680,5 +681,160 @@ describe("AssistantApprovalResult", () => {
     expect(batch.wrapper.find('[data-test^="assistant-approval-result-undo"]').exists()).toBe(
       false,
     );
+  });
+
+  describe("v7", () => {
+    const UPDATE = approvalOf({
+      type: "confirmation_required",
+      call_id: "c9",
+      kind: "update",
+      operation: "UpdateAlert",
+      tool: "UpdateAlert",
+      targets: [{ type: "alert", id: "2abc", name: "checkout-5xx" }],
+      args: { alert_id: "2abc" },
+      after: { threshold: 3, period: "10 min" },
+      before: { threshold: 2, period: "5 min" },
+      before_digest: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    });
+    const updateBlock: ContentBlock = { type: "approval", approval: UPDATE };
+    const message =
+      "The alert changed after you were asked. Nothing was changed; review the new version and ask again.";
+
+    it("C3 changed_since: says so, redraws the diff against the object as it is now, and offers Ask again", async () => {
+      const { wrapper, host } = mountRecord(
+        {
+          outcome: { state: "skipped", at: 1, decision: { approved: true, scope: "once" } },
+          result: {
+            status: "skipped",
+            items: [
+              {
+                id: "2abc",
+                type: "alert",
+                name: "checkout-5xx",
+                status: "skipped",
+                code: "changed_since",
+                message,
+                before: { threshold: 2.5, period: "5 min" },
+              },
+            ],
+            resolvedBy: "ada@example.com",
+            resolvedAt: 1,
+          },
+        },
+        { blocks: [updateBlock] },
+      );
+
+      expect(line(wrapper)).toBe("Changed since asked");
+      expect(wrapper.get('[data-test="assistant-approval-result-skipped-detail"]').text()).toBe(
+        message,
+      );
+      const diff = wrapper.get('[data-test="assistant-approval-result-fresh-diff"]');
+      expect(diff.findAll("s").map((el) => el.text())).toEqual(["2.5", "5 min"]);
+      expect(diff.text()).toContain("10 min");
+      expect(wrapper.find('[data-test^="assistant-approval-result-item-"]').exists()).toBe(false);
+      await wrapper.get('[data-test="assistant-approval-result-ask-again"]').trigger("click");
+      expect(host.askAgain).toHaveBeenCalledWith(expect.anything(), "c9");
+    });
+
+    it("C3 recheck_failed: says nothing was written and draws no diff", () => {
+      const { wrapper } = mountRecord(
+        {
+          outcome: { state: "skipped", at: 1, decision: { approved: true, scope: "once" } },
+          result: {
+            status: "skipped",
+            items: [
+              {
+                type: "alert",
+                name: "checkout-5xx",
+                status: "skipped",
+                code: "recheck_failed",
+              },
+            ],
+            resolvedBy: "ada@example.com",
+            resolvedAt: 1,
+          },
+        },
+        { blocks: [updateBlock] },
+      );
+
+      expect(line(wrapper)).toBe("Couldn't check for changes, so nothing was written");
+      expect(wrapper.find('[data-test="assistant-approval-result-fresh-diff"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("a reopened chat's skipped resolution reads as skipped, never as done", () => {
+      const resolved: ContentBlock = {
+        type: "approval_result",
+        resolved: {
+          id: "c9",
+          approved: true,
+          recorded: true,
+          outcome: "skipped",
+          code: "changed_since",
+          detail: message,
+          at: 1,
+        },
+      };
+      const { wrapper } = mountRecord(null, { blocks: [updateBlock, resolved] });
+
+      expect(line(wrapper)).toBe("Changed since asked");
+    });
+
+    it("an always-allowed approve says so with Revoke, which revokes the reader's grant", async () => {
+      const { wrapper } = mountRecord(
+        {
+          outcome: { state: "done", at: 1, decision: { approved: true, scope: "tool" } },
+        },
+        { blocks: [updateBlock] },
+      );
+      const always = wrapper.get('[data-test="assistant-approval-result-always"]');
+      expect(always.text()).toContain("Always allowed: updating alerts");
+      const grants = vi.spyOn(assistantSettings, "grants").mockResolvedValue([
+        {
+          id: "g1",
+          tool: "UpdateAlert",
+          operation: "",
+          scope: "always",
+          granted_by: "ada@example.com",
+          granted_at: 1,
+        },
+      ]);
+      const revoke = vi.spyOn(assistantSettings, "revokeGrant").mockResolvedValue(undefined);
+
+      await wrapper.get('[data-test="assistant-approval-result-revoke"]').trigger("click");
+      await flushPromises();
+
+      expect(grants).toHaveBeenCalled();
+      expect(revoke).toHaveBeenCalledWith(expect.any(String), "g1");
+      expect(always.text()).toBe("Approval revoked. The assistant will ask next time.");
+    });
+
+    it("a once approve has no always line", () => {
+      const { wrapper } = mountRecord(
+        { outcome: { state: "done", at: 1, decision: { approved: true, scope: "once" } } },
+        { blocks: [updateBlock] },
+      );
+      expect(wrapper.find('[data-test="assistant-approval-result-always"]').exists()).toBe(false);
+    });
+
+    it("a single undoable change carries the shipped undo-limits sentence", async () => {
+      const single = mountRecord({ outcome: { state: "done", at: 1 } });
+      single.evidence.store.state.sessions[single.evidence.sid]!.ledger.push({
+        id: "led-1",
+        approvalId: "c9",
+        turnId: "t1",
+        tool: "o2_delete",
+        op: "delete",
+        resource: { type: "alert", name: "checkout-latency-old" },
+        status: "done",
+        undoable: true,
+        at: 1,
+      });
+      await nextTick();
+      expect(single.wrapper.get('[data-test="assistant-approval-result-undo-limits"]').text()).toBe(
+        "Undo restores the object. Notifications already sent and data already deleted stay as they are.",
+      );
+    });
   });
 });

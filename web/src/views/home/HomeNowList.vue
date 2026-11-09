@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <section :aria-labelledby="headingId" class="flex min-w-0 flex-col gap-2" data-test="home-now">
     <div class="flex min-h-8 min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 ps-1">
       <h2 :id="headingId" class="text-text-heading text-base font-semibold">
-        {{ problems ? t("home.agent.problems.title") : t("overview.now.title") }}
+        {{ problems ? t("home.agent.problems.title") : t("home.agent.needsYouTitle") }}
       </h2>
       <OTag v-if="problems" type="countChip" value="warning" data-test="home-now-count">{{
         snapshot.rows.length
@@ -107,15 +107,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :askable="askable"
           :meta="rowMeta[row.key] ?? null"
           :create-alert="problems ? createAlert : null"
+          :run="row.kind === 'incident' ? (incidentRuns?.get(row.id) ?? null) : null"
           @investigate="onInvestigate"
+          @follow="(_r, run) => follow(run)"
           @create-alert="(r) => emit('createAlert', r)"
           @open="(r) => emit('open', r)"
           @service="(r) => emit('service', r)"
           @show-runs="showRunningChats"
         />
+        <HomeFailedRunRow
+          v-for="run in problems ? [] : failedRuns"
+          :key="run.run_id"
+          :run="run"
+          :timezone="timezone"
+          :busy="busyKeys.has(run.run_id)"
+          @retry="retryRun"
+          @open="(r) => emit('openIncident', r.incident_id)"
+        />
         <li
           v-if="
-            snapshot.rows.length === 0 && failedSources.length === 0 && deniedSources.length === 0
+            snapshot.rows.length === 0 &&
+            (problems || failedRuns.length === 0) &&
+            failedSources.length === 0 &&
+            deniedSources.length === 0
           "
           class="text-text-secondary px-3 py-3 text-sm"
           data-test="home-now-clear"
@@ -144,6 +158,7 @@ import {
   type WatchStopHandle,
 } from "vue";
 
+import { useRcaFollow } from "@/components/ai-assistant/shell/rcaFollow";
 import {
   contextChipFor,
   openAssistant,
@@ -161,12 +176,16 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import incidents from "@/services/incidents";
+import type { OrgRcaRun } from "@/services/rca_runs_org";
 import type { ServicesTrendResponse } from "@/services/service_graph";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
 
 import HomeBuiltFrom, { type BuiltFromSource } from "./HomeBuiltFrom.vue";
 import HomeCreditsLine from "./HomeCreditsLine.vue";
+import HomeFailedRunRow from "./HomeFailedRunRow.vue";
 import HomeNowRow, { type NowRowMeta } from "./HomeNowRow.vue";
 import { investigateRow, rowSentence } from "./homeInvestigate";
 import { trendPoints } from "./useHomeNow";
@@ -198,6 +217,10 @@ const props = withDefaults(
     createAlert?: { enabled: boolean } | null;
     /** What an empty list says; Home's Now says nothing else is over baseline when Problems lists rows below. */
     clearText?: I18nText | null;
+    /** Each incident's newest RCA run; null where the org's runs cannot be read. */
+    incidentRuns?: Map<string, OrgRcaRun> | null;
+    /** Auto-runs whose newest attempt failed; each is a row of its own. */
+    failedRuns?: OrgRcaRun[];
   }>(),
   {
     dataAsOf: null,
@@ -208,6 +231,8 @@ const props = withDefaults(
     rowMeta: () => ({}),
     createAlert: null,
     clearText: null,
+    incidentRuns: null,
+    failedRuns: () => [],
   },
 );
 
@@ -222,6 +247,7 @@ const emit = defineEmits<{
   /** An incident's Investigate was sent; the page opens the incident's analysis beside the chat. */
   analysis: [row: NowRow];
   createAlert: [row: NowRow];
+  openIncident: [id: string];
 }>();
 
 const { t } = useI18nTyped();
@@ -233,6 +259,8 @@ const busyKeys = reactive(new Set<string>());
 const notes = reactive<Record<string, { text: I18nText; showRuns: boolean }>>({});
 // The door accepts before the server admits, so each sent row watches its chat for a run-cap refusal.
 const refusalWatches = new Map<string, WatchStopHandle>();
+
+const rca = useRcaFollow();
 
 const creditsExhausted = computed(() => capability.value.creditMode === "exhausted");
 // Without a chat to send to, the row's button names the page it opens instead of falling back silently.
@@ -297,6 +325,30 @@ function fallbackOf(row: NowRow): I18nText | null {
   return t("overview.now.investigateFallback", { target: rowSentence(row, props.snapshot, t) });
 }
 
+function follow(run: Pick<OrgRcaRun, "incident_id" | "run_id">): void {
+  rca.follow({ org: props.org, incidentId: run.incident_id, runId: run.run_id });
+}
+
+// The incident's own analysis is the run to follow; a refused start falls back to asking in a chat.
+async function startRun(incidentId: string, busyKey: string): Promise<boolean> {
+  busyKeys.add(busyKey);
+  try {
+    const { data } = await incidents.triggerRca(props.org, incidentId);
+    follow({ incident_id: incidentId, run_id: data.run_id });
+    return true;
+  } catch (err) {
+    console.error("Failed to start the incident analysis:", err);
+    return false;
+  } finally {
+    busyKeys.delete(busyKey);
+  }
+}
+
+async function retryRun(run: OrgRcaRun): Promise<void> {
+  if (!(await startRun(run.incident_id, run.run_id)))
+    toast({ variant: "error", message: t("home.agent.retryRunFailed") });
+}
+
 async function onInvestigate(row: NowRow): Promise<void> {
   if (!askable.value) {
     emit("select", row);
@@ -304,6 +356,7 @@ async function onInvestigate(row: NowRow): Promise<void> {
     return;
   }
   emit("select", row);
+  if (row.kind === "incident" && props.incidentRuns && (await startRun(row.id, row.key))) return;
   delete notes[row.key];
   refusalWatches.get(row.key)?.();
   refusalWatches.delete(row.key);

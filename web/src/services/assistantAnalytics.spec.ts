@@ -166,6 +166,9 @@ const SAMPLES: { [N in AiEventName]: AiEventProps[N] } = {
     truncated: false,
   },
   ai_fork: { result: "ok" },
+  ai_read_aloud: { action: "start" },
+  ai_answer_link: { result: "copied" },
+  ai_branch: { result: "failed", status: 409 },
   ai_local_import: { result: "done", count: 4 },
   ai_consent: { step: "shown", surface: "chat", org_match: true, plan_type: "direct" },
   ai_credit_notice: { threshold: 70, mode: "free", action: "shown", had_prior_warning: false },
@@ -267,6 +270,9 @@ const CATALOGUE: Record<AiEventName, string[]> = {
   ai_share: ["action", "visibility", "mode", "scope"],
   ai_shared_view: ["visibility", "mode", "state", "redacted", "truncated"],
   ai_fork: ["result"],
+  ai_read_aloud: ["action"],
+  ai_answer_link: ["result"],
+  ai_branch: ["result", "status"],
   ai_local_import: ["result", "count"],
   ai_consent: ["step", "surface", "org_match", "plan_type"],
   ai_credit_notice: ["threshold", "mode", "action", "had_prior_warning"],
@@ -322,7 +328,7 @@ afterEach(() => {
 describe("event catalogue", () => {
   it("pins every event name of 99 §3.3", () => {
     expect([...AI_EVENT_NAMES].sort()).toEqual(Object.keys(CATALOGUE).sort());
-    expect(AI_EVENT_NAMES).toHaveLength(64);
+    expect(AI_EVENT_NAMES).toHaveLength(67);
   });
 
   it.each(AI_EVENT_NAMES)("%s carries exactly its catalogue properties", (name) => {

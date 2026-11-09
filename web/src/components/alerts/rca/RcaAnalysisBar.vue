@@ -15,13 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- One row at any width: the subtitle truncates first, then Ask and Re-analyze drop to icons,
-       then the run label truncates. -->
-  <div
-    data-test="rca-analysis-bar"
-    class="@container flex flex-nowrap items-center gap-2.5"
-    :class="variant === 'report' ? 'max-md:flex-wrap' : ''"
-  >
+  <!-- One row at any width: the subtitle truncates first, then Ask drops to an icon, then the run label. -->
+  <div data-test="rca-analysis-bar" class="@container flex flex-nowrap items-center gap-2.5">
     <ODropdown align="start" content-class="w-80">
       <template #trigger>
         <OButton data-test="rca-run-selector" variant="outline" size="sm" class="min-w-0">
@@ -58,13 +53,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ subtitle }}
     </span>
 
-    <template v-if="variant === 'report'">
-      <template v-if="!selectedIsLive">
+    <OButton
+      v-if="!live && canAsk"
+      data-test="rca-ask-btn"
+      variant="outline"
+      size="sm"
+      class="shrink-0"
+      icon-left="auto-awesome"
+      @click="$emit('ask')"
+    >
+      <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaAsk.button") }}</span>
+    </OButton>
+
+    <ODropdown align="end" content-class="w-55">
+      <template #trigger>
         <OButton
-          ref="copyButton"
-          data-test="rca-report-copy-btn"
+          data-test="rca-more-btn"
           variant="outline"
-          size="sm"
+          size="icon-toolbar"
           class="shrink-0"
           icon-left="content-copy"
           :disabled="!hasReport"
@@ -128,112 +134,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="forum"
         @click="$emit('open-thread')"
       >
-        {{ t("alerts.incidents.rcaLight.openThread") }}
-      </OButton>
-    </template>
-
-    <template v-else>
-      <OButton
-        v-if="live"
-        data-test="rca-cancel-btn"
-        variant="ghost-destructive"
-        size="sm"
-        class="shrink-0"
-        icon-left="stop-circle"
-        :loading="cancelling"
-        @click="$emit('cancel')"
-      >
-        {{ t("alerts.incidents.rcaRun.cancelRun") }}
-      </OButton>
-
-      <OButton
-        v-if="!live && canAsk"
-        data-test="rca-ask-btn"
-        variant="outline"
-        size="sm"
-        class="shrink-0"
-        icon-left="auto-awesome"
-        @click="$emit('ask')"
-      >
-        <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaAsk.button") }}</span>
-      </OButton>
-
-      <OTooltip
-        v-if="!live"
-        :content="startLockedReason"
-        :disabled="!startLockedReason"
-        side="bottom"
-      >
-        <span class="inline-flex shrink-0">
-          <OButton
-            data-test="rca-reanalyze-btn"
-            variant="outline"
-            size="sm"
-            :icon-left="startLockedReason ? 'lock' : 'refresh'"
-            :loading="triggering"
-            :disabled="resuming || !!startLockedReason"
-            @click="$emit('reanalyze')"
-          >
-            <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaReanalyze") }}</span>
-          </OButton>
-        </span>
-      </OTooltip>
-
-      <ODropdown align="end" content-class="w-55">
-        <template #trigger>
-          <OButton
-            data-test="rca-more-btn"
-            variant="outline"
-            size="icon-toolbar"
-            class="shrink-0"
-            :aria-label="t('alerts.incidents.rcaRun.more')"
-          >
-            <OIcon name="more-horiz" size="sm" />
-          </OButton>
-        </template>
+        {{ t("alerts.incidents.rcaThread.copy") }}
+      </ODropdownItem>
+      <!-- Cancel stops the run for everyone on the incident, so it sits here behind a confirm. -->
+      <template v-if="live">
+        <ODropdownSeparator />
         <ODropdownItem
-          data-test="rca-copy-btn"
-          icon-left="content-copy"
-          :disabled="!hasReport"
-          @select="$emit('copy-report')"
+          data-test="rca-cancel-btn"
+          variant="destructive"
+          icon-left="stop-circle"
+          :disabled="cancelling"
+          @select="cancelOpen = true"
         >
-          {{ t("alerts.incidents.rcaCopy") }}
+          {{ t("alerts.incidents.rcaRun.cancelRun") }}
         </ODropdownItem>
-        <ODropdownItem
-          data-test="rca-download-btn"
-          icon-left="download"
-          :disabled="!hasReport"
-          @select="$emit('download-report')"
-        >
-          {{ t("alerts.incidents.rcaDownload") }}
-        </ODropdownItem>
-        <ODropdownItem
-          data-test="rca-copy-thread-btn"
-          icon-left="forum"
-          :disabled="!hasThread"
-          @select="$emit('copy-thread')"
-        >
-          {{ t("alerts.incidents.rcaThread.copy") }}
-        </ODropdownItem>
-      </ODropdown>
-    </template>
+      </template>
+    </ODropdown>
+    <RcaCancelRunDialog
+      v-model:open="cancelOpen"
+      :incident-number="incidentNumber"
+      :cancelling="cancelling"
+      @confirm="$emit('cancel')"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type ComponentPublicInstance } from "vue";
+import { computed, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { RcaRunItem } from "@/services/incidents";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { timezoneAbbr } from "@/utils/formatters";
 import { rcaTriggerLabel } from "@/utils/incidents/rcaThread";
+import RcaCancelRunDialog from "./RcaCancelRunDialog.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -252,35 +191,23 @@ const props = withDefaults(
     hasThread: boolean;
     /** The shown run has a report or a record and AI chat is available (J5). */
     canAsk?: boolean;
-    triggering?: boolean;
-    /** A resume is in flight: Re-analyze waits for it. */
-    resuming?: boolean;
     cancelling?: boolean;
-    /** Why no new run can start: Re-analyze stays visible, disabled, with this reason. */
-    startLockedReason?: I18nText;
-    /** `report`: the Report tab's bar, with Copy report and Download as Markdown as buttons. */
-    variant?: "analysis" | "report";
-    /** The app's time zone for run times. */
-    timezone?: string;
-    /** The Markdown Copy report just put on the clipboard; null hides the preview. */
-    copyPreview?: string | null;
+    /** How the cancel confirm names the incident after "#". */
+    incidentNumber?: string;
   }>(),
   {
     variant: "analysis",
     timezone: "UTC",
     copyPreview: null,
     canAsk: false,
-    triggering: false,
-    resuming: false,
     cancelling: false,
-    startLockedReason: undefined,
+    incidentNumber: "",
   },
 );
 
 defineEmits<{
   "select-run": [runId: string | null];
-  /** Re-analyze: open the re-analysis dialog. */
-  reanalyze: [];
+  /** Confirmed in the dialog. */
   cancel: [];
   "copy-report": [];
   "download-report": [];
@@ -294,11 +221,9 @@ defineEmits<{
 
 const { t } = useI18nTyped();
 
-const runTime = (us: number) =>
-  `${formatTimestampInTimezone(us, "MMM D, HH:mm", props.timezone)} ${timezoneAbbr(props.timezone, new Date(us / 1000))}`;
+const cancelOpen = ref(false);
 
-const copyButton = ref<ComponentPublicInstance | null>(null);
-const copyAnchor = computed(() => (copyButton.value?.$el as Element | undefined) ?? null);
+const runTime = (us: number) => formatTimestampInTimezone(us, "MMM D, HH:mm", "UTC");
 
 const items = computed(() =>
   props.runs.map((run, idx) => {

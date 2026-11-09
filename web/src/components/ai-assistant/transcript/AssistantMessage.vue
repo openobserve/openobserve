@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="message.role === 'user'"
-    class="flex min-w-0 flex-col items-end gap-1"
+    class="group/message flex min-w-0 flex-col items-end gap-1"
     data-test="assistant-message-user"
     data-scroll-anchor
   >
     <p
       v-if="userText"
-      class="bg-assistant-user-bg rounded-default text-text-body max-w-[85%] min-w-0 px-3 py-2 text-sm break-words whitespace-pre-wrap"
+      class="bg-assistant-user-bg rounded-surface rounded-ee-default text-text-body max-w-[80%] min-w-0 px-3.5 py-2 text-sm break-words whitespace-pre-wrap"
       data-test="assistant-message-text"
     >
       {{ userText }}
@@ -104,6 +104,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("assistant.message.editedFrom", { n: message.editedFrom }) }}
     </p>
+    <!-- The row keeps its height while hidden, so hovering a message never moves the transcript -->
+    <div
+      v-if="$slots.actions || (answerTime && !userMeta)"
+      class="flex min-h-6 items-center justify-end gap-1"
+      data-test="assistant-message-user-line"
+    >
+      <slot name="actions" />
+      <OText
+        v-if="answerTime && !userMeta"
+        variant="meta"
+        as="span"
+        class="shrink-0 whitespace-nowrap opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100"
+        data-test="assistant-message-user-time"
+      >
+        {{ answerTime }}
+      </OText>
+    </div>
   </div>
 
   <div
@@ -114,10 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-scroll-anchor
   >
     <div
-      v-if="agent !== DEFAULT_AGENT || $slots.versions"
+      v-if="head || agent !== DEFAULT_AGENT || $slots.versions"
       class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
+      data-test="assistant-message-head"
     >
-      <AssistantAgentIdentity v-if="agent !== DEFAULT_AGENT" size="meta" :agent="agent" />
+      <AssistantAgentIdentity v-if="head || agent !== DEFAULT_AGENT" size="meta" :agent="agent" />
       <slot name="versions" />
     </div>
     <slot name="status" />
@@ -134,8 +152,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantMarkdownPart
             v-if="part.kind !== 'code'"
             :part="part"
-            :html-class="item.key === leadKey ? `${PROSE} ${LEAD_HTML}` : PROSE"
-            :text-class="item.key === leadKey ? `${PLAIN} ${LEAD_TEXT}` : PLAIN"
+            :html-class="
+              item.key === leadKey
+                ? `${PROSE_CLASSES.html} ${PROSE_CLASSES.leadHtml}`
+                : PROSE_CLASSES.html
+            "
+            :text-class="
+              item.key === leadKey
+                ? `${PROSE_CLASSES.plain} ${PROSE_CLASSES.leadPlain}`
+                : PROSE_CLASSES.plain
+            "
             :live="item.live"
           />
           <AssistantMarkdownCode
@@ -241,6 +267,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :turn="turn"
       />
     </template>
+    <AssistantChartCard
+      v-if="answerChart"
+      :chart="answerChart.chart"
+      :query="answerChart.query"
+      :sid="turn?.sid ?? null"
+      :turn-id="turn?.turnId"
+      :readonly="readonly"
+    />
     <slot name="after" />
     <AssistantQueriesGroup
       v-if="!live"
@@ -264,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="answerTime"
             variant="meta"
             as="span"
-            class="shrink-0 whitespace-nowrap"
+            class="ms-auto shrink-0 whitespace-nowrap"
             data-test="assistant-answer-time"
           >
             {{ answerTime }}
@@ -318,6 +352,8 @@ export interface AssistantMessageProps {
   agent?: AgentId;
   /** The question line's "Last 1 h"; the last turn only, the older ones keep the hour. */
   rangeLabel?: I18nText | null;
+  /** The mark and agent name above an answer; only the first answer of a run carries it. */
+  head?: boolean;
 }
 
 // A decision's record replaces its card in place; the pending card itself renders in the container.
@@ -370,21 +406,6 @@ const POLICY_CODES: ReadonlySet<string> = new Set(["permission_denied_tool", "da
 // A block counts once per page load, so a re-render never repeats the event.
 const reported = new Set<string>();
 
-const PROSE = [
-  "min-w-0 text-sm leading-5 text-text-body break-words",
-  "[&_p]:my-1.5 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
-  "[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:ps-5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:ps-5",
-  "[&_li]:my-0.5 [&_blockquote]:border-s-2 [&_blockquote]:border-border-default [&_blockquote]:ps-3",
-  "[&_blockquote]:text-text-secondary [&_hr]:my-3 [&_hr]:border-border-default [&_strong]:font-semibold",
-].join(" ");
-
-const PLAIN = "text-text-body min-w-0 text-sm leading-5 break-words whitespace-pre-wrap";
-
-// The conclusion is the only heading-colour line, so a multi-turn chat scans by its answers.
-const LEAD_HTML = "[&_p:first-child]:text-text-heading [&_p:first-child]:font-medium";
-
-const LEAD_TEXT = "text-text-heading font-medium";
-
 // The server cuts a ```findings fence out of the prose but leaves the label the model wrote above it.
 const FINDINGS_LABEL = /[ \t]*(?:#{1,6}[ \t]+)?(?:\*\*|__)?Findings:?(?:\*\*|__)?:?\s*$/i;
 
@@ -412,6 +433,8 @@ import AssistantAgentIdentity from "@/components/ai-assistant/agents/AssistantAg
 import { chipGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import AssistantAnswerMeta from "@/components/ai-assistant/evidence/AssistantAnswerMeta.vue";
+import AssistantChartCard from "@/components/ai-assistant/evidence/AssistantChartCard.vue";
+import { chartOf } from "@/components/ai-assistant/evidence/chartSeries";
 import AssistantInlineClaims from "@/components/ai-assistant/evidence/AssistantInlineClaims.vue";
 import AssistantLinkCard from "@/components/ai-assistant/evidence/AssistantLinkCard.vue";
 import AssistantQueriesGroup from "@/components/ai-assistant/evidence/AssistantQueriesGroup.vue";
@@ -444,6 +467,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgRange, formatOrgTime } from "@/utils/formatters";
 
 import AssistantAttachmentBlock from "./AssistantAttachmentBlock.vue";
+import { PROSE_CLASSES } from "./markdownCore";
 import {
   AssistantMarkdownCode,
   AssistantMarkdownPart,
@@ -473,6 +497,7 @@ const props = withDefaults(defineProps<AssistantMessageProps>(), {
   turn: null,
   agent: "o2-ai",
   rangeLabel: null,
+  head: false,
 });
 
 const { t } = useI18nTyped();
@@ -551,6 +576,20 @@ const org = computed(() => props.turn?.org ?? "");
 const steps = computed(() =>
   props.message.role === "assistant" ? stepsOf(props.message, org.value) : [],
 );
+// A reloaded turn has no series (the server keeps none), so its last PromQL step offers Show chart instead.
+const answerChart = computed(() => {
+  if (props.message.role !== "assistant" || props.live) return null;
+  const found = chartOf(props.message);
+  if (found) {
+    const callId = found.step?.call_id;
+    const step = callId ? steps.value.find((candidate) => candidate.callId === callId) : null;
+    return { chart: found.chart, query: step?.query ?? null };
+  }
+  const promql = steps.value.findLast(
+    (step) => step.kind === "promql" && step.state === "done" && !!step.query,
+  );
+  return promql?.query ? { chart: null, query: promql.query } : null;
+});
 const pageRange = computed(() => promptRange(props.turn?.prompt, props.turn?.askedWindow));
 // Viewers lose the drafts; an unknown permission still shows them.
 const permissions = computed(() => {

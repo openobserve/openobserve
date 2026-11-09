@@ -87,6 +87,13 @@ const AI_TOKEN_LEGACY_CONSUMERS = [
 const AI_ASSISTANT_KEYS: string[] = JSON.parse(
   readFileSync(join(__dirname, "__fixtures__/aiAssistantKeys.json"), "utf8"),
 );
+// The status dot, plus the composer's two kit shapes (round Send/Stop, agent pill), each held in one exported class.
+const ROUNDED_FULL_FILES = [
+  "components/ai-assistant/common/AssistantStatusDot.vue",
+  "components/ai-assistant/composer/AssistantComposerBottomRow.vue",
+  "components/ai-assistant/composer/AssistantAgentPill.vue",
+];
+
 const PURE_CONSTRUCTORS = new Set(["Set", "Map"]);
 
 const TOP_LEVEL_DECLARATIONS = new Set([
@@ -240,13 +247,13 @@ describe("assistant repo guards", () => {
     expect(offenders((f) => inAssistantUi(f.path) && pattern.test(f.text))).toEqual([]);
   });
 
-  it("allows rounded-full only in the status dot", () => {
+  it("allows rounded-full only in the status dot and the composer's round Send and agent pill", () => {
     expect(
       offenders(
         (f) =>
           inAssistantUi(f.path) &&
           /\brounded-full\b/.test(f.text) &&
-          f.path !== "components/ai-assistant/common/AssistantStatusDot.vue",
+          !ROUNDED_FULL_FILES.includes(f.path),
       ),
     ).toEqual([]);
   });

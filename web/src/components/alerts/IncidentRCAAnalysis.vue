@@ -175,9 +175,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-else
     data-test="rca-analysis-container"
-    class="flex min-h-0 flex-1 flex-col overflow-auto lg:grid lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden"
+    :data-layout="layout"
+    class="flex min-h-0 flex-1 flex-col overflow-auto"
+    :class="
+      layout === 'page' ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_25rem] lg:overflow-hidden' : 'gap-4'
+    "
   >
-    <div class="flex min-w-0 flex-col gap-6 px-7 pt-4 pb-10 lg:overflow-auto">
+    <div
+      class="flex min-w-0 flex-col gap-6"
+      :class="layout === 'page' ? 'px-7 pt-4 pb-10 lg:overflow-auto' : 'px-4 pt-3'"
+    >
       <RcaAnalysisBar
         :runs="history"
         :latest-run-id="rca.run_id"
@@ -187,13 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :has-report="!!ownReport"
         :has-thread="!!thread && thread.transcript === 'available'"
         :can-ask="canAsk"
-        :triggering="triggering"
-        :resuming="resuming"
         :cancelling="cancelling"
-        :start-locked-reason="startLockedReason"
-        :timezone="timezone"
+        :incident-number="incidentNumber"
         @select-run="$emit('view-run', $event)"
-        @reanalyze="openGuidance('')"
         @cancel="$emit('cancel-rca')"
         @copy-report="copyReport(false)"
         @download-report="downloadReport"
@@ -362,6 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("alerts.incidents.rcaRun.reportAfterRun") }}
       </p>
+      <slot name="after-record" />
     </div>
 
     <RcaThreadColumn
@@ -384,6 +388,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :author-email="authorEmail"
       :sending="steerSending"
       :send="sendMessage"
+      :variant="layout === 'page' ? 'column' : 'inline'"
+      :class="layout === 'page' ? '' : 'px-4 pb-4'"
+      :start-locked-reason="startLockedReason"
+      :reanalyzing="triggering || resuming"
       @retry="retryThread"
       @open-evidence="evidenceList?.openEntry($event)"
       @reanalyze-with="openGuidance"
@@ -434,6 +442,7 @@ import {
   formatRcaLocalClock,
   humanizeElapsed,
   isLiveRca,
+  rcaIncidentNumber,
   userLocalPart,
 } from "@/utils/incidents/rcaCell";
 import {
@@ -537,14 +546,8 @@ const props = withDefaults(
     /** AI credits an analysis and a re-analysis use; unset outside cloud, where no cost shows. */
     analyzeCreditCost?: number | null;
     reanalyzeCreditCost?: number | null;
-    /** `report`: the Report tab, which shows the shown run's report alone. */
-    view?: "analysis" | "report";
-    /** This incident's own firings (its trigger rows). */
-    firings?: IncidentUnfoldInput["triggers"];
-    /** The live state of the incident's alerts; null while unknown. */
-    alertsNow?: RcaAlertsNow | null;
-    /** The incident's events, for analyses that failed before any run was stored. */
-    incidentEvents?: RcaIncidentEvent[] | null;
+    /** `page` is the incident's Analysis tab; `assistant` is one column inside the assistant. */
+    layout?: "page" | "assistant";
   }>(),
   {
     view: "analysis",
@@ -577,6 +580,7 @@ const props = withDefaults(
     refusal: null,
     analyzeCreditCost: null,
     reanalyzeCreditCost: null,
+    layout: "page",
   },
 );
 
@@ -631,6 +635,7 @@ const startLockedReason = computed<I18nText | undefined>(() => {
 });
 
 const live = computed(() => isLiveRca(props.rca));
+const incidentNumber = computed(() => rcaIncidentNumber(props.incidentId));
 const currentRun = computed(() => props.rca?.current_run ?? null);
 /** Step a resumed live run restarted from. */
 const liveResumeStep = computed(() =>
@@ -1163,4 +1168,6 @@ const ask = () => {
     context: { currentPage: "incidents", org_id: props.orgId },
   });
 };
+
+defineExpose({ copyReport, downloadReport, copyThread, ask, canAsk });
 </script>

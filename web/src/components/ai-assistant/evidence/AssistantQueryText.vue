@@ -15,12 +15,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex min-w-0 flex-col gap-1">
+  <div
+    v-if="chrome"
+    role="group"
+    :aria-label="label"
+    class="rounded-surface border-border-subtle bg-assistant-syn-bg flex min-w-0 flex-col overflow-hidden border"
+    :data-test="`${dataTest}-chrome`"
+  >
+    <div
+      class="border-border-subtle text-text-secondary text-2xs flex h-8 min-w-0 items-center gap-2 border-b ps-3 pe-1 font-medium"
+    >
+      <span class="shrink-0" :data-test="`${dataTest}-lang`">{{ languageLabel(language) }}</span>
+      <OTruncatedText v-if="meta" class="min-w-0 font-normal" :data-test="`${dataTest}-meta`">{{
+        meta
+      }}</OTruncatedText>
+      <AssistantIconButton
+        class="ms-auto"
+        :label="t('assistant.query.copy')"
+        :icon="assistantGlyph.copy"
+        :done="copied ? t('common.copied') : undefined"
+        :data-test="`${dataTest}-copy`"
+        @click="copy"
+      />
+    </div>
+    <OCodeBlock
+      :code="text"
+      class="my-0! rounded-none! border-0!"
+      :lang="lang"
+      :highlighted-html="highlighted"
+      :copyable="false"
+      :toolbar="false"
+      wrap
+      padded
+      :max-lines="MAX_LINES"
+      contrast="aa"
+      :scroll-label="label"
+      :data-test="dataTest"
+    />
+    <div
+      v-if="$slots.foot"
+      class="border-border-subtle bg-surface-base flex min-w-0 items-center gap-1 border-t px-2 py-1.5"
+      :data-test="`${dataTest}-foot`"
+    >
+      <slot name="foot" />
+    </div>
+  </div>
+  <div v-else class="flex min-w-0 flex-col gap-1">
     <!-- One Monaco per query breaks the transcript budget; wrapped, since overlay scrollbars hide a sideways overflow -->
     <OCodeBlock
       :code="text"
       class="my-0!"
       :lang="lang"
+      :highlighted-html="highlighted"
       :copyable="false"
       :toolbar="false"
       wrap
@@ -33,21 +79,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 
 import type { QueryRef } from "@/composables/assistant/pure";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import type { I18nText } from "@/types/i18n";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { copyToClipboard } from "@/utils/clipboard";
+
+import AssistantIconButton from "../common/AssistantIconButton.vue";
+import { assistantGlyph } from "../common/glyphs";
+import { highlightCode } from "../transcript/markdownCore";
+
+import { languageLabel } from "./evidenceText";
 
 const MAX_LINES = 12;
 
-const props = defineProps<{
-  text: string;
-  language: QueryRef["language"];
-  /** The scroll region's name; unique per block, as two regions of one name are one landmark to a reader. */
-  label: I18nText;
-  dataTest: string;
-}>();
+// How long Copy reads "Copied" in place before it turns back.
+const COPIED_MS = 2_000;
+
+const props = withDefaults(
+  defineProps<{
+    text: string;
+    language: QueryRef["language"];
+    /** The scroll region's name; unique per block, as two regions of one name are one landmark to a reader. */
+    label: I18nText;
+    /** A head with the language and Copy, and a foot for the card's actions (K1 code block). */
+    chrome?: boolean;
+    /** What the head says after the language, such as the stream and window. */
+    meta?: I18nText;
+    dataTest: string;
+  }>(),
+  { chrome: false, meta: undefined },
+);
+
+defineSlots<{ foot?: () => unknown }>();
+
+const { t } = useI18nTyped();
 
 const lang = computed(() => (props.language === "regex" ? "plaintext" : props.language));
+
+const highlighted = computed(() => highlightCode(props.text, lang.value));
+
+const copied = ref(false);
+
+let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+async function copy(): Promise<void> {
+  const ok = await copyToClipboard(props.text, t, { silent: true });
+  if (!ok) {
+    toast({ variant: "error", message: t("assistant.client.copyManually") });
+    return;
+  }
+  copied.value = true;
+  clearTimeout(copiedTimer);
+  copiedTimer = setTimeout(() => (copied.value = false), COPIED_MS);
+}
+
+onBeforeUnmount(() => clearTimeout(copiedTimer));
 </script>

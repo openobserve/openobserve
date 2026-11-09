@@ -90,6 +90,7 @@ pub mod history_summary;
 pub mod incident_integrations;
 pub mod incidents;
 pub mod mute;
+pub mod rca_runs_org;
 #[cfg(feature = "cloud")]
 pub mod slack_oauth;
 pub mod templates;

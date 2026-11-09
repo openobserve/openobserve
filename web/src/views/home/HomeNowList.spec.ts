@@ -22,11 +22,18 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { raw } from "@/types/i18n";
 
+import { followedRcaRun, stopFollowingRca } from "@/components/ai-assistant/shell/rcaFollow";
+import type { OrgRcaRun } from "@/services/rca_runs_org";
+
 import HomeNowList from "./HomeNowList.vue";
 
 const mocks = vi.hoisted(() => ({
   open: vi.fn(),
-  store: { state: { userOrgKey: "k1", sessions: {} as Record<string, { turn: unknown }> } },
+  store: {
+    state: { userOrgKey: "k1", sessions: {} as Record<string, { turn: unknown }> },
+    open: vi.fn(),
+  },
+  triggerRca: vi.fn(),
   creditMode: { value: null as string | null },
   gate: { value: "available" },
   runs: { active: 0, cap: 3 },
@@ -47,6 +54,7 @@ vi.mock("@/composables/assistant", async () => {
     useAssistantStore: () => mocks.store,
   };
 });
+vi.mock("@/services/incidents", () => ({ default: { triggerRca: mocks.triggerRca } }));
 vi.mock("./HomeCreditsLine.vue", () => ({
   default: { name: "CreditsLine", template: '<div data-test="credits-line-stub" />' },
 }));
@@ -61,6 +69,18 @@ const incident: OverviewNowRow = {
   severity: "P1",
   status: "open",
   alertCount: 3,
+};
+
+const RUN: OrgRcaRun = {
+  run_id: "run-1",
+  incident_id: "inc-7",
+  incident_title: "Checkout errors",
+  severity: "P1",
+  state: "completed",
+  trigger: "auto",
+  started_at: 1_762_299_000_000_000,
+  ended_at: 1_762_299_400_000_000,
+  error_code: null,
 };
 
 const snapshot = (rows: OverviewNowRow[] = [incident]): OverviewNowSnapshot => ({
@@ -100,13 +120,16 @@ describe("HomeNowList", () => {
     mocks.creditMode.value = null;
     mocks.gate.value = "available";
     mocks.runs.active = 0;
+    mocks.store.open.mockReset();
+    mocks.triggerRca.mockReset();
+    stopFollowingRca();
     for (const sid of Object.keys(mocks.store.state.sessions))
       delete mocks.store.state.sessions[sid];
   });
 
-  it("titles Now with the services stamp and all regions combined", () => {
+  it("titles the list Needs you with the services stamp and all regions combined", () => {
     const wrapper = mountList();
-    expect(wrapper.get("h2").text()).toBe("Now");
+    expect(wrapper.get("h2").text()).toBe("Needs you");
     expect(wrapper.get('[data-test="home-now-services-until"]').text()).toBe(
       "Services data to 09:40",
     );
@@ -355,5 +378,62 @@ describe("HomeNowList", () => {
 
   it("shows skeleton rows on the first load", () => {
     expect(mountList({ pending: true }).find('[data-test="home-now-loading"]').exists()).toBe(true);
+  });
+
+  it("follows an incident's run in the side panel instead of starting another", async () => {
+    const wrapper = mountList({ incidentRuns: new Map([["inc-7", RUN]]) });
+    expect(wrapper.find('[data-test="home-now-row-investigate"]').exists()).toBe(false);
+    await wrapper.get('[data-test="home-now-row-follow"]').trigger("click");
+    expect(followedRcaRun().value).toEqual({ org: "acme", incidentId: "inc-7", runId: "run-1" });
+    expect(mocks.store.open).toHaveBeenCalledWith(
+      { kind: "sidebar" },
+      expect.objectContaining({ focus: "none" }),
+    );
+    expect(mocks.open).not.toHaveBeenCalled();
+    expect(mocks.triggerRca).not.toHaveBeenCalled();
+  });
+
+  it("starts an incident's run with the existing request when none exists, and follows it", async () => {
+    mocks.triggerRca.mockResolvedValue({ data: { message: "started", run_id: "run-9" } });
+    const wrapper = mountList({ incidentRuns: new Map() });
+    await wrapper.get('[data-test="home-now-row-investigate"]').trigger("click");
+    await flushPromises();
+    expect(mocks.triggerRca).toHaveBeenCalledWith("acme", "inc-7");
+    expect(followedRcaRun().value).toEqual({ org: "acme", incidentId: "inc-7", runId: "run-9" });
+    expect(mocks.open).not.toHaveBeenCalled();
+  });
+
+  it("asks in a chat when the run cannot start", async () => {
+    mocks.triggerRca.mockRejectedValue(Object.assign(new Error("403"), { status: 403 }));
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const wrapper = mountList({ incidentRuns: new Map() });
+    await wrapper.get('[data-test="home-now-row-investigate"]').trigger("click");
+    await flushPromises();
+    expect(mocks.open).toHaveBeenCalledTimes(1);
+    expect(followedRcaRun().value).toBeNull();
+    error.mockRestore();
+  });
+
+  it("lists a failed auto-run as its own row with Retry and Open incident", async () => {
+    mocks.triggerRca.mockResolvedValue({ data: { message: "started", run_id: "run-10" } });
+    const failed: OrgRcaRun = {
+      ...RUN,
+      run_id: "run-2",
+      incident_id: "inc-481",
+      incident_title: "Payments timeouts",
+      state: "failed",
+      error_code: "query_timeout",
+    };
+    const wrapper = mountList({ snapshot: snapshot([]), failedRuns: [failed] });
+    expect(wrapper.find('[data-test="home-now-clear"]').exists()).toBe(false);
+    const row = wrapper.get('[data-test="home-failed-run"]');
+    expect(row.text()).toContain("Payments timeouts");
+    expect(row.get('[data-test="home-failed-run-state"]').text()).toBe("Failed");
+    await row.get('[data-test="home-failed-run-open"]').trigger("click");
+    expect(wrapper.emitted("openIncident")).toEqual([["inc-481"]]);
+    await row.get('[data-test="home-failed-run-retry"]').trigger("click");
+    await flushPromises();
+    expect(mocks.triggerRca).toHaveBeenCalledWith("acme", "inc-481");
+    expect(followedRcaRun().value?.runId).toBe("run-10");
   });
 });

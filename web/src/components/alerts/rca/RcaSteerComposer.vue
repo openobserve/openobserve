@@ -18,115 +18,124 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <form
     ref="root"
     data-test="rca-steer-composer"
-    class="border-border-default bg-surface-base flex flex-none flex-col gap-2 border-t px-4 pt-3 pb-3.5"
+    class="flex flex-none flex-col px-3 pt-1.5 pb-2"
     @submit.prevent="submit"
   >
-    <div class="flex items-baseline gap-2">
-      <label :for="textareaId" class="text-text-heading text-compact font-bold">
-        {{
-          waitingInput
-            ? t("alerts.incidents.rcaSteer.composerTitlePaused")
-            : t("alerts.incidents.rcaSteer.composerTitleLive")
-        }}
-      </label>
-      <span class="text-text-secondary text-xs">
-        {{
-          waitingInput
-            ? t("alerts.incidents.rcaSteer.composerHintPaused")
-            : t("alerts.incidents.rcaSteer.composerHintLive")
-        }}
-      </span>
-    </div>
-
-    <template v-if="waitingInput">
-      <p
-        v-if="openQuestion"
-        data-test="rca-steer-question"
-        class="text-text-body text-compact m-0 break-words"
-      >
-        <span class="text-text-heading font-semibold">
-          {{ t("alerts.incidents.rcaSteer.agentAsks") }}:
-        </span>
-        {{ openQuestion.question }}
-      </p>
-      <p
-        data-test="rca-steer-answer-note"
-        class="text-status-warning-text m-0 flex items-start gap-1.5 text-xs"
-      >
-        <OIcon name="info" size="xs" class="mt-px shrink-0" />
-        {{ t("alerts.incidents.rcaSteer.answerNote") }}
-      </p>
-    </template>
-
-    <div
-      class="flex flex-wrap gap-1.5"
-      role="group"
-      :aria-label="t('alerts.incidents.rcaSteer.suggestions')"
-    >
-      <button
-        v-for="chip in chips"
-        :key="chip.id"
-        type="button"
-        :data-test="`rca-steer-chip-${chip.id}`"
-        class="border-border-control text-text-body hover:bg-surface-subtle-hover bg-surface-base inline-flex h-6.5 cursor-pointer items-center rounded-full border px-2.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
-        :disabled="sending"
-        @click="prefill(chip.label)"
-      >
-        {{ chip.label }}
-      </button>
-    </div>
-
-    <OTextarea
-      :id="textareaId"
+    <AssistantComposerFrame
       v-model="draft"
-      data-test="rca-steer-input"
-      :rows="3"
-      :maxlength="MAX_STEER_CHARS"
+      :state="waitingInput ? 'paused' : 'steer'"
       :placeholder="
         waitingInput
           ? t('alerts.incidents.rcaSteer.placeholderPaused')
-          : t('alerts.incidents.rcaSteer.placeholderLive')
+          : t('assistant.composer.steerPlaceholder')
       "
       :disabled="sending"
+      :input-attrs="{
+        'aria-label': waitingInput
+          ? t('alerts.incidents.rcaSteer.composerTitlePaused')
+          : t('alerts.incidents.rcaSteer.composerTitleLive'),
+        'aria-describedby': notice ? noticeId : undefined,
+        maxlength: MAX_STEER_CHARS,
+      }"
+      data-test="rca-steer-input"
       @keydown="onKeydown"
-    />
-
-    <p
-      v-if="error"
-      data-test="rca-steer-error"
-      role="alert"
-      class="text-status-error-text m-0 text-xs"
     >
-      {{ error }}
-    </p>
-
-    <div class="flex items-center gap-2">
-      <span data-test="rca-steer-sending-as" class="text-text-secondary min-w-0 flex-1 text-xs">
-        {{ t("alerts.incidents.rcaSteer.sendingAs", { email: authorEmail }) }}
-      </span>
-      <OButton
-        data-test="rca-steer-send-btn"
-        type="submit"
-        variant="primary"
-        size="sm"
-        icon-left="send"
-        :disabled="!canSend"
-        :loading="sending"
-      >
-        {{ t("alerts.incidents.rcaSteer.send") }}
-      </OButton>
-    </div>
+      <template #strip>
+        <AssistantComposerStrip :notice="notice" :sentence-id="noticeId">
+          <div
+            class="flex min-w-0 items-center gap-1"
+            role="group"
+            :aria-label="t('alerts.incidents.rcaSteer.suggestions')"
+          >
+            <OButton
+              v-for="chip in chips"
+              :key="chip.id"
+              variant="ghost-subtle"
+              size="chip"
+              class="bg-surface-subtle shrink-0"
+              :disabled="sending"
+              :data-test="`rca-steer-chip-${chip.id}`"
+              @click="prefill(chip.label)"
+            >
+              {{ chip.label }}
+            </OButton>
+          </div>
+          <template #sees>
+            <OPopover
+              side="top"
+              align="end"
+              privacy="mask"
+              :aria-label="t('assistant.context.title')"
+              content-class="w-max max-w-[min(26rem,calc(100vw-1.5rem))] p-3"
+            >
+              <template #trigger>
+                <AssistantIconButton
+                  :label="t('assistant.context.title')"
+                  :icon="assistantGlyph.info"
+                  data-test="rca-steer-sees"
+                />
+              </template>
+              <section class="flex flex-col gap-2" data-test="rca-steer-sees-popover">
+                <OText variant="card-title" as="h2">{{ t("assistant.context.title") }}</OText>
+                <OText variant="meta" as="p">
+                  {{
+                    waitingInput
+                      ? t("alerts.incidents.rcaSteer.composerHintPaused")
+                      : t("alerts.incidents.rcaSteer.composerHintLive")
+                  }}
+                </OText>
+                <OText variant="meta" as="p" data-test="rca-steer-sending-as">
+                  {{ t("alerts.incidents.rcaSteer.sendingAs", { email: authorEmail }) }}
+                </OText>
+                <OText v-if="waitingInput" variant="meta" as="p" data-test="rca-steer-answer-note">
+                  {{ t("alerts.incidents.rcaSteer.answerNote") }}
+                </OText>
+              </section>
+            </OPopover>
+          </template>
+        </AssistantComposerStrip>
+      </template>
+      <template #bar>
+        <AssistantComposerBottomRow>
+          <template #agent>
+            <AssistantAgentPill agent="sre" />
+          </template>
+          <AssistantIconButton
+            variant="primary"
+            size="md"
+            :label="t('alerts.incidents.rcaSteer.send')"
+            :icon="assistantGlyph.send"
+            :disabled="!canSend"
+            :loading="sending"
+            :class="ROUND_ACTION_CLASS"
+            data-test="rca-steer-send-btn"
+            @click="submit"
+          />
+        </AssistantComposerBottomRow>
+      </template>
+    </AssistantComposerFrame>
+    <span v-if="error" role="alert" class="sr-only" data-test="rca-steer-error">{{ error }}</span>
   </form>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from "vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
-import type { RcaOpenQuestion } from "@/services/incidents";
+
+import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import AssistantAgentPill from "@/components/ai-assistant/composer/AssistantAgentPill.vue";
+import AssistantComposerBottomRow, {
+  ROUND_ACTION_CLASS,
+} from "@/components/ai-assistant/composer/AssistantComposerBottomRow.vue";
+import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
+import AssistantComposerStrip from "@/components/ai-assistant/composer/AssistantComposerStrip.vue";
+import { pickNotice, sentenceNotice } from "@/components/ai-assistant/composer/composerNotice";
 import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import type { RcaOpenQuestion } from "@/services/incidents";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { isClosedRunRefusal } from "@/utils/incidents/rcaSteering";
 
 /** At most 2,000 characters. */
@@ -149,7 +158,7 @@ const props = withDefaults(
 );
 
 const { t } = useI18nTyped();
-const textareaId = useId();
+const noticeId = `rca-steer-notice-${useId()}`;
 const root = ref<HTMLFormElement | null>(null);
 
 const draft = ref("");
@@ -169,6 +178,18 @@ const chips = computed(() => [
   { id: "focus", label: t("alerts.incidents.rcaSteer.chipFocus") },
   { id: "changed", label: t("alerts.incidents.rcaSteer.chipChanged") },
 ]);
+
+// The strip says one thing: a refused send first, then the agent's open question; otherwise the suggestions show.
+const notice = computed(() =>
+  pickNotice([
+    error.value && sentenceNotice("blocked", error.value),
+    props.waitingInput &&
+      props.openQuestion && {
+        ...sentenceNotice("entry", raw(props.openQuestion.question), "info"),
+        title: t("alerts.incidents.rcaSteer.agentAsks"),
+      },
+  ]),
+);
 
 const canSend = computed(() => draft.value.trim().length > 0 && !props.sending);
 
@@ -197,12 +218,11 @@ const submit = async () => {
   error.value = result.message;
 };
 
-// Ctrl/Cmd+Enter sends.
+// Enter sends as in every composer; Shift+Enter is a new line.
 const onKeydown = (event: KeyboardEvent) => {
-  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-    event.preventDefault();
-    void submit();
-  }
+  if (event.isComposing || event.key !== "Enter" || event.shiftKey) return;
+  event.preventDefault();
+  void submit();
 };
 
 defineExpose({ focus });

@@ -99,21 +99,22 @@ afterEach(() => {
 });
 
 describe("AssistantAgentPicker", () => {
-  it("renders nothing without a choice to offer", () => {
-    expect(setup([]).wrapper.find('[data-test="assistant-agent-picker"]').exists()).toBe(false);
-    expect(setup([ROSTER[0]]).wrapper.find('[data-test="assistant-agent-picker"]').exists()).toBe(
-      false,
-    );
+  it("shows a plain pill with no menu without a choice to offer", () => {
+    for (const roster of [[], [ROSTER[0]]]) {
+      const { wrapper } = setup(roster);
+      expect(wrapper.find('[data-test="assistant-agent-picker"]').exists()).toBe(false);
+      expect(wrapper.get('[data-test="assistant-agent-pill"]').text()).toBe("O2 Assistant");
+    }
   });
 
-  it("names the chevron, lists one radio row per agent, and checks the current one", () => {
+  it("is a pill naming the agent, lists one radio row per agent by name only, and checks the current one", () => {
     const { wrapper } = setup();
-    expect(trigger(wrapper).attributes("aria-label")).toBe("Choose agent");
+    expect(trigger(wrapper).get('[data-test="assistant-agent-picker-name"]').text()).toBe(
+      "O2 Assistant",
+    );
+    expect(trigger(wrapper).classes()).toContain("rounded-full");
     expect(wrapper.text()).toContain("Agent");
-    expect(option(wrapper, "sre").text()).toContain("Finds causes · Read-only");
-    expect(
-      option(wrapper, "generate-query").get('[data-test="assistant-agent-option-clause"]').text(),
-    ).toBe("Writes queries");
+    expect(wrapper.find('[data-test="assistant-agent-option-clause"]').exists()).toBe(false);
     expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(3);
     expect(option(wrapper, "o2-ai").attributes("aria-checked")).toBe("true");
     expect(option(wrapper, "sre").attributes("aria-checked")).toBe("false");
@@ -125,17 +126,11 @@ describe("AssistantAgentPicker", () => {
     ).toBe(false);
   });
 
-  it("says a policy every agent shares once, and gives each row its purpose on a second line", () => {
+  it("says a policy every agent shares once in the header, and no row repeats it", () => {
     const shared = ROSTER.map((agent) => ({ ...agent, readOnly: true }));
     const { wrapper } = setup(shared);
     expect(wrapper.get('[data-test="assistant-agent-shared-policy"]').text()).toBe("Read-only");
     expect(option(wrapper, "generate-query").text()).not.toContain("Read-only");
-    expect(
-      option(wrapper, "generate-query").get('[data-test="assistant-agent-option-clause"]').text(),
-    ).toBe("Writes queries");
-    expect(
-      option(wrapper, "o2-ai").find('[data-test="assistant-agent-option-clause"]').exists(),
-    ).toBe(false);
     expect(setup().wrapper.find('[data-test="assistant-agent-shared-policy"]').exists()).toBe(
       false,
     );

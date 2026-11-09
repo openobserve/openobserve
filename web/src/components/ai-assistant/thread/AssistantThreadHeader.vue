@@ -177,11 +177,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownSub>
                 </template>
                 <slot v-if="foldedLayout && layoutDirect" name="menu-layout" />
-                <ODropdownSub v-else-if="foldedLayout" :text-value="t('assistant.shell.layout')">
-                  <template #icon-left><OIcon :name="assistantGlyph.layout" size="sm" /></template>
+                <ODropdownSub v-else-if="foldedLayout" :text-value="t('assistant.shell.openAs')">
+                  <template #icon-left
+                    ><OIcon :name="assistantGlyph.openFull" size="sm"
+                  /></template>
                   <template #trigger>
                     <span data-test="assistant-title-menu-layout">{{
-                      t("assistant.shell.layout")
+                      t("assistant.shell.openAs")
                     }}</span>
                   </template>
                   <slot name="menu-layout" />
@@ -251,7 +253,7 @@ export interface AssistantThreadHeaderProps {
   container: Container;
   /** The container already knows it is below 24 rem, as a window does from its geometry. */
   narrow?: boolean;
-  /** The folded layout slot holds one move, shown as a direct item instead of a Layout submenu. */
+  /** The folded Open as slot holds one move, shown as a direct item instead of a submenu. */
   layoutDirect?: boolean;
 }
 

@@ -139,19 +139,48 @@ describe("AssistantMessage", () => {
     expect(wrapper.find("strong").exists()).toBe(false);
   });
 
-  it("keeps the range on the last turn's question line only, under a right-aligned bubble", () => {
+  it("keeps the range on the last turn's question line only, under a right-aligned tinted bubble", () => {
     const last = mountMessage(user());
     expect(last.find('[data-test="assistant-message-range"]').exists()).toBe(false);
     expect(last.classes()).toContain("items-end");
     const bubble = last.get('[data-test="assistant-message-text"]');
     expect(bubble.classes()).toEqual(
-      expect.arrayContaining(["bg-assistant-user-bg", "rounded-default", "text-text-body"]),
+      expect.arrayContaining([
+        "bg-assistant-user-bg",
+        "rounded-surface",
+        "rounded-ee-default",
+        "max-w-[80%]",
+        "text-text-body",
+      ]),
     );
     const wrapper = mount(AssistantMessage, {
       props: { message: user(), turnId: "t1", rangeLabel: raw("Last 1 h") },
     });
     expect(wrapper.get('[data-test="assistant-message-range"]').text()).toContain("Last 1 h");
     expect(wrapper.get('[data-test="assistant-message-meta"]').classes()).toContain("text-end");
+  });
+
+  it("keeps a sent message's action row at a fixed height, its time shown on hover or focus", () => {
+    const wrapper = mount(AssistantMessage, {
+      props: { message: user(), turnId: "t1" },
+      slots: { actions: '<div data-test="prompt-actions" />' },
+    });
+    const line = wrapper.get('[data-test="assistant-message-user-line"]');
+    expect(line.classes()).toContain("min-h-6");
+    expect(line.find('[data-test="prompt-actions"]').exists()).toBe(true);
+    expect(line.get('[data-test="assistant-message-user-time"]').classes()).toEqual(
+      expect.arrayContaining(["opacity-0", "group-hover/message:opacity-100"]),
+    );
+  });
+
+  it("heads an answer with the mark and agent name only when it is the first of its run", () => {
+    const answer: ChatMessage = { role: "assistant", content: raw("Hi"), contentBlocks: [] };
+    const first = mount(AssistantMessage, { props: { message: answer, turnId: "a", head: true } });
+    expect(first.get('[data-test="assistant-agent-identity"]').attributes("data-agent")).toBe(
+      "o2-ai",
+    );
+    const next = mount(AssistantMessage, { props: { message: answer, turnId: "b" } });
+    expect(next.find('[data-test="assistant-message-head"]').exists()).toBe(false);
   });
 
   it("places the range line and then the sent-context line below the bubble", () => {
@@ -270,7 +299,7 @@ describe("AssistantMessage", () => {
     // A closed SQL fence is a runnable query block, never a code block with a Retry.
     const block = wrapper.get('[data-test="assistant-query-block"]');
     expect(block.attributes("role")).toBe("group");
-    expect(block.get('[data-test="assistant-query-language"]').text()).toBe("SQL");
+    expect(block.get('[data-test="assistant-query-text-lang"]').text()).toBe("SQL");
     expect(wrapper.find('[data-test="assistant-code-block"]').exists()).toBe(false);
   });
 

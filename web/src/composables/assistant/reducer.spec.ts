@@ -21,12 +21,15 @@ import {
   extractStreamText,
   interruptSteps,
   reduce,
+  skippedApprovalItem,
   type ReducerCtx,
   type StreamEffect,
   type StreamPhase,
   type StreamState,
 } from "./reducer";
-import { stepsOf } from "./evidence";
+import { boundedChartSeries, stepsOf } from "./evidence";
+import { parseFrame } from "./frames";
+import { branchedFromOf } from "./historyRecords";
 import { foldTurns } from "./record";
 import { approvalOutcomeOf } from "./useAssistantApprovals";
 import type { ChatMessage, NavigationAction } from "@/ts/interfaces/chat";
@@ -2010,5 +2013,168 @@ describe("reduce: approval cards", () => {
       errorType: "permission_denied_tool",
       details: { detail: "Writes are off.", policy: "admin" },
     });
+  });
+});
+
+// The frames below are o2-ai's own wire shapes for C3 and C4 (L6b contract), parsed as the stream parses them.
+describe("reduce: C3 changed-since and C4 chart series", () => {
+  const live = () => makeCtx({ phase: "live", isActive: false });
+  const blocks = (state: StreamState) => state.messages.at(-1)?.contentBlocks ?? [];
+  const wire = (json: string) => {
+    const frame = parseFrame(json);
+    expect(frame.type).not.toBe("unknown");
+    return frame;
+  };
+  const series =
+    '{"x_unit":"us","series":[{"name":"http_requests_total{code=\\"500\\", job=\\"api\\"}","points":[[1731110400000000,12.5],[1731110460000000,13]]}]}';
+
+  it("keeps a PromQL tool_result's series on its step and the complete frame's on the footer", () => {
+    const state = makeState({ messages: [assistant()] });
+    reduce(
+      state,
+      wire('{"type":"tool_call","tool":"PrometheusRangeQuery","call_id":"c1"}'),
+      live(),
+    );
+    reduce(
+      state,
+      wire(
+        `{"type":"tool_result","tool":"PrometheusRangeQuery","call_id":"c1","success":true,"chart_series":${series}}`,
+      ),
+      live(),
+    );
+    reduce(state, wire(`{"type":"complete","chart_series":${series}}`), live());
+    const step = blocks(state).find((block) => block.call_id === "c1");
+    expect(step?.chartSeries).toEqual({
+      xUnit: "us",
+      series: [
+        {
+          name: 'http_requests_total{code="500", job="api"}',
+          points: [
+            [1731110400000000, 12.5],
+            [1731110460000000, 13],
+          ],
+        },
+      ],
+    });
+    const footer = blocks(state).find((block) => block.type === "footer")?.footer;
+    expect(footer?.chartSeries?.series).toHaveLength(1);
+  });
+
+  it("keeps no chart for a null, malformed or oversized chart_series, and never drops the frame", () => {
+    const state = makeState({ messages: [assistant()] });
+    reduce(state, wire('{"type":"complete","chart_series":null}'), live());
+    expect(blocks(state).find((b) => b.type === "footer")?.footer?.chartSeries).toBeUndefined();
+    expect(boundedChartSeries({ x_unit: "ms", series: [] })).toBeNull();
+    const eleven = Array.from({ length: 11 }, (_, i) => ({
+      name: `s${i}`,
+      points: [
+        [1, 1],
+        [2, 2],
+      ],
+    }));
+    expect(boundedChartSeries({ x_unit: "us", series: eleven })).toBeNull();
+    expect(
+      boundedChartSeries({ x_unit: "us", series: [{ name: "one", points: [[1, 1]] }] }),
+    ).toBeNull();
+    const bad = boundedChartSeries({
+      x_unit: "us",
+      series: [{ name: "a", points: [[1, 1], [2, "x"], [3, 3], null] }],
+    });
+    expect(bad?.series[0].points).toEqual([
+      [1, 1],
+      [3, 3],
+    ]);
+  });
+
+  it("keeps a card's before and its digest for the diff (C3 ask time)", () => {
+    const state = makeState({ messages: [assistant()] });
+    const digest = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+    reduce(
+      state,
+      wire(
+        JSON.stringify({
+          type: "confirmation_required",
+          id: "apr_0123456789abcdef0123",
+          tool: "UpdateAlert",
+          kind: "update",
+          operation: "UpdateAlert",
+          targets: [{ type: "alert", id: "2abc", name: "High error rate" }],
+          after: { threshold: 3 },
+          before: { threshold: 2 },
+          before_digest: digest,
+        }),
+      ),
+      live(),
+    );
+    const card = blocks(state).find((block) => block.type === "approval")?.approval;
+    expect(card).toMatchObject({ before: { threshold: 2 }, beforeDigest: digest });
+    expect(approvalOf({ tool: "UpdateAlert", before_digest: "not-hex" }).beforeDigest).toBe(
+      undefined,
+    );
+  });
+
+  it("maps a skipped resolution with its changed_since or recheck_failed code", () => {
+    const state = makeState({ messages: [assistant()] });
+    for (const code of ["changed_since", "recheck_failed", "exploded"])
+      reduce(
+        state,
+        wire(
+          JSON.stringify({
+            type: "confirmation_resolved",
+            id: `apr_${code}`,
+            approved: true,
+            by: "ada",
+            at: 1,
+            tool: "UpdateAlert",
+            operation: "update",
+            outcome: "skipped",
+            code,
+            detail: "The alert changed after you were asked. Nothing was changed.",
+          }),
+        ),
+        live(),
+      );
+    const resolved = blocks(state)
+      .filter((block) => block.type === "approval_result")
+      .map((block) => block.resolved);
+    expect(resolved.map((r) => [r?.outcome, r?.code])).toEqual([
+      ["skipped", "changed_since"],
+      ["skipped", "recheck_failed"],
+      ["skipped", undefined],
+    ]);
+  });
+
+  it("reads a /confirm item o2-ai skipped, with the fresh before only on changed_since", () => {
+    const changed = {
+      id: "2abc",
+      type: "alert",
+      name: "High error rate",
+      status: "skipped",
+      code: "changed_since",
+      message: "The alert changed after you were asked.",
+      before: { threshold: 4 },
+    };
+    expect(skippedApprovalItem(changed)).toEqual({
+      status: "skipped",
+      code: "changed_since",
+      message: changed.message,
+      before: { threshold: 4 },
+    });
+    expect(
+      skippedApprovalItem({ ...changed, code: "recheck_failed", before: { threshold: 4 } }),
+    ).toEqual({ status: "skipped", code: "recheck_failed", message: changed.message });
+    expect(skippedApprovalItem({ ...changed, status: "done" })).toBeNull();
+    expect(skippedApprovalItem({ ...changed, code: "other" })).toBeNull();
+  });
+});
+
+describe("branchedFromOf (C1 branched_from on a stored chat)", () => {
+  it("reads the source chat, its turn and title, and nothing from a plain chat", () => {
+    expect(branchedFromOf({ session_id: "s1", turn_id: "t2", title: "Checkout failures" })).toEqual(
+      { sessionId: "s1", turnId: "t2", title: "Checkout failures" },
+    );
+    expect(branchedFromOf(null)).toBeNull();
+    expect(branchedFromOf({ session_id: "", turn_id: "t" })).toBeNull();
+    expect(branchedFromOf({ session_id: "s1", turn_id: "t", title: 3 })?.title).toBe("");
   });
 });

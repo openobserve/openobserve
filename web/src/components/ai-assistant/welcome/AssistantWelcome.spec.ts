@@ -60,19 +60,39 @@ beforeEach(() => resetWelcomeTelemetryForTests());
 afterEach(() => track.mockClear());
 
 describe("AssistantWelcome", () => {
-  it("is a section of plain suggestion rows under one meta heading, nothing else (§8)", () => {
+  it("greets with the mark and a heading, then three icon starter cards, nothing else (§8)", () => {
     const wrapper = mountWelcome();
     const section = wrapper.get('[data-test="assistant-welcome"]');
     expect(section.element.tagName).toBe("SECTION");
     const heading = wrapper.get('[data-test="assistant-welcome-heading"]');
-    expect(heading.text()).toBe("Suggestions");
+    expect(heading.text()).toMatch(/^(Good|Working)/);
     expect(section.attributes("aria-labelledby")).toBe(heading.attributes("id"));
+    expect(
+      wrapper
+        .find('[data-test="assistant-welcome-greeting"] [data-test="assistant-mark"]')
+        .exists(),
+    ).toBe(true);
     expect(wrapper.findAll("li")).toHaveLength(3);
     expect(wrapper.findAll("h2")).toHaveLength(1);
     expect(wrapper.find('[data-test="assistant-welcome-scope"]').exists()).toBe(false);
-    expect(wrapper.get('[data-test="assistant-starter-0"]').classes()).toContain(
-      "whitespace-normal!",
+    for (const card of wrapper.findAll("ul > li button")) {
+      expect(card.find("svg").exists()).toBe(true);
+    }
+  });
+
+  it("plays the opening only when asked: sparkle on the mark, greeting and cards rising in turn", () => {
+    const still = mountWelcome();
+    expect(still.find(".assistant-mark-sparkle").exists()).toBe(false);
+    expect(still.find(".assistant-fade-up").exists()).toBe(false);
+    const opening = mountWelcome({ opening: true });
+    expect(opening.attributes("data-opening")).toBe("");
+    expect(opening.find(".assistant-mark-sparkle").exists()).toBe(true);
+    expect(opening.get('[data-test="assistant-welcome-greeting"]').classes()).toEqual(
+      expect.arrayContaining(["assistant-fade-up", "assistant-fade-up-0"]),
     );
+    expect(
+      opening.findAll("li").map((li) => li.classes().find((c) => /fade-up-\d/.test(c))),
+    ).toEqual(["assistant-fade-up-1", "assistant-fade-up-2", "assistant-fade-up-3"]);
   });
 
   it("never offers more than three, and marks a fresh org", () => {
@@ -92,9 +112,9 @@ describe("AssistantWelcome", () => {
     expect(wrapper.text()).not.toContain("`");
   });
 
-  it("grows every starter to a 2.75 rem target on coarse pointers at any width", () => {
+  it("keeps every starter card at least a 2.75 rem target at any width", () => {
     for (const button of mountWelcome().findAll("ul > li button")) {
-      expect(button.classes()).toContain("pointer-coarse:min-h-11");
+      expect(button.classes()).toContain("min-h-16");
     }
   });
 

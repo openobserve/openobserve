@@ -15,6 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  RCA_HYPOTHESIS_TONE,
+  RCA_PILL_TONE_CLASS,
   filterRcaEvidence,
   groupRcaHypotheses,
   rcaBandLabel,
@@ -244,14 +246,11 @@ describe("rcaVerdictDetails (stored verdict on the card)", () => {
   });
 });
 
-describe("rcaPageRecommendation (the agent's paging advice)", () => {
-  it("reads the agent's paging advice from a stored result", () => {
-    expect(
-      rcaPageRecommendation({
-        verdict: { page_recommendation: { action: "downgrade", reason: "Baseline volume." } },
-      }),
-    ).toEqual({ action: "downgrade", reason: "Baseline volume." });
-    expect(rcaPageRecommendation({ verdict: {} })).toBeNull();
-    expect(rcaPageRecommendation(null)).toBeNull();
+describe("RCA_HYPOTHESIS_TONE", () => {
+  it("draws a confirmed root cause as a green tag", () => {
+    expect(RCA_HYPOTHESIS_TONE.root_cause).toBe("ok");
+    expect(RCA_PILL_TONE_CLASS[RCA_HYPOTHESIS_TONE.root_cause]).toContain(
+      "text-status-success-text",
+    );
   });
 });

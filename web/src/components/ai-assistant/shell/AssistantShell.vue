@@ -47,19 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :layout-direct="onlyFullPage"
       >
         <template #container-actions="{ narrow }">
-          <AssistantDensitySwitch
-            v-if="!narrow && densitySwitch"
-            :placement="densitySwitch"
-            :sid="activeSid"
-            :dock-host="host?.id"
-            :compact="densitySwitch === 'sidebar'"
-          />
-          <AssistantLayoutMenu
-            v-else-if="!narrow"
+          <AssistantHeaderSees v-if="headerSees" :sid="activeSid" />
+          <AssistantOpenAsMenu
+            v-if="!narrow"
             :placement="placement"
             :sheet="sheet"
             :sid="activeSid"
             :dock-host="host?.id"
+            :labelled="placement === 'full'"
           />
           <slot name="container-actions" />
           <AssistantIconButton
@@ -77,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="assistant-shell-place-full"
             @select="sheetToFull"
           >
-            {{ t("assistant.shell.placeFull") }}
+            {{ t("assistant.shell.fullPage") }}
           </ODropdownItem>
-          <AssistantLayoutMenu
+          <AssistantOpenAsMenu
             v-else
             bare
             :placement="placement"
@@ -113,21 +108,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown v-if="state === 'gate' && placement === 'sidebar'" align="end">
             <template #trigger>
               <AssistantIconButton
-                :label="t('assistant.shell.layout')"
-                :icon="assistantGlyph.layout"
-                data-test="assistant-layout-button"
+                :label="t('assistant.shell.openAs')"
+                :icon="assistantGlyph.openFull"
+                data-test="assistant-open-as-button"
               />
             </template>
             <ODropdownItem data-test="assistant-shell-open-in-full-view" @select="openInFullView">
-              {{ t("assistant.shell.placeFull") }}
+              {{ t("assistant.shell.fullPage") }}
             </ODropdownItem>
           </ODropdown>
-          <AssistantLayoutMenu
+          <AssistantOpenAsMenu
             v-else-if="state !== 'gate'"
             :placement="placement"
             :sheet="sheet"
             :sid="activeSid"
             :dock-host="host?.id"
+            :labelled="placement === 'full'"
           />
           <slot name="container-actions" />
           <AssistantIconButton
@@ -142,8 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="notice || creditThreshold || historyUnavailable || sheetRequest || $slots.notice"
-      ref="noticeRow"
+      v-if="notice || historyUnavailable || sheetRequest || $slots.notice"
       class="shrink-0 px-3 pt-2"
       data-test="assistant-shell-notice-row"
     >
@@ -238,16 +233,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="assistant-shell-history-unavailable"
         @retry="retryHistory"
       />
-      <AssistantCreditNotice
-        v-else-if="creditThreshold"
-        :threshold="creditThreshold"
-        :can-manage="credits.canManage.value"
-        :resets-at="credits.usage.value?.resetsAt"
-        :org="org"
-        @dismiss="dismissCreditNotice"
-        @manage="creditNotice.noteAction('manage')"
-        @ask-admin="creditNotice.noteAction('ask_admin')"
-      />
       <slot v-else name="notice" />
     </div>
 
@@ -267,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @shared-links="shareManagerOpen = true"
     >
       <template #menu-layout>
-        <AssistantLayoutMenu
+        <AssistantOpenAsMenu
           bare
           :placement="placement"
           :sheet="sheet"
@@ -357,6 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="welcome.loading.value"
         :container="container"
         :sid="activeSid"
+        :opening="opening"
         @select-starter="onStarter"
         @open-chat="onOpenChat"
       />
@@ -365,8 +351,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="transcript"
           :sid="activeSid ?? undefined"
           :density="density"
-          @status-visible="(shown) => (statusRowVisible = shown)"
-          @answer-visible="(shown) => (latestAnswerVisible = shown)"
           @outcome-shown="onOutcomeShown"
         >
           <template #cards>
@@ -474,58 +458,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("assistant.shell.approvalNotAnswerableHere") }}
         </OText>
       </div>
-      <slot name="status-strip">
-        <div
-          v-if="strip || metered"
-          class="border-border-default @container flex min-w-0 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-t px-3 py-1"
-          data-test="assistant-status-strip"
-        >
-          <AssistantTurnStatus
-            v-if="strip?.status && session"
-            variant="block"
-            :turn="session.turn"
-            :meta="session.turnMeta"
-            :owned-by-this-tab="session.turnMeta.ownedByThisTab"
-            :answer="session.messages.at(-1)?.role === 'assistant' ? session.messages.at(-1) : null"
-            class="min-w-0 flex-1"
-            data-test="assistant-sticky-status"
-          />
-          <span v-else class="flex-1" />
-          <OButton
-            v-if="strip?.jump"
-            variant="ghost"
-            size="sm"
-            :icon-left="assistantGlyph.jumpToLatest"
-            :aria-label="jumpName"
-            class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
-            data-test="assistant-scroll-latest"
-            @click="jumpToLatest"
-          >
-            {{ jumpLabel }}
-          </OButton>
-          <OButton
-            v-if="strip?.goToAnswer"
-            variant="ghost"
-            size="sm"
-            class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
-            data-test="assistant-strip-go-to-answer"
-            @click="goToAnswer"
-          >
-            {{ t("assistant.strip.goToAnswer") }}
-          </OButton>
-          <AssistantCreditMeter
-            v-if="metered"
-            size="compact"
-            :usage="credits.usage.value"
-            :overage="credits.overage.value"
-            :status="credits.status.value"
-            :can-manage="credits.canManage.value"
-            :org="org"
-            :org-name="orgNameOf(org)"
-            @retry="credits.retry()"
-          />
-        </div>
-      </slot>
       <!-- A refusal stored nothing, so it sits above the composer that holds the restored prompt (`30` §4.2) -->
       <div v-if="refusalRow" class="shrink-0 px-3 pt-1.5">
         <AssistantTurnOutcome
@@ -565,8 +497,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AssistantComposer
           ref="composer"
           :sid="activeSid"
-          :density="density"
           :host="host"
+          :opening="opening"
           :visible="visible"
           :access-lost="accessLost"
           :cooldown-reason="
@@ -578,6 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('assistant.composer.rateLimited')
                   : undefined
           "
+          @show-running="threadHeader?.openChats()"
         >
           <template #chips>
             <slot name="tray">
@@ -696,8 +629,6 @@ import {
   type AssistantApprovalsHost,
 } from "@/components/ai-assistant/approvals/approvals.types";
 import AssistantConsentCard from "@/components/ai-assistant/credits/AssistantConsentCard.vue";
-import AssistantCreditMeter from "@/components/ai-assistant/credits/AssistantCreditMeter.vue";
-import AssistantCreditNotice from "@/components/ai-assistant/credits/AssistantCreditNotice.vue";
 import AssistantErrorRow from "@/components/ai-assistant/common/AssistantErrorRow.vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
@@ -727,7 +658,6 @@ import AssistantTurnOutcome, {
   outcomeActionOf,
   type OutcomeAction,
 } from "@/components/ai-assistant/turn/AssistantTurnOutcome.vue";
-import AssistantTurnStatus from "@/components/ai-assistant/turn/AssistantTurnStatus.vue";
 import AssistantWelcome from "@/components/ai-assistant/welcome/AssistantWelcome.vue";
 import {
   approvalOutcomeOf,
@@ -748,7 +678,6 @@ import {
   useAssistantRuns,
   useAssistantStarters,
   useAssistantStore,
-  useCreditNotice,
   useOtherAccountSignedIn,
   useSignedOutElsewhere,
   stopElsewhere as stopHeldTurn,
@@ -785,10 +714,11 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatCount, formatOrgIsoDay, formatOrgTime } from "@/utils/formatters";
 
-import AssistantDensitySwitch from "./AssistantDensitySwitch.vue";
-import AssistantLayoutMenu from "./AssistantLayoutMenu.vue";
+import AssistantHeaderSees from "./AssistantHeaderSees.vue";
+import AssistantOpenAsMenu from "./AssistantOpenAsMenu.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
+import { useOpeningMotion } from "./useOpeningMotion";
 
 // Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
 provideAssistantSurface();
@@ -808,7 +738,6 @@ defineSlots<{
   notice?: () => unknown;
   transcript?: () => unknown;
   cards?: () => unknown;
-  "status-strip"?: () => unknown;
   tray?: () => unknown;
   composer?: () => unknown;
 }>();
@@ -827,13 +756,10 @@ const vuex = useStore();
 const { lgUp } = useBreakpoint();
 const root = ref<HTMLElement | null>(null);
 const lower = ref<HTMLElement | null>(null);
-const noticeRow = ref<HTMLElement | null>(null);
 const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
 const threadHeader = ref<InstanceType<typeof AssistantThreadHeader> | null>(null);
 const composer = ref<InstanceType<typeof AssistantComposer> | null>(null);
 const transcript = ref<InstanceType<typeof AssistantTranscript> | null>(null);
-const statusRowVisible = ref(true);
-const latestAnswerVisible = ref(true);
 const online = ref(typeof navigator === "undefined" || navigator.onLine !== false);
 const signedIn = ref(false);
 const popupBlocked = ref(false);
@@ -902,12 +828,6 @@ const container = computed<Container>(() => {
 
 // A window closes from its own title bar, and the full page is left by navigating.
 const closable = computed(() => props.placement !== "window" && props.placement !== "full");
-// Full and Panel switch density in their header; a window's bar and the editor dock keep the Layout menu.
-const densitySwitch = computed(() =>
-  !props.sheet && lgUp.value && (props.placement === "full" || props.placement === "sidebar")
-    ? props.placement
-    : null,
-);
 
 const chromeClasses = computed(() => {
   const base = "border-border-default flex shrink-0 items-center gap-1 border-b ps-1 pe-2";
@@ -1040,6 +960,14 @@ const visible = computed(() => {
   return kind === props.placement;
 });
 
+// Only a container whose composer shows can owe the header an ⓘ.
+const headerSees = computed(
+  () => (state.value === "empty" || state.value === "conversation") && !composerLocked.value,
+);
+
+// The opening plays only on the open that showed this container, never on a remount or a new chat.
+const { opening } = useOpeningMotion(() => visible.value);
+
 const landmark = computed(() => {
   const name = t("assistant.name");
   if (props.sheet) return { tag: "div", attrs: {} };
@@ -1057,13 +985,6 @@ const credits = useAssistantCredits(
   () => metered.value,
   () => capability.value.isAdmin,
 );
-// The row shows one banner; a credit notice behind another one has not been seen.
-const creditNotice = useCreditNotice(
-  () => store.state.userOrgKey,
-  () => credits.usage.value,
-  () => metered.value && visible.value && !notice.value && !historyUnavailable.value,
-);
-const creditThreshold = computed(() => creditNotice.threshold.value);
 
 // The welcome's data is built only once the welcome shows, so a gated container never reads it (IW-05 AC 10).
 const welcomeScope = effectScope();
@@ -1160,37 +1081,6 @@ const cooldownUntil = computed(() => {
 });
 // Send waits out the same `retry_after` as the refusal's Retry, so the two paths agree (`80` §2.4).
 const coolingDown = computed(() => cooldownUntil.value > clock.value);
-
-// The strip speaks the status row's text while the row is out of view, and holds the one keyboard bridge (`30` §1.6, §3.2).
-const strip = computed(() => {
-  const current = session.value;
-  if (!current || state.value !== "conversation") return null;
-  // A followed turn speaks through the elsewhere row alone, and a waiting card is its own status (C1).
-  const status =
-    isRunning(current.turn) &&
-    current.turnMeta.ownedByThisTab &&
-    !current.pendingApproval &&
-    !statusRowVisible.value;
-  const jump = !current.ui.follow;
-  // With no answer text there is nothing to go to; the outcome block is the latest content.
-  const goToAnswer =
-    !latestAnswerVisible.value &&
-    ["done", "stopped", "failed"].includes(current.turn.state) &&
-    hasAnswerText(current.messages);
-  return status || jump || goToAnswer ? { status, jump, goToAnswer } : null;
-});
-
-const unseen = computed(() => session.value?.ui.unseen ?? 0);
-const jumpLabel = computed(() =>
-  unseen.value > 0
-    ? t("assistant.scroll.jumpToLatestCount", { count: unseen.value })
-    : t("assistant.scroll.jumpToLatest"),
-);
-const jumpName = computed(() =>
-  unseen.value > 0
-    ? t("assistant.scroll.jumpToLatestName", { count: unseen.value })
-    : t("assistant.scroll.jumpToLatest"),
-);
 
 // The cards render in the visible container only; a hidden one shows the header light and its toast.
 const decisions = computed(() => {
@@ -1346,11 +1236,6 @@ function reviewSheetRequest(): void {
   if (sheetRequest.value) void runs.open(sheetRequest.value, { focus: "card" });
 }
 
-function jumpToLatest(): void {
-  trackAssistant("ai_scroll_jump", { unseen: unseen.value });
-  transcript.value?.jumpToLatest();
-}
-
 function goToAnswer(): boolean {
   return !!transcript.value?.focusLatestAnswer();
 }
@@ -1460,13 +1345,6 @@ function copyCreditRequest(): void {
   void copyToClipboard(text, t, { successMessage: t("common.copied") });
 }
 
-// The notice unmounts with focus inside it; the composer takes focus back instead of the page body.
-function dismissCreditNotice(): void {
-  const hadFocus = !!noticeRow.value?.contains(document.activeElement);
-  creditNotice.dismiss();
-  if (hadFocus) void nextTick(focusEntry);
-}
-
 // An expired card asks for itself again in one short turn, never a resend of the original prompt.
 function askAgainCard(sid: string): boolean {
   const id = [...(store.state.sessions[sid]?.messages ?? [])]
@@ -1477,14 +1355,6 @@ function askAgainCard(sid: string): boolean {
   if (!id || !approvals) return false;
   void approvals.askAgain(sid, id);
   return true;
-}
-
-function hasAnswerText(messages: ChatMessage[]): boolean {
-  const last = messages.at(-1);
-  return (
-    last?.role === "assistant" &&
-    !!last.contentBlocks?.some((block) => block.type === "text" && !!block.text?.trim())
-  );
 }
 
 // A half sheet grows so the new outcome's title and action fit; no "Expanded.", the outcome's own line is speaking (`30` §4.3).

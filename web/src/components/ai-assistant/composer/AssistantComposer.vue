@@ -19,119 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="root"
     data-test="assistant-composer-root"
     data-dd-privacy="mask"
-    class="flex shrink-0 flex-col gap-1.5 px-3 pt-1.5 pb-2"
+    class="flex shrink-0 flex-col px-3 pt-1.5 pb-2"
   >
-    <OBanner
-      v-if="prefillPending"
-      variant="info"
-      dense
-      inline-actions
-      :content="t('assistant.welcome.prefill.question')"
-      data-test="assistant-prefill-choice"
-    >
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          data-test="assistant-prefill-choice-replace"
-          @click="resolvePrefill('replace')"
-        >
-          {{ t("assistant.welcome.prefill.replace") }}
-        </OButton>
-        <OButton
-          variant="outline"
-          size="sm"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          data-test="assistant-prefill-choice-append"
-          @click="resolvePrefill('append')"
-        >
-          {{ t("assistant.welcome.prefill.append") }}
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="sm"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          data-test="assistant-prefill-choice-cancel"
-          @click="resolvePrefill(null)"
-        >
-          {{ t("assistant.welcome.prefill.cancel") }}
-        </OButton>
-      </template>
-    </OBanner>
-
-    <!-- Keyed by notice: OBanner reads its actions slot once, so a notice that gains an action needs a fresh banner -->
-    <OBanner
-      v-if="clearedText"
-      :key="cleared?.at"
-      variant="default"
-      dense
-      inline-actions
-      :content="clearedText"
-      data-test="assistant-composer-cleared"
-    >
-      <template v-if="cleared?.token || cleared?.from" #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          data-test="assistant-composer-undo"
-          @click="undoClear"
-        >
-          {{ cleared?.from ? t("assistant.composer.bringDraft") : t("assistant.composer.undo") }}
-        </OButton>
-      </template>
-    </OBanner>
-
-    <AssistantErrorRow
-      v-if="errorRow"
-      :message="errorRow"
-      :tone="busyLeft > 0 ? 'refused' : 'failed'"
-      data-test="assistant-composer-error-row"
-    />
-    <OBanner
-      v-if="attachNotice"
-      variant="default"
-      bar
-      dense
-      icon="info-outline"
-      :content="t('assistant.attach.saved')"
-      class="rounded-default min-h-9"
-      data-test="assistant-composer-attach-notice"
-    >
-      <template #actions>
-        <OButton
-          variant="ghost"
-          size="xs"
-          :class="TOUCH_TARGET_CLASS"
-          data-test="assistant-composer-attach-ok"
-          @click="dismissAttachNotice"
-        >
-          {{ t("assistant.attach.ok") }}
-        </OButton>
-      </template>
-    </OBanner>
-
-    <div
-      v-if="replying"
-      class="flex min-w-0 items-center gap-2"
-      data-test="assistant-composer-reply"
-    >
-      <OText variant="meta" as="p" class="min-w-0 flex-1">
-        {{ asking ? t("assistant.question.answerHint") : t("assistant.composer.replyHelper") }}
-      </OText>
-      <OButton
-        variant="ghost"
-        size="chip"
-        :class="TOUCH_TARGET_CLASS"
-        data-test="assistant-composer-reply-cancel"
-        @click="leaveReply"
-      >
-        {{ t("assistant.composer.replyCancel") }}
-      </OButton>
-    </div>
-
-    <div class="relative flex flex-col gap-1.5">
+    <div class="relative">
       <AssistantMentionMenu
         ref="mention"
         :open="mentionAt !== null"
@@ -142,19 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select="pickMention"
         @close="closeMention"
       />
-      <OTextarea
+      <AssistantComposerFrame
         ref="textbox"
         :model-value="shownText"
-        :rows="1"
-        autogrow
-        :max-rows="8"
-        :size="density === 'roomy' ? 'md' : 'sm'"
-        width="full"
+        :state="state"
+        :inert="inertKind !== null"
+        :trailing="voice.mine.value"
+        :opening="opening"
         :readonly="inertKind !== null"
         :placeholder="placeholder"
         :input-attrs="textboxAttrs"
         :tabindex="inertKind ? -1 : undefined"
-        :class="frameClass"
         placeholder-tone="strong"
         data-test="assistant-composer"
         :data-state="state"
@@ -164,59 +52,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus="refreshPageContext"
         @blur="onBlur"
       >
-        <template v-if="inertKind" #header>
-          <span class="pointer-events-none absolute start-3 top-3.75 flex">
-            <AssistantStatusDot state="attention" />
-          </span>
-        </template>
-        <template v-if="inertKind" #footer>
-          <div
-            v-if="cardAway"
-            class="flex min-w-0 justify-end px-1 pb-1"
-            data-test="assistant-composer-inert-row"
-          >
-            <OButton
-              variant="ghost-primary"
-              size="chip"
-              :class="TOUCH_TARGET_CLASS"
-              data-test="assistant-composer-go-to-request"
-              @click="goToRequest"
-            >
-              {{ t("assistant.composer.goToRequest") }}
-            </OButton>
-          </div>
-        </template>
-        <template v-else #footer>
-          <div
-            class="mt-1 flex min-w-0 flex-wrap items-center gap-0.5 px-1 pb-1"
-            data-test="assistant-composer-controls"
-          >
+        <template #strip>
+          <AssistantComposerStrip :notice="notice" :sentence-id="noticeId" @action="onNoticeAction">
             <slot v-if="!replying" name="chips" />
-            <AssistantDictationMeter
-              v-if="voice.listening.value"
-              :label="voice.rowLabel.value"
-              :level="voice.level.value"
-              :elapsed-ms="voice.elapsedMs.value"
-              :narrow="width.narrow.value"
-              :tight="width.tight.value && pickerRoom"
-            />
-            <span
-              v-else-if="voice.waiting.value"
-              class="text-text-secondary inline-flex min-w-0 items-center gap-1.5 text-xs"
-              data-test="assistant-dictate-waiting"
-            >
-              <OSpinner size="xs" class="motion-reduce:hidden" />
-              <span class="truncate">{{
-                width.narrow.value
-                  ? t("assistant.voice.waitingShort")
-                  : t("assistant.voice.waitingPermission")
-              }}</span>
-            </span>
-            <span class="flex-1" />
+            <template #link-askAdmin>
+              <AssistantAskAdminPopover kind="access" :org="org">
+                <template #trigger>
+                  <OButton
+                    variant="ghost-primary"
+                    size="chip"
+                    class="h-auto! min-h-0! px-0! font-medium"
+                    data-test="assistant-composer-ask-admin"
+                  >
+                    {{ t("assistant.gate.noPermission.askAdmin") }}
+                  </OButton>
+                </template>
+              </AssistantAskAdminPopover>
+            </template>
+            <template v-if="seesShown" #sees>
+              <AssistantContextSeesPopover :sid="liveSid" placement="top">
+                <template v-if="storageBlocked" #detail>
+                  <OText variant="meta" as="p" data-test="assistant-composer-storage-blocked">
+                    {{ t("assistant.client.storageBlocked") }}
+                  </OText>
+                </template>
+              </AssistantContextSeesPopover>
+            </template>
+          </AssistantComposerStrip>
+        </template>
+        <template #trailing>
+          <AssistantDictationWave :elapsed-ms="voice.elapsedMs.value" />
+        </template>
+        <template #bar>
+          <AssistantComposerBottomRow>
+            <template #agent>
+              <AssistantAgentPicker :sid="sid" :disabled="inertKind !== null || accessLost" />
+            </template>
             <AssistantIconButton
               v-if="!replying"
               :label="t('assistant.composer.attachImage')"
               :icon="assistantGlyph.chipImage"
+              :disabled="inertKind !== null"
               data-test="assistant-attach-image"
               @click="openPicker"
             />
@@ -224,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="coarse && recallEntries.length > 0"
               :label="t('assistant.composer.recentPrompts')"
               :icon="assistantGlyph.history"
+              :disabled="inertKind !== null"
               aria-haspopup="dialog"
               :aria-expanded="recallOpen"
               data-test="assistant-recall-open"
@@ -231,77 +108,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <AssistantDictateButton
               v-if="voice.mic.value !== 'none'"
-              :mic="accessLost ? 'crossed' : voice.mic.value"
+              :mic="accessLost || inertKind ? 'crossed' : voice.mic.value"
               :pressed="voice.mine.value"
-              :primer-open="voice.primerOpen.value"
-              :sentence="voice.sentence.value"
               :disabled-reason="voice.helperLine.value ?? micOffReason"
               @press="onMicPress"
-              @accept="voice.acceptPrimer"
-              @decline="voice.declinePrimer"
-              @turn-on="voice.turnOn"
             />
-            <span class="grid">
-              <AssistantIconButton
-                v-if="showStop"
-                :variant="stalled ? 'secondary' : 'outline'"
-                size="md"
-                :label="t('assistant.turn.stopLabel')"
-                :icon="assistantGlyph.stop"
-                :loading="state === 'stopping'"
-                data-test="assistant-stop"
-                @click="stop"
-              />
-              <OButtonGroup v-else class="[&>[data-test=assistant-agent-picker]]:h-8">
-                <OButton
-                  v-if="sendNamed"
-                  variant="primary"
-                  size="xs"
-                  :icon-left="assistantGlyph.send"
-                  :disabled="!canSend"
-                  :focusable-unavailable="!canSend && !!sendBlockedReason"
-                  :aria-label="sendLabel"
-                  :class="[
-                    'h-8 max-md:min-h-11 pointer-coarse:min-h-11',
-                    !canSend &&
-                      !replying &&
-                      'bg-button-primary! text-button-primary-foreground/50!',
-                  ]"
-                  data-test="assistant-send"
-                  @click="trySend"
-                >
-                  <span data-test="assistant-send-label">{{ sendLabel }}</span>
-                  <template v-if="!canSend && sendBlockedReason" #unavailable-reason>{{
-                    sendBlockedReason
-                  }}</template>
-                  <OTooltip v-if="!canSend && sendBlockedReason" :content="sendBlockedReason" />
-                </OButton>
-                <AssistantIconButton
-                  v-else
-                  variant="primary"
-                  size="md"
-                  :label="sendLabel"
-                  :icon="assistantGlyph.send"
-                  :disabled="!canSend"
-                  :disabled-reason="sendBlockedReason"
-                  :class="
-                    !canSend &&
-                    !replying &&
-                    pickerRoom &&
-                    'bg-button-primary! text-button-primary-foreground/50!'
-                  "
-                  data-test="assistant-send"
-                  @click="trySend"
-                />
-                <template v-if="!replying && pickerRoom">
-                  <OSeparator vertical class="w-px" />
-                  <AssistantAgentPicker :sid="sid" />
-                </template>
-              </OButtonGroup>
-            </span>
-          </div>
+            <AssistantIconButton
+              v-if="showStop"
+              variant="primary"
+              size="md"
+              :label="t('assistant.turn.stopLabel')"
+              :icon="assistantGlyph.stop"
+              :loading="state === 'stopping'"
+              :class="ROUND_ACTION_CLASS"
+              data-test="assistant-stop"
+              @click="stop"
+            />
+            <AssistantIconButton
+              v-else
+              variant="primary"
+              size="md"
+              :label="sendLabel"
+              :icon="assistantGlyph.send"
+              :disabled="!canSend"
+              :disabled-reason="sendBlockedReason"
+              :class="ROUND_ACTION_CLASS"
+              data-test="assistant-send"
+              @click="trySend"
+            />
+          </AssistantComposerBottomRow>
         </template>
-      </OTextarea>
+      </AssistantComposerFrame>
       <AssistantDictationTail
         :field="textbox?.textarea ?? null"
         :before="text.slice(0, voice.anchor.value)"
@@ -309,74 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div v-if="helper" class="flex min-w-0 flex-wrap items-center gap-x-2">
-      <OText
-        :id="helperId"
-        variant="meta"
-        as="p"
-        :class="[
-          'min-w-0',
-          helperEmphasis ? 'text-text-body font-medium' : '',
-          helperFailed ? 'text-status-error-text' : '',
-        ]"
-        data-test="assistant-composer-helper"
-      >
-        {{ helper }}
-      </OText>
-      <OButton
-        v-if="pasteOffer && helper === pasteLine"
-        variant="ghost-primary"
-        size="chip"
-        :class="TOUCH_TARGET_CLASS"
-        data-test="assistant-composer-paste-inline"
-        @click="pasteInline"
-      >
-        {{ t("assistant.context.pasteInline") }}
-      </OButton>
-      <OButton
-        v-if="helper === voice.helperLine.value && voice.action.value === 'retry'"
-        variant="ghost-primary"
-        size="chip"
-        :class="TOUCH_TARGET_CLASS"
-        data-test="assistant-dictate-retry"
-        @click="voice.retry"
-      >
-        {{ t("assistant.voice.tryAgain") }}
-      </OButton>
-      <AssistantVoiceAllowPopover
-        v-if="helper === voice.helperLine.value && voice.action.value === 'how'"
-      />
-      <AssistantAskAdminPopover v-if="accessLost" kind="access" :org="org">
-        <template #trigger>
-          <OButton
-            variant="ghost-primary"
-            size="chip"
-            :class="TOUCH_TARGET_CLASS"
-            data-test="assistant-composer-ask-admin"
-          >
-            {{ t("assistant.gate.noPermission.askAdmin") }}
-          </OButton>
-        </template>
-      </AssistantAskAdminPopover>
-      <OButton
-        v-if="helper === threadLine"
-        variant="ghost-primary"
-        size="chip"
-        :class="TOUCH_TARGET_CLASS"
-        data-test="assistant-context-start-new"
-        @click="startNew"
-      >
-        {{ t("assistant.context.startNew") }}
-      </OButton>
-    </div>
-    <OText
-      v-if="storageBlocked"
-      variant="meta"
-      as="p"
-      data-test="assistant-composer-storage-blocked"
-    >
-      {{ t("assistant.client.storageBlocked") }}
-    </OText>
     <span role="status" aria-live="polite" class="sr-only" data-test="assistant-composer-status">
       <span v-if="status" :key="status.seq">{{ status.text }}</span>
     </span>
@@ -416,13 +185,17 @@ export interface AssistantComposerProps {
   cooldownReason?: I18nText;
   /** Access went mid-session: the draft stays readable and nothing can be sent. */
   accessLost?: boolean;
+  /** The container just opened; the frame plays its one border sweep. */
+  opening?: boolean;
+}
+
+export interface AssistantComposerEmits {
+  /** The run-limit notice's link; the shell owns the running-chats list. */
+  (e: "show-running"): void;
 }
 
 /** A starter prompt over a draft this long asks Replace · Append · Cancel (IW-06 AC 5). */
 export const PREFILL_CHOICE_CHARS = 500;
-
-// Long enough to read, short enough not to linger after the next key.
-const EMPHASIS_MS = 2_000;
 
 // Long enough that typing a query speaks once, not per key.
 const MENTION_ANNOUNCE_MS = 400;
@@ -435,24 +208,18 @@ const THREAD_WINDOW_MS = 30 * 60_000;
 const REPLY_SELECTOR =
   '[data-test="assistant-approval-reply"], [data-test="assistant-question-other"]';
 
-// The frame lives inside OTextarea, whose wrapper is only reachable from the root until the lib grows `#trailing`.
-const FRAME_CLASS = "[&>div]:focus-within:ring-1 [&>div]:focus-within:ring-assistant-focus-ring/25";
-
-const INERT_FRAME_CLASS =
-  "[&>div]:relative [&>div]:border-border-default [&>div]:bg-surface-subtle";
-
 const CARD_SELECTOR = '[data-test="assistant-approval-card"], [data-test="assistant-consent-card"]';
 </script>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, useId, watch } from "vue";
+import { useRouter } from "vue-router";
 
 import AssistantAgentPicker from "@/components/ai-assistant/agents/AssistantAgentPicker.vue";
-import AssistantErrorRow from "@/components/ai-assistant/common/AssistantErrorRow.vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
-import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { billingHrefOf } from "@/components/ai-assistant/credits/AssistantCreditManage.vue";
+import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
 import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
@@ -484,31 +251,36 @@ import {
   agentIdOf,
   agentName,
   currentAgent,
+  errorTitle,
   nextAgent,
-  rosterOffersChoice,
+  openTabWithoutOpener,
 } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { MAX_IMAGE_SIZE_BYTES } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatBytes } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
 
+import AssistantComposerBottomRow, { ROUND_ACTION_CLASS } from "./AssistantComposerBottomRow.vue";
+import AssistantComposerFrame from "./AssistantComposerFrame.vue";
+import AssistantComposerStrip from "./AssistantComposerStrip.vue";
 import AssistantDictateButton from "./AssistantDictateButton.vue";
-import AssistantDictationMeter from "./AssistantDictationMeter.vue";
 import AssistantDictationTail from "./AssistantDictationTail.vue";
+import AssistantDictationWave from "./AssistantDictationWave.vue";
 import AssistantRecallSheet from "./AssistantRecallSheet.vue";
-import AssistantVoiceAllowPopover from "./AssistantVoiceAllowPopover.vue";
+import {
+  lineCount,
+  micHelpUrl,
+  pickNotice,
+  sentenceNotice,
+  type ComposerNotice,
+  type NoticeAction,
+} from "./composerNotice";
 import {
   BUSY_CODES,
   CAP_NOTICE_MS,
@@ -522,6 +294,7 @@ import {
   noteDraftCleared,
 } from "./composerUi";
 import { useAssistantVoice } from "./useAssistantVoice";
+import { useComposerQueue } from "./useComposerQueue";
 import { useComposerWidth } from "./useComposerWidth";
 
 const props = withDefaults(defineProps<AssistantComposerProps>(), {
@@ -530,23 +303,26 @@ const props = withDefaults(defineProps<AssistantComposerProps>(), {
   visible: true,
   cooldownReason: undefined,
   accessLost: false,
+  opening: false,
 });
+
+const emit = defineEmits<AssistantComposerEmits>();
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();
 const placement = useAssistantPlacement(store);
+const router = useRouter();
 const { mdUp } = useBreakpoint();
 const root = ref<HTMLElement | null>(null);
-const textbox = ref<InstanceType<typeof OTextarea> | null>(null);
+const textbox = ref<InstanceType<typeof AssistantComposerFrame> | null>(null);
 const file = ref<InstanceType<typeof OFile> | null>(null);
 const mention = ref<InstanceType<typeof AssistantMentionMenu> | null>(null);
 const width = useComposerWidth(root);
 const uid = useId();
-const helperId = `assistant-composer-helper-${uid}`;
 const listboxId = `assistant-mention-${uid}`;
+const noticeId = `assistant-composer-notice-${uid}`;
 
 // View state only; every draft write is a store action.
-const helperEmphasis = ref(false);
 const blockedLine = ref<I18nText | null>(null);
 const droppedImages = ref(0);
 const recallOpen = ref(false);
@@ -559,8 +335,9 @@ const prefillPending = ref<{ text: string; chips: ContextChip[]; homeStarter?: b
 // The last long paste, offered back as plain text until the next edit or send (D4 decision 10).
 const pasteOffer = ref<{ chipId: string; text: string; at: number } | null>(null);
 const attachDismissed = ref(false);
+// An admin pressed a mic that is off in this browser; the strip offers Turn on until the next edit.
+const offOffer = ref(false);
 const now = ref(Date.now());
-let emphasisTimer: ReturnType<typeof setTimeout> | null = null;
 let emptyEnterSaid = false;
 let recallPicked = false;
 let mentionTimer: ReturnType<typeof setTimeout> | null = null;
@@ -592,6 +369,11 @@ const stagedChips = computed(() =>
   (composer.value?.chips ?? []).filter((chip) => chip.provenance !== "page"),
 );
 const attached = computed(() => stagedChips.value.length > 0 || images.value.length > 0);
+// With no chips the panel header carries the ⓘ, so the strip shows it only beside chips and never beside a notice.
+const chipsShown = computed(
+  () => images.value.length > 0 || stagedChips.value.some((chip) => chip.kind !== "time"),
+);
+const seesShown = computed(() => !notice.value && chipsShown.value);
 const attachNotice = computed(() => {
   const key = store.state.userOrgKey;
   if (!key || attachDismissed.value || !attached.value || replying.value) return false;
@@ -637,7 +419,6 @@ const voice = useAssistantVoice({
   },
   touch: () => !mdUp.value && coarse.value,
   say,
-  focusField: () => el()?.focus({ preventScroll: true }),
 });
 
 // The textbox shows the unsettled tail; the draft never holds it.
@@ -657,7 +438,7 @@ const state = computed(() => {
 // The reply and Other answer rows send while the turn waits, so Send keeps its place there.
 const showStop = computed(() => running.value && !elsewhere.value && !replying.value);
 
-// After 30 s without a frame Stop is the one emphasised control (HT-01 AC 3); the clock runs only while a turn does.
+// After 30 s without a frame the answering line goes quiet; the clock runs only while a turn does.
 const clock = ref(Date.now());
 let clockTimer: ReturnType<typeof setInterval> | null = null;
 watch(
@@ -678,6 +459,7 @@ const stalled = computed(() => {
 });
 
 const refusal = computed(() => (turn.value ? composerRowOf(turn.value) : null));
+const refusedCode = computed(() => (turn.value?.state === "refused" ? turn.value.error : null));
 const busyLeft = ref(0);
 let busyTimer: ReturnType<typeof setInterval> | null = null;
 const busyUntil = computed(() => {
@@ -697,59 +479,54 @@ const errorRow = computed<I18nText | null>(() => {
 
 const noAccessLine = computed(() => t("assistant.composer.noAccess"));
 
+const creditsRefusedAbove = computed(() => isCreditsRefusal(refusedCode.value?.code));
+// Out of credits keeps the draft and holds Send; image and mic stay usable (K7).
+const creditsOut = computed(
+  () => creditsRefusedAbove.value || store.state.capability.creditMode === "exhausted",
+);
+
 const canSend = computed(
   () =>
     voice.mine.value ||
     (hasContent.value &&
       !inertKind.value &&
       !props.accessLost &&
-      (replying.value || (!running.value && !props.cooldownReason && busyLeft.value === 0))),
+      (replying.value ||
+        (!running.value && !props.cooldownReason && busyLeft.value === 0 && !creditsOut.value))),
 );
 const sendLabel = computed(() => {
   if (!replying.value)
-    return pickerRoom.value
+    return shownAgent.value !== DEFAULT_AGENT
       ? t("assistant.composer.sendTo", { agent: agentLabel.value })
       : t("assistant.turn.sendLabel");
   return asking.value ? t("assistant.question.sendAnswer") : t("assistant.composer.sendReply");
 });
-// The default agent's Send stays an icon; a named agent, a reply or an answer says so on the button.
-const sendNamed = computed(
-  () => replying.value || (pickerRoom.value && shownAgent.value !== DEFAULT_AGENT),
-);
 const sendBlockedReason = computed(() => {
   if (props.accessLost) return noAccessLine.value;
   if (busyLeft.value > 0) return errorRow.value ?? undefined;
   if (props.cooldownReason) return props.cooldownReason;
+  if (creditsOut.value && hasContent.value) return creditsSentence.value;
   return hasContent.value ? undefined : t("assistant.composer.sendEmpty");
 });
 
 const micOffReason = computed<I18nText | undefined>(() => {
   if (props.accessLost) return noAccessLine.value;
+  if (inertKind.value) return t("assistant.composer.inert");
   return voice.offline.value && !voice.mine.value ? t("assistant.composer.offline") : undefined;
 });
 
 const shownAgent = computed(() => nextAgent(session.value));
 const agentLabel = computed(() => agentName(shownAgent.value, t));
-const pickerRoom = computed(() => rosterOffersChoice(store.state.capability.agents));
 
 const placeholder = computed<I18nText>(() => {
-  if (inertKind.value === "asking") return t("assistant.composer.inertAnswer");
-  if (inertKind.value) return t("assistant.composer.inert");
+  if (inertKind.value) return raw("");
   if (replying.value) return t("assistant.composer.replyPlaceholder");
+  if (voice.mine.value && voice.firstUse.value) return t("assistant.voice.listeningPlaceholder");
   if (shownAgent.value !== DEFAULT_AGENT)
     return t("assistant.composer.askAgent", { agent: agentLabel.value });
-  if (!context.noScope.value)
-    return t("assistant.composer.scoped", {
-      stream: raw((context.page.value?.selectedStreams ?? []).join(", ")),
-    });
   return session.value?.messages.length
-    ? t("assistant.composer.followUp")
-    : t("assistant.composer.placeholder");
-});
-
-const creditsRefusedAbove = computed(() => {
-  const turn = session.value?.turn;
-  return turn?.state === "refused" && isCreditsRefusal(turn.error.code);
+    ? t("assistant.composer.followUpAt")
+    : t("assistant.composer.placeholderAt");
 });
 
 const pendingLine = computed<I18nText | null>(() => {
@@ -775,41 +552,55 @@ const threadLine = computed<I18nText | null>(() => {
     : null;
 });
 
+const queue = useComposerQueue({
+  sid: () => liveSid.value,
+  running: () => running.value && !elsewhere.value,
+  endedDone: () => turn.value?.state === "done",
+  draft: (id) => store.state.sessions[id]?.composer.text ?? "",
+  send(id, value) {
+    store.setDraft(id, { text: value });
+    freshSendId(id);
+    void nextTick(trySend);
+  },
+  restore(id, value) {
+    store.setDraft(id, { text: value });
+    void nextTick(() => focusInput("end"));
+  },
+});
+
 // A followed turn speaks once, in the shell's elsewhere row, which also knows a run this tab started before a reload (B1).
 const answeringLine = computed<I18nText | null>(() => {
-  if (elsewhere.value) return null;
+  if (elsewhere.value || queue.queued.value) return null;
   return running.value && hasContent.value && !stalled.value && state.value !== "stopping"
-    ? t("assistant.composer.running")
+    ? t("assistant.composer.strip.enterQueues")
     : null;
 });
 
-const helper = computed<I18nText | null>(() => {
-  if (inertKind.value) return null;
-  if (props.accessLost) return noAccessLine.value;
-  if (voice.helperLine.value) return voice.helperLine.value;
-  if (blockedLine.value) return blockedLine.value;
-  if (capLine.value) return capLine.value;
-  const notice = liveSid.value ? store.entryNotice(liveSid.value) : null;
-  if (notice) return t(notice);
-  if (pasteOffer.value) return pasteLine.value;
-  if (droppedImages.value > 0)
-    return t(
-      "assistant.composer.imagesDropped",
-      { count: droppedImages.value },
-      droppedImages.value,
-    );
-  // Send stays enabled: the server is the gate, the line only predicts a refusal not yet shown above.
-  if (store.state.capability.creditMode === "exhausted" && !creditsRefusedAbove.value)
-    return t("assistant.credits.predictedExhausted", { org: raw(org.value) });
-  if (voice.show.value && voice.offline.value) return t("assistant.composer.offline");
-  return answeringLine.value ?? pendingLine.value ?? threadLine.value;
+const creditsSentence = computed(() =>
+  refusedCode.value && creditsRefusedAbove.value
+    ? t("assistant.error.credits_exhausted.title", { org: raw(org.value) })
+    : t("assistant.credits.predictedExhausted", { org: raw(org.value) }),
+);
+
+const pasteLine = computed(() => t("assistant.context.pastedAsChip"));
+
+const cleared = computed(() => {
+  const notice = ui.value.cleared;
+  return notice && now.value - notice.at < UNDO_WINDOW_MS ? notice : null;
 });
-
-const helperFailed = computed(() => helper.value === voice.helperLine.value && voice.failure.value);
-
-const voiceExtra = computed(() => voice.listening.value || voice.waiting.value);
-
-const frameClass = computed(() => (inertKind.value ? INERT_FRAME_CLASS : FRAME_CLASS));
+const clearedText = computed<I18nText | null>(() => {
+  const notice = cleared.value;
+  if (!notice) return null;
+  if (notice.from) {
+    const title = store.state.sessions[notice.from]?.title;
+    return title
+      ? t("assistant.composer.draftStayed", { chat: title })
+      : t("assistant.composer.draftStayedUnnamed");
+  }
+  return notice.token
+    ? t("assistant.composer.cleared")
+    : t("assistant.composer.clearedOrg", { org: raw(notice.org) });
+});
 
 // Go to request is offered only while the card is out of view, as the card itself is the way back otherwise.
 const cardAway = ref(false);
@@ -836,35 +627,217 @@ provide(
     narrow: width.narrow.value,
     tight: width.tight.value,
     wide: width.wide.value,
-    yieldChips: width.tight.value && voiceExtra.value && pickerRoom.value,
   })),
 );
 
-const pasteLine = computed(() => t("assistant.context.pastedAsChip"));
-
-const cleared = computed(() => {
-  const notice = ui.value.cleared;
-  return notice && now.value - notice.at < UNDO_WINDOW_MS ? notice : null;
-});
-const clearedText = computed<I18nText | null>(() => {
-  const notice = cleared.value;
-  if (!notice) return null;
-  if (notice.from) {
-    const title = store.state.sessions[notice.from]?.title;
-    return title
-      ? t("assistant.composer.draftStayed", { chat: title })
-      : t("assistant.composer.draftStayedUnnamed");
+const holdNotice = computed<ComposerNotice | null>(() => {
+  if (prefillPending.value)
+    return {
+      id: "prefill",
+      tone: "info",
+      title: t("assistant.composer.strip.replaceDraft"),
+      sentence: t("assistant.welcome.prefill.question"),
+      links: [
+        { action: "prefillReplace", label: t("assistant.welcome.prefill.replace") },
+        { action: "prefillAppend", label: t("assistant.welcome.prefill.append") },
+        { action: "prefillCancel", label: t("assistant.welcome.prefill.cancel") },
+      ],
+    };
+  if (inertKind.value) {
+    const title =
+      inertKind.value === "asking"
+        ? t("assistant.composer.inertAnswer")
+        : t("assistant.composer.strip.decideAbove");
+    const links = cardAway.value
+      ? [{ action: "goToRequest" as const, label: t("assistant.composer.goToRequest") }]
+      : [];
+    return { id: "inert", tone: "paused", title, sentence: title, links };
   }
-  return notice.token
-    ? t("assistant.composer.cleared")
-    : t("assistant.composer.clearedOrg", { org: raw(notice.org) });
+  if (replying.value) {
+    const title = asking.value
+      ? t("assistant.question.answerHint")
+      : t("assistant.composer.replyHelper");
+    const links = [{ action: "replyCancel" as const, label: t("assistant.composer.replyCancel") }];
+    return { id: "reply", tone: "info", title, sentence: title, links };
+  }
+  if (!props.accessLost) return null;
+  return {
+    id: "access",
+    tone: "warning",
+    title: t("assistant.composer.strip.needsAccess"),
+    sentence: noAccessLine.value,
+    links: [{ action: "askAdmin", label: t("assistant.gate.noPermission.askAdmin") }],
+  };
 });
+
+const voiceNotice = computed<ComposerNotice | null>(() => {
+  if (offOffer.value)
+    return sentenceNotice("voice", t("assistant.voice.offAdmin"), "info", [
+      { action: "turnOn", label: t("assistant.voice.turnOn") },
+    ]);
+  if (voice.waiting.value)
+    return sentenceNotice("voice", t("assistant.voice.waitingPermission"), "info");
+  const line = voice.helperLine.value;
+  if (!line) return null;
+  if (voice.action.value === "how") {
+    const help = micHelpUrl(voice.brand());
+    return {
+      id: "voice",
+      tone: "warning",
+      title: t("assistant.composer.strip.micBlocked"),
+      sentence: line,
+      links: help ? [{ action: "micHelp", label: t("assistant.composer.strip.howToAllow") }] : [],
+    };
+  }
+  const links =
+    voice.action.value === "retry"
+      ? [{ action: "voiceRetry" as const, label: t("assistant.voice.tryAgain") }]
+      : [];
+  return sentenceNotice("voice", line, voice.failure.value ? "warning" : "info", links);
+});
+
+const refusalNotice = computed<ComposerNotice | null>(() => {
+  if (busyLeft.value > 0 && errorRow.value)
+    return {
+      id: "busy",
+      tone: "warning",
+      title: t("assistant.composer.strip.busyFor", { s: busyLeft.value }),
+      sentence: errorRow.value,
+      links: [],
+    };
+  const error = refusedCode.value;
+  const sentence = () => {
+    const { key, params } = errorTitle(error!, { org: org.value, product: t("assistant.name"), t });
+    return t(key, params);
+  };
+  if (error?.code === "run_limit_member")
+    return {
+      id: "runLimit",
+      tone: "warning",
+      title: t("assistant.composer.strip.runLimit"),
+      sentence: sentence(),
+      links: [{ action: "showRunning", label: t("assistant.composer.strip.showRunning") }],
+    };
+  if (error?.code === "run_limit_org")
+    return {
+      id: "orgBusy",
+      tone: "warning",
+      title: t("assistant.composer.strip.orgBusy"),
+      sentence: sentence(),
+      links: [{ action: "retry", label: t("assistant.composer.strip.retry") }],
+    };
+  return null;
+});
+
+const stateNotice = computed<ComposerNotice | null>(() => {
+  if (creditsOut.value)
+    return {
+      id: "credits",
+      tone: "warning",
+      title: t("assistant.composer.strip.creditsOut"),
+      sentence: creditsSentence.value,
+      links: billingHrefOf(router, org.value)
+        ? [{ action: "manageUsage", label: t("assistant.composer.strip.managePaid") }]
+        : [],
+    };
+  const offline =
+    errorRow.value === t("assistant.composer.offline") || (voice.show.value && voice.offline.value);
+  if (offline)
+    return {
+      id: "offline",
+      tone: "warning",
+      title: t("assistant.composer.strip.offline"),
+      sentence: t("assistant.composer.offline"),
+      links: [],
+    };
+  return errorRow.value ? sentenceNotice("unreachable", errorRow.value) : null;
+});
+
+const draftNotice = computed<ComposerNotice | null>(() => {
+  if (capLine.value) return sentenceNotice("cap", capLine.value);
+  if (clearedText.value) {
+    const notice = cleared.value;
+    const links: ComposerNotice["links"] = notice?.from
+      ? [{ action: "bringDraft", label: t("assistant.composer.bringDraft") }]
+      : notice?.token
+        ? [{ action: "undo", label: t("assistant.composer.undo") }]
+        : [];
+    return sentenceNotice("cleared", clearedText.value, "info", links);
+  }
+  if (queue.queued.value)
+    return {
+      id: "queued",
+      tone: "info",
+      title: t("assistant.composer.queued", { count: 1 }),
+      sentence: t("assistant.composer.queuedSentence"),
+      links: [{ action: "editQueued", label: t("assistant.composer.queuedEdit") }],
+    };
+  const entry = liveSid.value ? store.entryNotice(liveSid.value) : null;
+  if (entry) return sentenceNotice("entry", t(entry), "info");
+  return null;
+});
+
+const offerNotice = computed<ComposerNotice | null>(() => {
+  const offer = pasteOffer.value;
+  if (offer) {
+    const lines = lineCount(offer.text);
+    return {
+      id: "paste",
+      tone: "info",
+      title: t("assistant.composer.strip.pastedLines", { count: lines }, lines),
+      sentence: pasteLine.value,
+      links: [{ action: "pasteInline", label: t("assistant.composer.strip.pasteInline") }],
+    };
+  }
+  if (droppedImages.value > 0)
+    return sentenceNotice(
+      "dropped",
+      t("assistant.composer.imagesDropped", { count: droppedImages.value }, droppedImages.value),
+      "info",
+    );
+  if (attachNotice.value)
+    return sentenceNotice("attach", t("assistant.attach.saved"), "info", [
+      { action: "attachOk", label: t("assistant.attach.ok") },
+    ]);
+  return null;
+});
+
+const quietNotice = computed<ComposerNotice | null>(() => {
+  if (answeringLine.value) return sentenceNotice("answering", answeringLine.value, "info");
+  if (pendingLine.value) return sentenceNotice("pending", pendingLine.value, "info");
+  if (!threadLine.value) return null;
+  return sentenceNotice("thread", threadLine.value, "info", [
+    { action: "startNew", label: t("assistant.context.startNew") },
+  ]);
+});
+
+// Beside chips this line sits in the ⓘ; an empty strip says it itself, as the header ⓘ does not carry it.
+const storageNotice = computed<ComposerNotice | null>(() =>
+  storageBlocked.value && !chipsShown.value
+    ? sentenceNotice("storage", t("assistant.client.storageBlocked"), "info")
+    : null,
+);
+
+// One line at a time in the strip; the chips come back once nothing needs saying.
+const notice = computed(() =>
+  pickNotice([
+    holdNotice.value,
+    voiceNotice.value,
+    blockedLine.value && sentenceNotice("blocked", blockedLine.value),
+    refusalNotice.value,
+    stateNotice.value,
+    draftNotice.value,
+    offerNotice.value,
+    quietNotice.value,
+    storageNotice.value,
+  ]),
+);
 
 const textboxAttrs = computed(() => ({
   "aria-label": t("assistant.composer.name", { product: t("assistant.name") }),
   "aria-multiline": "true",
   "aria-placeholder": placeholder.value,
-  "aria-describedby": helper.value ? helperId : undefined,
+  "aria-describedby": notice.value ? noticeId : undefined,
   "aria-disabled": inertKind.value ? "true" : undefined,
   "aria-readonly": inertKind.value ? "true" : undefined,
   // A textarea cannot be a combobox, so there is no `aria-expanded`; the menu's state is spoken instead.
@@ -873,10 +846,8 @@ const textboxAttrs = computed(() => ({
   "aria-activedescendant": mentionAt.value !== null ? mention.value?.activeId : undefined,
   "data-assistant-composer": "",
   class: [
-    "py-2.25! max-md:min-h-11 pointer-coarse:min-h-11",
-    // A column frame sizes a `flex-1` textbox by its one `rows` line, ignoring the grown height (F1).
-    "pb-0! basis-auto!",
-    inertKind.value ? "text-text-secondary! ps-6.5!" : "",
+    "max-md:min-h-11 pointer-coarse:min-h-11",
+    inertKind.value ? "text-text-muted!" : "",
   ].join(" "),
 }));
 
@@ -898,14 +869,10 @@ function say(line: I18nText): void {
 
 function clearBlocked(): void {
   blockedLine.value = null;
-  helperEmphasis.value = false;
 }
 
 function emphasise(line: I18nText): void {
   blockedLine.value = line;
-  helperEmphasis.value = true;
-  if (emphasisTimer) clearTimeout(emphasisTimer);
-  emphasisTimer = setTimeout(() => (helperEmphasis.value = false), EMPHASIS_MS);
 }
 
 // The first keystroke of an org that has no chat yet starts one; mount never does (`00` §4.2 rule 2).
@@ -929,6 +896,7 @@ function onInput(value: string): void {
   blockedLine.value = null;
   droppedImages.value = 0;
   pasteOffer.value = null;
+  offOffer.value = false;
   freshSendId(id);
   emptyEnterSaid = false;
   // Typing in the new chat ends the Undo offer, so Undo never replaces new work (U9).
@@ -1130,7 +1098,7 @@ function trySend(): void {
   if (!id || !composer.value) return;
   if (inertKind.value) {
     trackAssistant("ai_composer_enter_blocked", { reason: "inert" });
-    return say(placeholder.value);
+    return say(holdNotice.value?.sentence ?? t("assistant.composer.inert"));
   }
   if (replying.value) {
     if (props.accessLost) return say(noAccessLine.value);
@@ -1145,14 +1113,8 @@ function trySend(): void {
     if (blockedLine.value !== props.cooldownReason) say(props.cooldownReason);
     return emphasise(props.cooldownReason);
   }
-  if (running.value) {
-    trackAssistant("ai_composer_enter_blocked", {
-      reason: elsewhere.value ? "elsewhere" : "running",
-    });
-    const line = t("assistant.composer.running");
-    if (blockedLine.value !== line) say(line);
-    return emphasise(line);
-  }
+  if (running.value) return queueOrHold(id);
+  if (creditsOut.value && hasContent.value) return say(creditsSentence.value);
   if (!hasContent.value) {
     trackAssistant("ai_composer_enter_blocked", { reason: "empty" });
     // Once per run of empty Enters, so a held key does not repeat it (CT-09 AC 10).
@@ -1169,6 +1131,20 @@ function trySend(): void {
     .send(id)
     .then((result) => onRefused(id, sendId, result))
     .finally(refreshRecall);
+}
+
+// Enter while this tab's answer streams queues one message; a second one, or a run in another tab, waits instead.
+function queueOrHold(id: Sid): void {
+  if (!elsewhere.value && hasContent.value && queue.enqueue(text.value)) {
+    store.setDraft(id, { text: "" });
+    return say(t("assistant.composer.queued", { count: 1 }));
+  }
+  trackAssistant("ai_composer_enter_blocked", {
+    reason: elsewhere.value ? "elsewhere" : "running",
+  });
+  const line = t("assistant.composer.running");
+  if (blockedLine.value !== line) say(line);
+  emphasise(line);
 }
 
 // A cross-tab lock that landed between render and click refuses the send; the draft stays and the same click works once it lifts.
@@ -1278,7 +1254,7 @@ function prefill(payload: { text: string; chips: ContextChip[]; homeStarter?: bo
     // The banner answers a click, so focus moves to it and its Escape is Cancel (IW-06 AC 5, U19).
     void nextTick(() =>
       root.value
-        ?.querySelector<HTMLElement>('[data-test="assistant-prefill-choice-append"]')
+        ?.querySelector<HTMLElement>('[data-test="assistant-composer-notice-prefillAppend"]')
         ?.focus(),
     );
     return;
@@ -1445,8 +1421,54 @@ function readBase64(picked: File): Promise<string> {
 
 // A keyboard press has `detail` 0 and keeps focus on the mic, so Enter or Space stops it (D4 §4.3).
 function onMicPress(event: MouseEvent): void {
+  if (voice.mic.value === "off") {
+    offOffer.value = true;
+    return;
+  }
   voice.press("mic");
-  if (event.detail > 0 && !voice.primerOpen.value) el()?.focus({ preventScroll: true });
+  if (event.detail > 0) el()?.focus({ preventScroll: true });
+}
+
+function turnOnVoice(): void {
+  offOffer.value = false;
+  voice.turnOn();
+}
+
+function openHref(href: string | null): void {
+  if (href) openTabWithoutOpener(href);
+}
+
+function editQueued(): void {
+  queue.edit();
+}
+
+function retryRefused(): void {
+  if (liveSid.value) void store.retry(liveSid.value);
+}
+
+const NOTICE_HANDLERS: Record<NoticeAction, () => void> = {
+  prefillReplace: () => resolvePrefill("replace"),
+  prefillAppend: () => resolvePrefill("append"),
+  prefillCancel: () => resolvePrefill(null),
+  goToRequest: () => goToRequest(),
+  replyCancel: () => leaveReply(),
+  askAdmin: () => undefined,
+  micHelp: () => openHref(micHelpUrl(voice.brand())),
+  voiceRetry: () => voice.retry(),
+  turnOn: turnOnVoice,
+  showRunning: () => emit("show-running"),
+  retry: retryRefused,
+  manageUsage: () => openHref(billingHrefOf(router, org.value)),
+  undo: () => undoClear(),
+  bringDraft: () => undoClear(),
+  editQueued,
+  pasteInline: () => pasteInline(),
+  attachOk: () => dismissAttachNotice(),
+  startNew: () => startNew(),
+};
+
+function onNoticeAction(action: NoticeAction): void {
+  NOTICE_HANDLERS[action]();
 }
 
 function dismissAttachNotice(): void {
@@ -1767,7 +1789,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   offs.forEach((off) => off());
   if (clockTimer) clearInterval(clockTimer);
-  if (emphasisTimer) clearTimeout(emphasisTimer);
   if (clearedTimer) clearTimeout(clearedTimer);
   if (mentionTimer) clearTimeout(mentionTimer);
   if (capTimer) clearTimeout(capTimer);

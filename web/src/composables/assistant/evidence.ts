@@ -41,6 +41,17 @@ export interface LinkBlockData {
   redacted?: boolean;
 }
 
+/** C4 `chart_series` as the transcript keeps it: x in microseconds, at most 10 series of 120 points. */
+export interface ChartSeries {
+  xUnit: "us";
+  series: ChartLine[];
+}
+
+export interface ChartLine {
+  name: string;
+  points: [number, number][];
+}
+
 /** What `complete` says about its turn, kept on the answer so a reload shows the same footer and vote. */
 export interface FooterData {
   traceId?: string;
@@ -50,6 +61,8 @@ export interface FooterData {
   contextUsed?: string[];
   persisted?: boolean;
   durationMs?: number;
+  /** C4: the chart `complete` carried; not stored by the server, so a reloaded turn has none. */
+  chartSeries?: ChartSeries;
 }
 
 export interface FooterUsage {
@@ -153,6 +166,12 @@ const STREAM_CHIPS: ReadonlySet<string> = new Set([
 
 const ROW_WINDOW_MS = 60_000;
 
+export const MAX_CHART_SERIES = 10;
+
+export const MAX_CHART_POINTS = 120;
+
+const MAX_SERIES_NAME_CHARS = 200;
+
 const ARG_KEYS = [
   "stream_name",
   "stream",
@@ -239,6 +258,32 @@ export function boundedQuery(raw: unknown, callId?: string): QueryBlockData | nu
 }
 
 /** A findings frame as the card reads it; `null` when it is not a usable payload. */
+// The wire is untrusted: a set past the series cap, or a point that is not two finite numbers, is dropped, never the answer.
+export function boundedChartSeries(value: unknown): ChartSeries | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as { x_unit?: unknown; series?: unknown };
+  if (raw.x_unit !== "us" || !Array.isArray(raw.series)) return null;
+  if (raw.series.length > MAX_CHART_SERIES) return null;
+  const series = raw.series.flatMap((entry): ChartLine[] => {
+    const line = entry as { name?: unknown; points?: unknown } | null;
+    if (!line || !Array.isArray(line.points)) return [];
+    const points = line.points
+      .slice(-MAX_CHART_POINTS)
+      .filter(
+        (point): point is [number, number] =>
+          Array.isArray(point) &&
+          point.length === 2 &&
+          Number.isFinite(point[0]) &&
+          Number.isFinite(point[1]),
+      )
+      .map(([x, y]) => [x, y] as [number, number]);
+    if (!points.length) return [];
+    const name = typeof line.name === "string" && line.name ? line.name : "value";
+    return [{ name: name.slice(0, MAX_SERIES_NAME_CHARS), points }];
+  });
+  return series.some((line) => line.points.length >= 2) ? { xUnit: "us", series } : null;
+}
+
 export function boundedFindings(raw: unknown): FindingsData | null {
   if (!raw || typeof raw !== "object") return null;
   const source = raw as Record<string, unknown>;

@@ -36,6 +36,7 @@ import type { AdoptInit } from "./assistantStore";
 import type {
   ApprovalOutcome,
   BlockAnnotation,
+  BranchedFromRef,
   EntryOrigin,
   SessionOrigin,
   Sid,
@@ -168,6 +169,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
         stateVersion: detail.state_version ?? null,
         historyUnavailable: false,
         forkedFromShare: detail.forked_from_share ?? null,
+        branchedFrom: branchedFromOf(detail.branched_from),
         pinned: detail.pinned ?? cached?.pinned ?? false,
       },
     });
@@ -258,6 +260,18 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
   };
 
   return { api, hooks: elsewhereHooks, openServer, openLocal };
+}
+
+/** C1 `branched_from` of a stored chat; null on any other chat or a malformed value. */
+export function branchedFromOf(value: unknown): BranchedFromRef | null {
+  if (!value || typeof value !== "object") return null;
+  const { session_id, turn_id, title } = value as Record<string, unknown>;
+  if (typeof session_id !== "string" || !session_id || typeof turn_id !== "string") return null;
+  return {
+    sessionId: session_id.slice(0, 128),
+    turnId: turn_id.slice(0, 128),
+    title: typeof title === "string" ? title.slice(0, 200) : "",
+  };
 }
 
 /** The owner's own reload folds unscrubbed, as the live stream showed it and `owner.json` pins it. */

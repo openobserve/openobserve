@@ -35,6 +35,9 @@ const mocks = vi.hoisted(() => ({
   history: vi.fn(),
   historyRows: [] as unknown[],
   sessions: {} as Record<string, { turn: { state: string } }>,
+  runRows: [] as { group: string; otherOrg?: boolean }[],
+  incidentsOn: { value: false },
+  listOrgRcaRuns: vi.fn(),
 }));
 
 vi.mock("./useAgentHomeState", async () => {
@@ -48,10 +51,12 @@ vi.mock("./useAgentHomeState", async () => {
     }),
   };
 });
-vi.mock("./useHomeNowData", async () => {
+vi.mock("./useHomeNowData", async (importOriginal) => {
   const { computed, reactive: live, ref } = await import("vue");
   const rows = live(mocks.rows);
+  const incidentsOn = live(mocks.incidentsOn);
   return {
+    homeRunsOf: (await importOriginal<typeof import("./useHomeNowData")>()).homeRunsOf,
     useHomeNowData: () => {
       const selectedKey = ref<string | null>(null);
       const snapshot = computed(() => ({
@@ -82,7 +87,7 @@ vi.mock("./useHomeNowData", async () => {
         trendCapped: ref(false),
         tracesLocked: ref(false),
         alertsLocked: ref(false),
-        incidentsOn: ref(false),
+        incidentsOn: computed(() => incidentsOn.value),
         timezone: ref("UTC"),
         org: ref("default"),
         load: mocks.load,
@@ -102,8 +107,10 @@ vi.mock("@/composables/assistant", () => ({
     return { recent: () => ({ value: mocks.historyRows }) };
   },
   useAssistantStore: () => ({ state: { sessions: mocks.sessions } }),
+  useAssistantRuns: () => ({ rows: { value: mocks.runRows } }),
   openAssistant: vi.fn(),
 }));
+vi.mock("@/services/rca_runs_org", () => ({ listOrgRcaRuns: mocks.listOrgRcaRuns }));
 vi.mock("@/composables/contextProviders/homeContextProvider", () => ({
   useHomeContextProvider: mocks.provider,
 }));
@@ -133,9 +140,17 @@ vi.mock("./AgentHomeAskNote.vue", () => ({
 vi.mock("./HomeNowList.vue", () => ({
   default: {
     name: "HomeNowList",
-    props: ["variant", "snapshot", "createAlert", "rowMeta", "clearText"],
+    props: [
+      "variant",
+      "snapshot",
+      "createAlert",
+      "rowMeta",
+      "clearText",
+      "incidentRuns",
+      "failedRuns",
+    ],
     template:
-      "<section :data-test=\"`now-list-${variant ?? 'now'}`\" :data-rows=\"snapshot.rows.map((r) => r.key).join(',')\" :data-create=\"createAlert ? String(createAlert.enabled) : 'none'\" :data-clear=\"clearText ?? ''\" />",
+      "<section :data-test=\"`now-list-${variant ?? 'now'}`\" :data-rows=\"snapshot.rows.map((r) => r.key).join(',')\" :data-create=\"createAlert ? String(createAlert.enabled) : 'none'\" :data-clear=\"clearText ?? ''\" :data-runs=\"incidentRuns ? [...incidentRuns.keys()].join(',') : 'none'\" :data-failed=\"(failedRuns ?? []).map((r) => r.run_id).join(',')\" />",
   },
 }));
 vi.mock("./AgentHomeDashboards.vue", () => ({
@@ -165,19 +180,37 @@ describe("AssistantHomeTab", () => {
     mocks.history.mockReset();
     mocks.historyRows = [];
     mocks.sessions = {};
+    mocks.runRows = [];
+    set(mocks.incidentsOn, false);
+    mocks.listOrgRcaRuns.mockReset();
     localStorage.clear();
     store.state.currentuser.role = "admin";
   });
 
-  it("with the agent on, shows the Ask box, headline, Now, Problems with no alert, Since and threads, and loads once without asking the agent", async () => {
+  it("with the agent on, shows the greeting, Needs you above the Ask box, Problems with no alert, Since and threads, and loads once without asking the agent", async () => {
+    mocks.runRows = [
+      { group: "ready" },
+      { group: "ready", otherOrg: true },
+      { group: "answering" },
+    ];
     const wrapper = mountTab();
     await flushPromises();
     expect(
       wrapper.find('[data-test="launcher-stub"][data-layout="overview"]').attributes("data-go-to"),
     ).toBe("no");
-    expect(wrapper.get('[data-test="agent-home-headline"]').text()).toBe(
-      "2 things need you · 1 service has no alert",
-    );
+    expect(wrapper.get('[data-test="agent-home-greeting-need-you"]').text()).toBe("2 need you");
+    expect(wrapper.get('[data-test="agent-home-greeting-answers"]').text()).toBe("1 answer ready");
+    const main = wrapper.get('[data-test="assistant-home-main"]').element;
+    const order = [...main.querySelectorAll("[data-test]")]
+      .map((el) => el.getAttribute("data-test"))
+      .filter((id) => id === "now-list-now" || id === "launcher-stub");
+    expect(order).toEqual(["now-list-now", "launcher-stub"]);
+    expect(
+      wrapper
+        .get('[data-test="assistant-home-aside"]')
+        .find('[data-test="agent-home-brief-me"]')
+        .exists(),
+    ).toBe(true);
     expect(wrapper.get('[data-test="now-list-now"]').attributes("data-rows")).toBe(
       "incident:inc-1,service:cart",
     );
@@ -269,7 +302,7 @@ describe("AssistantHomeTab", () => {
     ]);
     const wrapper = mountTab();
     await flushPromises();
-    expect(wrapper.get('[data-test="agent-home-headline"]').text()).toBe("1 thing needs you");
+    expect(wrapper.get('[data-test="agent-home-greeting-need-you"]').text()).toBe("1 needs you");
     expect(wrapper.get('[data-test="now-list-now"]').attributes("data-rows")).toBe(
       "incident:inc-1",
     );
@@ -331,5 +364,46 @@ describe("AssistantHomeTab", () => {
         query: expect.objectContaining({ tab: "incidentAnalysis", org_identifier: "default" }),
       }),
     );
+  });
+
+  it("reads the org's runs since the window opened, hands each incident its run, and counts failed auto-runs as needing you", async () => {
+    set(mocks.incidentsOn, true);
+    const run = (over: Record<string, unknown>) => ({
+      run_id: "r",
+      incident_id: "inc-1",
+      incident_title: "Checkout errors",
+      severity: "P1",
+      state: "completed",
+      trigger: "auto",
+      started_at: 2,
+      ended_at: 3,
+      error_code: null,
+      ...over,
+    });
+    mocks.listOrgRcaRuns.mockResolvedValue({
+      data: {
+        runs: [
+          run({ run_id: "r3", incident_id: "inc-9", state: "failed", error_code: "turn_limit" }),
+          run({ run_id: "r2", incident_id: "inc-1", state: "running" }),
+          run({ run_id: "r1", incident_id: "inc-9", state: "completed" }),
+          run({ run_id: "r0", incident_id: "inc-5", state: "refused", trigger: "manual" }),
+        ],
+        has_more: false,
+      },
+    });
+    const wrapper = mountTab();
+    await flushPromises();
+    expect(mocks.listOrgRcaRuns).toHaveBeenCalledWith("default", { since: 0, limit: 100 });
+    const list = wrapper.get('[data-test="now-list-now"]');
+    expect(list.attributes("data-runs")).toBe("inc-9,inc-1,inc-5");
+    expect(list.attributes("data-failed")).toBe("r3");
+    expect(wrapper.get('[data-test="agent-home-greeting-need-you"]').text()).toBe("3 need you");
+  });
+
+  it("reads no runs where incidents are off, and gives the rows none", async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+    expect(mocks.listOrgRcaRuns).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-test="now-list-now"]').attributes("data-runs")).toBe("none");
   });
 });

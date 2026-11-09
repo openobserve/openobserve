@@ -30,6 +30,9 @@ import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { Marked, type Token, type Tokens } from "marked";
 
+import { promql } from "./grammars/promql";
+import { vrl } from "./grammars/vrl";
+
 /** The fence languages WP-08 renders as query blocks once the fence is closed (`30` §2.3). */
 export const QUERY_LANGUAGES: ReadonlySet<string> = new Set(["sql", "promql", "vrl"]);
 
@@ -155,10 +158,11 @@ export const SAFE_DATA_IMAGE = /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9
 export const EXTERNAL_REL = "noopener noreferrer nofollow";
 
 export const CLASSES = {
-  h2: "text-base font-semibold text-text-heading leading-6 mt-4 mb-1.5 first:mt-0",
-  h3: "text-sm font-semibold text-text-heading leading-5 mt-3 mb-1 first:mt-0",
-  code: "rounded-default border-code-border bg-code-bg text-code-text border px-1 py-px font-mono text-xs",
-  link: "text-text-link-hover underline underline-offset-2 hover:no-underline",
+  h2: "text-lg font-semibold text-text-heading leading-7 mt-4 mb-1.5 first:mt-0",
+  h3: "text-base font-semibold text-text-heading leading-6 mt-4 mb-1.5 first:mt-0",
+  code: "rounded-default bg-code-bg text-code-text px-1 py-px font-mono text-xs",
+  strong: "font-semibold text-text-heading",
+  link: "text-text-link font-medium no-underline underline-offset-2 hover:underline",
   host: "text-text-secondary ms-1 text-xs",
   meta: "text-text-secondary text-xs",
   image: "rounded-default my-1 max-h-80 max-w-full",
@@ -172,7 +176,101 @@ export const CLASSES = {
   cellCenter: "text-center",
   itemContinued: "list-none",
   pre: "rounded-default border-code-border bg-code-bg text-code-text my-2 overflow-x-auto border p-2 font-mono text-xs whitespace-pre",
+  calloutCause: "rounded-surface bg-status-info-bg my-3 flex gap-2.5 px-3 py-2.5",
+  calloutNext: "rounded-surface bg-status-success-bg my-3 flex gap-2.5 px-3 py-2.5",
+  calloutWatch: "rounded-surface bg-status-warning-bg my-3 flex gap-2.5 px-3 py-2.5",
+  calloutNote: "rounded-surface bg-surface-subtle my-3 flex gap-2.5 px-3 py-2.5",
+  calloutIconCause:
+    "assistant-callout-icon-cause text-status-info-text mt-0.5 size-4 shrink-0 bg-current",
+  calloutIconNext:
+    "assistant-callout-icon-next text-status-success-text mt-0.5 size-4 shrink-0 bg-current",
+  calloutIconWatch:
+    "assistant-callout-icon-watch text-status-warning-text mt-0.5 size-4 shrink-0 bg-current",
+  calloutIconNote:
+    "assistant-callout-icon-note text-text-secondary mt-0.5 size-4 shrink-0 bg-current",
+  calloutBody: "min-w-0 flex-1",
 } as const;
+
+/** The answer's prose column: a 72ch measure, relaxed leading and tabular figures, so numbers line up down a paragraph. */
+export const PROSE_CLASSES = {
+  html: [
+    "min-w-0 max-w-[72ch] text-sm leading-relaxed text-text-body break-words tabular-nums",
+    "[&_p]:my-2.5 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
+    "[&_ul]:my-2 [&_ul]:list-disc [&_ul]:ps-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:ps-5",
+    "[&_li]:my-0.5 [&_hr]:my-3 [&_hr]:border-border-default",
+  ].join(" "),
+  plain:
+    "text-text-body min-w-0 max-w-[72ch] text-sm leading-relaxed break-words whitespace-pre-wrap tabular-nums",
+  /** The answer's first sentence states the conclusion, so it alone takes the heading colour at semibold. */
+  leadHtml: "[&_p:first-child]:text-text-heading [&_p:first-child]:font-semibold",
+  leadPlain: "text-text-heading font-semibold",
+} as const;
+
+export type CalloutKind = "cause" | "next" | "watch" | "note";
+
+// A quote opening with one of these bold labels is that kind of callout; any other quote is a neutral note.
+const CALLOUT_LABELS: readonly [CalloutKind, RegExp][] = [
+  ["cause", /^(?:root cause|likely cause|cause)\b/i],
+  ["next", /^(?:next steps?|fix|suggested fix|recommendation|what to do)\b/i],
+  ["watch", /^(?:watch out|warning|caution|careful|heads up|risk)\b/i],
+];
+
+const CALLOUT_CLASSES: Readonly<Record<CalloutKind, { box: string; icon: string }>> = {
+  cause: { box: CLASSES.calloutCause, icon: CLASSES.calloutIconCause },
+  next: { box: CLASSES.calloutNext, icon: CLASSES.calloutIconNext },
+  watch: { box: CLASSES.calloutWatch, icon: CLASSES.calloutIconWatch },
+  note: { box: CLASSES.calloutNote, icon: CLASSES.calloutIconNote },
+};
+
+/** The role classes assistant code is painted with (tailwind.css `sk-*`); short, since a highlighted fence is mostly spans. */
+export const SYNTAX_CLASSES = {
+  keyword: "sk-k",
+  function: "sk-f",
+  string: "sk-s",
+  number: "sk-n",
+  field: "sk-i",
+  label: "sk-l",
+  operator: "sk-o",
+  comment: "sk-c",
+  punct: "sk-p",
+} as const;
+
+export type SyntaxRole = keyof typeof SYNTAX_CLASSES;
+
+// A scope with no role keeps its span but loses the class, so nesting still balances.
+const SCOPE_ROLES: Readonly<Record<string, SyntaxRole>> = {
+  keyword: "keyword",
+  literal: "keyword",
+  doctag: "keyword",
+  type: "keyword",
+  "template-tag": "keyword",
+  "selector-tag": "keyword",
+  name: "keyword",
+  title: "function",
+  built_in: "function",
+  string: "string",
+  regexp: "string",
+  symbol: "string",
+  number: "number",
+  variable: "field",
+  property: "field",
+  params: "field",
+  "template-variable": "field",
+  attr: "label",
+  attribute: "label",
+  section: "label",
+  "selector-attr": "label",
+  "selector-class": "label",
+  "selector-id": "label",
+  operator: "operator",
+  comment: "comment",
+  quote: "comment",
+  meta: "comment",
+  punctuation: "punct",
+  tag: "punct",
+};
+
+const HLJS_SPAN = /<span class="([^"]*)">/g;
 
 // Only the grammars the assistant's answers use; an unknown fence language is plain text (round 5 X4).
 const GRAMMARS = {
@@ -189,6 +287,8 @@ const GRAMMARS = {
   typescript,
   xml,
   yaml,
+  promql,
+  vrl,
 };
 
 let parser: Marked | null = null;
@@ -206,6 +306,9 @@ let page: { origin: string; imageRemoved: string } = {
 
 // Same-origin hrefs of the block being rendered; the main thread allowlists them into link cards.
 let sameOrigin: string[] = [];
+
+// External hrefs already linked in this block: an entity is a link on its first mention only (K2).
+let linked = new Set<string>();
 
 /** A piece of a rendered block: prose HTML of at most PART_CHARS (sanitised as it mounts), a fence, or text. */
 export type MarkdownPart =
@@ -284,6 +387,18 @@ function instance(): Marked {
       codespan({ text }) {
         return spend(`<code class="${CLASSES.code}">${escapeHtml(text)}</code>`);
       },
+      // The children spent their own output, so only the wrapper is charged here.
+      strong({ tokens }) {
+        const inner = this.parser.parseInline(tokens);
+        return wrap(`<strong class="${CLASSES.strong}">`, inner, "</strong>");
+      },
+      // A quote is a tinted callout with its kind's glyph, never a bordered stripe (K2).
+      blockquote({ tokens }) {
+        const { box, icon } = CALLOUT_CLASSES[calloutKind(tokens)];
+        const inner = this.parser.parse(tokens);
+        const open = `<div class="${box}"><span class="${icon}"></span><div class="${CLASSES.calloutBody}">`;
+        return wrap(open, inner, "</div></div>");
+      },
       text(token) {
         if ("tokens" in token && token.tokens) return this.parser.parseInline(token.tokens);
         return spend(
@@ -356,6 +471,7 @@ class OverBudget extends Error {
 export function parseBlock(request: ParseRequest): ParseResult {
   page = { origin: request.origin, imageRemoved: request.imageRemoved };
   sameOrigin = [];
+  linked = new Set();
   const claims: string[] = [];
   const risk = riskOf(request.text);
   if (risk) return { ...plainResult(request.blockId, request.text), rejected: risk };
@@ -437,6 +553,11 @@ function spend(text: string): string {
   budget.left -= text.length;
   if (budget.left < 0) throw new OverBudget("output");
   return text;
+}
+
+function wrap(open: string, inner: string, close: string): string {
+  spend(open + close);
+  return open + inner + close;
 }
 
 /** The block as text, in parts of at most PART_CHARS split at line ends: the fallback for a parse that failed, was rejected or ran out of time. */
@@ -603,7 +724,7 @@ function codePart(key: string, token: Tokens.Code, open: boolean): MarkdownPart 
 
 function highlightPart(part: MarkdownPart): MarkdownPart {
   if (part.kind !== "code" || part.open || part.lang === "plaintext") return part;
-  const highlighted = highlight(part.code, part.lang);
+  const highlighted = highlightCode(part.code, part.lang);
   const size = highlighted?.length ?? 0;
   if (highlighted === undefined || size > budget.left || size > budget.highlight) return part;
   budget.left -= size;
@@ -707,6 +828,14 @@ function reopen(tag: OpenTag, index: number, stack: OpenTag[]): string {
   return `<ol start="${tag.start}">`;
 }
 
+function calloutKind(tokens: Token[]): CalloutKind {
+  const first = tokens[0];
+  const lead = first?.type === "paragraph" ? (first as Tokens.Paragraph).tokens[0] : undefined;
+  if (lead?.type !== "strong") return "note";
+  const label = (lead as Tokens.Strong).text.trim();
+  return CALLOUT_LABELS.find(([, pattern]) => pattern.test(label))?.[0] ?? "note";
+}
+
 function capAlt(text: string): string {
   const chars = Array.from(text);
   return chars.length > MAX_ALT_CHARS ? `${chars.slice(0, MAX_ALT_CHARS).join("")}…` : text;
@@ -736,7 +865,8 @@ function linkHtml(href: string | null | undefined, label: string): string {
   }
   // `&` and `'` survive URL parsing and escape to five characters each, so the cap applies to the attribute as written (Z1).
   const attr = escapeAttr(url.href);
-  if (attr.length > MAX_URL_CHARS) return `<span>${label}</span>`;
+  if (attr.length > MAX_URL_CHARS || linked.has(url.href)) return `<span>${label}</span>`;
+  linked.add(url.href);
   const host = escapeHtml(url.host);
   return `<a href="${attr}" target="_blank" rel="${EXTERNAL_REL}" class="${CLASSES.link}">${label}</a><span class="${CLASSES.host}">${host}</span>`;
 }
@@ -753,14 +883,19 @@ export function parseUrl(href: string | null | undefined, origin = page.origin):
   }
 }
 
-function highlight(code: string, lang: string): string | undefined {
+/** Code as role-classed spans around escaped text, or `undefined` for an unknown language or code past HIGHLIGHT_MAX_CHARS. */
+export function highlightCode(code: string, lang: string): string | undefined {
   if (!grammarsReady) {
     for (const [name, grammar] of Object.entries(GRAMMARS)) hljs.registerLanguage(name, grammar);
     grammarsReady = true;
   }
   if (!lang || code.length > HIGHLIGHT_MAX_CHARS || !hljs.getLanguage(lang)) return undefined;
   try {
-    return hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
+    const html = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
+    return html.replace(HLJS_SPAN, (_, classes: string) => {
+      const role = SCOPE_ROLES[classes.split(" ")[0].replace(/^hljs-/, "")];
+      return role ? `<span class="${SYNTAX_CLASSES[role]}">` : "<span>";
+    });
   } catch {
     return undefined;
   }

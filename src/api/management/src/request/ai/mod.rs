@@ -15,6 +15,7 @@
 
 pub mod access_requests;
 pub mod activity;
+pub mod branch;
 pub mod capabilities;
 pub mod chat;
 pub mod chats;

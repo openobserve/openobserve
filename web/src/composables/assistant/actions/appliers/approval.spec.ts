@@ -302,6 +302,129 @@ describe("approval applier", () => {
     expect(session.ledger[0]).toMatchObject({ status: "failed", reason: detail });
   });
 
+  describe("C3: a write o2-ai skipped because the object changed or could not be re-read", () => {
+    const UPDATE = {
+      type: "confirmation_required",
+      id: "apr_0123456789abcdef0123",
+      kind: "update",
+      operation: "UpdateAlert",
+      tool: "UpdateAlert",
+      targets: [{ type: "alert", id: "2abc", name: "High error rate" }],
+      args: { alert_id: "2abc" },
+      after: { threshold: 3 },
+      before: { threshold: 2 },
+      before_digest: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    };
+    const CHANGED = {
+      id: "apr_0123456789abcdef0123",
+      status: "skipped",
+      items: [
+        {
+          id: "2abc",
+          type: "alert",
+          name: "High error rate",
+          status: "skipped",
+          code: "changed_since",
+          message:
+            "The alert changed after you were asked. Nothing was changed; review the new version and ask again.",
+          before: { threshold: 2.5 },
+        },
+      ],
+      resolved: {
+        type: "confirmation_resolved",
+        id: "apr_0123456789abcdef0123",
+        approved: true,
+        outcome: "skipped",
+        code: "changed_since",
+        detail:
+          "The alert changed after you were asked. Nothing was changed; review the new version and ask again.",
+      },
+    };
+
+    it("reads changed_since as skipped with the fresh object, and writes nothing to the ledger", async () => {
+      const { sid, env, session, dispatcher } = withCard(UPDATE);
+      env.confirm.mockResolvedValueOnce(CHANGED);
+      await dispatcher.approvals(sid, {
+        kind: "approval",
+        approvalId: UPDATE.id,
+        decision: { approved: true, scope: "once" },
+      });
+
+      const kept = session.annotations[approvalAnnotationKey(UPDATE.id)];
+      expect(kept.approvalOutcome).toMatchObject({ state: "skipped" });
+      expect(kept.approvalResult).toMatchObject({
+        status: "skipped",
+        items: [
+          {
+            id: "2abc",
+            name: "High error rate",
+            status: "skipped",
+            code: "changed_since",
+            before: { threshold: 2.5 },
+          },
+        ],
+      });
+      expect(session.ledger).toEqual([]);
+    });
+
+    it("reads recheck_failed as skipped with no fresh object", async () => {
+      const { sid, env, session, dispatcher } = withCard(UPDATE);
+      const message = "Could not check the alert is unchanged before writing. Nothing was changed.";
+      env.confirm.mockResolvedValueOnce({
+        status: "skipped",
+        items: [
+          {
+            id: "2abc",
+            type: "alert",
+            name: "High error rate",
+            status: "skipped",
+            code: "recheck_failed",
+            message,
+          },
+        ],
+        resolved: { outcome: "skipped", code: "recheck_failed", detail: message },
+      });
+      await dispatcher.approvals(sid, {
+        kind: "approval",
+        approvalId: UPDATE.id,
+        decision: { approved: true, scope: "once" },
+      });
+
+      const result = session.annotations[approvalAnnotationKey(UPDATE.id)].approvalResult;
+      expect(result?.status).toBe("skipped");
+      expect(result?.items[0]).toMatchObject({ code: "recheck_failed", message });
+      expect(result?.items[0]).not.toHaveProperty("before");
+    });
+
+    it("a mix of written and skipped items is partial", () => {
+      const result = approvalResultOf(
+        approvalOf(BATCH),
+        {
+          items: [
+            { name: "checkout-latency-old", type: "alert", status: "done" },
+            { ...CHANGED.items[0], name: "payments-5xx-staging" },
+          ],
+        },
+        "a@b.c",
+        1,
+      );
+      expect(result?.status).toBe("partial");
+    });
+
+    it("a skipped outcome with no rows is skipped, never approved", async () => {
+      const { sid, env, session, dispatcher } = withCard(UPDATE);
+      env.confirm.mockResolvedValueOnce({ resolved: CHANGED.resolved });
+      await dispatcher.approvals(sid, {
+        kind: "approval",
+        approvalId: UPDATE.id,
+        decision: { approved: true, scope: "once" },
+      });
+      expect(session.annotations[approvalAnnotationKey(UPDATE.id)].approvalOutcome?.state).toBe(
+        "skipped",
+      );
+    });
+  });
+
   it("reads a failed outcome with no rows as failed, never as approved", async () => {
     const { sid, env, store, dispatcher } = withCard();
     env.confirm.mockResolvedValueOnce({

@@ -32,6 +32,8 @@ pub const APPROVAL_STANDING: &str = "standing";
 pub const APPROVAL_NONE: &str = "none";
 pub const STATUS_DONE: &str = "done";
 pub const STATUS_FAILED: &str = "failed";
+/// A confirmed change that was deliberately not written; `undo_reason` keeps the code.
+pub const STATUS_SKIPPED: &str = "skipped";
 pub const OP_CREATE: &str = "create";
 pub const OP_UPDATE: &str = "update";
 pub const OP_DELETE: &str = "delete";

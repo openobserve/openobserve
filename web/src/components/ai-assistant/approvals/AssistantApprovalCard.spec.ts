@@ -19,6 +19,7 @@ import { createStore } from "vuex";
 
 import { runEscapeLadder } from "@/composables/assistant";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { approvalOf } from "@/composables/assistant/reducer";
 import { resetAssistantShortcutsForTests } from "@/composables/assistant/shortcuts";
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
@@ -65,13 +66,31 @@ function cardOf(
   };
 }
 
+// ODropdown renders its menu only when open; the stub renders every item in place so the ⋯ menu can be asserted.
+const dropdownStubs = {
+  ODropdown: {
+    props: ["side", "align"],
+    template:
+      "<div data-test='assistant-approval-menu' :data-side='side' :data-align='align'><slot name='trigger' /><slot /></div>",
+  },
+  ODropdownItem: {
+    props: { disabled: { type: Boolean, default: false } },
+    emits: ["select"],
+    template:
+      "<div role='menuitem' :data-disabled='disabled' @click=\"!disabled && $emit('select')\"><slot /></div>",
+  },
+};
+
 function mountCard(card: ApprovalCardView, props: Record<string, unknown> = {}) {
   return mount(AssistantApprovalCard, {
     props: { card, org: "default", ...props },
     attachTo: document.body,
-    global: { plugins: [fakeRouter(routes)] },
+    global: { plugins: [fakeRouter(routes)], stubs: dropdownStubs },
   });
 }
+
+const menuItems = (wrapper: ReturnType<typeof mountCard>) =>
+  wrapper.findAll('[role="menuitem"]').map((el) => el.attributes("data-test"));
 
 // A pointer click carries a click count; a keyboard-made click has none.
 async function press(target: { element: Element }): Promise<void> {
@@ -99,7 +118,7 @@ describe("AssistantApprovalCard", () => {
   });
   afterEach(() => (document.body.innerHTML = ""));
 
-  it("is a named group: the strip and timer, the effect, Deny · Reply · the primary, then Details", async () => {
+  it("is a named group: the strip and timer, the effect, ⋯ · Deny · the verb primary, then Details", async () => {
     const wrapper = mountCard(cardOf(DELETE_ONE, { expiresAt: Date.now() + 222_000 }));
     await flushPromises();
     const group = wrapper.get('[data-test="assistant-approval-card"]');
@@ -110,11 +129,12 @@ describe("AssistantApprovalCard", () => {
     expect(timer.text()).toBe("3:42");
     expect(timer.attributes("aria-label")).toBe("Expires in 3:42");
     expect(buttons(wrapper)).toEqual([
+      "assistant-approval-more",
       "assistant-approval-deny",
-      "assistant-approval-reply",
       "assistant-approval-approve",
       undefined,
     ]);
+    expect(menuItems(wrapper)).toEqual(["assistant-approval-reply"]);
     expect(wrapper.text()).not.toContain("Reply declines");
     const strip = wrapper.get('[data-test="assistant-approval-strip"]');
     expect(strip.get('[data-test="assistant-approval-strip-label"]').text()).toBe("Needs your OK");
@@ -308,7 +328,7 @@ describe("AssistantApprovalCard", () => {
     wrapper.unmount();
   });
 
-  it("keeps the diff in Details and reads Approve, primary", async () => {
+  it("shows the diff on the card face, old struck through and new in the success colour, and a verb primary", async () => {
     const wrapper = mountCard(
       cardOf({
         type: "confirmation_required",
@@ -320,11 +340,14 @@ describe("AssistantApprovalCard", () => {
       }),
     );
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-approval-diff"]').exists()).toBe(false);
-    await openDetails(wrapper);
     const diff = wrapper.get('[data-test="assistant-approval-diff"]');
     expect(diff.text()).toContain("title");
     expect(diff.get("s").text()).toBe("Old");
+    expect(diff.get("s").classes()).toContain("text-text-secondary");
+    const after = diff.get('[data-test="assistant-approval-diff-after"]');
+    expect(after.text()).toBe("New");
+    expect(after.classes()).toContain("text-status-success-text");
+    expect(wrapper.find('[data-test="assistant-approval-details"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-approval-approve"]').text()).toBe("Update dashboard");
   });
 
@@ -358,8 +381,6 @@ describe("AssistantApprovalCard", () => {
     );
     const meta = wrapper.get('[data-test="assistant-approval-meta"]').text();
     expect(meta).toMatch(/^Until .* · Payments$/);
-    expect(wrapper.text()).not.toContain("#cart-oncall");
-    await openDetails(wrapper);
     expect(wrapper.get('[data-test="assistant-approval-diff"]').text()).toContain("#cart-oncall");
     expect(wrapper.get('[data-test="assistant-approval-approve"]').text()).toBe("Pause alert");
   });
@@ -389,18 +410,17 @@ describe("AssistantApprovalCard", () => {
     expect(one.find('[data-test="assistant-approval-meta"]').exists()).toBe(false);
   });
 
-  it("offers Finish in Alerts inside Details, resolving the card first (PO A9)", async () => {
+  it("offers Finish in Alerts in ⋯, resolving the card first (PO A9)", async () => {
     const router = fakeRouter(routes);
     const push = vi.spyOn(router, "push");
     const wrapper = mount(AssistantApprovalCard, {
       props: { card: cardOf(PAUSE), org: "default" },
       attachTo: document.body,
-      global: { plugins: [router] },
+      global: { plugins: [router], stubs: dropdownStubs },
     });
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-approval-finish-in"]').exists()).toBe(false);
-    await openDetails(wrapper);
     const finish = wrapper.get('[data-test="assistant-approval-finish-in"]');
+    expect(finish.attributes("role")).toBe("menuitem");
     expect(finish.text()).toBe("Finish in Alerts");
     await press(finish);
     expect(wrapper.emitted("decide")?.[0][0]).toEqual({
@@ -442,6 +462,33 @@ describe("AssistantApprovalCard", () => {
     const destructive = mountCard(cardOf(DELETE_ONE, { grantable: true }));
     await openDetails(destructive);
     expect(destructive.find('[data-test="assistant-approval-scope"]').exists()).toBe(false);
+  });
+
+  it("offers an always scope only for a change to several targets, worded by the action", async () => {
+    const pause = (targets: { type: string; id: string; name: string }[]) =>
+      cardOf({
+        type: "confirmation_required",
+        tool: "EnableAlert",
+        kind: "update",
+        grantable: true,
+        targets,
+        args: { value: false },
+      });
+    const one = mountCard(pause([{ type: "alert", id: "a1", name: "inventory pod restarts" }]));
+    expect(one.find('[data-test="assistant-approval-scope"]').exists()).toBe(false);
+    const three = mountCard(
+      pause([
+        { type: "alert", id: "a1", name: "inventory pod restarts" },
+        { type: "alert", id: "a2", name: "inventory p95 > 600 ms" },
+        { type: "alert", id: "a3", name: "inventory error budget burn" },
+      ]),
+    );
+    const options = three.findComponent(OSelect).props("options") as { label: string }[];
+    expect(options.map((option) => option.label)).toEqual([
+      "Just this once",
+      "For this chat",
+      "Always for pausing alerts",
+    ]);
   });
 
   it("plans a batch with tick boxes, and Approve follows the ticked items", async () => {
@@ -509,7 +556,7 @@ describe("AssistantApprovalCard", () => {
   });
 
   it("puts Details after the buttons in the DOM", async () => {
-    const wrapper = mountCard(cardOf(PAUSE));
+    const wrapper = mountCard(cardOf(DELETE_ONE));
     await flushPromises();
     const details = wrapper.get('[data-test="assistant-approval-details"]').element;
     const approve = wrapper.get('[data-test="assistant-approval-approve"]').element;
@@ -587,18 +634,42 @@ describe("AssistantApprovalCard", () => {
     expect(wrapper.find('[data-test="assistant-approval-edit"]').exists()).toBe(false);
   });
 
-  it("offers More time from mount when the server allows it, in the action row before Approve (PO A11, A23)", async () => {
+  it("offers More time from mount when the server allows it, in ⋯ after Reply (PO A11, A23)", async () => {
     const later = cardOf(DELETE_ONE, { expiresAt: Date.now() + 240_000 });
     expect(mountCard(later).find('[data-test="assistant-approval-extend"]').exists()).toBe(false);
     const extendable = mountCard(later, { extendable: true });
-    expect(extendable.find('[data-test="assistant-approval-extend"]').exists()).toBe(true);
-    const order = buttons(extendable);
-    expect(order.indexOf("assistant-approval-extend")).toBeLessThan(
-      order.indexOf("assistant-approval-approve"),
+    expect(menuItems(extendable)).toEqual([
+      "assistant-approval-reply",
+      "assistant-approval-extend",
+    ]);
+    await press(extendable.get('[data-test="assistant-approval-extend"]'));
+    expect(extendable.emitted("extend")).toHaveLength(1);
+  });
+
+  it("opens ⋯ upward from the start, so the menu never covers Deny or Approve", () => {
+    const menu = mountCard(cardOf(DELETE_ONE)).get('[data-test="assistant-approval-menu"]');
+    expect(menu.attributes("data-side")).toBe("top");
+    expect(menu.attributes("data-align")).toBe("start");
+  });
+
+  it("the footer holds only Deny and the verb primary as buttons", () => {
+    const wrapper = mountCard(cardOf(PAUSE));
+    const footer = wrapper.get('[data-test="assistant-approval-footer"]');
+    const labels = footer
+      .findAll("button")
+      .filter(
+        (b) =>
+          b.attributes("role") !== "menuitem" &&
+          b.attributes("data-test") !== "assistant-approval-more",
+      )
+      .map((b) => b.text());
+    expect(labels).toEqual(["Deny", "Pause alert"]);
+    expect(footer.get('[data-test="assistant-approval-deny"]').attributes("data-o2-variant")).toBe(
+      "outline",
     );
-    expect(order.indexOf("assistant-approval-reply")).toBeLessThan(
-      order.indexOf("assistant-approval-extend"),
-    );
+    expect(
+      footer.get('[data-test="assistant-approval-approve"]').attributes("data-o2-variant"),
+    ).toBe("primary");
   });
 
   it("keeps the raw arguments behind Details", async () => {
@@ -698,14 +769,8 @@ describe("AssistantApprovalCard", () => {
       );
       const finish = wrapper.get('[data-test="assistant-approval-finish-in"]');
       expect(finish.attributes("data-o2-variant")).toBe("primary");
-      expect(finish.classes()).toContain("ms-auto");
-      expect(buttons(wrapper).filter((id) => id === "assistant-approval-finish-in")).toHaveLength(
-        1,
-      );
-      const order = buttons(wrapper);
-      expect(order.indexOf("assistant-approval-reply")).toBeLessThan(
-        order.indexOf("assistant-approval-finish-in"),
-      );
+      expect(wrapper.findAll('[data-test="assistant-approval-finish-in"]')).toHaveLength(1);
+      expect(menuItems(wrapper)).toEqual(["assistant-approval-reply"]);
     });
 
     it("decides the gate when the card mounts, so an upgrade never changes a card being read", async () => {

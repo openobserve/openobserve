@@ -136,7 +136,7 @@ describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
     }
   });
 
-  it("says a policy every agent shares once in the header, with each purpose under its name", async () => {
+  it("says a policy every agent shares once in the header, and lists agents by name only (K10)", async () => {
     withAgents([
       { id: "o2-ai", pickable: true, available: true, readOnly: true },
       { id: "sre", pickable: true, available: true, readOnly: true },
@@ -151,11 +151,10 @@ describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
     const clauses = group
       .findAll('[data-test="assistant-mention-agent-clause"]')
       .map((c) => c.text());
-    expect(clauses).toHaveLength(2);
-    expect(clauses.some((c) => c.includes("Read-only"))).toBe(false);
+    expect(clauses).toEqual([]);
   });
 
-  it("never words a policy for agents that are not read-only", async () => {
+  it("never words a policy or a purpose for agents that are not read-only", async () => {
     withAgents([
       { id: "o2-ai", pickable: true, available: true },
       { id: "sre", pickable: true, available: true },
@@ -165,7 +164,7 @@ describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
     expect(group.find('[data-test="assistant-mention-group-note"]').exists()).toBe(false);
     expect(
       group.findAll('[data-test="assistant-mention-agent-clause"]').map((c) => c.text()),
-    ).toEqual(["Finds causes"]);
+    ).toEqual([]);
   });
 
   it("renders no group for one agent or without a roster", async () => {

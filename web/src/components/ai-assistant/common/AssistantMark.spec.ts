@@ -17,6 +17,7 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
 import AssistantMark from "./AssistantMark.vue";
+import { ASSISTANT_MOTION } from "./assistantMotion";
 
 describe("AssistantMark", () => {
   it("is a decorative rounded square, never a circle", () => {
@@ -49,5 +50,14 @@ describe("AssistantMark", () => {
   it("is not interactive", () => {
     const wrapper = mount(AssistantMark);
     expect(wrapper.find("button, a, [tabindex]").exists()).toBe(false);
+  });
+  it("is a tinted tile with its inner ring, and sparkles only when asked", () => {
+    const mark = mount(AssistantMark).get('[data-test="assistant-mark"]');
+    expect(mark.classes()).toContain("shadow-assistant-mark");
+    expect(mark.classes()).not.toContain(ASSISTANT_MOTION.sparkle);
+    const sparkling = mount(AssistantMark, { props: { sparkle: true } }).get(
+      '[data-test="assistant-mark"]',
+    );
+    expect(sparkling.classes()).toContain(ASSISTANT_MOTION.sparkle);
   });
 });

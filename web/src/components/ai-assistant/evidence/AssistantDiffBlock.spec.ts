@@ -136,6 +136,17 @@ describe("AssistantDiffBlock", () => {
     wrapper.unmount();
   });
 
+  it("strikes the old line through, muted, and draws the new one in the success colour", async () => {
+    const { wrapper } = setup({ before: "a", after: "b" });
+    await flushPromises();
+    const [removed, added] = wrapper.findAll('[data-test="assistant-diff-lines"] li');
+    expect(removed.classes()).toEqual(
+      expect.arrayContaining(["text-text-secondary", "line-through"]),
+    );
+    expect(added.classes()).toContain("text-status-success-text");
+    wrapper.unmount();
+  });
+
   it("marks each unknown field where it appears in the proposal, named for screen readers", async () => {
     const { wrapper } = setup({
       before: "a",

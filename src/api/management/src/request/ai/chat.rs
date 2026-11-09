@@ -5783,6 +5783,7 @@ mod tests {
             pinned_at: None,
             seed: None,
             search_text: None,
+            branched_from: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(row).reset_all())
             .exec(conn)

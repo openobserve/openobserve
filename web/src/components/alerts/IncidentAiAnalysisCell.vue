@@ -81,6 +81,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("alerts.incidents.aiAnalysis.analyze") }}
       </OButton>
+      <!-- A run already exists, so the door follows it in the assistant instead of starting another. -->
+      <OButton
+        v-if="followTarget"
+        variant="ghost-primary"
+        size="xs"
+        :icon-left="assistantGlyph.thread"
+        class="shrink-0"
+        data-test="incident-ai-analysis-follow-btn"
+        @click.stop="follow"
+      >
+        {{ t("alerts.incidents.rcaRun.followInThread") }}
+      </OButton>
     </template>
   </div>
 </template>
@@ -93,7 +105,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import type { Incident } from "@/services/incidents";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaTrigger } from "@/composables/useRcaTrigger";
-import { RCA_BADGE_VARIANT, rcaCellModel } from "@/utils/incidents/rcaCell";
+import { RCA_BADGE_VARIANT, rcaCellModel, rcaFollowTarget } from "@/utils/incidents/rcaCell";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { useRcaFollow } from "@/components/ai-assistant/shell/rcaFollow";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -135,6 +149,15 @@ const model = computed(() =>
 );
 
 const starting = ref(false);
+
+const followTarget = computed(() =>
+  rcaFollowTarget(props.incident, store.state.selectedOrganization.identifier),
+);
+const follow = (event: MouseEvent) => {
+  const target = followTarget.value;
+  // The assistant runtime is built on first use, so a list that never follows a run never builds it.
+  if (target) useRcaFollow().follow(target, event.currentTarget as HTMLElement | null);
+};
 
 // The badge's accessible name is its visible label; the detail describes it.
 const detailId = `${useId()}-rca-detail`;

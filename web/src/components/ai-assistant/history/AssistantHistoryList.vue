@@ -75,10 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
         <ODropdownSub
           v-if="narrow && $slots['menu-layout']"
-          :text-value="t('assistant.shell.layout')"
+          :text-value="t('assistant.shell.openAs')"
         >
-          <template #icon-left><OIcon :name="assistantGlyph.layout" size="sm" /></template>
-          <template #trigger>{{ t("assistant.shell.layout") }}</template>
+          <template #icon-left><OIcon :name="assistantGlyph.openFull" size="sm" /></template>
+          <template #trigger>{{ t("assistant.shell.openAs") }}</template>
           <slot name="menu-layout" />
         </ODropdownSub>
         <template v-if="history.rows.value.length && !readonly">
@@ -94,43 +94,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </ODropdown>
     </div>
-    <ODropdown v-if="toolsShown && filterShown" align="start">
-      <template #trigger>
-        <OButton
-          variant="ghost"
-          size="xs"
-          :icon-left="assistantGlyph.filter"
-          :aria-label="filterName"
-          :class="[
-            '-ms-1 shrink-0 self-start max-md:min-h-11 pointer-coarse:min-h-11',
-            activeFilters.length && 'text-assistant-link',
-          ]"
-          data-test="assistant-history-filter"
-        >
-          {{ filterName }}
-        </OButton>
-      </template>
-      <ODropdownGroup
-        v-for="section in filterSections"
-        :key="section.id"
-        :label="section.label"
-        :data-test="`assistant-history-filter-${section.id}`"
+    <div
+      v-if="toolsShown && views.length > 1"
+      class="-mx-1 flex min-w-0 shrink-0 overflow-x-auto px-1"
+      data-test="assistant-history-views"
+    >
+      <OToggleGroup
+        :model-value="view"
+        :aria-label="t('assistant.history.filter.show')"
+        mobile-dropdown
+        @update:model-value="(value) => setView(value as HistoryView)"
       >
-        <ODropdownItem
-          v-for="choice in section.choices"
-          :key="choice.id"
-          role="menuitemradio"
-          :aria-checked="choice.checked"
-          :data-test="`assistant-history-filter-${choice.id}`"
-          @select="choice.toggle"
+        <OToggleGroupItem
+          v-for="item in views"
+          :key="item.id"
+          :value="item.id"
+          size="xs"
+          :data-test="`assistant-history-view-${item.id}`"
         >
-          {{ choice.label }}
-          <template v-if="choice.checked" #icon-right>
-            <OIcon :name="assistantGlyph.done" size="sm" class="text-assistant-link ms-auto" />
-          </template>
-        </ODropdownItem>
-      </ODropdownGroup>
-    </ODropdown>
+          {{ item.label }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+    </div>
 
     <div ref="scroller" class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
       <h2 v-if="mode === 'rail'" class="sr-only">{{ t("assistant.history.title") }}</h2>
@@ -170,28 +155,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @retry="history.retry()"
       />
 
-      <div
-        v-if="activeFilters.length"
-        class="flex min-w-0 shrink-0 flex-wrap items-center gap-1"
-        data-test="assistant-history-chips"
-      >
-        <OButton
-          v-for="chip in activeFilters"
-          :key="chip.id"
-          variant="secondary"
-          size="xs"
-          :icon-right="assistantGlyph.close"
-          :aria-label="t('assistant.history.filter.remove', { filter: chip.label })"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          :data-test="`assistant-history-chip-${chip.id}`"
-          @click="chip.clear"
-        >
-          {{ chip.label }}
-        </OButton>
-        <OText variant="meta" as="span" data-test="assistant-history-chips-count">
-          {{ t("assistant.history.filter.count", { count: drawn.length }, drawn.length) }}
-        </OText>
-      </div>
       <OText
         v-if="searchLine"
         variant="meta"
@@ -202,7 +165,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ searchLine }}
       </OText>
 
-      <div class="shrink-0">
+      <div v-if="view === 'auto_runs'" class="shrink-0" data-test="assistant-history-auto-runs">
+        <div v-if="autoRuns.isPending.value" class="flex flex-col gap-2">
+          <OSkeleton v-for="n in 3" :key="n" type="rect" class="h-8 w-full" />
+        </div>
+        <AssistantErrorRow
+          v-else-if="autoRuns.isError.value"
+          :message="t('assistant.history.serverError')"
+          retryable
+          :retry-label="t('common.retry')"
+          data-test="assistant-history-auto-runs-error"
+          @retry="autoRuns.refetch()"
+        />
+        <OEmptyState
+          v-else-if="!autoRunRows.length"
+          size="inline"
+          :backdrop="false"
+          :title="t('assistant.history.autoRuns.empty')"
+          data-test="assistant-history-auto-runs-empty"
+        />
+        <ul v-else :aria-label="t('assistant.history.filter.autoRuns')" class="flex flex-col">
+          <AssistantAutoRunRow
+            v-for="run in autoRunRows"
+            :key="run.run_id"
+            :run="run"
+            @open="openRun"
+          />
+        </ul>
+      </div>
+      <div v-else class="shrink-0">
         <div
           v-if="
             (listState.status === 'loading' || listState.status === 'idle') &&
@@ -265,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="inline"
           :backdrop="false"
           :title="t('assistant.history.filterEmpty')"
-          :action-label="t('assistant.history.filter.clear')"
+          :action-label="t('assistant.history.filter.all')"
           data-test="assistant-history-filter-empty"
           @action="clearFilters"
         />
@@ -434,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { Container, HistoryFilter, HistoryRow, Sid } from "@/composables/assistant";
+import type { Container, HistoryRow, Sid } from "@/composables/assistant";
 
 export interface AssistantHistoryListProps {
   /** `panel` replaces a container's chat (D5 §3.2); `rail` sits beside the full view's chat. */
@@ -477,6 +468,12 @@ const GROUP_HEADING_CLASS = "text-text-secondary px-2 pb-1 text-xs font-medium";
 
 type GroupId = (typeof GROUP_ORDER)[number];
 
+/** The list's one filter row: everything, waiting chats, investigations, the org's auto-runs, or shared chats. */
+export type HistoryView = "all" | "needs_you" | "investigations" | "auto_runs" | "shared";
+
+/** Auto-runs the Auto-runs view reads in one page. */
+export const AUTO_RUNS_PAGE = 50;
+
 type FlatEntry = { kind: "group"; id: GroupId } | { kind: "row"; id: string; row: HistoryRow };
 </script>
 
@@ -499,7 +496,6 @@ import {
   runAgentKey,
   useAssistantCapability,
   useAssistantHistory,
-  useAssistantName,
   useAssistantRuns,
   useAssistantStore,
   useChatExport,
@@ -511,26 +507,32 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { mySharesQuery } from "@/services/ai_chat_share.queries";
+import type { OrgRcaRun } from "@/services/rca_runs_org";
+import { orgRcaRunsQuery } from "@/services/rca_runs_org.queries";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgTime, orgDayDistance, orgTimeZone } from "@/utils/formatters";
 
+import AssistantAutoRunRow from "./AssistantAutoRunRow.vue";
 import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";
 import AssistantHistoryRow from "./AssistantHistoryRow.vue";
 import AssistantImportCard from "./AssistantImportCard.vue";
 import AssistantLocalOnlyHeader from "./AssistantLocalOnlyHeader.vue";
+import { useRcaFollow } from "@/components/ai-assistant/shell/rcaFollow";
+
 import { chatStatusOf, isInProgress, type ChatStatus } from "./chatStatus";
 import { useAssistantHistoryKeys } from "./useAssistantHistoryKeys";
 
@@ -541,7 +543,6 @@ const emit = defineEmits<{ opened: [sid: Sid]; close: []; "shared-links": [] }>(
 defineSlots<{ "menu-layout"?: () => unknown }>();
 
 const { t } = useI18nTyped();
-const { product } = useAssistantName();
 const history = useAssistantHistory();
 const capability = useAssistantCapability();
 const store = useAssistantStore();
@@ -610,66 +611,47 @@ const sharesOffered = computed(
 const offersAgents = computed(() => rosterOffersChoice(capability.value.agents));
 const triedTime = computed(() => (triedAt.value ? formatOrgTime(triedAt.value) : ""));
 
-function filterChoice<K extends "kind" | "agent" | "started">(
-  key: K,
-  value: NonNullable<HistoryFilter[K]>,
-  off: HistoryFilter[K],
-  id: string,
-  label: I18nText,
-) {
-  const checked = history.filter.value[key] === value;
-  return {
-    id,
-    label,
-    checked,
-    toggle: () => history.setFilter({ [key]: checked ? off : value }),
-    clear: () => history.setFilter({ [key]: off }),
-  };
-}
-
-// Only the server keeps share links, so a browser-only list has nothing to show as shared.
-const filterSections = computed(() => {
+// Investigations and Auto-runs need the agent roster and the server; Shared needs the server's links.
+const views = computed(() => {
   const server = history.mode.value === "server";
   const f = "assistant.history.filter";
-  const sections = [
+  const list: { id: HistoryView; label: I18nText }[] = [
+    { id: "all", label: t(`${f}.all`) },
     {
-      id: "show",
-      label: t(`${f}.show`),
-      choices: [
-        filterChoice("kind", "pinned", "all", "pinned", t(`${f}.pinned`)),
-        ...(server ? [filterChoice("kind", "shared", "all", "shared", t(`${f}.shared`))] : []),
-      ],
-    },
-    {
-      id: "started",
-      label: t(`${f}.started`),
-      choices: [
-        filterChoice("started", "alert", null, "alert", t(`${f}.alertOrIncident`)),
-        filterChoice("started", "editor", null, "editor", t(`${f}.queryEditor`)),
-      ],
+      id: "needs_you",
+      label: needsYouCount.value
+        ? t(`${f}.needsYouCount`, { count: needsYouCount.value })
+        : t(`${f}.needsYou`),
     },
   ];
-  if (offersAgents.value)
-    sections.splice(1, 0, {
-      id: "agent",
-      label: t(`${f}.agent`),
-      choices: (["general", "investigator", "queryBuilder"] as const).map((id) =>
-        filterChoice("agent", id, null, id, t(`assistant.runs.agent.${id}`, { product })),
-      ),
-    });
-  return sections;
+  if (offersAgents.value) list.push({ id: "investigations", label: t(`${f}.investigations`) });
+  if (server) list.push({ id: "auto_runs", label: t(`${f}.autoRuns`) });
+  if (server) list.push({ id: "shared", label: t(`${f}.shared`) });
+  return list;
 });
-const activeFilters = computed(() =>
-  filterSections.value.flatMap((section) => section.choices.filter((choice) => choice.checked)),
+const needsYouCount = computed(
+  () => runs.rows.value.filter((row) => row.group === "needs_you" && !row.otherOrg).length,
 );
-const filterShown = computed(
-  () => history.rows.value.length >= FILTER_FROM || activeFilters.value.length > 0,
+const localView = ref<"all" | "needs_you" | "auto_runs">("all");
+// Shared and Investigations live in the stored filter, so a reload keeps them; the rest are this list's own.
+const view = computed<HistoryView>(() => {
+  const { kind, agent } = history.filter.value;
+  if (kind === "shared") return "shared";
+  if (agent === "investigator") return "investigations";
+  return localView.value;
+});
+const narrowed = computed(() => view.value !== "all");
+
+const autoRuns = useQuery(
+  computed(() => ({
+    ...orgRcaRunsQuery(org.value, { trigger: "auto", limit: AUTO_RUNS_PAGE }),
+    enabled: view.value === "auto_runs" && !!org.value,
+  })),
+  queryClient,
 );
-const filterName = computed(() =>
-  activeFilters.value.length
-    ? t("assistant.history.filter.active", { n: activeFilters.value.length })
-    : t("assistant.history.filter.button"),
-);
+const autoRunRows = computed<OrgRcaRun[]>(() => autoRuns.data.value?.runs ?? []);
+const rca = useRcaFollow();
+
 // A failed read or an empty list has nothing to search; a first load keeps the box under the skeleton.
 const toolsShown = computed(
   () =>
@@ -693,7 +675,11 @@ const liveRows = computed<HistoryRow[]>(() => {
   return runs.rows.value.filter((row) => !listed.has(row.sid) && isCounted(row)).map(rowOfRun);
 });
 const shownRows = computed<HistoryRow[]>(() => {
-  if (query.value || activeFilters.value.length) return history.visible.value;
+  if (view.value === "needs_you")
+    return [...liveRows.value, ...history.visible.value].filter(
+      (row) => statusOf(row) === "needs_you",
+    );
+  if (query.value || narrowed.value) return history.visible.value;
   const seen = new Set(history.visible.value.map((row) => row.sid));
   const drafts = history.drafts.value.filter((row) => !seen.has(row.sid));
   return [...liveRows.value, ...history.visible.value, ...drafts];
@@ -764,6 +750,14 @@ onMounted(() => {
     });
   if (props.mode === "panel") root.value?.addEventListener("keydown", onRootKey);
   history.ensureLoaded();
+  // A filter stored before the filter row existed has no control left to clear it.
+  const stored = history.filter.value;
+  if (
+    stored.kind === "pinned" ||
+    stored.started ||
+    (stored.agent && stored.agent !== "investigator")
+  )
+    setView("all");
   trackAssistant("ai_history_open", { placement: props.mode });
   clock = setInterval(tick, 60_000);
   if (props.mode !== "rail") void nextTick(() => focusSearch());
@@ -922,8 +916,31 @@ function clearSearch(): void {
 }
 
 function clearFilters(): void {
-  history.setFilter({ kind: "all", agent: null, started: null });
+  setView("all");
   focusSearch();
+}
+
+function setView(next: HistoryView): void {
+  localView.value = next === "needs_you" || next === "auto_runs" ? next : "all";
+  const kind = next === "shared" ? "shared" : "all";
+  const agent = next === "investigations" ? "investigator" : null;
+  history.setFilter({ kind, agent, started: null });
+}
+
+// The panel follows the run beside the page; the full view has no side panel, so the incident's analysis opens.
+function openRun(run: OrgRcaRun): void {
+  if (props.mode === "panel" && !props.windowSid) {
+    rca.follow({ org: org.value, incidentId: run.incident_id, runId: run.run_id });
+    emit("close");
+    return;
+  }
+  void router
+    .push({
+      name: "incidentDetail",
+      params: { id: run.incident_id },
+      query: { org_identifier: org.value, tab: "incidentAnalysis" },
+    })
+    .catch(() => undefined);
 }
 
 async function openRow(sid: Sid): Promise<void> {

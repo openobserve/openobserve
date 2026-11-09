@@ -316,13 +316,7 @@ impl RcaTurnError {
 
     /// A turn that never started may legitimately have no session row.
     pub fn is_start_code(code: &str) -> bool {
-        [
-            admission::TURN_LIMIT,
-            ERROR_CREDENTIALS,
-            ERROR_AGENT_UNAVAILABLE,
-            ERROR_BUSY,
-        ]
-        .contains(&code)
+        config::meta::alerts::rca_runs::is_refusal_code(code)
     }
 }
 

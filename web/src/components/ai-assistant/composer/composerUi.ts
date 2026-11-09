@@ -67,8 +67,6 @@ export interface ComposerLayout {
   narrow: boolean;
   tight: boolean;
   wide: boolean;
-  /** Dictation at 20 rem takes the room of `+N` and the chips. */
-  yieldChips: boolean;
 }
 
 export const composerLayoutKey: InjectionKey<ComputedRef<ComposerLayout>> =
@@ -82,7 +80,7 @@ let seq = 0;
 export function useComposerLayout(): ComputedRef<ComposerLayout> {
   return inject(
     composerLayoutKey,
-    computed(() => ({ narrow: false, tight: false, wide: false, yieldChips: false })),
+    computed(() => ({ narrow: false, tight: false, wide: false })),
     false,
   );
 }

@@ -25,6 +25,7 @@ import { setOrgTimeZoneSource } from "@/utils/formatters";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import { historyStubs } from "../__tests__/historyStubs";
+import { followedRcaRun, stopFollowingRca } from "../shell/rcaFollow";
 
 import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";
 import AssistantHistoryList, {
@@ -33,8 +34,9 @@ import AssistantHistoryList, {
   VIRTUAL_FROM,
 } from "./AssistantHistoryList.vue";
 
-const { fake, exporter } = vi.hoisted(() => ({
+const { fake, exporter, listOrgRcaRuns } = vi.hoisted(() => ({
   fake: { current: null as any },
+  listOrgRcaRuns: vi.fn(),
   exporter: {
     exportChat: vi.fn(),
     exportAll: vi.fn(),
@@ -49,6 +51,7 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantHistory: () => fake.current.history,
   useChatExport: () => exporter,
 }));
+vi.mock("@/services/rca_runs_org", () => ({ listOrgRcaRuns }));
 vi.mock("@/services/ai_chat_share", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/ai_chat_share")>();
   return {
@@ -330,65 +333,116 @@ describe("AssistantHistoryList", () => {
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockReturnValue({ width: 382 } as DOMRect);
     const inWindow = await setup({ container: "window" });
-    inWindow.history.setFilter({ kind: "pinned" });
-    await flushPromises();
     const list = (w: typeof inWindow.wrapper) => w.get('[data-test="assistant-history"]');
     expect(list(inWindow.wrapper).attributes("data-narrow")).toBeUndefined();
-    expect(inWindow.wrapper.get('[data-test="assistant-history-filter"]').text()).toBe(
-      "Filter · 1",
-    );
     inWindow.wrapper.unmount();
     const inSidebar = await setup({ container: "sidebar" });
-    inSidebar.history.setFilter({ kind: "pinned" });
-    await flushPromises();
     expect(list(inSidebar.wrapper).attributes("data-narrow")).toBe("");
-    expect(inSidebar.wrapper.get('[data-test="assistant-history-filter"]').text()).toBe(
-      "Filter · 1",
-    );
     rect.mockRestore();
   });
 
-  it("shows Filter from 8 chats or while one is active, and counts what the chips leave", async () => {
-    const { wrapper, history } = await setup();
+  it("offers one filter row, All first, and Needs you narrows to the chats waiting on the reader", async () => {
+    const { wrapper } = await setup();
+    const views = wrapper
+      .findAll('[data-test^="assistant-history-view-"]')
+      .map((el) => el.attributes("data-test"));
+    expect(views.slice(0, 2)).toEqual([
+      "assistant-history-view-all",
+      "assistant-history-view-needs_you",
+    ]);
     expect(wrapper.find('[data-test="assistant-history-filter"]').exists()).toBe(false);
-    history.setFilter({ kind: "pinned" });
+    expect(rowButtons(wrapper).length).toBeGreaterThan(0);
+    await wrapper.get('[data-test="assistant-history-view-needs_you"]').trigger("click");
     await flushPromises();
-    expect(wrapper.get('[data-test="assistant-history-filter"]').text()).toBe("Filter · 1");
-    const rows = wrapper.findAll('[data-test="assistant-history-row"]');
-    expect(wrapper.get('[data-test="assistant-history-chips-count"]').text()).toBe(
-      `${rows.length} chat`,
-    );
-    await wrapper.get('[data-test="assistant-history-chip-pinned"]').trigger("click");
-    expect(history.filter.value.kind).toBe("all");
+    expect(rowButtons(wrapper)).toHaveLength(0);
+    expect(wrapper.find('[data-test="assistant-history-filter-empty"]').exists()).toBe(true);
   });
 
-  it("offers a Shared filter only where the server keeps share links", async () => {
-    const options = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
-      wrapper
-        .get('[data-test="assistant-history-filter-show"]')
-        .findAll('[role="menuitemradio"]')
-        .map((item) => item.text());
+  it("clears a stored filter the row cannot show, so no chat stays hidden behind it", async () => {
+    const { wrapper, history } = await setup(
+      {},
+      {
+        patchHistory: (h: any) => {
+          h.setFilter({ kind: "pinned" });
+          return h;
+        },
+      },
+    );
+    expect(history.filter.value.kind).toBe("all");
+    expect(rowButtons(wrapper)).toHaveLength(SEED.length);
+  });
+
+  it("offers Auto-runs and Shared only where the server keeps them", async () => {
+    const ids = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
+      wrapper.findAll('[data-test^="assistant-history-view-"]').map((el) => el.text());
     const local = await setup();
-    local.history.setFilter({ kind: "pinned" });
-    await flushPromises();
-    expect(options(local.wrapper)).not.toContain("Shared");
-    local.history.setFilter({ kind: "all" });
+    expect(ids(local.wrapper)).not.toContain("Shared");
+    expect(ids(local.wrapper)).not.toContain("Auto-runs");
     local.wrapper.unmount();
     const server = await setup({}, { persistence: true });
     expect(server.history.mode.value).toBe("server");
-    server.history.setFilter({ kind: "pinned" });
-    await flushPromises();
-    expect(options(server.wrapper)).toContain("Shared");
+    expect(ids(server.wrapper)).toEqual(expect.arrayContaining(["Auto-runs", "Shared"]));
     expect(aiChatShare.listMine).not.toHaveBeenCalled();
     vi.mocked(aiChatShare.listMine).mockResolvedValueOnce({
       data: { shares: [{ session_id: SEED[0].sessionId }] },
     } as never);
     const noted = vi.spyOn(server.history, "noteShared");
-    server.history.setFilter({ kind: "shared" });
+    await server.wrapper.get('[data-test="assistant-history-view-shared"]').trigger("click");
     await flushPromises();
+    expect(server.history.filter.value.kind).toBe("shared");
     expect(aiChatShare.listMine).toHaveBeenCalledTimes(1);
     expect(noted).toHaveBeenLastCalledWith([SEED[0].sessionId]);
     server.history.setFilter({ kind: "all" });
+  });
+
+  it("lists the org's auto-runs from the server and follows one in the side panel", async () => {
+    listOrgRcaRuns.mockResolvedValue({
+      data: {
+        runs: [
+          {
+            run_id: "r2",
+            incident_id: "inc-481",
+            incident_title: "Checkout errors",
+            severity: "P1",
+            state: "refused",
+            trigger: "auto",
+            started_at: (NOW - 60_000) * 1000,
+            ended_at: (NOW - 59_000) * 1000,
+            error_code: "turn_limit",
+          },
+          {
+            run_id: "r1",
+            incident_id: "inc-482",
+            incident_title: null,
+            severity: null,
+            state: "running",
+            trigger: "auto",
+            started_at: (NOW - 120_000) * 1000,
+            ended_at: null,
+            error_code: null,
+          },
+        ],
+        has_more: false,
+      },
+    });
+    const { wrapper } = await setup({}, { persistence: true });
+    expect(listOrgRcaRuns).not.toHaveBeenCalled();
+    await wrapper.get('[data-test="assistant-history-view-auto_runs"]').trigger("click");
+    await flushPromises();
+    expect(listOrgRcaRuns).toHaveBeenCalledWith("default", { trigger: "auto", limit: 50 });
+    const runs = wrapper.findAll('[data-test="assistant-auto-run"]');
+    expect(runs.map((run) => run.attributes("data-mark"))).toEqual(["failed", "working"]);
+    expect(runs[0].text()).toContain("Checkout errors");
+    expect(runs[0].text()).toContain("Failed");
+    expect(runs[1].text()).toContain("inc-482");
+    await runs[0].get('[data-test="assistant-auto-run-open"]').trigger("click");
+    expect(followedRcaRun().value).toEqual({
+      org: "default",
+      incidentId: "inc-481",
+      runId: "r2",
+    });
+    expect(wrapper.emitted("close")).toHaveLength(1);
+    stopFollowingRca();
   });
 
   it("lists as shared only chats whose link has not expired", async () => {

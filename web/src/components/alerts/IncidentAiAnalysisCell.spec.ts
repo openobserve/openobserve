@@ -17,7 +17,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import type * as ConsentModule from "@/composables/usePaidOverageConsent";
 
-const { toastMock, awsConfig, promptForConsent } = vi.hoisted(() => ({
+const { toastMock, awsConfig, promptForConsent, follow } = vi.hoisted(() => ({
+  follow: vi.fn(),
   toastMock: vi.fn(),
   awsConfig: { isCloud: "false", isEnterprise: "true" },
   promptForConsent: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("@/composables/usePaidOverageConsent", async (importOriginal) => ({
 }));
 vi.mock("@/services/incidents", () => ({ default: { triggerRca: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+vi.mock("@/components/ai-assistant/shell/rcaFollow", () => ({ useRcaFollow: () => ({ follow }) }));
 
 import incidentsService, { type Incident } from "@/services/incidents";
 import store from "@/test/unit/helpers/store";
@@ -37,6 +39,7 @@ import i18n from "@/locales";
 import { aiCreditsNotice } from "@/utils/aiCredits";
 import type { TranslateFn } from "@/types/i18n";
 import IncidentAiAnalysisCell from "./IncidentAiAnalysisCell.vue";
+import { rcaSummary } from "@/test/unit/fixtures/rcaThread";
 
 const triggerRca = vi.mocked(incidentsService.triggerRca);
 
@@ -268,5 +271,37 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
     const detail = wrapper.get('[data-test="incident-ai-analysis-detail"]');
     expect(badge.attributes("aria-describedby")).toBe(detail.attributes("id"));
     expect(detail.text()).toContain("re-run failed");
+  });
+
+  describe("v7: Follow in thread", () => {
+    const mountWith = (rca: Incident["rca"]) =>
+      mount(IncidentAiAnalysisCell, {
+        props: { incident: { ...incident, rca }, rcaEnabled: true, now: Date.now() },
+        global: { plugins: [store, i18n] },
+      });
+
+    it.each(["running", "completed"] as const)(
+      "a %s run offers Follow in thread, which follows that run in the assistant",
+      async (state) => {
+        const wrapper = mountWith(rcaSummary({ run_id: "run-7", state }));
+        const button = wrapper.get('[data-test="incident-ai-analysis-follow-btn"]');
+
+        expect(button.text()).toBe("Follow in thread");
+        await button.trigger("click");
+        expect(follow).toHaveBeenCalledWith(
+          { org: "default", incidentId: "inc-1", runId: "run-7" },
+          button.element,
+        );
+        expect(triggerRca).not.toHaveBeenCalled();
+        expect(wrapper.emitted("open")).toBeUndefined();
+      },
+    );
+
+    it("an incident with no run keeps Analyze and has no Follow in thread", () => {
+      const wrapper = mountWith(null);
+
+      expect(wrapper.find('[data-test="incident-ai-analysis-follow-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="incident-ai-analysis-analyze-btn"]').exists()).toBe(true);
+    });
   });
 });

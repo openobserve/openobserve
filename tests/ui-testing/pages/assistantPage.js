@@ -97,11 +97,6 @@ export class AssistantPage {
     return this.transcript().locator('[data-test="assistant-turn-status"]');
   }
 
-  /** The sticky copy of the status in the strip above the composer. */
-  stickyStatus() {
-    return this.container().locator('[data-test="assistant-sticky-status"]');
-  }
-
   /** A terminal block: refusals sit above the composer, failures in the log. */
   outcome() {
     return this.container().locator('[data-test="assistant-turn-outcome"]').last();
@@ -120,10 +115,6 @@ export class AssistantPage {
     return this.transcript().locator("[data-answer]").last();
   }
 
-  strip() {
-    return this.container().locator('[data-test="assistant-status-strip"]');
-  }
-
   launcher() {
     return this.page.locator('[data-test="assistant-launcher"]');
   }
@@ -134,10 +125,6 @@ export class AssistantPage {
 
   meter() {
     return this.container().locator('[data-test="assistant-credit-meter"]');
-  }
-
-  creditNotice() {
-    return this.container().locator('[data-test="assistant-credit-notice"]');
   }
 
   notice() {

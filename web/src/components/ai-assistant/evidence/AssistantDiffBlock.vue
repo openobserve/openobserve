@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="index"
         :class="[
           'px-2 break-all whitespace-pre-wrap',
-          line.kind === 'added' ? 'bg-surface-subtle text-text-heading font-medium' : '',
+          line.kind === 'added' ? 'bg-surface-subtle text-status-success-text font-medium' : '',
           line.kind === 'removed' ? 'text-text-secondary line-through' : '',
         ]"
         :data-kind="line.kind"

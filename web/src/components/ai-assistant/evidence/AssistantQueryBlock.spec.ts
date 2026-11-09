@@ -25,7 +25,7 @@ import {
 
 import { fakeEvidence } from "../__tests__/fakeEvidence";
 import { fakeRouter } from "../__tests__/fakeAssistant";
-import AssistantQueryBlock, { type QueryBlock } from "./AssistantQueryBlock.vue";
+import AssistantQueryBlock, { PREVIEW_ROWS, type QueryBlock } from "./AssistantQueryBlock.vue";
 
 vi.mock("@/components/QueryEditor.vue", () => ({
   default: { props: ["query"], template: "<pre>{{ query }}</pre>" },
@@ -98,6 +98,40 @@ describe("AssistantQueryBlock", () => {
     );
   });
 
+  it("previews 5 rows and opens the rest in the explorer: Open in Logs for all N", async () => {
+    const { wrapper, host, runs } = mountBlock();
+    const rows = Array.from({ length: 30 }, (_, i) => ({ a: String(i) }));
+    runs.set("b1", { status: "done", startedAt: 1, rows, columns: ["a"], total: 1284, tookMs: 1 });
+    await flushPromises();
+    const table = wrapper.get('[data-test="assistant-query-table"]');
+    expect(table.findAll("tbody tr")).toHaveLength(PREVIEW_ROWS);
+    const all = wrapper.get('[data-test="assistant-query-open-all"]');
+    expect(all.text()).toBe("Open in Logs for all 1,284");
+    await all.trigger("click");
+    expect(host.dispatch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ kind: "open_in_explorer" }),
+    );
+    runs.set("b1", { status: "done", startedAt: 1, rows: rows.slice(0, 3), total: 3, tookMs: 1 });
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-query-open-all"]').exists()).toBe(false);
+  });
+
+  it("renders one code card: language, stream and range in its head, actions in its foot", () => {
+    const { wrapper } = mountBlock();
+    const card = wrapper.get('[data-test="assistant-query-text-chrome"]');
+    expect(card.get('[data-test="assistant-query-text-lang"]').text()).toBe("SQL");
+    expect(card.get('[data-test="assistant-query-text-meta"]').text()).toMatch(
+      /^stream default · /,
+    );
+    expect(
+      card
+        .get('[data-test="assistant-query-text-foot"]')
+        .find('[data-test="assistant-query-open"]')
+        .exists(),
+    ).toBe(true);
+  });
+
   it("makes Run primary only on the last block", () => {
     const { wrapper } = mountBlock({ isLast: false });
     expect(wrapper.get('[data-test="assistant-query-run"]').classes().join(" ")).not.toContain(
@@ -164,8 +198,8 @@ describe("AssistantQueryBlock", () => {
   it("states the window that ran when the answer named none, or when it was cut to 7 days", async () => {
     const unknown = { ...block, query: { ...block.query, from: undefined, to: undefined } };
     const { wrapper, runs } = mountBlock({ block: unknown });
-    expect(wrapper.get('[data-test="assistant-query-range"]').text()).toBe(
-      "range: unknown · runs on the last 15 min",
+    expect(wrapper.get('[data-test="assistant-query-text-meta"]').text()).toBe(
+      "stream default · range: unknown · runs on the last 15 min",
     );
     const done = { status: "done" as const, startedAt: 1, rows: [], total: 0, tookMs: 5 };
     runs.set("b1", {

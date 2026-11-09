@@ -15,28 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton
-    variant="ghost-primary"
-    size="sm"
-    class="h-auto! min-h-7 justify-start! px-0! py-0.5 text-start font-normal whitespace-normal! max-md:min-h-11 pointer-coarse:min-h-11"
+  <EmptyStateActionCard
+    :icon="icon"
+    :label="label"
+    class="max-w-none! basis-full"
     @click="emit('click')"
   >
-    <span>
+    <template #label>
       <template v-for="(part, index) in parts" :key="index">
         <code v-if="index % 2 === 1" class="font-mono text-xs">{{ part }}</code>
         <template v-else>{{ part }}</template>
       </template>
-    </span>
-  </OButton>
+    </template>
+  </EmptyStateActionCard>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 
-import OButton from "@/lib/core/Button/OButton.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import type { I18nText } from "@/types/i18n";
 
-const props = defineProps<{ label: I18nText }>();
+const props = withDefaults(defineProps<{ label: I18nText; icon?: IconName }>(), {
+  icon: assistantGlyph.assistant,
+});
 
 const emit = defineEmits<{ (e: "click"): void }>();
 

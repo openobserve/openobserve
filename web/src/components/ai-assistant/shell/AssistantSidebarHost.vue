@@ -25,7 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="assistant-sidebar-host"
       :[DRAWER_INSET_ATTR]="''"
       :data-dragging="liveWidth !== null ? '' : undefined"
-      :class="[PINNED_CLASSES, liveWidth === null ? MOTION : '']"
+      :class="[
+        PINNED_CLASSES,
+        liveWidth === null ? MOTION : '',
+        opening ? ASSISTANT_MOTION.panelIn : '',
+      ]"
+      :data-opening="opening ? '' : undefined"
       @pointerdown="onChromeDown"
       @pointermove="onChromeMove"
       @pointerup="endTearOff"
@@ -42,7 +47,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @reset="resetWidth"
       />
       <div :class="pageCardClasses(false, isDark)" data-test="assistant-sidebar-card">
-        <AssistantShell placement="sidebar" />
+        <AssistantRcaThread
+          v-if="followed"
+          :key="followed.runId"
+          :org="followed.org"
+          :incident-id="followed.incidentId"
+          :run-id="followed.runId"
+          @close="stopFollowingRca"
+        />
+        <AssistantShell v-show="!followed" placement="sidebar" />
       </div>
     </div>
     <OSheet
@@ -76,7 +89,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantStatusDot v-if="peekSignal" :state="peekSignal" />
         </span>
       </template>
-      <AssistantShell placement="sidebar" sheet :sid="sheetWindowSid" />
+      <AssistantRcaThread
+        v-if="followed"
+        :key="followed.runId"
+        :org="followed.org"
+        :incident-id="followed.incidentId"
+        :run-id="followed.runId"
+        @close="stopFollowingRca"
+      />
+      <AssistantShell v-show="!followed" placement="sidebar" sheet :sid="sheetWindowSid" />
     </OSheet>
   </template>
   <AssistantLifecycleDialogs />
@@ -115,11 +136,20 @@ const NO_TEAR_OFF = "button, a, input, textarea, select, [role='button'], [role=
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
+import { ASSISTANT_MOTION } from "@/components/ai-assistant/common/assistantMotion";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
@@ -159,6 +189,13 @@ import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { readFromAnswerStart } from "./answerStart";
 import { tearOffRequest } from "./assistantWindowHost";
 import { closeLockedPanel, lockedPanelMoved, useLockedPanel } from "./lockedPanel";
+import { followedRcaRun, stopFollowingRca } from "./rcaFollow";
+import { useOpeningMotion } from "./useOpeningMotion";
+
+// The run view carries the whole RCA thread, so it loads only when a run is followed.
+const AssistantRcaThread = defineAsyncComponent(
+  () => import("@/components/ai-assistant/rca/AssistantRcaThread.vue"),
+);
 
 const SNAP_ORDER: SheetSnap[] = ["peek", "half", "full"];
 
@@ -212,6 +249,9 @@ const visible = computed(
     !onAssistantRoute.value &&
     (placement.placement.value.kind === "sidebar" || !!lockedPanel.value || !!sheetWindowSid.value),
 );
+
+const followed = followedRcaRun();
+const { opening } = useOpeningMotion(() => visible.value && lgUp.value);
 
 const activeSession = computed(
   () => store.state.sessions[sheetWindowSid.value ?? store.state.shell.activeSid ?? ""] ?? null,
@@ -375,6 +415,7 @@ function endTearOff(): void {
 // A move to the full view or a dock is not a close: the new container announces and takes focus.
 watch(visible, (shown, was) => {
   if (shown && !was) onOpen();
+  if (!shown) stopFollowingRca();
   const floated = !!store.windowOf(lastShownSid);
   const closed =
     !floated &&

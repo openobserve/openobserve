@@ -37,12 +37,14 @@ describe("AssistantDictationTail", () => {
     expect(render("").wrapper.find('[data-test="assistant-dictate-tail"]').exists()).toBe(false);
   });
 
-  it("underlines only the tail, hidden from assistive technology", () => {
+  it("mutes only the interim words, hidden from assistive technology", () => {
     const mirror = render("cart fail").wrapper.get('[data-test="assistant-dictate-tail"]');
     expect(mirror.attributes("aria-hidden")).toBe("true");
     expect(mirror.classes()).toContain("text-transparent");
     expect(mirror.get("span").text()).toBe("cart fail");
-    expect(mirror.get("span").classes()).toContain("decoration-dotted");
+    expect(mirror.get("span").classes()).toEqual(
+      expect.arrayContaining(["text-text-muted", "bg-input-bg"]),
+    );
   });
 
   it("follows the textbox's scroll", async () => {

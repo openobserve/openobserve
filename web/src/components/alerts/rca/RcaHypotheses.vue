@@ -64,27 +64,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ rcaHypothesisStatusLabel(hypothesis.status, outcome) }}
             </RcaPill>
           </span>
-        </template>
-        <span data-test="rca-hypothesis-statement">
-          <RcaInlineText :text="hypothesis.statement" />
-        </span>
-        <template #meta>
-          <span
-            data-test="rca-hypothesis-evidence-count"
-            class="text-text-secondary shrink-0 text-xs font-normal"
-          >
-            {{ evidenceCount(hypothesis) }}
-          </span>
-        </template>
-        <template v-if="canSteer || pending.has(hypothesis.id)" #actions>
-          <span class="flex shrink-0 items-center gap-1">
-            <template v-if="canSteer">
+
+          <div class="min-w-0">
+            <div
+              data-test="rca-hypothesis-statement"
+              class="text-sm font-semibold"
+              :class="
+                hypothesis.status === 'ruled_out' ? 'text-text-secondary' : 'text-text-heading'
+              "
+            >
+              <RcaInlineText :text="hypothesis.statement" />
+            </div>
+            <div
+              v-if="hypothesis.reason"
+              class="text-text-secondary text-compact [text-wrap:pretty]"
+            >
+              <RcaInlineText :text="hypothesis.reason" />
+            </div>
+
+            <template v-if="hypothesis.history.length > 0">
+              <button
+                type="button"
+                data-test="rca-hypothesis-history-toggle"
+                class="text-text-secondary mt-1 flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-xs"
+                :aria-expanded="historyOpen.has(hypothesis.id)"
+                :aria-controls="historyId(hypothesis.id)"
+                @click="toggleHistory(hypothesis.id)"
+              >
+                <OIcon
+                  :name="historyOpen.has(hypothesis.id) ? 'expand-less' : 'expand-more'"
+                  size="sm"
+                />
+                {{
+                  t("alerts.incidents.rcaSummary.statusHistory", {
+                    count: hypothesis.history.length,
+                  })
+                }}
+              </button>
+              <ol
+                v-if="historyOpen.has(hypothesis.id)"
+                :id="historyId(hypothesis.id)"
+                data-test="rca-hypothesis-history"
+                class="text-text-secondary m-0 mt-1 flex list-none flex-col gap-0.5 p-0 font-mono text-xs"
+              >
+                <li v-for="(change, idx) in hypothesis.history" :key="idx">
+                  {{ rcaStatusHistoryLine(change) }}
+                </li>
+              </ol>
+            </template>
+
+            <RcaEvidenceCard
+              v-if="open?.hypothesisId === hypothesis.id && openEntry"
+              :id="cardId(hypothesis.id)"
+              class="mt-2"
+              :entry="openEntry"
+              :hypotheses="hypotheses"
+              :hypothesis-id="hypothesis.id"
+              @open-hypothesis="showHypothesis"
+              :org="org"
+              with-header
+            />
+          </div>
+
+          <div class="flex flex-wrap items-center justify-end gap-1 pt-px">
+            <button
+              v-for="number in hypothesis.evidence_numbers"
+              :key="number"
+              type="button"
+              data-test="rca-hypothesis-chip"
+              class="rounded-default text-3xs inline-grid h-5 min-w-5.5 cursor-pointer place-items-center border px-1.5 font-mono font-semibold"
+              :class="
+                isOpen(hypothesis.id, number)
+                  ? 'bg-accent text-text-inverse border-transparent'
+                  : 'border-border-control bg-surface-base text-text-heading hover:bg-surface-subtle-hover'
+              "
+              :aria-expanded="isOpen(hypothesis.id, number)"
+              :aria-controls="isOpen(hypothesis.id, number) ? cardId(hypothesis.id) : undefined"
+              :aria-label="t('alerts.incidents.rcaSummary.openEvidence', { number })"
+              @click="toggle(hypothesis.id, number)"
+            >
+              {{ number }}
+            </button>
+            <span
+              v-for="id in hypothesis.unverified_ids"
+              :key="id"
+              data-test="rca-hypothesis-unverified"
+              class="rounded-default border-status-warning-text text-status-warning-text text-3xs inline-flex h-5 items-center border border-dashed px-1.5 font-mono font-semibold"
+            >
+              {{ t("alerts.incidents.rcaSummary.notVerifiedId", { id }) }}
+            </span>
+            <span
+              v-if="
+                hypothesis.evidence_numbers.length === 0 && hypothesis.unverified_ids.length === 0
+              "
+              class="text-text-muted text-xs"
+            >
+              {{ t("alerts.incidents.rcaSummary.noEvidenceYet") }}
+            </span>
+            <!-- A finished run takes no actions, whatever the steering view still says. -->
+            <template v-if="canSteer && live">
               <OButton
                 v-for="action in rcaHypothesisActions(hypothesis.status)"
                 :key="action"
                 :data-test="`rca-hypothesis-action-${action}`"
                 variant="outline"
                 size="xs"
+                class="max-md:min-h-11"
                 :disabled="sending || pending.has(hypothesis.id)"
                 :aria-label="actionAriaLabel(action, hypothesis.statement)"
                 @click="$emit('steer-action', { hypothesisId: hypothesis.id, action })"
