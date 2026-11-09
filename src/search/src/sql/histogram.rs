@@ -27,20 +27,13 @@ use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
     ast::{
         Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, ObjectName, SetExpr,
-        Statement, Value, visit_expressions_mut,
+        Statement, Value, visit_expressions, visit_expressions_mut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
 use super::visitor::histogram_interval::generate_histogram_interval;
-
-/// What pinning found in a statement's `histogram()` calls.
-pub struct PinnedHistograms {
-    pub changed: bool,
-    /// Bucket offset in microseconds shared by every call; `None` when the calls disagree.
-    pub offset: Option<i64>,
-}
 
 /// Sets the bucket `histogram()` interval from the request, so execution buckets like partitions.
 pub fn handle_histogram(
@@ -74,34 +67,46 @@ pub fn pin_histogram_timezone(
     timezone: &mut Option<String>,
     end_time: i64,
 ) -> Result<(), Error> {
+    let reference_time = pin_reference_time(end_time);
     if !mentions_histogram(sql) {
-        pin_request_timezone(timezone, pin_reference_time(end_time));
+        pin_request_timezone(timezone, reference_time);
         return Ok(());
     }
     rewrite_statements(sql, |statement| {
-        pin_statement(statement, timezone, end_time).map(|pinned| pinned.changed)
+        pin_request_timezone(timezone, reference_time);
+        let mut changed = false;
+        let result = visit_expressions_mut(statement, |expr| {
+            match pin_histogram_call(expr, timezone.as_deref(), reference_time) {
+                Ok(updated) => changed |= updated,
+                Err(error) => return ControlFlow::Break(error),
+            }
+            ControlFlow::Continue(())
+        });
+        match result {
+            ControlFlow::Break(error) => Err(error),
+            ControlFlow::Continue(()) => Ok(changed),
+        }
     })
 }
 
-/// Pins the request default and every `histogram()` timezone in the statement at the request end.
-pub fn pin_statement(
-    statement: &mut Statement,
-    timezone: &mut Option<String>,
-    end_time: i64,
-) -> Result<PinnedHistograms, Error> {
-    let end_time = pin_reference_time(end_time);
-    pin_request_timezone(timezone, end_time);
-    let timezone = timezone.as_deref();
-    let mut changed = false;
+/// Returns the shared histogram offset at the supplied instant, or None when offsets differ.
+pub fn histogram_offset(
+    statement: &Statement,
+    timezone: Option<&str>,
+    reference_time: i64,
+) -> Result<Option<i64>, Error> {
     let mut offsets = Vec::new();
-    let result = visit_expressions_mut(statement, |expr| {
-        match pin_histogram_call(expr, timezone, end_time) {
-            Ok(Some((updated, offset))) => {
-                changed |= updated;
-                offsets.push(offset);
+    let result = visit_expressions(statement, |expr| {
+        if let Expr::Function(func) = expr
+            && is_histogram_function(&func.name)
+            && let FunctionArguments::List(list) = &func.args
+        {
+            let offset = histogram_timezone(&list.args, timezone)
+                .and_then(|timezone| timezone_offset_micros(timezone.as_deref(), reference_time));
+            match offset {
+                Ok(offset) => offsets.push(offset),
+                Err(error) => return ControlFlow::Break(error),
             }
-            Ok(None) => {}
-            Err(error) => return ControlFlow::Break(error),
         }
         ControlFlow::Continue(())
     });
@@ -109,13 +114,10 @@ pub fn pin_statement(
         return Err(error);
     }
     let first = offsets.first().copied().unwrap_or_default();
-    Ok(PinnedHistograms {
-        changed,
-        offset: offsets
-            .iter()
-            .all(|offset| *offset == first)
-            .then_some(first),
-    })
+    Ok(offsets
+        .iter()
+        .all(|offset| *offset == first)
+        .then_some(first))
 }
 
 /// Cheap pre-check shared by every caller that would otherwise parse the SQL for `histogram()`.
@@ -376,32 +378,54 @@ fn pin_histogram_call(
     expr: &mut Expr,
     timezone: Option<&str>,
     end_time: i64,
-) -> Result<Option<(bool, i64)>, Error> {
+) -> Result<bool, Error> {
     let Expr::Function(func) = expr else {
-        return Ok(None);
+        return Ok(false);
     };
     if !is_histogram_function(&func.name) {
-        return Ok(None);
+        return Ok(false);
     }
     let FunctionArguments::List(list) = &mut func.args else {
-        return Ok(None);
+        return Ok(false);
     };
-    let Some(arg) = list.args.get_mut(2) else {
-        return timezone_offset_micros(timezone, end_time).map(|offset| Some((false, offset)));
+    let timezone = histogram_timezone(&list.args, timezone)?;
+    timezone_offset_micros(timezone.as_deref(), end_time)?;
+    if let Some(tz) = timezone.as_deref()
+        && let Some(fixed) = fixed_offset_of_named_zone(tz, end_time)
+        && let Some(arg) = list.args.get_mut(2)
+        && let Some(value) = string_literal(arg)
+    {
+        *value = Value::SingleQuotedString(fixed);
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+fn histogram_timezone(
+    args: &[FunctionArg],
+    timezone: Option<&str>,
+) -> Result<Option<String>, Error> {
+    let Some(arg) = args.get(2) else {
+        return Ok(timezone.map(str::to_string));
     };
-    let value = string_literal(arg).ok_or_else(|| {
+    let value = match arg {
+        FunctionArg::Unnamed(FunctionArgExpr::Expr(expr)) => {
+            let mut expr = expr;
+            while let Expr::Nested(inner) = expr {
+                expr = inner;
+            }
+            match expr {
+                Expr::Value(literal) => literal.value.clone().into_string(),
+                _ => None,
+            }
+        }
+        _ => None,
+    };
+    value.map(Some).ok_or_else(|| {
         Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
             "histogram() timezone must be a constant string".to_string(),
         ))
-    })?;
-    let tz = value.clone().into_string().unwrap_or_default();
-    let offset = timezone_offset_micros(Some(&tz), end_time)?;
-    let fixed = fixed_offset_of_named_zone(&tz, end_time);
-    let changed = fixed.is_some();
-    if let Some(fixed) = fixed {
-        *value = Value::SingleQuotedString(fixed);
-    }
-    Ok(Some((changed, offset)))
+    })
 }
 
 fn string_literal(arg: &mut FunctionArg) -> Option<&mut Value> {

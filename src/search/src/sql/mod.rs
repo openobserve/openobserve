@@ -195,9 +195,13 @@ impl Sql {
             )));
         }
 
-        let mut timezone = query.timezone.clone();
+        let reference_time = if query.end_time > 0 {
+            query.end_time
+        } else {
+            query.start_time
+        };
         let histogram_offset =
-            histogram::pin_statement(&mut statement, &mut timezone, query.end_time)?.offset;
+            histogram::histogram_offset(&statement, query.timezone.as_deref(), reference_time)?;
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
@@ -346,7 +350,7 @@ impl Sql {
             group_by,
             order_by,
             histogram_interval,
-            timezone,
+            timezone: query.timezone.clone(),
             histogram_offset,
             sorted_by_time: need_sort_by_time,
             sampling_config: parse_sampling_config(
