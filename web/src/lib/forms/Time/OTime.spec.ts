@@ -3,6 +3,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import OTime from "./OTime.vue";
+import ODate from "../Date/ODate.vue";
 
 describe("OTime", () => {
   let wrapper: VueWrapper;
@@ -22,6 +23,16 @@ describe("OTime", () => {
       props: { label: "Meeting time" },
     });
     expect(wrapper.text()).toContain("Meeting time");
+  });
+
+  it.each([true, false])("labels_itself_like_the_date_field_when_disabled_is_%s", (disabled) => {
+    wrapper = mount(OTime, { attachTo: document.body, props: { label: "End time", disabled } });
+    const date = mount(ODate, { attachTo: document.body, props: { label: "End date", disabled } });
+    expect(wrapper.find("label").classes().sort()).toEqual(date.find("label").classes().sort());
+    expect(wrapper.find("label").classes().includes("text-input-label-text-disabled")).toBe(
+      disabled,
+    );
+    date.unmount();
   });
 
   it("should render label slot content", () => {

@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             shape="rounded"
             data-test="alert-calibration-finding-dismissed"
           >
-            {{ t("alertCalibration.dismiss.badge") }}
+            {{ dismissal ? dismissCopy.badge(dismissal) : t("alertCalibration.dismiss.badge") }}
           </OBadge>
         </div>
         <OText

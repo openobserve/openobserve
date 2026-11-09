@@ -197,7 +197,7 @@ const total = computed(() => page.data.value?.total ?? 0);
 
 function summary(row: DecisionView): I18nText {
   const first = t("insight.decisions.list.summary", {
-    reason: copy.value.reasonLabel(row.reason),
+    reason: copy.value.recordReason(row.reason),
     actor: copy.value.actor(row.actor, store.state.userInfo?.email),
     when: copy.value.when(row.decided_at),
   });

@@ -49,6 +49,7 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import { byTest } from "@/test/unit/helpers/draftDom";
+import { fillField } from "@/test/unit/helpers/fillField";
 import { queryClient } from "@/composables/query/queryClient";
 import fixture from "@/components/autoobserve/live/__fixtures__/autoobserveDecisions.json";
 import autoobserveDecisions from "@/services/autoobserveDecisions";
@@ -57,13 +58,17 @@ import { dismissAll, toast } from "@/lib/feedback/Toast/useToast";
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import { autoobserveKeys } from "@/services/autoobserve.querykeys";
+import type { DecisionRequest } from "@/services/autoobserveDecisions";
 import DecisionDismissDialog from "./DecisionDismissDialog.vue";
 import AlertCalibrationDismissDialog from "@/components/alert_calibration/AlertCalibrationDismissDialog.vue";
 import type { DismissTarget } from "@/components/alert_calibration/dismissals";
 import {
+  DECISION_DISMISS_REASONS,
+  decisionBodyOf,
   decisionDismissDefaults,
   makeDecisionDismissSchema,
   PLANNED_WORK_MAX_MS,
+  previewParamsOf,
   untilMicros,
   type DecisionTarget,
 } from "./decisionDismiss";
@@ -71,6 +76,22 @@ import {
 const t = i18n.global.t as unknown as TranslateFn;
 const FINDING = "f49d3499f38e5e8a374debbca25af38c40c34d9b6c9e96ba68746e17883073f9";
 const target: DecisionTarget = { family: "suggestion", id: "s-cluster-d", title: "cluster-d" };
+const calTarget: DecisionTarget = { family: "alert_finding", id: FINDING, title: "ops_cpu" };
+
+// ENT autoobserve/decisions.rs check_term, so every body the dialog builds is one the route takes.
+const routeTermError = (body: DecisionRequest, nowMs: number): string | null => {
+  const reopened = body.until_reopened ?? false;
+  if (body.reason === "planned_work") {
+    if (body.until === undefined || body.duration_days !== undefined || reopened) {
+      return "until_required";
+    }
+    const ok = body.until > nowMs * 1000 && body.until <= (nowMs + PLANNED_WORK_MAX_MS) * 1000;
+    return ok ? null : "until_invalid";
+  }
+  if (body.until !== undefined) return "until_unexpected";
+  if (body.duration_days === undefined) return reopened ? null : "duration_invalid";
+  return !reopened && [30, 90, 180].includes(body.duration_days) ? null : "duration_invalid";
+};
 
 const httpError = (status: number, data: unknown = { code: status, message: "server words" }) =>
   Object.assign(new Error(`HTTP ${status}`), { response: { status, data } });
@@ -93,11 +114,21 @@ const chooseReason = (reason: string) => click(`[data-test="decision-dismiss-rea
 const submit = () => click('[data-test="decision-dismiss-submit"]');
 const submitButton = () => byTest("decision-dismiss-submit") as HTMLButtonElement;
 
-const mountDialog = async () => {
+const chooseDuration = (value: string) =>
+  click(`[data-test="decision-dismiss-duration-option"][data-test-value="${value}"]`);
+const durationOff = (value: string) => {
+  const el = document.body.querySelector<HTMLElement>(
+    `[data-test="decision-dismiss-duration-option"][data-test-value="${value}"]`,
+  );
+  if (!el) throw new Error(`missing duration ${value}`);
+  return el.hasAttribute("disabled") || el.hasAttribute("data-disabled");
+};
+
+const mountDialog = async (on: DecisionTarget = target) => {
   wrapper = mount(DecisionDismissDialog, {
     props: {
       open: true,
-      target,
+      target: on,
       "onUpdate:open": (open: boolean) => wrapper?.setProps({ open }),
     },
     attachTo: document.body,
@@ -128,7 +159,10 @@ describe("DecisionDismissDialog", () => {
     const now = new Date(2026, 10, 9, 14, 5).getTime();
     const schema = makeDecisionDismissSchema(t, () => now);
     const errors = (reason: string, at: number | null) => {
-      const until = at === null ? { untilDate: "", untilTime: "" } : decisionDismissDefaults(at);
+      const until =
+        at === null
+          ? { ...decisionDismissDefaults(now), untilDate: "", untilTime: "" }
+          : decisionDismissDefaults(at);
       const result = schema.safeParse({ ...until, reason });
       return result.success ? [] : result.error.issues.map((issue) => issue.message);
     };
@@ -145,7 +179,7 @@ describe("DecisionDismissDialog", () => {
   });
 
   it.each(["not_needed", "false_positive", "will_fix_later"])(
-    "sends_the_body_for_%s_without_an_end",
+    "sends_the_body_for_%s_with_the_routes_default_term",
     async (reason) => {
       await mountDialog();
       await chooseReason(reason);
@@ -158,10 +192,129 @@ describe("DecisionDismissDialog", () => {
         id: "s-cluster-d",
         action: "dismiss",
         reason,
+        duration_days: 90,
         request_id: expect.any(String),
+      });
+      expect(vi.mocked(autoobserveDecisions.preview).mock.calls.at(-1)?.[1]).toEqual({
+        family: "suggestion",
+        id: "s-cluster-d",
+        action: "dismiss",
+        reason,
+        duration_days: 90,
       });
     },
   );
+
+  it.each(["suggestion", "alert_finding"] as const)(
+    "every_reason_builds_a_body_the_route_takes_and_previews_the_same_term_for_%s",
+    (family) => {
+      const now = new Date(2026, 10, 9, 14, 5).getTime();
+      const on: DecisionTarget = { family, id: "x", title: null };
+      for (const reason of DECISION_DISMISS_REASONS) {
+        const form = { ...decisionDismissDefaults(now), reason };
+        const body = decisionBodyOf(on, form, { requestId: "r1", revision: 0 });
+        expect([reason, routeTermError(body, now)]).toEqual([reason, null]);
+        const { request_id: _id, note: _note, ...asked } = body;
+        expect(previewParamsOf(on, form, now)).toEqual(asked);
+      }
+    },
+  );
+
+  it("a_calibration_finding_without_a_hide_for_is_caught_before_save", () => {
+    const now = new Date(2026, 10, 9, 14, 5).getTime();
+    const schema = makeDecisionDismissSchema(
+      t,
+      () => now,
+      () => "alert_finding",
+    );
+    const form = { ...decisionDismissDefaults(now), reason: "not_needed", duration: "" };
+    const result = schema.safeParse(form);
+    expect(result.success ? [] : result.error.issues.map((issue) => issue.message)).toEqual([
+      t("insight.decisions.dismiss.durationRequired"),
+    ]);
+    expect(previewParamsOf(calTarget, form as never, now)).toEqual({
+      family: "alert_finding",
+      id: FINDING,
+      action: "dismiss",
+    });
+    const suggestion = makeDecisionDismissSchema(
+      t,
+      () => now,
+      () => "suggestion",
+    );
+    expect(suggestion.safeParse(form).success).toBe(true);
+  });
+
+  it("a_calibration_finding_offers_hide_for_and_a_note_and_a_suggestion_does_not", async () => {
+    await mountDialog(calTarget);
+    const options = [
+      ...document.body.querySelectorAll('[data-test="decision-dismiss-duration-option"]'),
+    ];
+    expect(options.map((o) => o.getAttribute("data-test-value"))).toEqual([
+      "30",
+      "90",
+      "180",
+      "until_reopened",
+    ]);
+    expect(byTest("decision-dismiss-duration")?.textContent).toContain("Hide for");
+    expect(byTest("decision-dismiss-duration")?.textContent).toContain("Until reopened");
+    expect(byTest("decision-dismiss-note")).toBeTruthy();
+    wrapper?.unmount();
+    await mountDialog();
+    expect(byTest("decision-dismiss-duration")).toBeNull();
+    expect(byTest("decision-dismiss-note")).toBeNull();
+  });
+
+  it("sends_the_chosen_hide_for_and_note_and_previews_that_term", async () => {
+    await mountDialog(calTarget);
+    await chooseReason("not_needed");
+    await chooseDuration("180");
+    await fillField("decision-dismiss-note", "  Owned by ingest  ");
+    await settle();
+    expect(vi.mocked(autoobserveDecisions.preview).mock.calls.at(-1)?.[1]).toEqual({
+      family: "alert_finding",
+      id: FINDING,
+      action: "dismiss",
+      reason: "not_needed",
+      duration_days: 180,
+    });
+    await submit();
+    expect(vi.mocked(autoobserveDecisions.decide).mock.calls[0][1]).toEqual({
+      family: "alert_finding",
+      id: FINDING,
+      action: "dismiss",
+      reason: "not_needed",
+      duration_days: 180,
+      note: "Owned by ingest",
+      request_id: expect.any(String),
+    });
+  });
+
+  it("until_reopened_is_sent_as_until_reopened", async () => {
+    await mountDialog(calTarget);
+    await chooseReason("will_fix_later");
+    await chooseDuration("until_reopened");
+    expect(vi.mocked(autoobserveDecisions.preview).mock.calls.at(-1)?.[1]).toMatchObject({
+      reason: "will_fix_later",
+      until_reopened: true,
+    });
+    await submit();
+    const body = vi.mocked(autoobserveDecisions.decide).mock.calls[0][1];
+    expect(body).toMatchObject({ reason: "will_fix_later", until_reopened: true });
+    expect(body).not.toHaveProperty("duration_days");
+  });
+
+  it("planned_work_turns_hide_for_off_and_sends_only_its_end", async () => {
+    await mountDialog(calTarget);
+    expect(durationOff("180")).toBe(false);
+    await chooseReason("planned_work");
+    expect(durationOff("180")).toBe(true);
+    await submit();
+    const body = vi.mocked(autoobserveDecisions.decide).mock.calls[0][1];
+    expect(body).toMatchObject({ reason: "planned_work", until: expect.any(Number) });
+    expect(body).not.toHaveProperty("duration_days");
+    expect(body).not.toHaveProperty("until_reopened");
+  });
 
   it("sends_planned_work_with_its_end_and_previews_that_end", async () => {
     await mountDialog();
@@ -382,6 +535,7 @@ describe("AlertCalibrationDismissDialog transport", () => {
       id: FINDING,
       action: "dismiss",
       reason: "not_needed",
+      duration_days: 90,
       request_id: expect.any(String),
     });
   });

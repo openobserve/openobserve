@@ -1167,4 +1167,53 @@ describe("AlertCalibrationFindingCard", () => {
     expect(alertCalibration.reopenDismissal).toHaveBeenCalledWith("default", id, 7);
     wrapper.unmount();
   });
+
+  it("a_finding_marked_as_an_intended_report_says_it_is_a_mark", () => {
+    const id = "f49d3499f38e5e8a374debbca25af38c40c34d9b6c9e96ba68746e17883073f9";
+    const record = finding({
+      schema_version: 2,
+      kind: "finding",
+      rule_id: "noise",
+      title: "ops_cpu fires too often",
+      alert_id: "a1",
+      alert_name: "ops_cpu",
+      finding_id: id,
+      scope_kind: "alert",
+      scope_key: "a1",
+    });
+    const wrapper = mount(AlertCalibrationFindingCard, {
+      props: {
+        finding: record,
+        dismissal: {
+          id,
+          rule_id: "noise",
+          pattern: null,
+          scope_kind: "alert",
+          scope_key: "a1",
+          state: "active",
+          revision: 3,
+          reason: "intended_report",
+          note: null,
+          has_note: false,
+          actor: "u-ops@example.com",
+          dismissed_at: 1,
+          duration_days: null,
+          expires_at: null,
+          reopened_at: null,
+          reopened_by: null,
+          updated_at: 1,
+          alert_name: "ops_cpu",
+        },
+      },
+      global: { plugins: [store] },
+    });
+    expect(wrapper.find('[data-test="alert-calibration-finding-dismissed"]').text()).toBe(
+      "Intended report",
+    );
+    const fold = wrapper.find('[data-test="alert-calibration-finding-fold"]').text();
+    expect(fold).toContain("Marked as intended report by u-ops@example.com");
+    expect(fold).not.toContain("Another reason");
+    expect(fold).not.toContain("Dismissed by");
+    wrapper.unmount();
+  });
 });

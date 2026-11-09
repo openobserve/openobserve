@@ -26,8 +26,10 @@ import {
 } from "./digests";
 import { ERROR_CLASS_LABEL, isRuleId, ruleLabelKey, type NotWorkingPattern } from "./rules";
 
-/** The server's reasons (ENT dismissals.rs `DismissReason`). */
+/** The server's reasons (ENT dismissals.rs `DismissReason`) that today's dialog offers. */
 export type DismissReason = "expected" | "known_issue" | "not_useful" | "false_positive" | "other";
+/** Every stored reason: the decision route also records planned work and intended reports. */
+export type StoredReason = DismissReason | "planned_work" | "intended_report";
 /** Derived by the server: an active row past its expiry reads as expired. */
 export type DismissalState = "active" | "expired" | "reopened";
 
@@ -41,7 +43,7 @@ export interface DismissalView {
   scope_key: string;
   state: DismissalState;
   revision: number;
-  reason: DismissReason;
+  reason: StoredReason;
   /** Null when none was written, or when this reader may not see it (`has_note` tells). */
   note: string | null;
   has_note: boolean;
@@ -95,12 +97,28 @@ export const LIST_MAX_PAGES = 5;
 
 const FINDING_ID = /^[0-9a-f]{64}$/;
 
-export const REASON_LABEL: Record<DismissReason, I18nKey> = {
+export const REASON_LABEL: Record<StoredReason, I18nKey> = {
   expected: "alertCalibration.dismiss.reasons.expected",
   known_issue: "alertCalibration.dismiss.reasons.known_issue",
   not_useful: "alertCalibration.dismiss.reasons.not_useful",
   false_positive: "alertCalibration.dismiss.reasons.false_positive",
   other: "alertCalibration.dismiss.reasons.other",
+  planned_work: "insight.decisions.reasons.planned_work",
+  intended_report: "insight.decisions.reasons.intended_report",
+};
+
+/** The decision route's names for the stored reasons (ENT decisions.rs `Reason::of_stored`). */
+const ROUTE_REASON: Record<string, StoredReason> = {
+  not_needed: "not_useful",
+  will_fix_later: "known_issue",
+};
+
+/** One label per recorded decision, whichever list shows it and whichever name it arrives under. */
+export const recordReasonKey = (reason: string | null): I18nKey => {
+  const stored = ROUTE_REASON[reason ?? ""] ?? reason ?? "";
+  return Object.hasOwn(REASON_LABEL, stored)
+    ? REASON_LABEL[stored as StoredReason]
+    : "alertCalibration.dismiss.reasonUnknown";
 };
 
 /** The six error classes keep their existing labels; the definition checks have their own. */
@@ -247,8 +265,7 @@ export function dismissalCopy(t: TranslateFn, locale: string) {
     });
   };
 
-  const reasonLabel = (reason: string): I18nText =>
-    t(isDismissReason(reason) ? REASON_LABEL[reason] : "alertCalibration.dismiss.reasonUnknown");
+  const reasonLabel = (reason: string): I18nText => t(recordReasonKey(reason));
 
   const until = (view: Pick<DismissalView, "expires_at">): I18nText =>
     view.expires_at === null ? t("alertCalibration.dismiss.untilReopened") : date(view.expires_at);
@@ -356,13 +373,26 @@ export function dismissalCopy(t: TranslateFn, locale: string) {
       view.alert_name ? raw(view.alert_name) : t("alertCalibration.dismiss.deletedAlert"),
     byAgo: (view: Pick<DismissalView, "actor" | "dismissed_at">): I18nText =>
       t("alertCalibration.dismiss.byAgo", { actor: raw(view.actor), time: ago(view.dismissed_at) }),
-    foldParts: (view: Pick<DismissalView, "actor" | "reason" | "expires_at">): I18nText[] => [
-      t("alertCalibration.dismiss.byActor", { actor: raw(view.actor) }),
-      reasonLabel(view.reason),
-      view.expires_at === null
-        ? t("alertCalibration.dismiss.foldUntilReopened")
-        : t("alertCalibration.dismiss.foldUntil", { date: date(view.expires_at) }),
-    ],
+    foldParts: (view: Pick<DismissalView, "actor" | "reason" | "expires_at">): I18nText[] => {
+      const until =
+        view.expires_at === null
+          ? t("alertCalibration.dismiss.foldUntilReopened")
+          : t("alertCalibration.dismiss.foldUntil", { date: date(view.expires_at) });
+      if (view.reason === "intended_report") {
+        return [t("alertCalibration.dismiss.markedBy", { actor: raw(view.actor) }), until];
+      }
+      return [
+        t("alertCalibration.dismiss.byActor", { actor: raw(view.actor) }),
+        reasonLabel(view.reason),
+        until,
+      ];
+    },
+    badge: (view: Pick<DismissalView, "reason">): I18nText =>
+      t(
+        view.reason === "intended_report"
+          ? "alertCalibration.dismiss.badgeMarked"
+          : "alertCalibration.dismiss.badge",
+      ),
     reopened: () => t("alertCalibration.dismiss.reopened"),
   };
 }

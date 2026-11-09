@@ -21,6 +21,13 @@ import type {
   DecisionRequest,
   PreviewParams,
 } from "@/services/autoobserveDecisions";
+import {
+  DEFAULT_DURATION,
+  DURATION_OPTIONS,
+  NOTE_MAX_CHARS,
+  noteLength,
+  type DismissDuration,
+} from "@/components/alert_calibration/dismissals";
 
 /** What the dialog decides about: a suggestion, or a calibration finding by its finding id. */
 export interface DecisionTarget {
@@ -34,7 +41,13 @@ export type DecisionDismissForm = {
   reason: string;
   untilDate: string;
   untilTime: string;
+  /** Hide for, asked of a calibration finding only. */
+  duration: string;
+  note: string;
 };
+
+/** How long a dismissal lasts, in the route's terms: exactly one of these. */
+type DecisionTerm = { until: number } | { duration_days: number } | { until_reopened: true };
 
 /** m13's four reasons, in its order. */
 export const DECISION_DISMISS_REASONS: readonly DecisionReason[] = [
@@ -46,6 +59,8 @@ export const DECISION_DISMISS_REASONS: readonly DecisionReason[] = [
 
 /** m13 and the server's cap: rolling upgrades and maintenance windows end within a week. */
 export const PLANNED_WORK_MAX_MS = 7 * 86_400_000;
+/** The route's DEFAULT_DAYS: m13 asks a suggestion no length, so it lasts what its preview showed. */
+export const SUGGESTION_DAYS = 90;
 const HOUR_MS = 3_600_000;
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -75,13 +90,47 @@ export function untilMicros(form: Pick<DecisionDismissForm, "untilDate" | "until
 export const isUntilInRange = (micros: number | null, nowMs: number) =>
   micros !== null && micros > nowMs * 1000 && micros <= (nowMs + PLANNED_WORK_MAX_MS) * 1000;
 
+const isDuration = (value: string): value is DismissDuration =>
+  (DURATION_OPTIONS as readonly string[]).includes(value);
+
+/** A calibration finding is hidden for its chosen length; a suggestion for the route's default. */
+function lengthOf(family: DecisionFamily, duration: string): DecisionTerm | null {
+  if (family !== "alert_finding") return { duration_days: SUGGESTION_DAYS };
+  if (!isDuration(duration)) return null;
+  return duration === "until_reopened"
+    ? { until_reopened: true }
+    : { duration_days: Number(duration) };
+}
+
+/** The one term both the preview and the write carry, so the preview checks what is saved. */
+function termOf(
+  family: DecisionFamily,
+  form: DecisionDismissForm,
+  nowMs: number | null,
+): DecisionTerm | null {
+  if (form.reason !== "planned_work") return lengthOf(family, form.duration);
+  const until = untilMicros(form);
+  if (until === null || (nowMs !== null && !isUntilInRange(until, nowMs))) return null;
+  return { until };
+}
+
 /** No reason is preselected, so the reader always says why; planned work ends two whole hours out. */
 export function decisionDismissDefaults(nowMs: number): DecisionDismissForm {
   const end = Math.ceil(nowMs / HOUR_MS) * HOUR_MS + HOUR_MS;
-  return { reason: "", untilDate: localDate(end), untilTime: localTime(end) };
+  return {
+    reason: "",
+    untilDate: localDate(end),
+    untilTime: localTime(end),
+    duration: String(DEFAULT_DURATION),
+    note: "",
+  };
 }
 
-export const makeDecisionDismissSchema = (t: TranslateFn, now: () => number = Date.now) =>
+export const makeDecisionDismissSchema = (
+  t: TranslateFn,
+  now: () => number = Date.now,
+  family: () => DecisionFamily = () => "suggestion",
+) =>
   z
     .object({
       reason: z
@@ -89,9 +138,26 @@ export const makeDecisionDismissSchema = (t: TranslateFn, now: () => number = Da
         .refine(isDecisionDismissReason, t("insight.decisions.dismiss.reasonRequired")),
       untilDate: z.string(),
       untilTime: z.string(),
+      duration: z.string(),
+      note: z
+        .string()
+        .refine(
+          (note) => noteLength(note) <= NOTE_MAX_CHARS,
+          t("alertCalibration.dismiss.noteTooLong"),
+        ),
     })
     .superRefine((form, ctx) => {
-      if (form.reason !== "planned_work") return;
+      if (!isDecisionDismissReason(form.reason)) return;
+      if (form.reason !== "planned_work") {
+        if (lengthOf(family(), form.duration) === null) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["duration"],
+            message: t("insight.decisions.dismiss.durationRequired"),
+          });
+        }
+        return;
+      }
       const until = untilMicros(form);
       if (until === null) {
         ctx.addIssue({
@@ -108,7 +174,7 @@ export const makeDecisionDismissSchema = (t: TranslateFn, now: () => number = Da
       }
     });
 
-/** The preview asks with the terms chosen so far; an unfinished planned-work end asks with none. */
+/** The preview asks with the terms chosen so far; an unfinished reason or term asks with none. */
 export function previewParamsOf(
   target: DecisionTarget,
   form: DecisionDismissForm,
@@ -116,9 +182,8 @@ export function previewParamsOf(
 ): PreviewParams {
   const base: PreviewParams = { family: target.family, id: target.id, action: "dismiss" };
   if (!isDecisionDismissReason(form.reason)) return base;
-  if (form.reason !== "planned_work") return { ...base, reason: form.reason };
-  const until = untilMicros(form);
-  return isUntilInRange(until, nowMs) ? { ...base, reason: form.reason, until: until! } : base;
+  const term = termOf(target.family, form, nowMs);
+  return term ? { ...base, reason: form.reason, ...term } : base;
 }
 
 export function decisionBodyOf(
@@ -126,14 +191,14 @@ export function decisionBodyOf(
   form: DecisionDismissForm,
   seen: { requestId: string; revision: number },
 ): DecisionRequest {
-  const reason = form.reason as DecisionReason;
-  const until = reason === "planned_work" ? untilMicros(form) : null;
+  const note = target.family === "alert_finding" ? form.note.trim() : "";
   return {
     family: target.family,
     id: target.id,
     action: "dismiss",
-    reason,
-    ...(until !== null ? { until } : {}),
+    reason: form.reason as DecisionReason,
+    ...termOf(target.family, form, null),
+    ...(note ? { note } : {}),
     ...(seen.revision > 0 ? { expected_revision: seen.revision } : {}),
     request_id: seen.requestId,
   };

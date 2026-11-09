@@ -11513,7 +11513,9 @@
         "source_inactive": "source inactive"
       },
       "badge": "Dismissed",
+      "badgeMarked": "Intended report",
       "byActor": "Dismissed by {actor}",
+      "markedBy": "Marked as intended report by {actor}",
       "foldUntil": "Hidden until {date}",
       "foldUntilReopened": "Hidden until reopened",
       "emptyTitle": "No dismissed findings",
@@ -34278,7 +34280,7 @@
         "planned_work": "Planned work",
         "false_positive": "Wrong: this didn't happen",
         "will_fix_later": "Will fix later",
-        "intended_report": "Intended report",
+        "intended_report": "Marked as intended report",
         "other": "Other",
         "expected": "Expected",
         "unknown": "Other reason"
@@ -34299,6 +34301,8 @@
         "reasonRequired": "Choose why you are dismissing it.",
         "untilRequired": "Choose when the planned work ends.",
         "untilInvalid": "Choose an end time within the next 7 days.",
+        "durationRequired": "Choose how long to hide it.",
+        "noteHelp": "Seen by you and by people who can dismiss findings.",
         "effectUntil": "Hidden for everyone in {org} until {when}, then shown again if it is still true. Recorded with your name and reason. Undo from Dismissed.",
         "effectUndone": "Hidden for everyone in {org} until someone undoes it. Recorded with your name and reason. Undo from Dismissed.",
         "effectLoading": "Checking what this changes…",

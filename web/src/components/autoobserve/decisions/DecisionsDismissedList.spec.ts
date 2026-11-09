@@ -135,7 +135,8 @@ describe("DecisionsDismissedList", () => {
       "Suggestion",
       "Alert finding",
     ]);
-    expect(all("decision-dismissed-summary")[1].textContent).toContain("Intended report");
+    expect(all("decision-dismissed-summary")[0].textContent).toContain("Planned work");
+    expect(all("decision-dismissed-summary")[1].textContent).toContain("Marked as intended report");
     expect(byTest("decision-dismissed")?.textContent).not.toContain("alert_finding");
   });
 

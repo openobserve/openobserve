@@ -19,6 +19,7 @@ import i18n from "@/locales";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import type { FindingRecord } from "./digests";
 import type { AutoObserveSuggestion } from "@/services/autoobserve";
+import { decisionCopy } from "@/components/autoobserve/insight/insightCopy";
 import {
   dismissalCopy,
   dismissBodyOf,
@@ -242,6 +243,35 @@ describe("dismissals", () => {
     expect(
       copy.foldParts(view({ reason: "made_up" as never, duration_days: null, expires_at: null })),
     ).toEqual(["Dismissed by u-ops@example.com", "Another reason", "Hidden until reopened"]);
+  });
+
+  it("one_decision_reads_the_same_in_both_lists_and_a_mark_says_it_is_a_mark", () => {
+    const decided = decisionCopy(i18n.global.t as unknown as TranslateFn, "en-US");
+    const sameDecision: [string, string][] = [
+      ["not_useful", "not_needed"],
+      ["known_issue", "will_fix_later"],
+      ["false_positive", "false_positive"],
+      ["planned_work", "planned_work"],
+      ["intended_report", "intended_report"],
+      ["expected", "expected"],
+      ["other", "other"],
+      ["made_up", "made_up"],
+    ];
+    for (const [stored, route] of sameDecision) {
+      expect([stored, String(copy.reasonLabel(stored))]).toEqual([
+        stored,
+        String(decided.recordReason(route)),
+      ]);
+    }
+    expect(copy.reasonLabel("planned_work")).toBe("Planned work");
+    expect(copy.reasonLabel("intended_report")).toBe("Marked as intended report");
+    const mark = view({ reason: "intended_report", duration_days: null, expires_at: null });
+    expect(copy.foldParts(mark)).toEqual([
+      "Marked as intended report by u-ops@example.com",
+      "Hidden until reopened",
+    ]);
+    expect(copy.badge(mark)).toBe("Intended report");
+    expect(copy.badge(view())).toBe("Dismissed");
   });
 });
 

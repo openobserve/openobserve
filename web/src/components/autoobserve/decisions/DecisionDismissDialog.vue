@@ -84,6 +84,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OFormRadioGroup>
 
+        <template v-if="isFinding">
+          <OFormOptionGroup
+            name="duration"
+            type="radio"
+            orientation="horizontal"
+            :label="t('alertCalibration.dismiss.duration')"
+            :options="durationOptions"
+            :disabled="durationDisabled"
+            data-test="decision-dismiss-duration"
+          />
+          <OFormTextarea
+            name="note"
+            :label="t('alertCalibration.dismiss.note')"
+            :help-text="t('insight.decisions.dismiss.noteHelp')"
+            :maxlength="NOTE_MAX_CHARS"
+            :rows="2"
+            :disabled="!ready || !!locked || submitting"
+            data-test="decision-dismiss-note"
+          />
+        </template>
+
         <div
           class="border-border-default flex min-h-16 flex-col gap-1 border-t pt-3"
           data-test="decision-dismiss-effect"
@@ -137,6 +158,9 @@ import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
+import OFormOptionGroup from "@/lib/forms/OptionGroup/OFormOptionGroup.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import type { OptionGroupOption } from "@/lib/forms/OptionGroup/OOptionGroup.types";
 import { useOrgId } from "@/composables/query";
 import { useI18nTyped } from "@/types/i18n";
 import { refusalOf, type Refusal } from "@/services/autoobserveDecisions";
@@ -148,6 +172,11 @@ import {
   type DecisionTransport,
 } from "@/composables/autoobserve/useDecisionRoute";
 import { decisionCopy, type DecisionNotice } from "@/components/autoobserve/insight/insightCopy";
+import {
+  dismissalCopy,
+  DURATION_OPTIONS,
+  NOTE_MAX_CHARS,
+} from "@/components/alert_calibration/dismissals";
 import {
   DECISION_DISMISS_REASONS,
   PLANNED_WORK_MAX_MS,
@@ -186,7 +215,7 @@ const refused = ref<Refusal | null>(null);
 
 const form = useOForm<DecisionDismissForm>({
   defaultValues: decisionDismissDefaults(openedAt.value),
-  schema: makeDecisionDismissSchema(t),
+  schema: makeDecisionDismissSchema(t, Date.now, () => props.target.family),
   onSubmit: submit,
 });
 const values = form.useStore((s) => s.values);
@@ -199,6 +228,16 @@ const untilDisabled = computed(
   () =>
     !ready.value || values.value.reason !== "planned_work" || !!locked.value || submitting.value,
 );
+const isFinding = computed(() => props.target.family === "alert_finding");
+// Planned work ends at its chosen time, and the route refuses a length beside it.
+const durationDisabled = computed(
+  () =>
+    !ready.value || values.value.reason === "planned_work" || !!locked.value || submitting.value,
+);
+const durationOptions = computed<OptionGroupOption[]>(() => {
+  const labels = dismissalCopy(t, locale.value);
+  return DURATION_OPTIONS.map((value) => ({ value, label: labels.durationLabel(value) }));
+});
 
 const params = computed(() => previewParamsOf(props.target, values.value, openedAt.value));
 const preview = useQuery(() => ({

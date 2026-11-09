@@ -27,7 +27,11 @@ import {
   isErrorClass,
   type ErrorClass,
 } from "@/components/alert_calibration/rules";
-import { dismissableOf, type DismissTarget } from "@/components/alert_calibration/dismissals";
+import {
+  dismissableOf,
+  recordReasonKey,
+  type DismissTarget,
+} from "@/components/alert_calibration/dismissals";
 import {
   refusalOf,
   type BatchItemResult,
@@ -424,6 +428,8 @@ export function decisionCopy(t: TranslateFn, locale: string) {
     value ? raw(value) : t("insight.decisions.untitled");
   const reasonLabel = (reason: string | null): I18nText =>
     t(DECISION_REASON_LABEL[reason ?? ""] ?? "insight.decisions.reasons.unknown");
+  /** A recorded decision reads as the calibration list reads the same row. */
+  const recordReason = (reason: string | null): I18nText => t(recordReasonKey(reason));
 
   /** By status only: the server's words are shown for a refusal alone, which is written for people. */
   const writeError = (error: unknown): DecisionNotice => {
@@ -511,6 +517,7 @@ export function decisionCopy(t: TranslateFn, locale: string) {
     when,
     title,
     reasonLabel,
+    recordReason,
     writeError,
     undoError,
     itemError,
