@@ -1978,9 +1978,8 @@ async fn handle_anomaly_detection_triggers(
         .disabled
     {
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
-        trigger.status = db::scheduler::TriggerStatus::Completed;
-        // The row is parked and never pulled again, so without this the last
-        // real outcome stands forever on a detector the kill switch stopped.
+        // Completed is never pulled again, and nothing re-arms it when the switch comes back on.
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
         record_anomaly_outcome(&mut trigger, &RunOutcome::Skipped, now_micros());
         db::scheduler::update_trigger(trigger, true, "").await?;
         return Ok(());

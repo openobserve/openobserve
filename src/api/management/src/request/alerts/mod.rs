@@ -117,7 +117,7 @@ const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
 ];
 
 /// The caller's visible object set: `None` means no filtering, else (org-wide grant, objects).
-type AlertVisibility = Option<(bool, hashbrown::HashSet<String>)>;
+pub(crate) type AlertVisibility = Option<(bool, hashbrown::HashSet<String>)>;
 
 #[derive(serde::Serialize, utoipa::ToSchema)]
 #[serde(untagged)]
@@ -1544,6 +1544,9 @@ async fn create_anomaly_alert(
 ) -> Response {
     use openobserve_core::anomaly_detection::CreateAnomalyConfigRequest;
 
+    if let Some(resp) = crate::request::anomaly_detection::disabled_response() {
+        return resp;
+    }
     let Some(anomaly_fields) = req_body.anomaly_fields() else {
         return MetaHttpResponse::bad_request(
             "detection_function is required when alert_type is anomaly_detection",
@@ -2209,6 +2212,9 @@ pub async fn clone_alert(
             }
             #[cfg(feature = "enterprise")]
             {
+                if let Some(resp) = crate::request::anomaly_detection::disabled_response() {
+                    return resp;
+                }
                 // Source read, then the folder the clone lands in, both resolved here.
                 let src_cfg =
                     match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str)
@@ -2431,6 +2437,9 @@ async fn build_and_run_anomaly_update(
 ) -> Response {
     use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
 
+    if let Some(resp) = crate::request::anomaly_detection::disabled_response() {
+        return resp;
+    }
     // A folder_id on the update is a move, and the route gate only covers `?folder=`.
     if let Some(folder) = fields.folder_id.as_deref().filter(|f| !f.is_empty())
         && !check_folder_write_permissions(org_id, &user_id, "alert_folders", folder).await
@@ -3323,7 +3332,7 @@ fn anomaly_row_visible(visibility: &AlertVisibility, item: &ListAlertsResponseBo
 /// mirroring `alert::list_v2`'s `permitted_alerts` path. `None` means "no
 /// filtering" (root user, OpenFGA disabled, or list-only-off), which is also the
 /// only result in OSS builds.
-async fn permitted_alert_visibility(
+pub(crate) async fn permitted_alert_visibility(
     org_id: &str,
     user_id: &str,
 ) -> Result<AlertVisibility, AlertError> {
@@ -3364,7 +3373,12 @@ fn name_resolved_expression(
     Some(spaced.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 
-fn visible_alert(visibility: &AlertVisibility, id: &str, folder_id: &str, name: &str) -> bool {
+pub(crate) fn visible_alert(
+    visibility: &AlertVisibility,
+    id: &str,
+    folder_id: &str,
+    name: &str,
+) -> bool {
     match visibility {
         None => true,
         Some((is_all_permitted, permitted)) => {
@@ -3830,6 +3844,9 @@ pub async fn enable_alert(
             {
                 // Fall back to anomaly detection config
                 use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+                if let Some(resp) = crate::request::anomaly_detection::disabled_response() {
+                    return resp;
+                }
                 let req = UpdateAnomalyConfigRequest {
                     enabled: Some(should_enable),
                     ..Default::default()
@@ -3982,6 +3999,11 @@ pub async fn enable_alert_bulk(
                 {
                     // Fall back to anomaly detection config
                     use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+                    if crate::request::anomaly_detection::disabled_response().is_some() {
+                        unsuccessful.push(id);
+                        err = Some("Anomaly detection is disabled".to_string());
+                        continue;
+                    }
                     let req = UpdateAnomalyConfigRequest {
                         enabled: Some(should_enable),
                         ..Default::default()
@@ -4107,6 +4129,9 @@ pub async fn trigger_alert(
             }
             #[cfg(feature = "enterprise")]
             {
+                if let Some(resp) = crate::request::anomaly_detection::disabled_response() {
+                    return resp;
+                }
                 // Fall back to anomaly detection — trigger a detection run
                 match openobserve_core::anomaly_detection::detect_anomalies(
                     &org_id,
@@ -4186,6 +4211,10 @@ pub async fn retrain_alert(
     #[cfg(not(feature = "enterprise"))]
     {
         MetaHttpResponse::bad_request("retrain is only supported for anomaly detection alerts")
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(resp) = crate::request::anomaly_detection::disabled_response() {
+        return resp;
     }
     #[cfg(feature = "enterprise")]
     if let Err(resp) = openobserve_core::background_access::guard_loaded(
@@ -4287,61 +4316,34 @@ pub async fn move_alerts(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
-    // Move anomaly configs first (enterprise only) so that if this fails,
-    // regular alerts have not yet been relocated (reduces partial-move risk).
+    // Every item is checked before any moves, so a batch with one bad id moves nothing.
     #[cfg(feature = "enterprise")]
-    for id in anomaly_ids {
-        use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
-        // Source side: `update_config` performs no check of its own, so without
-        // this a caller could pull a config out of a folder they cannot reach.
-        let id_str = id.to_string();
-        // Fail closed: a read error or a config without a folder must deny, not
-        // skip the check and let the move through.
-        let src_folder = match openobserve_core::anomaly_detection::get_config(&org_id, &id_str)
-            .await
-        {
-            Ok(Some(cfg)) => cfg
-                .get("folder_id")
-                .and_then(|f| f.as_str())
-                .map(str::to_string),
-            Ok(None) => return MetaHttpResponse::not_found(format!("alert {id_str} not found")),
-            Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
-        };
-        let Some(src_folder) = src_folder else {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
-        };
-        if !check_permissions(
-            &id_str,
+    if !anomaly_ids.is_empty()
+        && let Some(resp) = crate::request::anomaly_detection::disabled_response()
+    {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    for id in &anomaly_ids {
+        if let Err(resp) = check_anomaly_move(&org_id, &user_email.user_id, &id.to_string()).await {
+            return resp;
+        }
+    }
+    let mut composite_moves = Vec::with_capacity(composite_ids.len());
+    for id in composite_ids {
+        match openobserve_core::alerts::composite::check_move_composite(
             &org_id,
+            &id.to_string(),
             &user_email.user_id,
-            "alerts",
-            "PUT",
-            Some(&src_folder),
-            false,
-            true,
-            false,
         )
         .await
         {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
-        }
-        let req = UpdateAnomalyConfigRequest {
-            folder_id: Some(req_body.dst_folder_id.clone()),
-            ..Default::default()
-        };
-        if let Err(e) =
-            openobserve_core::anomaly_detection::update_config(&org_id, &id.to_string(), req).await
-        {
-            let msg = e.to_string().to_lowercase();
-            if msg.contains("not found") {
-                return MetaHttpResponse::not_found(e.to_string());
-            } else {
-                return MetaHttpResponse::internal_error(e.to_string());
-            }
+            Ok(src_folder) => composite_moves.push((id, src_folder)),
+            Err(error) => return composite_error_response(error),
         }
     }
 
-    // Move regular alerts in one batch
+    // Checks all of its alerts before it updates any.
     if !alert_ids.is_empty()
         && let Err(e) = alert::move_to_folder(
             client,
@@ -4354,10 +4356,28 @@ pub async fn move_alerts(
     {
         return e.into();
     }
-    for id in composite_ids {
+    #[cfg(feature = "enterprise")]
+    for id in anomaly_ids {
+        use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+        let req = UpdateAnomalyConfigRequest {
+            folder_id: Some(req_body.dst_folder_id.clone()),
+            ..Default::default()
+        };
+        if let Err(e) =
+            openobserve_core::anomaly_detection::update_config(&org_id, &id.to_string(), req).await
+        {
+            let msg = e.to_string().to_lowercase();
+            if msg.contains("not found") {
+                return MetaHttpResponse::not_found(e.to_string());
+            }
+            return MetaHttpResponse::internal_error(e.to_string());
+        }
+    }
+    for (id, src_folder) in composite_moves {
         if let Err(error) = openobserve_core::alerts::composite::move_composite(
             &org_id,
             &id.to_string(),
+            &src_folder,
             &req_body.dst_folder_id,
             &user_email.user_id,
         )
@@ -4373,6 +4393,40 @@ pub async fn move_alerts(
         "Alerts moved"
     };
     MetaHttpResponse::ok(message)
+}
+
+/// Refuses the move of an anomaly config the caller cannot edit in its current folder.
+#[cfg(feature = "enterprise")]
+async fn check_anomaly_move(org_id: &str, user_id: &str, id: &str) -> Result<(), Response> {
+    // Fail closed: a read error or a config without a folder must deny.
+    let src_folder = match openobserve_core::anomaly_detection::get_config(org_id, id).await {
+        Ok(Some(cfg)) => cfg
+            .get("folder_id")
+            .and_then(|f| f.as_str())
+            .map(str::to_string),
+        Ok(None) => return Err(MetaHttpResponse::not_found(format!("alert {id} not found"))),
+        Err(e) => return Err(MetaHttpResponse::internal_error(e.to_string())),
+    };
+    let Some(src_folder) = src_folder else {
+        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+    };
+    if check_permissions(
+        id,
+        org_id,
+        user_id,
+        "alerts",
+        "PUT",
+        Some(&src_folder),
+        false,
+        true,
+        false,
+    )
+    .await
+    {
+        Ok(())
+    } else {
+        Err(MetaHttpResponse::forbidden("Unauthorized Access"))
+    }
 }
 
 /// GenerateSql
