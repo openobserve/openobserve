@@ -855,10 +855,9 @@ mod tests {
             signal_at: 1,
         };
         let e = port.start(&request).await.unwrap_err();
-        assert!(
-            e.downcast_ref::<ActionRefused>().is_some(),
-            "incidents are off here: {e}"
-        );
+        // ENT defaults incidents on; then the request passes the gate into the incident path.
+        let on = crate::alerts::incidents::incidents_enabled();
+        assert_eq!(e.downcast_ref::<ActionRefused>().is_some(), !on, "{e}");
     }
 
     /// Deleting a stream drops its cached settings, so the re-created stream is bounded again.

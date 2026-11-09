@@ -80,6 +80,14 @@ static FINDING_TURN_LOCKS: std::sync::LazyLock<Vec<std::sync::Arc<tokio::sync::M
             .map(|_| std::sync::Arc::new(tokio::sync::Mutex::new(())))
             .collect()
     });
+/// Status turn locks for incidents on a node, as many as the finding turns for the same spread.
+const INCIDENT_TURNS: usize = 64;
+static INCIDENT_TURN_LOCKS: std::sync::LazyLock<Vec<std::sync::Arc<tokio::sync::Mutex<()>>>> =
+    std::sync::LazyLock::new(|| {
+        (0..INCIDENT_TURNS)
+            .map(|_| std::sync::Arc::new(tokio::sync::Mutex::new(())))
+            .collect()
+    });
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -161,12 +169,16 @@ pub(crate) trait TurnFence: Send + Sync + std::fmt::Debug {
     async fn before(&self, step: FenceStep) -> anyhow::Result<()>;
 }
 
-/// The correlation steps a [TurnFence] runs before.
+/// The steps a [TurnFence] runs before: correlation's, then a status change's follow-ups.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum FenceStep {
     Lookup,
     Join,
     Open,
+    OncallRecovery,
+    StatusEvent,
+    Analysis,
+    StatusPublish,
 }
 
 impl FenceStep {
@@ -175,6 +187,10 @@ impl FenceStep {
             Self::Lookup => "looking up the open incident",
             Self::Join => "joining the incident",
             Self::Open => "opening the incident",
+            Self::OncallRecovery => "recovering on-call",
+            Self::StatusEvent => "recording the status event",
+            Self::Analysis => "stopping or starting the analysis",
+            Self::StatusPublish => "publishing the status",
         }
     }
 }
@@ -337,7 +353,6 @@ impl FindingTurn {
 }
 
 /// A turn's cluster lease as any step reads it.
-#[cfg(feature = "enterprise")]
 #[derive(Clone, Debug)]
 pub(crate) struct LeaseWatch {
     key: String,
@@ -345,12 +360,11 @@ pub(crate) struct LeaseWatch {
     lost: Option<tokio::sync::watch::Receiver<bool>>,
 }
 
-#[cfg(feature = "enterprise")]
 impl LeaseWatch {
     fn held(&self, step: &str) -> anyhow::Result<()> {
         if self.lost.as_ref().is_some_and(|lost| *lost.borrow()) {
             anyhow::bail!(
-                "lost the finding lock {} before {step}; the act retries under a new one",
+                "lost the lock {} before {step}; the act retries under a new one",
                 self.key
             );
         }
@@ -358,11 +372,55 @@ impl LeaseWatch {
     }
 }
 
-#[cfg(feature = "enterprise")]
 #[async_trait::async_trait]
 impl TurnFence for LeaseWatch {
     async fn before(&self, step: FenceStep) -> anyhow::Result<()> {
         self.held(step.doing())
+    }
+}
+
+/// Where an incident's status changes take turns, behind a seam so a reopen can be raced in tests.
+#[async_trait::async_trait]
+pub(crate) trait IncidentTurns: Send + Sync {
+    async fn take(&self, org_id: &str, incident_id: &str) -> anyhow::Result<IncidentTurn>;
+}
+
+/// The production [IncidentTurns]: the node's stripe, then the cluster lock (none in local mode).
+pub(crate) struct ClusterIncidentTurns;
+
+#[async_trait::async_trait]
+impl IncidentTurns for ClusterIncidentTurns {
+    async fn take(&self, org_id: &str, incident_id: &str) -> anyhow::Result<IncidentTurn> {
+        let stripe = incident_turn(incident_id).clone().lock_owned().await;
+        let key = format!("/incidents/status/{org_id}/{incident_id}");
+        let cluster = infra::dist_lock::lock(&key, 0).await?;
+        let lease = LeaseWatch {
+            key,
+            lost: cluster.as_ref().map(infra::dist_lock::Locker::lost),
+        };
+        Ok(IncidentTurn {
+            stripe,
+            cluster,
+            fence: std::sync::Arc::new(lease),
+        })
+    }
+}
+
+/// An incident's status turn: a status write and its follow-up steps run inside one.
+pub(crate) struct IncidentTurn {
+    stripe: tokio::sync::OwnedMutexGuard<()>,
+    cluster: Option<infra::dist_lock::Locker>,
+    /// Run before each follow-up step; a step after a lost lease is left for a retry.
+    fence: std::sync::Arc<dyn TurnFence>,
+}
+
+impl IncidentTurn {
+    /// A failed release only logs: its keep-alive has stopped, so the cluster lock expires.
+    async fn end(self) {
+        if let Err(e) = infra::dist_lock::unlock(&self.cluster).await {
+            log::error!("[incidents] releasing an incident status lock failed: {e}");
+        }
+        drop(self.stripe);
     }
 }
 
@@ -1611,56 +1669,24 @@ pub async fn resolve_alert_firing(
     let Some(incident_id) = event.incident_id.as_deref() else {
         return Ok(());
     };
-    infra::table::alert_incidents::resolve_alert_firings(
-        incident_id,
-        &event.alert_id,
-        event.recovered_at,
-    )
-    .await?;
-
-    // Published even when this region updated no rows: the receiver runs the same idempotent update
-    // against its own replica, which may still be behind.
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-        && !config::get_config().common.local_mode
-        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_resolve_alert(
-            &event.org_id,
-            incident_id,
-            &event.alert_id,
-            event.recovered_at,
-        )
-        .await
-    {
-        log::error!("[SUPER_CLUSTER] Failed to publish incident resolve_alert: {e}");
-    }
-
-    let Some(incident) = infra::table::alert_incidents::get(&event.org_id, incident_id).await?
-    else {
-        return Ok(());
-    };
-    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
-    let fired_by_detection =
-        db::alerts::alert::any_siem_alert(&event.org_id, links.iter().map(|l| l.alert_id.as_str()))
-            .await;
-    if !recovery_closes(&incident, &links, fired_by_detection) {
-        return Ok(());
-    }
-
-    update_status_as(
-        &event.org_id,
-        incident_id,
-        "resolved",
-        "system@openobserve.ai",
-        muted,
-    )
-    .await?;
-    log::info!(
-        "[incidents] Auto-resolved incident {incident_id} — all {} contributing alert(s) recovered",
-        links.len()
-    );
+    let (org_id, alert_id, turns) = (&event.org_id, &event.alert_id, &ClusterIncidentTurns);
+    let at = event.recovered_at;
+    resolve_firing(org_id, incident_id, alert_id, at, muted, None, turns).await?;
     Ok(())
+}
+
+/// The finding's firing at `triggered_at` recovered; true only if this call resolved it.
+#[cfg(feature = "enterprise")]
+pub async fn resolve_finding_firing(
+    org_id: &str,
+    subject_id: &str,
+    triggered_at: i64,
+    recovered_at: i64,
+) -> Result<bool, anyhow::Error> {
+    let turns = &ClusterIncidentTurns;
+    let (resolved, repairs) =
+        recover_finding_firing(org_id, subject_id, triggered_at, recovered_at, turns).await?;
+    finished(resolved, repairs.as_ref())
 }
 
 /// The on-call recovery a muted [resolve_alert_firing] skipped, over the recent resolved incidents.
@@ -1727,21 +1753,6 @@ pub async fn try_auto_resolve_incident_for_external_alert(
     }
 
     Ok(())
-}
-
-/// Whether all of an incident's firings recovering closes it; a security case never closes so.
-fn recovery_closes(
-    incident: &infra::table::entity::alert_incidents::Model,
-    links: &[infra::table::entity::alert_incident_alerts::Model],
-    fired_by_detection: bool,
-) -> bool {
-    incident.status != "resolved"
-        && incident.acknowledged_by.is_none()
-        && incident.assigned_to.is_none()
-        && !links.is_empty()
-        && links.iter().all(|l| l.resolved_at.is_some())
-        && !incident.security_case
-        && !fired_by_detection
 }
 
 /// The lock stripe for one org's security case on `group_values`.
@@ -2617,6 +2628,189 @@ enum AlertIdJoin {
     HeldBy(String),
 }
 
+/// What [resolve_firing] did with one recovered firing.
+#[derive(Debug, Default)]
+struct FiringResolve {
+    /// The link's cross-region publish failed, so another region still holds it open.
+    unpublished: bool,
+    incident: IncidentAfter,
+}
+
+/// The incident after one of its firings recovered.
+#[derive(Debug, Default)]
+enum IncidentAfter {
+    /// Missing, or kept open for another firing or a human.
+    #[default]
+    Kept,
+    /// Resolved before this call; with what its follow-up steps did when the caller repairs.
+    AlreadyResolved(Option<Repairs>),
+    /// Resolved by this call.
+    Resolved(Repairs),
+}
+
+/// What a status change's follow-up steps did; a re-sent Resolve runs a failed one again.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Repairs {
+    oncall: OncallRecovery,
+    /// The other follow-up steps that failed.
+    failed: Vec<&'static str>,
+}
+
+impl Repairs {
+    /// The steps a re-sent Resolve would still have to do.
+    fn unfinished(&self) -> Vec<&'static str> {
+        let oncall = (self.oncall == OncallRecovery::Failed).then_some("on-call recovery");
+        oncall
+            .into_iter()
+            .chain(self.failed.iter().copied())
+            .collect()
+    }
+}
+
+/// The on-call recovery a status change ran or skipped.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum OncallRecovery {
+    /// Not a resolve.
+    #[default]
+    None,
+    Muted,
+    /// On-call is off or unlicensed.
+    Off,
+    Ran,
+    Failed,
+}
+
+/// [resolve_alert_firing]'s rules for any firing; a finding's `onset` keeps its later firings open.
+async fn resolve_firing(
+    org_id: &str,
+    incident_id: &str,
+    alert_id: &str,
+    recovered_at: i64,
+    muted: bool,
+    onset: Option<i64>,
+    turns: &dyn IncidentTurns,
+) -> Result<FiringResolve, anyhow::Error> {
+    // A retried recovery must not close a firing that started after the onset it is about.
+    let (id, at) = (incident_id, recovered_at);
+    infra::table::alert_incidents::resolve_firings_fired_by(id, alert_id, onset, at).await?;
+    let mut done = FiringResolve::default();
+
+    // Published even when no row here changed: the receiver's replica may still be behind.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_resolve_alert(
+            org_id,
+            incident_id,
+            alert_id,
+            recovered_at,
+            onset,
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident resolve_alert: {e}");
+        done.unpublished = true;
+    }
+
+    if fired_by_detection(org_id, incident_id).await? {
+        return Ok(done);
+    }
+
+    // The follow-up steps run inside the turn, so a reopen cannot land before or between them.
+    let turn = turns.take(org_id, incident_id).await?;
+    let fence = turn.fence.as_ref();
+    let repair = onset.is_some();
+    let settled = settle_resolution(org_id, incident_id, muted, repair, fence).await;
+    turn.end().await;
+    done.incident = settled?;
+    Ok(done)
+}
+
+/// A detection's incident is an analyst's to close, even one opened before cases were marked.
+async fn fired_by_detection(org_id: &str, incident_id: &str) -> Result<bool, anyhow::Error> {
+    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+    Ok(db::alerts::alert::any_siem_alert(org_id, links.iter().map(|l| l.alert_id.as_str())).await)
+}
+
+/// Resolves a recovered incident and runs its follow-up steps; `repair` re-runs them if resolved.
+async fn settle_resolution(
+    org_id: &str,
+    incident_id: &str,
+    muted: bool,
+    repair: bool,
+    fence: &dyn TurnFence,
+) -> Result<IncidentAfter, anyhow::Error> {
+    use infra::table::alert_incidents::AutomaticResolution;
+
+    Ok(
+        match infra::table::alert_incidents::resolve_if_recovered(org_id, incident_id).await? {
+            AutomaticResolution::Kept => IncidentAfter::Kept,
+            AutomaticResolution::AlreadyResolved(_) if !repair => {
+                IncidentAfter::AlreadyResolved(None)
+            }
+            // A cut-short attempt may have committed the status but not its follow-up steps.
+            AutomaticResolution::AlreadyResolved(snapshot) => {
+                let user = SYSTEM_USER_EMAIL;
+                let resent =
+                    finish_status_change(org_id, incident_id, user, false, *snapshot, fence);
+                IncidentAfter::AlreadyResolved(Some(resent.await?.1))
+            }
+            AutomaticResolution::Resolved { before, after } => {
+                let muted_before = before.muted_by_downtime_id.is_some()
+                    && o2_enterprise::enterprise::common::config::get_config()
+                        .downtimes
+                        .enabled;
+                let quiet = muted || muted_before;
+                let user = SYSTEM_USER_EMAIL;
+                let finished =
+                    finish_status_change(org_id, incident_id, user, quiet, *after, fence);
+                IncidentAfter::Resolved(finished.await?.1)
+            }
+        },
+    )
+}
+
+/// [resolve_finding_firing] with what the resolve's follow-up steps did, when it reached them.
+#[cfg(feature = "enterprise")]
+async fn recover_finding_firing(
+    org_id: &str,
+    subject_id: &str,
+    triggered_at: i64,
+    recovered_at: i64,
+    turns: &dyn IncidentTurns,
+) -> Result<(bool, Option<Repairs>), anyhow::Error> {
+    let held =
+        infra::table::alert_incidents::find_incident_with_firing(org_id, subject_id, triggered_at)
+            .await?;
+    let Some(incident) = held else {
+        return Ok((false, None));
+    };
+    let (id, at) = (&incident.id, recovered_at);
+    let onset = Some(triggered_at);
+    let done = resolve_firing(org_id, id, subject_id, at, false, onset, turns).await?;
+    let (resolved, mut repairs) = match done.incident {
+        IncidentAfter::Kept => (false, None),
+        IncidentAfter::Resolved(r) => (true, Some(r)),
+        IncidentAfter::AlreadyResolved(r) => (false, r),
+    };
+    if done.unpublished {
+        repairs.get_or_insert_default().failed.push("link publish");
+    }
+    Ok((resolved, repairs))
+}
+
+/// Ok only when nothing is left for a retry, so the engine tells a recovery once it is whole.
+#[cfg(feature = "enterprise")]
+fn finished(resolved: bool, repairs: Option<&Repairs>) -> Result<bool, anyhow::Error> {
+    let unfinished = repairs.map(Repairs::unfinished).unwrap_or_default();
+    if !unfinished.is_empty() {
+        anyhow::bail!("recovery left unfinished: {}", unfinished.join(", "));
+    }
+    Ok(resolved)
+}
+
 /// [open_finding_incident] with its seams; attempts at one finding take turns across the cluster.
 #[cfg(feature = "enterprise")]
 async fn open_finding_incident_with(
@@ -2760,6 +2954,16 @@ fn finding_incident_id(f: &FindingIncident, known: &[String]) -> String {
     let mut bytes = [0u8; 20];
     bytes.copy_from_slice(&digest[..20]);
     svix_ksuid::Ksuid::from_bytes(bytes).to_string()
+}
+
+/// The turn an incident's status changes wait on; one incident always maps to one lock.
+fn incident_turn(incident_id: &str) -> &'static std::sync::Arc<tokio::sync::Mutex<()>> {
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    incident_id.hash(&mut hasher);
+    let turn = usize::try_from(hasher.finish() % INCIDENT_TURNS as u64).unwrap_or_default();
+    &INCIDENT_TURN_LOCKS[turn]
 }
 
 /// The turn a finding's incident work waits on, so a detached attempt and its retry never overlap.
@@ -4461,79 +4665,11 @@ pub async fn update_status_as(
     user_id: &str,
     quiet: bool,
 ) -> Result<Incident, anyhow::Error> {
-    if is_the_one_ack(org_id, incident_id, status).await? {
-        return through_the_one_ack(org_id, incident_id, status, user_id).await;
-    }
-    // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
-    let before = infra::table::alert_incidents::get(org_id, incident_id).await?;
-    let muted_before = reads_mute_before(
-        status,
-        o2_enterprise::enterprise::common::config::get_config()
-            .downtimes
-            .enabled,
-    ) && before
-        .as_ref()
-        .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    // A re-sent Resolve re-runs the idempotent repairs but keeps the first row and event.
-    let again = status == "resolved" && before.as_ref().is_some_and(|m| m.status == "resolved");
-    let updated = match before {
-        Some(m) if again => m,
-        _ => infra::table::alert_incidents::update_status(org_id, incident_id, status).await?,
-    };
-
-    let muted = status_change_is_muted(
-        quiet || muted_before,
-        updated.muted_by_downtime_id.as_deref(),
-    );
-    // Every resolution path lands here, so closing the record once covers all of them.
-    #[cfg(feature = "enterprise")]
-    if status == "resolved"
-        && !muted
-        && o2_enterprise::enterprise::oncall::is_enabled()
-        && let Err(e) =
-            o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
-                .await
-    {
-        log::error!("[incidents] on-call recovery failed for {org_id}/{incident_id}: {e}");
-    }
-
-    // Emit status change event
-    use config::meta::alerts::incidents::IncidentEvent;
-    let event = match status {
-        "resolved" => Some(IncidentEvent::resolved(Some(user_id.to_string()))),
-        "open" => Some(IncidentEvent::manually_reopened(user_id)),
-        _ => None,
-    };
-    if let Some(evt) = event.filter(|_| !again)
-        && let Err(e) = append_event_unless_muted(org_id, incident_id, evt, muted).await
-    {
-        log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
-    }
-
-    // A resolve cancels a run that waits for an answer; a working run finishes.
-    #[cfg(feature = "enterprise")]
-    if status == "resolved"
-        && let Err(e) =
-            super::rca_steering::cancel_waiting_on_resolve(org_id, incident_id, user_id).await
-    {
-        log::error!(
-            "[INCIDENTS::RCA] Could not stop the paused run of {org_id}/{incident_id}: {e}"
-        );
-    }
-
-    // A reopened incident gets a fresh automatic run.
-    #[cfg(feature = "enterprise")]
-    if status == "open" && !muted {
-        start_automatic_rca(
-            org_id,
-            incident_id,
-            config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
-        )
-        .await;
-    }
-
-    publish_status(org_id, incident_id, status).await;
-    model_to_incident(updated).await
+    Ok(
+        change_status_as(org_id, incident_id, status, user_id, quiet)
+            .await?
+            .0,
+    )
 }
 
 /// Runs the one rule when the status change is the one ack's (AK-2, D20). [strong] (reads)
@@ -4607,7 +4743,242 @@ async fn through_the_one_ack(
     model_to_incident(model).await
 }
 
-async fn publish_status(org_id: &str, incident_id: &str, status: &str) {
+/// [update_status_as] with what its follow-up steps did.
+async fn change_status_as(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+    quiet: bool,
+) -> Result<(Incident, Repairs), anyhow::Error> {
+    if is_the_one_ack(org_id, incident_id, status).await? {
+        let incident = through_the_one_ack(org_id, incident_id, status, user_id).await?;
+        return Ok((incident, Repairs::default()));
+    }
+    // A reopen waits out a resolve's follow-up steps, so none of them acts on the reopened one.
+    let turn = ClusterIncidentTurns.take(org_id, incident_id).await?;
+    let changed = change_status_in(org_id, incident_id, status, user_id, quiet, &turn).await;
+    turn.end().await;
+    changed
+}
+
+/// [change_status_as]'s write and follow-up steps, inside the incident's status turn.
+async fn change_status_in(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+    quiet: bool,
+    turn: &IncidentTurn,
+) -> Result<(Incident, Repairs), anyhow::Error> {
+    // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
+    let before = infra::table::alert_incidents::get_rw(org_id, incident_id).await?;
+    let muted_before = reads_mute_before(
+        status,
+        o2_enterprise::enterprise::common::config::get_config()
+            .downtimes
+            .enabled,
+    ) && before
+        .as_ref()
+        .is_some_and(|m| m.muted_by_downtime_id.is_some());
+    // A retry must preserve the resolution timestamp used to deduplicate its event.
+    let again = status == "resolved" && before.as_ref().is_some_and(|m| m.status == "resolved");
+    let updated = match before {
+        Some(m) if again => m,
+        _ => infra::table::alert_incidents::update_status(org_id, incident_id, status).await?,
+    };
+
+    let quiet = quiet || muted_before;
+    let fence = turn.fence.as_ref();
+    finish_status_change(org_id, incident_id, user_id, quiet, updated, fence).await
+}
+
+async fn finish_status_change(
+    org_id: &str,
+    incident_id: &str,
+    user_id: &str,
+    quiet: bool,
+    updated: infra::table::entity::alert_incidents::Model,
+    fence: &dyn TurnFence,
+) -> Result<(Incident, Repairs), anyhow::Error> {
+    let status = updated.status.as_str();
+    let muted = status_change_is_muted(quiet, updated.muted_by_downtime_id.as_deref());
+    // A step in flight when the turn's lease is lost still writes only inside this episode.
+    let episode = infra::table::alert_incidents::Episode::of(&updated);
+    let mut repairs = Repairs::default();
+    if status == "resolved" {
+        repairs = resolve_follow_ups(org_id, incident_id, user_id, muted, &episode, fence).await?;
+    } else if status == "open" {
+        reopen_follow_ups(org_id, incident_id, user_id, muted, fence).await;
+    }
+    if !(turn_held(fence, FenceStep::StatusPublish).await
+        && publish_episode(org_id, incident_id, &episode).await)
+    {
+        repairs.failed.push("status publish");
+    }
+    Ok((model_to_incident(updated).await?, repairs))
+}
+
+/// A resolve's follow-up steps, each only while `fence` still holds the incident's turn.
+async fn resolve_follow_ups(
+    org_id: &str,
+    incident_id: &str,
+    user_id: &str,
+    muted: bool,
+    episode: &infra::table::alert_incidents::Episode,
+    fence: &dyn TurnFence,
+) -> Result<Repairs, anyhow::Error> {
+    // Every resolution path lands here, so closing the record once covers all of them.
+    let oncall = if turn_held(fence, FenceStep::OncallRecovery).await {
+        recover_oncall(org_id, incident_id, muted, episode).await
+    } else {
+        OncallRecovery::Failed
+    };
+    let mut repairs = Repairs {
+        oncall,
+        ..Repairs::default()
+    };
+
+    if !muted {
+        let resolved_at = episode
+            .resolved_at
+            .ok_or_else(|| anyhow::anyhow!("resolved incident has no resolution timestamp"))?;
+        let recorded = turn_held(fence, FenceStep::StatusEvent).await
+            && infra::table::incident_events::ensure_resolved(
+                org_id,
+                incident_id,
+                resolved_at,
+                user_id,
+            )
+            .await
+            .inspect_err(|e| log::error!("[Incidents] Failed to record resolution event: {e}"))
+            .is_ok();
+        if !recorded {
+            repairs.failed.push("resolution event");
+        }
+    }
+
+    // A resolve cancels a run that waits for an answer; a working run finishes.
+    #[cfg(feature = "enterprise")]
+    if !turn_held(fence, FenceStep::Analysis).await {
+        repairs.failed.push("analysis stop");
+    } else if let Err(e) =
+        super::rca_steering::cancel_waiting_on_resolve(org_id, incident_id, user_id, episode).await
+    {
+        log::error!(
+            "[INCIDENTS::RCA] Could not stop the paused run of {org_id}/{incident_id}: {e}"
+        );
+        repairs.failed.push("analysis stop");
+    }
+    Ok(repairs)
+}
+
+/// A reopen's follow-up steps, each only while `fence` still holds the incident's turn.
+async fn reopen_follow_ups(
+    org_id: &str,
+    incident_id: &str,
+    user_id: &str,
+    muted: bool,
+    fence: &dyn TurnFence,
+) {
+    if turn_held(fence, FenceStep::StatusEvent).await
+        && let Err(e) = append_event_unless_muted(
+            org_id,
+            incident_id,
+            IncidentEvent::manually_reopened(user_id),
+            muted,
+        )
+        .await
+    {
+        log::error!("[Incidents] Failed to record status event: {e}");
+    }
+
+    // A reopened incident gets a fresh automatic run.
+    #[cfg(feature = "enterprise")]
+    if !muted && turn_held(fence, FenceStep::Analysis).await {
+        start_automatic_rca(
+            org_id,
+            incident_id,
+            config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
+        )
+        .await;
+    }
+}
+
+/// False, logged, once the incident's turn is lost before `step`; a retry runs it.
+async fn turn_held(fence: &dyn TurnFence, step: FenceStep) -> bool {
+    match fence.before(step).await {
+        Ok(()) => true,
+        Err(e) => {
+            log::error!("[incidents] {e}");
+            false
+        }
+    }
+}
+
+/// The on-call recovery a resolve runs; a muted one notifies nobody.
+async fn recover_oncall(
+    org_id: &str,
+    incident_id: &str,
+    muted: bool,
+    episode: &infra::table::alert_incidents::Episode,
+) -> OncallRecovery {
+    use o2_enterprise::enterprise::oncall::escalation::recover_for_resolution;
+
+    if muted {
+        return OncallRecovery::Muted;
+    }
+    if !o2_enterprise::enterprise::oncall::is_enabled() {
+        return OncallRecovery::Off;
+    }
+    match recover_for_resolution(org_id, incident_id, episode).await {
+        Ok(_) => OncallRecovery::Ran,
+        Err(e) => {
+            log::error!("[incidents] on-call recovery failed for {org_id}/{incident_id}: {e}");
+            OncallRecovery::Failed
+        }
+    }
+}
+
+/// [publish_status] of `episode`, sent only while the incident is still in it.
+async fn publish_episode(
+    org_id: &str,
+    incident_id: &str,
+    episode: &infra::table::alert_incidents::Episode,
+) -> bool {
+    if !o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        || config::get_config().common.local_mode
+    {
+        return true;
+    }
+    let publish = publish_status(org_id, incident_id, &episode.status);
+    publish_in_episode(org_id, incident_id, episode, publish).await
+}
+
+/// False when `publish` failed or the incident could not be held; a stale one is dropped unsent.
+async fn publish_in_episode(
+    org_id: &str,
+    incident_id: &str,
+    episode: &infra::table::alert_incidents::Episode,
+    publish: impl std::future::Future<Output = bool>,
+) -> bool {
+    use infra::table::alert_incidents::while_in_episode;
+
+    match while_in_episode(org_id, incident_id, episode, publish).await {
+        Ok(Some(sent)) => sent,
+        // The status write that ended the episode publishes its own status.
+        Ok(None) => true,
+        Err(e) => {
+            log::error!("[incidents] could not hold {org_id}/{incident_id} to publish it: {e}");
+            false
+        }
+    }
+}
+
+/// False when the cross-region publish failed.
+async fn publish_status(org_id: &str, incident_id: &str, status: &str) -> bool {
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
@@ -4622,7 +4993,9 @@ async fn publish_status(org_id: &str, incident_id: &str, status: &str) {
         log::error!(
             "[SUPER_CLUSTER] Failed to publish incident update_status: org_id: {org_id}, error: {e}"
         );
+        return false;
     }
+    true
 }
 
 /// Records the resolved event of the auto-resolve job; a muted incident notifies nobody (D3).
@@ -5026,6 +5399,10 @@ mod tests {
         const TITLE: &str = "checkout (logs) stopped sending data";
         const ONSET: i64 = 1_793_784_600_000_000;
         const QUARTER_HOUR: i64 = 900_000_000;
+        const BACK: i64 = ONSET + 4 * QUARTER_HOUR;
+        /// Ample for an unblocked write to land on SQLite or a local Postgres.
+        const WAIT: std::time::Duration = std::time::Duration::from_millis(500);
+        const PERSON: &str = "someone@example.com";
 
         /// Stands in for on-call: counts pages and links, and refuses either on demand.
         #[derive(Default)]
@@ -5626,7 +6003,7 @@ mod tests {
             };
             let (old, new) = tokio::join!(open_finding_incident_with(&f, &pager, &a), takeover);
             let lost = old.expect_err("the old holder's act fails");
-            assert!(lost.to_string().contains("lost the finding lock"), "{lost}");
+            assert!(lost.to_string().contains("lost the lock"), "{lost}");
             let id = new.unwrap().incident_id().to_string();
             assert_eq!(incidents_of(&org).await.len(), 1);
             assert_eq!(pager.pages(), 1, "one on-call record, paged once");
@@ -5791,6 +6168,562 @@ mod tests {
                 Some(RCA_OFF_DISABLED)
             );
             assert_eq!(item.investigation.run_id, None);
+        }
+
+        /// The configured meta store: SQLite through the run tests' helper, or an o2-svc Postgres.
+        async fn store() -> tokio::sync::MutexGuard<'static, ()> {
+            if config::get_config().common.meta_store != "postgres" {
+                return crate::alerts::rca_runs::tests::db().await;
+            }
+            static TABLES: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+            static LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+            TABLES
+                .get_or_init(|| async {
+                    use infra::table::entity::{
+                        alert_incident_alerts, incident_events, oncall_responses, rca_runs,
+                        rca_steering,
+                    };
+                    use sea_orm::{ConnectionTrait, Schema};
+
+                    let conn = infra::db::get_orm_client_rw().await;
+                    let backend = conn.get_database_backend();
+                    let schema = Schema::new(backend);
+                    for mut table in [
+                        schema.create_table_from_entity(incident_rows::Entity),
+                        schema.create_table_from_entity(alert_incident_alerts::Entity),
+                        schema.create_table_from_entity(incident_events::Entity),
+                        schema.create_table_from_entity(rca_runs::Entity),
+                        schema.create_table_from_entity(rca_steering::Entity),
+                        schema.create_table_from_entity(oncall_responses::Entity),
+                    ] {
+                        conn.execute(backend.build(table.if_not_exists()))
+                            .await
+                            .unwrap();
+                    }
+                    infra::scheduler::init().await.unwrap();
+                })
+                .await;
+            eprintln!("meta store: postgres");
+            LOCK.lock().await
+        }
+
+        async fn status(org_id: &str, id: &str) -> String {
+            infra::table::alert_incidents::get_rw(org_id, id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status
+        }
+
+        async fn links_resolved_at(id: &str) -> Vec<Option<i64>> {
+            infra::table::alert_incidents::get_incident_alerts(id)
+                .await
+                .unwrap()
+                .iter()
+                .map(|l| l.resolved_at)
+                .collect()
+        }
+
+        /// The follow-up steps of an unmuted resolve where on-call is unlicensed, as in unit tests.
+        fn off() -> Repairs {
+            Repairs {
+                oncall: OncallRecovery::Off,
+                failed: Vec::new(),
+            }
+        }
+
+        /// An unmuted resolve's follow-up steps; on-call recovery runs wherever on-call is on.
+        fn unmuted() -> Repairs {
+            Repairs {
+                oncall: if o2_enterprise::enterprise::oncall::is_enabled() {
+                    OncallRecovery::Ran
+                } else {
+                    OncallRecovery::Off
+                },
+                failed: Vec::new(),
+            }
+        }
+
+        async fn resolved_by_system(org_id: &str, id: &str) -> bool {
+            use config::meta::alerts::incidents::IncidentEventType;
+
+            infra::table::incident_events::get(org_id, id)
+                .await
+                .unwrap()
+                .iter()
+                .any(|e| {
+                    matches!(&e.event_type, IncidentEventType::Resolved { user_id: Some(u) }
+                        if u == "system@openobserve.ai")
+                })
+        }
+
+        #[tokio::test]
+        async fn a_recovered_finding_resolves_its_unacknowledged_incident_unmuted() {
+            let _db = store().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let f = finding(&org, ONSET);
+            let id = open(&f, &pager).await.unwrap();
+            assert_ne!(status(&org, &id).await, "resolved");
+            let resolved =
+                recover_finding_firing(&org, &f.subject_id, ONSET, BACK, &ClusterIncidentTurns)
+                    .await;
+            assert_eq!(
+                resolved.unwrap(),
+                (true, Some(unmuted())),
+                "resolved here, unmuted"
+            );
+            assert_eq!(status(&org, &id).await, "resolved");
+            assert_eq!(links_resolved_at(&id).await, [Some(BACK)]);
+            assert!(resolved_by_system(&org, &id).await);
+            let again = resolve_finding_firing(&org, &f.subject_id, ONSET, BACK + QUARTER_HOUR);
+            assert!(!again.await.unwrap(), "already resolved");
+            assert_eq!(
+                links_resolved_at(&id).await,
+                [Some(BACK)],
+                "first value kept"
+            );
+        }
+
+        #[tokio::test]
+        async fn a_retry_after_a_cut_short_resolve_runs_its_follow_up_steps_again() {
+            let _db = store().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let f = finding(&org, ONSET);
+            let id = open(&f, &pager).await.unwrap();
+            infra::table::alert_incidents::update_status(&org, &id, "resolved")
+                .await
+                .unwrap();
+            assert!(!resolved_by_system(&org, &id).await);
+            let again =
+                recover_finding_firing(&org, &f.subject_id, ONSET, BACK, &ClusterIncidentTurns)
+                    .await;
+            assert_eq!(again.unwrap(), (false, Some(unmuted())));
+            assert_eq!(links_resolved_at(&id).await, [Some(BACK)]);
+            let told = resolve_finding_firing(&org, &f.subject_id, ONSET, BACK).await;
+            assert!(!told.unwrap(), "resolved before this call");
+            let events = infra::table::incident_events::get(&org, &id).await.unwrap();
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| matches!(
+                        event.event_type,
+                        config::meta::alerts::incidents::IncidentEventType::Resolved { .. }
+                    ))
+                    .count(),
+                1,
+                "interrupted resolution is repaired exactly once"
+            );
+        }
+
+        /// The production incident turn, held once before one follow-up step.
+        struct Paused(Arc<Gate>);
+
+        #[async_trait::async_trait]
+        impl IncidentTurns for Paused {
+            async fn take(&self, org_id: &str, incident_id: &str) -> anyhow::Result<IncidentTurn> {
+                let mut turn = ClusterIncidentTurns.take(org_id, incident_id).await?;
+                let lease = LeaseWatch {
+                    key: incident_id.to_string(),
+                    lost: None,
+                };
+                let gate = self.0.clone();
+                turn.fence = Arc::new(Gated { lease, gate });
+                Ok(turn)
+            }
+        }
+
+        /// The incident's resolves and reopens, oldest first.
+        async fn status_events(org_id: &str, id: &str) -> Vec<&'static str> {
+            use config::meta::alerts::incidents::IncidentEventType;
+
+            let events = infra::table::incident_events::get(org_id, id)
+                .await
+                .unwrap();
+            let named = events.iter().filter_map(|e| match &e.event_type {
+                IncidentEventType::Resolved { .. } => Some("resolved"),
+                IncidentEventType::Reopened { .. } => Some("reopened"),
+                _ => None,
+            });
+            named.collect()
+        }
+
+        #[tokio::test]
+        async fn a_reopen_waits_for_every_follow_up_step_of_a_resolve_and_of_its_repair() {
+            let _db = store().await;
+            let steps = [
+                FenceStep::OncallRecovery,
+                FenceStep::StatusEvent,
+                FenceStep::Analysis,
+                FenceStep::StatusPublish,
+            ];
+            for (repair, step) in [false, true]
+                .into_iter()
+                .flat_map(|r| steps.map(|s| (r, s)))
+            {
+                let case = format!("repair {repair}, paused before {step:?}");
+                let (org, pager) = (new_org(), Pager::default());
+                let f = finding(&org, ONSET);
+                let id = open(&f, &pager).await.unwrap();
+                if repair {
+                    infra::table::alert_incidents::update_status(&org, &id, "resolved")
+                        .await
+                        .unwrap();
+                }
+                let gate = Gate::at(step, true);
+                let paused = Paused(gate.clone());
+                let recovery = recover_finding_firing(&org, &f.subject_id, ONSET, BACK, &paused);
+                let person = async {
+                    gate.arrived().await;
+                    let reopen = update_status(&org, &id, "open", PERSON);
+                    tokio::pin!(reopen);
+                    let early = tokio::time::timeout(WAIT, &mut reopen).await;
+                    assert!(early.is_err(), "{case}: the reopen waits for the turn");
+                    assert_eq!(status(&org, &id).await, "resolved", "{case}");
+                    gate.resume.notify_one();
+                    reopen.await
+                };
+                let (recovered, reopened) = tokio::join!(recovery, person);
+                assert_eq!(recovered.unwrap(), (!repair, Some(unmuted())), "{case}");
+                assert_eq!(reopened.unwrap().status.to_string(), "open", "{case}");
+                assert_eq!(status(&org, &id).await, "open", "{case}");
+                assert_eq!(
+                    status_events(&org, &id).await,
+                    ["resolved", "reopened"],
+                    "{case}: every resolve step landed before the reopen"
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn a_recovery_waits_for_a_status_change_in_progress_but_on_calls_close_does_not() {
+            let _db = store().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let f = finding(&org, ONSET);
+            let id = open(&f, &pager).await.unwrap();
+            let turn = ClusterIncidentTurns.take(&org, &id).await.unwrap();
+            let recovery = resolve_finding_firing(&org, &f.subject_id, ONSET, BACK);
+            tokio::pin!(recovery);
+            let early = tokio::time::timeout(WAIT, &mut recovery).await;
+            assert!(early.is_err(), "the recovery waits for the turn");
+            assert_eq!(status(&org, &id).await, "open");
+            // The write on-call's promoted-incident close makes from inside an on-call step.
+            let close = infra::table::alert_incidents::update_status(&org, &id, "resolved");
+            let closed = tokio::time::timeout(WAIT, close).await;
+            let closed = closed.expect("on-call's close takes no turn, so it cannot deadlock");
+            assert_eq!(closed.unwrap().status, "resolved");
+            turn.end().await;
+            assert!(!recovery.await.unwrap(), "on-call resolved it first");
+            assert_eq!(
+                status_events(&org, &id).await,
+                ["resolved"],
+                "repaired once"
+            );
+        }
+
+        #[tokio::test]
+        async fn a_recovery_retried_after_a_reopen_keeps_what_people_and_new_firings_did() {
+            let _db = store().await;
+            for case in ["acknowledged", "assigned", "new firing"] {
+                let (org, pager) = (new_org(), Pager::default());
+                let f = finding(&org, ONSET);
+                let id = open(&f, &pager).await.unwrap();
+                infra::table::alert_incidents::update_status(&org, &id, "resolved")
+                    .await
+                    .unwrap();
+                update_status(&org, &id, "open", PERSON).await.unwrap();
+                match case {
+                    "acknowledged" => {
+                        let acked = infra::table::alert_incidents::acknowledge(&org, &id, PERSON);
+                        assert!(acked.await.unwrap().is_some(), "{case}");
+                    }
+                    "assigned" => {
+                        incident_rows::Entity::update_many()
+                            .col_expr(incident_rows::Column::AssignedTo, Expr::value(PERSON))
+                            .filter(incident_rows::Column::Id.eq(&id))
+                            .exec(infra::db::get_orm_client_rw().await)
+                            .await
+                            .unwrap();
+                    }
+                    _ => {
+                        let later = finding(&org, ONSET + QUARTER_HOUR);
+                        assert_eq!(open(&later, &pager).await.unwrap(), id, "{case}");
+                    }
+                }
+                let turns = &ClusterIncidentTurns;
+                let again = recover_finding_firing(&org, &f.subject_id, ONSET, BACK, turns).await;
+                assert_eq!(
+                    again.unwrap(),
+                    (false, None),
+                    "{case}: no follow-up step ran"
+                );
+                let row = infra::table::alert_incidents::get_rw(&org, &id)
+                    .await
+                    .unwrap();
+                let row = row.unwrap();
+                assert_ne!(row.status, "resolved", "{case}");
+                assert_eq!(row.resolved_at, None, "{case}");
+                assert_eq!(status_events(&org, &id).await, ["reopened"], "{case}");
+            }
+        }
+
+        #[tokio::test]
+        async fn a_status_publish_in_flight_holds_off_a_reopen_and_a_late_one_sends_nothing() {
+            use infra::table::alert_incidents::{Episode, update_status};
+
+            let _db = store().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let id = open(&finding(&org, ONSET), &pager).await.unwrap();
+            let resolved = Episode::of(&update_status(&org, &id, "resolved").await.unwrap());
+            let sent = Arc::new(Mutex::new(Vec::new()));
+            let (started, sending) = tokio::sync::oneshot::channel::<()>();
+            let (release, released) = tokio::sync::oneshot::channel::<()>();
+            let log = sent.clone();
+            let publish = async move {
+                started.send(()).unwrap();
+                released.await.unwrap();
+                log.lock().unwrap().push("resolved");
+                true
+            };
+            let (o, i, e) = (org.clone(), id.clone(), resolved.clone());
+            let in_flight =
+                tokio::spawn(async move { publish_in_episode(&o, &i, &e, publish).await });
+            sending.await.unwrap();
+
+            // A reopen on the node that took the turn after this one lost its lease.
+            let reopen = update_status(&org, &id, "open");
+            tokio::pin!(reopen);
+            let early = tokio::time::timeout(WAIT, &mut reopen).await;
+            assert!(early.is_err(), "the reopen waits for the publish in flight");
+            release.send(()).unwrap();
+            assert!(in_flight.await.unwrap(), "the publish in flight completes");
+            assert_eq!(reopen.await.unwrap().status, "open");
+
+            let log = sent.clone();
+            let late = async move {
+                log.lock().unwrap().push("stale resolved");
+                true
+            };
+            assert!(
+                publish_in_episode(&org, &id, &resolved, late).await,
+                "a dropped stale publish leaves nothing to retry"
+            );
+            assert_eq!(
+                *sent.lock().unwrap(),
+                ["resolved"],
+                "no stale status after the reopen"
+            );
+        }
+
+        /// [resolved_by_system] read on the primary, for a test whose replica is another database.
+        async fn primary_resolved_by_system(org_id: &str, id: &str) -> bool {
+            use infra::table::entity::incident_events;
+
+            let row = incident_events::Entity::find()
+                .filter(incident_events::Column::OrgId.eq(org_id))
+                .filter(incident_events::Column::IncidentId.eq(id))
+                .one(infra::db::get_orm_client_rw().await)
+                .await
+                .unwrap();
+            let events = row.map(|r| r.events).unwrap_or_default();
+            let events = events.as_array().cloned().unwrap_or_default();
+            events.iter().any(|e| {
+                let e = e.to_string();
+                e.contains("esolved") && e.contains(SYSTEM_USER_EMAIL)
+            })
+        }
+
+        #[tokio::test]
+        #[ignore = "needs ZO_META_STORE=postgres and ZO_META_POSTGRES_RO_DSN on another database"]
+        async fn a_stale_replica_never_decides_a_resolve_or_its_mute() {
+            use sea_orm::{ActiveModelTrait, ConnectionTrait, IntoActiveModel, Schema, Set};
+
+            let _db = store().await;
+            let cfg = config::get_config();
+            let (rw, ro) = (
+                &cfg.common.meta_postgres_dsn,
+                &cfg.common.meta_postgres_ro_dsn,
+            );
+            assert_eq!(cfg.common.meta_store, "postgres");
+            assert!(
+                !ro.is_empty() && ro != rw,
+                "the replica must be its own database"
+            );
+            let replica = infra::db::get_orm_client_ro().await;
+            let backend = replica.get_database_backend();
+            for mut table in [
+                Schema::new(backend).create_table_from_entity(incident_rows::Entity),
+                Schema::new(backend)
+                    .create_table_from_entity(infra::table::entity::alert_incident_alerts::Entity),
+            ] {
+                replica
+                    .execute(backend.build(table.if_not_exists()))
+                    .await
+                    .unwrap();
+            }
+            for primary_resolved in [true, false] {
+                let (org, pager) = (new_org(), Pager::default());
+                let f = finding(&org, ONSET);
+                let id = open(&f, &pager).await.unwrap();
+                if primary_resolved {
+                    infra::table::alert_incidents::update_status(&org, &id, "resolved")
+                        .await
+                        .unwrap();
+                } else {
+                    incident_rows::Entity::update_many()
+                        .col_expr(
+                            incident_rows::Column::MutedByDowntimeId,
+                            Expr::value("dt-1"),
+                        )
+                        .filter(incident_rows::Column::Id.eq(&id))
+                        .exec(infra::db::get_orm_client_rw().await)
+                        .await
+                        .unwrap();
+                }
+                let primary = infra::table::alert_incidents::get_rw(&org, &id)
+                    .await
+                    .unwrap();
+                let mut stale = primary.unwrap().into_active_model();
+                stale.status = Set(if primary_resolved { "open" } else { "resolved" }.into());
+                stale.muted_by_downtime_id = Set(primary_resolved.then(|| "dt-stale".to_string()));
+                stale.reset_all().insert(replica).await.unwrap();
+                let turns = &ClusterIncidentTurns;
+                let told = recover_finding_firing(&org, &f.subject_id, ONSET, BACK, turns).await;
+                let case = format!("primary resolved {primary_resolved}");
+                if primary_resolved {
+                    assert_eq!(
+                        told.unwrap(),
+                        (false, Some(off())),
+                        "{case}: repaired unmuted"
+                    );
+                    assert!(primary_resolved_by_system(&org, &id).await, "{case}");
+                } else {
+                    let muted = Repairs {
+                        oncall: OncallRecovery::Muted,
+                        failed: Vec::new(),
+                    };
+                    assert_eq!(told.unwrap(), (true, Some(muted)), "{case}: resolved muted");
+                    assert!(!primary_resolved_by_system(&org, &id).await, "{case}");
+                }
+                assert_eq!(status(&org, &id).await, "resolved", "{case}");
+            }
+            eprintln!("stale replica arm ran");
+        }
+
+        #[test]
+        fn an_unfinished_follow_up_step_fails_the_recovery_so_the_engine_retries() {
+            let repairs = |oncall, failed: &[&'static str]| Repairs {
+                oncall,
+                failed: failed.to_vec(),
+            };
+            let err = finished(true, Some(&repairs(OncallRecovery::Failed, &[]))).unwrap_err();
+            assert!(err.to_string().contains("on-call recovery"), "{err}");
+            for step in [
+                "link publish",
+                "analysis stop",
+                "status publish",
+                "resolution event",
+            ] {
+                let err = finished(true, Some(&repairs(OncallRecovery::Ran, &[step]))).unwrap_err();
+                assert!(err.to_string().contains(step), "{err}");
+            }
+            assert!(finished(true, Some(&off())).unwrap());
+            assert!(!finished(false, Some(&repairs(OncallRecovery::Muted, &[]))).unwrap());
+            assert!(!finished(false, None).unwrap());
+        }
+
+        #[tokio::test]
+        async fn an_acknowledged_or_assigned_incident_gets_its_link_resolved_and_stays_open() {
+            let _db = store().await;
+            for column in [
+                incident_rows::Column::AcknowledgedBy,
+                incident_rows::Column::AssignedTo,
+            ] {
+                let (org, pager) = (new_org(), Pager::default());
+                let f = finding(&org, ONSET);
+                let id = open(&f, &pager).await.unwrap();
+                incident_rows::Entity::update_many()
+                    .col_expr(column, Expr::value("someone@example.com"))
+                    .filter(incident_rows::Column::Id.eq(&id))
+                    .exec(infra::db::get_orm_client_rw().await)
+                    .await
+                    .unwrap();
+                let resolved = resolve_finding_firing(&org, &f.subject_id, ONSET, BACK).await;
+                assert!(!resolved.unwrap(), "{column:?}");
+                assert_ne!(status(&org, &id).await, "resolved", "{column:?}");
+                assert_eq!(links_resolved_at(&id).await, [Some(BACK)], "{column:?}");
+                assert!(!resolved_by_system(&org, &id).await, "{column:?}");
+            }
+        }
+
+        #[tokio::test]
+        async fn no_incident_holding_the_firing_resolves_nothing_and_writes_nothing() {
+            let _db = store().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let f = finding(&org, ONSET);
+            let id = open(&f, &pager).await.unwrap();
+            let other = new_org();
+            for (org_id, subject, at) in [
+                (org.as_str(), f.subject_id.as_str(), ONSET + QUARTER_HOUR),
+                (org.as_str(), "autoobserve:finding-b", ONSET),
+                (other.as_str(), f.subject_id.as_str(), ONSET),
+            ] {
+                let resolved = resolve_finding_firing(org_id, subject, at, BACK).await;
+                assert!(!resolved.unwrap(), "{org_id} {subject} {at}");
+            }
+            assert_eq!(links_resolved_at(&id).await, [None]);
+            assert_ne!(status(&org, &id).await, "resolved");
+            assert!(!resolved_by_system(&org, &id).await);
+        }
+
+        #[tokio::test]
+        async fn two_firings_of_one_finding_in_one_incident_both_resolve_then_the_incident() {
+            let _db = store().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let id = open(&finding(&org, ONSET), &pager).await.unwrap();
+            let later = finding(&org, ONSET + QUARTER_HOUR);
+            assert_eq!(open(&later, &pager).await.unwrap(), id);
+            let resolved =
+                resolve_finding_firing(&org, &later.subject_id, later.triggered_at, BACK).await;
+            assert!(resolved.unwrap());
+            assert_eq!(links_resolved_at(&id).await, [Some(BACK), Some(BACK)]);
+            assert_eq!(status(&org, &id).await, "resolved");
+        }
+
+        #[tokio::test]
+        async fn a_recovery_resolves_the_incident_its_page_opened() {
+            use o2_enterprise::enterprise::autoobserve::{
+                contract::{ActionKind, ActionRequest},
+                names::{decision_kinds, kinds},
+                plugins::stream::page_subject,
+                ports::Recovery,
+            };
+
+            use crate::autoobserve::incidents::{finding_incident, recovery_subject};
+
+            let _db = store().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let request = ActionRequest {
+                org: org.clone(),
+                entity_type: kinds::STREAM.into(),
+                entity_id: "logs/checkout".into(),
+                decision_kind: decision_kinds::STREAM_SILENCE.into(),
+                group_key: String::new(),
+                action: ActionKind::Investigate,
+                signal_at: ONSET,
+            };
+            let f = finding_incident(&page_subject(&request).unwrap(), &org);
+            let id = open(&f, &pager).await.unwrap();
+            let recovery = Recovery {
+                org: org.clone(),
+                decision_kind: request.decision_kind.clone(),
+                entity_id: request.entity_id.clone(),
+                signal_at: ONSET,
+                recovered_at: BACK,
+            };
+            let subject = recovery_subject(&recovery);
+            let resolved = resolve_finding_firing(&org, &subject, ONSET, BACK).await;
+            assert!(resolved.unwrap());
+            assert_eq!(status(&org, &id).await, "resolved");
         }
     }
 
@@ -7573,46 +8506,6 @@ mod tests {
         assert_eq!(names, ["allowed"]);
         let ids: Vec<_> = composites.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(ids, ["c_allowed"]);
-    }
-
-    fn recovered_link(alert_id: &str) -> infra::table::entity::alert_incident_alerts::Model {
-        infra::table::entity::alert_incident_alerts::Model {
-            incident_id: "inc-1".to_string(),
-            alert_id: alert_id.to_string(),
-            alert_fired_at: 1,
-            alert_name: alert_id.to_string(),
-            alert_kind: "internal".to_string(),
-            correlation_reason: None,
-            created_at: 1,
-            resolved_at: Some(2),
-        }
-    }
-
-    #[test]
-    fn an_ops_incident_closes_once_every_firing_recovers() {
-        let open = incident(None);
-        assert!(recovery_closes(&open, &[recovered_link("cpu")], false));
-
-        let mut still_firing = recovered_link("cpu");
-        still_firing.resolved_at = None;
-        assert!(!recovery_closes(&open, &[still_firing], false));
-        assert!(!recovery_closes(&open, &[], false));
-
-        let mut assigned = incident(None);
-        assigned.assigned_to = Some("a@acme.io".to_string());
-        assert!(!recovery_closes(&assigned, &[recovered_link("cpu")], false));
-    }
-
-    #[test]
-    fn a_security_case_never_closes_on_recovery() {
-        let open = incident(None);
-        assert!(!recovery_closes(&open, &[recovered_link("siem-1")], true));
-        let mut marked = incident(None);
-        marked.security_case = true;
-        assert!(
-            !recovery_closes(&marked, &[recovered_link("deleted-detection")], false),
-            "the marker keeps a case open after its detection is deleted"
-        );
     }
 
     #[test]

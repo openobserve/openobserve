@@ -22,14 +22,15 @@ use o2_enterprise::enterprise::autoobserve::{
     api::Page,
     contract::ActionRequest,
     paging_enabled_for,
-    plugins::stream::{PageSubject, page_subject},
-    ports::{ActionRefused, InvestigationPort},
+    plugins::stream::{PageSubject, finding_id, page_subject},
+    ports::{ActionRefused, InvestigationPort, Recovery},
 };
 use serde::{Deserialize, Serialize};
 
 use crate::alerts::incidents::{
     FINDING_KIND_DIMENSION, FINDING_STREAM_NAME_DIMENSION, FINDING_STREAM_TYPE_DIMENSION,
     FindingIncident, finding_dimensions, incidents_enabled, open_finding_incident,
+    resolve_finding_firing,
 };
 
 /// Prefixes every finding's trigger id, so it can never equal an alert's id in `alert_id`.
@@ -49,6 +50,18 @@ impl InvestigationPort for IncidentInvestigation {
         // The act's timeout drops this future; spawned, the incident work still runs to its end.
         let outcome = tokio::spawn(async move { open_finding_incident(&finding).await }).await??;
         Ok(outcome.incident_id().to_string())
+    }
+
+    /// Incidents off opened nothing, so there is nothing to resolve.
+    async fn resolve(&self, recovery: &Recovery) -> anyhow::Result<bool> {
+        if !incidents_enabled() {
+            return Ok(false);
+        }
+        let (org, subject) = (recovery.org.clone(), recovery_subject(recovery));
+        let (at, back) = (recovery.signal_at, recovery.recovered_at);
+        // The pull's budget drops this future; spawned, a resolve already begun still finishes.
+        let resolve = async move { resolve_finding_firing(&org, &subject, at, back).await };
+        Ok(tokio::spawn(resolve).await??)
     }
 }
 
@@ -105,6 +118,12 @@ pub fn finding_incident(s: &PageSubject, org: &str) -> FindingIncident {
         dimensions: finding_dimensions(&s.decision_kind, &s.stream_type, &s.stream_name),
         triggered_at: s.signal_at,
     }
+}
+
+/// The trigger id `start` gave the finding's firing, so its recovery finds the same incident.
+pub fn recovery_subject(r: &Recovery) -> String {
+    let id = finding_id(&r.org, &r.decision_kind, &r.entity_id);
+    format!("{SUBJECT_PREFIX}{id}")
 }
 
 /// The org's AutoObserve incidents, newest first, with whether paging is on for it.
@@ -279,7 +298,6 @@ mod tests {
                 .map(|r| r.0.as_str()),
             Some(REFUSED_INCIDENTS_OFF)
         );
-        assert!(!incidents_enabled(), "the test config leaves incidents off");
         let request = ActionRequest {
             org: "demo-org".into(),
             entity_type: kinds::STREAM.into(),
@@ -290,7 +308,12 @@ mod tests {
             signal_at: 1,
         };
         let e = IncidentInvestigation.start(&request).await.unwrap_err();
-        assert!(e.downcast_ref::<ActionRefused>().is_some(), "{e}");
+        // ENT defaults incidents on, so the switch decides which side of the gate this reaches.
+        assert_eq!(
+            e.downcast_ref::<ActionRefused>().is_some(),
+            !incidents_enabled(),
+            "{e}"
+        );
     }
 
     #[test]
@@ -366,5 +389,32 @@ mod tests {
         assert_eq!(item.incident.id, "inc-1");
         let item = item_of(&incident(serde_json::json!("garbage")), &link("c"));
         assert_eq!((item.finding.kind, item.finding.id.as_str()), (None, "c"));
+    }
+
+    #[tokio::test]
+    async fn a_recovery_names_the_subject_its_page_opened_and_incidents_off_resolve_nothing() {
+        let recovery = Recovery {
+            org: "demo-org".into(),
+            decision_kind: decision_kinds::STREAM_SILENCE.into(),
+            entity_id: "logs/checkout".into(),
+            signal_at: 1_762_300_000_000_000,
+            recovered_at: 1_762_300_900_000_000,
+        };
+        let opened = finding_incident(&subject(), "demo-org");
+        assert_eq!(recovery_subject(&recovery), opened.subject_id);
+        let drop = Recovery {
+            decision_kind: decision_kinds::STREAM_DROP.into(),
+            ..recovery.clone()
+        };
+        assert_ne!(recovery_subject(&drop), opened.subject_id, "per kind");
+        let resolved = IncidentInvestigation.resolve(&recovery).await;
+        if incidents_enabled() {
+            assert!(
+                !matches!(resolved, Ok(true)),
+                "no incident holds this firing"
+            );
+        } else {
+            assert!(!resolved.unwrap(), "incidents off resolve nothing");
+        }
     }
 }

@@ -113,6 +113,41 @@ pub enum Joining {
     Held(String),
 }
 
+/// One status episode of an incident: the status and resolution time its last status write left.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Episode {
+    pub status: String,
+    pub resolved_at: Option<i64>,
+}
+
+impl Episode {
+    pub fn of(incident: &alert_incidents::Model) -> Self {
+        Self {
+            status: incident.status.clone(),
+            resolved_at: incident.resolved_at,
+        }
+    }
+
+    /// `query` narrowed to the incident while it is still in this episode.
+    pub(crate) fn held<Q: QueryFilter>(&self, query: Q) -> Q {
+        let query = query.filter(alert_incidents::Column::Status.eq(self.status.as_str()));
+        match self.resolved_at {
+            Some(at) => query.filter(alert_incidents::Column::ResolvedAt.eq(at)),
+            None => query.filter(alert_incidents::Column::ResolvedAt.is_null()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AutomaticResolution {
+    Kept,
+    AlreadyResolved(Box<alert_incidents::Model>),
+    Resolved {
+        before: Box<alert_incidents::Model>,
+        after: Box<alert_incidents::Model>,
+    },
+}
+
 /// The row a new incident starts as. One construction site, so the plain create
 /// and the on-call promotion's transaction cannot drift as columns are added.
 #[allow(clippy::too_many_arguments)]
@@ -204,6 +239,12 @@ async fn link_firing<C: ConnectionTrait>(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    if incident.status == "resolved" {
+        return Err(Error::DbError(DbError::SeaORMError(
+            "Incident resolved before firing join; retry correlation".to_string(),
+        )));
+    }
 
     let is_new_alert_type = alert_incident_alerts::Entity::find()
         .select_only()
@@ -715,6 +756,104 @@ pub async fn add_firing_once_with(
     let new_alert_type = link_firing(&txn, incident_id, alert, alert_fired_at, None).await?;
     txn.commit().await.map_err(db_err)?;
     Ok(Joining::Joined { new_alert_type })
+}
+
+pub async fn resolve_if_recovered(
+    org_id: &str,
+    id: &str,
+) -> Result<AutomaticResolution, errors::Error> {
+    resolve_if_recovered_with(get_orm_client_rw().await, org_id, id).await
+}
+
+pub async fn resolve_if_recovered_with(
+    db: &sea_orm::DatabaseConnection,
+    org_id: &str,
+    id: &str,
+) -> Result<AutomaticResolution, errors::Error> {
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let txn = db.begin().await.map_err(db_err)?;
+    let Some(before) = alert_incidents::Entity::find_by_id(id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .lock(LockType::Update)
+        .one(&txn)
+        .await
+        .map_err(db_err)?
+    else {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(AutomaticResolution::Kept);
+    };
+    if before.status == "resolved" {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(AutomaticResolution::AlreadyResolved(Box::new(before)));
+    }
+    // A security case is an analyst's to close, whatever its detections do.
+    if before.status != "open"
+        || before.acknowledged_by.is_some()
+        || before.assigned_to.is_some()
+        || before.security_case
+    {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(AutomaticResolution::Kept);
+    }
+    let links = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::IncidentId.eq(id))
+        .all(&txn)
+        .await
+        .map_err(db_err)?;
+    if links.is_empty() || links.iter().any(|link| link.resolved_at.is_none()) {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(AutomaticResolution::Kept);
+    }
+    let now = chrono::Utc::now().timestamp_micros();
+    let mut active: alert_incidents::ActiveModel = before.clone().into();
+    active.status = Set("resolved".to_string());
+    active.resolved_at = Set(Some(now));
+    active.updated_at = Set(now);
+    active.muted_by_downtime_id = Set(None);
+    let after = active.update(&txn).await.map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(AutomaticResolution::Resolved {
+        before: Box::new(before),
+        after: Box::new(after),
+    })
+}
+
+/// Runs `act` while no status write can end `episode`; None, without running it, once one did.
+pub async fn while_in_episode<T>(
+    org_id: &str,
+    id: &str,
+    episode: &Episode,
+    act: impl std::future::Future<Output = T>,
+) -> Result<Option<T>, errors::Error> {
+    let db = get_orm_client_rw().await;
+    let Some(txn) = hold_episode(db, org_id, id, episode).await? else {
+        return Ok(None);
+    };
+    let done = act.await;
+    txn.commit().await?;
+    Ok(Some(done))
+}
+
+/// A transaction holding the incident's row while it is in `episode`, or None once it left it.
+pub(crate) async fn hold_episode(
+    db: &sea_orm::DatabaseConnection,
+    org_id: &str,
+    id: &str,
+    episode: &Episode,
+) -> Result<Option<sea_orm::DatabaseTransaction>, errors::Error> {
+    let txn = db.begin().await?;
+    // On SQLite the one write connection this transaction holds keeps other writers out instead.
+    let held = episode
+        .held(alert_incidents::Entity::find_by_id(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .lock(LockType::Update)
+        .one(&txn)
+        .await?;
+    if held.is_none() {
+        txn.rollback().await?;
+        return Ok(None);
+    }
+    Ok(Some(txn))
 }
 
 /// Update incident status
@@ -1232,15 +1371,29 @@ pub async fn resolve_alert_firings(
     alert_id: &str,
     resolved_at: i64,
 ) -> Result<u64, errors::Error> {
+    resolve_firings_fired_by(incident_id, alert_id, None, resolved_at).await
+}
+
+/// [`resolve_alert_firings`], only for the firings fired at or before `fired_by` when given.
+pub async fn resolve_firings_fired_by(
+    incident_id: &str,
+    alert_id: &str,
+    fired_by: Option<i64>,
+    resolved_at: i64,
+) -> Result<u64, errors::Error> {
     let client = get_orm_client_rw().await;
-    let res = alert_incident_alerts::Entity::update_many()
+    let mut update = alert_incident_alerts::Entity::update_many()
         .col_expr(
             alert_incident_alerts::Column::ResolvedAt,
             Expr::value(Some(resolved_at)),
         )
         .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
         .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
-        .filter(alert_incident_alerts::Column::ResolvedAt.is_null())
+        .filter(alert_incident_alerts::Column::ResolvedAt.is_null());
+    if let Some(fired_by) = fired_by {
+        update = update.filter(alert_incident_alerts::Column::AlertFiredAt.lte(fired_by));
+    }
+    let res = update
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -1252,6 +1405,20 @@ pub async fn get_incident_alerts(
     incident_id: &str,
 ) -> Result<Vec<alert_incident_alerts::Model>, errors::Error> {
     let client = get_orm_client_ro().await;
+
+    alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .order_by_desc(alert_incident_alerts::Column::AlertFiredAt)
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// [get_incident_alerts] on the primary, for a decision right after a link write.
+pub async fn get_incident_alerts_rw(
+    incident_id: &str,
+) -> Result<Vec<alert_incident_alerts::Model>, errors::Error> {
+    let client = get_orm_client_rw().await;
 
     alert_incident_alerts::Entity::find()
         .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
@@ -3268,6 +3435,101 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn automatic_resolution_observes_ownership_and_current_links() {
+        for (name, db, schema) in kind_backends().await {
+            for (case, acknowledged, assigned, unresolved, security_case) in [
+                ("ack", true, false, false, false),
+                ("assigned", false, true, false, false),
+                ("new-link", false, false, true, false),
+                ("security-case", false, false, false, true),
+                ("recovered", false, false, false, false),
+            ] {
+                let id = incident_at(&db, "demo-org", 100).await;
+                link_at(&db, &id, "finding", "autoobserve", 100).await;
+                alert_incident_alerts::Entity::update_many()
+                    .col_expr(
+                        alert_incident_alerts::Column::ResolvedAt,
+                        Expr::value(Some(200_i64)),
+                    )
+                    .filter(alert_incident_alerts::Column::IncidentId.eq(&id))
+                    .exec(&db)
+                    .await
+                    .unwrap();
+                let mut row: alert_incidents::ActiveModel =
+                    alert_incidents::Entity::find_by_id(&id)
+                        .one(&db)
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .into();
+                row.acknowledged_by = Set(acknowledged.then(|| "owner".to_string()));
+                row.assigned_to = Set(assigned.then(|| "owner".to_string()));
+                row.security_case = Set(security_case);
+                row.update(&db).await.unwrap();
+                if unresolved {
+                    link_at(&db, &id, "new-finding", "autoobserve", 300).await;
+                }
+                let result = resolve_if_recovered_with(&db, "demo-org", &id)
+                    .await
+                    .unwrap();
+                if acknowledged || assigned || unresolved || security_case {
+                    assert_eq!(result, AutomaticResolution::Kept, "{name}/{case}");
+                } else {
+                    let AutomaticResolution::Resolved { before, after } = result else {
+                        panic!("{name}/{case}: expected resolution");
+                    };
+                    assert_eq!(before.status, "open");
+                    assert_eq!(after.status, "resolved");
+                    assert!(after.resolved_at.is_some());
+                    assert_eq!(
+                        resolve_if_recovered_with(&db, "demo-org", &id)
+                            .await
+                            .unwrap(),
+                        AutomaticResolution::AlreadyResolved(after),
+                        "{name}/{case}: retry preserves timestamp"
+                    );
+                }
+            }
+            drop_kind_schema(schema).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_resolved_target_rejects_new_firings_but_keeps_existing_holders() {
+        for (name, db, schema) in kind_backends().await {
+            let Opening::Opened(incident) =
+                open_fixed(&db, "inc-closed", &FIRST, 100).await.unwrap()
+            else {
+                panic!("{name}: expected an open incident");
+            };
+            update_status_with(&db, "demo-org", &incident.id, "resolved")
+                .await
+                .unwrap();
+            assert!(
+                add_firing_once_with(&db, "demo-org", &incident.id, &FIRST, 200)
+                    .await
+                    .is_err(),
+                "{name}: a new finding cannot join a resolved incident"
+            );
+            let txn = db.begin().await.unwrap();
+            assert!(
+                link_firing(&txn, &incident.id, &FIRST, 300).await.is_err(),
+                "{name}: regular alerts share the same protection"
+            );
+            txn.rollback().await.unwrap();
+            assert_eq!(
+                add_firing_once_with(&db, "demo-org", &incident.id, &FIRST, 100)
+                    .await
+                    .unwrap(),
+                Joining::Held(incident.id.clone()),
+                "{name}"
+            );
+            assert_eq!(onsets_in(&db, &incident.id).await, [100], "{name}");
+            drop_kind_schema(schema).await;
+        }
+    }
+
+    #[tokio::test]
     async fn a_create_waits_on_the_lock_a_join_holds_then_finds_its_firing() {
         for (name, db, schema) in kind_backends().await {
             // SQLite has one writer at a time, so there is no lock to wait on.
@@ -3360,6 +3622,47 @@ mod tests {
                 "{name}: X never gets it"
             );
             assert_eq!(onsets_in(&db, "inc-y").await, [200], "{name}");
+            drop_kind_schema(schema).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn an_episode_is_held_only_while_the_incident_is_still_in_it() {
+        for (kind, db, schema) in kind_backends().await {
+            let org = "org-episode";
+            let id = incident_at(&db, org, 1).await;
+            let row = alert_incidents::Entity::find_by_id(id.as_str())
+                .one(&db)
+                .await;
+            let opened = Episode::of(&row.unwrap().unwrap());
+            let held = hold_episode(&db, org, &id, &opened).await.unwrap();
+            held.expect("the open incident is in its episode")
+                .rollback()
+                .await
+                .unwrap();
+
+            let resolved =
+                Episode::of(&update_status_with(&db, org, &id, "resolved").await.unwrap());
+            for (episode, why) in [(&opened, "opened"), (&resolved, "resolved")] {
+                let held = hold_episode(&db, org, &id, episode).await.unwrap();
+                assert_eq!(held.is_some(), why == "resolved", "{kind}: {why}");
+                if let Some(txn) = held {
+                    txn.commit().await.unwrap();
+                }
+            }
+            let elsewhere = hold_episode(&db, "another-org", &id, &resolved)
+                .await
+                .unwrap();
+            assert!(elsewhere.is_none(), "{kind}: another org's incident");
+
+            update_status_with(&db, org, &id, "open").await.unwrap();
+            let ended = hold_episode(&db, org, &id, &resolved).await.unwrap();
+            assert!(ended.is_none(), "{kind}: a reopen ends the resolution");
+            let row = alert_incidents::Entity::find_by_id(id.as_str())
+                .one(&db)
+                .await;
+            let reopened = Episode::of(&row.unwrap().unwrap());
+            assert_eq!(reopened.resolved_at, None, "{kind}");
             drop_kind_schema(schema).await;
         }
     }
