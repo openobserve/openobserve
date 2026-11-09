@@ -5,6 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -365,12 +366,14 @@ watch(orgId, () => {
 function onRange(value: unknown) {
   if (!value || value === range.value) return;
   range.value = value as RangeKey;
+  analytics.track("security_time_range_changed", { view: "entities", range: range.value });
   fullWindow.clear();
   syncUrl();
   void refresh();
 }
 function onKind(value: string | number) {
   kind.value = value as EntityKind;
+  analytics.track("security_tab_switched", { view: "entities", tab: kind.value });
   signalFilter.value = "all";
   closeDrawer();
   syncUrl();
@@ -549,6 +552,7 @@ function relocate() {
 watch(filteredRows, () => void nextTick(relocate));
 
 function openEntity(row: Row) {
+  if (!selected.value) analytics.track("security_detail_opened", { view: "entities" });
   selected.value = row;
   syncUrl();
   relocate();

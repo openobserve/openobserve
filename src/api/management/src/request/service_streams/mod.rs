@@ -544,7 +544,7 @@ pub async fn save_identity_config(
         updated_by: Some(user_email.user_id),
     };
 
-    match infra::table::system_settings::set(&setting).await {
+    match db::system_settings::set_service_identity_config(&setting).await {
         Ok(_) => {
             #[cfg(feature = "enterprise")]
             {

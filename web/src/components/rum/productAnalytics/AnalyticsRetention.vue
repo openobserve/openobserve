@@ -208,6 +208,7 @@ import NamedEventsNotice from "@/components/rum/productAnalytics/NamedEventsNoti
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import useAnalyticsSearch from "@/composables/rum/useAnalyticsSearch";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
@@ -346,6 +347,7 @@ const cellCounts = computed(() => {
 
 const openCell = (c: { cohort: number; k: number }) => {
   cell.value = c;
+  analytics.track("rum_retention_cell_opened", { period: c.k, granularity: def.value.per });
 };
 
 const hold = (status: "idle" | "loading") => {

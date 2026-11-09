@@ -2,6 +2,7 @@
 
 // Intel tables are ordinary enrichment tables, so one added elsewhere shows up when its name marks it as intel.
 
+import analytics from "@/services/product_analytics";
 import jsTransformService from "@/services/jstransform";
 import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import streamService from "@/services/stream";
@@ -104,7 +105,10 @@ const threatIntel = {
     existingColumns: string[] = [],
   ) {
     if (!append || !existingColumns.length) {
-      return uploadCsv(orgId, table, indicatorsToCsv(indicators), append);
+      return uploadCsv(orgId, table, indicatorsToCsv(indicators), append).then((res) => {
+        analytics.track("security_intel_indicators_uploaded", { count: indicators.length, append });
+        return res;
+      });
     }
     const rows = indicators.map((i) => indicatorToRow(i, existingColumns));
     if (rows.some((r) => !r)) throw new RemoveRefused("noIndicatorColumn", 0);
@@ -113,12 +117,20 @@ const threatIntel = {
       table,
       rowsToCsv(existingColumns, rows as Record<string, string>[]),
       true,
-    );
+    ).then((res) => {
+      analytics.track("security_intel_indicators_uploaded", { count: indicators.length, append });
+      return res;
+    });
   },
 
   /** Registers a CSV feed; the server fetches it in the background. */
   importUrl(orgId: string, table: string, url: string, append: boolean) {
-    return jsTransformService.create_enrichment_table_from_url(orgId, table, url, append);
+    return jsTransformService
+      .create_enrichment_table_from_url(orgId, table, url, append)
+      .then((res) => {
+        analytics.track("security_intel_feed_imported", { append });
+        return res;
+      });
   },
 
   /** An emptied list stays a header-only table: deleting it would also drop attached pipelines/alerts. */
@@ -134,6 +146,7 @@ const threatIntel = {
     if (!removed) throw new RemoveRefused("notFound", 0);
     const columns = read.columns.length ? read.columns : [...INTEL_COLUMNS];
     await uploadCsv(orgId, target.table, rowsToCsv(columns, kept), false);
+    analytics.track("security_intel_indicator_removed", { count: removed });
     return { removed };
   },
 };

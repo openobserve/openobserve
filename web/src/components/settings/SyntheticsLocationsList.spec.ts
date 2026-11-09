@@ -20,6 +20,7 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
 import SyntheticsLocationsList from "./SyntheticsLocationsList.vue";
+import analytics from "@/services/product_analytics";
 
 // ── Hoisted mock references (accessible inside vi.mock factories) ──────────────
 
@@ -34,6 +35,7 @@ const { mockToast, mockConfirm, mockGetLocations, mockUpdateLocation, mockDelete
 
 // ── Mock external modules ──────────────────────────────────────────────────────
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true" },
 }));
@@ -511,6 +513,7 @@ describe("SyntheticsLocationsList", () => {
       await flushPromises();
 
       expect(wrapper.vm.locations[0].enabled).toBe(false);
+      expect(analytics.track).toHaveBeenCalledWith("synthetics_location_disabled", { count: 1 });
     });
 
     it("enables a disabled location", async () => {
@@ -585,6 +588,7 @@ describe("SyntheticsLocationsList", () => {
 
       expect(wrapper.vm.locations[0].enabled).toBe(false);
       expect(wrapper.vm.locations[1].enabled).toBe(false);
+      expect(analytics.track).toHaveBeenCalledWith("synthetics_location_disabled", { count: 2 });
     });
 
     it("shows success toast when all bulk operations succeed", async () => {
@@ -667,6 +671,7 @@ describe("SyntheticsLocationsList", () => {
         confirmVariant: "destructive",
       });
       expect(mockDeleteLocation).toHaveBeenCalledWith("test-org", "loc-1");
+      expect(analytics.track).toHaveBeenCalledWith("synthetics_location_deleted", { count: 1 });
     });
 
     it("removes the location from the local array on successful delete", async () => {
@@ -750,6 +755,7 @@ describe("SyntheticsLocationsList", () => {
       const remainingIds = wrapper.vm.locations.map((l: TestLocation) => l.id);
       expect(remainingIds).toContain("loc-2");
       expect(remainingIds).toContain("loc-3");
+      expect(analytics.track).toHaveBeenCalledWith("synthetics_location_deleted", { count: 1 });
 
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({

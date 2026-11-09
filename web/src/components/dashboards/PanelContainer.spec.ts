@@ -374,6 +374,49 @@ describe("PanelContainer", () => {
 
       expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(false);
     });
+
+    describe("inline description info beside the title", () => {
+      const inlineInfo = '[data-test="dashboard-panel-title-description-info"]';
+
+      it("renders right after the title in the simplified view when a description exists", () => {
+        // The real tooltip only mounts its content slot once opened.
+        const OTooltip = { name: "OTooltip", template: "<div><slot name='content' /></div>" };
+        wrapper = createWrapper({ simplifiedPanelView: true }, { OTooltip });
+
+        const info = wrapper.find(inlineInfo);
+        expect(info.exists()).toBe(true);
+        expect(info.attributes("aria-label")).toBe("Description");
+        const header = wrapper.find('[data-test="dashboard-panel-header"]');
+        expect(header.element.nextElementSibling).toBe(info.element);
+        expect(info.text()).toContain("Test panel description");
+      });
+
+      it.each([
+        ["empty", ""],
+        ["missing", undefined],
+      ])("is not rendered when the description is %s", (_label, description) => {
+        wrapper = createWrapper({
+          simplifiedPanelView: true,
+          data: { ...mockPanelData, description },
+        });
+
+        expect(wrapper.find(inlineInfo).exists()).toBe(false);
+      });
+
+      it("is not rendered outside the simplified view, where the header-end info covers it", async () => {
+        wrapper = createWrapper({ simplifiedPanelView: false });
+        await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
+
+        expect(wrapper.find(inlineInfo).exists()).toBe(false);
+        expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(true);
+      });
+
+      it("is not rendered in view-only mode", () => {
+        wrapper = createWrapper({ simplifiedPanelView: true, viewOnly: true });
+
+        expect(wrapper.find(inlineInfo).exists()).toBe(false);
+      });
+    });
   });
 
   describe("Panel Controls", () => {

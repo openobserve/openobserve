@@ -22,6 +22,7 @@ import OrgDomainRequests from "./OrgDomainRequests.vue";
 
 const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mockToast }));
 vi.mock("@/services/organizations", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -35,6 +36,7 @@ vi.mock("@/services/organizations", async (importOriginal) => {
 });
 
 import organizations from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 const api = organizations as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 const DialogStub = defineComponent({
@@ -105,6 +107,7 @@ describe("OrgDomainRequests", () => {
     await expect(dialog.props("submit")("owns it")).resolves.toBe(true);
     expect(api.approve_org_domain_request).toHaveBeenCalledWith("_meta", "open", "owns it");
     expect(api.reject_org_domain_request).not.toHaveBeenCalled();
+    expect(analytics.track).toHaveBeenCalledWith("org_domain_request_decided", { approved: true });
   });
 
   it("rejects through the reject endpoint", async () => {

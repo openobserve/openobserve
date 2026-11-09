@@ -13,6 +13,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import ocsfPacks, { type OcsfPack } from "@/services/ocsfPacks";
+import analytics from "@/services/product_analytics";
 import { useSecuritySources } from "@/composables/security/useSecuritySources";
 import { realtimePipelinesFor, useOcsfAttach } from "@/composables/security/useOcsfAttach";
 import {
@@ -340,11 +341,15 @@ async function setIncluded(row: SourceRow, included: boolean) {
     // Routed through run() so a 403 surfaces in the notices and the row only reloads on success.
     const setting = { ...row.setting, included };
     const res = await attachFlow.run(() => ocsfPacks.saveSetting(orgId.value, row.name, setting));
-    if (res !== null) await reload();
+    if (res !== null) {
+      analytics.track("security_source_inclusion_changed", { included, view: "sources" });
+      await reload();
+    }
     return;
   }
   if (included) secSources.include(row.name);
   else secSources.exclude(row.name);
+  analytics.track("security_source_inclusion_changed", { included, view: "sources" });
 }
 
 watch(orgId, async (id) => {

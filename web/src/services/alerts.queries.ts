@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { quantizeRange } from "@/composables/query/queryClient";
 import alerts from "./alerts";
+import analytics from "./product_analytics";
 import search from "./search";
 import type { AlertHistoryQuery } from "./alerts";
 import { alertKeys, oneAckScopes } from "./alerts.querykeys";
@@ -229,6 +230,9 @@ export const ackAlertMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (vars: { alertId: string; body: AckAlertRequest; folderId?: string }) =>
       (await alerts.ackAlert(org, vars.alertId, vars.body, vars.folderId)).data,
+    onSuccess: (answer) => {
+      if (answer?.changed) analytics.track("alert_acknowledged", { count: 1 });
+    },
     // Callers render refusals and stale-firing answers themselves.
     meta: { invalidates: oneAckScopes(org), silentError: true },
   });
@@ -255,6 +259,9 @@ export const ackAlertsMutation = (org: string) =>
       const written = new Set(answers.flatMap((a) => (a.changed && a.incident?.id) || []));
       const acked = answers.filter((a) => a.changed || written.has(a.incident?.id ?? "")).length;
       return { acked, failures };
+    },
+    onSuccess: ({ acked }) => {
+      if (acked > 0) analytics.track("alert_acknowledged", { count: acked });
     },
     meta: { invalidates: oneAckScopes(org), silentError: true },
   });

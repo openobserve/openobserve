@@ -286,6 +286,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import syntheticsService from "@/services/synthetics";
+import analytics from "@/services/product_analytics";
 import SyntheticsLocationForm from "./SyntheticsLocationForm.vue";
 import ImportSyntheticsLocations from "./ImportSyntheticsLocations.vue";
 import type { SyntheticsLocationRecord } from "@/types/synthetics";
@@ -483,6 +484,12 @@ export default defineComponent({
           row.id,
           { label: row.label, enabled: newEnabled },
         );
+        analytics.track(
+          newEnabled ? "synthetics_location_enabled" : "synthetics_location_disabled",
+          {
+            count: 1,
+          },
+        );
         // Update the local row in-place instead of re-fetching.
         const idx = locations.value.findIndex((l) => l.id === row.id);
         if (idx !== -1) {
@@ -525,6 +532,14 @@ export default defineComponent({
           } catch {
             // continue with remaining locations
           }
+        }
+        if (successCount > 0) {
+          analytics.track(
+            enabled ? "synthetics_location_enabled" : "synthetics_location_disabled",
+            {
+              count: successCount,
+            },
+          );
         }
         // Update local rows in-place instead of re-fetching.
         for (let i = 0; i < locations.value.length; i++) {
@@ -582,6 +597,7 @@ export default defineComponent({
     const deleteLocation = async (id: string) => {
       try {
         await syntheticsService.deleteLocation(store.state.selectedOrganization.identifier, id);
+        analytics.track("synthetics_location_deleted", { count: 1 });
         // Remove the local row in-place instead of re-fetching.
         const idx = locations.value.findIndex((l) => l.id === id);
         if (idx !== -1) locations.value.splice(idx, 1);
@@ -624,6 +640,8 @@ export default defineComponent({
             // continue with other deletions
           }
         }
+        if (successCount > 0)
+          analytics.track("synthetics_location_deleted", { count: successCount });
         // Remove successful deletes from local array in-place.
         locations.value = locations.value.filter((l) => !successIds.has(l.id));
         if (successCount === ids.length) {

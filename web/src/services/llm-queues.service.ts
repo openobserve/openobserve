@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
 
 // ─── LLM Annotation · Queues ────────────────────────────────────────────────
 
@@ -407,6 +408,10 @@ const llmQueuesService = {
       `${base(orgId)}/${queueId}/items/${queueItemId}/reviews`,
       payload,
     );
+    analytics.track("llm_queue_review_submitted", {
+      score_count: payload.scores.length,
+      has_comment: Boolean(payload.comments),
+    });
     return res.data;
   },
 
@@ -432,6 +437,7 @@ const llmQueuesService = {
       },
     );
     const item = res.data?.item ?? {};
+    analytics.track("llm_queue_item_pushed_to_dataset", { created: res.data?.created === true });
     return {
       created: res.data?.created === true,
       datasetItemId: item.logicalId ?? item.logical_id ?? "",
@@ -451,6 +457,10 @@ const llmQueuesService = {
       description: payload.description ?? null,
       targetDatasetId: payload.targetDatasetId ?? null,
       scoreConfigRowIds: scoreConfigRowIds as string[],
+    });
+    analytics.track("llm_queue_created", {
+      score_config_count: scoreConfigRowIds.length,
+      has_target_dataset: Boolean(payload.targetDatasetId),
     });
     return normalizeQueue(res.data);
   },

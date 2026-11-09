@@ -39,6 +39,9 @@ vi.mock("vue-router", () => ({
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: mockCopyToClipboard,
 }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
+import analytics from "@/services/product_analytics";
 
 describe("ErrorHeader", () => {
   let wrapper: ReturnType<typeof mount>;
@@ -193,6 +196,21 @@ describe("ErrorHeader", () => {
         expect.any(Function),
         expect.objectContaining({ successMessage: "Copied to clipboard" }),
       );
+    });
+
+    it("tracks the copy only when the clipboard write succeeds", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      mockCopyToClipboard.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      const btn = wrapper.find('[data-test="error-header-copy-id-btn"]');
+
+      await btn.trigger("click");
+      await flushPromises();
+      await btn.trigger("click");
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("rum_error_id_copied");
     });
 
     it("copies the updated event id after the error prop changes", async () => {

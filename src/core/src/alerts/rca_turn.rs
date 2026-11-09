@@ -49,6 +49,7 @@ use config::{
     },
     utils::time::now_micros,
 };
+use futures::StreamExt;
 use infra::table::{
     ai_chat_sessions, ai_chat_turns,
     rca_runs::{self as runs_table, Model as RunRow, RunSummaryPatch, RunUpdate},
@@ -117,6 +118,8 @@ const CONTINUATION_RETRY_BACKOFF: [Duration; 4] = [
 ];
 /// Running runs one sweep looks at; the next pass picks up the rest.
 const SWEEP_BATCH: u64 = 500;
+/// Running runs swept at once; a healthy turn's lease probe waits about a second in a cluster.
+const SWEEP_CONCURRENCY: usize = 16;
 /// A run pauses for at most this many questions; a third one closes the deadline.
 const MAX_QUESTIONS: i32 = 2;
 /// `rca_questions_total{result}` of a wait the deadline ended.
@@ -1940,10 +1943,15 @@ async fn stop_turn(org_id: &str, session_id: &str) {
 pub async fn sweep_rca_runs() -> anyhow::Result<usize> {
     let timeout = get_o2_config().incidents.rca_timeout_secs;
     let now = now_micros();
+    let mut swept_runs = futures::stream::iter(runs_table::list_running(SWEEP_BATCH).await?)
+        .map(|run| {
+            let run_id = run.run_id.clone();
+            async move { (run_id, sweep_run(run, now, timeout).await) }
+        })
+        .buffer_unordered(SWEEP_CONCURRENCY);
     let mut ended = 0;
-    for run in runs_table::list_running(SWEEP_BATCH).await? {
-        let run_id = run.run_id.clone();
-        match sweep_run(run, now, timeout).await {
+    while let Some((run_id, swept)) = swept_runs.next().await {
+        match swept {
             Ok(true) => ended += 1,
             Ok(false) => {}
             Err(e) => log::warn!("[RCA_TURN] could not sweep run {run_id}: {e:#}"),

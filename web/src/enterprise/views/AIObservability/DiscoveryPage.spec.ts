@@ -117,6 +117,8 @@ vi.mock("@/enterprise/components/AIObservability/AddToQueueMenu.vue", () => ({
 }));
 
 import { mount, flushPromises } from "@vue/test-utils";
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 import DiscoveryPage from "./DiscoveryPage.vue";
 
 function searchResult(overrides: Record<string, unknown> = {}) {
@@ -172,6 +174,7 @@ beforeEach(() => {
   mockListQueues.mockReset().mockResolvedValue([]);
   mockToast.mockReset();
   mockPush.mockReset();
+  vi.mocked(analytics.track).mockClear();
 });
 
 describe("DiscoveryPage fetching", () => {
@@ -203,6 +206,10 @@ describe("DiscoveryPage fetching", () => {
       "test-org",
       expect.objectContaining({ queueStatus: "reviewed", from: 0 }),
     );
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_filter_applied", {
+      filter: "queue_status",
+      value: "reviewed",
+    });
   });
 
   it("switches columns and table id per scope, and clears paging", async () => {
@@ -363,6 +370,10 @@ describe("DiscoveryPage fetching", () => {
     await flushPromises();
 
     expect(localStorage.getItem("o2_ai_discovery_scope")).toBe("session");
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_filter_applied", {
+      filter: "scope",
+      value: "session",
+    });
   });
 
   it("surfaces a load failure as an error toast", async () => {
@@ -440,6 +451,9 @@ describe("DiscoveryPage row drill-down", () => {
         to: 1_700_000_000_000_000 + 3_600_000_000,
         trace_id: "trace-1",
       },
+    });
+    expect(analytics.track).toHaveBeenCalledWith("llm_discovery_target_opened", {
+      scope: "trace",
     });
   });
 

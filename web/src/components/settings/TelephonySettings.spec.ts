@@ -30,7 +30,9 @@ import type {
 import TelephonyAccountDialog from "./TelephonyAccountDialog.vue";
 import TelephonySettings from "./TelephonySettings.vue";
 import { axiosReply } from "@/test/unit/helpers/mockService";
+import analytics from "@/services/product_analytics";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -323,6 +325,7 @@ describe("TelephonySettings", () => {
       settle({ data: CONNECTED.org });
       await flushPromises();
       expect(dialog("sid")).toBeNull();
+      expect(analytics.track).toHaveBeenCalledWith("telephony_updated");
     });
 
     it("connect sends the token it was given", async () => {
@@ -340,6 +343,8 @@ describe("TelephonySettings", () => {
         auth_token: "secret",
         from_number: "+18335550100",
       });
+      await flushPromises();
+      expect(analytics.track).toHaveBeenCalledWith("telephony_connected");
     });
 
     it("5c: a rejected account shows the mockup banner and keeps the dialog open", async () => {
@@ -450,6 +455,15 @@ describe("TelephonySettings", () => {
       expect(q("disconnect")?.hasAttribute("disabled")).toBe(true);
     });
 
+    it("a disconnect tracks the event", async () => {
+      service.deleteTelephony.mockResolvedValue({} as any);
+      await render(CONNECTED);
+      await click("disconnect");
+      document.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!.click();
+      await flushPromises();
+      expect(analytics.track).toHaveBeenCalledWith("telephony_disconnected");
+    });
+
     it("a 403 on disconnect latches the page read-only", async () => {
       service.deleteTelephony.mockRejectedValue(failure(403));
       await render(CONNECTED);
@@ -458,6 +472,7 @@ describe("TelephonySettings", () => {
       await flushPromises();
       expect(service.deleteTelephony).toHaveBeenCalled();
       expect(text("read-only")).toBe(READ_ONLY);
+      expect(analytics.track).not.toHaveBeenCalledWith("telephony_disconnected");
     });
 
     it("a 403 on the read shows the sentence instead of the hero", async () => {

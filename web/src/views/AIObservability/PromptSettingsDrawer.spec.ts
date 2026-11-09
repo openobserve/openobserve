@@ -14,6 +14,8 @@ vi.mock("@/types/i18n", () => ({
   raw: (value: string) => value,
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 import PromptSettingsDrawer from "./PromptSettingsDrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -60,12 +62,32 @@ describe("prompt settings recovery", () => {
     await form.handleSubmit();
     await flushPromises();
     expect(mocks.updateSettings).toHaveBeenCalledTimes(1);
+    expect(analytics.track).not.toHaveBeenCalled();
     expect(wrapper.emitted("updated")).toHaveLength(1);
     expect(wrapper.emitted("update:open")).toBeUndefined();
     expect(wrapper.find('[data-test="prompt-settings-save-error"]').text()).toContain(
       "secretSavePartial",
     );
     expect(form.state.values.secret).toBe("test-only-secret");
+  });
+
+  it("tracks the update once the settings and the rotated secret both save", async () => {
+    mocks.rotateSecret.mockResolvedValue({ secretConfigured: true });
+    const wrapper = mountSettings();
+    await flushPromises();
+    const form = wrapper.findComponent(OForm).props("form");
+    form.setFieldValue("webhookEnabled", true);
+    form.setFieldValue("endpoint", "https://example.com/hook");
+    form.setFieldValue("events", ["label_moved"]);
+    form.setFieldValue("secret", "test-only-secret");
+    await form.handleSubmit();
+    await flushPromises();
+    expect(mocks.rotateSecret).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("llm_prompt_settings_updated", {
+      protected_label_count: 1,
+      webhook_enabled: true,
+    });
   });
 
   it("ignores a settings response for an organization that is no longer selected", async () => {
