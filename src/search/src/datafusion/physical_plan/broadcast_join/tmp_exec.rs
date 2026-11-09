@@ -54,7 +54,7 @@ impl TmpExec {
         data: Option<Vec<u8>>,
         schema: SchemaRef,
     ) -> Self {
-        let cache = Self::compute_properties(Arc::clone(&schema), 1);
+        let cache = Self::compute_properties(EquivalenceProperties::new(Arc::clone(&schema)));
         TmpExec {
             trace_id,
             cluster,
@@ -65,12 +65,19 @@ impl TmpExec {
         }
     }
 
-    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> Arc<PlanProperties> {
-        let eq_properties = EquivalenceProperties::new(schema);
-        let output_partitioning = Partitioning::UnknownPartitioning(n_partitions);
+    /// Reports the properties of `build_side`, whose rows this node reads back on the followers.
+    pub fn with_properties_of(mut self, build_side: &Arc<dyn ExecutionPlan>) -> Self {
+        let mut eq_properties = build_side.properties().eq_properties.clone();
+        eq_properties.clear_orderings();
+        eq_properties.clear_per_partition_constants();
+        self.cache = Self::compute_properties(eq_properties);
+        self
+    }
+
+    fn compute_properties(eq_properties: EquivalenceProperties) -> Arc<PlanProperties> {
         Arc::new(PlanProperties::new(
             eq_properties,
-            output_partitioning,
+            Partitioning::UnknownPartitioning(1),
             EmissionType::Incremental,
             Boundedness::Bounded,
         ))
