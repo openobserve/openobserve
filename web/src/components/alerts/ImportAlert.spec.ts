@@ -172,6 +172,27 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
     });
   });
 
+  describe("org_id", () => {
+    it("does not ask for an org id, whatever the export carries", async () => {
+      for (const org_id of [undefined, "", "other-org"]) {
+        wrapper.vm.alertErrorsToDisplay = [];
+        await wrapper.vm.validateAlertInputs(
+          {
+            name: "a1",
+            stream_type: "invalid",
+            query_condition: {},
+            trigger_condition: {},
+            org_id,
+          },
+          1,
+        );
+        const errors = wrapper.vm.alertErrorsToDisplay.flat();
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors.some((e: any) => e?.field === "org_id")).toBe(false);
+      }
+    });
+  });
+
   describe("1. Data Update Functions", () => {
     describe("updateStreams", () => {
       it("should fetch and update streamList", async () => {
@@ -273,15 +294,32 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         it.each([
           ["absent", undefined],
           ["empty", []],
+          ["null", null],
         ])("imports an alert whose destinations are %s", async (_case, destinations) => {
           expect(await destinationErrors(destinations)).toEqual([]);
         });
 
-        it.each([
-          ["null", null],
-          ["not a list", "ops-slack"],
-        ])("rejects destinations that are %s", async (_case, destinations) => {
-          expect(await destinationErrors(destinations)).toHaveLength(1);
+        it("rejects destinations that are not a list", async () => {
+          expect(await destinationErrors("ops-slack")).toHaveLength(1);
+        });
+
+        it("sends null destinations and recovery destinations as empty lists", async () => {
+          const mockAlertsService = await import("@/services/alerts");
+          vi.mocked(mockAlertsService.default.create_by_alert_id).mockResolvedValue(true as any);
+          const input: any = {
+            name: "a1",
+            trigger_condition: {},
+            destinations: null,
+            recovery_destinations: null,
+          };
+
+          await wrapper.vm.createAlert(input, 1, "folder1");
+
+          const sent = vi
+            .mocked(mockAlertsService.default.create_by_alert_id)
+            .mock.calls.at(-1)?.[1];
+          expect(sent.destinations).toEqual([]);
+          expect(sent.recovery_destinations).toEqual([]);
         });
 
         it("still rejects a destination this org does not have", async () => {
@@ -293,7 +331,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         it.each([
           ["an unknown name", ["no-such-destination"], []],
           ["a known and an unknown name", ["email-dest", "no-such-destination"], ["email-dest"]],
-          ["null", null, []],
         ])(
           "puts what a retry imports into the picker and the JSON for %s",
           async (_case, destinations, expected) => {
@@ -306,6 +343,36 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
             expect(JSON.parse(baseImport.jsonStr)[0].destinations).toEqual(expected);
           },
         );
+
+        // A valid item earlier in the file has no error group, so group and item indexes differ.
+        it("writes a fix-up into the item its error belongs to", async () => {
+          const baseImport = wrapper.vm.$refs.baseImportRef;
+          const invalid = {
+            name: "",
+            stream_type: "invalid",
+            query_condition: { type: "custom" },
+            trigger_condition: {},
+            destinations: ["no-such-destination"],
+          };
+          baseImport.updateJsonArray([{ name: "valid", destinations: ["email-dest"] }, invalid]);
+          wrapper.vm.alertErrorsToDisplay = [];
+          await wrapper.vm.validateAlertInputs(baseImport.jsonArrayOfObj[1], 2);
+          await wrapper.vm.$nextTick();
+
+          const field = (component: string, dataTest: string) =>
+            wrapper
+              .findAllComponents({ name: component })
+              .find((c: any) => c.attributes("data-test") === dataTest);
+          field("OSelect", "alert-import-destination-name-input").vm.$emit("update:model-value", [
+            "test-destination-1",
+          ]);
+          field("OInput", "alert-import-name-input").vm.$emit("update:model-value", "fixed");
+
+          const items = JSON.parse(baseImport.jsonStr);
+          expect(items[0]).toEqual({ name: "valid", destinations: ["email-dest"] });
+          expect(items[1].destinations).toEqual(["test-destination-1"]);
+          expect(items[1].name).toBe("fixed");
+        });
 
         // Same wording as the alert form's Destination field: empty is a valid choice.
         it("tells the user the picker is optional only while it is empty", async () => {
@@ -436,7 +503,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
   });
 
   describe("8. Computed Properties and Reactive Data", () => {
-    // TODO: organizationDataList shape changed during ux-revamp (added `selectable` field). Skipped until rewritten.
     describe("getFormattedDestinations computed property", () => {
       it("should extract destination names", () => {
         expect(wrapper.vm.getFormattedDestinations).toEqual([

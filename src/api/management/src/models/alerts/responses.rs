@@ -167,6 +167,9 @@ pub struct ListAlertsResponseBodyItem {
     /// `groups_observed` does not.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub groups_firing_is_lower_bound: Option<bool>,
+    /// SIEM detections only: the detection's context attributes minus the rule YAML.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_attributes: Option<HashMap<String, String>>,
     /// Composite rows only: number of referenced children.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub child_count: Option<usize>,
@@ -516,6 +519,13 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
         } else {
             "scheduled".to_string()
         };
+        #[cfg(feature = "enterprise")]
+        let context_attributes = alert
+            .context_attributes
+            .as_ref()
+            .and_then(o2_enterprise::enterprise::security::siem_list_attributes);
+        #[cfg(not(feature = "enterprise"))]
+        let context_attributes = None;
         // Every scheduled/realtime/slo alert is saved against a real stream —
         // an empty `stream_name` only happens pre-save, never on a stored
         // alert — but treat it as "no stream" defensively rather than send a
@@ -559,6 +569,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            context_attributes,
             child_count: None,
             referenced_by_composite_count: None,
             expression_summary: None,
@@ -697,6 +708,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         groups_firing: None,
         groups_observed_is_lower_bound: None,
         groups_firing_is_lower_bound: None,
+        context_attributes: None,
         child_count: None,
         referenced_by_composite_count: None,
         expression_summary: None,
@@ -938,6 +950,7 @@ mod tests {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            context_attributes: None,
             child_count: None,
             referenced_by_composite_count: None,
             expression_summary: None,

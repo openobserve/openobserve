@@ -2,6 +2,7 @@
 //methods: addDashboardVariable, selectValueFromVariableDropDown
 //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
 import { expect } from "@playwright/test";
+import { SELECTORS, clickDashboardMenuItem } from "./dashboard-selectors.js";
 import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-stream-field-utils.js";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
 
@@ -51,11 +52,11 @@ export default class DashboardVariables {
   }
 
   /**
-   * Get the dashboard settings button locator
+   * Get the toolbar More button locator (it holds Settings and shows once the dashboard is ready)
    * @returns {import('@playwright/test').Locator}
    */
-  getSettingBtnLocator() {
-    return this.page.locator('[data-test="dashboard-setting-btn"]');
+  getMoreOptionsBtnLocator() {
+    return this.page.locator(SELECTORS.MORE_OPTIONS_BTN);
   }
 
   /**
@@ -481,7 +482,7 @@ export default class DashboardVariables {
     field = "kubernetes_namespace_name"
   ) {
     // Open dashboard settings
-    await this.page.locator('[data-test="dashboard-setting-btn"]').click();
+    await clickDashboardMenuItem(this.page, SELECTORS.SETTING_BTN);
 
     // Wait for the settings panel to be fully opened and variable tab to be available
     const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');

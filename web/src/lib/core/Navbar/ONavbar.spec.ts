@@ -243,6 +243,30 @@ describe("ONavbar", () => {
       expect(wrapper.find('[data-test="nav-group-settings"]').exists()).toBe(true);
     });
 
+    it("adds no flyout groups to a flat rail", () => {
+      wrapper = mountNavbar({
+        flat: true,
+        linksList: [
+          {
+            title: "Overview",
+            icon: "bar-chart",
+            link: "/security/overview",
+            name: "securityOverview",
+          },
+          {
+            title: "Alerts",
+            icon: "notifications-active",
+            link: "/security/alerts",
+            name: "alertList",
+          },
+        ],
+      });
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="nav-group-reliability"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="menu-link-securityOverview-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(true);
+    });
+
     it("drops the Data group entirely when no data items are present", () => {
       wrapper = mountNavbar(); // only home/logs/metrics
       expect(wrapper.find('[data-test="nav-group-data"]').exists()).toBe(false);

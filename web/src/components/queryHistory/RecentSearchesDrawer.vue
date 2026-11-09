@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <OButton
         variant="ghost"
-        size="icon-xs"
+        size="icon-sm"
         icon-left="info-outline"
         :aria-label="aboutText"
         data-test="recent-searches-about"
@@ -441,6 +441,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import analytics from "@/services/product_analytics";
 
 const props = defineProps<{ source: HistorySource }>();
 
@@ -624,6 +625,11 @@ const countLabel = (count: number | undefined) => (count === undefined ? "…" :
 const pluralOf = (count: number | undefined) => count ?? 2;
 
 const restore = (entry: QueryHistoryEntry, when: RestoreTime, run: boolean) => {
+  analytics.track("search_history_entry_restored", {
+    source: entry.source,
+    run,
+    surface: "drawer",
+  });
   emit("restore", entry, when, run);
   open.value = false;
 };

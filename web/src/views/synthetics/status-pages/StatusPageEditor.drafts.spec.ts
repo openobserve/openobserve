@@ -20,6 +20,7 @@ import { RouterView, createMemoryHistory, createRouter, type Router } from "vue-
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import statusPagesService from "@/services/status_pages";
+import analytics from "@/services/product_analytics";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import {
   editorDraftKey,
@@ -39,6 +40,7 @@ vi.mock("@/services/status_pages", () => ({
     rotateSlug: vi.fn(),
   },
 }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/synthetics", () => ({
   default: { listByFolderId: vi.fn(() => Promise.resolve({ data: { checks: [] } })) },
 }));
@@ -136,6 +138,7 @@ describe("StatusPageEditor drafts", () => {
     localStorage.clear();
     vi.mocked(statusPagesService.update).mockClear();
     vi.mocked(statusPagesService.updateComponents).mockClear();
+    vi.mocked(analytics.track).mockClear();
     vi.mocked(statusPagesService.get).mockResolvedValue({ data: serverPage() } as never);
   });
 
@@ -350,5 +353,18 @@ describe("StatusPageEditor drafts", () => {
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("synthetics"));
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(readEditorDraft(scope)).toBeNull();
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("status_page_updated");
+  });
+
+  it("tracks no update when saving the components fails", async () => {
+    vi.mocked(statusPagesService.updateComponents).mockRejectedValueOnce(new Error("boom"));
+    await mountEditor();
+    await edit({ description: "Cloud regions" });
+
+    click("status-page-editor-save");
+    await vi.waitFor(() => expect(statusPagesService.updateComponents).toHaveBeenCalledTimes(1));
+    await flushPromises();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

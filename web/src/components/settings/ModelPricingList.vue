@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   mobile-dropdown
                   :tabs="tabOptions"
                   v-model:active-tab="selectedTab"
-                  @update:active-tab="onTabChange"
+                  @update:active-tab="onTabSelect"
                 />
               </div>
               <OSearchInput
@@ -723,6 +723,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
+import analytics from "@/services/product_analytics";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -912,6 +913,11 @@ const tabOptions = computed(() => [
   { label: t("modelPricing.tabCustom"), value: "org", icon: "tune" },
   { label: t("modelPricing.tabSystem"), value: "inherited", icon: "business" },
 ]);
+
+function onTabSelect() {
+  analytics.track("model_pricing_tab_switched", { tab: selectedTab.value });
+  onTabChange();
+}
 
 function onTabChange() {
   selectedIds.value = [];

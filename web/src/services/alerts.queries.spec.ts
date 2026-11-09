@@ -41,8 +41,10 @@ import { downtimeKeys } from "./downtimes.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import alerts from "./alerts";
 import search from "./search";
+import analytics from "./product_analytics";
 
 vi.mock("./search", () => ({ default: { metrics_query: vi.fn() } }));
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("./alerts", () => ({
   default: {
@@ -219,6 +221,22 @@ describe("ack and mute queries", () => {
     const result = await (ackAlertsMutation(ORG).mutationFn as any)(targets);
 
     expect(result).toEqual({ acked: 1, failures: [{ alertId: "2", error: reason }] });
+  });
+
+  it("tracks an ack only when it changed something", () => {
+    vi.mocked(analytics.track).mockClear();
+    const single = ackAlertMutation(ORG).onSuccess as (answer: unknown) => void;
+    single({ changed: false, acks: [] });
+    expect(analytics.track).not.toHaveBeenCalled();
+    single({ changed: true, acks: [] });
+    expect(analytics.track).toHaveBeenCalledWith("alert_acknowledged", { count: 1 });
+
+    vi.mocked(analytics.track).mockClear();
+    const bulk = ackAlertsMutation(ORG).onSuccess as (result: unknown) => void;
+    bulk({ acked: 0, failures: [] });
+    expect(analytics.track).not.toHaveBeenCalled();
+    bulk({ acked: 3, failures: [] });
+    expect(analytics.track).toHaveBeenCalledWith("alert_acknowledged", { count: 3 });
   });
 
   it("refreshes the Firing read after a pause or resume", () => {

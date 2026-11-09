@@ -285,6 +285,9 @@ import i18n from "@/locales";
 import enUS from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
+import settingsService from "@/services/settings";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { gt } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { getDashboard } from "@/utils/commons.ts";
@@ -1692,7 +1695,11 @@ describe("ViewDashboard", () => {
       createWrapper({
         global: {
           plugins: [i18n, store],
-          stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+          renderStubDefaultSlot: true,
+          stubs: {
+            OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
+            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          },
         },
       });
 
@@ -1734,6 +1741,50 @@ describe("ViewDashboard", () => {
 
       expect(analytics.track).not.toHaveBeenCalled();
     });
+
+    describe("home unpin", () => {
+      const pinThis = () => {
+        useHomeDashboard(gt).homeDashboard.value = {
+          dashboardId: "test-dashboard-1",
+          folderId: "default",
+          label: "Pinned",
+        };
+      };
+
+      afterEach(() => {
+        useHomeDashboard(gt).homeDashboard.value = null;
+      });
+
+      it("tracks home_dashboard_unpinned once the pin is cleared", async () => {
+        vi.spyOn(settingsService, "deleteOrgSetting").mockResolvedValueOnce({} as any);
+        wrapper = createWrapper();
+        await flushPromises();
+        pinThis();
+
+        await wrapper.vm.toggleHomeDashboard();
+
+        expect(analytics.track).toHaveBeenCalledWith("home_dashboard_unpinned", {
+          source: "dashboard_view",
+        });
+      });
+
+      it("does not track an unpin the server refused", async () => {
+        vi.spyOn(settingsService, "deleteOrgSetting").mockRejectedValueOnce({
+          response: { status: 500 },
+        });
+        wrapper = createWrapper();
+        await flushPromises();
+        pinThis();
+
+        await wrapper.vm.toggleHomeDashboard();
+
+        expect(useHomeDashboard(gt).homeDashboard.value?.dashboardId).toBe("test-dashboard-1");
+        expect(analytics.track).not.toHaveBeenCalledWith(
+          "home_dashboard_unpinned",
+          expect.anything(),
+        );
+      });
+    });
   });
 
   it("names beta in the publish button's label instead of a chip while public links are on", async () => {
@@ -1745,16 +1796,19 @@ describe("ViewDashboard", () => {
     wrapper = createWrapper({
       global: {
         plugins: [i18n, store],
-        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+        renderStubDefaultSlot: true,
+        stubs: {
+          OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
+          ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+        },
       },
     });
     await flushPromises();
-    const publish = wrapper.find('[data-test="dashboard-publish-public"]');
-    const button = publish.find('[data-test="dashboard-publish-public-btn"]');
+    const button = wrapper.find('[data-test="dashboard-publish-public-btn"]');
     expect(button.exists()).toBe(true);
-    expect(publish.findComponent({ name: "BetaBadge" }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "BetaBadge" }).exists()).toBe(false);
     // This spec's t() returns the key, so the rendered label is checked against the real message.
-    expect(button.attributes("aria-label")).toBe("dashboard.publicDashboard.shareTooltip");
+    expect(button.text()).toBe("dashboard.publicDashboard.shareTooltip");
     expect(i18n.global.t("dashboard.publicDashboard.shareTooltip")).toBe("Publish publicly (beta)");
   });
 
@@ -1786,6 +1840,62 @@ describe("ViewDashboard", () => {
     await wrapper.vm.onVariablesManagerReady(manager);
 
     expect(wrapper.vm.variablesManager.getUrlParams()).toEqual({ "var-qns": "ingress-nginx" });
+  });
+
+  describe("toolbar menus", () => {
+    const mountToolbar = () =>
+      createWrapper({
+        global: {
+          plugins: [i18n, store],
+          renderStubDefaultSlot: true,
+          stubs: {
+            OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
+            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          },
+        },
+      });
+    const setPublicDashboards = (enabled: boolean) => {
+      const zoConfig = global.mockStoreState.zoConfig;
+      global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: enabled };
+      onTestFinished(() => {
+        global.mockStoreState.zoConfig = zoConfig;
+      });
+    };
+
+    it("opens TV mode setup once the More menu has closed, keeping its focus", async () => {
+      wrapper = mountToolbar();
+      await flushPromises();
+
+      wrapper.findComponent('[data-test="dashboard-kiosk-btn"]').vm.$emit("select");
+      const event = { preventDefault: vi.fn() };
+      wrapper.vm.onMoreOptionsClosed(event);
+
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(wrapper.vm.kioskSetupOpen).toBe(true);
+    });
+
+    it.each([
+      [false, false],
+      [true, true],
+    ])("shows the share options menu only when public links are on (%s)", async (on, shown) => {
+      setPublicDashboards(on);
+      wrapper = mountToolbar();
+      await flushPromises();
+      expect(wrapper.find('[data-test="dashboard-share-options-btn"]').exists()).toBe(shown);
+    });
+
+    it("disables Scheduled dashboards while reports is locked", async () => {
+      const zoConfigs = [mockStoreState.zoConfig, (store.state as any).zoConfig];
+      for (const zoConfig of zoConfigs) zoConfig.features = { reports: "locked" };
+      onTestFinished(() => {
+        for (const zoConfig of zoConfigs) zoConfig.features = undefined;
+      });
+      wrapper = mountToolbar();
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="view-dashboard-scheduled-reports"]').attributes("disabled"),
+      ).toBe("true");
+    });
   });
 
   describe("layout edit mode", () => {
@@ -1828,6 +1938,7 @@ describe("ViewDashboard", () => {
                 '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
             },
             RenderDashboardCharts: RenderDashboardChartsStub,
+            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
             OBanner: {
               props: ["dataTest"],
               template: '<div :data-test="dataTest"><slot /><slot name="actions" /></div>',
@@ -1902,8 +2013,8 @@ describe("ViewDashboard", () => {
     it("marks Settings with a dot while this dashboard has a settings draft", async () => {
       localStorage.clear();
       await mountDashboard();
-      const settings = () => wrapper.find('[data-test="dashboard-setting-btn"]');
-      expect(settings().attributes("aria-label")).toBeUndefined();
+      const settings = () => wrapper.find('[data-test="dashboard-more-options-btn"]');
+      expect(settings().attributes("aria-label")).toBe("common.moreOptions");
 
       const scope = {
         kind: "dashboard_settings" as const,
@@ -1918,7 +2029,7 @@ describe("ViewDashboard", () => {
       await flushPromises();
       expect(wrapper.vm.hasSettingsDraft).toBe(true);
       // A button's children are presentational, so the draft state must be in the button's own name.
-      expect(settings().attributes("aria-label")).toBe("common.editorDraft.newDotDated");
+      expect(settings().attributes("aria-label")).toBe("dashboard.moreOptionsSettingsDraft");
       localStorage.clear();
     });
 
@@ -1940,6 +2051,7 @@ describe("ViewDashboard", () => {
       expect(has("dashboard-panel-add")).toBe(false);
       expect(has("dashboard-setting-btn")).toBe(false);
       expect(has("dashboard-json-edit-btn")).toBe(false);
+      expect(has("dashboard-more-options-btn")).toBe(false);
       expect(has("dashboard-edit-changes-count")).toBe(true);
       expect(wrapper.vm.layoutChangeCount).toBe(0);
       expect(wrapper.find('[data-test="dashboard-edit-save-btn"]').attributes("disabled")).toBe(
@@ -2434,6 +2546,94 @@ describe("ViewDashboard", () => {
         expect(query?.from).toBe("1700000000000");
         expect(query?.to).toBe("1700003600000");
       });
+    });
+  });
+
+  describe("Export", () => {
+    let downloads: HTMLAnchorElement[];
+
+    const exportedJson = (anchor: HTMLAnchorElement) => {
+      const href = anchor.getAttribute("href")!;
+      return JSON.parse(decodeURIComponent(href.slice(href.indexOf(",") + 1)));
+    };
+    const pressExport = async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "x" }));
+      await flushPromises();
+    };
+
+    beforeEach(async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      vi.mocked(getDashboard).mockClear();
+      downloads = [];
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+        this: HTMLAnchorElement,
+      ) {
+        downloads.push(this);
+      });
+    });
+
+    afterEach(() => {
+      global.mockStoreState.kioskMode = false;
+    });
+
+    it("downloads <title>.dashboard.json without the owner and tracks the export", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({ title: "Sales", owner: "a@b.c", tabs: [] });
+
+      await wrapper.vm.exportDashboard();
+
+      expect(getDashboard).toHaveBeenCalledWith(expect.anything(), "test-dashboard-1", "default");
+      expect(downloads).toHaveLength(1);
+      expect(downloads[0].getAttribute("download")).toBe("Sales.dashboard.json");
+      expect(exportedJson(downloads[0])).toEqual({ title: "Sales", owner: "", tabs: [] });
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_exported", { format: "json" });
+    });
+
+    it("falls back to dashboard.dashboard.json when the dashboard has no title", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({ tabs: [] });
+
+      await wrapper.vm.exportDashboard();
+
+      expect(downloads[0].getAttribute("download")).toBe("dashboard.dashboard.json");
+    });
+
+    it("neither downloads nor tracks when loading the dashboard fails", async () => {
+      vi.mocked(getDashboard).mockRejectedValueOnce(new Error("boom"));
+
+      await expect(wrapper.vm.exportDashboard()).rejects.toThrow("boom");
+
+      expect(downloads).toHaveLength(0);
+      expect(analytics.track).not.toHaveBeenCalledWith("dashboard_exported", expect.anything());
+    });
+
+    it("exports on the x shortcut in the normal view", async () => {
+      await pressExport();
+
+      expect(downloads).toHaveLength(1);
+    });
+
+    it.each([
+      ["edit mode", () => wrapper.vm.enterLayoutEdit()],
+      [
+        "fullscreen",
+        () => {
+          wrapper.vm.isFullscreen = true;
+        },
+      ],
+      [
+        "kiosk mode",
+        () => {
+          global.mockStoreState.kioskMode = true;
+        },
+      ],
+    ])("ignores the x shortcut in %s", async (_state, enter) => {
+      enter();
+      await nextTick();
+
+      await pressExport();
+
+      expect(getDashboard).not.toHaveBeenCalled();
+      expect(downloads).toHaveLength(0);
     });
   });
 

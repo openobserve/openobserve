@@ -41,6 +41,8 @@ class WorkflowHttpPage {
     this.steady = '[data-test="workflow-http-steady"]';
     this.lastCall = '[data-test="workflow-http-last-call"]';
     this.credentials = '[data-test="workflow-http-credentials"]';
+    this.credentialShowAny = '[data-test="workflow-http-credentials"] [data-test$="-show"]';
+    this.credentialRevokeAny = '[data-test="workflow-http-credentials"] [data-test$="-revoke"]';
     this.retiringRow = '[data-test="workflow-http-credential-retiring"]';
     this.rotate = '[data-test="workflow-http-rotate"]';
     this.rotatePopover = '[data-test="workflow-http-rotate-popover"]';

@@ -48,6 +48,7 @@
       "alerts-ui-operations.spec.js",
       "alerts-destinations-prebuilt.spec.js",
       "alert-library.spec.js",
+      "alert-library-anomaly.spec.js",
       "alerts-composite-builder.spec.js",
       "alerts-composite-detail.spec.js",
       "alerts-composite-list.spec.js",
@@ -368,7 +369,8 @@
       "logs-search-around-multistream.spec.js",
       "logs-default-columns.spec.js",
       "logsResultsToolbar.spec.js",
-      "logsSavedFunctionOverwrite.spec.js"
+      "logsSavedFunctionOverwrite.spec.js",
+      "logs-explain-analyze.spec.js"
     ],
     "disabled": [
       {

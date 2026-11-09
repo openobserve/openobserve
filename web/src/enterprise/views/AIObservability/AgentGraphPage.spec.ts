@@ -183,6 +183,8 @@ vi.mock("@/components/shared/SkeletonBox.vue", () => ({
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 import AgentGraphPage from "./AgentGraphPage.vue";
 import { queryClient } from "@/composables/query/queryClient";
 
@@ -371,6 +373,15 @@ describe("AgentGraphPage — agent-mode stream gating", () => {
     const sg = wrapper.find('[data-test="service-graph-stub"]');
     expect(sg.attributes("data-viz")).toBe("graph");
     expect(sg.attributes("data-layout")).toBe("force");
+  });
+
+  it("tracks a switch between the tree and graph views", async () => {
+    mockListAgents.mockResolvedValue({ agents: [AGENT] });
+    const wrapper = await mountPage();
+
+    (wrapper.vm as any).$.setupState.onVizTypeChange("tree");
+
+    expect(analytics.track).toHaveBeenCalledWith("llm_agent_graph_view_changed", { view: "tree" });
   });
 
   it("hides the cascade Version dropdown (version-agnostic) and shows the version-agnostic hint", async () => {

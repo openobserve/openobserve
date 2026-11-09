@@ -145,7 +145,10 @@ vi.mock("@/plugins/traces/SyntaxGuide.vue", () => ({
 // ---------------------------------------------------------------------------
 // Component import (AFTER all vi.mock() calls)
 // ---------------------------------------------------------------------------
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import AppErrors from "./AppErrors.vue";
+import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -920,6 +923,24 @@ describe("AppErrors", () => {
 
       const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
       expect(fieldList.props("baseFilter")).toBe("type='error' AND service='check''out'");
+    });
+
+    it("tracks filter chips without sending the service name", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      const bar = wrapper.findComponent({ name: "ErrorsFilterBar" });
+      await bar.vm.$emit("update:status", "new");
+      await bar.vm.$emit("update:type", "unhandled");
+      await bar.vm.$emit("update:service", "checkout");
+      await flushPromises();
+
+      expect(vi.mocked(analytics.track).mock.calls).toEqual([
+        ["rum_error_filter_applied", { filter: "status", value: "new" }],
+        ["rum_error_filter_applied", { filter: "type", value: "unhandled" }],
+        ["rum_error_filter_applied", { filter: "service", value: "set" }],
+      ]);
     });
   });
 

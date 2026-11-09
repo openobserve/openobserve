@@ -51,15 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="openRun"
     >
       <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="reports-reportrunhistory-summary"
-        >
+        <div data-test="reports-reportrunhistory-summary">
           <OStatStrip
             :items="tiles"
             :loading="history.isLoading.value"
             selectable
             compact
+            default-key="all"
             :selected-key="tile"
             @select="onTileSelect"
           />

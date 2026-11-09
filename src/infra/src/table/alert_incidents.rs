@@ -26,7 +26,7 @@ use config::meta::alerts::{
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
-    sea_query::{Expr, JoinType, LockType},
+    sea_query::{Expr, JoinType, LockType, Query, SimpleExpr},
 };
 use svix_ksuid::KsuidLike;
 
@@ -262,8 +262,8 @@ pub async fn add_alert_to_incident(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     // Lock the incident row first so that concurrent transactions serialise on
-    // it. Without this lock, two READ COMMITTED transactions can both read
-    // prior_count == 0 before either commits (the PK includes alert_fired_at,
+    // it. Without this lock, two READ COMMITTED transactions can both see
+    // no prior firing before either commits (the PK includes alert_fired_at,
     // so both inserts succeed), resulting in duplicate NewAlertTypeJoined
     // notifications. FOR UPDATE is a no-op on SQLite (file-level locking
     // already serialises writes there).
@@ -276,14 +276,18 @@ pub async fn add_alert_to_incident(
 
     // With the incident row locked, check whether this alert_id already
     // appears in the incident. Only one transaction can hold the lock at a
-    // time, so this count is stable until we commit.
-    let prior_count = alert_incident_alerts::Entity::find()
+    // time, so this check is stable until we commit.
+    let is_new_alert_type = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::AlertId)
         .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
         .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
-        .count(&txn)
+        .into_tuple::<String>()
+        // LIMIT 1: a long-firing alert links tens of thousands of rows to one incident.
+        .one(&txn)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    let is_new_alert_type = prior_count == 0;
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .is_none();
 
     // Insert alert link
     let alert_link = alert_incident_alerts::ActiveModel {
@@ -644,6 +648,25 @@ pub async fn list(
     list_with(get_orm_client_ro().await, org_id, status, limit, offset).await
 }
 
+/// Lists incidents, optionally only those containing at least one of `alert_ids`.
+pub async fn list_filtered(
+    org_id: &str,
+    status: Option<&str>,
+    alert_ids: Option<&[String]>,
+    limit: u64,
+    offset: u64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    list_with_alerts(
+        get_orm_client_ro().await,
+        org_id,
+        status,
+        alert_ids,
+        limit,
+        offset,
+    )
+    .await
+}
+
 /// [`list`] on a given connection.
 pub async fn list_with<C: ConnectionTrait>(
     client: &C,
@@ -652,6 +675,21 @@ pub async fn list_with<C: ConnectionTrait>(
     limit: u64,
     offset: u64,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    list_with_alerts(client, org_id, status, None, limit, offset).await
+}
+
+/// [`list_filtered`] on a given connection.
+pub async fn list_with_alerts<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    status: Option<&str>,
+    alert_ids: Option<&[String]>,
+    limit: u64,
+    offset: u64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    if alert_ids.is_some_and(|ids| ids.is_empty()) {
+        return Ok(vec![]);
+    }
     let mut query = alert_incidents::Entity::find()
         .select_only()
         // Skip topology_context for performance; the run summary columns feed the list's AI cell.
@@ -683,6 +721,9 @@ pub async fn list_with<C: ConnectionTrait>(
 
     if let Some(s) = status {
         query = query.filter(alert_incidents::Column::Status.eq(s));
+    }
+    if let Some(ids) = alert_ids {
+        query = query.filter(containing_alerts(ids));
     }
 
     let page_size = limit.max(1);
@@ -1013,6 +1054,18 @@ pub async fn count_open(org_id: &str) -> Result<u64, errors::Error> {
 
 /// Count incidents with optional status filter
 pub async fn count(org_id: &str, status: Option<&str>) -> Result<u64, errors::Error> {
+    count_filtered(org_id, status, None).await
+}
+
+/// Counts incidents, optionally only those containing at least one of `alert_ids`.
+pub async fn count_filtered(
+    org_id: &str,
+    status: Option<&str>,
+    alert_ids: Option<&[String]>,
+) -> Result<u64, errors::Error> {
+    if alert_ids.is_some_and(|ids| ids.is_empty()) {
+        return Ok(0);
+    }
     let client = get_orm_client_ro().await;
 
     let mut query =
@@ -1020,6 +1073,9 @@ pub async fn count(org_id: &str, status: Option<&str>) -> Result<u64, errors::Er
 
     if let Some(s) = status {
         query = query.filter(alert_incidents::Column::Status.eq(s));
+    }
+    if let Some(ids) = alert_ids {
+        query = query.filter(containing_alerts(ids));
     }
 
     query
@@ -1267,10 +1323,7 @@ pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
 
     let mut resolved_ids = Vec::new();
     loop {
-        // Find open/acknowledged incidents with last_alert_at older than threshold
-        let stale_incidents = alert_incidents::Entity::find()
-            .filter(alert_incidents::Column::Status.ne("resolved"))
-            .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+        let stale_incidents = stale_incidents_query(cutoff)
             .limit(PAGE_SIZE)
             .all(client)
             .await
@@ -1320,6 +1373,28 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Incidents whose junction rows reference any of `alert_ids`.
+fn containing_alerts(alert_ids: &[String]) -> sea_orm::Condition {
+    sea_orm::Condition::all().add(
+        Expr::col(alert_incidents::Column::Id).in_subquery(
+            Query::select()
+                .column(alert_incident_alerts::Column::IncidentId)
+                .from(alert_incident_alerts::Entity)
+                .and_where(alert_incident_alerts::Column::AlertId.is_in(alert_ids.iter().cloned()))
+                .to_owned(),
+        ),
+    )
+}
+
+fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity> {
+    // Inlined, not bound: PostgreSQL's generic plan cannot match a bind to the partial index.
+    alert_incidents::Entity::find()
+        .filter(
+            Expr::col(alert_incidents::Column::Status).ne(SimpleExpr::Constant("resolved".into())),
+        )
+        .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::{Database, DatabaseConnection, Schema};
@@ -1350,6 +1425,48 @@ mod tests {
         );
     }
 
+    // A bound status would let PostgreSQL's generic plan skip the partial index.
+    #[test]
+    fn stale_incidents_query_inlines_the_resolved_status() {
+        use sea_orm::{DbBackend, QueryTrait};
+
+        let stmt = stale_incidents_query(100).build(DbBackend::Postgres);
+
+        assert!(
+            stmt.sql.contains(r#""status" <> 'resolved'"#),
+            "{}",
+            stmt.sql
+        );
+    }
+
+    #[tokio::test]
+    async fn stale_incidents_query_uses_the_unresolved_index() {
+        use sea_orm::QueryTrait;
+
+        let db = incidents_db().await;
+        crate::table::migration::create_alert_incidents_unresolved_index_for_test(&db)
+            .await
+            .unwrap();
+        let mut stmt = stale_incidents_query(100)
+            .limit(500)
+            .build(db.get_database_backend());
+        stmt.sql = format!("EXPLAIN QUERY PLAN {}", stmt.sql);
+
+        let plan = db
+            .query_all(stmt)
+            .await
+            .unwrap()
+            .iter()
+            .map(|row| row.try_get::<String>("", "detail").unwrap())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(
+            plan.contains("USING INDEX alert_incidents_unresolved_last_alert_idx"),
+            "{plan}"
+        );
+    }
+
     async fn incidents_db() -> DatabaseConnection {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         let backend = db.get_database_backend();
@@ -1360,6 +1477,16 @@ mod tests {
 
     /// An incident in `status` that alert `a1` fired into at `fired_at`.
     async fn fired_into(db: &DatabaseConnection, status: &str, fired_at: i64) -> String {
+        alert_fired_into(db, "a1", status, fired_at).await
+    }
+
+    /// An incident in `status` that `alert_id` fired into at `fired_at`.
+    async fn alert_fired_into(
+        db: &DatabaseConnection,
+        alert_id: &str,
+        status: &str,
+        fired_at: i64,
+    ) -> String {
         let mut incident = new_incident(
             "acme",
             "P2",
@@ -1373,9 +1500,9 @@ mod tests {
         let incident = incident.insert(db).await.unwrap();
         alert_incident_alerts::ActiveModel {
             incident_id: Set(incident.id.clone()),
-            alert_id: Set("a1".to_string()),
+            alert_id: Set(alert_id.to_string()),
             alert_fired_at: Set(fired_at),
-            alert_name: Set("a1".to_string()),
+            alert_name: Set(alert_id.to_string()),
             alert_kind: Set("alert".to_string()),
             correlation_reason: Set(None),
             created_at: Set(fired_at),
@@ -1784,6 +1911,36 @@ mod tests {
             row.topology_context, None,
             "the list skips topology_context"
         );
+    }
+
+    // Security's Cases page lists only incidents a SIEM detection fired into.
+    #[tokio::test]
+    async fn the_alert_filter_lists_only_incidents_those_alerts_fired_into() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let siem = alert_fired_into(&db, "siem-1", "open", 1).await;
+        alert_fired_into(&db, "gc-pause", "open", 2).await;
+
+        let siem_ids = ["siem-1".to_string()];
+        let rows = list_with_alerts(&db, "acme", None, Some(&siem_ids), 50, 0)
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
+            [siem.as_str()]
+        );
+
+        let none = list_with_alerts(&db, "acme", None, Some(&[]), 50, 0)
+            .await
+            .unwrap();
+        assert!(none.is_empty(), "an org with no detections has no cases");
+
+        let all = list_with_alerts(&db, "acme", None, None, 50, 0)
+            .await
+            .unwrap();
+        assert_eq!(all.len(), 2);
     }
 
     #[test]

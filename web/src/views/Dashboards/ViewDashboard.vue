@@ -318,37 +318,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- These save, print or reload outside the draft, so edit mode hides them until Save or Discard. -->
           <template v-if="!isEditingLayout">
-            <ExportDashboard
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              :dashboardId="currentDashboardData.data?.dashboardId"
-            />
-            <ShareButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              :url="dashboardShareURL"
-              @copy:success="onDashboardShared"
-              variant="outline"
-              size="icon-toolbar"
-              data-test="dashboard-share-btn"
-            />
-            <span
-              v-if="!isFullscreen && store.state.zoConfig?.public_dashboards_enabled"
-              v-show="store.state.printMode !== true"
-              class="inline-flex items-center"
-              data-test="dashboard-publish-public"
-            >
-              <OButton
+            <OButtonGroup v-if="!isFullscreen" v-show="store.state.printMode !== true">
+              <ShareButton
+                :url="dashboardShareURL"
+                @copy:success="onDashboardShared"
                 variant="outline"
-                size="icon-toolbar"
-                data-test="dashboard-publish-public-btn"
-                icon-left="language"
-                :aria-label="t('dashboard.publicDashboard.shareTooltip')"
-                @click="showPublicLinksPanel = true"
+                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                :show-label="!isMobile"
+                data-test="dashboard-share-btn"
+              />
+              <ODropdown
+                v-if="store.state.zoConfig?.public_dashboards_enabled"
+                align="end"
+                side="bottom"
               >
-                <OTooltip :content="t('dashboard.publicDashboard.shareTooltip')" />
-              </OButton>
-            </span>
+                <template #trigger>
+                  <OButton
+                    variant="outline"
+                    size="icon-toolbar"
+                    class="w-5"
+                    :aria-label="t('dashboard.viewDashboard.moreShareOptions')"
+                    data-test="dashboard-share-options-btn"
+                    icon-left="arrow-drop-down"
+                  />
+                </template>
+                <ODropdownItem
+                  data-test="dashboard-publish-public-btn"
+                  icon-left="language"
+                  @select="showPublicLinksPanel = true"
+                >
+                  {{ t("dashboard.publicDashboard.shareTooltip") }}
+                </ODropdownItem>
+              </ODropdown>
+            </OButtonGroup>
             <PublicLinksPanel
               v-if="
                 currentDashboardData.data?.dashboardId &&
@@ -365,24 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :folder-id="(route.query.folder as string) ?? 'default'"
             />
             <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
-              data-test="dashboard-setting-btn"
-              @click="openSettingsDialog"
-              icon-left="settings"
-              :aria-label="hasSettingsDraft ? settingsButtonLabel : undefined"
-            >
-              <OTooltip :content="settingsButtonLabel" />
-              <EditorDraftDot
-                v-if="hasSettingsDraft"
-                corner
-                :tooltip="false"
-                data-test="dashboard-setting-btn-draft-dot"
-              />
-            </OButton>
-            <OButton
+              v-if="store.state.printMode === true || isFullscreen"
               variant="outline"
               size="icon-toolbar"
               @click="printDashboard"
@@ -410,74 +395,104 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 shortcut-id="dashboardFullscreen"
               />
             </OButton>
-            <KioskSetupPopover
+            <span
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
-              :current-refresh-seconds="refreshInterval"
-              :min-refresh-seconds="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-              @open="enterKiosk"
-            />
-            <OTooltip v-if="!isFullscreen && reportsLocked" :content="reportsLockedReason">
-              <span v-show="store.state.printMode !== true" class="inline-flex">
-                <OButton
-                  variant="outline"
-                  size="icon-toolbar"
-                  disabled
-                  :aria-label="t('dashboard.scheduledDashboards')"
-                  data-test="view-dashboard-scheduled-reports"
-                >
-                  <template #icon-left>
-                    <OIcon
-                      name="lock"
-                      class="lock-chip"
-                      size="sm"
-                      data-test="view-dashboard-scheduled-reports-lock"
+              class="inline-flex items-center"
+            >
+              <ODropdown align="end" side="bottom" @close-auto-focus="onMoreOptionsClosed">
+                <template #trigger>
+                  <OButton
+                    variant="outline"
+                    :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                    icon-left="more-horiz"
+                    :aria-label="
+                      hasSettingsDraft
+                        ? t('dashboard.moreOptionsSettingsDraft')
+                        : t('common.moreOptions')
+                    "
+                    data-test="dashboard-more-options-btn"
+                  >
+                    <template v-if="!isMobile">{{ t("search.menuMore") }}</template>
+                    <OTooltip v-if="isMobile" :content="t('common.moreOptions')" />
+                    <EditorDraftDot
+                      v-if="hasSettingsDraft"
+                      corner
+                      :tooltip="false"
+                      data-test="dashboard-setting-btn-draft-dot"
                     />
-                  </template>
-                </OButton>
-              </span>
-            </OTooltip>
-            <OButton
-              v-else-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
-              @click="openScheduledReports"
-              data-test="view-dashboard-scheduled-reports"
-            >
-              <template #icon-left><OIcon name="description" size="sm" /></template>
-              <OTooltip :content="t('dashboard.scheduledDashboards')" />
-            </OButton>
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
-              data-test="dashboard-json-edit-btn"
-              @click="openJsonEditor"
-              icon-left="code"
-            >
-              <OTooltip :content="t('dashboard.editJson')" />
-            </OButton>
-            <!-- Pin as org-wide home dashboard: a low-frequency, set-once
-                   action, so it sits at the far right, icon-only. Filled pin +
-                   highlighted variant signal the "already home" state. -->
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
-              size="icon-toolbar"
-              :class="isHome(dashboardId) ? 'text-primary border-button-outline-border border' : ''"
-              @click="toggleHomeDashboard"
-              data-test="dashboard-view-set-home-btn"
-              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
-            >
-              <OTooltip
-                :content="
-                  isHome(dashboardId) ? t('dashboard.removeFromHome') : t('dashboard.setAsHomeDesc')
-                "
-              />
-            </OButton>
+                  </OButton>
+                </template>
+                <ODropdownItem
+                  data-test="dashboard-kiosk-btn"
+                  icon-left="tv"
+                  @select="kioskSetupChosen = true"
+                >
+                  {{ t("dashboard.kiosk.tvMode") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  data-test="dashboard-print-menu-item"
+                  icon-left="print"
+                  @select="printDashboard"
+                >
+                  {{ t("dashboard.print") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+                <ODropdownItem
+                  data-test="export-dashboard"
+                  icon-left="download"
+                  shortcut-id="dashboardExport"
+                  @select="exportDashboard"
+                >
+                  {{ t("dashboard.export") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  data-test="view-dashboard-scheduled-reports"
+                  :icon-left="reportsLocked ? 'lock' : 'description'"
+                  :disabled="reportsLocked"
+                  :focusable-unavailable="reportsLocked"
+                  :description="reportsLocked ? reportsLockedReason : null"
+                  @select="openScheduledReports"
+                >
+                  {{ t("dashboard.scheduledDashboards") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+                <ODropdownItem
+                  data-test="dashboard-setting-btn"
+                  icon-left="settings"
+                  @select="openSettingsDialog"
+                >
+                  {{ settingsButtonLabel }}
+                </ODropdownItem>
+                <ODropdownItem
+                  data-test="dashboard-json-edit-btn"
+                  icon-left="code"
+                  @select="openJsonEditor"
+                >
+                  {{ t("dashboard.editJson") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  data-test="dashboard-view-set-home-btn"
+                  :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+                  :description="isHome(dashboardId) ? null : t('dashboard.setAsHomeDesc')"
+                  @select="toggleHomeDashboard"
+                >
+                  {{
+                    isHome(dashboardId) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome")
+                  }}
+                </ODropdownItem>
+              </ODropdown>
+              <KioskSetupPopover
+                v-model:open="kioskSetupOpen"
+                :current-refresh-seconds="refreshInterval"
+                :min-refresh-seconds="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+                @open="enterKiosk"
+              >
+                <template #trigger>
+                  <span class="block size-0" aria-hidden="true" />
+                </template>
+              </KioskSetupPopover>
+            </span>
           </template>
           <template v-if="isEditingLayout && isMobile">
             <OButton
@@ -722,7 +737,6 @@ import {
   convertPanelTimeRangeToPicker,
 } from "@/utils/dashboard/panelTimeUtils";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import PublicLinksPanel from "@/components/dashboards/PublicLinksPanel.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -845,7 +859,6 @@ export default defineComponent({
     ShareButton,
     PublicLinksPanel,
     AutoRefreshInterval,
-    ExportDashboard,
     DashboardSettings,
     RenderDashboardCharts,
     ScheduledDashboards,
@@ -937,12 +950,14 @@ export default defineComponent({
     // Set/remove this dashboard as the single org-wide home dashboard, shared
     // reactive state with the dashboard list and HomeView via the composable.
     const { isHome, setHomeDashboard, clearHomeDashboard } = useHomeDashboard(t);
-    const toggleHomeDashboard = () => {
+    const toggleHomeDashboard = async () => {
       const id = dashboardId.value as string | undefined;
       if (!id) return;
       const org = store.state.selectedOrganization?.identifier;
       if (isHome(id)) {
-        clearHomeDashboard(org);
+        await clearHomeDashboard(org);
+        // clearHomeDashboard reverts the pin instead of throwing when the write fails.
+        if (!isHome(id)) analytics.track("home_dashboard_unpinned", { source: "dashboard_view" });
       } else {
         setHomeDashboard(org, {
           dashboardId: id,
@@ -2494,6 +2509,38 @@ export default defineComponent({
 
     const onDashboardShared = () => analytics.track("dashboard_shared");
 
+    const exportDashboard = async () => {
+      const dashboard = await getDashboard(
+        store,
+        currentDashboardData.data?.dashboardId,
+        route.query.folder,
+      );
+      dashboard.owner = "";
+      const htmlA = document.createElement("a");
+      htmlA.setAttribute(
+        "href",
+        "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dashboard, null, 2)),
+      );
+      htmlA.setAttribute("download", (dashboard.title || "dashboard") + ".dashboard.json");
+      htmlA.click();
+      analytics.track("dashboard_exported", { format: "json" });
+    };
+
+    const kioskSetupOpen = ref(false);
+    const kioskSetupChosen = ref(false);
+    // The kiosk popover takes the focus the closing menu would hand back to its trigger.
+    const onMoreOptionsClosed = (event: Event) => {
+      if (!kioskSetupChosen.value) return;
+      event.preventDefault();
+      kioskSetupChosen.value = false;
+      kioskSetupOpen.value = true;
+    };
+    // The setup's anchor is unfocusable, so a dismiss would otherwise drop focus to the page.
+    watch(kioskSetupOpen, (open) => {
+      if (open || kioskMode.value) return;
+      document.querySelector<HTMLElement>('[data-test="dashboard-more-options-btn"]')?.focus();
+    });
+
     /**
      * Computed property for dashboard share URL
      * Converts relative time periods to absolute times for sharing
@@ -2897,9 +2944,9 @@ export default defineComponent({
       {
         id: "dashboardExport",
         handler: () => {
-          if (isInputFocused() || kioskMode.value) return;
-          // Trigger the whole-dashboard export (ExportDashboard button).
-          (document.querySelector('[data-test="export-dashboard"]') as HTMLElement | null)?.click();
+          if (isInputFocused() || kioskMode.value || isEditingLayout.value || isFullscreen.value)
+            return;
+          exportDashboard();
         },
       },
     ]);
@@ -2964,6 +3011,10 @@ export default defineComponent({
       onDataZoom,
       dashboardShareURL,
       onDashboardShared,
+      exportDashboard,
+      kioskSetupOpen,
+      kioskSetupChosen,
+      onMoreOptionsClosed,
       selectedTabId,
       onMovePanel,
       printDashboard,
