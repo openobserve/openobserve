@@ -401,32 +401,47 @@ pub async fn transition_status(
     job_id: &str,
     new_status: &str,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
-    transition(org_id, job_id, new_status, None).await
+    let job = get_job(org_id, job_id).await?;
+    transition(org_id, job, new_status, None).await
 }
 
 /// The health pass's budget enforcement (AIO-24): `Some(spend)` pauses a job whose spend for
-/// the day reached its budget; `None` resumes it once a new UTC day starts.
+/// the day reached its budget; `None` resumes it once a new UTC day starts. Returns `None`
+/// without a change when the job left the state the pass decided on: the pass read its job
+/// list before its spend query, and a user's pause or Keep paused in between must stand.
 #[tracing::instrument()]
 pub async fn transition_for_budget(
     org_id: &str,
     job_id: &str,
     pause_at_spend: Option<f64>,
-) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
-    let new_status = if pause_at_spend.is_some() {
-        "paused"
-    } else {
-        "active"
+) -> Result<Option<table::online_eval_jobs::OnlineEvalJob>, EvalJobError> {
+    let job = get_job(org_id, job_id).await?;
+    let (new_status, still_applies) = match pause_at_spend {
+        Some(_) => ("paused", job.status == "active"),
+        None => (
+            "active",
+            job.status == "paused"
+                && job
+                    .budget
+                    .as_ref()
+                    .is_some_and(|budget| budget.paused_at.is_some()),
+        ),
     };
-    transition(org_id, job_id, new_status, pause_at_spend).await
+    if !still_applies {
+        return Ok(None);
+    }
+    transition(org_id, job, new_status, pause_at_spend)
+        .await
+        .map(Some)
 }
 
 async fn transition(
     org_id: &str,
-    job_id: &str,
+    job: table::online_eval_jobs::OnlineEvalJob,
     new_status: &str,
     budget_spend: Option<f64>,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
-    let job = get_job(org_id, job_id).await?;
+    let job_id = job.id.clone();
     let target = check_transition(org_id, &job, new_status).await?;
     let pipeline_id = reconciler::reconcile(&target)
         .await
@@ -438,7 +453,7 @@ async fn transition(
     // Persist the new status (and any pipeline_id allocated by reconcile).
     let now = Utc::now().timestamp_millis();
     table::online_eval_jobs::update_status(
-        job_id,
+        &job_id,
         new_status,
         pipeline_id.as_deref(),
         budget.as_ref(),
