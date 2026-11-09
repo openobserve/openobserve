@@ -47,7 +47,7 @@
 //! caller stores it under the remote scan that made the call.
 //!
 //! The leader also renders the text rows of EXPLAIN ANALYZE from this tree, one per
-//! node it called that was not skipped, which is why `ProfileMetric::display` keeps each
+//! node that was not skipped, which is why `ProfileMetric::display` keeps each
 //! value exactly as DataFusion prints it.
 
 use std::fmt::Write;
@@ -194,7 +194,7 @@ pub enum NodeStatus {
     Skipped,
     /// The request never reached the node: the caller finished before sending it.
     NotExecuted,
-    /// No report reached the caller; a placeholder until fetched, final if the fetch fails.
+    /// The node's report could not be fetched; also what a caller older than `status` leaves.
     #[default]
     Unavailable,
 }

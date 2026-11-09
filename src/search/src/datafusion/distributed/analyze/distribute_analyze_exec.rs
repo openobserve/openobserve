@@ -243,7 +243,7 @@ impl ExecutionPlan for DistributeAnalyzeExec {
     }
 }
 
-/// Lists, depth first, each remote node called but not skipped, with its stage below the leader.
+/// Lists, depth first, each remote node that was not skipped, with its stage below the leader.
 fn collect_remote_rows<'a>(
     node: &'a ProfileNode,
     stage: i32,
@@ -257,7 +257,8 @@ fn collect_remote_rows<'a>(
         }
         ProfileInputs::Remote(remotes) => {
             for remote in remotes {
-                if remote.status == NodeStatus::Skipped {
+                // A leader older than `status` only sets `skipped`.
+                if remote.status == NodeStatus::Skipped || remote.skipped {
                     continue;
                 }
                 rows.push((stage, remote));
@@ -387,6 +388,10 @@ mod tests {
             inputs: ProfileInputs::Children(vec![scan(vec![
                 cluster_leader,
                 node("skipped", NodeStatus::Skipped, None),
+                RemoteNodeProfile {
+                    skipped: true,
+                    ..node("skipped-by-old-leader", NodeStatus::Unavailable, None)
+                },
                 node("unstarted", NodeStatus::NotExecuted, None),
             ])]),
             ..Default::default()

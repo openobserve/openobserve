@@ -317,9 +317,8 @@ mod tests {
         let recorder = NodeProfileRecorder::start(remote.state.node_profiles.clone(), 0, &*node);
         let channel = get_cached_channel(&node.get_grpc_addr()).await.unwrap();
         let mut client = FlightServiceClient::new(channel);
-        recorder.mark_sent();
+        recorder.mark_sent("j0".to_string());
         let response = client.do_get(Ticket::default()).await.unwrap();
-        recorder.mark_streaming("j0".to_string());
 
         let query_context = QueryContext::new(Arc::clone(&node)).with_node_profile(recorder);
         let partial_err = query_context.partial_err.clone();

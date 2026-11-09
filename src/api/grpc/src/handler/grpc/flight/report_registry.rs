@@ -69,7 +69,7 @@ impl ReportRegistry {
     }
 }
 
-/// Where one run delivers its report; a run dropped before reporting stopped early.
+/// Where one run delivers its report; a run that ends without one leaves it unavailable.
 pub(crate) struct ReportSlot {
     entries: Entries,
     key: String,
@@ -100,7 +100,7 @@ impl ReportSlot {
 impl Drop for ReportSlot {
     fn drop(&mut self) {
         self.deliver(NodeReport {
-            status: NodeStatus::EarlyStopped,
+            status: NodeStatus::Unavailable,
             plan: None,
         });
     }
@@ -137,11 +137,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_dropped_slot_reports_early_stop() {
+    async fn test_dropped_slot_reports_unavailable() {
         let registry = ReportRegistry::new(REPORT_TTL);
         drop(registry.open("t-1"));
         let fetched = registry.fetch("t-1").await.unwrap();
-        assert_eq!(fetched.status, NodeStatus::EarlyStopped);
+        assert_eq!(fetched.status, NodeStatus::Unavailable);
     }
 
     #[tokio::test]

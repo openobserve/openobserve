@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, pin::Pin, sync::Arc, task::Poll};
+use std::{collections::VecDeque, pin::Pin, sync::Arc, task::Poll, time::Duration};
 
 use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{FlightData, error::FlightError};
@@ -40,6 +40,9 @@ use crate::handler::grpc::flight::{
 /// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
 /// which is what the receiving channel accepts.
 pub(super) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
+
+/// How long a run may take to settle before it reports what it has; under its caller's wait.
+const REPORT_DEADLINE: Duration = Duration::from_secs(REMOTE_PROFILE_TIMEOUT.as_secs() * 4 / 5);
 
 pub struct FlightEncoderStreamBuilder {
     node_messages: NodeMessages,
@@ -414,7 +417,7 @@ impl Drop for FlightEncoderStream {
             Some(report) => {
                 let source = std::mem::replace(&mut self.source, FlightSource::Closed);
                 let tasks = std::mem::take(&mut self.ctx.tasks);
-                tokio::spawn(report_run(source, tasks, guards, report));
+                tokio::spawn(report_run(source, tasks, guards, report, REPORT_DEADLINE));
             }
         }
         log::info!(
@@ -424,23 +427,32 @@ impl Drop for FlightEncoderStream {
     }
 }
 
-/// Waits until the run's partitions have stopped, then reports its final profile.
+/// Reports the run's profile once its partitions have stopped, or at `deadline` as it then stands.
 async fn report_run(
     source: FlightSource,
     mut tasks: JoinSet<()>,
     guards: (Option<DeferredLock>, Option<SessionGuard>),
     report: RunReport,
+    deadline: Duration,
 ) {
     drop(source);
-    tasks.shutdown().await;
-    drop(guards);
     let RunReport { slot, plan, status } = report;
-    // A cluster leader must finish its own fetches within its caller's wait.
-    complete_remote_profiles(plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
+    let settle = async {
+        tasks.shutdown().await;
+        // Partition tasks may read the session data until they have stopped.
+        drop(guards);
+        // A cluster leader must finish its own fetches within its caller's wait.
+        complete_remote_profiles(plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
+    };
+    tokio::pin!(settle);
+    let settled = tokio::time::timeout(deadline, &mut settle).await.is_ok();
     slot.complete(NodeReport {
         status,
         plan: Some(build_profile(plan.as_ref())),
     });
+    if !settled {
+        settle.await;
+    }
 }
 
 fn write_options() -> IpcWriteOptions {
@@ -615,7 +627,7 @@ mod tests {
             ("partition error", vec![error()], 100, NodeStatus::Failed),
             ("timed out", batches(4), 0, NodeStatus::TimedOut),
         ];
-        let registry = ReportRegistry::new(std::time::Duration::from_secs(60));
+        let registry = ReportRegistry::new(Duration::from_secs(60));
         let plan: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema.clone()));
         for (name, items, read, expected) in cases {
             let slot = registry.open(name);
@@ -648,11 +660,14 @@ mod tests {
                 query_identifier: Default::default(),
                 search_infos: Default::default(),
                 index_info: Default::default(),
-                super_cluster_info: Default::default(),
+                super_cluster_info: proto::cluster_rpc::SuperClusterInfo {
+                    is_super_cluster: true,
+                    ..Default::default()
+                },
             },
         )
         .unwrap();
-        let registry = ReportRegistry::new(std::time::Duration::from_secs(60));
+        let registry = ReportRegistry::new(Duration::from_secs(60));
         let partition = Box::pin(RecordBatchStreamAdapter::new(
             schema,
             futures::stream::empty(),
@@ -671,6 +686,34 @@ mod tests {
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0].node_name, "q-0");
         assert_eq!(nodes[0].status, NodeStatus::NotExecuted);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_run_reports_at_its_deadline_while_a_partition_is_still_stopping() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+        let registry = ReportRegistry::new(Duration::from_secs(60));
+        let report = RunReport::new(registry.open("slow"), Arc::new(EmptyExec::new(schema)));
+        let mut tasks = JoinSet::new();
+        let (started, running) = tokio::sync::oneshot::channel();
+        tasks.spawn(async move {
+            let _ = started.send(());
+            std::thread::sleep(Duration::from_millis(400));
+        });
+        running.await.unwrap();
+        let start = std::time::Instant::now();
+        let run = tokio::spawn(report_run(
+            FlightSource::Closed,
+            tasks,
+            (None, None),
+            report,
+            Duration::from_millis(50),
+        ));
+        let fetched = registry.fetch("slow").await.unwrap();
+        assert!(start.elapsed() < Duration::from_millis(300));
+        assert_eq!(fetched.status, NodeStatus::EarlyStopped);
+        assert_eq!(fetched.plan.unwrap().name, "EmptyExec");
+        run.await.unwrap();
+        assert!(start.elapsed() >= Duration::from_millis(300));
     }
 
     #[test]

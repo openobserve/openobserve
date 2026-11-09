@@ -397,6 +397,9 @@ mod tests {
         fn get_name(&self) -> String {
             "q-0".to_string()
         }
+        fn is_ingester(&self) -> bool {
+            true
+        }
         fn is_local(&self) -> bool {
             true
         }
@@ -474,8 +477,7 @@ mod tests {
         for (partition, job) in ["j0", "j1", "j2"].into_iter().enumerate() {
             let recorder =
                 NodeProfileRecorder::start(remote.state.node_profiles.clone(), partition, &*node);
-            recorder.mark_sent();
-            recorder.mark_streaming(job.to_string());
+            recorder.mark_sent(job.to_string());
             if partition == 1 {
                 recorder.mark_timed_out();
             }
@@ -510,7 +512,7 @@ mod tests {
             [
                 (NodeStatus::EarlyStopped, Some("j0".to_string())),
                 (NodeStatus::TimedOut, Some("j1".to_string())),
-                (NodeStatus::Unavailable, None),
+                (NodeStatus::EarlyStopped, None),
                 (NodeStatus::NotExecuted, None),
             ]
         );

@@ -74,18 +74,18 @@ impl NodeProfileRecorder {
         });
     }
 
-    /// The request is going out; a call dropped before the node answers stopped early.
-    pub fn mark_sent(&self) {
-        self.update(|p| p.status = NodeStatus::EarlyStopped);
-    }
-
-    /// The node returned a stream, so it holds a report under `job_id` until this caller fetches
-    /// it.
-    pub fn mark_streaming(&self, job_id: String) {
+    /// The request is going out under `job_id`; a call dropped from here on stopped early.
+    pub fn mark_sent(&self, job_id: String) {
         self.update(|p| {
-            p.status = NodeStatus::Unavailable;
+            p.status = NodeStatus::EarlyStopped;
             p.job_id = job_id;
         });
+    }
+
+    /// The node returned no stream, so it holds no report to fetch.
+    pub fn mark_refused(&self, e: &tonic::Status) {
+        self.mark_failed(e);
+        self.update(|p| p.job_id.clear());
     }
 
     /// This caller's own deadline ended the call.
@@ -157,8 +157,7 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     }
 }
 
-/// Gives every partition of every remote scan in `plan` an entry, fetching the reports streams
-/// lost.
+/// Gives every partition of every remote scan in `plan` an entry and fetches the missing reports.
 pub async fn complete_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duration) {
     let mut scans = Vec::new();
     collect_remote_scans(plan, &mut scans);
@@ -167,7 +166,8 @@ pub async fn complete_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duratio
     for remote in scans {
         let mut profiles = remote.state.node_profiles.lock();
         end_open_calls(&mut profiles, now);
-        let pending = pending_reports(&mut profiles, &remote.remote_scan_node().nodes);
+        let nodes = &remote.remote_scan_node().nodes;
+        let pending = pending_reports(&mut profiles, nodes, |p| remote.is_skipped(p));
         drop(profiles);
         for (partition, job_id) in pending {
             fetches.push(fetch_report(remote, partition, job_id, timeout));
@@ -258,20 +258,31 @@ async fn fetch_report(
     let node = scan_node.nodes[partition].clone();
     let node_name = node.get_name();
     let job = job_trace_id(&identifier.trace_id, &job_id);
-    match fetch_node_report(&identifier.trace_id, &identifier.org_id, node, job, timeout).await {
+    let fetched =
+        fetch_node_report(&identifier.trace_id, &identifier.org_id, node, job, timeout).await;
+    let mut profiles = remote.state.node_profiles.lock();
+    let Some(profile) = profiles.get_mut(&partition) else {
+        return;
+    };
+    // The node sees only that its caller went away; an ending the caller recorded wins.
+    let caller_ended = matches!(profile.status, NodeStatus::Failed | NodeStatus::TimedOut);
+    match fetched {
         Ok(report) => {
-            if let Some(profile) = remote.state.node_profiles.lock().get_mut(&partition) {
-                // The node sees only that its caller went away; a timeout the caller recorded wins.
-                if profile.status == NodeStatus::Unavailable {
-                    profile.status = report.status;
-                }
-                profile.plan = report.plan;
+            if !caller_ended {
+                profile.status = report.status;
             }
+            profile.plan = report.plan;
         }
-        Err(e) => log::warn!(
-            "[trace_id {}] explain analyze: no profile from node {node_name}, partition {partition}: {e}",
-            identifier.trace_id
-        ),
+        Err(e) => {
+            // Not found means the node never got as far as returning a stream.
+            if !caller_ended && e.code() != tonic::Code::NotFound {
+                profile.status = NodeStatus::Unavailable;
+            }
+            log::warn!(
+                "[trace_id {}] explain analyze: no profile from node {node_name}, partition {partition}: {e}",
+                identifier.trace_id
+            );
+        }
     }
 }
 
@@ -301,18 +312,25 @@ fn node_profile(partition: usize, node: &dyn NodeInfo) -> RemoteNodeProfile {
     }
 }
 
-/// Adds an entry for each partition that never started and lists the started ones with no report.
+/// Adds an entry for each partition that never started and lists the sent calls with no report.
 fn pending_reports(
     profiles: &mut BTreeMap<usize, RemoteNodeProfile>,
     nodes: &[Arc<dyn NodeInfo>],
+    is_skipped: impl Fn(usize) -> bool,
 ) -> Vec<(usize, String)> {
     for (partition, node) in nodes.iter().enumerate() {
-        profiles
-            .entry(partition)
-            .or_insert_with(|| RemoteNodeProfile {
-                status: NodeStatus::NotExecuted,
+        profiles.entry(partition).or_insert_with(|| {
+            let skipped = is_skipped(partition);
+            RemoteNodeProfile {
+                status: if skipped {
+                    NodeStatus::Skipped
+                } else {
+                    NodeStatus::NotExecuted
+                },
+                skipped,
                 ..node_profile(partition, node.as_ref())
-            });
+            }
+        });
     }
     profiles
         .iter()
@@ -399,10 +417,8 @@ mod tests {
         let status = |profiles: &NodeProfiles| profiles.lock()[&2].status;
         assert_eq!(status(&profiles), NodeStatus::NotExecuted);
         assert_eq!(profiles.lock()[&2].role, "querier");
-        recorder.mark_sent();
+        recorder.mark_sent("j2".to_string());
         assert_eq!(status(&profiles), NodeStatus::EarlyStopped);
-        recorder.mark_streaming("j2".to_string());
-        assert_eq!(status(&profiles), NodeStatus::Unavailable);
         assert_eq!(profiles.lock()[&2].job_id, "j2");
         recorder.record_plan(vec![Metrics {
             profile: Some(ProfileNode {
@@ -452,6 +468,17 @@ mod tests {
     }
 
     #[test]
+    fn test_refused_call_leaves_no_report_to_fetch() {
+        let profiles = NodeProfiles::default();
+        let recorder = NodeProfileRecorder::start(profiles.clone(), 0, &TestNode);
+        recorder.mark_sent("j0".to_string());
+        recorder.mark_refused(&tonic::Status::internal("no plan"));
+        assert_eq!(profiles.lock()[&0].status, NodeStatus::Failed);
+        let nodes: Vec<Arc<dyn NodeInfo>> = vec![Arc::new(TestNode)];
+        assert!(pending_reports(&mut profiles.lock(), &nodes, |_| false).is_empty());
+    }
+
+    #[test]
     fn test_late_drop_keeps_a_fetched_report() {
         let profiles = NodeProfiles::default();
         let recorder = NodeProfileRecorder::start(profiles.clone(), 0, &TestNode);
@@ -480,18 +507,20 @@ mod tests {
                 0,
                 entry(NodeStatus::Completed, "j0", Some(ProfileNode::default())),
             ),
-            (1, entry(NodeStatus::Unavailable, "j1", None)),
+            (1, entry(NodeStatus::EarlyStopped, "j1", None)),
             (2, entry(NodeStatus::Skipped, "", None)),
-            (3, entry(NodeStatus::EarlyStopped, "", None)),
+            (3, entry(NodeStatus::Failed, "", None)),
             (4, entry(NodeStatus::TimedOut, "j4", None)),
         ]);
-        let nodes: Vec<Arc<dyn NodeInfo>> = (0..6).map(|_| Arc::new(TestNode) as _).collect();
+        let nodes: Vec<Arc<dyn NodeInfo>> = (0..7).map(|_| Arc::new(TestNode) as _).collect();
         assert_eq!(
-            pending_reports(&mut profiles, &nodes),
+            pending_reports(&mut profiles, &nodes, |partition| partition == 6),
             vec![(1, "j1".to_string()), (4, "j4".to_string())]
         );
         assert_eq!(profiles[&5].status, NodeStatus::NotExecuted);
         assert_eq!(profiles[&5].node_name, "q-0");
+        assert_eq!(profiles[&6].status, NodeStatus::Skipped);
+        assert!(profiles[&6].skipped);
         assert_eq!(profiles[&2].status, NodeStatus::Skipped);
     }
 
@@ -600,7 +629,7 @@ mod tests {
                 partition,
                 &TestNode,
             );
-            recorder.mark_sent();
+            recorder.mark_sent(String::new());
             recorder.add_scan_stats(&ScanStats {
                 files: i64::from(rows),
                 ..Default::default()

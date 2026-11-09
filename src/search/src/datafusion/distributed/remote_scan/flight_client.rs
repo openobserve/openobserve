@@ -174,8 +174,7 @@ pub(super) mod tests {
         }
     }
 
-    /// A node whose `do_get` stream fails after its headers and whose `do_action` replies with
-    /// `report`, or sends headers and then nothing when `report` is `None`.
+    /// `do_get` fails after its headers; `do_action` replies with `report`, or hangs on `None`.
     pub(crate) struct StubFlight {
         pub(crate) report: Option<NodeReport>,
     }
