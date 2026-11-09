@@ -16,6 +16,7 @@
 import { S3_BASE, S3_PREFIX } from "@/composables/useDashboardGallery";
 
 import bundledAlerts from "./bundledKubernetesAlerts.json";
+import { HOSTS_PACK } from "./hostsPack";
 import type { PackBundledAlert, StarterPack } from "./types";
 
 const GALLERY_DASHBOARD_PATH = "Kubernetes(openobserve-collector)/kubernetes_overview.json";
@@ -61,6 +62,9 @@ export const KUBERNETES_PACK: StarterPack = {
   ],
   alerts: PLACEHOLDER_KUBERNETES_ALERT_IDS,
   bundledAlerts: bundledAlerts as PackBundledAlert[],
+  nativeView: { feature: "kubernetes_monitoring", route: "infraKubernetes" },
+  clusterScoped: true,
+  collectorRoute: "ingestFromKubernetes",
   aliases: [
     ["k8s_cluster", "k8s_cluster_name", "cluster", "cluster_name"],
     [
@@ -145,4 +149,4 @@ export const KUBERNETES_PACK: StarterPack = {
   ],
 };
 
-export const STARTER_PACKS: StarterPack[] = [KUBERNETES_PACK];
+export const STARTER_PACKS: StarterPack[] = [KUBERNETES_PACK, HOSTS_PACK];

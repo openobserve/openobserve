@@ -24,6 +24,7 @@ import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackF
 
 const props = defineProps<{
   flow: StarterPackFlow;
+  title: I18nText;
   streamCount: number;
   testId: string;
   primaryLabel?: I18nText;
@@ -47,7 +48,7 @@ const total = computed(() => dashboards.value + alerts.value + views.value);
   >
     <OIcon name="hub" size="md" class="text-text-secondary mt-0.5 shrink-0" />
     <div class="flex min-w-0 flex-1 flex-col gap-1">
-      <strong class="text-base">{{ t("starterPacks.home.title") }}</strong>
+      <strong class="text-base">{{ t("starterPacks.home.title", { title }) }}</strong>
       <div class="flex flex-wrap items-center gap-3" :data-test="`${testId}-counts`">
         <span>{{ t("starterPacks.card.dashboards", { count: dashboards }, dashboards) }}</span>
         <span>{{ t("starterPacks.countAlerts", { count: alerts }, alerts) }}</span>

@@ -31,6 +31,15 @@ export interface PackDashboard {
   id: string;
   title: string;
   load: () => Promise<Record<string, any>>;
+  /** Created by an importer other surfaces share, so the pack never makes a second copy. */
+  shared?: PackSharedDashboard;
+}
+
+/** Another surface's dashboard import; one it finds already there is linked, never owned. */
+export interface PackSharedDashboard {
+  find: (org: string) => Promise<{ id: string; folderId: string } | null>;
+  /** True only when this call made the dashboard. */
+  create: (org: string) => Promise<boolean>;
 }
 
 export interface PackSavedView {
@@ -121,6 +130,14 @@ export interface StarterPack {
   aliasTitles?: Record<string, I18nKey>;
   roles?: PackStreamRole[];
   flavours?: PackFlavour[];
+  /** A built-in page the plan may unlock, opened after setup instead of the pack dashboard. */
+  nativeView?: { feature: string; route: string };
+  /** Alerts group by cluster, so the surfaces show the alert scope line. */
+  clusterScoped?: boolean;
+  /** The ingestion guide a stale pack points at. */
+  collectorRoute?: string;
+  /** Metric streams that show this source is reporting; without one the pack is never matched. */
+  signals?: string[];
 }
 
 export interface PackRecordItem {

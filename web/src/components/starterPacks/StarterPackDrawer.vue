@@ -64,6 +64,7 @@ const ROW_KEYS: Partial<Record<PackItemKind, I18nKey>> = {
 
 const flow = props.flow;
 const pack = flow.pack;
+const title = t(pack.titleKey);
 const confirmMode = ref<"undo" | "remove">("undo");
 const confirmOpen = ref(false);
 
@@ -83,7 +84,6 @@ const planned = (kind: PackItemKind) =>
   (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
 const streamOf = (itemId: string) =>
   pack.bundledAlerts?.find(({ entry }) => entry.id === itemId)?.entry.stream ?? "";
-const packName = computed(() => t(pack.titleKey));
 const notIncluded = computed(() => {
   // A preview read after the install finds the pack's own items as existing.
   const madeIds = new Set(flow.made.value.map(({ itemId }) => itemId));
@@ -93,7 +93,7 @@ const notIncluded = computed(() => {
     tag: t(TAG_KEYS[row.reason]),
     text: t(REASON_KEYS[row.reason], { name: raw(row.name) }),
   }));
-  if (flow.licensed.value) return rows;
+  if (flow.licensed.value || !pack.nativeView) return rows;
   const name = t("starterPacks.drawer.view");
   return [
     {
@@ -188,8 +188,8 @@ const askConfirm = (mode: "undo" | "remove") => {
     size="md"
     :title="
       flow.installed.value
-        ? t('starterPacks.drawer.packTitle')
-        : t('starterPacks.manifest.title', { pack: packName })
+        ? t('starterPacks.drawer.packTitle', { title })
+        : t('starterPacks.manifest.title', { pack: title })
     "
     :sub-title="
       flow.installed.value
@@ -208,7 +208,9 @@ const askConfirm = (mode: "undo" | "remove") => {
       data-test="starter-pack-installed"
     >
       <strong data-test="starter-pack-progress-summary">{{ summary }}</strong>
-      <OText variant="meta" data-test="starter-pack-progress-scope">{{ scope }}</OText>
+      <OText v-if="pack.clusterScoped" variant="meta" data-test="starter-pack-progress-scope">{{
+        scope
+      }}</OText>
       <ul class="flex flex-col" data-test="starter-pack-installed-list">
         <li
           v-for="row in rows"
@@ -354,7 +356,10 @@ const askConfirm = (mode: "undo" | "remove") => {
       <section class="flex flex-col" data-test="starter-pack-drawer-reach">
         <OText variant="section" class="pb-1">{{ t("starterPacks.manifest.adapted") }}</OText>
         <StarterPackAdaptedRows :flow="flow" />
-        <div class="border-border-default flex justify-between gap-3 border-b py-2">
+        <div
+          v-if="pack.clusterScoped"
+          class="border-border-default flex justify-between gap-3 border-b py-2"
+        >
           <div class="flex flex-col">
             <span>{{ t("starterPacks.drawer.scope") }}</span>
             <OText variant="meta">{{ t("starterPacks.drawer.scopeNote") }}</OText>

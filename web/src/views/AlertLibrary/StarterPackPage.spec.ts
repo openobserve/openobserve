@@ -50,7 +50,7 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: { org_identifier: "org" } }),
+  useRoute: () => ({ query: { org_identifier: "org" }, params: { pack: "kubernetes" } }),
   useRouter: () => ({ push: vi.fn(async () => undefined) }),
 }));
 vi.mock("@/composables/starterPacks/useStarterPackFlow", () => ({

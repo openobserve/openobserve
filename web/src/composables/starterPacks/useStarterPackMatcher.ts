@@ -29,6 +29,7 @@ import {
 
 import { KUBERNETES_PACK } from "./kubernetesPack";
 import { matchPack, readOrgStreams, readSchemaColumns } from "./packMatchData";
+import type { StarterPack } from "./types";
 
 export type PackMatchState = "checking" | "matched" | "waiting" | "none" | "error";
 
@@ -41,13 +42,18 @@ const CLUSTER_COLUMNS = ["k8s_cluster", "k8s_cluster_name"];
 interface MatchOptions {
   /** Re-checks until the pack matches, for a guide waiting on new data. */
   poll?: boolean;
+  /** Defaults to Kubernetes, the only pack with clusters to read. */
+  pack?: StarterPack;
 }
 
 const readNames = async (org: string, type: string): Promise<string[]> =>
   (await readQuery(streamNameListQuery(org, type), true)).map((row) => row.name);
 
-/** Whether this org's data fits the Kubernetes pack, and which clusters it has seen. */
-export function useStarterPackMatcher(org: string, { poll = false }: MatchOptions = {}) {
+/** Whether this org's data fits the pack, and for Kubernetes which clusters it has seen. */
+export function useStarterPackMatcher(
+  org: string,
+  { poll = false, pack = KUBERNETES_PACK }: MatchOptions = {},
+) {
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
   const library = STARTER_PACKS_ENABLED ? useAlertLibrary() : null;
   const state = ref<PackMatchState>("checking");
@@ -104,7 +110,30 @@ export function useStarterPackMatcher(org: string, { poll = false }: MatchOption
       );
     });
 
+  const decideBySignals = async (): Promise<{
+    next: PackMatchState;
+    seen: string[];
+    found: string[];
+  }> => {
+    const streams = library ? await readOrgStreams(org) : null;
+    const metrics = streams
+      ? [...(streams.metrics?.keys() ?? [])]
+      : await readNames(org, "metrics");
+    const present = (pack.signals ?? []).filter((name) => metrics.includes(name));
+    // Without a signal stream the pack cannot fit, so the Library match is not paid for.
+    if (!present.length) return { next: "none", seen: [], found: [] };
+    const matched =
+      library && streams
+        ? (await matchPack(org, pack, streams, library)).ready
+        : (
+            await Promise.all(present.map((name) => readSchemaColumns(org, "metrics", name, true)))
+          ).some((columns) => columns.length > 0);
+    if (matched) return { next: "matched", seen: [], found: present };
+    return { next: present.length ? "waiting" : "none", seen: [], found: present };
+  };
+
   const decide = async (): Promise<{ next: PackMatchState; seen: string[]; found: string[] }> => {
+    if (pack.id !== KUBERNETES_PACK.id) return decideBySignals();
     const orgStreams = library ? await readOrgStreams(org) : null;
     const [metrics, logs] = orgStreams
       ? [[...(orgStreams.metrics?.keys() ?? [])], [...(orgStreams.logs?.keys() ?? [])]]
