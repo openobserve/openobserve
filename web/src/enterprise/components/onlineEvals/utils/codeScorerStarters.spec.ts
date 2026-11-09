@@ -129,6 +129,9 @@ describe("scoreFunctionParams", () => {
       "var doc = 'function score(expected)';\nfunction score(output) { return true; }",
       "var doc = `function score(\n expected)`;\nfunction score(output) { return true; }",
       "var re = /function score\\(expected\\)/;\nfunction score(output) { return re.test(output); }",
+      // A regex after a keyword, holding a brace, is not a division.
+      "function isJson(s) { return /^\\{/.test(s); }\nfunction score(output) { return isJson(output); }",
+      "function half(n) { return n / 2; }\nfunction score(output) { return half(output) / 2; }",
       "function wrap() { function score(expected) {} }\nfunction score(output) { return 1 / 2; }",
       "function score(expected) { return 1; }\nfunction score(output) { return 2; }",
     ]) {

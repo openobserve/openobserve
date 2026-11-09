@@ -102,6 +102,31 @@ const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 const IDENT_CHAR = /[\w$]/;
 /** A `/` after one of these opens a regex literal rather than a division. */
 const REGEX_PREFIX = "(,=:[!&|?{};+-*%<>~^";
+/** Keywords that take an expression, so a `/` after one opens a regex literal. */
+const REGEX_KEYWORDS: Record<string, true> = {
+  return: true,
+  typeof: true,
+  case: true,
+  do: true,
+  else: true,
+  in: true,
+  of: true,
+  new: true,
+  delete: true,
+  void: true,
+  throw: true,
+  instanceof: true,
+  yield: true,
+  await: true,
+};
+
+/** Whether the `/` at `i` opens a regex literal rather than a division. */
+function opensRegex(source: string, i: number, prev: string | null): boolean {
+  if (prev === null || REGEX_PREFIX.includes(prev)) return true;
+  if (!IDENT_CHAR.test(prev)) return false;
+  const word = /[\w$]+$/.exec(source.slice(0, i).trimEnd());
+  return word !== null && REGEX_KEYWORDS[word[0]] === true;
+}
 
 /** The index just past the string, template or regex literal opened at `start`. */
 function skipLiteral(source: string, start: number, quote: string): number {
@@ -145,7 +170,7 @@ function scoreSignature(source: string): string | null {
       prev = c;
       continue;
     }
-    if (c === "/" && (prev === null || REGEX_PREFIX.includes(prev))) {
+    if (c === "/" && opensRegex(source, i, prev)) {
       i = skipLiteral(source, i, "/");
       prev = "/";
       continue;

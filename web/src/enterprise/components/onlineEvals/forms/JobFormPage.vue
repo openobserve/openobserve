@@ -839,7 +839,14 @@ const RUN_STATE_KEYS = new Set([
 
 function jobDefinition(row: EvalJob | null) {
   if (!row) return null;
-  return Object.fromEntries(Object.entries(row).filter(([key]) => !RUN_STATE_KEYS.has(key)));
+  const definition: Record<string, unknown> = Object.fromEntries(
+    Object.entries(row).filter(([key]) => !RUN_STATE_KEYS.has(key)),
+  );
+  // The server writes the budget's pause state (pausedAt, pausedSpendUsd, liftedUntil) itself.
+  if (row.budget) {
+    definition.budget = { dailyUsd: row.budget.dailyUsd, onReach: row.budget.onReach };
+  }
+  return definition;
 }
 
 const jobDraft = useEditorDraft<JobDraft>({
