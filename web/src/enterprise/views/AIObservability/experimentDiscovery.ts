@@ -13,26 +13,45 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { LlmExperiment } from "@/services/llm-experiments.service";
+import type {
+  ExperimentClientScoreSummary,
+  LlmExperiment,
+} from "@/services/llm-experiments.service";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
-/** `scoreConfigId` is the key to the config's health policy, which decides a move against the baseline. */
-export type ExperimentScoreSummary = { scoreConfigId: string | null } & (
-  | { name: string; kind: "numeric"; value: number; sampleCount: number }
-  | {
-      name: string;
-      kind: "boolean";
-      trueCount: number;
-      falseCount: number;
-      sampleCount: number;
-    }
-  | {
-      name: string;
-      kind: "categorical";
-      values: Array<{ value: string; count: number }>;
-      sampleCount: number;
-    }
+/**
+ * One score column. `key` is its identity across runs: the name for a platform
+ * Scorer's Score Config, and (Score Config, client key) for a dimension the
+ * customer's own code reported, which `clientScorerKey` marks. `name` is the
+ * Score Config name either way. `scoreConfigId` is the key to the config's
+ * health policy, which decides a move against the baseline.
+ */
+export type ExperimentScoreSummary = {
+  key: string;
+  name: string;
+  scoreConfigId: string | null;
+  clientScorerKey: string | null;
+  sampleCount: number;
+} & (
+  | { kind: "numeric"; value: number }
+  | { kind: "boolean"; trueCount: number; falseCount: number }
+  | { kind: "categorical"; values: Array<{ value: string; count: number }> }
 );
+
+/** A client dimension's column identity. Two client keys under one Score Config stay two columns. */
+export function clientScoreKey(scoreConfigId: string, clientScorerKey: string): string {
+  return `client:${scoreConfigId}:${clientScorerKey}`;
+}
+
+/** A score column's header. A client dimension says its scores came from the customer's own code. */
+export function scoreColumnLabel(
+  column: Pick<ExperimentScoreSummary, "name" | "clientScorerKey">,
+  t: TranslateFn,
+): I18nText {
+  return column.clientScorerKey === null
+    ? raw(column.name)
+    : t("experimentsAtScale.clientScore", { score: column.name });
+}
 
 export interface ExperimentEvidence {
   completedSlots: number;
@@ -90,46 +109,75 @@ export interface ExperimentDatasetGroup {
   experiments: LlmExperiment[];
 }
 
+type ScoreIdentity = Pick<
+  ExperimentScoreSummary,
+  "key" | "name" | "scoreConfigId" | "clientScorerKey" | "sampleCount"
+>;
+
+/** The browse table's shape of one type-aware aggregate; null when there is none yet. */
+function scoreSummary(
+  identity: ScoreIdentity,
+  aggregate: Record<string, unknown> | null,
+): ExperimentScoreSummary | null {
+  if (aggregate?.kind === "numeric") {
+    return { ...identity, kind: "numeric", value: Number(aggregate.mean ?? 0) };
+  }
+  if (aggregate?.kind === "boolean") {
+    return {
+      ...identity,
+      kind: "boolean",
+      trueCount: Number(aggregate.trueCount ?? aggregate.true_count ?? 0),
+      falseCount: Number(aggregate.falseCount ?? aggregate.false_count ?? 0),
+    };
+  }
+  if (aggregate?.kind === "categorical") {
+    const counts = (aggregate.counts ?? {}) as Record<string, number>;
+    return {
+      ...identity,
+      kind: "categorical",
+      values: Object.entries(counts).map(([value, count]) => ({ value, count: Number(count) })),
+    };
+  }
+  return null;
+}
+
+function clientScoreSummary(summary: ExperimentClientScoreSummary): ExperimentScoreSummary | null {
+  return scoreSummary(
+    {
+      key: clientScoreKey(summary.scoreConfigId, summary.clientScorerKey),
+      name: summary.scoreConfigName || summary.clientScorerKey,
+      scoreConfigId: summary.scoreConfigId || null,
+      clientScorerKey: summary.clientScorerKey,
+      sampleCount: summary.sampleCount,
+    },
+    summary.value,
+  );
+}
+
 /**
  * The row's own `includeSummary` fields already carry the type-aware
- * aggregate per scorer, so this only reshapes it for the browse table's
- * per-scorer column — it never needs raw execution/score records.
+ * aggregate per scorer and per client-reported dimension, so this only
+ * reshapes them for the browse table's score columns — it never needs raw
+ * execution/score records. Platform columns come first, then client ones.
  */
 export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidence {
-  const scores: ExperimentScoreSummary[] = [];
-  for (const summary of experiment.scoreSummaries ?? []) {
-    const aggregate = summary.value as Record<string, unknown> | null;
-    if (!aggregate) continue;
+  const platform = (experiment.scoreSummaries ?? []).map((summary) => {
     const name = summary.scoreConfigName || summary.name;
-    const scoreConfigId = summary.scoreConfigId;
-    if (aggregate.kind === "numeric") {
-      scores.push({
-        scoreConfigId,
+    return scoreSummary(
+      {
+        key: name,
         name,
-        kind: "numeric",
-        value: Number(aggregate.mean ?? 0),
+        scoreConfigId: summary.scoreConfigId,
+        clientScorerKey: null,
         sampleCount: summary.sampleCount,
-      });
-    } else if (aggregate.kind === "boolean") {
-      scores.push({
-        scoreConfigId,
-        name,
-        kind: "boolean",
-        trueCount: Number(aggregate.trueCount ?? aggregate.true_count ?? 0),
-        falseCount: Number(aggregate.falseCount ?? aggregate.false_count ?? 0),
-        sampleCount: summary.sampleCount,
-      });
-    } else if (aggregate.kind === "categorical") {
-      const counts = (aggregate.counts ?? {}) as Record<string, number>;
-      scores.push({
-        scoreConfigId,
-        name,
-        kind: "categorical",
-        values: Object.entries(counts).map(([value, count]) => ({ value, count: Number(count) })),
-        sampleCount: summary.sampleCount,
-      });
-    }
-  }
+      },
+      summary.value,
+    );
+  });
+  const client = (experiment.clientScoreSummaries ?? []).map(clientScoreSummary);
+  const scores = [...platform, ...client].filter(
+    (score): score is ExperimentScoreSummary => score !== null,
+  );
 
   return {
     completedSlots: experiment.executionProgress?.completed ?? 0,

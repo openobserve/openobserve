@@ -245,7 +245,7 @@
               >
                 {{
                   t("experimentsAtScale.headline", {
-                    score: outcomeOf(row)!.headline.name,
+                    score: scoreColumnLabel(outcomeOf(row)!.headline, t),
                     delta: signedPoints(outcomeOf(row)!.headline.delta),
                   })
                 }}
@@ -264,24 +264,24 @@
         </template>
 
         <template
-          v-for="name in groupScorerNames(group.children)"
-          :key="name"
-          #[`cell-score:${name}`]="{ row }"
+          v-for="column in groupScoreColumns(group.children)"
+          :key="column.key"
+          #[`cell-score:${column.key}`]="{ row }"
         >
           <div class="flex min-w-0 flex-col">
             <div class="flex min-w-0 items-center gap-1.5">
-              <OTruncatedText>{{ raw(scoreCell(row, name)) }}</OTruncatedText>
+              <OTruncatedText>{{ raw(scoreCell(row, column.key)) }}</OTruncatedText>
               <OTag
-                v-if="deltaOf(row, name)"
+                v-if="deltaOf(row, column.key)"
                 size="sm"
-                :variant="OUTCOME_BADGES[deltaOf(row, name)!.outcome]"
-                :data-test="`ai-experiment-delta-${row.id}-${name}`"
+                :variant="OUTCOME_BADGES[deltaOf(row, column.key)!.outcome]"
+                :data-test="`ai-experiment-delta-${row.id}-${column.key}`"
               >
-                {{ raw(signedPoints(deltaOf(row, name)!.delta)) }}
+                {{ raw(signedPoints(deltaOf(row, column.key)!.delta)) }}
                 <OTooltip
                   :content="
                     t('experimentsAtScale.deltaTooltip', {
-                      delta: signedPoints(deltaOf(row, name)!.delta),
+                      delta: signedPoints(deltaOf(row, column.key)!.delta),
                       threshold: COMPARISON_THRESHOLD * 100,
                     })
                   "
@@ -289,11 +289,11 @@
               </OTag>
             </div>
             <span
-              v-if="foldSpread(row, name)"
+              v-if="foldSpread(row, column.key)"
               class="text-text-secondary text-xs"
-              :data-test="`ai-experiment-spread-${row.id}-${name}`"
+              :data-test="`ai-experiment-spread-${row.id}-${column.key}`"
             >
-              {{ t("experimentsAtScale.spread", foldSpread(row, name)!) }}
+              {{ t("experimentsAtScale.spread", foldSpread(row, column.key)!) }}
             </span>
           </div>
         </template>
@@ -484,6 +484,7 @@ import {
   experimentCostText,
   experimentEvidence,
   groupExperiments,
+  scoreColumnLabel,
   type ComparisonIneligibilityReason,
 } from "@/enterprise/views/AIObservability/experimentDiscovery";
 import {
@@ -519,6 +520,7 @@ import {
   type ExperimentGroupSort,
   type RunComparison,
   type RunFold,
+  type ScoreColumn,
   type ScorePolicy,
   type SharedCaseComparison,
 } from "@/enterprise/views/AIObservability/experimentScale";
@@ -607,14 +609,23 @@ function isGroupRow(row: TreeRow): row is DatasetRow {
 }
 
 function buildColumns(experiments: LlmExperiment[]): OTableColumnDef[] {
-  const scoreColumns: OTableColumnDef[] = groupScorerNames(experiments).map((name) => ({
-    id: `score:${name}`,
-    header: raw(name),
-    accessorFn: (row: TreeRow) => (isGroupRow(row) ? "" : scoreCell(row, name)),
+  const scoreColumns: OTableColumnDef[] = groupScoreColumns(experiments).map((column) => ({
+    id: `score:${column.key}`,
+    header: scoreColumnLabel(column, t),
+    accessorFn: (row: TreeRow) => (isGroupRow(row) ? "" : scoreCell(row, column.key)),
     sortable: true,
     hideable: true,
     size: 140,
-    meta: { align: "left" as const },
+    meta: {
+      align: "left" as const,
+      ...(column.clientScorerKey === null
+        ? {}
+        : {
+            headerTooltip: t("experimentsAtScale.clientScoreTooltip", {
+              key: column.clientScorerKey,
+            }),
+          }),
+    },
   }));
 
   return [
@@ -792,8 +803,8 @@ function outcomeOf(run: LlmExperiment) {
   return comparisons.value.get(run.id) ?? null;
 }
 
-function deltaOf(run: LlmExperiment, scorerName: string) {
-  return outcomeOf(run)?.deltas.get(scorerName) ?? null;
+function deltaOf(run: LlmExperiment, scoreKey: string) {
+  return outcomeOf(run)?.deltas.get(scoreKey) ?? null;
 }
 
 function sharedCasesLabel(cases: NonNullable<RunComparison["cases"]>) {
@@ -810,9 +821,9 @@ function foldSize(run: LlmExperiment) {
   return 1 + (earlierRuns.value.get(run.id)?.length ?? 0);
 }
 
-function foldSpread(run: LlmExperiment, scorerName: string) {
+function foldSpread(run: LlmExperiment, scoreKey: string) {
   const earlier = earlierRuns.value.get(run.id);
-  return earlier ? scoreSpread([run, ...earlier], scorerName) : null;
+  return earlier ? scoreSpread([run, ...earlier], scoreKey) : null;
 }
 
 function ciGroupLabel(section: CiGroup) {
@@ -973,20 +984,21 @@ function visibleStatusReason(experiment: LlmExperiment) {
     : null;
 }
 
-// One column per scorer in the group: the scores array already carries each
-// scorer separately, so nothing here needs the API to change.
-function groupScorerNames(experiments: LlmExperiment[]): string[] {
-  const names: string[] = [];
+// One column per scorer and per client-reported dimension in the group: the
+// scores array already carries each separately, keyed so a client dimension
+// never shares a column with a Scorer of the same Score Config.
+function groupScoreColumns(experiments: LlmExperiment[]): ScoreColumn[] {
+  const columns = new Map<string, ScoreColumn>();
   for (const experiment of experiments) {
-    for (const score of evidence(experiment).scores) {
-      if (!names.includes(score.name)) names.push(score.name);
+    for (const { key, name, clientScorerKey } of evidence(experiment).scores) {
+      if (!columns.has(key)) columns.set(key, { key, name, clientScorerKey });
     }
   }
-  return names;
+  return [...columns.values()];
 }
 
-function scoreCell(experiment: LlmExperiment, scorerName: string): string {
-  const score = evidence(experiment).scores.find((entry) => entry.name === scorerName);
+function scoreCell(experiment: LlmExperiment, scoreKey: string): string {
+  const score = evidence(experiment).scores.find((entry) => entry.key === scoreKey);
   if (!score) return "—";
   if (score.kind === "numeric") return score.value.toFixed(3);
   if (score.kind === "boolean") {
@@ -994,10 +1006,17 @@ function scoreCell(experiment: LlmExperiment, scorerName: string): string {
     return `${pct}% true`;
   }
   // Every category with its count: the mode alone read "none × 39" over 17 full leaks.
-  const summary = experiment.scoreSummaries?.find(
-    (entry) => (entry.scoreConfigName || entry.name) === scorerName,
-  );
-  return experimentScoreSummaryValue(summary?.value);
+  const aggregate =
+    score.clientScorerKey === null
+      ? experiment.scoreSummaries?.find(
+          (entry) => (entry.scoreConfigName || entry.name) === scoreKey,
+        )?.value
+      : experiment.clientScoreSummaries?.find(
+          (entry) =>
+            entry.scoreConfigId === score.scoreConfigId &&
+            entry.clientScorerKey === score.clientScorerKey,
+        )?.value;
+  return experimentScoreSummaryValue(aggregate);
 }
 
 function rejectComparison(reason: ComparisonIneligibilityReason) {

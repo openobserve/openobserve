@@ -21,6 +21,7 @@ import { nextTick, reactive } from "vue";
 import ExperimentBrowser from "./ExperimentBrowser.vue";
 import { makeExperiment } from "@/enterprise/views/AIObservability/experimentTestFixtures";
 import type { ExperimentScoreSummary } from "@/services/llm-experiments.service";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { createStore } from "vuex";
 import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
@@ -856,6 +857,56 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.find('[data-test="ai-experiment-trend-point-qa2-dsv11"]').exists()).toBe(true);
     expect(wrapper.get('[data-test="ai-experiment-trend-regressed"]').text()).toBe(
       "experimentsAtScale.regressedCount 0",
+    );
+  });
+
+  // B-14: an SDK run with `scorers: []` whose code reports its own Scores.
+  it("gives client-reported scores their own column and judges them against the baseline", async () => {
+    const clientLeak = (trueCount: number) => [
+      {
+        scoreConfigId: "cfg-leak",
+        scoreConfigName: "leak",
+        clientScorerKey: "ci_leak",
+        sampleCount: 56,
+        value: { kind: "boolean", trueCount, falseCount: 56 - trueCount },
+      },
+    ];
+    const base = makeExperiment({
+      id: "sdk-base",
+      name: "sdk-base",
+      createdAt: 1,
+      isBaseline: true,
+      scoreSummaries: [],
+      clientScoreSummaries: clientLeak(17),
+    });
+    const pr = makeExperiment({
+      id: "sdk-pr",
+      name: "sdk-pr",
+      createdAt: 2,
+      scoreSummaries: [],
+      clientScoreSummaries: clientLeak(23),
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: { orgId: "acme", experiments: [base, pr], datasets: [] as any },
+      global: { stubs, plugins: [store] },
+    });
+    await flushPromises();
+
+    const column = "score:client:cfg-leak:ci_leak";
+    const columns = wrapper.findComponent(stubs.OTable).props("columns") as OTableColumnDef[];
+    const header = columns.find((entry) => entry.id === column);
+    expect(header?.header).toBe("experimentsAtScale.clientScore leak");
+    expect(header?.meta?.headerTooltip).toBe("experimentsAtScale.clientScoreTooltip ci_leak");
+    expect(wrapper.get(`[data-test="cell-${column}-sdk-pr"]`).text()).toContain("41% true");
+
+    const outcome = wrapper.get('[data-test="ai-experiment-outcome-sdk-pr"]').text();
+    expect(outcome).toContain("experimentsAtScale.outcome.regressed");
+    expect(outcome).toContain("experimentsAtScale.clientScore leak −10.7");
+    expect(
+      wrapper.get('[data-test="ai-experiment-delta-sdk-pr-client:cfg-leak:ci_leak"]').text(),
+    ).toContain("−10.7");
+    expect(wrapper.get('[data-test="ai-experiment-trend-regressed"]').text()).toBe(
+      "experimentsAtScale.regressedCount 1",
     );
   });
 

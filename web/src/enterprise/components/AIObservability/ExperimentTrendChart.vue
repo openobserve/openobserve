@@ -15,7 +15,7 @@
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
       <span class="text-text-heading font-medium">{{ t("experimentsAtScale.trendTitle") }}</span>
       <OSelect
-        v-model="scoreName"
+        v-model="scoreKey"
         :label="t('experimentsAtScale.trendScore')"
         label-position="inside"
         size="sm"
@@ -102,6 +102,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { scoreColumnLabel } from "@/enterprise/views/AIObservability/experimentDiscovery";
 import {
   COMPARISON_THRESHOLD,
   scoreTrend,
@@ -137,27 +138,35 @@ const POINT_TONE: Record<BaselineOutcome, string> = {
 };
 
 const scores = computed(() => trendScores(props.baseline, props.policies));
-const scoreName = ref("");
+const scoreKey = ref("");
 // The first plottable score until the user picks one, and again if the pick
 // leaves (a new baseline without that score).
 watch(
   scores,
   (next) => {
-    if (!next.some(({ name }) => name === scoreName.value)) scoreName.value = next[0]?.name ?? "";
+    if (!next.some(({ key }) => key === scoreKey.value)) scoreKey.value = next[0]?.key ?? "";
   },
   { immediate: true },
 );
 
 const options = computed(() =>
-  scores.value.map(({ name, share }) => ({
-    value: name,
-    label: share ? t("experimentsAtScale.trendShareOption", { score: name }) : raw(name),
-  })),
+  scores.value.map((score) => {
+    const label = scoreColumnLabel(score, t);
+    return {
+      value: score.key,
+      label: score.share ? t("experimentsAtScale.trendShareOption", { score: label }) : label,
+    };
+  }),
 );
 
+const scoreLabel = computed(() => {
+  const score = scores.value.find(({ key }) => key === scoreKey.value);
+  return score ? scoreColumnLabel(score, t) : raw("");
+});
+
 const trend = computed(() =>
-  scoreName.value
-    ? scoreTrend(props.runs, props.baseline, scoreName.value, props.policies, props.sharedCases)
+  scoreKey.value
+    ? scoreTrend(props.runs, props.baseline, scoreKey.value, props.policies, props.sharedCases)
     : null,
 );
 
@@ -202,7 +211,7 @@ const noiseLabel = computed(() => {
 
 const ariaLabel = computed(() =>
   t("experimentsAtScale.trendAria", {
-    score: scoreName.value,
+    score: scoreLabel.value,
     count: trend.value!.points.length,
     value: format(trend.value!.baseline),
     regressed: trend.value!.regressed,

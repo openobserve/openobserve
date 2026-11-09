@@ -26,7 +26,11 @@ import {
   entityId,
   valueOf,
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
-import { experimentEvidence, type ExperimentScoreSummary } from "./experimentDiscovery";
+import {
+  clientScoreKey,
+  experimentEvidence,
+  type ExperimentScoreSummary,
+} from "./experimentDiscovery";
 
 /** DEFAULT_COMPARISON_THRESHOLD in comparison.rs: 5 points of healthy share. */
 export const COMPARISON_THRESHOLD = 0.05;
@@ -141,14 +145,21 @@ function classify(delta: number): BaselineOutcome {
   return rounded > COMPARISON_THRESHOLD ? "improved" : "unchanged";
 }
 
-export interface ScoreDelta {
-  name: string;
+/** A score column's identity and label, carried by every per-score result. */
+export type ScoreColumn = Pick<ExperimentScoreSummary, "key" | "name" | "clientScorerKey">;
+
+export interface ScoreDelta extends ScoreColumn {
   delta: number;
   outcome: BaselineOutcome;
 }
 
+function scoreColumn({ key, name, clientScorerKey }: ScoreColumn): ScoreColumn {
+  return { key, name, clientScorerKey };
+}
+
 export interface RunComparison {
   outcome: BaselineOutcome;
+  /** By score column key. */
   deltas: Map<string, ScoreDelta>;
   /** Lowest delta; regressions-first sorts on it. */
   worst: ScoreDelta;
@@ -175,17 +186,39 @@ export interface SharedCaseComparison {
   shared: number;
   /** Cases only one side ran: new in the run, or missing from it. */
   excluded: number;
-  /** `delta` oriented so positive is better; `change` raw, in the score's own measure. */
-  scores: Map<string, { delta: number; change: number }>;
+  /** By score column key. `delta` oriented so positive is better; `change` raw, in the score's own measure. */
+  scores: Map<string, ScoreColumn & { delta: number; change: number }>;
+}
+
+/** Compare names a client dimension `<client key> · client` (comparison.rs `score_dimension_key`). */
+const CLIENT_DIMENSION_SUFFIX = " · client";
+
+/** The list column a Compare score dimension measures, so its move lands in that column. */
+function comparisonColumn(dimension: ExperimentComparison["dimensions"][number]): ScoreColumn {
+  if (dimension.scoreConfigId && dimension.name.endsWith(CLIENT_DIMENSION_SUFFIX)) {
+    const clientScorerKey = dimension.name.slice(0, -CLIENT_DIMENSION_SUFFIX.length);
+    return {
+      key: clientScoreKey(dimension.scoreConfigId, clientScorerKey),
+      name: dimension.scoreConfigName || clientScorerKey,
+      clientScorerKey,
+    };
+  }
+  const name = dimension.scoreConfigName || dimension.name;
+  return { key: name, name, clientScorerKey: null };
 }
 
 /** Only voting score dimensions with paired evidence, the ones Compare's own verdict rests on. */
 export function sharedCaseComparison(comparison: ExperimentComparison): SharedCaseComparison {
-  const scores = new Map<string, { delta: number; change: number }>();
+  const scores: SharedCaseComparison["scores"] = new Map();
   for (const dimension of comparison.dimensions) {
     if (dimension.kind !== "score" || !dimension.gating || !dimension.comparableRowCount) continue;
     if (dimension.orientedDelta === null || dimension.delta === null) continue;
-    scores.set(dimension.name, { delta: dimension.orientedDelta, change: dimension.delta });
+    const column = comparisonColumn(dimension);
+    scores.set(column.key, {
+      ...column,
+      delta: dimension.orientedDelta,
+      change: dimension.delta,
+    });
   }
   return {
     shared: comparison.counts.commonRows,
@@ -232,21 +265,22 @@ export function compareToBaseline(
   const deltas = new Map<string, ScoreDelta>();
   if (!sameCases(run, baseline)) {
     if (!shared) return null;
-    for (const [name, { delta }] of shared.scores) {
-      deltas.set(name, { name, delta, outcome: classify(delta) });
+    for (const [key, move] of shared.scores) {
+      deltas.set(key, { ...scoreColumn(move), delta: move.delta, outcome: classify(move.delta) });
     }
     return verdict(deltas, { shared: shared.shared, excluded: shared.excluded });
   }
-  const reference = new Map(experimentEvidence(baseline).scores.map((s) => [s.name, s]));
+  // Columns match on key: a client dimension pairs only with the same Score Config and client key.
+  const reference = new Map(experimentEvidence(baseline).scores.map((s) => [s.key, s]));
   for (const score of experimentEvidence(run).scores) {
-    const other = reference.get(score.name);
+    const other = reference.get(score.key);
     const policy = policyOf(score, policies);
     if (!other || !policy) continue;
     const candidate = scoreMeasure(score, policy);
     const base = scoreMeasure(other, policy);
     if (candidate === null || base === null) continue;
     const delta = orientedDelta(policy, base, candidate);
-    deltas.set(score.name, { name: score.name, delta, outcome: classify(delta) });
+    deltas.set(score.key, { ...scoreColumn(score), delta, outcome: classify(delta) });
   }
   return verdict(deltas, null);
 }
@@ -300,13 +334,13 @@ export function foldReruns(runs: LlmExperiment[]): RunFold[] {
  */
 export function scoreSpread(
   runs: LlmExperiment[],
-  name: string,
+  key: string,
 ): { count: number; range: string } | null {
   const values: number[] = [];
   let percent = false;
   for (const run of runs) {
     if (run.status !== "completed") continue;
-    const score = experimentEvidence(run).scores.find((entry) => entry.name === name);
+    const score = experimentEvidence(run).scores.find((entry) => entry.key === key);
     if (score?.kind === "boolean" && score.trueCount + score.falseCount > 0) {
       percent = true;
       values.push(score.trueCount / (score.trueCount + score.falseCount));
@@ -436,11 +470,11 @@ export interface ScoreTrend {
 export function trendScores(
   baseline: LlmExperiment,
   policies: Map<string, ScorePolicy>,
-): Array<{ name: string; share: boolean }> {
+): Array<ScoreColumn & { share: boolean }> {
   return experimentEvidence(baseline).scores.flatMap((score) => {
     const policy = policyOf(score, policies);
     return policy && scoreMeasure(score, policy) !== null
-      ? [{ name: score.name, share: policy.kind !== "numeric" }]
+      ? [{ ...scoreColumn(score), share: policy.kind !== "numeric" }]
       : [];
   });
 }
@@ -454,11 +488,11 @@ export function trendScores(
 export function scoreTrend(
   runs: LlmExperiment[],
   baseline: LlmExperiment,
-  name: string,
+  key: string,
   policies: Map<string, ScorePolicy>,
   shared: Map<string, SharedCaseComparison>,
 ): ScoreTrend | null {
-  const reference = experimentEvidence(baseline).scores.find((score) => score.name === name);
+  const reference = experimentEvidence(baseline).scores.find((score) => score.key === key);
   const policy = reference ? policyOf(reference, policies) : null;
   const base = reference && policy ? scoreMeasure(reference, policy) : null;
   if (!policy || base === null) return null;
@@ -468,12 +502,12 @@ export function scoreTrend(
     let value: number | null;
     let outcome: BaselineOutcome;
     if (sameCases(run, baseline)) {
-      const score = experimentEvidence(run).scores.find((entry) => entry.name === name);
+      const score = experimentEvidence(run).scores.find((entry) => entry.key === key);
       value = score ? scoreMeasure(score, policy) : null;
       if (value === null) continue;
       outcome = classify(orientedDelta(policy, base, value));
     } else {
-      const move = shared.get(run.id)?.scores.get(name);
+      const move = shared.get(run.id)?.scores.get(key);
       if (!move) continue;
       // The baseline's value plus the shared-case change: the point sits where its verdict says.
       value = base + move.change;

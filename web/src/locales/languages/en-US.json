@@ -18782,6 +18782,8 @@
         "taskDistribution": "{succeeded} succeeded · {failed} failed · {pending} pending · {skipped} skipped",
         "scoreOutcomeDistribution": "{scored} scored · {failed} failed · {pending} pending · {skipped} skipped · {unscored} unscored",
         "scoringDistribution": "{success} successful · {failed} failed · {pending} pending · {skipped} skipped",
+        "clientScoresDistribution": "Reported by your code · {count} dimension | Reported by your code · {count} dimensions",
+        "clientScoreFooter": "{count} score · key {key} | {count} scores · key {key}",
         "compare": "Compare",
         "comparePicker": {
           "title": "Compare Against a Baseline",
@@ -31727,7 +31729,9 @@
     "trendBaseline": "Baseline {name} · {value}",
     "trendNoisePts": "Noise ±{value} pts",
     "trendNoise": "Noise ±{value}",
-    "trendAria": "{score} across {count} runs against the baseline at {value}, {regressed} regressed and {improved} improved"
+    "trendAria": "{score} across {count} runs against the baseline at {value}, {regressed} regressed and {improved} improved",
+    "clientScore": "{score} · client",
+    "clientScoreTooltip": "Reported by your own code (client key {key}), on this Score Config's scale and judged by its health policy."
   },
   "codeScorer": {
     "typeDialogIntro": "Choose the scorer type. All three are first-class options.",

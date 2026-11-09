@@ -146,6 +146,9 @@ pub struct ExperimentSummaryResponseBody {
     pub task_outcomes: Option<ExperimentTaskOutcomesBody>,
     pub score_outcomes: Option<ExperimentScoreOutcomesBody>,
     pub score_summaries: Option<Vec<ExperimentScoreSummaryBody>>,
+    /// Dimensions the customer's own code reported, one per Score Config and
+    /// reporting key. Separate from `score_summaries`: no Scorer produced them.
+    pub client_score_summaries: Option<Vec<ExperimentClientScoreSummaryBody>>,
     pub aggregate_summary: Option<ExperimentAggregateSummaryBody>,
 }
 
@@ -1900,6 +1903,7 @@ mod tests {
             "taskOutcomes",
             "scoreOutcomes",
             "scoreSummaries",
+            "clientScoreSummaries",
             "aggregateSummary",
         ];
 
@@ -1925,6 +1929,7 @@ mod tests {
                 task_outcomes: None,
                 score_outcomes: None,
                 score_summaries: None,
+                client_score_summaries: None,
                 aggregate_summary: None,
             }),
         })

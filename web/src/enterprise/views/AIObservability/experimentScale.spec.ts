@@ -38,6 +38,7 @@ import {
   sortByRegressions,
   trendScores,
 } from "./experimentScale";
+import { clientScoreKey } from "./experimentDiscovery";
 import { makeExperiment } from "./experimentTestFixtures";
 
 const summary = (name: string, value: Record<string, unknown>): ExperimentScoreSummary => ({
@@ -156,6 +157,33 @@ describe("compare to baseline", () => {
     expect(compareToBaseline(run("x", 2, [bool(23, 33)]), null, policies)).toBeNull();
   });
 
+  // B-14: a CI job that scores in its own process reports client Scores only.
+  it("judges client-reported dimensions by their Score Config's policy, pairing on config and client key", () => {
+    const client = (clientScorerKey: string, mean: number) => ({
+      scoreConfigId: "cfg-quality",
+      scoreConfigName: "quality",
+      clientScorerKey,
+      sampleCount: 10,
+      value: { kind: "numeric", mean },
+    });
+    const base = run("sdk-base", 1, [], {
+      isBaseline: true,
+      clientScoreSummaries: [client("ci_judge", 0.8), client("other_judge", 0.8)],
+    });
+    const pr = run("sdk-pr", 2, [quality(0.8)], {
+      clientScoreSummaries: [client("ci_judge", 0.6), client("new_judge", 0.1)],
+    });
+    const result = compareToBaseline(pr, base, policies)!;
+
+    const key = clientScoreKey("cfg-quality", "ci_judge");
+    expect(result.outcome).toBe("regressed");
+    expect(result.headline).toMatchObject({ key, name: "quality", clientScorerKey: "ci_judge" });
+    expect(signedPoints(result.headline.delta)).toBe("−20.0");
+    // A key the baseline never reported, and the Scorer column sharing the
+    // Score Config, pair with nothing.
+    expect([...result.deltas.keys()]).toEqual([key]);
+  });
+
   describe("a run on other cases than the baseline", () => {
     // qa2-base pinned at dataset version 10; qa2-dsv11 ran version 11, with one
     // new case it fails. The ten shared cases score the same as the baseline.
@@ -199,6 +227,34 @@ describe("compare to baseline", () => {
       expect(result.cases).toEqual({ shared: 10, excluded: 1 });
       // A same-case run keeps the summary path and has nothing left out.
       expect(compareToBaseline({ ...dsv11, datasetVersion: 10 }, base, policies)!.cases).toBeNull();
+    });
+
+    it("files Compare's client and platform dimensions under the list's own columns", () => {
+      const mapped = compared([
+        dimension({
+          id: "score:a",
+          name: "scorer-quality · v1",
+          scoreConfigId: "cfg-quality",
+          scoreConfigName: "quality",
+        }),
+        dimension({
+          id: "score:b",
+          name: "ci_judge · client",
+          scoreConfigId: "cfg-quality",
+          scoreConfigName: "quality",
+          orientedDelta: -0.2,
+          delta: -0.2,
+        }),
+      ]);
+      const key = clientScoreKey("cfg-quality", "ci_judge");
+      expect([...mapped.scores.keys()]).toEqual(["quality", key]);
+      expect(mapped.scores.get(key)).toMatchObject({
+        name: "quality",
+        clientScorerKey: "ci_judge",
+      });
+      const result = compareToBaseline(dsv11, base, policies, mapped)!;
+      expect(result.outcome).toBe("regressed");
+      expect(result.headline.key).toBe(key);
     });
 
     it("has no verdict until Compare answers, and takes a regression from it", () => {
@@ -377,8 +433,8 @@ describe("trend", () => {
     expect(trend.band[1] - trend.band[0]).toBeCloseTo(0.1);
     expect([trend.regressed, trend.improved]).toEqual([1, 1]);
     expect(trendScores(baseline, policies)).toEqual([
-      { name: "disclosure", share: true },
-      { name: "severity", share: true },
+      { key: "disclosure", name: "disclosure", clientScorerKey: null, share: true },
+      { key: "severity", name: "severity", clientScorerKey: null, share: true },
     ]);
   });
 });
