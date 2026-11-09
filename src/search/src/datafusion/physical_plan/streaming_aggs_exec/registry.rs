@@ -789,7 +789,9 @@ mod tests {
             false,
         )]));
 
-        let properties = StreamingAggsExec::compute_properties(schema.clone(), 3);
+        let input: Arc<dyn datafusion::physical_plan::ExecutionPlan> =
+            Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema));
+        let properties = StreamingAggsExec::compute_properties(&input, 3);
 
         // Verify the properties are set correctly - we can't access schema() directly but we can
         // verify partitioning Check partitioning
