@@ -9,7 +9,6 @@
 const mockFetchSession = vi.fn();
 const mockFetchTurnDetail = vi.fn();
 const mockFetchSessionSpans = vi.fn();
-const mockFetchSessionAgent = vi.fn();
 const mockMappingGet = vi.fn();
 const mockStripHarness = vi.fn();
 const mockRouterPush = vi.fn();
@@ -30,7 +29,6 @@ vi.mock("./composables/useSessions", () => ({
     fetchSession: mockFetchSession,
     fetchTurnDetail: mockFetchTurnDetail,
     fetchSessionSpans: mockFetchSessionSpans,
-    fetchSessionAgent: mockFetchSessionAgent,
   })),
 }));
 
@@ -279,7 +277,6 @@ beforeEach(() => {
     model: "gpt-4",
   });
   mockFetchSessionSpans.mockResolvedValue([makeSpan()]);
-  mockFetchSessionAgent.mockResolvedValue(null);
   mockMappingGet.mockRejectedValue(new Error("not enterprise"));
 });
 
@@ -643,10 +640,9 @@ describe("SessionDetails — turn rows", () => {
           : { text, hidden: 0, only: null },
       ),
     );
-    mockFetchSessionAgent.mockResolvedValue("omp");
     mockFetchSession.mockResolvedValue({
       detail: makeDetail(),
-      traces: [makeTrace({ turnUserMessage: message })],
+      traces: [makeTrace({ turnUserMessage: message, agentName: "omp" })],
     });
     mockFetchSessionSpans.mockResolvedValue([
       makeSpan({ gen_ai_input_messages: JSON.stringify([{ role: "user", content: message }]) }),
@@ -671,16 +667,41 @@ describe("SessionDetails — turn rows", () => {
     expect(wrapper.find(turnBodySelector()).text()).toContain("os: linux");
   });
 
+  // TS-13 / S3-04: the agent comes from the turns already loaded, with no query
+  // of its own: the first turn with a message, so a later sub-agent's patterns
+  // do not apply.
+  it("picks the harness patterns of the first turn's agent", async () => {
+    mockMappingGet.mockResolvedValue({
+      harness_patterns: [{ agent: "task", patterns: ["<env>"] }],
+    });
+    mockStripHarness.mockResolvedValue([]);
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail({ turns: 2 }),
+      traces: [
+        makeTrace({ traceId: "t1", turnUserMessage: "<env>a</env>", agentName: "omp" }),
+        makeTrace({
+          traceId: "t2",
+          startTimeMicros: 1700000002000000000,
+          turnUserMessage: "<env>b</env>",
+          agentName: "task",
+        }),
+      ],
+    });
+    mockFetchSessionSpans.mockResolvedValue([]);
+
+    await mountComponent();
+    expect(mockStripHarness).not.toHaveBeenCalled();
+  });
+
   it("shows the full message when the server cannot hide harness text", async () => {
     const message = "<env>x</env>\nFix the login bug";
     mockMappingGet.mockResolvedValue({
       harness_patterns: [{ agent: "omp", patterns: ["regex (?s)<env>.*?</env>"] }],
     });
     mockStripHarness.mockRejectedValue(new Error("network"));
-    mockFetchSessionAgent.mockResolvedValue("omp");
     mockFetchSession.mockResolvedValue({
       detail: makeDetail(),
-      traces: [makeTrace({ turnUserMessage: message })],
+      traces: [makeTrace({ turnUserMessage: message, agentName: "omp" })],
     });
     mockFetchSessionSpans.mockResolvedValue([]);
 

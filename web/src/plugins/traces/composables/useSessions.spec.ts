@@ -850,26 +850,58 @@ describe("useSessions — fetchSession: paging long sessions", () => {
   });
 
   it("keeps one copy of a turn an older page repeats", async () => {
-    mockSessionsDetails.mockResolvedValueOnce({ data: { hits: [hit(3), hit(2)], total: 3 } });
-    // A new turn arrived: the next offset repeats turn 2.
-    mockSessionsDetails.mockResolvedValueOnce({ data: { hits: [hit(2), hit(1)], total: 4 } });
+    sessionOf(SESSION_TURNS_PAGE_SIZE + 100);
     const { fetchSession } = useSessions();
     const first = await fetchSession("stream", "s", 1000, 2000);
+    // A new turn arrived: the next offset repeats the oldest loaded turn.
+    sessionOf(SESSION_TURNS_PAGE_SIZE + 101);
     const older = await fetchSession("stream", "s", 1000, 2000, first.traces);
 
-    expect(older.traces.map((t) => t.traceId)).toEqual(["trace-1", "trace-2", "trace-3"]);
-    expect(older.detail!.turns).toBe(4);
+    const ids = older.traces.map((t) => t.traceId);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toHaveLength(SESSION_TURNS_PAGE_SIZE + 100);
+    expect(older.hasOlder).toBe(false);
   });
 
-  it("stops offering older turns when a page comes back empty", async () => {
-    mockSessionsDetails.mockResolvedValueOnce({ data: { hits: [hit(2)], total: 5 } });
-    mockSessionsDetails.mockResolvedValueOnce({ data: { hits: [], total: 5 } });
+  // G4-07: deleting an hour of the stream removed 55 turns' spans but not their
+  // ids from the session time index, which still counts 1,100.
+  it("counts only turns with data and finishes once the index's last page is read", async () => {
+    const count = SESSION_TURNS_PAGE_SIZE + 100;
+    const newestFirst = Array.from({ length: count }, (_, i) => count - i);
+    mockSessionsDetails.mockImplementation(async ({ from, size }) => ({
+      data: {
+        hits: newestFirst
+          .slice(from, from + size)
+          .filter((n) => n <= 500 || n > 555) // turns 501–555 lost their spans
+          .map(hit),
+        total: count,
+      },
+    }));
     const { fetchSession } = useSessions();
     const first = await fetchSession("stream", "s", 1000, 2000);
     expect(first.hasOlder).toBe(true);
+    expect(first.detail!.turns).toBe(count);
+
     const older = await fetchSession("stream", "s", 1000, 2000, first.traces);
-    expect(older.traces).toHaveLength(1);
+    expect(older.traces).toHaveLength(count - 55);
+    expect(older.detail!.turns).toBe(count - 55);
     expect(older.hasOlder).toBe(false);
+  });
+
+  it("stops offering older turns when a page comes back empty or adds no turn", async () => {
+    const newest = Array.from({ length: SESSION_TURNS_PAGE_SIZE }, (_, i) => hit(5000 - i));
+    for (const second of [[], newest.slice(-10)]) {
+      mockSessionsDetails.mockReset();
+      mockSessionsDetails.mockResolvedValueOnce({ data: { hits: newest, total: 5000 } });
+      mockSessionsDetails.mockResolvedValueOnce({ data: { hits: second, total: 5000 } });
+      const { fetchSession } = useSessions();
+      const first = await fetchSession("stream", "s", 1000, 2000);
+      expect(first.hasOlder).toBe(true);
+      const older = await fetchSession("stream", "s", 1000, 2000, first.traces);
+      expect(older.traces).toHaveLength(SESSION_TURNS_PAGE_SIZE);
+      expect(older.detail!.turns).toBe(SESSION_TURNS_PAGE_SIZE);
+      expect(older.hasOlder).toBe(false);
+    }
   });
 });
 

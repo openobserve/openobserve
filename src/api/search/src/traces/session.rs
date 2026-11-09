@@ -1013,10 +1013,17 @@ fn build_session_trace_details_sql(
     let stream_ident = traces::session::quote_identifier(stream_name);
 
     if validated.has_gen_ai {
-        let first_msg_clause = if validated.has_input_messages {
-            "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')".to_string()
+        let (first_msg_clause, agent_clause) = if validated.has_input_messages {
+            let present = "gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != ''";
+            (
+                format!(
+                    "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE {present})"
+                ),
+                // The page picks the session agent's harness patterns from its turns' agents.
+                format!("{} as agent_name, ", trace_agent_expr(present)),
+            )
         } else {
-            "''".to_string()
+            ("''".to_string(), String::new())
         };
         let usage = |column: &str| usage_rule(column, validated.has_operation_name);
         let optional_usage =
@@ -1076,6 +1083,7 @@ fn build_session_trace_details_sql(
             {cost_net_cache_impact_expr}, \
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
+            {agent_clause}\
             {trace_selects} \
             FROM {stream_ident} \
             WHERE {trace_id_predicate} \
@@ -1239,6 +1247,11 @@ fn build_session_trace_response_item(
                 .unwrap_or_default(),
         ),
         gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
+        agent_name: item
+            .get("agent_name")
+            .and_then(|v| v.as_str())
+            .filter(|name| !name.is_empty())
+            .map(String::from),
         models: item
             .get("gen_ai_response_models")
             .and_then(|v| v.as_array())
@@ -1253,6 +1266,21 @@ fn build_session_trace_response_item(
     };
 
     Some((tid, service_count, hit))
+}
+
+/// A trace's agent: the agent of the span its first message is read from (TS-13), so a
+/// sub-agent whose name sorts later does not take over the orchestrator's request; when that
+/// span names no agent, the trace's earliest span that does. `message_present` matches a span
+/// carrying a message.
+fn trace_agent_expr(message_present: &str) -> String {
+    format!(
+        "COALESCE(\
+             FIRST_VALUE(NULLIF(gen_ai_agent_name, '') ORDER BY start_time ASC) \
+             FILTER (WHERE {message_present}), \
+             FIRST_VALUE(gen_ai_agent_name ORDER BY start_time ASC) \
+             FILTER (WHERE gen_ai_agent_name IS NOT NULL AND gen_ai_agent_name != '')\
+             )"
+    )
 }
 
 /// `<sum_expr> as <alias>` when the column exists, else `0 as <alias>`.
@@ -1943,6 +1971,9 @@ struct SessionTraceResponseItem {
     gen_ai_usage_cost_cache_read_savings: f64,
     gen_ai_usage_cost_net_cache_impact: f64,
     gen_ai_input_messages: Option<json::Value>,
+    /// The trace's agent, on streams with message fields; the page picks harness patterns by it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agent_name: Option<String>,
     models: Vec<String>,
     /// Tokens of this trace's spans that no price matched; their cost is missing.
     gen_ai_unpriced_tokens: i64,
@@ -2195,6 +2226,43 @@ mod tests {
         );
         assert_eq!(hit.service_name[0].service_name, "o2-ai");
         assert_eq!(hit.models, vec!["claude-sonnet-4-6".to_string()]);
+    }
+
+    // S3-04: Session Detail takes the session agent from its turns instead of a
+    // second query over up to 1,000 trace ids.
+    #[test]
+    fn session_trace_details_carry_the_first_message_spans_agent() {
+        let details = |gen_ai: bool, messages: bool| {
+            let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(gen_ai);
+            validated.has_input_messages = messages;
+            build_session_trace_details_sql(
+                "default",
+                &validated,
+                false,
+                "service_name",
+                "\"trace_id\" IN ('trace-1')",
+            )
+        };
+        let sql = details(true, true);
+        assert!(
+            sql.contains(
+                "COALESCE(FIRST_VALUE(NULLIF(gen_ai_agent_name, '') ORDER BY start_time ASC) \
+                 FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != ''), \
+                 FIRST_VALUE(gen_ai_agent_name ORDER BY start_time ASC) \
+                 FILTER (WHERE gen_ai_agent_name IS NOT NULL AND gen_ai_agent_name != '')) \
+                 as agent_name"
+            ),
+            "{sql}"
+        );
+        // Without messages there is no harness text to hide, so no agent is read.
+        assert!(!details(true, false).contains("gen_ai_agent_name"));
+        assert!(!details(false, true).contains("gen_ai_agent_name"));
+
+        let item = |agent: &str| json!({"trace_id": "t", "trace_start_time": 1, "trace_end_time": 2, "agent_name": agent});
+        let (_, _, hit) = build_session_trace_response_item(&item("omp")).unwrap();
+        assert_eq!(hit.agent_name.as_deref(), Some("omp"));
+        let (_, _, hit) = build_session_trace_response_item(&item("")).unwrap();
+        assert_eq!(hit.agent_name, None);
     }
 
     #[test]

@@ -1073,7 +1073,7 @@ const route = useRoute();
 const router = useRouter();
 const store = useStore();
 
-const { fetchSession, fetchSessionSpans, fetchSessionAgent } = useSessions();
+const { fetchSession, fetchSessionSpans } = useSessions();
 const detail = ref<SessionDetail | null>(null);
 const traces = ref<SessionTraceRow[]>([]);
 const loading = ref(false);
@@ -1609,7 +1609,15 @@ const sessionSpans = ref<any[]>([]);
 // the span sidebar always keep everything.
 const harnessRules = ref<HarnessPatternRule[]>([]);
 const revealedHarness = ref<Set<string>>(new Set());
-const sessionAgent = ref<string | null>(null);
+// The session's agent, as the Sessions list picks it (TS-13): the agent of the
+// first turn with a message, else the first turn naming one. Turns are in time order.
+const sessionAgent = computed(
+  () =>
+    (
+      traces.value.find((tr) => tr.agentName && tr.turnUserMessage) ??
+      traces.value.find((tr) => tr.agentName)
+    )?.agentName ?? null,
+);
 function revealHarness(traceId: string) {
   revealedHarness.value = new Set(revealedHarness.value).add(traceId);
 }
@@ -1663,16 +1671,6 @@ function harnessLabel(stripped: HarnessStripped) {
     ? raw(stripped.text)
     : t("readableSessions.onlyHarness", { tag: `<${stripped.only}>` });
 }
-// Looked up only once some agent has patterns and the turns are known.
-async function loadSessionAgent() {
-  if (!harnessRules.value.length || !traces.value.length) return;
-  sessionAgent.value = await fetchSessionAgent(
-    streamName.value,
-    traces.value.map((tr) => tr.traceId),
-    sessionEvaluationRange.value.startTime,
-    sessionEvaluationRange.value.endTime,
-  );
-}
 // The turn row's title, with harness text hidden like the turn body.
 function turnTitle(tr: SessionTraceRow) {
   const stripped = hiddenHarness(tr.traceId, tr.turnUserMessage);
@@ -1683,7 +1681,6 @@ genAiAgentMappingService
   .get(store.state.selectedOrganization?.identifier ?? "")
   .then((c) => {
     harnessRules.value = c.harness_patterns;
-    loadSessionAgent();
   })
   .catch(() => {});
 // Span loads in flight: the first page's and, after "Load older turns", the
@@ -1940,7 +1937,6 @@ async function load() {
     detail.value = result.detail;
     traces.value = result.traces;
     hasOlderTurns.value = result.hasOlder;
-    loadSessionAgent();
     // Fetch the session spans in the background — powers the rail's Tool
     // Hotspots and makes the Pretty view instant. Not awaited (the page is
     // usable from `traces` alone).

@@ -85,6 +85,11 @@ export interface SessionTraceRow {
   serviceName?: string | null;
   /** First non-empty user id on the trace; the session rollup takes the first one found. */
   userId?: string | null;
+  /**
+   * The trace's agent (the first message's span's, else the earliest named one), on
+   * streams with message fields; null otherwise.
+   */
+  agentName?: string | null;
 }
 
 /** Turns per session-details page: the newest page loads first, "Load older turns" pages back. */
@@ -481,6 +486,7 @@ export function useSessions() {
         models: modelsArr,
         turnUserMessage: userMessageOf(r.gen_ai_input_messages),
         serviceName: svcArr[0]?.service_name ? String(svcArr[0].service_name) : null,
+        agentName: r.agent_name ? String(r.agent_name) : null,
         userId:
           (Array.isArray(r.user_ids) &&
             r.user_ids.find(
@@ -497,7 +503,15 @@ export function useSessions() {
     const traces = [...loaded, ...page.filter((tr) => !loadedIds.has(tr.traceId))].sort(
       (a, b) => a.startTimeMicros - b.startTimeMicros,
     );
-    const turns = Math.max(Number(res.data?.total) || 0, traces.length);
+    // `total` counts the session's trace ids in the time index, which keeps ids
+    // whose spans were deleted since (G4-07). Once a page reaches the index's end,
+    // comes back empty or adds no turn, the loaded turns are all there are.
+    const total = Number(res.data?.total) || 0;
+    const exhausted =
+      accumulated.length === 0 ||
+      traces.length === loaded.length ||
+      loaded.length + SESSION_TURNS_PAGE_SIZE >= total;
+    const turns = exhausted ? traces.length : Math.max(total, traces.length);
 
     // Roll the per-trace rows up into the session-level detail.
     let firstSeenNanos = Infinity;
@@ -566,9 +580,7 @@ export function useSessions() {
       status: totalErrors > 0 ? "error" : "ok",
     };
 
-    // An empty page ends the paging even if `total` disagrees, so the control
-    // can't loop on a page that never fills.
-    return { detail, traces, hasOlder: accumulated.length > 0 && traces.length < turns };
+    return { detail, traces, hasOlder: !exhausted };
   }
 
   /**
@@ -671,24 +683,6 @@ export function useSessions() {
   }
 
   /**
-   * The session's agent, for its harness patterns (AIO-22). A query of its own:
-   * a stream without agent mapping has no `gen_ai_agent_name`, and naming it in
-   * the spans query would fail that query. Null when there is none.
-   */
-  async function fetchSessionAgent(
-    streamName: string,
-    traceIds: string[],
-    startTime: number,
-    endTime: number,
-  ): Promise<string | null> {
-    if (!streamName || !traceIds.length || !startTime || !endTime) return null;
-    const inList = traceIds.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",");
-    const sql = `SELECT MAX(gen_ai_agent_name) AS agent FROM "${streamName}" WHERE trace_id IN (${inList})`;
-    const hits = await executeQuery(sql, startTime, endTime).catch(() => null);
-    return hits?.[0]?.agent || null;
-  }
-
-  /**
    * Cancel in-flight SQL streams from `useLLMStreamQuery`. Called from the
    * parent on unmount so server-side turn-detail work isn't kept around after
    * the tab goes away.
@@ -720,7 +714,6 @@ export function useSessions() {
     fetchSession,
     fetchTurnDetail,
     fetchSessionSpans,
-    fetchSessionAgent,
     cancelAll: cancelAllSessionStreams,
   };
 }
