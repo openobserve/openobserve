@@ -91,6 +91,9 @@ fn tracer_payload_to_resource_spans(
     budget: &mut ExpansionBudget,
 ) -> Result<Vec<ResourceSpans>, DatadogError> {
     let base = tracer_resource(tracer, agent);
+    // Downstream trace ingest merges the resource into every span.
+    let spans = tracer.chunks.iter().map(|c| c.spans.len()).sum::<usize>();
+    budget.charge(RECORD_BYTES + resource_bytes(&base), spans)?;
     let mut by_service: BTreeMap<String, Vec<Span>> = BTreeMap::new();
     for chunk in &tracer.chunks {
         let own = chunk_tid(&chunk.spans).map(|(_, upper)| upper);
@@ -100,9 +103,6 @@ fn tracer_payload_to_resource_spans(
             by_service.entry(service).or_default().push(otlp_span);
         }
     }
-    // Downstream trace ingest merges the resource into every span.
-    let spans = tracer.chunks.iter().map(|c| c.spans.len()).sum::<usize>();
-    budget.charge(RECORD_BYTES + resource_bytes(&base), spans)?;
     Ok(by_service
         .into_iter()
         .map(|(service, spans)| {
@@ -822,6 +822,17 @@ mod tests {
                 str_attr(&charge.attributes, "error.type"),
                 Some("builtins.ValueError")
             );
+        }
+    }
+
+    #[test]
+    fn test_agent_captures_fit_the_ratio_budget() {
+        // Repeated past the 64 KiB floor, so the 32x ratio alone must admit real Agent traffic.
+        for capture in [
+            &include_bytes!("testdata/traces_legacy_v05.pb")[..],
+            &include_bytes!("testdata/traces_idx_v1.pb")[..],
+        ] {
+            assert!(agent_payload_to_otlp(&capture.repeat(200)).is_ok());
         }
     }
 

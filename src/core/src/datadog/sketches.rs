@@ -116,8 +116,9 @@ fn sketch_to_resource_metrics(
     if !sketch.host.is_empty() {
         resource_attrs.insert(HOST_NAME.to_string(), sketch.host);
     }
-    // Downstream OTLP ingest copies the resource onto every point as well.
-    budget.charge(resource_bytes(&resource_attrs), sketch.dogsketches.len())?;
+    // Downstream OTLP ingest copies the resource at least once per point.
+    let point_bytes = RECORD_BYTES + resource_bytes(&resource_attrs);
+    budget.charge(point_bytes, sketch.dogsketches.len())?;
     let attributes = to_key_values(tags.attributes);
     let mut data_points = Vec::with_capacity(sketch.dogsketches.len());
     for dogsketch in &sketch.dogsketches {
@@ -420,6 +421,20 @@ mod tests {
     }
 
     #[test]
+    fn test_many_untagged_empty_sketches_past_the_size_budget_are_rejected() {
+        let payload = SketchPayload {
+            sketches: vec![Sketch {
+                metric: "m".into(),
+                dogsketches: vec![Dogsketch::default(); 200_000],
+                ..Default::default()
+            }],
+            metadata: None,
+        };
+        let err = sketches_to_otlp(&payload.encode_to_vec()).unwrap_err();
+        assert!(err.to_string().contains("size budget"), "{err}");
+    }
+
+    #[test]
     fn test_sketch_with_out_of_range_key_is_dropped() {
         assert!(map_buckets(&[i32::from(i16::MAX)], &[1]).is_none());
         assert!(map_buckets(&[-40_000], &[1]).is_none());
@@ -455,6 +470,13 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn test_agent_capture_sketches_fit_the_ratio_budget() {
+        // Repeated past the 64 KiB floor, so the 32x ratio alone must admit real Agent traffic.
+        let body = include_bytes!("testdata/sketches.pb").repeat(200);
+        assert_eq!(sketches_to_otlp(&body).unwrap().resource_metrics.len(), 200);
     }
 
     #[test]

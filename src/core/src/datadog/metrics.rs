@@ -291,7 +291,13 @@ mod tests {
     #[test]
     fn test_many_empty_series_past_the_size_budget_are_rejected() {
         let body = MetricPayload {
-            series: vec![MetricSeries::default(); 200_000],
+            series: vec![
+                MetricSeries {
+                    r#type: MetricType::Gauge as i32,
+                    ..Default::default()
+                };
+                200_000
+            ],
         }
         .encode_to_vec();
         let err = series_to_otlp(&body).unwrap_err();
@@ -347,6 +353,13 @@ mod tests {
         );
         assert!(check_runs_to_otlp(b"\"nope\"").is_err());
         assert!(check_runs_to_otlp(b"[{\"status\":1}]").is_err());
+    }
+
+    #[test]
+    fn test_agent_capture_series_fits_the_ratio_budget() {
+        // Repeated past the 64 KiB floor, so the 32x ratio alone must admit real Agent traffic.
+        let body = include_bytes!("testdata/series_v2.pb").repeat(200);
+        assert_eq!(series_to_otlp(&body).unwrap().resource_metrics.len(), 1400);
     }
 
     #[test]

@@ -29,7 +29,7 @@ use opentelemetry_proto::tonic::common::v1::{KeyValue, any_value::Value};
 pub use sketches::sketches_to_otlp;
 pub use traces::agent_payload_to_otlp;
 
-/// Bytes a payload may copy or expand into per body byte; captured Agent payloads use under 5.
+/// Bytes a payload may copy or expand into per body byte; captured Agent payloads use under 11.
 const EXPANSION_FACTOR: usize = 32;
 /// Body size credited to small payloads, so a few tags on many points still translate.
 const MIN_BUDGET_BODY: usize = 64 * 1024;
