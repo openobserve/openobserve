@@ -151,6 +151,10 @@ ent POST /api/v2/{org_id}/alert_calibration/dismissals/{id}/reopen | the handler
 ent POST /api/v2/{org_id}/alert_calibration/findings/{finding_id}/dismiss | the handler answers o2-enterprise DismissalView, which derives no schema
 ent GET /api/v2/{org_id}/autoobserve/coverage | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
 ent GET /api/v2/{org_id}/autoobserve/coverage/history | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
+ent GET /api/v2/{org_id}/autoobserve/decisions | the handler answers o2-enterprise DecisionList, which derives no schema
+ent POST /api/v2/{org_id}/autoobserve/decisions | the handler answers o2-enterprise DecisionResult or BatchResult, which derive no schema
+ent GET /api/v2/{org_id}/autoobserve/decisions/preview | the handler answers o2-enterprise Preview, which derives no schema
+ent POST /api/v2/{org_id}/autoobserve/decisions/{decision_id}/undo | the handler answers o2-enterprise DecisionResult, which derives no schema
 ent GET /api/v2/{org_id}/autoobserve/entity_types | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema
 ent GET /api/v2/{org_id}/autoobserve/incidents | the handler answers openobserve-core AutoObserveIncidents, which derives no schema
 ent GET /api/v2/{org_id}/autoobserve/marks | the handler answers the o2-enterprise AutoObserve engine's response, which derives no schema

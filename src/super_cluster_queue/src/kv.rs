@@ -88,7 +88,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 
             // Update local cache
             let cache_key = format!("{}/{}", org_id, kv_key);
-            KVS.insert(cache_key, value);
+            db::kv::cache(cache_key, kv_key, value);
 
             log::debug!(
                 "[SUPER_CLUSTER:KV] Put key: {}/{} to kv_store table and coordinator",

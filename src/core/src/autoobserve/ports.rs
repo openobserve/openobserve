@@ -224,6 +224,32 @@ impl KvWritePort for KvAdapter {
     ) -> anyhow::Result<bool> {
         crate::kv::compare_and_set(org, key, expected, bytes::Bytes::from(value)).await
     }
+
+    async fn compare_and_delete(
+        &self,
+        org: &str,
+        key: &str,
+        expected: &[u8],
+    ) -> anyhow::Result<bool> {
+        crate::kv::compare_and_delete(org, key, expected).await
+    }
+    async fn compare_and_mutate_guarded(
+        &self,
+        org: &str,
+        key: &str,
+        expected: Option<&[u8]>,
+        value: Option<Vec<u8>>,
+        guard_key: &str,
+        guard: &[u8],
+    ) -> anyhow::Result<bool> {
+        crate::kv::compare_and_mutate_guarded(org, key, expected, value, guard_key, guard).await
+    }
+
+    fn spans_regions(&self) -> bool {
+        o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled
+    }
 }
 
 /// Reads the node's stats and schema caches; no query runs.

@@ -15,6 +15,7 @@
 
 //! AutoObserve engine routes: coverage, suggestions, and the marks the alert gate reads.
 
+pub mod decisions;
 pub mod incidents;
 pub mod review;
 

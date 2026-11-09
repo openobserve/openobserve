@@ -21,23 +21,28 @@ use std::{
 };
 
 use axum::{
-    Json,
+    Extension, Json,
     extract::{
         Path, Query,
         rejection::{JsonRejection, QueryRejection},
     },
+    http::HeaderMap,
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::{meta::alerts::alert::ListAlertsParams, utils::time::now_micros};
-use o2_enterprise::enterprise::alert_calibration_service::{
-    AlertCalibrationServiceError as Error,
-    dismissals::{
-        self, ALERT_NOT_FOUND, BODY_INVALID, DISMISSAL_NOT_FOUND, DismissRequest, Dismissal,
-        DismissalFilter, LIST_INVALID, LOAD_FAILED, Reader, ReopenRequest, SAVE_FAILED,
+use infra::errors::Error as InfraError;
+use o2_enterprise::enterprise::{
+    alert_calibration_service::{
+        AlertCalibrationServiceError as Error,
+        dismissals::{
+            self, ALERT_NOT_FOUND, BODY_INVALID, DISMISSAL_NOT_FOUND, DismissRequest, Dismissal,
+            DismissalFilter, LIST_INVALID, LOAD_FAILED, Reader, ReopenRequest, SAVE_FAILED,
+        },
     },
+    autoobserve::decisions::{self, Caller},
 };
-use openobserve_api_common::extractors::Headers;
+use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
 use openobserve_core::{
     alerts::{alert, alert_calibration::dismissals::DismissalKv},
     background_access::rbac_enforced,
@@ -45,9 +50,12 @@ use openobserve_core::{
 
 use super::{deployment_disabled, visibility::PROBE_CAP};
 use crate::{
-    request::alert_grants::{
-        AlertAuthority, AlertVisibility, LiveAuthority, Probe, alert_visibility, live_visibility,
-        org_wide_allows,
+    request::{
+        alert_grants::{
+            AlertAuthority, AlertVisibility, LiveAuthority, Probe, alert_visibility,
+            live_visibility, org_wide_allows,
+        },
+        autoobserve::decisions::decision_source,
     },
     service::auth::UserEmail,
 };
@@ -154,6 +162,8 @@ pub async fn list_dismissals(
 pub async fn dismiss_finding(
     Path((org_id, finding_id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
     body: Result<Json<DismissRequest>, JsonRejection>,
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
@@ -174,16 +184,11 @@ pub async fn dismiss_finding(
         return refused(&e, SAVE_FAILED);
     }
     let now = now_micros();
-    match dismissals::dismiss(
-        &DismissalKv,
-        &org_id,
-        &user.user_id,
-        &finding_id,
-        &request,
-        now,
-    )
-    .await
-    {
+    let caller = Caller {
+        user_id: &user.user_id,
+        source: decision_source(delegated.as_deref(), &headers),
+    };
+    match decisions::dismiss_compat(&DismissalKv, &org_id, caller, validated, now).await {
         Ok(row) => respond(&org_id, &row, now).await,
         Err(e) => refused(&e, SAVE_FAILED),
     }
@@ -219,6 +224,8 @@ pub async fn dismiss_finding(
 pub async fn reopen_dismissal(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
     body: Result<Json<ReopenRequest>, JsonRejection>,
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
@@ -236,10 +243,14 @@ pub async fn reopen_dismissal(
         return refused(&e, SAVE_FAILED);
     }
     let now = now_micros();
-    let reopened = dismissals::reopen(
+    let caller = Caller {
+        user_id: &user.user_id,
+        source: decision_source(delegated.as_deref(), &headers),
+    };
+    let reopened = decisions::reopen_compat(
         &DismissalKv,
         &org_id,
-        &user.user_id,
+        caller,
         &id,
         request.expected_revision,
         now,
@@ -249,6 +260,30 @@ pub async fn reopen_dismissal(
         Ok(row) => respond(&org_id, &row, now).await,
         Err(e) => refused(&e, SAVE_FAILED),
     }
+}
+
+pub(crate) async fn visible_alerts(
+    org_id: &str,
+    user_id: &str,
+    alert_ids: Vec<String>,
+) -> Result<BTreeSet<String>, InfraError> {
+    let probe = Probe {
+        full: alert_ids.len() > PROBE_CAP,
+        ids: alert_ids.clone(),
+    };
+    let visibility = live_visibility(org_id, user_id, || ready(Ok(probe))).await?;
+    let existing = LiveAuthority { org_id, user_id }
+        .folders_of(alert_ids)
+        .await;
+    Ok(existing
+        .into_keys()
+        .filter(|id| admits(&visibility, id))
+        .collect())
+}
+
+/// A listed row's alert is readable, so calibration POST is what dismissing still needs.
+pub(crate) async fn may_dismiss(org_id: &str, user_id: &str) -> bool {
+    !rbac_enforced().await || org_wide_allows(org_id, user_id, "alert_calibration", "POST").await
 }
 
 /// Hidden, missing and foreign alerts share one 404, so the answer discloses nothing (D:L329).
@@ -298,11 +333,6 @@ async fn authorize_target<A: AlertAuthority>(auth: &A, rbac: bool, alert_id: &st
         .await
         .contains_key(alert_id)
         && admits(&visibility, alert_id)
-}
-
-/// A listed row's alert is readable, so calibration POST is what dismissing still needs.
-async fn may_dismiss(org_id: &str, user_id: &str) -> bool {
-    !rbac_enforced().await || org_wide_allows(org_id, user_id, "alert_calibration", "POST").await
 }
 
 fn admits(visibility: &AlertVisibility, alert_id: &str) -> bool {
@@ -408,6 +438,8 @@ mod tests {
             reopened_at: None,
             reopened_by: None,
             updated_at: 1,
+            source: None,
+            request_id: None,
         }
     }
 

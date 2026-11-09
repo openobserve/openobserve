@@ -35,8 +35,11 @@ use config::{
 };
 use infra::errors::{Error as InfraError, ErrorCodes};
 use o2_enterprise::enterprise::{
-    alert_calibration_service::{self, dismissals::SCOPE_ALERT},
-    autoobserve::alert_findings::{DigestRun, FAILURE_RULE},
+    alert_calibration_service::{
+        self,
+        dismissals::{SCOPE_ALERT, Target},
+    },
+    autoobserve::alert_findings::{DigestRun, FAILURE_RULE, RUN_LOOKBACK_US},
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::alerts::{
@@ -549,6 +552,26 @@ pub(crate) async fn latest_alert_findings(
     alert_findings_with(&schema, search).await
 }
 
+pub(crate) async fn finding_target(
+    org_id: &str,
+    finding_id: &str,
+    now: i64,
+) -> Result<Option<Target>, InfraError> {
+    let schema = alert_schema(org_id).await?;
+    if !FINDING_COLUMNS
+        .iter()
+        .all(|column| schema.field_with_name(column).is_ok())
+    {
+        return Ok(None);
+    }
+    let range = (now.saturating_sub(RUN_LOOKBACK_US), now + 1);
+    match search_at(org_id, finding_sql(finding_id), range, 0, 1).await {
+        Ok(found) => Ok(found.hits.first().and_then(target_of)),
+        Err(InfraError::ErrorCode(code)) if Columns::Finding.not_written_yet(&code) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
 /// This node's cache can lag a column another node added, so a miss re-reads the stored schema.
 async fn alert_schema(org_id: &str) -> Result<Schema, InfraError> {
     let cached = infra::schema::get(org_id, DIGEST_STREAM, StreamType::Logs).await?;
@@ -804,6 +827,30 @@ fn alert_records_sql(run: &DigestRun, after: &str) -> String {
         run.emitted_at,
         quote_sql_string(after)
     )
+}
+
+fn finding_sql(finding_id: &str) -> String {
+    format!(
+        "SELECT * FROM \"{DIGEST_STREAM}\" WHERE kind = 'finding' AND scope_kind = {} \
+         AND finding_id = {} ORDER BY _timestamp DESC",
+        quote_sql_string(SCOPE_ALERT),
+        quote_sql_string(finding_id)
+    )
+}
+
+/// An empty pattern column is no pattern, as `rule_family` reads it.
+fn target_of(hit: &Value) -> Option<Target> {
+    let text = |key: &str| {
+        hit.get(key)
+            .and_then(Value::as_str)
+            .filter(|v| !v.is_empty())
+            .map(str::to_string)
+    };
+    Some(Target {
+        rule_id: text("rule_id")?,
+        pattern: text("pattern"),
+        alert_id: text("scope_key")?,
+    })
 }
 
 /// A run row whose window or emission time is unreadable names no run, so nothing is owned.
@@ -1496,5 +1543,23 @@ mod tests {
         );
         let hits = rows("ops", read.map(|response| response.hits), Columns::Run);
         assert!(hits.is_ok_and(|hits| hits.is_empty()));
+    }
+
+    #[test]
+    fn a_finding_is_read_by_its_id_and_names_its_rule_pattern_and_alert() {
+        let sql = finding_sql("ab'c");
+        assert!(sql.contains("finding_id = 'ab''c'"), "{sql}");
+        assert!(sql.contains("scope_kind = 'alert'"), "{sql}");
+        let hit = serde_json::json!({"rule_id": "noise", "pattern": "", "scope_key": "a1"});
+        let target = target_of(&hit).unwrap();
+        assert_eq!(
+            (
+                target.rule_id.as_str(),
+                target.pattern,
+                target.alert_id.as_str()
+            ),
+            ("noise", None, "a1")
+        );
+        assert!(target_of(&serde_json::json!({"rule_id": "noise"})).is_none());
     }
 }
