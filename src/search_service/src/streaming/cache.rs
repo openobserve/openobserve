@@ -48,7 +48,7 @@ pub async fn write_results_to_cache(
     accumulated_results: &mut Vec<SearchResultType>,
     clear_cache: bool,
 ) -> Result<(), infra::errors::Error> {
-    if accumulated_results.is_empty() {
+    if accumulated_results.is_empty() || c_resp.file_path.is_empty() {
         return Ok(());
     }
 
