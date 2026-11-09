@@ -7713,7 +7713,10 @@
     "splunkHecTab": "Splunk HEC",
     "datadogAgentTab": "Datadog Agent",
     "datadogAgent": {
-      "intro": "Verstuur logs, metrieken en traces van een bestaande {product} naar deze organisatie door de configuratie ervan te wijzigen. Je applicaties en tracers blijven ongewijzigd.",
+      "intro": "Werk de configuratie van uw bestaande {product} bij om logs, metrieken en traces naar deze organisatie te sturen.",
+      "correlationBody": "Voor het koppelen van logs aan traces moeten toepassingen de volledige 128-bits trace-ID loggen. Als uw Java-tracer alleen de onderste 64 bits logt, stel dan {setting} in op de toepassing.",
+      "profilingBody": "Profilering gebruikt een aparte bestemming en de API-sleutel van de Agent. Als een toepassing al een profiler gebruikt, schakel dan tijdens de migratie de profilering van de toepassing of tracer uit, of configureer de bestemming afzonderlijk.",
+      "multiValueTagsBody": "Tags met meerdere verschillende waarden gebruiken een gesorteerde JSON-arraystring. Een enkele waarde die begint met [ wordt ook als JSON-array met één element gecodeerd om de reeksidentiteit te behouden.",
       "envTitle": "Agentconfiguratie",
       "envBody": "Stel deze omgevingsvariabelen in op de {product} en herstart deze. Vereist {product} {version} of later.",
       "tokenBody": "De API-sleutel moet een ingestietoken van de organisatie zijn dat met {prefix} begint. Deze organisatie heeft geen ingeschakelde ingestietoken, dus er wordt geen setupfragment getoond. Maak een ingestietoken aan en keer vervolgens terug naar deze pagina.",

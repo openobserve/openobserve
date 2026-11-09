@@ -110,7 +110,22 @@ fn expand_message(record: &mut Map<String, Value>) {
 fn message_severity(record: &Map<String, Value>) -> Option<Value> {
     ["level", "severity", "status"]
         .into_iter()
-        .find_map(|key| record.get(key).filter(|v| v.is_string()).cloned())
+        .find_map(|key| match record.get(key)? {
+            Value::String(value) => Some(Value::String(value.clone())),
+            value if key == "level" => {
+                let severity = match value.as_u64()? {
+                    10 => "trace",
+                    20 => "debug",
+                    30 => "info",
+                    40 => "warn",
+                    50 => "error",
+                    60 => "fatal",
+                    _ => return None,
+                };
+                Some(Value::String(severity.to_string()))
+            }
+            _ => None,
+        })
 }
 
 fn take_timestamp(
@@ -158,7 +173,11 @@ fn rfc3339_micros(value: &Value) -> Option<i64> {
 }
 
 fn text(record: &Map<String, Value>, key: &str) -> Option<String> {
-    match record.get(key)? {
+    let value = record.get(key).or_else(|| {
+        let (namespace, field) = key.split_once('.')?;
+        record.get(namespace)?.get(field)
+    })?;
+    match value {
         Value::String(s) => Some(s.trim().to_string()),
         Value::Number(n) => Some(n.to_string()),
         _ => None,
@@ -426,5 +445,37 @@ mod tests {
         let r = one(json!([{"message": "m", "dd.trace_id": "0", "dd.span_id": "x"}]));
         assert!(!r.contains_key("trace_id"));
         assert!(!r.contains_key("span_id"));
+    }
+
+    #[test]
+    fn test_nested_log_injection_produces_canonical_ids() {
+        for message in [
+            json!({"dd": {"trace_id": "1234", "span_id": "5678"}}),
+            json!({"dd": {"trace_id": "000000000000000000000000000004d2", "span_id": "5678"}}),
+            json!({"otel": {"trace_id": "000000000000000000000000000004d2", "span_id": "000000000000162e"}}),
+            json!({"dd.trace_id": "1234", "dd.span_id": "5678", "dd": {"trace_id": "9", "span_id": "8"}}),
+        ] {
+            let record = one(json!([{"message": message.to_string()}]));
+            assert_eq!(record["trace_id"], format!("{:032x}", 1234), "{message}");
+            assert_eq!(record["span_id"], format!("{:016x}", 5678), "{message}");
+        }
+    }
+
+    #[test]
+    fn test_pino_numeric_levels_override_the_agent_envelope() {
+        for (level, expected) in [
+            (10, "trace"),
+            (20, "debug"),
+            (30, "info"),
+            (40, "warn"),
+            (50, "error"),
+            (60, "fatal"),
+            (35, "info"),
+        ] {
+            let message = json!({"level": level, "msg": "payment"}).to_string();
+            let record = one(json!([{"message": message, "status": "info"}]));
+            assert_eq!(record["severity"], expected, "level {level}");
+            assert_eq!(record["level"], level);
+        }
     }
 }

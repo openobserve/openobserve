@@ -7713,7 +7713,10 @@
     "splunkHecTab": "Splunk HEC",
     "datadogAgentTab": "Datadog Agent",
     "datadogAgent": {
-      "intro": "Senden Sie Logs, Metriken und Traces von einem vorhandenen {product} an diese Organisation, indem Sie dessen Konfiguration ändern. Ihre Anwendungen und Tracer bleiben unverändert.",
+      "intro": "Aktualisieren Sie die Konfiguration Ihres vorhandenen {product}, um Logs, Metriken und Traces an diese Organisation zu senden.",
+      "correlationBody": "Zur Verknüpfung von Logs und Traces müssen Anwendungen die vollständige 128-Bit-Trace-ID protokollieren. Protokolliert Ihr Java-Tracer nur die unteren 64 Bit, setzen Sie {setting} in der Anwendung.",
+      "profilingBody": "Profiling verwendet ein separates Ziel und den API-Schlüssel des Agents. Läuft bereits ein Profiler, deaktivieren Sie das Profiling der Anwendung oder des Tracers während der Migration oder konfigurieren Sie dessen Ziel separat.",
+      "multiValueTagsBody": "Tags mit mehreren unterschiedlichen Werten verwenden eine sortierte JSON-Array-Zeichenfolge. Ein einzelner Wert, der mit [ beginnt, wird ebenfalls als JSON-Array mit einem Element kodiert, um die Serienidentität zu erhalten.",
       "envTitle": "Agent-Konfiguration",
       "envBody": "Legen Sie diese Umgebungsvariablen auf dem {product} fest und starten Sie ihn neu. Erfordert {product} {version} oder höher.",
       "tokenBody": "Der API-Schlüssel muss ein Datenerfassungs-Token der Organisation sein, das mit {prefix} beginnt. Diese Organisation hat kein aktiviertes Datenerfassungs-Token, daher wird kein Einrichtungssnippet angezeigt. Erstellen Sie ein Datenerfassungs-Token und kehren Sie dann zu dieser Seite zurück.",

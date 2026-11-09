@@ -7713,7 +7713,10 @@
     "splunkHecTab": "Splunk HEC",
     "datadogAgentTab": "Datadog Agent",
     "datadogAgent": {
-      "intro": "Gửi nhật ký, chỉ số và trace từ {product} hiện có đến tổ chức này bằng cách thay đổi cấu hình của nó. Ứng dụng và tracer của bạn vẫn giữ nguyên.",
+      "intro": "Cập nhật cấu hình {product} hiện có để gửi nhật ký, chỉ số và dấu vết tới tổ chức này.",
+      "correlationBody": "Để liên kết nhật ký với dấu vết, ứng dụng phải ghi ID dấu vết 128 bit đầy đủ. Nếu Java tracer chỉ ghi 64 bit thấp, hãy đặt {setting} trên ứng dụng.",
+      "profilingBody": "Việc lập hồ sơ dùng đích riêng và khóa API của Agent. Nếu ứng dụng đã chạy trình lập hồ sơ, hãy tắt tính năng lập hồ sơ của ứng dụng hoặc tracer khi di chuyển, hoặc cấu hình đích riêng.",
+      "multiValueTagsBody": "Thẻ có nhiều giá trị khác nhau dùng chuỗi mảng JSON được sắp xếp. Một giá trị đơn bắt đầu bằng [ cũng được mã hóa thành mảng JSON một phần tử để giữ nguyên danh tính chuỗi.",
       "envTitle": "Cấu hình Agent",
       "envBody": "Đặt các biến môi trường này trên {product} và khởi động lại nó. Yêu cầu {product} {version} trở lên.",
       "tokenBody": "Khóa API phải là token tiếp nhận dữ liệu của tổ chức, bắt đầu bằng {prefix}. Tổ chức này không có token tiếp nhận dữ liệu nào được bật, vì vậy không có đoạn mã thiết lập nào được hiển thị. Hãy tạo token tiếp nhận dữ liệu, sau đó quay lại trang này.",

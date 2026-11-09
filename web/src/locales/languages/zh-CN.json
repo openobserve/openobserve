@@ -7713,7 +7713,10 @@
     "splunkHecTab": "Splunk HEC",
     "datadogAgentTab": "Datadog Agent",
     "datadogAgent": {
-      "intro": "通过更改现有 {product} 的配置，将其日志、指标和追踪发送到此组织。您的应用程序和追踪器保持不变。",
+      "intro": "更新现有 {product} 的配置，将日志、指标和链路发送到此组织。",
+      "correlationBody": "要关联日志和链路，应用必须记录完整的 128 位链路 ID。如果 Java tracer 仅记录低 64 位，请在应用上设置 {setting}。",
+      "profilingBody": "性能分析使用独立的目标地址和 Agent API 密钥。如果应用已启用性能分析，请在迁移期间关闭应用或 tracer 的性能分析，或单独配置其目标地址。",
+      "multiValueTagsBody": "同一标签的多个不同值会存为排序后的 JSON 数组字符串。以 [ 开头的单个值也会编码为单元素 JSON 数组，以保留序列身份。",
       "envTitle": "Agent 配置",
       "envBody": "在 {product} 上设置这些环境变量并重启。需要 {product} {version} 或更高版本。",
       "tokenBody": "API 密钥必须是组织数据摄取令牌，以 {prefix} 开头。此组织没有已启用的数据摄取令牌，因此不显示设置片段。请创建数据摄取令牌，然后返回此页面。",

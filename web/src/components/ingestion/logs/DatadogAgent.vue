@@ -40,6 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           })
         }}
       </OText>
+      <OText variant="meta" as="p" data-test="ingestion-datadogagent-profiling-note">
+        {{ t("ingestion.datadogAgent.profilingBody") }}
+      </OText>
       <OBanner
         v-if="passcodeIsNotOrgToken"
         variant="warning"
@@ -66,6 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText variant="body" as="p">
         {{
           t("ingestion.datadogAgent.logsBody", { product, setting: raw("DD_LOGS_ENABLED=true") })
+        }}
+      </OText>
+      <OText variant="meta" as="p" data-test="ingestion-datadogagent-correlation-note">
+        {{
+          t("ingestion.datadogAgent.correlationBody", {
+            setting: raw("DD_TRACE_128_BIT_TRACEID_LOGGING_ENABLED=true"),
+          })
         }}
       </OText>
     </section>
@@ -119,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </li>
         <li>{{ t("ingestion.datadogAgent.metricsSketch") }}</li>
+        <li>{{ t("ingestion.datadogAgent.multiValueTagsBody") }}</li>
       </ul>
     </section>
   </IngestionContent>
@@ -191,7 +202,9 @@ const logsEndpoint = computed(() => {
 });
 
 const dualContent = computed(
-  () => `additional_endpoints:
+  () => `data_plane:
+  enabled: false
+additional_endpoints:
   "${datadogUrl.value}": ["[PASSCODE]"]
 apm_config:
   additional_endpoints:
@@ -199,7 +212,7 @@ apm_config:
 logs_config:
   force_use_http: true
   additional_endpoints:
-    - host: ${logsEndpoint.value.host}
+    - host: ${JSON.stringify(logsEndpoint.value.host)}
       port: ${logsEndpoint.value.port}
       use_ssl: ${logsEndpoint.value.useSsl}
       path_prefix: ${logsEndpoint.value.pathPrefix}

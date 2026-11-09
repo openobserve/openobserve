@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { load } from "js-yaml";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
@@ -127,7 +128,7 @@ const mountPage = async () => {
   return wrapper;
 };
 
-const block = (wrapper: any, slug: string) =>
+const block = (wrapper: Awaited<ReturnType<typeof mountPage>>, slug: string) =>
   wrapper.find(`[data-test="ingestion-${slug}-code-block"]`).text() as string;
 
 describe("DatadogAgent", () => {
@@ -212,7 +213,7 @@ describe("DatadogAgent", () => {
     const yaml = block(wrapper, "datadogagent-dual");
     expect(yaml).toContain(`"https://o2.example.com/base/datadog/${ORG}": ["${ORG_TOKEN}"]`);
     expect(yaml).toContain("force_use_http: true");
-    expect(yaml).toContain("- host: o2.example.com");
+    expect(yaml).toContain('- host: "o2.example.com"');
     expect(yaml).toContain("port: 443");
     expect(yaml).toContain("use_ssl: true");
     expect(yaml).toContain(`path_prefix: /base/datadog/${ORG}`);
@@ -245,5 +246,41 @@ describe("DatadogAgent", () => {
     expect(wrapper.text()).not.toContain(USER_PASSCODE);
     expect(wrapper.find('[data-test="ingestion-datadogagent-token-note"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="ingestion-datadogagent-tokens-link"]').exists()).toBe(true);
+  });
+
+  it.each([
+    ["https://o2.example.com/base", "o2.example.com", 443, true, "/base"],
+    ["http://127.0.0.1:5080", "127.0.0.1", 5080, false, ""],
+    ["https://[2001:db8::1]:5080", "[2001:db8::1]", 5080, true, ""],
+  ])("generates usable dual-shipping YAML for %s", async (url, host, port, useSsl, prefix) => {
+    ingestion.url = url;
+    const wrapper = await mountPage();
+    const config = load(block(wrapper, "datadogagent-dual"));
+    const endpoint = `${url}/datadog/${ORG}`;
+    expect(config).toEqual({
+      data_plane: { enabled: false },
+      additional_endpoints: { [endpoint]: [ORG_TOKEN] },
+      apm_config: { additional_endpoints: { [endpoint]: [ORG_TOKEN] } },
+      logs_config: {
+        force_use_http: true,
+        additional_endpoints: [
+          {
+            host,
+            port,
+            use_ssl: useSsl,
+            path_prefix: `${prefix}/datadog/${ORG}`,
+            api_key: ORG_TOKEN,
+          },
+        ],
+      },
+    });
+  });
+
+  it("explains full-width Java correlation, profiler destinations and repeated tags", async () => {
+    const wrapper = await mountPage();
+    const text = wrapper.text();
+    expect(text).toContain("DD_TRACE_128_BIT_TRACEID_LOGGING_ENABLED=true");
+    expect(text).toContain("profiling");
+    expect(text).toContain("JSON");
   });
 });

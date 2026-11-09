@@ -7713,7 +7713,10 @@
     "splunkHecTab": "Splunk HEC",
     "datadogAgentTab": "Datadog Agent",
     "datadogAgent": {
-      "intro": "透過變更現有 {product} 的設定，將其日誌、指標與追蹤傳送到此組織。您的應用程式與追蹤器維持不變。",
+      "intro": "更新現有 {product} 的設定，將日誌、指標和追蹤傳送至此組織。",
+      "correlationBody": "要關聯日誌和追蹤，應用程式必須記錄完整的 128 位元追蹤 ID。如果 Java tracer 僅記錄低 64 位元，請在應用程式上設定 {setting}。",
+      "profilingBody": "效能分析使用獨立的目的地和 Agent API 金鑰。如果應用程式已啟用效能分析，請在遷移期間關閉應用程式或 tracer 的效能分析，或另外設定其目的地。",
+      "multiValueTagsBody": "同一標籤的多個相異值會儲存為排序後的 JSON 陣列字串。以 [ 開頭的單一值也會編碼為單元素 JSON 陣列，以保留序列身分。",
       "envTitle": "Agent 設定",
       "envBody": "在 {product} 上設定這些環境變數並重新啟動。需要 {product} {version} 或更新版本。",
       "tokenBody": "API 金鑰必須是組織資料擷取權杖，開頭為 {prefix}。此組織沒有已啟用的資料擷取權杖，因此不顯示設定片段。請建立資料擷取權杖，然後返回此頁面。",

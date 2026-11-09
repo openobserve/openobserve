@@ -15,7 +15,7 @@
 //
 // Portions ported from opentelemetry-collector-contrib receiver/datadogreceiver (Apache-2.0).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use opentelemetry_proto::tonic::{
     common::v1::{AnyValue, KeyValue, any_value::Value},
@@ -71,24 +71,28 @@ pub(super) struct SplitTags {
 
 impl SplitTags {
     pub(super) fn from_tags<'a>(tags: impl IntoIterator<Item = &'a str>) -> Self {
-        let mut split = Self::default();
+        let mut grouped: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
         for tag in tags {
-            split.insert(tag);
+            if tag.is_empty() {
+                continue;
+            }
+            let (key, value) = split_tag(tag);
+            grouped.entry(key).or_default().insert(value);
+        }
+        let mut split = Self::default();
+        for (key, values) in grouped {
+            // Bracket-leading single values must remain distinct from encoded multi-value tags.
+            let value = if values.len() > 1 || values.iter().any(|value| value.starts_with('[')) {
+                serde_json::json!(values).to_string()
+            } else {
+                values.into_iter().collect()
+            };
+            match resource_key(key) {
+                Some(otel_key) => split.resource.insert(otel_key.to_string(), value),
+                None => split.attributes.insert(key.to_string(), value),
+            };
         }
         split
-    }
-
-    fn insert(&mut self, tag: &str) {
-        if tag.is_empty() {
-            return;
-        }
-        let (key, value) = split_tag(tag);
-        match resource_key(key) {
-            Some(otel_key) => self
-                .resource
-                .insert(otel_key.to_string(), value.to_string()),
-            None => self.attributes.insert(key.to_string(), value.to_string()),
-        };
     }
 }
 
@@ -143,12 +147,33 @@ mod tests {
             "",
             "env:staging",
         ]);
-        assert_eq!(tags.resource[DEPLOYMENT_ENVIRONMENT_NAME], "staging");
+        assert_eq!(
+            tags.resource[DEPLOYMENT_ENVIRONMENT_NAME],
+            r#"["prod","staging"]"#
+        );
         assert_eq!(tags.resource[SERVICE_NAME], "checkout");
         assert_eq!(tags.resource["k8s.namespace.name"], "shop");
         assert_eq!(tags.attributes["team"], "payments");
         assert_eq!(tags.attributes["url"], "http://a:8080");
         assert_eq!(tags.attributes["standalone"], "");
         assert_eq!(tags.resource.len() + tags.attributes.len(), 6);
+    }
+
+    #[test]
+    fn test_repeated_tag_values_are_canonical_and_keep_literal_arrays_distinct() {
+        for input in [
+            vec!["team:payments", "team:platform", "team:payments"],
+            vec!["team:platform", "team:payments"],
+        ] {
+            let tags = SplitTags::from_tags(input);
+            assert_eq!(tags.attributes["team"], r#"["payments","platform"]"#);
+        }
+        let literal = SplitTags::from_tags([r#"team:["payments","platform"]"#]);
+        assert_eq!(
+            literal.attributes["team"],
+            r#"["[\"payments\",\"platform\"]"]"#
+        );
+        let duplicate = SplitTags::from_tags(["team:payments", "team:payments"]);
+        assert_eq!(duplicate.attributes["team"], "payments");
     }
 }

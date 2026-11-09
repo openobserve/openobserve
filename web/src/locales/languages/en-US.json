@@ -7713,7 +7713,10 @@
     "splunkHecTab": "Splunk HEC",
     "datadogAgentTab": "Datadog Agent",
     "datadogAgent": {
-      "intro": "Send logs, metrics and traces from an existing {product} to this organization by changing its configuration. Your applications and tracers stay as they are.",
+      "intro": "Send logs, metrics and traces from an existing {product} to this organization by updating its configuration.",
+      "correlationBody": "For log-to-trace correlation, applications must log the full 128-bit trace ID. If your Java tracer logs only the low 64 bits, set {setting} on the application.",
+      "profilingBody": "Profiling uses a separate destination and the Agent API key. If an application already runs a profiler, disable application/tracer profiling during migration or configure its destination separately.",
+      "multiValueTagsBody": "Tags with multiple distinct values use a sorted JSON-array string. A single value beginning with [ is also encoded as a one-element JSON array to preserve series identity.",
       "envTitle": "Agent configuration",
       "envBody": "Set these environment variables on the {product} and restart it. Requires {product} {version} or later.",
       "tokenBody": "The API key must be an organization ingestion token, which starts with {prefix}. This organization has no enabled ingestion token, so no setup snippet is shown. Create an ingestion token, then return to this page.",

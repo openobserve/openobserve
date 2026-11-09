@@ -7713,7 +7713,10 @@
     "splunkHecTab": "Splunk HEC",
     "datadogAgentTab": "Datadog Agent",
     "datadogAgent": {
-      "intro": "Yapılandırmasını değiştirerek mevcut bir {product} üzerinden bu kuruluşa günlükler, metrikler ve izler gönderin. Uygulamalarınız ve tracer'larınız olduğu gibi kalır.",
+      "intro": "Mevcut {product} yapılandırmasını güncelleyerek günlükleri, metrikleri ve izleri bu kuruluşa gönderin.",
+      "correlationBody": "Günlükleri izlerle ilişkilendirmek için uygulamalar tam 128 bit iz kimliğini kaydetmelidir. Java tracer yalnızca alt 64 biti kaydediyorsa uygulamada {setting} ayarlayın.",
+      "profilingBody": "Profilleme ayrı bir hedef ve Agent API anahtarını kullanır. Uygulamada zaten bir profil oluşturucu çalışıyorsa geçiş sırasında uygulama veya tracer profillemesini kapatın ya da hedefini ayrıca yapılandırın.",
+      "multiValueTagsBody": "Birden fazla farklı değeri olan etiketler sıralanmış JSON dizisi metni kullanır. [ ile başlayan tek bir değer de seri kimliğini korumak için tek öğeli JSON dizisi olarak kodlanır.",
       "envTitle": "Agent yapılandırması",
       "envBody": "Bu ortam değişkenlerini {product} üzerinde ayarlayın ve yeniden başlatın. {product} {version} veya üzerini gerektirir.",
       "tokenBody": "API anahtarı {prefix} ile başlayan bir kuruluş veri alımı token'ı olmalıdır. Bu kuruluşta etkin bir veri alımı token'ı yok, bu nedenle kurulum snippet'i gösterilmiyor. Bir veri alımı token'ı oluşturun, ardından bu sayfaya dönün.",
