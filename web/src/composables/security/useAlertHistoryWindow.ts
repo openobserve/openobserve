@@ -3,6 +3,7 @@
 import { computed, ref, shallowRef } from "vue";
 
 import alertsService from "@/services/alerts";
+import { isForbiddenError } from "@/composables/security/useSecurityAccess";
 import streamService from "@/services/stream";
 import type { HistoryRow } from "@/utils/security/history";
 import { MAX_URL_ALERT_IDS } from "./useAlertHistorySummary";
@@ -93,6 +94,10 @@ export function useAlertHistoryWindow() {
   const total = ref(0);
   const loading = ref(false);
   const error = ref("");
+  /** The caller lacks the read grant: a lock, not an error message. */
+  const forbidden = ref(false);
+  /** The failed request, for the lock's Copy details. */
+  const failure = shallowRef<unknown>(null);
   /** Start the server actually used, when its stream setting narrowed the window. */
   const effectiveStartMs = ref<number | null>(null);
   let seq = 0;
@@ -110,6 +115,8 @@ export function useAlertHistoryWindow() {
     const mine = ++seq;
     loading.value = true;
     error.value = "";
+    forbidden.value = false;
+    failure.value = null;
     try {
       const [result, rangeHours] = await Promise.all([
         fetchHistoryWindow(orgId, startMs, endMs, options),
@@ -127,11 +134,14 @@ export function useAlertHistoryWindow() {
       total.value = 0;
       complete.value = true;
       effectiveStartMs.value = null;
-      error.value = e?.response?.data?.message ?? e?.message ?? "";
+      failure.value = e;
+      // A 403 body is plain text, so its message would read "Request failed with status code 403".
+      forbidden.value = isForbiddenError(e);
+      error.value = forbidden.value ? "" : (e?.response?.data?.message ?? e?.message ?? "");
     } finally {
       if (mine === seq) loading.value = false;
     }
   }
 
-  return { rows, total, capped, loading, error, effectiveStartMs, load };
+  return { rows, total, capped, loading, error, forbidden, failure, effectiveStartMs, load };
 }

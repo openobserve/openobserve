@@ -1,8 +1,13 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { countsByAlert, parseSummaryRows } from "./useAlertHistorySummary";
+import alertsService from "@/services/alerts";
+import { countsByAlert, parseSummaryRows, useAlertHistorySummary } from "./useAlertHistorySummary";
+
+vi.mock("@/services/alerts", () => ({ default: { getHistorySummary: vi.fn() } }));
+
+const getHistorySummary = alertsService.getHistorySummary as unknown as ReturnType<typeof vi.fn>;
 
 describe("parseSummaryRows", () => {
   it("converts microsecond buckets to ms and drops unusable rows", () => {
@@ -35,5 +40,28 @@ describe("countsByAlert", () => {
       lastFiringMs: 60_000,
     });
     expect(counts.get("b")).toEqual({ firings: 0, errors: 3, evaluations: 3, lastFiringMs: null });
+  });
+});
+
+describe("useAlertHistorySummary", () => {
+  it("reads a 403 as a missing grant, not as the raw status text", async () => {
+    const refusal = {
+      response: { status: 403, data: "Unauthorized Access" },
+      message: "Request failed with status code 403",
+    };
+    getHistorySummary.mockRejectedValue(refusal);
+    const summary = useAlertHistorySummary();
+    await summary.load("acme", 0, 1);
+    expect(summary.forbidden.value).toBe(true);
+    expect(summary.error.value).toBe("");
+    expect(summary.failure.value).toBe(refusal);
+  });
+
+  it("keeps a server error as the message", async () => {
+    getHistorySummary.mockRejectedValue({ response: { status: 500, data: { message: "boom" } } });
+    const summary = useAlertHistorySummary();
+    await summary.load("acme", 0, 1);
+    expect(summary.forbidden.value).toBe(false);
+    expect(summary.error.value).toBe("boom");
   });
 });

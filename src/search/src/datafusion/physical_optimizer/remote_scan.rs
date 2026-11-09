@@ -968,6 +968,13 @@ mod tests {
         });
     }
 
+    // Follows Sql::resolve, which declares the files' order only for plain scans.
+    fn sort_order_for(sql: &str) -> crate::datafusion::sort_order::FileSortOrder {
+        crate::datafusion::sort_order::FileSortOrder::from_sorted_by_time(
+            !config::utils::sql::is_complex_query(sql).unwrap(),
+        )
+    }
+
     async fn cluster_plan(sql: &str) -> (SessionContext, Arc<dyn ExecutionPlan>) {
         use tracing_opentelemetry::OpenTelemetrySpanExt;
         let schema = Arc::new(Schema::new(vec![
@@ -1005,7 +1012,7 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let table = NewEmptyTable::new("t", schema)
             .with_partitions(4)
-            .with_sort_order(crate::datafusion::sort_order::FileSortOrder::TimestampDesc);
+            .with_sort_order(sort_order_for(sql));
         ctx.register_table("t", Arc::new(table)).unwrap();
         let logical = ctx.state().create_logical_plan(sql).await.unwrap();
         let plan = ctx.state().create_physical_plan(&logical).await.unwrap();
@@ -1055,10 +1062,7 @@ mod tests {
                 .into_iter()
                 .zip(node.required_input_ordering())
             {
-                // A merge over a remote scan trusts each follower's stream to be sorted.
-                let Some(required) =
-                    required.filter(|_| child.downcast_ref::<RemoteScanExec>().is_none())
-                else {
+                let Some(required) = required else {
                     continue;
                 };
                 let (alternatives, _) = required.into_alternatives();
@@ -1071,5 +1075,65 @@ mod tests {
             Ok(TreeNodeRecursion::Continue)
         })
         .unwrap();
+    }
+
+    async fn assert_cluster_plan_is_sane(sql: &str) {
+        let (ctx, plan) = cluster_plan(sql).await;
+        let check = datafusion::physical_optimizer::sanity_checker::SanityCheckPlan::new();
+        if let Err(e) = check.optimize(Arc::clone(&plan), ctx.state().config_options()) {
+            panic!(
+                "{sql}: {e}\n{}",
+                datafusion::physical_plan::displayable(plan.as_ref()).indent(false)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_order_by_limit_plans_are_sane() {
+        for sql in [
+            "SELECT _timestamp, value FROM t ORDER BY value DESC LIMIT 10",
+            "SELECT _timestamp, event_name FROM t ORDER BY _timestamp ASC LIMIT 10",
+            "SELECT _timestamp, event_name FROM t ORDER BY _timestamp ASC, event_name LIMIT 15",
+            "SELECT _timestamp, event_name FROM t WHERE value IS NOT NULL ORDER BY value DESC",
+            "SELECT event_name, _timestamp FROM t WHERE substr(event_name, 0, 2) = 'ap' \
+                ORDER BY _timestamp DESC LIMIT 50000",
+            "SELECT event_name, count(*) AS c FROM t GROUP BY event_name ORDER BY c DESC LIMIT 10",
+        ] {
+            assert_cluster_plan_is_sane(sql).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_union_and_join_plans_sort_on_the_leader() {
+        for sql in [
+            "SELECT _timestamp, event_name FROM t WHERE value >= 30 \
+                UNION ALL SELECT _timestamp, event_name FROM t WHERE value < 0 \
+                ORDER BY _timestamp DESC LIMIT 10",
+            "SELECT event_name, _timestamp FROM t WHERE event_name IN \
+                (SELECT event_name FROM t) ORDER BY _timestamp DESC LIMIT 100",
+            "SELECT a.event_name, _timestamp FROM t a JOIN \
+                (SELECT k8s_cluster FROM t WHERE value > 1) b \
+                ON a.k8s_cluster = b.k8s_cluster ORDER BY _timestamp DESC LIMIT 100",
+            // Broadcast join: an aggregate with a limit on the build side
+            "SELECT a.event_name, _timestamp FROM t a WHERE a.k8s_cluster IN \
+                (SELECT k8s_cluster FROM t GROUP BY k8s_cluster ORDER BY count(*) DESC LIMIT 10) \
+                ORDER BY _timestamp DESC LIMIT 21",
+        ] {
+            assert_cluster_plan_is_sane(sql).await;
+            let (_, plan) = cluster_plan(sql).await;
+            let mut sorted_below_merge = false;
+            plan.apply(|node| {
+                sorted_below_merge |= node.downcast_ref::<SortExec>().is_some_and(|sort| {
+                    sort.expr().iter().any(|e| {
+                        e.expr
+                            .downcast_ref::<datafusion::physical_expr::expressions::Column>()
+                            .is_some_and(|c| c.name() == "_timestamp")
+                    })
+                });
+                Ok(TreeNodeRecursion::Continue)
+            })
+            .unwrap();
+            assert!(sorted_below_merge, "{sql}");
+        }
     }
 }

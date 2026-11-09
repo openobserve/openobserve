@@ -15,12 +15,11 @@
 
 use std::{fmt::Debug, sync::Arc};
 
-use arrow::datatypes::SchemaRef;
 use datafusion::{
     common::{Result, tree_node::TreeNodeRecursion},
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, PhysicalExpr},
+    physical_expr::PhysicalExpr,
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
         PlanProperties,
@@ -75,7 +74,7 @@ impl StreamingAggsExec {
             input_partitions + cached_partition_num
         };
 
-        let cache = Self::compute_properties(Arc::clone(&input.schema()), total_partition_num);
+        let cache = Self::compute_properties(&input, total_partition_num);
 
         let cached_buf = CacheStream::new(
             !aggregate_plan.group_expr().is_empty(),
@@ -142,10 +141,13 @@ impl StreamingAggsExec {
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
     pub(crate) fn compute_properties(
-        schema: SchemaRef,
+        input: &Arc<dyn ExecutionPlan>,
         n_partitions: usize,
     ) -> Arc<PlanProperties> {
-        let eq_properties = EquivalenceProperties::new(schema);
+        // Cached partitions come from the same query, so the input's constants hold for them too
+        let mut eq_properties = input.equivalence_properties().clone();
+        eq_properties.clear_orderings();
+        eq_properties.clear_per_partition_constants();
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
         Arc::new(PlanProperties::new(
             eq_properties,

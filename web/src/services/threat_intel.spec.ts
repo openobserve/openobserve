@@ -17,6 +17,12 @@ vi.mock("@/services/jstransform", () => ({
 }));
 vi.mock("@/services/stream", () => ({ default: { nameList: vi.fn() } }));
 vi.mock("@/composables/security/useSecurityStreamPlans", () => ({ runSql: vi.fn() }));
+// The server classifies intel values; every non-blank one here is an IP.
+vi.mock("@/services/securityIntel", () => ({
+  classifyValues: vi.fn(async (_org: string, values: string[]) =>
+    values.map((indicator) => (indicator ? { indicator, type: "ip" } : null)),
+  ),
+}));
 
 const js = jsTransformService as unknown as Record<string, ReturnType<typeof vi.fn>>;
 

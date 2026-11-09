@@ -3,52 +3,48 @@
 // Coverage is returned with matches, so an empty result is told apart from "nothing could have matched".
 
 import { ref, shallowRef } from "vue";
-import { runPool, runSql } from "@/composables/security/useSecurityStreamPlans";
 import streamService from "@/services/stream";
-import { bestMatch } from "@/utils/security/classify";
+import securityIntel, {
+  type SweepCoverage,
+  type SweepStreamTarget,
+} from "@/services/securityIntel";
+import { fetchSecuritySources, fetchSourceMatch } from "@/services/securitySources.queries";
 import { FieldIndex } from "@/utils/security/fields";
-import {
-  batches,
-  candidateColumns,
-  foldMatches,
-  sweepColumnRows,
-  sweepSql,
-  type Indicator,
-  type IndicatorMatch,
-  type SweepType,
-} from "@/utils/security/intel";
-import { securitySourceNames } from "@/utils/security/sourceSelection";
+import type { Indicator, IndicatorMatch, SweepType } from "@/utils/security/intel";
 
-/** Queries per sweep. Past this the sweep stops and says it is partial. */
-export const MAX_SWEEP_QUERIES = 200;
-const CONCURRENCY = 4;
+export type { SweepCoverage } from "@/services/securityIntel";
+export { MAX_SWEEP_QUERIES } from "@/services/securityIntel";
 
 /** Unambiguous fields only: `host`/`resource` may hold account ids, so domains and URLs match by column name. */
-const MAPPED_FIELDS: Record<
-  SweepType,
-  ("srcIp" | "dstIp" | "host" | "actor" | "actorId" | "resource")[]
+const MAPPED_FIELDS: Partial<
+  Record<SweepType, ("srcIp" | "dstIp" | "host" | "actor" | "actorId" | "resource")[]>
 > = {
   ip: ["srcIp", "dstIp"],
-  domain: [],
-  url: [],
-  hash: [],
   email: ["actor", "actorId"],
 };
 
-export interface SweepCoverage {
-  type: SweepType;
-  indicators: number;
-  /** Columns every batch of this type was searched in. */
-  columns: { stream: string; column: string }[];
-  /** Columns that could hold this type but were not (fully) searched: cap or failure. */
-  skipped: { stream: string; column: string }[];
-}
-
-interface Task {
-  stream: string;
-  columns: string[];
-  type: SweepType;
-  values: string[];
+/** Columns the stream's detected source maps to each type, for the server to search too. */
+async function mappedColumns(orgId: string, stream: string): Promise<SweepStreamTarget> {
+  const res = await streamService.schema(orgId, stream, "logs");
+  const fields: string[] = (res.data?.schema ?? res.data?.fields ?? []).map((f: any) =>
+    String(f.name),
+  );
+  const source = fields.length
+    ? ((await fetchSourceMatch(orgId, fields)).classification?.source ?? null)
+    : null;
+  const index = new FieldIndex(fields);
+  const mapped: SweepStreamTarget["mapped"] = {};
+  for (const [type, keys] of Object.entries(MAPPED_FIELDS) as [SweepType, string[]][]) {
+    const columns = keys
+      .flatMap(
+        (key) => (source?.map?.[key as keyof typeof source.map] as string[] | undefined) ?? [],
+      )
+      .flatMap((path) => path.split("|"))
+      .map((path) => index.resolve(path))
+      .filter((c): c is string => !!c);
+    if (columns.length) mapped[type] = columns;
+  }
+  return { name: stream, mapped };
 }
 
 export function useIntelSweep() {
@@ -58,30 +54,18 @@ export function useIntelSweep() {
   const running = ref(false);
   const done = ref(0);
   const planned = ref(0);
+  /** The query cap cut the sweep short. */
   const partial = ref(false);
   const failed = ref(0);
   /** Queries the server answered only partially. */
   const partialResults = ref(0);
+  /** Indicators fully checked, out of `total` sweepable ones. */
+  const checked = ref(0);
+  const total = ref(0);
   /** Streams whose schema could not be read — nothing in them was searched. */
   const unreadStreams = shallowRef<string[]>([]);
   const lastRunAt = ref<number | null>(null);
   let seq = 0;
-
-  async function columnsFor(orgId: string, stream: string) {
-    const res = await streamService.schema(orgId, stream, "logs");
-    const fields: string[] = (res.data?.schema ?? res.data?.fields ?? []).map((f: any) =>
-      String(f.name),
-    );
-    const source = bestMatch(fields)?.source ?? null;
-    const index = new FieldIndex(fields);
-    const mapped = (type: SweepType) =>
-      MAPPED_FIELDS[type]
-        .flatMap((key) => (source?.map?.[key] as string[] | undefined) ?? [])
-        .flatMap((path) => path.split("|"))
-        .map((path) => index.resolve(path))
-        .filter((c): c is string => !!c);
-    return (type: SweepType) => candidateColumns(type, fields, mapped(type));
-  }
 
   async function run(
     orgId: string,
@@ -93,118 +77,34 @@ export function useIntelSweep() {
     const stale = () => mySeq !== seq || !!signal?.aborted;
     running.value = true;
     done.value = 0;
-    failed.value = 0;
-    partialResults.value = 0;
-    partial.value = false;
+    planned.value = 0;
     try {
-      const all = await streamService.nameList(orgId, "logs", false);
-      const names = securitySourceNames(
-        orgId,
-        (all.data?.list ?? []).map((s: any) => String(s.name)),
-      );
+      const names = (await fetchSecuritySources(orgId)).sources;
       if (stale()) return;
       streams.value = names;
-
-      const valuesByType = new Map<SweepType, string[]>();
-      const seenValues = new Map<SweepType, Set<string>>();
-      for (const i of indicators) {
-        if (i.type === "cidr") continue;
-        const list = valuesByType.get(i.type) ?? [];
-        const seen = seenValues.get(i.type) ?? new Set<string>();
-        if (!seen.has(i.indicator)) {
-          seen.add(i.indicator);
-          list.push(i.indicator);
-        }
-        valuesByType.set(i.type, list);
-        seenValues.set(i.type, seen);
-      }
-
-      const settled = await runPool(names.map((stream) => () => columnsFor(orgId, stream)));
-      if (stale()) return;
-      const unread = names.filter((_, s) => settled[s].status === "rejected");
-      const resolvers = settled.map((r) =>
-        r.status === "fulfilled" ? r.value : () => [] as string[],
+      const targets = await Promise.all(
+        names.map((name) => mappedColumns(orgId, name).catch(() => ({ name }))),
       );
-      unreadStreams.value = unread;
-
-      // Interleaved per type, so the query cap trims every type rather than dropping the last one.
-      const perType: Task[][] = [];
-      for (const [type, values] of valuesByType) {
-        const list: Task[] = [];
-        names.forEach((stream, s) => {
-          const columns = resolvers[s](type);
-          if (!columns.length) return;
-          for (const batch of batches(values)) list.push({ stream, columns, type, values: batch });
-        });
-        perType.push(list);
-      }
-      const tasks: Task[] = [];
-      for (let i = 0; perType.some((list) => i < list.length); i++) {
-        for (const list of perType) if (i < list.length) tasks.push(list[i]);
-      }
-      partial.value = tasks.length > MAX_SWEEP_QUERIES;
-      const queue = tasks.slice(0, MAX_SWEEP_QUERIES);
-      const dropped = tasks.slice(MAX_SWEEP_QUERIES);
-      planned.value = queue.length;
-      const failedTasks: Task[] = [];
-      const partialTasks: Task[] = [];
-
-      const results: {
-        stream: string;
-        column: string;
-        type: SweepType;
-        rows: Record<string, unknown>[];
-      }[] = [];
-      const worker = async () => {
-        for (let task = queue.shift(); task; task = queue.shift()) {
-          if (stale()) return;
-          try {
-            const res = await runSql(
-              orgId,
-              sweepSql(task.stream, task.columns, task.type, task.values),
-              window.start,
-              window.end,
-              -1,
-              { signal },
-            );
-            for (const { column, rows } of sweepColumnRows(task.columns, res.hits)) {
-              results.push({ stream: task.stream, column, type: task.type, rows });
-            }
-            // A partial (or capped) answer still counts its rows, but its columns were not fully searched.
-            if (res.partial || res.functionError) {
-              partialTasks.push(task);
-              partialResults.value += 1;
-            }
-          } catch {
-            if (stale()) return;
-            // One unreadable column must not sink the sweep; it is counted and shown.
-            failed.value += 1;
-            failedTasks.push(task);
-          }
-          if (mySeq === seq) done.value += 1;
-        }
-      };
-      await Promise.all(Array.from({ length: CONCURRENCY }, worker));
       if (stale()) return;
-      // A column counts as searched only when none of its batches was dropped by the cap or failed.
-      const keys = (t: Task) => t.columns.map((column) => `${t.type}|${t.stream}|${column}`);
-      const incomplete = new Set([...dropped, ...failedTasks, ...partialTasks].flatMap(keys));
-      coverage.value = [...valuesByType].map(([type, values]) => {
-        const columns: { stream: string; column: string }[] = [];
-        const skippedCols: { stream: string; column: string }[] = [];
-        const seen = new Set<string>();
-        for (const t of tasks) {
-          if (t.type !== type) continue;
-          t.columns.forEach((column) => {
-            const k = `${t.type}|${t.stream}|${column}`;
-            if (seen.has(k)) return;
-            seen.add(k);
-            (incomplete.has(k) ? skippedCols : columns).push({ stream: t.stream, column });
-          });
-        }
-        return { type, indicators: values.length, columns, skipped: skippedCols };
+      const res = (await securityIntel.sweep(orgId, indicators, targets, window, signal)).data;
+      if (stale()) return;
+      // The server echoes each match's key; the page keeps its own copy of the indicator.
+      const byKey = new Map(
+        indicators.map((i) => [`${i.type}:${i.indicator.toLowerCase()}`, i] as const),
+      );
+      matches.value = res.matches.flatMap((m) => {
+        const indicator = byKey.get(`${m.indicator.type}:${m.indicator.indicator.toLowerCase()}`);
+        return indicator ? [{ ...m, indicator }] : [];
       });
-      matches.value = foldMatches(indicators, results);
+      coverage.value = res.coverage;
+      unreadStreams.value = res.unread_streams;
+      partial.value = res.capped;
+      failed.value = res.failed;
+      partialResults.value = res.partial_results;
+      checked.value = res.checked;
+      total.value = res.total;
+      planned.value = res.planned;
+      done.value = res.planned;
       lastRunAt.value = Date.now();
     } finally {
       if (mySeq === seq) running.value = false;
@@ -222,6 +122,8 @@ export function useIntelSweep() {
     partial,
     failed,
     partialResults,
+    checked,
+    total,
     lastRunAt,
     run,
   };

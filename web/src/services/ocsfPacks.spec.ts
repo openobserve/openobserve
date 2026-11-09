@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ocsfPacks from "@/services/ocsfPacks";
 import http from "@/services/http";
 import jstransform from "@/services/jstransform";
-import pipelines from "@/services/pipelines";
 import streamService from "@/services/stream";
 
 vi.mock("@/services/http", () => ({
@@ -13,26 +12,12 @@ vi.mock("@/services/http", () => ({
 }));
 vi.mock("@/services/jstransform", () => ({
   default: {
-    list: vi.fn(),
-    create: vi.fn(),
-    getAssociatedPipelines: vi.fn(),
-    delete: vi.fn(),
     test: vi.fn(),
-  },
-}));
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    getPipelines: vi.fn(),
-    getPipeline: vi.fn(),
-    getPipelineStreams: vi.fn(),
-    createPipeline: vi.fn(),
-    updatePipeline: vi.fn(),
-    deletePipeline: vi.fn(),
   },
 }));
 vi.mock("@/services/stream", () => ({ default: { updateSettings: vi.fn() } }));
 
-describe("ocsfPacks service (R1, F13 delegation)", () => {
+describe("ocsfPacks service", () => {
   let instance: any;
 
   beforeEach(() => {
@@ -49,45 +34,13 @@ describe("ocsfPacks service (R1, F13 delegation)", () => {
     expect(res).toEqual(body);
   });
 
-  it("delegates function reads/writes to the shared jstransform service", () => {
-    ocsfPacks.listFunctions("org1");
-    expect(jstransform.list).toHaveBeenCalledWith(1, 1000, "name", false, "", "org1");
-
-    ocsfPacks.saveFunction("org1", "ocsf_entity_v1_web", ".foo = 1\n.");
-    expect(jstransform.create).toHaveBeenCalledWith("org1", {
-      name: "ocsf_entity_v1_web",
-      function: ".foo = 1\n.",
-      params: "row",
-      transType: 0,
-    });
-
-    ocsfPacks.functionDependencies("org1", "ocsf_entity_v1_web");
-    expect(jstransform.getAssociatedPipelines).toHaveBeenCalledWith("org1", "ocsf_entity_v1_web");
-
-    ocsfPacks.deleteFunction("org1", "ocsf_entity_v1_web");
-    expect(jstransform.delete).toHaveBeenCalledWith("org1", "ocsf_entity_v1_web");
-
+  it("delegates the pack preview to the shared jstransform service", () => {
     ocsfPacks.preview("org1", ".x = 1", [{ a: 1 }]);
     expect(jstransform.test).toHaveBeenCalledWith("org1", {
       function: ".x = 1",
       events: [{ a: 1 }],
       trans_type: 0,
     });
-  });
-
-  it("delegates pipeline CRUD to the shared pipelines service", () => {
-    const data = { name: "ocsf-web", nodes: [], edges: [] } as any;
-    ocsfPacks.getPipeline("org1", "p1");
-    expect(pipelines.getPipeline).toHaveBeenCalledWith({ name: "p1", org_identifier: "org1" });
-
-    ocsfPacks.createPipeline("org1", data);
-    expect(pipelines.createPipeline).toHaveBeenCalledWith({ data, org_identifier: "org1" });
-
-    ocsfPacks.updatePipeline("org1", data);
-    expect(pipelines.updatePipeline).toHaveBeenCalledWith({ org_identifier: "org1", data });
-
-    ocsfPacks.deletePipeline("org1", "p1");
-    expect(pipelines.deletePipeline).toHaveBeenCalledWith({ pipeline_id: "p1", org_id: "org1" });
   });
 
   it("saveSetting wraps the setting under the security key via the stream settings service", () => {

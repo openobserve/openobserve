@@ -3,7 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
@@ -41,19 +41,27 @@ import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.v
 import SecurityIntelAddDialog from "@/components/security/SecurityIntelAddDialog.vue";
 import SecurityIntelImportDialog from "@/components/security/SecurityIntelImportDialog.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
+import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import threatIntel, {
   INTEL_READ_LIMIT,
   RemoveRefused,
   type IntelTable,
 } from "@/services/threat_intel";
-import { runPool, runSql } from "@/composables/security/useSecurityStreamPlans";
+import { runPool } from "@/composables/security/useSecurityStreamPlans";
+import { useQueryClient } from "@tanstack/vue-query";
+import { intelSightingsQuery } from "@/services/securityIntel.queries";
 import { useIntelSweep, MAX_SWEEP_QUERIES } from "@/composables/security/useIntelSweep";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import {
+  forbiddenReason,
+  isForbiddenError,
+  useSecurityAccess,
+} from "@/composables/security/useSecurityAccess";
 import {
   INDICATOR_TYPES,
   expiresSoon,
   isExpired,
-  sightingsSql,
   type Indicator,
   type IndicatorMatch,
   type IndicatorType,
@@ -73,6 +81,9 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { confirm } = useConfirmDialog();
+const queryClient = useQueryClient();
+// Adding and importing indicators is authoring (POST); removing one is admin (DELETE). The sweep only reads.
+const { canAuthor, canAdmin } = useSecurityAccess();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
 const RANGES = [
@@ -95,6 +106,13 @@ const tables = ref<IntelTable[]>([]);
 const indicators = ref<Indicator[]>([]);
 const loading = ref(false);
 const loadError = ref("");
+/** The list read was refused; threat-intel lists are enrichment tables, read with their own grant. */
+const loadRefusal = shallowRef<unknown>(null);
+const accessDenials = computed(() =>
+  loadRefusal.value
+    ? [viewDenial("enrichment_tables", "list", failedRequests(loadRefusal.value))]
+    : [],
+);
 /** Tables whose read stopped short of their row count. */
 const truncated = ref<string[]>([]);
 /** Tables that could not be read at all. */
@@ -115,6 +133,7 @@ async function loadIndicators(): Promise<boolean> {
   const mySeq = ++loadSeq;
   loading.value = true;
   loadError.value = "";
+  loadRefusal.value = null;
   try {
     const list = await threatIntel.listTables(orgId.value);
     const reads = (
@@ -157,7 +176,8 @@ async function loadIndicators(): Promise<boolean> {
       .filter((x) => x.n > 0);
   } catch (e: any) {
     if (mySeq !== loadSeq) return false;
-    loadError.value = e?.response?.data?.message ?? e?.message ?? t("siem.intel.loadFailed");
+    if (isForbiddenError(e)) loadRefusal.value = e;
+    else loadError.value = e?.response?.data?.message ?? e?.message ?? t("siem.intel.loadFailed");
   } finally {
     if (mySeq === loadSeq) loading.value = false;
   }
@@ -269,8 +289,16 @@ const notices = computed<SecurityNotice[]>(() => {
   const add = (key: string, tone: SecurityNotice["tone"], text: string) =>
     out.push({ key, tone, text, dataTest: `security-intel-${key}` });
   // A load error is shown by the tables themselves, in place of their rows.
-  if (sweep.partial.value)
-    add("partial", "warning", t("siem.intel.partial", { n: MAX_SWEEP_QUERIES }));
+  if (sweep.lastRunAt.value !== null && sweep.checked.value < sweep.total.value) {
+    const counts = { checked: sweep.checked.value, total: sweep.total.value };
+    add(
+      "partial",
+      "warning",
+      sweep.partial.value
+        ? t("siem.intel.partialCapped", { ...counts, n: MAX_SWEEP_QUERIES })
+        : t("siem.intel.partialChecked", counts),
+    );
+  }
   if (sweep.partialResults.value) {
     add("partial-results", "warning", t("siem.intel.caveat.partial", sweep.partialResults.value));
   }
@@ -545,7 +573,11 @@ const toneOf = (i: Indicator) => toneOfSigmaLevel(i.severity);
 /** Why "nothing was seen" may not mean "nothing is there". */
 const sweepCaveats = computed(() => {
   const out: string[] = [];
-  if (sweep.partial.value) out.push(t("siem.intel.caveat.capped"));
+  if (sweep.checked.value < sweep.total.value) {
+    out.push(
+      t("siem.intel.caveat.checked", { checked: sweep.checked.value, total: sweep.total.value }),
+    );
+  }
   if (sweep.failed.value) out.push(t("siem.intel.caveat.failed", sweep.failed.value));
   if (sweep.partialResults.value)
     out.push(t("siem.intel.caveat.partial", sweep.partialResults.value));
@@ -688,7 +720,7 @@ let timelineSeq = 0;
 const timelineSeries = computed(() =>
   (selectedMatch.value?.sightings ?? []).slice(0, SERIES_LIMIT).map((s, i) => ({
     key: `s${i}`,
-    label: `${s.stream} · ${s.column}`,
+    label: sightingLabel(s),
     token: `--color-chart-series-${i + 1}` as `--${string}`,
   })),
 );
@@ -705,33 +737,32 @@ async function loadTimeline() {
   const window = windowUs.value;
   const interval = histogramInterval((window.end - window.start) / 1000);
   const buckets = new Map<number, Record<string, number>>();
-  await Promise.all(
-    m.sightings.slice(0, SERIES_LIMIT).map(async (s, i) => {
-      try {
-        const { hits } = await runSql(
-          orgId.value,
-          sightingsSql(
-            s.stream,
-            s.column,
-            m.indicator.type as Exclude<IndicatorType, "cidr">,
-            m.indicator.indicator,
-            interval.sql,
-          ),
-          window.start,
-          window.end,
-        );
-        for (const hit of hits) {
-          const ts = histogramKeyToMs(hit.zo_ts);
-          if (ts === null) continue;
-          const counts = buckets.get(ts) ?? {};
-          counts[`s${i}`] = (counts[`s${i}`] ?? 0) + Number(hit.zo_n ?? 0);
-          buckets.set(ts, counts);
-        }
-      } catch {
-        /* a series that fails to load is simply absent from the chart */
+  try {
+    const res = await queryClient.fetchQuery(
+      intelSightingsQuery(orgId.value, {
+        type: m.indicator.type as Exclude<IndicatorType, "cidr">,
+        indicator: m.indicator.indicator,
+        interval: interval.sql,
+        start_time: window.start,
+        end_time: window.end,
+        sightings: m.sightings
+          .slice(0, SERIES_LIMIT)
+          .map((s) => ({ stream: s.stream, column: s.column, mode: s.mode })),
+      }),
+    );
+    // A series that fails to load is simply absent from the chart.
+    res.series.forEach((series, i) => {
+      for (const hit of series.hits) {
+        const ts = histogramKeyToMs(hit.zo_ts);
+        if (ts === null) continue;
+        const counts = buckets.get(ts) ?? {};
+        counts[`s${i}`] = (counts[`s${i}`] ?? 0) + Number(hit.zo_n ?? 0);
+        buckets.set(ts, counts);
       }
-    }),
-  );
+    });
+  } catch {
+    buckets.clear();
+  }
   if (mySeq !== timelineSeq) return;
   timeline.value = [...buckets.entries()]
     .sort((a, b) => a[0] - b[0])
@@ -754,10 +785,22 @@ function huntInEvents(s: Sighting) {
       org_identifier: orgId.value,
       stream: s.stream,
       period: range.value,
-      filters: b64EncodeUnicode(JSON.stringify([{ field: s.column, op: "=", value: s.raw }])) ?? "",
+      filters:
+        b64EncodeUnicode(
+          JSON.stringify([
+            { field: s.column, op: s.mode === "token" ? "contains" : "=", value: s.raw },
+          ]),
+        ) ?? "",
     },
   });
 }
+
+function sightingLabel(s: Sighting) {
+  const where = `${s.stream} · ${s.column}`;
+  return s.mode === "token" ? t("siem.intel.inText", { column: where }) : raw(where);
+}
+const sightingTestId = (s: Sighting) =>
+  `${s.stream}-${s.column}${s.mode === "token" ? "-text" : ""}`;
 
 const selectedTable = computed(
   () => tables.value.find((tb) => tb.name === selected.value?.table) ?? null,
@@ -766,7 +809,7 @@ const selectedTable = computed(
 /** Enrichment tables have no row delete, so the whole list is rewritten without the indicator. */
 async function removeIndicator() {
   const i = selected.value;
-  if (!i || selectedTable.value?.feed) return;
+  if (!i || selectedTable.value?.feed || !canAdmin.value) return;
   const ok = await confirm({
     title: t("siem.intel.remove.title"),
     message: t("siem.intel.remove.message", { indicator: i.indicator, table: i.table }),
@@ -864,9 +907,11 @@ async function onSaved() {
               size="sm"
               icon-left="upload"
               icon-right="expand-more"
+              :disabled="!canAuthor"
               data-test="security-intel-import"
             >
               {{ t("siem.intel.import") }}
+              <OTooltip v-if="!canAuthor" :content="t('siem.access.needsAuthor')" />
             </OButton>
           </template>
           <ODropdownItem
@@ -888,16 +933,25 @@ async function onSaved() {
           variant="primary"
           size="sm"
           icon-left="add"
+          :disabled="!canAuthor"
           data-test="security-intel-add"
           @click="showAdd = true"
         >
           {{ t("siem.intel.add") }}
+          <OTooltip v-if="!canAuthor" :content="t('siem.access.needsAuthor')" />
         </OButton>
       </div>
     </template>
 
+    <SecurityAccessLock
+      v-if="accessDenials.length"
+      :denials="accessDenials"
+      :reason="raw(forbiddenReason(loadRefusal))"
+      size="hero"
+      data-test="security-intel-access-lock"
+    />
     <div
-      v-if="!loading && !tables.length && !loadError"
+      v-else-if="!loading && !tables.length && !loadError"
       class="flex min-h-0 flex-1 items-center justify-center"
     >
       <OEmptyState
@@ -905,9 +959,9 @@ async function onSaved() {
         icon="radar"
         :title="t('siem.intel.empty.title')"
         :description="t('siem.intel.empty.description')"
-        :action-label="t('siem.intel.add')"
+        :action-label="canAuthor ? t('siem.intel.add') : undefined"
         action-icon="add"
-        :secondary-action-label="t('siem.intel.importCsv')"
+        :secondary-action-label="canAuthor ? t('siem.intel.importCsv') : undefined"
         data-test="security-intel-empty"
         @action="showAdd = true"
         @secondary-action="importMode = 'file'"
@@ -1008,6 +1062,7 @@ async function onSaved() {
             />
             <div class="w-44 shrink-0">
               <OSelect
+                :aria-label="t('siem.aria.indicatorType')"
                 v-model="typeFilter"
                 :options="typeOptions"
                 data-test="security-intel-type-filter"
@@ -1063,12 +1118,12 @@ async function onSaved() {
           <div class="flex min-w-0 items-center gap-1 overflow-hidden">
             <OTag
               v-for="s in row.match.sightings.slice(0, 2)"
-              :key="`${s.stream}.${s.column}`"
+              :key="`${s.stream}.${s.column}.${s.mode}`"
               variant="primary-soft"
               shape="rounded"
               size="xs"
               class="font-mono"
-              >{{ s.stream }}·{{ s.column }}</OTag
+              >{{ sightingLabel(s) }}</OTag
             >
             <span v-if="row.match.sightings.length > 2" class="text-text-secondary text-xs">
               +{{ row.match.sightings.length - 2 }}
@@ -1156,6 +1211,7 @@ async function onSaved() {
             />
             <div class="w-44 shrink-0">
               <OSelect
+                :aria-label="t('siem.aria.indicatorType')"
                 v-model="typeFilter"
                 :options="typeOptions"
                 data-test="security-intel-indicator-type-filter"
@@ -1399,16 +1455,18 @@ async function onSaved() {
           <div class="border-border-default rounded-surface overflow-hidden border">
             <div
               v-for="s in selectedMatch.sightings"
-              :key="`${s.stream}.${s.column}`"
+              :key="`${s.stream}.${s.column}.${s.mode}`"
               class="border-border-subtle flex items-center gap-3 border-b px-3 py-2.5 last:border-b-0"
-              :data-test="`security-intel-sighting-${s.stream}-${s.column}`"
+              :data-test="`security-intel-sighting-${sightingTestId(s)}`"
             >
               <OIcon name="database" size="sm" class="text-text-secondary shrink-0" />
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-text-heading truncate font-mono text-xs font-semibold">{{
                   s.stream
                 }}</span>
-                <span class="text-text-secondary text-2xs truncate font-mono">{{ s.column }}</span>
+                <span class="text-text-secondary text-2xs truncate font-mono">{{
+                  s.mode === "token" ? t("siem.intel.inText", { column: s.column }) : s.column
+                }}</span>
               </div>
               <div class="flex shrink-0 flex-col items-end">
                 <span class="text-text-heading text-sm font-semibold tabular-nums">{{
@@ -1422,7 +1480,7 @@ async function onSaved() {
                 variant="ghost-primary"
                 size="xs"
                 icon-right="arrow-forward"
-                :data-test="`security-intel-hunt-${s.stream}-${s.column}`"
+                :data-test="`security-intel-hunt-${sightingTestId(s)}`"
                 @click="huntInEvents(s)"
               >
                 {{ t("siem.intel.drawer.hunt") }}
@@ -1452,6 +1510,7 @@ async function onSaved() {
 
       <template #footer>
         <OButton
+          v-if="canAdmin"
           variant="outline-destructive"
           size="sm-action"
           icon-left="delete"

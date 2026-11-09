@@ -3,6 +3,7 @@
 import { ref, shallowRef } from "vue";
 
 import alertsService from "@/services/alerts";
+import { isForbiddenError } from "@/composables/security/useSecurityAccess";
 import { isErrorOutcome, isFiringOutcome } from "@/utils/alerts/runOutcome";
 
 /** Above this many ids the filter moves client-side; a longer URL risks proxy limits. */
@@ -77,6 +78,10 @@ export function useAlertHistorySummary() {
   const effectiveStartMs = ref<number | null>(null);
   const loading = ref(false);
   const error = ref("");
+  /** The caller lacks the read grant: a lock, not an error message. */
+  const forbidden = ref(false);
+  /** The failed request, for the lock's Copy details. */
+  const failure = shallowRef<unknown>(null);
   let seq = 0;
 
   async function load(
@@ -94,11 +99,15 @@ export function useAlertHistorySummary() {
       partial.value = false;
       effectiveStartMs.value = null;
       error.value = "";
+      forbidden.value = false;
+      failure.value = null;
       loading.value = false;
       return;
     }
     loading.value = true;
     error.value = "";
+    forbidden.value = false;
+    failure.value = null;
     const serverIds =
       options.alertIds && options.alertIds.length <= MAX_URL_ALERT_IDS ? options.alertIds : null;
     try {
@@ -127,11 +136,25 @@ export function useAlertHistorySummary() {
       total.value = 0;
       partial.value = false;
       effectiveStartMs.value = null;
-      error.value = e?.response?.data?.message ?? e?.message ?? "";
+      failure.value = e;
+      // A 403 body is plain text, so its message would read "Request failed with status code 403".
+      forbidden.value = isForbiddenError(e);
+      error.value = forbidden.value ? "" : (e?.response?.data?.message ?? e?.message ?? "");
     } finally {
       if (mine === seq) loading.value = false;
     }
   }
 
-  return { rows, total, bucketMs, partial, effectiveStartMs, loading, error, load };
+  return {
+    rows,
+    total,
+    bucketMs,
+    partial,
+    effectiveStartMs,
+    loading,
+    error,
+    forbidden,
+    failure,
+    load,
+  };
 }

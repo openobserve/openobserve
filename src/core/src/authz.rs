@@ -541,6 +541,14 @@ pub async fn check_permissions(
     } else {
         role.to_string()
     };
+    // an unmapped route carries no object; deny without asking OpenFGA, which would log an error
+    if object_str.is_empty() {
+        log::warn!(
+            "permission denied for {user_id}: {} route has no permission mapping",
+            auth_info.method
+        );
+        return false;
+    }
 
     let org_id = &auth_info.org_id;
     let effective_role = if org_id == config::META_ORG_ID {

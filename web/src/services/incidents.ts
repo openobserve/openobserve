@@ -57,6 +57,8 @@ export interface Incident {
   rca_off_reason?: string | null;
   /** List only: every alert that fired into the incident and how often, most-fired first. */
   alert_groups?: { alert_id: string; alert_name: string; count: number }[];
+  /** A security case only backfills over past data fired into. */
+  historical?: boolean;
 }
 
 export type RcaRunState = "running" | "waiting_input" | "completed" | "failed" | "cancelled";
