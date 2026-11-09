@@ -143,10 +143,16 @@ impl std::fmt::Display for TargetScope {
 }
 
 /// Valid state transitions. Maps from current state to allowed next states.
+/// `paused → paused` makes a pause the user's: on a job its budget paused it clears the budget's
+/// pause, so the job no longer resumes at 00:00 UTC (see [`EvalJobBudget::after_transition`]).
 pub fn is_valid_transition(from: &str, to: &str) -> bool {
     matches!(
         (from, to),
-        ("draft", "active") | ("active", "paused") | ("paused", "active") | (_, "archived")
+        ("draft", "active")
+            | ("active", "paused")
+            | ("paused", "paused")
+            | ("paused", "active")
+            | (_, "archived")
     )
 }
 
@@ -1208,6 +1214,8 @@ mod tests {
         assert!(is_valid_transition("draft", "active"));
         assert!(is_valid_transition("active", "paused"));
         assert!(is_valid_transition("paused", "active"));
+        // Keep paused: a budget pause becomes the user's.
+        assert!(is_valid_transition("paused", "paused"));
         assert!(!is_valid_transition("active", "degraded"));
         assert!(is_valid_transition("draft", "archived"));
         assert!(is_valid_transition("active", "archived"));
@@ -1475,6 +1483,11 @@ mod tests {
             (None, None)
         );
         assert_eq!(user_paused.lifted_until, Some(11 * DAY));
+        // Keep paused turns a budget pause into the user's: it no longer resumes on its own.
+        let kept = budget(None)
+            .after_transition("paused", Some(6.21), 10 * DAY + 1)
+            .after_transition("paused", None, now);
+        assert_eq!((kept.paused_at, kept.paused_spend_usd), (None, None));
 
         // Resumed the day it paused, still over its limit: the budget is lifted until 00:00 UTC.
         let same_day = budget(None)

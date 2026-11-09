@@ -333,7 +333,8 @@ pub async fn activate_eval_job(
     tag = "EvalJobs",
     operation_id = "PauseEvalJob",
     summary = "Pause eval job",
-    description = "Transitions an active eval job to the paused state.",
+    description = "Transitions an active eval job to the paused state. On a job its daily budget \
+                   paused, makes the pause the user's: the job no longer resumes at 00:00 UTC.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),

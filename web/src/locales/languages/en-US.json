@@ -31859,7 +31859,7 @@
       "actions": {
         "pause": {
           "label": "Pause until 00:00 UTC",
-          "help": "Scores stop. The job resumes on its own."
+          "help": "Pauses within about a minute of reaching the budget; scores already queued still finish. The job resumes on its own."
         },
         "keep_running": {
           "label": "Keep running",
@@ -31883,12 +31883,14 @@
       "unpricedHint": "Some judge calls have no price, so today's spend is at least the priced part shown, and the daily budget cannot count the unpriced calls. Set a price in Model Pricing.",
       "pausedBudget": "Paused · budget",
       "resumeToday": "Resume until 00:00 UTC",
+      "keepPaused": "Keep paused",
+      "keepPausedHint": "Stays paused until you resume it, instead of resuming at 00:00 UTC.",
       "editBudget": "Edit budget",
       "banner": "{name} paused at {time} UTC when today's judge spend reached {amount}. It resumes at 00:00 UTC, in {hours} h {minutes} m.",
       "liftedUntil": "Budget lifted until 00:00 UTC"
     },
     "oneClick": {
-      "budget": "Pauses at a {amount} daily budget.",
+      "budget": "Pauses within about a minute of reaching a {amount} daily budget; scores already queued still finish.",
       "unpriced": "No price for {model}: the {amount} daily budget can't be enforced, and the job scores at any volume."
     }
   },

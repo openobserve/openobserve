@@ -58,7 +58,8 @@
               @select="onStatSelect"
             />
           </div>
-          <!-- Jobs their budget paused (AIO-24): why, when they resume, and a one-day override. -->
+          <!-- Jobs their budget paused (AIO-24): why, when they resume, a one-day override, and
+               Keep paused, which makes the pause the user's so 00:00 UTC does not resume it. -->
           <div
             v-for="row in budgetPausedRows"
             :key="row.id"
@@ -77,6 +78,16 @@
                   @click="$emit('activate', row)"
                 >
                   {{ t("evalSpend.list.resumeToday") }}
+                </OButton>
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  :title="t('evalSpend.list.keepPausedHint')"
+                  :disabled="pendingStatusId !== null"
+                  :data-test="`eval-job-budget-keep-paused-${row.name}`"
+                  @click="$emit('pause', row)"
+                >
+                  {{ t("evalSpend.list.keepPaused") }}
                 </OButton>
                 <OButton
                   variant="ghost"
