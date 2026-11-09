@@ -409,17 +409,22 @@ fn reject_stream_rows(
             status.error = reason.to_string();
         }
         IngestionStatus::Bulk(bulk_res) => {
-            if let Some(order) = response_order {
-                order.emitted.extend(order.json.drain(..));
-                order.emitted.append(&mut order.columnar);
-            }
+            let positions: Vec<usize> = response_order
+                .map(|order| {
+                    order
+                        .accepted
+                        .drain(..)
+                        .chain(order.columnar.drain(..))
+                        .collect()
+                })
+                .unwrap_or_default();
             let doc_ids = json_data
                 .iter()
                 .map(|(_, record)| record.get("_id").and_then(Value::as_str).map(String::from))
                 .chain(columnar.into_iter().flat_map(|mut c| c.take_bulk_ids()));
-            for doc_id in doc_ids {
+            for (doc_id, position) in doc_ids.zip(bulk::padded_positions(positions)) {
                 bulk_res.errors = true;
-                bulk::add_record_status(
+                if let Some(item) = bulk::add_record_status(
                     stream_name.to_string(),
                     doc_id,
                     String::new(),
@@ -427,7 +432,9 @@ fn reject_stream_rows(
                     bulk_res,
                     Some(bulk::STREAM_NAME_TOO_LONG.to_string()),
                     Some(reason.to_string()),
-                );
+                ) {
+                    item.request_position = position;
+                }
             }
         }
     }
@@ -559,7 +566,7 @@ async fn write_logs(
     for (timestamp, mut record_val) in json_data {
         let response_position = response_order
             .as_mut()
-            .and_then(|order| order.json.pop_front());
+            .and_then(|order| order.accepted.pop_front());
         let doc_id = record_val
             .get("_id")
             .map(|v| v.as_str().unwrap().to_string());
@@ -612,7 +619,7 @@ async fn write_logs(
                             ])
                             .inc();
                         log_failed_record(log_ingest_errors, &record_val, &e.to_string());
-                        bulk::add_record_status(
+                        if let Some(item) = bulk::add_record_status(
                             stream_name.to_string(),
                             doc_id,
                             "".to_string(),
@@ -620,11 +627,8 @@ async fn write_logs(
                             bulk_res,
                             Some(bulk::SCHEMA_CONFORMANCE_FAILED.to_string()),
                             Some(e.to_string()),
-                        );
-                        if let Some(position) = response_position
-                            && let Some(order) = response_order.as_mut()
-                        {
-                            order.emitted.push(position);
+                        ) {
+                            item.request_position = response_position;
                         }
                     }
                 }
@@ -712,12 +716,8 @@ async fn write_logs(
                         "index".to_string(),
                         stream_name,
                         doc_id.unwrap_or_default(),
+                        response_position,
                     ));
-                    if let Some(position) = response_position
-                        && let Some(order) = response_order.as_mut()
-                    {
-                        order.emitted.push(position);
-                    }
                 }
             }
         }
@@ -763,14 +763,14 @@ fn columnar_entries(
     match status {
         IngestionStatus::Record(status) => status.successful += columnar.rows() as u32,
         IngestionStatus::Bulk(bulk_res) => {
-            let doc_ids = columnar.take_bulk_ids();
-            let previous_items = bulk_res.items.len();
-            bulk::add_success_items(columnar.stream_name(), doc_ids, bulk_res);
-            if bulk_res.items.len() > previous_items
-                && let Some(order) = response_order
-            {
-                order.emitted.append(&mut order.columnar);
-            }
+            let positions = response_order
+                .map(|order| std::mem::take(&mut order.columnar))
+                .unwrap_or_default();
+            let rows = columnar
+                .take_bulk_ids()
+                .into_iter()
+                .zip(bulk::padded_positions(positions));
+            bulk::add_success_items(columnar.stream_name(), rows, bulk_res);
         }
     }
     columnar.into_entries(org_id)
@@ -917,12 +917,12 @@ mod tests {
         let IngestionStatus::Bulk(response) = status else {
             unreachable!()
         };
+        assert!(order.columnar.is_empty());
         if get_config().common.bulk_api_response_errors_only {
             assert!(response.items.is_empty());
-            assert!(order.emitted.is_empty());
         } else {
             assert_eq!(response.items.len(), 1);
-            assert_eq!(order.emitted, [2]);
+            assert_eq!(response.items[0]["index"].request_position, Some(2));
         }
     }
 
@@ -946,7 +946,7 @@ mod tests {
             if columnar.parse_bulk_line(record.to_string().as_bytes(), Some(id)) {
                 order.columnar.push(position);
             } else {
-                order.json.push_back(position);
+                order.accepted.push_back(position);
                 rows.push((0, json!({"_id": id}).as_object().unwrap().clone()));
             }
         }
@@ -967,7 +967,7 @@ mod tests {
         let IngestionStatus::Bulk(mut response) = status else {
             unreachable!()
         };
-        bulk::restore_response_order(&mut response.items, &mut order.emitted, 5);
+        bulk::restore_response_order(&mut response.items);
         let ids: Vec<&str> = response
             .items
             .iter()
