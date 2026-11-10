@@ -553,6 +553,7 @@ impl ListAlertsQuery {
         meta_alerts::ListAlertsParams {
             org_id: org_id.to_string(),
             folder_id: self.folder,
+            listable_folder_ids: None,
             name_substring: self.alert_name_substring,
             stream_type_and_name: self
                 .stream_type
