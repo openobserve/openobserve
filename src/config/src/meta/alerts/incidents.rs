@@ -387,6 +387,8 @@ pub struct IncidentAlert {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labels: Option<std::collections::HashMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<std::collections::HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detected_source: Option<String>,
 }
 
@@ -2332,6 +2334,10 @@ mod tests {
                 "service".to_string(),
                 "checkout".to_string(),
             )])),
+            annotations: Some(std::collections::HashMap::from([(
+                "description".to_string(),
+                "p99 disk latency > 2s".to_string(),
+            )])),
             detected_source: Some("pagerduty".to_string()),
         };
 
@@ -2339,6 +2345,7 @@ mod tests {
         assert_eq!(json["alert_kind"], "external");
         assert_eq!(json["source_url"], "https://example.com/alert/1");
         assert_eq!(json["detected_source"], "pagerduty");
+        assert_eq!(json["annotations"]["description"], "p99 disk latency > 2s");
 
         let round_tripped: IncidentAlert = serde_json::from_value(json).unwrap();
         assert_eq!(round_tripped.alert_kind, AlertKind::External);
@@ -2346,6 +2353,7 @@ mod tests {
             round_tripped.source_url,
             Some("https://example.com/alert/1".to_string())
         );
+        assert_eq!(round_tripped.annotations, alert.annotations);
     }
 
     #[test]
@@ -2365,6 +2373,9 @@ mod tests {
         assert_eq!(alert.source_url, None);
         assert_eq!(alert.labels, None);
         assert_eq!(alert.detected_source, None);
+        assert_eq!(alert.annotations, None);
+        let json = serde_json::to_value(&alert).unwrap();
+        assert!(json.get("annotations").is_none());
     }
 
     #[test]

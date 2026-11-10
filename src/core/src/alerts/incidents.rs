@@ -2651,6 +2651,7 @@ where
             created_at: a.created_at,
             source_url: None,
             labels: None,
+            annotations: None,
             detected_source: None,
         })
         .collect();
@@ -2677,6 +2678,10 @@ where
                     if let Some(record) = records_by_id.get(&trigger.alert_id) {
                         trigger.source_url = record.source_url.clone();
                         trigger.labels = serde_json::from_value(record.labels.clone()).ok();
+                        trigger.annotations = record
+                            .last_payload
+                            .get("annotations")
+                            .and_then(|a| serde_json::from_value(a.clone()).ok());
                         trigger.detected_source = Some(record.detected_source.clone());
                     }
                 }
