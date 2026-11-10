@@ -30782,7 +30782,8 @@
         "coverage": "coverage",
         "suggestions": "suggestions",
         "incidents": "paged findings",
-        "issues": "issues"
+        "issues": "issues",
+        "history": "history"
       },
       "coverage": {
         "deniedTitle": "You don't have permission to see coverage",
@@ -30812,6 +30813,15 @@
         "pageEmptyTitle": "The top suggestions were already handled",
         "pageEmptyDesc": "Open the full list for the ones still waiting."
       },
+      "history": {
+        "deniedTitle": "You don't have permission to see history",
+        "deniedDesc": "History lists the incidents AutoObserve opened, so seeing it needs permission to list incidents in this organization. Ask an organization admin for it.",
+        "offDesc": "History appears here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "History is temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load history",
+        "failedDesc": "Something went wrong while loading it. Try again in a moment."
+      },
       "incidents": {
         "deniedTitle": "You don't have permission to see paged findings",
         "deniedDesc": "Paged findings open incidents, so seeing them needs permission to list incidents in this organization. Ask an organization admin for it.",
@@ -30834,6 +30844,17 @@
     "time": {
       "justNow": "just now",
       "ago": "{time} ago"
+    },
+    "history": {
+      "incident": "Opened an incident: {title}",
+      "dismissed": "{actor} dismissed {title}",
+      "accepted": "{actor} accepted {title}",
+      "changed": "{actor} changed {title}",
+      "untitled": "a suggestion",
+      "openIncident": "Open incident",
+      "newest": "Showing the {count} newest. Older incidents are on the Issues page.",
+      "loading": "Loading history",
+      "loaded": "History loaded"
     },
     "incidents": {
       "title": "Paged findings",

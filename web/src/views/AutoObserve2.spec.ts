@@ -34,6 +34,7 @@ import HistoryDrawer from "@/components/autoobserve/v2/HistoryDrawer.vue";
 import SettingsDrawer from "@/components/autoobserve/v2/SettingsDrawer.vue";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
+import LiveHistory from "@/components/autoobserve/live/LiveHistory.vue";
 import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
 import AutoObserve2 from "./AutoObserve2.vue";
 
@@ -93,6 +94,7 @@ const mountOpen = () =>
         LivePaged: true,
         LiveSuggestions: true,
         AllSuggestionsDrawer: true,
+        LiveHistory: true,
         HowItWorksDrawer: true,
         AutoObserveIssueDrawer: true,
         TopBar: true,
@@ -273,19 +275,19 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(wrapper.findComponent(AllSuggestionsDrawer).props("open")).toBe(true);
   });
 
-  it("live History lists no fixture entries and sends the reader to the Issues page", async () => {
+  it("live History shows the live feed, no fixture entries, and can send the reader to Issues (G6)", async () => {
     const wrapper = mountOpen();
     await flushPromises();
     const history = wrapper.findComponent(HistoryDrawer);
     expect(history.props("entries")).toEqual([]);
     expect(wrapper.find('[data-test="autoobserve2-history-filter"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="autoobserve-live-empty-history"]').text()).toContain(
-      "No history yet",
-    );
+    const feed = wrapper.findComponent(LiveHistory);
+    expect(feed.exists()).toBe(true);
     wrapper.findComponent(TopBar).vm.$emit("open", "history");
     await flushPromises();
     expect(history.props("open")).toBe(true);
-    await wrapper.find('[data-test="autoobserve-live-empty-history-action"]').trigger("click");
+    feed.vm.$emit("see-issues");
+    await flushPromises();
     expect(history.props("open")).toBe(false);
     expect(push).toHaveBeenCalledTimes(1);
     expect(push.mock.calls[0][0].query.page).toBe("issues");

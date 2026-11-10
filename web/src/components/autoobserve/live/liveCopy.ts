@@ -27,7 +27,7 @@ import { LIVE_CHECKS, type CoverageCell, type LiveCheck } from "../fixtures";
 
 export type LiveFailure = "denied" | "off" | "unavailable" | "failed";
 
-export type LiveSurface = "coverage" | "suggestions" | "incidents" | "issues";
+export type LiveSurface = "coverage" | "suggestions" | "incidents" | "issues" | "history";
 
 export type LiveEmptySurface = "changes" | "history" | "settings";
 
@@ -126,6 +126,24 @@ const NOTICE_KEY: Record<LiveSurface, Record<LiveFailure, { title: I18nKey; desc
       desc: "autoobserveLive.notice.issues.failedDesc",
     },
   },
+  history: {
+    denied: {
+      title: "autoobserveLive.notice.history.deniedTitle",
+      desc: "autoobserveLive.notice.history.deniedDesc",
+    },
+    off: {
+      title: "autoobserveLive.notice.offTitle",
+      desc: "autoobserveLive.notice.history.offDesc",
+    },
+    unavailable: {
+      title: "autoobserveLive.notice.history.unavailableTitle",
+      desc: "autoobserveLive.notice.history.unavailableDesc",
+    },
+    failed: {
+      title: "autoobserveLive.notice.history.failedTitle",
+      desc: "autoobserveLive.notice.history.failedDesc",
+    },
+  },
   incidents: {
     denied: {
       title: "autoobserveLive.notice.incidents.deniedTitle",
@@ -163,6 +181,10 @@ const LOAD_KEY: Record<LiveSurface, Record<Exclude<LivePhase, "idle">, I18nKey>>
     loading: "autoobserveLive.issues.loading",
     loaded: "autoobserveLive.issues.loaded",
   },
+  history: {
+    loading: "autoobserveLive.history.loading",
+    loaded: "autoobserveLive.history.loaded",
+  },
 };
 
 const WHAT_KEY: Record<LiveSurface, I18nKey> = {
@@ -170,6 +192,7 @@ const WHAT_KEY: Record<LiveSurface, I18nKey> = {
   suggestions: "autoobserveLive.notice.what.suggestions",
   incidents: "autoobserveLive.notice.what.incidents",
   issues: "autoobserveLive.notice.what.issues",
+  history: "autoobserveLive.notice.what.history",
 };
 
 // A denial or a turned-off engine cannot change on a retry, so neither offers one.

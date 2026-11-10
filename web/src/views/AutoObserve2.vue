@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @open-change="openChange"
       >
         <template v-if="live" #empty>
-          <LiveSurfaceEmpty surface="history" @action="historyToIssues" />
+          <LiveHistory @see-issues="historyToIssues" />
         </template>
       </HistoryDrawer>
       <SettingsDrawer v-model:open="settingsOpen">
@@ -329,6 +329,7 @@ import AppliedChangesList from "@/components/autoobserve/decisions/AppliedChange
 import { MAIN_PAGED_CAP } from "@/components/autoobserve/live/incidentsCopy";
 import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
+import LiveHistory from "@/components/autoobserve/live/LiveHistory.vue";
 import {
   SIGNALS,
   coverageFor,
