@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       type="assistantContext"
       :value="state"
       :label="label"
-      :icon="chipGlyph[chip.kind]"
+      :icon="chip.withheldAt ? assistantGlyph.withheld : chipGlyph[chip.kind]"
       :clickable="!inert"
       :removable="removable"
       :remove-label="t('assistant.context.remove', { label })"
@@ -51,7 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="assistant-context-chip-thumb"
         />
       </template>
-      <OTruncatedText class="min-w-0">{{ compact ? (shortLabel ?? label) : label }}</OTruncatedText>
+      <OTruncatedText
+        :class="['min-w-0', chip.withheldAt && 'text-text-secondary']"
+        :data-test="chip.withheldAt ? 'assistant-context-chip-withheld' : undefined"
+        >{{ compact ? (shortLabel ?? label) : label }}</OTruncatedText
+      >
       <span v-if="secondary && !compact" class="shrink-0 font-normal" aria-hidden="true"
         >{{ dot }} {{ secondary }}</span
       >
@@ -92,7 +96,7 @@ export interface AssistantContextChipEmits {
 <script setup lang="ts">
 import { computed } from "vue";
 
-import { chipGlyph } from "@/components/ai-assistant/common/glyphs";
+import { assistantGlyph, chipGlyph } from "@/components/ai-assistant/common/glyphs";
 import { CHIP_HIT_AREA_CLASS } from "@/components/ai-assistant/composer/composerUi";
 import { chipSecondaryOf, chipStateOf } from "@/composables/assistant";
 import OTag from "@/lib/core/Badge/OTag.vue";

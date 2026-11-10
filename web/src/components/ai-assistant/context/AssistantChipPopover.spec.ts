@@ -50,6 +50,22 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+describe("AssistantChipPopover: withheld at the data level", () => {
+  it("names the org's data level and where admins change it", async () => {
+    const { popover } = await open({
+      chip: { ...ROW, sent: "not_read", withheldAt: "aggregates" },
+    });
+    expect(popover()?.querySelector('[data-test="assistant-chip-withheld"]')?.textContent).toBe(
+      "Not sent at this data level (Schema and aggregates). Admins can change it in assistant settings.",
+    );
+  });
+
+  it("says nothing of it on a chip that is sent", async () => {
+    const { popover } = await open();
+    expect(popover()?.querySelector('[data-test="assistant-chip-withheld"]')).toBeNull();
+  });
+});
+
 describe("AssistantChipPopover: pasted text (D4 §3.9)", () => {
   it("shows the text and offers Paste into the message only on a pasted text chip", async () => {
     const pasted: ContextChip = {

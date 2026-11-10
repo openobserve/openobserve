@@ -210,6 +210,7 @@ describe("useAssistantContext", () => {
     store.syncCapability({ ...store.state.capability, dataLevel: "aggregates" });
     await flushPromises();
     expect(chipStateOf(row())).toBe("not_read");
+    expect(row().withheldAt).toBe("aggregates");
     expect(view.sees.value.some((r) => r.id === "attachments")).toBe(false);
   });
 

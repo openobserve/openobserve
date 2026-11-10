@@ -82,6 +82,11 @@ export function approvalVerb(card: Card): ApprovalVerb | null {
   return null;
 }
 
+/** Whether the card makes one object that covers all its targets, so its single result row stands for every target. */
+export function approvalCoversTargets(card: Pick<ApprovalBlockData, "tool">): boolean {
+  return /createdowntime$/.test(normalTool(card.tool));
+}
+
 /** The entity a toggle tool acts on, when the targets do not say. */
 export function approvalToolEntity(card: Pick<ApprovalBlockData, "tool">): string | null {
   const tool = normalTool(card.tool);
@@ -216,7 +221,9 @@ function epochMsOfWire(value: number): number {
 
 // A tool's arguments sit at the top level or, for a write, under `request_body`.
 function argSources(card: Pick<Card, "args">): (Record<string, unknown> | null | undefined)[] {
-  return [card.args, recordOf(card.args?.request_body)];
+  const body = recordOf(card.args?.request_body);
+  // CreateDowntime nests its window under `schedule`.
+  return [card.args, body, recordOf(body?.schedule)];
 }
 
 function normalTool(tool: string): string {

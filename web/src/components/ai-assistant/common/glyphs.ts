@@ -36,6 +36,7 @@ export const assistantGlyph = {
   done: "check",
   elsewhere: "tab",
   notSaved: "cloud-off",
+  withheld: "visibility-off",
   interrupted: "remove-circle-outline",
   expired: "schedule",
   restored: "swap-horiz",

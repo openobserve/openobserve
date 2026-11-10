@@ -1089,6 +1089,66 @@ describe("AssistantApprovalResult", () => {
       );
     });
 
+    it("one downtime that covers two alerts says Paused 2 alerts and offers its Undo", async () => {
+      const downtime = approvalOf({
+        type: "confirmation_required",
+        id: "c9",
+        tool: "CreateDowntime",
+        kind: "create",
+        operation: "create",
+        targets: [
+          { type: "alert", id: "a1", name: "lat" },
+          { type: "alert", id: "a2", name: "5xx" },
+        ],
+        args: {
+          request_body: {
+            name: "Bulk mute",
+            schedule: {
+              repeat: "none",
+              starts_at: 1_760_000_000_000_000,
+              ends_at: 1_760_003_600_000_000,
+              duration_secs: 3600,
+            },
+            targets: [{ module: "alerts", ids: ["a1", "a2"] }],
+          },
+        },
+      });
+      const { wrapper, evidence } = mountRecord(
+        {
+          outcome: { state: "done", at: 1_760_000_000_000 },
+          result: {
+            status: "done",
+            items: [
+              {
+                id: "dt1",
+                type: "downtime",
+                name: "Bulk mute",
+                status: "done",
+                undoable: true,
+                ledgerId: "led-dt",
+              },
+            ],
+            resolvedBy: "ada",
+            resolvedAt: 1,
+          },
+        },
+        { blocks: [{ type: "approval", approval: downtime }] },
+      );
+      evidence.store.state.sessions[evidence.sid]!.ledger.push({
+        ...ledger("led-dt", "dt1", "Bulk mute"),
+        tool: "CreateDowntime",
+        op: "create" as const,
+        resource: { type: "downtime", id: "dt1", name: "Bulk mute" },
+      });
+      await nextTick();
+      expect(line(wrapper)).toMatch(
+        /^(Paused 2 alerts until |assistant\.approval\.record\.pausedCountUntil)/,
+      );
+      expect(wrapper.find('[data-test="assistant-approval-result-undo-led-dt"]').exists()).toBe(
+        true,
+      );
+    });
+
     it("AE-02: gathered targets that share a name and have no id each bind Undo to their own ledger row", async () => {
       const twins = [
         { type: "alert", name: "lat", status: "done" as const, undoable: true, ledgerId: "led-1" },

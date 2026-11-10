@@ -16,7 +16,13 @@
 import type { I18nText } from "@/types/i18n";
 
 import type { RouteTarget } from "../actions/types";
-import type { Container, EntryKind, EntryVerb, ObjectKind } from "../assistantStore.types";
+import type {
+  Container,
+  DataLevel,
+  EntryKind,
+  EntryVerb,
+  ObjectKind,
+} from "../assistantStore.types";
 
 /** `report` is the RCA report, the on-call verdict or the AutoObserve ask (`60` §5). */
 export type ChipKind =
@@ -61,6 +67,8 @@ export interface ContextChip {
   count?: number;
   /** What the agent receives today (constraint 40). */
   sent: "whitelist" | "serialized" | "not_read";
+  /** The org's data level that keeps this chip out of the request. */
+  withheldAt?: DataLevel;
   /** Fields cut to fit the 32 KB cap, longest values first (CT-02 AC 8). */
   truncated?: string[];
   /** "Hide internal fields" turned off: `_o2_id` and `_original` are sent too (CT-03 AC 2). */

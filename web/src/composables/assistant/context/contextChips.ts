@@ -482,6 +482,7 @@ export function pastedTextChip(text: string, id: string, t: TranslateFn = gt): C
 
 /** The secondary line a chip shows: the honest "not read yet" and "truncated" win over provenance. */
 export function chipSecondaryOf(chip: ContextChip, t: TranslateFn = gt): I18nText | undefined {
+  if (chip.withheldAt) return t("assistant.context.withheld");
   if (chip.sent === "not_read") return t("assistant.context.notReadYet");
   if (chip.truncated?.length)
     return t("assistant.context.truncated", { size: raw(formatBytes(MAX_ATTACHED_BYTES)) });

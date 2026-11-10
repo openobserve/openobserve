@@ -43,6 +43,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </header>
 
+      <div
+        v-if="chip.withheldAt"
+        class="text-text-secondary flex items-start gap-1.5"
+        data-test="assistant-chip-withheld"
+      >
+        <OIcon :name="assistantGlyph.withheld" size="sm" class="mt-0.5 shrink-0" />
+        <OText variant="meta">{{ withheldLine }}</OText>
+      </div>
+
       <template v-if="chip.kind !== 'time'">
         <img
           v-if="chip.kind === 'image' && imageSrc"
@@ -247,6 +256,18 @@ const codeText = computed(() => {
   if (rows.value.length > 0 || data === undefined || data === null) return "";
   return typeof data === "string" ? data : JSON.stringify(data, null, 2);
 });
+
+const LEVEL_LABEL = {
+  schema: "assistant.settings.data.levelSchema",
+  aggregates: "assistant.settings.data.levelAggregates",
+  raw: "assistant.settings.data.levelRaw",
+} as const;
+
+const withheldLine = computed(() =>
+  props.chip.withheldAt
+    ? t("assistant.context.withheldLine", { level: t(LEVEL_LABEL[props.chip.withheldAt]) })
+    : raw(""),
+);
 
 const truncatedList = computed(() => raw((props.chip.truncated ?? []).join(", ")));
 

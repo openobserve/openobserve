@@ -259,6 +259,7 @@ import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import { isRunning } from "@/composables/assistant";
 import {
+  approvalCoversTargets,
   approvalEditor,
   approvalEntity,
   approvalOutcomeOf,
@@ -1002,7 +1003,10 @@ function batchEffectLine(
   time: I18nText | null,
 ): I18nText {
   const items = view.value?.result?.items;
-  const count = items?.length ? items.filter((item) => item.status === "done").length : total.value;
+  const done = items?.filter((item) => item.status === "done").length ?? 0;
+  // One downtime row answers for every alert it names.
+  const covers = !!card.value && approvalCoversTargets(card.value) && done > 0;
+  const count = items?.length && !covers ? done : total.value;
   const params = { count, entity: t(`assistant.entity.${approvalNoun(facts)}`, count) };
   if (verb === "resume") return t("assistant.approval.record.resumedCount", params, count);
   return time === null
