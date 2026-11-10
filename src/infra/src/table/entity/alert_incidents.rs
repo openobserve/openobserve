@@ -50,6 +50,12 @@ pub struct Model {
     pub rca_summary: Option<String>,
     /// Why automatic runs never start for this incident (`l0_off`); written once at creation.
     pub rca_off_reason: Option<String>,
+    /// A SIEM detection fired into it; kept after the detection is deleted or edited.
+    #[sea_orm(default_value = false)]
+    pub security_case: bool,
+    /// Every firing came from a backfill over past data, so it describes no current activity.
+    #[sea_orm(default_value = false)]
+    pub historical: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -99,6 +105,8 @@ mod tests {
             rca_confidence: None,
             rca_summary: None,
             rca_off_reason: None,
+            security_case: false,
+            historical: false,
         };
         assert_eq!(m.id, "inc-1");
         assert_eq!(m.status, "open");
@@ -139,6 +147,8 @@ mod tests {
             rca_confidence: None,
             rca_summary: None,
             rca_off_reason: None,
+            security_case: false,
+            historical: false,
         };
         assert_eq!(m.acknowledged_by.as_deref(), Some("user@example.com"));
         assert_eq!(m.acknowledged_at, Some(1500));

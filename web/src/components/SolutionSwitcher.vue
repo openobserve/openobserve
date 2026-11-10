@@ -11,7 +11,13 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+defineProps<{
+  /** The license locks Security, so its entry opens the upsell page. */
+  securityLocked?: boolean;
+}>();
 
 const { t } = useI18nTyped();
 
@@ -63,14 +69,14 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         size="sm"
         :icon-left="current.icon"
         icon-right="expand-more"
-        class="font-[650] tracking-[-0.00625rem]"
+        class="font-semibold tracking-tight"
         data-test="solution-switcher"
       >
         {{ t(current.labelKey) }}
       </OButton>
     </template>
 
-    <div class="text-3xs px-3.5 pt-1.5 pb-1 font-bold tracking-[0.03125rem] uppercase opacity-50">
+    <div class="text-text-secondary text-3xs px-3.5 pt-1.5 pb-1 font-bold">
       {{ t("solutionSwitcher.title") }}
     </div>
 
@@ -80,28 +86,33 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
       :data-test="`solution-${solution.key}`"
       @select="switchTo(solution)"
     >
-      <div class="flex min-w-[13.75rem] items-center gap-2.5">
+      <div class="flex min-w-55 items-center gap-2.5">
         <div
-          class="rounded-default flex size-8 shrink-0 items-center justify-center"
+          class="rounded-default relative flex size-8 shrink-0 items-center justify-center"
           :class="
             solution.key === 'security'
-              ? 'bg-status-success-bg text-status-success-text'
-              : 'bg-accent/12 text-accent'
+              ? 'bg-icon-chip-success-bg text-icon-chip-success-text'
+              : 'bg-icon-chip-primary-bg text-icon-chip-primary-text'
           "
         >
           <OIcon :name="solution.icon" size="sm" />
+          <OLockBadge
+            v-if="solution.key === 'security' && securityLocked"
+            :label="t('featureLock.routeTitle')"
+            data-test="solution-security-locked"
+          />
         </div>
-        <div class="flex flex-1 flex-col gap-px">
-          <span class="text-compact font-[650]">{{ t(solution.labelKey) }}</span>
-          <span class="text-2xs opacity-55">{{ t(solution.descriptionKey) }}</span>
+        <div class="flex flex-1 flex-col gap-0.25">
+          <span class="text-compact font-semibold">{{ t(solution.labelKey) }}</span>
+          <span class="text-text-secondary text-2xs">{{ t(solution.descriptionKey) }}</span>
         </div>
         <OIcon v-if="solution.key === mode" name="task-alt" class="text-accent size-3.5 shrink-0" />
       </div>
     </ODropdownItem>
 
     <ODropdownSeparator />
-    <div class="text-2xs flex items-center gap-1.5 px-3.5 pt-1.5 pb-2 opacity-45">
-      <OIcon name="info-outline" size="xs" class="opacity-50" />
+    <div class="text-text-secondary text-2xs flex items-center gap-1.5 px-3.5 pt-1.5 pb-2">
+      <OIcon name="info-outline" size="xs" />
       <span>{{ t("solutionSwitcher.hint") }}</span>
     </div>
   </ODropdown>

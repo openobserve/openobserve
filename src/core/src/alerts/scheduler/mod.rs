@@ -19,6 +19,8 @@ mod calibration;
 pub mod handlers;
 #[cfg(feature = "enterprise")]
 pub mod query_optimization_recommendation;
+#[cfg(feature = "enterprise")]
+mod siem;
 pub mod worker;
 
 pub use calibration::{LastRun, last_run};

@@ -4,6 +4,7 @@ import { isErrorOutcome, isFiringOutcome } from "@/utils/alerts/runOutcome";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { SeverityTone } from "./severity";
 import type { HistoryRow } from "./history";
+import type { NormalizedEvent } from "./ocsf";
 
 export interface FiringRow extends HistoryRow {
   threshold_value?: number | null;
@@ -97,4 +98,23 @@ export function summarizeError(text: string | null | undefined, max = 280): stri
     .replace(/\s+/g, " ")
     .trim();
   return plain.length > max ? `${plain.slice(0, max - 1).trimEnd()}…` : plain;
+}
+
+/** The column a value-count rule counts distinct values of, read from its evidence SQL's `PARTITION BY`. */
+export function evidenceValueField(sql: string | null | undefined): string | null {
+  const match = /PARTITION BY\s+"((?:[^"]|"")+)"/i.exec(sql ?? "");
+  return match ? match[1].replace(/""/g, '"') : null;
+}
+
+/** One evidence row as a line; a value-count rule's counted value (the country, for impossible travel) follows the actor. */
+export function evidenceSummary(ev: NormalizedEvent, valueField: string | null = null): string {
+  const counted = valueField ? ev.raw[valueField] : undefined;
+  const parts = [
+    ev.actor,
+    counted == null ? "" : String(counted),
+    ev.srcIp,
+    ev.activity || ev.operation,
+    ev.message,
+  ];
+  return [...new Set(parts.filter(Boolean))].join(" · ");
 }
