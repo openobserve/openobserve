@@ -3183,6 +3183,10 @@ pub async fn list_alerts(
     #[cfg(feature = "enterprise")]
     let listable_folders = if folder_slug.is_none() {
         match alert::listable_alert_folders(&org_id, &user_email.user_id).await {
+            // No listable folder is no access to alerts, which the skipped route check refused.
+            Ok(Some(folders)) if folders.is_empty() => {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
             Ok(folders) => folders,
             Err(e) => return e.into(),
         }
