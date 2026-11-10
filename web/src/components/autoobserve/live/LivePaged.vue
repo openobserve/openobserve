@@ -432,7 +432,8 @@ const slotKind = computed(() => {
   if (settled.value && paged.newCount.value > 0) return "new";
   if (settled.value && learningText.value && !(waiting.value && !rows.value.length))
     return "learning";
-  if (settled.value && rows.value.length && !paging.value) return "pagingOff";
+  // With no rows the off empty state says it, unless the learning empty state holds that place.
+  if (settled.value && !paging.value && (rows.value.length || waiting.value)) return "pagingOff";
   if (state.value.status === "loading") return skeleton.value ? "skeleton" : "none";
   return "subtitle";
 });

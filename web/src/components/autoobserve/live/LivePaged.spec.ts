@@ -714,6 +714,18 @@ describe("LivePaged (D9-web)", () => {
       expect(empty.text()).toContain("The first of 12 streams is ready on Nov 24.");
     });
 
+    it("says paging is off while every stream is still learning (T1-11)", async () => {
+      coverageApi.mockResolvedValue(coverage(12, 0));
+      api.mockResolvedValueOnce(page([], { paging: false }));
+      const w = mountCard();
+      await flushPromises();
+      expect(w.find(sel("subtitle-slot")).text()).toBe(
+        "Paging is off for this organization, so AutoObserve opens no incidents.",
+      );
+      expect(w.find(sel("empty-learning")).text()).toContain("Learning your streams");
+      expect(w.find(sel("empty-off")).exists()).toBe(false);
+    });
+
     it("a server without the learning block keeps today's card", async () => {
       coverageApi.mockResolvedValue({ data: { rows: [] } } as never);
       api.mockResolvedValueOnce(page([]));
