@@ -235,7 +235,7 @@ describe("AlertCalibrationDismissedList", () => {
     vi.mocked(alertCalibration.listDismissals).mockRejectedValue(httpError(500));
     await mountList();
     const error = wrapper?.find('[data-test="alert-calibration-dismissed-error"]');
-    expect(error?.text()).toContain("Dismissed findings couldn't be loaded");
+    expect(error?.text()).toContain("Couldn't load dismissed findings");
     vi.mocked(alertCalibration.listDismissals).mockResolvedValue(page([view()]));
     await error?.find("button").trigger("click");
     await settle();

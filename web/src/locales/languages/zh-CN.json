@@ -11435,7 +11435,6 @@
       "emptyDescription": "告警校准每次运行都会写入一份摘要。立即运行以查看其发现。",
       "filteredTitle": "没有运行匹配此过滤器",
       "filteredDescription": "扩大过滤器范围，或清除搜索。",
-      "errorTitle": "运行记录不可用",
       "runsCapped": "运行记录搜索在最新的 {count} 行处停止，因此未列出更早的运行记录。",
       "searchCapped": "告警名称搜索在 {count} 条匹配的运行记录处停止，因此未显示其他匹配的运行记录。"
     },

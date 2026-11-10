@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nText, TranslateFn } from "@/types/i18n";
-import { httpStatus } from "@/services/alert_calibration";
+import { isAxiosError } from "axios";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { errorMessage, httpStatus } from "@/services/alert_calibration";
 import type { LiveNoticeView } from "@/components/autoobserve/live/liveCopy";
 
 /** A failed read in the AutoObserve look: a 403 is a denial without Retry, anything else can be retried. */
@@ -22,7 +23,7 @@ export function readNotice(
   t: TranslateFn,
   error: unknown,
   title: I18nText,
-  description: I18nText,
+  description: I18nText = readFailedCopy(t, error),
 ): LiveNoticeView {
   if (httpStatus(error) === 403) {
     return {
@@ -39,7 +40,19 @@ export function readNotice(
     description,
     severity: "error",
     retry: true,
-    details: false,
+    details: true,
     icon: "error-outline",
   };
 }
+
+/** The same words AutoObserve uses for a failed read; an unreachable server says so instead. */
+export const readFailedCopy = (t: TranslateFn, error: unknown): I18nText =>
+  isAxiosError(error) && !error.response
+    ? t("alertCalibration.readError.unreachable")
+    : t("alertCalibration.readError.failed");
+
+/** What the Details disclosure shows: the server's own words, kept out of the notice itself. */
+export const readFailedDetail = (error: unknown): I18nText | null => {
+  const message = error ? errorMessage(error) : "";
+  return message ? raw(message) : null;
+};

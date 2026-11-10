@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="forbidden || data.error.value"
         size="block"
         :notice="boardNotice"
+        :detail="readFailedDetail(data.error.value)"
         :busy="data.loading.value"
         :data-test="
           forbidden ? 'alert-calibration-dashboard-no-access' : 'alert-calibration-dashboard-error'
@@ -418,7 +419,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
-import { httpStatus, readErrorCopy } from "@/services/alert_calibration";
+import { httpStatus } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import { useActiveDismissals } from "@/composables/alertCalibration/useDismissals";
@@ -447,7 +448,7 @@ import {
   type DismissableFinding,
 } from "./dismissals";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
-import { readNotice } from "./notices";
+import { readFailedDetail, readNotice } from "./notices";
 import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
 import {
   countOrDash,
@@ -533,7 +534,6 @@ const boardNotice = computed(() =>
     t,
     forbidden.value ? { response: { status: 403 } } : data.error.value,
     t("alertCalibration.dashboard.loadFailedTitle"),
-    readErrorCopy(t, data.error.value),
   ),
 );
 /** A 403 is a missing permission, not a failure, so it gets no Retry. */

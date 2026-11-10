@@ -11435,7 +11435,6 @@
       "emptyDescription": "Alarmkalibratie schrijft een digest telkens wanneer het draait. Voer het nu uit om te zien wat het vindt.",
       "filteredTitle": "Geen runs komen overeen met dit filter",
       "filteredDescription": "Verruim het filter of wis de zoekopdracht.",
-      "errorTitle": "Runs niet beschikbaar",
       "runsCapped": "De zoekopdracht naar runs stopte bij de meest recente {count} rijen, dus oudere runs worden niet vermeld.",
       "searchCapped": "De zoekopdracht op alarmnaam stopte bij {count} overeenkomende runs, dus andere overeenkomende runs worden niet getoond."
     },

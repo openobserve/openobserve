@@ -11435,7 +11435,6 @@
       "emptyDescription": "Hiệu chuẩn cảnh báo ghi một bản tóm tắt mỗi lần chạy. Chạy ngay bây giờ để xem nó phát hiện được gì.",
       "filteredTitle": "Không có lần chạy nào khớp với bộ lọc này",
       "filteredDescription": "Mở rộng bộ lọc hoặc xóa tìm kiếm.",
-      "errorTitle": "Lượt chạy không khả dụng",
       "runsCapped": "Tìm kiếm lượt chạy đã dừng ở {count} hàng mới nhất, nên các lượt chạy cũ hơn không được liệt kê.",
       "searchCapped": "Tìm kiếm tên cảnh báo đã dừng ở {count} lượt chạy khớp, nên các lượt chạy khớp khác không được hiển thị."
     },

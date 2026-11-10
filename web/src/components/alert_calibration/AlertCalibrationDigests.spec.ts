@@ -183,9 +183,9 @@ describe("AlertCalibrationDigests", () => {
   it("a failed runs read shows the plain error copy, never the server's words", async () => {
     vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, "internal"));
     const wrapper = await mountPage();
-    expect(wrapper.text()).toContain("Runs unavailable");
+    expect(wrapper.text()).toContain("Couldn't load runs");
     expect(wrapper.text()).toContain(
-      "Alert calibration runs couldn't be loaded. Try again in a moment.",
+      "Something went wrong while loading them. Try again in a moment.",
     );
     expect(wrapper.text()).not.toContain("internal");
     wrapper.unmount();

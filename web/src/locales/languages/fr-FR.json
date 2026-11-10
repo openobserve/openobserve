@@ -11435,7 +11435,6 @@
       "emptyDescription": "La calibration des alertes écrit une synthèse à chaque exécution. Exécutez-la maintenant pour voir ce qu'elle trouve.",
       "filteredTitle": "Aucune exécution ne correspond à ce filtre",
       "filteredDescription": "Élargissez le filtre ou effacez la recherche.",
-      "errorTitle": "Exécutions indisponibles",
       "runsCapped": "La recherche d'exécutions s'est arrêtée à ses {count} dernières lignes ; les exécutions plus anciennes ne sont donc pas listées.",
       "searchCapped": "La recherche par nom d'alerte s'est arrêtée à {count} exécutions correspondantes ; les autres exécutions correspondantes ne sont donc pas affichées."
     },

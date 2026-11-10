@@ -178,13 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <LiveNoticeState
               size="block"
               :notice="
-                readNotice(
-                  t,
-                  runs.error.value,
-                  t('alertCalibration.digests.errorTitle'),
-                  runsError ?? raw(''),
-                )
+                readNotice(t, runs.error.value, t('alertCalibration.digests.loadFailedTitle'))
               "
+              :detail="readFailedDetail(runs.error.value)"
               :busy="runs.loading.value"
               data-test="alert-calibration-digests-error"
               retry-test="alert-calibration-digests-retry"
@@ -226,7 +222,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { readErrorCopy } from "@/services/alert_calibration";
 import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
-import { readNotice } from "./notices";
+import { readFailedDetail, readNotice } from "./notices";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";

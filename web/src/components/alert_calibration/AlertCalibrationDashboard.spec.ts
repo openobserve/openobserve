@@ -407,16 +407,18 @@ describe("AlertCalibrationDashboard", () => {
     wrapper.unmount();
   });
 
-  it("a failed runs read shows the plain error copy, never the server's words", async () => {
+  it("a failed runs read shows the AutoObserve load failure, with the server's words only under Details", async () => {
     vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, "internal"));
     const wrapper = await mountPage();
     const board = wrapper.find('[data-test="alert-calibration-dashboard-no-board"]');
-    expect(board.text()).toContain("Findings couldn't be loaded");
+    expect(board.text()).toContain("Couldn't load findings");
     expect(board.text()).toContain(
-      "Alert calibration runs couldn't be loaded. Try again in a moment.",
+      "Something went wrong while loading them. Try again in a moment.",
     );
     expect(board.text()).toContain("Retry");
     expect(wrapper.text()).not.toContain("internal");
+    await board.find('[data-test="alert-calibration-dashboard-error-details"]').trigger("click");
+    expect(board.text()).toContain("internal");
     wrapper.unmount();
   });
 
@@ -889,7 +891,7 @@ describe("AlertCalibrationDashboard dismissals", () => {
     const wrapper = await mountPage();
     await settle();
     expect(wrapper.text()).not.toContain("Runs unavailable");
-    expect(wrapper.text()).toContain("Findings couldn't be loaded");
+    expect(wrapper.text()).toContain("Couldn't load findings");
     wrapper.unmount();
   });
 
