@@ -443,6 +443,27 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
     });
   });
 
+  it("names the band when asked, on a finished run and on the earlier result a failed re-run keeps", () => {
+    const done = {
+      rca: rca({ state: "completed", outcome: "root_cause_identified", confidence: "medium" }),
+      severity: "P2",
+    } as Row;
+    const failedRerun = {
+      rca: rca({
+        state: "failed",
+        summary: {
+          previous: { run_id: "r1", outcome: "inconclusive", confidence: "low", ended_at: 0 },
+        },
+      }),
+      severity: "P2",
+    } as Row;
+    const opts = { rcaEnabled: true, now: NOW, namedBand: true };
+
+    expect(rcaCellModel(done, opts).detail).toBe("Medium confidence");
+    expect(rcaCellModel(failedRerun, opts).detail).toBe("Low confidence");
+    expect(rcaCellModel(done, { rcaEnabled: true, now: NOW }).detail).toBe("Medium");
+  });
+
   it("shows persisted progress instead of elapsed time once the stage is known", () => {
     const row = {
       rca: rca({ summary: { stage: "log_patterns", stage_index: 5, stage_count: 7 } }),
