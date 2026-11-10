@@ -165,6 +165,64 @@ describe("LiveHistory (G6)", () => {
     expect(w.find(sel("newest")).text()).toContain("Older incidents are on the Issues page.");
   });
 
+  it("reads every decision state, so applied, undone and marked ones are listed (T1-N1)", async () => {
+    const now = Date.now();
+    incidentsApi.mockResolvedValue(incidentPage([]));
+    decisionsApi.mockResolvedValue(
+      decisionPage([
+        { ...decision("undone-apply", now - 10_000), action: "apply", state: "undone" },
+        { ...decision("marked", now - 20_000), action: "accept" },
+      ]),
+    );
+    const w = mountFeed();
+    await flushPromises();
+    expect(decisionsApi).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.not.objectContaining({ state: expect.anything() }),
+      expect.anything(),
+    );
+    const rows = w.findAll(`${sel("list")} li`).map((r) => r.find("p").text());
+    expect(rows[0]).toContain("ops-lead@example.com changed Nothing watches undone-apply");
+    expect(rows[0]).toContain("Undone");
+    expect(rows[1]).toBe(
+      "ops-lead@example.com marked Nothing watches marked as an intended report",
+    );
+  });
+
+  it("lists the decisions a user may read when incidents are denied, with one red line (T1-N2)", async () => {
+    incidentsApi.mockRejectedValue(httpError(403));
+    decisionsApi.mockResolvedValue(decisionPage([decision("checkout", Date.now())]));
+    const w = mountFeed();
+    await flushPromises();
+    expect(w.find(sel("error")).exists()).toBe(false);
+    expect(w.findAll(`${sel("list")} li`)).toHaveLength(1);
+    const note = w.find(sel("partial"));
+    expect(note.text()).toBe("Incidents aren't listed: you don't have permission to see them.");
+    expect(note.classes()).toContain("text-status-error-text");
+  });
+
+  it("keeps the whole-feed denial when incidents are denied and there are no decisions", async () => {
+    incidentsApi.mockRejectedValue(httpError(403));
+    decisionsApi.mockResolvedValue(decisionPage([]));
+    const w = mountFeed();
+    await flushPromises();
+    expect(w.find(sel("error")).text()).toContain("permission");
+    expect(w.find(sel("partial")).exists()).toBe(false);
+  });
+
+  it("lists incidents with one red line when decisions are denied", async () => {
+    incidentsApi.mockResolvedValue(
+      incidentPage([incident("inc-1", "pay_api stopped", Date.now())]),
+    );
+    decisionsApi.mockRejectedValue(httpError(403));
+    const w = mountFeed();
+    await flushPromises();
+    expect(w.findAll(`${sel("list")} li`)).toHaveLength(1);
+    expect(w.find(sel("partial")).text()).toBe(
+      "Decisions aren't listed: you don't have permission to see them.",
+    );
+  });
+
   it("reads no decisions in the open-source build", async () => {
     config.isEnterprise = "false";
     incidentsApi.mockResolvedValue(

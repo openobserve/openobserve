@@ -30884,8 +30884,12 @@
     "history": {
       "incident": "Opened an incident: {title}",
       "dismissed": "{actor} dismissed {title}",
-      "accepted": "{actor} accepted {title}",
+      "accepted": "{actor} marked {title} as an intended report",
       "changed": "{actor} changed {title}",
+      "denied": {
+        "incidents": "Incidents aren't listed: you don't have permission to see them.",
+        "decisions": "Decisions aren't listed: you don't have permission to see them."
+      },
       "untitled": "a suggestion",
       "openIncident": "Open incident",
       "newest": "Showing the {count} newest. Older incidents are on the Issues page.",

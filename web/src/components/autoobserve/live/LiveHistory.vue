@@ -51,6 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ul>
     <LiveSurfaceEmpty v-else-if="!rows.length" surface="history" @action="emit('see-issues')" />
     <template v-else>
+      <p
+        v-if="partial"
+        class="text-status-error-text flex items-center gap-1.5 text-xs"
+        data-test="autoobserve-live-history-partial"
+      >
+        <OIcon name="lock" size="xs" class="shrink-0" />
+        {{ partial }}
+      </p>
       <ul class="flex flex-col" data-test="autoobserve-live-history-list">
         <li
           v-for="row in rows"
@@ -145,7 +153,7 @@ const incidents = useQuery(() => ({
   enabled: !!org.value,
 }));
 const decisions = useQuery(() => ({
-  ...decisionsPageQuery(org.value, null, HISTORY_PAGE, 0),
+  ...decisionsPageQuery(org.value, null, HISTORY_PAGE, 0, null),
   enabled: enterprise && !!org.value,
   retry: false,
 }));
@@ -164,7 +172,29 @@ const decisionsPending = computed(
   () => enterprise && decisions.isPending.value && !decisions.isError.value,
 );
 
+const incidentItems = computed(() => incidents.data.value?.items ?? []);
+const decisionItems = computed(() => decisions.data.value?.decisions ?? []);
+
+// One denied source leaves the other listed; a failure, or nothing left to list, fails the whole feed.
+const deniedSource = computed<"incidents" | "decisions" | null>(() => {
+  const state = incidentsState.value;
+  if (state.status === "error" && state.failure === "denied" && decisionItems.value.length)
+    return "incidents";
+  if (
+    decisionsFailed.value &&
+    liveFailureOf(decisions.error.value) === "denied" &&
+    incidents.isSuccess.value &&
+    incidentItems.value.length
+  )
+    return "decisions";
+  return null;
+});
+const partial = computed(() =>
+  deniedSource.value ? t(`autoobserveLive.history.denied.${deniedSource.value}`) : null,
+);
+
 const notice = computed(() => {
+  if (deniedSource.value) return null;
   const state = incidentsState.value;
   if (state.status === "error" && state.failure) return liveNotice(t, "history", state.failure);
   if (decisionsFailed.value) return liveNotice(t, "history", liveFailureOf(decisions.error.value));
@@ -179,14 +209,7 @@ const loadPhase = useLoadPhase(() => (pending.value ? "loading" : "ready"), load
 const loadText = computed(() => liveLoadText(t, "history", loadPhase.value));
 
 const rows = computed(() =>
-  pending.value
-    ? []
-    : toHistoryRows(
-        t,
-        zone.value,
-        incidents.data.value?.items ?? [],
-        decisions.data.value?.decisions ?? [],
-      ),
+  pending.value ? [] : toHistoryRows(t, zone.value, incidentItems.value, decisionItems.value),
 );
 const truncated = computed(
   () =>
