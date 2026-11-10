@@ -29640,7 +29640,7 @@
       "waitingForOk": "等待您确认",
       "proposedFix": "建议修复",
       "unfoldTab": "如何演变",
-      "seeEvidence": "查看证据→"
+      "seeEvidence": "查看全部"
     },
     "unfold": {
       "hint": "从左到右阅读：发生了什么变更、触发了哪些信号，以及最终到达您团队的内容。选择卡片可查看其触发记录。",
