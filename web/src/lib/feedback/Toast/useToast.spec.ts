@@ -9,6 +9,18 @@ beforeEach(() => {
 });
 
 describe("toast()", () => {
+  it("shows a message that starts with a name exactly as written (T3-N2)", () => {
+    toast({ message: "ingress-upstream-blips marked as intended report." });
+    expect(toastRecords[0].message).toBe("ingress-upstream-blips marked as intended report.");
+  });
+
+  it("collapses a repeated lowercase-first message into one toast", () => {
+    toast({ message: "pay_api is unreachable" });
+    toast({ message: "pay_api is unreachable" });
+    expect(toastRecords).toHaveLength(1);
+    expect(toastRecords[0].count).toBe(2);
+  });
+
   it("adds a record to toastRecords", () => {
     toast({ variant: "success", message: "Saved!" });
     expect(toastRecords).toHaveLength(1);
@@ -21,8 +33,8 @@ describe("toast()", () => {
     expect(typeof dismiss).toBe("function");
   });
 
-  it("carries the id of its record, whatever the message became", () => {
-    const dismiss = toast({ variant: "success", message: "deleted x" });
+  it("carries the id of its record", () => {
+    const dismiss = toast({ variant: "success", message: "Deleted x" });
     expect(toastRecords[0].message).toBe("Deleted x");
     expect(dismiss.id).toBe(toastRecords[0].id);
   });
