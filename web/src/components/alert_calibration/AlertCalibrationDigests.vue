@@ -318,18 +318,18 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "schedule",
-      // "1 · Runs every · day" reads as a sentence; an off schedule keeps its noun.
+      // "1 · day between runs" reads as one phrase; an off schedule keeps its noun.
       label: c?.enabled
-        ? t("alertCalibration.digests.runsEvery")
+        ? t("alertCalibration.digests.betweenRuns", { unit: cadence.unit })
         : t("alertCalibration.digests.schedule"),
       value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : raw("—"),
       sub: c
         ? c.enabled
-          ? cadence.unit
+          ? undefined
           : t("alertCalibration.digests.noScheduledRun")
         : t("alertCalibration.digests.notConfigured"),
       icon: "schedule",
-      tone: c?.enabled ? "success" : "neutral",
+      tone: "neutral",
     },
   ];
 });

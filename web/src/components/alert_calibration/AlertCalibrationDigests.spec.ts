@@ -21,6 +21,8 @@ import { queryClient } from "@/composables/query/queryClient";
 import alertCalibration from "@/services/alert_calibration";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import AlertCalibrationDigests from "./AlertCalibrationDigests.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { RunRow } from "./digests";
 import analytics from "@/services/product_analytics";
 
@@ -127,6 +129,17 @@ describe("AlertCalibrationDigests", () => {
       },
     } as never);
     vi.mocked(alertCalibration.getStatus).mockResolvedValue({ data: { last_run: null } } as never);
+  });
+
+  it("the_schedule_stat_reads_as_a_phrase_and_stays_neutral_because_it_is_a_setting", async () => {
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([] as never);
+    const wrapper = await mountPage();
+    const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
+    const schedule = items.find((item) => item.key === "schedule")!;
+    expect(`${schedule.value} ${schedule.label}`).toBe("1 day between runs");
+    expect(schedule.sub).toBeUndefined();
+    expect(schedule.tone ?? "neutral").toBe("neutral");
+    wrapper.unmount();
   });
 
   it("lists a run pulled twice once, as its newest emission", async () => {

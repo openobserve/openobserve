@@ -11803,7 +11803,7 @@
     },
     "digests": {
       "schedule": "Schedule",
-      "runsEvery": "Runs every",
+      "betweenRuns": "{unit} between runs",
       "off": "Off",
       "notConfigured": "Not configured",
       "noScheduledRun": "No scheduled run",
