@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :row-key="runKey"
           :loading="runs.loading.value"
           :error="runsError"
-          :forbidden="forbidden"
           pagination="client"
           :page-size="20"
           sorting="client"
@@ -176,15 +175,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #error>
-            <OEmptyState
-              size="hero"
-              illustration="broken-panel"
-              variant="error"
-              :title="t('alertCalibration.digests.errorTitle')"
-              :description="runsError ?? undefined"
-              :action-label="t('alertCalibration.retry')"
-              action-icon="refresh"
-              @action="refresh"
+            <LiveNoticeState
+              size="block"
+              :notice="
+                readNotice(
+                  t,
+                  runs.error.value,
+                  t('alertCalibration.digests.errorTitle'),
+                  runsError ?? raw(''),
+                )
+              "
+              :busy="runs.loading.value"
+              data-test="alert-calibration-digests-error"
+              retry-test="alert-calibration-digests-retry"
+              @retry="refresh"
             />
           </template>
 
@@ -220,7 +224,9 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
-import { httpStatus, readErrorCopy } from "@/services/alert_calibration";
+import { readErrorCopy } from "@/services/alert_calibration";
+import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
+import { readNotice } from "./notices";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
@@ -266,10 +272,7 @@ const runs = useLatestRead(async () => {
   return { emissions: emissions.length, rows: latestPerWindow(emissions) };
 });
 const rows = computed(() => runs.data.value?.rows ?? []);
-const forbidden = computed(() => httpStatus(runs.error.value) === 403);
-const runsError = computed(() =>
-  runs.error.value && !forbidden.value ? readErrorCopy(t, runs.error.value) : null,
-);
+const runsError = computed(() => (runs.error.value ? readErrorCopy(t, runs.error.value) : null));
 
 const search = ref("");
 const scope = ref<Scope>("all");

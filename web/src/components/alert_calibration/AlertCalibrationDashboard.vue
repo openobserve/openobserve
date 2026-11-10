@@ -69,24 +69,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AlertCalibrationDismissedList v-else-if="decisionRoute.transport.value !== 'pending'" />
       </template>
 
-      <OEmptyState
-        v-else-if="forbidden"
-        size="hero"
-        preset="no-access"
-        :description="t('alertCalibration.readError.forbidden')"
-        data-test="alert-calibration-dashboard-no-access"
-      />
-
-      <OEmptyState
-        v-else-if="data.error.value"
-        size="hero"
-        illustration="broken-panel"
-        variant="error"
-        :title="t('alertCalibration.dashboard.loadFailedTitle')"
-        :description="readErrorCopy(t, data.error.value)"
-        :action-label="t('alertCalibration.retry')"
-        action-icon="refresh"
-        @action="refresh"
+      <LiveNoticeState
+        v-else-if="forbidden || data.error.value"
+        size="block"
+        :notice="boardNotice"
+        :busy="data.loading.value"
+        :data-test="
+          forbidden ? 'alert-calibration-dashboard-no-access' : 'alert-calibration-dashboard-error'
+        "
+        retry-test="alert-calibration-dashboard-retry"
+        @retry="refresh"
       />
 
       <OEmptyState
@@ -452,6 +444,8 @@ import {
   type DismissableFinding,
 } from "./dismissals";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
+import { readNotice } from "./notices";
+import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
 import {
   countOrDash,
   coverageNoteRows,
@@ -532,6 +526,14 @@ const loading = computed(
     !dismissals.settled.value,
 );
 const latest = computed(() => data.data.value?.latest ?? null);
+const boardNotice = computed(() =>
+  readNotice(
+    t,
+    forbidden.value ? { response: { status: 403 } } : data.error.value,
+    t("alertCalibration.dashboard.loadFailedTitle"),
+    readErrorCopy(t, data.error.value),
+  ),
+);
 /** A 403 is a missing permission, not a failure, so it gets no Retry. */
 const forbidden = computed(
   () => httpStatus(data.error.value) === 403 || httpStatus(configQuery.error.value) === 403,

@@ -44,15 +44,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton class="rounded-default h-40 w-full" />
     </div>
 
-    <OEmptyState
+    <LiveNoticeState
       v-else-if="loadError"
-      size="hero"
-      illustration="broken-panel"
-      variant="error"
-      :title="t('alertCalibration.detail.unavailableTitle')"
-      :description="loadError"
-      :action-label="t('alertCalibration.detail.backToDigests')"
-      action-icon="chevron-left"
+      size="block"
+      :notice="{
+        ...readNotice(
+          t,
+          records.error.value,
+          t('alertCalibration.detail.unavailableTitle'),
+          loadError,
+        ),
+        retry: false,
+      }"
+      :action="t('alertCalibration.detail.backToDigests')"
       data-test="alert-calibration-digest-error"
       @action="router.push(digestsRoute)"
     />
@@ -270,6 +274,8 @@ import { useActiveDismissals } from "@/composables/alertCalibration/useDismissal
 import { raw, useI18nTyped, type I18nText, type I18nKey } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { readErrorCopy } from "@/services/alert_calibration";
+import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
+import { readNotice } from "./notices";
 import { writeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import AlertCalibrationSkipGroup, {

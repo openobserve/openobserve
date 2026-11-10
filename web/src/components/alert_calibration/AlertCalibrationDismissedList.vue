@@ -21,16 +21,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton class="rounded-surface h-32 w-full" />
     </div>
 
-    <OEmptyState
+    <LiveNoticeState
       v-else-if="unknown"
       size="block"
-      illustration="broken-panel"
-      variant="error"
-      :title="t('alertCalibration.dismiss.loadFailedTitle')"
-      :action-label="t('alertCalibration.retry')"
-      action-icon="refresh"
+      :notice="
+        readNotice(
+          t,
+          query.error.value,
+          t('alertCalibration.dismiss.loadFailedTitle'),
+          readErrorCopy(t, query.error.value),
+        )
+      "
       data-test="alert-calibration-dismissed-error"
-      @action="query.refetch()"
+      retry-test="alert-calibration-dismissed-retry"
+      @retry="query.refetch()"
     />
 
     <OEmptyState
@@ -111,6 +115,9 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { readErrorCopy } from "@/services/alert_calibration";
+import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
+import { readNotice } from "./notices";
 import {
   useActiveDismissals,
   useReopenDismissal,

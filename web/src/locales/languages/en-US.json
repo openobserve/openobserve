@@ -11788,6 +11788,8 @@
     },
     "readError": {
       "forbidden": "You don't have access to Alert calibration. Ask an org admin for read access to it.",
+      "noAccessTitle": "You don't have access to Alert calibration",
+      "noAccessDescription": "Ask an org admin for read access to it.",
       "unreachable": "Couldn't reach the server. Check your connection and try again.",
       "runs": "Alert calibration runs couldn't be loaded. Try again in a moment.",
       "run": "This run couldn't be loaded. Try again in a moment.",

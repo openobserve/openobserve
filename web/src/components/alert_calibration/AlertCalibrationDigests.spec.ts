@@ -173,7 +173,9 @@ describe("AlertCalibrationDigests", () => {
       serverError(403, { message: "Unauthorized Access" }),
     );
     const wrapper = await mountPage();
-    expect(wrapper.find('[data-test="o2-table-forbidden"]').exists()).toBe(true);
+    const notice = wrapper.find('[data-test="alert-calibration-digests-error"]');
+    expect(notice.text()).toContain("You don't have access to Alert calibration");
+    expect(notice.find('[data-test="alert-calibration-digests-retry"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Runs unavailable");
     wrapper.unmount();
   });
