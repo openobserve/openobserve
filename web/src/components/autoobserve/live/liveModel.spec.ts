@@ -191,6 +191,35 @@ describe("useLiveAutoObserve groups the rail from every gap (F8)", () => {
     expect(railCall?.[1].limit).toBeGreaterThanOrEqual(50);
   });
 
+  it("holds the rail as loading until the gaps and coverage it builds the group card from arrive (T5-N6)", async () => {
+    let releaseGaps: () => void = () => undefined;
+    vi.mocked(autoobserve.coverage).mockResolvedValue({ data: coverage() } as never);
+    vi.mocked(autoobserve.suggestions).mockImplementation((_org, params) =>
+      params.kind === "coverage_gap"
+        ? (new Promise((resolve) => {
+            releaseGaps = () =>
+              resolve({
+                data: { suggestions: [0, 1, 2].map(gap), total: 3, limit: 3, offset: 0 },
+              } as never);
+          }) as never)
+        : (Promise.resolve({
+            data: { suggestions: [gap(0)], total: 1, limit: 5, offset: 0 },
+          }) as never),
+    );
+    const StatusHarness = defineComponent({
+      setup() {
+        const { rail } = useLiveAutoObserve();
+        return () => h("span", { "data-test": "status" }, rail.value.status);
+      },
+    });
+    const wrapper = mount(StatusHarness, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    expect(wrapper.find('[data-test="status"]').text()).toBe("loading");
+    releaseGaps();
+    await flushPromises();
+    expect(wrapper.find('[data-test="status"]').text()).toBe("ready");
+  });
+
   it("pages past the server's largest page, so a group of 501 gaps reads all 501 (F8)", async () => {
     vi.mocked(autoobserve.coverage).mockResolvedValue({ data: coverage() } as never);
     vi.mocked(autoobserve.suggestions).mockClear();

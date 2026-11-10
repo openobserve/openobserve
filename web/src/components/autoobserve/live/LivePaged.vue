@@ -393,6 +393,7 @@ const PAGE_TONE: Record<PageLine["tone"], { icon: string; text: string }> = {
 };
 
 const props = withDefaults(defineProps<{ cap?: number }>(), { cap: PAGED_CAP });
+const emit = defineEmits<{ settled: [] }>();
 
 const { t, locale } = useI18nTyped();
 const router = useRouter();
@@ -417,6 +418,12 @@ const routingSet = computed(() => !!routing.data.value?.default_team_id);
 const paging = computed(() => paged.paging.value);
 const hasMore = computed(() => paged.hasMore.value);
 const settled = computed(() => !skeleton.value && state.value.status === "ready");
+// The page footer below waits for this, so it is never painted and then pushed down by the rows.
+watch(
+  () => !skeleton.value && state.value.status !== "loading",
+  (done) => done && emit("settled"),
+  { immediate: true },
+);
 const notice = computed(() =>
   !skeleton.value && state.value.status === "error" && state.value.failure
     ? liveNotice(t, "incidents", state.value.failure)
