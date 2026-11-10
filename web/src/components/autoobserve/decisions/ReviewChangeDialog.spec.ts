@@ -258,6 +258,29 @@ describe("ReviewChangeDialog (W5)", () => {
     expect(api.preview.mock.calls.length).toBeGreaterThan(reads);
   });
 
+  it("an_apply_whose_reread_also_finds_the_finding_gone_still_says_so_and_drops_the_stale_values", async () => {
+    const gone = httpError(404, {
+      code: 404,
+      error: "not_found",
+      message: "This item is no longer listed.",
+    });
+    api.decide.mockRejectedValue(gone);
+    await mountDialog();
+    api.preview.mockRejectedValue(gone);
+    applyButton()!.click();
+    await flushPromises();
+    await flushPromises();
+    const notice = q("review-change-notice");
+    expect(notice?.textContent?.trim()).toBe(
+      "This suggestion is no longer available. Open the alert to review it.",
+    );
+    expect(notice?.dataset.severity).toBe("warning");
+    expect(applyButton()).toBeNull();
+    expect(q("review-change-edit")?.textContent).toContain("Edit in alert editor");
+    expect(q("review-change-fields")).toBeNull();
+    expect(q("review-change-where")).toBeNull();
+  });
+
   it("a write failure takes the note's place below the change, so nothing above it moves", async () => {
     api.decide.mockRejectedValue(httpError(409, { error: "alert_changed", message: "changed" }));
     await mountDialog();
