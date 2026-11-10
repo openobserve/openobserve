@@ -60,21 +60,31 @@ export const SCOPE_MODE_CHOICE_LS_KEY = "aiObservability_scopeModeChoice";
 /** Scope carried in a Monitor page URL: `?type=&stream=&agent=&env=&version=`. */
 export interface UrlScope {
   type: ScopeMode | null;
+  /** The Stream-mode stream ("" when the URL is agent-scoped). */
   stream: string;
   agent: string;
   env: string;
   version: string;
+  /** The agent's picked stream: `stream` of an agent-scoped URL, else "". */
+  agentStream: string;
 }
 
 export function readUrlScope(query: LocationQuery): UrlScope {
   const str = (v: unknown) => (typeof v === "string" ? v : "");
   const type = str(query.type);
+  const agent = str(query.agent);
+  const env = str(query.env);
+  const version = str(query.version);
+  // Agent mode writes `stream` for the agent's picked stream, so it must not
+  // also seed the Stream-mode picker.
+  const agentScoped = type === "agent" || (!type && !!(agent || env || version));
   return {
     type: type === "stream" || type === "agent" ? type : null,
-    stream: str(query.stream),
-    agent: str(query.agent),
-    env: str(query.env),
-    version: str(query.version),
+    stream: agentScoped ? "" : str(query.stream),
+    agent,
+    env,
+    version,
+    agentStream: agentScoped ? str(query.stream) : "",
   };
 }
 
@@ -127,7 +137,8 @@ export function scopeUrlQuery(
     mode: ScopeMode;
     explicit: boolean;
     stream: string;
-    agent?: { name: string; env: string; version: string } | null;
+    /** `stream` here is the agent's picked stream ("" when the default was kept). */
+    agent?: { name: string; env: string; version: string; stream?: string } | null;
   },
 ): LocationQueryRaw {
   const query: LocationQueryRaw = { ...current };
@@ -142,6 +153,7 @@ export function scopeUrlQuery(
       query.agent = scope.agent.name;
       query.env = scope.agent.env;
       query.version = scope.agent.version;
+      if (scope.agent.stream) query.stream = scope.agent.stream;
     }
   } else if (scope.stream) {
     query.stream = scope.stream;
@@ -255,6 +267,19 @@ export interface UseAgentScopeReturn {
   /** Selected version (or UNSET, scoped to env + name). */
   selectedVersion: Ref<string>;
   /**
+   * Streams carrying the selected env + agent + version, the default stream
+   * (earliest `first_seen`: the stream the agent has lived in longest) first.
+   * More than one means the page shows a Stream picker; empty until the
+   * cascade resolves an agent.
+   */
+  agentStreams: ComputedRef<SelectOption[]>;
+  /**
+   * The stream the user picked for the selected agent ("" = the default). A
+   * pick that no longer carries the selected agent (agent, env or version
+   * changed, or a reload dropped it) is cleared, falling back to the default.
+   */
+  selectedAgentStream: Ref<string>;
+  /**
    * Seed the cascade selection from an agent NAME (the URL `?agent=` deep-link
    * and localStorage-restore path). Picks the FIRST agent with that name and
    * pins env → name → version (UNSET-aware) so `selectedAgent` resolves. Returns
@@ -267,9 +292,11 @@ export interface UseAgentScopeReturn {
    * persisted selection. Any of the three may be "" (not given). Picks the agent
    * matching every given dimension, else drops version, else matches the name
    * alone, so a same-named agent under a different env/version is only the
-   * fallback. Returns true when an agent was selected.
+   * fallback. `stream` (the URL `stream` of an agent-mode link) is kept when
+   * the resolved agent sends to it, else the default stream is used. Returns
+   * true when an agent was selected.
    */
-  selectAgentByScope: (env: string, name: string, version: string) => boolean;
+  selectAgentByScope: (env: string, name: string, version: string, stream?: string) => boolean;
 }
 
 export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
@@ -300,6 +327,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   const selectedEnv = ref<string>("");
   const selectedAgentName = ref<string>("");
   const selectedVersion = ref<string>("");
+  const selectedAgentStream = ref<string>("");
 
   // distinct-in-first-seen-order helper producing SelectOption[]. The UNSET
   // sentinel (agent has no value for this dimension) is rendered as a bucket
@@ -383,6 +411,34 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
       : [],
   );
 
+  // Every registry row of the selected env + agent + version: one per stream
+  // (and per id) it sends to.
+  const variantRows = computed<GenAiAgentListItem[]>(() => {
+    if (!cascade || !selectedEnv.value || !selectedAgentName.value || !selectedVersion.value) {
+      return [];
+    }
+    return agents.value.filter(
+      (a) =>
+        agentEnv(a) === selectedEnv.value &&
+        a.name === selectedAgentName.value &&
+        agentVersion(a) === selectedVersion.value,
+    );
+  });
+
+  // The streams of the selected variant, the default first: the earliest
+  // `first_seen`, i.e. the stream the agent has lived in longest. The registry
+  // carries no span or trace counts and a count query per stream would cost a
+  // search on every page entry, while `first_seen` is already on each row and
+  // new traffic never moves it, so one stray trace in another stream cannot take
+  // over. A row without `first_seen` sorts last; ties keep the registry order.
+  const agentStreams = computed<SelectOption[]>(() => {
+    const ordered = [...variantRows.value].sort(
+      (a, b) =>
+        (a.first_seen ?? Number.MAX_SAFE_INTEGER) - (b.first_seen ?? Number.MAX_SAFE_INTEGER),
+    );
+    return distinctOptions(ordered.map((a) => a.source_stream));
+  });
+
   // Keep each cascade level valid + auto-select a sensible default. Runs top-down
   // so clearing/auto-selecting a higher level re-derives the ones below within
   // the same reactive flush. `{ immediate: true }` seeds the initial selection.
@@ -408,14 +464,22 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
       if (!verVals.includes(selectedVersion.value)) {
         selectedVersion.value = verVals.length ? verVals[0] : "";
       }
+      // A picked stream that no longer carries this agent falls back to the default.
+      if (
+        selectedAgentStream.value &&
+        !agentStreams.value.some((o) => o.value === selectedAgentStream.value)
+      ) {
+        selectedAgentStream.value = "";
+      }
     };
     // `flush: 'sync'` so a caller that sets a higher level and immediately reads
     // the re-derived lower levels (the common imperative usage) sees a
     // consistent cascade without awaiting a tick.
-    watch([agents, selectedEnv, selectedAgentName, selectedVersion], reconcile, {
-      immediate: true,
-      flush: "sync",
-    });
+    watch(
+      [agents, selectedEnv, selectedAgentName, selectedVersion, selectedAgentStream],
+      reconcile,
+      { immediate: true, flush: "sync" },
+    );
   }
 
   // Seed the cascade from an agent name (URL deep-link / persistence restore).
@@ -436,7 +500,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   // agent). Tries the exact given dimensions first, then drops version, then
   // keeps only the name, so a link whose version or env is gone for this window
   // still lands on the named agent rather than on the first one in the list.
-  function selectAgentByScope(env: string, name: string, version: string): boolean {
+  function selectAgentByScope(env: string, name: string, version: string, stream = ""): boolean {
     if (!cascade || (!env && !name && !version)) return false;
     const envOk = (a: GenAiAgentListItem) => !env || agentEnv(a) === env;
     const nameOk = (a: GenAiAgentListItem) => !name || a.name === name;
@@ -450,6 +514,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     selectedEnv.value = agentEnv(match);
     selectedAgentName.value = match.name;
     selectedVersion.value = agentVersion(match);
+    selectedAgentStream.value = agentStreams.value.some((o) => o.value === stream) ? stream : "";
     return true;
   }
 
@@ -469,20 +534,12 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   );
 
   const selectedAgent = computed<GenAiAgentListItem | null>(() => {
-    // Cascade mode: resolve the concrete agent from env + name + version
-    // (all three must be pinned to a real, unset-aware value).
+    // Cascade mode: resolve the concrete agent from env + name + version (all
+    // three pinned to a real, unset-aware value), then the stream: the picked
+    // one, else the default (the first of `agentStreams`).
     if (cascade) {
-      if (!selectedEnv.value || !selectedAgentName.value || !selectedVersion.value) {
-        return null;
-      }
-      return (
-        agents.value.find(
-          (a) =>
-            agentEnv(a) === selectedEnv.value &&
-            a.name === selectedAgentName.value &&
-            agentVersion(a) === selectedVersion.value,
-        ) ?? null
-      );
+      const stream = selectedAgentStream.value || agentStreams.value[0]?.value;
+      return variantRows.value.find((a) => a.source_stream === stream) ?? null;
     }
     // Single-dropdown mode (unchanged).
     if (allAgents && activeAgent.value === ALL_AGENTS_VALUE) return null;
@@ -490,8 +547,8 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   });
 
   // Hazard 3 — effectiveStream normalization: uniformly `?? ""`. In agent mode
-  // the selected agent's source_stream drives the query; with no agent it is "".
-  // Stream mode reads the page-picked stream.
+  // the selected agent's source_stream drives the query (the picked stream, else
+  // the default); with no agent it is "". Stream mode reads the page-picked stream.
   const effectiveStream = computed(() =>
     opts.filterMode.value === "agent"
       ? (selectedAgent.value?.source_stream ?? "")
@@ -623,6 +680,8 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     selectedEnv,
     selectedAgentName,
     selectedVersion,
+    agentStreams,
+    selectedAgentStream,
     selectAgentByName,
     selectAgentByScope,
   };

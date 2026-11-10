@@ -66,10 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :envs="envs"
       :agent-names="agentNames"
       :versions="versions"
+      :agent-streams="agentStreams"
+      :selected-agent-stream="effectiveStream"
       :selected-stream-count="selectedStreamCount"
       :streams-loaded="true"
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
+      @update:selected-agent-stream="selectedAgentStream = $event"
       @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
@@ -718,16 +721,21 @@ const scopeReady = ref(false);
 // nothing, so the next load after it decides again; so does a window the user
 // picks, whose agents may differ (unless the user chose the mode).
 let modeSettled = false;
-// Env/name/version to seed the cascade with once the list loads: the URL
-// deep-link first (any of agent/env/version), else the persisted last
-// selection. Resolved into selectedEnv/AgentName/Version via
+// Env/name/version (and the agent's picked stream) to seed the cascade with
+// once the list loads: the URL deep-link first (any of agent/env/version), else
+// the persisted last selection. Resolved into selectedEnv/AgentName/Version via
 // `selectAgentByScope`, then cleared. (The URL carries readable values, not the
 // internal agent key.) Env/version come from the same source as the name, so a
 // name-only link never pairs with a stored variant of another agent.
 const urlHasAgentScope = !!(urlScope.agent || urlScope.env || urlScope.version);
-const pendingScope = ref<{ env: string; name: string; version: string } | null>(
+const pendingScope = ref<{ env: string; name: string; version: string; stream?: string } | null>(
   urlHasAgentScope
-    ? { env: urlScope.env, name: urlScope.agent, version: urlScope.version }
+    ? {
+        env: urlScope.env,
+        name: urlScope.agent,
+        version: urlScope.version,
+        stream: urlScope.agentStream,
+      }
     : localStorage.getItem(AGENT_LS_KEY)
       ? {
           env: localStorage.getItem(ENV_LS_KEY) || "",
@@ -763,6 +771,8 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  agentStreams,
+  selectedAgentStream,
   selectAgentByName,
   selectAgentByScope,
 } = useAgentScope({
@@ -1098,7 +1108,12 @@ watch(panelCacheDashboardId, (id) => ensurePanelCacheStub(id), {
 // (e.g. the time range owned by the parent).
 function syncFilterUrl() {
   const agent = selectedAgent.value
-    ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
+    ? {
+        name: selectedAgent.value.name,
+        env: selectedEnv.value,
+        version: selectedVersion.value,
+        stream: selectedAgentStream.value,
+      }
     : null;
   // replace (not push) — filter tweaks shouldn't pile up in browser history.
   void replaceRouteQuery(router, route, (current) => {
@@ -1554,8 +1569,8 @@ async function loadInsights(
       // Seed the cascade from the carried-over env/name/version (URL deep-link,
       // else the persisted last selection) now that the list exists; then clear it.
       if (pendingScope.value && agents.value.length > 0) {
-        const { env, name, version } = pendingScope.value;
-        selectAgentByScope(env, name, version);
+        const { env, name, version, stream } = pendingScope.value;
+        selectAgentByScope(env, name, version, stream);
         pendingScope.value = null;
       }
       // Default to the first agent when nothing valid is selected (fresh entry

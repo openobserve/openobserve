@@ -34,10 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the parent (the page shows its own no-agents empty state), so this component
   never renders a stuck/empty dropdown.
 
-  data-test on each: `${prefix}-cascade-{env|agent|version}`.
+  A fourth Stream dropdown renders only when the selected env + agent + version
+  sends to more than one stream (useAgentScope.agentStreams), so a single-stream
+  setup keeps its three-control row. It shows the stream the page reads (the
+  pick, else the default) and emits the pick via update:selectedStream. Below md
+  it takes its own row under the three-up cascade.
+
+  data-test on each: `${prefix}-cascade-{env|agent|version|stream}`.
 -->
 <template>
-  <div class="flex flex-wrap items-center gap-2 max-md:basis-full max-md:flex-nowrap">
+  <div
+    class="flex flex-wrap items-center gap-2 max-md:basis-full"
+    :class="{ 'max-md:flex-nowrap': !showStream }"
+  >
     <div class="w-44 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink">
       <OSelect
         :model-value="selectedEnv"
@@ -85,6 +94,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onVersionChange"
       />
     </div>
+    <div
+      v-if="showStream"
+      class="w-44 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:basis-full"
+      :title="t('aiObservability.scope.streamHint', { count: agentStreams.length })"
+    >
+      <OSelect
+        :model-value="selectedStream"
+        :label="t('aiObservability.scope.stream')"
+        label-position="inside"
+        :options="agentStreams"
+        labelKey="label"
+        valueKey="value"
+        class="rounded-default w-full"
+        :data-test="`${prefix}-cascade-stream`"
+        @update:model-value="onStreamChange"
+      />
+    </div>
   </div>
 </template>
 
@@ -117,9 +143,18 @@ const props = withDefaults(
      * the Env + Agent dropdowns render.
      */
     showVersion?: boolean;
+    /**
+     * Streams carrying the selected env + agent + version (useAgentScope
+     * .agentStreams). The Stream dropdown shows only when there are two or more.
+     */
+    agentStreams?: SelectOption[];
+    /** The stream the page reads for the selected agent (two-way via update:selectedStream). */
+    selectedStream?: string;
   }>(),
   {
     showVersion: true,
+    agentStreams: () => [],
+    selectedStream: "",
   },
 );
 
@@ -127,9 +162,12 @@ const emit = defineEmits<{
   (e: "update:selectedEnv", value: string): void;
   (e: "update:selectedAgentName", value: string): void;
   (e: "update:selectedVersion", value: string): void;
+  (e: "update:selectedStream", value: string): void;
 }>();
 
 const { t } = useI18nTyped();
+
+const showStream = computed(() => props.agentStreams.length > 1);
 
 // useAgentScope puts the ids behind each name on its option (`agentIds`).
 const selectedAgentIdHint = computed(() => {
@@ -149,5 +187,9 @@ const onAgentNameChange = (value: unknown) => {
 
 const onVersionChange = (value: unknown) => {
   emit("update:selectedVersion", value as string);
+};
+
+const onStreamChange = (value: unknown) => {
+  emit("update:selectedStream", value as string);
 };
 </script>

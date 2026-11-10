@@ -97,10 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :envs="envs"
       :agent-names="agentNames"
       :versions="versions"
+      :agent-streams="agentStreams"
+      :selected-agent-stream="effectiveStream"
       :selected-stream-count="selectedStreamCount"
       :streams-loaded="streamsLoaded"
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
+      @update:selected-agent-stream="selectedAgentStream = $event"
       @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
@@ -481,13 +484,18 @@ const modeExplicit = ref(explicitMode !== null);
 // so it only seeds the mode a back-navigation's cached rows show; the next load
 // that runs decides from its own window's list.
 let modeSettledOrg: string | null = null;
-// Env/name/version to seed the cascade with once the list is available: the
-// URL deep-link first (any of agent/env/version), else the persisted last
-// selection, never a mix of the two. Resolved via `selectAgentByScope`, then
-// cleared.
-const pendingScope = ref<{ env: string; name: string; version: string } | null>(
+// Env/name/version (and the agent's picked stream) to seed the cascade with
+// once the list is available: the URL deep-link first (any of
+// agent/env/version), else the persisted last selection, never a mix of the
+// two. Resolved via `selectAgentByScope`, then cleared.
+const pendingScope = ref<{ env: string; name: string; version: string; stream?: string } | null>(
   urlScope.agent || urlScope.env || urlScope.version
-    ? { env: urlScope.env, name: urlScope.agent, version: urlScope.version }
+    ? {
+        env: urlScope.env,
+        name: urlScope.agent,
+        version: urlScope.version,
+        stream: urlScope.agentStream,
+      }
     : localStorage.getItem(AGENT_LS_KEY)
       ? {
           env: localStorage.getItem(ENV_LS_KEY) || "",
@@ -540,6 +548,8 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  agentStreams,
+  selectedAgentStream,
   selectAgentByName,
   selectAgentByScope,
 } = useAgentScope({
@@ -561,8 +571,8 @@ const {
 // cleared once `agents` was ready to resolve it.
 function seedPendingCascade() {
   if (!pendingScope.value || agents.value.length === 0) return;
-  const { env, name, version } = pendingScope.value;
-  selectAgentByScope(env, name, version);
+  const { env, name, version, stream } = pendingScope.value;
+  selectAgentByScope(env, name, version, stream);
   pendingScope.value = null;
 }
 
@@ -749,7 +759,12 @@ function syncFilterUrl() {
       explicit: modeExplicit.value,
       stream: activeStream.value,
       agent: selectedAgent.value
-        ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
+        ? {
+            name: selectedAgent.value.name,
+            env: selectedEnv.value,
+            version: selectedVersion.value,
+            stream: selectedAgentStream.value,
+          }
         : null,
     });
     // Only the applied term — so the filtered view has a link and survives a

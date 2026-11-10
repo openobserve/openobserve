@@ -52,10 +52,13 @@
         :envs="envs"
         :agent-names="agentNames"
         :versions="versions"
+        :agent-streams="agentStreams"
+        :selected-agent-stream="effectiveStream"
         :selected-stream-count="selectedStreamCount"
         :streams-loaded="true"
         :agents-loaded="agentsLoaded"
         @filter-mode-change="onFilterModeChange"
+        @update:selected-agent-stream="selectedAgentStream = $event"
         @agent-pick="modeExplicit = true"
       />
     </template>
@@ -180,6 +183,8 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  agentStreams,
+  selectedAgentStream,
   selectAgentByScope,
 } = useAgentScope({
   filterMode,
@@ -212,7 +217,12 @@ const panelScope = computed(
 
 function syncScopeUrl() {
   const agent = selectedAgent.value
-    ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
+    ? {
+        name: selectedAgent.value.name,
+        env: selectedEnv.value,
+        version: selectedVersion.value,
+        stream: selectedAgentStream.value,
+      }
     : null;
   void replaceRouteQuery(router, route, (current) => {
     const next = scopeUrlQuery(current, {
@@ -239,7 +249,7 @@ function onFilterModeChange(mode: unknown) {
   syncScopeUrl();
 }
 
-watch([activeStream, selectedEnv, selectedAgentName, selectedVersion], () => {
+watch([activeStream, selectedEnv, selectedAgentName, selectedVersion, selectedAgentStream], () => {
   if (scopeReady.value) syncScopeUrl();
 });
 
@@ -291,7 +301,12 @@ async function settleScope(force = false) {
     filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
   }
   if (pendingUrlScope && agents.value.length) {
-    selectAgentByScope(pendingUrlScope.env, pendingUrlScope.agent, pendingUrlScope.version);
+    selectAgentByScope(
+      pendingUrlScope.env,
+      pendingUrlScope.agent,
+      pendingUrlScope.version,
+      pendingUrlScope.agentStream,
+    );
     pendingUrlScope = null;
   }
   scopeReady.value = true;

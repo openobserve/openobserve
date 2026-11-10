@@ -55,10 +55,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :envs="envs"
         :agent-names="agentNames"
         :versions="versions"
+        :agent-streams="agentStreams"
+        :selected-agent-stream="effectiveStream"
         :selected-stream-count="selectedStreamCount"
         :streams-loaded="true"
         :agents-loaded="agentsLoaded"
         @filter-mode-change="onFilterModeChange"
+        @update:selected-agent-stream="selectedAgentStream = $event"
         @agent-pick="modeExplicit = true"
       >
         <!-- Version-agnostic hint. Agent Graph hides the cascade's Version
@@ -255,9 +258,14 @@ const scopeReady = ref(false);
 // picks, whose agents may differ (unless the user chose the mode).
 let modeSettled = false;
 // Seeded once from the URL after the first agents load, then cleared.
-let pendingUrlScope: { env: string; name: string; version: string } | null =
+let pendingUrlScope: { env: string; name: string; version: string; stream: string } | null =
   urlScope.agent || urlScope.env || urlScope.version
-    ? { env: urlScope.env, name: urlScope.agent, version: urlScope.version }
+    ? {
+        env: urlScope.env,
+        name: urlScope.agent,
+        version: urlScope.version,
+        stream: urlScope.agentStream,
+      }
     : null;
 const activeStream = ref<string>(urlScope.stream);
 
@@ -354,6 +362,8 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  agentStreams,
+  selectedAgentStream,
   selectAgentByScope,
 } = useAgentScope({
   filterMode,
@@ -404,7 +414,12 @@ const graphReady = computed(
 
 function syncScopeUrl() {
   const agent = selectedAgent.value
-    ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
+    ? {
+        name: selectedAgent.value.name,
+        env: selectedEnv.value,
+        version: selectedVersion.value,
+        stream: selectedAgentStream.value,
+      }
     : null;
   void replaceRouteQuery(router, route, (current) => {
     const next = scopeUrlQuery(current, {
@@ -431,7 +446,7 @@ function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[])
   syncScopeUrl();
 }
 
-watch([activeStream, selectedEnv, selectedAgentName], () => {
+watch([activeStream, selectedEnv, selectedAgentName, selectedAgentStream], () => {
   if (scopeReady.value) syncScopeUrl();
 });
 
@@ -459,7 +474,12 @@ async function loadAgents(force = false, windowPicked = false) {
   }
   if (!agentsError.value) modeSettled = true;
   if (pendingUrlScope && agents.value.length) {
-    selectAgentByScope(pendingUrlScope.env, pendingUrlScope.name, pendingUrlScope.version);
+    selectAgentByScope(
+      pendingUrlScope.env,
+      pendingUrlScope.name,
+      pendingUrlScope.version,
+      pendingUrlScope.stream,
+    );
     pendingUrlScope = null;
   }
   if (activeStream.value && !availableStreams.value.includes(activeStream.value)) {

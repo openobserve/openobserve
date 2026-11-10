@@ -19041,6 +19041,8 @@
       "env": "Env",
       "agent": "Agent",
       "version": "Version",
+      "stream": "Stream",
+      "streamHint": "This agent version sends traces to {count} streams. The one it has used longest is shown unless you pick another.",
       "agentIdHint": "Agent ID: {ids}",
       "noAgentIdentity": "No agent identity found",
       "noAgentIdentityDescription": "These LLM spans carry no agent name, so they are shown by stream. Map the attribute that names your agent to view them by agent.",
