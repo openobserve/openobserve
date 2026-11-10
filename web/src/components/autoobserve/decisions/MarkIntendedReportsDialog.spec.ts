@@ -96,11 +96,11 @@ const okItem = (id: string, index: number) => ({
   },
 });
 
-const mountDialog = async () => {
+const mountDialog = async (targets: MarkTarget[] = alerts) => {
   wrapper = mount(MarkIntendedReportsDialog, {
     props: {
       open: true,
-      alerts,
+      alerts: targets,
       "onUpdate:open": (open: boolean) => wrapper?.setProps({ open }),
     },
     attachTo: document.body,
@@ -150,6 +150,15 @@ describe("MarkIntendedReportsDialog", () => {
     expect(byTest("decision-mark-status")?.textContent).toContain("report-6 stays as it is.");
     expect(byTest("decision-mark-submit")?.textContent).toContain("Mark 5 as intended");
     expect(byTest("decision-mark-dialog")?.textContent).not.toContain(hex(1));
+  });
+
+  it("one_alert_reads_in_the_singular_with_nothing_to_untick", async () => {
+    await mountDialog(alerts.slice(0, 1));
+    const text = byTest("decision-mark-dialog")?.textContent ?? "";
+    expect(text).toContain("Mark alert as intended report");
+    expect(text).toContain("It stops showing as noise.");
+    expect(text).toContain("The alert keeps sending exactly as before.");
+    expect(text).not.toContain("Untick");
   });
 
   it("sends_one_batch_and_toasts_with_undo_for_every_written_item", async () => {

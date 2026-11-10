@@ -34385,9 +34385,9 @@
       },
       "mark": {
         "action": "Mark as intended report",
-        "title": "Mark alerts as intended reports",
-        "intro": "They stop showing as noise.",
-        "keeps": "The alerts keep sending exactly as before.",
+        "title": "Mark alert as intended report | Mark alerts as intended reports",
+        "intro": "It stops showing as noise. | They stop showing as noise.",
+        "keeps": "The alert keeps sending exactly as before. | The alerts keep sending exactly as before.",
         "untick": "Untick any that are not meant as reports.",
         "team": "{team} team",
         "folder": "folder {folder}",

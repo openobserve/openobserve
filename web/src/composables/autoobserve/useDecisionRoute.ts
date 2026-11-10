@@ -285,6 +285,7 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
       if (!toastRecords.some((r) => r.id === key && r.open)) undoGroups.delete(key);
     }
     let key = "";
+    let close: (() => void) | null = null;
     const handle = toast({
       message,
       variant,
@@ -293,10 +294,13 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
         handler: () => {
           const group = undoGroups.get(key);
           undoGroups.delete(key);
+          // The undo ends in its own toast, so this one must not keep a live-looking Undo.
+          close?.();
           if (group) void undo(group);
         },
       },
     });
+    close = handle;
     key = handle.id;
     const group = undoGroups.get(key);
     if (group) group.push(...items);
@@ -327,7 +331,12 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
         ? [{ org, view: item.result.decision, title: titleOf(item.id) }]
         : [],
     );
-    toastWritten(written, copy().marked(written.length));
+    toastWritten(
+      written,
+      written.length === 1
+        ? copy().saved(written[0].view, written[0].title)
+        : copy().marked(written.length),
+    );
     return result;
   }
 
