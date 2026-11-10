@@ -423,6 +423,27 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     expect(review.reviewRows.value.find((r) => r.key === "errs")?.threshold).toBe(40);
   });
 
+  it("shows a measuring row's wait in its Fires when cell, not as a line that later goes (T5-N5)", async () => {
+    api.schema.mockResolvedValue({
+      data: {
+        schema: [
+          { name: "service_name" },
+          { name: "k8s_namespace_name" },
+          { name: "level", type: "Utf8" },
+        ],
+      },
+    });
+    measureBaseline.mockReturnValue(new Promise(() => undefined));
+    await mountDrawer();
+    const [row] = fieldRows(IDS);
+    await openWith([{ ...row, key: "errs", kind: "errors", usually: null }]);
+    await flushPromises();
+    expect(q("bulk-review-cant-errs")).toBeNull();
+    const wait = q("bulk-review-measuring-errs")!;
+    expect(q("bulk-review-firesWhen-errs")!.contains(wait)).toBe(true);
+    expect(wait.getAttribute("aria-label")).toBe("Measuring the usual level over the last 7 days…");
+  });
+
   it("keeps a row one line tall when its week has no usual level (T5-N5)", async () => {
     api.schema.mockResolvedValue({
       data: {

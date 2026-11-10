@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <!-- One line on a wide screen, so a row that resolves to a threshold ask keeps its height. -->
             <OTruncatedText
-              v-if="!row.prefill || row.block"
+              v-if="(!row.prefill || row.block) && !(measuring(row) && !isMobile)"
               :lines="isMobile ? 2 : 1"
               :class="[
                 'text-xs',
@@ -252,11 +252,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`bulk-review-threshold-${row.key}`"
               @update:model-value="(v: string | number) => typeThreshold(row.key, v)"
             />
+            <OSkeleton
+              v-else-if="measuring(row)"
+              animation="pulse"
+              class="h-4 w-36"
+              role="status"
+              :aria-label="t('insight.threshold.measuring')"
+              :data-test="`bulk-review-measuring-${row.key}`"
+            />
             <template v-else>{{ firesWhenOf(t, kind, row) }}</template>
           </div>
         </template>
         <template #cell-usually="{ row }">
-          <span class="text-text-body tabular-nums">{{ usuallyOf(t, locale, row, kind) }}</span>
+          <OSkeleton v-if="measuring(row)" animation="pulse" class="h-4 w-20" aria-hidden="true" />
+          <span v-else class="text-text-body tabular-nums">{{
+            usuallyOf(t, locale, row, kind)
+          }}</span>
         </template>
       </OTable>
     </div>
@@ -329,6 +340,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import alertsService from "@/services/alerts";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -466,6 +478,8 @@ const compactLine = (row: ReviewRow) =>
   [row.stream.name, firesWhenOf(t, kind.value, row), usuallyOf(t, locale.value, row, kind.value)]
     .filter(Boolean)
     .join(" · ");
+
+const measuring = (row: ReviewRow) => row.block?.code === "measuring";
 
 const asksThreshold = (row: ReviewRow) =>
   row.block?.code === "noBaseline" || !!state.thresholds[row.key];
