@@ -29,12 +29,7 @@ interface StreamErrorBody {
 
 export type StreamQueryError = Error & { status?: number; code?: number; raw: unknown };
 
-/**
- * Turn a streaming-search error (`handlers.error`'s second argument) into an
- * `Error` carrying the server's message, with `.status`, `.code` and `.raw`.
- * useStreamingSearch wraps the server error body as
- * `{ content: { ...errorBody, trace_id }, type: "error" }`.
- */
+/** Unwraps useStreamingSearch's `{ content: { ...errorBody, trace_id } }` into an Error with the server message. */
 export function streamQueryError(
   response: { content?: StreamErrorBody } | StreamErrorBody | undefined,
 ): StreamQueryError {

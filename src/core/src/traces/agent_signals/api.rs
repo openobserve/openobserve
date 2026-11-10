@@ -160,8 +160,7 @@ pub async fn get_agent_signals(
     MetaHttpResponse::forbidden("Not Supported")
 }
 
-/// Columns a signal row is identified by over a range (each hourly window
-/// writes one row per combination). `org_id` is filtered to one value.
+/// Each hourly window writes one row per combination of these columns.
 #[cfg(any(feature = "enterprise", test))]
 const SIGNAL_DIMENSIONS: [&str; 7] = [
     "source_stream",
@@ -184,11 +183,7 @@ const SIGNAL_MEASURES: [&str; 6] = [
     "errors",
 ];
 
-/// The range read: one row per signal identity (dimensions present in the
-/// stream), its measures summed over every hourly window in the range, so a
-/// long range is counted in full rather than cut to its newest raw rows.
-/// Columns the stream lacks are left out, since naming one fails the query.
-/// `None` when the stream has no `signal_type` column (nothing written yet).
+/// Columns the stream lacks are omitted since naming one fails the query.
 #[cfg(any(feature = "enterprise", test))]
 fn signals_rollup_sql(
     start_time: i64,
@@ -340,10 +335,7 @@ fn aggregate_failure_hits(hits: &[serde_json::Value]) -> std::collections::HashM
     map
 }
 
-/// WHERE predicate selecting one arm's `_agent_signals` rows of `signal_type`.
-/// An empty `env` selects the env-less variant; without a `gen_ai_agent_env`
-/// column in the stream every row is env-less, so no clause is added (naming a
-/// missing column would fail the query).
+/// Without a `gen_ai_agent_env` column every row is env-less, so no env clause is added.
 #[cfg(any(feature = "enterprise", test))]
 fn arm_filters(org_id: &str, signal_type: &str, arm: &CompareArm, has_env_field: bool) -> String {
     let mut filters = format!(

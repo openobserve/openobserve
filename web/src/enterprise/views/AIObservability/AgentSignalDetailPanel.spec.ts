@@ -135,8 +135,6 @@ describe("failure drill-down SQL", () => {
   const joins = 'LEFT JOIN "s" AS p1 ON c.reference_parent_span_id = p1.span_id';
   const detail = "COALESCE(NULLIF(c.status_message, ''))";
 
-  // A child span joined to N duplicate parent copies yields N rows; COUNT(*)
-  // inflated the counts, distinct span ids do not.
   it("counts distinct error spans per message, not joined rows", () => {
     const sql = failureErrorsSql("s", joins, "1=1", detail);
     expect(sql).toContain("COUNT(DISTINCT c.span_id) AS occurrences");

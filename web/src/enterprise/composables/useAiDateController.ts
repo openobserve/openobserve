@@ -10,14 +10,7 @@
 // `useChildRefresh`. `onDateChange` here updates date state + writes URL only;
 // the page wires the child refresh off the resolved `timeRange`.
 //
-// The date resolves when the composable is created, in the page's setup and so
-// before the shell's DateTime mounts. The picker seeds itself from `dateState`
-// once, on mount, and replays that seed as a `date-change`; resolving later
-// (e.g. in the page's `onMounted`) let the replay carry the previous visit's
-// range into the URL and the picker label while the data used the link's.
-//
-// URL sync: every AI page keeps its range in the URL (`period`, or `from`/`to`),
-// so deep-links reproduce the exact view.
+// Resolve at creation, before the picker mounts, or its seed replay writes the previous visit's range.
 
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -28,9 +21,6 @@ import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
 
-// The picker shows `<n><unit>` periods (n ≥ 1) and calendar tokens. A URL value
-// such as "1.5h", "0h" or "abc" is no period; the leading-zero form "06h" is
-// written back as the picker names it ("6h").
 function normalizePeriod(raw: string): string | null {
   const match = raw.match(/^(\d+)([smhdwM])$/);
   if (match) {
@@ -97,9 +87,7 @@ export function useAiDateController(opts: { defaultRelative?: string } = {}) {
     return false;
   }
 
-  // An org switch remounts the page before its navigation commits, so the route
-  // still names the previous org while the store holds the one the page shows.
-  // Writing on that route must not put the previous org back.
+  // An org switch remounts before navigation commits, so the route still names the previous org.
   function writeToUrl() {
     void replaceRouteQuery(router, route, (next) => {
       const org = store.state.selectedOrganization?.identifier;
@@ -119,8 +107,7 @@ export function useAiDateController(opts: { defaultRelative?: string } = {}) {
 
   // Date-only part of the page's onDateChange: update state + write URL. The
   // page wires the child refresh off `timeRange` separately (see useChildRefresh).
-  // Returns whether the selected range changed, so a page can re-fetch on a
-  // programmatic emit that moves the window and skip the picker's mount replay.
+  // Returns whether the range changed, so pages skip the picker's mount replay.
   function onDateChange(value: any): boolean {
     const before = selectionKey();
     if (value?.valueType === "relative" && value.relativeTimePeriod) {
@@ -138,9 +125,7 @@ export function useAiDateController(opts: { defaultRelative?: string } = {}) {
     return selectionKey() !== before;
   }
 
-  // The picker keeps whole seconds, so a deep link with sub-second from/to comes
-  // back from its mount replay slightly moved. That echo is the same selection:
-  // keep the link's exact range rather than re-fetching on the rounded one.
+  // The picker rounds to whole seconds; treat its mount-replay echo as the same selection.
   function sameToTheSecond(value: { startTime?: unknown; endTime?: unknown }): boolean {
     const s = dateState.value;
     return (

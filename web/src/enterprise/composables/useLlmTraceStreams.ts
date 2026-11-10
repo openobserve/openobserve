@@ -61,11 +61,7 @@ export function useLlmTraceStreams(activeStream: Ref<string>, t: TranslateFn) {
   return { availableStreams, streamsLoaded, loadTraceStreams, ensureStreamsLoaded };
 }
 
-/**
- * The stream a page opens on: the first app stream. `_`-prefixed system streams
- * (`_evaluator`, the LLM judge's own spans) stay in the list but are never the
- * default, so a page does not open on the judge's calls.
- */
+/** `_`-prefixed system streams are never the default, so a page does not open on the judge's calls. */
 export function defaultLlmStream(streams: string[]): string {
   return streams.find((s) => !s.startsWith("_")) ?? streams[0] ?? "";
 }

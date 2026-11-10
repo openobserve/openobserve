@@ -182,13 +182,11 @@ const emit = defineEmits<{
 
 const MAX_SERVICES = 3;
 const MAX_PODS = 2;
-// Split between the oldest and newest lines of the window, so a busy trace
-// shows ticks at both ends rather than only its last moments.
+// Split between oldest and newest lines so a busy trace shows ticks at both ends.
 const LOG_LINES = 200;
 // Restart counters are scraped every 15–60 s, so look a minute past the spans.
 const POD_PAD_US = 60_000_000;
-// AIO-37's open question: one metric per span type from a fixed list, the first
-// the service correlates to, so a lane reads the same on every trace.
+// A fixed metric per span type so a lane reads the same on every trace.
 const LANE_METRICS = {
   db: ["postgresql_database_locks", "postgresql_backends"],
   service: ["k8s_pod_memory_working_set", "k8s_pod_cpu_usage"],

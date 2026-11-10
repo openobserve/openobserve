@@ -135,8 +135,7 @@ watch(
   { immediate: true },
 );
 
-// Read from the editor: it hands its text over only after a short debounce,
-// so a quick Enter would otherwise apply the text from before the last keys.
+// Read from the editor: its model update is debounced, so a quick Enter would apply stale text.
 function apply() {
   const text = (editorRef.value?.getValue?.() ?? draft.value).trim();
   draft.value = text;
@@ -148,9 +147,7 @@ function clear() {
   if (props.applied) emit("apply", "");
 }
 
-// The editor runs on Cmd/Ctrl+Enter; a one-line search runs on Enter too,
-// unless Enter is picking a completion. Bound on first focus: the editor
-// exists only once Monaco has loaded, and Enter needs focus anyway.
+// Bound on first focus: the editor exists only once Monaco has loaded.
 let enterBound = false;
 async function bindEnter() {
   const editor = editorRef.value?.editorObj;

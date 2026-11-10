@@ -94,9 +94,7 @@ pub struct GenAiAgentMappingConfig {
     #[serde(default)]
     pub version_fields: Vec<String>,
 
-    /// Harness text each agent wraps around its user's request (AIO-22), hidden
-    /// when sessions are read. Read time only: ingest ignores it and stored spans
-    /// keep everything, so it plays no part in `is_all_empty`.
+    /// Harness text hidden when reading sessions; read time only, so not part of `is_all_empty`.
     #[serde(default)]
     pub harness_patterns: Vec<HarnessPatternRule>,
 
@@ -104,14 +102,11 @@ pub struct GenAiAgentMappingConfig {
     #[serde(default)]
     pub session_title: SessionTitleMode,
 
-    /// Cost attribution fallbacks (AIO-27): attributes copied to `user.id`,
-    /// `feature.name` and `tenant.id` at ingest when a span lacks them.
+    /// Attributes copied to `user.id`, `feature.name`, `tenant.id` at ingest if a span lacks them.
     #[serde(default)]
     pub attribution_fields: AttributionFields,
 }
 
-/// The span contract for cost attribution: a standard attribute per dimension,
-/// then fallbacks, the same way the agent identity fields work.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct AttributionFields {
     #[serde(default)]
@@ -133,8 +128,7 @@ impl AttributionFields {
     }
 }
 
-/// One agent's harness patterns: `tag <name>` hides `<name …>…</name>` blocks,
-/// `regex <expr>` hides matches. A rule for one agent never touches another's.
+/// Agent harness patterns: `tag <name>` hides `<name …>…</name>`, `regex <expr>` hides matches.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct HarnessPatternRule {
     pub agent: String,
@@ -168,8 +162,7 @@ pub fn compile_harness_patterns(patterns: &[String]) -> Vec<CompiledHarnessPatte
         .collect()
 }
 
-/// What save accepts: a `tag ` or `regex ` pattern within the length limit that
-/// cannot match empty text (it would hide nothing but still count as hidden).
+/// Rejects patterns that can match empty text: they would hide nothing but still count as hidden.
 fn check_harness_pattern(pattern: &str) -> Result<CompiledHarnessPattern, String> {
     if pattern.len() > MAX_HARNESS_PATTERN_LEN {
         return Err(format!(
@@ -232,8 +225,7 @@ pub struct HarnessStripped {
     pub only: Option<String>,
 }
 
-/// One agent's patterns, saved or a draft, and the messages to hide them in. Session Detail
-/// and the settings test hide harness text with this, so it matches the Sessions list.
+/// An agent's patterns and messages to hide them in, shared so results match Sessions list.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct HarnessStripRequest {
     #[serde(default)]

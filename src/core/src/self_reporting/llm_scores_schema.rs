@@ -29,8 +29,7 @@ use config::{
 use dashmap::DashMap;
 use tokio::sync::OnceCell;
 
-// Stable org cells keep failures retryable and make success cheap: later calls
-// only re-check that the stream still exists.
+// Per-org cells keep failures retryable; later calls only re-check the stream exists.
 static INITIALIZATION_CACHE: Lazy<InitializationCache> = Lazy::new(InitializationCache::default);
 
 #[derive(Default)]
@@ -39,8 +38,7 @@ struct InitializationCache {
 }
 
 impl InitializationCache {
-    /// Runs `initialize` once per org, and again whenever `exists` reports that
-    /// the stream an earlier run created is gone (deleted since).
+    /// Runs `initialize` once per org, and again if the stream was deleted since.
     async fn run<Exists, ExistsFuture, Initialize, InitializeFuture>(
         &self,
         org_id: &str,
@@ -73,11 +71,6 @@ fn expected_llm_scores_schema() -> Result<arrow_schema::Schema> {
 }
 
 /// Initialize the canonical `_llm_scores` schema once per org; the watcher converges caches.
-///
-/// A stream deleted after this node initialised it would otherwise be recreated
-/// by the next write with only that record's fields, and Quality's reads of the
-/// missing columns would fail until a restart; so a missing stream is
-/// initialised again. The check is a schema-cache read while the stream exists.
 pub async fn ensure_llm_scores_stream_initialized(org_id: &str) -> Result<()> {
     INITIALIZATION_CACHE
         .run(

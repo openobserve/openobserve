@@ -406,15 +406,13 @@ const SEARCH_INPUT_ID = "sessions-list-search";
 // must reproduce its filtered view. When it differs from what the cached rows
 // were fetched with, the cache guard in `loadSessions` is bypassed once so the
 // mount fetch runs with the URL's term instead of restoring the stale page.
-// A link followed with the same term may name another stream, so only Back
-// (the entry has a `forward`) restores the cached rows.
+// A link with the same term may name another stream, so only Back (a `forward` entry) restores cached rows.
 let searchChangedByUrl = false;
 if (urlKeyword && (urlKeyword !== searchKeyword.value || !window.history.state?.forward)) {
   searchKeyword.value = urlKeyword;
   searchChangedByUrl = true;
 }
-// `?user=<id>` keeps one user's sessions (exact match). The URL alone owns it:
-// a link without it shows every user.
+// The URL alone owns `?user=`: a link without it shows every user.
 const urlUser = normalizeSearchTerm(typeof route.query.user === "string" ? route.query.user : "");
 if (urlUser !== searchUser.value) {
   searchUser.value = urlUser;
@@ -484,10 +482,7 @@ const modeExplicit = ref(explicitMode !== null);
 // so it only seeds the mode a back-navigation's cached rows show; the next load
 // that runs decides from its own window's list.
 let modeSettledOrg: string | null = null;
-// Env/name/version (and the agent's picked stream) to seed the cascade with
-// once the list is available: the URL deep-link first (any of
-// agent/env/version), else the persisted last selection, never a mix of the
-// two. Resolved via `selectAgentByScope`, then cleared.
+// Seeded from the URL deep-link or else the persisted selection, never a mix of the two.
 const pendingScope = ref<{ env: string; name: string; version: string; stream?: string } | null>(
   urlScope.agent || urlScope.env || urlScope.version
     ? {
@@ -619,8 +614,7 @@ watch(total, () => {
 // `hideable` exposes a column in OTable's auto-injected column chooser;
 // `sessionId` stays mandatory (it's the row identity). `firstUserMessage` is
 // the flex column — it fills leftover width on load and freezes on first
-// resize. All widths are user-resizable + persisted via `table-id`. Cost and
-// status come right after turns, so a 1280 px window shows them without scrolling.
+// resize. All widths are user-resizable + persisted via `table-id`.
 const tableColumns = computed(() =>
   [
     {
@@ -767,8 +761,6 @@ function syncFilterUrl() {
           }
         : null,
     });
-    // Only the applied term — so the filtered view has a link and survives a
-    // reload, and a cleared box leaves no stale param behind.
     if (searchKeyword.value) query.keyword = searchKeyword.value;
     else delete query.keyword;
     if (searchUser.value) query.user = searchUser.value;
@@ -878,8 +870,7 @@ async function loadSessions(
   const stream = effectiveStream.value;
   if (!stream) {
     clearSessionRows();
-    // The empty list is now this org's: without the stamp, the cache guard
-    // would serve it to the previous org on the way back (G2-12).
+    // Stamp the org so the cache guard does not serve this empty list to the previous org.
     loadedOrg.value = orgId;
     loading.value = false; // nothing to fetch — release the held skeleton
     return;

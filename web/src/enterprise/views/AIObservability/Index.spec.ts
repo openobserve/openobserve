@@ -15,8 +15,6 @@
 //
 // @vitest-environment jsdom
 //
-// OSS shows the enterprise sections locked (feature-gated routes), enterprise/cloud unlocked.
-// Related sections share one rail item and are told apart by the tab strip above the page.
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
@@ -142,10 +140,7 @@ const ALL_GROUP_LABELS = [
 
 const MONITOR_KEYS = ["llmInsights", "sessions", "costUsage", "agents"];
 
-// Rendered in group order (Monitor, Evaluate, Annotate — see
-// `sectionGroupOrder`), not AI_OBSERVABILITY_SECTIONS's flat order. Evaluate
-// lists evaluations, experiments, scorers, then prompts. Playground is pinned to
-// the rail's foot, outside the groups.
+// Group order (`sectionGroupOrder`), not AI_OBSERVABILITY_SECTIONS's flat order; Playground sits outside the groups.
 const ALL_ITEM_KEYS = [
   ...MONITOR_KEYS,
   "evaluations",

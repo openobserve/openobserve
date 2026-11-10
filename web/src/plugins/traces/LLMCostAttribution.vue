@@ -170,9 +170,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ (e: "filter", dim: FilterDim, value: string): void }>();
 
-// Model first: every LLM call carries one, so the view is never empty. Then
-// user (OpenObserve reads `user.id` already); tenant and feature are
-// attributes an app sets for itself.
+// Model first: every LLM call carries one, so the view is never empty.
 const DIMS: FilterDim[] = ["model", "user", "tenant", "feature"];
 const ATTRIBUTES: Record<FilterDim, string> = {
   model: "gen_ai.response.model",
@@ -208,8 +206,6 @@ const noneAttributed = computed(
 
 const about = (d: FilterDim) => t(`llmAttribution.about.${d}`, { attribute: ATTRIBUTES[d] });
 
-// The mapping page's cost attribution section: per-field coverage, standard
-// attribute and fallbacks, so the user sees whether to map or instrument.
 function openMapping() {
   router.push({
     name: "genAiAgentMapping",
@@ -261,8 +257,7 @@ const tableRows = computed<Row[]>(() => {
   ];
 });
 
-// Colour follows the value, not its rank (the dashboards' name hash), so a
-// tenant keeps its colour across windows and filters.
+// Colour follows the value, not rank, so it stays stable across windows and filters.
 const seriesSlot = computed(() => {
   const colors = getDistinctSeriesColors(
     result.value.rows.map((r) => r.value),

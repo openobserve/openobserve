@@ -213,9 +213,7 @@ type SectionEntry = Omit<SectionHubItem, "icon" | "dataTest"> & {
 // and enterprise routers build their /ai routes from (see
 // composables/shared/useAIObservabilityRoutes.ts), so a nav item's
 // `featureKey`/`routeName` can't drift from what actually gates/names its
-// route. Every section beyond LLM Insights, Sessions, Issues, Users and
-// Budgets is enterprise/cloud-only — rather than hiding those in OSS, they
-// stay visible but locked (lock icon + pitch-card tooltip), matching the
+// route. Enterprise-only sections stay visible but locked in OSS.
 // Settings/IAM rail pattern.
 const sectionEntries = computed<SectionEntry[]>(() => {
   const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
@@ -269,9 +267,7 @@ const tabsByItem = computed(() => {
   return tabs;
 });
 
-// One rail item per standalone section and per tabbed item, placed where its
-// first tab sits. A tabbed item opens on its first unlocked tab and is locked
-// only when every tab is.
+// A tabbed item opens on its first unlocked tab and is locked only when every tab is.
 const railItems = computed<SectionEntry[]>(() => {
   const items: SectionEntry[] = [];
   for (const entry of sectionEntries.value) {
@@ -318,8 +314,7 @@ function openEntry(entry: SectionEntry) {
   );
 }
 
-// Looked up in the full table, not the listed entries: a deep link to a
-// section the rail hides still lights its rail item.
+// Looked up in the full table so a deep link to a hidden section still lights its rail item.
 const TAB_OF_SECTION = new Map(AI_OBSERVABILITY_SECTIONS.map((s) => [s.key, s.tabOf]));
 
 const activeSection = computed<string>(
@@ -341,9 +336,6 @@ function openTab(key: string | number) {
   );
 }
 
-// Each page draws its tabs in its own header, under the title (AiSectionTabs),
-// as the rest of the app does; the shell only knows which tabs there are.
-// A tabbed rail item's header, the same on each of its tabs (Alerts keeps "Alerts").
 const ITEM_SUBTITLES: Record<AiObservabilityTabbedItemKey, I18nKey> = {
   agents: "aiObservability.itemSubtitle.agents",
   costUsage: "aiObservability.itemSubtitle.costUsage",
@@ -364,10 +356,6 @@ provide(AI_SECTION_TABS, {
   open: openTab,
 });
 
-// Group order: Monitor, then Evaluate, then Annotate. Evaluate holds
-// Evaluations (scoring live traffic), Experiments (runs over a dataset) and
-// Prompts. The rail's foot holds the rest: Playground, and the Configure pages
-// (the settings the pages above read) in its Tools menu.
 const sectionGroupOrder = ["Monitor", "Evaluate", "Annotate"];
 
 const groupLabels = computed<Record<string, I18nText>>(() => ({

@@ -13,13 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Eval spend guard (AIO-24): the job form's cost estimate and the daily budget.
- * A judge's cost per call comes from its own `_evaluator` spans,
- * which the LLM processor priced at ingest — the same table real calls use. A
- * judge with no priced call has no estimate: it is never counted as $0.
- */
-
 import type { EvalBudgetAction, EvalJob, EvalTargetScope } from "@/services/online-evals.service";
 import { countExpression, quoteIdent } from "../composables/useJobMatchedTargets";
 import StreamService from "@/services/stream";
@@ -37,12 +30,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** 00:00 UTC of the day `atMs` falls in. */
 export const utcDayStartMs = (atMs: number): number => atMs - (((atMs % DAY_MS) + DAY_MS) % DAY_MS);
 
-/**
- * Matched targets per rolling 24 h over the estimate window, at the job's own
- * scope; null when the stream (with schema `fields`) cannot be counted at it.
- * Days count from `windowStartUs`, not from 00:00 UTC: UTC buckets cut the
- * first and the current day short, and averaging those undercounts a day.
- */
+/** Days count from `windowStartUs`, not 00:00 UTC, since partial UTC days would undercount the average. */
 export function matchedPerDaySql(
   stream: string,
   where: string,
@@ -76,11 +64,7 @@ export function judgeHistorySql(scorerIds: string[]): string {
   ].join("\n");
 }
 
-/**
- * The `_evaluator` columns the spend query reads. Each appears with the first
- * span that sets it (the cost with the first priced judge call, the status with
- * the first unpriced one), and a query naming a missing column fails.
- */
+/** Each column appears only once a span sets it, and naming a missing column fails the query. */
 export interface SpendColumns {
   jobId: boolean;
   cost: boolean;
@@ -96,11 +80,6 @@ export function spendColumns(fields: readonly { name?: string }[]): SpendColumns
   };
 }
 
-/**
- * Judge spend per job since the start of the query window (00:00 UTC), and its
- * unpriced calls. A missing cost column reads as 0; without the job column no
- * job has a span, and the query only proves `_evaluator` can be read.
- */
 export function spendTodaySql(jobIds: string[], cols: SpendColumns): string {
   if (!cols.jobId)
     return `SELECT '' AS job_id, 0 AS spend, 0 AS unpriced FROM "_evaluator" LIMIT 1`;
@@ -116,20 +95,13 @@ export function spendTodaySql(jobIds: string[], cols: SpendColumns): string {
   ].join("\n");
 }
 
-/**
- * A job's judge spend today. `usd` counts the priced calls only: with any
- * unpriced call the true spend is unknown, and the budget cannot see it.
- */
+/** `usd` counts priced calls only; any unpriced call makes the true spend unknown. */
 export interface JobSpend {
   usd: number;
   unpricedCalls: number;
 }
 
-/**
- * `_evaluator`'s schema fields, read from the server each time. The cached
- * stream list and schema can predate the first judge call, and the list leaves
- * out streams the user may not list.
- */
+/** Read fresh each time: the cached schema can predate the first judge call. */
 export async function evaluatorFields(org: string): Promise<readonly { name?: string }[]> {
   const res = await StreamService.schema(org, "_evaluator", "traces");
   return res.data?.schema ?? [];
@@ -141,13 +113,7 @@ function evaluatorMissing(e: unknown): boolean {
   return err?.response?.status === 404 || err?.response?.data?.code === 20002;
 }
 
-/**
- * Today's judge spend of each job in `jobIds`; a job without a row spent
- * nothing, and so does every job while `_evaluator` does not exist (no judge
- * call yet). The query always runs, so a user who cannot read `_evaluator`
- * gets "forbidden", never $0 (a schema read can pass where search is denied).
- * Any other failure is "failed".
- */
+/** The query always runs so a user who cannot read `_evaluator` gets "forbidden", never $0. */
 export async function loadSpendToday(
   jobIds: string[],
   read: {
@@ -211,20 +177,10 @@ export interface SpendEstimate {
   tokensPerTarget: number | null;
   /** The judge model, when every judge in the job uses one. */
   model: string | null;
-  /**
-   * Why the judge cost is unknown: a judge made calls none of which was priced
-   * (`unpriced`, fixed in Model Pricing), or a judge made no call to go on yet
-   * (`noCalls`). Null when every judge's cost is known.
-   */
   judgeGap: "unpriced" | "noCalls" | null;
 }
 
-/**
- * Matched targets a day × sample rate × judge cost per target. Days without
- * traffic are not averaged in, so a stream that started yesterday is not
- * diluted over the whole week. Scorers that are not LLM judges cost nothing.
- * Unknown traffic (`dailyCounts` null) leaves any judge's spend unknown.
- */
+/** Days without traffic are not averaged in, so a new stream is not diluted over the week. */
 export function estimateJobSpend(opts: {
   dailyCounts: number[] | null;
   rate: number;
@@ -266,10 +222,6 @@ export const isBudgetPaused = (job: EvalJob): boolean =>
 export const isBudgetLifted = (job: EvalJob, nowMs: number): boolean =>
   job.status === "active" && (job.budget?.liftedUntil ?? 0) / 1000 > nowMs;
 
-/**
- * What the budget-pause banner states: the spend the job paused at (never a budget edited
- * since), the UTC time it paused, and the time left until 00:00 UTC.
- */
 export function budgetPauseFacts(job: EvalJob, nowMs: number) {
   const left = utcDayStartMs(nowMs) + DAY_MS - nowMs;
   const budget = job.budget;

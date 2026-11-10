@@ -13,19 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Cost budgets (AIO-38), on the alert engine: a budget is one SQL multi-alert
- * on the trace stream's cost columns, one group per budget key. Each group's
- * `spent` is classified warning at 80% and critical at 100% of the limit. Both
- * levels go to the alert's destinations; a gateway webhook tells them apart by
- * the payload's alert level and stops the calls on critical. OpenObserve stays
- * out of the request path (D1).
- *
- * Periods are rolling windows the alert evaluates (the last day, the last 30
- * days, or the last hour for a session's burn rate), not calendar boundaries.
- * Unpriced spans carry no cost, so a budget never counts them as $0 spend —
- * the page names them instead.
- */
+// Periods are rolling windows the alert evaluates, not calendar boundaries; unpriced spans are never counted as $0.
 
 import { SEVERITY_TO_PRIORITY } from "@/constants/alertLibrary";
 import { traceUsageSum } from "@/plugins/traces/llmAttribution";
@@ -70,17 +58,7 @@ export const PERIOD_MINUTES: Record<BudgetPeriod, number> = {
 /** Ratio of the limit at which a budget turns warning; critical is the limit itself. */
 export const WARN_RATIO = 0.8;
 
-/**
- * Spend in the period, one row per key (`spent`, grouped on the scope's column). The column stays
- * unaliased: a SQL multi-alert requires every GROUP BY field projected under its own name. Worst
- * first, so the alert's bounded page holds the most-over keys.
- *
- * Agent, feature, user and session keys are attributed per trace, so cost on unlabelled LLM-call
- * children still counts: a trace counts its whole usage (`traceUsageSum`). A one-value budget
- * counts every trace with a span carrying the value; an "each" budget gives a trace to the value
- * its spans carry (`MAX`), as Users does. A model is set on each LLM call, so model budgets stay
- * per span. `hasParentSpan`: the stream stores span parents (`agentParentsJoin`).
- */
+/** GROUP BY columns stay unaliased: a SQL multi-alert requires each projected under its own name. */
 export function budgetSql(b: BudgetDef, hasParentSpan: boolean): string {
   const col = BUDGET_COLUMNS[b.scope];
   const tail = `GROUP BY ${col} ORDER BY spent DESC`;
@@ -98,8 +76,7 @@ export function budgetSql(b: BudgetDef, hasParentSpan: boolean): string {
     // Only LLM calls: an agent span carrying the model repeats its children's cost.
     return `SELECT ${col}, ${llmCallUsageSum("gen_ai_usage_cost")} AS spent FROM "${b.stream}" WHERE ${match} ${tail}`;
   }
-  // Every trace with a span carrying the value counts whole, as the agent pack's scope does: a
-  // sub-agent's budget sees the traces it ran in even when another agent's name is on the root.
+  // Whole traces count, so a sub-agent's budget sees traces whose root names another agent.
   return (
     `SELECT ${col}, SUM(cost) AS spent FROM (` +
     `SELECT trace_id, MAX(CASE WHEN ${match} THEN ${col} END) AS ${col}, ${cost} ` +
@@ -111,11 +88,7 @@ export function budgetSql(b: BudgetDef, hasParentSpan: boolean): string {
 /** The alert name a budget is stored under. */
 export const budgetAlertName = (name: string) => name.trim().replace(/[^A-Za-z0-9_-]+/g, "_");
 
-/**
- * Whether `name` is already one of `budgets`. Compared as stored alert names,
- * so "a b" and "a_b" count as the same budget. While a budget is edited, its
- * own name (`editing`) stays free.
- */
+/** Compared as stored alert names, so "a b" and "a_b" collide. */
 export function budgetNameTaken(
   name: string,
   budgets: readonly { name: string }[],
@@ -126,10 +99,7 @@ export function budgetNameTaken(
   return budgets.some((b) => budgetAlertName(b.name) === want);
 }
 
-/**
- * The scope's column when the stream's schema lacks it, else null. A stream that never received
- * the column cannot be budgeted on it: the budget's query names the column, and the alert fails.
- */
+/** A column the stream never received cannot be budgeted: the alert's query would fail. */
 export function budgetMissingField(
   scope: BudgetScope,
   fields: readonly { name: string }[],
@@ -199,13 +169,7 @@ export function budgetAlertPayload(
   };
 }
 
-/**
- * A stored budget alert changed to `b`. Every place the budget lives moves
- * together: the SQL, the critical threshold (`having.value`), the warning value
- * and `context_attributes`, which the page reads the limit back from. Anything
- * else set on the alert since (owner, extra destinations, its schedule while the
- * period is unchanged) is kept; `destination` replaces only the first one.
- */
+/** The limit lives in the SQL, `having.value`, the warning value and `context_attributes`; all must move together. */
 export function budgetAlertUpdate(
   stored: Record<string, any>,
   b: BudgetDef,
@@ -259,21 +223,12 @@ export interface BudgetAlert {
   query_condition?: { aggregation?: unknown } | null;
 }
 
-/**
- * A budget from before the one-alert design: a `<name>_warn` / `<name>_over`
- * pair of plain alerts, the threshold in the SQL's HAVING and no aggregation.
- * An edit has no aggregation to move the limit in, so it is deleted and re-created.
- */
+/** Legacy budgets have no aggregation to move the limit in, so an edit deletes and re-creates them. */
 export const isLegacyBudgetAlert = (alert: BudgetAlert | null | undefined): boolean =>
   !!alert && !alert.query_condition?.aggregation;
 
 const LEGACY_SUFFIX = /_(warn|over)$/;
 
-/**
- * One budget per legacy pair: a `<x>_warn` and an `<x>_over` alert of the same budget (name,
- * stream, scope, value, limit and period) merge into one row, deleted together. Any other legacy
- * alert, such as a second budget that reused the name, stays its own row.
- */
 export function mergeLegacyBudgets<
   T extends BudgetDef & { legacy: boolean; alertIds: string[]; alertName: string },
 >(defs: readonly T[]): T[] {
@@ -331,28 +286,17 @@ export function budgetState(spent: number, limit: number): BudgetState {
   return spent >= WARN_RATIO * limit ? "warning" : "under";
 }
 
-/**
- * The warning threshold of a limit: 80% of it, with float noise trimmed. Never
- * rounded to a fixed number of decimals, which lifts a sub-cent limit's warning
- * onto the limit itself and the backend refuses it.
- */
+/** Never rounded to fixed decimals: that lifts a sub-cent limit's warning onto the limit, which the backend refuses. */
 export function warningValue(limitUsd: number): number {
   return +(limitUsd * WARN_RATIO).toPrecision(12);
 }
 
-/**
- * A budget amount in USD: cents, or two significant digits below a cent, so a
- * sub-cent spend never reads $0.00 next to a sub-cent limit.
- */
+/** Sub-cent amounts use two significant digits so they never read $0.00. */
 export function formatBudgetUsd(value: number): string {
   if (value > 0 && value < 0.01) return `$${+value.toPrecision(2)}`;
   return `$${value.toFixed(2)}`;
 }
 
-/**
- * The spend of a per-key budget over every key, not one page of them: how many
- * keys spent, how many are at or over the limit, their total and the largest.
- */
 export function budgetSummarySql(b: BudgetDef, hasParentSpan: boolean): string {
   return (
     `SELECT COUNT(*) AS key_count, ` +

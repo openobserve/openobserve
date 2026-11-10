@@ -409,9 +409,6 @@ describe("ThreadView", () => {
       });
     }
 
-    // AIO-21: the Thread view shows one card per tool call. The first call of a
-    // turn and every failed call open by default; the rest show a summary line.
-
     it("should render a tool call thread when the turn has tool spans", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p");
@@ -553,9 +550,7 @@ describe("ThreadView", () => {
     });
   });
 
-  // =========================================================================
   // AIO-37: "Behind this step" on a failed or slow step, in the trace view only
-  // =========================================================================
 
   describe("behind this step", () => {
     const llm = makeLLMSpan({ span_id: "llm-p" });

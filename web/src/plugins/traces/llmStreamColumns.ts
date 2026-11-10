@@ -17,12 +17,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { PARENT_SPAN_FIELD } from "./config/llmInsightsPanels";
 
-/**
- * Whether a trace stream stores span parents, which `agentParentsJoin` needs
- * to tell top-level agents from nested ones. Reads the cached schema. A schema
- * that can't be read counts as having none: the usage queries still run, they
- * only lose the nested-agent check.
- */
+/** An unreadable schema counts as no parents; usage queries then just skip the nested-agent check. */
 export async function streamHasParentSpan(org: string, stream: string): Promise<boolean> {
   try {
     const payload = await queryClient.fetchQuery(streamSchemaQuery(org, stream, "traces"));

@@ -202,8 +202,7 @@ describe("traces/constants", () => {
         expect(result).toBe("span_kind='Unknown'");
       });
 
-      // A deep link's trace-level filter quotes the stream; re-serialising it
-      // turned "default" into `default`, which the backend rejects.
+      // Re-serialising turned "default" into `default`, which the backend rejects.
       it("should return a clause with no span_kind label exactly as written", () => {
         const clause =
           `trace_id IN (SELECT trace_id FROM "default" WHERE (tenant_id = 'globex')) AND ` +

@@ -43,11 +43,7 @@ export interface AiPrefillInput {
 
 const isJobKind = (kind: AiAlertKind): kind is AiJobAlertKind => kind.startsWith("eval_");
 
-/**
- * "Create alert" on an AI page (AIO-20): the pack's template, narrowed to the
- * agent (and tool) in scope, in the existing alert form. Same SQL and schedule
- * as the pack, so the alert agrees with the page and with an installed pack.
- */
+/** Alert prefill from an AI page, using the pack's SQL and schedule so it agrees with an installed pack. */
 export const buildAiPrefill = (input: AiPrefillInput): AlertPrefill => {
   if (isJobKind(input.kind)) return buildJobPrefill(input, input.kind);
   const rule = AI_AGENTS_PACK.find((r) => r.id === input.kind)!;
@@ -71,7 +67,6 @@ export const buildAiPrefill = (input: AiPrefillInput): AlertPrefill => {
     triggerThreshold: 1,
     triggerOperator: ">=",
     // Without an agent the alert covers the whole stream; it still runs, so say so.
-    // The cost template groups by model, the others by agent.
     warnings: input.agent
       ? []
       : [warn(input.kind === "cost" ? "aiAllAgentsByModel" : "aiAllAgents", "info")],

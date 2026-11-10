@@ -15,12 +15,7 @@
 
 export type LikePosition = "start" | "end" | "contains";
 
-// The backend parses these strings with sqlparser-rs's PostgreSqlDialect,
-// which has no backslash escapes, so doubling `'` is enough for one parse. The
-// search service then re-serialises the parsed SQL, and that writes a `'` that
-// follows a `\` or another `'` without doubling it: `a\'b` would come back as
-// `'a\'b'`, which ends the literal after `a\`. Such a value is split at those
-// spots into literals joined with `||` (same rule as Rust's `quote_sql_string`).
+// The search service re-serialises SQL without doubling a `'` after `\` or `'`, so such values are split and joined with `||` (as Rust's `quote_sql_string`).
 export const sqlLiteral = (value: unknown): string => {
   const pieces = String(value ?? "")
     .split(/(?<=[\\'])(?=')/)

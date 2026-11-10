@@ -64,8 +64,7 @@ describe("traceListSql", () => {
     expect(sql).toMatch(/ORDER BY ts DESC LIMIT 50$/);
   });
 
-  // A failing tool: the tool's own span must be the one that errored, not any
-  // span of a trace that also calls the tool.
+  // The tool's own span must be the one that errored, not any span of a trace calling it.
   it("needs one span that is both the series and errored", () => {
     const sql = traceListSql(
       "s",

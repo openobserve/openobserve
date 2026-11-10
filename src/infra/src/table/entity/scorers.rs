@@ -70,8 +70,7 @@ pub struct Model {
     pub entity_id: String,
     pub name: String,
     pub version: i32,
-    /// Kept as text, not [`ScorerType`], so a row of a type this node does not
-    /// know (written by a newer node) still loads and can be skipped.
+    /// Text, not [`ScorerType`], so rows of unknown types from newer nodes still load.
     #[sea_orm(column_type = "String(StringLen::N(50))")]
     pub scorer_type: String,
     pub description: Option<String>,

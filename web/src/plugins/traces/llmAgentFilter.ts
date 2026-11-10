@@ -50,8 +50,7 @@ export function buildAgentTraceFilter(
   if (agent.version) {
     clauses.push(`gen_ai_agent_version = ${sqlLiteral(agent.version)}`);
   }
-  // A registry row without an env is the env-less variant, its own row apart
-  // from the same version's env'd rows: no clause would count every env.
+  // An env-less registry row is its own variant, separate from the same version's env'd rows.
   clauses.push(
     agent.env
       ? `gen_ai_agent_env = ${sqlLiteral(agent.env)}`

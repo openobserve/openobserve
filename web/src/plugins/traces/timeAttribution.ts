@@ -13,12 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * "Where the time went" (AIO-37): for each LLM or tool step, the span below it
- * that held most of its critical path, from the spans alone (no LLM). Takes raw
- * trace rows (ns start/end, µs duration). No Vue, no store.
- */
-
 import {
   computeCriticalPath,
   computeCriticalPathForRoots,
@@ -188,11 +182,7 @@ export function attributeSteps(spans: Span[]): StepAttribution[] {
     if (!kind) continue;
     const below = preOrder(step.children);
 
-    // Identical siblings (same parent, and the same call to the same target: an N+1 loop,
-    // retries, paging) are one cause, named by the one that held the most. Generic span
-    // names ("GET", "SELECT orders") repeat across targets, so the target and system are
-    // part of the identity. A cause must hold strictly more than the step's own share, so
-    // a step that did its own work keeps it.
+    // Generic span names repeat across targets, so target and system are part of a cause's identity.
     const held = heldTime(computeCriticalPath(step));
     const groups = new Map<string, { node: Node; nodeUs: number; timeUs: number; count: number }>();
     for (const n of below) {
@@ -238,9 +228,7 @@ export function attributeSteps(spans: Span[]): StepAttribution[] {
         : null,
     });
   }
-  // A trace that is one model call and nothing else: "All of it was the model
-  // call" says nothing the span bar does not, so it is not called out (C2-06).
-  // A failed call still is.
+  // A lone successful model call says nothing the span bar does not (C2-06).
   const only = steps.length === 1 ? steps[0] : null;
   if (only && only.kind === "llm" && !only.cause && !only.failed) {
     only.slow = false;
@@ -342,13 +330,7 @@ export function attributionSentence(step: StepAttribution, t: TranslateFn): I18n
   return `${lead} ${rest}` as I18nText;
 }
 
-/**
- * When a restart counter first rose in [fromUs, toUs], from Prometheus matrix
- * series (`values: [seconds, "count"][]`); null when it did not. The restart
- * happened between the sample before the rise and the rise, so the earlier
- * sample's time (no earlier than fromUs) is returned: on a coarse grid the
- * rising sample can land after the trace although the restart was inside it.
- */
+/** Returns the sample before the rise, since on a coarse grid the rising sample can land after the trace. */
 export function firstRestartUs(
   series: { values?: [number | string, string][] }[],
   fromUs: number,

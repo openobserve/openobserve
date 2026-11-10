@@ -56,8 +56,7 @@ const AIRemoteTaskFormPage = () =>
 const AIRemoteTaskDetailPage = () =>
   import("@/enterprise/views/AIObservability/RemoteTaskDetailPage.vue");
 const AIOnlineEvals = () => import("@/enterprise/components/OnlineEvals.vue");
-// Configure: the AI settings pages, moved here from Settings. Their files and
-// route names stayed put, so every link to them follows without a change.
+// Route names kept from Settings so existing links still resolve.
 const AILlmProvidersPage = () => import("@/components/settings/LlmProvidersSettings.vue");
 const AIAgentMappingPage = () => import("@/components/settings/GenAiAgentMappingSettings.vue");
 const AIModelPricingPage = () => import("@/components/settings/ModelPricingList.vue");
@@ -80,12 +79,7 @@ export interface AiObservabilityTabbedItem {
 }
 
 /**
- * One rail item each, its tabs being the sections that name it in `tabOf`.
- * The routes stay flat siblings — a tab is presentation, not nesting (the
- * AlertSectionTabs pattern) — so every page keeps its own URL, feature gate
- * and online-evaluations flag, and an item holding pages of different gates
- * still locks or hides each of its tabs on its own.
- */
+ * Routes stay flat siblings so each tab keeps its own URL and feature gate.
 export const AI_OBSERVABILITY_TABBED_ITEMS: Record<
   AiObservabilityTabbedItemKey,
   AiObservabilityTabbedItem
@@ -118,18 +112,12 @@ export const AI_OBSERVABILITY_TABBED_ITEMS: Record<
 };
 
 /**
- * The ONE list an AI Observability nav rail item or tab AND its primary route
- * are both built from (see `Index.vue`'s `sectionEntries` and
+ * One list builds nav items and routes (see `Index.vue`'s `sectionEntries` and
  * `useAIObservabilityRouteChildren` below) — a typo in `featureKey` or
  * `routeName` now breaks the nav tooltip and the route guard the SAME way,
  * instead of silently drifting between independently hand-typed copies.
  *
- * `featureKey: null` marks the sections OSS serves from its own backend
- * (LLM Insights, Sessions, Issues, Users, Budgets) — always reachable, no
- * gate. Several entries share one `routeName` (the four Evaluations tabs all
- * land on `aiEvaluations`) — `useAIObservabilityRouteChildren` collapses
- * those to a single route record; `tabQuery` carries the `?tab=` value the
- * tab's link needs that the shared route itself doesn't know about.
+ * `featureKey: null` marks sections OSS serves itself; always reachable.
  */
 export interface AiObservabilitySection {
   key: string;
@@ -268,9 +256,6 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     group: "Annotate",
     dataTest: "ai-secondary-nav-datasets",
   },
-  // Evaluate, in rail order: evaluations (scoring live traffic), experiments
-  // (runs over a dataset), the scorers and score configs both run, then the
-  // prompts they test.
   {
     key: "quality",
     featureKey: "evaluations",
@@ -591,11 +576,7 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
   return children;
 }
 
-/**
- * The tab title of each `?tab=` of a route several rail items share (Scorers
- * and Evaluations both live on `aiEvaluations`): the rail item's label, as the
- * rail and page header read. The router uses it over `titleKey`.
- */
+/** Per-`?tab=` titles for routes several rail items share; the router prefers these over `titleKey`. */
 function titleKeysByTab(routeName: string): Record<string, I18nKey> | undefined {
   const entries = AI_OBSERVABILITY_SECTIONS.filter(
     (section) => section.routeName === routeName && section.tabQuery,

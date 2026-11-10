@@ -880,8 +880,7 @@ const {
       : extractTemplateVariables(template),
 );
 
-// `null` when the function's parameters cannot be read (no `score`, or a
-// default/destructured parameter), which the schema also refuses.
+// `null` when the parameters cannot be read, which the schema also refuses.
 const codeVariables = computed(() => scoreFunctionParams(formValues.value.template || ""));
 
 // A new Code scorer opens on the first starter, as the design shows.
@@ -895,10 +894,7 @@ const starterOptions = computed(() =>
   })),
 );
 
-// Picking a starter replaces the function, after asking when the function holds
-// the user's own edits. A blank name takes the starter's key; a blank
-// description, or one a starter filled in, takes the new starter's, so the
-// scorer is ready to save and never describes another check.
+// A starter-filled description is replaced too, so the scorer never describes another check.
 async function applyStarter(key: unknown) {
   const starter = CODE_SCORER_STARTERS.find((s) => s.key === key);
   if (!starter) return;

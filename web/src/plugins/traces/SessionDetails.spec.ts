@@ -661,8 +661,7 @@ describe("SessionDetails — turn rows", () => {
     expect(wrapper.find(turnBodySelector("t3")).exists()).toBe(false);
   });
 
-  // The server hides the text (the Sessions list's Rust regex), so a pattern a
-  // browser RegExp rejects, like the inline flag `(?s)`, still works here.
+  // The server applies the Rust regex, so a pattern browser RegExp rejects like `(?s)` still works.
   it("hides the agent's harness text in the turn title and body (AIO-22)", async () => {
     const message = "<env>\nos: linux\n</env>\nFix the login bug";
     const patterns = ["regex (?s)<env>.*?</env>"];
@@ -706,9 +705,6 @@ describe("SessionDetails — turn rows", () => {
     expect(ribbon.props("userText")(turn)).toBeUndefined();
   });
 
-  // TS-13 / S3-04: the agent comes from the turns already loaded, with no query
-  // of its own: the first turn with a message, so a later sub-agent's patterns
-  // do not apply.
   it("picks the harness patterns of the first turn's agent", async () => {
     mockMappingGet.mockResolvedValue({
       harness_patterns: [{ agent: "task", patterns: ["<env>"] }],

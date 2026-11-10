@@ -1298,8 +1298,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
-        // Code scorers run in the transform crate's QuickJS sandbox, which the
-        // enterprise crate cannot depend on.
+        // Registered here: the enterprise crate can't depend on the transform crate's QuickJS.
         o2_enterprise::enterprise::llm_evaluations::scorers::code::register_code_runner(
             transform::js::run_score_fn,
         );

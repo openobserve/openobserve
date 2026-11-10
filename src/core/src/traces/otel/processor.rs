@@ -107,9 +107,6 @@ impl Default for OtelIngestionProcessor {
     }
 }
 
-/// Cost attribution (AIO-27): a span without `user.id`, `feature.name` or
-/// `tenant.id` takes the first configured fallback attribute it (or its
-/// resource) carries, so every breakdown reads one column per dimension.
 /// Resource keys arrive as `service_<key>` (`resource_attribute_key`).
 fn apply_attribution_fallbacks(
     span_attributes: &mut HashMap<String, json::Value>,

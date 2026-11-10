@@ -13,13 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Release watch (AIO-39): compare an agent's newest version with the one before
- * it over each version's first hours, so a release that doubles cost or breaks
- * turns shows up without anyone opening Compare versions. Observation only: no
- * canary, no traffic split, no rollback (X3).
- */
-
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { TRACE_ERRORED_SQL } from "@/plugins/traces/llmTraceOutcome";
 import { buildAgentTraceFilter } from "@/plugins/traces/llmAgentFilter";
@@ -42,10 +35,6 @@ export function watchPair(
   return versions.length >= 2 ? { next: versions[0], prev: versions[1] } : null;
 }
 
-/**
- * Window measures for one version: traces, traces with errors, sessions, cost, p95.
- * `hasParentSpan`: the stream stores span parents (`agentParentsJoin`).
- */
 export function versionWindowSql(
   stream: string,
   v: GenAiAgentListItem,
@@ -61,10 +50,7 @@ export function versionWindowSql(
   );
 }
 
-/**
- * The localStorage key that mutes one release: the same agent and version in
- * another org, stream or env is a different release and stays visible.
- */
+/** Another org, stream or env with the same agent and version is a different release. */
 export function releaseWatchMuteKey(org: string, stream: string, v: GenAiAgentListItem): string {
   return `o2_release_watch_muted:${JSON.stringify([org, stream, v.id ?? v.name, v.env ?? "", v.version ?? ""])}`;
 }
@@ -161,10 +147,7 @@ export function introducedClasses(
     .map(([cls, traces]) => ({ cls, traces }));
 }
 
-/**
- * "429 from the provider after 3 retries" → "429 from the provider after # retries".
- * Counts and ids vary per trace; a 4xx/5xx status code names the class.
- */
+/** Normalises counts and ids, which vary per trace, so messages group by class. */
 export function errorClass(message: string): string {
   const m = (message || "").toLowerCase().trim();
   if (!m) return "";

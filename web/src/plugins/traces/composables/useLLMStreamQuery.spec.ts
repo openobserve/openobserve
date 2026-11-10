@@ -261,8 +261,7 @@ describe("useLLMStreamQuery — executeQuery: hits accumulation", () => {
 });
 
 describe("useLLMStreamQuery — executeQuery: error handling", () => {
-  // useStreamingSearch calls `handlers.error(requestPayload, wrapped)`, where
-  // `wrapped` is `{ content: { ...serverErrorBody, trace_id }, type: "error" }`.
+  // useStreamingSearch wraps the server error body as `{ content: { ...body, trace_id }, type: "error" }`.
   const payload = { queryReq: { query: { sql: "BAD" } } };
   const wrapped = (body: Record<string, unknown>) => ({
     content: { ...body, trace_id: "trace-fixed-id" },

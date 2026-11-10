@@ -1025,8 +1025,6 @@ export default defineComponent({
       type: Object as PropType<HTMLElement | null>,
       default: null,
     },
-    // Agent Graph's Agent-mode selection (env/version may be UNSET = not set).
-    // The Behavior tab narrows to it when the clicked node is that agent.
     agentScope: {
       type: Object as PropType<{
         name: string;

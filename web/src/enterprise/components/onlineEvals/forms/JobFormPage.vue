@@ -559,8 +559,7 @@ const selectedScorers = computed(() =>
     .filter((scorer): scorer is Scorer => Boolean(scorer)),
 );
 
-// Cost estimate (AIO-24). Only LLM judges cost money; the rate is what the job
-// samples now, so the tiles follow the sampling field as it is typed.
+// Only LLM judges cost money.
 const judgeIds = computed(() =>
   selectedScorers.value
     .filter(
@@ -754,8 +753,6 @@ function initForm(row: EvalJob | null): JobForm {
     samplingMode: samplingModeOf(row),
     samplingValue: samplingRateForForm(valueOf(row, "samplingValue", "sampling_value")),
     filterGroup: initFilterGroup(row),
-    // A job without a budget (removed, or saved before budgets) stays without one until the
-    // user sets one; the limit field then starts at the default.
     budgetEnabled: row.budget != null,
     dailyBudgetUsd: row.budget?.dailyUsd ?? DEFAULT_DAILY_BUDGET_USD,
     budgetAction: row.budget?.onReach ?? DEFAULT_BUDGET_ACTION,

@@ -126,8 +126,7 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 
-// The SVG's own coordinate space; its width follows the element's, so CSS
-// stretches nothing and the text stays legible.
+// Width follows the element's so CSS stretches nothing and text stays legible.
 const DEFAULT_W = 640;
 const H = 140;
 const X0 = 48;
@@ -157,8 +156,6 @@ const POINT_TONE: Record<BaselineOutcome, string> = {
 
 const scores = computed(() => trendScores(props.baseline, props.policies));
 const scoreKey = ref("");
-// The first plottable score until the user picks one, and again if the pick
-// leaves (a new baseline without that score).
 watch(
   scores,
   (next) => {
@@ -216,8 +213,7 @@ function format(value: number) {
   return raw(trend.value!.share ? `${(value * 100).toFixed(1)}%` : value.toFixed(3));
 }
 
-// Re-runs minutes apart share a day, so the axis then says the time as well:
-// "Nov 6 … Nov 6" named one day twice.
+// Re-runs minutes apart share a day, so the axis then shows the time too.
 function dateLabel(ms: number) {
   const points = trend.value!.points;
   const sameDay =

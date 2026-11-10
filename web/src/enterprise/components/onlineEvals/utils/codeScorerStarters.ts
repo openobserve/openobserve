@@ -142,11 +142,7 @@ function skipLiteral(source: string, start: number, quote: string): number {
   return source.length;
 }
 
-/**
- * The parameter list of the last top-level `function score(...)`, skipping
- * comments, strings, template and regex literals. Mirrors the backend's
- * `score_signature` (scorers/code.rs).
- */
+/** Mirrors the backend's `score_signature` (scorers/code.rs). */
 function scoreSignature(source: string): string | null {
   let depth = 0;
   let last: string | null = null;
@@ -192,11 +188,7 @@ function scoreSignature(source: string): string | null {
   return last;
 }
 
-/**
- * Parameter names of `function score(...)`, in order, or `null` when the source
- * does not declare it with plain names. Mirrors the backend's `score_params`,
- * which rejects a scorer whose variables it cannot read.
- */
+/** Mirrors the backend's `score_params`, which rejects names it cannot read. */
 export function scoreFunctionParams(source: string): string[] | null {
   const signature = scoreSignature(source);
   if (signature === null) return null;

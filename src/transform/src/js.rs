@@ -45,8 +45,7 @@ const JS_CONTEXT_CACHE_BUDGET_BYTES: usize = 32 * 1024 * 1024;
 
 const JS_MAX_STACK_SIZE_BYTES: usize = 512 * 1024;
 
-/// Per-call budget for a Code scorer: a check runs once per scored span, so it
-/// gets far less than a transform.
+/// A Code scorer runs once per scored span, so it gets far less time than a transform.
 const SCORE_FN_TIMEOUT: Duration = Duration::from_millis(100);
 
 /// Compiled JS function configuration
@@ -109,14 +108,10 @@ fn compile_js_function_inner(
     }
     check_js_security(func)?;
 
-    // Strip #ResultArray# marker for compilation validation
-    // The marker is invalid JS syntax (# is not a comment in JS)
-    // We keep it in storage but remove it for compilation check
+    // #ResultArray# is invalid JS syntax, so strip it before compiling.
     let func_for_compilation = strip_result_array_marker(func);
 
-    // Detect if this is a ResultArray function to use appropriate variable name
-    // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single object)
-    // Only match #ResultArray# at the start of the function (not in comments)
+    // Only a leading #ResultArray# marks a ResultArray function, not one in comments.
     let is_result_array = RESULT_ARRAY.is_match(func);
     let var_name = if is_result_array { "rows" } else { "row" };
     let test_value = if is_result_array { "[]" } else { "{}" };
@@ -395,14 +390,7 @@ fn eval_js_fn(
     })
 }
 
-/// Runs a Code scorer: `source` declares `function score(...)`, which is called
-/// with `args` in parameter order. Returns what it returns, or an error for a
-/// forbidden pattern, a syntax or runtime error, a non-finite number, or a
-/// broken time or memory limit.
-///
-/// Every call gets a fresh context, so nothing a call leaves on the built-ins
-/// (`Math.calls = ...`) is seen by the next one; only the runtime is reused.
-/// The org takes no part: no state outlives a call.
+/// Runs a Code scorer in a fresh context per call, so nothing left on built-ins leaks onward.
 pub fn run_score_fn(
     _org_id: &str,
     source: &str,
@@ -415,8 +403,7 @@ pub fn run_score_fn(
     let context = Context::full(&rt).map_err(|e| format!("Failed to create JS context: {e}"))?;
     let result = eval_score_fn(&context, source, &args);
     drop(context);
-    // A queued job keeps the dropped context alive, and a failed call may have
-    // left the heap full: start the next call on a new runtime.
+    // A pending job keeps the dropped context alive and a failed call may have filled the heap.
     if result.is_err() || rt.is_job_pending() {
         SCORE_RUNTIME.with(|cached| cached.borrow_mut().take());
     } else {
@@ -442,10 +429,7 @@ fn eval_score_fn(context: &Context, source: &str, args: &str) -> Result<json::Va
         ctx.globals()
             .set("scoreArgs", args)
             .map_err(|e| format!("Failed to set arguments: {e}"))?;
-        // JSON turns NaN and Infinity into null, so they are reported before
-        // serializing. QuickJS throws a bare null when it runs out of memory
-        // while building the error; a scorer that throws null itself is read
-        // the same way.
+        // QuickJS throws bare null on OOM while building the error, so a thrown null means OOM.
         let code = format!(
             r#"
                 (function() {{
@@ -1380,8 +1364,7 @@ for (var i = 0; i < filtered.length; i++) {
 
     #[test]
     fn test_score_fn_names_memory_and_non_finite_failures() {
-        // Large chunks per iteration, so a slow runner reaches the memory limit well inside the
-        // time limit.
+        // Large chunks so a slow runner hits the memory limit well before the time limit.
         let hog = "function score(o) { var a = []; for (var i = 0; i < 100000; i++) a.push(new Array(10000).fill(i)); return a.length > 0; }";
         let err = run_score_fn("score_org", hog, &[json!("x")]).unwrap_err();
         assert_eq!(err, "Code scorer exceeded the 10 MB memory limit");

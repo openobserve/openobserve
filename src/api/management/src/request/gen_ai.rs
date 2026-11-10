@@ -220,10 +220,7 @@ pub async fn save_agent_mapping(
     }
 }
 
-/// Hide harness text in messages
-///
-/// Applies one agent's harness patterns, saved or a draft, to messages with the same code
-/// that hides them in the Sessions list. Results come back in request order.
+/// Hide harness text in messages with the same code the Sessions list uses.
 #[utoipa::path(
     post,
     path = "/{org_id}/settings/gen_ai/harness_strip",

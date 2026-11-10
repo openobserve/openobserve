@@ -181,14 +181,10 @@ describe("compare to baseline", () => {
     expect(result.outcome).toBe("regressed");
     expect(result.headline).toMatchObject({ key, name: "quality", clientScorerKey: "ci_judge" });
     expect(signedPoints(result.headline.delta)).toBe("−20.0");
-    // A key the baseline never reported, and the Scorer column sharing the
-    // Score Config, pair with nothing.
     expect([...result.deltas.keys()]).toEqual([key]);
   });
 
   describe("a run on other cases than the baseline", () => {
-    // qa2-base pinned at dataset version 10; qa2-dsv11 ran version 11, with one
-    // new case it fails. The ten shared cases score the same as the baseline.
     const base = run("qa2-base", 1, [quality(0.8)], { isBaseline: true, datasetVersion: 10 });
     const dsv11 = run("qa2-dsv11", 2, [quality(0.727)], { datasetVersion: 11 });
     const dimension = (overrides: Record<string, unknown>) => ({
@@ -473,8 +469,7 @@ describe("trend", () => {
   });
 });
 
-// C2-X5: `scoring_failed` is terminal; a Scorer that errored on some rows must
-// not blank the verdict on every other score.
+// A Scorer that errored on some rows must not blank the verdict on other scores.
 describe("partly failed scoring", () => {
   const failedSeverity = { ...severity({ none: 20, full: 30 }), errorCount: 5 };
   const partial = run("partial", 2, [bool(10, 46), failedSeverity], { status: "scoring_failed" });

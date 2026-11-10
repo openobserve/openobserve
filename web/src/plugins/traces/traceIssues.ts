@@ -13,17 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Issues on one trace (AIO-33): the ai-agents pack's tool rules run over the
- * trace's loaded spans, so the trace header, the chip on the evidence span and
- * the Issues tab agree with what the alert fires on. Calls are grouped per
- * (span-local agent, tool), as the alert's SQL groups them. One issue per
- * (agent, tool): when both rules match, "Repeated tool calls" covers the
- * failing calls too.
- *
- * ponytail: the pack's default thresholds; a threshold tuned in the alert is not
- * read back here. Read it from the installed alert if they drift apart.
- */
+// Uses the pack's default thresholds; thresholds tuned in the alert are not read back.
 
 import { FAILING_TOOL_MIN_CALLS, REPEATED_TOOL_MIN_CALLS } from "@/utils/alerts/aiAgentsPack";
 

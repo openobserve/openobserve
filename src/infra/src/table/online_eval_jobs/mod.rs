@@ -143,8 +143,7 @@ impl std::fmt::Display for TargetScope {
 }
 
 /// Valid state transitions. Maps from current state to allowed next states.
-/// `paused → paused` makes a pause the user's: on a job its budget paused it clears the budget's
-/// pause, so the job no longer resumes at 00:00 UTC (see [`EvalJobBudget::after_transition`]).
+/// `paused → paused` turns a budget pause into a user's, so no auto-resume at 00:00 UTC.
 pub fn is_valid_transition(from: &str, to: &str) -> bool {
     matches!(
         (from, to),
@@ -188,8 +187,7 @@ pub struct EvalJobBudget {
     /// The day's judge spend when the health pass paused the job, in USD. Server-owned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paused_spend_usd: Option<f64>,
-    /// "Resume until 00:00 UTC": the budget does not apply before this time, in microseconds.
-    /// Server-owned.
+    /// Server-owned "resume until 00:00 UTC" time (µs) before which the budget does not apply.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lifted_until: Option<i64>,
 }
@@ -246,11 +244,7 @@ impl EvalJobBudget {
             .is_some_and(|spent| self.daily_usd > spent)
     }
 
-    /// The budget once the job moves to `new_status`. `budget_spend` is the day's spend when
-    /// the budget pauses the job; only that pause records `paused_at`, so a job the user paused
-    /// never resumes on its own. Resuming a job the same UTC day its budget paused it lifts the
-    /// budget until 00:00 UTC, unless the limit is now above the spend it paused at: then the
-    /// budget keeps applying. The next day's resume does not lift it either.
+    /// Budget after `new_status`; only budget pauses set `paused_at`, so user pauses never resume.
     pub fn after_transition(
         mut self,
         new_status: &str,
@@ -893,8 +887,7 @@ fn budget_json(budget: Option<&EvalJobBudget>) -> Option<String> {
     budget.and_then(|budget| serde_json::to_string(budget).ok())
 }
 
-/// Update only the status, pipeline_id and budget fields of a job; the budget carries the
-/// pause state a transition sets.
+/// Update only status, pipeline_id and budget; the budget carries the transition's pause state.
 pub async fn update_status(
     id: &str,
     status: &str,
@@ -1462,8 +1455,7 @@ mod tests {
     #[test]
     fn test_budget_pause_state_follows_transitions() {
         let now = 10 * DAY + 5;
-        // Only the budget pause records when and at what spend it paused, so only it resumes
-        // on its own. It ends a lift that has run out.
+        // Only a budget pause auto-resumes; it also ends an expired lift.
         let mut expired_lift = budget(None);
         expired_lift.lifted_until = Some(10 * DAY);
         let paused = expired_lift.after_transition("paused", Some(6.21), now);

@@ -162,8 +162,7 @@ const loading = ref(false);
 const installing = ref(false);
 const streams = ref<string[]>([]);
 const destinations = ref<string[]>([]);
-// Every trace and log stream as `streamKey`, `_`-prefixed ones included: the
-// evaluator's rules read `_llm_scores` and `_evaluator`.
+// `_`-prefixed streams included: the evaluator's rules read `_llm_scores` and `_evaluator`.
 const existingStreams = ref<Set<string>>(new Set());
 const stream = ref("");
 const destination = ref<string | null>(null);
@@ -175,8 +174,7 @@ const destinationOptions = computed(() =>
 const readiness = (rule: AiPackRule) => ruleReadiness(rule, stream.value, existingStreams.value);
 const ready = computed(() => AI_AGENTS_PACK.filter((r) => readiness(r) === "ready"));
 
-// Pack alerts that already exist, as "stream/name". A rule's alert is named
-// for the stream it was installed for (packAlertName), so this is exact.
+// Exact because a rule's alert is named for the stream it was installed for (packAlertName).
 const installedAlerts = ref<Set<string>>(new Set());
 const alertKey = (streamName: string, name: string) => `${streamName}/${name}`;
 function isInstalled(rule: AiPackRule): boolean {
@@ -278,8 +276,6 @@ async function packFolderId(): Promise<string> {
   return created?.data?.folderId ?? "default";
 }
 
-// One alert at a time, only those not installed yet; a failure does not stop
-// the rest, and the toast counts both.
 async function install() {
   if (!stream.value) return;
   installing.value = true;

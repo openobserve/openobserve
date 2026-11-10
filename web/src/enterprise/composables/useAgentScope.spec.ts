@@ -764,8 +764,7 @@ describe("useAgentScope — stream options", () => {
 });
 
 describe("useAgentScope — agent stream (one variant in several streams)", () => {
-  // The registry returns one row per stream, newest `last_seen` first: a stray
-  // trace in `stray` puts its row ahead of the long-lived `main` row.
+  // The registry returns rows newest `last_seen` first, so `stray` precedes `main`.
   const row = (
     stream: string,
     firstSeen: number | null,

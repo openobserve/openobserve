@@ -404,8 +404,7 @@ mod tests {
         let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
         let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
                         ('chat', 'text_completion', 'generate_content', 'embeddings'))";
-        // LLM-call spans, else the top-level agents: agent-only traces keep their
-        // usage, sibling agents add up, a nested agent is not counted again.
+        // Fall back to top-level agents so a nested agent is not counted twice.
         for (column, alias) in [
             ("gen_ai_usage_input_tokens", "gen_ai_usage_details_input"),
             ("gen_ai_usage_output_tokens", "gen_ai_usage_details_output"),

@@ -486,10 +486,7 @@ export function evaluatorTraceLink(score: QualityScore, org: string): RouteLocat
   };
 }
 
-/**
- * The scored trace (or span) for the in-page trace drawer (AIO-21), over the
- * same window as {@link targetLink}. Sessions have no trace to show.
- */
+/** Sessions have no trace to show. */
 export function targetDrawerTrace(score: QualityScore): AiDrawerTrace | null {
   const traceId = targetTraceId(score);
   if (!traceId || !score.sourceStream) return null;

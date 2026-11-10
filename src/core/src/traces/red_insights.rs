@@ -430,8 +430,7 @@ fn duplicates(group: &[&ManagedDetector]) -> Vec<String> {
         .collect()
 }
 
-/// Reads the SQL string at the start of `s` (opening quote already consumed): one literal, or
-/// the `'a' || 'b'` chain `quote_sql_string` writes, concatenated.
+/// Also accepts the `'a' || 'b'` chain `quote_sql_string` writes.
 fn leading_sql_string(s: &str) -> Option<String> {
     let (mut out, mut rest) = leading_sql_literal(s)?;
     while let Some(next) = rest
@@ -446,8 +445,6 @@ fn leading_sql_string(s: &str) -> Option<String> {
     Some(out)
 }
 
-/// Reads a single-quoted SQL literal at the start of `s` (opening quote already consumed) and
-/// returns it with the text after its closing quote.
 fn leading_sql_literal(s: &str) -> Option<(String, &str)> {
     let mut out = String::new();
     let mut chars = s.char_indices().peekable();

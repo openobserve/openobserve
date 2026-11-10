@@ -253,8 +253,7 @@ async function load() {
   );
 }
 
-// The pair's identity: another agent or env can carry the same version strings.
-// A string key, compared by value.
+// Keyed by agent and env too, since another pair can carry the same versions.
 watch(
   () => {
     const p = pair.value;

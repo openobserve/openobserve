@@ -235,11 +235,7 @@ const genAiAgentMappingService = {
     analytics.track("gen_ai_agent_mapping_saved");
     return normalizeConfig(response.data);
   },
-  /**
-   * Hides harness text with the server's patterns engine, the one the Sessions
-   * list uses. Results are in `texts` order. A bad pattern rejects with the
-   * server's 400 message.
-   */
+  /** Uses the server's patterns engine so results match the Sessions list. */
   stripHarness: async (
     orgIdentifier: string,
     patterns: string[],

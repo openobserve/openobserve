@@ -76,8 +76,7 @@ impl LlmColumns {
     }
 }
 
-/// Stored column holding a span's parent span id. A stream whose spans never had a parent lacks
-/// it.
+/// A stream whose spans never had a parent lacks this column.
 pub(super) const PARENT_SPAN_ID_COLUMN: &str = "reference_parent_span_id";
 
 /// Schema facts for callers that only need the generation and usage layout.

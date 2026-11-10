@@ -625,8 +625,7 @@ const OUTCOME_BADGES: Record<BaselineOutcome, BadgeVariant> = {
   unchanged: "default-soft",
 };
 
-// Score Config health policies decide which way a score is better. Without
-// them nothing can vote, so the list still shows values, just no deltas.
+// Without Score Config health policies nothing can vote, so the list shows values but no deltas.
 const policies = ref(new Map<string, ScorePolicy>());
 watch(
   () => props.orgId,
@@ -774,13 +773,10 @@ function toggleGroup(groupId: string) {
     : collapsedGroups.value.filter((id) => id !== groupId);
 }
 
-// Each dataset's baseline from the unfiltered list: a name search that hides
-// the baseline must not drop every verdict measured against it.
+// From the unfiltered list: a name search that hides the baseline must not drop every verdict against it.
 const baselines = computed(
   () => new Map(props.experiments.filter(isBaseline).map((row) => [row.datasetId, row])),
 );
-// Each run against its own dataset's baseline; a run on other cases than the
-// baseline by Compare's answer over the cases both ran.
 const comparisons = computed(() => {
   const result = new Map<string, RunComparison | null>();
   for (const group of groups.value) {
@@ -800,8 +796,7 @@ const datasetRows = computed<DatasetRow[]>(() =>
     const sorted =
       groupSort.value === "regressions" ? sortByRegressions(unsorted, comparisons.value) : unsorted;
     const sections = ciGroups(sorted, groupBy.value, groupSort.value, comparisons.value);
-    // The row numbers follow the data's order, so the data takes the order the
-    // sections show; otherwise grouped rows read "02, 03, 04, 01".
+    // Row numbers follow data order, so sort the data as the sections show it; else rows read "02, 03, 04, 01".
     const sectionIndex = new Map(sections.map((section, index) => [section.key, index]));
     const folds = sections.length
       ? [...sorted].sort(
@@ -867,8 +862,6 @@ function sharedCasesLabel(cases: NonNullable<RunComparison["cases"]>) {
 
 const INCOMPLETE_KINDS = ["cancelled", "failed", "inProgress"] as const;
 
-// Counts are of settled runs, the ones the verdict and the spread come from;
-// the rest are named beside them: "4 runs (1 cancelled)".
 function incompleteText(tally: RunTally): I18nText | null {
   const rest = INCOMPLETE_KINDS.filter((kind) => tally.incomplete[kind]).map((kind) =>
     t(`experimentsAtScale.incomplete.${kind}`, { count: tally.incomplete[kind] }),
@@ -880,8 +873,7 @@ function foldTally(run: LlmExperiment) {
   return tallyRuns([run, ...(earlierRuns.value.get(run.id) ?? [])]);
 }
 
-// The badge stays "× 4" so the name keeps its width; the tooltip names the
-// re-runs it does not count.
+// The badge stays "× 4" so the name keeps its width; the tooltip names the uncounted re-runs.
 function foldTooltip(run: LlmExperiment) {
   const tally = foldTally(run);
   const counted = t("experimentsAtScale.foldTooltip", { count: tally.settled }, tally.settled);
@@ -938,10 +930,7 @@ const groups = computed(() =>
   ),
 );
 
-// Runs on another dataset version or filter than their baseline ran other
-// cases, so only Compare, which pairs cases, can judge them. One cached Compare
-// per such run; same-case runs keep the list's own summaries, so the common
-// case costs no extra request.
+// Runs on other cases than their baseline need Compare, which pairs cases; same-case runs cost no extra request.
 const sharedCasePairs = computed(() =>
   groups.value.flatMap((group) => {
     const baseline = baselines.value.get(group.datasetId);
@@ -1067,9 +1056,7 @@ function visibleStatusReason(experiment: LlmExperiment) {
     : null;
 }
 
-// One column per scorer and per client-reported dimension in the group: the
-// scores array already carries each separately, keyed so a client dimension
-// never shares a column with a Scorer of the same Score Config.
+// Keyed so a client dimension never shares a column with a Scorer of the same Score Config.
 function groupScoreColumns(experiments: LlmExperiment[]): ScoreColumn[] {
   const columns = new Map<string, ScoreColumn>();
   for (const experiment of experiments) {
@@ -1121,9 +1108,7 @@ function isBaseline(experiment: LlmExperiment) {
 
 // A baseline is the fixed reference every later run gets compared against, so
 // it must point at a run with final results — pending/running/failed/cancelled
-// runs have nothing stable to pin, and the server refuses a run with any task
-// error (baseline.rs). Already-baseline experiments can still be cleared
-// regardless of status: unpinning is always safe.
+// runs have nothing stable to pin (baseline.rs refuses them); clearing a baseline is always safe.
 function canSetBaseline(experiment: LlmExperiment) {
   return experiment.isBaseline || (experiment.status === "completed" && !taskFailures(experiment));
 }
@@ -1163,8 +1148,7 @@ async function cloneExperiment(experiment: LlmExperiment) {
 
 async function toggleBaseline(experiment: LlmExperiment) {
   baselineChangingId.value = experiment.id;
-  // The write's response has no summary fields, so handing it up as the row
-  // blanked its scores and status until a refresh. Only the flag changed.
+  // The write's response has no summary fields, so only the flag is updated to avoid blanking the row.
   const flagged = (isBaseline: boolean) => ({ ...experiment, isBaseline });
   try {
     if (experiment.isBaseline) {

@@ -353,8 +353,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
     await flushPromises();
     expect(mockFetchAll).toHaveBeenCalledTimes(1);
     mockFetchAll.mockClear();
-    // Same window + selection, non-forced → served from the cache snapshot,
-    // through `restore`, which supersedes any load still in flight (W3-03).
+    // Non-forced reload is served from the cache via `restore`.
     await (wrapper.vm as any).loadInsights();
     expect(mockFetchAll).not.toHaveBeenCalled();
     expect(mockRestore).toHaveBeenCalledWith(expect.objectContaining({ kpi: {}, sparklines: {} }));
@@ -549,8 +548,7 @@ describe("LLMInsightsDashboard — onUnmounted", () => {
   // queries are cancelled when the user navigates away. Without this the server
   // keeps streaming results to a component that's no longer rendered. Unmount
   // cancels the dashboard's own queries plus the version-compare arms (armA +
-  // armB) and the filter-option queries; how many of those share this spy is a
-  // detail of the mocks, so assert that cancelling happens, not the count.
+  // armB) and filter-option queries; the spy count depends on mocks, so assert only that cancelling happens.
   it("calls cancelAll on unmount", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
@@ -565,9 +563,6 @@ describe("LLMInsightsDashboard — onUnmounted", () => {
 // ===========================================================================
 
 describe("LLMInsightsDashboard — onViewTrace", () => {
-  // The recent-errors panel emits view-trace with a trace_id. The dashboard
-  // opens the trace in a drawer on this page (AIO-21), over the current window,
-  // so the scope and the window stay as they were.
   it("opens the trace drawer with the current window, without leaving the page", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
@@ -875,8 +870,7 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     expect(vm.filterMode).toBe("agent");
   });
 
-  // Right after a rollout the previous version has no spans in a short page
-  // window, so the pair comes from the agent's versions over the wide window.
+  // Right after a rollout the previous version has no spans in a short window.
   it("pairs the release watch from the agent's wide-window versions, not the page window", async () => {
     mockListAgents.mockResolvedValue({ agents: [agentAt("omp", "s1", "production", "2")] });
     const seen = (version: string, stream: string, first_seen: number) => ({

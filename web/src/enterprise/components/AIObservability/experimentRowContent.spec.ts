@@ -64,8 +64,7 @@ describe("durationLabel", () => {
   });
 });
 
-// A boolean's scalar is its healthy share: 0 for a `true` answer when `false` is
-// healthy. The raw value travels as the label.
+// A boolean's scalar is its healthy share; the raw value travels as the label.
 describe("dimensionSideValue", () => {
   const flag = {
     dataType: "boolean" as const,

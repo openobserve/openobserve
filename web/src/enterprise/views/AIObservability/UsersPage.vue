@@ -208,8 +208,7 @@ let seq = 0;
 // The org has no LLM trace stream at all: nothing to instrument with user.id yet.
 const noStream = computed(() => ready.value && !availableStreams.value.length);
 
-// Tenants seen on the last load that was not narrowed to one tenant, so picking one
-// keeps the others on offer; the picked one stays listed even when it came from the URL.
+// Only unnarrowed loads refresh this, so picking one tenant keeps the others on offer.
 const knownTenants = ref<string[]>([]);
 const tenantOptions = computed(() =>
   [...new Set([...knownTenants.value, ...(tenant.value ? [tenant.value] : [])])].map((v) => ({
@@ -329,11 +328,7 @@ async function reload() {
   }
 }
 
-/**
- * Loads the streams and agents for the window, then the users once. The filter
- * watchers stay quiet while the scope settles (the stream picked on load, an
- * agent dropped by it), so one load runs one users query, not one per change.
- */
+/** Filter watchers stay quiet while the scope settles, so one load runs one users query. */
 async function loadAll() {
   ready.value = false;
   const { startTime, endTime } = timeRange.value;
@@ -368,10 +363,6 @@ function syncUrl() {
   if (JSON.stringify(query) !== JSON.stringify(route.query)) router.replace({ query });
 }
 
-/**
- * The user's sessions, under the same agent scope as the row. Sessions has no
- * tenant filter; the button's tooltip says so while one is set.
- */
 function openSessions(user: string) {
   router.push({
     name: "aiSessions",

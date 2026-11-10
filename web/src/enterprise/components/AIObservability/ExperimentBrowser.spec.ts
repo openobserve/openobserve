@@ -376,8 +376,7 @@ describe("ExperimentBrowser", () => {
   });
 
   it("calls clearBaseline when the pin is clicked on the current baseline", async () => {
-    // The write's response carries no summary; the emitted row must keep the
-    // listed one's scores, or the row blanks until a refresh.
+    // The response carries no summary, so the emitted row must keep the listed scores.
     clearBaseline.mockResolvedValue(makeExperiment({ id: "old", isBaseline: false }));
     const scoreSummaries = [
       makeScoreSummary({
@@ -810,8 +809,6 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.get('[data-test="ai-experiment-spread-r2-leak"]').text()).toContain("27–32%");
   });
 
-  // C2-X3: qa2-base pinned at dataset version 10, qa2-dsv11 run on version 11
-  // with one new case it fails. The ten shared cases are unchanged.
   it("judges a run on a newer dataset version over the cases it shares with the baseline", async () => {
     compareExperiments.mockResolvedValue({
       counts: { commonRows: 10, new: 1, missing: 0 },

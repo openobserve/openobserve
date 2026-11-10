@@ -360,14 +360,11 @@ const store = useStore();
 const route = useRoute();
 const { confirm } = useConfirmDialog();
 
-// One grid for both field tables, so their columns line up: field, the
-// standard attribute, the fallbacks, and traces with a value (attribution only).
+// One grid for both field tables so their columns line up.
 const FIELD_GRID =
   "text-compact grid grid-cols-[7rem_12rem_minmax(0,1fr)_8rem] items-center gap-x-3 gap-y-2";
 
-// The standard attribute the resolver always checks first for each dimension
-// (current OTel / GenAI semconv), mirroring agent_registry.rs, then the
-// editable fallbacks (seeded with the defaults on load).
+// Standard attributes are checked first by the resolver, mirroring agent_registry.rs.
 type IdentityKey = "agentName" | "agentId" | "env" | "version";
 const IDENTITY_FIELDS: Array<{
   key: IdentityKey;
@@ -421,11 +418,7 @@ const identityText = ref<Record<IdentityKey, string>>({
   env: "",
   version: "",
 });
-// AIO-22: per-agent harness patterns and the session title source. Kept out of
-// setDraft: "Apply defaults" and the default seeding only cover the field lists.
-// Patterns stay as typed (one per line) and are parsed on read, so a trailing
-// newline or space survives while typing.
-// Each row has a stable id, so a test result stays with its row when another is removed.
+// Patterns stay as typed and are parsed on read, so a trailing newline survives while typing.
 type HarnessRow = { id: number; agent: string; patternsText: string };
 let nextHarnessRowId = 0;
 const harnessRow = (agent = "", patternsText = ""): HarnessRow => ({
@@ -442,8 +435,7 @@ const removeHarnessRule = (id: number) => {
   const { [id]: _removed, ...rest } = testResults.value;
   testResults.value = rest;
 };
-// Agents named on more than one row. Save refuses them, as the server does: two
-// rules for one agent would hide different text in the list and in Session Detail.
+// Save refuses duplicate agents, as the server does.
 const duplicateAgents = computed(() => {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
@@ -459,8 +451,6 @@ const sessionTitleOptions = [
   { value: "off", label: t("readableSessions.settings.titleOff") },
   { value: "first_request", label: t("readableSessions.settings.titleFirstRequest") },
 ];
-// AIO-27: attribution fallbacks, comma separated in the inputs; with the read
-// rules they are kept out of setDraft.
 const ATTRIBUTION_DIMS: AttributionDim[] = ["user", "tenant", "feature"];
 const ATTRIBUTION_PLACEHOLDERS: Record<AttributionDim, string> = {
   user: "enduser.id",
@@ -558,8 +548,6 @@ const shownResults = computed(() => {
   return shown;
 });
 
-// The most recent sessions of this agent in one stream over the last day: the
-// first message of each, newest session first.
 const recentFirstMessages = async (stream: string, agent: string, start: number, end: number) => {
   const schema = await getStream(stream, "traces", true).catch(() => null);
   const names = new Set((schema?.schema ?? []).map((f: { name: string }) => f.name));
@@ -581,9 +569,6 @@ const recentFirstMessages = async (stream: string, agent: string, start: number,
   return (res.data?.hits ?? []) as Array<{ input: unknown; last_start: number }>;
 };
 
-// The draft patterns on this agent's most recent sessions of the last day: how
-// many first messages match, and before / after for the first that does. Spans
-// are not changed.
 const testRule = async (id: number) => {
   const rule = harnessRules.value.find((r) => r.id === id);
   const agent = rule?.agent.trim();
@@ -815,8 +800,6 @@ const saveConfig = async () => {
   }
 };
 
-// Save, and leaving, compare the form with what was last read or saved — the
-// same rule as the other Settings forms (PasswordPolicy, CorrelationSettings).
 const savedConfig = ref("");
 const markSaved = () => {
   savedConfig.value = JSON.stringify(draftConfig());

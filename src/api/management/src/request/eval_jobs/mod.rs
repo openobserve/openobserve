@@ -233,8 +233,7 @@ pub async fn update_eval_job(
     if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
         return resp;
     }
-    // Raising or removing the budget of a job its budget paused resumes it: an activation, so
-    // the activation's scorer check applies too.
+    // Lifting a budget pause is an activation, so the scorer check applies.
     #[cfg(feature = "enterprise")]
     let resumes = was_paused && job.status == "active";
     #[cfg(feature = "enterprise")]

@@ -205,11 +205,7 @@ pub async fn get_latest_sessions(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    // A session is its traces: those with a span carrying the session id, read
-    // across all their spans, as Session Detail reads them. Page by session id
-    // first, then aggregate only those sessions. This avoids materializing
-    // every trace id while keeping expensive summary aggregation after
-    // pagination.
+    // Page by session id before aggregating, so summaries run only for the page's sessions.
     let stream_type = StreamType::Traces;
     let schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
@@ -426,8 +422,7 @@ pub async fn get_latest_sessions(
     })
 }
 
-/// Most trace ids the legacy source-stream scan of one session returns, the
-/// same bound the time index applies to its trace lists.
+/// Same bound the time index applies to its trace lists.
 const SESSION_TRACE_ID_LIMIT: i64 = 50_000;
 
 /// GetSessionDetails
@@ -435,8 +430,7 @@ const SESSION_TRACE_ID_LIMIT: i64 = 50_000;
 /// Returns per-trace turn summaries for one LLM session. Session membership is
 /// selected by the session id column, then each returned trace is aggregated by
 /// `trace_id` across all spans so child/tool error spans are reflected in the
-/// turn status even when they do not carry the session id attribute. `total`
-/// is the session's turn count; `from`/`size` page the turns newest first.
+/// turn status even when they do not carry the session id attribute.
 ///
 /// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
@@ -652,8 +646,7 @@ pub async fn get_session_details(
         req.query.sql =
             traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id, None);
         req.query.from = 0;
-        // Every id (an id-only GROUP BY trace_id) so `total` counts all turns
-        // after merging with the index-discovered traces.
+        // Fetch every id so `total` counts all turns after merging with index-discovered traces.
         req.query.size = SESSION_TRACE_ID_LIMIT;
         req.query.start_time = caller.start_time;
         req.query.end_time = caller.end_time;
@@ -819,8 +812,6 @@ pub async fn get_session_details(
     })
 }
 
-/// The session's turn count and the requested page of its trace ids, ordered
-/// like the legacy "ORDER BY zo_sql_timestamp DESC, trace_id ASC" (newest first).
 fn session_trace_page(
     ordering: HashMap<String, i64>,
     from: i64,
@@ -1270,10 +1261,7 @@ fn build_session_trace_response_item(
     Some((tid, service_count, hit))
 }
 
-/// A trace's agent: the agent of the span its first message is read from (TS-13), so a
-/// sub-agent whose name sorts later does not take over the orchestrator's request; when that
-/// span names no agent, the trace's earliest span that does. `message_present` matches a span
-/// carrying a message.
+/// A trace's agent comes from its first-message span, so a later-sorting sub-agent never wins.
 fn trace_agent_expr(message_present: &str) -> String {
     format!(
         "COALESCE(\
@@ -1294,13 +1282,7 @@ fn optional_usage_expr(has_field: bool, sum_expr: &str, alias: &str) -> String {
     }
 }
 
-/// One trace's usage: its LLM-call spans' sum, else, when no LLM call carries any, the sum over
-/// its top-level `invoke_agent` spans (agent spans whose parent is not an agent span). SDKs that
-/// report usage only on the agent span still count, sibling agents add up, and an agent span
-/// repeating its children's usage (or an outer agent repeating a nested one) counts once. Reads
-/// the column [`agent_parents_join`] adds, and is only valid inside a `GROUP BY trace_id`: a
-/// session's usage is the sum of its traces'. Mirrors `traceUsageSum` in
-/// `web/src/plugins/traces/llmAttribution.ts`.
+/// Falls back to top-level agent spans so nested agents repeating child usage count once.
 pub(super) fn usage_rule(column: &str, has_operation_name: bool) -> String {
     let llm_sum = super::schema_compat::usage_sum_expr(column, has_operation_name);
     if !has_operation_name {
@@ -1315,15 +1297,9 @@ pub(super) fn usage_rule(column: &str, has_operation_name: bool) -> String {
 /// The spans the usage rule falls back to.
 const AGENT_SPAN: &str = "gen_ai_operation_name = 'invoke_agent'";
 
-/// Added to every span by [`agent_parents_join`]: its parent's id when that parent is an agent
-/// span of the same trace, else NULL.
 const AGENT_PARENT_SPAN: &str = "agent_parent_span";
 
-/// What [`usage_rule`] finds top-level agents through, placed right after the stream in `FROM`:
-/// each span joins its parent when that parent is an `invoke_agent` span of the same trace, one
-/// row per span since the agent ids are distinct. `scope` narrows the agent lookup to the traces
-/// the outer query reads. A stream without the parent column holds only root spans, so every
-/// agent span is top-level and the join is to no rows. Empty when the rule reads no agent spans.
+/// Joins each span to its agent parent; a stream without the parent column holds only roots.
 pub(super) fn agent_parents_join(
     stream_ident: &str,
     layout: super::schema_compat::StreamLlmLayout,
@@ -1406,8 +1382,7 @@ fn normalize_session_search_term(raw: Option<&String>) -> Option<String> {
 /// Case-insensitive substring predicate on one span column.
 ///
 /// `str_match_ignore_case` takes the term as literal text — unlike `LIKE` it
-/// has no wildcards, so `%` and `_` need no escaping. The literal itself comes
-/// from `quote_sql_string`, which keeps a `\'` in the term from closing it.
+/// has no wildcards, so `%` and `_` need no escaping.
 fn session_search_predicate(column: &str, term: &str) -> String {
     format!(
         "str_match_ignore_case({column}, {})",
@@ -1415,10 +1390,6 @@ fn session_search_predicate(column: &str, term: &str) -> String {
     )
 }
 
-/// The list search: `keyword` is ORed across the user id and available
-/// message columns, `user_id` is an exact match on the user id. Both are
-/// normalised and, with `filter`, each is its own session-level condition in
-/// the phase-1 membership `HAVING`.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(super) struct LatestSessionSearch {
     pub(super) keyword: Option<String>,
@@ -1518,8 +1489,7 @@ impl LatestSessionSearch {
         }
     }
 
-    /// Each search condition on its own: the session matches when every one
-    /// holds on some span, not necessarily the same span.
+    /// Each holds on some span of the session, not necessarily the same one.
     fn predicates(&self, validated: &super::schema_compat::ValidatedLlmSchema) -> Vec<String> {
         let user_col = validated.columns.user_id;
         let keyword = self.keyword.as_deref().map(|keyword| {
@@ -1588,10 +1558,7 @@ fn build_latest_session_page_sql(
 ) -> String {
     let session_id_col = validated.columns.session_id;
     let filter = normalize_latest_session_filter(filter, stream_name, session_id_col);
-    // Each condition (the agent-scope filter, the keyword, the user) is its own
-    // per-trace flag the session must have set once, so they can hold on
-    // different spans: SDKs put `user.id` on the agent span and the messages on
-    // its chat child.
+    // Separate per-trace flags: SDKs put `user.id` on the agent span, messages on its chat child.
     let conditions: Vec<String> = std::iter::once(filter)
         .filter(|filter| !filter.is_empty())
         .chain(search.predicates(validated))
@@ -1637,12 +1604,7 @@ fn build_latest_session_page_sql(
         String::new()
     };
 
-    // Per trace, over all of its spans: its session (the id its spans carry;
-    // SDKs often set it on the agent span only, while the chat children carry
-    // the usage, messages and errors), last activity, sort value and condition
-    // flags. Then per session, as Session Detail reads a session's traces.
-    // Grouping every trace and dropping the sessionless ones afterwards is
-    // faster than a `trace_id IN (SELECT ...)` membership semi-join.
+    // Grouping all traces then dropping sessionless ones beats a `trace_id IN (SELECT ...)`.
     format!(
         "SELECT session_id, max(trace_last_activity) as session_last_activity{sort_projection} \
          FROM (SELECT max({session_id_col}) as session_id, trace_id, \
@@ -1673,16 +1635,12 @@ fn latest_session_usage_sort_column(
     }
 }
 
-/// A sort's per-trace value (`trace_sort_value`) and the session value rolled
-/// up from it over the per-trace rows. The end-time sort ranks by the session's
-/// last activity, which every page query projects.
 fn latest_session_sort_expressions(
     field: LatestSessionSortField,
     validated: &super::schema_compat::ValidatedLlmSchema,
 ) -> (Option<String>, Option<String>) {
     if let Some(column) = latest_session_usage_sort_column(field, validated) {
-        // The usage rule holds per trace; a session's usage is its traces' sum,
-        // like the totals `build_latest_sessions_sql` reports.
+        // Usage rule holds per trace; a session's usage is the sum of its traces.
         let usage = usage_rule(column, validated.has_operation_name);
         return (
             Some(format!("COALESCE({usage}, 0)")),
@@ -1757,8 +1715,6 @@ fn build_latest_sessions_sql(
         &usage(total_tokens_col),
         "gen_ai_usage_total_tokens",
     );
-    // Per trace: the trace's first message and when it was sent; the session
-    // keeps the earliest.
     let (first_message_expr, session_first_message_expr) = if validated.has_input_messages {
         let present = format!("{input_messages_col} IS NOT NULL AND {input_messages_col} != ''");
         (
@@ -1847,11 +1803,7 @@ fn build_latest_sessions_sql(
         (String::new(), String::new())
     };
 
-    // The usage rule holds per trace, so the inner query applies it per trace
-    // over all of the trace's spans and the outer one sums the traces of each
-    // session. A trace belongs to the session id its spans carry (the largest,
-    // as in the page query); the outer filter keeps this page's sessions. Like
-    // the page query, grouping every trace beats a membership semi-join.
+    // Grouping every trace beats a membership semi-join, as in the page query.
     format!(
         "SELECT session_id, {session_agent_name_expr}\
          min(start_time) as start_time, \
@@ -1890,8 +1842,6 @@ fn build_latest_sessions_sql(
     )
 }
 
-/// How sessions read for one org (AIO-22): each agent's harness patterns,
-/// compiled once per request, and where a session's short title comes from.
 #[derive(Default)]
 struct SessionReadRules {
     harness: HashMap<String, Vec<config::meta::gen_ai::CompiledHarnessPattern>>,
@@ -1908,8 +1858,7 @@ impl SessionReadRules {
     }
 }
 
-/// Each agent's compiled patterns. Save refuses a duplicate agent; for one stored
-/// before that, the first rule wins, as in Session Detail (`patternsForAgent`).
+/// Save refuses duplicate agents; for older stored duplicates the first rule wins.
 fn harness_by_agent(
     rules: &[config::meta::gen_ai::HarnessPatternRule],
 ) -> HashMap<String, Vec<config::meta::gen_ai::CompiledHarnessPattern>> {
@@ -1935,8 +1884,7 @@ fn normalize_latest_session_hits(
             .get("agent_name")
             .and_then(|value| value.as_str())
             .and_then(|agent| rules.harness.get(agent));
-        // Harness text is hidden before the cut, or a long wrapper would push the
-        // request itself past it.
+        // Hide harness text before the cut, or a long wrapper pushes the request past it.
         let full = hit.get("gen_ai_input_messages").and_then(|value| {
             extract_first_user_message(
                 value,
@@ -2287,8 +2235,6 @@ mod tests {
         assert_eq!(hit.models, vec!["claude-sonnet-4-6".to_string()]);
     }
 
-    // S3-04: Session Detail takes the session agent from its turns instead of a
-    // second query over up to 1,000 trace ids.
     #[test]
     fn session_trace_details_carry_the_first_message_spans_agent() {
         let details = |gen_ai: bool, messages: bool| {
@@ -2607,9 +2553,6 @@ mod tests {
         assert!(page.contains(", 0 as session_sort_value"), "{page}");
     }
 
-    /// Splits a session query into the session-level select list, the
-    /// per-trace subquery up to its `GROUP BY trace_id` and the session-level
-    /// tail after it.
     fn split_per_trace(sql: &str) -> (&str, &str, &str) {
         let (per_session, rest) = sql
             .split_once(" FROM (SELECT ")
@@ -2622,8 +2565,7 @@ mod tests {
 
     #[test]
     fn session_usage_rule_runs_per_trace_and_sums_per_session() {
-        // X3-01: sA = 3 agent-only traces of 1,000 tokens must read 3,000, not
-        // the largest agent span of the whole session (1,000).
+        // Agent-only traces must sum per trace, not take the session's largest agent span.
         let mut validated = with_operation_name();
         validated.has_input_messages = true;
         validated.has_cost_status = true;
@@ -2672,8 +2614,6 @@ mod tests {
             "sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count",
             "array_agg(DISTINCT user_id)",
             "as first_message_time",
-            // TS-13: the agent of the span the first message is read from, else
-            // the earliest span naming one; never the largest name.
             "COALESCE(FIRST_VALUE(NULLIF(gen_ai_agent_name, '') ORDER BY start_time ASC) \
              FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != ''), \
              FIRST_VALUE(gen_ai_agent_name ORDER BY start_time ASC) \
@@ -2686,8 +2626,6 @@ mod tests {
         assert!(!sql.contains("max(agent_name)"), "{sql}");
     }
 
-    // A2-04: a duplicate stored before save refused it reads as Session Detail
-    // reads it, first rule first.
     #[test]
     fn harness_by_agent_keeps_the_first_rule_for_an_agent() {
         let rule = |agent: &str, pattern: &str| config::meta::gen_ai::HarnessPatternRule {
@@ -2709,8 +2647,7 @@ mod tests {
 
     #[test]
     fn session_usage_sort_ranks_by_per_trace_usage_and_keeps_membership() {
-        // X3-01: the Tokens/Cost sort must rank sessions by the same per-trace sum
-        // the list shows; each membership condition still holds per session.
+        // The Tokens/Cost sort must rank by the same per-trace sum the list shows.
         let filter = "gen_ai_agent_id = 'agent-1'";
         let mut validated = gen_ai_with_messages();
         validated.has_total_tokens = true;
@@ -2756,11 +2693,7 @@ mod tests {
 
     #[test]
     fn session_list_reads_every_span_of_the_sessions_traces() {
-        // G4-06: the conversation id is often on the agent span only, while its
-        // chat children carry the usage, messages and errors. The page and the
-        // summary take a trace's session from the id its spans carry, as Session
-        // Detail picks a session's traces, and read every span of the trace,
-        // not only the spans with the id.
+        // Session id is often on the agent span only; chat children carry usage and messages.
         let mut validated = gen_ai_with_messages();
         validated.has_total_tokens = true;
         validated.has_operation_name = true;
@@ -2803,9 +2736,6 @@ mod tests {
 
         for (sql, sessions) in queries {
             let (_, per_trace, tail) = split_per_trace(&sql);
-            // A trace's session is the id its spans carry; the spans it reads
-            // are all of the trace's (no span-level WHERE), and only the
-            // per-trace rows are filtered by session.
             assert!(
                 per_trace.starts_with("max(gen_ai_conversation_id) as session_id, trace_id, "),
                 "{sql}"
@@ -2816,8 +2746,7 @@ mod tests {
             assert!(spans.ends_with(" FROM \"bench_traces\""), "{sql}");
             assert!(tail.starts_with(sessions), "{sql}");
             assert!(!tail.contains("gen_ai_conversation_id"), "{sql}");
-            // Conditions are per-trace flags, so the keyword and the user may
-            // sit on different spans of a session.
+            // Per-trace flags let the keyword and the user sit on different spans.
             if sql.contains("kiwiword") {
                 assert!(per_trace.contains("as session_match_1"), "{sql}");
                 assert!(per_trace.contains("as session_match_2"), "{sql}");
@@ -2853,10 +2782,6 @@ mod tests {
         validated
     }
 
-    /// G2-13: with no LLM-call usage, a trace sums its top-level agent spans
-    /// (parent not an agent span), so two sibling agents add up and an agent
-    /// nested under one of them is not counted again. The parent join marks
-    /// the nested ones; the largest agent span alone is no longer the answer.
     #[test]
     fn usage_rule_sums_top_level_agents_found_through_their_parents() {
         assert_eq!(
@@ -2868,8 +2793,7 @@ mod tests {
             )
         );
         let layout = with_operation_name().layout();
-        // Each span meets its parent when the parent is an agent span of the same
-        // trace; the agent ids are distinct, so no span is duplicated.
+        // Agent ids are distinct, so the parent join duplicates no span.
         let agents = "SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span \
                       FROM \"s\" WHERE gen_ai_operation_name = 'invoke_agent'";
         let on =
@@ -2883,8 +2807,6 @@ mod tests {
             agent_parents_join("\"s\"", layout, Some("trace_id IN ('t1')")),
             format!(" LEFT JOIN ({agents} AND (trace_id IN ('t1'))) AS agent_parents {on}")
         );
-        // No parent column: only root spans, so every agent is top-level and the
-        // join adds no parent (and names no missing column).
         let flat = super::super::schema_compat::StreamLlmLayout {
             has_parent_span: false,
             ..layout
@@ -3235,9 +3157,7 @@ mod tests {
             &LatestSessionSort::default(),
             &gen_ai_with_messages(),
         );
-        // The user and the messages may sit on different spans of the session
-        // (user.id on the agent span, the text on its chat child), so each is
-        // its own session-level condition, not one per-span conjunction.
+        // User and messages may sit on different spans, so each is its own session-level condition.
         assert!(sql.contains(
             "OR str_match_ignore_case(gen_ai_output_messages, 'refund'))) THEN 1 ELSE 0 END) \
              as session_match_0, \
@@ -3291,8 +3211,7 @@ mod tests {
 
     #[test]
     fn page_sql_keeps_conditions_out_of_subqueries() {
-        // A subquery inside a condition's `max(CASE ...)` is an unsupported
-        // `InSubquery` expression; conditions are plain per-trace flags.
+        // A subquery inside `max(CASE ...)` is an unsupported `InSubquery` expression.
         let sql = build_latest_session_page_sql(
             "bench_traces",
             "gen_ai_agent_id = 'agent-1'",

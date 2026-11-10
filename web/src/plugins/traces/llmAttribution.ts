@@ -13,17 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Cost attribution by user, feature and tenant (AIO-27).
- *
- * The span contract: `user.id` (OpenObserve already reads it), `feature.name`
- * and `tenant.id`, flattened at ingest to the columns below. A trace takes the
- * value of any of its spans (usually the root carries it) and its whole cost,
- * so cost on the LLM spans is attributed to the tenant set on the root.
- *
- * A column a stream has never received does not exist in its schema, and a
- * query naming it fails; callers pass only the columns the schema has.
- */
+// A trace takes any span's attribution value; columns missing from the schema make the query fail, so pass only existing ones.
 
 import { TRACE_ERRORED_SQL } from "./llmTraceOutcome";
 import {
@@ -52,16 +42,7 @@ export const ATTRIBUTION_ATTRIBUTES: Record<AttributionDim, string> = {
 
 const where = (scope: string) => (scope ? ` WHERE ${scope}` : "");
 
-/**
- * One trace's usage, the rule every Insights, Users and Sessions total uses
- * (the backend's session totals mirror it): the sum over its LLM-call spans,
- * else, when no LLM-call span carries any, the sum over its top-level agent
- * spans (agent spans whose parent is not an agent span). SDKs that report usage
- * only on agent spans still count, sibling agents add up, and an agent span
- * repeating its children's usage (or an outer agent repeating a nested one)
- * counts once. Use inside `GROUP BY trace_id`, over a FROM that carries
- * `agentParentsJoin`.
- */
+/** LLM-call usage, else top-level agent usage, so agent-only SDKs count and nested usage counts once; needs `agentParentsJoin`. */
 export const traceUsageSum = (column: string) =>
   `COALESCE(NULLIF(${llmCallUsageSum(column)}, 0), ${topLevelAgentUsage(column)}, 0)`;
 
@@ -77,11 +58,7 @@ export interface UsageColumns {
   hasCostStatus?: boolean;
 }
 
-/**
- * Tokens on LLM calls that had no price (ingest marks them
- * `gen_ai_usage_cost_status = 'unpriced'`), so a row's cost reads as a lower
- * bound or unknown, not as a free $0. "0" on a stream without the status column.
- */
+/** Unpriced-token total so a cost reads as a lower bound, not a free $0. */
 export const unpricedTokensSum = (hasCostStatus: boolean) =>
   hasCostStatus
     ? `COALESCE(${llmCallUsageSum(
@@ -92,12 +69,7 @@ export const unpricedTokensSum = (hasCostStatus: boolean) =>
 /** How many attributed values the rows query fetches (the panel shows the top few). */
 const TOP_VALUES = 50;
 
-/**
- * The two queries over one per-value grouping: `rows` fetches the top values
- * plus the '' (unattributed) row, which never falls out of the limit; `totals`
- * aggregates every value, so the panel's total, shares and "N more" row cover
- * the whole window, not just the fetched rows.
- */
+/** `totals` covers the whole window so shares and the "more" row are not limited to fetched rows. */
 export interface AttributionSql {
   rows: string;
   totals: string;
@@ -105,8 +77,7 @@ export interface AttributionSql {
 
 function attributionSql(grouped: string): AttributionSql {
   return {
-    // The search layer ignores an ORDER BY on an expression (rows come back sorted by `v`), so the
-    // unattributed-first key is projected as a column and sorted by its alias.
+    // The search layer ignores ORDER BY on an expression, so the sort key is projected and sorted by alias.
     rows:
       `SELECT v, cost, tokens, traces, unpriced, CASE WHEN v = '' THEN 0 ELSE 1 END AS unattributed_last ` +
       `FROM (${grouped}) ORDER BY unattributed_last, cost DESC LIMIT ${TOP_VALUES + 1}`,
@@ -133,13 +104,7 @@ export function costByDimensionSql(
   );
 }
 
-/**
- * Cost, tokens and traces per model. Per (trace, model), not per trace: one
- * trace can call several models, and each LLM call carries its own model and
- * usage. A trace whose usage is only on its agent spans (see `traceUsageSum`)
- * has no LLM call to take a model from, so that usage lands in the '' row,
- * shown as unattributed like the other dimensions' spans with no value.
- */
+/** Grouped per (trace, model) since one trace can call several models; agent-only usage lands in the '' row. */
 export function costByModelSql(stream: string, scope: string, cols: UsageColumns): AttributionSql {
   const scoped = scope ? ` AND (${scope})` : "";
   const cost = "gen_ai_usage_cost";
@@ -182,11 +147,6 @@ export interface AttributionTotals {
   unpriced?: unknown;
 }
 
-/**
- * The top `limit` values, the rest folded into one "more" row, and the
- * unattributed row last. The total, the shares and the "more" row come from
- * the whole-window `totals`, so values past the fetched rows still count.
- */
 export function toAttributionRows(
   hits: Array<{ v: unknown; cost: unknown; tokens: unknown; traces: unknown; unpriced?: unknown }>,
   totals: AttributionTotals | null | undefined,
@@ -234,10 +194,6 @@ export function toAttributionRows(
   };
 }
 
-/**
- * One row per user: their tenant, sessions, tokens, cost, error rate (traces
- * with an errored span) and last activity, most expensive first.
- */
 export function usersSql(
   stream: string,
   opts: {
@@ -251,8 +207,7 @@ export function usersSql(
   const filters = ["user_id IS NOT NULL", "user_id != ''"];
   if (opts.tenant) filters.push(`tenant = ${sqlLiteral(opts.tenant)}`);
   if (opts.search) {
-    // Case-insensitive, as the other search boxes: both sides lowercased.
-    // `\`, `%` and `_` are escaped so the term matches literally.
+    // Escape `\`, `%` and `_` so the term matches literally.
     const term = opts.search.toLowerCase().replace(/[\\%_]/g, "\\$&");
     filters.push(`LOWER(user_id) LIKE ${sqlLiteral(`%${term}%`)}`);
   }

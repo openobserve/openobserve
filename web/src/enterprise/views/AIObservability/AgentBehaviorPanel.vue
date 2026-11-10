@@ -234,8 +234,7 @@ const detailScope = computed<DrillScope>(
 
 // Highlight the row whose drawer is currently open, so the relationship
 // "this row → this drawer" is visible at a glance (rather than a drawer that
-// seems disconnected from the table). A row is an (agent, tool) loop or an
-// (agent, class) failure, or one of its env/version variants, each with its own id.
+// seems disconnected from the table); each row variant has its own id.
 const isActiveRow = (type: "loop" | "failure", row: any): boolean => {
   const d = detailRow.value;
   return !!detailOpen.value && !!d && d.signalType === type && d.id === row.id;
@@ -317,14 +316,10 @@ const behaviorStats = computed<StatItem[]>(() => {
   ];
 });
 
-// Agent, tool, failure class, env and version are what tell rows apart. They share
-// the width the fixed columns leave (`autoWidth`) and, below `minSize`, the table
-// scrolls instead of crushing them to a few letters (`flex`).
+// Identity columns share the leftover width and scroll below `minSize` rather than crush.
 const identityColumn = { size: 136, minSize: 136 } as const;
 const identityMeta = { align: "left", flex: true, autoWidth: true } as const;
 
-// Calls/trace, calls and traces: the same for an (agent, tool) row and its variants.
-// Short numbers, so they stay compact and leave the width to the identifying columns.
 const loopMetricColumns = computed<OTableColumnDef[]>(() => [
   {
     id: "ratio",

@@ -842,9 +842,7 @@ mod tests {
         );
         let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
                         ('chat', 'text_completion', 'generate_content', 'embeddings'))";
-        // LLM-call usage, else the top-level agents': sibling agents with usage
-        // only on their invoke_agent spans add up, a nested agent or a rollup
-        // repeating its chat child counts once.
+        // LLM-call usage, else top-level agents', so nested usage counts once.
         for (column, alias) in [
             ("gen_ai_usage_total_tokens", "gen_ai_usage_details_total"),
             ("gen_ai_usage_cost", "gen_ai_usage_cost_details"),

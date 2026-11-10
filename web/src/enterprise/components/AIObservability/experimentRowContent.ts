@@ -76,10 +76,7 @@ export function dimensionLabel(
 
 /**
  * What a side actually reads as. A categorical score is a policy-derived rank on
- * the wire and a boolean is its healthy share, so the raw scalar makes `0 → 1`
- * mean three different things with no way to tell them apart. The label carries
- * the original value; a boolean without one has mixed trials, so it reads as
- * the share it is rather than as a true/false the trials did not agree on.
+ * the wire and a boolean is its healthy share, so the raw scalar alone is ambiguous.
  */
 export function dimensionSideValue(
   dimension: Pick<

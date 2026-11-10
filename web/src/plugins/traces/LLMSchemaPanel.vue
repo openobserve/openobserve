@@ -101,9 +101,7 @@ const buildAlert = () =>
   buildAiPrefill({ kind: props.panel.alert!, stream: props.streamName, agent: props.alertAgent });
 const store = useStore();
 
-// The usage trends fall back to a trace's top-level agents, a lookup that
-// depends on whether the stream stores span parents. Those panels wait for
-// that answer before they query; the others render at once.
+// Usage trends fall back to top-level agents, so they wait to learn whether the stream stores span parents.
 const needsParents = computed(() => props.panel.query.sql.includes("{{agentParents}}"));
 const hasParentSpan = ref<boolean | null>(null);
 watch(
@@ -117,9 +115,7 @@ watch(
   { immediate: true },
 );
 
-// Horizontal bars select their category (the model); trends select the series
-// (breakdown value, or the value column for multi-series panels) at the
-// clicked bucket. Chart times are shifted into the viewer's timezone.
+// Chart times are shifted into the viewer's timezone.
 function onChartClick(params: any) {
   if (!props.panel.drill || !params) return;
   if (props.panel.type === "horizontal-bar") {

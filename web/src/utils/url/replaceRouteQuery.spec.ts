@@ -70,8 +70,6 @@ describe("replaceRouteQuery", () => {
     expect(route().query).toEqual({ org: "team1", keyword: "refund" });
   });
 
-  // An org switch remounts the page before its push commits; the remounted
-  // writers replay what the URL already holds and must not cancel that push.
   it("issues no replace when the update changes nothing, so a push in flight lands", async () => {
     const replace = vi.spyOn(router, "replace");
     const push = router.push("/insights?org=team1");

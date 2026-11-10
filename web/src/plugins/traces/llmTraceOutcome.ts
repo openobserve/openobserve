@@ -13,12 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Trace status: a trace has an error when any of its spans has status ERROR.
- * It reads only the status the instrumentation set, so it means the same for
- * every SDK and trace shape. It does not judge which error the user saw.
- */
-
 /** 1 when the grouped trace has an errored span, else 0. Use inside `GROUP BY trace_id`. */
 export const TRACE_ERRORED_SQL = "max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END)";
 

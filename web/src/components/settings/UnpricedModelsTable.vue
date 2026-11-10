@@ -314,9 +314,6 @@ const columns: OTableColumnDef<UnpricedModel>[] = [
     header: t("modelPricing.unpriced.colModel"),
     accessorKey: "model",
     sortable: true,
-    // `autoWidth` hands Model and Priced as the width the fixed columns leave, split
-    // evenly; `flex` makes the table scroll instead once that drops below `minSize`.
-    // At the minimums the columns fit the 696 px pane of a 1024 px window.
     size: 136,
     minSize: 136,
     meta: { align: "left", flex: true, autoWidth: true },
@@ -351,8 +348,6 @@ const columns: OTableColumnDef<UnpricedModel>[] = [
     header: t("modelPricing.unpriced.colActions"),
     isAction: true,
     pinned: "right",
-    // "Create price" next to "Keep prices" (the matched name rides in the tooltip),
-    // so the columns fit a 1024 px window without the pinned column covering Tokens and Cost.
     size: 232,
     meta: { align: "right", actionCount: 2 },
   },

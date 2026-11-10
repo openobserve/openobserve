@@ -19,15 +19,7 @@ import type {
 } from "@/services/llm-experiments.service";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
-/**
- * One score column. `key` is its identity across runs: the name for a platform
- * Scorer's Score Config, and (Score Config, client key) for a dimension the
- * customer's own code reported, which `clientScorerKey` marks. `name` is the
- * Score Config name either way. `scoreConfigId` is the key to the config's
- * health policy, which decides a move against the baseline. `errorCount` and
- * `pendingCount` are the rows a platform Scorer failed on or has not scored
- * yet; client dimensions arrive already scored, so they carry 0.
- */
+/** `key` identifies a column across runs: Score Config name, or (config, client key) for client dimensions. */
 export type ExperimentScoreSummary = {
   key: string;
   name: string;
@@ -168,9 +160,7 @@ function clientScoreSummary(summary: ExperimentClientScoreSummary): ExperimentSc
 
 /**
  * The row's own `includeSummary` fields already carry the type-aware
- * aggregate per scorer and per client-reported dimension, so this only
- * reshapes them for the browse table's score columns — it never needs raw
- * execution/score records. Platform columns come first, then client ones.
+ * aggregate per scorer and per client dimension, so this only reshapes them.
  */
 export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidence {
   const platform = (experiment.scoreSummaries ?? []).map((summary) => {

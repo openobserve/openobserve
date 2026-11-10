@@ -58,17 +58,7 @@ pub fn quote_identifier(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\"\""))
 }
 
-/// Quotes `value` as a SQL string literal that survives the search service's
-/// parse → re-serialise passes.
-///
-/// The dialect has no backslash escapes, so doubling `'` is enough for one
-/// parse. The search path, however, re-serialises the parsed SQL with
-/// sqlparser's `Display`, which writes a `'` that follows a `\` or another `'`
-/// as-is instead of doubling it: `a\'b` would come back as `'a\'b'`, which
-/// closes the literal after `a\` and lets the rest run as SQL. Such a value is
-/// therefore split at those spots into literals joined with `||`, so no
-/// literal holds a `'` after a `\` or a `'`. Values without such a spot (nearly
-/// all) stay one plain literal.
+/// Splits at a `'` after `\` or `'` because sqlparser's `Display` would not re-escape it.
 pub fn quote_sql_string(value: &str) -> String {
     let body = escape_sql_string(value);
     if literal_pieces(value).nth(1).is_some() {
@@ -78,11 +68,7 @@ pub fn quote_sql_string(value: &str) -> String {
     }
 }
 
-/// The text to put between `'…'` for [`quote_sql_string`]'s literal. A value
-/// that must be split comes back as `a\' || '''b`, which inside the caller's
-/// quotes reads as a `||` chain; `||` binds tighter than comparisons, `LIKE`
-/// and `IN`, so the chain stays one operand. Prefer [`quote_sql_string`],
-/// which also parenthesises the chain.
+/// Prefer [`quote_sql_string`], which also parenthesises a split `||` chain.
 pub fn escape_sql_string(value: &str) -> String {
     literal_pieces(value)
         .map(|piece| piece.replace('\'', "''"))
@@ -140,8 +126,7 @@ mod tests {
         }
     }
 
-    /// The value each predicate compares against, after the SQL went through
-    /// two parse → `Display` passes as it does in the search service.
+    /// Runs two parse → `Display` passes, as the search service does.
     fn compared_values(sql: &str) -> Vec<String> {
         let once = parse(sql).to_string();
         let twice = parse(&once).to_string();

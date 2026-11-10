@@ -75,8 +75,7 @@ export function readUrlScope(query: LocationQuery): UrlScope {
   const agent = str(query.agent);
   const env = str(query.env);
   const version = str(query.version);
-  // Agent mode writes `stream` for the agent's picked stream, so it must not
-  // also seed the Stream-mode picker.
+  // Agent mode writes `stream` for the agent's picked stream, so it must not seed the Stream-mode picker.
   const agentScoped = type === "agent" || (!type && !!(agent || env || version));
   return {
     type: type === "stream" || type === "agent" ? type : null,
@@ -266,18 +265,9 @@ export interface UseAgentScopeReturn {
   selectedAgentName: Ref<string>;
   /** Selected version (or UNSET, scoped to env + name). */
   selectedVersion: Ref<string>;
-  /**
-   * Streams carrying the selected env + agent + version, the default stream
-   * (earliest `first_seen`: the stream the agent has lived in longest) first.
-   * More than one means the page shows a Stream picker; empty until the
-   * cascade resolves an agent.
-   */
+  /** Streams carrying the selected agent variant, the default (earliest `first_seen`) first. */
   agentStreams: ComputedRef<SelectOption[]>;
-  /**
-   * The stream the user picked for the selected agent ("" = the default). A
-   * pick that no longer carries the selected agent (agent, env or version
-   * changed, or a reload dropped it) is cleared, falling back to the default.
-   */
+  /** The stream picked for the selected agent ("" = default); cleared when it no longer carries that agent. */
   selectedAgentStream: Ref<string>;
   /**
    * Seed the cascade selection from an agent NAME (the URL `?agent=` deep-link
@@ -292,9 +282,7 @@ export interface UseAgentScopeReturn {
    * persisted selection. Any of the three may be "" (not given). Picks the agent
    * matching every given dimension, else drops version, else matches the name
    * alone, so a same-named agent under a different env/version is only the
-   * fallback. `stream` (the URL `stream` of an agent-mode link) is kept when
-   * the resolved agent sends to it, else the default stream is used. Returns
-   * true when an agent was selected.
+   * fallback. A given `stream` is kept when the agent sends to it. Returns true when an agent was selected.
    */
   selectAgentByScope: (env: string, name: string, version: string, stream?: string) => boolean;
 }
@@ -411,8 +399,6 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
       : [],
   );
 
-  // Every registry row of the selected env + agent + version: one per stream
-  // (and per id) it sends to.
   const variantRows = computed<GenAiAgentListItem[]>(() => {
     if (!cascade || !selectedEnv.value || !selectedAgentName.value || !selectedVersion.value) {
       return [];
@@ -425,12 +411,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     );
   });
 
-  // The streams of the selected variant, the default first: the earliest
-  // `first_seen`, i.e. the stream the agent has lived in longest. The registry
-  // carries no span or trace counts and a count query per stream would cost a
-  // search on every page entry, while `first_seen` is already on each row and
-  // new traffic never moves it, so one stray trace in another stream cannot take
-  // over. A row without `first_seen` sorts last; ties keep the registry order.
+  // Default stream is the earliest `first_seen`: free on every row and new traffic never moves it, unlike counts.
   const agentStreams = computed<SelectOption[]>(() => {
     const ordered = [...variantRows.value].sort(
       (a, b) =>
@@ -534,9 +515,6 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   );
 
   const selectedAgent = computed<GenAiAgentListItem | null>(() => {
-    // Cascade mode: resolve the concrete agent from env + name + version (all
-    // three pinned to a real, unset-aware value), then the stream: the picked
-    // one, else the default (the first of `agentStreams`).
     if (cascade) {
       const stream = selectedAgentStream.value || agentStreams.value[0]?.value;
       return variantRows.value.find((a) => a.source_stream === stream) ?? null;
@@ -547,8 +525,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   });
 
   // Hazard 3 — effectiveStream normalization: uniformly `?? ""`. In agent mode
-  // the selected agent's source_stream drives the query (the picked stream, else
-  // the default); with no agent it is "". Stream mode reads the page-picked stream.
+  // the selected agent's source_stream drives the query; Stream mode reads the page-picked stream.
   const effectiveStream = computed(() =>
     opts.filterMode.value === "agent"
       ? (selectedAgent.value?.source_stream ?? "")

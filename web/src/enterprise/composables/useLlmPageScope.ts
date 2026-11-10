@@ -22,11 +22,6 @@ import genAiAgentMappingService, {
 import { useLlmTraceStreams } from "./useLlmTraceStreams";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
-/**
- * Stream + agent scope for the lighter AI pages (Users, Issues, Budgets): an
- * LLM trace stream and, optionally, one agent on it by name. `scope` is the
- * bare SQL predicate for the agent ("" = every agent on the stream).
- */
 export function useLlmPageScope(t: TranslateFn) {
   const store = useStore();
   const stream = ref("");

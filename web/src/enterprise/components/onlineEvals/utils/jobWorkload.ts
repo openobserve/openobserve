@@ -13,13 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * An eval job as a workload (AIO-25): score lag and throughput from
- * `_llm_scores`, judge errors and spend from `_evaluator`, bucketed over the
- * drawer's window; and "Scores stopped", which compares the scores the job
- * wrote with the traces its filter matched.
- */
-
 import type { EvalTargetScope } from "@/services/online-evals.service";
 import { countExpression, quoteIdent } from "../composables/useJobMatchedTargets";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
@@ -60,11 +53,7 @@ export function scoreSeriesSql(jobId: string, interval: string): string {
   ].join("\n");
 }
 
-/**
- * Judge calls per bucket and outcome; failures by error kind. The kind column
- * appears with a stream's first failure, so `withKind: false` groups failures
- * by status for a stream that has none yet.
- */
+/** Judge calls per bucket and outcome; pass `withKind: false` while the stream has no kind column yet. */
 export function judgeOutcomeSql(jobId: string, interval: string, withKind = true): string {
   const failure = withKind
     ? "COALESCE(attributes_error_kind, attributes_status)"
@@ -78,11 +67,7 @@ export function judgeOutcomeSql(jobId: string, interval: string, withKind = true
   ].join("\n");
 }
 
-/**
- * Judge spend per bucket, in USD, with its unpriced calls. The cost-status
- * column appears with a stream's first priced or unpriced call, so
- * `withStatus: false` reads the cost alone.
- */
+/** Judge spend per bucket in USD; pass `withStatus: false` while the stream has no cost-status column yet. */
 export function judgeSpendSql(jobId: string, interval: string, withStatus = true): string {
   const unpriced = withStatus
     ? "SUM(CASE WHEN gen_ai_usage_cost_status = 'unpriced' THEN 1 ELSE 0 END)"
@@ -96,10 +81,7 @@ export function judgeSpendSql(jobId: string, interval: string, withStatus = true
   ].join("\n");
 }
 
-/**
- * Spend points from `judgeSpendSql` rows. A bucket whose calls were all
- * unpriced has no known spend, so it plots as a gap, never as $0.
- */
+/** Spend points from `judgeSpendSql` rows; an all-unpriced bucket plots as a gap, never $0. */
 export function spendPoints(
   rows: { bucket: unknown; cost?: unknown; unpriced?: unknown }[],
 ): [number, number | null][] {
@@ -114,10 +96,7 @@ export function lastScoreSql(jobId: string): string {
   return `SELECT max(_timestamp) AS last_us FROM "_llm_scores" WHERE job_id = ${sqlLiteral(jobId)}`;
 }
 
-/**
- * Targets the job's filter matched, at its scope; null when the stream (with
- * schema `fields`) cannot be counted at it.
- */
+/** Targets the job's filter matched at its scope; null when the stream cannot be counted at it. */
 export function matchedSinceSql(
   stream: string,
   where: string,
@@ -177,18 +156,10 @@ export function errorSeries(rows: any[]): ErrorSeries {
 
 /** Scores stop being late and start being missing after this long. */
 export const SCORES_STOPPED_AFTER_MIN = 30;
-/**
- * Expected scores (matched × rate) before missing ones mean anything: at 3, a
- * job sampling 10% goes 30 matched traces without a score about 4% of the time.
- * Small jobs are judged by their own rate, not by a minimum run count.
- */
+/** Minimum expected scores (matched × rate) before missing ones count as stopped. */
 export const SCORES_STOPPED_MIN_EXPECTED = 3;
 
-/**
- * Where the "Scores stopped" count starts: the newest score, or a day ago when
- * there is none, but never before the job's last edit or transition. A paused
- * job is not expected to score, so a resume restarts the count.
- */
+/** Start of the "Scores stopped" count: newest score or a day ago, never before the job's last edit or transition. */
 export function stoppedSinceUs(opts: {
   lastScoreUs: number;
   updatedUs: number;
@@ -198,11 +169,7 @@ export function stoppedSinceUs(opts: {
   return Math.max(opts.lastScoreUs || fallbackUs, opts.updatedUs);
 }
 
-/**
- * No score since `sinceUs` while the filter kept matching. `matched` counts
- * targets from `sinceUs` until the completion window before now, since newer
- * ones cannot have been scored yet.
- */
+/** No score since `sinceUs` while the filter kept matching; targets still inside the completion window are excluded. */
 export function scoresStopped(opts: {
   sinceUs: number;
   nowUs: number;

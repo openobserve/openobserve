@@ -33,14 +33,7 @@ type Span = {
   usage: number;
 };
 
-/**
- * One trace's usage as the generated SQL computes it, over in-memory spans:
- * the FROM's agent-parent join gives each span `agent_parent_span` (its parent
- * when that parent is a span of the join's agent operation), then `rule` is
- * read back: the LLM-call sum's operations, and the fallback's operation and
- * whether it keeps only spans with no agent parent. A fallback in any other
- * shape (a MAX, a sum over every agent) does not parse and fails the test.
- */
+/** One trace's usage as the generated SQL computes it over in-memory spans; an unparseable fallback fails the test. */
 function traceUsageOver(from: string, rule: string, column: string, spans: Span[]): number {
   const join =
     /AS agent_parents ON trace_id = agent_parent_trace AND (\w+) = agent_parent_span$/.exec(from);
@@ -77,9 +70,7 @@ describe("cost attribution (AIO-27)", () => {
     );
   });
 
-  // G2-13: the one per-trace rule is LLM-call usage, else the usage of the
-  // top-level agent spans (parent not an agent span). Sibling agents add up; a
-  // nested agent repeats part of its parent's usage and is not counted again.
+  // Usage is LLM-call usage, else top-level agents'; nested agents repeat their parent's usage.
   describe("a trace's usage (traceUsageSum)", () => {
     const usage = (spans: Span[], hasParentSpan = true) =>
       traceUsageOver(
@@ -155,9 +146,7 @@ describe("cost attribution (AIO-27)", () => {
     expect(flat).not.toContain("reference_parent_span_id");
   });
 
-  // One trace can call several models, so a model's cost is its own calls'.
-  // A trace with usage only on its agent span has no model to take, so that
-  // usage lands in the unattributed '' row instead of vanishing.
+  // Agent-only usage has no model, so it lands in the unattributed '' row instead of vanishing.
   it("attributes cost per model and trace, agent-only usage unattributed", () => {
     const sql = costByModelSql("s", "gen_ai_agent_name = 'a'", withParents).rows;
     const [models, agentOnly] = sql.split(" UNION ALL ");
@@ -181,9 +170,7 @@ describe("cost attribution (AIO-27)", () => {
     expect(sql).toContain("COUNT(DISTINCT trace_id) AS traces");
   });
 
-  // The '' row sorts first so it never falls out of the limit, and the totals
-  // query aggregates the same grouping with no limit. The search layer ignores
-  // an ORDER BY on an expression (S3V-01), so the sort key is a projected alias.
+  // The search layer ignores ORDER BY on an expression (S3V-01), so the '' row sorts first via a projected alias.
   it("fetches the top values plus unattributed, and totals over every value", () => {
     for (const sql of [
       costByDimensionSql("s", "user_id", "", withParents),

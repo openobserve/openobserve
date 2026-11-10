@@ -19,9 +19,7 @@ import { UNSET } from "@/enterprise/composables/useAgentScope";
 
 /**
  * Predicate: does signal `s` match the selected agent scope (name + env +
- * version)? `env`/`version` narrow the match only when set: null = don't
- * constrain, UNSET = the signal must have no value for that dimension. Mirrors
- * buildAgentClimbFilter, so the table and the drill-down count the same spans.
+ * version)? null = don't constrain, UNSET = must have no value; mirrors buildAgentClimbFilter.
  *
  * Colocated here (rather than inline in AgentBehaviorPanel.vue's
  * `<script setup>`) so it can be unit tested directly without mounting the
@@ -41,13 +39,7 @@ export const matchesAgentScope = (
   );
 };
 
-/**
- * The page-level scope of the selected agent variant, for matchesAgentScope
- * and the drill-down. A missing env or version becomes UNSET ("not set") when
- * another variant of the same agent in the same stream has one, so "(No env)"
- * excludes the production signals. When none has it, it stays null
- * (unconstrained): the stream may not have the column at all.
- */
+/** Missing env/version becomes UNSET only when a sibling variant has one; else null, since the column may not exist. */
 export const selectedAgentScope = (
   agent: GenAiAgentListItem | null | undefined,
   agents: ReadonlyArray<GenAiAgentListItem>,
@@ -61,10 +53,7 @@ export const selectedAgentScope = (
   return { name: agent.name, env: pin(agent.env, "env"), version: pin(agent.version, "version") };
 };
 
-/**
- * The env/version a Behavior row's drill-down filters on. `null` leaves a
- * dimension open; UNSET pins it to "not set".
- */
+/** `null` leaves a dimension open; UNSET pins it to "not set". */
 export interface DrillScope {
   env: string | null;
   version: string | null;
@@ -101,11 +90,7 @@ const ratioOf = (calls: number, traces: number): number =>
   traces > 0 ? Math.round((calls / traces) * 100) / 100 : 0;
 const byRatio = (a: LoopTotals, b: LoopTotals) => b.ratio - a.ratio;
 
-/**
- * Sets each variant's drill-down scope. A variant without env or version is
- * told apart from its siblings by "not set", so that dimension is pinned to
- * UNSET. One all variants lack stays open: the stream may not have the column.
- */
+/** A dimension all variants lack stays open: the stream may not have the column. */
 const pinVariantScopes = <
   V extends { env: string | null; version: string | null; scope: DrillScope },
 >(
@@ -123,12 +108,7 @@ const pinVariantScopes = <
   return variants;
 };
 
-/**
- * Loop signals as one row per (agent, tool), ranked by calls/trace. The rollup
- * writes a record per hourly window, env and version, so calls and traces are
- * summed over the range and calls/trace is derived from the sums. Each row
- * keeps its env/version variants, summed the same way.
- */
+/** The rollup writes per hour, env and version, so calls/trace is derived from summed counts. */
 export const buildLoopRows = (signals: AgentSignalRecord[], unknownAgent: string): LoopRow[] => {
   const groups = new Map<string, Map<string, LoopVariantRow>>();
   for (const s of signals) {
@@ -208,12 +188,6 @@ export interface FailureRow extends FailureTotals {
 
 const byCount = (a: FailureTotals, b: FailureTotals) => b.count - a.count;
 
-/**
- * Failure signals as one row per (agent, class), most frequent first. Like
- * loops, the rollup writes a record per hourly window, env and version; the
- * counts are summed over the range, and each row keeps its env/version
- * variants, summed the same way.
- */
 export const buildFailureRows = (
   signals: AgentSignalRecord[],
   unknownAgent: string,

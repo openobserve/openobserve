@@ -115,8 +115,7 @@ const props = withDefaults(
     /** Hover delay (ms) before the preview opens. Default 120 (chips/rail); the
      *  ribbon passes a smaller value so scrubbing across bars feels snappier. */
     delay?: number;
-    /** The user message to show instead of the turn's raw one, e.g. with
-     *  harness text hidden as the turn row hides it. */
+    /** Replaces the turn's raw user message, e.g. with harness text hidden. */
     userText?: string;
   }>(),
   { side: "top", delay: 120 },

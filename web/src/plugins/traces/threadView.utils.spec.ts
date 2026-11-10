@@ -374,8 +374,7 @@ describe("extractContent", () => {
     expect(extractContent([{ type: "reasoning", content: "let me check" }])).toBe("let me check");
   });
 
-  // AIO-21: the Thread view draws tool calls as cards (toolCallParts), so the
-  // bubble keeps only the text around them.
+  // Tool calls render as cards, so the bubble keeps only the surrounding text.
   it("leaves tool_call parts out of the text, for the tool cards", () => {
     const result = extractContent([
       { type: "reasoning", content: "checking the weather" },
@@ -1122,10 +1121,6 @@ describe("buildTraceGroup", () => {
   });
 });
 
-// ===========================================================================
-// SDK tool-call and message shapes (QA C2-01 / C2-02)
-// ===========================================================================
-
 describe("SDK tool-call payload shapes", () => {
   // Traceloop/OpenLLMetry, as the pipeline stores gen_ai.completion.0.tool_calls.*.
   const traceloop = JSON.stringify([
@@ -1242,8 +1237,7 @@ describe("SDK tool-call payload shapes", () => {
     ]);
   });
 
-  // OpenInference wraps every message as {message: {...}}: the wrapped system
-  // message must not read as an earlier user message, nor the user turn repeat.
+  // A wrapped system message must not read as an earlier user message, nor the user turn repeat.
   it("reads an OpenInference trace as a normal conversation", () => {
     const wrap = (message: Record<string, unknown>) => ({ message });
     const system = wrap({ role: "system", content: "You are a weather bot." });

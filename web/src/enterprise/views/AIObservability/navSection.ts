@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Which section (a rail item, or a tab of one) is lit for the route we are on.
 // The shell lifts a tab's key to its rail item through the section's `tabOf`.
 //
 // Matched by PREFIX, not by an exact list: every section grows drill-down routes

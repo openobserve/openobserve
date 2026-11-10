@@ -19,13 +19,9 @@
  * the dashboard via `useLLMInsights`). The chart panels reuse the dashboards'
  * own IndexedDB cache instead.
  *
- * Keyed org + stream + agent + time window via `selectionKey`, so a tab toggle
- * back to the same selection is an instant hit and a new selection/window is a
- * clean miss that refetches.
+ * Keyed by `selectionKey`, so returning to the same selection hits.
  *
- * A **module singleton** on purpose: it must survive a component remount. The
- * dashboard keys panels by selection, so they are recreated on every tab
- * toggle, and a `Map` declared inside a component's
+ * A module singleton on purpose: panels are recreated on every tab toggle, so a `Map` in
  * `setup()` would be reset to empty each time and never hit. Module scope means
  * one shared instance for the page's lifetime; cleared only on a full reload.
  *

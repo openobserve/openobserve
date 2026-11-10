@@ -22,11 +22,7 @@ interface LiteralSpan {
 const MARKER_PREFIX = "__o2lit_";
 const MARKER_RE = /^__o2lit_(\d+)__$/;
 
-/**
- * Finds single-quoted string literals in `sql`, skipping double-quoted and
- * backtick-quoted identifiers. Inside a literal, `''` and a backslash followed
- * by any character do not terminate it (matching the SQL parser).
- */
+/** `''` and a backslash escape do not terminate a literal, matching the SQL parser. */
 const scanLiterals = (sql: string): LiteralSpan[] | null => {
   const spans: LiteralSpan[] = [];
   let i = 0;
@@ -62,16 +58,7 @@ export interface LiteralNode {
   raw: string;
 }
 
-/**
- * Parses `whereClause` with `parser`, lets `visit` pick string literal nodes
- * to replace, and splices only those replacements into the original text.
- * Every other byte of the clause (identifier quoting, other literals and their
- * escapes) is preserved exactly.
- *
- * `visit` receives the WHERE AST; each string literal node carries its
- * original text in `raw`. It returns a map of node → replacement SQL text.
- * Returns `null` when the clause cannot be tokenised or parsed.
- */
+/** Splices only the replaced literals into the original text, preserving every other byte. */
 export const rewriteWhereLiterals = (
   whereClause: string,
   parser: { astify: (sql: string) => unknown },
@@ -81,8 +68,7 @@ export const rewriteWhereLiterals = (
   const spans = scanLiterals(whereClause);
   if (!spans) return null;
 
-  // Replace every literal with an indexed marker so AST nodes can be mapped
-  // back to their exact position in the original text.
+  // Indexed markers map AST nodes back to their exact position in the original text.
   let masked = "";
   let cursor = 0;
   spans.forEach((span, idx) => {

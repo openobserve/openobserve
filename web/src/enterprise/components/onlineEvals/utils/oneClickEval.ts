@@ -29,10 +29,7 @@ export function oneClickWhere(agent: string | null): string {
   return agent ? `gen_ai_agent_name = ${sqlLiteral(agent)}` : "";
 }
 
-/**
- * A sampled, trace-scoped job for one agent (or the whole stream). Each scorer
- * maps only the variables its template uses.
- */
+/** A sampled, trace-scoped job for one agent or the whole stream. */
 export function buildOneClickJob(opts: {
   agent: string | null;
   stream: string;

@@ -1301,8 +1301,7 @@ const DEFAULT_TRACE_TAB: TraceTabValue = "waterfall";
 
 const LS_TRACE_TAB_ORDER_KEY = "o2_trace_tab_order";
 const LS_TRACE_ACTIVE_TAB_KEY = "o2_trace_active_tab";
-// LLM traces remember their own tab and default to Thread (AIO-21), so a
-// Waterfall saved from plain traces does not hide the conversation view.
+// Separate key so a Waterfall saved from plain traces does not hide the LLM Thread view.
 const LS_LLM_TRACE_ACTIVE_TAB_KEY = "o2_llm_trace_active_tab";
 const DEFAULT_LLM_TRACE_TAB: TraceTabValue = "thread";
 const LS_TRACE_CRITICAL_PATH_KEY = "o2_trace_critical_path";
@@ -1968,10 +1967,7 @@ export default defineComponent({
       return spans.some((span: any) => isLLMTrace(span));
     });
 
-    // An LLM trace opens on its own tab only when it has a conversation to show.
-    // With message capture off (the OTel default) the Thread would be empty, so
-    // it opens and remembers its tab like a plain trace. Every Thread turn is a
-    // span with a payload, so this also covers "buildTraceGroup has a turn".
+    // With message capture off (the OTel default) the Thread would be empty.
     const hasLLMContent = computed(
       () => hasLLMSpans.value && effectiveSpanList.value.some((span: any) => hasLLMPayload(span)),
     );
@@ -2346,8 +2342,7 @@ export default defineComponent({
       },
     );
 
-    // A host that moves to another span of the same trace (e.g. Previous /
-    // Next score) changes only spanIdProp; the trace watcher above misses it.
+    // Moving within the same trace changes only spanIdProp, which the trace watcher misses.
     watch(
       () => props.spanIdProp,
       (newSpanId) => {
@@ -3552,8 +3547,6 @@ export default defineComponent({
       logsAtUs.value = null;
     };
 
-    // AIO-33: the pack's tool rules over this trace's spans. The header count,
-    // the chip on the last evidence span and the Issues tab read this list.
     const traceIssueList = computed(() => traceIssues(effectiveSpanList.value ?? []));
     const issueSpanLabels = computed(() =>
       Object.fromEntries(
@@ -3646,8 +3639,6 @@ export default defineComponent({
         org_identifier: effectiveOrgIdentifier.value,
         tab: originSearchTab(),
       };
-      // Land the new tab on the span selected here (the Thread/Waterfall
-      // choice already carries over through the remembered last tab).
       if (selectedSpanId.value) query.span_id = selectedSpanId.value;
 
       // Add log_stream parameter for correlation navigation

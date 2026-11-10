@@ -4,20 +4,10 @@
 //
 // Regression tests for the Agent Behavior panel.
 //
-// The scoping bug: `scopedSignals` filtered by `agent_name` only, so two
-// variants of the same agent (differing by env/version) collapsed into one —
-// e.g. a "prod" and "staging" deployment of agent "a" both counted as agent
-// "a"'s loops/failures. This pins `matchesAgentScope` narrowing by name + env +
+// Agent scope narrows by name + env +
 // version, using the CANONICAL serialized keys `gen_ai_agent_env` /
 // `gen_ai_agent_version` (NOT `agent_env`).
 //
-// The late-response bug (K4-03): a slow answer for the previous stream replaced
-// the current stream's signals, so the panel is mounted with its children stubbed.
-//
-// The duplicate-rows bug (B5): the rollup writes a loop record per hourly
-// window × env × version and the table listed each, while "Looping agents"
-// counted those records. Rows are now one per (agent, tool) with summed totals
-// and the variants under them; the KPI counts agents.
 
 import { describe, it, expect, vi } from "vitest";
 import { defineComponent, h } from "vue";
@@ -85,8 +75,6 @@ describe("matchesAgentScope", () => {
   });
 });
 
-// The report's data: research-agent/web_search in a no-env variant (12 calls in
-// 1 trace) and a production variant split over two hourly windows (5 in 3).
 const loopSignal = (
   agent: string | null,
   tool: string,

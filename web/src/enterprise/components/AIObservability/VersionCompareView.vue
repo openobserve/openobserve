@@ -289,11 +289,7 @@ const versionOptions = computed<SelectOption[]>(() =>
   })),
 );
 
-// Default: the `initialPair` when both versions are listed, else A = the
-// immediately-previous version (the baseline), B = current (latest): the compare
-// engine and its copy read every change from A to B. Sort the DEDUPED versions
-// by first_seen desc so "current" and "previous" are two distinct versions
-// regardless of how many buckets each spanned.
+// Sort deduped versions so "current" and "previous" are distinct regardless of bucket count.
 function seedDefaults() {
   if (selectedA.value && selectedB.value) return;
   const listed = new Set(uniqueVersions.value.map((v) => v.version));

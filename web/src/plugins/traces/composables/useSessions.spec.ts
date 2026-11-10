@@ -863,8 +863,7 @@ describe("useSessions — fetchSession: paging long sessions", () => {
     expect(older.hasOlder).toBe(false);
   });
 
-  // G4-07: deleting an hour of the stream removed 55 turns' spans but not their
-  // ids from the session time index, which still counts 1,100.
+  // The session time index keeps ids of turns whose spans were deleted.
   it("counts only turns with data and finishes once the index's last page is read", async () => {
     const count = SESSION_TURNS_PAGE_SIZE + 100;
     const newestFirst = Array.from({ length: count }, (_, i) => count - i);

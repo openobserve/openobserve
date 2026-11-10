@@ -495,8 +495,6 @@ const columns = computed(() =>
       size: COL.dateAbsolute,
       meta: { align: "left" },
     },
-    // Health, spend and the last error come before the job's set-up columns, so a
-    // 1280 px window shows today's spend without scrolling.
     {
       id: "health",
       header: t("onlineEvals.job.columns.health"),
@@ -791,9 +789,7 @@ function formatDateShort(value: number) {
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
 
-// — Spend today (AIO-24) — judge spend since 00:00 UTC, from the `_evaluator`
-// spans. Unpriced judge calls make it unknown, and so does a read that fails or
-// is not allowed: none is shown as $0.
+// Unpriced calls or a failed/forbidden read make spend unknown, never $0.
 const store = useStore();
 const org = () => store.state.selectedOrganization?.identifier ?? "";
 const { executeQueryOnce } = useLLMStreamQuery();

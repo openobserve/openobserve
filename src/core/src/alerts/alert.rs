@@ -370,8 +370,7 @@ pub enum AlertError {
     MultiAlertGroupingError(String),
     #[error("Group by column {column} not found on stream {stream_name}")]
     GroupByColumnNotFound { column: String, stream_name: String },
-    /// A SQL multi-alert naming a column its stream has not received; the planner's own wording
-    /// ("Schema error: No field named …") is not shown.
+    /// A SQL multi-alert naming a column its stream has not received.
     #[error(
         "Stream {stream_name} has no field {field} yet. Alerts can only use fields that exist in the stream."
     )]
@@ -535,8 +534,6 @@ fn validate_custom_group_by(
         })
 }
 
-/// A SQL multi-alert whose result schema could not be planned. A column missing from the stream
-/// is named as such ([`AlertError::FieldNotFound`]); anything else keeps the grouping error.
 fn multi_alert_plan_error(stream_name: &str, err: anyhow::Error) -> AlertError {
     if let Some(DataFusionError::SchemaError(schema_err, _)) = err
         .downcast_ref::<DataFusionError>()
@@ -9545,8 +9542,6 @@ mod tests {
         );
     }
 
-    /// A budget-shaped SQL multi-alert on a stream without its scope column is refused naming the
-    /// field, not with the planner's "Schema error: No field named …".
     #[tokio::test]
     async fn prepare_alert_names_a_multi_alert_field_the_stream_lacks() {
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};

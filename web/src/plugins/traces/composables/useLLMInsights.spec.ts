@@ -39,8 +39,7 @@ vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: vi.fn((s: string) => `b64(${s})`),
 }));
 
-// The stream stores span parents, so usage reads top-level agents through the
-// agent-parent join. fetchAll looks this up before it queries.
+// The stream stores span parents, so usage reads top-level agents via the agent-parent join.
 const mockHasParentSpan = vi.fn(async (_org: string, _stream: string) => true);
 vi.mock("../llmStreamColumns", () => ({
   streamHasParentSpan: (org: string, stream: string) => mockHasParentSpan(org, stream),
@@ -69,10 +68,7 @@ function driveKpiHits(callbacks: any, row: Record<string, number>) {
   callbacks.data(null, { content: { results: { hits: [row] } } });
 }
 
-/**
- * Helper — fail a query the way useStreamingSearch does: `handlers.error`
- * gets the request payload first and the wrapped server error body second.
- */
+/** Fails a query like useStreamingSearch: `handlers.error(payload, serverBody)`. */
 function failQuery(callbacks: any, body: Record<string, unknown>) {
   callbacks.error(
     { queryReq: { query: {} } },
@@ -182,8 +178,7 @@ describe("useLLMInsights — fetchAll fires 3 parallel queries", () => {
     expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(3);
   });
 
-  // Distinct counts are not additive across buckets, so the tiles read a
-  // whole-window per-trace query rather than summing the histogram's buckets.
+  // Distinct counts aren't additive across buckets, so tiles use a whole-window per-trace query.
   it("counts traces and errored traces over the whole window, per trace", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
@@ -216,9 +211,7 @@ describe("useLLMInsights — fetchAll fires 3 parallel queries", () => {
     expect(sql).not.toMatch(/histogram\(_timestamp,/);
   });
 
-  // One rule per trace, shared with Cost by, Users and Sessions: LLM-call
-  // usage, else the top-level agents'. Stream and agent mode alike, so a trace
-  // whose usage sits only on its invoke_agent spans counts in both.
+  // One shared per-trace rule (LLM-call usage, else top-level agents') in stream and agent mode.
   it("totals each trace's usage with the shared rule in stream and agent mode", async () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
@@ -292,8 +285,7 @@ describe("useLLMInsights — a superseded fetchAll never lands", () => {
     expect(latest?.kpi.p95DurationMicros).toBe(222);
   });
 
-  // Switching to a stream whose numbers are cached restores them with no fetch;
-  // the previous stream's load still in flight must not land on top of them.
+  // A cache restore must not be overwritten by the previous stream's in-flight load.
   it("a cache restore supersedes an in-flight load and ends its loading flags", async () => {
     const { fetchAll, restore, kpi, sparklines, loading, p95Loading } = useLLMInsights();
     const inFlight = fetchAll("stream_a", 100, 200);
@@ -323,10 +315,7 @@ describe("useLLMInsights — a superseded fetchAll never lands", () => {
 });
 
 describe("useLLMInsights — fetchAll resolves and populates KPI on success", () => {
-  // Requests are SUMMED across the histogram buckets; trace and error counts
-  // and the token and cost totals come from the whole-window per-trace
-  // query, P95 from its own query. call 0 = histogram, call 1 = totals,
-  // call 2 = P95.
+  // call 0 = histogram (requests summed), call 1 = per-trace totals, call 2 = P95.
   it("sums histogram buckets for requests and takes the other totals and P95 from their own queries", async () => {
     const { fetchAll, kpi, hasLoadedOnce, error } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
@@ -513,9 +502,7 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
 describe("useLLMInsights — fetchAll error path", () => {
   // A failure on any summary query should populate `error.value`
   // and the dashboard renders its error state. We catch internally so
-  // callers don't need a try/catch. The server's message rides the error
-  // handler's SECOND argument (the first is the request payload), so a bad
-  // filter says why it failed.
+  // callers don't need a try/catch; the server message is the error handler's second argument.
   it("captures the server error message and clears loading on rejection", async () => {
     const { fetchAll, error, loading } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);

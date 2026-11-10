@@ -612,8 +612,7 @@ function durationLabel(row: LlmDiscoveryItem) {
   return row.durationUs == null ? DASH : raw(formatTimeWithSuffix(row.durationUs));
 }
 
-// Quick range or scope changes overlap their requests; only the latest one may
-// fill the table, or a slower earlier range overwrites it.
+// Only the latest request may fill the table, or a slower earlier range overwrites it.
 let seq = 0;
 
 async function fetchItems() {
@@ -691,9 +690,7 @@ function onPageSizeChange(size: number) {
 }
 
 function onDateChange(value: any) {
-  // The DateTime picker replays its seeded range on mount; that replay keeps the
-  // range resolved from the URL, which onMounted loads. A user pick, or any emit
-  // that moves the range, re-fetches so the table matches the picker and URL.
+  // Skip the picker's mount replay of the seeded range; onMounted already loads it.
   if (onDateStateChange(value) || value?.userChangedValue === true) reload();
 }
 

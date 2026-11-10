@@ -45,9 +45,7 @@ const SPECIAL_CHAR_CASES: Array<[label: string, input: string]> = [
   ["empty string", ""],
 ];
 
-// A model of what the backend does to a literal: sqlparser-rs (PostgreSqlDialect,
-// no backslash escapes) parses it, and the search service re-serialises the AST
-// with sqlparser's `EscapeQuotedString`, then parses the result again.
+// Models the backend: sqlparser-rs parses a literal, re-serialises it with `EscapeQuotedString`, then reparses.
 
 /** Parses `'a'`, or `('a' || 'b' …)`, into its piece values; throws on anything else. */
 const parseLiteralChain = (sql: string): string[] => {

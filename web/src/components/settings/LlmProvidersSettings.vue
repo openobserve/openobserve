@@ -398,10 +398,7 @@ function openEdit(row: Provider) {
   pushRouteAction({ action: "update", id: String(row.id) });
 }
 
-// Saved (the save mutation's `invalidates` already refetches the list) or
-// cancelled. A caller that sent the user here to add a provider (the one-click
-// evaluate dialog) passes `return_to`; closing the form goes back there. Only an
-// in-app path is followed.
+// Only an in-app `return_to` path is followed.
 function returnTarget(): string | null {
   const to = route.query.return_to;
   return typeof to === "string" && to.startsWith("/") && isSameOriginRedirect(to) ? to : null;

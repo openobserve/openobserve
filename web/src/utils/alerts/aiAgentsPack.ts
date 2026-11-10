@@ -13,16 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * The `ai-agents` alert pack (AIO-20): the reliability rules and AI templates
- * that read gen_ai_* traces, and the SQL that the pack and the pages' "Create
- * alert" share, so an alert agrees with the page it was made from.
- *
- * The pack ships in the app: the Alert Library manifest lives in the external
- * o2-alerts-library repo and names one fixed stream, while users name their own
- * trace streams. Rules whose fields no SDK writes yet are listed with what they
- * wait for, and are not installed.
- */
+// Shipped in-app because the external library manifest names one fixed stream while users name their own.
 
 import type { I18nKey } from "@/types/i18n";
 import { SEVERITY_TO_PRIORITY, type LibrarySeverity } from "@/constants/alertLibrary";
@@ -50,12 +41,7 @@ export interface AiAlertSpec {
   severity: LibrarySeverity;
 }
 
-/**
- * Bare predicate for an agent (and tool), for a page's "Create alert". The
- * agent is matched on the trace: OTel SDKs put `gen_ai.agent.name` on the
- * `invoke_agent` span, not on its tool and LLM children, so a span-local
- * filter would miss them. The tool stays span-local.
- */
+/** Agent matched on the trace since `gen_ai.agent.name` is only on the `invoke_agent` span; the tool stays span-local. */
 export function agentToolScope(
   stream: string,
   agent?: string | null,
@@ -94,10 +80,6 @@ export function repeatedToolCallsSql(
   );
 }
 
-/**
- * Agents whose error rate (traces with an errored span) is over
- * `maxRatePct` across at least `minTraces` traces.
- */
 export function failureRateSql(
   stream: string,
   opts: { minTraces?: number; maxRatePct?: number; scope?: string } = {},
@@ -122,19 +104,10 @@ export function costSql(stream: string, opts: { maxUsd?: number; scope?: string 
   );
 }
 
-/**
- * Scores the eval scheduler wrote on its own. A manual run (a re-evaluation)
- * scores old targets on purpose and on demand, so it says
- * nothing about live scoring. Rows from before `task_producer` existed are
- * online scores.
- */
+/** Manual re-evaluations score old targets on purpose, so they say nothing about live scoring. */
 const ONLINE_SCORES_SQL = "(task_producer IS NULL OR task_producer != 'manual')";
 
-/**
- * Score configs whose scores land more than `maxLagMinutes` after their
- * targets (p95). Only online evaluator scores: annotations, feedback and manual
- * runs carry the target's time too, so scoring an old trace is not lag.
- */
+/** Online evaluator scores only: annotations, feedback and manual runs carry the target's time, which is not lag. */
 export function evaluatorLagSql(opts: { maxLagMinutes?: number } = {}): string {
   const { maxLagMinutes = 10 } = opts;
   const lagMinutes = "approx_percentile_cont(_timestamp - ref_timestamp, 0.95) / 60000000.0";
@@ -145,13 +118,7 @@ export function evaluatorLagSql(opts: { maxLagMinutes?: number } = {}): string {
   );
 }
 
-/**
- * Eval jobs that stopped writing scores (AIO-25). An alert is one query on one
- * stream, so it cannot also count the source stream's matching traces; the
- * traffic check is that the job scored in the same hour the day before. A job
- * that is quiet at night was quiet last night too, and does not fire. Manual
- * runs neither show the job is live nor stand for yesterday's traffic.
- */
+/** An alert cannot count source traffic, so scoring in the same hour yesterday stands in for it. */
 export function scoresStoppedSql(opts: { jobId?: string | null; minScores?: number } = {}): string {
   const { jobId, minScores = 3 } = opts;
   const since = (interval: string) =>
@@ -344,10 +311,7 @@ export const AI_AGENTS_PACK: AiPackRule[] = [
 /** How the pack names an existing stream: "type/name". */
 export const streamKey = (streamType: string, name: string) => `${streamType}/${name}`;
 
-/**
- * Whether a rule installs now: it has a query, and the stream it reads exists
- * (`streams` holds `streamKey`s). An alert on a missing stream fails to save.
- */
+/** An alert on a missing stream fails to save. */
 export function ruleReadiness(
   rule: AiPackRule,
   stream: string,
@@ -358,11 +322,6 @@ export function ruleReadiness(
   return streams.has(streamKey(spec.streamType, spec.streamName)) ? "ready" : "needs-data";
 }
 
-/**
- * What a rule that does not run now waits for: its own `waitsKey` when it has
- * no query, else the stream its query reads (a trace stream, the evaluator's
- * spans or the scores).
- */
 export function ruleWaitsKey(rule: AiPackRule, stream: string): I18nKey {
   if (!rule.spec) return rule.waitsKey ?? "aiAlertPack.waits.perConfig";
   const { streamName } = rule.spec(stream);

@@ -178,8 +178,7 @@ const props = withDefaults(
     traces: SessionTraceRow[];
     /** Session-level cache reuse percentage forwarded to hover cards. */
     cachePct: number;
-    /** Turns before `traces[0]` that are not loaded: bars show session turn
-     *  numbers (and `jump` emits them), so loading older turns doesn't renumber. */
+    /** Unloaded turns before `traces[0]`, so loading older turns doesn't renumber. */
     turnOffset?: number;
     /** A turn's user message for the hover card, when it differs from the raw one. */
     userText?: (turn: SessionTraceRow) => string | undefined;

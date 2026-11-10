@@ -167,8 +167,6 @@ describe("parseDurationWhereClause", () => {
       expect(result).toBe("service_name = 'foo'");
     });
 
-    // A deep link's trace-level filter quotes the stream; re-serialising it
-    // turned "default" into `default`, which the backend rejects.
     it("should return a clause with no duration predicate exactly as written", () => {
       const clause =
         `trace_id IN (SELECT trace_id FROM "default" WHERE (tenant_id = 'globex')) AND ` +

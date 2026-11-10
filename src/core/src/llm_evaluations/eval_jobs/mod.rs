@@ -274,9 +274,7 @@ pub async fn prepare_job_update(
 
     job.input_mapping = merge_input_mapping(existing.input_mapping.clone(), job.input_mapping);
     job.budget = budget.apply(existing.budget.as_ref());
-    // Raising a budget-paused job's limit above the spend it paused at resumes it, and the new
-    // limit applies for the rest of the day. Removing the budget that paused it (only that
-    // pause records `paused_at`) resumes it too.
+    // Only a budget pause records `paused_at`, so removing the budget resumes just that pause.
     let resumes = existing.status == "paused"
         && match &job.budget {
             Some(budget) => budget.allows_resume(),
@@ -405,10 +403,7 @@ pub async fn transition_status(
     transition(org_id, job, new_status, None).await
 }
 
-/// The health pass's budget enforcement (AIO-24): `Some(spend)` pauses a job whose spend for
-/// the day reached its budget; `None` resumes it once a new UTC day starts. Returns `None`
-/// without a change when the job left the state the pass decided on: the pass read its job
-/// list before its spend query, and a user's pause or Keep paused in between must stand.
+/// Returns `None` unchanged when a user paused or kept paused after the pass read its job list.
 #[tracing::instrument()]
 pub async fn transition_for_budget(
     org_id: &str,

@@ -1211,9 +1211,7 @@ const queuesAccess = useLockedAffordance("queues");
 const aiObsLock = useLicenseLock("ai_observability");
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
-// S3V-02: pages run newest first, so the loaded turns are the session's newest
-// ones and the turns before them are not loaded yet. Numbering counts those, so
-// a turn keeps its number when Load Older Turns adds the ones before it.
+// Pages load newest first; offset keeps turn numbers stable when older turns load.
 const turnOffset = computed(() => Math.max(0, (detail.value?.turns ?? 0) - traces.value.length));
 /** The session turn number (1-based) of the loaded turn at `index`. */
 function turnNumber(index: number): number {
@@ -1378,8 +1376,7 @@ const kpiCards = computed<
       label: t("traces.sessionDetail.kpi.turns"),
       value: String(d.turns),
       unit: "",
-      // The value is the session's turn count; with older turns not loaded the
-      // duration (and every other tile) covers only the loaded ones.
+      // With older turns unloaded, every tile covers only the loaded turns.
       subLead: partial
         ? t("traces.sessionDetail.kpiSub.turnsLoaded", {
             loaded,
@@ -1401,8 +1398,7 @@ const kpiCards = computed<
       // that the tile stays neutral so the colour means "this session broke".
       variant: s.errRate > 50 ? "danger" : undefined,
       // Up to 3 error turns → jump chips. More than that → a "Filter Errors"
-      // button (chips would be an overwhelming wall of numbers). Errors are
-      // counted over the loaded turns, so that is the denominator.
+      // button. Errors are counted over the loaded turns only.
       subLead: !s.errors
         ? partial
           ? t("traces.sessionDetail.kpiSub.errorsNoneLoaded", { total: loaded })
@@ -1640,10 +1636,7 @@ function turnDetail(traceId: string): (TurnDetail & { harnessHidden?: number }) 
   return turnDetailsByTrace.value[traceId];
 }
 
-// Per-turn tool calls (for the collapsed body's "Show calls" thread, its count,
-// and Tool Hotspots), grouped from the same sessionSpans + ordered
-// chronologically: the execute_tool spans, plus each call an LLM output asked
-// for that no tool span carries, as the Pretty view shows them (G3-T6).
+// Includes calls an LLM output requested that no execute_tool span carries, as the Pretty view does.
 const toolCallsByTrace = computed<Record<string, any[]>>(() => {
   const toolSpans: Record<string, any[]> = {};
   const llmSpans: Record<string, any[]> = {};
@@ -1663,8 +1656,7 @@ const toolCallsByTrace = computed<Record<string, any[]>>(() => {
   }
   return out;
 });
-// The tool calls in a trace's LLM outputs that no execute_tool span carries by
-// `gen_ai_tool_call_id`, as cards without a duration (the Pretty view's rule).
+// Same rule as the Pretty view: calls no execute_tool span carries by `gen_ai_tool_call_id`.
 function payloadOnlyToolCalls(traceId: string, llmSpans: any[], toolSpans: any[]): any[] {
   const ids = new Set(toolSpans.map((t) => String(t.gen_ai_tool_call_id ?? "")).filter(Boolean));
   // Spans without call ids cannot be matched to calls: trust the spans.
@@ -1672,8 +1664,7 @@ function payloadOnlyToolCalls(traceId: string, llmSpans: any[], toolSpans: any[]
   const out: any[] = [];
   for (const span of llmSpans) {
     toolCallParts(getOutputRaw(span)).forEach((c, i) => {
-      // A call without a name has nothing to show; one without an id can't be
-      // told apart from the tool spans.
+      // An id-less call can't be told apart from the tool spans.
       if (!c.name || ids.has(c.id) || (!c.id && toolSpans.length)) return;
       if (c.id) ids.add(c.id);
       out.push({
@@ -1705,13 +1696,9 @@ function toggleTurn(traceId: string) {
 const viewMode = ref<"collapsed" | "pretty">("collapsed");
 const sessionSpans = ref<any[]>([]);
 
-// AIO-22: the session's agent and its harness patterns (GenAI Agent Mapping).
-// Turn previews hide that text; "Show" puts it back for one turn. The spans and
-// the span sidebar always keep everything.
 const harnessRules = ref<HarnessPatternRule[]>([]);
 const revealedHarness = ref<Set<string>>(new Set());
-// The session's agent, as the Sessions list picks it (TS-13): the agent of the
-// first turn with a message, else the first turn naming one. Turns are in time order.
+// Must pick the agent the same way the Sessions list does, so patterns match.
 const sessionAgent = computed(
   () =>
     (
@@ -1722,9 +1709,7 @@ const sessionAgent = computed(
 function revealHarness(traceId: string) {
   revealedHarness.value = new Set(revealedHarness.value).add(traceId);
 }
-// The server hides the text with the code the Sessions list uses, so a pattern
-// means the same in both. Results are kept per message text for the current
-// patterns; until they arrive, or if the request fails, turns show everything.
+// Until server results arrive, or if the request fails, turns show everything.
 const harnessPatterns = computed(() => patternsForAgent(harnessRules.value, sessionAgent.value));
 const harnessStripped = ref<Map<string, HarnessStripped>>(new Map());
 const harnessRequested = new Set<string>();
@@ -1772,8 +1757,6 @@ function harnessLabel(stripped: HarnessStripped) {
     ? raw(stripped.text)
     : t("readableSessions.onlyHarness", { tag: `<${stripped.only}>` });
 }
-// A turn's message with its harness text hidden like the turn body; undefined
-// when nothing is hidden, so the hover cards show the message as is.
 function turnPreviewText(tr: SessionTraceRow | undefined) {
   const stripped = tr && hiddenHarness(tr.traceId, tr.turnUserMessage);
   return stripped ? harnessLabel(stripped) : undefined;
@@ -1789,14 +1772,11 @@ genAiAgentMappingService
     harnessRules.value = c.harness_patterns;
   })
   .catch(() => {});
-// Span loads in flight: the first page's and, after "Load older turns", the
-// older page's can overlap.
+// A counter, not a flag: the first page and an older page can load at once.
 const spanLoads = ref(0);
 const sessionSpansLoading = computed(() => spanLoads.value > 0);
 // Turns whose spans are in `sessionSpans` or on their way.
 const spansRequested = new Set<string>();
-// G4-08: turns whose last span fetch failed. Their body shows the error with
-// Retry, and Tool Hotspots says they are missing, rather than "not captured".
 const spansFailed = ref<Set<string>>(new Set());
 
 // Fetches the spans of the loaded turns that have none yet and merges them in.
@@ -1811,8 +1791,7 @@ async function loadSessionSpans() {
   }
   spanLoads.value++;
   try {
-    // The details endpoint widens the link's window to the whole session, so
-    // turns can start before `from`; fetch their spans over the session's range.
+    // The details endpoint widens the window to the whole session, so turns can start before `from`.
     const rows = await fetchSessionSpans(
       streamName.value,
       pending,
@@ -1832,8 +1811,7 @@ async function loadSessionSpans() {
   }
 }
 
-// "Load older turns": the details API pages newest first, so the next page
-// goes before the loaded turns. Their spans follow in the background.
+// The details API pages newest first, so the next page goes before the loaded turns.
 const hasOlderTurns = ref(false);
 const loadingOlderTurns = ref(false);
 async function loadOlderTurns() {

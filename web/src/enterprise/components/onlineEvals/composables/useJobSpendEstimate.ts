@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The job form's cost estimate (AIO-24): matched targets per day over the last
-// week and what each selected judge cost per call over the same week. The
-// queries are debounced like the matched-targets preview. A failed or
-// impossible traffic query (session scope on a stream without a session
-// column) leaves the counts unknown, never 0.
+// A failed or impossible traffic query leaves the counts unknown, never 0.
 
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
@@ -94,8 +90,7 @@ export function useJobSpendEstimate(opts: {
     }
   }
 
-  // No `_evaluator` stream, or no priced call yet (the cost column appears with
-  // the first one), fails the query: either way there is nothing to estimate from.
+  // No `_evaluator` stream or no priced call yet fails the query: nothing to estimate from.
   async function loadJudges() {
     if (!opts.judgeIds.value.length) {
       history.value = [];

@@ -68,9 +68,7 @@ const useManagementRoutes = () => {
           path: "alert_sources",
           redirect: (to: any) => ({ name: "alertSources", query: to.query }),
         },
-        // LLM Providers and Agent Mapping moved to AI Observability's Configure
-        // group (/ai/llm-providers, /ai/agent-mapping) under the same route
-        // names. Redirects kept for bookmarks, query included, as above.
+        // Redirects kept for bookmarks after these moved to /ai under the same route names.
         {
           path: "llm_providers",
           redirect: (to: any) => ({ name: "llmProviders", query: to.query }),
@@ -140,10 +138,7 @@ const useManagementRoutes = () => {
     },
   });
 
-  // The enterprise-only operations/security pages below are all always
-  // registered; a direct URL redirects to the shared locked page (see
-  // `withFeatureGate`) when the edition doesn't unlock them, instead of landing
-  // on the real page or a 404. (LLM Model Pricing moved to /ai.)
+  // Always registered so a direct URL hits the locked page (`withFeatureGate`) instead of a 404.
   // Registered in every build; slackRouteGuard and the rail both hide it unless the org config turns Slack on.
   routes[0].children.push({
     path: "slack",

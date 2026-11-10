@@ -67,10 +67,7 @@ export type ParseDurationResult = string | { error: string };
  * Converts duration comparisons in a WHERE clause that carry human-readable
  * unit suffixes back to raw microseconds.
  *
- * Parses the clause into a SQL AST, walks the tree to locate duration
- * comparisons (including BETWEEN) whose operand is a quoted string (e.g.
- * `'1.50ms'`), and splices the numeric value over just those literals in the
- * original text; everything else in the clause is kept byte-for-byte.
+ * Only quoted duration literals are rewritten via the SQL AST; the rest of the clause is kept byte-for-byte.
  *
  * Tolerates optional whitespace between the number and unit, and accepts all
  * common unit aliases (e.g. "second", "seconds", "sec", "secs" → s).

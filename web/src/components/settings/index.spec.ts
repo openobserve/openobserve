@@ -196,8 +196,6 @@ describe("SettingsIndex", () => {
       expect(items.some((i: any) => i.dataTest === "pipeline-destinations-tab")).toBe(true);
     });
 
-    // LLM Providers and Agent Mapping moved to AI Observability's Configure
-    // group (/ai) — the flag that listed them here no longer does.
     it("lists no LLM Providers or Agent Mapping item, even with evaluations on", () => {
       mockStore.state.zoConfig = { service_streams_enabled: true, online_evals_enabled: true };
       const items = getAllItems(createWrapper());

@@ -351,8 +351,7 @@ const forbidden = ref<ForbiddenState>(false);
 // Set once the stream list is read: the org has no LLM trace stream to budget.
 const streamsLoaded = ref(false);
 const noStream = computed(() => streamsLoaded.value && !availableStreams.value.length);
-// The month the banner counted over; the gaps page lists the same window
-// (it defaults to the last 24 hours, which missed older unpriced calls).
+// The gaps page must use the banner's month; its 24h default missed older unpriced calls.
 const unpricedWindow = ref<TimeWindow | null>(null);
 const dialogOpen = ref(false);
 const creating = ref(false);
@@ -376,11 +375,8 @@ const draft = reactive<BudgetDef>(blankDraft());
 const destinationOptions = computed(() =>
   destinations.value.map((d) => ({ value: d, label: raw(d) })),
 );
-// What the value dropdown offers: the scope's values in the stream's last 30
-// days, most frequent first.
 const valueOptions = ref<string[]>([]);
-// A typed value, or an edited budget's value the stream has not seen lately, is
-// offered too, or the select would show it empty.
+// Offer the current value even if unseen lately, or the select would show it empty.
 const valueSelectOptions = computed(() =>
   (draft.value && !valueOptions.value.includes(draft.value)
     ? [draft.value, ...valueOptions.value]
@@ -399,9 +395,7 @@ async function loadValueOptions() {
   const col = BUDGET_COLUMNS[draft.scope];
   valueOptionsLoading.value = true;
   try {
-    // A column the stream never received is not in its schema, and a query naming it fails.
-    // Read fresh, as a cached schema can predate the column. An unread schema blocks nothing:
-    // the save refuses a missing column too.
+    // Read fresh: a cached schema can predate the column, and a query naming a missing column fails.
     const schema = await getStream(draft.stream, "traces", true, true).catch(() => null);
     if (mine !== valueSeq || !schema) return;
     missingField.value = budgetMissingField(draft.scope, schema.schema ?? []);
@@ -417,8 +411,7 @@ async function loadValueOptions() {
     if (mine === valueSeq) valueOptionsLoading.value = false;
   }
 }
-// An agent name is not a model: a new scope starts empty. Synchronous, so a
-// prefill that sets the scope and then the value keeps the value.
+// Synchronous, so a prefill that sets the scope and then the value keeps the value.
 watch(
   () => draft.scope,
   () => {
@@ -610,8 +603,6 @@ function openEdit(row: Row) {
     scope: row.scope,
     value: row.value,
     limitUsd: row.limitUsd,
-    // A session budget's hour is fixed; were it moved to another scope, it
-    // would start on a period the select offers.
     period: row.period === "hour" ? "day" : row.period,
     stream: row.stream,
   });

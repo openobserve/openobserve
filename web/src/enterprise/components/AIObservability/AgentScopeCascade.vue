@@ -143,10 +143,7 @@ const props = withDefaults(
      * the Env + Agent dropdowns render.
      */
     showVersion?: boolean;
-    /**
-     * Streams carrying the selected env + agent + version (useAgentScope
-     * .agentStreams). The Stream dropdown shows only when there are two or more.
-     */
+    /** The Stream dropdown shows only when there are two or more. */
     agentStreams?: SelectOption[];
     /** The stream the page reads for the selected agent (two-way via update:selectedStream). */
     selectedStream?: string;

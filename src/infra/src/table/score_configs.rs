@@ -228,8 +228,7 @@ pub async fn get_by_active_name(
     get_by_active_name_with(get_orm_client_ro().await, org_id, name).await
 }
 
-/// [`get_by_active_name`] on a caller-supplied connection. A check that must see
-/// a write committed a moment ago passes the primary: a read-only replica may lag.
+/// [`get_by_active_name`] on a given connection; pass the primary to see a just-committed write.
 pub async fn get_by_active_name_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -308,9 +307,7 @@ pub async fn delete_with<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Makes `config` the only active version of its entity. Deactivating the old
-/// versions and inserting the new one commit together, so a reader by name or
-/// entity never finds the config without an active version.
+/// Atomically makes `config` the only active version of its entity.
 pub async fn replace_active_version_with<C: TransactionTrait>(
     conn: &C,
     config: &ScoreConfig,
@@ -434,8 +431,7 @@ mod tests {
         config.version = 1;
         add_with(&db, &config).await.unwrap();
 
-        // Readers interleave between the writer's statements: the pool has one
-        // connection, so each await of the writer lets a waiting read run.
+        // The pool has one connection, so each writer await lets a waiting read interleave.
         let writer = async {
             for version in 2..=20 {
                 config.id = format!("sc-{version}");

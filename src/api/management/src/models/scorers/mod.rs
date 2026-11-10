@@ -153,9 +153,7 @@ pub struct RemoteScorerRequest {
     pub params: RemoteScorerParams,
 }
 
-/// A Code scorer: `template` holds the JavaScript `function score(...)`, whose
-/// parameter names are the scorer's variables. It needs no provider or params.
-/// The same body creates and updates one.
+/// A Code scorer; its `function score(...)` parameter names are the scorer's variables.
 #[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CodeScorerRequest {

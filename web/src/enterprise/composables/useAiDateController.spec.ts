@@ -1,15 +1,6 @@
 // @vitest-environment jsdom
 // Tests for useAiDateController — the AI-page date state + URL-sync logic
-// extracted from SessionsPage.vue. This composable owns ONLY the date state +
-// URL sync; it does NOT own the child refresh. Covers:
-//   • construction resolves the date: URL > resolveAiDateWindow > default
-//     relative, before a picker child mounts and replays its seed
 //   • applyRelative sets timeRange + relative dateState
-//   • readFromUrl: absolute {from,to} → true; a valid {period} → applyRelative +
-//     true; an invalid period or neither → false
-//   • writeToUrl: router.replace with period (relative) / from,to (absolute);
-//     no replace when the URL already holds it; the store's org over the route's
-//   • onDateChange: relative vs absolute paths, both write URL, report a change
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { defineComponent, h, onMounted, ref } from "vue";
@@ -157,8 +148,7 @@ describe("useAiDateController — resolves on construction", () => {
   });
 });
 
-// The picker seeds itself from `dateState` on mount and replays that seed as a
-// date-change, before the page's own onMounted. A deep link must survive it.
+// The picker replays its mount seed as a date-change before the page's onMounted; a deep link must survive it.
 describe("useAiDateController — a deep link beats the previous visit's range", () => {
   const Picker = defineComponent({
     props: { seed: { type: String, required: true } },
@@ -204,15 +194,13 @@ describe("useAiDateController — a deep link beats the previous visit's range",
 
     expect(controller.dateState.value.relativeTimePeriod).toBe(period);
     expect(controller.timeRange.value).toEqual(WINDOWS[period]);
-    // The URL already holds the period, so neither the resolve nor the replay
-    // replaces: a replace would cancel a navigation in flight (an org switch).
+    // A replace would cancel a navigation in flight (an org switch).
     expect(replaceMock).not.toHaveBeenCalled();
     expect(replayChanged).toBe(false);
   });
 });
 
-// An org switch dispatches the new org to the store and remounts the page before
-// MainLayout's push commits, so the route still names the previous org.
+// On org switch the page remounts before MainLayout's push commits, so the route still names the previous org.
 describe("useAiDateController — org switch", () => {
   it("writes the store's org, not the previous one left on the route", () => {
     routeQuery.org_identifier = "team1";

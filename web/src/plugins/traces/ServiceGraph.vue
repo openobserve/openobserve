@@ -484,8 +484,7 @@ export default defineComponent({
       type: String as PropType<string | null>,
       default: null,
     },
-    // Agent-mode selection for the node drawer's Behavior tab (env/version may
-    // be UNSET = not set); null outside Agent mode.
+    // env/version may be UNSET (not set); null outside Agent mode.
     agentScope: {
       type: Object as PropType<{
         name: string;
@@ -539,9 +538,7 @@ export default defineComponent({
     // Node side panel state
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
-    // Prefer the parent-supplied window (Agent Graph page's date picker); fall
-    // back to the shared traces datetime (Traces Service Graph tab). Stored
-    // relative start/end go stale, so "now" is resolved on each call.
+    // Stored relative start/end go stale, so "now" is resolved on each call.
     const effectiveTimeRange = () =>
       props.timeRange && props.timeRange.startTime && props.timeRange.endTime
         ? { startTime: props.timeRange.startTime, endTime: props.timeRange.endTime }

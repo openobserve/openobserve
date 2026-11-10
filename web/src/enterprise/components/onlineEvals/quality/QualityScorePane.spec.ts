@@ -194,8 +194,6 @@ describe("QualityScorePane", () => {
     );
   });
 
-  // AIO-21: the trace and its judge open in a drawer on this page, so the
-  // scope, the score list and the selected score stay put.
   it("opens the scored trace and its judge in the trace drawer, without leaving the page", async () => {
     const wrapper = mountPane();
     const drawer = () => wrapper.findComponent({ name: "AiTraceDrawer" });

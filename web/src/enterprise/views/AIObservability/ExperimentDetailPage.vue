@@ -816,8 +816,7 @@ const metricCards = computed<MetricCard[]>(() => {
       dataTest: "ai-experiment-detail-scoring",
     });
   }
-  // One card per client-reported dimension: the row table's score columns come
-  // from pinned Scorers, so this is where the code's own scores read at run level.
+  // Row table score columns come from pinned Scorers, so client scores surface here.
   for (const summary of clientSummaries) {
     const id = `${summary.scoreConfigId}-${summary.clientScorerKey}`;
     cards.push({

@@ -236,8 +236,7 @@ const { listQuery, rows, visibleRows, tiles, tileFilter, listStatus } = useQuali
   agentParams: toRef(props, "agentParams"),
   enabled: toRef(props, "enabled"),
 });
-// The quality read answers a user without score config read with an empty list, not a 403,
-// so a denied config list with nothing visible is the no-access state, not "no configs yet".
+// The quality read returns an empty list, not a 403, to users without config read.
 const tableForbidden = computed(
   () => listStatus.value === 403 || (!!props.configsForbidden && rows.value.length === 0),
 );

@@ -1,8 +1,7 @@
 // Live matched-target preview for the Eval Job form. The filter is evaluated
 // against spans, while the result is counted at the selected Target Scope:
 // rows for span scope, distinct trace ids for trace scope, and distinct session
-// ids for session scope. A session id lives in whichever of the scheduler's
-// session columns the stream has; a stream with none cannot be counted by session.
+// ids for session scope.
 
 import { ref, watch, onUnmounted, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
@@ -26,11 +25,7 @@ export function quoteIdent(name: string): string {
 /** The columns the eval scheduler reads a span's session id from, in its order. */
 export const SESSION_ID_COLUMNS = ["session_id", "gen_ai_conversation_id", "llm_session_id"];
 
-/**
- * A target's id at `scope`, as SQL over a stream with `fields`. A session id is
- * the first non-empty session column, as the scheduler reads it; null when the
- * stream has no session column.
- */
+/** A target's id at `scope` as SQL; null when session scope has no session column. */
 export function targetIdExpression(
   targetScope: EvalTargetScope,
   fields: readonly string[],

@@ -68,8 +68,7 @@ const EMPTY_KPI: LLMKPI = {
  * Composable that owns the LLM Insights dashboard's state + fetch flow.
  *
  * Returns a bag of refs (whole-window KPI numbers, sparkline series,
- * loading/error flags, the discovered list of LLM streams) plus three
- * methods (`fetchAll`, `restore`, `cancelAll`).
+ * loading/error flags, LLM streams) plus `fetchAll`, `restore`, `cancelAll`.
  *
  * State is per-mount: a fresh component instance gets a fresh set of
  * refs. The dashboard's `onMounted` is the single trigger for the
@@ -218,25 +217,14 @@ export function useLLMInsights() {
 
   /**
    * Internal — fetch the bucketed time-series powering the sparklines
-   * under each KPI card, plus the KPI totals. Two queries run in parallel:
-   *
-   *   - the histogram: sparkline series, and the request total summed over
-   *     its buckets;
-   *   - a whole-window per-trace query for the trace and error counts and
-   *     the token and cost totals, exact so they agree with the per-trace
-   *     panels. Distinct counts are not additive: a trace with spans in two
-   *     buckets would be counted in both.
+   * under each KPI card plus the totals; totals use a whole-window per-trace query since distinct counts aren't additive across buckets.
    *
    * `histogram(_timestamp)` is intentionally called WITHOUT an explicit
    * interval — the backend picks an appropriate bucket width for the
    * query window. We consume the returned rows in `ORDER BY ts` order,
    * so the frontend never needs to know the interval.
    *
-   * Each trace's tokens and cost follow `traceUsageSum` (its LLM calls'
-   * usage, else its top-level agents'), the rule Cost by, Users and Sessions
-   * use. The sparklines apply it per bucket, so they only trace the shape. The
-   * per-bucket error-rate SERIES divides each bucket's error count by its
-   * trace count.
+   * Tokens and cost follow `traceUsageSum`, the rule Cost by, Users and Sessions share.
    */
   async function fetchSummary(
     streamName: string,
@@ -335,14 +323,11 @@ export function useLLMInsights() {
   }
 
   /**
-   * The single public fetch entry point. Kicks off two INDEPENDENT parts:
-   *   - summary (histogram + whole-window trace/error counts) → `sparklines`
-   *       + every `kpi` total but P95; drives `loading` (the KPI strip skeleton)
+   * Entry point; runs two independent parts: summary → `sparklines` + `kpi` but P95 (`loading`), and
    *   - whole-window P95  → `kpi.p95DurationMicros`
    *       drives `p95Loading` (just the P95 card's loader)
    *
-   * The two are decoupled ON PURPOSE: the summary cards render as soon as
-   * their queries land instead of waiting on the slower P95 query, so
+   * Decoupled on purpose: summary cards render without waiting on the slower P95 query, so
    * only the P95 card shows a loader while it's still in flight. A P95
    * failure degrades that card to "0" rather than failing the whole strip.
    *
@@ -358,8 +343,7 @@ export function useLLMInsights() {
    *   if (error.value) console.error(error.value);
    *   else console.log(kpi.value.totalCost);
    */
-  // Bumped per fetchAll; a response only lands if its call is still the latest,
-  // so a slower earlier load can't overwrite the tiles of a newer selection.
+  // Bumped per fetchAll so a slower earlier load can't overwrite a newer selection's tiles.
   let fetchSeq = 0;
 
   async function fetchAll(
@@ -376,15 +360,13 @@ export function useLLMInsights() {
     p95Loading.value = true;
     error.value = null;
 
-    // Usage falls back to the trace's top-level agents, found through span
-    // parents when the stream stores them.
+    // Usage falls back to top-level agents, found via span parents when the stream stores them.
     const hasParentSpan = await streamHasParentSpan(
       store.state.selectedOrganization.identifier,
       streamName,
     );
 
-    // This call's own results; the snapshot returned to the caller (KPI cache)
-    // is built from these, never from the shared refs.
+    // The returned snapshot (KPI cache) is built from these, never from the shared refs.
     const own: {
       summary?: { totals: Omit<LLMKPI, "p95DurationMicros">; series: LLMSparklineSeries };
       p95: number;
@@ -448,10 +430,7 @@ export function useLLMInsights() {
     };
   }
 
-  /**
-   * Shows a cached selection's numbers. Supersedes any in-flight `fetchAll`, so
-   * a slower load for the previous selection can't land on top of them.
-   */
+  /** Shows a cached selection's numbers, superseding any in-flight `fetchAll`. */
   function restore(snapshot: { kpi: LLMKPI; sparklines: LLMSparklineSeries }) {
     fetchSeq++;
     kpi.value = snapshot.kpi;

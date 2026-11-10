@@ -1073,8 +1073,6 @@ describe("SessionsList — search", () => {
     });
   });
 
-  // The Users page's "Sessions" link: one user's sessions by exact id, shown as a
-  // removable chip and kept in the URL.
   it("filters to the exact user from `?user=` and drops it on clear", async () => {
     mockRouteQuery = { type: "stream", user: "qa-u1" };
     const wrapper = await mountComponent();

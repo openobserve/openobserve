@@ -225,8 +225,6 @@ async function loadCatalog() {
   }
 }
 
-// Starter checks in catalog shape, so search, selection and import treat them
-// like any entry. Each produces its own Boolean score config.
 const codeEntries = computed<CatalogScorer[]>(() =>
   CODE_SCORER_STARTERS.map((starter) => ({
     name: starter.key,

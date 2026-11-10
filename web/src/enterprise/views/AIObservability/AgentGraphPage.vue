@@ -230,9 +230,6 @@ const router = useRouter();
 
 // Shared AI-module date range — the same singleton LLM Insights / Sessions /
 // Agent Behavior use, so picking a time on any AI tab lands on all of them.
-// The range is kept in the URL (`period` or `from`/`to`), so a shared link
-// opens it. `timeRange` is the resolved absolute window (µs) the graph +
-// agent-list queries read.
 const {
   dateState,
   timeRange,
@@ -384,8 +381,7 @@ const {
   t,
 });
 
-// The node drawer's Behavior tab follows the Agent-mode env ("(No env)" pinned
-// to UNSET). Version stays open: this page hides the version picker.
+// Version stays open: this page hides the version picker.
 const nodeBehaviorScope = computed(() => {
   const scope =
     filterMode.value === "agent" ? selectedAgentScope(selectedAgent.value, agents.value) : null;
@@ -428,8 +424,7 @@ function syncScopeUrl() {
       stream: activeStream.value,
       agent,
     });
-    // An org switch puts the new org in the store before the route; building on
-    // the route alone would write the previous org back.
+    // An org switch updates the store before the route; reading the route would write the previous org back.
     const org = store.state.selectedOrganization?.identifier;
     if (org && next.org_identifier != null) next.org_identifier = org;
     return next;

@@ -195,8 +195,6 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    // LLM Providers and Agent Mapping live under /ai now (useAIObservabilityRoutes.ts);
-    // the Settings URLs only redirect there, query included.
     it.each([
       ["llm_providers", "llmProviders"],
       ["gen_ai_agent_mapping", "genAiAgentMapping"],

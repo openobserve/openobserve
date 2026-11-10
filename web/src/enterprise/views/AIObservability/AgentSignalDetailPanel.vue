@@ -510,8 +510,7 @@ const runQuery = async (sql: string): Promise<any[]> => {
   return res.data?.hits ?? [];
 };
 
-// Reopening on another row refetches; only the latest call's answer lands, so
-// the drawer and its Explain evidence always describe the row it shows.
+// Only the latest call's answer lands, so the drawer always describes the row it shows.
 let seq = 0;
 const fetchDetails = async () => {
   const mine = ++seq;
@@ -538,18 +537,14 @@ const fetchDetails = async () => {
     let errors: typeof errorRows.value = [];
     let traces: typeof traceRows.value;
     if (r.signalType === "failure") {
-      // The error text lives in a different column per framework; COALESCE the
-      // ones this stream has, as the rollup does with its error-detail fields.
+      // The error text column differs per framework; COALESCE the ones this stream has.
       const schema = await getStream(s, "traces", true);
       const detail = errorDetailExpr(
         new Set((schema?.schema ?? []).map((f: { name: string }) => f.name)),
       );
-      // All of the agent's error messages, grouped. Not narrowed to this class:
-      // the class taxonomy lives server-side (see failureErrorsSql).
+      // Not narrowed to this class: the class taxonomy lives server-side (failureErrorsSql).
       errors = detail
         ? (await runQuery(failureErrorsSql(s, joins, af, detail))).map((h: any) => ({
-            // `message` is the condensed one-line gist (scannable); `full` is the
-            // raw text, revealed on demand via the expand toggle.
             message: raw(condenseError(h.message)),
             full: h.message,
             occurrences: h.occurrences,
@@ -611,8 +606,7 @@ function explain() {
             : `${row.spans} error spans`,
     })),
   });
-  // A new question, sent at once; the same hand-off the Issues page used. The
-  // drawer closes so the chat panel, which opens beneath it, is visible.
+  // The drawer closes so the chat panel opening beneath it is visible.
   emit("sendToAiChat", { query: raw(prompt), autoSend: true }, false);
   emit("update:open", false);
 }

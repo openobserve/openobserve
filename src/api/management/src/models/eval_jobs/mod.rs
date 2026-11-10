@@ -39,8 +39,7 @@ pub enum ScorerRefForm {
 pub struct EvalJobBudgetRequest {
     /// Judge spend allowed per UTC day, in USD; must be positive.
     pub daily_usd: f64,
-    /// What happens once the day's spend reaches the limit. Omitted on create means `pause`;
-    /// omitted on update keeps the stored action.
+    /// Omitted on create means `pause`; omitted on update keeps the stored action.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_reach: Option<BudgetAction>,
     /// Server-owned, as returned by a read; accepted so a read can be sent back, and ignored.
@@ -165,8 +164,6 @@ pub struct EvalJobResponseBody {
     pub trace_config: Option<TraceEvalConfig>,
     #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
-    /// `pausedAt` and `pausedSpendUsd` are set while the budget holds the job paused;
-    /// `liftedUntil` while it is lifted. `null` when the job has no budget.
     #[schema(nullable)]
     pub budget: Option<EvalJobBudget>,
     #[schema(value_type = String)]

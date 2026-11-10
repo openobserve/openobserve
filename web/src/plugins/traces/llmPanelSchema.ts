@@ -137,8 +137,7 @@ export function buildLLMPanelSchema(opts: {
             : "numbers",
       unit_custom: "",
       decimals: 2,
-      // A bucket with no data is a gap: a line drawn through it would claim a
-      // latency for hours with no calls. Bars are unaffected.
+      // A line through an empty bucket would claim a latency for hours with no calls.
       connect_nulls: false,
       no_value_replacement: "",
       // Render a dot at each data point. LLM traffic is often sparse — a window
@@ -156,14 +155,10 @@ export function buildLLMPanelSchema(opts: {
       base_map: { type: "osm" },
       map_view: { zoom: 1, lat: 0, lng: 0 },
       mark_line: [],
-      // Color: single-series panels can pin one fixed brand color; breakdown
-      // panels omit it so the palette gives each series a distinct color.
       ...(panel.color
         ? { color: { mode: "fixed", fixedColor: [panel.color], seriesBy: "last" } }
         : {}),
-      // The dashboards stack a breakdown, not several measures, so the measures
-      // of a stacked panel get one stack group (input + output, OK + errored add
-      // up to the bucket's total) and their pinned colour, as series overrides.
+      // Measures of a stacked panel share one stack group so they add up to the bucket's total.
       ...(panel.type === "stacked-bar" && measures && measures.length > 1
         ? {
             override_config: measures.map((m) =>
@@ -189,9 +184,7 @@ export function buildLLMPanelSchema(opts: {
           x: xFieldName
             ? [axisField(xFieldName, isHBar ? "" : t("traces.lLMInsightsDashboard.timeAxis"))]
             : [],
-          // One Y field; with no breakdown its label becomes the legend/series
-          // name, so honour the panel's translated seriesLabelKey (e.g.
-          // "errors") when set.
+          // With no breakdown the Y label becomes the series name, so use the translated seriesLabelKey.
           y: measures?.length
             ? measures.map((m) => axisField(m.field, t(m.labelKey)))
             : valueField

@@ -94,8 +94,6 @@ const loading = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
 const experimentDrafts = useEditorDraftIds("experiment");
 
-// `experiment` is the listed row with its flag flipped (the browser keeps its
-// summary), so the row keeps its scores while the pin moves.
 function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
   experiments.value = experiments.value.map((row) => {
     if (row.id === experiment.id) return experiment;
@@ -104,11 +102,7 @@ function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string
   });
 }
 
-// A running row's slot count moves without Refresh: while any row is live the
-// list re-reads itself quietly. A failed poll stops it until the next refresh.
-// A run that stops moving backs the poll off to once a minute: an SDK run whose
-// process died stays "running" until its 24 h deadline. A hidden tab does not
-// poll; showing it again re-reads at once.
+// Stalled runs back off to once a minute: a dead SDK run stays "running" until its 24 h deadline.
 const LIVE_STATUSES = new Set(["pending", "running", "scoring"]);
 const LIVE_POLL_MS = 5_000;
 const LIVE_POLL_MAX_MS = 60_000;
@@ -148,8 +142,7 @@ async function pollLive() {
     // Refresh still reports the error; a background poll should not toast on every read.
     return;
   }
-  // Structural sharing hands back the same array when nothing changed, which
-  // the watch below never sees; that is the stuck run the back-off is for.
+  // Structural sharing returns the same array when nothing changed, which the watch never sees.
   if (experiments.value === before) scheduleLivePoll(before);
 }
 

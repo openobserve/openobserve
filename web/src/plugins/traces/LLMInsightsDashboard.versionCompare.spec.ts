@@ -320,8 +320,6 @@ describe("LLMInsightsDashboard — version compare entry", () => {
   });
 
   it("opens the card's pair when the previous version has no spans in the page window", async () => {
-    // The page-window agents list has only the new version (header entry hidden);
-    // the card read both over the wide window.
     mockListAgents.mockResolvedValue({ agents: [AGENT_V15] });
     const emptyKpi = mockKpi.value;
     mockKpi.value = { ...emptyKpi, requestCount: 5, traceCount: 5 };

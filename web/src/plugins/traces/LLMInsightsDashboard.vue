@@ -721,9 +721,7 @@ const scopeReady = ref(false);
 // nothing, so the next load after it decides again; so does a window the user
 // picks, whose agents may differ (unless the user chose the mode).
 let modeSettled = false;
-// Env/name/version (and the agent's picked stream) to seed the cascade with
-// once the list loads: the URL deep-link first (any of agent/env/version), else
-// the persisted last selection. Resolved into selectedEnv/AgentName/Version via
+// Scope to seed the cascade with once the list loads: the URL deep-link first, else the persisted selection.
 // `selectAgentByScope`, then cleared. (The URL carries readable values, not the
 // internal agent key.) Env/version come from the same source as the name, so a
 // name-only link never pairs with a stored variant of another agent.
@@ -788,11 +786,7 @@ const {
   t,
 });
 
-// Every version of the selected agent in its env, for the release watch. Read
-// over the wide (retention) window, as compare mode does: the previous version
-// usually has no spans in a short page window right after a rollout. One
-// agent's versions in the stream the card measures; another stream's
-// first_seen would pick the wrong pair.
+// Read over the wide window: the previous version usually has no spans in a short window right after a rollout.
 const releaseVersionList = ref<GenAiAgentListItem[]>([]);
 let releaseVersionSeq = 0;
 
@@ -834,8 +828,7 @@ watch(
   { immediate: true },
 );
 
-// The agents list has one row per version per time bucket: keep each version's
-// earliest first_seen, its rollout.
+// The agents list has one row per version per time bucket; the earliest first_seen is the rollout.
 const releaseVariants = computed(() => {
   const byVersion = new Map<string, GenAiAgentListItem>();
   for (const a of releaseVersionList.value) {
@@ -858,7 +851,6 @@ const agentFilterClause = computed(() =>
   buildAgentTraceFilter(effectiveAgent.value, effectiveStream.value),
 );
 
-// --- Page filter (AIO-26) -----------------------------------------------------
 // The search bar's WHERE clause over the spans, kept in the URL as `q`.
 const searchQuery = ref(typeof route.query.q === "string" ? route.query.q.trim() : "");
 const hasActiveFilters = computed(() => !!searchQuery.value);
@@ -893,12 +885,7 @@ const compareVersionList = ref<GenAiAgentListItem[]>([]);
 const compareInitialPair = ref<{ a: string; b: string } | null>(null);
 const versionCompare = useVersionCompare();
 
-// Cheap pre-check from the already-loaded agents list (scoped to the page
-// window) — good enough to gate the entry button without an extra network call
-// on every render. It counts only the effective stream's versions, as the
-// compare arms do (see enterCompareMode); a version seen only in another
-// stream would open the view with an empty Version B. The wide-window list
-// (loaded on entry) is the source of truth for the compare bar's own options.
+// Counts only the effective stream's versions: one seen only in another stream would leave Version B empty.
 const canCompare = computed(() => {
   if (!selectedAgentName.value) return false;
   const unsetEnv = selectedEnv.value === "__unset__";
@@ -928,8 +915,6 @@ const compareDateDisabled = computed(
   () => compareMode.value && compareAlign.value !== "sameWallClock",
 );
 
-// `pair` comes from the Release watch card, which already found both versions
-// over the wide window; the page-window `canCompare` gate is for the header entry.
 async function enterCompareMode(pair?: { a: string; b: string }) {
   if (!pair && !canCompare.value) return;
   compareInitialPair.value = pair ?? null;
@@ -938,7 +923,6 @@ async function enterCompareMode(pair?: { a: string; b: string }) {
   if (!orgId || !selectedAgentName.value) return;
   const nowMicros = Date.now() * 1000;
   const stream = effectiveStream.value;
-  // The arms query `effectiveStream`, so only its versions can be compared.
   // "(No env)" is its own variant: the service reads a null env as any env.
   const unsetEnv = selectedEnv.value === "__unset__";
   compareVersionList.value = (
@@ -1191,8 +1175,6 @@ function onFilterToModel(model: string) {
   setFilter("model", model);
 }
 
-// The full search in Traces: the drawer's scope (agent and page search) and
-// series, as a span filter.
 function openTraceListInTraces() {
   const sel = traceListSelection.value;
   if (!sel) return;
@@ -1408,10 +1390,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   // data health check finds unpriced tokens the tile reads as a lower bound
   // ("≥ $X"), or "cost unknown" when none of the window's tokens were priced,
   // with the token count under it.
-  // The check reads the whole window, not the filters, so under a filter the
-  // count is labelled as the window's, and a recorded cost is shown as it is. A
-  // filter that matches no tokens costs $0.00; only filtered tokens with no cost
-  // at all read as "cost unknown".
+  // The check reads the whole window, not the filters; only filtered tokens with no cost at all read as "cost unknown".
   const u = unpriced.value;
   const windowOnly = hasActiveFilters.value;
   const filteredPriced = kpi.value.totalCost > 0 || kpi.value.totalTokens === 0;
@@ -1517,9 +1496,7 @@ function kpiCacheKey(start: number, end: number): string {
 // queries.
 let loadedAgentKey = "";
 let resolvingScope = 0;
-// Numbers loadInsights calls when they start. A call whose awaits (streams,
-// agents list) resolve after a newer call began must not go on to fetch: it
-// would start fetchAll last and its window's numbers would win the tiles.
+// A load whose awaits resolve after a newer load began must not fetch, or its stale numbers win the tiles.
 let loadSeq = 0;
 
 // Single fetch entry point. Always pulls from the current props (which the
@@ -1611,8 +1588,7 @@ async function loadInsights(
     const ck = kpiCacheKey(start, end);
     if (!force && kpiCache.has(ck)) {
       const snap = kpiCache.get(ck)!;
-      // Also supersedes an in-flight load for the previous selection, which
-      // would otherwise land on these tiles, and drops its loading flags.
+      // Also supersedes an in-flight load for the previous selection, which would otherwise land on these tiles.
       restore(snap);
       lastRunAt.value = snap.lastRunAt;
       return;
@@ -1620,8 +1596,7 @@ async function loadInsights(
 
     const result = await fetchAll(stream, start, end, effectiveAgent.value, filterClause.value);
     // `loading` true→false already stamped lastRunAt via the watcher; snapshot
-    // this call's own result (null when superseded or failed) so returning to
-    // this selection skips the network.
+    // this call's own result so returning to this selection skips the network.
     if (result) {
       kpiCache.set(ck, { ...result, lastRunAt: lastRunAt.value });
     }
@@ -1686,8 +1661,7 @@ async function refresh(startTime?: number, endTime?: number, force = true, windo
 // its single last-refresh off `searchObj.loading`. Exposed to the page header,
 // which renders it via ORefreshButton.
 const lastRunAt = ref<number | null>(null);
-// Sync: a cache restore ends a load and then sets the snapshot's own time,
-// which a deferred stamp would overwrite.
+// Sync: a cache restore ends a load and then sets the snapshot's time, which a deferred stamp would overwrite.
 watch(
   loading,
   (isLoading, wasLoading) => {

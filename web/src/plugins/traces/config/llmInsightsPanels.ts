@@ -55,27 +55,17 @@ export interface LLMPanelQuery {
   valueField?: string;
   /**
    * i18n KEY for the legend label used when seriesField is not set. Resolved by
-   * `buildLLMPanelSchema`: this module is a plain config, so a resolved string
-   * would not follow the locale.
+   * Resolved by `buildLLMPanelSchema` so the label follows the locale.
    */
   seriesLabelKey?: I18nKey;
-  /**
-   * Several value columns drawn as one series each (input and output tokens),
-   * in place of `valueField`; the label is the legend name. `color` pins the
-   * series colour; `errored` is what a click on the series lists: errored
-   * traces (true) or traces without an error (false).
-   */
+  /** Series drawn one per value column; `errored` picks errored (true) or error-free (false) traces on click. */
   measures?: Array<{ field: string; labelKey: I18nKey; color?: string; errored?: boolean }>;
   /**
    * Hint to the renderer for axis / tooltip formatting.
    * - "cost": prefix with `$` and use 2-decimal precision in tooltips.
    */
   valueFormat?: LLMValueFormat;
-  /**
-   * Keep only the `n` series with the largest window total (a stream can carry
-   * dozens of models). `others` folds the rest into one "others" series, for
-   * values that add up (cost); percentiles do not, so latency drops the rest.
-   */
+  /** Keep the top `n` series; `others` folds the rest only for additive values (percentiles don't add up). */
   topSeries?: { n: number; others: boolean };
 }
 
@@ -98,10 +88,7 @@ export interface LLMPanelDef {
   /** Optional row cap for horizontal-bar panels (top N). */
   limit?: number;
   /**
-   * Click-through (AIO-26): what a clicked point selects. `seriesSql` is the
-   * expression the series/category value was computed from (a trace matches
-   * when any span has that value); `errored` selects the traces with an
-   * errored span.
+   * A trace matches when any span has the `seriesSql` value; `errored` selects traces with an errored span.
    */
   drill?: { seriesSql?: string; errored?: true };
   /** "Create alert" from this panel (AIO-20): the pack template it maps to. */
@@ -168,15 +155,7 @@ const AGENT_SPAN = `${OBSERVATION_TYPE_FIELD} = 'invoke_agent'`;
 /** Stored column holding a span's parent span id; a stream whose spans never had a parent lacks it. */
 export const PARENT_SPAN_FIELD = "reference_parent_span_id";
 
-/**
- * What `topLevelAgentUsage` finds top-level agents through, placed right after
- * the stream in FROM: each span joins its parent when that parent is an
- * `invoke_agent` span of the same trace (`agent_parent_span`, else NULL), one
- * row per span since the agent ids are distinct. A stream without the parent
- * column holds only root spans, so every agent span is top-level and the join
- * is to no rows. Mirrors `agent_parents_join` in
- * src/api/search/src/traces/session.rs.
- */
+/** Joins each span to its `invoke_agent` parent; without the parent column every agent span is top-level. Mirrors `agent_parents_join` in session.rs. */
 export function agentParentsJoin(stream: string, hasParentSpan: boolean): string {
   const agents = `SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span FROM "${stream}"`;
   return hasParentSpan
@@ -185,31 +164,16 @@ export function agentParentsJoin(stream: string, hasParentSpan: boolean): string
     : ` LEFT JOIN (${agents} WHERE false) AS agent_parents ON trace_id = agent_parent_trace`;
 }
 
-/**
- * The usage of a trace's top-level agent spans, those whose parent is not an
- * agent span: sibling agents add up, and a nested agent, whose usage its
- * parent's already holds, is not counted again. Needs `agentParentsJoin` in FROM.
- */
+/** Nested agents are skipped because their parent's usage already includes theirs; needs `agentParentsJoin` in FROM. */
 export const topLevelAgentUsage = (column: string) =>
   `SUM(CASE WHEN ${AGENT_SPAN} AND agent_parent_span IS NULL THEN ${column} END)`;
 
-/**
- * Inside `GROUP BY trace_id`: the top-level agents' usage a trace's total falls
- * back to when none of its LLM calls carries any (`traceUsageSum`), else 0.
- * That usage has no LLM call to take a model from, so per-model views show it
- * as unattributed.
- */
+/** Top-level agent usage when no LLM call in the trace carries any; per-model views show it as unattributed. */
 export const agentFallbackUsage = (column: string) =>
   `CASE WHEN COALESCE(${llmCallUsageSum(column)}, 0) = 0 ` +
   `THEN COALESCE(${topLevelAgentUsage(column)}, 0) ELSE 0 END`;
 
-/**
- * The traces whose usage is only on their agent spans, one row each, placed in
- * the bucket of their first span. A trace is judged whole, not per bucket, so a
- * trace whose agent span and LLM calls fall in different buckets never counts
- * twice. Its first span's time is projected as `first_ts` (the search layer
- * forbids aliasing `_timestamp`), which the outer `histogram(first_ts, …)` buckets.
- */
+/** Agent-only traces judged whole (not per bucket) so they never count twice; `first_ts` because `_timestamp` cannot be aliased. */
 function agentOnlyTracesSql(columns: Array<[string, string]>, havingColumn: string): string {
   const projected = columns.map(([col, alias]) => `${agentFallbackUsage(col)} as ${alias}`);
   return `
@@ -220,15 +184,9 @@ function agentOnlyTracesSql(columns: Array<[string, string]>, havingColumn: stri
     HAVING ${agentFallbackUsage(havingColumn)} > 0`;
 }
 
-// Top to bottom: is it healthy (traffic with its errors, latency), what is
-// breaking (errors by message, failing tools), then what it costs (cost and
-// token trends). Pairs of one-column panels, so every row is full.
 export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   {
-    // Traces per bucket, split into OK and errored, so the errors read against
-    // the traffic. Counted the way the KPI strip counts them (approx_distinct of
-    // trace_id; errored = any ERROR span), so the bars add up to the Traces tile
-    // and the red part to the Error rate tile's numerator.
+    // Counted like the KPI strip (approx_distinct trace_id) so the bars add up to the Traces tile.
     id: "traces-over-time",
     titleKey: "aiObservability.panels.tracesOverTime.title",
     subtitleKey: "aiObservability.panels.tracesOverTime.subtitle",
@@ -238,10 +196,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     drill: {},
     alert: "failure_rate",
     query: {
-      // No baseFilter: OTel SDKs typically propagate the failure to a deep
-      // child span (e.g. tool.<name>) which doesn't carry
-      // gen_ai_operation_name, and the KPI strip counts every trace too. The
-      // WHERE is there for renderPanelSql to splice the scope onto.
+      // No baseFilter: failures land on deep child spans without gen_ai_operation_name.
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
@@ -273,14 +228,12 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     id: "latency-trend",
     titleKey: "aiObservability.panels.latencyByModel.title",
     subtitleKey: "aiObservability.panels.latencyByModel.subtitle",
-    // A line per model, not stacked: percentiles of two models do not add up.
-    // A bucket with no calls is a gap, not a line drawn through it.
+    // Not stacked: percentiles of two models do not add up.
     type: "line",
     layout: { colSpan: 1 },
     drill: { seriesSql: MODEL_SERIES_SQL },
     query: {
-      // p95 of each model's LLM calls (ms) per bucket. Scoped to LLM calls so
-      // fast tool/child spans don't drag the tail down.
+      // Scoped to LLM calls so fast tool/child spans don't drag the tail down.
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
@@ -300,11 +253,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     },
   },
   {
-    // What fails, by the message the failing span set (the OTel status
-    // message): where it happened, the traces it hit and when it was last
-    // seen. Spans with no message share the "" row. `operation` is one of the
-    // operations the message came from (MIN, so it is stable across reloads)
-    // and `operations` how many there are.
+    // `operation` uses MIN so it is stable across reloads.
     id: "top-errors",
     titleKey: "aiObservability.panels.topErrors.title",
     subtitleKey: "aiObservability.panels.topErrors.subtitle",
@@ -329,11 +278,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     },
   },
   {
-    // Which tools keep failing: the 10 tools with the most failed calls, with
-    // failed and total calls (for the failure rate), the traces with a failed
-    // call, and the last failure. Counts the tool-call spans themselves: every
-    // span carries the agent's canonical name, so the agent filter needs no
-    // parent climb.
+    // Every span carries the agent's canonical name, so the agent filter needs no parent climb.
     id: "failing-tools",
     titleKey: "aiObservability.panels.failingTools.title",
     subtitleKey: "aiObservability.panels.failingTools.subtitle",
@@ -366,11 +311,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     drill: { seriesSql: MODEL_SERIES_SQL },
     alert: "cost",
     query: {
-      // Cost field populated by the backend extractor from
-      // gen_ai.usage.cost / Langfuse cost_details — same source the Traces
-      // tab uses. Each model's LLM-call cost per bucket, plus the traces whose
-      // cost is only on their agent span as the unattributed series, so the
-      // bars add up to the Total Cost tile (the rule of `traceUsageSum`).
+      // Agent-only cost is the unattributed series so the bars add up to the Total Cost tile.
       sql: `
         SELECT ts, model, SUM(cost) as cost
         FROM (
@@ -404,9 +345,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     // A click lists the bucket's traces; input and output are measures, not a filter.
     drill: {},
     query: {
-      // Input and output tokens of LLM calls per bucket, stacked: together they
-      // are the bucket's total. A trace whose tokens are only on its agent span
-      // counts those, as the Total Tokens tile does.
+      // Includes agent-span-only tokens, as the Total Tokens tile does.
       sql: `
         SELECT ts, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens
         FROM (
@@ -449,11 +388,9 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
  *   {{endTime}}    → numeric microseconds, unquoted
  *   {{interval}}   → bucket width string ("5 minutes", "1 hour", etc.) — used
  *                                    only inside `histogram(_timestamp, '…')`
- *   {{scope}}      → ` AND (<agentFilter>)`, or nothing: a template with several
- *                                    WHEREs (a UNION) marks each one to scope
+ *   {{scope}}      → ` AND (<agentFilter>)` or nothing; mark each WHERE of a UNION
  *   {{unattributed}} → the quoted series name for usage with no model
- *   {{agentParents}} → `agentParentsJoin` for the stream, after `{{stream}}` in a
- *                                    FROM whose usage falls back to top-level agents
+ *   {{agentParents}} → `agentParentsJoin`, placed after `{{stream}}`
  *
  * @example
  *   renderPanelSql(
@@ -560,11 +497,7 @@ export function compactSql(sql: string): string {
  *   pickInterval(14 * 86400 * 1_000_000)  // "6 hours"    (14 day window)
  *   pickInterval(60 * 86400 * 1_000_000)  // "1 day"      (60 day window)
  */
-/**
- * Width (µs) of the buckets `histogram(_timestamp)` picks for a window, so a
- * clicked bar maps back to its time range. Mirrors `generate_histogram_interval`
- * in src/search/src/sql/visitor/histogram_interval.rs.
- */
+/** Mirrors `generate_histogram_interval` in histogram_interval.rs so a clicked bar maps back to its range. */
 export function autoHistogramBucketMicros(startMicros: number, endMicros: number): number {
   const HOUR = 3_600_000_000;
   const range = endMicros - startMicros;

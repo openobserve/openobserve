@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The Experiments list at scale: runs grouped by their CI metadata, re-runs
-// folded, and each run judged against its dataset's baseline by the rule
-// Compare uses (score_policy.rs + comparison.rs), from the list's own summaries;
-// a run on other cases than its baseline is judged by Compare itself, over the
-// cases both ran.
+// Baseline verdicts mirror Compare's rule (score_policy.rs + comparison.rs); keep them in sync.
 
 import type { ExperimentComparison, LlmExperiment } from "@/services/llm-experiments.service";
 import type { ScoreConfig } from "@/services/online-evals.service";
@@ -84,9 +80,7 @@ export function scorePolicy(config: ScoreConfig): ScorePolicy | null {
     : null;
 }
 
-// ponytail: keyed by entity only, so a run pinned to an older config version is
-// judged by the current policy; Compare pairs by version. Key by version if
-// policies start changing under live datasets.
+// ponytail: keyed by entity, not version, so a run pinned to an older config is judged by the current policy.
 export function scorePolicies(configs: ScoreConfig[]): Map<string, ScorePolicy> {
   const policies = new Map<string, ScorePolicy>();
   for (const config of configs) {
@@ -132,11 +126,7 @@ export function isRelative(policy: ScorePolicy | null | undefined): boolean {
   return policy?.kind === "numeric" && policy.span === null;
 }
 
-/**
- * A run whose scores are final: completed, or scored with some Scorer errors
- * (`scoring_failed` is terminal, as Compare treats it). The latter's clean
- * scores still vote; an errored or unfinished one does not (`isCleanScore`).
- */
+/** `scoring_failed` is terminal, as Compare treats it; only its clean scores vote. */
 export function isSettled(run: LlmExperiment): boolean {
   return run.status === "completed" || run.status === "scoring_failed";
 }
@@ -162,11 +152,7 @@ export function noiseBand(policy: ScorePolicy, baseline: number): [number, numbe
   return [baseline - half, baseline + half];
 }
 
-/**
- * Float noise is removed before the strict threshold test, so an exact
- * threshold-sized move (0.8 → 0.75) is unchanged however the subtraction
- * rounds. Compare's `classify_delta` in `comparison.rs` uses the same rule.
- */
+/** Float noise is trimmed before the strict test so an exact threshold-sized move stays unchanged, as in Compare's `classify_delta`. */
 function classify(delta: number): BaselineOutcome {
   const rounded = (Math.sign(delta) * Math.round(Math.abs(delta) * 1e9)) / 1e9;
   if (rounded < -COMPARISON_THRESHOLD) return "regressed";
@@ -216,10 +202,7 @@ export interface SharedCaseComparison {
   shared: number;
   /** Cases only one side ran: new in the run, or missing from it. */
   excluded: number;
-  /**
-   * By score column key. `delta` oriented so positive is better; `change` raw,
-   * in the score's own measure; `scoreConfigId` names the health policy.
-   */
+  /** `delta` is oriented so positive is better; `change` is raw. */
   scores: Map<
     string,
     ScoreColumn & { delta: number; change: number; scoreConfigId: string | null }
@@ -281,16 +264,7 @@ function verdict(
   return { outcome, deltas, worst, headline: outcome === "improved" ? best : worst, cases };
 }
 
-/**
- * Score columns only vote, as in Compare: latency and cost never count. A run
- * with no score that has a policy on both sides gets no outcome, the same as
- * Compare's inconclusive. A settled run whose Scorer failed on some rows votes
- * with its other scores; the failed one does not.
- *
- * A run on another dataset version or filter than its baseline ran other
- * cases, so its means are not comparable: it is judged by `shared`, Compare's
- * answer over the cases both ran, and has no outcome until that arrives.
- */
+/** Only score columns vote; a run on other cases than its baseline waits for `shared`, since its means are not comparable. */
 export function compareToBaseline(
   run: LlmExperiment,
   baseline: LlmExperiment | null,
@@ -357,15 +331,7 @@ export interface RunFold {
   newerIncomplete: LlmExperiment | null;
 }
 
-/**
- * Runs with one name on one commit are re-runs; they fold into the newest
- * settled one. It, not the mean, stands for the fold everywhere (delta,
- * outcome, sort, trend point): it is the last verdict CI got, and a mean would
- * smooth a flaky run into a value no run produced. A newer re-run that was
- * cancelled or failed has no verdict, so it does not hide that one. The spread
- * keeps the variance in view. The baseline never folds, and a run without a
- * commit has nothing to fold on.
- */
+/** Re-runs fold into the newest settled run, not a mean, which would smooth a flaky run into a value no run produced. */
 export function foldReruns(runs: LlmExperiment[]): RunFold[] {
   const folds = new Map<string, LlmExperiment[]>();
   for (const run of runs) {
@@ -393,11 +359,6 @@ export function incompleteKind(run: LlmExperiment): IncompleteKind | null {
   return run.status === "failed" || run.status === "execution_failed" ? "failed" : "inProgress";
 }
 
-/**
- * How many runs carry a verdict, and why the others do not. Fold badges and
- * section headers count `settled`, the runs the spread and the verdict come
- * from, and name the rest beside it.
- */
 export interface RunTally {
   settled: number;
   incomplete: Record<IncompleteKind, number>;
@@ -413,11 +374,6 @@ export function tallyRuns(runs: LlmExperiment[]): RunTally {
   return tally;
 }
 
-/**
- * "27–32%" for a boolean score across a fold's settled runs, with how many
- * runs it spans; categorical scores show counts instead. Runs that agree read
- * as one value ("80%"), not a range from a value to itself.
- */
 export function scoreSpread(
   runs: LlmExperiment[],
   key: string,
@@ -443,10 +399,6 @@ export function scoreSpread(
   return { count: values.length, range: percent ? `${range}%` : range };
 }
 
-/**
- * The section a run sits in. Under Pull request a run with no PR falls back to
- * its branch, so CI pushes to main group as "main" beside the PRs.
- */
 export function ciGroupKey(run: LlmExperiment, groupBy: ExperimentGroupBy): string | null {
   if (groupBy === "none") return null;
   const pr = groupBy === "pr" ? gitMeta(run, "pr") : null;
@@ -567,13 +519,7 @@ export function trendScores(
   });
 }
 
-/**
- * One point per (folded) settled run, oldest first, judged against the
- * baseline's band; a run whose Scorer failed on a row of this score has none.
- * A run on other cases than the baseline is plotted by its move over the cases
- * both ran, from `shared` (keyed by run id), and is left out until that
- * comparison arrives.
- */
+/** A run on other cases than the baseline is plotted from `shared` and omitted until it arrives. */
 export function scoreTrend(
   runs: LlmExperiment[],
   baseline: LlmExperiment,

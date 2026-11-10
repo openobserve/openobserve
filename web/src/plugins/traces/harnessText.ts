@@ -13,14 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Harness text (AIO-22): the wrapper a coding agent puts around its user's
- * request (`<system-reminder>`, `<job>`), hidden when sessions are read. Per
- * agent, from GenAI Agent Mapping. The server hides it everywhere
- * (`strip_harness` in src/config/src/meta/gen_ai.rs): the Sessions list in its
- * query, the turn previews and the settings test through
- * `genAiAgentMappingService.stripHarness`, so a pattern means the same in each.
- */
+// Must match the server's `strip_harness` (src/config/src/meta/gen_ai.rs).
 
 export interface HarnessPatternRule {
   agent: string;

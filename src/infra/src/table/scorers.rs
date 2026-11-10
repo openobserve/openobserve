@@ -70,16 +70,14 @@ impl TryFrom<Model> for Scorer {
     }
 }
 
-/// One row read by id; a type this node does not know is an error, as the
-/// caller asked for this scorer and cannot run it.
+/// A row read by id; an unknown type is an error since the caller asked to run it.
 fn known(model: Model) -> Result<Scorer, errors::Error> {
     Scorer::try_from(model).map_err(|scorer_type| {
         errors::Error::Message(format!("Unknown scorer type '{scorer_type}'"))
     })
 }
 
-/// Rows of a type this node does not know (a newer node wrote them) are left
-/// out, so one such row cannot fail a whole list.
+/// Rows of an unknown type (from a newer node) are skipped so one cannot fail a whole list.
 fn known_rows(records: Vec<Model>) -> impl Iterator<Item = Scorer> {
     records
         .into_iter()

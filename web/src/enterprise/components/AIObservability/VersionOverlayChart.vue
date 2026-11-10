@@ -30,12 +30,7 @@ export interface OverlayPoint {
 
 export type OverlayMode = "sinceRollout" | "sameWallClock";
 
-/** Points are already rebased by VersionCompareView: either elapsed since each
- * rollout, or elapsed since a shared wall-clock origin, in the selected unit.
- * Use the shared ChartRenderer directly, as CoverageMetricChart does for
- * precomputed series. The SQL panel's categorical line conversion would distort
- * unequal time gaps; numeric [x, y] coordinates preserve them without changing
- * any dashboard line charts. */
+/** Numeric [x, y] points, since the SQL panel's categorical conversion would distort unequal gaps. */
 export function buildOverlayOptions(
   seriesA: OverlayPoint[],
   seriesB: OverlayPoint[],

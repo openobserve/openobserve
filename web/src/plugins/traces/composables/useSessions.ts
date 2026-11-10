@@ -86,27 +86,15 @@ export interface SessionTraceRow {
   serviceName?: string | null;
   /** First non-empty user id on the trace; the session rollup takes the first one found. */
   userId?: string | null;
-  /**
-   * The trace's agent (the first message's span's, else the earliest named one), on
-   * streams with message fields; null otherwise.
-   */
   agentName?: string | null;
 }
 
 /** Turns per session-details page: the newest page loads first, "Load older turns" pages back. */
 export const SESSION_TURNS_PAGE_SIZE = 1000;
-/**
- * Span budget per `fetchSessionSpans` query. Turns are packed into queries by
- * their span counts, so no query can hit its LIMIT and drop a turn's spans.
- */
+/** Turns are packed by span count so no query hits its LIMIT and drops spans. */
 export const SESSION_SPANS_PER_QUERY = 2000;
 
-/**
- * Packs turns (in the given order) into span queries of at most `budget` spans
- * and `SESSION_TURNS_PAGE_SIZE` ids each. A turn larger than the budget gets a
- * query of its own. `limit` is the query's LIMIT: never below the chunk's span
- * total, so every span of every turn in it comes back.
- */
+/** `limit` is never below a chunk's span total, so every span of every turn comes back. */
 export function chunkTurnsBySpans(
   turns: Pick<SessionTraceRow, "traceId" | "spanCount">[],
   budget = SESSION_SPANS_PER_QUERY,
@@ -387,15 +375,11 @@ export function useSessions() {
   }
 
   /**
-   * Fetch one page of a session's turns and derive the session-level rollup
-   * client-side.
+   * Fetch one page of a session's turns and derive the session-level rollup client-side.
    *
    * The backend returns the same trace-summary hit shape that this mapper
    * already consumes, but with per-turn status computed from all spans in each
-   * trace. Pages run newest first and `total` is the session's turn count: the
-   * first call (no `loaded`) gets the newest `SESSION_TURNS_PAGE_SIZE` turns;
-   * passing the turns already shown fetches the next older page and returns it
-   * merged with them. `hasOlder` says whether turns remain to load.
+   * trace. Pages run newest first; `total` is the session's turn count.
    */
   async function fetchSession(
     streamName: string,
@@ -497,16 +481,12 @@ export function useSessions() {
       };
     });
 
-    // Sort chronologically so the conversation list reads in turn order (the
-    // endpoint pages newest first). A turn that arrived since the last page
-    // shifts the offsets, so an older page can repeat a loaded turn: keep one.
+    // Offsets shift when a new turn arrives, so an older page can repeat a loaded turn.
     const loadedIds = new Set(loaded.map((tr) => tr.traceId));
     const traces = [...loaded, ...page.filter((tr) => !loadedIds.has(tr.traceId))].sort(
       (a, b) => a.startTimeMicros - b.startTimeMicros,
     );
-    // `total` counts the session's trace ids in the time index, which keeps ids
-    // whose spans were deleted since (G4-07). Once a page reaches the index's end,
-    // comes back empty or adds no turn, the loaded turns are all there are.
+    // `total` keeps ids whose spans were deleted, so a page adding no turn also ends loading.
     const total = Number(res.data?.total) || 0;
     const exhausted =
       accumulated.length === 0 ||
@@ -642,13 +622,7 @@ export function useSessions() {
   /**
    * Fetch all gen_ai spans of the given turns — the raw span rows the
    * `ThreadView` component renders from (it groups by `trace_id` and classifies
-   * by `gen_ai_operation_name`). Used by the session-detail turn bodies, the
-   * Tool Hotspots rail and the "Pretty" transcript view. Filters by the turns'
-   * trace ids (rather than conversation_id) so tool-execution spans are
-   * included, and selects exactly the columns `ThreadView` reads. The turns are
-   * split into queries by span count (`chunkTurnsBySpans`), so every turn's
-   * spans come back however long the session is. Pass turns oldest first; the
-   * rows come back in that order.
+   * by `gen_ai_operation_name`). Filters by trace ids so tool-execution spans are included.
    */
   async function fetchSessionSpans(
     streamName: string,

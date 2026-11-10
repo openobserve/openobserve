@@ -13,13 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * The tabs of an AI Observability rail item (Cost & Usage → Users, Budgets).
- * The shell (AIObservability/Index.vue) knows which tabs the current page has
- * and provides them; each page draws them in its header, under the title, as
- * the rest of the app does (OPageLayout `#header-tabs` with `tabs-below`).
- */
-
 import { computed, inject, type ComputedRef, type InjectionKey } from "vue";
 import type { I18nText } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -50,10 +43,6 @@ export interface AiSectionTabsContext {
 
 export const AI_SECTION_TABS: InjectionKey<AiSectionTabsContext> = Symbol("aiSectionTabs");
 
-/**
- * The current page's tabs and its rail item's header; none outside the shell
- * or for a single page, which keeps its own header.
- */
 export function useAiSectionTabs() {
   const ctx = inject(AI_SECTION_TABS, null);
   const tabs = computed(() => {

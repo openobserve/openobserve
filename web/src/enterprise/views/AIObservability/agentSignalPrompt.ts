@@ -15,12 +15,7 @@
 
 import { UNSET } from "@/enterprise/composables/useAgentScope";
 
-/**
- * The question "Explain with O2 AI" hands to the AI panel for one Agent Behavior
- * signal (AIO-36). It carries the evidence the drill-down drawer already loaded,
- * the error messages and the worst traces, so the answer starts from them.
- * Model input, so it stays English.
- */
+// Model input, so it stays English.
 
 export interface SignalForPrompt {
   signalType: "loop" | "failure" | "cost";
@@ -89,8 +84,7 @@ export function explainSignalPrompt(s: SignalForPrompt, e: PromptEvidence): stri
     `Investigate the root cause of this AI agent behaviour: ${subject(s, agent)}.`,
     `Trace stream: ${e.stream}${variant ? `. Agent ${variant}` : ""}. Window: ${from} to ${to}.`,
   ];
-  // The drill-down cannot narrow evidence to one failure class (the taxonomy is
-  // resolved server-side), so say the evidence spans all of the agent's errors.
+  // Failure classes resolve server-side, so the evidence cannot be narrowed to one.
   const allClasses = s.signalType === "failure" ? " (all of this agent's failure classes)" : "";
   const errors = e.errors.slice(0, PROMPT_EVIDENCE_LIMIT);
   if (errors.length) {

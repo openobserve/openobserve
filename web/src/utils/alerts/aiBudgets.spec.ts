@@ -90,8 +90,7 @@ describe("budgets (AIO-38)", () => {
     expect(budgetSql({ ...feature, scope: "user", value: "" }, true)).toContain(
       "SELECT trace_id, MAX(user_id) AS user_id, COALESCE(",
     );
-    // A model is on each LLM call: spend stays per span, over LLM calls only, so an agent
-    // span carrying the model does not count its children's cost again.
+    // Over LLM calls only, so an agent span carrying the model does not count its children's cost again.
     const model = budgetSql({ ...feature, scope: "model", value: "gpt-4o" }, true);
     expect(model).not.toContain("SUM(gen_ai_usage_cost)");
     expect(model).toContain("THEN gen_ai_usage_cost ELSE 0 END) AS spent");
@@ -99,8 +98,7 @@ describe("budgets (AIO-38)", () => {
     expect(model).not.toContain("agent_parents");
   });
 
-  // G2-13: a trace's spend falls back to its top-level agents, read through the
-  // agent-parent join; a stream that stores no parents joins none.
+  // A stream that stores no parents joins none.
   it("spends a trace's top-level agents when it has no LLM-call cost", () => {
     for (const scope of ["agent", "user", "session", "feature", "oneUser"] as const) {
       const b = { ...feature, scope, value: scope === "user" || scope === "session" ? "" : "v" };
@@ -274,8 +272,6 @@ describe("budgets (AIO-38)", () => {
     expect(budgetReading(feature, [])).toMatchObject({ error: null, state: "under" });
   });
 
-  // The page reads the limit back from context_attributes; the alert fires on
-  // having.value and warns on warning_value. An edit that moves one leaves the others lying.
   it("moves the limit everywhere it is stored on an edit, keeping the rest of the alert", () => {
     const stored = {
       ...budgetAlertPayload(feature, {

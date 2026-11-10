@@ -205,8 +205,7 @@ const rate = computed(() => {
   return mode === "rate" ? Number(valueOf(props.row, "samplingValue", "sampling_value")) || 0 : 1;
 });
 
-// Every query degrades to an empty series: a job that never failed, or whose
-// judge was never priced, lacks the column the query names.
+// Degrade to empty: a job that never failed or was never priced lacks the queried column.
 const query = (sql: string, startUs: number, endUs: number, type: "traces" | "logs" = "traces") =>
   executeQueryOnce(sql, startUs, endUs, type).catch(() => null);
 
@@ -240,8 +239,7 @@ async function loadToday() {
   spendToday.value = typeof byJob === "string" ? byJob : byJob[jobId.value];
 }
 
-// "Scores stopped" is about now, whatever window the charts show: no score
-// since T while the filter kept matching targets the job should have scored.
+// "Scores stopped" is about now, regardless of the chart window.
 async function loadStopped() {
   stopped.value = null;
   if (props.row.status !== "active" || !rate.value) return;

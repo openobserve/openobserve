@@ -18,19 +18,7 @@ import type { LocationQueryRaw, RouteLocationNormalizedLoaded, Router } from "vu
 // Where the last replace issued here is headed, until it settles.
 let pending: { path: string; query: LocationQueryRaw } | null = null;
 
-/**
- * Replace the current route's query with `update(query)`.
- *
- * Several parts of one page write their own params (a date controller, a list's
- * filters). A replace started while another is in flight cancels it, and the
- * route still shows the query from before both, so a writer that built on the
- * route would drop the other's params. Writers going through here build on the
- * query the in-flight replace is heading to instead, in whichever order they run.
- *
- * An update that changes nothing issues no replace: it would only cancel a
- * navigation in flight, such as the org switch that remounts the page before
- * its push commits.
- */
+/** Builds on the in-flight replace's target query, since a new replace cancels it and the route still shows the old query. */
 export function replaceRouteQuery(
   router: Router,
   route: RouteLocationNormalizedLoaded,

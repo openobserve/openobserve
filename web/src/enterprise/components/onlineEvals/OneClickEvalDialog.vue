@@ -328,9 +328,7 @@ async function load() {
   else providerStatus.value = "failed";
 }
 
-// Whether a pricing rule covers the judge model, asked as ingest prices its
-// calls (the job form's estimate reads past judge calls, which a new job lacks).
-// A failed lookup leaves it unknown, which is not unpriced.
+// A failed lookup leaves pricing unknown, which is not unpriced.
 async function checkPricing() {
   if (!judgeModel.value) return;
   try {
@@ -353,8 +351,7 @@ function setPrice() {
   });
 }
 
-// A config or scorer of the same name is reused, so a second click does not
-// fail on a name clash; a 409 from a concurrent create is read back the same way.
+// Reuse same-named configs (and read back on 409) so a second click does not fail on a name clash.
 async function ensureScoreConfig(name: string): Promise<ScoreConfig> {
   const find = async () =>
     (await onlineEvalsService.scoreConfigs.list(org())).find((c: ScoreConfig) => c.name === name);
@@ -460,8 +457,6 @@ function openFullForm() {
   });
 }
 
-// The providers page comes back here once the provider is saved, and the
-// dialog reopens (`one_click`), so the picked judges are the only thing lost.
 function addProvider() {
   emit("update:open", false);
   const back = router.resolve({

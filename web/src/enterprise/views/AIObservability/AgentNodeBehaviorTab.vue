@@ -148,17 +148,14 @@ const detailRow = ref<any>(null);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 
-/** The page's Agent-mode env/version when the clicked node is that agent;
- *  otherwise open (null). UNSET = "not set". */
+/** The page's env/version when the clicked node is that agent, else null. */
 const nodeScope = computed(() =>
   props.agentScope && props.agentScope.name === props.agentName
     ? { env: props.agentScope.env, version: props.agentScope.version }
     : { env: null, version: null },
 );
 
-/** Only this agent's signals, narrowed to the page's env/version — the drawer
- *  and page resolve agent names the same way, so a name match is the scoping
- *  key (see design §4b id-vs-name note). */
+/** This agent's signals at the page's env/version; names are the scoping key since drawer and page resolve them alike. */
 const mySignals = computed(() =>
   signals.value.filter((s) => matchesAgentScope(s, { name: props.agentName, ...nodeScope.value })),
 );

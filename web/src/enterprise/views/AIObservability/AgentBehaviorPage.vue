@@ -134,8 +134,7 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-// Shared with LLM Insights / Sessions / Quality — see useAiDateRange.ts. The
-// range is kept in the URL (`period` or `from`/`to`), so a shared link opens it.
+// Range kept in the URL so a shared link opens it.
 const {
   dateState,
   timeRange,
@@ -205,8 +204,6 @@ const agentFilter = computed(() =>
   filterMode.value === "agent" ? (selectedAgent.value?.name ?? "") : "",
 );
 
-// The selected variant's env/version for the panel ("(No env)" pinned to UNSET
-// when a sibling variant has an env); null leaves a dimension open.
 const panelScope = computed(
   () =>
     (filterMode.value === "agent" && selectedAgentScope(selectedAgent.value, agents.value)) || {
@@ -231,8 +228,7 @@ function syncScopeUrl() {
       stream: activeStream.value,
       agent,
     });
-    // An org switch puts the new org in the store before the route; building on
-    // the route alone would write the previous org back.
+    // The store gets the new org before the route; the route alone would write the previous org back.
     const org = store.state.selectedOrganization?.identifier;
     if (org && next.org_identifier != null) next.org_identifier = org;
     return next;

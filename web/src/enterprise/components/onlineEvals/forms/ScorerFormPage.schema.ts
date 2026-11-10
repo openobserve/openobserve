@@ -109,8 +109,7 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
           });
         }
       } else if (val.scorerType === "code") {
-        // The variables are the `score` parameters; the backend refuses a
-        // function whose parameters it cannot read.
+        // The backend refuses a function whose parameters it cannot read.
         if (scoreFunctionParams(val.template) === null) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,

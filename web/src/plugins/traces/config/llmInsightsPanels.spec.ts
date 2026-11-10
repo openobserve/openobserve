@@ -213,8 +213,6 @@ describe("cost and token trends add up to the tiles", () => {
     expect(sql.match(/AND \(gen_ai_agent_name = 'a'\)/g)).toHaveLength(2);
   });
 
-  // G2-13: the agent-only half sums the top-level agents, found by joining each
-  // span to its agent parent; a stream that stores no parents joins none.
   it("sums the top-level agents of an agent-only trace in both trends", () => {
     for (const id of ["cost-trend", "token-trend"]) {
       const sql = render(id);
@@ -381,8 +379,6 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     }
   });
 
-  // Health first, then what breaks, then what it costs; one-column panels in
-  // pairs, so every row is full.
   it("orders the panels health, errors, cost, two to a row", () => {
     expect(LLM_INSIGHTS_PANELS.map((p) => p.id)).toEqual([
       "traces-over-time",
@@ -395,8 +391,6 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     expect(LLM_INSIGHTS_PANELS.every((p) => p.layout.colSpan === 1)).toBe(true);
   });
 
-  // Traffic and errors in one chart, counted as the KPI strip counts them, so
-  // the bars add up to the Traces tile and the red part to its errored traces.
   it("traces-over-time stacks OK and errored traces, clicked as such", () => {
     const traces = LLM_INSIGHTS_PANELS.find((p) => p.id === "traces-over-time")!;
     expect(traces.type).toBe("stacked-bar");
@@ -436,8 +430,6 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     expect(sql).toMatch(/ORDER BY traces DESC LIMIT 10$/);
   });
 
-  // Latency over time: p95 per model per bucket, a line each (a percentile
-  // of two models does not add up, so never stacked).
   it("latency-trend is each model's p95 per time bucket, not stacked", () => {
     const latency = LLM_INSIGHTS_PANELS.find((p) => p.id === "latency-trend");
     expect(latency?.type).toBe("line");
@@ -452,8 +444,6 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     expect(sql).toContain("approx_percentile_cont(duration, 0.95)");
   });
 
-  // Tokens over time are split by direction, not by model: input and output
-  // stacked, so a bucket's height is its total.
   it("token-trend stacks input and output tokens per bucket", () => {
     const tokens = LLM_INSIGHTS_PANELS.find((p) => p.id === "token-trend")!;
     expect(tokens.type).toBe("stacked-bar");
@@ -464,8 +454,6 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     expect(sql).toContain("THEN gen_ai_usage_output_tokens ELSE 0 END");
   });
 
-  // A table, not bars: the 10 tools with the most failed calls, with what the
-  // table shows for each (calls for the rate, traces, last failure).
   it("failing-tools ranks the 10 tools with the most failed calls", () => {
     const tools = LLM_INSIGHTS_PANELS.find((p) => p.id === "failing-tools")!;
     expect(tools.type).toBe("tool-table");

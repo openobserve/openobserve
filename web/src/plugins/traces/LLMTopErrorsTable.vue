@@ -91,8 +91,6 @@ const loading = ref(false);
 const failed = ref(false);
 let seq = 0;
 
-// Fits a half-width panel at 1280 px: the message takes what the fixed columns leave
-// (`autoWidth`) and the table scrolls once that drops below `minSize` (`flex`).
 const columns: OTableColumnDef[] = [
   {
     id: "message",
