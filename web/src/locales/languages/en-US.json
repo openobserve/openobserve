@@ -11418,6 +11418,7 @@
     "runNowHint": "Asks for a run now instead of waiting for the next one. If a run is already due or in progress, it answers the request instead.",
     "runRequested": "Run requested. Its findings appear here when it finishes.",
     "runFailed": "The run could not be requested: {message}",
+    "runDenied": "You don't have permission to run Alert calibration. Ask an admin for edit access to it.",
     "runNeedsConfig": "Turn alert calibration on in its settings to run it.",
     "refresh": "Refresh",
     "retry": "Retry",
@@ -11878,7 +11879,8 @@
       "notEnabledTitle": "Alert calibration is not running for this organization",
       "notEnabledDescription": "Turn it on in the settings. The first run is due as soon as it is on.",
       "emptyTitle": "No runs in the last {days} days",
-      "emptyDescription": "The dashboard fills in once alert calibration has run."
+      "emptyDescription": "The dashboard fills in once alert calibration has run.",
+      "loadFailedTitle": "Findings couldn't be loaded"
     },
     "lastRun": {
       "succeeded": "The last run succeeded {time}.",

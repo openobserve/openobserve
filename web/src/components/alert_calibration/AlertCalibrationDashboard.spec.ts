@@ -410,7 +410,7 @@ describe("AlertCalibrationDashboard", () => {
     vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, "internal"));
     const wrapper = await mountPage();
     const board = wrapper.find('[data-test="alert-calibration-dashboard-no-board"]');
-    expect(board.text()).toContain("Runs unavailable");
+    expect(board.text()).toContain("Findings couldn't be loaded");
     expect(board.text()).toContain(
       "Alert calibration runs couldn't be loaded. Try again in a moment.",
     );
@@ -869,6 +869,27 @@ describe("AlertCalibrationDashboard dismissals", () => {
         Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } })),
       );
     }
+  });
+
+  it("a_reader_without_access_sees_the_no_access_state_without_retry", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(
+      serverError(403, { code: 403, message: "Unauthorized Access" }),
+    );
+    const wrapper = await mountPage();
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-no-access"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("Runs unavailable");
+    expect(wrapper.text()).not.toContain("Retry");
+    wrapper.unmount();
+  });
+
+  it("a_failed_read_names_the_dashboard_not_the_runs", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, {}));
+    const wrapper = await mountPage();
+    await settle();
+    expect(wrapper.text()).not.toContain("Runs unavailable");
+    expect(wrapper.text()).toContain("Findings couldn't be loaded");
+    wrapper.unmount();
   });
 
   it("the_filter_lives_in_the_url", async () => {

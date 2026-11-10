@@ -168,6 +168,16 @@ describe("AlertCalibrationDigests", () => {
     wrapper.unmount();
   });
 
+  it("a_reader_without_access_sees_no_access_not_a_failure", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(
+      serverError(403, { message: "Unauthorized Access" }),
+    );
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="o2-table-forbidden"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("Runs unavailable");
+    wrapper.unmount();
+  });
+
   it("a failed runs read shows the plain error copy, never the server's words", async () => {
     vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, "internal"));
     const wrapper = await mountPage();

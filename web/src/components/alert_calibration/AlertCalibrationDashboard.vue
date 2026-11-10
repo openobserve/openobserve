@@ -70,11 +70,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <OEmptyState
+        v-else-if="forbidden"
+        size="hero"
+        preset="no-access"
+        :description="t('alertCalibration.readError.forbidden')"
+        data-test="alert-calibration-dashboard-no-access"
+      />
+
+      <OEmptyState
         v-else-if="data.error.value"
         size="hero"
         illustration="broken-panel"
         variant="error"
-        :title="t('alertCalibration.digests.errorTitle')"
+        :title="t('alertCalibration.dashboard.loadFailedTitle')"
         :description="readErrorCopy(t, data.error.value)"
         :action-label="t('alertCalibration.retry')"
         action-icon="refresh"
@@ -385,7 +393,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
-import { readErrorCopy } from "@/services/alert_calibration";
+import { httpStatus, readErrorCopy } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import { useActiveDismissals } from "@/composables/alertCalibration/useDismissals";
@@ -493,6 +501,10 @@ const loading = computed(
     !dismissals.settled.value,
 );
 const latest = computed(() => data.data.value?.latest ?? null);
+/** A 403 is a missing permission, not a failure, so it gets no Retry. */
+const forbidden = computed(
+  () => httpStatus(data.error.value) === 403 || httpStatus(configQuery.error.value) === 403,
+);
 const version = computed(() => latest.value?.schema_version ?? 1);
 /** The list and the records read can reach nodes of different cache freshness, so either one's unknown count makes the board unknown. */
 const countsPending = computed(
