@@ -48,6 +48,8 @@ import {
   skipDetailLabel,
   skipReasonLabel,
   splitMinutes,
+  coverageBadge,
+  SEVERITY_BADGE,
 } from "./format";
 import { evidenceFor, ruleLabelKey, rulesShownFor } from "./rules";
 
@@ -676,5 +678,17 @@ describe("a short-blips noise finding", () => {
       "evidence_noise_mean_time_to_normal_secs",
       "evidence_noise_incident_linkage_ratio",
     ]);
+  });
+});
+
+describe("the colours a run's words take", () => {
+  it("never paints full coverage green when no alert was in scope", () => {
+    expect(coverageBadge(run({ alerts_in_scope: 0 })).tone).toBe("neutral");
+    expect(coverageBadge(run({ alerts_in_scope: 0 })).variant).toBe("default-soft");
+    expect(coverageBadge(run({ alerts_in_scope: 4 })).tone).toBe("success");
+  });
+
+  it("shows High severity in the same orange Incidents uses for High", () => {
+    expect(SEVERITY_BADGE.High).toBe("orange-soft");
   });
 });

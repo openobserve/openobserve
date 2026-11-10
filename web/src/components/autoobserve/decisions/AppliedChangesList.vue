@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="entry.view.state === 'undone'"
         variant="default"
-        size="xs"
+        size="sm"
         :label="t('insight.decisions.applied.undone')"
         data-test="autoobserve-applied-undone"
       />

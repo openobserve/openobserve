@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex min-w-0 flex-wrap items-baseline gap-x-2"
               data-test="alert-calibration-digest-skip"
             >
-              <OBadge variant="default-outline" size="xs" shape="rounded">{{
+              <OBadge variant="default-outline" size="sm" shape="rounded">{{
                 ruleLabel(skip.rule_id)
               }}</OBadge>
               <span class="text-text-body text-xs font-medium">{{
@@ -294,7 +294,7 @@ import {
   type RunRow,
 } from "./digests";
 import {
-  COVERAGE_BADGE,
+  coverageBadge,
   formatMinutes,
   NOT_CHECKED_CAUSES,
   notCheckedCause,
@@ -463,7 +463,7 @@ const partialTitleKey = computed<I18nKey>(() =>
 const stats = computed<StatItem[]>(() => {
   const r = run.value;
   if (!r) return [];
-  const verdict = COVERAGE_BADGE[coverageVerdict(r)];
+  const verdict = coverageBadge(r);
   const scope = visibilityCopy(t, r).alertsInScope;
   const windowMinutes = Math.round((r.window_end - r.window_start) / 60_000_000);
   return [

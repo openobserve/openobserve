@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBadge>
             <OBadge
               v-else
-              variant="error-soft"
+              variant="warning-soft"
               size="sm"
               shape="rounded"
               :count="row.finding_count ?? undefined"
@@ -143,11 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-coverage="{ row }">
             <span class="relative inline-flex">
-              <OBadge
-                :variant="COVERAGE_BADGE[coverageVerdict(row)].variant"
-                size="sm"
-                shape="rounded"
-              >
+              <OBadge :variant="coverageBadge(row).variant" size="sm" shape="rounded">
                 {{ t(COVERAGE_BADGE[coverageVerdict(row)].labelKey) }}
               </OBadge>
               <OTooltip v-if="coverageNotes(t, row).length" side="left" max-width="25rem">
@@ -245,7 +241,7 @@ import {
   visibilityCopy,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, formatMinutes, splitMinutes } from "./format";
+import { COVERAGE_BADGE, coverageBadge, formatMinutes, splitMinutes } from "./format";
 
 type Scope = "all" | "findings" | "gaps";
 
@@ -310,7 +306,7 @@ const stats = computed<StatItem[]>(() => {
       key: "latest",
       label: t("alertCalibration.digests.latestFindings"),
       value: countOrDash(run?.finding_count, locale.value),
-      sub: run ? t(COVERAGE_BADGE[coverageVerdict(run)].labelKey) : undefined,
+      sub: run ? t(coverageBadge(run).labelKey) : undefined,
       icon: "fact-check",
       tone: (run?.finding_count ?? 0) > 0 ? "warning" : "neutral",
     },

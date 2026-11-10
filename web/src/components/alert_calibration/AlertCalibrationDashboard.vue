@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 v-if="group.severity"
                 :variant="SEVERITY_BADGE[group.severity]"
-                size="xs"
+                size="sm"
                 shape="rounded"
               >
                 {{ t(SEVERITY_LABEL[group.severity]) }}
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 v-if="group.pending"
                 variant="warning-soft"
-                size="xs"
+                size="sm"
                 shape="rounded"
                 data-test="alert-calibration-dashboard-group-pending"
               >
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 v-else-if="!RULE_META[group.rule_id].clusterWide"
                 :variant="group.findings.length ? 'default-soft' : 'default-outline'"
-                size="xs"
+                size="sm"
                 shape="rounded"
               >
                 {{
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-focused="isFocused(finding) || undefined"
                   :data-test="`alert-calibration-dashboard-alert-${finding.alert_id}`"
                 >
-                  <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="xs" shape="rounded">
+                  <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="sm" shape="rounded">
                     {{ t(SEVERITY_LABEL[finding.severity]) }}
                   </OBadge>
                   <div class="flex min-w-0 flex-1 basis-56 flex-wrap items-baseline gap-x-2">
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-if="appliedOf(finding)">
                     <OBadge
                       variant="default-soft"
-                      size="xs"
+                      size="sm"
                       shape="rounded"
                       data-test="alert-calibration-dashboard-applied"
                     >
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <OButton
                     v-else-if="changeOf(finding)"
-                    variant="ghost-primary"
+                    variant="outline"
                     size="xs"
                     data-test="alert-calibration-dashboard-review-change"
                     @click="reviewChange(finding)"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="ctasOf(finding).review"
-                    variant="ghost-primary"
+                    variant="outline"
                     size="xs"
                     :loading="reviewing === finding.finding_id"
                     data-test="alert-calibration-dashboard-review-alert"
@@ -340,9 +340,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="finding.alert_id"
-                    variant="ghost-muted"
+                    variant="ghost-primary"
                     size="xs"
-                    icon-left="open-in-new"
                     data-test="alert-calibration-dashboard-open-alert"
                     @click="openAlert(finding)"
                   >
@@ -350,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="ctasOf(finding).logs"
-                    variant="ghost-muted"
+                    variant="ghost-primary"
                     size="xs"
                     data-test="alert-calibration-dashboard-logs"
                     @click="openLogs(finding)"
@@ -361,7 +360,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="canAsk && ctasOf(finding).ai"
                     variant="ghost-primary"
                     size="xs"
-                    icon-left="auto-awesome"
                     data-test="alert-calibration-dashboard-ask-ai"
                     @click="ask(finding)"
                   >
@@ -369,9 +367,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="isDismissable(finding)"
-                    variant="ghost-muted"
+                    variant="ghost-primary"
                     size="xs"
-                    icon-left="visibility-off"
                     data-test="alert-calibration-dashboard-dismiss"
                     @click="openDismiss(finding)"
                   >
@@ -381,9 +378,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ul>
               <div class="border-border-default flex justify-end border-t px-3 py-1.5">
                 <OButton
-                  variant="ghost-muted"
+                  variant="ghost-primary"
                   size="xs"
-                  icon-left="fact-check"
                   data-test="alert-calibration-dashboard-view-evidence"
                   @click="viewEvidence(group.rule_id)"
                 >
@@ -474,7 +470,7 @@ import {
   type RuleId,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
+import { coverageBadge, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
 import { RULE_META, ruleLabelKey, rulesShownFor } from "./rules";
 import { openAlertReview } from "./reviewAlert";
 import { rowCtas, type RowCtas } from "./rowCtas";
@@ -678,7 +674,7 @@ const alertCount = (findings: FindingRecord[]) =>
 const latestStats = computed<StatItem[]>(() => {
   const run = latest.value;
   if (!run) return [];
-  const verdict = COVERAGE_BADGE[coverageVerdict(run)];
+  const verdict = coverageBadge(run);
   const scope = visibilityCopy(t, run).alertsInScope;
   return [
     {

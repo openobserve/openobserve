@@ -238,7 +238,7 @@ describe("ReviewChangeDialog (W5)", () => {
     expect(notice.textContent?.trim()).toBe("This alert changed. Open it to review.");
     expect(notice.dataset.severity).toBe("warning");
     expect(applyButton()?.disabled).toBe(true);
-    expect(q("o-dialog-secondary-btn")?.textContent).toContain("Edit in alert editor");
+    expect(q("o-dialog-neutral-btn")?.textContent).toContain("Edit in alert editor");
   });
 
   it("an_apply_the_server_no_longer_lists_says_the_suggestion_is_gone_and_rereads_the_alert", async () => {
@@ -338,9 +338,16 @@ describe("ReviewChangeDialog (W5)", () => {
     expect(text).toContain("Ask a@x.test, b@x.test, c@x.test and 2 more.");
   });
 
+  it("cancel_sits_beside_apply_and_edit_takes_the_left_slot", async () => {
+    await mountDialog();
+    expect(q("o-dialog-secondary-btn")?.textContent?.trim()).toBe("Cancel");
+    expect(q("o-dialog-neutral-btn")?.textContent?.trim()).toBe("Edit in alert editor");
+    expect(applyButton()?.textContent?.trim()).toBe("Apply");
+  });
+
   it("Edit in alert editor hands the stored change to the editor in the alert's folder", async () => {
     await mountDialog();
-    q("o-dialog-secondary-btn")!.click();
+    q("o-dialog-neutral-btn")!.click();
     await flushPromises();
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -365,7 +372,7 @@ describe("ReviewChangeDialog (W5)", () => {
     );
     expect(notice.dataset.severity).toBe("warning");
     expect(applyButton()).toBeNull();
-    expect(q("o-dialog-secondary-btn")?.textContent).toContain("Edit in alert editor");
+    expect(q("review-change-edit")?.textContent).toContain("Edit in alert editor");
     expect(q("review-change-note")).toBeNull();
   });
 

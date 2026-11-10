@@ -17,9 +17,11 @@ import { format as formatDate } from "date-fns";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import {
   arrayColumn,
+  coverageVerdict,
   type Confidence,
   type CoverageVerdict,
   type DigestRecord,
+  type RunRow,
   type Quality,
   type Severity,
   type Tier,
@@ -197,11 +199,12 @@ export function resourceOptions(t: TranslateFn, record: DigestRecord): ResourceO
   return options;
 }
 
+/** High is orange, as Incidents shows a High priority; red stays for failures and denials. */
 export const SEVERITY_BADGE: Record<
   Severity,
-  "error-soft" | "warning-soft" | "primary-soft" | "default-soft"
+  "orange-soft" | "warning-soft" | "primary-soft" | "default-soft"
 > = {
-  High: "error-soft",
+  High: "orange-soft",
   Medium: "warning-soft",
   Low: "primary-soft",
   Info: "default-soft",
@@ -209,7 +212,7 @@ export const SEVERITY_BADGE: Record<
 
 /** The rule icon's tile takes the severity badge's tone, so the two read as one signal. */
 export const SEVERITY_TILE: Record<Severity, string> = {
-  High: "bg-badge-error-soft-bg text-badge-error-soft-text",
+  High: "bg-badge-orange-soft-bg text-badge-orange-soft-text",
   Medium: "bg-badge-warning-soft-bg text-badge-warning-soft-text",
   Low: "bg-badge-primary-soft-bg text-badge-primary-soft-text",
   Info: "bg-badge-default-soft-bg text-badge-default-soft-text",
@@ -352,14 +355,17 @@ export const notCheckedCopy = (t: TranslateFn, cause: NotCheckedCause) => ({
   next: t(NOT_CHECKED_COPY[cause].next),
 });
 
+type CoverageVariant = "success-soft" | "warning-soft" | "error-soft" | "default-soft";
+type CoverageTone = "success" | "warning" | "error" | "neutral";
+
 export const COVERAGE_BADGE: Record<
   CoverageVerdict,
   {
     labelKey: I18nKey;
     /** The same verdict where a "Coverage" label already names it. */
     shortKey: I18nKey;
-    variant: "success-soft" | "warning-soft" | "error-soft";
-    tone: "success" | "warning" | "error";
+    variant: CoverageVariant;
+    tone: CoverageTone;
   }
 > = {
   full: {
@@ -380,4 +386,15 @@ export const COVERAGE_BADGE: Record<
     variant: "error-soft",
     tone: "error",
   },
+};
+
+/** A run's coverage badge; full coverage of no alert at all is not a healthy state, so it is neutral. */
+export const coverageBadge = (
+  run: Pick<RunRow, "coverage_gap" | "coverage_stream_substrate_empty" | "alerts_in_scope">,
+) => {
+  const verdict = coverageVerdict(run as RunRow);
+  const badge = COVERAGE_BADGE[verdict];
+  return verdict === "full" && run.alerts_in_scope === 0
+    ? { ...badge, variant: "default-soft" as const, tone: "neutral" as const }
+    : badge;
 };
