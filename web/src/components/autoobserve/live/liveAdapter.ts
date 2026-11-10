@@ -189,7 +189,7 @@ const SUGGESTION_KIND: Record<string, { label: I18nKey; look: LookKind; tag?: Ba
     tag: "error-soft",
   },
   coverage_lost: { label: "autoobserveLive.suggestions.kinds.coverage_lost", look: "watching" },
-  alert_not_working: { label: "alertCalibration.rules.notWorking", look: "notify" },
+  alert_not_working: { label: "insight.chip.notWorking", look: "notify" },
   alert_no_destination: {
     label: "autoobserveLive.suggestions.kinds.alert_no_destination",
     look: "notify",

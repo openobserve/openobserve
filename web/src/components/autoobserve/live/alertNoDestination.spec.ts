@@ -104,3 +104,15 @@ describe("alert_no_destination suggestions (C7)", () => {
     expect(request.insight.next).toBe("Choose who gets notified.");
   });
 });
+
+describe("one label for a kind (filter chip and row)", () => {
+  it("alert_not_working's filter chip says what its rows say", () => {
+    const [row] = toSuggestionRows(
+      gt,
+      ZONE,
+      [finding("alert_not_working", { rule_id: "failure", pattern: "syntax" })],
+      NOW_MS,
+    );
+    expect(suggestionKindLabel(gt, "alert_not_working")).toBe(row.kind);
+  });
+});

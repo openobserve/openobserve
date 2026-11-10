@@ -153,7 +153,7 @@ describe("alert_not_working cards (P5b test 27)", () => {
       global: { plugins: [i18n, store, router] },
     });
     const first = rail(ITEMS).requests[0].copy;
-    expect(String(first?.label)).toBe("Alert not working");
+    expect(String(first?.label)).toBe("Not working");
     expect(String(first?.why)).toBe("From the calibration run 2 hours ago");
     expect(first?.tags.map((tag) => [String(tag.label), tag.variant])).toEqual([
       ["Confirmed condition", "default-soft"],
