@@ -582,20 +582,24 @@ const readSchemas = async (
   return { schemas, types };
 };
 
-/** Each row that notifies no one gets the team and destination its service's own alerts use, from one alert read. */
+/** Each row missing a team or destination gets those its service's own alerts use, from one alert read. */
 const readOwnership = async (
   org: string,
   rows: BulkRow[],
 ): Promise<Record<string, Pick<BulkRow, "team" | "notify">>> => {
-  const wanting = rows.filter((r) => r.alertIds?.length && !r.notify?.destinations.length);
+  const wanting = rows.filter(
+    (r) => r.alertIds?.length && (!r.notify?.destinations.length || r.team?.source !== "folder"),
+  );
   const ids = [...new Set(wanting.flatMap((r) => r.alertIds ?? []))];
   const alerts = await loadOwnedAlerts(org, ids);
   const owned: Record<string, Pick<BulkRow, "team" | "notify">> = {};
   for (const row of wanting) {
     const mine = alerts.filter((a) => a.id && row.alertIds!.includes(a.id));
-    const notify = notifyOf(serviceName(row.scope), mine);
-    if (!notify.destinations.length) continue;
+    const found = notifyOf(serviceName(row.scope), mine);
+    const notify = row.notify?.destinations.length ? row.notify : found;
+    // The team follows the alerts' folder even when they notify no one, as the service drawer's review does.
     const team = row.team?.source === "folder" ? row.team : teamOf(serviceName(row.scope), mine);
+    if (!notify.destinations.length && team.source !== "folder") continue;
     owned[row.key] = { team, notify };
   }
   return owned;

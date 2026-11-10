@@ -657,6 +657,22 @@ describe("BulkReviewDrawer — AutoObserve is the destination", () => {
     expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("takes the folder of the service's own alerts even when they notify no one (T2-10)", async () => {
+    api.list.mockResolvedValue({
+      data: {
+        list: [
+          { alert_id: "al-1", folder_id: "f-pay", folder_name: "payments", destinations: [] },
+        ],
+      },
+    });
+    await mountDrawer();
+    await openWith([orphan("a-1", ["al-1"])]);
+    const row = review.reviewRows.value[0];
+    expect(row.folder.id).toBe("f-pay");
+    expect(row.teamName).toBe("payments");
+    expect(row.destinations).toEqual([]);
+  });
+
   it("keeps the block when the service's alerts notify no one either and incidents are off", async () => {
     reach(false, false);
     api.list.mockResolvedValue({
