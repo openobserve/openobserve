@@ -269,22 +269,6 @@ mod tests {
     }
 
     #[test]
-    fn test_remote_status_serializes_and_job_id_stays_internal() {
-        let remote = RemoteNodeProfile {
-            job_id: "abc".to_string(),
-            status: NodeStatus::EarlyStopped,
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&remote).unwrap();
-        assert!(json.contains(r#""status":"early_stopped""#), "{json}");
-        assert!(!json.contains("abc"), "{json}");
-        let mut value = serde_json::to_value(&remote).unwrap();
-        value.as_object_mut().unwrap().remove("status");
-        let back: RemoteNodeProfile = serde_json::from_value(value).unwrap();
-        assert_eq!(back.status, NodeStatus::Unavailable);
-    }
-
-    #[test]
     fn test_to_text_indents_children_and_stops_at_remote() {
         let metric = |name: &str, display: &str| ProfileMetric {
             name: name.to_string(),

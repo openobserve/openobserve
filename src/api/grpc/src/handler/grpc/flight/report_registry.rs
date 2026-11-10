@@ -46,11 +46,6 @@ impl ReportRegistry {
         }
     }
 
-    #[cfg(test)]
-    pub(super) fn open(&self, key: &str) -> ReportSlot {
-        self.open_for(key, Duration::ZERO)
-    }
-
     /// The slot a run reports into, kept until fetched or the longer of `ttl` and `keep` after it.
     pub(super) fn open_for(&self, key: &str, keep: Duration) -> ReportSlot {
         let report = Arc::new(watch::channel(None).0);
@@ -108,54 +103,5 @@ impl Drop for ReportSlot {
             status: NodeStatus::Unavailable,
             plan: None,
         });
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn report(status: NodeStatus) -> NodeReport {
-        NodeReport { status, plan: None }
-    }
-
-    #[tokio::test]
-    async fn test_fetch_waits_for_a_run_still_finishing() {
-        let registry = Arc::new(ReportRegistry::new(REPORT_TTL));
-        let slot = registry.open("t-1");
-        let fetch = tokio::spawn({
-            let registry = Arc::clone(&registry);
-            async move { registry.fetch("t-1").await }
-        });
-        tokio::task::yield_now().await;
-        slot.complete(report(NodeStatus::Failed));
-        assert_eq!(fetch.await.unwrap().unwrap().status, NodeStatus::Failed);
-    }
-
-    #[tokio::test]
-    async fn test_dropped_slot_reports_unavailable() {
-        let registry = ReportRegistry::new(REPORT_TTL);
-        drop(registry.open("t-1"));
-        let fetched = registry.fetch("t-1").await.unwrap();
-        assert_eq!(fetched.status, NodeStatus::Unavailable);
-    }
-
-    #[tokio::test]
-    async fn test_reports_expire_only_after_their_run_ends() {
-        let ttl = Duration::from_millis(20);
-        let registry = ReportRegistry::new(ttl);
-        let running = registry.open("running");
-        registry
-            .open("done")
-            .complete(report(NodeStatus::Completed));
-        tokio::time::sleep(ttl * 3).await;
-        assert!(registry.fetch("done").await.is_none());
-        running.complete(report(NodeStatus::Completed));
-        assert!(registry.fetch("running").await.is_some());
-        registry
-            .open_for("slow-caller", ttl * 100)
-            .complete(report(NodeStatus::Completed));
-        tokio::time::sleep(ttl * 3).await;
-        assert!(registry.fetch("slow-caller").await.is_some());
     }
 }

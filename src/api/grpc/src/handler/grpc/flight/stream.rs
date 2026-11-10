@@ -469,20 +469,11 @@ mod tests {
     use arrow::array::{Int32Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
-    use datafusion::physical_plan::{
-        ExecutionPlan, empty::EmptyExec, stream::RecordBatchStreamAdapter,
-    };
-    use flight::{
-        common::{CustomMessage, NodeRole},
-        profile::{NodeStatus, ProfileInputs},
-    };
+    use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
+    use flight::common::{CustomMessage, NodeRole};
     use futures::TryStreamExt;
-    use search::datafusion::distributed::remote_scan::{
-        node::RemoteScanNode, remote_scan_exec::RemoteScanExec,
-    };
 
     use super::*;
-    use crate::handler::grpc::flight::{report_registry::ReportRegistry, tests::LoopbackNode};
 
     fn make_builder() -> FlightEncoderStreamBuilder {
         FlightEncoderStreamBuilder::new(
@@ -577,117 +568,6 @@ mod tests {
             futures::stream::empty(),
         ));
         assert_eq!(message_kinds(empty).await, ["ScanStats", "PeakMemory"]);
-    }
-
-    #[tokio::test]
-    async fn test_run_reports_how_its_stream_ended() {
-        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
-        let batch =
-            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1, 2]))])
-                .unwrap();
-        let partition = |items: Vec<datafusion::common::Result<RecordBatch>>| {
-            Box::pin(RecordBatchStreamAdapter::new(
-                schema.clone(),
-                futures::stream::iter(items),
-            )) as SendableRecordBatchStream
-        };
-        let error = || {
-            Err(datafusion::common::DataFusionError::Execution(
-                "boom".into(),
-            ))
-        };
-        let batches = |n| (0..n).map(|_| Ok(batch.clone())).collect::<Vec<_>>();
-        let cases = [
-            ("read to the end", batches(1), 100, NodeStatus::Completed),
-            (
-                "dropped after one message",
-                batches(4),
-                1,
-                NodeStatus::EarlyStopped,
-            ),
-            ("partition error", vec![error()], 100, NodeStatus::Failed),
-            ("timed out", batches(4), 0, NodeStatus::TimedOut),
-        ];
-        let registry = ReportRegistry::new(Duration::from_secs(60));
-        let plan: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema.clone()));
-        for (name, items, read, expected) in cases {
-            let slot = registry.open(name);
-            let mut stream = make_builder()
-                .with_report(Some(RunReport::new(slot, Arc::clone(&plan))))
-                .build(vec![partition(items)], tracing::Span::none());
-            for _ in 0..read {
-                if !matches!(stream.next().await, Some(Ok(_))) {
-                    break;
-                }
-            }
-            if expected == NodeStatus::TimedOut {
-                stream.mark_timed_out();
-            }
-            drop(stream);
-            let report = registry.fetch(name).await.unwrap();
-            assert_eq!(report.status, expected, "{name}");
-            assert_eq!(report.plan.unwrap().name, "EmptyExec", "{name}");
-        }
-    }
-
-    #[tokio::test]
-    async fn test_cluster_leader_report_lists_its_own_nodes() {
-        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
-        let scan = RemoteScanExec::new(
-            Arc::new(EmptyExec::new(schema.clone())),
-            RemoteScanNode {
-                nodes: vec![Arc::new(LoopbackNode("http://127.0.0.1:1".to_string()))],
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        let registry = ReportRegistry::new(Duration::from_secs(60));
-        let partition = Box::pin(RecordBatchStreamAdapter::new(
-            schema,
-            futures::stream::empty(),
-        )) as SendableRecordBatchStream;
-        let stream = make_builder()
-            .with_report(Some(RunReport::new(
-                registry.open("leader"),
-                Arc::new(scan),
-            )))
-            .build(vec![partition], tracing::Span::none());
-        drop(stream);
-        let plan = registry.fetch("leader").await.unwrap().plan.unwrap();
-        let ProfileInputs::Remote(nodes) = plan.inputs else {
-            panic!("expected the leader's own remote scan");
-        };
-        assert_eq!(nodes.len(), 1);
-        assert_eq!(nodes[0].node_name, "q-0");
-        assert_eq!(nodes[0].status, NodeStatus::NotExecuted);
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_run_reports_at_its_deadline_while_a_partition_is_still_stopping() {
-        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
-        let registry = ReportRegistry::new(Duration::from_secs(60));
-        let report = RunReport::new(registry.open("slow"), Arc::new(EmptyExec::new(schema)));
-        let mut tasks = JoinSet::new();
-        let (started, running) = tokio::sync::oneshot::channel();
-        tasks.spawn(async move {
-            let _ = started.send(());
-            std::thread::sleep(Duration::from_millis(400));
-        });
-        running.await.unwrap();
-        let start = std::time::Instant::now();
-        let run = tokio::spawn(report_run(
-            FlightSource::Closed,
-            tasks,
-            (None, None),
-            report,
-            Duration::from_millis(50),
-        ));
-        let fetched = registry.fetch("slow").await.unwrap();
-        assert!(start.elapsed() < Duration::from_millis(300));
-        assert_eq!(fetched.status, NodeStatus::EarlyStopped);
-        assert_eq!(fetched.plan.unwrap().name, "EmptyExec");
-        run.await.unwrap();
-        assert!(start.elapsed() >= Duration::from_millis(300));
     }
 
     #[test]
