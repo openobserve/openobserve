@@ -18,6 +18,7 @@
 pub mod decisions;
 pub mod incidents;
 pub mod review;
+pub mod slack_feed;
 
 use std::{
     collections::{BTreeSet, HashMap},

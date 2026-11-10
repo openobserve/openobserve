@@ -2913,6 +2913,22 @@ pub fn slack_routes() -> Router {
         .route("/{org_id}/slack/installations/{installation_id}/oncall-unlinked", get(set::oncall_unlinked))
         .route("/{org_id}/slack/installations/{installation_id}/oncall-unlinked/remind", post(set::remind_oncall_unlinked))
         .route("/{org_id}/slack/installations/{installation_id}/org-access", get(inst::get_org_access).put(inst::put_org_access))
+        .merge(slack_insights_routes())
+}
+
+// Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
+#[cfg(feature = "enterprise")]
+#[rustfmt::skip]
+fn slack_insights_routes() -> Router {
+    use slack::insights as ins;
+    Router::new()
+        .route("/{org_id}/slack/insights-settings", get(ins::get_insights_settings).put(ins::put_insights_settings))
+}
+
+// The OSS build has no insights feed, so the route is absent, not a stub.
+#[cfg(not(feature = "enterprise"))]
+fn slack_insights_routes() -> Router {
+    Router::new()
 }
 
 /// Create other service routes (AWS, GCP, RUM)
@@ -3331,6 +3347,22 @@ mod tests {
             .unwrap();
         let response = slack_routes().oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn the_insights_settings_route_is_absent_without_enterprise() {
+        for method in [Method::GET, Method::PUT] {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri("/default/slack/insights-settings")
+                .header("user_id", "root@example.com")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{method}");
+        }
     }
 
     /// Requests whose body or query axum's extractors refuse, one per extractor shape.

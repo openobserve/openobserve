@@ -363,6 +363,33 @@ pub(crate) fn decision_source(delegated: Option<&DelegatedCaller>, headers: &Hea
     }
 }
 
+/// Every active suggestion decision `user_id` can read, for the Slack insights feed's S5 updates.
+pub(super) async fn feed_decisions(
+    org_id: &str,
+    user_id: &str,
+    now: i64,
+) -> Result<Vec<o2_enterprise::enterprise::autoobserve::decisions::DecisionView>, DecisionError> {
+    use o2_enterprise::enterprise::autoobserve::decisions::{Family, ListQuery};
+    let access = LiveAccess { org_id, user_id };
+    let deps = Deps::live().map_err(DecisionError::from)?;
+    let ctx = context(&deps, &access, Source::Api);
+    let mut out = Vec::new();
+    loop {
+        let query = ListQuery {
+            state: Some("active".into()),
+            family: Some(Family::Suggestion),
+            limit: None,
+            offset: Some(out.len()),
+        };
+        let page = decisions::list(&ctx, &query, now).await?;
+        let got = page.decisions.len();
+        out.extend(page.decisions);
+        if got == 0 || out.len() >= page.total {
+            return Ok(out);
+        }
+    }
+}
+
 fn deployment_disabled() -> Option<Response> {
     (!decisions_enabled()).then(|| MetaHttpResponse::not_found(DISABLED_MESSAGE))
 }

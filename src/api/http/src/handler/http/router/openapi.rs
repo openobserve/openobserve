@@ -1148,6 +1148,8 @@ pub struct ApiDoc;
     openobserve_api_management::request::security::sigma::compile,
     openobserve_api_management::request::security::sigma::get_mitre_coverage,
     openobserve_api_management::request::security::sigma::get_detection_evidence,
+    openobserve_api_management::request::slack::insights::get_insights_settings,
+    openobserve_api_management::request::slack::insights::put_insights_settings,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -2344,6 +2346,13 @@ mod tests {
             .iter()
             .map(|(m, p)| (m.to_string(), p.to_string()))
             .collect();
+        #[cfg(feature = "enterprise")]
+        want.extend(["get", "put"].map(|m| {
+            (
+                m.to_string(),
+                "/api/{org_id}/slack/insights-settings".to_string(),
+            )
+        }));
         want.sort();
         assert_eq!(documented, want);
     }

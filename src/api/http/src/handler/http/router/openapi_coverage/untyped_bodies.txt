@@ -102,6 +102,8 @@ all POST /api/{org_id}/slack/connectivity | the handler returns an o2-enterprise
 all POST /api/{org_id}/slack/install/exchange | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
 all POST /api/{org_id}/slack/install/start | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
 all GET /api/{org_id}/slack/installations | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
+ent GET /api/{org_id}/slack/insights-settings | the handler returns the o2-enterprise SettingsView, which derives no schema
+ent PUT /api/{org_id}/slack/insights-settings | the handler returns the o2-enterprise SettingsView, which derives no schema
 all POST /api/{org_id}/slack/installations | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
 all DELETE /api/{org_id}/slack/installations/{installation_id} | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
 all GET /api/{org_id}/slack/installations/{installation_id}/channel-defaults | the handler returns an o2-enterprise slack type; OSS publishes this op too and cannot name it
