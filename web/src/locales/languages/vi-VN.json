@@ -29640,7 +29640,7 @@
       "waitingForOk": "Đang chờ bạn xác nhận",
       "proposedFix": "Bản sửa đề xuất",
       "unfoldTab": "Diễn biến sự việc",
-      "seeEvidence": "Xem bằng chứng ({count}) →"
+      "seeEvidence": "Xem bằng chứng →"
     },
     "unfold": {
       "hint": "Đọc từ trái sang phải: những gì đã thay đổi, các tín hiệu mà nó kích hoạt, rồi những gì đã đến với nhóm của bạn. Chọn một thẻ để xem các lần kích hoạt của thẻ đó.",

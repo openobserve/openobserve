@@ -29640,7 +29640,7 @@
       "waitingForOk": "Esperando tu confirmación",
       "proposedFix": "Corrección propuesta",
       "unfoldTab": "Cómo se desarrolló",
-      "seeEvidence": "Ver la evidencia ({count}) →"
+      "seeEvidence": "Ver la evidencia →"
     },
     "unfold": {
       "hint": "Lee de izquierda a derecha: qué cambió, las señales que desencadenó y, después, lo que llegó a tu equipo. Selecciona una tarjeta para ver sus activaciones.",

@@ -29640,7 +29640,7 @@
       "waitingForOk": "Onayınız bekleniyor",
       "proposedFix": "Önerilen düzeltme",
       "unfoldTab": "Nasıl geliştiği",
-      "seeEvidence": "Kanıtları görün ({count}) →"
+      "seeEvidence": "Kanıtları görün →"
     },
     "unfold": {
       "hint": "Soldan sağa okuyun: neyin değiştiği, tetiklediği sinyaller ve ardından ekibinize ulaşanlar. Tetiklenmeleri için bir kart seçin.",

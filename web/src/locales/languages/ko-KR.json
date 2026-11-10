@@ -29640,7 +29640,7 @@
       "waitingForOk": "승인 대기 중",
       "proposedFix": "제안된 수정",
       "unfoldTab": "전개 과정",
-      "seeEvidence": "증거 보기 ({count}) →"
+      "seeEvidence": "증거 보기 →"
     },
     "unfold": {
       "hint": "왼쪽에서 오른쪽으로 읽으세요: 무엇이 변경되었는지, 그것이 촉발한 신호, 그다음 팀에 도달한 내용입니다. 카드를 선택하면 해당 발생 내역을 볼 수 있습니다.",

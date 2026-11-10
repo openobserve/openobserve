@@ -29640,7 +29640,7 @@
       "waitingForOk": "Warten auf Ihre Freigabe",
       "proposedFix": "Vorgeschlagene Behebung",
       "unfoldTab": "Wie es sich entfaltet hat",
-      "seeEvidence": "Belege ansehen ({count}) →"
+      "seeEvidence": "Belege ansehen →"
     },
     "unfold": {
       "hint": "Lesen Sie von links nach rechts: was sich geändert hat, die dadurch ausgelösten Signale und schließlich, was Ihr Team erreicht hat. Wählen Sie eine Karte für ihre Auslösungen.",

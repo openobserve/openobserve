@@ -29635,7 +29635,7 @@
       "waitingForOk": "等待您的確認",
       "proposedFix": "建議修正",
       "unfoldTab": "事件發展過程",
-      "seeEvidence": "查看證據（{count}）→"
+      "seeEvidence": "查看證據→"
     },
     "unfold": {
       "hint": "由左至右閱讀：什麼發生了變化、它引發的訊號，然後是什麼傳達到您的團隊。選取卡片以查看其觸發記錄。",
