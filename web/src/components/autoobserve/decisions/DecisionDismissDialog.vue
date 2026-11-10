@@ -124,10 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </p>
           <p
             v-else-if="locked"
-            class="text-text-secondary flex items-start gap-1 text-sm"
+            class="text-status-error-text flex items-start gap-1 text-sm"
+            data-severity="error"
             data-test="decision-dismiss-locked"
           >
-            <OIcon name="lock" size="xs" class="text-icon-locked mt-0.5" />
+            <OIcon name="lock" size="xs" class="mt-0.5" />
             <span>{{ locked.message }}</span>
           </p>
           <p

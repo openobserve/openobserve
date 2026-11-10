@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="meta"
           as="p"
           class="col-start-1 row-start-1"
-          :class="{ invisible: !!writeNotice }"
-          :aria-hidden="writeNotice ? 'true' : undefined"
+          :class="{ invisible: !!writeNotice || isLocked }"
+          :aria-hidden="writeNotice || isLocked ? 'true' : undefined"
           data-test="review-change-note"
           >{{ t("insight.decisions.apply.note") }}</OText
         >
@@ -257,6 +257,11 @@ const readNotice = computed<{ variant: Variant; text: I18nText } | null>(() => {
   return null;
 });
 
+/** A refused reader is never promised an undoable apply. */
+const isLocked = computed(
+  () => !!preview.data.value?.locked || !!refusalOf(preview.error.value),
+);
+
 const applicable = computed(
   () =>
     !!preview.data.value?.change &&
@@ -271,8 +276,12 @@ const writeNoticeOf = (error: unknown): { variant: Variant; text: I18nText } => 
     ?.response;
   if (response?.status === 409 && response.data?.error === "alert_changed")
     return { variant: "warning", text: t("insight.decisions.apply.changed") };
+  if (isItemGone(error)) return { variant: "warning", text: t("insight.decisions.apply.gone") };
   return decisions.value.writeError(error);
 };
+
+const statusOf = (error: unknown) =>
+  (error as { response?: { status?: number } } | null)?.response?.status;
 
 async function apply() {
   const current = preview.data.value;
@@ -301,6 +310,8 @@ async function apply() {
     emit("update:open", false);
   } catch (error) {
     writeNotice.value = writeNoticeOf(error);
+    // A conflict or a gone finding means the alert moved on, so the values shown are re-read.
+    if (isItemGone(error) || statusOf(error) === 409) void preview.refetch();
   } finally {
     applying.value = false;
   }

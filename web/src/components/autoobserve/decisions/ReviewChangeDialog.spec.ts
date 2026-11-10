@@ -225,6 +225,23 @@ describe("ReviewChangeDialog (W5)", () => {
     expect(q("o-dialog-secondary-btn")?.textContent).toContain("Edit in alert editor");
   });
 
+  it("an_apply_the_server_no_longer_lists_says_the_suggestion_is_gone_and_rereads_the_alert", async () => {
+    api.decide.mockRejectedValue(
+      httpError(404, { code: 404, error: "not_found", message: "This item is no longer listed." }),
+    );
+    await mountDialog();
+    const reads = api.preview.mock.calls.length;
+    applyButton()!.click();
+    await flushPromises();
+    const notice = q("review-change-notice")!;
+    expect(notice.textContent?.trim()).toBe(
+      "This suggestion is no longer available. Open the alert to review it.",
+    );
+    expect(notice.dataset.severity).toBe("warning");
+    expect(applyButton()?.disabled).toBe(true);
+    expect(api.preview.mock.calls.length).toBeGreaterThan(reads);
+  });
+
   it("a write failure takes the note's place below the change, so nothing above it moves", async () => {
     api.decide.mockRejectedValue(httpError(409, { error: "alert_changed", message: "changed" }));
     await mountDialog();
@@ -278,6 +295,7 @@ describe("ReviewChangeDialog (W5)", () => {
     await mountDialog();
     expect(q("review-change-notice")?.textContent).toContain("folder infra");
     expect(applyButton()?.disabled).toBe(true);
+    expect(q("review-change-note")?.classList.contains("invisible")).toBe(true);
   });
 
   it("Edit in alert editor hands the stored change to the editor in the alert's folder", async () => {

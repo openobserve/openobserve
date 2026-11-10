@@ -353,6 +353,7 @@ describe("DecisionDismissDialog", () => {
       fixture.preview_locked.locked.message,
     );
     expect(byTest("decision-dismiss-locked")?.querySelector("[data-test], svg, span")).toBeTruthy();
+    expect(byTest("decision-dismiss-locked")?.getAttribute("data-severity")).toBe("error");
     expect(submitButton().disabled).toBe(true);
     await chooseReason("not_needed");
     await submit();
