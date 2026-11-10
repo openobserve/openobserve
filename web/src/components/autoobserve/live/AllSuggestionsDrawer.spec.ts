@@ -500,6 +500,37 @@ describe("AllSuggestionsDrawer: Slack deep links (C4)", () => {
     expect(wrapper.text()).not.toContain("This suggestion is no longer open.");
   });
 
+  it("scrolls the linked row into view even when the drawer body mounts after the data (T1-N3)", async () => {
+    serve(ids(60));
+    const scroll = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    // The real drawer mounts its body a few frames after it opens, behind its open animation.
+    const LateBodyStub = {
+      props: ["open"],
+      data: () => ({ ready: false }),
+      mounted(this: { ready: boolean }) {
+        setTimeout(() => (this.ready = true), 60);
+      },
+      template: "<div><slot name='header-left' /><slot v-if='ready' /></div>",
+    };
+    try {
+      mount(AllSuggestionsDrawer, {
+        props: { open: true, focusId: "s30" },
+        attachTo: document.body,
+        global: { plugins: [i18n, store], stubs: { ODrawer: LateBodyStub } },
+      });
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 400));
+      await flushPromises();
+      const row = document.querySelector('[data-test="autoobserve2-suggestions-row-s30"]');
+      expect(row).not.toBeNull();
+      expect(scroll.mock.contexts).toContain(row);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it("says a linked suggestion is no longer open, on page 1, without an error", async () => {
     serve(ids(3));
     const wrapper = mountWith({ focusId: "gone" });
@@ -522,6 +553,37 @@ describe("AllSuggestionsDrawer: Slack deep links (C4)", () => {
     expect(chip.text()).toContain("Not watched");
     chip.vm.$emit("remove");
     expect(wrapper.emitted("update:kind")).toEqual([[null]]);
+  });
+
+  it("says a kind has nothing open and offers every open suggestion instead (T1-N4)", async () => {
+    api.mockImplementation(async (_org, params) => {
+      const all = params.kind === "coverage_lost" ? [] : ids(26);
+      return {
+        data: {
+          suggestions: all.slice(0, 25).map(suggestion),
+          total: all.length,
+          limit: 25,
+          offset: 0,
+        },
+      } as never;
+    });
+    const wrapper = mountWith({ kind: "coverage_lost" });
+    await flushPromises();
+    const empty = wrapper.get('[data-test="autoobserve2-suggestions-drawer-empty"]');
+    expect(empty.text()).toContain("No open suggestions of the kind Coverage lost");
+    expect(empty.text()).toContain("26 other suggestions are open.");
+    expect(empty.text()).not.toContain("No suggestions right now");
+    await empty.get("button").trigger("click");
+    expect(wrapper.emitted("update:kind")).toEqual([[null]]);
+  });
+
+  it("keeps the plain empty state when nothing at all is open, filter or not", async () => {
+    serve([]);
+    const wrapper = mountWith({ kind: "coverage_lost" });
+    await flushPromises();
+    expect(wrapper.get('[data-test="autoobserve2-suggestions-drawer-empty"]').text()).toContain(
+      "No suggestions right now",
+    );
   });
 
   it("ignores a kind it doesn't know rather than showing an empty list", async () => {

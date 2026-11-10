@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="!card && canAsk"
           variant="ghost-primary"
-          size="sm"
+          :size="actionSize"
           icon-left="auto-awesome"
           :data-test="`insight-block-${parts.id}-ask-ai`"
           @click.stop="ask"
@@ -192,8 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-for="action in parts.secondary"
           :key="action.key"
-          variant="outline"
-          size="sm"
+          variant="ghost-primary"
+          size="xs"
           :data-test="`insight-block-${parts.id}-secondary-${action.key}`"
           @click.stop="emit('secondary', action)"
         >
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="!card && parts.dismissable"
           variant="ghost-muted"
-          size="sm"
+          :size="actionSize"
           :data-test="`insight-block-${parts.id}-dismiss`"
           @click.stop="emit('dismiss')"
         >
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="lock" size="xs" class="mt-0.5 shrink-0" />{{ parts.cta.locked }}
         </OText>
         <OText
-          v-else-if="!card && parts.note"
+          v-else-if="!card && !hideCta && parts.note"
           variant="meta"
           as="span"
           :data-test="`insight-block-${parts.id}-note`"
@@ -279,6 +279,8 @@ const askAi = inject(ASK_AI_KEY, null);
 const detailsId = `insight-details-${useId()}`;
 const open = ref(false);
 const card = computed(() => props.variant === "card");
+// Under a table row that shows the CTA itself, the actions take the row's size.
+const actionSize = computed(() => (props.hideCta ? "xs" : "sm"));
 
 const detailWhy = computed(() =>
   card.value ? props.parts.whyDetail : (props.parts.whyDetail ?? props.parts.why),

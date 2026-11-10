@@ -30803,6 +30803,8 @@
       "drawerLine": "Ranked by what matters most first. Open a row for what I found.",
       "focusGone": "This suggestion is no longer open.",
       "clearKind": "Show all suggestions",
+      "kindEmptyTitle": "No open suggestions of the kind {kind}",
+      "kindEmptyDesc": "{count} other suggestion is open. | {count} other suggestions are open.",
       "columns": {
         "suggestion": "Suggestion",
         "where": "Where",
