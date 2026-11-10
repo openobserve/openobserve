@@ -383,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-state="{ row }">
             <OTag
               v-if="row.status"
-              :variant="row.status.state === 'gap' ? 'warning-soft' : 'success-soft'"
+              :variant="row.status.state === 'gap' ? 'amber-soft' : 'success-soft'"
               size="sm"
               :label="row.status.label"
               :data-test="`autoobserve-coverage-state-${row.service}`"
@@ -598,13 +598,13 @@ const FILL_LABEL: Record<CoverageFill, I18nKey> = {
 const SEGMENT_CLASS: Record<CellState, string> = {
   watched: "bg-icon-chip-success-text",
   learning: "bg-status-neutral-text",
-  gap: "bg-icon-chip-warning-text",
+  gap: "bg-badge-amber-soft-text",
   na: "",
 };
 const SWATCH: Record<HexClass, string> = {
   watched: "bg-badge-success-soft-text/15 border border-badge-success-soft-text/60",
   learning: "bg-badge-default-soft-bg border border-dashed border-status-neutral-text",
-  gap: "bg-icon-chip-warning-text",
+  gap: "bg-badge-amber-soft-text",
   none: "bg-status-neutral-text",
   s1: "bg-map-seq-1",
   s2: "bg-map-seq-2",
@@ -712,7 +712,7 @@ const watchedPct = computed(() =>
 const split = computed(() => [
   { cls: "bg-badge-success-soft-text", count: totals.value.fullyWatched },
   { cls: "bg-status-neutral-text/60", count: totals.value.learning },
-  { cls: "bg-icon-chip-warning-text", count: totals.value.gaps },
+  { cls: "bg-badge-amber-soft-text", count: totals.value.gaps },
 ]);
 
 const summaryText = computed(() => {

@@ -444,8 +444,8 @@ export const liveCellWord = (
 
 export const LIVE_DOT: Record<LiveCellLook, string> = {
   covered: "bg-badge-success-soft-text",
-  missing: "border border-icon-chip-warning-text",
-  problem: "bg-icon-chip-warning-text",
+  missing: "border border-badge-amber-soft-text",
+  problem: "bg-badge-amber-soft-text",
   added: "bg-border-strong",
 };
 

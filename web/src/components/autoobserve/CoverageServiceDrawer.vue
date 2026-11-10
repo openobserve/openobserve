@@ -494,12 +494,12 @@ const RANGE_MS: Record<ChartRange, number> = {
 const STATE_VARIANT: Record<ServiceState, BadgeVariant> = {
   watched: "success-soft",
   learning: "blue-soft",
-  gap: "warning-soft",
+  gap: "amber-soft",
 };
 const STATE_FILL: Record<ServiceState, string> = {
   watched: "fill-badge-success-soft-text",
   learning: "fill-status-info-text",
-  gap: "fill-icon-chip-warning-text",
+  gap: "fill-badge-amber-soft-text",
 };
 const CELL_LABEL: Record<CellState, I18nKey> = {
   watched: "autoobserve.coverage.watched",
@@ -514,7 +514,7 @@ const CELL_FILL: Record<CellState, string> = {
 const DOT: Record<CellState, string> = {
   watched: "bg-badge-success-soft-text",
   learning: "bg-status-info-text",
-  gap: "bg-icon-chip-warning-text",
+  gap: "bg-badge-amber-soft-text",
   na: "border border-border-strong",
 };
 
