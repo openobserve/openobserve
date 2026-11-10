@@ -6619,6 +6619,7 @@ mod tests {
         #[tokio::test]
         async fn a_routing_failure_fails_the_act_and_the_replay_pages_once() {
             let _db = crate::alerts::rca_runs::tests::db().await;
+            crate::alerts::rca_runs::tests::rca_off();
             let org = new_org();
             let pager = Pager::refusing(true, false);
             let f = finding(&org, ONSET);
@@ -6656,6 +6657,7 @@ mod tests {
         #[tokio::test]
         async fn a_replay_after_the_link_finishes_the_page_and_the_analysis() {
             let _db = crate::alerts::rca_runs::tests::db().await;
+            crate::alerts::rca_runs::tests::rca_off();
             let (org, pager) = (new_org(), Pager::default());
             let f = finding(&org, ONSET);
             // The state a process exit right after the link commit leaves behind.
@@ -6707,6 +6709,7 @@ mod tests {
         #[tokio::test]
         async fn a_node_that_loses_its_lease_mid_route_stops_and_the_next_holder_pages_once() {
             let _db = crate::alerts::rca_runs::tests::db().await;
+            crate::alerts::rca_runs::tests::rca_off();
             let (org, pager) = (new_org(), Pager::stalling());
             let f = finding(&org, ONSET);
             let cluster = Arc::default();
@@ -6870,6 +6873,7 @@ mod tests {
         #[tokio::test]
         async fn a_finding_incident_with_analysis_off_says_why() {
             let _db = crate::alerts::rca_runs::tests::db().await;
+            crate::alerts::rca_runs::tests::rca_off();
             let (org, pager) = (new_org(), Pager::default());
             let id = open(&finding(&org, ONSET), &pager).await.unwrap();
             let row = infra::table::alert_incidents::get_rw(&org, &id)
