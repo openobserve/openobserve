@@ -269,8 +269,8 @@ describe("insightCopy: chip colour and words (test 6)", () => {
   });
 
   it("is amber for a gap and neutral for information", () => {
-    expect(parts(gap("coverage_gap")).chip.variant).toBe("warning-soft");
-    expect(parts(gap("no_absence_check")).chip.variant).toBe("warning-soft");
+    expect(parts(gap("coverage_gap")).chip.variant).toBe("amber-soft");
+    expect(parts(gap("no_absence_check")).chip.variant).toBe("amber-soft");
     expect(parts(gap("discovery_unusable", { good: 1, active: 4 })).chip.variant).toBe(
       "default-soft",
     );

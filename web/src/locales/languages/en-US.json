@@ -34259,6 +34259,7 @@
       "whyNever": "{failed} of {total} run failed since {time}, so it cannot fire. | {failed} of {total} runs failed since {time}, so it cannot fire.",
       "whyCount": "{failed} of {total} run failed in the last calibration window. | {failed} of {total} runs failed in the last calibration window.",
       "whyEmptyScope": "No rows matched its filters in the last {window}, so it cannot fire.",
+      "whyNoDestination": "It fired {count} time in the last calibration window, and no one was notified. | It fired {count} times in the last calibration window, and no one was notified.",
       "nextNoDestination": "Choose who gets notified.",
       "errorType": {
         "stream_missing": "stream-not-found errors",

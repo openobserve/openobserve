@@ -256,7 +256,7 @@ const badge = computed<{ icon: IconName; label: I18nText; tone: string }>(() => 
       label: props.cell.engine
         ? liveCellWord(t, props.cell.engine.stateKey)
         : t("autoobserve.coverage.badgeNotWatched"),
-      tone: "text-status-warning-text",
+      tone: "text-badge-amber-soft-text",
     };
   if (props.cell.state === "learning")
     return {

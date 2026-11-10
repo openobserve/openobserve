@@ -156,15 +156,15 @@ const HOUR_US = 3_600_000_000;
 
 const TONE_VARIANT: Record<InsightTone, BadgeVariant> = {
   failure: "error-soft",
-  gap: "warning-soft",
+  gap: "amber-soft",
   info: "default-soft",
 };
 
-// An alert or monitor that cannot fire or tells no one is a failure; a missing check is a gap.
+// An alert or monitor that cannot fire is a failure; one that tells no one, or a missing check, is a gap.
 const KIND_TONE: Record<string, InsightTone> = {
   alert_not_working: "failure",
-  alert_no_destination: "failure",
-  silent_coverage: "failure",
+  alert_no_destination: "gap",
+  silent_coverage: "gap",
   blind_guardrail: "failure",
   coverage_gap: "gap",
   no_absence_check: "gap",
@@ -357,6 +357,13 @@ const alertWhy = (t: TranslateFn, zone: InsightZone, item: AutoObserveSuggestion
   return t("insight.alert.whyCount", counts, total);
 };
 
+const noDestinationWhy = (t: TranslateFn, zone: InsightZone, item: AutoObserveSuggestion) => {
+  const firings = num(item.evidence.firings);
+  return firings && firings > 0
+    ? t("insight.alert.whyNoDestination", { count: countText(firings, zone.locale) }, firings)
+    : null;
+};
+
 const alertNext = (t: TranslateFn, item: AutoObserveSuggestion): I18nText | null =>
   item.advice && Object.hasOwn(ADVICE_LABEL, item.advice) ? t(ADVICE_LABEL[item.advice]) : null;
 
@@ -534,22 +541,23 @@ const notWorkingParts = (
   const logs = stream && review?.key !== `logs-${stream}` ? logsCta(t, item, stream, nowMs) : null;
   const calibration = calibrationCta(t, item);
   const silent = item.kind === NO_DESTINATION;
+  const tone = KIND_TONE[item.kind] ?? "failure";
   return {
     id: item.id,
     chip: {
       label: t(silent ? "insight.kind.chip.notifiesNoOne" : "insight.chip.notWorking"),
-      variant: TONE_VARIANT.failure,
-      tone: "failure",
+      variant: TONE_VARIANT[tone],
+      tone,
     },
     headline: today.headline,
-    why: silent ? null : alertWhy(t, zone, item),
+    why: silent ? noDestinationWhy(t, zone, item) : alertWhy(t, zone, item),
     whyDetail: null,
     next: silent ? t("insight.alert.nextNoDestination") : alertNext(t, item),
     cta,
     secondary: [change ? review : null, logs, calibration].filter(
       (c): c is InsightCta => c !== null,
     ),
-    note: cta?.note ?? null,
+    note: silent && cta === review ? t("insight.note.chooseWho") : (cta?.note ?? null),
     facts: today.tags,
     meta: today.why,
     dismissable: dismissableOf(item),

@@ -110,13 +110,13 @@ describe("toSuggestionRows (the all-suggestions drawer)", () => {
     expect(rows[0]).toMatchObject({
       where: "prod-eu / billing",
       kind: "Not watched",
-      kindVariant: "warning-soft",
+      kindVariant: "amber-soft",
       severity: { label: "High", variant: "warning-soft" },
     });
     expect(rows[1]).toMatchObject({
       where: "—",
       kind: "Notifies no one",
-      kindVariant: "error-soft",
+      kindVariant: "amber-soft",
       severity: null,
     });
   });
@@ -546,13 +546,14 @@ describe("silent_coverage: Notifies no one (demo bug 4)", () => {
   const card = (s: AutoObserveSuggestion) => toRequests(gt, EAST, [s])[0].copy!;
   const row = (s: AutoObserveSuggestion) => toSuggestionRows(gt, EAST, [s])[0];
 
-  it("is red on the card and in the drawer, never the amber tuning look", () => {
+  it("is the coverage amber on the card and in the drawer, with its own bell, not red", () => {
     const s = withServices(1);
     expect(card(s).label).toBe("Notifies no one");
     expect(card(s).look).toBe("notify");
-    expect(KIND_LOOK[card(s).look].badge).toContain("error");
-    expect(KIND_LOOK[card(s).look].accent).toContain("error");
-    expect(row(s)).toMatchObject({ kind: "Notifies no one", kindVariant: "error-soft" });
+    expect(KIND_LOOK[card(s).look].icon).toBe("notifications");
+    expect(KIND_LOOK[card(s).look].badge).toContain("text-badge-amber-soft-text");
+    expect(KIND_LOOK[card(s).look].accent).toBe("bg-badge-amber-soft-text");
+    expect(row(s)).toMatchObject({ kind: "Notifies no one", kindVariant: "amber-soft" });
   });
 
   it.each([

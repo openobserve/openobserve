@@ -350,9 +350,9 @@ interface IssueRow {
   haystack: string;
 }
 
-const PAGE_VARIANT: Record<PageCell["tone"], "default-soft" | "warning-soft" | "error-soft"> = {
+const PAGE_VARIANT: Record<PageCell["tone"], "default-soft" | "amber-soft" | "error-soft"> = {
   neutral: "default-soft",
-  warning: "warning-soft",
+  warning: "amber-soft",
   error: "error-soft",
 };
 

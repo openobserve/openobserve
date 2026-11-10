@@ -244,7 +244,7 @@ import { ASK_AI_KEY, aiEnabled, askAiPayload, insightCtaLabel } from "./insightC
 
 const ACCENT: Record<InsightTone, string> = {
   failure: "bg-status-error-text",
-  gap: "bg-ingest-accent-amber",
+  gap: "bg-badge-amber-soft-text",
   info: "bg-border-default",
 };
 

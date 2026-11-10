@@ -73,6 +73,9 @@ describe("CoverageMetricChart gap wording", () => {
   it("names a live gap by its glossary word once, on the badge only", () => {
     const missing = mountChart(gapCell("none"), true);
     expect(badge(missing)).toBe("Not watched");
+    expect(
+      missing.find('[data-test="autoobserve-coverage-chart-badge-latency"]').classes(),
+    ).toContain("text-badge-amber-soft-text");
     expect(missing.text().split("Not watched")).toHaveLength(2);
     expect(missing.find('[data-test="autoobserve-coverage-chart-gap-latency"]').exists()).toBe(
       false,

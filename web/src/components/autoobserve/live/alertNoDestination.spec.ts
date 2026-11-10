@@ -83,7 +83,7 @@ describe("alert_no_destination suggestions (C7)", () => {
   it("words the All suggestions row with its own headline, next step and CTA, not Other", () => {
     const [row] = toSuggestionRows(gt, ZONE, [noDestination()], NOW_MS);
     expect(row.kind).toBe("Notifies no one");
-    expect(row.kindVariant).toBe("error-soft");
+    expect(row.kindVariant).toBe("amber-soft");
     expect(row.headline).toBe("checkout-errors fired and notifies no one");
     expect(String(row.note)).toContain("Choose who gets notified.");
     expect(row.insight.cta?.label).toBe("Review alert");
@@ -102,6 +102,17 @@ describe("alert_no_destination suggestions (C7)", () => {
     expect(request.insight.chip.label).toBe("Notifies no one");
     expect(request.insight.headline).toBe("checkout-errors fired and notifies no one");
     expect(request.insight.next).toBe("Choose who gets notified.");
+  });
+
+  it("is amber, says how often it fired and what the button opens, on the card itself (T1-N5)", () => {
+    const [request] = toRequests(gt, ZONE, [noDestination()], NOW_MS);
+    expect(request.insight.chip).toMatchObject({ variant: "amber-soft", tone: "gap" });
+    expect(request.insight.why).toBe(
+      "It fired 4 times in the last calibration window, and no one was notified.",
+    );
+    expect(request.insight.note).toBe(
+      "Opens the alert editor at who gets notified. Nothing is saved until you save.",
+    );
   });
 });
 

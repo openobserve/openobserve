@@ -208,9 +208,9 @@ describe("InsightBlock card (test 8)", () => {
 
   it("draws a gap amber and information neutral", () => {
     const amber = mountBlock(
-      insight({ chip: { label: raw("Coverage gap"), variant: "warning-soft", tone: "gap" } }),
+      insight({ chip: { label: raw("Coverage gap"), variant: "amber-soft", tone: "gap" } }),
     );
-    expect(amber.find("article > span").classes()).toContain("bg-ingest-accent-amber");
+    expect(amber.find("article > span").classes()).toContain("bg-badge-amber-soft-text");
     const neutral = mountBlock(
       insight({ chip: { label: raw("Other"), variant: "default-soft", tone: "info" } }),
     );

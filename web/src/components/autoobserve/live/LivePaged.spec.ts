@@ -627,7 +627,10 @@ describe("LivePaged (D9-web)", () => {
       expect(lines[2].text()).toContain("Paging failed");
       expect(lines[2].attributes("data-tone")).toBe("error");
       expect(lines[3].text()).toContain("hasn't confirmed the page yet");
-      expect(lines[3].attributes("data-tone")).toBe("neutral");
+      expect(lines[3].attributes("data-tone")).toBe("pending");
+      expect(lines[3].findComponent({ name: "OIcon" }).props("name")).toBe("schedule");
+      expect(lines[0].findComponent({ name: "OIcon" }).props("name")).toBe("check");
+      expect(lines[1].classes()).toContain("text-badge-amber-soft-text");
       expect(rows(w)[0].findAll(sel("routing"))).toHaveLength(0);
       await rows(w)[1].find(sel("routing")).trigger("click");
       expect(push).toHaveBeenCalledWith({

@@ -324,7 +324,7 @@ describe("AllSuggestionsDrawer: a monitor that notifies no one (demo bug 4)", ()
     store.commit("setSelectedOrganization", originalOrg);
   });
 
-  it("shows the kind in red and the why and next under the headline", async () => {
+  it("shows the kind in amber and the why and next under the headline", async () => {
     api.mockResolvedValueOnce({
       data: {
         suggestions: [
@@ -350,10 +350,10 @@ describe("AllSuggestionsDrawer: a monitor that notifies no one (demo bug 4)", ()
     await flushPromises();
     const kind = wrapper.findComponent('[data-test="autoobserve2-suggestions-kind-silent"]');
     expect(kind.text()).toBe("Notifies no one");
-    expect(kind.props("variant")).toBe("error-soft");
+    expect(kind.props("variant")).toBe("amber-soft");
     expect(
       wrapper.findComponent('[data-test="autoobserve2-suggestions-kind-gap"]').props("variant"),
-    ).toBe("warning-soft");
+    ).toBe("amber-soft");
     expect(wrapper.get('[data-test="autoobserve2-suggestions-note-silent"]').text()).toBe(
       "svc-no-data would notice svc-y stopping, but it notifies no one. Give it a destination.",
     );

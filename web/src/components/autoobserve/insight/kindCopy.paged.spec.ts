@@ -197,7 +197,7 @@ describe("pagedFindingCopy (W2)", () => {
 
   it("a pending page says the page is waiting on the on-call service", () => {
     expect(copy(item({ page: page("pending") })).page).toEqual({
-      tone: "neutral",
+      tone: "pending",
       text: "Paging on-call: the on-call service hasn't confirmed the page yet.",
       routing: false,
     });

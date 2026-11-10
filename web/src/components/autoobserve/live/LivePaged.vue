@@ -387,7 +387,8 @@ const NOTICE_TEST: Record<LiveFailure, string> = {
 
 const PAGE_TONE: Record<PageLine["tone"], { icon: string; text: string }> = {
   neutral: { icon: "check", text: "text-text-secondary" },
-  warning: { icon: "warning", text: "text-status-warning-text" },
+  pending: { icon: "schedule", text: "text-text-secondary" },
+  warning: { icon: "warning", text: "text-badge-amber-soft-text" },
   error: { icon: "warning", text: "text-status-error-text" },
 };
 
