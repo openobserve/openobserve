@@ -115,23 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </label>
             </div>
-            <div
-              v-else
-              class="border-border-default rounded-surface order-4 mt-6 flex flex-wrap items-center justify-center gap-2 border border-dashed px-4 py-3"
-              data-test="autoobserve2-scenario-live"
-            >
-              <OTag variant="default-soft" size="xs" :label="scenarioNote.tag" />
-              <span class="text-text-body text-xs">{{ scenarioNote.text }}</span>
-              <OButton
-                variant="ghost-primary"
-                size="xs"
-                icon-right="arrow-forward"
-                data-test="autoobserve2-scenario-live-action"
-                @click="howOpen = true"
-              >
-                {{ scenarioNote.action }}
-              </OButton>
-            </div>
           </div>
           <aside
             v-if="railShown"
@@ -331,10 +314,7 @@ import AutoObserveCoverageTab from "@/components/autoobserve/AutoObserveCoverage
 import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
 import ChangesPage from "@/components/autoobserve/v2/ChangesPage.vue";
 import { useLiveAutoObserve, useLiveMode } from "@/components/autoobserve/live/liveModel";
-import {
-  coverageSentence as liveSentence,
-  liveScenarioNote,
-} from "@/components/autoobserve/live/liveCopy";
+import { coverageSentence as liveSentence } from "@/components/autoobserve/live/liveCopy";
 import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
 import LiveSurfaceEmpty from "@/components/autoobserve/live/LiveSurfaceEmpty.vue";
@@ -572,8 +552,6 @@ const setIssuesRange = (value: IssuesRange) => {
     query: { ...route.query, issuesRange: value === "30d" ? undefined : value },
   });
 };
-
-const scenarioNote = computed(() => liveScenarioNote(t));
 
 const historyToIssues = () => {
   historyOpen.value = false;

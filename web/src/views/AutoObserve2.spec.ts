@@ -287,17 +287,13 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(wrapper.find('[data-test^="autoobserve-live-empty-"]').exists()).toBe(false);
   });
 
-  it("live mode keeps the scenario surface as a live-data note with a next step", async () => {
+  it("live mode shows no scenario surface and makes no claim about samples", async () => {
     const wrapper = mountOpen();
     await flushPromises();
     expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="autoobserve2-scenario-select"]').exists()).toBe(false);
-    const note = wrapper.find('[data-test="autoobserve2-scenario-live"]');
-    expect(note.text()).toContain("Live data");
-    expect(note.text()).toContain("Sample scenarios aren't shown");
-    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(false);
-    await wrapper.find('[data-test="autoobserve2-scenario-live-action"]').trigger("click");
-    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(true);
+    expect(wrapper.find('[data-test="autoobserve2-scenario-live"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Sample scenarios");
   });
 
   it("fixture=1 shows the scenario picker and no live-data note", () => {

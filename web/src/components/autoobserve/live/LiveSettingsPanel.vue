@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
   <div
     v-else-if="!paging.loading.value"
-    class="flex flex-col gap-6 pb-8"
+    class="flex flex-col gap-3 pb-8"
     :class="inPage && 'max-w-2xl p-4'"
     data-test="autoobserve-live-settings"
   >
