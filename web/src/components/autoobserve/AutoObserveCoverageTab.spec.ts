@@ -93,6 +93,17 @@ describe("AutoObserveCoverageTab under the page's coverage bar", () => {
   });
 });
 
+describe("AutoObserveCoverageTab map beside an open service drawer (T5-25)", () => {
+  it("makes room for the drawer, so it doesn't cover the hexes", async () => {
+    const wrapper = mountTab(live(FEW));
+    const scroller = () => wrapper.find('[data-test="autoobserve-coverage-map-scroller"]');
+    expect(scroller().classes()).not.toContain("xl:pe-160");
+    wrapper.findComponent(HexMapStub).vm.$emit("select", "api");
+    await flushPromises();
+    expect(scroller().classes()).toContain("xl:pe-160");
+  });
+});
+
 const has = (wrapper: ReturnType<typeof mountTab>, test: string) =>
   wrapper.find(`[data-test="${test}"]`).exists();
 

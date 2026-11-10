@@ -86,6 +86,22 @@ const shorten = (text: string, font: number, room: number, measure: MeasureText)
   return "";
 };
 
+// The name at exactly this size: wrapped at its own separators, then cut with an ellipsis.
+const fitAt = (
+  name: string,
+  room: number,
+  height: number,
+  size: number,
+  measure: MeasureText,
+): HexLabel | null => {
+  const max = Math.floor(height / (size * LINE_HEIGHT));
+  if (max < 1) return null;
+  const fit = best(name, size, max, room, measure);
+  if (fit.wide <= room) return { lines: fit.lines, font: size };
+  const lines = fit.lines.map((l) => shorten(l, size, room, measure)).filter(Boolean);
+  return lines.length ? { lines, font: size } : null;
+};
+
 // Wraps only at the name's own separators; one font step down, then an ellipsis.
 export const fitLabel = (
   name: string,
@@ -102,12 +118,22 @@ export const fitLabel = (
     const fit = best(name, size, max, room, measure);
     if (fit.wide <= room) return { lines: fit.lines, font: size };
   }
-  const size = smaller;
-  const max = Math.max(1, Math.floor(height / (size * LINE_HEIGHT)));
-  const lines = best(name, size, max, room, measure)
-    .lines.map((l) => shorten(l, size, room, measure))
-    .filter(Boolean);
-  return lines.length ? { lines, font: size } : null;
+  return fitAt(name, room, Math.max(height, smaller * LINE_HEIGHT), smaller, measure);
+};
+
+/** Every hex's label at one size: the smallest any of them needs, so a map never mixes two. */
+export const fitLabels = (
+  names: string[],
+  room: number,
+  height: number,
+  font: number,
+  measure: MeasureText,
+): (HexLabel | null)[] => {
+  const natural = names.map((name) => fitLabel(name, room, height, font, measure));
+  const sizes = natural.flatMap((label) => (label ? [label.font] : []));
+  const size = Math.min(...sizes);
+  if (!sizes.length || sizes.every((s) => s === size)) return natural;
+  return names.map((name) => fitAt(name, room, height, size, measure));
 };
 
 // Smallest hex worth labelling: about six average characters at the minimum font.

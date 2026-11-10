@@ -270,9 +270,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="autoobserve-coverage-no-match"
           @action="clearSearch"
         />
+        <!-- The service drawer is not modal and opens over the map's right side, so the hexes move out from under it. -->
         <div
           v-else
           class="px-page-edge min-h-0 flex-1 overflow-auto py-4 max-lg:h-[60vh] max-lg:flex-none"
+          :class="selectedRow ? 'xl:pe-160' : ''"
+          data-test="autoobserve-coverage-map-scroller"
         >
           <CoverageHexMap
             :items="items"

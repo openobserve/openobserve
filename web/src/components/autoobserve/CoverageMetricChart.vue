@@ -325,8 +325,11 @@ const fmtTime = (ms: number) =>
     minute: "2-digit",
   });
 
+// Rates under 1 keep two significant digits, or nice ticks such as 0.02 and 0.04 both read "0".
 const compact = (v: number) =>
-  v.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 1 });
+  Math.abs(v) < 1 && v !== 0
+    ? v.toLocaleString(undefined, { maximumSignificantDigits: 2 })
+    : v.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 1 });
 
 const outside = computed(() => {
   const { points, band } = props.series;
@@ -354,9 +357,11 @@ const options = computed(() => {
           symbol: "none",
           lineStyle: { type: "dashed", color: warning, width: 1 },
           label: {
-            position: "insideEndTop",
+            position: "insideStartTop",
             color: warning,
             fontSize: 10,
+            backgroundColor: surface,
+            padding: [1, 3],
             formatter: () => plain(def.threshold ?? 0),
           },
           data: [{ yAxis: def.threshold }],
@@ -476,6 +481,8 @@ const options = computed(() => {
           distance: 4,
           color: text,
           fontSize: 10,
+          backgroundColor: surface,
+          padding: [1, 3],
           formatter: () => t("autoobserve.coverage.now"),
         },
       },
