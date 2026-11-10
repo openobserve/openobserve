@@ -2300,6 +2300,22 @@ fn get_skipped_timestamps(
     (skipped_timestamps, final_timestamp)
 }
 
+/// The slot a run's delay counts from; an unaligned window ends at now, which would hide all lag.
+fn late_against(
+    supposed_to_run_at: i64,
+    skipped_timestamps: &[i64],
+    final_end_time: i64,
+    align_time: bool,
+) -> i64 {
+    if align_time {
+        return final_end_time;
+    }
+    skipped_timestamps
+        .last()
+        .copied()
+        .unwrap_or(supposed_to_run_at)
+}
+
 /// Cron runs within `delay` plus the next one, or `None` when the schedule cannot be evaluated.
 fn skipped_cron_timestamps(
     supposed_to_run_at: i64,
@@ -3710,7 +3726,14 @@ async fn handle_alert_triggers(
             trigger.module_key,
             delay
         );
-        (now - final_end_time, true)
+        let align_time = alert.trigger_condition.align_time;
+        let slot = late_against(
+            trigger.next_run_at,
+            &skipped_timestamps,
+            final_end_time,
+            align_time,
+        );
+        (now - slot, true)
     };
 
     // This is the end time of the last trigger timerange  + 1.
@@ -8326,6 +8349,31 @@ mod tests {
 
         // Final timestamp should be the current time when align_time is false
         assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn an_unaligned_run_is_late_against_its_latest_scheduled_slot() {
+        let minute = second_micros(60);
+        let planned = 1_760_000_000_000_000;
+        let now = planned + 90_000_000;
+        let (skipped, end) =
+            get_skipped_timestamps(planned, "", 0, 300, 90_000_000, false, now, None);
+        assert_eq!((skipped.len(), end), (0, now));
+        assert_eq!(
+            now - late_against(planned, &skipped, end, false),
+            90_000_000
+        );
+
+        let now = planned + 11 * minute;
+        let (skipped, end) =
+            get_skipped_timestamps(planned, "", 0, 300, 11 * minute, false, now, None);
+        assert_eq!(skipped, [planned + 5 * minute, planned + 10 * minute]);
+        assert_eq!(now - late_against(planned, &skipped, end, false), minute);
+
+        assert_eq!(
+            late_against(planned, &skipped, planned + minute, true),
+            planned + minute
+        );
     }
 
     #[test]
