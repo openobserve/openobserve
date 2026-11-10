@@ -3605,7 +3605,9 @@ mod tests {
             );
             let txn = db.begin().await.unwrap();
             assert!(
-                link_firing(&txn, &incident.id, &FIRST, 300).await.is_err(),
+                link_firing(&txn, &incident.id, &FIRST, 300, None)
+                    .await
+                    .is_err(),
                 "{name}: regular alerts share the same protection"
             );
             txn.rollback().await.unwrap();
