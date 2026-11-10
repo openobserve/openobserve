@@ -34233,7 +34233,7 @@
         "usually": "Usually"
       },
       "tickGroup": "Tick every alert in {group}",
-      "tickRow": "Tick {service}",
+      "tickRow": "Tick {service}, {alert}",
       "teamName": "{team} team",
       "noTeam": "No team yet",
       "noTeamWhy": "No owner is known for these, so they use the org default.",
@@ -34269,7 +34269,7 @@
       "hours": "{count} hour | {count} hours",
       "usually": "{rate} an hour",
       "unsureTail": "Unticked: check before adding.",
-      "cantBuild": "AutoObserve can't build this alert. Open the service to add it by hand.",
+      "cantBuild": "AutoObserve can't build this alert from this stream's fields. Add it by hand in Alerts.",
       "block": {
         "checking": "Checking the stream's fields…",
         "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",
@@ -34668,7 +34668,8 @@
       "latencySuffix": "ms (p95)",
       "errorsReason": "AutoObserve found no usual error count for {service} over the last 7 days. Set a threshold to add this alert.",
       "latencyReason": "AutoObserve found no usual latency for {service} over the last 7 days. Set a threshold to add this alert.",
-      "measuring": "Measuring the usual level over the last 7 days…"
+      "measuring": "Measuring the usual level over the last 7 days…",
+      "invalid": "Enter a number above 0."
     }
   }
 }

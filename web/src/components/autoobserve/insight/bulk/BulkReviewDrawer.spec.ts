@@ -184,6 +184,63 @@ describe("BulkReviewDrawer — review", () => {
   });
 });
 
+describe("BulkReviewDrawer — rows that can't be added (T2-11, T2-18, T2-24)", () => {
+  const svc = (key: string, kind: "errors" | "no_data") => ({
+    key,
+    kind,
+    scope: {
+      service: "svc-y",
+      cluster: null,
+      namespace: null,
+      stream: { type: "logs", name: "app_logs" },
+      schema: ["service_name"],
+    },
+    usually: null,
+  });
+
+  it("a row AutoObserve can't build is unticked as well as disabled, and Add leaves it out", async () => {
+    await mountDrawer();
+    const unread = (key: string, kind: "errors" | "no_data") => {
+      const row = svc(key, kind);
+      return { ...row, scope: { ...row.scope, schema: undefined } };
+    };
+    await openWith([unread("y:errors", "errors"), unread("y:no_data", "no_data")] as never);
+    expect(review.reviewRows.value.find((r) => r.key === "y:errors")?.prefill).toBeNull();
+    const box = wrapper!.findAllComponents({ name: "BulkRowMark" }).find(
+      (c) => c.attributes("data-test") === "bulk-review-tick-y:errors",
+    )!;
+    expect(box.props("disabled")).toBe(true);
+    expect(box.props("checked")).toBe(false);
+  });
+
+  it("names the alert in each row's tick label, so two rows of one service differ", async () => {
+    await mountDrawer();
+    await openWith([svc("y:errors", "errors"), svc("y:no_data", "no_data")] as never);
+    const labels = wrapper!
+      .findAllComponents({ name: "BulkRowMark" })
+      .map((c) => String(c.props("label")));
+    expect(labels).toEqual(["Tick svc-y, Errors", "Tick svc-y, Stops sending"]);
+  });
+
+  it("says why a threshold of 0 or below can't be used, and keeps what was typed", async () => {
+    measureBaseline.mockResolvedValue(null);
+    await mountDrawer();
+    await openWith([
+      { ...svc("y:errors", "errors"), inputs: { errorField: { name: "level", kind: "level" } } },
+    ] as never);
+    await flushPromises();
+    const input = wrapper!.findComponent('[data-test="bulk-review-threshold-y:errors"]');
+    input.vm.$emit("update:modelValue", "-5");
+    await flushPromises();
+    expect(input.props("modelValue")).toBe("-5");
+    expect(input.props("errorMessage")).toBe("Enter a number above 0.");
+    input.vm.$emit("update:modelValue", "5");
+    await flushPromises();
+    expect(input.props("errorMessage")).toBeUndefined();
+    expect(review.toCreate.value.map((r) => r.key)).toEqual(["y:errors"]);
+  });
+});
+
 describe("BulkReviewDrawer — group editor (T2-17)", () => {
   it("the hint names teams only while grouped by team (T2-9)", async () => {
     await mountDrawer();

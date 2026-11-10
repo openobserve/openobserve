@@ -158,9 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-tick="{ row }">
           <BulkRowMark
             :result="results[row.key]"
-            :checked="state.ticked.has(row.key)"
+            :checked="state.ticked.has(row.key) && isTickable(row)"
             :disabled="locked || !isTickable(row)"
-            :label="t('insight.bulk.tickRow', { service: label(row) })"
+            :label="t('insight.bulk.tickRow', { service: label(row), alert: alertName(row) })"
             :data-test="`bulk-review-tick-${row.key}`"
             @update="(on: boolean) => toggleRow(row.key, on)"
           />
@@ -191,17 +191,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OInput
               v-if="row.block?.code === 'noBaseline' || state.thresholds[row.key]"
-              :model-value="state.thresholds[row.key] ?? ''"
+              :model-value="typed[row.key] ?? state.thresholds[row.key] ?? ''"
               type="number"
               size="sm"
               class="mt-1 max-w-52"
               :label="t('insight.threshold.label')"
               :suffix="String(t(`insight.threshold.${thresholdKind(row)}Suffix`))"
               :disabled="locked"
+              :error="badThreshold(row.key)"
+              :error-message="badThreshold(row.key) ? t('insight.threshold.invalid') : undefined"
               :data-test="`bulk-review-threshold-${row.key}`"
-              @update:model-value="
-                (v: string | number) => setRowThreshold(row.key, Number(v) || null)
-              "
+              @update:model-value="(v: string | number) => typeThreshold(row.key, v)"
             />
             <span
               v-else-if="row.row.unsure"
@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, provide, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, provide, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { incidentReachGap, unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
@@ -342,6 +342,29 @@ const enterprise = config.isEnterprise === "true";
 const { isMobile } = useBreakpoint();
 const { state, reviewRows, groups, toCreate, tickedRows, checking, silent } = useBulkReview();
 const locale = computed(() => String(i18nLocale.value));
+// What the user typed in each threshold field, so a value the review can't use stays visible with its reason.
+const typed = reactive<Record<string, string>>({});
+const typeThreshold = (key: string, value: string | number) => {
+  typed[key] = String(value ?? "");
+  const n = Number(value);
+  setRowThreshold(key, typed[key].trim() !== "" && Number.isFinite(n) && n > 0 ? n : null);
+};
+watch(
+  () => state.request,
+  () => Object.keys(typed).forEach((key) => delete typed[key]),
+);
+const badThreshold = (key: string) => {
+  const value = typed[key]?.trim();
+  return !!value && !(Number(value) > 0);
+};
+const ALERT_NAME: Record<string, "errors" | "latency" | "absence"> = {
+  errors: "errors",
+  latency: "latency",
+  no_data: "absence",
+  source: "absence",
+};
+const alertName = (row: ReviewRow) =>
+  t(`insight.kind.classes.name.${ALERT_NAME[row.row.kind ?? kind.value] ?? "absence"}`);
 const reachGap = computed(() => incidentReachGap(store.state.zoConfig));
 // Every AutoObserve draft opens an incident, so a row with no destination is blocked only when that pages no one.
 const unreachable = computed(() => (reachGap.value === null ? [] : silent.value));
