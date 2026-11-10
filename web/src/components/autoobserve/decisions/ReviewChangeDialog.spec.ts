@@ -166,6 +166,22 @@ describe("ReviewChangeDialog (W5)", () => {
     expect(applyButton()?.disabled).toBe(false);
   });
 
+  it("an_empty_destination_list_reads_as_no_destination_not_none", async () => {
+    api.preview.mockResolvedValue({
+      data: preview({
+        change: {
+          alert: { title: "ops-a", folder: "ops", team: null, destinations: [] },
+          fields: [{ field: "destinations", from: [], to: ["ops-webhook"] }],
+        },
+      }),
+    } as never);
+    await mountDialog();
+    expect(q("review-change-where")?.textContent?.trim()).toBe("Folder ops · notifies no one");
+    const row = q("review-change-row-destinations")!;
+    expect(row.textContent).toContain("No destination");
+    expect(row.textContent).not.toContain("None");
+  });
+
   it("names the team when the preview knows it", async () => {
     api.preview.mockResolvedValue({
       data: preview({

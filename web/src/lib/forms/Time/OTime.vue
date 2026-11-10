@@ -16,8 +16,12 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+// The label's `for` points at the group, which a label cannot name, so the input carries its name itself.
+const inputAriaLabel = computed(
+  () => ($attrs["aria-label"] as string | undefined) ?? (props.label || undefined),
+);
 const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, "aria-label": _ariaLabel, ...rest } = $attrs;
   return rest;
 });
 
@@ -349,6 +353,7 @@ const fieldClasses = computed(() => [
           autocomplete="off"
           :value="modelValue ?? ''"
           :tabindex="inputTabindex"
+          :aria-label="inputAriaLabel"
           :placeholder="placeholder ?? raw('HH:MM')"
           :maxlength="withSeconds ? 8 : 5"
           :disabled="isDisabled || undefined"
@@ -366,6 +371,7 @@ const fieldClasses = computed(() => [
           type="time"
           :value="modelValue ?? ''"
           :tabindex="inputTabindex"
+          :aria-label="inputAriaLabel"
           :step="withSeconds ? 1 : 60"
           :disabled="isDisabled || undefined"
           :readonly="readonly || undefined"

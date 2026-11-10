@@ -284,7 +284,8 @@ export function saveFailure(
   if (kind === "forbidden") {
     return { kind, message: t("slackApp.insights.failed.forbidden"), detail: null };
   }
-  const reason = serverMessageOf(error);
+  // The template ends the reason's sentence, so a server message's own full stop is dropped.
+  const reason = serverMessageOf(error)?.replace(/[.!?]+\s*$/, "");
   return {
     kind,
     message: reason

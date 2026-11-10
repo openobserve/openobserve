@@ -227,10 +227,13 @@ const rows = computed(() =>
 const where = computed<I18nText | null>(() => {
   const alert = change.value?.alert;
   if (!alert) return null;
-  const params = {
-    folder: raw(alert.folder ?? "default"),
-    destinations: copy.value.value("destinations", alert.destinations),
-  };
+  const folder = raw(alert.folder ?? "default");
+  if (!alert.destinations.length) {
+    return alert.team
+      ? t("insight.decisions.apply.whereTeamNoOne", { folder, team: raw(alert.team) })
+      : t("insight.decisions.apply.whereNoOne", { folder });
+  }
+  const params = { folder, destinations: copy.value.value("destinations", alert.destinations) };
   return alert.team
     ? t("insight.decisions.apply.whereTeam", { ...params, team: raw(alert.team) })
     : t("insight.decisions.apply.where", params);
