@@ -65,6 +65,7 @@ use crate::{
         },
         alert_grants::org_wide_allows,
         alerts::ack::ack_source,
+        security,
     },
     service::auth::UserEmail,
 };
@@ -123,10 +124,15 @@ impl Access for LiveAccess<'_> {
         Ok(finding_target(self.org_id, id, now).await?)
     }
 
-    /// The check the alert PUT route makes, so a change here needs what the editor's Save does.
+    /// The checks the alert PUT route makes, so a change here needs what the editor's Save does.
     async fn may_edit_alert(&self, alert_id: &str) -> bool {
-        !rbac_enforced().await
-            || alert_allows(self.org_id, self.user_id, alert_id, "PUT").await == Some(true)
+        let may_put = !rbac_enforced().await
+            || alert_allows(self.org_id, self.user_id, alert_id, "PUT").await == Some(true);
+        let detection = security::is_siem_alert(self.org_id, alert_id).await;
+        may_put
+            && security::guard_siem(self.org_id, self.user_id, "POST", detection)
+                .await
+                .is_ok()
     }
 
     async fn suggested_change(
@@ -870,5 +876,365 @@ mod tests {
         assert_eq!(describe("demo-org", &service).await.title, "svc-a");
         let bare = EntityRef::new(kinds::SERVICE, &[(dims::ENTITY_ID, "svc-a")]);
         assert_eq!(describe("demo-org", &bare).await.title, "svc-a");
+    }
+
+    mod detection_gate {
+        use std::{
+            collections::HashMap,
+            sync::{
+                Arc, Mutex,
+                atomic::{AtomicUsize, Ordering::SeqCst},
+            },
+        };
+
+        use config::meta::{
+            alerts::alert::{Alert, SIEM_ATTRIBUTE},
+            folder::Folder,
+        };
+        use o2_enterprise::enterprise::{
+            alert_calibration_service::applied::{AlertNow, AlertPatcher, Fence, Patched},
+            autoobserve::{
+                analyzers::heartbeat::HeartbeatSwitches,
+                decisions::{DecisionError, DecisionRequest, DecisionResult, Preview},
+                insight::FieldPatch,
+                marks::TableKvReader,
+                ports::{Ports, StreamSinkPort},
+            },
+        };
+        use serde_json::{Value, json};
+
+        use super::*;
+        use crate::request::security::tests::{grant, meta_store};
+
+        const FINDING: &str = "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1";
+
+        /// The finding's change is handed in; the edit rule is the route's own.
+        struct Offered<'a> {
+            live: LiveAccess<'a>,
+            change: SuggestedChange,
+        }
+
+        #[async_trait]
+        impl Access for Offered<'_> {
+            async fn readable(&self, subjects: Vec<EntityRef>) -> Vec<bool> {
+                vec![true; subjects.len()]
+            }
+
+            async fn visible_alerts(
+                &self,
+                alert_ids: Vec<String>,
+            ) -> anyhow::Result<BTreeSet<String>> {
+                Ok(alert_ids.into_iter().collect())
+            }
+
+            async fn may_decide(&self, _family: Family, _subject: &EntityRef) -> bool {
+                false
+            }
+
+            async fn reads_notes(&self, _family: Family) -> bool {
+                true
+            }
+
+            async fn describe(&self, _subject: &EntityRef) -> SubjectInfo {
+                SubjectInfo {
+                    title: "login failures".into(),
+                    folder: Some("ops".into()),
+                    team: None,
+                }
+            }
+
+            async fn can_act(&self) -> Vec<PersonRef> {
+                Vec::new()
+            }
+
+            async fn finding(&self, _id: &str, _now: i64) -> anyhow::Result<Option<Target>> {
+                Ok(None)
+            }
+
+            async fn may_edit_alert(&self, alert_id: &str) -> bool {
+                self.live.may_edit_alert(alert_id).await
+            }
+
+            async fn suggested_change(
+                &self,
+                _id: &str,
+                _now: i64,
+            ) -> anyhow::Result<Option<SuggestedChange>> {
+                Ok(Some(self.change.clone()))
+            }
+        }
+
+        #[derive(Default)]
+        struct Pending {
+            secs: Mutex<HashMap<String, i64>>,
+            writes: AtomicUsize,
+        }
+
+        impl Pending {
+            fn of(&self, alert_id: &str) -> i64 {
+                self.secs
+                    .lock()
+                    .unwrap()
+                    .get(alert_id)
+                    .copied()
+                    .unwrap_or(0)
+            }
+
+            fn write(&self, alert_id: &str, patch: &[FieldPatch]) -> Patched {
+                let mut secs = self.secs.lock().unwrap();
+                let now = secs.entry(alert_id.to_string()).or_insert(0);
+                for field in patch {
+                    if let FieldPatch::PendingPeriodSecs { from, to } = field {
+                        if *now != *from {
+                            return Patched::Changed;
+                        }
+                        *now = *to;
+                    }
+                }
+                self.writes.fetch_add(1, SeqCst);
+                Patched::Written
+            }
+        }
+
+        #[async_trait]
+        impl AlertPatcher for Pending {
+            async fn read(&self, _org: &str, alert_id: &str) -> anyhow::Result<Option<AlertNow>> {
+                Ok(Some(AlertNow {
+                    title: "login failures".into(),
+                    folder: Some("ops".into()),
+                    destinations: vec!["ops".into()],
+                    pending_period_secs: self.of(alert_id),
+                }))
+            }
+
+            async fn patch(
+                &self,
+                _org: &str,
+                alert_id: &str,
+                _actor: &str,
+                patch: &[FieldPatch],
+            ) -> anyhow::Result<Patched> {
+                Ok(self.write(alert_id, patch))
+            }
+
+            async fn patch_fenced(
+                &self,
+                org: &str,
+                alert_id: &str,
+                _actor: &str,
+                patch: &[FieldPatch],
+                fence: &Fence,
+            ) -> anyhow::Result<Patched> {
+                let written = Bytes::from(fence.written.clone());
+                let swapped = openobserve_core::kv::compare_and_set(
+                    org,
+                    &fence.key,
+                    Some(&fence.expected),
+                    written,
+                )
+                .await?;
+                Ok(if swapped {
+                    self.write(alert_id, patch)
+                } else {
+                    Patched::Fenced
+                })
+            }
+        }
+
+        #[derive(Default)]
+        struct History(Mutex<Vec<Value>>);
+
+        #[async_trait]
+        impl StreamSinkPort for History {
+            async fn append(&self, _stream: &str, rows: Vec<Value>) -> anyhow::Result<()> {
+                self.0.lock().unwrap().extend(rows);
+                Ok(())
+            }
+        }
+
+        fn deps() -> Deps {
+            Deps {
+                ports: Arc::new(Ports {
+                    sink: Arc::new(History::default()),
+                    ..openobserve_core::autoobserve::ports::ports()
+                }),
+                kv: Arc::new(TableKvReader),
+                heartbeat: HeartbeatSwitches::default(),
+                source_suggestions: false,
+                learning: None,
+            }
+        }
+
+        /// An alert stored in folder ops and cached as the alert routes read it, and a root user.
+        async fn stored_alert(org: &str) -> (String, String) {
+            use config::meta::folder::FolderType;
+
+            meta_store().await;
+            let folder = Folder {
+                folder_id: "ops".to_string(),
+                name: "ops".to_string(),
+                ..Default::default()
+            };
+            infra::table::folders::put(org, None, folder, FolderType::Alerts)
+                .await
+                .unwrap();
+            let mut alert = Alert::default();
+            alert.name = "login_failures".to_string();
+            alert.org_id = org.to_string();
+            alert.stream_name = "web".to_string();
+            let alert = infra::table::alerts::create(
+                infra::db::get_orm_client_rw().await,
+                org,
+                "ops",
+                alert,
+                false,
+            )
+            .await
+            .unwrap();
+            let id = alert.id.unwrap().to_string();
+            mark(org, &id, false).await;
+            let root = format!("root-{org}@example.com");
+            common::infra::config::ORG_USERS.insert(
+                format!("{}/{root}", config::DEFAULT_ORG),
+                infra::table::org_users::OrgUserRecord::new(
+                    config::DEFAULT_ORG,
+                    &root,
+                    config::meta::user::UserRole::Root,
+                    "token",
+                    None,
+                ),
+            );
+            (id, root)
+        }
+
+        /// Marks or unmarks the cached alert as a detection, as saving the detection flag does.
+        async fn mark(org: &str, id: &str, detection: bool) {
+            let mut alert = Alert::default();
+            alert.id = Some(svix_ksuid::Ksuid::from_str(id).unwrap());
+            alert.org_id = org.to_string();
+            alert.name = "login_failures".to_string();
+            if detection {
+                alert.context_attributes = Some(
+                    [(SIEM_ATTRIBUTE.to_string(), "true".to_string())]
+                        .into_iter()
+                        .collect(),
+                );
+            }
+            common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key(org, id),
+                (Folder::default(), alert),
+            );
+        }
+
+        fn wait_longer(alert_id: &str) -> SuggestedChange {
+            SuggestedChange {
+                alert_id: alert_id.to_string(),
+                patch: vec![FieldPatch::PendingPeriodSecs { from: 0, to: 120 }],
+                acknowledged: None,
+            }
+        }
+
+        fn ctx<'a>(
+            deps: &'a Deps,
+            access: &'a Offered<'a>,
+            alerts: &'a Pending,
+            user_id: &'a str,
+        ) -> Ctx<'a> {
+            Ctx {
+                deps,
+                store: &DismissalKv,
+                alerts,
+                findings: &LiveDigest,
+                access,
+                org: access.live.org_id,
+                caller: Caller {
+                    user_id,
+                    source: Source::Ui,
+                },
+            }
+        }
+
+        async fn apply(ctx: &Ctx<'_>) -> Result<DecisionResult, DecisionError> {
+            let ask: DecisionRequest = serde_json::from_value(
+                json!({"family": "alert_finding", "id": FINDING, "action": "apply"}),
+            )
+            .unwrap();
+            decisions::decide_one(ctx, &ask, now_micros()).await
+        }
+
+        async fn preview(ctx: &Ctx<'_>) -> Preview {
+            let query: PreviewQuery = serde_json::from_value(
+                json!({"family": "alert_finding", "id": FINDING, "action": "apply"}),
+            )
+            .unwrap();
+            decisions::preview(ctx, &query, now_micros()).await.unwrap()
+        }
+
+        fn is_refused<T: std::fmt::Debug>(result: &Result<T, DecisionError>) -> bool {
+            matches!(result, Err(DecisionError::Refused(_)))
+        }
+
+        #[tokio::test]
+        async fn detection_apply_needs_the_security_permission_the_editor_save_needs() {
+            let org = format!("aec_{}", config::ider::uuid());
+            let (alert_id, user) = stored_alert(&org).await;
+            mark(&org, &alert_id, true).await;
+            grant(&user, &[]);
+            let (deps, alerts) = (deps(), Pending::default());
+            let access = Offered {
+                live: LiveAccess {
+                    org_id: &org,
+                    user_id: &user,
+                },
+                change: wait_longer(&alert_id),
+            };
+            let ctx = ctx(&deps, &access, &alerts, &user);
+
+            let shown = preview(&ctx).await;
+            assert!(!shown.may);
+            assert_eq!(shown.locked.map(|l| l.verb).as_deref(), Some("apply"));
+            let refused = apply(&ctx).await;
+            assert!(is_refused(&refused), "{refused:?}");
+            assert_eq!((alerts.of(&alert_id), alerts.writes.load(SeqCst)), (0, 0));
+
+            grant(&user, &["POST"]);
+            assert!(preview(&ctx).await.may);
+            let done = apply(&ctx).await;
+            assert!(done.is_ok(), "{done:?}");
+            assert_eq!(alerts.of(&alert_id), 120);
+        }
+
+        #[tokio::test]
+        async fn detection_undo_needs_the_security_permission_the_editor_save_needs() {
+            let org = format!("aec_{}", config::ider::uuid());
+            let (alert_id, user) = stored_alert(&org).await;
+            grant(&user, &[]);
+            let (deps, alerts) = (deps(), Pending::default());
+            let access = Offered {
+                live: LiveAccess {
+                    org_id: &org,
+                    user_id: &user,
+                },
+                change: wait_longer(&alert_id),
+            };
+            let ctx = ctx(&deps, &access, &alerts, &user);
+            let done = apply(&ctx).await.unwrap();
+            assert_eq!(alerts.of(&alert_id), 120);
+
+            mark(&org, &alert_id, true).await;
+            let ask = UndoRequest {
+                expected_revision: done.decision.revision,
+                request_id: None,
+            };
+            let decision_id = done.decision.decision_id.clone();
+            let refused = decisions::undo(&ctx, &decision_id, &ask, now_micros()).await;
+            assert!(is_refused(&refused), "{refused:?}");
+            assert_eq!((alerts.of(&alert_id), alerts.writes.load(SeqCst)), (120, 1));
+
+            grant(&user, &["POST"]);
+            let undone = decisions::undo(&ctx, &decision_id, &ask, now_micros()).await;
+            assert!(undone.is_ok(), "{undone:?}");
+            assert_eq!(alerts.of(&alert_id), 0);
+        }
     }
 }
