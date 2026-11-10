@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -37,6 +37,9 @@ vi.mock("@/services/autoobserve", () => ({
 }));
 
 const api = vi.mocked(autoobserve.suggestions);
+
+// A drawer left mounted refetches when the cache is cleared, so its calls would land in the next test.
+enableAutoUnmount(afterEach);
 
 const suggestion = (id: string): AutoObserveSuggestion => ({
   id,
@@ -449,5 +452,84 @@ describe("AllSuggestionsDrawer: Next step and the row's Details (test 15)", () =
       document.body.querySelectorAll('[data-test="alert-calibration-dismiss-dialog"]'),
     ).toHaveLength(1);
     wrapper.unmount();
+  });
+});
+
+describe("AllSuggestionsDrawer: Slack deep links (C4)", () => {
+  const ids = (n: number, from = 0) => Array.from({ length: n }, (_, i) => `s${from + i}`);
+
+  // The locate scan reads 500 at a time; the drawer's own pages read 25.
+  const serve = (all: string[]) =>
+    api.mockImplementation(async (_org, params) => {
+      const offset = params.offset ?? 0;
+      const slice = all.slice(offset, offset + (params.limit ?? 25));
+      return {
+        data: { suggestions: slice.map(suggestion), total: all.length, limit: 25, offset },
+      } as never;
+    });
+
+  const mountWith = (props: Record<string, unknown>) =>
+    mount(AllSuggestionsDrawer, {
+      props: { open: true, ...props },
+      global: { plugins: [i18n, store], stubs: { ODrawer: DrawerStub } },
+    });
+
+  beforeEach(() => {
+    api.mockReset();
+    setOrg("org-a");
+  });
+
+  afterEach(() => {
+    store.commit("setSelectedOrganization", originalOrg);
+  });
+
+  it("opens on the page that holds the linked suggestion, expanded and marked", async () => {
+    serve(ids(60));
+    const wrapper = mountWith({ focusId: "s30" });
+    await flushPromises();
+    expect(api).toHaveBeenCalledWith("org-a", expect.objectContaining({ offset: 25, limit: 25 }));
+    expect(api).not.toHaveBeenCalledWith(
+      "org-a",
+      expect.objectContaining({ offset: 0, limit: 25 }),
+    );
+    const table = wrapper.findComponent(OTable);
+    expect(rows(wrapper).map((r) => r.id)).toContain("s30");
+    expect(table.props("currentPage")).toBe(2);
+    expect(table.props("expandedIds")).toEqual(["s30"]);
+    expect(table.props("activeRowIndex")).toBe(5);
+    expect(wrapper.text()).not.toContain("This suggestion is no longer open.");
+  });
+
+  it("says a linked suggestion is no longer open, on page 1, without an error", async () => {
+    serve(ids(3));
+    const wrapper = mountWith({ focusId: "gone" });
+    await flushPromises();
+    expect(wrapper.text()).toContain("This suggestion is no longer open.");
+    expect(rows(wrapper).map((r) => r.id)).toEqual(["s0", "s1", "s2"]);
+    expect(wrapper.findComponent(OTable).props("activeRowIndex")).toBeNull();
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-drawer-error"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("filters to the linked kind and names it in a chip that clears the filter", async () => {
+    serve(ids(2));
+    const wrapper = mountWith({ kind: "coverage_gap" });
+    await flushPromises();
+    expect(api).toHaveBeenCalledWith("org-a", expect.objectContaining({ kind: "coverage_gap" }));
+    const chip = wrapper.findComponent('[data-test="autoobserve2-suggestions-drawer-kind"]');
+    expect(chip.exists()).toBe(true);
+    expect(chip.text()).toContain("Not watched");
+    chip.vm.$emit("remove");
+    expect(wrapper.emitted("update:kind")).toEqual([[null]]);
+  });
+
+  it("ignores a kind it doesn't know rather than showing an empty list", async () => {
+    serve(ids(2));
+    const wrapper = mountWith({ kind: "bogus" });
+    await flushPromises();
+    expect(api).not.toHaveBeenCalledWith("org-a", expect.objectContaining({ kind: "bogus" }));
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-drawer-kind"]').exists()).toBe(false);
+    expect(rows(wrapper).map((r) => r.id)).toEqual(["s0", "s1"]);
   });
 });

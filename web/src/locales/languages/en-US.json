@@ -30765,6 +30765,8 @@
       "seeAll": "See all",
       "drawerTitle": "Suggestions",
       "drawerLine": "Ranked by what matters most first. Open a row for what I found.",
+      "focusGone": "This suggestion is no longer open.",
+      "clearKind": "Show all suggestions",
       "columns": {
         "suggestion": "Suggestion",
         "where": "Where",

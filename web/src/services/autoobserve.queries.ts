@@ -39,9 +39,14 @@ export const autoobserveCoverageQuery = (org: string, view: AutoObserveCoverageV
   });
 
 // One page of proposed suggestions in the panel's rank order; total counts every proposed one.
-export const autoobserveSuggestionsPageQuery = (org: string, limit: number, offset: number) =>
+export const autoobserveSuggestionsPageQuery = (
+  org: string,
+  limit: number,
+  offset: number,
+  kind?: string,
+) =>
   queryOptions({
-    queryKey: autoobserveKeys.suggestionsPage(org, limit, offset),
+    queryKey: autoobserveKeys.suggestionsPage(org, limit, offset, kind),
     queryFn: async (): Promise<AutoObserveSuggestionList> =>
       (
         await autoobserve.suggestions(org, {
@@ -49,8 +54,36 @@ export const autoobserveSuggestionsPageQuery = (org: string, limit: number, offs
           sort: "priority",
           limit,
           offset,
+          ...(kind ? { kind } : {}),
         })
       ).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+const LOCATE_PAGE = 500;
+const LOCATE_CAP = 5_000;
+
+// The list route has no id filter, so a linked suggestion's rank is found by scanning in the drawer's order; -1 when it is no longer proposed.
+export const autoobserveSuggestionRankQuery = (org: string, id: string, kind?: string) =>
+  queryOptions({
+    queryKey: autoobserveKeys.suggestionRank(org, id, kind),
+    queryFn: async (): Promise<number> => {
+      for (let offset = 0; offset < LOCATE_CAP; offset += LOCATE_PAGE) {
+        const page = (
+          await autoobserve.suggestions(org, {
+            status: "proposed",
+            sort: "priority",
+            limit: LOCATE_PAGE,
+            offset,
+            ...(kind ? { kind } : {}),
+          })
+        ).data;
+        const at = page.suggestions.findIndex((s) => s.id === id);
+        if (at >= 0) return offset + at;
+        if (page.suggestions.length < LOCATE_PAGE || offset + LOCATE_PAGE >= page.total) break;
+      }
+      return -1;
+    },
     staleTime: LIVE_STALE_TIME,
   });
 

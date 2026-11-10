@@ -285,7 +285,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </SettingsDrawer>
       <HowItWorksDrawer v-model:open="howOpen" />
-      <AllSuggestionsDrawer v-if="live" v-model:open="allOpen" />
+      <AllSuggestionsDrawer
+        v-if="live"
+        v-model:open="allOpen"
+        :focus-id="linkedSuggestion"
+        :kind="linkedKind"
+        @update:kind="clearLinkedKind"
+      />
     </div>
   </OPageLayout>
 </template>
@@ -501,6 +507,19 @@ const COVERAGE_FILTER_STATES: Record<string, CellState[]> = {
 const queryString = (key: string) =>
   typeof route.query[key] === "string" ? (route.query[key] as string) : undefined;
 
+// Slack links name one suggestion or one kind; the drawer decides what a stale value shows.
+const linkedSuggestion = computed(() => queryString("suggestion") ?? null);
+const linkedKind = computed(() => queryString("suggestions") ?? null);
+const SUGGESTION_LINK_QUERY = { suggestion: undefined, suggestions: undefined };
+
+const clearLinkedKind = () =>
+  void router.replace({ query: { ...route.query, suggestions: undefined } });
+
+const clearSuggestionLink = (isOpen: boolean) => {
+  if (isOpen || (!route.query.suggestion && !route.query.suggestions)) return;
+  void router.replace({ query: { ...route.query, ...SUGGESTION_LINK_QUERY } });
+};
+
 const page = computed(() => PAGES.find((p) => p === route.query.page));
 const onCoveragePage = computed(() => page.value === "coverage");
 const coverageKey = computed(() => `${queryString("focus") ?? ""}:${queryString("filter") ?? ""}`);
@@ -642,6 +661,7 @@ watch([range, priority, shown], ([r, filter, rows]) => {
   if (!same) void router.replace({ query: { ...route.query, ...next } });
 });
 watch(problemOpen, clearDrawerQuery);
+watch(allOpen, clearSuggestionLink);
 
 const railEl = ref<HTMLElement | null>(null);
 const railMore = ref(false);
@@ -703,6 +723,10 @@ onMounted(async () => {
     problemOpen.value = true;
   } else if (drawer || route.query.problem) {
     void router.replace({ query: { ...route.query, ...DRAWER_QUERY } });
+  }
+  if (live.value && !page.value && (linkedSuggestion.value || linkedKind.value)) {
+    howOpen.value = false;
+    allOpen.value = true;
   }
   await nextTick();
   observeRail(railEl.value);

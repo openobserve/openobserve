@@ -226,6 +226,36 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     }
   });
 
+  it("a Slack suggestion link opens All suggestions on that item, and closing drops the link", async () => {
+    Object.assign(routeQuery, { suggestion: "sug-9" });
+    const wrapper = mountView();
+    await flushPromises();
+    const drawer = wrapper.findComponent(AllSuggestionsDrawer);
+    expect(drawer.props("open")).toBe(true);
+    expect(drawer.props("focusId")).toBe("sug-9");
+    expect(drawer.props("kind")).toBeNull();
+    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(false);
+    drawer.vm.$emit("update:open", false);
+    await flushPromises();
+    const query = replace.mock.calls.at(-1)?.[0].query;
+    expect(query.suggestion).toBeUndefined();
+    expect(query.suggestions).toBeUndefined();
+  });
+
+  it("a Slack grouped link opens All suggestions filtered to its kind", async () => {
+    localStorage.removeItem("autoobserve2.howItWorksSeen");
+    Object.assign(routeQuery, { suggestions: "no_absence_check" });
+    const wrapper = mountView();
+    await flushPromises();
+    const drawer = wrapper.findComponent(AllSuggestionsDrawer);
+    expect(drawer.props("open")).toBe(true);
+    expect(drawer.props("kind")).toBe("no_absence_check");
+    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(false);
+    drawer.vm.$emit("update:kind", null);
+    await flushPromises();
+    expect(replace.mock.calls.at(-1)?.[0].query.suggestions).toBeUndefined();
+  });
+
   it("live mode keeps the Changes page with an honest empty state, never the fixture ledger", async () => {
     Object.assign(routeQuery, { page: "activity", change: "c-1" });
     const wrapper = mountOpen();

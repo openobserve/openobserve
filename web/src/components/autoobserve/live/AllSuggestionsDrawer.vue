@@ -36,12 +36,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-5 w-8 rounded-full"
         data-test="autoobserve2-suggestions-drawer-count-skeleton"
       />
+      <OTag
+        v-if="kindLabel"
+        variant="default-soft"
+        size="sm"
+        removable
+        :label="kindLabel"
+        :remove-label="t('autoobserveLive.suggestions.clearKind')"
+        data-test="autoobserve2-suggestions-drawer-kind"
+        @remove="emit('update:kind', null)"
+      />
     </template>
     <div class="flex h-full min-h-0 flex-col gap-3">
       <span class="sr-only" role="status" data-test="autoobserve2-suggestions-drawer-announce">{{
         loadText
       }}</span>
-      <p class="text-text-secondary text-sm">{{ t("autoobserveLive.suggestions.drawerLine") }}</p>
+      <p
+        class="text-text-secondary text-sm"
+        :role="focusGone ? 'status' : undefined"
+        data-test="autoobserve2-suggestions-drawer-line"
+      >
+        {{
+          focusGone
+            ? t("autoobserveLive.suggestions.focusGone")
+            : t("autoobserveLive.suggestions.drawerLine")
+        }}
+      </p>
       <LiveNoticeState
         v-if="notice"
         :notice="notice"
@@ -64,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!notice"
         :data="rows"
         :columns="columns"
-        :loading="skeleton || paging || clampTotal !== null"
+        :loading="skeleton || paging || clampTotal !== null || locating"
         :frame="false"
         row-key="id"
         :pagination="total > 0 ? 'server' : 'none'"
@@ -72,6 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size-options="[]"
         :current-page="page"
         :total-count="total"
+        :active-row-index="focusRowIndex"
+        v-model:expanded-ids="expandedIds"
         expansion="single"
         expand-on-row-click
         :show-global-filter="false"
@@ -81,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @pagination-change="(p) => (page = p.page)"
       >
         <template #cell-headline="{ row }">
-          <div class="py-1.5">
+          <div class="py-1.5" :data-test="`autoobserve2-suggestions-row-${row.id}`">
             <span class="text-text-heading block text-pretty">{{ row.headline }}</span>
             <span
               v-if="row.note"
@@ -129,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <div
-            v-if="state.status === 'loading' || pastEnd"
+            v-if="state.status === 'loading' || pastEnd || locating"
             aria-hidden="true"
             data-test="autoobserve2-suggestions-drawer-pending"
           />
@@ -167,6 +189,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   autoobserveCoverageQuery,
+  autoobserveSuggestionRankQuery,
   autoobserveSuggestionsPageQuery,
 } from "@/services/autoobserve.queries";
 import InsightBlock from "../insight/InsightBlock.vue";
@@ -175,7 +198,7 @@ import ReviewChangeDialog from "../decisions/ReviewChangeDialog.vue";
 import AlertCalibrationDismissDialog from "@/components/alert_calibration/AlertCalibrationDismissDialog.vue";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveRefreshFailed from "./LiveRefreshFailed.vue";
-import { toSuggestionRows, type SuggestionRow } from "./liveAdapter";
+import { suggestionKindLabel, toSuggestionRows, type SuggestionRow } from "./liveAdapter";
 import { DRAWER_PAGE, liveLoadText, liveNotice } from "./liveCopy";
 import {
   keepSameOrg,
@@ -186,9 +209,16 @@ import {
   useLoadPhase,
 } from "./liveModel";
 
-const props = defineProps<{ open: boolean }>();
+// focusId and kind come from a Slack link; either may be stale, which only changes what is shown.
+const props = withDefaults(
+  defineProps<{ open: boolean; focusId?: string | null; kind?: string | null }>(),
+  { focusId: null, kind: null },
+);
 
-const emit = defineEmits<{ "update:open": [value: boolean] }>();
+const emit = defineEmits<{
+  "update:open": [value: boolean];
+  "update:kind": [value: null];
+}>();
 
 const { t, locale } = useI18nTyped();
 const store = useStore();
@@ -198,9 +228,31 @@ const { run, dismiss, pendingId, dismissTarget, dismissOpen, reviewTarget, revie
 const page = ref(1);
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const kindLabel = computed(() => (props.kind ? suggestionKindLabel(t, props.kind) : null));
+const kindFilter = computed(() => (kindLabel.value ? (props.kind ?? undefined) : undefined));
+const rank = useQuery(() => ({
+  ...autoobserveSuggestionRankQuery(org.value, props.focusId ?? "", kindFilter.value),
+  enabled: props.open && !!org.value && !!props.focusId,
+}));
+const locating = computed(() => !!props.focusId && rank.isPending.value && !rank.isError.value);
+const focusRank = computed(() =>
+  props.focusId && rank.data.value !== undefined && rank.data.value >= 0 ? rank.data.value : null,
+);
+const focusPage = computed(() =>
+  focusRank.value === null ? null : Math.floor(focusRank.value / DRAWER_PAGE) + 1,
+);
+const focusGone = computed(() => !!props.focusId && rank.data.value === -1);
+// Holds the page read until it has moved to the linked row's page, so page 1 is never fetched on the way.
+const focusMoved = ref(false);
 const query = useQuery(() => ({
-  ...autoobserveSuggestionsPageQuery(org.value, DRAWER_PAGE, (page.value - 1) * DRAWER_PAGE),
-  enabled: props.open && !!org.value,
+  ...autoobserveSuggestionsPageQuery(
+    org.value,
+    DRAWER_PAGE,
+    (page.value - 1) * DRAWER_PAGE,
+    kindFilter.value,
+  ),
+  enabled:
+    props.open && !!org.value && !locating.value && (focusPage.value === null || focusMoved.value),
   placeholderData: keepSameOrg(org.value),
 }));
 const refetch = () => void query.refetch();
@@ -247,9 +299,39 @@ const formatCount = (n: number) => raw(new Intl.NumberFormat(locale.value).forma
 watch(
   () => props.open,
   (isOpen) => {
-    if (isOpen) page.value = 1;
+    if (isOpen) page.value = focusPage.value ?? 1;
   },
 );
+
+const expandedIds = ref<string[]>([]);
+const focusRowIndex = computed(() =>
+  focusRank.value !== null && page.value === focusPage.value ? focusRank.value % DRAWER_PAGE : null,
+);
+const focusShown = computed(
+  () =>
+    focusPage.value !== null &&
+    page.value === focusPage.value &&
+    rows.value.some((r) => r.id === props.focusId),
+);
+
+watch(
+  focusPage,
+  (p) => {
+    if (p === null) return;
+    page.value = p;
+    focusMoved.value = true;
+    expandedIds.value = props.focusId ? [props.focusId] : [];
+  },
+  { immediate: true },
+);
+
+watch(focusShown, async (shown) => {
+  if (!shown) return;
+  await nextTick();
+  document
+    .querySelector(`[data-test="autoobserve2-suggestions-row-${props.focusId}"]`)
+    ?.scrollIntoView?.({ block: "center" });
+});
 
 watch(org, () => {
   page.value = 1;
