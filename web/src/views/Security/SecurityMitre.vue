@@ -31,32 +31,39 @@ import {
   countsByAlert,
   useAlertHistorySummary,
 } from "@/composables/security/useAlertHistorySummary";
-import { sigmaCatalog } from "@/utils/security/sigma";
-import { sigmaLogsourceLabel } from "@/utils/security/sourceTypes";
-import { techniqueUrl } from "@/utils/security/mitre";
+import { useQuery } from "@tanstack/vue-query";
+import { mitreCoverageQuery, sigmaCatalogQuery } from "@/services/securitySigma.queries";
+import type {
+  CatalogRule,
+  TechniqueCell as CoverageCell,
+  TechniqueState,
+} from "@/services/securitySigma";
 import {
-  buildAttackMatrix,
   heatLevel,
   parentTechnique,
-  summarizeMatrix,
-  type AttackMatrix,
-  type MatrixDetection,
-  type TechniqueCell as MatrixCell,
-  type TechniqueState,
-} from "@/utils/security/attackMatrix";
-import type { SigmaRule } from "@/utils/security/sigma";
+  techniqueUrl,
+  type AttackTactic,
+} from "@/utils/security/mitre";
 import { severityTagValue, toneLabelKey, toneOfSigmaLevel } from "@/utils/security/severity";
 import { formatEventCount } from "@/utils/formatters";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 
-type TechniqueCell = MatrixCell<SigmaRule>;
+type TechniqueCell = Omit<CoverageCell, "catalogRules"> & { catalogRules: CatalogRule[] };
 
-const STATE_RANK: Record<TechniqueState, number> = { firing: 0, covered: 1, available: 2 };
+const STATE_RANK: Record<TechniqueState, number> = {
+  firing: 0,
+  covered: 1,
+  available: 2,
+  none: 3,
+};
 
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
+// Enabling a rule creates a detection, which is authoring.
+const { canAuthor } = useSecurityAccess();
 
 const RANGES = [
   { value: "1h", minutes: 60 },
@@ -89,6 +96,14 @@ let detectionsReady: Promise<void> = Promise.resolve();
 
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
+  if (coverageQuery.error.value) {
+    out.push({
+      key: "coverage-error",
+      tone: "error",
+      text: t("siem.mitrePage.coverageError", { reason: coverageQuery.error.value.message }),
+      dataTest: "security-mitre-coverage-error",
+    });
+  }
   if (rulesError.value) {
     out.push({
       key: "rules-error",
@@ -137,27 +152,28 @@ async function loadHistory() {
   await history.load(orgId.value, end - minutes * 60_000, end, { alertIds, bucketMs });
   lastRunAt.value = Date.now();
 }
+const coverageQuery = useQuery(() => ({
+  ...mitreCoverageQuery(orgId.value),
+  enabled: !!orgId.value,
+}));
+const catalogQuery = useQuery(() => ({
+  ...sigmaCatalogQuery(orgId.value),
+  enabled: !!orgId.value,
+}));
+const catalog = computed<CatalogRule[]>(() => catalogQuery.data.value?.rules ?? []);
+
 function refresh() {
   detectionsReady = loadDetections(orgId.value);
   void loadHistory();
+  void coverageQuery.refetch();
 }
 onMounted(refresh);
 watch(orgId, refresh);
 
-const loading = computed(() => rulesLoading.value || history.loading.value);
-
-const catalog = sigmaCatalog();
-
-const detections = computed<MatrixDetection[]>(() =>
-  siemRows.value.map(({ alert, meta }) => ({
-    name: String(alert.name ?? ""),
-    enabled: !!alert.enabled,
-    sigmaId: meta.sigmaId,
-    level: meta.level,
-    techniques: meta.techniques,
-    tactics: meta.tactics,
-  })),
+const loading = computed(
+  () => rulesLoading.value || history.loading.value || coverageQuery.isPending.value,
 );
+const attackVersion = computed(() => coverageQuery.data.value?.attackVersion ?? "");
 
 /** One entry per detection that fired; `timeMs` is the start of its newest firing bucket. */
 const firings = computed(() =>
@@ -191,24 +207,54 @@ const firingsByTechnique = computed(() => {
 const byHeat = (a: TechniqueCell, b: TechniqueCell) =>
   STATE_RANK[a.state] - STATE_RANK[b.state] || b.firings - a.firings || a.id.localeCompare(b.id);
 
-// buildAttackMatrix counts one per firing entry; exact counts are laid over it and re-sorted.
-function withFiringCounts(base: AttackMatrix<SigmaRule>): AttackMatrix<SigmaRule> {
-  const cells = new Map<string, TechniqueCell>();
-  for (const [id, cell] of base.cells) {
-    cells.set(id, { ...cell, firings: firingsByTechnique.value.get(id) ?? 0 });
+/** Newest firing per technique, for the drawer's "last fired". */
+const lastFiredByTechnique = computed(() => {
+  const out = new Map<string, number>();
+  for (const f of firings.value) {
+    for (const tech of new Set(f.techniques.map((x) => x.trim().toUpperCase()))) {
+      out.set(tech, Math.max(out.get(tech) ?? 0, f.timeMs));
+    }
   }
-  const swap = (list: TechniqueCell[]) => list.map((c) => cells.get(c.id)!).sort(byHeat);
+  return out;
+});
+
+/** The server's coverage with the window's firing counts laid over it and re-sorted. */
+const matrix = computed(() => {
+  const coverage = coverageQuery.data.value;
+  const rules = new Map(catalog.value.map((r) => [r.key, r]));
+  const cells = new Map<string, TechniqueCell>();
+  for (const cell of coverage?.matrix.cells ?? []) {
+    const count = firingsByTechnique.value.get(cell.id) ?? 0;
+    cells.set(cell.id, {
+      ...cell,
+      catalogRules: cell.catalogRules.flatMap((key) => rules.get(key) ?? []),
+      firings: count,
+      lastFiredMs: count ? (lastFiredByTechnique.value.get(cell.id) ?? null) : null,
+      state: count > 0 ? "firing" : cell.state,
+    });
+  }
+  const pick = (ids: string[]) => ids.flatMap((id) => cells.get(id) ?? []).sort(byHeat);
   return {
-    columns: base.columns.map((col) => ({ ...col, cells: swap(col.cells) })),
-    unmapped: swap(base.unmapped),
+    columns: (coverage?.matrix.columns ?? []).map((col) => ({
+      tactic: col.tactic as AttackTactic,
+      cells: pick(col.cells),
+    })),
+    unmapped: pick(coverage?.matrix.unmapped ?? []),
     cells,
   };
-}
-
-const matrix = computed(() =>
-  withFiringCounts(buildAttackMatrix(catalog, detections.value, firings.value)),
-);
-const summary = computed(() => summarizeMatrix(matrix.value));
+});
+const summary = computed(() => {
+  const base = coverageQuery.data.value?.summary ?? {
+    tacticsCovered: 0,
+    tacticsTotal: 0,
+    techniquesCovered: 0,
+    techniquesTotal: 0,
+    techniquesFiring: 0,
+    gaps: 0,
+  };
+  const firing = [...matrix.value.cells.values()].filter((c) => c.firings > 0);
+  return { ...base, techniquesFiring: new Set(firing.map((c) => parentTechnique(c.id))).size };
+});
 
 type View = "all" | "covered" | "gaps" | "firing";
 const view = ref<View>("all");
@@ -305,7 +351,16 @@ function cellClass(cell: TechniqueCell): string {
   if (cell.firings > 0) return HEAT_CLASS[heatLevel(cell.firings)];
   if (cell.enabledCount > 0)
     return "bg-badge-success-soft-bg text-badge-success-soft-text border-transparent";
+  if (cell.state === "none") return "bg-surface-base text-text-secondary border-border-subtle";
   return "bg-surface-base text-text-secondary border-border-default border-dashed";
+}
+
+function cellCaption(cell: TechniqueCell) {
+  if (cell.enabledCount) return t("siem.mitrePage.cellEnabled", cell.enabledCount);
+  if (cell.catalogRules.length) {
+    return t("siem.mitrePage.cellAvailable", cell.catalogRules.length);
+  }
+  return t("siem.mitrePage.cellNone");
 }
 
 const selectedId = ref<string | null>(null);
@@ -329,7 +384,9 @@ function step(delta: number) {
   if (next) selectedId.value = next.id;
 }
 
-const installed = computed(() => new Set(detections.value.map((d) => d.sigmaId).filter(Boolean)));
+const installed = computed(
+  () => new Set(siemRows.value.map((row) => row.meta.sigmaId).filter(Boolean)),
+);
 const availableRules = computed(() =>
   (selected.value?.catalogRules ?? []).filter((r) => !r.id || !installed.value.has(r.id)),
 );
@@ -381,6 +438,7 @@ const drawerTabs = computed<RecordTab[]>(() => [
 ]);
 
 function enableRule(ruleId: string | undefined) {
+  if (!canAuthor.value) return;
   router.push({
     path: "/security/detections",
     query: { org_identifier: orgId.value, ...(ruleId ? { sigma_id: ruleId } : {}) },
@@ -484,6 +542,10 @@ function openDetections() {
             <span class="border-border-default rounded-default size-3 border border-dashed" />
             {{ t("siem.mitrePage.legend.available") }}
           </span>
+          <span class="flex items-center gap-1.5">
+            <span class="border-border-subtle rounded-default size-3 border" />
+            {{ t("siem.mitrePage.legend.none") }}
+          </span>
         </div>
       </div>
 
@@ -533,14 +595,16 @@ function openDetections() {
                       {{ formatEventCount(cell.firings) }}
                     </span>
                   </div>
-                  <span class="text-2xs truncate opacity-80">
-                    {{
-                      cell.enabledCount
-                        ? t("siem.mitrePage.cellEnabled", cell.enabledCount)
-                        : t("siem.mitrePage.cellAvailable", cell.catalogRules.length)
-                    }}
-                  </span>
-                  <OTooltip :content="raw(cell.catalogRules.map((r) => r.title).join(' · '))" />
+                  <span class="text-2xs truncate opacity-80">{{ cellCaption(cell) }}</span>
+                  <OTooltip
+                    :content="
+                      raw(
+                        [cell.name, ...cell.catalogRules.map((r) => r.title)]
+                          .filter(Boolean)
+                          .join(' · '),
+                      )
+                    "
+                  />
                 </div>
               </template>
               <span
@@ -588,7 +652,13 @@ function openDetections() {
       </div>
 
       <p class="text-2xs text-text-secondary">
-        {{ t("siem.mitrePage.footnote", { n: catalog.length }) }}
+        {{
+          t("siem.mitrePage.footnote", {
+            n: catalog.length,
+            total: summary.techniquesTotal,
+            version: attackVersion,
+          })
+        }}
       </p>
     </div>
 
@@ -596,7 +666,7 @@ function openDetections() {
       v-if="selected"
       :open="!!selected"
       v-model:tab="drawerTab"
-      :title="selected.id"
+      :title="selected.name ? raw(`${selected.id} ${selected.name}`) : raw(selected.id)"
       :eyebrow="t('siem.mitrePage.drawerEyebrow')"
       :subtitle="selected.tactics.map((x) => t(`siem.mitre.tactics.${x}`)).join(' · ')"
       icon="grid-on"
@@ -672,7 +742,7 @@ function openDetections() {
           }}</span>
           <div
             v-for="rule in availableRules"
-            :key="rule.id ?? rule.title"
+            :key="rule.key"
             class="border-border-default rounded-surface flex items-start gap-3 border border-dashed p-3"
             :data-test="`security-mitre-catalog-${rule.id}`"
           >
@@ -688,19 +758,18 @@ function openDetections() {
                   rule.title
                 }}</span>
               </div>
-              <span class="text-text-secondary font-mono text-xs">{{
-                sigmaLogsourceLabel(rule.logsource)
-              }}</span>
+              <span class="text-text-secondary font-mono text-xs">{{ rule.logsourceLabel }}</span>
               <p v-if="rule.description" class="text-text-secondary line-clamp-2 text-xs">
                 {{ rule.description }}
               </p>
             </div>
             <OButton
+              v-if="canAuthor"
               variant="outline"
               size="sm"
               icon-left="add"
               :data-test="`security-mitre-enable-${rule.id}`"
-              @click="enableRule(rule.id)"
+              @click="enableRule(rule.key)"
             >
               {{ t("siem.mitrePage.enable") }}
             </OButton>

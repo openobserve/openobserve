@@ -266,6 +266,7 @@ describe("useIngestionRoutes", () => {
       expect(metricRouteNames).toContain("otelCollector");
       expect(metricRouteNames).toContain("telegraf");
       expect(metricRouteNames).toContain("cloudwatchMetrics");
+      expect(metricRouteNames).toContain("datadogAgentMetrics");
     });
 
     it("should have traces routes under custom", () => {
@@ -287,6 +288,7 @@ describe("useIngestionRoutes", () => {
 
       expect(traceRouteNames).toContain("tracesOTLP");
       expect(traceRouteNames).toContain("ingestTracesFromOtel");
+      expect(traceRouteNames).toContain("datadogAgentTraces");
     });
 
     it("should have profiles routes under custom", () => {

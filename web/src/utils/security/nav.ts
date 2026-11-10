@@ -60,4 +60,10 @@ export const securityNavLinks = (t: TranslateFn): NavItem[] => [
     link: "/security/content",
     name: "securityContent",
   },
+  {
+    title: t("siem.nav.sources"),
+    icon: "cloud-upload",
+    link: "/security/sources",
+    name: "securitySources",
+  },
 ];

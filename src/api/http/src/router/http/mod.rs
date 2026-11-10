@@ -44,6 +44,7 @@ use futures::{Stream, StreamExt};
 use hashbrown::HashMap;
 use http_body_util::{BodyExt, Limited};
 use infra::cluster;
+use openobserve_api_ingest::request::datadog::DATADOG_MAX_BODY_BYTES;
 use openobserve_api_management::request::public_dashboards;
 
 mod hec;
@@ -279,6 +280,17 @@ async fn proxy_request(
                 return splunk_payload_too_large();
             }
         }
+    } else if is_datadog_route(query_path) {
+        match Limited::new(req.into_body(), DATADOG_MAX_BODY_BYTES)
+            .collect()
+            .await
+        {
+            Ok(collected) => collected.to_bytes(),
+            Err(e) => {
+                log::warn!("Datadog request body rejected: {e}");
+                return StatusCode::PAYLOAD_TOO_LARGE.into_response();
+            }
+        }
     } else {
         match req.into_body().collect().await {
             Ok(collected) => collected.to_bytes(),
@@ -358,6 +370,9 @@ fn proxy_error_response(
             if is_splunk_collector_route(path) {
                 return splunk_server_busy(StatusCode::BAD_GATEWAY);
             }
+            if is_datadog_route(path) {
+                return (StatusCode::BAD_GATEWAY, "Proxy request failed").into_response();
+            }
             (
                 StatusCode::BAD_GATEWAY,
                 format!("Proxy request failed: {e}"),
@@ -369,6 +384,14 @@ fn proxy_error_response(
         }
         None => no_nodes(path, "No online nodes"),
     }
+}
+
+/// The `/datadog/` validate URL carries the API key, so its error bodies never echo the URL.
+fn is_datadog_route(path: &str) -> bool {
+    let cfg = get_config();
+    path.strip_prefix(cfg.common.base_uri.as_str())
+        .unwrap_or(path)
+        .starts_with("/datadog/")
 }
 
 /// The router's own 503, with a retry hint on public paths; a querier's 503 passes through as is.
@@ -716,6 +739,9 @@ async fn build_response(
                     mask_log_url(&format!("{e:?}")),
                     start.elapsed().as_millis()
                 );
+                if is_datadog_route(&target.path) {
+                    return (StatusCode::BAD_GATEWAY, "Failed to read response").into_response();
+                }
                 return (
                     StatusCode::BAD_GATEWAY,
                     format!("Failed to read response: {e}"),
@@ -871,6 +897,7 @@ pub fn create_router_routes() -> axum::Router {
         .route("/aws/{*path}", any(dispatch))
         .route("/gcp/{*path}", any(dispatch))
         .route("/rum/{*path}", any(dispatch))
+        .route("/datadog/{*path}", any(dispatch))
 }
 
 /// Proxy routes for the Splunk HEC collector, for router nodes only.
@@ -1282,6 +1309,51 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(&body[..], b"No online nodes");
+    }
+
+    #[test]
+    fn test_datadog_route_detection() {
+        assert!(is_datadog_route("/datadog/default/api/v2/series"));
+        assert!(is_datadog_route(
+            "/datadog/default/api/v1/validate?api_key=x"
+        ));
+        assert!(!is_datadog_route("/datadogx/default"));
+        assert!(!is_datadog_route("/api/default/datadog/x"));
+    }
+
+    #[tokio::test]
+    async fn a_failed_datadog_validate_hop_leaks_the_key_nowhere() {
+        let _ring = RING.lock().await;
+        let _ = log::set_logger(&CAPTURE_LOGGER);
+        log::set_max_level(log::LevelFilter::Trace);
+        let secret = "o2oi_ddProxySecret42";
+        let path = format!("/datadog/default/api/v1/validate?api_key={secret}");
+        let req = Request::builder().uri(&path).body(Body::empty()).unwrap();
+        let nodes = vec![refused_node(9300).await];
+
+        let resp = proxy_request(req, path, nodes, std::time::Instant::now()).await;
+
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&body[..], b"Proxy request failed");
+        let lines = LOG_LINES.lock().unwrap().clone();
+        assert!(lines.iter().any(|l| l.contains("api_key=…")), "{lines:?}");
+        let leaked: Vec<_> = lines.iter().filter(|l| l.contains(secret)).collect();
+        assert!(leaked.is_empty(), "key in router logs: {leaked:?}");
+    }
+
+    #[tokio::test]
+    async fn an_oversized_datadog_body_is_refused_before_proxying() {
+        let path = "/datadog/default/api/v2/logs".to_string();
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri(&path)
+            .body(Body::from(vec![b' '; DATADOG_MAX_BODY_BYTES + 1]))
+            .unwrap();
+        let resp = proxy_request(req, path, vec![], std::time::Instant::now()).await;
+        assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     fn chunk(text: &'static str) -> Result<Bytes, &'static str> {

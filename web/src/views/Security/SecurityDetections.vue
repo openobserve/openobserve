@@ -22,6 +22,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
+import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -42,6 +44,7 @@ import {
 import { STATUS_VARIANT, firingStatus, type FiringStatus } from "@/utils/security/firings";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import { useSiemDetections, type DetectionRow } from "@/composables/security/useSiemDetections";
 import { whereOfDetectionSql } from "@/utils/security/detection";
 import { isFiring, type HistoryRow } from "@/utils/security/history";
@@ -65,12 +68,16 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 const { confirm } = useConfirmDialog();
+// Creating, editing and running detections is authoring (POST); deleting one is admin (DELETE).
+const { loaded: accessLoaded, canAuthor, canAdmin } = useSecurityAccess();
 
 const {
   rows,
   siemRows,
   loading,
   error,
+  forbidden: rulesForbidden,
+  failure: rulesFailure,
   load: loadRules,
   loadFull: loadFullRule,
   patch: patchRule,
@@ -82,6 +89,12 @@ const firings = computed(() => countsByAlert(summary24h.rows.value));
 const firingsPartial = summary24h.partial;
 const firingsLoading = summary24h.loading;
 const firingsError = summary24h.error;
+// Without the alerts read the list is empty for lack of a grant, not for lack of detections.
+const denials = computed(() =>
+  rulesForbidden.value || summary24h.forbidden.value
+    ? [viewDenial("alerts", "list", failedRequests(rulesFailure.value, summary24h.failure.value))]
+    : [],
+);
 /** Bucket width of the 24 h summary; a firing's time is known to this precision. */
 const FIRINGS_BUCKET_MS = 5 * 60_000;
 
@@ -191,6 +204,7 @@ const scoped = computed<Row[]>(() =>
 const counts = computed(() => ({
   fired: scoped.value.filter((r) => r.fired).length,
   erroring: scoped.value.filter((r) => r.state === "erroring").length,
+  notifyFailing: scoped.value.filter((r) => r.state === "notifyFailing").length,
   enabled: scoped.value.filter((r) => r.state === "enabled").length,
   disabled: scoped.value.filter((r) => r.state === "disabled").length,
 }));
@@ -239,6 +253,15 @@ const stats = computed<StatItem[]>(() => [
     tone: "error",
     max: scoped.value.length || undefined,
     dataTest: "security-detections-stat-erroring",
+  },
+  {
+    key: "notifyFailing",
+    label: t("siem.detections.stat.notifyFailing"),
+    value: counts.value.notifyFailing,
+    icon: "warning-amber",
+    tone: "warning",
+    max: scoped.value.length || undefined,
+    dataTest: "security-detections-stat-notify-failing",
   },
   {
     key: "enabled",
@@ -332,14 +355,17 @@ const rowClass = (row: Row) =>
     ? "!bg-table-row-selected-bg"
     : row.state === "erroring"
       ? "!bg-status-error-bg"
-      : row.state === "disabled"
-        ? "!bg-surface-panel"
-        : "";
+      : row.state === "notifyFailing"
+        ? "!bg-status-warning-bg"
+        : row.state === "disabled"
+          ? "!bg-surface-panel"
+          : "";
 
 const toggling = ref<string | null>(null);
 
 /** Waits for the server before flipping the row so the UI never shows "enabled" over a rule that is off. */
 async function toggleRule(row: Row) {
+  if (!canAuthor.value) return;
   const alert = row.entry.alert;
   if (!alert.id) {
     toast({ variant: "error", message: t("siem.detections.noId", { name: alert.name }) });
@@ -369,7 +395,7 @@ async function toggleRule(row: Row) {
 
 async function deleteRule(row: Row) {
   const alert = row.entry.alert;
-  if (!alert.id) return;
+  if (!alert.id || !canAdmin.value) return;
   const ok = await confirm({
     title: t("siem.detections.deleteTitle"),
     message: t("siem.detections.deleteMessage", { name: alert.name }),
@@ -627,6 +653,7 @@ const showNew = ref(false);
 const preset = ref<NewDetectionPreset | null>(null);
 
 function openNew(p: NewDetectionPreset | null = null) {
+  if (!canAuthor.value) return;
   preset.value = p;
   showNew.value = true;
 }
@@ -651,8 +678,9 @@ function openFromQuery() {
 
 onMounted(() => {
   void refresh();
-  openFromQuery();
 });
+// A deep link opens the dialog only once the grant is known, so an author is not refused while it loads.
+watch(accessLoaded, (ready) => ready && openFromQuery(), { immediate: true });
 watch(orgId, () => void refresh());
 </script>
 
@@ -669,10 +697,12 @@ watch(orgId, () => void refresh());
         variant="primary"
         size="sm"
         icon-left="add"
+        :disabled="!canAuthor"
         data-test="security-detections-new"
         @click="openNew()"
       >
         {{ t("siem.detections.new") }}
+        <OTooltip v-if="!canAuthor" :content="t('siem.access.needsAuthor')" />
       </OButton>
     </template>
 
@@ -722,6 +752,7 @@ watch(orgId, () => void refresh());
           <div class="flex w-full items-center gap-2">
             <div class="w-40 shrink-0">
               <OSelect
+                :aria-label="t('siem.aria.severityFilter')"
                 :model-value="severity"
                 :options="severityOptions"
                 :placeholder="t('siem.detections.anySeverity')"
@@ -777,6 +808,15 @@ watch(orgId, () => void refresh());
                 :content="row.entry.alert.last_error || t('siem.detections.stat.erroring')"
               />
             </OIcon>
+            <OIcon
+              v-else-if="row.state === 'notifyFailing'"
+              name="warning-amber"
+              size="xs"
+              class="text-status-warning-text shrink-0"
+              data-test="security-detections-notify-failing-icon"
+            >
+              <OTooltip :content="t('siem.detections.notifyFailingHint')" />
+            </OIcon>
           </div>
         </template>
         <template #cell-stream="{ row }">
@@ -824,21 +864,29 @@ watch(orgId, () => void refresh());
           <div @click.stop>
             <OSwitch
               :model-value="row.enabled"
-              :disabled="toggling === row.id"
+              :disabled="!canAuthor || toggling === row.id"
               :data-test="`security-detections-toggle-${row.id}`"
               @update:model-value="toggleRule(row)"
             />
+            <OTooltip v-if="!canAuthor" :content="t('siem.access.needsAuthor')" />
           </div>
         </template>
 
         <template #empty>
+          <SecurityAccessLock
+            v-if="denials.length"
+            :denials="denials"
+            data-test="security-detections-access-lock"
+          />
           <OEmptyState
-            v-if="!loading"
+            v-else-if="!loading"
             size="block"
             icon="shield-alert-outline"
             :title="t('siem.detections.emptyTitle')"
             :description="t('siem.detections.emptyHint')"
-            :action-label="filtersActive ? undefined : t('siem.detections.createFirst')"
+            :action-label="
+              filtersActive || !canAuthor ? undefined : t('siem.detections.createFirst')
+            "
             action-icon="add"
             :filtered="filtersActive"
             @action="(id?: string) => (id === 'clear-filters' ? clearFilters() : openNew())"
@@ -880,14 +928,18 @@ watch(orgId, () => void refresh());
               ? 'success-soft'
               : selected.state === 'erroring'
                 ? 'error-soft'
-                : 'default-soft'
+                : selected.state === 'notifyFailing'
+                  ? 'warning-soft'
+                  : 'default-soft'
           "
           :icon="
             selected.state === 'enabled'
               ? 'check-circle'
               : selected.state === 'erroring'
                 ? 'error-outline'
-                : 'pause-circle-filled'
+                : selected.state === 'notifyFailing'
+                  ? 'warning-amber'
+                  : 'pause-circle-filled'
           "
           size="sm"
           >{{ t(`siem.detections.state.${selected.state}`) }}</OTag
@@ -920,6 +972,14 @@ watch(orgId, () => void refresh());
           data-test="security-detection-drawer-error"
         >
           {{ selected.entry.alert.last_error || t("siem.detections.erroringHint") }}
+        </OBanner>
+        <OBanner
+          v-else-if="selected.state === 'notifyFailing'"
+          variant="warning"
+          icon="warning-amber"
+          data-test="security-detection-drawer-notify-failing"
+        >
+          {{ t("siem.detections.notifyFailingHint") }}
         </OBanner>
 
         <div v-if="selected.techniques.length || tactics.length" class="flex flex-col gap-2">
@@ -1049,6 +1109,7 @@ watch(orgId, () => void refresh());
 
       <template #footer>
         <OButton
+          v-if="canAdmin"
           variant="outline-destructive"
           size="sm-action"
           icon-left="delete"
@@ -1069,6 +1130,7 @@ watch(orgId, () => void refresh());
           {{ t("siem.detections.viewMatches") }}
         </OButton>
         <OButton
+          v-if="canAuthor"
           variant="primary"
           size="sm-action"
           :icon-left="selected.enabled ? 'pause' : 'play-arrow'"

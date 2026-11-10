@@ -1,6 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
+<!-- Security Events: one stream normalised onto OCSF, or every source at once; the URL carries the whole view. -->
 <script setup lang="ts">
 import {
   computed,
@@ -9,6 +10,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  shallowRef,
   watch,
 } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -17,49 +19,59 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
-import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
-import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 import DateTime from "@/components/DateTime.vue";
-import SecuritySeverityChart from "@/components/security/SecuritySeverityChart.vue";
+import SecurityEventsSources from "@/components/security/events/SecurityEventsSources.vue";
+import SecurityEventsDetected from "@/components/security/events/SecurityEventsDetected.vue";
+import SecurityEventsFilterBar from "@/components/security/events/SecurityEventsFilterBar.vue";
+import SecurityEventsFilterChips from "@/components/security/events/SecurityEventsFilterChips.vue";
+import SecurityEventsTopValues from "@/components/security/events/SecurityEventsTopValues.vue";
+import SecurityEventsHunt from "@/components/security/events/SecurityEventsHunt.vue";
+import SecurityEventsTimeline from "@/components/security/events/SecurityEventsTimeline.vue";
+import SecurityEventsTable, {
+  type EventRow,
+} from "@/components/security/events/SecurityEventsTable.vue";
 import SecurityEventDrawer from "./SecurityEventDrawer.vue";
+import SecurityNewDetectionDialog, {
+  type NewDetectionPreset,
+} from "@/components/security/SecurityNewDetectionDialog.vue";
+import { useSiemDetections } from "@/composables/security/useSiemDetections";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { generateTraceContext } from "@/utils/auth";
+import type { Classification, SeveritySql } from "@/services/securitySources";
+import { fetchSourceMatch } from "@/services/securitySources.queries";
 import {
-  bestMatch,
-  isSecuritySource,
-  readPath,
-  type Classification,
-} from "@/utils/security/classify";
-import { normalizeEvents, populatedColumns, sourceColumnFor } from "@/utils/security/normalize";
-import {
-  NORMALIZED_COLUMNS,
-  ocsfCategoryOf,
-  ocsfClass,
-  toOcsfSeverity,
-  type NormalizedEvent,
-} from "@/utils/security/ocsf";
-import { sigmaLogsourceLabel } from "@/utils/security/sourceTypes";
-import { blockedReason, caveat } from "@/utils/security/sigma";
+  normalizeEvent,
+  normalizeEvents,
+  populatedColumns,
+  sourceColumnFor,
+} from "@/utils/security/normalize";
+import { NORMALIZED_COLUMNS, type NormalizedEvent } from "@/utils/security/ocsf";
 import { useSigmaRules } from "@/composables/security/useSigmaRules";
-import { ocsfClassCounts, withRecentActivity } from "@/composables/security/streamActivity";
+import { useEventsDetection } from "@/composables/security/useEventsDetection";
+import {
+  EMPTY_DATE,
+  initialViewState,
+  loadSavedCols,
+  rangeFor,
+  sameRange,
+  saveCols,
+  useEventsPrefs,
+  type DateState,
+} from "@/composables/security/useEventsViewState";
 import {
   addToSqlWhere,
   eventKey,
@@ -68,36 +80,33 @@ import {
   foldHistogram,
   histogramInterval,
   histogramSql,
+  isAggregateSql,
+  resultColumns,
+  SEVERITY_ALIAS,
+  splitSeverity,
   topValuesSql,
   whereParts,
+  type EventSort,
   type FieldFilter,
   type HistogramResult,
   type SeverityValue,
 } from "@/utils/security/eventQuery";
-import {
-  SEVERITY_TONES,
-  TONE_ICON,
-  TONE_STAT,
-  TONE_TOKEN,
-  severityRailColor,
-  severityTagValue,
-  toneLabelKey,
-  toneOfSeverityId,
-  toneOfSigmaLevel,
-  type SeverityTone,
-} from "@/utils/security/severity";
-import { widerPeriodFor, sourceHealth, type SourceHealth } from "@/utils/security/streams";
+import { ALL_SOURCES, huntLinkQuery, type HuntQuery } from "@/utils/security/huntLink";
+import { toneLabelKey, toneOfSeverityId } from "@/utils/security/severity";
+import { widerPeriodFor } from "@/utils/security/streams";
 import { useSecuritySources } from "@/composables/security/useSecuritySources";
+import {
+  forbiddenReason,
+  isForbiddenError,
+  useSecurityAccess,
+} from "@/composables/security/useSecurityAccess";
 import { FieldIndex } from "@/utils/security/fields";
+import { groupFields } from "@/utils/security/fieldGroups";
 import { quoteIdent } from "@/utils/security/sql";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
-import {
-  b64DecodeUnicodeSafe,
-  b64EncodeUnicode,
-  formatCompactCount,
-  formatEventCount,
-} from "@/utils/formatters";
+import { b64EncodeUnicode } from "@/utils/formatters";
+import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 
 const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -107,176 +116,23 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-// The URL is the source of truth; localStorage only restores a bare URL.
-interface DateState {
-  type: "relative" | "absolute";
-  period: string;
-  absolute: { startTime: number; endTime: number } | null;
-}
-interface ViewState {
-  stream: string | null;
-  sqlMode: boolean;
-  query: string;
-  severity: SeverityValue[];
-  filters: FieldFilter[];
-  date: DateState;
-  eventTs: string | null;
-}
-
-const URL_KEYS = [
-  "stream",
-  "period",
-  "from",
-  "to",
-  "sql_mode",
-  "query",
-  "severity",
-  "filters",
-  "event_ts",
-];
-const EMPTY_DATE: DateState = { type: "relative", period: "15m", absolute: null };
+// ── View state: the URL is the source of truth; localStorage restores a bare URL ──
 const stateKey = () => `oo_sec_events_state_${orgId.value}`;
 const colsKey = () => `oo_sec_events_cols_${orgId.value}`;
-const prefsKey = () => `oo_sec_events_prefs_${orgId.value}`;
+const initialState = initialViewState(route.query as Record<string, any>, stateKey());
 
-function parseFilters(raw: string): FieldFilter[] {
-  try {
-    const parsed = JSON.parse(raw.trim().startsWith("[") ? raw : b64DecodeUnicodeSafe(raw, "[]"));
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((f: any) => f?.field && f?.value != null)
-      .map((f: any) => ({
-        field: String(f.field),
-        op: String(f.op ?? "="),
-        value: String(f.value),
-      }));
-  } catch {
-    return [];
-  }
-}
-
-function stateFromUrl(): ViewState | null {
-  const q = route.query as Record<string, any>;
-  if (!URL_KEYS.some((k) => q[k] != null && q[k] !== "")) return null;
-  return {
-    stream: q.stream ? String(q.stream) : null,
-    sqlMode: String(q.sql_mode) === "true",
-    query: q.query ? b64DecodeUnicodeSafe(String(q.query), "") : "",
-    severity: q.severity
-      ? String(q.severity)
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [],
-    filters: q.filters ? parseFilters(String(q.filters)) : [],
-    date:
-      q.from && q.to
-        ? {
-            type: "absolute",
-            period: "",
-            absolute: { startTime: Number(q.from), endTime: Number(q.to) },
-          }
-        : { type: "relative", period: String(q.period ?? "15m"), absolute: null },
-    eventTs: q.event_ts ? String(q.event_ts) : null,
-  };
-}
-
-function stateFromStorage(): ViewState | null {
-  try {
-    const raw = localStorage.getItem(stateKey());
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    return {
-      stream: s.stream ?? null,
-      sqlMode: !!s.sqlMode,
-      query: s.query ?? "",
-      severity: Array.isArray(s.severity) ? s.severity.map(String) : [],
-      filters: Array.isArray(s.filters) ? s.filters : [],
-      date: s.date?.type ? s.date : { ...EMPTY_DATE },
-      eventTs: null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-const initialState: ViewState = stateFromUrl() ??
-  stateFromStorage() ?? {
-    stream: null,
-    sqlMode: false,
-    query: "",
-    severity: [],
-    filters: [],
-    date: { ...EMPTY_DATE },
-    eventTs: null,
-  };
-
-const PERIOD_MICROS: Record<string, number> = {
-  s: 1_000_000,
-  m: 60_000_000,
-  h: 3_600_000_000,
-  d: 86_400_000_000,
-  w: 604_800_000_000,
-  M: 2_592_000_000_000,
-};
-function relativeToMicros(period: string): number {
-  const m = period?.match(/^(\d+)\s*([smhdwM])$/);
-  return m ? Number(m[1]) * (PERIOD_MICROS[m[2]] ?? PERIOD_MICROS.m) : 15 * 60 * 1_000_000;
-}
-function rangeFor(d: DateState) {
-  if (d.type === "absolute" && d.absolute?.startTime && d.absolute?.endTime) {
-    return { start: Number(d.absolute.startTime), end: Number(d.absolute.endTime) };
-  }
-  const end = Date.now() * 1000;
-  return { start: end - relativeToMicros(d.period), end };
-}
-
-const dateState = ref<DateState>({ ...initialState.date });
+const dateState = ref<DateState>({ ...(initialState.date ?? EMPTY_DATE) });
 const timeRange = ref(rangeFor(initialState.date));
 // Bumped to remount the picker when the range is set from outside it (chart zoom).
 const dateKey = ref(0);
 
-function loadPrefs(): { timeline: boolean; raw: boolean; sidebar: number } {
-  try {
-    return {
-      timeline: true,
-      raw: false,
-      sidebar: 260,
-      ...JSON.parse(localStorage.getItem(prefsKey()) ?? "{}"),
-    };
-  } catch {
-    return { timeline: true, raw: false, sidebar: 260 };
-  }
-}
-const prefs = loadPrefs();
-const showTimeline = ref<boolean>(prefs.timeline);
-const showRaw = ref<boolean>(prefs.raw);
-const sidebarWidth = ref<number>(prefs.sidebar || 260);
-const lastSidebarWidth = ref<number>(sidebarWidth.value || 260);
-watch([showTimeline, showRaw, sidebarWidth], () => {
-  try {
-    localStorage.setItem(
-      prefsKey(),
-      JSON.stringify({
-        timeline: showTimeline.value,
-        raw: showRaw.value,
-        sidebar: sidebarWidth.value,
-      }),
-    );
-  } catch {
-    /* best-effort */
-  }
-});
-function toggleSidebar() {
-  if (sidebarWidth.value > 0) {
-    lastSidebarWidth.value = sidebarWidth.value;
-    sidebarWidth.value = 0;
-  } else {
-    sidebarWidth.value = lastSidebarWidth.value || 260;
-  }
-}
+const { showTimeline, showRaw, sidebarWidth, toggleSidebar } = useEventsPrefs(
+  () => `oo_sec_events_prefs_${orgId.value}`,
+);
 
 const secSources = useSecuritySources();
+// Including a source is triage, excluding one weakens coverage (admin), and a detection is authoring.
+const { canTriage, canAuthor, canAdmin } = useSecurityAccess();
 const {
   streams: streamList,
   loading: streamsLoading,
@@ -284,39 +140,20 @@ const {
   suggestions: suggestedSources,
   classifying: classifyingSources,
 } = secSources;
+// The list answers 200 with no streams for a role without a stream read, which is not "nothing ingested".
+const streamDenials = computed(() => [
+  viewDenial("streams", "list", [`GET /api/${orgId.value}/security/sources`]),
+]);
 const selectedStream = ref<string | null>(null);
+const isHunt = computed(() => selectedStream.value === ALL_SOURCES);
+const huntState = ref<HuntQuery>({ ...initialState.hunt });
 
 const allStreamNames = computed(() => streamList.value.map((s) => String(s.name)));
 const sourceByName = computed(() => new Map(secSources.sources.value.map((e) => [e.name, e])));
-const SUGGESTIONS_SHOWN = 5;
-const showAllSuggestions = ref(false);
-const visibleSuggestions = computed(() =>
-  showAllSuggestions.value
-    ? suggestedSources.value
-    : suggestedSources.value.slice(0, SUGGESTIONS_SHOWN),
-);
-function sourceHint(name: string): I18nText | undefined {
-  const entry = sourceByName.value.get(name);
-  if (entry?.reason === "auto" && entry.verdict) {
-    const n = Math.round(entry.verdict.confidence * 100);
-    return t("siem.events.autoSource", { label: entry.verdict.label, n });
-  }
-  return entry?.reason === "name" ? t("siem.events.nameSource") : undefined;
-}
 const otherStreamNames = computed(() =>
-  allStreamNames.value.filter((n) => !secStreamNames.value.includes(n) && !n.startsWith("_o2_")),
+  allStreamNames.value.filter((n) => !secStreamNames.value.includes(n)),
 );
-/** Stats re-read from the data for sources the stream stats have not caught up on. */
-const freshStats = ref<Map<string, any>>(new Map());
-const streamStats = computed(
-  () =>
-    new Map(
-      streamList.value.map((s) => [
-        String(s.name),
-        freshStats.value.get(String(s.name)) ?? s.stats,
-      ]),
-    ),
-);
+const streamStats = computed(() => new Map(streamList.value.map((s) => [String(s.name), s.stats])));
 
 const streamOptions = computed(() => {
   const opts: SelectOption[] = [];
@@ -327,6 +164,7 @@ const streamOptions = computed(() => {
       header: true,
       headerCount: raw(String(secStreamNames.value.length)),
     });
+    opts.push({ label: t("siem.events.allSources"), value: ALL_SOURCES, icon: "manage-search" });
     secStreamNames.value.forEach((n) => opts.push({ label: raw(n), value: n, icon: "shield" }));
   }
   if (otherStreamNames.value.length) {
@@ -340,27 +178,34 @@ const streamOptions = computed(() => {
   }
   return opts;
 });
-const addStreamOptions = computed(() =>
-  otherStreamNames.value.map((n) => ({ label: raw(n), value: n })),
-);
 
-function addStreamToSecurity(name: unknown) {
-  const n = String(name ?? "");
-  if (!n) return;
-  secSources.include(n);
+// A refused save leaves the org-wide list unchanged, so the sidebar already shows the truth.
+const sourceSaveFailed = (err: unknown, fallback: I18nText) => {
+  const data = (err as { response?: { data?: { message?: string; error?: string } } })?.response
+    ?.data;
+  toast({ variant: "error", message: raw(data?.message ?? data?.error) || fallback });
+};
+async function addStreamToSecurity(name: string) {
+  if (!canTriage.value) return;
+  try {
+    await secSources.include(name);
+  } catch (err) {
+    sourceSaveFailed(err, t("siem.events.includeFailed", { name }));
+    return;
+  }
   analytics.track("security_source_inclusion_changed", { included: true, view: "events" });
-  selectedStream.value = n;
+  selectedStream.value = name;
 }
-function removeStreamFromSecurity(name: string) {
-  secSources.exclude(name);
+async function removeStreamFromSecurity(name: string) {
+  if (!canAdmin.value) return;
+  try {
+    await secSources.exclude(name);
+  } catch (err) {
+    sourceSaveFailed(err, t("siem.events.excludeFailed", { name }));
+    return;
+  }
   analytics.track("security_source_inclusion_changed", { included: false, view: "events" });
 }
-
-const HEALTH_DOT: Record<SourceHealth, string> = {
-  live: "bg-status-positive",
-  quiet: "bg-badge-amber-solid-bg",
-  never: "bg-border-default",
-};
 
 interface StreamField {
   name: string;
@@ -369,48 +214,12 @@ interface StreamField {
 const schemaFields = ref<StreamField[]>([]);
 const fieldNames = computed(() => schemaFields.value.map((f) => f.name));
 
-// Groups follow OCSF objects, so a field sits where the OCSF schema puts it.
-const FIELD_GROUPS: [RegExp, string][] = [
-  [
-    /^(class_uid|class_name|category_uid|category_name|activity_id|activity_name|type_uid|type_name|severity_id|severity|level|status|status_code|status_id|status_detail|message|time|start_time|end_time|duration|count)$/,
-    "event",
-  ],
-  [/^(actor|user|session)[._]/, "actor"],
-  [/^(src_endpoint|src)[._]/, "src"],
-  [/^(dst_endpoint|dst)[._]/, "dst"],
-  [/^(connection_info|traffic|network_traffic|tls|proxy)[._]/, "network"],
-  [/^(http_request|http_response|url|web_resources)[._]/, "http"],
-  [/^(process|file|module|registry_key)[._]/, "process"],
-  [/^(cloud|api|resources)[._]/, "cloud"],
-  [/^(finding_info|finding|attacks|vulnerabilities|malware|observables)[._]/, "finding"],
-  [/^device[._]/, "device"],
-  [/^metadata[._]/, "metadata"],
-];
-const FIELD_GROUP_ORDER = [
-  "event",
-  "actor",
-  "src",
-  "dst",
-  "network",
-  "http",
-  "process",
-  "cloud",
-  "finding",
-  "device",
-  "metadata",
-  "other",
-];
-const fieldItems = computed<FieldItem[]>(() => {
-  const groups: Record<string, StreamField[]> = {};
-  for (const f of schemaFields.value) {
-    const group = FIELD_GROUPS.find(([re]) => re.test(f.name))?.[1] ?? "other";
-    (groups[group] ??= []).push(f);
-  }
-  return FIELD_GROUP_ORDER.filter((g) => groups[g]?.length).flatMap((g) => [
-    { name: `__group_${g}`, isGroup: true, groupName: t(`siem.fieldGroup.${g}`), group: g },
-    ...groups[g].map((f) => ({ name: f.name, type: f.ftype, group: g })),
-  ]);
-});
+const fieldItems = computed<FieldItem[]>(() =>
+  groupFields(schemaFields.value).flatMap(({ group, fields }) => [
+    { name: `__group_${group}`, isGroup: true, groupName: t(`siem.fieldGroup.${group}`), group },
+    ...fields.map((f) => ({ name: f.name, type: f.ftype, group })),
+  ]),
+);
 
 const PREFERRED = [
   "_timestamp",
@@ -424,28 +233,11 @@ const PREFERRED = [
 ];
 const visibleCols = ref<string[]>([]);
 
-function loadSavedCols(stream: string): string[] | null {
-  try {
-    const cols = JSON.parse(localStorage.getItem(colsKey()) ?? "{}")?.[stream];
-    return Array.isArray(cols) && cols.length ? cols : null;
-  } catch {
-    return null;
-  }
-}
-function saveCols(stream: string, cols: string[]) {
-  try {
-    const all = JSON.parse(localStorage.getItem(colsKey()) ?? "{}");
-    all[stream] = cols;
-    localStorage.setItem(colsKey(), JSON.stringify(all));
-  } catch {
-    /* best-effort */
-  }
-}
 function initColumns(fields: StreamField[]) {
   const names = new Set(fields.map((f) => f.name));
-  const restored = (selectedStream.value ? loadSavedCols(selectedStream.value) : null)?.filter(
-    (c) => names.has(c),
-  );
+  const restored = (
+    selectedStream.value ? loadSavedCols(colsKey(), selectedStream.value) : null
+  )?.filter((c) => names.has(c));
   if (restored?.length) {
     visibleCols.value = restored;
     return;
@@ -467,7 +259,7 @@ function toggleCol(name: string) {
   if (i === -1) visibleCols.value = [...visibleCols.value, name];
   else if (visibleCols.value.length > 1)
     visibleCols.value = visibleCols.value.filter((c) => c !== name);
-  if (selectedStream.value) saveCols(selectedStream.value, visibleCols.value);
+  if (selectedStream.value) saveCols(colsKey(), selectedStream.value, visibleCols.value);
   showRaw.value = true;
 }
 
@@ -489,36 +281,12 @@ const notices = computed<SecurityNotice[]>(() =>
     : [],
 );
 
-// Numeric fallbacks are skipped: syslog counts the other way (0 is worst) and would invert the tiles.
-const SEVERITY_FIELDS = [
-  "severity_id",
-  "severity",
-  "level",
-  "log_level",
-  "loglevel",
-  "severity_text",
-];
-const severityField = computed(() => {
-  const index = new FieldIndex(fieldNames.value);
-  for (const path of (detected.value?.source.map.severityId as string[] | undefined) ?? []) {
-    for (const option of path.split("|")) {
-      const column = index.resolve(option);
-      if (column) return column;
-    }
-  }
-  const fallback = SEVERITY_FIELDS.find((c) => fieldNames.value.includes(c)) ?? null;
-  // A numeric level/severity from an unknown producer has no known scale, so it is not read as severity.
-  const type = schemaFields.value.find((f) => f.name === fallback)?.ftype ?? "";
-  if (fallback && fallback !== "severity_id" && /int|float|double|decimal/i.test(type)) return null;
-  return fallback;
-});
-const severityIsOcsf = computed(() => severityField.value === "severity_id");
-const severityIsNumeric = computed(() => {
-  const type = schemaFields.value.find((f) => f.name === severityField.value)?.ftype ?? "";
-  return severityIsOcsf.value || /int|float|double|decimal/i.test(type);
-});
+// The server owns the severity definition, so the tiles, chart and rows all read the same one.
+const severityExpr = ref<SeveritySql | null>(null);
+const severitySql = computed(() => severityExpr.value?.sql ?? null);
+const hasSeverity = computed(() => !!severitySql.value);
 
-const SEVERITY_ID_OPTIONS = computed(() =>
+const severityOptions = computed<SelectOption[]>(() =>
   [
     { id: 6, key: "siem.severity.fatal" },
     { id: 5, key: toneLabelKey("critical") },
@@ -530,96 +298,14 @@ const SEVERITY_ID_OPTIONS = computed(() =>
     { id: 99, key: "siem.severity.other" },
   ].map(({ id, key }) => ({ label: t(key), value: id })),
 );
-const severityTextOptions = ref<SelectOption[]>([]);
-const severityOptions = computed(() =>
-  severityIsOcsf.value ? SEVERITY_ID_OPTIONS.value : severityTextOptions.value,
-);
-
-async function loadSeverityValues() {
-  severityTextOptions.value = [];
-  const field = severityField.value;
-  if (!field || severityIsOcsf.value || !selectedStream.value) return;
-  try {
-    const res = await streamService.fieldValues({
-      org_identifier: orgId.value,
-      stream_name: selectedStream.value,
-      fields: [field],
-      size: 50,
-      start_time: timeRange.value.start,
-      end_time: timeRange.value.end,
-      type: "logs",
-    });
-    const vals: string[] = (res.data?.hits ?? []).flatMap((h: any) =>
-      (h.values ?? []).map((v: any) => String(v.zo_sql_key ?? v.key ?? v)),
-    );
-    const uniq = [...new Set(vals)].filter((v) => v !== "" && v !== "null");
-    // Worst first, whatever order the data came back in.
-    uniq.sort((a, b) => toOcsfSeverity(b) - toOcsfSeverity(a) || a.localeCompare(b));
-    severityTextOptions.value = uniq.map((v) => ({ label: raw(v), value: v }));
-  } catch {
-    severityTextOptions.value = [];
-  }
-}
-
-function onSeverityChange(v: unknown) {
-  const next = (Array.isArray(v) ? v : v == null ? [] : [v]).filter(
-    (x) => x !== null && x !== undefined && x !== "",
-  ) as SeverityValue[];
-  const cur = severityFilter.value;
-  if (next.length === cur.length && next.every((n, i) => n === cur[i])) return;
-  severityFilter.value = next;
-}
 
 const filters = computed(() => ({
-  severityField: severityField.value,
-  severityNumeric: severityIsNumeric.value,
+  severitySql: severitySql.value,
   severity: severityFilter.value,
   filters: fieldFilters.value,
 }));
 
-const builderField = ref("");
-const builderOp = ref("=");
-const builderValue = ref("");
-const builderValueOptions = ref<SelectOption[]>([]);
-const builderValuesLoading = ref(false);
-
-const FILTER_OPS = computed(() => [
-  { label: t("siem.op.eq"), value: "=" },
-  { label: t("siem.op.neq"), value: "!=" },
-  { label: t("siem.op.contains"), value: "contains" },
-  { label: t("siem.op.notContains"), value: "not_contains" },
-]);
-const OP_SYMBOL: Record<string, string> = {
-  "=": "=",
-  "!=": "≠",
-  contains: "~",
-  not_contains: "!~",
-};
-const fieldNameOptions = computed(() => fieldNames.value.map((n) => ({ label: raw(n), value: n })));
-
-watch(builderField, async (field) => {
-  builderValue.value = "";
-  builderValueOptions.value = [];
-  if (!field || !selectedStream.value) {
-    builderValuesLoading.value = false;
-    return;
-  }
-  builderValuesLoading.value = true;
-  const values = await fetchTopValues(field, 50);
-  // Another field may have been picked while these loaded.
-  if (builderField.value !== field) return;
-  builderValueOptions.value = values.map((v) => ({ label: raw(v.value), value: v.value }));
-  builderValuesLoading.value = false;
-});
-
-function commitFilter() {
-  const field = builderField.value.trim();
-  const value = String(builderValue.value ?? "").trim();
-  if (!field || !value) return;
-  addFilter(field, value, builderOp.value);
-  builderValue.value = "";
-}
-
+// ── Filters ──────────────────────────────────────────────────────────────────
 function addFilter(field: string, value: string, op = "=") {
   if (!field || value == null) return;
   // In SQL mode a pivot narrows the hand-written query rather than discarding it.
@@ -668,116 +354,84 @@ function clearFilters() {
   else void runSearch();
 }
 
-const PAGE_ROWS = 250;
+// ── Results ──────────────────────────────────────────────────────────────────
+const PAGE_SIZES = [50, 100, 250];
+const page = ref(1);
+const pageSize = ref(PAGE_SIZES[0]);
+const sortBy = ref("time");
+const sortOrder = ref<"asc" | "desc">("desc");
 const events = ref<Record<string, any>[]>([]);
+/** The server's severity per row of `events`; null where the query did not project it. */
+const rowSeverity = ref<(number | null)[]>([]);
+/** An aggregate or computed SQL result: shown as returned, never read as events. */
+const resultMode = ref(false);
+const resultCols = ref<string[]>([]);
+/** The table a hand-written query reads, when it is a stream the picker knows. */
+const queryOnPicked = ref(true);
 const loading = ref(false);
-const total = ref(0);
 const errorMsg = ref("");
+/** The search was refused for a missing stream read, which the page shows as a lock rather than an error. */
+const searchRefusal = shallowRef<unknown>(null);
+const searchDenials = computed(() =>
+  searchRefusal.value ? [viewDenial("streams", "list", failedRequests(searchRefusal.value))] : [],
+);
 const lastRunAt = ref<number | null>(null);
 
 const detected = ref<Classification | null>(null);
-function detectSource(sample: Record<string, unknown> | null = events.value[0] ?? null) {
-  detected.value = fieldNames.value.length ? bestMatch(fieldNames.value, { sample }) : null;
+let detectSeq = 0;
+async function detectSource(sample: Record<string, unknown> | null = events.value[0] ?? null) {
+  const seq = ++detectSeq;
+  const fields = fieldNames.value;
+  if (!fields.length) {
+    detected.value = null;
+    severityExpr.value = null;
+    return;
+  }
+  try {
+    const match = await fetchSourceMatch(orgId.value, fields, sample);
+    if (seq !== detectSeq) return;
+    detected.value = match.classification;
+    severityExpr.value = match.severity;
+  } catch {
+    if (seq !== detectSeq) return;
+    detected.value = null;
+    severityExpr.value = null;
+  }
 }
 
 const normalizedEvents = computed<NormalizedEvent[]>(() =>
-  normalizeEvents(events.value as Record<string, unknown>[], detected.value?.source ?? null),
+  normalizeEvents(
+    events.value as Record<string, unknown>[],
+    detected.value?.source ?? null,
+    rowSeverity.value,
+  ),
 );
 const normalizedColumns = computed(
   () => populatedColumns(normalizedEvents.value, NORMALIZED_COLUMNS) as (keyof NormalizedEvent)[],
 );
 
-const OCSF_OBJECTS = [
-  "actor",
-  "src_endpoint",
-  "dst_endpoint",
-  "connection_info",
-  "traffic",
-  "http_request",
-  "http_response",
-  "process",
-  "file",
-  "device",
-  "cloud",
-  "api",
-  "finding_info",
-  "metadata",
-];
-
-/** Row counts per class over the last hour, for streams that carry `class_uid`. */
-const classMix = ref<{ uid: number; n: number }[]>([]);
-async function loadClassMix(streamName: string) {
-  classMix.value = [];
-  if (!fieldNames.value.includes("class_uid")) return;
-  const endUs = Date.now() * 1000;
-  try {
-    const counts = await ocsfClassCounts(
-      orgId.value,
-      streamName,
-      "class_uid",
-      endUs - 3_600_000_000,
-      endUs,
-    );
-    if (selectedStream.value === streamName) classMix.value = counts;
-  } catch {
-    // The card falls back to the classes seen in the loaded rows.
-  }
-}
-
-/** Most common `class_uid` in the loaded rows; OCSF-native types carry no fixed class. */
-const dominantClassUid = computed<number | null>(() => {
-  if (classMix.value.length) return classMix.value[0].uid;
-  const counts = new Map<number, number>();
-  for (const row of events.value) {
-    const uid = Number((row as Record<string, unknown>).class_uid);
-    if (Number.isFinite(uid) && uid > 0) counts.set(uid, (counts.get(uid) ?? 0) + 1);
-  }
-  let best: number | null = null;
-  for (const [uid, n] of counts) if (best == null || n > (counts.get(best) ?? 0)) best = uid;
-  return best;
+const { loadClassMix, detectedSummary } = useEventsDetection({
+  orgId,
+  detected,
+  fieldNames,
+  events,
+  selectedStream,
 });
 
-const detectedSummary = computed(() => {
-  const match = detected.value;
-  if (!match) return null;
-  const classUid = match.source.ocsfClass || dominantClassUid.value;
-  const index = new FieldIndex(fieldNames.value);
-  const mixTotal = classMix.value.reduce((sum, c) => sum + c.n, 0);
-  const product = String(readPath(events.value[0] ?? null, "metadata.product.name") ?? "");
-  return {
-    label: match.source.label,
-    product: product && product !== match.source.label ? product : "",
-    classMix:
-      classMix.value.length > 1 && mixTotal
-        ? classMix.value
-            .slice(0, 4)
-            .map((c) =>
-              t("siem.events.classShare", { uid: c.uid, pct: Math.round((c.n / mixTotal) * 100) }),
-            )
-            .join(", ")
-        : "",
-    objects: OCSF_OBJECTS.filter((o) => fieldNames.value.some((f) => f.startsWith(`${o}_`))),
-    missing: (match.source.signals ?? [])
-      .filter((spec) => !spec.split("|").some((option) => index.resolve(option)))
-      .map((spec) => spec.split("|")[0])
-      .join(", "),
-    confidence: Math.round(match.confidence * 100),
-    category: ocsfCategoryOf(classUid)?.name ?? "",
-    classUid,
-    className: ocsfClass(classUid)?.name ?? "",
-    sigma: sigmaLogsourceLabel(match.source.sigma),
-    evidence: [...match.matchedRequired, ...match.matchedSignals].join(", "),
-    isSecurity: isSecuritySource(match),
-  };
-});
-
-type Row = NormalizedEvent & { _key: string; _tone: SeverityTone };
+// ── Table ────────────────────────────────────────────────────────────────────
+type Row = EventRow;
 const rows = computed<Row[]>(() =>
-  normalizedEvents.value.map((ev, i) => ({
-    ...ev,
-    _key: `${ev.raw._timestamp ?? ""}-${i}`,
-    _tone: toneOfSeverityId(ev.severityId),
-  })),
+  resultMode.value
+    ? events.value.map((raw, i) => ({
+        ...normalizeEvent(raw, null, 0),
+        _key: `result-${i}`,
+        _tone: "unknown",
+      }))
+    : normalizedEvents.value.map((ev, i) => ({
+        ...ev,
+        _key: `${ev.raw._timestamp ?? ""}-${i}`,
+        _tone: toneOfSeverityId(ev.severityId),
+      })),
 );
 
 const COLUMN_SIZE: Partial<Record<keyof NormalizedEvent, number>> = {
@@ -795,13 +449,48 @@ function readRaw(row: Record<string, unknown>, col: string): string {
   return v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
 }
 
+/** Stored column a table column sorts by on the server; null when it has none. */
+function sortFieldFor(columnId: string): string | null {
+  if (columnId === "time") return "_timestamp";
+  if (columnId.startsWith("raw:")) return columnId.slice(4);
+  if (columnId === "severityId") return hasSeverity.value ? SEVERITY_ALIAS : null;
+  const index = new FieldIndex(fieldNames.value);
+  const paths = detected.value?.source.map[columnId as keyof NormalizedEvent] as
+    string[] | undefined;
+  for (const path of paths ?? []) {
+    for (const option of path.split("|")) {
+      const column = index.resolve(option);
+      if (column) return column;
+    }
+  }
+  return null;
+}
+
+// A plain-row query can return columns the schema lacks (aliases, computed fields).
+const extraCols = computed(() => {
+  if (!sqlMode.value || resultMode.value) return [];
+  const known = new Set([...fieldNames.value, ...visibleCols.value]);
+  return resultColumns(null, events.value).filter((c) => !known.has(c));
+});
+
 const columns = computed<OTableColumnDef<Row>[]>(() => {
+  if (resultMode.value) {
+    return resultCols.value.map((col) => ({
+      id: `res:${col}`,
+      header: raw(col),
+      accessorFn: (row: Row) => readRaw(row.raw, col),
+      size: 180,
+      sortable: false,
+      meta: { rawField: col },
+    }));
+  }
   if (showRaw.value) {
-    return visibleCols.value.map((col) => ({
+    return [...visibleCols.value, ...extraCols.value].map((col) => ({
       id: col === "_timestamp" ? "time" : `raw:${col}`,
       header: col === "_timestamp" ? t("siem.column.time") : raw(col),
       accessorFn: (row: Row) => (col === "_timestamp" ? row.time : readRaw(row.raw, col)),
       size: col === "_timestamp" ? 170 : 180,
+      sortable: true,
       meta: { rawField: col },
     }));
   }
@@ -811,8 +500,14 @@ const columns = computed<OTableColumnDef<Row>[]>(() => {
     accessorKey: col,
     size: COLUMN_SIZE[col] ?? 160,
     hideable: col !== "time" && col !== "severityId",
+    sortable: !!sortFieldFor(col),
     meta: { isName: col === "className" },
   }));
+});
+
+const currentSort = computed<EventSort | null>(() => {
+  const field = sortFieldFor(sortBy.value);
+  return field ? { field, order: sortOrder.value } : null;
 });
 
 const drawerEvent = ref<Record<string, any> | null>(null);
@@ -833,30 +528,39 @@ const drawerKey = computed(() => eventKey(drawerEvent.value));
 function isActiveRow(row: Row) {
   return !!drawerEvent.value && eventKey(row.raw) === drawerKey.value;
 }
-// Prev/next walk the table as displayed (its sort, across its pages).
+// Prev/next walk the table as displayed, and turn the server page at its ends.
 const eventsTable = ref<{ table?: NavTable<Row> } | null>(null);
-const sortTick = ref(0);
 const isDrawerRow = (r: Row) => eventKey(r.raw) === drawerKey.value;
+const pageOffset = computed(() => (page.value - 1) * pageSize.value);
 const drawerIndex = computed(() => {
-  void sortTick.value;
-  return positionOf(displayOrder(eventsTable.value?.table, rows.value), isDrawerRow);
+  const i = positionOf(displayOrder(eventsTable.value?.table, rows.value), isDrawerRow);
+  return i === null ? null : i + pageOffset.value;
 });
-function stepDrawer(delta: number) {
+async function stepDrawer(delta: number) {
   const next = stepRow(eventsTable.value?.table, rows.value, isDrawerRow, delta);
-  if (next) openDrawer(next.row);
-}
-/** Turns the table to the page holding the open record (deep links). */
-function revealDrawerRow() {
-  const table = eventsTable.value?.table;
-  const i = drawerIndex.value;
-  const size = table?.getState().pagination?.pageSize;
-  if (table && i !== null && size) table.setPageIndex(Math.floor(i / size));
+  if (next) {
+    openDrawer(next.row);
+    return;
+  }
+  const target = page.value + delta;
+  if (target < 1 || (delta > 0 && !hasNextPage.value)) return;
+  page.value = target;
+  await runSearch({ pageOnly: true });
+  const edge = delta > 0 ? rows.value[0] : rows.value[rows.value.length - 1];
+  if (edge) openDrawer(edge);
 }
 const rowClass = (row: Row) => (isActiveRow(row) ? "!bg-table-row-selected-bg" : "");
-const rowRail = (row: Row) => severityRailColor(row._tone);
 
 /** Field + value a cell pivots on, or null when the value was derived. */
 function pivotFor(row: Row, columnId: string): { field: string; value: string } | null {
+  if (resultMode.value) {
+    // Only a stored column of the queried table can narrow the query.
+    const field = columnId.startsWith("res:") ? columnId.slice(4) : "";
+    const value = readRaw(row.raw, field);
+    return queryOnPicked.value && fieldNames.value.includes(field) && value
+      ? { field, value }
+      : null;
+  }
   if (columnId.startsWith("raw:")) {
     const field = columnId.slice(4);
     const value = readRaw(row.raw, field);
@@ -873,26 +577,18 @@ function pivotFor(row: Row, columnId: string): { field: string; value: string } 
   return value ? { field, value } : null;
 }
 
-function fmtTs(ms: number | null): string {
-  if (!ms) return "—";
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
+// ── Timeline + severity tiles (server-side, whole window) ────────────────────
 const histogram = ref<HistogramResult | null>(null);
 const histogramLoading = ref(false);
+/** Whether `histogram` describes the search currently on screen. */
+const histogramFresh = ref(false);
 
-// A response from an older search is dropped, so a slow query never overwrites a newer one.
+// A slow older search's response is dropped, never overwriting a newer one.
 let searchSeq = 0;
 
 async function runHistogram(seq: number, run: SearchRun) {
   const stream = selectedStream.value;
-  if (!stream || sqlMode.value) {
+  if (!stream || sqlMode.value || isHunt.value) {
     histogram.value = null;
     return;
   }
@@ -902,14 +598,14 @@ async function runHistogram(seq: number, run: SearchRun) {
   try {
     const { hits } = await runSql(
       orgId.value,
-      histogramSql(stream, whereParts(filters.value, false), severityField.value, interval.sql),
+      histogramSql(stream, whereParts(filters.value, false), severitySql.value, interval.sql),
       start,
       end,
       -1,
       { signal: run.controller.signal, traceId: run.histogramTrace.traceId },
     );
     if (seq !== searchSeq) return;
-    histogram.value = foldHistogram(hits, !!severityField.value);
+    histogram.value = foldHistogram(hits, hasSeverity.value);
     histogramFresh.value = true;
   } catch {
     if (seq === searchSeq) histogram.value = null;
@@ -918,72 +614,24 @@ async function runHistogram(seq: number, run: SearchRun) {
   }
 }
 
-/** Whether `histogram` describes the search currently on screen. */
-const histogramFresh = ref(false);
-
-// Exact window total from the histogram (the search total is capped at the page).
+// Exact window total from the histogram; null in SQL mode or before it lands.
 const windowTotal = computed<number | null>(() => {
   const h = histogram.value;
-  // No exact total to offer: the response total is capped at the page size.
   if (!h || !histogramFresh.value || sqlMode.value) return null;
   if (!severityFilter.value.length) return h.total;
-  return severityFilter.value.reduce<number>((sum, v) => sum + (h.rawCounts[String(v)] ?? 0), 0);
+  return severityFilter.value.reduce<number>((sum, v) => sum + (h.idCounts[v] ?? 0), 0);
 });
-
-/** Tones drawn: the five, plus Unknown when events carry no readable severity. */
-const shownTones = computed<SeverityTone[]>(() =>
-  histogram.value?.totals.unknown ? [...SEVERITY_TONES, "unknown"] : [...SEVERITY_TONES],
+/** A full page may have more behind it even when no exact total is known. */
+const hasNextPage = computed(() =>
+  windowTotal.value !== null
+    ? pageOffset.value + rows.value.length < windowTotal.value
+    : rows.value.length >= pageSize.value,
 );
-
-const chartSeries = computed(() =>
-  severityField.value
-    ? [...shownTones.value].reverse().map((tone) => ({
-        key: tone,
-        label: t(toneLabelKey(tone)),
-        token: TONE_TOKEN[tone],
-      }))
-    : [{ key: "info", label: t("siem.events.events"), token: "--color-accent" as const }],
+const pagerTotal = computed(() =>
+  windowTotal.value !== null
+    ? windowTotal.value
+    : pageOffset.value + rows.value.length + (hasNextPage.value ? 1 : 0),
 );
-
-/** Raw severity values a tile stands for, so a click can become a filter. */
-function valuesForTone(tone: SeverityTone): SeverityValue[] {
-  const seen = histogram.value?.rawByTone[tone] ?? [];
-  return severityIsNumeric.value ? seen.map(Number).filter((n) => Number.isFinite(n)) : seen;
-}
-
-const severityStats = computed<StatItem[]>(() => {
-  const h = histogram.value;
-  // No "All" tile: re-clicking the active tile clears the facet.
-  return shownTones.value.map((tone) => ({
-    key: tone,
-    label: t(toneLabelKey(tone)),
-    value: h ? h.totals[tone] : "—",
-    icon: TONE_ICON[tone],
-    tone: TONE_STAT[tone],
-    max: h?.total || undefined,
-    dataTest: `security-events-severity-${tone}`,
-  }));
-});
-
-const selectedTone = computed<string | null>(() => {
-  if (!severityFilter.value.length) return null;
-  const current = new Set(severityFilter.value.map(String));
-  return (
-    shownTones.value.find((tone) => {
-      const values = valuesForTone(tone).map(String);
-      return values.length === current.size && values.every((v) => current.has(v));
-    }) ?? null
-  );
-});
-
-function onSeverityTile(key: string) {
-  if (key === selectedTone.value) {
-    severityFilter.value = [];
-    return;
-  }
-  const values = valuesForTone(key as SeverityTone);
-  if (values.length) severityFilter.value = values;
-}
 
 function onChartZoom({ start, end }: { start: number; end: number }) {
   dateState.value = {
@@ -1005,7 +653,7 @@ async function fetchTopValues(
   limit = 10,
 ): Promise<{ value: string; count: number }[]> {
   const stream = selectedStream.value;
-  if (!stream) return [];
+  if (!stream || isHunt.value) return [];
   const { start, end } = timeRange.value;
   try {
     const { hits } = await runSql(
@@ -1022,6 +670,7 @@ async function fetchTopValues(
     return [];
   }
 }
+const builderValues = (field: string) => fetchTopValues(field, 50);
 
 async function onFieldClick(row: FieldItem) {
   if (row.isGroup) return;
@@ -1045,7 +694,6 @@ async function loadTopValues(field: string) {
   topValues.value = values;
   topValuesLoading.value = false;
 }
-const topValuesTotal = computed(() => topValues.value.reduce((sum, v) => sum + v.count, 0));
 
 const {
   ranked: sigmaRules,
@@ -1060,7 +708,7 @@ const showRules = ref(false);
 let compiledKey = "";
 let countedKey = "";
 
-function refreshRules() {
+async function refreshRules() {
   const stream = selectedStream.value;
   const { start, end } = timeRange.value;
   const key = JSON.stringify([
@@ -1073,8 +721,10 @@ function refreshRules() {
   ]);
   // Recompiling clears the counts, so it only happens when their inputs change.
   if (key !== compiledKey) {
-    compileFor(detected.value?.source ?? null, fieldNames.value);
     compiledKey = key;
+    await compileFor(orgId.value, detected.value?.source ?? null, fieldNames.value);
+    if (key !== compiledKey) return;
+    if (rulesError.value) compiledKey = "";
   }
   if (!showRules.value || !stream || !runnableCount.value || key === countedKey) return;
   countedKey = key;
@@ -1083,19 +733,25 @@ function refreshRules() {
   });
 }
 watch(showRules, (open) => {
-  if (open) refreshRules();
+  if (open) void refreshRules();
 });
 
+const detectionList = useSiemDetections();
+const existingAlertNames = computed(() =>
+  detectionList.alerts.value.map((alert) => String(alert.name ?? "")),
+);
+const newDetectionOpen = ref(false);
+const newDetectionPreset = ref<NewDetectionPreset | null>(null);
+// The dialog opens over Events, so the analyst keeps the query and results they started from.
 function createDetectionFrom(sigmaId: string) {
-  router.push({
-    path: "/security/detections",
-    query: {
-      org_identifier: orgId.value,
-      sigma_id: sigmaId,
-      stream: selectedStream.value ?? "",
-      source: detected.value?.source.id ?? "",
-    },
-  });
+  if (!canAuthor.value) return;
+  newDetectionPreset.value = {
+    sigmaId,
+    stream: selectedStream.value ?? undefined,
+    source: detected.value?.source.id ?? undefined,
+  };
+  newDetectionOpen.value = true;
+  void detectionList.load(orgId.value);
 }
 
 function filterByRule(where: string) {
@@ -1108,6 +764,7 @@ function filterByRule(where: string) {
 }
 
 function openDrawer(row: Row) {
+  if (resultMode.value) return;
   if (!drawerEvent.value) analytics.track("security_detail_opened", { view: "events" });
   drawerEvent.value = row.raw;
   syncUrl();
@@ -1119,7 +776,7 @@ function closeDrawer() {
   pendingEventKey.value = null;
   syncUrl();
 }
-// A shared link pins the absolute window; a relative one resolves against the viewer's clock.
+// A shared link pins the absolute window; a relative one resolves on the viewer's clock.
 const shareUrl = computed(() => {
   if (!drawerEvent.value || typeof window === "undefined") return "";
   const url = new URL(window.location.href);
@@ -1132,7 +789,12 @@ function buildSQL(): string {
   const stream = selectedStream.value;
   if (!stream) return "";
   if (sqlMode.value && sqlQuery.value.trim()) return sqlQuery.value.trim();
-  return eventsSql(stream, sqlMode.value ? [] : whereParts(filters.value));
+  return eventsSql(
+    stream,
+    sqlMode.value ? [] : whereParts(filters.value),
+    currentSort.value,
+    severitySql.value,
+  );
 }
 // Seeds the SQL editor from the builder, unless the analyst edited the last seed.
 let seededSql = "";
@@ -1155,6 +817,10 @@ function buildQuery(pinTime = false): Record<string, string> {
   } else {
     q.from = String(timeRange.value.start);
     q.to = String(timeRange.value.end);
+  }
+  if (isHunt.value) {
+    if (huntState.value.value) Object.assign(q, huntLinkQuery(huntState.value));
+    return q;
   }
   q.sql_mode = String(sqlMode.value);
   if (sqlMode.value && sqlQuery.value.trim())
@@ -1180,6 +846,7 @@ function syncUrl() {
         severity: severityFilter.value,
         filters: fieldFilters.value,
         date: dateState.value,
+        hunt: huntState.value,
       }),
     );
   } catch {
@@ -1190,21 +857,21 @@ function syncUrl() {
 let streamsSeq = 0;
 async function loadStreams() {
   const seq = ++streamsSeq;
-  // The previous load's checks describe the previous list.
-  freshStats.value = new Map();
   await secSources.load(orgId.value);
   if (seq !== streamsSeq) return;
   const wanted = initialState.stream;
-  if (wanted && allStreamNames.value.includes(wanted)) selectedStream.value = wanted;
-  else if (secStreamNames.value.length) selectedStream.value = secStreamNames.value[0];
-  else if (allStreamNames.value.length) selectedStream.value = allStreamNames.value[0];
-  // In the background, from the data itself where the stream stats lag ingestion.
-  withRecentActivity(orgId.value, streamList.value, secStreamNames.value)
-    .then((fresh) => {
-      if (seq !== streamsSeq) return;
-      freshStats.value = new Map(fresh.map((s: any) => [String(s.name), s.stats]));
-    })
-    .catch(() => {});
+  if (wanted === ALL_SOURCES || (wanted && allStreamNames.value.includes(wanted)))
+    selectedStream.value = wanted;
+  else selectedStream.value = newestSource();
+}
+
+/** The Security source that reported last; none leaves the page on its empty state. */
+function newestSource(): string | null {
+  const last = (name: string) => Number(streamStats.value.get(name)?.doc_time_max ?? 0);
+  return secStreamNames.value.reduce<string | null>(
+    (best, name) => (best === null || last(name) > last(best) ? name : best),
+    null,
+  );
 }
 
 async function loadSchema(streamName: string) {
@@ -1218,8 +885,8 @@ async function loadSchema(streamName: string) {
       ftype: f.type ?? f.field_type ?? "",
     }));
     initColumns(schemaFields.value);
-    // Identify from the schema alone so the severity column is known before the first search.
-    detectSource(null);
+    // Identified from the schema first so severity is known before the first search.
+    await detectSource(null);
     void loadClassMix(streamName);
   } catch {
     if (selectedStream.value === streamName) schemaFields.value = [];
@@ -1235,8 +902,12 @@ interface SearchRun {
 }
 let activeRun: SearchRun | null = null;
 
+const huntRef = ref<InstanceType<typeof SecurityEventsHunt> | null>(null);
+const huntLoading = ref(false);
+
 /** Stops the running search and its histogram, in the browser and on the server. */
 function cancelSearch({ quiet = false } = {}) {
+  huntRef.value?.cancel();
   const run = activeRun;
   if (!run) return;
   activeRun = null;
@@ -1252,10 +923,18 @@ function cancelSearch({ quiet = false } = {}) {
 
 onBeforeUnmount(() => cancelSearch({ quiet: true }));
 
-async function runSearch(userRun = false) {
+/** Searches the window; a page or sort change keeps the timeline and fetches only rows. */
+async function runSearch({ pageOnly = false, userRun = false } = {}) {
   if (mountComplete) syncUrl();
+  if (isHunt.value) {
+    await huntRef.value?.run();
+    return;
+  }
   if (!selectedStream.value || !orgId.value) return;
-  if (dateState.value.type === "relative") timeRange.value = rangeFor(dateState.value);
+  if (!sqlMode.value || !sqlQuery.value.trim()) queryOnPicked.value = true;
+  else if (!pageOnly && (await followQueryTable())) return;
+  if (!pageOnly) page.value = 1;
+  if (dateState.value.type === "relative" && !pageOnly) timeRange.value = rangeFor(dateState.value);
   cancelSearch({ quiet: true });
   const run: SearchRun = {
     controller: new AbortController(),
@@ -1265,24 +944,49 @@ async function runSearch(userRun = false) {
   activeRun = run;
   loading.value = true;
   errorMsg.value = "";
+  searchRefusal.value = null;
   const { start, end } = timeRange.value;
   const seq = ++searchSeq;
-  histogramFresh.value = false;
-  const histogramDone = runHistogram(seq, run);
+  if (!pageOnly) histogramFresh.value = false;
+  const histogramDone = pageOnly ? Promise.resolve() : runHistogram(seq, run);
+  const sql = buildSQL();
   try {
-    const res = await runSql(orgId.value, buildSQL(), start, end, PAGE_ROWS, {
-      signal: run.controller.signal,
-      traceId: run.searchTrace.traceId,
-    });
+    const res = await searchService.search(
+      {
+        org_identifier: orgId.value,
+        query: {
+          query: {
+            sql,
+            start_time: start,
+            end_time: end,
+            from: pageOffset.value,
+            size: pageSize.value,
+          },
+        },
+        page_type: "logs",
+        signal: run.controller.signal,
+        traceparent: run.searchTrace.traceparent,
+      },
+      "ui",
+    );
     if (seq !== searchSeq) return;
-    events.value = res.hits;
-    total.value = res.total ?? events.value.length;
-    if (!schemaFields.value.length && events.value.length) {
+    const hits: Record<string, unknown>[] = res.data?.hits ?? [];
+    const split = splitSeverity(hits);
+    resultMode.value =
+      sqlMode.value && (isAggregateSql(sql) || (hits.length > 0 && !("_timestamp" in hits[0])));
+    resultCols.value = resultMode.value ? resultColumns(res.data?.columns, split.rows) : [];
+    events.value = split.rows;
+    rowSeverity.value = split.severity;
+    if (!resultMode.value && !schemaFields.value.length && events.value.length) {
       schemaFields.value = Object.keys(events.value[0]).map((k) => ({ name: k, ftype: "Utf8" }));
       initColumns(schemaFields.value);
     }
-    detectSource();
-    refreshRules();
+    if (queryOnPicked.value) {
+      // A computed row would misidentify the source, so only a stored event is a sample.
+      await detectSource(resultMode.value ? null : (events.value[0] ?? null));
+      if (seq !== searchSeq) return;
+      if (!pageOnly) void refreshRules();
+    }
     if (drawerEvent.value) {
       const fresh = events.value.find((e) => eventKey(e) === drawerKey.value);
       if (fresh) drawerEvent.value = fresh;
@@ -1297,25 +1001,60 @@ async function runSearch(userRun = false) {
     }
   } catch (e: any) {
     if (seq !== searchSeq) return;
-    errorMsg.value =
-      e?.response?.data?.error ??
-      e?.response?.data?.message ??
-      e?.message ??
-      t("siem.events.searchFailed");
+    if (isForbiddenError(e)) searchRefusal.value = e;
+    else
+      errorMsg.value =
+        e?.response?.data?.error ??
+        e?.response?.data?.message ??
+        e?.message ??
+        t("siem.events.searchFailed");
     events.value = [];
-    total.value = 0;
   } finally {
     if (seq === searchSeq) loading.value = false;
   }
-  if (expandedField.value) void loadTopValues(expandedField.value);
+  if (expandedField.value && !pageOnly) void loadTopValues(expandedField.value);
   await histogramDone;
   if (activeRun === run) activeRun = null;
+}
+
+/** Points the picker at a hand-written query's table; true when that re-runs the search. */
+async function followQueryTable(): Promise<boolean> {
+  const query = sqlQuery.value.trim();
+  const table = String((await getStreamFromQuery(query)) ?? "");
+  if (table && table !== selectedStream.value && allStreamNames.value.includes(table)) {
+    pendingSql = query;
+    selectedStream.value = table;
+    return true;
+  }
+  queryOnPicked.value = table === selectedStream.value;
+  // Rows from a table the page cannot identify are shown as they are, not as the picked source.
+  if (!queryOnPicked.value) {
+    detected.value = null;
+    severityExpr.value = null;
+  }
+  return false;
+}
+
+function onPage({ page: p, size }: { page: number; size: number }) {
+  if (p === page.value && size === pageSize.value) return;
+  if (size !== pageSize.value) {
+    pageSize.value = size;
+    page.value = 1;
+  } else page.value = p;
+  void runSearch({ pageOnly: true });
+}
+
+function onSort({ column, order }: { column: string; order: "asc" | "desc" }) {
+  sortBy.value = column;
+  sortOrder.value = order;
+  page.value = 1;
+  void runSearch({ pageOnly: true });
 }
 
 async function restoreDrawerFromUrl() {
   const ts = pendingEventTs.value;
   if (!ts || drawerEvent.value) return;
-  // With a content key only that exact event will do: others share its timestamp.
+  // A content key needs that exact event, since others share its timestamp.
   const inPage = pendingEventKey.value
     ? events.value.find((e) => eventKey(e) === pendingEventKey.value)
     : events.value.find((e) => String(e._timestamp) === ts);
@@ -1323,7 +1062,6 @@ async function restoreDrawerFromUrl() {
     drawerEvent.value = inPage;
     pendingEventTs.value = null;
     pendingEventKey.value = null;
-    void nextTick(revealDrawerRow);
     return;
   }
   const tsNum = Number(ts);
@@ -1352,42 +1090,80 @@ async function restoreDrawerFromUrl() {
   if (!drawerEvent.value) syncUrl();
 }
 
+// ── Cross-source hunt ────────────────────────────────────────────────────────
+/** A hunt row the analyst opened: its stream loads, then its event opens in the drawer. */
+let huntJump: { stream: string; ts: number } | null = null;
+
+function onHuntQuery(q: HuntQuery) {
+  huntState.value = q;
+  if (mountComplete) syncUrl();
+}
+
+function openFromHunt(stream: string, ts: number) {
+  huntJump = { stream, ts };
+  selectedStream.value = stream;
+}
+
+// ── Watchers ─────────────────────────────────────────────────────────────────
 let suppressSeverityWatch = false;
 function applySeverity(values: SeverityValue[]) {
   suppressSeverityWatch = true;
-  severityFilter.value = severityIsNumeric.value
-    ? values.map(Number).filter((n) => !Number.isNaN(n))
-    : values.map(String);
+  severityFilter.value = values.map(Number).filter((n) => Number.isInteger(n));
   void nextTick(() => (suppressSeverityWatch = false));
 }
+
+/** A query the picker switched streams for; the switch keeps it instead of resetting to the builder. */
+let pendingSql: string | null = null;
 
 let switchingStream = false;
 watch(selectedStream, async (v) => {
   if (!mountComplete || !v) return;
   switchingStream = true;
+  const keptSql = pendingSql;
+  pendingSql = null;
   fieldFilters.value = [];
-  sqlQuery.value = "";
-  sqlMode.value = false;
+  sqlQuery.value = keptSql ?? "";
+  sqlMode.value = keptSql !== null;
+  queryOnPicked.value = true;
+  resultMode.value = false;
   drawerEvent.value = null;
   pendingEventTs.value = null;
   pendingEventKey.value = null;
   expandedField.value = null;
   showRules.value = false;
+  sortBy.value = "time";
+  sortOrder.value = "desc";
+  if (v === ALL_SOURCES) {
+    cancelSearch({ quiet: true });
+    schemaFields.value = [];
+    detected.value = null;
+    severityExpr.value = null;
+    events.value = [];
+    histogram.value = null;
+    switchingStream = false;
+    await nextTick();
+    void runSearch();
+    return;
+  }
   await loadSchema(v);
-  if (selectedStream.value !== v) return;
-  await loadSeverityValues();
   if (selectedStream.value !== v) return;
   applySeverity([]);
   switchingStream = false;
-  void runSearch();
+  const jump = huntJump?.stream === v ? huntJump : null;
+  huntJump = null;
+  await runSearch();
+  if (jump && selectedStream.value === v) {
+    pendingEventTs.value = String(jump.ts);
+    await restoreDrawerFromUrl();
+    syncUrl();
+  }
 });
-// Re-identification can move severity to another column; a URL severity is re-applied once.
+// The facet follows a moved severity column; a URL severity is re-applied once.
 let severityRestorePending = initialState.severity.length > 0;
-watch(severityField, (next, prev) => {
+watch(severitySql, (next, prev) => {
   if (!mountComplete || switchingStream || next === prev) return;
   applySeverity(severityRestorePending ? initialState.severity : []);
   severityRestorePending = false;
-  void loadSeverityValues();
   void runSearch();
 });
 watch(
@@ -1401,10 +1177,6 @@ watch(
 watch(sqlMode, () => {
   if (mountComplete) syncUrl();
 });
-
-function sameRange(a: { start: number; end: number }, b: { start: number; end: number }) {
-  return Math.abs(a.start - b.start) < 1_000_000 && Math.abs(a.end - b.end) < 1_000_000;
-}
 
 function onDateChange(dt: any) {
   const next = { start: Number(dt.startTime), end: Number(dt.endTime) };
@@ -1432,13 +1204,15 @@ function onDateChange(dt: any) {
 
 onMounted(async () => {
   await loadStreams();
-  if (selectedStream.value) {
+  if (selectedStream.value && !isHunt.value) {
     await loadSchema(selectedStream.value);
-    await loadSeverityValues();
     applySeverity(initialState.severity);
   }
   mountComplete = true;
-  if (selectedStream.value) {
+  if (isHunt.value) {
+    await nextTick();
+    await runSearch();
+  } else if (selectedStream.value) {
     await runSearch();
     // The watcher had its one chance to re-apply the URL severity.
     await nextTick();
@@ -1457,12 +1231,12 @@ function onEmptyAction(id?: string) {
   else if (widerPeriod.value) widenTo(widerPeriod.value);
 }
 
-// An empty window the stream has not reported in yet is not "no events": offer one that reaches it.
+// An empty window the stream has not reported in is not "no events": offer one that reaches it.
 const lastReportedUs = computed(() =>
   Number(streamStats.value.get(selectedStream.value ?? "")?.doc_time_max ?? 0),
 );
 const widerPeriod = computed(() =>
-  // A filter or hand-written query can empty the page on its own; the last event says nothing of it.
+  // A filter or hand-written query can empty the page; the last event says nothing then.
   filtersActive.value || (sqlMode.value && sqlQuery.value.trim())
     ? null
     : widerPeriodFor(lastReportedUs.value, timeRange.value.start),
@@ -1509,7 +1283,7 @@ function widenTo(period: string) {
           @on:date-change="onDateChange"
         />
         <OButton
-          v-if="loading || histogramLoading"
+          v-if="loading || histogramLoading || huntLoading"
           variant="outline-destructive"
           size="sm"
           icon-left="close"
@@ -1524,7 +1298,7 @@ function widenTo(period: string) {
           size="sm"
           icon-left="play-arrow"
           data-test="security-events-run"
-          @click="runSearch(true)"
+          @click="runSearch({ userRun: true })"
         >
           {{ t("siem.events.run") }}
         </OButton>
@@ -1549,6 +1323,7 @@ function widenTo(period: string) {
           </OButton>
           <div class="w-60 shrink-0">
             <OSelect
+              :aria-label="t('siem.aria.stream')"
               :model-value="selectedStream"
               :options="streamOptions"
               icon-key="icon"
@@ -1560,6 +1335,7 @@ function widenTo(period: string) {
             />
           </div>
           <OToggleGroup
+            v-if="!isHunt"
             :model-value="sqlMode ? 'sql' : 'builder'"
             data-test="security-events-mode"
             @update:model-value="switchToSql"
@@ -1581,107 +1357,28 @@ function widenTo(period: string) {
             >
           </OToggleGroup>
 
-          <template v-if="!sqlMode">
-            <div v-if="severityField" class="w-52 shrink-0">
-              <OSelect
-                :model-value="severityFilter"
-                :options="severityOptions"
-                multiple
-                clearable
-                :placeholder="t('siem.events.allSeverities')"
-                data-test="security-events-severity-filter"
-                @update:model-value="onSeverityChange"
-              />
-            </div>
-            <OSeparator vertical class="mx-1 h-5" />
-            <div class="w-48 shrink-0">
-              <OSelect
-                v-model="builderField"
-                :options="fieldNameOptions"
-                :placeholder="t('siem.events.field')"
-                searchable
-                data-test="security-events-builder-field"
-              />
-            </div>
-            <div class="w-36 shrink-0">
-              <OSelect
-                v-model="builderOp"
-                :options="FILTER_OPS"
-                data-test="security-events-builder-op"
-              />
-            </div>
-            <div class="w-56 shrink-0">
-              <OSelect
-                v-model="builderValue"
-                :options="builderValueOptions"
-                :loading="builderValuesLoading"
-                :disabled="!builderField"
-                :placeholder="t('siem.events.value')"
-                searchable
-                creatable
-                @create="(v: string) => (builderValue = v)"
-                data-test="security-events-builder-value"
-              />
-            </div>
-            <OButton
-              variant="outline"
-              size="sm"
-              icon-left="add"
-              :disabled="!builderField || !builderValue"
-              data-test="security-events-builder-add"
-              @click="commitFilter"
-            >
-              {{ t("siem.events.addFilter") }}
-            </OButton>
-          </template>
+          <SecurityEventsFilterBar
+            v-if="!sqlMode && !isHunt"
+            :field-names="fieldNames"
+            :has-severity="hasSeverity"
+            :severity-options="severityOptions"
+            :severity="severityFilter"
+            :load-values="builderValues"
+            @update:severity="severityFilter = $event"
+            @add="addFilter"
+          />
         </div>
 
-        <div v-if="!sqlMode && fieldFilters.length" class="flex flex-wrap items-center gap-1.5">
-          <OTag
-            v-for="(f, i) in fieldFilters"
-            :key="`${f.field}-${f.op}-${f.value}`"
-            :variant="f.op === '!=' || f.op === 'not_contains' ? 'error-soft' : 'primary-soft'"
-            shape="rounded"
-            size="sm"
-            :data-test="`security-events-filter-${i}`"
-          >
-            <span class="max-w-80 truncate font-mono">
-              <span class="font-semibold">{{ f.field }}</span>
-              {{ OP_SYMBOL[f.op] ?? f.op }} {{ f.value }}
-            </span>
-            <template #trailing>
-              <OButton
-                variant="ghost"
-                size="icon-xs"
-                icon-left="swap-horiz"
-                :data-test="`security-events-filter-invert-${i}`"
-                @click="invertFilter(i)"
-              >
-                <OTooltip :content="t('siem.events.invertFilter')" />
-              </OButton>
-              <OButton
-                variant="ghost"
-                size="icon-xs"
-                icon-left="close"
-                :data-test="`security-events-filter-remove-${i}`"
-                @click="removeFilter(i)"
-              >
-                <OTooltip :content="t('siem.events.removeFilter')" />
-              </OButton>
-            </template>
-          </OTag>
-          <OButton
-            variant="ghost-muted"
-            size="xs"
-            data-test="security-events-clear-filters"
-            @click="clearFilters"
-          >
-            {{ t("siem.events.clearFilters") }}
-          </OButton>
-        </div>
+        <SecurityEventsFilterChips
+          v-if="!sqlMode && !isHunt"
+          :filters="fieldFilters"
+          @invert="invertFilter"
+          @remove="removeFilter"
+          @clear="clearFilters"
+        />
 
         <div
-          v-if="sqlMode"
+          v-if="sqlMode && !isHunt"
           class="border-border-default rounded-default h-24 overflow-hidden border"
         >
           <CodeQueryEditor
@@ -1692,7 +1389,7 @@ function widenTo(period: string) {
             class="h-full"
             data-test="security-events-sql"
             @update:query="(q: string) => (sqlQuery = q)"
-            @run-query="runSearch(true)"
+            @run-query="runSearch({ userRun: true })"
           />
         </div>
       </div>
@@ -1708,141 +1405,21 @@ function widenTo(period: string) {
         @row-click="onFieldClick"
       >
         <template #before-list>
-          <div class="border-border-default flex flex-col gap-1 border-b pt-2 pb-2">
-            <div
-              class="px-page-edge text-text-secondary text-2xs flex items-center justify-between font-semibold tracking-wide uppercase"
-            >
-              <span>{{ t("siem.events.sources") }}</span>
-              <span class="tabular-nums">{{ secStreamNames.length }}</span>
-            </div>
-            <ul class="flex max-h-48 flex-col overflow-y-auto">
-              <li
-                v-for="name in secStreamNames"
-                :key="name"
-                class="group px-page-edge hover:bg-surface-subtle flex cursor-pointer items-center gap-2 py-1"
-                :class="{ 'bg-surface-subtle': selectedStream === name }"
-                role="button"
-                tabindex="0"
-                :data-test="`security-events-source-${name}`"
-                @click="selectedStream = name"
-                @keydown.enter="selectedStream = name"
-                @keydown.space.prevent="selectedStream = name"
-              >
-                <span
-                  class="size-2 shrink-0 rounded-full"
-                  :class="HEALTH_DOT[sourceHealth(streamStats.get(name))]"
-                >
-                  <OTooltip :content="t(`siem.health.${sourceHealth(streamStats.get(name))}`)" />
-                </span>
-                <span
-                  class="min-w-0 flex-1 truncate font-mono text-xs"
-                  :class="
-                    selectedStream === name
-                      ? 'text-text-heading font-semibold'
-                      : 'text-text-heading'
-                  "
-                  >{{ name }}<OTooltip v-if="sourceHint(name)" :content="sourceHint(name)"
-                /></span>
-                <OTag
-                  v-if="sourceByName.get(name)?.reason === 'auto'"
-                  variant="primary-soft"
-                  size="xs"
-                  :data-test="`security-events-source-auto-${name}`"
-                  >{{ t("siem.events.autoTag") }}</OTag
-                >
-                <span class="text-text-secondary text-2xs tabular-nums">{{
-                  formatCompactCount(Number(streamStats.get(name)?.doc_num ?? 0))
-                }}</span>
-                <OButton
-                  :data-test="`security-events-source-remove-${name}`"
-                  variant="ghost"
-                  size="icon-xs"
-                  icon-left="remove"
-                  class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                  @click.stop="removeStreamFromSecurity(name)"
-                >
-                  <OTooltip :content="t('siem.events.removeSource')" />
-                </OButton>
-              </li>
-            </ul>
-            <div
-              v-if="suggestedSources.length || classifyingSources"
-              class="flex flex-col gap-0.5"
-              data-test="security-events-suggested"
-            >
-              <div
-                class="px-page-edge text-text-secondary text-2xs flex items-center gap-1.5 pt-1 font-semibold tracking-wide uppercase"
-              >
-                <span>{{ t("siem.events.suggested") }}</span>
-                <OSpinner v-if="classifyingSources" size="xs">
-                  <OTooltip :content="t('siem.events.classifying')" />
-                </OSpinner>
-              </div>
-              <div
-                v-for="entry in visibleSuggestions"
-                :key="entry.name"
-                class="px-page-edge flex items-center gap-1 py-0.5"
-                :data-test="`security-events-suggested-${entry.name}`"
-              >
-                <span class="text-text-secondary min-w-0 flex-1 truncate font-mono text-xs"
-                  >{{ entry.name
-                  }}<OTooltip
-                    v-if="entry.verdict"
-                    :content="
-                      t('siem.events.suggestedSource', {
-                        label: entry.verdict.label,
-                        n: Math.round(entry.verdict.confidence * 100),
-                      })
-                    "
-                /></span>
-                <OButton
-                  variant="ghost"
-                  size="icon-xs"
-                  icon-left="add"
-                  :data-test="`security-events-suggested-add-${entry.name}`"
-                  @click="addStreamToSecurity(entry.name)"
-                >
-                  <OTooltip :content="t('siem.events.addSuggested')" />
-                </OButton>
-                <OButton
-                  variant="ghost"
-                  size="icon-xs"
-                  icon-left="close"
-                  :data-test="`security-events-suggested-dismiss-${entry.name}`"
-                  @click="secSources.dismiss(entry.name)"
-                >
-                  <OTooltip :content="t('siem.events.dismissSuggestion')" />
-                </OButton>
-              </div>
-              <div v-if="suggestedSources.length > SUGGESTIONS_SHOWN" class="px-page-edge">
-                <OButton
-                  variant="ghost"
-                  size="xs"
-                  data-test="security-events-suggested-more"
-                  @click="showAllSuggestions = !showAllSuggestions"
-                >
-                  {{
-                    showAllSuggestions
-                      ? t("siem.events.showFewer")
-                      : t("siem.events.showMore", {
-                          n: suggestedSources.length - SUGGESTIONS_SHOWN,
-                        })
-                  }}
-                </OButton>
-              </div>
-            </div>
-            <div class="px-page-edge">
-              <OSelect
-                :model-value="null"
-                :options="addStreamOptions"
-                :placeholder="t('siem.events.addSource')"
-                searchable
-                size="sm"
-                data-test="security-events-add-source"
-                @update:model-value="addStreamToSecurity"
-              />
-            </div>
-          </div>
+          <SecurityEventsSources
+            :names="secStreamNames"
+            :selected="selectedStream"
+            :stream-stats="streamStats"
+            :source-by-name="sourceByName"
+            :suggestions="suggestedSources"
+            :classifying="classifyingSources"
+            :other-names="otherStreamNames"
+            :can-include="canTriage"
+            :can-exclude="canAdmin"
+            @select="selectedStream = $event"
+            @remove="removeStreamFromSecurity"
+            @add="addStreamToSecurity"
+            @dismiss="secSources.dismiss($event)"
+          />
         </template>
 
         <template #field-actions="{ row }">
@@ -1866,264 +1443,52 @@ function widenTo(period: string) {
         </template>
 
         <template #expansion="{ row }">
-          <div
-            class="flex flex-col gap-1 px-2"
-            :data-test="`security-events-field-values-${row.name}`"
-          >
-            <span v-if="sqlMode" class="text-text-secondary text-2xs px-1">
-              {{ t("siem.events.topValuesWholeStream") }}
-            </span>
-            <div v-if="topValuesLoading" class="flex justify-center py-2">
-              <OSpinner size="sm" />
-            </div>
-            <span v-else-if="!topValues.length" class="text-text-secondary px-1 py-1 text-xs">
-              {{ t("siem.events.noValues") }}
-            </span>
-            <template v-else>
-              <div
-                v-for="v in topValues"
-                :key="v.value"
-                class="group rounded-default hover:bg-surface-subtle flex flex-col gap-0.5 px-1 py-0.5"
-              >
-                <div class="flex items-center gap-1">
-                  <span class="text-text-heading min-w-0 flex-1 truncate font-mono text-xs"
-                    >{{ v.value }}<OTooltip :content="raw(v.value)"
-                  /></span>
-                  <span class="text-text-secondary text-2xs tabular-nums">{{
-                    formatEventCount(v.count)
-                  }}</span>
-                  <div
-                    class="flex items-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
-                  >
-                    <OButton
-                      :data-test="`security-events-value-include-${v.value}`"
-                      variant="ghost"
-                      size="icon-xs"
-                      icon-left="add-circle-outline"
-                      @click.stop="addFilter(row.name, v.value, '=')"
-                    >
-                      <OTooltip :content="t('siem.pivot.include')" />
-                    </OButton>
-                    <OButton
-                      :data-test="`security-events-value-exclude-${v.value}`"
-                      variant="ghost"
-                      size="icon-xs"
-                      icon-left="block"
-                      @click.stop="addFilter(row.name, v.value, '!=')"
-                    >
-                      <OTooltip :content="t('siem.pivot.exclude')" />
-                    </OButton>
-                  </div>
-                </div>
-                <OProgressBar :value="topValuesTotal ? v.count / topValuesTotal : 0" size="xs" />
-              </div>
-            </template>
-          </div>
+          <SecurityEventsTopValues
+            :field="row.name"
+            :values="topValues"
+            :loading="topValuesLoading"
+            :whole-stream="sqlMode"
+            @add="addFilter"
+          />
         </template>
 
         <template #empty>
-          {{ selectedStream ? t("siem.events.noFields") : t("siem.events.selectStreamFirst") }}
+          {{
+            isHunt
+              ? t("siem.events.hunt.noFields")
+              : selectedStream
+                ? t("siem.events.noFields")
+                : t("siem.events.selectStreamFirst")
+          }}
         </template>
       </OFieldList>
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
-      <div
-        v-if="detectedSummary"
-        class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-1.5 text-xs"
-        data-test="security-events-detected"
-      >
-        <OIcon
-          :name="detectedSummary.isSecurity ? 'verified-user' : 'info-outline'"
-          size="sm"
-          :class="
-            detectedSummary.isSecurity ? 'text-icon-chip-primary-text' : 'text-text-secondary'
-          "
-        />
-        <span class="text-text-heading font-semibold">{{ detectedSummary.label }}</span>
-        <OTag
-          v-if="detectedSummary.product"
-          variant="default-soft"
-          size="xs"
-          data-test="security-events-product"
-          >{{ t("siem.events.product", { name: detectedSummary.product }) }}</OTag
-        >
-        <OTag variant="primary-soft" size="xs">
-          {{ t("siem.events.confidence", { n: detectedSummary.confidence }) }}
-          <OTooltip
-            v-if="detectedSummary.missing"
-            :content="t('siem.events.missingSignals', { fields: detectedSummary.missing })"
-          />
-        </OTag>
-        <OTag
-          v-if="detectedSummary.category"
-          variant="default-soft"
-          size="xs"
-          data-test="security-events-ocsf-category"
-          >{{ t("siem.events.ocsfCategory", { name: detectedSummary.category }) }}</OTag
-        >
-        <OTag
-          v-if="detectedSummary.className"
-          variant="default-soft"
-          size="xs"
-          data-test="security-events-ocsf-class"
-          >{{
-            t("siem.events.ocsfClass", {
-              name: detectedSummary.className,
-              uid: detectedSummary.classUid,
-            })
-          }}<OTooltip
-            v-if="detectedSummary.classMix"
-            :content="t('siem.events.classMix', { mix: detectedSummary.classMix })"
-        /></OTag>
-        <OTag
-          v-if="detectedSummary.objects.length"
-          variant="default-soft"
-          size="xs"
-          data-test="security-events-ocsf-objects"
-          >{{ t("siem.events.objects") }} · {{ detectedSummary.objects.length
-          }}<OTooltip :content="raw(detectedSummary.objects.join(', '))"
-        /></OTag>
-        <OTag
-          v-if="detectedSummary.sigma"
-          variant="purple-soft"
-          size="xs"
-          class="font-mono"
-          data-test="security-events-sigma-logsource"
-        >
-          {{ t("siem.events.rulesMatch", { logsource: detectedSummary.sigma }) }}
-          <OTooltip :content="t('siem.events.rulesMatchHint')" />
-        </OTag>
-        <OTag v-if="!detectedSummary.isSecurity" variant="default-soft" size="xs">
-          {{ t("siem.events.telemetryOnly") }}
-        </OTag>
-        <span class="text-text-secondary max-w-md truncate">
-          {{ t("siem.events.matchedOn", { fields: detectedSummary.evidence }) }}
-          <OTooltip :content="raw(detectedSummary.evidence)" />
-        </span>
-        <div class="flex-1" />
-        <OButton
-          v-if="sigmaRules.length"
-          :variant="firingCount ? 'outline-destructive' : 'outline'"
-          size="xs"
-          icon-left="shield-alert-outline"
-          :icon-right="showRules ? 'expand-less' : 'expand-more'"
-          data-test="security-events-rules-toggle"
-          @click="showRules = !showRules"
-        >
-          {{ t("siem.events.detections", runnableCount) }}
-          <template v-if="firingCount"> · {{ t("siem.events.firing", firingCount) }}</template>
-        </OButton>
-      </div>
+      <SecurityEventsDetected
+        v-if="detectedSummary && !isHunt"
+        v-model:show-rules="showRules"
+        :summary="detectedSummary"
+        :rules="sigmaRules"
+        :counting="rulesCounting"
+        :error="rulesError"
+        :runnable-count="runnableCount"
+        :firing-count="firingCount"
+        :can-create="canAuthor"
+        @filter-by-rule="filterByRule"
+        @create-detection="createDetectionFrom"
+      />
 
-      <div
-        v-if="showRules && sigmaRules.length"
-        class="border-border-default bg-surface-panel flex max-h-72 shrink-0 flex-col overflow-y-auto border-b"
-        data-test="security-events-rules"
-      >
-        <div class="px-page-edge text-text-secondary flex items-center gap-2 py-1.5 text-xs">
-          <span class="font-semibold">{{
-            t("siem.events.rulesFor", { source: detectedSummary?.sigma || "" })
-          }}</span>
-          <OSpinner v-if="rulesCounting" size="xs" />
-          <span v-else-if="rulesError" class="text-status-error-text">{{ rulesError }}</span>
-        </div>
-        <div
-          v-for="entry in sigmaRules"
-          :key="entry.rule.id ?? entry.rule.title"
-          class="px-page-edge border-border-subtle flex items-center gap-2 border-t py-1.5 text-xs"
-          :class="{ 'opacity-60': !entry.compiled.runnable }"
-        >
-          <OTag
-            type="severity"
-            :value="severityTagValue(toneOfSigmaLevel(entry.rule.level))"
-            :label="t(toneLabelKey(toneOfSigmaLevel(entry.rule.level)))"
-            size="xs"
-          />
-          <span class="text-text-heading truncate font-medium">
-            {{ entry.rule.title }}
-            <OTooltip v-if="entry.rule.description" :content="raw(entry.rule.description)" />
-          </span>
-          <OTag
-            v-for="tech in entry.rule.techniques.slice(0, 3)"
-            :key="tech"
-            variant="purple-soft"
-            shape="rounded"
-            size="xs"
-            >{{ tech }}</OTag
-          >
-          <div class="flex-1" />
-          <span v-if="!entry.compiled.runnable" class="text-text-secondary max-w-80 truncate">
-            {{ blockedReason(entry.compiled) }}
-            <OTooltip :content="blockedReason(entry.compiled)" />
-          </span>
-          <template v-else>
-            <OIcon
-              v-if="caveat(entry.compiled)"
-              name="warning-amber"
-              size="xs"
-              class="text-status-warning-text"
-            >
-              <OTooltip :content="caveat(entry.compiled)" />
-            </OIcon>
-            <OTag
-              v-if="entry.count !== null"
-              :variant="entry.count > 0 ? 'error-soft' : 'default-soft'"
-              size="xs"
-              class="tabular-nums"
-            >
-              {{ t("siem.events.hits", { n: formatEventCount(entry.count) }, entry.count) }}
-            </OTag>
-            <OButton
-              :data-test="`security-events-rule-view-${entry.rule.id}`"
-              v-if="entry.count"
-              variant="ghost"
-              size="xs"
-              @click="filterByRule(entry.compiled.where)"
-            >
-              {{ t("siem.events.viewHits") }}
-            </OButton>
-            <OButton
-              :data-test="`security-events-rule-create-${entry.rule.id}`"
-              variant="ghost-primary"
-              size="xs"
-              @click="createDetectionFrom(entry.rule.id ?? '')"
-            >
-              {{ t("siem.events.createDetection") }}
-            </OButton>
-          </template>
-        </div>
-      </div>
-
-      <div
-        v-if="selectedStream && !sqlMode && showTimeline"
-        class="px-page-edge border-border-default flex shrink-0 flex-col gap-2 border-b py-2"
-        data-test="security-events-timeline"
-      >
-        <OStatStrip
-          v-if="severityField"
-          compact-values
-          data-test="security-events-severity-strip"
-          :items="severityStats"
-          :loading="histogramLoading && !histogram"
-          selectable
-          :selected-key="selectedTone"
-          @select="onSeverityTile"
-        />
-        <div class="h-28">
-          <SecuritySeverityChart
-            :buckets="histogram?.buckets ?? []"
-            :series="chartSeries"
-            :loading="histogramLoading"
-            :highlight="selectedTone"
-            :min="Math.floor(timeRange.start / 1000)"
-            :max="Math.ceil(timeRange.end / 1000)"
-            zoomable
-            data-test="security-events-chart"
-            @zoom="onChartZoom"
-          />
-        </div>
-      </div>
+      <SecurityEventsTimeline
+        v-if="selectedStream && !isHunt && !sqlMode && showTimeline"
+        v-model:severity="severityFilter"
+        :histogram="histogram"
+        :loading="histogramLoading"
+        :has-severity="hasSeverity"
+        :start="timeRange.start"
+        :end="timeRange.end"
+        @zoom="onChartZoom"
+      />
       <SecurityNotices
         v-else
         :notices="notices"
@@ -2131,176 +1496,68 @@ function widenTo(period: string) {
         data-test="security-events-notices"
       />
 
+      <SecurityAccessLock
+        v-if="!selectedStream && !streamsLoading && !secSources.streamsReadable.value"
+        :denials="streamDenials"
+        size="hero"
+        data-test="security-events-access-lock"
+      />
       <OEmptyState
-        v-if="!selectedStream && !streamsLoading"
+        v-else-if="!selectedStream && !streamsLoading"
         size="hero"
         icon="manage-search"
         :title="t('siem.events.noStreamTitle')"
         :description="t('siem.events.noStreamHint')"
       />
-      <OTable
+      <SecurityEventsHunt
+        v-else-if="isHunt"
+        ref="huntRef"
+        :org-id="orgId"
+        :start="timeRange.start"
+        :end="timeRange.end"
+        :initial="huntState"
+        @update:query="onHuntQuery"
+        @open-event="openFromHunt"
+        @loading="huntLoading = $event"
+      />
+      <SecurityAccessLock
+        v-else-if="searchDenials.length"
+        :denials="searchDenials"
+        :reason="raw(forbiddenReason(searchRefusal))"
+        size="hero"
+        data-test="security-events-search-lock"
+      />
+      <SecurityEventsTable
         v-else
-        :key="showRaw ? 'raw' : 'normalized'"
-        :data="rows"
-        :columns="columns"
-        row-key="_key"
-        :loading="loading"
-        :error="errorMsg || null"
         ref="eventsTable"
-        :page-size="50"
-        :page-size-options="[50, 100, 250]"
-        :show-global-filter="false"
-        :persist-columns="!showRaw"
-        :table-id="showRaw ? undefined : 'security-events-normalized'"
-        :enable-column-resize="true"
+        v-model:show-raw="showRaw"
+        v-model:show-timeline="showTimeline"
+        :rows="rows"
+        :columns="columns"
+        :loading="loading"
+        :error="errorMsg"
+        :page="page"
+        :page-size="pageSize"
+        :page-sizes="PAGE_SIZES"
+        :total="pagerTotal"
+        :total-exact="windowTotal !== null"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        :sql-mode="sqlMode"
+        :result-table="resultMode"
+        :can-show-timeline="!!selectedStream && !sqlMode"
         :row-class="rowClass"
-        :get-row-status-color="rowRail"
-        class="min-h-0 flex-1"
-        data-test="security-events-table"
+        :pivot-for="pivotFor"
+        :empty-hint="emptyHint"
+        :filtered="filtersActive"
+        :wider-period="widerPeriod"
         @row-click="openDrawer"
-        @sort-change="sortTick++"
-      >
-        <template #toolbar>
-          <div class="flex w-full items-center gap-3">
-            <span class="text-text-secondary text-xs" data-test="security-events-count">
-              <template v-if="windowTotal === null">{{
-                t("siem.events.latestCount", rows.length)
-              }}</template>
-              <template v-else-if="windowTotal > rows.length">
-                {{
-                  t("siem.events.showingOf", {
-                    shown: formatEventCount(rows.length),
-                    total: formatEventCount(windowTotal),
-                  })
-                }}
-              </template>
-              <template v-else>{{
-                t("siem.events.count", { n: formatEventCount(windowTotal) }, windowTotal)
-              }}</template>
-            </span>
-            <div class="flex-1" />
-            <OButton
-              v-if="selectedStream && !sqlMode"
-              variant="ghost"
-              size="xs"
-              :icon-left="showTimeline ? 'expand-less' : 'expand-more'"
-              data-test="security-events-toggle-timeline"
-              @click="showTimeline = !showTimeline"
-            >
-              {{ showTimeline ? t("siem.events.hideTimeline") : t("siem.events.showTimeline") }}
-            </OButton>
-            <OToggleGroup
-              :model-value="showRaw ? 'raw' : 'normalized'"
-              data-test="security-events-view"
-              @update:model-value="(v: unknown) => (showRaw = v === 'raw')"
-            >
-              <OToggleGroupItem
-                data-test="security-events-view-normalized"
-                value="normalized"
-                size="xs"
-                :tooltip="t('siem.events.normalizedHint')"
-              >
-                {{ t("siem.events.normalized") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="raw" size="xs" data-test="security-events-view-raw">{{
-                t("siem.events.raw")
-              }}</OToggleGroupItem>
-            </OToggleGroup>
-          </div>
-        </template>
-
-        <template #cell-time="{ row }">
-          <span class="text-text-secondary font-mono text-xs whitespace-nowrap">{{
-            fmtTs(row.time)
-          }}</span>
-        </template>
-        <template #cell-severityId="{ row }">
-          <OTag
-            type="severity"
-            :value="severityTagValue(row._tone)"
-            :label="t(toneLabelKey(row._tone))"
-            size="xs"
-          />
-        </template>
-        <template #cell-className="{ row }">
-          <span class="text-text-heading truncate font-medium">{{ row.className || "—" }}</span>
-        </template>
-        <template #cell-statusId="{ row }">
-          <OTag
-            v-if="row.statusId === 1 || row.statusId === 2"
-            :variant="row.statusId === 2 ? 'error-soft' : 'success-soft'"
-            size="xs"
-            >{{ t(`siem.outcome.${row.statusId === 2 ? "failure" : "success"}`) }}</OTag
-          >
-          <span v-else class="text-text-secondary">—</span>
-        </template>
-        <template #cell-srcIp="{ row }">
-          <span class="truncate font-mono text-xs">{{ row.srcIp || "—" }}</span>
-        </template>
-        <template #cell-dstIp="{ row }">
-          <span class="truncate font-mono text-xs">{{ row.dstIp || "—" }}</span>
-        </template>
-
-        <template #cell-hover-actions="{ row, column, active }">
-          <div
-            v-if="active && pivotFor(row, column.id)"
-            class="bg-surface-base border-border-default rounded-default flex items-center border"
-          >
-            <OButton
-              :data-test="`security-events-pivot-include-${column.id}`"
-              variant="ghost"
-              size="icon-xs"
-              icon-left="add-circle-outline"
-              @click.stop="
-                addFilter(pivotFor(row, column.id)!.field, pivotFor(row, column.id)!.value, '=')
-              "
-            >
-              <OTooltip :content="t('siem.pivot.include')" />
-            </OButton>
-            <OButton
-              :data-test="`security-events-pivot-exclude-${column.id}`"
-              variant="ghost"
-              size="icon-xs"
-              icon-left="block"
-              @click.stop="
-                addFilter(pivotFor(row, column.id)!.field, pivotFor(row, column.id)!.value, '!=')
-              "
-            >
-              <OTooltip :content="t('siem.pivot.exclude')" />
-            </OButton>
-          </div>
-        </template>
-
-        <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
-            data-test="security-events-refresh"
-            @click="runSearch()"
-          >
-            <OTooltip side="bottom" :content="t('siem.events.refresh')" />
-          </OButton>
-        </template>
-
-        <template #empty>
-          <OEmptyState
-            v-if="!loading"
-            size="block"
-            icon="search-off"
-            :title="t('siem.events.noEvents')"
-            :description="emptyHint"
-            :filtered="filtersActive"
-            :action-label="
-              widerPeriod ? t('siem.events.searchWider', { period: widerPeriod }) : undefined
-            "
-            action-icon="history"
-            data-test="security-events-empty"
-            @action="onEmptyAction"
-          />
-        </template>
-      </OTable>
+        @pagination-change="onPage"
+        @sort-change="onSort"
+        @refresh="runSearch()"
+        @add-filter="addFilter"
+        @empty-action="onEmptyAction"
+      />
     </div>
 
     <SecurityEventDrawer
@@ -2314,11 +1571,17 @@ function widenTo(period: string) {
       :rules="sigmaRules"
       :share-url="shareUrl"
       :index="drawerIndex"
-      :total="rows.length"
+      :total="pagerTotal"
       @close="closeDrawer"
       @prev="stepDrawer(-1)"
       @next="stepDrawer(1)"
       @add-filter="addFilter"
+    />
+    <SecurityNewDetectionDialog
+      v-model:open="newDetectionOpen"
+      :org-id="orgId"
+      :preset="newDetectionPreset"
+      :existing-names="existingAlertNames"
     />
   </OPageLayout>
 </template>

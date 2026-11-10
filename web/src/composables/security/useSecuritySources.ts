@@ -1,259 +1,159 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, ref, shallowRef } from "vue";
+import { computed, ref } from "vue";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 
+import { loadSecurityAccess } from "@/composables/security/useSecurityAccess";
 import ocsfPacks from "@/services/ocsfPacks";
-import { runSql } from "@/composables/security/useSecurityStreamPlans";
-import streamService from "@/services/stream";
-import type { SecuritySetting } from "@/utils/security/ocsfPipeline";
-import { quoteIdent } from "@/utils/security/sql";
+import type { SecuritySetting, SourceRow } from "@/services/securitySources";
+import { classifySourcesMutation, securitySourcesQuery } from "@/services/securitySources.queries";
 import {
   isLocalPrefsMigrated,
-  judgeStream,
   loadSourcePrefs,
   markLocalPrefsMigrated,
   pendingIncludeMigrations,
-  resolveSources,
   saveSourcePrefs,
-  sourcesFromSettings,
-  staleStreams,
-  streamKey,
-  streamsWithIncludeSetting,
-  suggestedSources,
-  unsampledKey,
-  type CachedVerdict,
-  type SourcePrefs,
-  type StreamWithSecurity,
-} from "@/utils/security/sourceSelection";
+} from "@/utils/security/sourcePrefs";
 import { loadTaggedStreams, saveTaggedStreams } from "@/utils/security/streams";
 
-const CLASSIFY_CONCURRENCY = 2;
-/** Streams classified per page load; the busiest go first and the rest follow on later loads. */
-const CLASSIFY_PER_LOAD = 40;
-const SAMPLE_ROWS = 30;
-const SAMPLE_WINDOW_US = 3_600_000_000;
+const EMPTY_SETTING: SecuritySetting = {
+  source_type: "",
+  pack_id: "",
+  pack_version: 0,
+  attached_at: 0,
+  pipeline_id: "",
+  pipeline_created: false,
+  included: null,
+};
 
-export interface StreamInfo {
-  name: string;
-  stats?: { created_at?: number; doc_num?: number; doc_time_min?: number; doc_time_max?: number };
-  [key: string]: unknown;
-}
+/** Orgs classified in this page session; the server keeps verdicts, so once per load is enough. */
+const classifiedOrgs = new Set<string>();
 
-/** One classification pass per org at a time, shared by every page that mounts. */
-const running = new Map<string, Promise<void>>();
-
-async function sampleRows(orgId: string, stream: string): Promise<Record<string, unknown>[]> {
-  const endUs = Date.now() * 1000;
-  try {
-    const { hits } = await runSql(
-      orgId,
-      `SELECT * FROM ${quoteIdent(stream)}`,
-      endUs - SAMPLE_WINDOW_US,
-      endUs,
-      SAMPLE_ROWS,
-    );
-    return hits;
-  } catch {
-    return [];
-  }
-}
-
-async function classifyOne(orgId: string, stream: StreamInfo): Promise<CachedVerdict | null> {
-  let fields: string[] = [];
-  try {
-    const res = await streamService.schema(orgId, stream.name, "logs");
-    fields = (res.data?.schema ?? []).map((f: { name: string }) => f.name);
-  } catch {
-    return null;
-  }
-  const samples = await sampleRows(orgId, stream.name);
-  const verdict = judgeStream(fields, samples);
-  return {
-    key: samples.length ? streamKey(stream.stats) : unsampledKey(stream.stats),
-    decision: verdict?.decision ?? "ignored",
-    sourceId: verdict?.sourceId ?? "",
-    label: verdict?.label ?? "",
-    confidence: verdict?.confidence ?? 0,
-  };
-}
-
+/** The org's streams and Security sources, as the server lists them. */
 export function useSecuritySources() {
   const orgId = ref("");
-  const streams = shallowRef<StreamInfo[]>([]);
-  const prefs = ref<SourcePrefs>({ include: [], exclude: [], dismissed: [], classified: {} });
-  const loading = ref(false);
-  const classifying = ref(false);
-  const error = ref("");
-
-  const names = computed(() => streams.value.map((s) => s.name));
-  const asSecurityStreams = (): StreamWithSecurity[] =>
-    streams.value.map((s) => ({ name: s.name, settings: (s as StreamWithSecurity).settings }));
-  const settingSources = computed(() => sourcesFromSettings(asSecurityStreams()));
-  const settingNames = computed(
-    () =>
-      new Set(
-        asSecurityStreams()
-          .filter((s) => s.settings?.security)
-          .map((s) => s.name),
-      ),
+  const dismissed = ref<string[]>([]);
+  const canWrite = ref(false);
+  const query = useQuery(
+    computed(() => ({ ...securitySourcesQuery(orgId.value), enabled: !!orgId.value })),
   );
-  // Streams carrying a setting are governed by it, not by the local classification.
-  const legacyNames = computed(() => names.value.filter((n) => !settingNames.value.has(n)));
-  const sources = computed(() => resolveSources(legacyNames.value, prefs.value));
-  // An excluded setting (included === false) is not a source, even when a pack is mapped.
-  const sourceNames = computed(() => [
-    ...new Set([
-      ...settingSources.value.filter((s) => s.included).map((s) => s.name),
-      ...sources.value.map((s) => s.name),
-    ]),
-  ]);
-  const suggestions = computed(() => suggestedSources(legacyNames.value, prefs.value));
+  const classifyMutation = useMutation(computed(() => classifySourcesMutation(orgId.value)));
 
-  /** Saves the user's choices, keeping verdicts another page's classification pass stored meanwhile. */
-  function persist() {
-    const stored = loadSourcePrefs(orgId.value);
-    prefs.value = {
-      ...prefs.value,
-      classified: { ...stored.classified, ...prefs.value.classified },
-    };
-    saveSourcePrefs(orgId.value, prefs.value);
-  }
+  const rows = computed<SourceRow[]>(() => query.data.value?.streams ?? []);
+  const streams = computed(() =>
+    rows.value.map((row) => ({
+      name: row.name,
+      stats: { doc_num: row.activity.doc_num, doc_time_max: row.activity.doc_time_max },
+      settings: { security: row.setting },
+    })),
+  );
+  const sources = computed(() => rows.value.filter((row) => row.reason !== null));
+  const sourceNames = computed(() => query.data.value?.sources ?? []);
+  const suggestions = computed(() => {
+    const hidden = new Set(dismissed.value);
+    const byName = new Map(rows.value.map((row) => [row.name, row]));
+    return (query.data.value?.suggestions ?? [])
+      .filter((name) => !hidden.has(name))
+      .map((name) => byName.get(name))
+      .filter((row): row is SourceRow => !!row);
+  });
+  const loading = computed(() => query.isLoading.value);
+  const classifying = computed(() => classifyMutation.isPending.value);
+  const error = computed(() => {
+    const err = query.error.value as {
+      response?: { data?: { message?: string } };
+      message?: string;
+    } | null;
+    return err ? (err.response?.data?.message ?? err.message ?? "") : "";
+  });
 
-  /** Stores one verdict on top of whatever choices are saved now, so it never undoes one. */
-  function storeVerdict(org: string, name: string, verdict: CachedVerdict) {
-    const stored = loadSourcePrefs(org);
-    stored.classified[name] = verdict;
-    saveSourcePrefs(org, stored);
-    if (org === orgId.value) prefs.value = stored;
-  }
+  const settingOf = (name: string): SecuritySetting | null =>
+    rows.value.find((row) => row.name === name)?.setting ?? null;
 
-  async function classify() {
-    const org = orgId.value;
-    const pending = running.get(org);
-    if (pending) {
-      classifying.value = true;
-      await pending;
-      if (org === orgId.value) prefs.value = loadSourcePrefs(org);
-      classifying.value = false;
-      return;
-    }
-    const byName = new Map(streams.value.map((s) => [s.name, s]));
-    const queue = staleStreams(streams.value, prefs.value)
-      .slice(0, CLASSIFY_PER_LOAD)
-      .map((name) => byName.get(name)!);
-    if (!queue.length) return;
-    classifying.value = true;
-    const work = (async () => {
-      const worker = async () => {
-        for (let next = queue.shift(); next; next = queue.shift()) {
-          const verdict = await classifyOne(org, next);
-          if (verdict) storeVerdict(org, next.name, verdict);
-          if (org !== orgId.value) return;
-        }
-      };
-      await Promise.all(Array.from({ length: CLASSIFY_CONCURRENCY }, worker));
-    })();
-    running.set(org, work);
-    try {
-      await work;
-    } finally {
-      running.delete(org);
-      if (org === orgId.value) classifying.value = false;
-    }
-  }
-
-  /** Loads the stream list and preferences; classification continues in the background. */
-  async function load(org: string, { fetchSchema = false } = {}) {
+  /** Loads the list; an author also has the server classify the streams that need it. */
+  async function load(org: string) {
     if (!org) return;
     orgId.value = org;
-    const loaded = loadSourcePrefs(org);
-    // Streams added by hand before content classification existed stay sources.
-    const legacy = loadTaggedStreams(org).filter((n) => !loaded.include.includes(n));
-    prefs.value = { ...loaded, include: [...loaded.include, ...legacy] };
+    const prefs = loadSourcePrefs(org);
+    // Streams added by hand before content classification existed migrate like other local choices.
+    const legacy = loadTaggedStreams(org).filter((n) => !prefs.include.includes(n));
     if (legacy.length) {
-      saveSourcePrefs(org, prefs.value);
-      // Cleared once migrated, or removing a source would bring it back next load.
+      saveSourcePrefs(org, { ...prefs, include: [...prefs.include, ...legacy] });
       saveTaggedStreams(org, []);
     }
-    loading.value = true;
-    error.value = "";
-    try {
-      const res = await streamService.nameList(org, "logs", fetchSchema);
-      if (org !== orgId.value) return;
-      streams.value = res.data?.list ?? [];
-    } catch (e: any) {
-      if (org !== orgId.value) return;
-      error.value = e?.response?.data?.message ?? e?.message ?? "";
-    } finally {
-      if (org === orgId.value) loading.value = false;
+    dismissed.value = prefs.dismissed;
+    const [, access] = await Promise.all([query.refetch(), loadSecurityAccess(org)]);
+    if (org !== orgId.value) return;
+    // Storing a classification verdict is an authoring write on the server.
+    canWrite.value = access.author;
+    if (canWrite.value && !classifiedOrgs.has(org)) {
+      classifiedOrgs.add(org);
+      classifyMutation.mutate([]);
     }
-    void classify();
   }
 
-  function include(name: string) {
-    prefs.value.include = [...new Set([...prefs.value.include, name])];
-    prefs.value.exclude = prefs.value.exclude.filter((n) => n !== name);
-    prefs.value.dismissed = prefs.value.dismissed.filter((n) => n !== name);
-    persist();
+  /** Records an explicit include or exclude on the server; throws when the save is refused. */
+  async function setIncluded(name: string, included: boolean) {
+    await ocsfPacks.saveSetting(orgId.value, name, {
+      ...(settingOf(name) ?? EMPTY_SETTING),
+      included,
+    });
+    await query.refetch();
   }
 
-  function exclude(name: string) {
-    prefs.value.exclude = [...new Set([...prefs.value.exclude, name])];
-    prefs.value.include = prefs.value.include.filter((n) => n !== name);
-    persist();
-  }
+  const include = (name: string) => setIncluded(name, true);
+  const exclude = (name: string) => setIncluded(name, false);
 
   function dismiss(name: string) {
-    prefs.value.dismissed = [...new Set([...prefs.value.dismissed, name])];
-    persist();
+    dismissed.value = [...new Set([...dismissed.value, name])];
+    saveSourcePrefs(orgId.value, { ...loadSourcePrefs(orgId.value), dismissed: dismissed.value });
   }
 
   /** Moves local include/exclude choices into stream settings once, for a user who can write them. */
-  async function migrateIncludes(canWrite: boolean) {
+  async function migrateIncludes(write: boolean) {
     const org = orgId.value;
-    if (!canWrite || !org || isLocalPrefsMigrated(org)) return;
-    // A failed stream load leaves streams empty; marking migrated now would silently drop every choice.
-    if (error.value || !streams.value.length) return;
-    const live = new Set(names.value);
-    const byName = new Map(asSecurityStreams().map((s) => [s.name, s.settings?.security]));
-    const pending = pendingIncludeMigrations(org, streamsWithIncludeSetting(asSecurityStreams()));
-    for (const item of pending) {
+    if (!write || !org || isLocalPrefsMigrated(org)) return;
+    // A failed load leaves no streams; marking migrated then would silently drop every choice.
+    if (error.value || !rows.value.length) return;
+    const live = new Set(rows.value.map((row) => row.name));
+    const decided = new Set(
+      rows.value
+        .filter((row) => row.included === true || row.included === false)
+        .map((row) => row.name),
+    );
+    for (const item of pendingIncludeMigrations(org, decided)) {
       // A local choice for a stream the loaded list does not contain can never succeed; skip it.
       if (!live.has(item.name)) continue;
-      const current = byName.get(item.name);
-      const setting: SecuritySetting = current
-        ? { ...current, included: item.included }
-        : {
-            source_type: "",
-            pack_id: "",
-            pack_version: 0,
-            attached_at: 0,
-            pipeline_id: "",
-            pipeline_created: false,
-            included: item.included,
-          };
       try {
-        await ocsfPacks.saveSetting(org, item.name, setting);
+        await ocsfPacks.saveSetting(org, item.name, {
+          ...(settingOf(item.name) ?? EMPTY_SETTING),
+          included: item.included,
+        });
       } catch (e: any) {
+        // Only a permanent 400/404 is skipped; anything else aborts unmarked so the choices retry.
         const status = e?.response?.status;
-        // Only a permanent 400/404 is skipped; anything else aborts unmarked so the choices retry next load.
         if (status === 400 || status === 404) continue;
         return;
       }
     }
     markLocalPrefsMigrated(org);
+    await query.refetch();
   }
 
   return {
+    rows,
     streams,
     sources,
-    settingSources,
     sourceNames,
     suggestions,
+    notices: computed(() => query.data.value?.notices ?? []),
+    streamsReadable: computed(() => query.data.value?.streams_readable !== false),
     loading,
     classifying,
+    canWrite,
     error,
     load,
+    refetch: () => query.refetch(),
     include,
     exclude,
     dismiss,

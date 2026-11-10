@@ -622,6 +622,9 @@ const getRoleDetails = () => {
           await seedK8sViewerPreset();
         } else if (preset === "rum_viewer" || preset === "rum_editor") {
           await seedRumPreset(preset);
+        } else if (presets.value.some((item) => item.id === preset)) {
+          // Offered presets only: one needing a module this org lacks would stage tuples FGA rejects.
+          await applyPreset(String(preset));
         }
       }
     })

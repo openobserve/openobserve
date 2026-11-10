@@ -2379,6 +2379,7 @@ async fn publish_estimate(
                 histogram_interval: 0,
                 sampling_ratio: None,
                 search_type: Some(search::SearchEventType::PublicDashboard),
+                timezone: None,
             };
             if let Ok(resp) = search_service::search_partition(
                 &ctx.family.child(),

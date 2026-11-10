@@ -691,7 +691,8 @@
       "scoreConfigs": "Configurazioni dei punteggi",
       "workflows": "Workflow",
       "syntheticFolders": "Cartelle Synthetics",
-      "downtimeFolders": "Cartelle dei downtime"
+      "downtimeFolders": "Cartelle dei downtime",
+      "security": "Sicurezza"
     },
     "resourcesInline": {
       "dashboards": "dashboard",
@@ -747,7 +748,8 @@
       "fleetManagement": "gestione della flotta",
       "incidents": "incidenti",
       "onCallResponses": "risposte di reperibilità",
-      "searchJobs": "job di ricerca"
+      "searchJobs": "job di ricerca",
+      "security": "Sicurezza"
     },
     "denied": {
       "view": "Non puoi visualizzare {resource}",
@@ -4500,6 +4502,7 @@
       "presetsSubtitle": "Aggiungi a questo ruolo le concessioni di un preset. Non viene rimosso nulla.",
       "presetsSectionBuiltin": "Integrati",
       "presetsSectionJob": "Per mansione",
+      "presetsSectionSecurity": "Sicurezza",
       "presetAddsTooltip": "Aggiunge {count} permesso | Aggiunge {count} permessi",
       "presetInRole": "Nel ruolo",
       "presetInRoleTooltip": "Questo ruolo ha già tutto ciò che c'è in questo preset",
@@ -4575,7 +4578,16 @@
       "presetRestored": "{title} ha ripristinato {permissions}. Verifica le modifiche prima di salvare.",
       "presetSummaryRestores": "Mantiene {count} permesso che hai contrassegnato per la rimozione. | Mantiene {count} permessi che hai contrassegnato per la rimozione.",
       "presetRestoreButton": "Mantieni {count} permesso | Mantieni {count} permessi",
-      "effectStillAllowed": "Nessuna modifica all'accesso: un permesso più ampio lo consente ancora."
+      "effectStillAllowed": "Nessuna modifica all'accesso: un permesso più ampio lo consente ancora.",
+      "moduleGroupSecurity": "Sicurezza",
+      "presetSocAnalystTitle": "Analista SOC",
+      "presetSocAnalystDescription": "Gestire avvisi e casi di Sicurezza, con accesso in lettura a rilevamenti, stream ed elenchi di threat intelligence",
+      "presetDetectionEngineerTitle": "Ingegnere dei rilevamenti",
+      "presetDetectionEngineerDescription": "Creare, ottimizzare, attivare ed eseguire rilevamenti, installare contenuti, collegare sorgenti con le relative funzioni e pipeline e gestire tabelle di arricchimento come gli elenchi di threat intelligence, con accesso in lettura a Sicurezza, casi e stream",
+      "presetSecurityAdminTitle": "Amministratore Sicurezza",
+      "presetSecurityAdminDescription": "Gestire tutta la Sicurezza, inclusa l'eliminazione di rilevamenti e casi e l'esclusione di sorgenti, con incidenti, funzioni, pipeline, tabelle di arricchimento e chiavi di cifratura, e accesso in lettura agli stream",
+      "presetSecurityViewerTitle": "Visualizzatore Sicurezza",
+      "presetSecurityViewerDescription": "Visualizzare Sicurezza, i suoi casi, rilevamenti e stream sorgente senza modificarli"
     },
     "rolesPage": {
       "subtitle": "I ruoli raggruppano le autorizzazioni: assegnali a utenti, account di servizio o gruppi per concedere l'accesso.",
@@ -7711,6 +7723,28 @@
       "tlsBody": "Il token è una credenziale bearer che può essere riutilizzata su HTTP in chiaro, quindi termina TLS su {brand} ({setting}, disabilitato per impostazione predefinita) o su un proxy attendibile davanti a esso."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Aggiorna la configurazione del {product} esistente per inviare log, metriche e tracce a questa organizzazione.",
+      "correlationBody": "Per correlare log e tracce, le applicazioni devono registrare l’ID di traccia completo a 128 bit. Se il tracer Java registra solo i 64 bit inferiori, imposta {setting} nell’applicazione.",
+      "profilingBody": "La profilazione utilizza una destinazione separata e la chiave API dell’Agent. Se un’applicazione esegue già un profiler, disattiva la profilazione dell’applicazione o del tracer durante la migrazione oppure configurane separatamente la destinazione.",
+      "multiValueTagsBody": "I tag con più valori distinti usano una stringa di array JSON ordinato. Anche un singolo valore che inizia con [ viene codificato come array JSON di un elemento per preservare l’identità della serie.",
+      "envTitle": "Configurazione dell'Agent",
+      "envBody": "Imposta queste variabili d'ambiente su {product} e riavvialo. Richiede {product} {version} o versione successiva.",
+      "tokenBody": "La chiave API deve essere un token di ingestione dell'organizzazione, che inizia con {prefix}. Questa organizzazione non ha token di ingestione abilitati, quindi non viene mostrato alcuno snippet di configurazione. Crea un token di ingestione, poi torna a questa pagina.",
+      "tokenLink": "Apri token di ingestione",
+      "featuresOffBody": "Le righe dopo gli URL disattivano le funzionalità dell'Agent che inviano ai server di {vendor} con la stessa chiave. {setting} mantiene anche {component} disattivato, che le versioni più recenti dell'Agent eseguono e che non conserva il percorso in questi URL.",
+      "logsTitle": "Log",
+      "logsBody": "La raccolta dei log è disattivata per impostazione predefinita in {product}. Imposta {setting} e configura le tue origini di log.",
+      "dualTitle": "Mantieni la destinazione attuale",
+      "dualBody": "Per inviare a questa organizzazione insieme a una destinazione esistente, mantieni gli URL e la chiave API attuali e aggiungi invece queste voci a {file}. I log richiedono {setting}, perché altrimenti gli endpoint di log aggiuntivi usano TCP.",
+      "metricsTitle": "Interrogazione delle metriche",
+      "metricsTypes": "Ogni serie viene memorizzata come gauge con il valore inviato dall'Agent, etichettata con {typeField} e {intervalField}.",
+      "metricsCount": "Le serie Count contengono il conteggio per ciascun intervallo di flush. Sommale con {promql} in PromQL o {sql} in SQL.",
+      "metricsRate": "Le serie Rate sono al secondo. Moltiplica il valore per {intervalField} per recuperare il conteggio relativo all'intervallo.",
+      "metricsCounterFns": "Le funzioni PromQL {rate} e {increase} richiedono contatori cumulativi, quindi non forniscono risultati significativi su queste serie.",
+      "metricsSketch": "Le distribuzioni vengono memorizzate come bucket di istogramma e i percentili vengono stimati da questi bucket. Un valore più alto di ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA produce bucket più fini e percentili più precisi, al costo di più righe memorizzate."
+    },
     "gpu": "GPU",
     "gpuExporter": "Esportatore GPU"
   },
@@ -24327,8 +24361,9 @@
       "classMix": "Classi nell'ultima ora: {mix}",
       "objects": "Oggetti OCSF",
       "missingSignals": "Non rilevati: {fields}",
-      "detections": "{n} rilevazione | {n} rilevazioni",
-      "firing": "{n} attivo | {n} attivi",
+      "detections": "{n} regola corrispondente | {n} regole corrispondenti",
+      "firing": "{n} con riscontro | {n} con riscontri",
+      "matchingRulesHint": "Regole del catalogo Sigma applicabili a questa origine. I riscontri sono corrispondenze nella finestra corrente, non rilevamenti distribuiti.",
       "rulesFor": "Regole Sigma per {source}",
       "hits": "{n} occorrenza | {n} occorrenze",
       "viewHits": "Visualizza occorrenze",
@@ -24357,7 +24392,44 @@
       "invertFilter": "Alterna tra inclusione ed esclusione",
       "removeFilter": "Rimuovi filtro",
       "pivotSqlUnsupported": "Questa query SQL non è un semplice SELECT … WHERE, quindi non è stato possibile aggiungervi il filtro. Modifica la query manualmente oppure passa a Builder.",
-      "topValuesWholeStream": "Modalità SQL: i valori vengono conteggiati sull'intero stream, non sulla tua query."
+      "topValuesWholeStream": "Modalità SQL: i valori vengono conteggiati sull'intero stream, non sulla tua query.",
+      "allSources": "Tutte le sorgenti di sicurezza",
+      "sortSqlMode": "Una query scritta a mano imposta il proprio ORDER BY",
+      "includeFailed": "Impossibile aggiungere {name} a Sicurezza",
+      "excludeFailed": "Impossibile rimuovere {name} da Sicurezza",
+      "hunt": {
+        "title": "Cerca in tutte le sorgenti di sicurezza contemporaneamente",
+        "hint": "Digita un indirizzo IP, un utente o un host. Ogni sorgente viene cercata con le proprie colonne e ogni riga indica da quale sorgente proviene.",
+        "noMatches": "Nessuna corrispondenza in questo intervallo",
+        "noMatchesHint": "Amplia l'intervallo di tempo oppure cerca in qualsiasi campo anziché in un solo tipo.",
+        "noFields": "I campi variano da sorgente a sorgente. Scegli una sorgente per sfogliarne i campi.",
+        "search": "Cerca",
+        "aliases": "Corrisponde anche a {n} grafia | Corrisponde anche a {n} grafie",
+        "clearAliases": "Corrispondi solo al nome digitato",
+        "uncounted": "Non conteggiato: {streams}",
+        "kind": {
+          "any": "Qualsiasi campo",
+          "user": "Utente",
+          "ip": "Indirizzo IP",
+          "host": "Host"
+        },
+        "placeholder": {
+          "any": "Indirizzo IP, utente, host o testo",
+          "user": "dave, ACME\\dave o dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "Nome host"
+        },
+        "column": {
+          "time": "Ora",
+          "source": "Origine",
+          "user": "Utente",
+          "ip": "IP di origine",
+          "host": "Host",
+          "action": "Azione",
+          "outcome": "Esito",
+          "message": "Messaggio"
+        }
+      }
     },
     "drawer": {
       "event": "Evento di sicurezza",
@@ -24378,7 +24450,14 @@
       "classUid": "class_uid {n}",
       "eyebrow": "Evento di sicurezza",
       "source": "Origine",
-      "matchedRules": "{n} rilevamento corrispondente | {n} rilevamenti corrispondenti"
+      "matchedRules": "{n} rilevamento corrispondente | {n} rilevamenti corrispondenti",
+      "openCase": "Apri caso",
+      "openCaseHint": "Apri un caso sull'host, l'utente o l'indirizzo indicato da questo evento",
+      "addToCase": "Aggiungi al caso",
+      "pickCase": "Aggiungi a un caso aperto",
+      "caseOpened": "Caso aperto: {title}",
+      "caseUpdated": "Evento aggiunto a {title}",
+      "caseError": "Impossibile aprire un caso da questo evento"
     },
     "record": {
       "prev": "Record precedente",
@@ -24482,7 +24561,20 @@
       "customWindow": "Visualizzazione di una finestra fissa: {from} → {to}",
       "backToRange": "Torna agli ultimi {range}",
       "missing": "L'avviso a cui punta questo link non è nella finestra caricata. Potrebbe essere più vecchio di questo intervallo o oltre il limite delle righe più recenti.",
-      "dismiss": "Ignora"
+      "dismiss": "Ignora",
+      "triage": {
+        "createCase": "Crea caso",
+        "addToCase": "Aggiungi al caso",
+        "openCase": "Apri caso",
+        "acknowledge": "Avvia analisi",
+        "addNote": "Aggiungi nota",
+        "notePlaceholder": "Aggiungi una nota al caso di questa attivazione",
+        "acknowledged": "Caso preso in analisi",
+        "noted": "Nota aggiunta al caso",
+        "caseOpened": "Caso aperto",
+        "attached": "Attivazione aggiunta al caso",
+        "failed": "Impossibile aggiornare il caso"
+      }
     },
     "cases": {
       "title": "Casi",
@@ -24510,7 +24602,8 @@
         "lastSeen": "Ultima osservazione"
       },
       "fact": {
-        "duration": "Durata"
+        "duration": "Durata",
+        "timeToClose": "Tempo di chiusura"
       },
       "durationMinutes": "{n} min",
       "durationHours": "{n} h",
@@ -24532,7 +24625,8 @@
         "service_discovery": "Correlato tramite service discovery",
         "primary_match": "Correlato sulle dimensioni primarie",
         "secondary_match": "Correlato sulle dimensioni secondarie",
-        "alert_id": "Stesso rilevamento"
+        "alert_id": "Stesso rilevamento",
+        "entity": "Stesso host, utente o indirizzo"
       },
       "commentPlaceholder": "Aggiungi una nota per il team",
       "postComment": "Pubblica nota",
@@ -24554,7 +24648,16 @@
         "analysisComplete": "Analisi della causa radice completata",
         "analysisFailed": "Analisi della causa radice non riuscita: {reason}",
         "analysisCancelled": "Analisi della causa radice annullata",
-        "other": "{type}"
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "Verdetto: vero positivo",
+          "false_positive": "Verdetto: falso positivo",
+          "benign": "Verdetto: benigno",
+          "duplicate": "Verdetto: duplicato",
+          "stale": "Verdetto: obsoleto / storico"
+        },
+        "alertsAttached": "Attivazioni aggiunte manualmente: {names}",
+        "eventAttached": "Evento da {stream} alle {at} aggiunto"
       },
       "analysisHint": "Un riepilogo AI di ciò che collega le attivazioni in questo caso.",
       "runAnalysis": "Analizza",
@@ -24570,7 +24673,42 @@
         "resolved": "Chiudi caso"
       },
       "notFound": "Caso non trovato",
-      "timelinePartial": "Questa sequenza temporale è stata ricostruita dal record del caso, quindi potrebbero mancare note, prese in carico e attività di analisi precedenti alla ricostruzione."
+      "timelinePartial": "Questa sequenza temporale è stata ricostruita dal record del caso, quindi potrebbero mancare note, prese in carico e attività di analisi precedenti alla ricostruzione.",
+      "verdict": {
+        "true_positive": "Vero positivo",
+        "false_positive": "Falso positivo",
+        "benign": "Benigno",
+        "duplicate": "Duplicato",
+        "stale": "Obsoleto / storico"
+      },
+      "close": {
+        "title": "Chiudi caso",
+        "verdict": "Verdetto",
+        "verdictRequired": "Scegli un verdetto",
+        "reason": "Motivo",
+        "reasonPlaceholder": "Cosa hai trovato e perché il caso può essere chiuso",
+        "reasonRequired": "Indica un motivo",
+        "reasonTooLong": "Limita il motivo a {max} caratteri o meno",
+        "cancel": "Annulla"
+      },
+      "settings": {
+        "open": "Impostazioni dei casi",
+        "title": "Impostazioni dei casi",
+        "save": "Salva",
+        "saved": "Impostazioni dei casi salvate",
+        "loadFailed": "Impossibile caricare le impostazioni dei casi",
+        "saveFailed": "Impossibile salvare le impostazioni dei casi",
+        "autoCloseDays": "Chiudi i casi inattivi dopo (giorni)",
+        "autoCloseDaysHint": "Un caso senza nuove attivazioni per questo numero di giorni si chiude da solo. 0 mantiene i casi aperti. Al massimo {max}.",
+        "groupWindowMinutes": "Raggruppa le attivazioni entro (minuti)",
+        "groupWindowMinutesHint": "L'attività sullo stesso host, utente o indirizzo entro questi minuti dall'ultima attività di un caso, in base all'ora dell'evento, si unisce a quel caso. 0 apre un caso per rilevamento. Al massimo {max}.",
+        "wholeNumber": "Inserisci un numero intero",
+        "range": "Inserisci un valore da 0 a {max}"
+      },
+      "assignedTo": "Assegnato a {to}",
+      "unassignedToast": "Caso non assegnato",
+      "historical": "Storico (backfill)",
+      "historicalHint": "Ogni attivazione in questo caso proviene da un backfill su dati passati, quindi non descrive alcuna attività attuale."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -24592,19 +24730,21 @@
       "legend": {
         "firing": "Attivati nella finestra (più scuro = più)",
         "covered": "Coperta da un rilevamento abilitato",
-        "available": "Regola disponibile, non abilitata"
+        "available": "Regola disponibile, non abilitata",
+        "none": "Nessuna regola nel catalogo"
       },
       "columnCount": "{covered} di {total} coperte",
       "cellEnabled": "{n} rilevamento attivo | {n} rilevamenti attivi",
       "cellAvailable": "{n} regola disponibile | {n} regole disponibili",
       "noMatch": "Nessuna tecnica corrispondente",
       "unmapped": "Tecniche senza una tattica nota",
-      "footnote": "Le tecniche provengono dalle {n} regole Sigma incluse e dai tuoi rilevamenti; la collocazione segue le tattiche con cui è contrassegnata ogni regola.",
+      "footnote": "La copertura è misurata rispetto alle {total} tecniche di MITRE ATT&CK Enterprise v{version}, con le sotto-tecniche conteggiate nella tecnica padre; {n} regole Sigma sono incluse nel prodotto.",
       "drawerEyebrow": "Tecnica ATT&CK",
       "state": {
         "firing": "Attivo",
         "covered": "Coperta",
-        "available": "Non coperta"
+        "available": "Non coperta",
+        "none": "Nessuna regola"
       },
       "fact": {
         "state": "Copertura",
@@ -24629,7 +24769,9 @@
       "openTechnique": "Apri {id} su attack.mitre.org",
       "viewOnAttack": "Visualizza su ATT&CK",
       "manageDetections": "Gestisci rilevamenti",
-      "historyNarrowed": "L'intervallo massimo di query della cronologia degli avvisi limita le attivazioni a quelle a partire da {from}; le attivazioni precedenti in questa finestra non vengono conteggiate."
+      "historyNarrowed": "L'intervallo massimo di query della cronologia degli avvisi limita le attivazioni a quelle a partire da {from}; le attivazioni precedenti in questa finestra non vengono conteggiate.",
+      "cellNone": "Nessuna regola",
+      "coverageError": "Impossibile caricare la copertura ATT&CK: {reason}"
     },
     "detections": {
       "title": "Rilevamenti",
@@ -24647,7 +24789,8 @@
         "erroring": "In errore",
         "enabled": "Abilitato",
         "disabled": "Disabilitato",
-        "all": "Tutti i rilevamenti"
+        "all": "Tutti i rilevamenti",
+        "notifyFailing": "Notifica non riuscita"
       },
       "column": {
         "name": "Rilevamento",
@@ -24660,7 +24803,8 @@
       "state": {
         "enabled": "Abilitato",
         "disabled": "Disabilitato",
-        "erroring": "In errore"
+        "erroring": "In errore",
+        "notifyFailing": "Notifica non riuscita"
       },
       "tab": {
         "overview": "Panoramica",
@@ -24722,17 +24866,23 @@
       "libraryEmpty": "Nessuna regola corrisponde a quel filtro",
       "stream": "Stream",
       "streamPlaceholder": "Scegli lo stream su cui eseguire",
-      "notify": "Notifica",
-      "notifyPlaceholder": "Scegli una destinazione",
-      "noDestinations": "Non esistono ancora destinazioni per gli avvisi. Un rilevamento ne richiede una per notificare, quindi creala in una nuova scheda e torna qui; questo elenco si aggiorna da solo.",
+      "notify": "Notifica (facoltativo)",
+      "notifyPlaceholder": "Nessuna: gli avvisi attivi aprono comunque casi",
+      "noDestinations": "Non esistono ancora destinazioni di avviso. I rilevamenti generano comunque riscontri e aprono casi anche senza una destinazione; aggiungi una destinazione solo se desideri anche le notifiche.",
       "createDestination": "Crea destinazione",
       "reloadDestinations": "Aggiorna",
       "lookBack": "Intervallo retrospettivo (minuti)",
+      "lookBackHelp": "Almeno la finestra di correlazione di {minutes} minuti; ogni esecuzione fa scorrere quella finestra al suo interno",
+      "correlationWindowLabel": "Finestra di correlazione (minuti)",
+      "backfill": "Controlla anche i dati passati alla prima esecuzione",
+      "backfillRange": "Dati passati da controllare",
+      "backfillHours": "Ultima ora | Ultime {n} ore",
       "runEvery": "Esegui ogni (minuti)",
       "silence": "Rimani in silenzio per (minuti)",
       "compiles": "Compilata su {stream}",
       "compilesAs": "Compilata su {stream}, identificato come {source}",
       "logsourceMismatch": "Questa regola è scritta per {rule}, ma {stream} è identificato come {source}. Può corrispondere solo dove i due condividono i nomi dei campi.",
+      "unseenFields": "Campo non ancora visto su questo stream: {fields}. La creazione del rilevamento aggiunge queste colonne, così è attivo prima del primo evento di questo tipo.",
       "ocsfBridge": "{stream} è OCSF, quindi i campi della regola sono mappati ai percorsi OCSF e la regola viene eseguita solo sugli eventi con {guard}.",
       "ocsfGuard": {
         "class": "class_uid {uid}",
@@ -24760,10 +24910,23 @@
       "validation": {
         "positive": "Deve essere almeno 1 minuto",
         "nonNegative": "Non può essere negativo",
-        "periodGap": "Inferiore all'intervallo di esecuzione: i minuti tra un'esecuzione e l'altra non verrebbero mai controllati"
+        "periodGap": "Inferiore all'intervallo di esecuzione: i minuti tra un'esecuzione e l'altra non verrebbero mai controllati",
+        "belowTimespan": "Deve essere almeno la finestra di correlazione di {minutes} minuti"
       },
       "nameTaken": "Esiste già una detection o un avviso denominato “{name}”. La sua cronologia verrebbe unita a questa, quindi scegli un altro stream o rimuovi prima quello esistente.",
-      "loadError": "Impossibile caricare le regole di detection"
+      "loadError": "Impossibile caricare le regole di detection",
+      "notifyFailingHint": "Questa regola è scattata ma l'ultima notifica non ha potuto essere consegnata. Controlla le sue destinazioni in Cronologia.",
+      "correlationWindow": "Definito dall'intervallo di tempo della correlazione",
+      "createForbidden": "Creare un rilevamento richiede il permesso Sicurezza",
+      "preview": {
+        "run": "Anteprima corrispondenze",
+        "hint": "Esegue la query sulle ultime 24 ore e mostra i primi 20 eventi corrispondenti",
+        "empty": "Nessuna corrispondenza nelle ultime 24 ore",
+        "shown": "{shown} di {total} eventi corrispondenti nelle ultime 24 ore",
+        "failed": "La query non è riuscita: {reason}",
+        "time": "Ora"
+      },
+      "queryFailed": "Non salvato: la query di questo rilevamento non viene eseguita ({reason})"
     },
     "content": {
       "title": "Contenuto",
@@ -24833,7 +24996,6 @@
       "noStreamsForRule": "Nessuno dei tuoi stream corrisponde a questa regola",
       "noStreamsForRuleHint": "È stata scritta per {logsource}. Esegui l'ingestione di quella sorgente e apparirà qui.",
       "runnable": "Eseguibile su questo stream",
-      "notRunnable": "Non eseguibile qui",
       "openInEvents": "Apri in Eventi",
       "installHere": "Installa su questo stream",
       "install": "Installa come rilevamento",
@@ -24855,7 +25017,38 @@
         "severityId": "Gravità",
         "statusId": "Esito"
       },
-      "cannotRun": "Non eseguibile sui tuoi dati"
+      "catalogError": "Impossibile caricare il catalogo dei rilevamenti: {reason}",
+      "notRunnableYet": "Non ancora eseguibile",
+      "newRulesAvailable": "{n} nuova regola ora può essere eseguita su {stream} | {n} nuove regole ora possono essere eseguite su {stream}",
+      "reviewNewRules": "Esamina",
+      "reviewingNewRules": "{n} regola che ora può essere eseguita su {stream} | {n} regole che ora possono essere eseguite su {stream}",
+      "showAllRules": "Mostra tutte le regole",
+      "installSelected": "Installa selezionate",
+      "selectRunnable": "Seleziona eseguibili",
+      "selectRunnableHint": "Seleziona tutte le regole mostrate che funzionano sui tuoi dati e non sono ancora installate",
+      "bulk": {
+        "title": "Installa {n} regola | Installa {n} regole",
+        "subtitle": "Ogni regola viene compilata per il suo stream sul server e salvata come rilevamento con queste impostazioni.",
+        "stream": "Stream",
+        "everyStream": "Ogni stream su cui viene eseguita ciascuna regola",
+        "folder": "Cartella avvisi",
+        "correlationWindow": "Una regola di correlazione guarda indietro almeno quanto la propria finestra.",
+        "nothing": "Nessuna delle regole selezionate viene eseguita su questo stream.",
+        "plan": "Verrà creato {n} rilevamento: | Verranno creati {n} rilevamenti:",
+        "correlation": "Correlazione",
+        "confirm": "Installa {n} rilevamento | Installa {n} rilevamenti",
+        "close": "Chiudi",
+        "summary": "{installed} installati, {skipped} ignorati, {failed} non riusciti su {total}",
+        "duplicate": "Esiste già un rilevamento chiamato {name}.",
+        "correlationBlocked": "La correlazione non può essere eseguita su questo stream.",
+        "status": {
+          "installed": "Installato",
+          "skipped": "Ignorato",
+          "failed": "Non riuscito",
+          "pending": "In attesa"
+        },
+        "done": "{n} rilevamento installato | {n} rilevamenti installati"
+      }
     },
     "entities": {
       "title": "Entità",
@@ -24865,18 +25058,15 @@
         "graph": "Grafico del rischio"
       },
       "riskGraph": {
-        "empty": "Nessuna entità da rappresentare",
-        "emptyHint": "Aggiungi sorgenti di sicurezza o amplia l'intervallo di tempo per vedere il grafico del rischio.",
-        "showingTop": "Visualizzazione delle prime {n} entità su {total} per rischio",
-        "illustrative": "A scopo illustrativo: le relazioni sono dedotte dalla classifica del rischio, non osservate.",
-        "baseScore": "base {n}",
-        "propagatedScore": "propagato {n}",
-        "tier": {
-          "critical": "Critico",
-          "high": "Alto",
-          "medium": "Medio",
-          "low": "Basso"
-        }
+        "empty": "Nessun elemento collegato in questa finestra",
+        "emptyHint": "Il grafico collega utenti, indirizzi IP e host che compaiono nello stesso evento o nello stesso caso. Nessuno è comparso in questa finestra; amplia l'intervallo di tempo.",
+        "showingTop": "Visualizzazione dei primi {n} di {total} per rischio",
+        "legend": "Linea continua: visti nello stesso evento. Linea tratteggiata: nominati dallo stesso caso.",
+        "edgeEvents": "{n} evento | {n} eventi",
+        "edgeCases": "{n} caso | {n} casi",
+        "scoreHint": "Casi che la nominano: {detection}. Eventi non riusciti: {failure}. Collegata a un'entità nominata da un caso: {neighbour}.",
+        "nodeFacts": "{events} eventi · {failures} non riusciti",
+        "nodeCases": "{n} caso | {n} casi"
       },
       "kinds": {
         "user": "Utenti",
@@ -24917,16 +25107,20 @@
           "ip": "Molti utenti",
           "host": "Molti utenti"
         },
-        "external": "Indirizzo pubblico"
+        "external": "Indirizzo pubblico",
+        "fail_then_success": "Successo dopo errori",
+        "open_case": "Caso aperto"
       },
       "signalHint": {
         "failures": "Almeno il {rate}% degli eventi di questa entità ha avuto esito negativo, con almeno {n} errori, contando solo le origini che riportano un esito.",
         "spread": {
-          "user": "Osservato da {n} o più IP di origine in una singola origine durante la finestra.",
-          "ip": "Utilizzato da {n} o più utenti in una singola origine durante la finestra. Anche il traffico in uscita da NAT e VPN appare così; lo stesso vale per il password spraying.",
-          "host": "A cui hanno avuto accesso {n} o più utenti in una singola origine durante la finestra."
+          "user": "Visto da {n} o più IP di origine in un'unica sorgente, ben al di sopra di quanto mostrano altri utenti in questa finestra.",
+          "ip": "Usato da {n} o più utenti in un'unica sorgente, ben al di sopra di altri indirizzi in questa finestra. Anche l'egress NAT e VPN si presenta così; lo stesso vale per il password spraying.",
+          "host": "A cui accedono {n} o più utenti in un'unica sorgente, ben al di sopra di altri host in questa finestra."
         },
-        "external": "Non appartenente a un intervallo privato, di loopback o link-local."
+        "external": "Non appartenente a un intervallo privato, di loopback o link-local.",
+        "fail_then_success": "Almeno {n} eventi non riusciti, poi uno riuscito dopo il primo errore: un tentativo che potrebbe aver funzionato.",
+        "open_case": "Un caso SIEM aperto indica questa entità."
       },
       "peersChip": {
         "ips": "Fino a {n} IP di origine in una singola origine | Fino a {n} IP di origine in una singola origine",
@@ -24937,7 +25131,7 @@
       "capped": "Ogni origine ha restituito le sue {n} entità più attive; quelle meno attive non sono elencate e i conteggi per le entità vicine a tale soglia possono essere parziali. I conteggi delle schede contrassegnati con + sono troncati.",
       "failedStreams": "Impossibile leggere: {streams}",
       "noSources": "Nessuna origine di sicurezza da leggere",
-      "noSourcesHint": "Le entità vengono trovate negli stream il cui nome li contrassegna come dati di sicurezza o che hai aggiunto come origine nella pagina Eventi.",
+      "noSourcesHint": "Le entità si trovano negli stream il cui nome li contrassegna come dati di sicurezza, oppure che hai incluso in Sicurezza → Origini.",
       "empty": "Nessuna entità in questa finestra",
       "emptyHint": "Amplia l'intervallo di tempo o verifica che le tue origini contengano campi utente, IP o host.",
       "refresh": "Aggiorna",
@@ -24945,7 +25139,8 @@
       "tab": {
         "activity": "Attività",
         "related": "Correlati",
-        "sources": "Origini"
+        "sources": "Origini",
+        "cases": "Casi"
       },
       "activity": "Eventi nel tempo",
       "chart": {
@@ -24954,6 +25149,9 @@
       },
       "topN": "Primi {n} per eventi",
       "noRelated": "Nessun elemento correlato in questa finestra.",
+      "noCases": "Nessun caso SIEM indica questa entità.",
+      "caseOpen": "Aperto",
+      "caseResolved": "Risolto",
       "failedCount": "{n} fallito | {n} falliti",
       "openEvents": "Apri in Eventi",
       "huntInEvents": "Cerca in Eventi",
@@ -24968,7 +25166,9 @@
         "failed": "Impossibile leggere"
       },
       "loadError": "Impossibile caricare le sorgenti di sicurezza",
-      "detailFailed": "Non è stato possibile leggere alcuni dati di questa entità: {streams}."
+      "detailFailed": "Non è stato possibile leggere alcuni dati di questa entità: {streams}.",
+      "aliasCount": "+{n} grafia | +{n} grafie",
+      "aliasHint": "Registrata con questa grafia; è la stessa identità."
     },
     "ueba": {
       "title": "Analisi del comportamento degli utenti",
@@ -25005,7 +25205,11 @@
         "new_ip": "Nuovo IP sorgente",
         "failure_jump": "Impennata di errori",
         "new_hours": "Orari insoliti",
-        "first_seen": "Prima apparizione"
+        "first_seen": "Prima apparizione",
+        "peer_volume": "Molto sopra i pari",
+        "peer_failures": "Errori molto sopra i pari",
+        "fail_then_success": "Successo dopo errori",
+        "open_case": "Caso aperto"
       },
       "reason": {
         "volume": "{n} eventi, circa {ratio}× i ~{expected} attesi nel precedente {baseline}.",
@@ -25013,7 +25217,12 @@
         "newIpExternal": "{n} eventi dall'indirizzo pubblico {ip}, mai visto nel precedente {baseline}. | {n} eventi dall'indirizzo pubblico {ip}, mai visto nel precedente {baseline} ({count} nuovi indirizzi in totale).",
         "failureJump": "{n} errori — {rate}% degli eventi, in aumento dal {baseline}% del periodo di riferimento.",
         "newHours": "{n} eventi alle {hours} UTC, orari in cui questo utente non è mai stato attivo nel precedente {baseline}.",
-        "firstSeen": "{n} eventi da un utente senza alcuna attività nel precedente {baseline}."
+        "firstSeen": "{n} eventi da un utente senza alcuna attività nel precedente {baseline}.",
+        "peerVolume": "{n} eventi mentre un utente tipico ne aveva circa {median}. La baseline propria di questo utente è ancora in costruzione.",
+        "peerFailures": "{n} errori ({rate}% degli eventi) mentre un utente tipico ne aveva circa {median}. La baseline propria di questo utente è ancora in costruzione.",
+        "newIpBuilding": "{n} eventi dall'indirizzo pubblico {ip}. La baseline di questo utente è ancora in costruzione, quindi viene segnalato qualsiasi indirizzo pubblico. | {n} eventi dall'indirizzo pubblico {ip}. La baseline di questo utente è ancora in costruzione, quindi viene segnalato qualsiasi indirizzo pubblico ({count} indirizzi pubblici in totale).",
+        "failThenSuccess": "{n} errori da {ip}, poi un evento riuscito dallo stesso indirizzo.",
+        "openCase": "Indicato dal caso aperto \"{title}\" ({severity}). | Indicato da {n} casi aperti, il più recente \"{title}\" ({severity})."
       },
       "fact": {
         "events": "Eventi",
@@ -25055,7 +25264,10 @@
       "notEvaluated": "Non valutati per questo utente perché i dati della baseline erano incompleti: {signals}.",
       "hoursNotJudged": "Le ore insolite vengono valutate solo con almeno {min} eventi di baseline che coprano il {share}% del {baseline} precedente. La cronologia di questo utente è più breve, quindi nessuna ora viene segnalata.",
       "noHistory": "Nessun dato nel {baseline} precedente per {streams}, quindi nessuno viene indicato come prima apparizione.",
-      "volumeNotJudged": "Il volume non viene valutato per questo utente: le finestre inferiori a un giorno vengono confrontate con le stesse ore del giorno nella baseline, il che richiede almeno un giorno di cronologia."
+      "volumeNotJudged": "Il volume non viene valutato per questo utente: le finestre inferiori a un giorno vengono confrontate con le stesse ore del giorno nella baseline, il che richiede almeno un giorno di cronologia.",
+      "baselineBuilding": "Baseline in costruzione",
+      "baselineBuildingHint": "{span} di cronologia finora. Il confronto con il passato di questo utente inizia quando esiste una cronologia completa di {baseline}; nel frattempo vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti.",
+      "buildingNotice": "La baseline è ancora in costruzione per {n} utente: finché non esiste una cronologia completa di {baseline}, vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti. | Le baseline sono ancora in costruzione per {n} utenti: finché non esiste una cronologia completa di {baseline}, vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti."
     },
     "intel": {
       "title": "Threat Intel",
@@ -25077,12 +25289,11 @@
       "sighted": "Osservato una volta | Osservato {n} volte",
       "sweeping": "Scansione… {done} di {total} query",
       "sweptAcross": "Scansionata {n} origine di sicurezza | Scansionate {n} origini di sicurezza",
-      "partial": "Questa scansione si è fermata al suo limite di {n} query, quindi alcune colonne non sono state cercate. Le query crescono con elenchi × colonne: rimuovi elenchi obsoleti o indicatori scaduti, oppure suddividi gli elenchi per tipo, per una scansione completa.",
       "failedQueries": "{n} colonna non è stata cercata ed è stata saltata. | {n} colonne non sono state cercate e sono state saltate.",
       "truncated": "Sono state lette solo le prime {n} righe di {lists}; il resto non è stato analizzato.",
       "noIndicators": "Nessun indicatore",
       "noCoverage": "Esegui una scansione per vedere quali colonne vengono cercate",
-      "coverageHint": "Cosa ha cercato una scansione in {n} origini di sicurezza. La corrispondenza è esatta, sulle colonne elencate; un tipo senza colonna non può essere rilevato in alcun modo.",
+      "coverageHint": "Cosa ha cercato una scansione in {n} origini di sicurezza. Ogni colonna viene confrontata in base al suo valore completo e ai token interi al suo interno, come array, testo dei log e hash SHA256=; un tipo senza colonna non può essere individuato affatto.",
       "indicatorCount": "{n} indicatore | {n} indicatori",
       "columnsSearched": "{n} colonna | {n} colonne",
       "blind": "Non cercabile",
@@ -25160,7 +25371,7 @@
         "cancel": "Annulla",
         "indicators": "Indicatori",
         "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "Uno per riga, oppure separati da virgole o spazi. I duplicati vengono ignorati.",
+        "indicatorsHelp": "Uno per riga, oppure separati da virgole o spazi. I duplicati vengono ignorati. Un elenco può contenere fino a {max}.",
         "indicatorsRequired": "Inserisci almeno un indicatore",
         "invalid": "Non riconosciuti come indicatori ({n}): {sample}",
         "line": "riga {n}",
@@ -25184,7 +25395,7 @@
         "importSubtitle": "Richiede una colonna indicatore; tipo, gravità, origine e scadenza sono facoltativi.",
         "importSubmit": "Importa",
         "file": "File CSV",
-        "fileHelp": "Le righe che non sono indicatori vengono saltate e conteggiate.",
+        "fileHelp": "Le righe che non sono indicatori vengono saltate e conteggiate. Un elenco può contenere fino a {max} indicatori; i file fino a {mb} MB.",
         "fileRequired": "Scegli un file CSV",
         "defaultSeverity": "Gravità per le righe che non ne hanno una",
         "append": "Aggiungi all'elenco invece di sostituirlo",
@@ -25203,7 +25414,10 @@
         "noIndicatorColumnIn": "{table} non ha una colonna indicator, ioc o value, quindi non è possibile aggiungervi indicatori. Scegli un altro elenco.",
         "replaceTitle": "Sostituisci l'elenco",
         "replaceMessage": "L'importazione con l'aggiunta disattivata sostituisce interamente {table}: ogni riga esistente, le sue colonne e le impostazioni vengono rimosse e restano solo gli indicatori di questo file.",
-        "replaceConfirm": "Sostituisci"
+        "replaceConfirm": "Sostituisci",
+        "tooMany": "Incollati {n} indicatori; un elenco ne contiene al massimo {max}.",
+        "listFull": "{table} conterrebbe {count} indicatori; un elenco ne contiene al massimo {max}. Suddividili in più elenchi.",
+        "fileTooLarge": "Il file supera {max} MB. Suddividilo in file più piccoli."
       },
       "importCsv": "Importa un CSV",
       "unreadTables": "Impossibile leggere {lists}; i suoi indicatori non vengono mostrati né analizzati. | Impossibile leggere {lists}; i loro indicatori non vengono mostrati né analizzati.",
@@ -25213,12 +25427,15 @@
       "columnsSkipped": "{n} colonna non cercata | {n} colonne non cercate",
       "skippedHint": "Ricerca non completa — la scansione ha raggiunto il limite di query o la query non è riuscita:",
       "caveat": {
-        "capped": "La scansione ha raggiunto il limite di query, quindi alcune colonne non sono state cercate.",
         "failed": "{n} colonna non è stata cercata. | {n} colonne non sono state cercate.",
         "partial": "{n} query ha restituito solo risultati parziali, quindi quelle colonne non sono state cercate del tutto. | {n} query hanno restituito solo risultati parziali, quindi quelle colonne non sono state cercate del tutto.",
         "unsearched": "Nessuno stream ha una colonna per: {types}.",
-        "cidr": "{n} intervallo CIDR non è stato analizzato. | {n} intervalli CIDR non sono stati analizzati."
-      }
+        "cidr": "{n} intervallo CIDR non è stato analizzato. | {n} intervalli CIDR non sono stati analizzati.",
+        "checked": "Solo {checked} indicatori su {total} sono stati controllati completamente."
+      },
+      "partialChecked": "Risultato parziale: controllati {checked} indicatori su {total}. I conteggi per gli altri potrebbero essere bassi.",
+      "partialCapped": "Risultato parziale: controllati {checked} indicatori su {total}. La scansione si ferma a {n} query; gli indicatori meno gravi non sono stati controllati.",
+      "inText": "{column} (nel testo)"
     },
     "sources": {
       "title": "Origini dei dati",
@@ -25238,8 +25455,7 @@
       "exclude": "Escludi",
       "attached": "Pacchetto {pack} allegato.",
       "detached": "Pacchetto scollegato.",
-      "detachedPipelineSkipped": "Pacchetto scollegato. La pipeline registrata non corrisponde più a questo stream e a questo pacchetto, quindi è stata lasciata invariata.",
-      "empty": "Nessuno stream di log ancora. Ingerisci i log di sicurezza come qualsiasi stream e compariranno qui.",
+      "empty": "Non ci sono ancora stream di log. Ingerisci i log di sicurezza come qualsiasi stream e compariranno qui.",
       "noticePackRemoved": "{stream}: pacchetto rimosso al di fuori del SIEM. Riallegalo o rimuovilo.",
       "noticeNoRecord": "{stream}: un pacchetto è allegato senza una registrazione. Registralo o scollegalo.",
       "noticeNotWriting": "{stream}: la pipeline non scrive più su questo stream.",
@@ -25249,14 +25465,31 @@
       "blockGlobalFlatten": "{stream}: il livello di flatten globale ({level}) non manterrebbe le colonne OCSF piatte.",
       "blockSchemaMissing": "{stream}: allo schema definito dall'utente mancano colonne OCSF: {columns}.",
       "blockPipelineDisabled": "{stream}: la pipeline esistente è disabilitata; abilitala prima di allegare.",
-      "attachErrors": {
-        "functionEditedOutside": "La funzione {name} è stata modificata al di fuori del SIEM.",
-        "pipelineNoAccess": "Questo stream ha una pipeline a cui non hai accesso.",
-        "permissionDenied": "Ti serve l'autorizzazione per modificare funzioni e pipeline di questo stream.",
-        "pipelineChanged": "La pipeline di questo stream è cambiata e ora blocca il collegamento; aggiorna e ricontrolla.",
-        "packConflict": "Questo stream ha già il pack {pack}; scollegalo prima.",
-        "noPipeline": "Impossibile creare o trovare una pipeline in tempo reale per questo stream.",
-        "failed": "Collegamento non riuscito."
+      "actionFailed": "La modifica non è stata salvata.",
+      "stateExcluded": "Escluso",
+      "excludedBy": "Escluso da {user} il {time}",
+      "sourceTypeConfidence": "{label} ({n}%)",
+      "notClassified": "Non ancora classificato",
+      "lastChange": "Ultima modifica di {user} il {time}: {summary}",
+      "previewTitle": "Allegare {pack} a {stream}?",
+      "previewSubtitle": "Nulla viene scritto finché non confermi.",
+      "previewLoading": "Verifica di cosa cambierebbe allegando…",
+      "previewPack": "Pacchetto",
+      "previewClasses": "Classe OCSF che scrive",
+      "previewFunction": "Funzione",
+      "previewPipeline": "Pipeline",
+      "previewFunctionCreate": "Crea {name}",
+      "previewFunctionReuse": "Riusa {name}, già identica",
+      "previewPipelineCreate": "Crea {name}: {stream} → funzione → {stream}",
+      "previewPipelineExtend": "Aggiungi un nodo funzione a {name}, subito dopo l'origine, che alimenta {feeds}",
+      "previewPipelineAlready": "{name} esegue già questo pacchetto; viene scritto solo il record",
+      "confirmAttach": "Allega",
+      "cancel": "Annulla",
+      "detachedSkipped": "Pacchetto scollegato. La pipeline {id} non è stata modificata: {reason}.",
+      "skipReason": {
+        "pipeline_missing": "non esiste più",
+        "other_stream": "ora legge un altro stream",
+        "other_pack": "ora esegue un pacchetto diverso"
       }
     },
     "nav": {
@@ -25269,13 +25502,60 @@
       "intel": "Threat Intelligence",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
-      "content": "Contenuti"
+      "content": "Contenuti",
+      "sources": "Sorgenti dati"
     },
     "sigma": {
       "notSupported": "Non supportato: {fields}",
       "cannotMatch": "Impossibile trovare corrispondenze: questo stream non ha {fields}",
       "compiledEmpty": "La regola non ha prodotto nulla dopo la compilazione",
       "assumedAbsent": "Si presume che questo stream non abbia mai {fields}"
+    },
+    "audit": {
+      "title": "Registro modifiche",
+      "hint": "Chi ha modificato rilevamenti, sorgenti e casi negli ultimi 7 giorni",
+      "when": "Quando",
+      "who": "Modificato da",
+      "area": "Area",
+      "action": "Azione",
+      "target": "Cosa è cambiato",
+      "empty": "Nessuna modifica registrata",
+      "emptyHint": "Le modifiche a rilevamenti, sorgenti di Sicurezza e casi vengono mostrate qui.",
+      "disabled": "Il log di audit è disattivato",
+      "disabledHint": "Attiva il log di audit per questa distribuzione per registrare chi modifica le impostazioni di Sicurezza.",
+      "category": {
+        "detection": "Rilevamento",
+        "case": "Caso",
+        "source": "Sorgente",
+        "security": "Sicurezza"
+      },
+      "verb": {
+        "created": "Creato",
+        "changed": "Modificato",
+        "deleted": "Eliminato",
+        "enabled": "Attivato",
+        "disabled": "Disattivato"
+      }
+    },
+    "access": {
+      "needsAuthor": "Richiede il permesso Crea su Sicurezza",
+      "openPreset": "Crea un ruolo da {preset}",
+      "askPreset": "Chiedi a un amministratore il preset {preset}.",
+      "checkFailedTitle": "Impossibile verificare il tuo accesso a Sicurezza",
+      "checkFailedHint": "Il server non ha risposto. La tua sessione è ancora attiva."
+    },
+    "aria": {
+      "addSource": "Aggiungi un'origine",
+      "addToCase": "Aggiungi al caso",
+      "caseAssignee": "Assegnatario del caso",
+      "casePriority": "Priorità del caso",
+      "filterField": "Campo del filtro",
+      "filterOperator": "Operatore del filtro",
+      "filterValue": "Valore del filtro",
+      "huntKind": "Cosa cercare",
+      "indicatorType": "Tipo di indicatore",
+      "severityFilter": "Filtro gravità",
+      "stream": "Stream"
     }
   },
   "promql": {

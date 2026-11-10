@@ -691,7 +691,8 @@
       "scoreConfigs": "Score-configuraties",
       "workflows": "Workflows",
       "syntheticFolders": "Synthetics-mappen",
-      "downtimeFolders": "Onderhoudsperiodemappen"
+      "downtimeFolders": "Onderhoudsperiodemappen",
+      "security": "Beveiliging"
     },
     "resourcesInline": {
       "dashboards": "dashboards",
@@ -747,7 +748,8 @@
       "fleetManagement": "fleetbeheer",
       "incidents": "incidenten",
       "onCallResponses": "piketreacties",
-      "searchJobs": "zoektaken"
+      "searchJobs": "zoektaken",
+      "security": "Beveiliging"
     },
     "denied": {
       "view": "U kunt {resource} niet bekijken",
@@ -4500,6 +4502,7 @@
       "presetsSubtitle": "Voeg de toekenningen van een voorinstelling toe aan deze rol. Er wordt niets verwijderd.",
       "presetsSectionBuiltin": "Ingebouwd",
       "presetsSectionJob": "Per functie",
+      "presetsSectionSecurity": "Beveiliging",
       "presetAddsTooltip": "Voegt {count} machtiging toe | Voegt {count} machtigingen toe",
       "presetInRole": "In rol",
       "presetInRoleTooltip": "Deze rol heeft al alles uit deze voorinstelling",
@@ -4575,7 +4578,16 @@
       "presetRestored": "{title}: {permissions} hersteld. Controleer de wijzigingen voordat je opslaat.",
       "presetSummaryRestores": "Behoudt {count} machtiging die je hebt gemarkeerd om te verwijderen. | Behoudt {count} machtigingen die je hebt gemarkeerd om te verwijderen.",
       "presetRestoreButton": "{count} machtiging behouden | {count} machtigingen behouden",
-      "effectStillAllowed": "Geen wijziging in toegang: een ruimere toekenning staat dit nog steeds toe."
+      "effectStillAllowed": "Geen wijziging in toegang: een ruimere toekenning staat dit nog steeds toe.",
+      "moduleGroupSecurity": "Beveiliging",
+      "presetSocAnalystTitle": "SOC-analist",
+      "presetSocAnalystDescription": "Beveiligingsmeldingen en -cases beoordelen, met leestoegang tot detecties, streams en threat-intellijsten",
+      "presetDetectionEngineerTitle": "Detectie-engineer",
+      "presetDetectionEngineerDescription": "Detecties maken, afstemmen, inschakelen en uitvoeren, content installeren, bronnen koppelen met hun functies en pipelines, en verrijkingstabellen zoals threat-intellijsten onderhouden, met leestoegang tot Beveiliging, cases en streams",
+      "presetSecurityAdminTitle": "Beveiligingsbeheerder",
+      "presetSecurityAdminDescription": "Alles in Beveiliging beheren, inclusief detecties en cases verwijderen en bronnen uitsluiten, met incidenten, functies, pipelines, verrijkingstabellen en cipher-sleutels, en leestoegang tot streams",
+      "presetSecurityViewerTitle": "Beveiligingsviewer",
+      "presetSecurityViewerDescription": "Beveiliging, de cases, detecties en bronstreams bekijken zonder ze te wijzigen"
     },
     "rolesPage": {
       "subtitle": "Rollen bundelen machtigingen — wijs ze toe aan gebruikers, serviceaccounts of groepen om toegang te verlenen.",
@@ -7711,6 +7723,28 @@
       "tlsBody": "Het token is een bearer-credential die via plaintext HTTP opnieuw kan worden gebruikt, dus beëindig TLS bij {brand} ({setting}, standaard uitgeschakeld) of bij een vertrouwde proxy ervoor."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Werk de configuratie van uw bestaande {product} bij om logs, metrieken en traces naar deze organisatie te sturen.",
+      "correlationBody": "Voor het koppelen van logs aan traces moeten toepassingen de volledige 128-bits trace-ID loggen. Als uw Java-tracer alleen de onderste 64 bits logt, stel dan {setting} in op de toepassing.",
+      "profilingBody": "Profilering gebruikt een aparte bestemming en de API-sleutel van de Agent. Als een toepassing al een profiler gebruikt, schakel dan tijdens de migratie de profilering van de toepassing of tracer uit, of configureer de bestemming afzonderlijk.",
+      "multiValueTagsBody": "Tags met meerdere verschillende waarden gebruiken een gesorteerde JSON-arraystring. Een enkele waarde die begint met [ wordt ook als JSON-array met één element gecodeerd om de reeksidentiteit te behouden.",
+      "envTitle": "Agentconfiguratie",
+      "envBody": "Stel deze omgevingsvariabelen in op de {product} en herstart deze. Vereist {product} {version} of later.",
+      "tokenBody": "De API-sleutel moet een ingestietoken van de organisatie zijn dat met {prefix} begint. Deze organisatie heeft geen ingeschakelde ingestietoken, dus er wordt geen setupfragment getoond. Maak een ingestietoken aan en keer vervolgens terug naar deze pagina.",
+      "tokenLink": "Ingestietokens openen",
+      "featuresOffBody": "De regels na de URL's schakelen Agent-functies uit die met dezelfde sleutel naar de eigen servers van {vendor} verzenden. {setting} houdt ook {component} uitgeschakeld, dat nieuwere Agent-versies uitvoeren en dat het pad in deze URL's niet behoudt.",
+      "logsTitle": "Logs",
+      "logsBody": "Logverzameling is standaard uitgeschakeld in de {product}. Stel {setting} in en configureer je logbronnen.",
+      "dualTitle": "Behoud je huidige bestemming",
+      "dualBody": "Om naast een bestaande bestemming naar deze organisatie te verzenden, behoud je de huidige URL's en API-sleutel en voeg je in plaats daarvan deze regels toe aan {file}. Logs hebben {setting} nodig, omdat extra log-eindpunten anders TCP gebruiken.",
+      "metricsTitle": "Metrieken opvragen",
+      "metricsTypes": "Elke reeks wordt opgeslagen als een gauge met de waarde die de Agent heeft verzonden, gelabeld met {typeField} en {intervalField}.",
+      "metricsCount": "Count-reeksen bevatten het aantal per flush-interval. Tel ze op met {promql} in PromQL of {sql} in SQL.",
+      "metricsRate": "Rate-reeksen zijn per seconde. Vermenigvuldig de waarde met {intervalField} om het aantal voor het interval te herstellen.",
+      "metricsCounterFns": "PromQL {rate} en {increase} verwachten cumulatieve tellers, dus ze geven geen zinvolle resultaten op deze reeksen.",
+      "metricsSketch": "Distributies worden opgeslagen als histogram-buckets, en percentielen worden geschat op basis van die buckets. Een hogere ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA geeft fijnere buckets en nauwkeurigere percentielen, ten koste van meer opgeslagen rijen."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU-exporter"
   },
@@ -24327,8 +24361,9 @@
       "classMix": "Klassen in het afgelopen uur: {mix}",
       "objects": "OCSF-objecten",
       "missingSignals": "Niet gezien: {fields}",
-      "detections": "{n} detectie | {n} detecties",
-      "firing": "{n} afgaan | {n} afgaan",
+      "detections": "{n} overeenkomende regel | {n} overeenkomende regels",
+      "firing": "{n} met treffers | {n} met treffers",
+      "matchingRulesHint": "Sigma-catalogusregels die op deze bron van toepassing zijn. Treffers zijn overeenkomsten in het huidige venster, geen geïmplementeerde detecties.",
       "rulesFor": "Sigma-regels voor {source}",
       "hits": "{n} treffer | {n} treffers",
       "viewHits": "Treffers bekijken",
@@ -24357,7 +24392,44 @@
       "invertFilter": "Schakel tussen opnemen en uitsluiten",
       "removeFilter": "Filter verwijderen",
       "pivotSqlUnsupported": "Deze SQL-query is geen eenvoudige SELECT … WHERE, dus het filter kon er niet aan worden toegevoegd. Bewerk de query handmatig of schakel over naar Builder.",
-      "topValuesWholeStream": "SQL-modus: waarden worden over de hele stream geteld, niet over je query."
+      "topValuesWholeStream": "SQL-modus: waarden worden over de hele stream geteld, niet over je query.",
+      "allSources": "Alle beveiligingsbronnen",
+      "sortSqlMode": "Een handgeschreven query bepaalt zelf zijn ORDER BY",
+      "includeFailed": "{name} kon niet aan Beveiliging worden toegevoegd",
+      "excludeFailed": "{name} kon niet uit Beveiliging worden verwijderd",
+      "hunt": {
+        "title": "Alle beveiligingsbronnen tegelijk doorzoeken",
+        "hint": "Typ een IP-adres, een gebruiker of een host. Elke bron wordt doorzocht met zijn eigen kolommen en elke rij toont uit welke bron die komt.",
+        "noMatches": "Geen resultaten in dit venster",
+        "noMatchesHint": "Vergroot het tijdsbereik of zoek in een willekeurig veld in plaats van één soort.",
+        "noFields": "Velden verschillen per bron. Kies één bron om de velden ervan te bekijken.",
+        "search": "Zoeken",
+        "aliases": "Komt ook overeen met {n} spelling | Komt ook overeen met {n} spellingen",
+        "clearAliases": "Alleen de getypte naam gebruiken",
+        "uncounted": "Niet meegeteld: {streams}",
+        "kind": {
+          "any": "Elk veld",
+          "user": "Gebruiker",
+          "ip": "IP-adres",
+          "host": "Host"
+        },
+        "placeholder": {
+          "any": "IP-adres, gebruiker, host of tekst",
+          "user": "dave, ACME\\dave of dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "Hostnaam"
+        },
+        "column": {
+          "time": "Tijd",
+          "source": "Bron",
+          "user": "Gebruiker",
+          "ip": "Bron-IP",
+          "host": "Host",
+          "action": "Actie",
+          "outcome": "Uitkomst",
+          "message": "Bericht"
+        }
+      }
     },
     "drawer": {
       "event": "Beveiligingsgebeurtenis",
@@ -24378,7 +24450,14 @@
       "classUid": "class_uid {n}",
       "eyebrow": "Beveiligingsgebeurtenis",
       "source": "Bron",
-      "matchedRules": "{n} detectie kwam overeen | {n} detecties kwamen overeen"
+      "matchedRules": "{n} detectie kwam overeen | {n} detecties kwamen overeen",
+      "openCase": "Casus openen",
+      "openCaseHint": "Open een casus voor de host, gebruiker of het adres dat deze gebeurtenis noemt",
+      "addToCase": "Toevoegen aan casus",
+      "pickCase": "Toevoegen aan een open casus",
+      "caseOpened": "Casus geopend: {title}",
+      "caseUpdated": "Gebeurtenis toegevoegd aan {title}",
+      "caseError": "Kan geen casus openen vanuit deze gebeurtenis"
     },
     "record": {
       "prev": "Vorige record",
@@ -24482,7 +24561,20 @@
       "customWindow": "Vast venster wordt getoond: {from} → {to}",
       "backToRange": "Terug naar laatste {range}",
       "missing": "Het alarm waarnaar deze link verwijst, zit niet in het geladen venster. Het is mogelijk ouder dan dit bereik of valt buiten de limiet voor de nieuwste rijen.",
-      "dismiss": "Sluiten"
+      "dismiss": "Sluiten",
+      "triage": {
+        "createCase": "Case maken",
+        "addToCase": "Toevoegen aan case",
+        "openCase": "Case openen",
+        "acknowledge": "Onderzoek starten",
+        "addNote": "Notitie toevoegen",
+        "notePlaceholder": "Voeg een notitie toe aan de case van deze trigger",
+        "acknowledged": "Case gemarkeerd als in onderzoek",
+        "noted": "Notitie aan de case toegevoegd",
+        "caseOpened": "Case geopend",
+        "attached": "Trigger aan de case toegevoegd",
+        "failed": "De case kon niet worden bijgewerkt"
+      }
     },
     "cases": {
       "title": "Casussen",
@@ -24510,7 +24602,8 @@
         "lastSeen": "Laatst gezien"
       },
       "fact": {
-        "duration": "Duur"
+        "duration": "Duur",
+        "timeToClose": "Tijd tot sluiten"
       },
       "durationMinutes": "{n} min",
       "durationHours": "{n} u",
@@ -24532,7 +24625,8 @@
         "service_discovery": "Gecorreleerd via service discovery",
         "primary_match": "Gecorreleerd op primaire dimensies",
         "secondary_match": "Gecorreleerd op secundaire dimensies",
-        "alert_id": "Dezelfde detectie"
+        "alert_id": "Dezelfde detectie",
+        "entity": "Zelfde host, gebruiker of adres"
       },
       "commentPlaceholder": "Voeg een notitie toe voor het team",
       "postComment": "Notitie plaatsen",
@@ -24554,7 +24648,16 @@
         "analysisComplete": "Grondoorzaakanalyse voltooid",
         "analysisFailed": "Grondoorzaakanalyse mislukt: {reason}",
         "analysisCancelled": "Grondoorzaakanalyse geannuleerd",
-        "other": "{type}"
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "Oordeel: terecht positief",
+          "false_positive": "Oordeel: fout-positief",
+          "benign": "Oordeel: goedaardig",
+          "duplicate": "Oordeel: duplicaat",
+          "stale": "Oordeel: verouderd / historisch"
+        },
+        "alertsAttached": "Handmatig toegevoegde triggers: {names}",
+        "eventAttached": "Gebeurtenis van {stream} om {at} toegevoegd"
       },
       "analysisHint": "Een AI-samenvatting van wat de afgegane alarmen in deze zaak met elkaar verbindt.",
       "runAnalysis": "Analyseren",
@@ -24570,7 +24673,42 @@
         "resolved": "Zaak sluiten"
       },
       "notFound": "Zaak niet gevonden",
-      "timelinePartial": "Deze tijdlijn is opnieuw opgebouwd uit het zaakdossier, dus notities, bevestigingen en analyseactiviteit van vóór de herbouw kunnen ontbreken."
+      "timelinePartial": "Deze tijdlijn is opnieuw opgebouwd uit het zaakdossier, dus notities, bevestigingen en analyseactiviteit van vóór de herbouw kunnen ontbreken.",
+      "verdict": {
+        "true_positive": "Terecht positief",
+        "false_positive": "Fout-positief",
+        "benign": "Goedaardig",
+        "duplicate": "Duplicaat",
+        "stale": "Verouderd / historisch"
+      },
+      "close": {
+        "title": "Case sluiten",
+        "verdict": "Oordeel",
+        "verdictRequired": "Kies een oordeel",
+        "reason": "Reden",
+        "reasonPlaceholder": "Wat je hebt gevonden en waarom de case kan worden gesloten",
+        "reasonRequired": "Geef een reden op",
+        "reasonTooLong": "Houd de reden op maximaal {max} tekens",
+        "cancel": "Annuleren"
+      },
+      "settings": {
+        "open": "Case-instellingen",
+        "title": "Case-instellingen",
+        "save": "Opslaan",
+        "saved": "Case-instellingen opgeslagen",
+        "loadFailed": "De case-instellingen konden niet worden geladen",
+        "saveFailed": "De case-instellingen konden niet worden opgeslagen",
+        "autoCloseDays": "Stille cases sluiten na (dagen)",
+        "autoCloseDaysHint": "Een case zonder nieuwe trigger gedurende dit aantal dagen sluit vanzelf. 0 houdt cases open. Maximaal {max}.",
+        "groupWindowMinutes": "Triggers groeperen binnen (minuten)",
+        "groupWindowMinutesHint": "Activiteit op dezelfde host, gebruiker of hetzelfde adres binnen dit aantal minuten na de laatste activiteit van een casus, op gebeurtenistijd, wordt aan die casus toegevoegd. 0 opent één casus per detectie. Maximaal {max}.",
+        "wholeNumber": "Voer een geheel getal in",
+        "range": "Voer een waarde van 0 tot {max} in"
+      },
+      "assignedTo": "Toegewezen aan {to}",
+      "unassignedToast": "Toewijzing van case ingetrokken",
+      "historical": "Historisch (backfill)",
+      "historicalHint": "Elke activering in deze casus kwam uit een backfill over eerdere gegevens en beschrijft dus geen huidige activiteit."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -24592,19 +24730,21 @@
       "legend": {
         "firing": "Afgegaan in venster (donkerder = meer)",
         "covered": "Gedekt door een ingeschakelde detectie",
-        "available": "Regel beschikbaar, niet ingeschakeld"
+        "available": "Regel beschikbaar, niet ingeschakeld",
+        "none": "Geen regel in de catalogus"
       },
       "columnCount": "{covered} van {total} gedekt",
       "cellEnabled": "{n} detectie aan | {n} detecties aan",
       "cellAvailable": "{n} regel beschikbaar | {n} regels beschikbaar",
       "noMatch": "Geen overeenkomende technieken",
       "unmapped": "Technieken zonder bekende tactiek",
-      "footnote": "Technieken komen uit de {n} meegeleverde Sigma-regels en je eigen detecties; de plaatsing volgt de tactieken waarmee elke regel is getagd.",
+      "footnote": "Dekking wordt gemeten tegen de {total} technieken van MITRE ATT&CK Enterprise v{version}, waarbij subtechnieken meetellen voor hun bovenliggende techniek; {n} Sigma-regels worden meegeleverd met het product.",
       "drawerEyebrow": "ATT&CK-techniek",
       "state": {
         "firing": "Afgaan",
         "covered": "Gedekt",
-        "available": "Niet gedekt"
+        "available": "Niet gedekt",
+        "none": "Geen regel"
       },
       "fact": {
         "state": "Dekking",
@@ -24629,7 +24769,9 @@
       "openTechnique": "Open {id} op attack.mitre.org",
       "viewOnAttack": "Bekijk op ATT&CK",
       "manageDetections": "Detecties beheren",
-      "historyNarrowed": "Het maximale querybereik van de alarmgeschiedenis beperkt afgaan tot die sinds {from}; eerdere afgaan in dit venster worden niet meegeteld."
+      "historyNarrowed": "Het maximale querybereik van de alarmgeschiedenis beperkt afgaan tot die sinds {from}; eerdere afgaan in dit venster worden niet meegeteld.",
+      "cellNone": "Geen regel",
+      "coverageError": "De ATT&CK-dekking kon niet worden geladen: {reason}"
     },
     "detections": {
       "title": "Detecties",
@@ -24647,7 +24789,8 @@
         "erroring": "Met fout",
         "enabled": "Ingeschakeld",
         "disabled": "Uitgeschakeld",
-        "all": "Alle detecties"
+        "all": "Alle detecties",
+        "notifyFailing": "Melding mislukt"
       },
       "column": {
         "name": "Detectie",
@@ -24660,7 +24803,8 @@
       "state": {
         "enabled": "Ingeschakeld",
         "disabled": "Uitgeschakeld",
-        "erroring": "Met fout"
+        "erroring": "Met fout",
+        "notifyFailing": "Melding mislukt"
       },
       "tab": {
         "overview": "Overzicht",
@@ -24722,17 +24866,23 @@
       "libraryEmpty": "Geen regels die aan dat filter voldoen",
       "stream": "Stream",
       "streamPlaceholder": "Kies de stream waarop de regel draait",
-      "notify": "Melden",
-      "notifyPlaceholder": "Kies een bestemming",
-      "noDestinations": "Er bestaan nog geen alarmbestemmingen. Een detectie heeft er een nodig om te melden, dus maak er een aan in een nieuw tabblad en kom terug; deze lijst wordt vanzelf vernieuwd.",
+      "notify": "Melden (optioneel)",
+      "notifyPlaceholder": "Geen: afgaande detecties openen nog steeds cases",
+      "noDestinations": "Er bestaan nog geen alarmbestemmingen. Detecties genereren nog steeds bevindingen en openen cases zonder bestemming; voeg alleen een bestemming toe als je ook meldingen wilt.",
       "createDestination": "Bestemming aanmaken",
       "reloadDestinations": "Vernieuwen",
       "lookBack": "Terugkijken (minuten)",
+      "lookBackHelp": "Minstens het correlatievenster van {minutes} minuten; elke uitvoering schuift dat venster eroverheen",
+      "correlationWindowLabel": "Correlatievenster (minuten)",
+      "backfill": "Bij de eerste uitvoering ook eerdere gegevens controleren",
+      "backfillRange": "Te controleren eerdere gegevens",
+      "backfillHours": "Laatste uur | Laatste {n} uur",
       "runEvery": "Uitvoeren elke (minuten)",
       "silence": "Stil blijven gedurende (minuten)",
       "compiles": "Wordt gecompileerd voor {stream}",
       "compilesAs": "Wordt gecompileerd voor {stream}, geïdentificeerd als {source}",
       "logsourceMismatch": "Deze regel is geschreven voor {rule}, maar {stream} is geïdentificeerd als {source}. Hij kan alleen overeenkomen waar beide dezelfde veldnamen delen.",
+      "unseenFields": "Veld nog niet gezien op deze stream: {fields}. Het aanmaken van de detectie voegt deze kolommen toe, zodat ze actief is vóór de eerste zulke gebeurtenis.",
       "ocsfBridge": "{stream} is OCSF, dus de velden van de regel worden toegewezen aan OCSF-paden en de regel draait alleen op gebeurtenissen met {guard}.",
       "ocsfGuard": {
         "class": "class_uid {uid}",
@@ -24760,10 +24910,23 @@
       "validation": {
         "positive": "Moet minimaal 1 minuut zijn",
         "nonNegative": "Mag niet negatief zijn",
-        "periodGap": "Korter dan het uitvoeringsinterval: minuten tussen uitvoeringen zouden nooit worden gecontroleerd"
+        "periodGap": "Korter dan het uitvoeringsinterval: minuten tussen uitvoeringen zouden nooit worden gecontroleerd",
+        "belowTimespan": "Moet minstens het correlatievenster van {minutes} minuten zijn"
       },
       "nameTaken": "Er bestaat al een detectie of alarm met de naam “{name}”. De geschiedenis ervan zou met deze worden samengevoegd, dus kies een andere stream of verwijder eerst de bestaande.",
-      "loadError": "Kan detectieregels niet laden"
+      "loadError": "Kan detectieregels niet laden",
+      "notifyFailingHint": "Deze regel is afgegaan, maar de laatste melding kon niet worden bezorgd. Controleer de bestemmingen in Geschiedenis.",
+      "correlationWindow": "Bepaald door de tijdspanne van de correlatie",
+      "createForbidden": "Voor het maken van een detectie is de Security-machtiging nodig",
+      "preview": {
+        "run": "Overeenkomsten voorvertonen",
+        "hint": "Voert de query uit over de afgelopen 24 uur en toont de eerste 20 overeenkomende gebeurtenissen",
+        "empty": "Niets kwam overeen in de afgelopen 24 uur",
+        "shown": "{shown} van {total} overeenkomende gebeurtenissen in de afgelopen 24 uur",
+        "failed": "De query is mislukt: {reason}",
+        "time": "Tijd"
+      },
+      "queryFailed": "Niet opgeslagen: de query van deze detectie werkt niet ({reason})"
     },
     "content": {
       "title": "Inhoud",
@@ -24833,7 +24996,6 @@
       "noStreamsForRule": "Geen van je streams komt overeen met deze regel",
       "noStreamsForRuleHint": "Deze is geschreven voor {logsource}. Ingereed die bron en dan verschijnt die hier.",
       "runnable": "Draait op deze stream",
-      "notRunnable": "Kan hier niet draaien",
       "openInEvents": "Openen in Gebeurtenissen",
       "installHere": "Installeren op deze stream",
       "install": "Installeren als detectie",
@@ -24855,7 +25017,38 @@
         "severityId": "Ernst",
         "statusId": "Uitkomst"
       },
-      "cannotRun": "Kan niet op je gegevens draaien"
+      "catalogError": "De detectiecatalogus kon niet worden geladen: {reason}",
+      "notRunnableYet": "Nog niet uitvoerbaar",
+      "newRulesAvailable": "{n} nieuwe regel kan nu draaien op {stream} | {n} nieuwe regels kunnen nu draaien op {stream}",
+      "reviewNewRules": "Bekijken",
+      "reviewingNewRules": "{n} regel die nu kan draaien op {stream} | {n} regels die nu kunnen draaien op {stream}",
+      "showAllRules": "Alle regels tonen",
+      "installSelected": "Selectie installeren",
+      "selectRunnable": "Uitvoerbare selecteren",
+      "selectRunnableHint": "Selecteer elke getoonde regel die op je gegevens draait en nog niet is geïnstalleerd",
+      "bulk": {
+        "title": "{n} regel installeren | {n} regels installeren",
+        "subtitle": "Elke regel wordt op de server voor zijn stream gecompileerd en met deze instellingen als detectie opgeslagen.",
+        "stream": "Streams",
+        "everyStream": "Elke stream waarop elke regel draait",
+        "folder": "Alarmmap",
+        "correlationWindow": "Een correlatieregel kijkt minstens zijn eigen venster terug.",
+        "nothing": "Geen van de geselecteerde regels draait op deze stream.",
+        "plan": "{n} detectie wordt aangemaakt: | {n} detecties worden aangemaakt:",
+        "correlation": "Correlatie",
+        "confirm": "{n} detectie installeren | {n} detecties installeren",
+        "close": "Sluiten",
+        "summary": "{installed} geïnstalleerd, {skipped} overgeslagen, {failed} mislukt van {total}",
+        "duplicate": "Er bestaat al een detectie met de naam {name}.",
+        "correlationBlocked": "De correlatie kan niet op deze stream worden uitgevoerd.",
+        "status": {
+          "installed": "Geïnstalleerd",
+          "skipped": "Overgeslagen",
+          "failed": "Mislukt",
+          "pending": "Wachten"
+        },
+        "done": "{n} detectie geïnstalleerd | {n} detecties geïnstalleerd"
+      }
     },
     "entities": {
       "title": "Entiteiten",
@@ -24865,18 +25058,15 @@
         "graph": "Risicografiek"
       },
       "riskGraph": {
-        "empty": "Geen entiteiten om in grafiek te zetten",
-        "emptyHint": "Voeg beveiligingsbronnen toe of verruim het tijdsbereik om de risicografiek te zien.",
-        "showingTop": "Toont top {n} van {total} op risico",
-        "illustrative": "Illustratief: relaties worden afgeleid uit de risicorangschikking, niet waargenomen.",
-        "baseScore": "basis {n}",
-        "propagatedScore": "doorgegeven {n}",
-        "tier": {
-          "critical": "Kritiek",
-          "high": "Hoog",
-          "medium": "Gemiddeld",
-          "low": "Laag"
-        }
+        "empty": "Niets gekoppeld in dit venster",
+        "emptyHint": "De grafiek koppelt gebruikers, IP-adressen en hosts die in dezelfde gebeurtenis of dezelfde case voorkomen. In dit venster gebeurde dat niet; verruim het tijdsbereik.",
+        "showingTop": "Toont de top {n} van {total} op risico",
+        "legend": "Doorgetrokken lijn: gezien in dezelfde gebeurtenis. Gestreepte lijn: genoemd door dezelfde case.",
+        "edgeEvents": "{n} gebeurtenis | {n} gebeurtenissen",
+        "edgeCases": "{n} case | {n} cases",
+        "scoreHint": "Cases die haar noemen: {detection}. Mislukte gebeurtenissen: {failure}. Gekoppeld aan een entiteit die een case noemt: {neighbour}.",
+        "nodeFacts": "{events} gebeurtenissen · {failures} mislukt",
+        "nodeCases": "{n} case | {n} cases"
       },
       "kinds": {
         "user": "Gebruikers",
@@ -24917,16 +25107,20 @@
           "ip": "Veel gebruikers",
           "host": "Veel gebruikers"
         },
-        "external": "Openbaar adres"
+        "external": "Openbaar adres",
+        "fail_then_success": "Succes na mislukkingen",
+        "open_case": "Open casus"
       },
       "signalHint": {
         "failures": "Minstens {rate}% van de gebeurtenissen van deze entiteit is mislukt, met minstens {n} mislukkingen; alleen bronnen die een uitkomst melden worden meegeteld.",
         "spread": {
-          "user": "Gezien vanaf {n} of meer bron-IP-adressen in één bron binnen het venster.",
-          "ip": "Gebruikt door {n} of meer gebruikers in één bron binnen het venster. NAT- en VPN-uitgaand verkeer ziet er ook zo uit; net als password spraying.",
-          "host": "Benaderd door {n} of meer gebruikers in één bron binnen het venster."
+          "user": "Gezien vanaf {n} of meer bron-IP's in één bron, ruim boven wat andere gebruikers in dit venster laten zien.",
+          "ip": "Gebruikt door {n} of meer gebruikers in één bron, ruim boven andere adressen in dit venster. NAT- en VPN-uitgaand verkeer ziet er ook zo uit; net als password spraying.",
+          "host": "Benaderd door {n} of meer gebruikers in één bron, ruim boven andere hosts in dit venster."
         },
-        "external": "Niet in een privé-, loopback- of link-local-bereik."
+        "external": "Niet in een privé-, loopback- of link-local-bereik.",
+        "fail_then_success": "Minstens {n} mislukte gebeurtenissen, daarna een geslaagde na de eerste mislukking: een gok die mogelijk is gelukt.",
+        "open_case": "Een open SIEM-casus noemt deze entiteit."
       },
       "peersChip": {
         "ips": "Tot {n} bron-IP-adres in één bron | Tot {n} bron-IP-adressen in één bron",
@@ -24937,7 +25131,7 @@
       "capped": "Elke bron gaf de {n} drukste entiteiten terug; rustigere entiteiten worden niet vermeld en tellingen van entiteiten rond die grens kunnen gedeeltelijk zijn. Tabbladtellingen met een + zijn afgekapt.",
       "failedStreams": "Kon niet lezen: {streams}",
       "noSources": "Geen beveiligingsbronnen om te lezen",
-      "noSourcesHint": "Entiteiten worden gevonden in streams waarvan de naam ze als beveiligingsgegevens markeert, of die je als bron hebt toegevoegd op de pagina Gebeurtenissen.",
+      "noSourcesHint": "Entiteiten worden gevonden in streams waarvan de naam ze als beveiligingsgegevens markeert, of die je hebt opgenomen onder Beveiliging → Bronnen.",
       "empty": "Geen entiteiten in dit venster",
       "emptyHint": "Verbreed het tijdsbereik of controleer of je bronnen velden voor gebruiker, IP of host bevatten.",
       "refresh": "Vernieuwen",
@@ -24945,7 +25139,8 @@
       "tab": {
         "activity": "Activiteit",
         "related": "Gerelateerd",
-        "sources": "Bronnen"
+        "sources": "Bronnen",
+        "cases": "Casussen"
       },
       "activity": "Gebeurtenissen in de tijd",
       "chart": {
@@ -24954,6 +25149,9 @@
       },
       "topN": "top {n} op gebeurtenissen",
       "noRelated": "Niets gerelateerd in dit venster.",
+      "noCases": "Geen SIEM-casus noemt deze entiteit.",
+      "caseOpen": "Open",
+      "caseResolved": "Opgelost",
       "failedCount": "{n} mislukt | {n} mislukt",
       "openEvents": "Openen in Gebeurtenissen",
       "huntInEvents": "Onderzoeken in Gebeurtenissen",
@@ -24968,7 +25166,9 @@
         "failed": "Kon niet lezen"
       },
       "loadError": "Kon beveiligingsbronnen niet laden",
-      "detailFailed": "Sommige gegevens van deze entiteit konden niet worden gelezen: {streams}."
+      "detailFailed": "Sommige gegevens van deze entiteit konden niet worden gelezen: {streams}.",
+      "aliasCount": "+{n} spelling | +{n} spellingen",
+      "aliasHint": "Gelogd met deze spelling; het is dezelfde identiteit."
     },
     "ueba": {
       "title": "Gebruikersgedraganalyse",
@@ -25005,7 +25205,11 @@
         "new_ip": "Nieuw bron-IP",
         "failure_jump": "Sprong in fouten",
         "new_hours": "Ongebruikelijke uren",
-        "first_seen": "Voor het eerst gezien"
+        "first_seen": "Voor het eerst gezien",
+        "peer_volume": "Ver boven vergelijkbare gebruikers",
+        "peer_failures": "Mislukkingen ver boven vergelijkbare gebruikers",
+        "fail_then_success": "Succes na mislukkingen",
+        "open_case": "Open casus"
       },
       "reason": {
         "volume": "{n} gebeurtenissen, ongeveer {ratio}× de ~{expected} die op basis van de voorgaande {baseline} werden verwacht.",
@@ -25013,7 +25217,12 @@
         "newIpExternal": "{n} gebeurtenissen van openbaar adres {ip}, nooit gezien in de voorgaande {baseline}. | {n} gebeurtenissen van openbaar adres {ip}, nooit gezien in de voorgaande {baseline} ({count} nieuwe adressen in totaal).",
         "failureJump": "{n} fouten — {rate}% van de gebeurtenissen, tegen {baseline}% in de baseline.",
         "newHours": "{n} gebeurtenissen om {hours} UTC, uren waarin deze gebruiker in de voorgaande {baseline} nooit actief was.",
-        "firstSeen": "{n} gebeurtenissen van een gebruiker zonder enige activiteit in de voorgaande {baseline}."
+        "firstSeen": "{n} gebeurtenissen van een gebruiker zonder enige activiteit in de voorgaande {baseline}.",
+        "peerVolume": "{n} gebeurtenissen, terwijl een typische gebruiker er ongeveer {median} had. De eigen baseline van deze gebruiker wordt nog opgebouwd.",
+        "peerFailures": "{n} mislukkingen ({rate}% van de gebeurtenissen), terwijl een typische gebruiker er ongeveer {median} had. De eigen baseline van deze gebruiker wordt nog opgebouwd.",
+        "newIpBuilding": "{n} gebeurtenissen vanaf openbaar adres {ip}. De eigen baseline van deze gebruiker wordt nog opgebouwd, dus elk openbaar adres wordt gemarkeerd. | {n} gebeurtenissen vanaf openbaar adres {ip}. De eigen baseline van deze gebruiker wordt nog opgebouwd, dus elk openbaar adres wordt gemarkeerd ({count} openbare adressen in totaal).",
+        "failThenSuccess": "{n} mislukkingen vanaf {ip}, daarna een geslaagde gebeurtenis vanaf hetzelfde adres.",
+        "openCase": "Genoemd door de open casus \"{title}\" ({severity}). | Genoemd door {n} open casussen, de nieuwste \"{title}\" ({severity})."
       },
       "fact": {
         "events": "Gebeurtenissen",
@@ -25055,7 +25264,10 @@
       "notEvaluated": "Niet geëvalueerd voor deze gebruiker omdat de basislijndata onvolledig waren: {signals}.",
       "hoursNotJudged": "Ongebruikelijke uren worden alleen beoordeeld met ten minste {min} basislijngebeurtenissen die {share}% van de voorgaande {baseline} beslaan. De geschiedenis van deze gebruiker is korter, dus geen enkel uur wordt gemarkeerd.",
       "noHistory": "Geen gegevens in de voorgaande {baseline} voor {streams}, dus niemand daarin wordt als 'voor het eerst gezien' aangemerkt.",
-      "volumeNotJudged": "Volume wordt niet beoordeeld voor deze gebruiker: vensters korter dan een dag worden vergeleken met dezelfde uren van de dag in de basislijn, wat ten minste een dag geschiedenis vereist."
+      "volumeNotJudged": "Volume wordt niet beoordeeld voor deze gebruiker: vensters korter dan een dag worden vergeleken met dezelfde uren van de dag in de basislijn, wat ten minste een dag geschiedenis vereist.",
+      "baselineBuilding": "Baseline wordt opgebouwd",
+      "baselineBuildingHint": "Tot nu toe {span} aan geschiedenis. Vergelijking met het eigen verleden van deze gebruiker begint zodra er een volledige geschiedenis van {baseline} is; tot die tijd worden alleen duidelijke uitschieters ten opzichte van andere gebruikers gemarkeerd.",
+      "buildingNotice": "De baseline wordt nog opgebouwd voor {n} gebruiker: tot er een volledige geschiedenis van {baseline} is, worden alleen duidelijke uitschieters ten opzichte van andere gebruikers gemarkeerd. | De baselines worden nog opgebouwd voor {n} gebruikers: tot er een volledige geschiedenis van {baseline} is, worden alleen duidelijke uitschieters ten opzichte van andere gebruikers gemarkeerd."
     },
     "intel": {
       "title": "Threat Intel",
@@ -25077,12 +25289,11 @@
       "sighted": "Eén keer gezien | {n} keer gezien",
       "sweeping": "Bezig met sweepen… {done} van {total} query's",
       "sweptAcross": "{n} beveiligingsbron doorzocht | {n} beveiligingsbronnen doorzocht",
-      "partial": "Deze scan stopte bij de limiet van {n} query's, dus sommige kolommen zijn niet doorzocht. Het aantal query's groeit met lijsten × kolommen: verwijder verouderde lijsten of verlopen indicatoren, of splits lijsten op type, voor een volledige scan.",
       "failedQueries": "{n} kolom kon niet worden gescand en is overgeslagen. | {n} kolommen konden niet worden gescand en zijn overgeslagen.",
       "truncated": "Alleen de eerste {n} rijen van {lists} zijn gelezen; de rest is niet gescand.",
       "noIndicators": "Geen indicatoren",
       "noCoverage": "Voer een scan uit om te zien welke kolommen worden gescand",
-      "coverageHint": "Wat een scan heeft doorzocht in {n} beveiligingsbronnen. Er wordt exact gematcht op de vermelde kolommen; een type zonder kolom kan helemaal niet worden waargenomen.",
+      "coverageHint": "Wat een sweep heeft doorzocht in {n} beveiligingsbronnen. Elke kolom wordt vergeleken op de volledige waarde en op volledige tokens daarin, zoals arrays, logtekst en SHA256=-hashes; een type zonder kolom kan helemaal niet worden gesignaleerd.",
       "indicatorCount": "{n} indicator | {n} indicatoren",
       "columnsSearched": "{n} kolom | {n} kolommen",
       "blind": "Niet doorzoekbaar",
@@ -25160,7 +25371,7 @@
         "cancel": "Annuleren",
         "indicators": "Indicatoren",
         "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "Eén per regel, of gescheiden door komma's of spaties. Duplicaten worden genegeerd.",
+        "indicatorsHelp": "Eén per regel, of gescheiden door komma's of spaties. Duplicaten worden genegeerd. Een lijst bevat maximaal {max}.",
         "indicatorsRequired": "Voer ten minste één indicator in",
         "invalid": "Niet herkend als indicatoren ({n}): {sample}",
         "line": "regel {n}",
@@ -25184,7 +25395,7 @@
         "importSubtitle": "Vereist een indicator-kolom; type, ernst, bron en vervaldatum zijn optioneel.",
         "importSubmit": "Importeren",
         "file": "CSV-bestand",
-        "fileHelp": "Rijen die geen indicatoren zijn, worden overgeslagen en geteld.",
+        "fileHelp": "Rijen die geen indicatoren zijn, worden overgeslagen en geteld. Een lijst bevat maximaal {max} indicatoren; bestanden tot {mb} MB.",
         "fileRequired": "Kies een CSV-bestand",
         "defaultSeverity": "Standaardernst voor rijen zonder ernst",
         "append": "Aan de lijst toevoegen in plaats van deze te vervangen",
@@ -25203,7 +25414,10 @@
         "noIndicatorColumnIn": "{table} heeft geen indicator-, ioc- of waardekolom, dus er kunnen geen indicatoren aan worden toegevoegd. Kies een andere lijst.",
         "replaceTitle": "De lijst vervangen",
         "replaceMessage": "Importeren zonder toevoegen vervangt {table} volledig: alle bestaande rijen, hun kolommen en instellingen worden verwijderd en alleen de indicatoren uit dit bestand blijven behouden.",
-        "replaceConfirm": "Vervangen"
+        "replaceConfirm": "Vervangen",
+        "tooMany": "{n} indicatoren geplakt; een lijst bevat maximaal {max}.",
+        "listFull": "{table} zou {count} indicatoren bevatten; een lijst bevat maximaal {max}. Verdeel ze over meerdere lijsten.",
+        "fileTooLarge": "Het bestand is groter dan {max} MB. Splits het in kleinere bestanden."
       },
       "importCsv": "Een CSV importeren",
       "unreadTables": "Kon {lists} niet lezen; de indicatoren ervan worden niet getoond of doorzocht. | Kon {lists} niet lezen; de indicatoren ervan worden niet getoond of doorzocht.",
@@ -25213,12 +25427,15 @@
       "columnsSkipped": "{n} kolom niet doorzocht | {n} kolommen niet doorzocht",
       "skippedHint": "Niet volledig doorzocht — de scan bereikte de querylimiet of de query is mislukt:",
       "caveat": {
-        "capped": "De scan bereikte de querylimiet, dus sommige kolommen zijn niet doorzocht.",
         "failed": "{n} kolom kon niet worden doorzocht. | {n} kolommen konden niet worden doorzocht.",
         "partial": "{n} query gaf slechts gedeeltelijke resultaten, dus die kolommen zijn niet volledig doorzocht. | {n} queries gaven slechts gedeeltelijke resultaten, dus die kolommen zijn niet volledig doorzocht.",
         "unsearched": "Geen enkele stream heeft een kolom voor: {types}.",
-        "cidr": "{n} CIDR-bereik is niet doorzocht. | {n} CIDR-bereiken zijn niet doorzocht."
-      }
+        "cidr": "{n} CIDR-bereik is niet doorzocht. | {n} CIDR-bereiken zijn niet doorzocht.",
+        "checked": "Slechts {checked} van {total} indicatoren zijn volledig gecontroleerd."
+      },
+      "partialChecked": "Gedeeltelijk resultaat: {checked} van {total} indicatoren gecontroleerd. Aantallen voor de rest kunnen te laag zijn.",
+      "partialCapped": "Gedeeltelijk resultaat: {checked} van {total} indicatoren gecontroleerd. De sweep stopt bij {n} queries; de minst ernstige indicatoren zijn niet gecontroleerd.",
+      "inText": "{column} (in tekst)"
     },
     "sources": {
       "title": "Gegevensbronnen",
@@ -25238,8 +25455,7 @@
       "exclude": "Uitsluiten",
       "attached": "Gekoppeld: {pack}.",
       "detached": "Pack ontkoppeld.",
-      "detachedPipelineSkipped": "Pack ontkoppeld. De geregistreerde pipeline komt niet meer overeen met deze stream en dit pack, dus deze is ongewijzigd gelaten.",
-      "empty": "Nog geen logs-streams. Neem beveiligingslogs op als een gewone stream en ze verschijnen hier.",
+      "empty": "Nog geen logstreams. Ingereer beveiligingslogs als een gewone stream en ze verschijnen hier.",
       "noticePackRemoved": "{stream}: pack buiten de SIEM verwijderd. Koppel het opnieuw of wis het.",
       "noticeNoRecord": "{stream}: er is een pack gekoppeld zonder registratie. Registreer het of ontkoppel.",
       "noticeNotWriting": "{stream}: de pipeline schrijft niet meer naar deze stream.",
@@ -25249,14 +25465,31 @@
       "blockGlobalFlatten": "{stream}: het globale flatten-niveau ({level}) zou de OCSF-kolommen niet plat houden.",
       "blockSchemaMissing": "{stream}: het door de gebruiker gedefinieerde schema mist OCSF-kolommen: {columns}.",
       "blockPipelineDisabled": "{stream}: de bestaande pipeline is uitgeschakeld; schakel deze in voordat je koppelt.",
-      "attachErrors": {
-        "functionEditedOutside": "Functie {name} is buiten de SIEM gewijzigd.",
-        "pipelineNoAccess": "Deze stream heeft een pipeline waartoe je geen toegang hebt.",
-        "permissionDenied": "Je hebt toestemming nodig om functies en pipelines voor deze stream te bewerken.",
-        "pipelineChanged": "De pipeline van deze stream is gewijzigd en blokkeert nu het koppelen; vernieuw en controleer opnieuw.",
-        "packConflict": "Deze stream heeft al pack {pack}; koppel deze eerst los.",
-        "noPipeline": "Kon geen realtime pipeline voor deze stream aanmaken of vinden.",
-        "failed": "Koppelen mislukt."
+      "actionFailed": "De wijziging is niet opgeslagen.",
+      "stateExcluded": "Uitgesloten",
+      "excludedBy": "Uitgesloten door {user} op {time}",
+      "sourceTypeConfidence": "{label} ({n}%)",
+      "notClassified": "Nog niet geclassificeerd",
+      "lastChange": "Laatst gewijzigd door {user} op {time}: {summary}",
+      "previewTitle": "{pack} aan {stream} koppelen?",
+      "previewSubtitle": "Er wordt niets geschreven totdat je bevestigt.",
+      "previewLoading": "Controleren wat koppelen zou wijzigen…",
+      "previewPack": "Pack",
+      "previewClasses": "OCSF-klasse die het schrijft",
+      "previewFunction": "Functie",
+      "previewPipeline": "Pipeline",
+      "previewFunctionCreate": "{name} aanmaken",
+      "previewFunctionReuse": "{name} hergebruiken, al identiek",
+      "previewPipelineCreate": "{name} aanmaken: {stream} → functie → {stream}",
+      "previewPipelineExtend": "Een functieknooppunt aan {name} toevoegen, direct na de bron, dat {feeds} voedt",
+      "previewPipelineAlready": "{name} draait dit pack al; alleen het record wordt geschreven",
+      "confirmAttach": "Koppelen",
+      "cancel": "Annuleren",
+      "detachedSkipped": "Pack ontkoppeld. Pipeline {id} is niet gewijzigd: {reason}.",
+      "skipReason": {
+        "pipeline_missing": "het bestaat niet meer",
+        "other_stream": "het leest nu een andere stream",
+        "other_pack": "het draait nu een ander pack"
       }
     },
     "nav": {
@@ -25269,13 +25502,60 @@
       "intel": "Dreigingsinformatie",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
-      "content": "Inhoud"
+      "content": "Inhoud",
+      "sources": "Databronnen"
     },
     "sigma": {
       "notSupported": "Niet ondersteund: {fields}",
       "cannotMatch": "Kan niet matchen: deze stream heeft geen {fields}",
       "compiledEmpty": "Regel leverde niets op bij compilatie",
       "assumedAbsent": "Ervan uitgaande dat deze stream nooit {fields} heeft"
+    },
+    "audit": {
+      "title": "Wijzigingsoverzicht",
+      "hint": "Wie detecties, bronnen en cases de afgelopen 7 dagen heeft gewijzigd",
+      "when": "Wanneer",
+      "who": "Gewijzigd door",
+      "area": "Gebied",
+      "action": "Actie",
+      "target": "Wat is gewijzigd",
+      "empty": "Geen wijzigingen vastgelegd",
+      "emptyHint": "Wijzigingen in detecties, Security-bronnen en cases verschijnen hier.",
+      "disabled": "Auditlogging staat uit",
+      "disabledHint": "Schakel auditlogging in voor deze deployment om vast te leggen wie Security-instellingen wijzigt.",
+      "category": {
+        "detection": "Detectie",
+        "case": "Case",
+        "source": "Bron",
+        "security": "Security"
+      },
+      "verb": {
+        "created": "Aangemaakt",
+        "changed": "Gewijzigd",
+        "deleted": "Verwijderd",
+        "enabled": "Ingeschakeld",
+        "disabled": "Uitgeschakeld"
+      }
+    },
+    "access": {
+      "needsAuthor": "Vereist de machtiging Creëren op Beveiliging",
+      "openPreset": "Begin een rol vanuit {preset}",
+      "askPreset": "Vraag een beheerder om de preset {preset}.",
+      "checkFailedTitle": "Kan je toegang tot Beveiliging niet controleren",
+      "checkFailedHint": "De server antwoordde niet. Je sessie is nog steeds aangemeld."
+    },
+    "aria": {
+      "addSource": "Een bron toevoegen",
+      "addToCase": "Toevoegen aan casus",
+      "caseAssignee": "Toegewezene van casus",
+      "casePriority": "Prioriteit van casus",
+      "filterField": "Filterveld",
+      "filterOperator": "Filteroperator",
+      "filterValue": "Filterwaarde",
+      "huntKind": "Waarnaar zoeken",
+      "indicatorType": "Type indicator",
+      "severityFilter": "Ernstfilter",
+      "stream": "Stream"
     }
   },
   "promql": {

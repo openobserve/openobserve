@@ -1214,6 +1214,18 @@ async fn delete_org_fleet_resources(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn delete_org_search_jobs(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    search_service::search_jobs::delete_org_result_files(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
+    infra::table::search_job::search_jobs::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_jobs: {e}"))?;
+
+    Ok(())
+}
+
 async fn delete_org_pipelines(org_id: &str) -> Result<(), anyhow::Error> {
     // Through the service layer, so triggers, backfill jobs, ownership and caches go cluster-wide.
     let pipelines = infra::pipeline::list_by_org(org_id).await?;
@@ -1579,17 +1591,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     alert_calibration::delete_by_org(get_orm_client_rw().await, org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_calibration: {e}"))?;
-    // Delete the S3 result objects backing this org's search jobs BEFORE dropping
-    // the DB rows — the result paths are derived from each job's created_at/trace_id,
-    // so once the rows are gone the objects can no longer be located and would leak.
-    // (search_jobs service is enterprise-only; OSS just drops the rows below.)
-    #[cfg(feature = "enterprise")]
-    search_service::search_jobs::delete_org_result_files(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
-    infra::table::search_job::search_jobs::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_jobs: {e}"))?;
+    delete_org_search_jobs(org_id).await?;
 
     // Cloud-only resources: pending org invites, billing-group invites, and
     // billing-group memberships. The enterprise crate owns the ordering/error

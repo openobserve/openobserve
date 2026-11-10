@@ -283,6 +283,7 @@ import alertsService from "../../services/alerts";
 import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
+import { anomalyBandPayload, anomalySensitivityPayload } from "@/composables/useAlertForm";
 import useStreams from "@/composables/useStreams";
 import BaseImport from "../common/BaseImport.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
@@ -528,11 +529,17 @@ export default defineComponent({
     const importAnomalyConfig = async (jsonObj: any, index: number) => {
       try {
         // Convert the exported anomaly config (GET format) back to the create (POST) format.
+        const budgetPerDay = jsonObj.alert_budget_per_day ?? null;
         const payload: any = {
           alert_type: "anomaly_detection",
           name: jsonObj.name,
+          description: jsonObj.description || undefined,
           stream_name: jsonObj.stream_name,
           stream_type: jsonObj.stream_type,
+          // The flattened Alert reads an absent flag as false, which overrides create's default of on.
+          enabled: jsonObj.enabled ?? true,
+          priority: jsonObj.priority ?? undefined,
+          tags: Array.isArray(jsonObj.tags) ? jsonObj.tags : [],
           // Destinations ride the flattened Alert; nested in anomaly_config they are dropped unread.
           destinations: jsonObj.alert_destinations ?? [],
           anomaly_config: {
@@ -543,11 +550,13 @@ export default defineComponent({
             training_window_days: jsonObj.training_window_days,
             // Absent must mean the create path's default, not the operator's explicit "Never" (0).
             retrain_interval_days: jsonObj.retrain_interval_days ?? 7,
-            threshold: jsonObj.threshold ?? 97,
+            ...anomalySensitivityPayload(budgetPerDay, jsonObj.threshold ?? 97),
+            ...anomalyBandPayload(jsonObj, budgetPerDay !== null),
             query_mode: jsonObj.query_mode ?? "filters",
             filters: jsonObj.filters ?? [],
             custom_sql: jsonObj.custom_sql ?? "",
             alert_enabled: jsonObj.alert_enabled ?? true,
+            template: jsonObj.template || null,
           },
         };
         // This branch returns before the regular path's refresh below, so it emits its own.
@@ -896,6 +905,14 @@ export default defineComponent({
               message: t("alerts.import.destinationNotExist", { index, destination }),
               field: "destination_name",
             });
+          }
+        });
+      }
+
+      if (Array.isArray(input.recovery_destinations)) {
+        input.recovery_destinations.forEach((destination: any) => {
+          if (!checkDestinationInList(props.destinations, destination)) {
+            alertErrors.push(t("alerts.import.destinationNotExist", { index, destination }));
           }
         });
       }

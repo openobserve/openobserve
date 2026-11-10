@@ -29,6 +29,22 @@ describe("makeNewDetectionSchema", () => {
     expect(issuesAt(value, "period")).toEqual(["siem.detections.validation.positive"]);
   });
 
+  it("flags a look-back shorter than the correlation's timespan", () => {
+    const correlated = makeNewDetectionSchema(
+      t,
+      () => [],
+      () => 30,
+    );
+    const value = { ...newDetectionDefaults(), period: "15", frequency: "5" };
+    const res = correlated.safeParse(value);
+    expect(res.success).toBe(false);
+    expect(res.success ? [] : res.error.issues.map((i) => i.message)).toEqual([
+      "siem.detections.validation.belowTimespan",
+    ]);
+    expect(correlated.safeParse({ ...value, period: "30" }).success).toBe(true);
+    expect(issuesAt(value, "period")).toEqual([]);
+  });
+
   it("flags a name already in the org", () => {
     const value = { ...newDetectionDefaults(), name: "taken__logs" };
     expect(issuesAt(value, "name")).toEqual(["siem.detections.nameTaken"]);
