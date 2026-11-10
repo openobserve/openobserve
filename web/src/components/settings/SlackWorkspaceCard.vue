@@ -330,9 +330,16 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
             variant="outline"
             size="sm-action"
             icon-left="key"
+            :disabled="readOnly"
+            data-test="slack-credentials-update"
             @click="credentialsOpen = true"
           >
             {{ t("slackApp.card.updateCredentials") }}
+            <OTooltip
+              v-if="readOnly"
+              side="bottom"
+              :content="t('slackApp.connect.permissionHint')"
+            />
           </OButton>
           <OButton
             v-else
@@ -340,10 +347,16 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
             size="sm-action"
             icon-left="refresh"
             :loading="reinstall.connecting.value"
+            :disabled="readOnly"
             data-test="slack-credentials-reinstall"
             @click="reinstall.open()"
           >
             {{ t("slackApp.card.reinstall") }}
+            <OTooltip
+              v-if="readOnly"
+              side="bottom"
+              :content="t('slackApp.connect.permissionHint')"
+            />
           </OButton>
         </template>
       </OBanner>
@@ -477,10 +490,16 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
             size="sm"
             icon-left="delete"
             :loading="credentialsMutation.isPending.value"
+            :disabled="readOnly"
             data-test="slack-forget-token"
             @click="forgetOpen = true"
           >
             {{ t("slackApp.card.forget") }}
+            <OTooltip
+              v-if="readOnly"
+              side="bottom"
+              :content="t('slackApp.connect.permissionHint')"
+            />
           </OButton>
         </span>
       </div>
@@ -491,10 +510,12 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           size="sm-action"
           icon-left="network-check"
           :loading="testMutation.isPending.value"
+          :disabled="readOnly"
           data-test="slack-test-connection"
           @click="runTest"
         >
           {{ t("slackApp.card.test") }}
+          <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
         </OButton>
         <OButton
           v-if="!managed"
@@ -502,20 +523,24 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           size="sm-action"
           icon-left="refresh"
           :loading="reinstall.connecting.value"
+          :disabled="readOnly"
           data-test="slack-reinstall"
           @click="reinstall.open()"
         >
           {{ t("slackApp.card.reinstall") }}
+          <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
         </OButton>
         <OButton
           v-if="ownsInstallation"
           variant="outline"
           size="sm-action"
           icon-left="key"
+          :disabled="readOnly"
           data-test="slack-update-credentials"
           @click="credentialsOpen = true"
         >
           {{ t("slackApp.card.updateCredentials") }}
+          <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
         </OButton>
       </div>
 
@@ -595,10 +620,18 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           :label="t('slackApp.card.helpContact')"
           :placeholder="t('slackApp.card.helpContactPlaceholder')"
           :maxlength="HELP_CONTACT_MAX_LENGTH"
+          :disabled="readOnly"
           data-test="slack-help-contact"
         />
-        <OButton variant="outline" size="sm-action" type="submit">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          type="submit"
+          :disabled="readOnly"
+          data-test="slack-help-contact-save"
+        >
           {{ t("common.save") }}
+          <OTooltip v-if="readOnly" side="bottom" :content="t('slackApp.connect.permissionHint')" />
         </OButton>
       </OForm>
     </section>
