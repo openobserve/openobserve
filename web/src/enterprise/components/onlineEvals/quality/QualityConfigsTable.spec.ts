@@ -118,6 +118,7 @@ function mountTable(props: Partial<InstanceType<typeof QualityConfigsTable>["$pr
       loading: false,
       forbidden: false,
       loadError: false,
+      agent: null,
       ...props,
     },
     global: {
@@ -321,6 +322,15 @@ describe("QualityConfigsTable", () => {
     // No rows yet is not "every config gives a result".
     expect(loading.find('[data-test="quality-tile-without-result-note"]').exists()).toBe(false);
     expect(loading.text()).not.toContain("Every config gives a result");
+  });
+
+  it("names the filtered agent in the empty state's one-click action and asks the page to open it", () => {
+    const empty = mountTable({ rows: [], agent: "support-bot" });
+    const state = empty.findComponent({ name: "OEmptyState" });
+    const action = state.props("actions").find((a: { id: string }) => a.id === "one-click");
+    expect(action.titleParams).toEqual({ agent: "support-bot" });
+    state.vm.$emit("action", "one-click");
+    expect(empty.emitted("one-click")).toHaveLength(1);
   });
 
   it("offers Show them only when there is something to show and the tile is not already on", () => {

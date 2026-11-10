@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       title-data-test="quality-page-title"
       :tabs-below="hasTabs && !configId"
+      overflow-first
     >
       <!-- The config list's peer tabs; a config's detail has its back button instead. -->
       <template v-if="hasTabs && !configId" #tabs><AiSectionTabs /></template>
@@ -47,6 +48,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="raw(`v${header.version}`)"
           />
         </div>
+      </template>
+      <!-- One-click stays reachable once configs exist; the empty state offers it too. -->
+      <template v-if="showOneClick" #actions-overflow>
+        <OButton
+          variant="outline"
+          size="sm-toolbar"
+          data-test="quality-one-click-btn"
+          @click="oneClickOpen = true"
+        >
+          {{
+            agent ? t("oneClickEval.headerActionAgent", { agent }) : t("oneClickEval.headerAction")
+          }}
+        </OButton>
       </template>
       <template #actions>
         <OButton
@@ -132,11 +146,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :forbidden="tableForbidden"
           :load-error="!!listQuery.error.value && listStatus !== 403"
           @open="openConfig"
-          @created="emit('created')"
+          :agent="agent"
+          @one-click="oneClickOpen = true"
           @retry="retryList"
         />
       </section>
     </OPageLockedBody>
+    <!-- Outside the header: the phone's More menu unmounts its content on close. -->
+    <OneClickEvalDialog
+      v-model:open="oneClickOpen"
+      :agent="agent"
+      :stream="agentStream || undefined"
+      @created="emit('created')"
+    />
   </div>
 </template>
 
@@ -176,6 +198,7 @@ import {
 } from "./utils/qualityFormat";
 import QualityConfigsTable from "./quality/QualityConfigsTable.vue";
 import QualityConfigDetail from "./quality/QualityConfigDetail.vue";
+import OneClickEvalDialog from "./OneClickEvalDialog.vue";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
@@ -186,6 +209,12 @@ const props = defineProps<{
   agentParams: QualityAgentParams;
   /** False until the agent list first loads, so a deep-linked agent is applied before the first request. */
   enabled: boolean;
+  /** The agent the Agent filter has selected; one-click evaluates it. */
+  agent?: string | null;
+  /** The selected agent's trace stream, preselected in one-click. */
+  agentStream?: string;
+  /** The scorer, score config or job list was denied: one-click creates all three. */
+  createForbidden?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -212,6 +241,24 @@ const { listQuery, rows, visibleRows, tiles, tileFilter, listStatus } = useQuali
 const tableForbidden = computed(
   () => listStatus.value === 403 || (!!props.configsForbidden && rows.value.length === 0),
 );
+// A first score in one screen (AIO-23), from the header or the empty state.
+const oneClickOpen = ref(false);
+const showOneClick = computed(
+  () => !configId.value && !props.createForbidden && !tableForbidden.value,
+);
+// Back from adding a provider for it (`one_click`): the dialog reopens once.
+watch(
+  () => route.query.one_click,
+  (flag) => {
+    if (flag !== "1") return;
+    oneClickOpen.value = true;
+    const query = { ...route.query };
+    delete query.one_click;
+    router.replace({ query }).catch(() => {});
+  },
+  { immediate: true },
+);
+
 // The table unmounts while a config is open, so the page keeps its search, as it keeps the tile filter.
 const search = ref("");
 

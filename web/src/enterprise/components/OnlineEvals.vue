@@ -170,6 +170,9 @@ the Free Software Foundation, either version 3 of the License, or
         :date-window="qualityDateWindow"
         :agent-params="qualityAgentParams"
         :enabled="qualityScopeReady"
+        :agent="qualityOneClickAgent"
+        :agent-stream="qualityAgentStream"
+        :create-forbidden="!!(scorersForbidden || scoreConfigsForbidden || jobsForbidden)"
         @status="(status) => (qualityStatus = status)"
         @created="reloadLists(true)"
       >
@@ -738,6 +741,7 @@ const {
   selectedEnv: qualitySelectedEnv,
   selectedAgentName: qualitySelectedAgentName,
   selectedVersion: qualitySelectedVersion,
+  effectiveStream: qualityAgentStream,
 } = useAgentScope({
   filterMode: ref<"stream" | "agent">("agent"),
   activeStream: ref(""),
@@ -750,6 +754,12 @@ const {
   allOption: true,
   t,
 });
+
+const qualityOneClickAgent = computed(() =>
+  qualitySelectedAgentName.value && qualitySelectedAgentName.value !== ALL_AGENTS_VALUE
+    ? qualitySelectedAgentName.value
+    : null,
+);
 
 const qualityAgentParams = computed(() =>
   agentParamsFor(

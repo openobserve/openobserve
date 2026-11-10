@@ -31653,6 +31653,8 @@
     "failed": "Could not start the evaluation: {reason}",
     "evaluate": "Evaluate {agent}…",
     "anAgent": "your traces",
+    "headerAction": "Evaluate an agent",
+    "headerActionAgent": "Evaluate {agent}",
     "emptyActionDesc": "Pick a built-in judge; the scorer, score config and a sampled job are created for you",
     "manual": "Set up a job manually"
   },

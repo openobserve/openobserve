@@ -122,11 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :actions="search.trim() || tileFilter ? undefined : emptyActions"
             @action="onEmptyAction"
           />
-          <OneClickEvalDialog
-            v-model:open="oneClickOpen"
-            :agent="scopeAgent"
-            @created="emit('created')"
-          />
         </div>
       </template>
 
@@ -220,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -231,7 +226,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
-import OneClickEvalDialog from "../OneClickEvalDialog.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
@@ -260,14 +254,16 @@ const props = defineProps<{
   loading: boolean;
   forbidden: boolean;
   loadError: boolean;
+  /** The agent the Quality filter has selected, if any; names the one-click action. */
+  agent: string | null;
 }>();
 
 const emit = defineEmits<{
   (e: "update:tileFilter", value: QualityTileFilter | null): void;
   (e: "open", row: QualityRow, only: QualityOnly): void;
   (e: "retry"): void;
-  /** One-click created a score config, scorer and job: the lists are stale. */
-  (e: "created"): void;
+  /** The empty state's one-click action; the page owns the dialog it opens. */
+  (e: "one-click"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -377,28 +373,12 @@ function openConfig(row: QualityRow) {
 }
 
 // A first score in one screen (AIO-23), before the manual path.
-const oneClickOpen = ref(false);
-const scopeAgent = computed(() =>
-  typeof route.query.agent === "string" && route.query.agent ? route.query.agent : null,
-);
-// Back from adding a provider for it (`one_click`): the dialog reopens once.
-watch(
-  () => route.query.one_click,
-  (flag) => {
-    if (flag !== "1") return;
-    oneClickOpen.value = true;
-    const query = { ...route.query };
-    delete query.one_click;
-    router.replace({ query }).catch(() => {});
-  },
-  { immediate: true },
-);
 const emptyActions = computed<EmptyStateAction[]>(() => [
   {
     id: "one-click",
     icon: "auto-awesome",
     titleKey: "oneClickEval.evaluate",
-    titleParams: { agent: scopeAgent.value ?? t("oneClickEval.anAgent") },
+    titleParams: { agent: props.agent ?? t("oneClickEval.anAgent") },
     descriptionKey: "oneClickEval.emptyActionDesc",
   },
   {
@@ -411,7 +391,7 @@ const emptyActions = computed<EmptyStateAction[]>(() => [
 
 function onEmptyAction(id?: string) {
   if (id === "one-click") {
-    oneClickOpen.value = true;
+    emit("one-click");
     return;
   }
   if (id === "clear-filters") {
