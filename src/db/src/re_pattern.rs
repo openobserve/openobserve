@@ -247,6 +247,8 @@ pub async fn process_association_changes(
         .collect();
 
     infra::table::re_pattern_stream_map::batch_process(added, removed).await?;
+    // Before the put, so a coordinator failure still invalidates; the watchers bump again.
+    invalidate_public_dashboards(org).await;
 
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
@@ -258,7 +260,6 @@ pub async fn process_association_changes(
             None,
         )
         .await?;
-    invalidate_public_dashboards(org).await;
 
     #[cfg(feature = "enterprise")]
     {

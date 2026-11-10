@@ -303,7 +303,8 @@ pub async fn read(
 
 /// A file built before the org's last settings or redaction change is never served.
 pub fn predates_settings(header: &Header, live: &Live) -> bool {
-    header.settings_rev != live.settings_rev
+    // The rev only moves forward, so a newer file read under an older rev is still safe.
+    header.settings_rev < live.settings_rev
 }
 
 /// The due rules in order; an edit or a masked screen after one failure skips the backoff once.
@@ -2140,7 +2141,7 @@ pub(super) mod tests {
         Dashboard,
         i64,
     ) {
-        let link = link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]));
+        let link = abs_link();
         let dash = dashboard(panels);
         let engine = fake(&link, &dash);
         let flights = flights(8, 1);
@@ -2155,6 +2156,10 @@ pub(super) mod tests {
                 .insert((*id).into(), Class::Transient);
         }
         (engine, flights, link, dash, now)
+    }
+
+    fn abs_link() -> PublicDashboard {
+        link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]))
     }
 
     fn abs_range() -> TimeRange {
@@ -2192,6 +2197,28 @@ pub(super) mod tests {
         let resp = data(&read_at(engine, flights, &link, &dash, abs_range(), now + 20 * MIN).await)
             .clone();
         assert_eq!(build_no(&resp, "p1"), 2, "served the pre-change body");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_reader_that_joins_a_build_started_before_a_settings_change_gets_no_data() {
+        let (link, dash) = (abs_link(), dashboard(&[("p1", "s1")]));
+        let engine = fake(&link, &dash);
+        engine.delay_ms.store(300, Ordering::SeqCst);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        let first = {
+            let (link, dash) = (link.clone(), dash.clone());
+            tokio::spawn(
+                async move { read_at(engine, flights, &link, &dash, abs_range(), now).await },
+            )
+        };
+        // The leader captured the old rev; a redaction change lands while it runs.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        engine.settings_rev.store(now + 1, Ordering::SeqCst);
+        let joined = read_at(engine, flights, &link, &dash, abs_range(), now).await;
+        assert!(!matches!(joined, Served::Data { .. }), "{joined:?}");
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 1);
+        first.await.unwrap();
     }
 
     #[tokio::test]
