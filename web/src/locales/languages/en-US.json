@@ -23607,6 +23607,7 @@
     },
     "time": {
       "openTimePicker": "Open time picker",
+      "invalid": "Enter a time as {format}, from {min} to {max}.",
       "clear": "Clear",
       "am": "AM",
       "pm": "PM",
