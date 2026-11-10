@@ -670,7 +670,11 @@ watch(
     // A decision made in this tab stored its grant after any earlier read, so the list is read again.
     if (view.value?.outcome?.decision)
       void queryClient.invalidateQueries({ queryKey: assistantSettingsKeys.grants(current) });
-    const observer = new QueryObserver(queryClient, assistantGrantsQuery(current));
+    // The core observer takes no refs, and it only runs for a non-empty org.
+    const observer = new QueryObserver(queryClient, {
+      ...assistantGrantsQuery(current),
+      enabled: true,
+    });
     const report = () => {
       const result = observer.getCurrentResult();
       // A refetch keeps the last settled list, so the line never blinks out under the reader.

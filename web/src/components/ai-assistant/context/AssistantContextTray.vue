@@ -71,7 +71,7 @@ export { trayChipLimit } from "./AssistantChipTray.vue";
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, type ComponentPublicInstance } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
@@ -107,7 +107,8 @@ const vuex = useStore();
 const context = useAssistantContext(() => props.sid, { store });
 const layout = useComposerLayout();
 const placement = useAssistantPlacement(store);
-const tray = ref<InstanceType<typeof AssistantChipTray> | null>(null);
+// A generic SFC has no constructor type, and only its root element is read.
+const tray = ref<ComponentPublicInstance | null>(null);
 const root = computed<HTMLElement | null>(() => tray.value?.$el ?? null);
 const openId = ref<string | null>(null);
 const expanded = ref(false);
