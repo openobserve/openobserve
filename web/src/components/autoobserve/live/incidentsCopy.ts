@@ -213,8 +213,15 @@ export const findingLogs = (
 ): RouteLocationRaw | null => {
   const { stream_name, stream_type, first_seen_at } = item.finding;
   if (!stream_name || !stream_type) return null;
+  // Only Logs searches several streams at once, so a group opens every member of the lead's type there.
+  const peers =
+    stream_type === "logs"
+      ? (item.members ?? []).filter((m) => m.stream_type === stream_type && m.stream_name)
+      : [];
+  const streams = [...new Set([stream_name, ...peers.map((m) => m.stream_name as string)])];
+  const signalAt = Math.min(first_seen_at, ...peers.map((m) => m.first_seen_at));
   return logsForFinding(
-    { stream_type, stream_name, signal_at: first_seen_at, lead_us: PAGED_LEAD_US },
+    { stream_type, stream_name: streams.join(","), signal_at: signalAt, lead_us: PAGED_LEAD_US },
     now * 1000,
   );
 };

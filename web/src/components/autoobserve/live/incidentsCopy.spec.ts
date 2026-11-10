@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import config from "@/aws-exports";
 import "@/locales";
 import { gt } from "@/types/i18n";
 import type { AutoObserveIncidentItem, AutoObserveIncidentList } from "@/services/autoobserve";
@@ -26,6 +27,7 @@ import {
   analysisLink,
   anyLive,
   failedDetail,
+  findingLogs,
   findingSentence,
   incidentLink,
   newFindingsText,
@@ -323,5 +325,48 @@ describe("sharedAnalysis", () => {
     expect(sharedAnalysis([line, line])).toBeNull();
     const running = analysisLine(gt, item(0), true);
     expect(sharedAnalysis([running, running])).toBeNull();
+  });
+});
+
+describe("findingLogs on a group (T1-17)", () => {
+  const HOUR_US = 3_600_000_000;
+  const originalBuild = config.isEnterprise;
+  afterEach(() => {
+    config.isEnterprise = originalBuild;
+  });
+
+  const member = (name: string | null, type: string | null, at: number) => ({
+    id: `m-${name}`,
+    title: `${name} stopped`,
+    stream_type: type,
+    stream_name: name,
+    first_seen_at: at,
+    recovered_at: null,
+  });
+
+  it("opens every member stream of the lead's type, from an hour before the first stop", () => {
+    config.isEnterprise = "true";
+    const lead = item(0);
+    const at = lead.finding.first_seen_at;
+    const group: AutoObserveIncidentItem = {
+      ...lead,
+      members: [
+        member(lead.finding.stream_name, "logs", at),
+        member("cart", "logs", at - 60_000_000),
+        member("payments", "logs", at + 60_000_000),
+        member("checkout-traces", "traces", at - 120_000_000),
+        member(null, null, at - 180_000_000),
+      ],
+    };
+    const route = findingLogs(group, 1_800_000_000_000) as { query: Record<string, string> };
+    expect(route.query.stream).toBe(`${lead.finding.stream_name},cart,payments`);
+    expect(route.query.from).toBe(String(at - 60_000_000 - HOUR_US));
+  });
+
+  it("a single finding still opens its one stream", () => {
+    config.isEnterprise = "true";
+    const route = findingLogs(item(0), 1_800_000_000_000) as { query: Record<string, string> };
+    expect(route.query.stream).toBe(item(0).finding.stream_name);
+    expect(route.query.from).toBe(String(item(0).finding.first_seen_at - HOUR_US));
   });
 });
