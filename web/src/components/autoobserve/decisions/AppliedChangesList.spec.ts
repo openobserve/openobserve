@@ -241,6 +241,60 @@ describe("What I've changed (W5, D2)", () => {
     expect(w.find('[data-test="autoobserve-applied-undone"]').text()).toBe("Undone");
   });
 
+  it("an_undone_row_says_who_undid_it_at_the_time_the_server_gives", async () => {
+    api.list.mockResolvedValue(
+      list([
+        view({
+          state: "undone",
+          actor: "root@example.com",
+          change: { alert: { id: "al-1", title: "disk latency" }, fields: [] },
+        }),
+      ]),
+    );
+    const w = await mountList();
+    const detail = w.find('[data-test="autoobserve-applied-detail"]').text();
+    expect(detail).toMatch(/^undone by root@example\.com at /);
+  });
+
+  it("an_undone_row_keeps_its_change_time_when_the_server_sends_the_undo_time_apart", async () => {
+    api.list.mockResolvedValue(
+      list([
+        {
+          ...view({
+            state: "undone",
+            change: { alert: { id: "al-1", title: "disk latency" }, fields: [] },
+          }),
+          undone_at: Date.UTC(2026, 10, 10, 15, 30) * 1000,
+          undone_by: "root@example.com",
+        } as DecisionView,
+      ]),
+    );
+    const w = await mountList();
+    const detail = w.find('[data-test="autoobserve-applied-detail"]').text();
+    expect(detail).toMatch(/^by ops@example\.com at .+ · undone by root@example\.com at .+$/);
+  });
+
+  it("a_row_undone_here_takes_the_undo_time_and_actor_the_server_returned", async () => {
+    api.list.mockResolvedValue(list([]));
+    api.undo.mockResolvedValue({
+      data: {
+        change: "undone",
+        decision: view({
+          state: "undone",
+          actor: "root@example.com",
+          decided_at: Date.UTC(2026, 10, 10, 15, 30) * 1000,
+          revision: 5,
+        }),
+      },
+    } as never);
+    recordApplied({ org: "demo-org", view: view(), title: "disk latency", fields: [] });
+    const w = await mountList();
+    await w.find('[data-test="autoobserve-applied-undo"]').trigger("click");
+    await flushPromises();
+    const detail = w.find('[data-test="autoobserve-applied-detail"]').text();
+    expect(detail).toMatch(/^undone by root@example\.com at /);
+  });
+
   it("a failed Undo leaves the row offering Undo", async () => {
     api.list.mockResolvedValue(list([]));
     api.undo.mockRejectedValue({ response: { status: 409, data: {} } });

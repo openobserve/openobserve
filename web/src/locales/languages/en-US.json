@@ -34530,6 +34530,7 @@
       "applied": {
         "title": "Applied changes",
         "by": "by {actor} at {when}",
+        "undoneBy": "undone by {actor} at {when}",
         "undone": "Undone",
         "you": "you"
       }

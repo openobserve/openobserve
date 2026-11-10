@@ -226,8 +226,18 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
                 request_id: newRequestId(),
               }),
             );
-            const revision = result?.data?.decision?.revision ?? item.view.revision;
-            const done = { ...item, view: { ...item.view, revision } };
+            const returned = result?.data?.decision;
+            const revision = returned?.revision ?? item.view.revision;
+            // The undo's own time and actor, so a row undone here reads as it will after a reload.
+            const stamp = returned
+              ? {
+                  decided_at: returned.decided_at,
+                  actor: returned.actor,
+                  undone_at: returned.undone_at,
+                  undone_by: returned.undone_by,
+                }
+              : {};
+            const done = { ...item, view: { ...item.view, revision, ...stamp } };
             (result?.data?.change === "unchanged" ? already : undone).push(done);
           } catch (error) {
             failed.push({ item, error });
