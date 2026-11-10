@@ -23,22 +23,17 @@ use std::{
 
 use arrow::array::RecordBatch;
 use arrow_schema::SchemaRef;
-use config::{
-    cluster::LOCAL_NODE,
-    meta::{cluster::NodeInfo, search::ScanStats},
-    utils::record_batch_ext::RecordBatchExt,
-};
+use config::{meta::search::ScanStats, utils::record_batch_ext::RecordBatchExt};
 use datafusion::{
     self,
-    physical_plan::{
-        ExecutionPlan,
-        metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue, MetricsSet},
+    physical_plan::metrics::{
+        self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue, MetricsSet,
     },
 };
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-use crate::profile::{ProfileNode, RemoteNodeProfile};
+use crate::profile::RemoteNodeProfile;
 
 /// Flight action that fetches a node's report on one finished run.
 pub const QUERY_PROFILE_ACTION: &str = "query_profile";
@@ -133,17 +128,13 @@ pub enum CustomMessage {
     PartialErr(String),
 }
 
+/// What older nodes send after their last batch; a caller's profile comes from `do_action` now.
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Metrics {
-    /// Unused; kept, like `metrics`, so that older leaders can still parse the message.
     pub stage: i32,
     pub node_address: String,
     pub node_name: String,
-    /// Left empty: the leader renders the text plan from `profile`.
     pub metrics: String,
-    /// The plan this node ran; older nodes do not send it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub profile: Option<ProfileNode>,
 }
 
 /// What a node sends besides its record batches; the shared references are read when sent.
@@ -152,8 +143,6 @@ pub struct NodeMessages {
     pub scan_stats: ScanStats,
     /// The peak of this node's memory pool.
     pub peak_memory: Arc<AtomicUsize>,
-    /// The plan to send back as a profile; set only for EXPLAIN ANALYZE.
-    pub profile: Option<MetricsInfo>,
     pub role: NodeRole,
 }
 
@@ -169,11 +158,6 @@ impl NodeMessages {
     pub fn last(&self) -> Vec<CustomMessage> {
         let mut messages = vec![CustomMessage::PeakMemory(self.reported_peak_memory())];
         messages.extend(self.partial_err());
-        messages.extend(
-            self.profile
-                .as_ref()
-                .map(|info| CustomMessage::Metrics(collect_metrics(info))),
-        );
         messages
     }
 
@@ -224,33 +208,16 @@ pub struct RemoteScanState {
     pub node_profiles: NodeProfiles,
 }
 
-pub struct MetricsInfo {
-    pub plan: Arc<dyn ExecutionPlan>,
-    /// Passed in because it lives in the search crate, which depends on this one.
-    pub build_profile: fn(&dyn ExecutionPlan) -> ProfileNode,
-}
-
 /// The id a node keys one run by: the query's trace id and the caller's job id for that call.
 pub fn job_trace_id(trace_id: &str, job_id: &str) -> String {
     format!("{trace_id}-{job_id}")
-}
-
-fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
-    vec![Metrics {
-        node_address: LOCAL_NODE.get_grpc_addr().to_string(),
-        node_name: LOCAL_NODE.get_name().to_string(),
-        profile: Some((metrics_info.build_profile)(metrics_info.plan.as_ref())),
-        ..Default::default()
-    }]
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
-    use datafusion::physical_plan::{ExecutionPlan, empty::EmptyExec};
     use parking_lot::Mutex;
 
     use super::*;
@@ -273,18 +240,6 @@ mod tests {
         }
     }
 
-    fn test_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
-        ProfileNode {
-            name: plan.name().to_string(),
-            ..Default::default()
-        }
-    }
-
-    fn create_test_execution_plan() -> Arc<dyn ExecutionPlan> {
-        let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]));
-        Arc::new(EmptyExec::new(schema))
-    }
-
     #[test]
     fn test_metrics_default() {
         let metrics = Metrics::default();
@@ -301,9 +256,7 @@ mod tests {
                 CustomMessage::ScanStats(stats) => format!("ScanStats({})", stats.files),
                 CustomMessage::PeakMemory(peak) => format!("PeakMemory({peak})"),
                 CustomMessage::PartialErr(err) => format!("PartialErr({err})"),
-                CustomMessage::Metrics(metrics) => {
-                    format!("Metrics({})", metrics[0].profile.as_ref().unwrap().name)
-                }
+                CustomMessage::Metrics(metrics) => format!("Metrics({})", metrics.len()),
             })
             .collect()
     }
@@ -313,7 +266,6 @@ mod tests {
         let messages = NodeMessages {
             scan_stats: create_test_scan_stats(),
             peak_memory: Arc::new(AtomicUsize::new(5)),
-            profile: None,
             role: NodeRole::Follower,
         };
         assert_eq!(describe(messages.first()), ["ScanStats(10)"]);
@@ -334,10 +286,6 @@ mod tests {
         let messages = NodeMessages {
             scan_stats: create_test_scan_stats(),
             peak_memory: Arc::new(AtomicUsize::new(5)),
-            profile: Some(MetricsInfo {
-                plan: create_test_execution_plan(),
-                build_profile: test_profile,
-            }),
             role: NodeRole::ClusterLeader(remote),
         };
         assert_eq!(describe(messages.first()), ["ScanStats(13)"]);
@@ -349,42 +297,8 @@ mod tests {
         );
         assert_eq!(
             describe(messages.last()),
-            [
-                "PeakMemory(7)",
-                "PartialErr(node down)",
-                "Metrics(EmptyExec)"
-            ]
+            ["PeakMemory(7)", "PartialErr(node down)"]
         );
-    }
-
-    #[test]
-    fn test_profile_carries_this_node() {
-        let metrics = collect_metrics(&MetricsInfo {
-            plan: create_test_execution_plan(),
-            build_profile: test_profile,
-        });
-        assert_eq!(metrics.len(), 1);
-        assert!(!metrics[0].node_address.is_empty());
-        assert!(!metrics[0].node_name.is_empty());
-    }
-
-    #[test]
-    fn test_metrics_without_profile_deserializes() {
-        let json = r#"{"stage":1,"node_address":"a","node_name":"b","metrics":"m"}"#;
-        let metrics: Metrics = serde_json::from_str(json).unwrap();
-        assert!(metrics.profile.is_none());
-    }
-
-    #[test]
-    fn test_metrics_keeps_fields_older_leaders_require() {
-        let metrics = Metrics {
-            profile: Some(ProfileNode::default()),
-            ..Default::default()
-        };
-        let json = serde_json::to_value(&metrics).unwrap();
-        for key in ["stage", "node_address", "node_name", "metrics"] {
-            assert!(json.get(key).is_some(), "missing {key}");
-        }
     }
 
     #[test]
@@ -411,7 +325,6 @@ mod tests {
             node_address: "test_node".to_string(),
             node_name: "Test Node".to_string(),
             metrics: "test_metrics".to_string(),
-            profile: None,
         }];
         let custom_msg = CustomMessage::Metrics(metrics);
 

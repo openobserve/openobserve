@@ -24,7 +24,7 @@ use datafusion::physical_plan::{
     metrics::{MetricValue, MetricsSet},
 };
 use flight::{
-    common::{Metrics, NodeProfiles, RemoteScanMetrics, job_trace_id},
+    common::{NodeProfiles, RemoteScanMetrics, job_trace_id},
     profile::{
         MetricKind, NodeStatus, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile,
     },
@@ -34,7 +34,7 @@ use crate::datafusion::distributed::remote_scan::{
     flight_client::fetch_node_report, remote_scan_exec::RemoteScanExec,
 };
 
-/// How long a caller waits for the reports its remote nodes' streams did not deliver.
+/// How long a caller waits for its remote nodes' reports once its query has ended.
 pub const REMOTE_PROFILE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Keeps one remote call's entry in its scan's profiles current; the default records nothing.
@@ -54,16 +54,6 @@ impl NodeProfileRecorder {
         profiles.lock().insert(partition, profile);
         Self {
             entry: Some((profiles, partition)),
-        }
-    }
-
-    /// Keeps the plan the node sent back about itself.
-    pub fn record_plan(&self, metrics: Vec<Metrics>) {
-        if let Some(plan) = metrics.into_iter().find_map(|m| m.profile) {
-            self.update(|p| {
-                p.plan = Some(plan);
-                p.status = NodeStatus::Completed;
-            });
         }
     }
 
@@ -157,7 +147,8 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     }
 }
 
-/// Gives every partition of every remote scan in `plan` an entry and fetches the missing reports.
+/// Gives every partition of every remote scan in `plan` an entry and fetches the reports of the
+/// calls it sent.
 pub async fn complete_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duration) {
     let mut scans = Vec::new();
     collect_remote_scans(plan, &mut scans);
@@ -420,13 +411,6 @@ mod tests {
         recorder.mark_sent("j2".to_string());
         assert_eq!(status(&profiles), NodeStatus::EarlyStopped);
         assert_eq!(profiles.lock()[&2].job_id, "j2");
-        recorder.record_plan(vec![Metrics {
-            profile: Some(ProfileNode {
-                name: "FilterExec".to_string(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }]);
         for files in [2, 3] {
             recorder.add_scan_stats(&ScanStats {
                 files,
@@ -437,10 +421,8 @@ mod tests {
 
         let p = profiles.lock().get(&2).cloned().unwrap();
         assert_eq!(p.node_name, "q-0");
-        assert_eq!(p.status, NodeStatus::Completed);
         assert!(p.end_us >= p.start_us);
         assert_eq!(p.scan_stats.unwrap().files, 5);
-        assert_eq!(p.plan.unwrap().name, "FilterExec");
     }
 
     #[test]

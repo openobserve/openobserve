@@ -72,9 +72,8 @@ impl FlightDecoderStream {
                 self.query_context.scan_stats.lock().add(&stats);
                 self.query_context.node_profile.add_scan_stats(&stats);
             }
-            CustomMessage::Metrics(metrics) => {
-                self.query_context.node_profile.record_plan(metrics);
-            }
+            // Older nodes send their profile this way; the caller fetches it now.
+            CustomMessage::Metrics(_) => {}
             CustomMessage::PeakMemory(peak_memory) => {
                 self.query_context
                     .peak_memory

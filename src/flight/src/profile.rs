@@ -25,7 +25,8 @@
 //! A `RemoteNodeProfile` has two parts:
 //! - what the caller observed of that node: start and end time, rows, batches and bytes received
 //!   over Flight, decode time, and the node's scan stats;
-//! - `plan`: the plan the node actually ran, with its own metrics, sent back by the node itself.
+//! - `plan`: the plan the node actually ran, with its own metrics, fetched from the node after the
+//!   query.
 //!
 //! A caller lists only the nodes it called directly; deeper nodes nest inside
 //! `plan`. In a super cluster the cluster leader's plan has its own
