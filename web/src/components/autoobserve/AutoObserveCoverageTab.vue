@@ -604,7 +604,7 @@ const SEGMENT_CLASS: Record<CellState, string> = {
 const SWATCH: Record<HexClass, string> = {
   watched: "bg-badge-success-soft-text/15 border border-badge-success-soft-text/60",
   learning: "bg-badge-default-soft-bg border border-dashed border-status-neutral-text",
-  gap: "bg-status-warning-text",
+  gap: "bg-icon-chip-warning-text",
   none: "bg-status-neutral-text",
   s1: "bg-map-seq-1",
   s2: "bg-map-seq-2",
@@ -710,9 +710,9 @@ const watchedPct = computed(() =>
 );
 
 const split = computed(() => [
-  { cls: "bg-badge-success-soft-text/50", count: totals.value.fullyWatched },
+  { cls: "bg-badge-success-soft-text", count: totals.value.fullyWatched },
   { cls: "bg-status-neutral-text/60", count: totals.value.learning },
-  { cls: "bg-status-warning-text", count: totals.value.gaps },
+  { cls: "bg-icon-chip-warning-text", count: totals.value.gaps },
 ]);
 
 const summaryText = computed(() => {

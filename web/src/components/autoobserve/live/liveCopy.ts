@@ -383,9 +383,9 @@ export const liveCellWord = (
   added && state !== "covered" ? t("autoobserveLive.cell.added") : t(CELL_WORD[state]);
 
 export const LIVE_DOT: Record<LiveCellLook, string> = {
-  covered: "bg-status-positive",
-  missing: "border border-status-warning-text",
-  problem: "bg-status-warning-text",
+  covered: "bg-badge-success-soft-text",
+  missing: "border border-icon-chip-warning-text",
+  problem: "bg-icon-chip-warning-text",
   added: "bg-border-strong",
 };
 

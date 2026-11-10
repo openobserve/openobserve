@@ -55,8 +55,8 @@ export const CHART_SIGNALS: Signal[] = ["requests", "errors", "latency", "satura
 // One accent per metric, so the four charts and their tiles read apart at a glance.
 export const ACCENT: Record<Signal, `--${string}`> = {
   requests: "--color-chart-series-1",
-  errors: "--color-chart-series-8",
-  latency: "--color-chart-series-3",
+  errors: "--color-chart-series-5",
+  latency: "--color-chart-series-9",
   saturation: "--color-chart-series-5",
   logPatterns: "--color-chart-series-7",
   dependencies: "--color-chart-series-9",

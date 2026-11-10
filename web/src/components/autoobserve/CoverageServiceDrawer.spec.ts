@@ -179,6 +179,62 @@ describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)
   });
 });
 
+describe("CoverageServiceDrawer: the threshold line on a live chart (G7)", () => {
+  it("draws where the service's own latency alert fires", async () => {
+    api.listAlerts.mockResolvedValue({
+      data: {
+        list: [
+          {
+            alert_id: "checkout-p95-id",
+            folder_id: "default",
+            destinations: ["ops"],
+            stream_type: "traces",
+            condition: {
+              sql: `SELECT approx_percentile_cont("duration", 0.95) AS p95 FROM "app_traces" HAVING approx_percentile_cont("duration", 0.95) > 34000`,
+            },
+            trigger_condition: { period: 15 },
+          },
+        ],
+      },
+    });
+    api.correlate.mockResolvedValue({
+      data: {
+        service_name: "checkout",
+        related_streams: {
+          traces: [
+            {
+              stream_name: "app_traces",
+              stream_type: "traces",
+              filters: { service_name: "checkout" },
+            },
+          ],
+          logs: [],
+        },
+      },
+    });
+    api.getStream.mockResolvedValue({ schema: [{ name: "duration", type: "Int64" }] });
+    try {
+      const row = liveRow(
+        { errors: cell("none"), latency: cell("covered", "checkout-p95"), absence: cell("none") },
+        [{ type: "traces", name: "app_traces" }],
+      );
+      const wrapper = mountDrawer(row, "watched");
+      await flushPromises();
+      const latency = wrapper
+        .findAllComponents(ChartStub)
+        .find((c) => c.props("def").signal === "latency");
+      expect(latency?.props("def").threshold).toBe(34);
+    } finally {
+      api.listAlerts.mockReset();
+      api.correlate.mockReset();
+      api.getStream.mockReset();
+      api.fetch.mockReset();
+      const { resetCorrelationCache } = await import("./live/useServiceCharts");
+      resetCorrelationCache();
+    }
+  });
+});
+
 describe("CoverageServiceDrawer header for a logs-only service (T2-7)", () => {
   it("offers Open in Logs instead of Traces and the Service Catalog", () => {
     const row = liveRow({ errors: cell("none"), latency: cell("none"), absence: cell("none") }, [

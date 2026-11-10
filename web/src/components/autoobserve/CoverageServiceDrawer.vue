@@ -425,6 +425,7 @@ import {
   userTimeZone,
 } from "./live/liveCopy";
 import { liveMetricDef, type LiveChartSignal } from "./live/serviceChartSql";
+import { chartThreshold } from "./live/alertThreshold";
 import { useServiceCharts, type ServiceChartStatus } from "./live/useServiceCharts";
 import InsightBlock from "./insight/InsightBlock.vue";
 import { useInsightActions } from "./insight/useInsightActions";
@@ -492,9 +493,9 @@ const STATE_VARIANT: Record<ServiceState, BadgeVariant> = {
   gap: "warning-soft",
 };
 const STATE_FILL: Record<ServiceState, string> = {
-  watched: "fill-badge-success-soft-text dark:fill-status-positive",
+  watched: "fill-badge-success-soft-text",
   learning: "fill-status-info-text",
-  gap: "fill-status-warning-text",
+  gap: "fill-icon-chip-warning-text",
 };
 const CELL_LABEL: Record<CellState, I18nKey> = {
   watched: "autoobserve.coverage.watched",
@@ -507,9 +508,9 @@ const CELL_FILL: Record<CellState, string> = {
   na: "fill-transparent stroke-border-strong",
 };
 const DOT: Record<CellState, string> = {
-  watched: "bg-badge-success-soft-text dark:bg-status-positive",
+  watched: "bg-badge-success-soft-text",
   learning: "bg-status-info-text",
-  gap: "bg-status-warning-text",
+  gap: "bg-icon-chip-warning-text",
   na: "border border-border-strong",
 };
 
@@ -602,9 +603,12 @@ const charts = computed(() =>
     .map((def) => {
       const signal = def.signal as LiveChartSignal;
       const live = props.live ? serviceCharts.charts.value[signal] : null;
+      const cell = liveChecks.value?.[LIVE_CELL[signal]] ?? props.row.cells[def.signal];
       return {
-        def: live ? liveMetricDef(signal, live.unit) : def,
-        cell: liveChecks.value?.[LIVE_CELL[signal]] ?? props.row.cells[def.signal],
+        def: live
+          ? liveMetricDef(signal, live.unit, chartThreshold(signal, live.unit, cellAlerts(cell)))
+          : def,
+        cell,
         series: live ? live.series : seriesFor(props.scenario, props.row, def, range.value),
         live,
       };
@@ -784,11 +788,15 @@ const insightFor = (key: string, cell: CoverageCell) =>
         owned.value,
       )
     : null;
-// The latest firing of the cell's own alerts, from the alert list the drawer already read.
-const lastFiredOf = (cell: CoverageCell): I18nText | null => {
-  if (!props.live || !cell.engine) return null;
+// The cell's own alerts, from the alert list the drawer already read.
+function cellAlerts(cell: CoverageCell): OwnedAlert[] {
+  if (!props.live || !cell.engine) return [];
   const ids = new Set(cell.engine.monitors.filter((m) => m.kindKey === "alert").map((m) => m.id));
-  const mine = owned.value.filter((a) => a.id && ids.has(a.id));
+  return owned.value.filter((a) => a.id && ids.has(a.id));
+}
+
+const lastFiredOf = (cell: CoverageCell): I18nText | null => {
+  const mine = cellAlerts(cell);
   if (!mine.length) return null;
   const at = Math.max(0, ...mine.map((a) => a.last_triggered_at ?? 0));
   if (!at) return t("autoobserve.coverage.never");

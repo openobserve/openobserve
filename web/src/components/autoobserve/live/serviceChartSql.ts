@@ -230,10 +230,15 @@ export const noFacts = (missingField: string | null = null): ServiceChartFacts =
   missingField,
 });
 
-export const liveMetricDef = (signal: LiveChartSignal, unit: MetricUnit): MetricDef => ({
+export const liveMetricDef = (
+  signal: LiveChartSignal,
+  unit: MetricUnit,
+  threshold: number | null = null,
+): MetricDef => ({
   signal,
   titleKey: SIGNAL_LABEL[signal],
   unit,
   base: 0,
   spread: 0,
+  ...(threshold !== null ? { threshold } : {}),
 });

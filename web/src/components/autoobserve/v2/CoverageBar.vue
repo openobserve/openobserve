@@ -69,7 +69,7 @@ const shown = computed(() =>
     {
       key: props.live ? "watched" : "watching",
       count: props.watching,
-      color: "bg-status-positive",
+      color: "bg-badge-success-soft-text",
       filter: "watching" as const,
       label: props.live
         ? coverageWord(t, "watched")
@@ -85,7 +85,7 @@ const shown = computed(() =>
     {
       key: props.live ? "gap" : "unseen",
       count: props.gaps,
-      color: "bg-status-warning-text",
+      color: "bg-icon-chip-warning-text",
       filter: "attention" as const,
       label: props.live ? coverageWord(t, "gap") : t("autoobserve2.coverageDrawer.legend.unseen"),
     },
