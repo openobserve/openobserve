@@ -6664,8 +6664,7 @@
     },
     "firstSource": {
       "yourPick": "Your pick",
-      "recommended": "Recommended",
-      "categories": "Categories"
+      "recommended": "Recommended"
     },
     "webServerGuide": {
       "installTitle": "Install Fluent Bit on the {server} host",

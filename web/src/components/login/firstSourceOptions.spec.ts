@@ -64,6 +64,12 @@ describe("firstSourceOptions", () => {
       ]);
     });
 
+    it("points llm and agent at their AI integrations category", () => {
+      const cat = (id: string) => FIRST_SOURCE_OPTIONS.find((o) => o.id === id)?.aiCategory;
+      expect(cat("llm")).toBe("model-providers");
+      expect(cat("agent")).toBe("frameworks");
+    });
+
     it("gives each option an English label in en-US.json", () => {
       expect(FIRST_SOURCE_OPTIONS.map((o) => lookup(o.labelKey))).toEqual([
         "Kubernetes",

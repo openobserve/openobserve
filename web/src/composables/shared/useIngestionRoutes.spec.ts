@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi } from "vitest";
-import useIngestionRoutes from "./useIngestionRoutes";
+import useIngestionRoutes, { aiLandingRouteName } from "./useIngestionRoutes";
 
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -115,10 +115,30 @@ vi.mock("@/components/ingestion/ai/AIIntegrationDetail.vue", () => ({ default: {
 vi.mock("@/components/ingestion/ai/data", () => ({
   aiCategories: [
     {
+      slug: "popular",
+      name: "Popular",
+      integrations: [
+        {
+          slug: "openai",
+          name: "OpenAI",
+          routeName: "ai-popular-openai",
+          docURL: "",
+          keywords: [],
+        },
+      ],
+    },
+    {
       slug: "frameworks",
       name: "AI Frameworks & Agents",
       integrations: [
         { slug: "agno", name: "Agno", routeName: "ai-agno", docURL: "", keywords: [] },
+      ],
+    },
+    {
+      slug: "model-providers",
+      name: "Model Providers",
+      integrations: [
+        { slug: "groq", name: "Groq", routeName: "ai-groq", docURL: "", keywords: [] },
       ],
     },
   ],
@@ -690,6 +710,16 @@ describe("useIngestionRoutes", () => {
       expect(aiRoute.component).toBeDefined();
       expect(typeof aiRoute.beforeEnter).toBe("function");
       expect(Array.isArray(aiRoute.children)).toBe(true);
+    });
+
+    it("lands on the category of the stored first-source pick", () => {
+      const key = "o2.onboarding.firstSource.acme";
+      expect(aiLandingRouteName("acme")).toBe("ai-popular-openai");
+      window.localStorage.setItem(key, "agent");
+      expect(aiLandingRouteName("acme")).toBe("ai-agno");
+      window.localStorage.setItem(key, "llm");
+      expect(aiLandingRouteName("acme")).toBe("ai-groq");
+      window.localStorage.removeItem(key);
     });
 
     it("should have ai integration child routes", () => {
