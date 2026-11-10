@@ -31,11 +31,17 @@ const api = vi.hoisted(() => ({
   fetch: vi.fn(),
   getLocations: vi.fn(),
   listAlerts: vi.fn(),
+  schema: vi.fn(),
+  push: vi.fn(),
+}));
+
+vi.mock("@/services/stream", () => ({
+  default: { schema: (...args: unknown[]) => api.schema(...args) },
 }));
 
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: api.push }),
 }));
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   default: { name: "ChartRenderer", template: "<div />" },
@@ -60,7 +66,11 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 }));
 
 const DrawerStub = { template: "<div><slot name='header' /><slot /></div>" };
-const ChartStub = { name: "CoverageMetricChart", props: ["def", "cell"], template: "<div />" };
+const ChartStub = {
+  name: "CoverageMetricChart",
+  props: ["def", "cell", "added"],
+  template: "<div />",
+};
 
 const monitor = (name: string) => ({
   monitor_kind: "alert",
@@ -140,7 +150,21 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
       const found = chips(mountDrawer(row, "gap"));
       expect(found[0].text()).toBe("Errors: Added");
       expect(found[0].find("span").classes().join(" ")).toContain(LIVE_DOT.added);
-      expect(found[1].text()).toBe("Latency: Not watched");
+      expect(found[1].text()).toBe("Latency: Coverage gap");
+      const wrapper = mountDrawer(row, "gap");
+      const lines = wrapper
+        .findAll('[data-test="autoobserve-coverage-drawer-gap-line"]')
+        .map((l) => l.text());
+      expect(lines.join(" ")).not.toContain("its errors,");
+      expect(lines).toContain(
+        "Added an alert for its errors. AutoObserve counts it at its next check.",
+      );
+      const added = Object.fromEntries(
+        wrapper
+          .findAllComponents(ChartStub)
+          .map((c) => [c.props("def").signal, !!c.props("added")]),
+      );
+      expect(added).toEqual({ requests: false, errors: true, latency: false });
     } finally {
       recently.clearOnPass(Number.MAX_SAFE_INTEGER);
     }
@@ -148,6 +172,39 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
 });
 
 describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)", () => {
+  it("shows no 'Last fired' for an alert that has only been evaluated, never fired (T2-N2)", async () => {
+    api.listAlerts.mockResolvedValue({
+      data: {
+        list: [
+          {
+            alert_id: "checkout-errors-id",
+            folder_id: "default",
+            destinations: [],
+            last_triggered_at: (Date.now() - 3 * 60_000) * 1000,
+            last_satisfied_at: null,
+          },
+        ],
+      },
+    });
+    try {
+      const row = liveRow({
+        errors: cell("none"),
+        latency: cell("none"),
+        absence: cell("covered", "checkout-errors"),
+      });
+      const wrapper = mountDrawer(row, "watched", true, "absence");
+      await flushPromises();
+      const detail = wrapper
+        .findAllComponents({ name: "CoverageSignalDetail" })
+        .find((c) => c.props("signal") === "absence");
+      expect(detail?.props("lastFired")).toBeNull();
+      expect(detail?.find('[data-test="autoobserve-coverage-detail-last-fired"]').exists()).toBe(
+        false,
+      );
+    } finally {
+      api.listAlerts.mockReset();
+    }
+  });
   it("reads it from the service's own alerts instead of 'Not available'", async () => {
     api.listAlerts.mockResolvedValue({
       data: {
@@ -156,7 +213,8 @@ describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)
             alert_id: "checkout-errors-id",
             folder_id: "default",
             destinations: [],
-            last_triggered_at: (Date.now() - 2 * 60 * 60_000) * 1000,
+            last_triggered_at: (Date.now() - 60_000) * 1000,
+            last_satisfied_at: (Date.now() - 2 * 60 * 60_000) * 1000,
           },
         ],
       },
@@ -263,20 +321,20 @@ describe("CoverageServiceDrawer in live mode", () => {
       "autoobserve-coverage-drawer-chip-absence",
     ]);
     expect(found.map((c) => c.text())).toEqual([
-      "Errors: Not watched",
-      "Latency: Silent",
-      "Stops sending: Covered",
+      "Errors: Coverage gap",
+      "Latency: Coverage gap",
+      "Stops sending: Watched",
     ]);
     const dot = (i: number) => found[i].find("span").classes().join(" ");
-    expect(dot(0)).toContain(LIVE_DOT.missing);
-    expect(dot(1)).toContain(LIVE_DOT.problem);
+    expect(dot(0)).toContain(LIVE_DOT.gap);
+    expect(dot(1)).toContain(LIVE_DOT.gap);
     expect(dot(2)).toContain(LIVE_DOT.covered);
     const charts = wrapper.findAllComponents(ChartStub).map((c) => c.props("def").signal);
     expect(charts).toEqual(["requests", "errors", "latency"]);
     const other = wrapper.find('[data-test="autoobserve-coverage-drawer-extra"]').text();
     expect(other).toContain("Saturation");
     expect(other).not.toContain("Stops sending");
-    expect(other).toContain("Not watched");
+    expect(other).toContain("Coverage gap");
     expect(other).not.toMatch(/\bNone\b/);
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-logs"]').exists()).toBe(false);
   });
@@ -647,5 +705,58 @@ describe("CoverageServiceDrawer synthetic check inputs (F6)", () => {
     const prefill = detail.props("insight").cta.target.prefill;
     expect(prefill.folder).toBe("f-pay");
     expect(prefill.destinations).toEqual(["pay-slack"]);
+  });
+});
+
+describe("CoverageServiceDrawer gap CTA counts what it can build (T2-11)", () => {
+  it("offers one Add alert when the stream has no field to count errors by", async () => {
+    const enterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    onTestFinished(() => {
+      config.isEnterprise = enterprise;
+      api.schema.mockReset();
+    });
+    api.schema.mockResolvedValue({
+      data: {
+        schema: [
+          { name: "service_name" },
+          { name: "k8s_cluster" },
+          { name: "k8s_namespace_name" },
+          { name: "body" },
+        ],
+      },
+    });
+    const row = liveRow(
+      { errors: cell("none"), latency: cell("covered", "checkout-p95"), absence: cell("none") },
+      [{ type: "logs", name: "checkout_logs" }],
+    );
+    const wrapper = mountDrawer(row, "gap");
+    await flushPromises();
+    const cta = wrapper.find(
+      '[data-test="autoobserve-coverage-drawer-gap-actions"] [data-test$="-cta"]',
+    );
+    expect(cta.text()).toBe("Add alert");
+  });
+});
+
+describe("CoverageServiceDrawer Service Catalog link (T2-7)", () => {
+  it("opens the catalog filtered to the service", async () => {
+    api.push.mockReset();
+    const row = liveRow(
+      {
+        errors: cell("covered", "e"),
+        latency: cell("covered", "l"),
+        absence: cell("covered", "a"),
+      },
+      [{ type: "traces", name: "default" }],
+    );
+    const wrapper = mountDrawer(row, "watched");
+    await wrapper.find('[data-test="autoobserve-coverage-drawer-catalog"]').trigger("click");
+    expect(api.push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "traces",
+        query: expect.objectContaining({ tab: "services-catalog", service: "checkout" }),
+      }),
+    );
   });
 });

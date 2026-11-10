@@ -45,6 +45,8 @@ const SOURCE_MINUTES = 60;
 
 export interface ServiceScope {
   service: string;
+  /** How the coverage page names this service, such as "svc-b · no namespace"; the bare name when absent. */
+  label?: string;
   cluster: string | null;
   namespace: string | null;
   stream: { type: string; name: string };

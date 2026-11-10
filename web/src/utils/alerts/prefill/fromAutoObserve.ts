@@ -99,6 +99,8 @@ export type NotifyPick =
 
 export interface ServiceScope {
   service: string;
+  /** How the coverage page names this service, such as "svc-b · no namespace"; the bare name when absent. */
+  label?: string;
   cluster: string | null;
   namespace: string | null;
   stream: { type: string; name: string };
@@ -215,6 +217,10 @@ const serviceScope = (s: ServiceScope, serviceFields = SERVICE_FIELDS): Scope =>
     [s.cluster, scopeFieldsOf(s.stream?.type).cluster, "autoobserve.noClusterField"],
     [s.namespace, scopeFieldsOf(s.stream?.type).namespace, "autoobserve.noNamespaceField"],
   ];
+  const emptyNs =
+    !s.namespace && s.schema ? pickField(scopeFieldsOf(s.stream?.type).namespace, s.schema) : null;
+  // Same pair as the charts; without it the no-namespace entity's alert watches every namespace's rows.
+  if (emptyNs) where.push(`(${sqlField(emptyNs)} IS NULL OR ${sqlField(emptyNs)} = '')`);
   for (const [value, candidates, missing] of extra) {
     if (!value) continue;
     // Without the schema a guessed cluster field could match nothing, which a no-data alert reads as an outage.
@@ -262,7 +268,7 @@ const nameOf = (
   );
 
 const assemble = (
-  label: { service: string; cluster?: string | null; namespace?: string | null },
+  label: { service: string; label?: string; cluster?: string | null; namespace?: string | null },
   stream: { type: string; name: string },
   shape: Shape,
   o: AutoObserveAlertOptions,
@@ -274,7 +280,9 @@ const assemble = (
   return {
     version: ALERT_PREFILL_VERSION,
     source: AUTOOBSERVE_SOURCE,
-    sourceLabel: gt("alerts.prefill.sources.autoobserve.sourceLabel", { service: label.service }),
+    sourceLabel: gt("alerts.prefill.sources.autoobserve.sourceLabel", {
+      service: label.label || label.service,
+    }),
     name: nameOf(label, shape.kind),
     streamType: stream?.type || "logs",
     streamName: stream?.name?.trim() ?? "",

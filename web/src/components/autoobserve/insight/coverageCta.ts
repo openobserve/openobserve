@@ -31,7 +31,13 @@ import {
 import { syntheticPrefillFor } from "@/utils/synthetics/syntheticPrefill";
 import type { CoverageCell, CoverageRow, LiveCheck } from "../fixtures";
 import type { SyntheticsLocation } from "@/types/synthetics";
-import type { BulkKind, BulkRow } from "./bulk/useBulkReview";
+import {
+  cantBuild,
+  readStreamFields,
+  type BulkKind,
+  type BulkRow,
+  type StreamFields,
+} from "./bulk/useBulkReview";
 import { KIND_OF_CHECK, serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import { draftTarget, type AlertDraft } from "./targets/alertDraft";
 import type { ServiceAddress } from "./targets/serviceAddress";
@@ -77,6 +83,7 @@ const nameOf = (row: CoverageRow) => row.identity?.serviceName ?? row.service;
 
 const scopeOf = (row: CoverageRow, stream: Stream): ServiceScope => ({
   service: nameOf(row),
+  label: row.service,
   cluster: row.identity?.cluster ?? null,
   namespace: row.identity?.namespace ?? null,
   stream,
@@ -211,6 +218,23 @@ const partsOf = (
   ai: enterprise() ? (copy.ai ?? null) : null,
 });
 
+/** The drafts the service's stream fields rule out, read before the gap card counts them. */
+export const cantBuildKinds = async (
+  org: string,
+  row: CoverageRow,
+  read: (org: string, stream: Stream) => Promise<StreamFields | null> = readStreamFields,
+): Promise<Set<BulkKind>> => {
+  if (!row.checks) return new Set();
+  const kinds = draftsOf(row, row.checks, org);
+  const ruled = await Promise.all(
+    kinds.map(async (kind) => {
+      const draft = bulkRowOf(row, kind, []);
+      return cantBuild(draft, await read(org, draft.scope.stream)) ? kind : null;
+    }),
+  );
+  return new Set(ruled.filter((kind): kind is BulkKind => kind !== null));
+};
+
 /** The Signals watched card's one action row: every draftable gap of the service in one list, plus Ask AI. */
 export const gapInsight = (
   t: TranslateFn,
@@ -218,11 +242,12 @@ export const gapInsight = (
   row: CoverageRow,
   owned: OwnedAlert[] = [],
   org: string = "",
+  cant: ReadonlySet<BulkKind> = new Set(),
 ): InsightParts | null => {
   const checks = row.checks;
   if (!checks) return null;
   const own = ownership(nameOf(row), owned);
-  const kinds = draftsOf(row, checks, org);
+  const kinds = draftsOf(row, checks, org).filter((kind) => !cant.has(kind));
   const one =
     kinds.length === 1 && kinds[0] === "no_data"
       ? addAlert(t, scopeOf(row, rowStream(row)!), (s) => noDataAlert(s, own), own.team.folderId)
@@ -256,7 +281,7 @@ export const gapInsight = (
       raw(
         `${t("insight.ai.coverage_gap.ask", { service: raw(nameOf(row)), classes })} ${t("insight.ai.coverage_gap.draft")}`,
       ),
-      [["Not watched", missing.join(", ")]],
+      [["Coverage gap", missing.join(", ")]],
     ),
   });
 };

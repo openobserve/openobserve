@@ -306,7 +306,7 @@ const gapCopy = (
       ),
       facts: [
         ["Service", service],
-        ["Not watched", missing.join(", ")],
+        ["Coverage gap", missing.join(", ")],
         ...(traffic !== null
           ? ([["Events an hour", String(Math.round(traffic))]] as [string, string][])
           : []),

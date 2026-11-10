@@ -109,7 +109,7 @@ describe("toSuggestionRows (the all-suggestions drawer)", () => {
     expect(rows.map((r) => r.id)).toEqual(["a", "b"]);
     expect(rows[0]).toMatchObject({
       where: "prod-eu / billing",
-      kind: "Not watched",
+      kind: "Coverage gap",
       kindVariant: "amber-soft",
       severity: { label: "High", variant: "warning-soft" },
     });

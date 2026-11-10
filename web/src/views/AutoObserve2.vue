@@ -171,15 +171,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex min-w-0 flex-col gap-1.5">
               <p
                 class="text-text-body max-w-[70ch] text-sm leading-relaxed text-pretty"
-                :class="live ? 'min-h-6' : ''"
+                :class="live ? 'min-h-11.5' : ''"
                 data-test="autoobserve2-coverage-sentence"
               >
-                <OSkeleton
-                  v-if="live && liveData.coverageSkeleton.value"
-                  animation="none"
-                  class="mt-1 h-4 w-80 max-w-full"
-                  data-test="autoobserve2-coverage-sentence-skeleton"
-                />
+                <template v-if="live && liveData.coverageSkeleton.value">
+                  <OSkeleton
+                    v-for="w in ['w-full', 'w-3/5']"
+                    :key="w"
+                    animation="none"
+                    class="my-1 h-4 max-w-full"
+                    :class="w"
+                    data-test="autoobserve2-coverage-sentence-skeleton"
+                  />
+                </template>
                 <template v-else>{{ coverageSentence }}</template>
               </p>
             </div>
@@ -229,6 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source="live ? liveData.source.value : undefined"
             :skeleton="live && liveData.coverageSkeleton.value"
             explain
+            header-bar
             @how-it-works="howOpen = true"
           />
         </div>

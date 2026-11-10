@@ -417,45 +417,32 @@ const COVERAGE_WORD: Record<LiveCoverageState, I18nKey> = {
 export const coverageWord = (t: TranslateFn, state: LiveCoverageState): I18nText =>
   t(COVERAGE_WORD[state]);
 
-export type LiveCellLook = "covered" | "missing" | "problem" | "added";
-
-const CELL_WORD: Record<AutoObserveCellState, I18nKey> = {
-  covered: "autoobserveLive.states.covered",
-  weak: "autoobserveLive.states.weak",
-  silent: "autoobserveLive.states.silent",
-  blind: "autoobserveLive.states.blind",
-  unmapped: "autoobserveLive.states.unmapped",
-  none: "autoobserveLive.cell.noMonitor",
-};
+export type LiveCellLook = "covered" | "gap" | "added";
 
 /** A check this page just added an alert for reads "Added" until a pass counts it. */
 export const liveCellLook = (state: AutoObserveCellState, added = false): LiveCellLook => {
   if (added && state !== "covered") return "added";
-  if (state === "covered") return "covered";
-  return state === "none" ? "missing" : "problem";
+  return state === "covered" ? "covered" : "gap";
 };
 
+export const LIVE_DOT: Record<LiveCellLook, string> = {
+  covered: "bg-badge-success-soft-text",
+  gap: "bg-badge-amber-soft-text",
+  added: "bg-border-strong",
+};
+
+const LOOK_WORD: Record<LiveCellLook, I18nKey> = {
+  covered: "autoobserveLive.coverage.stateWatched",
+  gap: "autoobserveLive.coverage.stateGap",
+  added: "autoobserveLive.cell.added",
+};
+
+// A check is Watched or has a Coverage gap; why it has one is the detail's job, not the chip's.
 export const liveCellWord = (
   t: TranslateFn,
   state: AutoObserveCellState,
   added = false,
-): I18nText =>
-  added && state !== "covered" ? t("autoobserveLive.cell.added") : t(CELL_WORD[state]);
-
-export const LIVE_DOT: Record<LiveCellLook, string> = {
-  covered: "bg-badge-success-soft-text",
-  missing: "border border-badge-amber-soft-text",
-  problem: "bg-badge-amber-soft-text",
-  added: "bg-border-strong",
-};
-
-// Weak, Silent, Blind and Unmapped share one amber dot, so a key names that dot with one word.
-const LOOK_WORD: Record<LiveCellLook, I18nKey> = {
-  covered: "autoobserveLive.states.covered",
-  missing: "autoobserveLive.cell.noMonitor",
-  problem: "autoobserveLive.cell.fallsShort",
-  added: "autoobserveLive.cell.added",
-};
+): I18nText => t(LOOK_WORD[liveCellLook(state, added)]);
 
 export const liveLookWord = (t: TranslateFn, look: LiveCellLook): I18nText => t(LOOK_WORD[look]);
 
@@ -493,17 +480,34 @@ export const liveGapLines = (
   t: TranslateFn,
   locale: string,
   checks: Record<LiveCheck, CoverageCell>,
+  added: ReadonlySet<LiveCheck> = new Set(),
 ): I18nText[] => {
   const stateOf = (check: LiveCheck) => checks[check].engine?.stateKey ?? "none";
-  const lines = LIVE_CHECKS.filter((c) => stateOf(c) !== "none" && stateOf(c) !== "covered").map(
-    (c) => checks[c].reason ?? liveCellWord(t, stateOf(c)),
-  );
-  const missing = LIVE_CHECKS.filter((c) => stateOf(c) === "none").map((c) => t(CHECK_INLINE[c]));
+  const open = LIVE_CHECKS.filter((c) => stateOf(c) !== "covered" && !added.has(c));
+  const lines = open
+    .filter((c) => stateOf(c) !== "none")
+    .map((c) => checks[c].reason ?? liveCellWord(t, stateOf(c)));
+  const missing = open.filter((c) => stateOf(c) === "none").map((c) => t(CHECK_INLINE[c]));
   if (missing.length)
     lines.push(
       t("autoobserveLive.coverage.gapNone", {
         checks: raw(new Intl.ListFormat(locale, { type: "disjunction" }).format(missing)),
       }),
+    );
+  const justAdded = LIVE_CHECKS.filter((c) => stateOf(c) !== "covered" && added.has(c));
+  if (justAdded.length)
+    lines.push(
+      t(
+        "autoobserveLive.coverage.gapAdded",
+        {
+          checks: raw(
+            new Intl.ListFormat(locale, { type: "conjunction" }).format(
+              justAdded.map((c) => t(CHECK_INLINE[c])),
+            ),
+          ),
+        },
+        justAdded.length,
+      ),
     );
   return lines;
 };

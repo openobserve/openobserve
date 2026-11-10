@@ -29771,7 +29771,7 @@
       "rangeLabel": "Time range",
       "logPatternsValue": "{known} known · {fresh} new today",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "Not watched",
+      "badgeNotWatched": "Coverage gap",
       "signalsWatched": "Signals watched",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Up {change} since the start of the range",

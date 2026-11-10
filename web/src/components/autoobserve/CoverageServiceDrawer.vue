@@ -141,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="liveChecks && absenceOpen"
           :cell="liveChecks.absence"
           :last-fired="lastFiredOf(liveChecks.absence)"
+          :added="addedChecks.has('absence')"
           :service="row.service"
           signal="absence"
           :ledger="ledger"
@@ -266,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :detail="chart.live?.detail ?? undefined"
               :partial="chart.live?.partial"
               :wide="chart.live?.wide"
+              :added="addedChecks.has(LIVE_CELL[chart.def.signal as LiveChartSignal])"
               @toggle="toggle(chart.def.signal)"
               @retry="chart.live?.retry()"
             >
@@ -275,6 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="sm:hidden"
                 :cell="chart.cell"
                 :last-fired="lastFiredOf(chart.cell)"
+                :added="addedChecks.has(LIVE_CELL[chart.def.signal as LiveChartSignal])"
                 :service="row.service"
                 :signal="chart.def.signal"
                 :ledger="ledger"
@@ -291,6 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <CoverageSignalDetail
                 :cell="openChart.cell"
                 :last-fired="lastFiredOf(openChart.cell)"
+                :added="addedChecks.has(LIVE_CELL[openChart.def.signal as LiveChartSignal])"
                 :service="row.service"
                 :signal="openChart.def.signal"
                 :ledger="ledger"
@@ -434,6 +438,7 @@ import { useServiceCharts, type ServiceChartStatus } from "./live/useServiceChar
 import InsightBlock from "./insight/InsightBlock.vue";
 import { useInsightActions } from "./insight/useInsightActions";
 import {
+  cantBuildKinds,
   cellInsight,
   gapInsight,
   justAdded,
@@ -443,6 +448,7 @@ import {
 } from "./insight/coverageCta";
 import { useServiceAddress } from "./insight/targets/serviceAddress";
 import { loadOwnedAlerts, type OwnedAlert } from "./insight/targets/ownership";
+import type { BulkKind } from "./insight/bulk/useBulkReview";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsLocation } from "@/types/synthetics";
 
@@ -622,7 +628,7 @@ const charts = computed(() =>
 
 const gapLines = computed<I18nText[]>(() => {
   if (state.value !== "gap") return [];
-  if (liveChecks.value) return liveGapLines(t, locale.value, liveChecks.value);
+  if (liveChecks.value) return liveGapLines(t, locale.value, liveChecks.value, addedChecks.value);
   const reason = SIGNALS.map((s) => props.row.cells[s]).find((c) => c.state === "gap")?.reason;
   return reason ? [reason] : [];
 });
@@ -667,11 +673,22 @@ const chips = computed(() => {
   });
 });
 
+// Checks this page just added alerts for; they read Added until a newer pass counts them.
+const addedChecks = computed(
+  () =>
+    new Set(
+      props.live
+        ? LIVE_CHECKS.filter((check) =>
+            justAdded(String(store.state.selectedOrganization?.identifier ?? ""), props.row, check),
+          )
+        : [],
+    ),
+);
+
 const liveChips = computed(() =>
   LIVE_CHECKS.map((check) => {
     const stateKey = liveChecks.value?.[check].engine?.stateKey ?? "none";
-    const org = String(store.state.selectedOrganization?.identifier ?? "");
-    const added = !!props.live && justAdded(org, props.row, check);
+    const added = addedChecks.value.has(check);
     return {
       check,
       look: liveCellLook(stateKey, added),
@@ -721,7 +738,7 @@ const logsOnly = computed(
     !props.row.identity.streams.some((s) => s.type === "traces"),
 );
 
-// Open in Traces (or Logs) lands on the scope the charts read; the catalog stays plain navigation (CTA-MAP §2).
+// Open in Traces (or Logs) lands on the scope the charts read; the catalog opens filtered to the service.
 const openTraces = (tab?: string) => {
   const org = store.state.selectedOrganization?.identifier;
   const to =
@@ -737,7 +754,15 @@ const openTraces = (tab?: string) => {
     void router.push(to);
     return;
   }
-  void router.push({ name: "traces", query: { org_identifier: org, ...(tab ? { tab } : {}) } });
+  const service = props.row.identity?.serviceName;
+  void router.push({
+    name: "traces",
+    query: {
+      org_identifier: org,
+      ...(tab ? { tab } : {}),
+      ...(tab === "services-catalog" && service ? { service } : {}),
+    },
+  });
 };
 
 const { run, pendingId } = useInsightActions();
@@ -758,9 +783,24 @@ watch(
   },
   { immediate: true },
 );
+// The CTA counts only drafts the stream fields allow, so it never promises a list of alerts it can't build.
+const cant = shallowRef<Set<BulkKind>>(new Set());
+const cantKey = computed(() =>
+  props.live && state.value === "gap" ? `${orgId.value}|${props.row.service}` : "",
+);
+watch(
+  cantKey,
+  async (key) => {
+    cant.value = new Set();
+    if (!key) return;
+    const found = await cantBuildKinds(orgId.value, props.row);
+    if (key === cantKey.value) cant.value = found;
+  },
+  { immediate: true },
+);
 const gapParts = computed(() =>
   props.live && state.value === "gap"
-    ? gapInsight(t, locale.value, props.row, owned.value, orgId.value)
+    ? gapInsight(t, locale.value, props.row, owned.value, orgId.value, cant.value)
     : null,
 );
 // The address query and the locations read run only once Synthetic check is open, not per drawer.
@@ -799,11 +839,10 @@ function cellAlerts(cell: CoverageCell): OwnedAlert[] {
   return owned.value.filter((a) => a.id && ids.has(a.id));
 }
 
+// last_triggered_at moves on every evaluation; last_satisfied_at moves only when the alert fires.
 const lastFiredOf = (cell: CoverageCell): I18nText | null => {
-  const mine = cellAlerts(cell);
-  if (!mine.length) return null;
-  const at = Math.max(0, ...mine.map((a) => a.last_triggered_at ?? 0));
-  if (!at) return t("autoobserve.coverage.never");
+  const at = Math.max(0, ...cellAlerts(cell).map((a) => a.last_satisfied_at ?? 0));
+  if (!at) return null;
   return agoText(t, locale.value, Math.max(0, Math.floor((Date.now() - at / 1000) / 60_000)));
 };
 const chartInsight = (signal: Signal, cell: CoverageCell) =>

@@ -23,7 +23,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
-const { BASELINE_LOOKBACK_US, measureBaseline } = await import("./baseline");
+const { BASELINE_LOOKBACK_US, forgetBaselines, measureBaseline } = await import("./baseline");
 const { b64DecodeUnicode } = await import("@/utils/zincutils");
 
 const ERRORS = {
@@ -50,6 +50,28 @@ const answer = (...chunks: { hits: Record<string, unknown>[]; aggs?: boolean }[]
 beforeEach(() => {
   api.fetch.mockReset();
   api.cancel.mockReset();
+  forgetBaselines();
+});
+
+describe("measureBaseline: one usual level per check (T2-N3)", () => {
+  it("gives the Add alert dialog and the review list the same p95, measured once", async () => {
+    answer({ hits: [{ p95_ms: 119, requests: 900 }] });
+    expect(await measureBaseline("demo-org", LATENCY)).toBe(119);
+    answer({ hits: [{ p95_ms: 115, requests: 900 }] });
+    expect(await measureBaseline("demo-org", LATENCY)).toBe(119);
+    expect(api.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("measures again for another org, and after a failed read", async () => {
+    answer({ hits: [{ p95_ms: 119, requests: 900 }] });
+    await measureBaseline("demo-org", LATENCY);
+    answer({ hits: [{ p95_ms: 80, requests: 900 }] });
+    expect(await measureBaseline("other-org", LATENCY)).toBe(80);
+    api.fetch.mockImplementation((_req: unknown, handlers: any) => handlers.error());
+    expect(await measureBaseline("third-org", LATENCY)).toBeNull();
+    answer({ hits: [{ p95_ms: 90, requests: 900 }] });
+    expect(await measureBaseline("third-org", LATENCY)).toBe(90);
+  });
 });
 
 describe("measureBaseline (F1)", () => {
@@ -97,6 +119,7 @@ describe("measureBaseline (F1)", () => {
   it("reads the usual p95 in milliseconds, only over enough requests", async () => {
     answer({ hits: [{ p95_ms: 250, requests: 900 }] });
     expect(await measureBaseline("demo-org", LATENCY)).toBe(250);
+    forgetBaselines();
     answer({ hits: [{ p95_ms: 250, requests: 5 }] });
     expect(await measureBaseline("demo-org", LATENCY)).toBeNull();
   });

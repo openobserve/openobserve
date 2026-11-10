@@ -191,6 +191,8 @@ const props = defineProps<{
   detail?: I18nText;
   partial?: boolean;
   wide?: boolean;
+  /** An alert for this check was just added and waits for the next pass to count it. */
+  added?: boolean;
 }>();
 
 const emit = defineEmits<{ toggle: []; retry: [] }>();
@@ -250,6 +252,12 @@ const plain = (v: number) => formatValue({ ...props.def, max: undefined }, v);
 
 const badge = computed<{ icon: IconName; label: I18nText; tone: string }>(() => {
   const [days, total] = props.cell.progress ?? [0, 0];
+  if (props.cell.state === "gap" && props.added)
+    return {
+      icon: "hourglass-empty",
+      label: t("autoobserveLive.cell.added"),
+      tone: "text-text-secondary",
+    };
   if (props.cell.state === "gap")
     return {
       icon: "warning-amber",
@@ -317,8 +325,11 @@ const fmtTime = (ms: number) =>
     minute: "2-digit",
   });
 
+// Rates under 1 keep two significant digits, or nice ticks such as 0.02 and 0.04 both read "0".
 const compact = (v: number) =>
-  v.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 1 });
+  Math.abs(v) < 1 && v !== 0
+    ? v.toLocaleString(undefined, { maximumSignificantDigits: 2 })
+    : v.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 1 });
 
 const outside = computed(() => {
   const { points, band } = props.series;
@@ -346,9 +357,11 @@ const options = computed(() => {
           symbol: "none",
           lineStyle: { type: "dashed", color: warning, width: 1 },
           label: {
-            position: "insideEndTop",
+            position: "insideStartTop",
             color: warning,
             fontSize: 10,
+            backgroundColor: surface,
+            padding: [1, 3],
             formatter: () => plain(def.threshold ?? 0),
           },
           data: [{ yAxis: def.threshold }],
@@ -468,6 +481,8 @@ const options = computed(() => {
           distance: 4,
           color: text,
           fontSize: 10,
+          backgroundColor: surface,
+          padding: [1, 3],
           formatter: () => t("autoobserve.coverage.now"),
         },
       },

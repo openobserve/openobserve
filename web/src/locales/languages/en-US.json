@@ -30418,7 +30418,7 @@
       "rangeLabel": "Time range",
       "logPatternsValue": "{known} known · {fresh} new today",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "Not watched",
+      "badgeNotWatched": "Coverage gap",
       "signalsWatched": "Signals watched",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Up {change} since the start of the range",
@@ -30643,7 +30643,7 @@
       "node": "node health"
     },
     "states": {
-      "covered": "Covered",
+      "covered": "Watched",
       "weak": "Weak",
       "silent": "Silent",
       "blind": "Blind",
@@ -30675,6 +30675,7 @@
         "gaps": "{count} has a coverage gap. | {count} have a coverage gap.",
         "mixed": "{watching} {gaps}"
       },
+      "gapAdded": "Added an alert for {checks}. AutoObserve counts it at its next check. | Added alerts for {checks}. AutoObserve counts them at its next check.",
       "gapNone": "No alert watches {checks}",
       "searchPlaceholder": "Search service, cluster or namespace",
       "labelNamespace": "{name} · {namespace}",
@@ -30692,7 +30693,6 @@
     "cell": {
       "noClass": "AutoObserve doesn't check this signal yet",
       "tipNoClass": "{signal}: AutoObserve doesn't check this yet",
-      "noMonitor": "Not watched",
       "gap": {
         "weak": "{signal}: only {monitor}, a broad alert, may notice a problem; it isn't scoped to this service | {signal}: only {monitor}, broad alerts, may notice a problem; they aren't scoped to this service",
         "silent": "{signal}: {monitor} matches, but it notifies no one | {signal}: {monitor} match, but they notify no one",
@@ -30700,13 +30700,11 @@
         "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service | {signal}: {monitor} may match, but their scope couldn't be tied to a service",
         "none": "{signal}: no alert watches this"
       },
-      "fallsShort": "Falls short",
       "added": "Added"
     },
     "drawer": {
       "moreChecks": "Other checks",
       "chartNoData": "Chart not available yet",
-      "notAvailable": "Not available",
       "monitors": "Alerts",
       "monitorLine": "{kind} · {state}",
       "noMonitor": "No alert matches"
@@ -30735,7 +30733,7 @@
       "serviceMeta": "{where}, about {traffic} events an hour",
       "trafficOnly": "About {traffic} events an hour",
       "kinds": {
-        "coverage_gap": "Not watched",
+        "coverage_gap": "Coverage gap",
         "no_absence_check": "Missing alert",
         "silent_coverage": "Notifies no one",
         "coverage_lost": "Coverage lost",
@@ -34301,6 +34299,7 @@
       "setUpKubernetes": "Opens Kubernetes setup for its cluster."
     },
     "bulk": {
+      "alertsPage": "Alerts",
       "title": {
         "no_data": "Add {count} no-data alert | Add {count} no-data alerts",
         "source": "Add {count} no-data alert | Add {count} no-data alerts",
@@ -34366,6 +34365,7 @@
       "usually": "{rate} an hour",
       "unsureTail": "Unticked: check before adding.",
       "cantBuild": "AutoObserve can't build this alert from this stream's fields. Add it by hand in Alerts.",
+      "cantBuildIn": "AutoObserve can't build this alert from this stream's fields. Add it by hand in {alerts}.",
       "block": {
         "checking": "Checking the stream's fields…",
         "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",
@@ -34630,7 +34630,7 @@
     },
     "kind": {
       "chip": {
-        "notWatched": "Not watched",
+        "notWatched": "Coverage gap",
         "missingAlert": "Missing alert",
         "notifiesNoOne": "Notifies no one",
         "stoppedSending": "Stopped sending",

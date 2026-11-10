@@ -24,6 +24,7 @@ import { scenarioData } from "@/components/autoobserve/v2/fixtures";
 import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
 import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
 import { MAIN_PAGED_CAP } from "@/components/autoobserve/live/incidentsCopy";
+import { SKELETON_DELAY_MS } from "@/components/autoobserve/live/liveModel";
 import ThisWeek from "@/components/autoobserve/v2/ThisWeek.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
 import TopBarStatus from "@/components/autoobserve/v2/TopBarStatus.vue";
@@ -410,6 +411,24 @@ describe("AutoObserve2 coverage page learning line (W3)", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="autoobserve2-coverage-sentence"]').text()).toMatch(
       /^.+\. Learning 9 streams\. The first is ready on Nov 24; AutoObserve needs 14 days of history to judge a stream\.$/,
+    );
+  });
+
+  it("reserves the loaded sentence's two lines while it loads, so the page never drops", async () => {
+    vi.mocked(autoobserve.coverage).mockReturnValue(new Promise(() => undefined) as never);
+    const loading = mountView();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, SKELETON_DELAY_MS + 20));
+    const sentence = loading.find('[data-test="autoobserve2-coverage-sentence"]');
+    expect(sentence.findAll('[data-test="autoobserve2-coverage-sentence-skeleton"]')).toHaveLength(
+      2,
+    );
+    expect(sentence.classes()).toContain("min-h-11.5");
+    vi.mocked(autoobserve.coverage).mockResolvedValue(data() as never);
+    const loaded = mountView();
+    await flushPromises();
+    expect(loaded.find('[data-test="autoobserve2-coverage-sentence"]').classes()).toContain(
+      "min-h-11.5",
     );
   });
 

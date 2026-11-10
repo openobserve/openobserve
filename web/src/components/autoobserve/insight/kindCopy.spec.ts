@@ -86,7 +86,7 @@ describe("coverage gap card (flagged surface 1)", () => {
   it("says why in plain words, with no raw state words or engine names", () => {
     const parts = gapCard([row([{ type: "logs", name: "ingest_c" }])]);
     expect(parts.headline).toBe("Nothing watches svc-ingest-c");
-    expect(parts.chip.label).toBe("Not watched");
+    expect(parts.chip.label).toBe("Coverage gap");
     expect(parts.why).toBe(
       "No alert watches its errors, its latency, or whether it stops sending. It handles about 47 events an hour.",
     );
@@ -504,7 +504,7 @@ describe("many coverage gaps fold into one card (0, 1, a few, many)", () => {
     expect(list.map((r) => r.id)).toEqual(["other-1", "coverage_gap-group"]);
     const parts = list[1].insight;
     expect(parts.headline).toBe("Nothing watches 10 services");
-    expect(parts.chip.label).toBe("Not watched");
+    expect(parts.chip.label).toBe("Coverage gap");
     expect(parts.why).toBe(
       "svc-0 (ns-0), svc-1 (ns-1), svc-2 (ns-2), and 7 more. They handle about 100 events an hour together.",
     );

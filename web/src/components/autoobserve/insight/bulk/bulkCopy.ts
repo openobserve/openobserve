@@ -85,8 +85,11 @@ export const ruleOf = (t: TranslateFn, kind: BulkKind, rows: ReviewRow[]): I18nT
   return raw([rule, t("insight.bulk.ruleTail")].filter(Boolean).join(" "));
 };
 
-/** The service name, with its cluster and namespace only when another row shares the name. */
+/** The coverage page's name for the service, else the name with its cluster and namespace only when another row shares it. */
 export const serviceLabel = (t: TranslateFn, row: ReviewRow, all: ReviewRow[]): I18nText => {
+  const scope = row.row.scope;
+  const pageLabel = "field" in scope ? undefined : scope.label;
+  if (pageLabel) return raw(pageLabel);
   // A service's own drafts of other kinds share its scope, so only a different cluster or namespace is a twin.
   const twins = all.filter(
     (r) =>

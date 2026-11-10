@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { canLabel, fitLabel, type MeasureText } from "./hexLabel";
+import { canLabel, fitLabel, fitLabels, type MeasureText } from "./hexLabel";
 
 // The canvas-less fallback CoverageHexMap uses, so widths are deterministic.
 const measure: MeasureText = (text, font) => text.length * font * 0.6;
@@ -153,5 +153,28 @@ describe("label sizes stay on the type scale (T5-5)", () => {
   it("shrinks a label that does not fit by one whole size only", () => {
     const out = fitLabel("a-very-long-service-name", 30, 60, 12, measure);
     expect(out?.font).toBe(11);
+  });
+});
+
+describe("fitLabels: one font size per map (T5-5)", () => {
+  it("draws every label at the size the tightest one needs", () => {
+    const names = ["svc-j", "svc-b · no namespace", "payments", "svc-ingest-c"];
+    const alone = names.map((n) => fit(n)!.font);
+    expect(new Set(alone).size).toBeGreaterThan(1);
+    const labels = fitLabels(names, LARGEST.room, LARGEST.height, LARGEST.font, measure);
+    expect(new Set(labels.map((l) => l!.font)).size).toBe(1);
+    expect(labels[0]!.font).toBe(Math.min(...alone));
+    expect(labels[0]!.lines).toEqual(["svc-j"]);
+  });
+
+  it("keeps the natural size when every label fits it", () => {
+    const labels = fitLabels(
+      ["svc-j", "payments"],
+      LARGEST.room,
+      LARGEST.height,
+      LARGEST.font,
+      measure,
+    );
+    expect(labels.map((l) => l!.font)).toEqual([fit("svc-j")!.font, fit("payments")!.font]);
   });
 });

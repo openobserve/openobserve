@@ -426,29 +426,57 @@ describe("liveGapLines (the drawer's line for a gap)", () => {
     ]);
   });
 
-  it("names the key's amber dot with one shared word", () => {
-    expect(liveLookWord(gt, "problem")).toBe("Falls short");
-    expect(liveLookWord(gt, "missing")).toBe("Not watched");
+  it("says which checks were just added instead of calling them unwatched (T2-N1)", () => {
+    const lines = liveGapLines(
+      gt,
+      "en-US",
+      { errors: check("none"), latency: check("none"), absence: check("none") },
+      new Set(["errors", "absence"] as const),
+    );
+    expect(lines).toEqual([
+      "No alert watches its latency",
+      "Added alerts for its errors and whether it stops sending. AutoObserve counts them at its next check.",
+    ]);
+    expect(
+      liveGapLines(
+        gt,
+        "en-US",
+        { errors: check("none"), latency: check("covered"), absence: check("covered") },
+        new Set(["errors"] as const),
+      ),
+    ).toEqual(["Added an alert for its errors. AutoObserve counts it at its next check."]);
+  });
+
+  it("names the key's dots with the page's two state words", () => {
+    expect(liveLookWord(gt, "covered")).toBe("Watched");
+    expect(liveLookWord(gt, "gap")).toBe("Coverage gap");
+  });
+
+  it("uses only Watched and Coverage gap for a service or check state, never older words", () => {
+    const words = [
+      gt("autoobserveLive.states.covered"),
+      gt("autoobserveLive.suggestions.kinds.coverage_gap"),
+      gt("insight.kind.chip.notWatched"),
+      gt("autoobserve.coverage.badgeNotWatched"),
+    ];
+    expect(words).toEqual(["Watched", "Coverage gap", "Coverage gap", "Coverage gap"]);
   });
 });
 
 describe("liveCellWord / liveCellLook (the coverage table's cells)", () => {
-  it("says Covered, No monitor, or the engine's own word for a monitor that falls short", () => {
-    expect(liveCellWord(gt, "covered")).toBe("Covered");
-    expect(liveCellWord(gt, "none")).toBe("Not watched");
-    expect(liveCellWord(gt, "silent")).toBe("Silent");
-    expect(liveCellWord(gt, "blind")).toBe("Blind");
+  it("says Watched, or Coverage gap whether no alert matches or an alert falls short", () => {
+    expect(liveCellWord(gt, "covered")).toBe("Watched");
+    expect(liveCellWord(gt, "none")).toBe("Coverage gap");
+    expect(liveCellWord(gt, "silent")).toBe("Coverage gap");
+    expect(liveCellWord(gt, "blind")).toBe("Coverage gap");
+    expect(liveCellWord(gt, "none", true)).toBe("Added");
   });
 
-  it("draws covered green, a missing monitor hollow, and a monitor that falls short amber", () => {
+  it("draws covered green and every gap with the one amber", () => {
     expect(liveCellLook("covered")).toBe("covered");
-    expect(liveCellLook("none")).toBe("missing");
-    expect(["weak", "silent", "blind", "unmapped"].map((s) => liveCellLook(s as never))).toEqual([
-      "problem",
-      "problem",
-      "problem",
-      "problem",
-    ]);
+    expect(
+      ["none", "weak", "silent", "blind", "unmapped"].map((s) => liveCellLook(s as never)),
+    ).toEqual(["gap", "gap", "gap", "gap", "gap"]);
   });
 });
 

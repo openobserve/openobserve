@@ -117,15 +117,53 @@ describe("noDataAlert", () => {
     );
   });
 
-  it("with no cluster or namespace it filters on the service alone, with no null text", () => {
+  it("scopes a no-namespace service to rows with no namespace, as its charts do (T2-8)", () => {
     const prefill = noDataAlert(logsScope({ cluster: null, namespace: null }), options)!;
 
+    expect(prefill.sql).toBe(
+      'SELECT count(*) AS row_count FROM "app_logs" WHERE "service_name" = \'svc-a\' AND ("k8s_namespace_name" IS NULL OR "k8s_namespace_name" = \'\') HAVING count(*) = 0',
+    );
+    expect(prefill.name).not.toMatch(/null/i);
+    expect(JSON.stringify(prefill.meta)).not.toContain('"null"');
+  });
+
+  it("scopes a no-namespace traces service by the span namespace field", () => {
+    const prefill = noDataAlert(
+      {
+        service: "svc-b",
+        cluster: null,
+        namespace: null,
+        stream: { type: "traces", name: "app_traces" },
+        schema: ["_timestamp", "service_name", "service_k8s_namespace_name"],
+      },
+      options,
+    )!;
+    expect(prefill.sql).toContain(
+      `WHERE "service_name" = 'svc-b' AND ("service_k8s_namespace_name" IS NULL OR "service_k8s_namespace_name" = '')`,
+    );
+  });
+
+  it("names the service in the subtitle the way the coverage page does (T2-N4)", () => {
+    const prefill = noDataAlert(
+      { ...logsScope({ cluster: null, namespace: "ns-d" }), label: "svc-a · ns-d" },
+      options,
+    )!;
+    expect(prefill.sourceLabel).toBe("Suggested by AutoObserve for svc-a · ns-d");
+    expect(prefill.sql).toContain(`"service_name" = 'svc-a'`);
+  });
+
+  it("with no namespace field in the stream it filters on the service alone, with no null text", () => {
+    const prefill = noDataAlert(
+      logsScope({ cluster: null, namespace: null, schema: ["_timestamp", "service_name"] }),
+      options,
+    )!;
     expect(prefill.sql).toBe(
       'SELECT count(*) AS row_count FROM "app_logs" WHERE "service_name" = \'svc-a\' HAVING count(*) = 0',
     );
     expect(prefill.sql).not.toMatch(/null/i);
-    expect(prefill.name).not.toMatch(/null/i);
-    expect(JSON.stringify(prefill.meta)).not.toContain('"null"');
+    expect(
+      noDataAlert(logsScope({ cluster: null, namespace: null, schema: undefined }), options)!.sql,
+    ).not.toMatch(/null/i);
   });
 
   it("escapes a quote in the service name and strips double quotes from field names", () => {
