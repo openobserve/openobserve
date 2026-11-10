@@ -79,7 +79,7 @@ def test_n02_saving_an_account_with_no_master_key_stores_nothing(env: TelephonyE
     resp = env.put_telephony(token=new_token(), from_number=new_phone())
     assert resp.status_code == 400, resp.text
     assert resp.json()["reason"] == "no_master_key", resp.text
-    assert resp.json()["message"] == "ask your operator to set O2_MASTER_ENCRYPTION_KEY", resp.text
+    assert resp.json()["message"] == "ask your operator to set O2_MASTER_ENCRYPTION_KEY or O2_ONCALL_MASTER_KEY", resp.text
     assert env.get_telephony()["org"] is None
 
 

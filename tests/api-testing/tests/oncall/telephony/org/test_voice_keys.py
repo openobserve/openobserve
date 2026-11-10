@@ -60,10 +60,17 @@ def ring(env: TelephonyEnv, person: Person) -> dict:
     return call
 
 
+def rung_done(env: TelephonyEnv, page_id: str) -> None:
+    # Key 8 counts a level as paged only once its page row lands, after every send; a press before re-picks it.
+    poll(lambda: any(e["kind"] == "page" for e in timeline(env, page_id)), timeout=45, interval=0.5,
+         msg=f"the first level of page {page_id} to finish sending")
+
+
 def page_one_rung(env: TelephonyEnv, people: list[Person]) -> Fired:
     page = fire_page(env, page_team(env, [people]))
     for person in people:
         ring(env, person)
+    rung_done(env, page.id)
     return page
 
 
@@ -202,6 +209,7 @@ def test_k05_key_eight_pages_the_next_level_once(client: OpenObserveClient, env:
     next_up = make_person(client, env)
     page = fire_page(env, page_team(env, [[first], [next_up]]))
     ring(env, first)
+    rung_done(env, page.id)
     assert env.mock.requests(to=next_up.phone, since_seq=next_up.seq) == [], "the next level must wait for the press"
 
     assert spoken(env, first, "8") == [ESCALATED_LINE]
@@ -247,6 +255,7 @@ def test_k08_key_eight_to_an_empty_level_says_so_and_changes_nothing(client: Ope
     page = fire_page(env, team)
     ring(env, person)
     env.mock.wait_for(person.phone, "sms", since_seq=person.seq)
+    rung_done(env, page.id)
     assert spoken(env, person, "8") == [ESCALATED_NOBODY_LINE]
     assert_unanswered(env, page.id)
     hold_count(env.mock, person.phone, None, 2, seconds=NO_REPAGE_SECS, since_seq=person.seq)
@@ -371,6 +380,7 @@ def test_k14_two_people_on_key_eight_page_the_next_level_once(client: OpenObserv
     page = fire_page(env, page_team(env, [[first, second], [next_up]]))
     ring(env, first)
     ring(env, second)
+    rung_done(env, page.id)
 
     assert spoken(env, first, "8") == [ESCALATED_LINE]
     # o2-enterprise#3420 R5: M10 names no reply for the second person's key 8, and top of the ladder is an equally valid reading.
