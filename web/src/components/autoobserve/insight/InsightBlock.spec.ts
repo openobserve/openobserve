@@ -208,9 +208,9 @@ describe("InsightBlock card (test 8)", () => {
 
   it("draws a gap amber and information neutral", () => {
     const amber = mountBlock(
-      insight({ chip: { label: raw("Coverage gap"), variant: "warning-soft", tone: "gap" } }),
+      insight({ chip: { label: raw("Coverage gap"), variant: "amber-soft", tone: "gap" } }),
     );
-    expect(amber.find("article > span").classes()).toContain("bg-ingest-accent-amber");
+    expect(amber.find("article > span").classes()).toContain("bg-badge-amber-soft-text");
     const neutral = mountBlock(
       insight({ chip: { label: raw("Other"), variant: "default-soft", tone: "info" } }),
     );
@@ -257,5 +257,30 @@ describe("InsightBlock details only (drawer row)", () => {
       "details",
     );
     expect(wrapper.get(sel("why-detail")).text()).toBe("Errors: none, latency: none");
+  });
+});
+
+describe("InsightBlock details under a row that shows the CTA itself (T5-N7)", () => {
+  const mountRow = () =>
+    mount(InsightBlock, {
+      props: { parts: insight(), variant: "details", hideCta: true },
+      global: { plugins: [i18n, storeWith(true)] },
+    });
+
+  it("drops the hidden CTA's note, which would describe a button that isn't there", () => {
+    expect(mountRow().find(sel("note")).exists()).toBe(false);
+  });
+
+  it("draws link-like actions ghost-primary xs and Dismiss ghost-muted at the row's xs size", () => {
+    const wrapper = mountRow();
+    const logs = wrapper.getComponent(sel("secondary-logs-app"));
+    expect([logs.props("variant"), logs.props("size")]).toEqual(["ghost-primary", "xs"]);
+    const dismiss = wrapper.getComponent(sel("dismiss"));
+    expect([dismiss.props("variant"), dismiss.props("size")]).toEqual(["ghost-muted", "xs"]);
+  });
+
+  it("keeps the note under a details block that shows its own CTA", () => {
+    const wrapper = mountBlock(insight(), "details");
+    expect(wrapper.get(sel("note")).text()).toContain("Opens the alert editor at the query.");
   });
 });

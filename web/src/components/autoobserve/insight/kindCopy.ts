@@ -61,7 +61,7 @@ export interface KindCopy {
 
 /** Who a paged finding reached; `routing` asks for the on-call routing CTA. */
 export interface PageLine {
-  tone: "neutral" | "warning" | "error";
+  tone: "neutral" | "pending" | "warning" | "error";
   text: I18nText;
   routing: boolean;
 }
@@ -388,7 +388,7 @@ const silentCheckCopy = (
         )
       : null;
   return {
-    chip: { label: t("insight.kind.chip.notifiesNoOne"), tone: "failure" },
+    chip: { label: t("insight.kind.chip.notifiesNoOne"), tone: "gap" },
     why: t("insight.kind.no_absence_check.whySilent", { monitor: name, service: raw(service) }),
     whyDetail: null,
     next: t("insight.kind.no_absence_check.nextSilent"),
@@ -467,7 +467,7 @@ const silentCoverageCopy = (
   const monitor = str(s.evidence.monitor_name);
   const review = actions.find((a) => a.type === "review_alert");
   return {
-    chip: { label: t("insight.kind.chip.notifiesNoOne"), tone: "failure" },
+    chip: { label: t("insight.kind.chip.notifiesNoOne"), tone: "gap" },
     cta:
       review?.type === "review_alert"
         ? ctaOf(
@@ -843,7 +843,7 @@ const pageLine = (t: TranslateFn, item: AutoObserveIncidentItem): PageLine | nul
     case "failed":
       return { tone: "error", text: t("insight.kind.paged.page.failed"), routing: false };
     case "pending":
-      return { tone: "neutral", text: t("insight.kind.paged.page.pending"), routing: false };
+      return { tone: "pending", text: t("insight.kind.paged.page.pending"), routing: false };
     default:
       return null;
   }

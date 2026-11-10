@@ -83,8 +83,8 @@ export const KIND_LOOK: Record<LookKind, { icon: IconName; badge: string; accent
   notify: {
     icon: "notifications",
     badge:
-      "from-badge-error-soft-bg to-status-error-text/25 text-badge-error-soft-text ring-badge-error-ol-border",
-    accent: "bg-status-error-text",
+      "from-badge-amber-soft-bg to-badge-amber-soft-text/25 text-badge-amber-soft-text ring-badge-amber-soft-text/30",
+    accent: "bg-badge-amber-soft-text",
   },
 };
 

@@ -288,15 +288,15 @@ describe("LiveSuggestions rail: a monitor that notifies no one (demo bug 4)", ()
     },
   };
 
-  it("draws the card red and says why and what next", () => {
+  it("draws the card amber and says why and what next", () => {
     const wrapper = mountRail(
       rail(0, 1, {
         requests: toRequests(gt, { locale: "en-US", timeZone: "UTC" }, [silent]),
       }),
     );
     const card = wrapper.get('[data-test="insight-block-s-silent"]');
-    expect(card.find("article > span").classes()).toContain("bg-status-error-text");
-    expect(card.find("article > span").classes()).not.toContain("bg-ingest-accent-amber");
+    expect(card.find("article > span").classes()).toContain("bg-badge-amber-soft-text");
+    expect(card.find("article > span").classes()).not.toContain("bg-status-error-text");
     expect(card.text()).toContain("Notifies no one");
     expect(card.text()).toContain("svc-y-errors can't reach ops-pager");
     expect(card.text()).toContain(

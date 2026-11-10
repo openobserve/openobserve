@@ -248,8 +248,18 @@ export const useLiveAutoObserve = () => {
       minute.value * 60_000,
     ),
   );
+  // The gap card is built from coverage rows and every gap, so the rail's first paint waits for both, or their failure.
+  const railInputsPending = computed(
+    () =>
+      (coverage.data.value === undefined && !coverage.isError.value) ||
+      (gaps.data.value === undefined && !gaps.isError.value),
+  );
   const rail = computed<RailSource>(() => ({
     ...railState.value,
+    status:
+      railState.value.status === "ready" && railInputsPending.value
+        ? "loading"
+        : railState.value.status,
     requests: toRequests(
       t,
       zone.value,

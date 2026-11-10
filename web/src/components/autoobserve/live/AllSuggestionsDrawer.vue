@@ -156,6 +156,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve2-suggestions-drawer-pending"
           />
           <OEmptyState
+            v-else-if="kindLabel && othersOpen"
+            size="inline"
+            icon="filter-alt"
+            :title="t('autoobserveLive.suggestions.kindEmptyTitle', { kind: kindLabel })"
+            :description="
+              t('autoobserveLive.suggestions.kindEmptyDesc', { count: othersOpen }, othersOpen)
+            "
+            :action-label="t('autoobserveLive.suggestions.clearKind')"
+            data-test="autoobserve2-suggestions-drawer-empty"
+            @action="emit('update:kind', null)"
+          />
+          <OEmptyState
             v-else
             size="inline"
             icon="task-alt"
@@ -256,6 +268,12 @@ const query = useQuery(() => ({
   placeholderData: keepSameOrg(org.value),
 }));
 const refetch = () => void query.refetch();
+// A kind with nothing open still says what else is open, read from the unfiltered first page.
+const unfiltered = useQuery(() => ({
+  ...autoobserveSuggestionsPageQuery(org.value, DRAWER_PAGE, 0),
+  enabled: props.open && !!org.value && !!kindFilter.value && query.data.value?.total === 0,
+}));
+const othersOpen = computed(() => (kindFilter.value ? (unfiltered.data.value?.total ?? 0) : 0));
 // The same cached coverage the page shows, so a row's fix can prefill from its service's streams.
 const coverage = useQuery(() => ({
   ...autoobserveCoverageQuery(org.value, "strict"),
@@ -325,12 +343,33 @@ watch(
   { immediate: true },
 );
 
+const FOCUS_WAIT_FRAMES = 90;
+const FOCUS_SETTLE_MS = 250;
+
+const outOfView = (el: Element) => {
+  const box = el.getBoundingClientRect();
+  return box.top < 0 || box.bottom > window.innerHeight;
+};
+
+// The drawer mounts its body and slides in after the data arrives, so wait for the row, then check again once it settles.
+const scrollToFocus = (id: string, framesLeft = FOCUS_WAIT_FRAMES) => {
+  if (props.focusId !== id || !props.open) return;
+  const el = document.querySelector(`[data-test="autoobserve2-suggestions-row-${id}"]`);
+  if (!el) {
+    if (framesLeft > 0) requestAnimationFrame(() => scrollToFocus(id, framesLeft - 1));
+    return;
+  }
+  el.scrollIntoView?.({ block: "center" });
+  setTimeout(() => {
+    if (props.focusId === id && el.isConnected && outOfView(el))
+      el.scrollIntoView?.({ block: "center" });
+  }, FOCUS_SETTLE_MS);
+};
+
 watch(focusShown, async (shown) => {
-  if (!shown) return;
+  if (!shown || !props.focusId) return;
   await nextTick();
-  document
-    .querySelector(`[data-test="autoobserve2-suggestions-row-${props.focusId}"]`)
-    ?.scrollIntoView?.({ block: "center" });
+  scrollToFocus(props.focusId);
 });
 
 watch(org, () => {

@@ -251,7 +251,7 @@ describe("no-data check", () => {
       NOW_MS,
     );
     expect(parts.chip.label).toBe("Notifies no one");
-    expect(parts.chip.tone).toBe("failure");
+    expect(parts.chip.tone).toBe("gap");
     expect(parts.why).toBe(
       "ingress-volume-detector would notice svc-ingest-c stopping, but it notifies no one.",
     );

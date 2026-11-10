@@ -627,7 +627,10 @@ describe("LivePaged (D9-web)", () => {
       expect(lines[2].text()).toContain("Paging failed");
       expect(lines[2].attributes("data-tone")).toBe("error");
       expect(lines[3].text()).toContain("hasn't confirmed the page yet");
-      expect(lines[3].attributes("data-tone")).toBe("neutral");
+      expect(lines[3].attributes("data-tone")).toBe("pending");
+      expect(lines[3].findComponent({ name: "OIcon" }).props("name")).toBe("schedule");
+      expect(lines[0].findComponent({ name: "OIcon" }).props("name")).toBe("check");
+      expect(lines[1].classes()).toContain("text-badge-amber-soft-text");
       expect(rows(w)[0].findAll(sel("routing"))).toHaveLength(0);
       await rows(w)[1].find(sel("routing")).trigger("click");
       expect(push).toHaveBeenCalledWith({
@@ -709,6 +712,18 @@ describe("LivePaged (D9-web)", () => {
       const empty = w.find(sel("empty-learning"));
       expect(empty.text()).toContain("Learning your streams");
       expect(empty.text()).toContain("The first of 12 streams is ready on Nov 24.");
+    });
+
+    it("says paging is off while every stream is still learning (T1-11)", async () => {
+      coverageApi.mockResolvedValue(coverage(12, 0));
+      api.mockResolvedValueOnce(page([], { paging: false }));
+      const w = mountCard();
+      await flushPromises();
+      expect(w.find(sel("subtitle-slot")).text()).toBe(
+        "Paging is off for this organization, so AutoObserve opens no incidents.",
+      );
+      expect(w.find(sel("empty-learning")).text()).toContain("Learning your streams");
+      expect(w.find(sel("empty-off")).exists()).toBe(false);
     });
 
     it("a server without the learning block keeps today's card", async () => {

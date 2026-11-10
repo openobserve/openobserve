@@ -33,8 +33,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="autoobserve-live-issues"
     @row-click="(row: IssueRow) => openIncident(row)"
   >
-    <template v-if="!notice" #toolbar>
-      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+    <template #toolbar>
+      <div
+        class="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+        :class="{ invisible: !!notice }"
+        :inert="notice ? true : undefined"
+        :aria-hidden="notice ? 'true' : undefined"
+        data-test="autoobserve-live-issues-controls"
+      >
         <div class="flex min-w-[12rem] flex-1 items-center sm:max-w-[22rem]">
           <label :for="SEARCH_ID" class="sr-only">{{ copy.searchLabel }}</label>
           <OInput
@@ -98,9 +104,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
       </div>
     </template>
-    <template v-if="!notice" #subheader>
+    <template #subheader>
+      <!-- A notice keeps this row's space, so loading turning into a failure moves nothing. -->
       <div
         class="px-page-edge border-table-row-divider flex h-9 items-center gap-2 border-b"
+        :class="{ invisible: !!notice }"
+        :inert="notice ? true : undefined"
+        :aria-hidden="notice ? 'true' : undefined"
         data-test="autoobserve-live-issues-summary"
       >
         <LiveRefreshFailed
@@ -152,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTruncatedText
         as="p"
         :lines="2"
-        class="text-text-heading py-1.5 leading-snug font-medium whitespace-normal"
+        class="text-text-heading py-1.5 leading-snug font-medium wrap-anywhere whitespace-normal"
         data-test="autoobserve-live-issues-sentence"
         >{{ row.sentence }}</OTruncatedText
       >
@@ -179,10 +189,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="row.page"
         :variant="PAGE_VARIANT[row.page.tone]"
         size="sm"
-        :label="row.page.text"
+        class="max-w-full"
         :data-tone="row.page.tone"
         data-test="autoobserve-live-issues-page"
-      />
+      >
+        <OTruncatedText as="span" data-test="autoobserve-live-issues-page-text">{{
+          row.page.text
+        }}</OTruncatedText>
+      </OTag>
       <span v-else class="text-text-secondary">—</span>
     </template>
     <template #cell-opened="{ row }">
@@ -350,9 +364,9 @@ interface IssueRow {
   haystack: string;
 }
 
-const PAGE_VARIANT: Record<PageCell["tone"], "default-soft" | "warning-soft" | "error-soft"> = {
+const PAGE_VARIANT: Record<PageCell["tone"], "default-soft" | "amber-soft" | "error-soft"> = {
   neutral: "default-soft",
-  warning: "warning-soft",
+  warning: "amber-soft",
   error: "error-soft",
 };
 

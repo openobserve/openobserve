@@ -387,11 +387,13 @@ const NOTICE_TEST: Record<LiveFailure, string> = {
 
 const PAGE_TONE: Record<PageLine["tone"], { icon: string; text: string }> = {
   neutral: { icon: "check", text: "text-text-secondary" },
-  warning: { icon: "warning", text: "text-status-warning-text" },
+  pending: { icon: "schedule", text: "text-text-secondary" },
+  warning: { icon: "warning", text: "text-badge-amber-soft-text" },
   error: { icon: "warning", text: "text-status-error-text" },
 };
 
 const props = withDefaults(defineProps<{ cap?: number }>(), { cap: PAGED_CAP });
+const emit = defineEmits<{ settled: [] }>();
 
 const { t, locale } = useI18nTyped();
 const router = useRouter();
@@ -416,6 +418,12 @@ const routingSet = computed(() => !!routing.data.value?.default_team_id);
 const paging = computed(() => paged.paging.value);
 const hasMore = computed(() => paged.hasMore.value);
 const settled = computed(() => !skeleton.value && state.value.status === "ready");
+// The page footer below waits for this, so it is never painted and then pushed down by the rows.
+watch(
+  () => !skeleton.value && state.value.status !== "loading",
+  (done) => done && emit("settled"),
+  { immediate: true },
+);
 const notice = computed(() =>
   !skeleton.value && state.value.status === "error" && state.value.failure
     ? liveNotice(t, "incidents", state.value.failure)
@@ -431,7 +439,8 @@ const slotKind = computed(() => {
   if (settled.value && paged.newCount.value > 0) return "new";
   if (settled.value && learningText.value && !(waiting.value && !rows.value.length))
     return "learning";
-  if (settled.value && rows.value.length && !paging.value) return "pagingOff";
+  // With no rows the off empty state says it, unless the learning empty state holds that place.
+  if (settled.value && !paging.value && (rows.value.length || waiting.value)) return "pagingOff";
   if (state.value.status === "loading") return skeleton.value ? "skeleton" : "none";
   return "subtitle";
 });

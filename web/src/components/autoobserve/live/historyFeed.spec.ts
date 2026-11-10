@@ -91,7 +91,7 @@ describe("toHistoryRows (G6)", () => {
     expect(rows.map((r) => String(r.text))).toEqual([
       "ops-lead@example.com dismissed Nothing watches checkout",
       "Opened an incident: pay_api (logs) stopped sending data",
-      "ops-lead@example.com accepted Nothing watches checkout",
+      "ops-lead@example.com marked Nothing watches checkout as an intended report",
       "ops-lead@example.com changed payments-errors",
     ]);
     expect(String(rows[1].when)).toBe("4:45 PM");

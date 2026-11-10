@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :notice="loadNotice"
     size="block"
     :busy="paging.retrying.value"
-    :class="inPage && 'max-w-2xl p-4'"
+    :class="inPage && 'p-4'"
     data-test="autoobserve-live-settings-paging-notice"
     retry-test="autoobserve-live-settings-paging-retry"
     @retry="paging.retry()"

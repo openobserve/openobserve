@@ -41,8 +41,25 @@ const isDisabled = useLockedDisabled(() => props.disabled);
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 
-const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
+// A typed time the field can't read stays on screen with this message until it is fixed.
+const typedError = ref<I18nText | null>(null);
+// What the 24-hour field shows: the model, or the unreadable text the user typed.
+const text24 = ref(props.modelValue ?? "");
+watch(
+  () => props.modelValue,
+  (val) => {
+    text24.value = val ?? "";
+    typedError.value = null;
+  },
+);
+const effectiveError = computed(
+  () => typedError.value || props.errorMessage || (props.error ? " " : null) || null,
+);
 const hasError = computed(() => !!effectiveError.value);
+const messageId = computed(() => `${inputId.value}-message`);
+const hasMessage = computed(
+  () => !!(effectiveError.value && effectiveError.value.trim()) || !!props.helpText,
+);
 
 // ── Popover state ──────────────────────────────────────────────
 const popoverOpen = ref(false);
@@ -204,6 +221,7 @@ function setPM() {
 }
 
 function emitCurrentValue() {
+  typedError.value = null;
   const h = String(internalHour.value).padStart(2, "0");
   const m = String(internalMinute.value).padStart(2, "0");
   const str = props.withSeconds
@@ -225,29 +243,45 @@ const displaySecond = computed(() => String(internalSecond.value).padStart(2, "0
 // ── Clear ──────────────────────────────────────────────────────
 function handleClear(e: Event) {
   e.stopPropagation();
+  typedError.value = null;
   emit("update:modelValue", "");
   emit("clear");
 }
 
 // ── 24-hour text input handler ──────────────────────────────
-// Parses `HH:MM` (seconds optional with `withSeconds`) on commit; anything
-// unparseable reverts the field to the last good value instead of emitting.
+// Reads `H:M`, `HH:MM` (seconds optional) or `HMM`/`HHMM`.
+function parseTyped(val: string): { h: number; min: number; s: number } | null {
+  const colon = /^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/.exec(val);
+  const m = colon ?? /^(\d{1,2})(\d{2})$/.exec(val);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  const s = Number(colon?.[3] ?? 0);
+  return h > 23 || min > 59 || s > 59 ? null : { h, min, s };
+}
+
+const typedErrorText = (): I18nText =>
+  t("components.time.invalid", { format: raw(props.withSeconds ? "HH:MM:SS" : "HH:MM") });
+
+// On commit; an entry it can't read stays as typed with a message, and nothing is emitted.
 function handleText24Change(e: Event) {
   const el = e.target as HTMLInputElement;
   const val = el.value.trim();
   if (!val) {
+    typedError.value = null;
+    text24.value = "";
     emit("update:modelValue", "");
     emit("change", "");
     return;
   }
-  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(val);
-  const h = m ? Number(m[1]) : NaN;
-  const min = m ? Number(m[2]) : NaN;
-  const s = m ? Number(m[3] ?? 0) : NaN;
-  if (!m || h > 23 || min > 59 || s > 59) {
-    el.value = props.modelValue ?? "";
+  const parsed = parseTyped(val);
+  if (!parsed) {
+    text24.value = el.value;
+    typedError.value = typedErrorText();
     return;
   }
+  typedError.value = null;
+  const { h, min, s } = parsed;
   internalHour.value = h;
   internalMinute.value = min;
   internalSecond.value = s;
@@ -255,6 +289,7 @@ function handleText24Change(e: Event) {
   const str = props.withSeconds ? `${pad(h)}:${pad(min)}:${pad(s)}` : `${pad(h)}:${pad(min)}`;
   // Normalise the visible text too ("7:5" → "07:05").
   el.value = str;
+  text24.value = str;
   emit("update:modelValue", str);
   emit("change", str);
 }
@@ -351,9 +386,11 @@ const fieldClasses = computed(() => [
           type="text"
           inputmode="numeric"
           autocomplete="off"
-          :value="modelValue ?? ''"
+          :value="text24"
           :tabindex="inputTabindex"
           :aria-label="inputAriaLabel"
+          :aria-invalid="hasError || undefined"
+          :aria-describedby="hasMessage ? messageId : undefined"
           :placeholder="placeholder ?? raw('HH:MM')"
           :maxlength="withSeconds ? 8 : 5"
           :disabled="isDisabled || undefined"
@@ -372,6 +409,8 @@ const fieldClasses = computed(() => [
           :value="modelValue ?? ''"
           :tabindex="inputTabindex"
           :aria-label="inputAriaLabel"
+          :aria-invalid="hasError || undefined"
+          :aria-describedby="hasMessage ? messageId : undefined"
           :step="withSeconds ? 1 : 60"
           :disabled="isDisabled || undefined"
           :readonly="readonly || undefined"
@@ -633,12 +672,13 @@ const fieldClasses = computed(() => [
     <div v-if="effectiveError || helpText" class="flex items-center gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
-        class="text-datepicker-error-text text-xs leading-none"
+        :id="messageId"
+        class="text-datepicker-error-text text-xs leading-snug"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-datepicker-label text-xs leading-none">
+      <span v-else-if="helpText" :id="messageId" class="text-datepicker-label text-xs leading-snug">
         {{ helpText }}
       </span>
     </div>

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
 import { flushPromises, mount, shallowMount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -160,7 +161,7 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(wrapper.findComponent(TopBarStatus).props("live")).toBe(false);
   });
 
-  it("live mode hides only the scenario picker; the footer keeps See changes", () => {
+  it("live mode hides only the scenario picker; the footer keeps See changes", async () => {
     Object.assign(routeQuery, { live: "1", scenario: SCENARIOS[0] });
     const wrapper = mountView();
     expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(false);
@@ -168,6 +169,10 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     const bar = wrapper.findComponent(TopBarStatus);
     expect(bar.props("live")).toBe(true);
     expect(bar.props("checked")).toEqual({ kind: "loading" });
+    // The footer waits for the paged card, so it is never painted and then pushed down (T5-N6).
+    expect(wrapper.findComponent(PageFooter).exists()).toBe(false);
+    wrapper.findComponent(LivePaged).vm.$emit("settled");
+    await nextTick();
     expect(wrapper.findComponent(PageFooter).exists()).toBe(true);
     const footer = mount(PageFooter, { global: { plugins: [i18n] } });
     expect(footer.find('[data-test="autoobserve2-footer-activity"]').exists()).toBe(true);
@@ -224,6 +229,16 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
       expect(wrapper.findComponent(AutoObserveIssuesTab).exists()).toBe(false);
       expect(wrapper.find('[data-test="autoobserve-issues-table"]').exists()).toBe(false);
       expect(wrapper.html()).not.toContain("INC-1051");
+      wrapper.unmount();
+    }
+  });
+
+  it("names the sub-page back button once: the header adds its own 'Back to' (T5-N1)", () => {
+    for (const page of ["issues", "coverage", "activity"]) {
+      Object.assign(routeQuery, { page });
+      const wrapper = mountView();
+      const back = wrapper.findComponent(PageLayoutStub).props("back") as { label: string };
+      expect(back.label, page).toBe("AutoObserve");
       wrapper.unmount();
     }
   });

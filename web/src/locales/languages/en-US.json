@@ -4915,7 +4915,7 @@
       "uploadingRules": "Please wait while uploading rules...",
       "errorUploadingRules": "Error while uploading rules",
       "errorParsingJson": "Error parsing JSON from file {name}",
-      "someValuesEmpty": "some values are empty please check",
+      "someValuesEmpty": "Some values are empty. Please check them.",
       "saveBeforeSwitchingTimeUnits": "Please save or cancel your changes before switching time units"
     },
     "addRolePage": {
@@ -16205,7 +16205,7 @@
       "contractRevokedSuccess": "External contract revoked successfully.",
       "revokeContractError": "Failed to revoke external contract.",
       "enableByobTitle": "Enable BYOB",
-      "enablingStorage": "enabling storage settings...",
+      "enablingStorage": "Enabling storage settings...",
       "storageEnabledSuccess": "Storage settings enabled successfully.",
       "enableStorageError": "Failed to enable storage settings.",
       "processingTrialExtension": "Please wait while processing trial period extension request...",
@@ -23607,6 +23607,7 @@
     },
     "time": {
       "openTimePicker": "Open time picker",
+      "invalid": "Enter a time as {format}.",
       "clear": "Clear",
       "am": "AM",
       "pm": "PM",
@@ -24262,9 +24263,9 @@
       "pipelinesExportedSuccessfully": "{count} pipeline exported successfully | {count} pipelines exported successfully",
       "functionsNotBundled": "{count} function could not be included in the export file: {names} | {count} functions could not be included in the export file: {names}",
       "pipelineDeletedSuccessfully": "Pipeline deleted successfully",
-      "deletingPipeline": "deleting pipeline...",
+      "deletingPipeline": "Deleting pipeline...",
       "pipelineCreatedSuccessfully": "Pipeline created successfully",
-      "savingPipeline": "saving pipeline...",
+      "savingPipeline": "Saving pipeline...",
       "stateResumed": "{name} state resumed successfully",
       "statePaused": "{name} state paused successfully"
     },
@@ -30803,6 +30804,9 @@
       "drawerLine": "Ranked by what matters most first. Open a row for what I found.",
       "focusGone": "This suggestion is no longer open.",
       "clearKind": "Show all suggestions",
+      "kindEmptyTitle": "No open suggestions of the kind {kind}",
+      "kindEmptyDesc": "{count} other suggestion is open. | {count} other suggestions are open.",
+      "folder": "Folder {folder}",
       "columns": {
         "suggestion": "Suggestion",
         "where": "Where",
@@ -30884,8 +30888,12 @@
     "history": {
       "incident": "Opened an incident: {title}",
       "dismissed": "{actor} dismissed {title}",
-      "accepted": "{actor} accepted {title}",
+      "accepted": "{actor} marked {title} as an intended report",
       "changed": "{actor} changed {title}",
+      "denied": {
+        "incidents": "Incidents aren't listed: you don't have permission to see them.",
+        "decisions": "Decisions aren't listed: you don't have permission to see them."
+      },
       "untitled": "a suggestion",
       "openIncident": "Open incident",
       "newest": "Showing the {count} newest. Older incidents are on the Issues page.",
@@ -31019,7 +31027,6 @@
     }
   },
   "autoobserve2": {
-    "backToHome": "Back to AutoObserve",
     "demoTag": "Demo",
     "scenarioLabel": "Demo scenario",
     "scenarios": {
@@ -34256,6 +34263,7 @@
       "whyNever": "{failed} of {total} run failed since {time}, so it cannot fire. | {failed} of {total} runs failed since {time}, so it cannot fire.",
       "whyCount": "{failed} of {total} run failed in the last calibration window. | {failed} of {total} runs failed in the last calibration window.",
       "whyEmptyScope": "No rows matched its filters in the last {window}, so it cannot fire.",
+      "whyNoDestination": "It fired {count} time in the last calibration window, and no one was notified. | It fired {count} times in the last calibration window, and no one was notified.",
       "nextNoDestination": "Choose who gets notified.",
       "errorType": {
         "stream_missing": "stream-not-found errors",

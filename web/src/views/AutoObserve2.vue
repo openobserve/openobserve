@@ -78,7 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="contents @min-[60rem]:flex @min-[60rem]:min-w-0 @min-[60rem]:flex-col @min-[60rem]:gap-6"
           >
-            <LivePaged v-if="live" :cap="MAIN_PAGED_CAP" class="order-1" />
+            <LivePaged
+              v-if="live"
+              :cap="MAIN_PAGED_CAP"
+              class="order-1"
+              @settled="pagedSettled = true"
+            />
             <ThisWeek
               v-else
               v-model:range="range"
@@ -92,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @open-issues="openIssuesPage"
             />
             <PageFooter
+              v-if="!live || pagedSettled"
               class="order-3 pt-2"
               @open-coverage="openCoverage()"
               @open-activity="openActivity()"
@@ -397,6 +403,7 @@ const suggestions = computed(() => data.value.requests.filter((r) => r.kind !== 
 const live = useLiveMode();
 const liveData = useLiveAutoObserve();
 const railShown = computed(() => live.value || suggestions.value.length > 0);
+const pagedSettled = ref(false);
 const allOpen = ref(false);
 
 const problems = computed(() => data.value.problems.map((id) => byId.value[id]).sort(byPriority));
@@ -618,7 +625,7 @@ const header = computed<{
           })
         : undefined,
     back: {
-      label: t("autoobserve2.backToHome"),
+      label: t("autoobserve.title"),
       onClick: closePage,
       dataTest: `autoobserve2-${page.value}-back`,
     },

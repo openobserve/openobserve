@@ -84,19 +84,26 @@ export const decisionPreviewQuery = (org: string, params: PreviewParams) =>
     retry: false,
   });
 
+/** `state: null` lists every decision, applied and undone ones included. */
 export const decisionsPageQuery = (
   org: string,
   family: DecisionFamily | null,
   limit: number,
   offset: number,
+  state: DecisionListParams["state"] | null = "active",
 ) =>
   queryOptions({
-    queryKey: autoobserveKeys.decisionsPage(org, family ?? "all", limit, offset),
+    queryKey: autoobserveKeys.decisionsPage(org, family ?? "all", limit, offset, state ?? "all"),
     queryFn: async ({ signal }) =>
       (
         await autoobserveDecisions.list(
           org,
-          family ? { state: "active", family, limit, offset } : { state: "active", limit, offset },
+          {
+            ...(state ? { state } : {}),
+            ...(family ? { family } : {}),
+            limit,
+            offset,
+          },
           signal,
         )
       ).data,

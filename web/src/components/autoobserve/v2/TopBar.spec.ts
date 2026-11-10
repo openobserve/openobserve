@@ -19,6 +19,8 @@ import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import TopBar from "./TopBar.vue";
 import TopBarStatus from "./TopBarStatus.vue";
+import ViewSwitch from "./ViewSwitch.vue";
+import router from "@/test/unit/helpers/router";
 
 const mountBar = () => mount(TopBar, { global: { plugins: [i18n], stubs: { ViewSwitch: true } } });
 
@@ -82,9 +84,7 @@ describe("TopBar", () => {
 });
 
 describe("ViewSwitch label (T5-28)", () => {
-  it("names the full view by what it shows, not 'Nerd'", async () => {
-    const { default: ViewSwitch } = await import("./ViewSwitch.vue");
-    const { default: router } = await import("@/test/unit/helpers/router");
+  it("names the full view by what it shows, not 'Nerd'", () => {
     const w = mount(ViewSwitch, { global: { plugins: [i18n, router] } });
     expect(w.find('[data-test="autoobserve-view-nerd"]').text()).toBe("Detailed");
   });

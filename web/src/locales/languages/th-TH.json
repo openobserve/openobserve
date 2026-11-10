@@ -4814,7 +4814,7 @@
       "uploadingRules": "Please wait while uploading rules...",
       "errorUploadingRules": "Error while uploading rules",
       "errorParsingJson": "Error parsing JSON from file {name}",
-      "someValuesEmpty": "some values are empty please check",
+      "someValuesEmpty": "Some values are empty. Please check them.",
       "saveBeforeSwitchingTimeUnits": "Please save or cancel your changes before switching time units"
     },
     "addRolePage": {
@@ -15763,7 +15763,7 @@
       "contractRevokedSuccess": "External contract revoked successfully.",
       "revokeContractError": "Failed to revoke external contract.",
       "enableByobTitle": "Enable BYOB",
-      "enablingStorage": "enabling storage settings...",
+      "enablingStorage": "Enabling storage settings...",
       "storageEnabledSuccess": "Storage settings enabled successfully.",
       "enableStorageError": "Failed to enable storage settings.",
       "processingTrialExtension": "Please wait while processing trial period extension request...",
@@ -23620,9 +23620,9 @@
       "pipelinesExportedSuccessfully": "{count} pipeline exported successfully | {count} pipelines exported successfully",
       "functionsNotBundled": "{count} function could not be included in the export file: {names} | {count} functions could not be included in the export file: {names}",
       "pipelineDeletedSuccessfully": "Pipeline deleted successfully",
-      "deletingPipeline": "deleting pipeline...",
+      "deletingPipeline": "Deleting pipeline...",
       "pipelineCreatedSuccessfully": "Pipeline created successfully",
-      "savingPipeline": "saving pipeline...",
+      "savingPipeline": "Saving pipeline...",
       "stateResumed": "{name} state resumed successfully",
       "statePaused": "{name} state paused successfully"
     },

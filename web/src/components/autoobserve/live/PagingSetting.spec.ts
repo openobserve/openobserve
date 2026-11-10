@@ -206,6 +206,19 @@ describe("PagingSetting (W1)", () => {
       expect(w.find('[data-test="autoobserve-live-empty-settings"]').exists()).toBe(false);
     });
 
+    it("in the Detailed Policy tab, a denial spans the panel like the Issues denial (T1-N8)", async () => {
+      get.mockRejectedValue(httpError(403));
+      const wrapper = mount(LiveSettingsPanel, {
+        props: { inPage: true },
+        attachTo: document.body,
+        global: { plugins: [i18n, store] },
+      });
+      wrappers.push(wrapper);
+      await flushPromises();
+      const notice = wrapper.get('[data-test="autoobserve-live-settings-paging-notice"]');
+      expect(notice.classes()).not.toContain("max-w-2xl");
+    });
+
     it("a server without the route keeps today's empty state", async () => {
       get.mockRejectedValue(httpError(404));
       const w = mountIt(LiveSettingsPanel);

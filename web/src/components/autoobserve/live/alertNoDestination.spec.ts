@@ -83,7 +83,7 @@ describe("alert_no_destination suggestions (C7)", () => {
   it("words the All suggestions row with its own headline, next step and CTA, not Other", () => {
     const [row] = toSuggestionRows(gt, ZONE, [noDestination()], NOW_MS);
     expect(row.kind).toBe("Notifies no one");
-    expect(row.kindVariant).toBe("error-soft");
+    expect(row.kindVariant).toBe("amber-soft");
     expect(row.headline).toBe("checkout-errors fired and notifies no one");
     expect(String(row.note)).toContain("Choose who gets notified.");
     expect(row.insight.cta?.label).toBe("Review alert");
@@ -102,6 +102,56 @@ describe("alert_no_destination suggestions (C7)", () => {
     expect(request.insight.chip.label).toBe("Notifies no one");
     expect(request.insight.headline).toBe("checkout-errors fired and notifies no one");
     expect(request.insight.next).toBe("Choose who gets notified.");
+  });
+
+  it("is amber, says how often it fired and what the button opens, on the card itself (T1-N5)", () => {
+    const [request] = toRequests(gt, ZONE, [noDestination()], NOW_MS);
+    expect(request.insight.chip).toMatchObject({ variant: "amber-soft", tone: "gap" });
+    expect(request.insight.why).toBe(
+      "It fired 4 times in the last calibration window, and no one was notified.",
+    );
+    expect(request.insight.note).toBe(
+      "Opens the alert editor at who gets notified. Nothing is saved until you save.",
+    );
+  });
+});
+
+describe("alert_no_destination on Home: Review change and Where (T3-17, C12)", () => {
+  const withChange = () =>
+    finding(
+      "alert_no_destination",
+      { rule_id: "no_destination", severity: "high", firings: 4, folder: "ops" },
+      {
+        actions: [
+          {
+            type: "apply_suggestion",
+            alert_id: "alert-1",
+            patch: [{ field: "destinations", from: [], to: ["pay-webhook"] }],
+          },
+          { type: "review_alert", alert_id: "alert-1", focus: "settings" },
+        ] as never,
+      },
+    );
+
+  it("offers Review change on the card and the row when the server sends the change", () => {
+    const [request] = toRequests(gt, ZONE, [withChange()], NOW_MS);
+    expect(request.insight.cta?.label).toBe("Review change");
+    expect(request.insight.cta?.target).toMatchObject({ type: "review_change" });
+    expect(request.insight.secondary.map((c) => c.label)).toContain("Review alert");
+    const [row] = toSuggestionRows(gt, ZONE, [withChange()], NOW_MS);
+    expect(row.insight.cta?.label).toBe("Review change");
+  });
+
+  it("puts the alert's folder in Where, and a dash only when the server doesn't know it", () => {
+    expect(toSuggestionRows(gt, ZONE, [withChange()], NOW_MS)[0].where).toBe("Folder ops");
+    expect(toSuggestionRows(gt, ZONE, [noDestination()], NOW_MS)[0].where).toBe("—");
+    const [notWorking] = toSuggestionRows(
+      gt,
+      ZONE,
+      [finding("alert_not_working", { rule_id: "failure", pattern: "syntax", folder: "pay" })],
+      NOW_MS,
+    );
+    expect(notWorking.where).toBe("Folder pay");
   });
 });
 

@@ -152,7 +152,7 @@ describe("useDecisionRoute", () => {
     await mountRoute();
     await route.decideBatch([body("f1")], () => "nightly-summary");
     await settle();
-    expect(String(openToasts()[0].message)).toBe("Nightly-summary marked as intended report.");
+    expect(String(openToasts()[0].message)).toBe("nightly-summary marked as intended report.");
   });
 
   it("an_undo_the_server_answers_unchanged_says_already_undone_not_undone", async () => {
