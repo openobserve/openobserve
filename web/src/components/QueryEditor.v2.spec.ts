@@ -20,70 +20,17 @@ import { defineComponent, h, ref } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-const { built, onChord } = vi.hoisted(() => ({
-  built: {
-    count: 0,
-    visible: true,
-    pending: null as unknown,
-    opts: null as null | { enabled?: () => boolean; query?: () => string | undefined },
-  },
-  onChord: vi.fn(() => true),
+const { focusCard, focusDock } = vi.hoisted(() => ({
+  focusCard: vi.fn(() => false),
+  focusDock: vi.fn((_id: string) => false),
 }));
 
 vi.mock("@/composables/assistant/flags", () => ({ isAssistantV2: () => true }));
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
-vi.mock("@/components/ai-assistant/helper/useQueryEditorHelper", async () => {
-  const { computed: c, ref: r, reactive: re } = await import("vue");
-  const live = re(built);
-  return {
-    useQueryEditorHelper: (opts: typeof built.opts) => {
-      built.count += 1;
-      built.opts = opts;
-      return {
-        visible: c(() => live.visible),
-        usable: c(() => true),
-        host: { id: "logs", language: "sql" },
-        proposal: null,
-        pending: c(() => live.pending),
-        label: c(() => null),
-        open: r(false),
-        entryKind: r("editor_button"),
-        prefill: r(undefined),
-        blocked: c(() => null),
-        dockOpen: c(() => false),
-        status: r(""),
-        editTick: r(0),
-        focused: r(false),
-        openFrom: vi.fn(),
-        onChord,
-        onUserEdit: vi.fn(),
-      };
-    },
-  };
-});
-
-const stub = (name: string, test: string) => ({
-  __esModule: true,
-  default: defineComponent({
-    name,
-    inheritAttrs: false,
-    setup:
-      (_, { attrs }) =>
-      () =>
-        h("div", { "data-test": attrs["data-test"] ?? test }),
-  }),
-});
-vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", () => stub("AiEntryButton", "door"));
-vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () => stub("AiLabel", "label"));
-vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
-  stub("AssistantDiffBlock", "diff"),
-);
-vi.mock("@/components/ai-assistant/helper/InlineQueryHelper.vue", () =>
-  stub("InlineQueryHelper", "inline-helper"),
-);
-vi.mock("@/components/ai-assistant/helper/InlineHelperHint.vue", () =>
-  stub("InlineHelperHint", "inline-helper-hint-host"),
-);
+vi.mock("@/composables/assistant", () => ({
+  assistantFocusCard: focusCard,
+  focusDockComposer: focusDock,
+}));
 
 import QueryEditor from "./QueryEditor.vue";
 
@@ -100,112 +47,62 @@ const CodeQueryEditorStub = defineComponent({
   },
 });
 
-async function settle() {
-  await vi.dynamicImportSettled();
-  await flushPromises();
-}
-
 function mountEditor(props: Record<string, unknown> = {}) {
   return mount(QueryEditor, {
-    props: {
-      query: "",
-      editorHeight: "12.5rem",
-      dataTestPrefix: "query-editor",
-      assistant: { id: "logs", stream: "default" },
-      ...props,
-    },
+    props: { query: "", dataTestPrefix: "query-editor", ...props },
     global: { plugins: [store, i18n], stubs: { CodeQueryEditor: CodeQueryEditorStub } },
   });
 }
 
 afterEach(() => {
-  built.count = 0;
-  built.visible = true;
-  built.pending = null;
   chordProp.value = null;
   vi.clearAllMocks();
+  store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
 });
 
-describe("QueryEditor on the v2 path", () => {
-  it("shows one Ask AI door in the toolbar row and no legacy bar or floating toggle", async () => {
-    const wrapper = mountEditor();
-    await settle();
-    expect(wrapper.find('[data-test="inline-helper-toolbar"]').attributes("data-host")).toBe(
-      "logs",
-    );
-    expect(wrapper.find('[data-test="ai-entry-query-generate"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="query-editor-ai-toggle-btn"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+describe("QueryEditor with the assistant redesign on", () => {
+  it("keeps the original natural-language toggle and bar", async () => {
+    store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+    const wrapper = mountEditor({ assistant: { id: "alert_query" } });
+    await flushPromises();
+    const toggle = wrapper.find('[data-test="query-editor-ai-toggle-btn"]');
+    expect(toggle.exists()).toBe(true);
+    await toggle.trigger("click");
+    expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="inline-helper"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
-  it("binds the chord in Monaco and never auto-opens on detected plain language", async () => {
-    const wrapper = mountEditor();
-    await settle();
-    expect(typeof chordProp.value).toBe("function");
-    (chordProp.value as () => boolean)();
-    expect(onChord).toHaveBeenCalled();
-    wrapper.findComponent({ name: "CodeQueryEditor" }).vm.$emit("nlpModeDetected", true);
-    await settle();
-    expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+  it("binds no chord for a host without an assistant adapter", () => {
+    mountEditor().unmount();
+    expect(chordProp.value).toBeNull();
+  });
+
+  it("routes the chord to the pending card, then the host's dock, and otherwise leaves it to Monaco", () => {
+    const wrapper = mountEditor({ assistant: { id: "alert_query" } });
+    const chord = chordProp.value as () => boolean;
+    expect(chord()).toBe(false);
+    expect(focusDock).toHaveBeenCalledWith("alert_query");
+    focusDock.mockReturnValueOnce(true);
+    expect(chord()).toBe(true);
+    focusCard.mockReturnValueOnce(true);
+    focusDock.mockClear();
+    expect(chord()).toBe(true);
+    expect(focusDock).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 
-  it("builds no helper for a host without an adapter", async () => {
-    mountEditor({ assistant: null }).unmount();
-    expect(built.count).toBe(0);
-  });
-
-  it("follows helper=off, read-only and the query prop live instead of freezing them at mount", async () => {
-    const wrapper = mountEditor({ helper: "off" });
-    expect(built.opts?.enabled?.()).toBe(false);
-    await wrapper.setProps({ helper: "on" });
-    expect(built.opts?.enabled?.()).toBe(true);
-    await wrapper.setProps({ readOnly: true });
-    expect(built.opts?.enabled?.()).toBe(false);
-    await wrapper.setProps({ query: "SELECT 2" });
-    expect(built.opts?.query?.()).toBe("SELECT 2");
-    wrapper.unmount();
-  });
-
-  it("grows the host instead of covering the editor", async () => {
-    const wrapper = mountEditor();
-    await settle();
-    expect(wrapper.attributes("style") ?? "").not.toContain("height");
-    const area = wrapper.get('[data-test="code-query-editor"]').element.parentElement!;
-    expect(area.getAttribute("style")).toContain("height: 12.5rem");
-    wrapper.unmount();
-  });
-
-  it("puts the door beside a fill-height editor and asks the host for room for a diff", async () => {
-    const wrapper = mountEditor({ editorHeight: "100%", helperLayout: "inline" });
-    await settle();
-    const toolbar = wrapper.get('[data-test="inline-helper-toolbar"]');
-    expect(toolbar.attributes("data-layout")).toBe("inline");
-    expect(
-      toolbar.element.previousElementSibling?.contains(
-        wrapper.get('[data-test="code-query-editor"]').element,
-      ),
-    ).toBe(true);
-    expect(wrapper.emitted("helper-space")).toBeUndefined();
-    const vm = wrapper.vm as unknown as { $forceUpdate(): void };
-    (await import("vue")).reactive(built).pending = { id: "p1" };
-    vm.$forceUpdate();
-    await settle();
-    expect(wrapper.emitted("helper-space")?.at(-1)).toEqual([160]);
-    wrapper.unmount();
-    expect(wrapper.emitted("helper-space")?.at(-1)).toEqual([0]);
-  });
-
-  it("draws the host's placeholder inside the editor area while empty and unfocused", async () => {
-    const wrapper = mountEditor({ placeholder: "Write a VRL function" });
-    await settle();
-    expect(wrapper.get('[data-test="query-editor-placeholder"]').text()).toBe(
-      "Write a VRL function",
-    );
-    wrapper.findComponent({ name: "CodeQueryEditor" }).vm.$emit("focus");
-    await settle();
-    expect(wrapper.find('[data-test="query-editor-placeholder"]').exists()).toBe(false);
+  it("draws the placeholder only while the editor is empty and unfocused", async () => {
+    const wrapper = mountEditor({ placeholder: "Search logs" });
+    const overlay = () => wrapper.find('[data-test="query-editor-placeholder"]');
+    expect(overlay().text()).toBe("Search logs");
+    const editor = wrapper.findComponent({ name: "CodeQueryEditor" });
+    editor.vm.$emit("focus");
+    await flushPromises();
+    expect(overlay().exists()).toBe(false);
+    editor.vm.$emit("blur");
+    await wrapper.setProps({ query: "SELECT 1" });
+    expect(overlay().exists()).toBe(false);
     wrapper.unmount();
   });
 });

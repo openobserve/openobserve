@@ -32,16 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col"
     >
       <div
-        v-for="group in groups"
+        v-for="(group, index) in groups"
         :key="group.id"
         role="group"
+        :class="index > 0 ? 'border-dropdown-border mt-1 border-t pt-1' : ''"
         :aria-label="group.title"
         :aria-describedby="group.note ? `${listboxId}-${group.id}-note` : undefined"
         :aria-busy="group.state === 'loading' || undefined"
         :data-test="`assistant-mention-group-${group.id}`"
       >
         <div
-          class="text-text-secondary flex justify-between px-2 pt-2 pb-1 text-xs font-medium"
+          class="text-dropdown-label flex items-baseline justify-between px-2 pt-1.5 pb-1 text-xs font-semibold"
           aria-hidden="true"
         >
           <span>{{ group.title }}</span>
@@ -54,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <span
             v-else-if="group.total"
-            class="tabular-nums"
+            class="font-normal tabular-nums"
             data-test="assistant-mention-group-count"
             >{{ group.total }}</span
           >
@@ -77,15 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label: item.label,
                 })
           "
-          :class="[
-            'rounded-default flex min-h-8 items-center gap-2 px-2 py-1 text-sm max-md:min-h-11 pointer-coarse:min-h-11',
-            item.disabled ? 'text-text-secondary' : 'cursor-pointer',
-            item.id === activeOptionId
-              ? 'bg-dropdown-item-hover-bg text-text-heading'
-              : item.disabled
-                ? ''
-                : 'text-text-body hover:bg-dropdown-item-hover-bg',
-          ]"
+          :class="rowClass(item)"
           :data-test="
             item.action
               ? `assistant-mention-${item.action}`
@@ -101,10 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @keydown.enter.prevent="choose(item)"
         >
           <OIcon
-            v-if="item.glyph"
-            :name="item.glyph"
-            size="xs"
-            class="text-text-secondary shrink-0"
+            v-if="rowGlyph(item)"
+            :name="rowGlyph(item)!"
+            size="sm"
+            :class="[
+              'shrink-0',
+              item.id === activeOptionId ? 'text-text-heading' : 'text-text-secondary',
+            ]"
+            data-test="assistant-mention-glyph"
           />
           <span v-if="item.agent" class="flex min-w-0 flex-1 flex-col items-start text-start">
             <span>{{ item.label }}</span>
@@ -120,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             item.label
           }}</OTruncatedText>
           <OTruncatedText
-            v-if="item.secondary && !item.agent && query"
+            v-if="item.secondary && !item.agent"
             :class="[
               'text-xs',
               item.action ? 'min-w-0 flex-1 text-end' : 'shrink-0',
@@ -190,7 +187,7 @@ const STREAM_TYPES = ["logs", "metrics", "traces"] as const;
 import { useQuery } from "@tanstack/vue-query";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 
-import { agentGlyph, assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { agentGlyph, assistantGlyph, chipGlyph } from "@/components/ai-assistant/common/glyphs";
 import { sharedAgentPolicy } from "@/components/ai-assistant/agents/agentClause";
 import { announceComposer } from "@/components/ai-assistant/composer/composerUi";
 import { shortLabelFor, useAssistantCapability, useAssistantStore } from "@/composables/assistant";
@@ -564,6 +561,32 @@ function namesOf(data: unknown): string[] {
 function stringOf(value: unknown): string | null {
   if (typeof value === "number") return String(value);
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function rowClass(item: MentionOption): string[] {
+  const active = item.id === activeOptionId.value;
+  const link = item.action === "more" || item.action === "retry";
+  const tone = link
+    ? "text-text-link"
+    : active
+      ? "text-text-heading"
+      : item.disabled
+        ? "text-text-secondary"
+        : "text-text-body";
+  return [
+    "rounded-default flex min-h-8 items-center gap-2 px-2 py-1 max-md:min-h-11 pointer-coarse:min-h-11",
+    link ? "ps-8 text-xs font-medium" : "text-sm",
+    item.disabled ? "" : "cursor-pointer",
+    tone,
+    active ? "bg-dropdown-item-hover-bg" : item.disabled ? "" : "hover:bg-dropdown-item-hover-bg",
+  ];
+}
+
+// Every chosen row carries its kind's glyph so groups read apart at a glance; Show all and Retry stay text.
+function rowGlyph(item: MentionOption): IconName | undefined {
+  if (item.glyph) return item.glyph;
+  if (item.action) return undefined;
+  return item.disabled ? assistantGlyph.locked : chipGlyph[item.kind];
 }
 
 // Each other character, `_` included, becomes its code point, so `app.log` and `app_log` never share an id.

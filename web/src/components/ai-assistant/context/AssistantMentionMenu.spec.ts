@@ -301,6 +301,20 @@ describe("AssistantMentionMenu", () => {
     expect(options()[0].getAttribute("aria-label")).toContain("Streams, ");
   });
 
+  it("marks every option with its kind's glyph and its type, and keeps Show all as plain link text", async () => {
+    const { options } = await open();
+    for (const row of options())
+      expect(row.querySelector('[data-test="assistant-mention-glyph"]')).not.toBeNull();
+    const stream = options().find((o) => o.dataset.kind === "stream")!;
+    expect(stream.textContent).toContain("logs");
+    const more = document.body.querySelector<HTMLElement>('[data-test="assistant-mention-more"]')!;
+    expect(more.querySelector('[data-test="assistant-mention-glyph"]')).toBeNull();
+    expect(more.className).toContain("text-text-link");
+    const groups = [...document.body.querySelectorAll<HTMLElement>('[role="group"]')];
+    expect(groups[0].className).not.toContain("border-t");
+    expect(groups.slice(1).every((g) => g.className.includes("border-t"))).toBe(true);
+  });
+
   it("filters across groups, a query showing more per group, with Show all (CT-05 AC 2)", async () => {
     const first = await open("che");
     const { options } = first;

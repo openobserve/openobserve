@@ -388,13 +388,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     visible: assistantChat,
     shortcuts: [
       {
-        id: "assistantHelper",
-        keyForWindows: "ctrl+i",
-        keyForMac: "meta+i",
-        descriptionKey: "shortcuts.actions.assistantHelper",
-        visible: assistantChat,
-      },
-      {
         id: "editorTabFocusMode",
         keyForWindows: "ctrl+m",
         keyForMac: "ctrl+shift+m",

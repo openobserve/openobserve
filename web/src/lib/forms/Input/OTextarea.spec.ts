@@ -2,6 +2,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import { nextTick } from "vue";
 import OTextarea from "./OTextarea.vue";
 
 describe("OTextarea", () => {
@@ -124,5 +125,41 @@ describe("OTextarea", () => {
     mount(OTextarea, { attrs: { "aria-label": "Name" } }).unmount();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("OTextarea"));
+  });
+
+  it("re-measures an autogrow field when its width changes after mount", async () => {
+    let fire: () => void = () => {};
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(cb: () => void) {
+          fire = cb;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    wrapper = mount(OTextarea, { props: { autogrow: true, placeholder: "Ask" } });
+    const el = wrapper.find("textarea").element;
+    let width = 60;
+    let height = 120;
+    Object.defineProperty(el, "clientWidth", { get: () => width });
+    Object.defineProperty(el, "scrollHeight", { get: () => height });
+    await nextTick();
+    await nextTick();
+    expect(el.style.height).toBe("120px");
+    width = 340;
+    height = 24;
+    fire();
+    expect(el.style.height).toBe("24px");
+  });
+
+  it("re-measures an autogrow field when its placeholder changes", async () => {
+    wrapper = mount(OTextarea, { props: { autogrow: true, placeholder: "A long one" } });
+    const el = wrapper.find("textarea").element;
+    Object.defineProperty(el, "scrollHeight", { get: () => 24 });
+    await wrapper.setProps({ placeholder: "Short" });
+    await nextTick();
+    expect(el.style.height).toBe("24px");
   });
 });

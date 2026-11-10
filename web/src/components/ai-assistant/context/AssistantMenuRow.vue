@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <span class="text-text-body min-w-0 flex-1 truncate font-normal">{{ label }}</span>
     <span v-if="meta" class="text-text-secondary shrink-0 text-xs font-normal">{{ meta }}</span>
-    <OIcon v-if="selected" :name="assistantGlyph.done" size="xs" class="text-link shrink-0" />
+    <OIcon v-if="selected" :name="assistantGlyph.done" size="xs" class="text-text-link shrink-0" />
   </OButton>
 </template>
 

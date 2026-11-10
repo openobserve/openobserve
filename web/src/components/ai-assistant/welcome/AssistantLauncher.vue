@@ -80,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="input"
           :model-value="shownText"
           :state="goToOnly ? 'go_to' : (state ?? undefined)"
-          :trailing="voice.mine.value"
           :disabled="fieldLoading && !goToOnly"
           :placeholder="placeholder"
           :input-attrs="{
@@ -171,9 +170,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </AssistantComposerStrip>
           </template>
-          <template #trailing>
-            <AssistantDictationWave :elapsed-ms="voice.elapsedMs.value" />
-          </template>
           <template #bar>
             <AssistantComposerBottomRow>
               <template v-if="!goToOnly" #agent>
@@ -186,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="assistant-launcher-clear"
                 @click="clear"
               />
+              <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
               <AssistantDictateButton
                 v-if="!goToOnly && voice.mic.value !== 'none' && voice.mic.value !== 'off'"
                 :mic="voice.mic.value"

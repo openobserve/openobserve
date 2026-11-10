@@ -7,7 +7,7 @@ import type {
   TextareaSlots,
   TextareaExposed,
 } from "./OTextarea.types";
-import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
@@ -101,12 +101,28 @@ const autogrowStyle = computed(() => {
   };
 });
 
+// The mount-time height is only right for the mount-time width, so a field whose container settles later (a floating window) re-measures when its width changes.
+let widthObserver: ResizeObserver | null = null;
+let observedWidth = 0;
+
 onMounted(() => {
-  if (props.autogrow) nextTick(resizeTextarea);
+  if (!props.autogrow) return;
+  nextTick(resizeTextarea);
+  const el = textareaRef.value;
+  if (!el || typeof ResizeObserver === "undefined") return;
+  observedWidth = el.clientWidth;
+  widthObserver = new ResizeObserver(() => {
+    if (el.clientWidth === observedWidth) return;
+    observedWidth = el.clientWidth;
+    resizeTextarea();
+  });
+  widthObserver.observe(el);
 });
 
+onBeforeUnmount(() => widthObserver?.disconnect());
+
 watch(
-  () => props.modelValue,
+  () => [props.modelValue, props.placeholder],
   () => {
     if (props.autogrow) nextTick(resizeTextarea);
   },

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="tail"
     ref="mirror"
     aria-hidden="true"
-    class="pointer-events-none absolute overflow-hidden px-1 py-0 pe-24 text-sm leading-6 wrap-break-word whitespace-pre-wrap text-transparent"
+    class="pointer-events-none absolute overflow-hidden px-1 py-0 text-sm leading-6 wrap-break-word whitespace-pre-wrap text-transparent"
     :style="box"
     data-test="assistant-dictate-tail"
   >

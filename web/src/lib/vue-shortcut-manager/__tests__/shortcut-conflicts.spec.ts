@@ -76,10 +76,10 @@ describe("shortcut conflict audit (10 §6.4)", () => {
     expect(duplicates).toEqual([]);
   });
 
-  it("keeps Ctrl+I global and the editor helper on the same chord in its own scope", () => {
+  it("keeps Ctrl+I global with no editor-scoped twin", () => {
     const bindings = visibleBindings(false);
     expect(bindings).toContain("global ctrl+i");
-    expect(bindings).toContain("editor ctrl+i");
+    expect(bindings).not.toContain("editor ctrl+i");
   });
 
   it("puts the assistant's Escape in its own scope, apart from closeDialog", () => {
@@ -113,7 +113,7 @@ describe("shortcut conflict audit (10 §6.4)", () => {
   });
 
   it("never binds the palette chord to the assistant", () => {
-    const assistantKeys = ["assistantOpen", "assistantHelper", "assistantHistory"].flatMap((id) =>
+    const assistantKeys = ["assistantOpen", "assistantHistory"].flatMap((id) =>
       resolveShortcutKeys(getShortcutDef(id)!, true),
     );
     expect(assistantKeys).not.toContain("meta+k");

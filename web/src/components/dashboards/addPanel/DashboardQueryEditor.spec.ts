@@ -342,31 +342,6 @@ describe("DashboardQueryEditor", () => {
     });
   });
 
-  describe("Assistant helper time", () => {
-    it("reads the panel's microsecond window as milliseconds, with its relative period", () => {
-      wrapper = createWrapper();
-      const to = 1_760_000_000_000;
-      wrapper.vm.dashboardPanelData.meta.dateTime = {
-        start_time: new Date((to - 900_000) * 1000),
-        end_time: new Date(to * 1000),
-        relativeTimePeriod: "15m",
-      };
-      expect(wrapper.vm.dashboardAssistant.timeRange).toEqual({
-        from: to - 900_000,
-        to,
-        period: "15m",
-      });
-      wrapper.vm.dashboardPanelData.meta.dateTime = {
-        start_time: new Date((to - 900_000) * 1000),
-        end_time: new Date(to * 1000),
-        relativeTimePeriod: null,
-      };
-      expect(wrapper.vm.dashboardAssistant.timeRange).toEqual({ from: to - 900_000, to });
-      wrapper.vm.dashboardPanelData.meta.dateTime = { start_time: "", end_time: "" };
-      expect(wrapper.vm.dashboardAssistant.timeRange).toBeUndefined();
-    });
-  });
-
   describe("Component State", () => {
     it("should track current query index", () => {
       wrapper = createWrapper();

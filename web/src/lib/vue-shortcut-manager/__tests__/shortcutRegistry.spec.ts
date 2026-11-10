@@ -310,7 +310,6 @@ describe("assistant entries", () => {
   const ASSISTANT_IDS = [
     "assistantOpen",
     "assistantClose",
-    "assistantHelper",
     "assistantHistory",
     "assistantComposerSend",
     "assistantComposerNewline",
@@ -371,10 +370,7 @@ describe("assistant entries", () => {
       scope: undefined,
       allowInInput: true,
     });
-    expect(getShortcutDef("assistantHelper")).toMatchObject({
-      keyForWindows: "ctrl+i",
-      scope: "editor",
-    });
+    expect(getShortcutDef("assistantHelper")).toBeUndefined();
     expect(getShortcutDef("assistantGoToAnswer")).toMatchObject({
       keyForWindows: "ctrl+up",
       keyForMac: "meta+up",
@@ -401,7 +397,7 @@ describe("getShortcutDisplay (K1)", () => {
   });
 
   it("keeps the shared form when the Mac binding only swaps Ctrl for ⌘, in any order", () => {
-    expect(getShortcutDisplay("assistantHelper", true)).toBe("ctrl+i");
+    expect(getShortcutDisplay("assistantOpen", true)).toBe("ctrl+i");
     const redo = SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts).find(
       (e) => e.keyForWindows === "ctrl+shift+z" && e.keyForMac === "shift+meta+z",
     );

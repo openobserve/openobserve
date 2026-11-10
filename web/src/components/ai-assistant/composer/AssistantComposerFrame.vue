@@ -39,9 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="bar" />
       </template>
     </OTextarea>
-    <span v-if="trailing" class="absolute end-2.5 top-9.5 flex">
-      <slot name="trailing" />
-    </span>
   </div>
 </template>
 
@@ -52,8 +49,6 @@ export interface AssistantComposerFrameProps {
   state?: string;
   /** Held for a decision: the field reads as unavailable. */
   inert?: boolean;
-  /** Shows the trailing slot (the dictation waveform) and keeps the text clear of it. */
-  trailing?: boolean;
   /** The panel just opened: one accent light runs round the border once (none under reduced motion). */
   opening?: boolean;
   /** Attributes for the textarea itself; `class` adds to the frame's own. */
@@ -92,7 +87,6 @@ defineOptions({ inheritAttrs: false });
 const props = withDefaults(defineProps<AssistantComposerFrameProps>(), {
   state: undefined,
   inert: false,
-  trailing: false,
   opening: false,
   inputAttrs: () => ({}),
 });
@@ -101,7 +95,6 @@ const emit = defineEmits<AssistantComposerFrameEmits>();
 
 defineSlots<{
   strip?: () => unknown;
-  trailing?: () => unknown;
   bar?: () => unknown;
 }>();
 
@@ -110,10 +103,9 @@ const sweeping = computed(() => props.opening && !prefersReducedMotion());
 
 const textbox = ref<InstanceType<typeof OTextarea> | null>(null);
 
-// The trailing waveform sits over the first line, so the text keeps clear of it.
 const fieldAttrs = computed(() => ({
   ...props.inputAttrs,
-  class: [FIELD_CLASS, props.trailing ? "pe-24!" : "", props.inputAttrs.class ?? ""].join(" "),
+  class: [FIELD_CLASS, props.inputAttrs.class ?? ""].join(" "),
 }));
 
 defineExpose({

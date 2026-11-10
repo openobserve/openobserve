@@ -40,7 +40,7 @@ describe("OShortcut", () => {
     });
 
     it("keeps the plain Ctrl→⌘ swap for an ordinary pair", () => {
-      wrapper = mount(OShortcut, { props: { id: "assistantHelper" } });
+      wrapper = mount(OShortcut, { props: { id: "assistantOpen" } });
       expect(wrapper.find("kbd").text()).toBe("⌘I");
     });
   });

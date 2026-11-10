@@ -762,7 +762,7 @@ describe("CodeQueryEditor", () => {
     const assistantAction = () =>
       (mockEditorObj.addAction.mock.calls as unknown as [any][])
         .map(([action]) => action)
-        .find((action) => action.id === "o2.assistantHelper");
+        .find((action) => action.id === "o2.assistantOpen");
 
     it("binds the assistant chord as an editor action that wins over Monaco's own Ctrl+I", async () => {
       const chord = vi.fn(() => true);

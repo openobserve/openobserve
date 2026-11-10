@@ -75,7 +75,7 @@ Mock scenarios: `permission_card` with `slow`. Page: Alerts, Add alert, SQL quer
 | 1 | Open the query editor dialog, then the dock with its toggle. Type in the editor. | Focus is in the editor buffer. |
 | 2 | In the docked message box, ask for a change that needs approval. Shift+Tab back into the editor and keep typing. Press `Ctrl+M` (`Ctrl+Shift+M` on macOS). | Monaco: "Pressing Tab will now move focus to the next focusable element". |
 | 3 | Wait for the card while typing in the editor. | A sentence ending "Press Control I to review it." Focus stays in the editor. |
-| 4 | `Ctrl+I` | Focus: "Deny, button". The inline helper does not open. |
+| 4 | `Ctrl+I` | Focus: "Deny, button". |
 | 5 | Escape | The card closes as declined. Focus moves to the docked message box. |
 | 6 | Type the next message while a turn runs, then press Enter. | "Wait for this answer to finish, or stop it." The pending card stays. |
 
