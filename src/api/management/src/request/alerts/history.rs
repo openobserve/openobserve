@@ -48,8 +48,12 @@ const MAX_ALERT_IDS: usize = 500;
 /// Longer id lists become one regex, since each leading-wildcard LIKE is a separate scan.
 const LIKE_PREDICATE_MAX_IDS: usize = 20;
 
+/// Latest accepted end time (9999-12-31); search adds offsets to it and overflows near `i64::MAX`.
+const MAX_END_TIME_MICROS: i64 = 253_402_300_799_999_999;
+
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 7] = [
+const OPTIONAL_HISTORY_COLUMNS: [&str; 8] = [
+    "severity",
     "downtime_id",
     "acked_by",
     "ack_action",
@@ -135,6 +139,9 @@ pub struct AlertHistoryEntry {
     /// Severity of the matched threshold: "ok" | "warning" | "critical".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub level: Option<String>,
+    /// SIEM detections only: the rule's Sigma level ("informational" to "critical").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
     /// The value that was compared (row count, or the aggregate).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actual_value: Option<f64>,
@@ -261,7 +268,7 @@ pub async fn get_alert_history(
     }
 
     // Validate time range
-    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+    if let Err(msg) = validate_history_range(start_time, end_time) {
         return MetaHttpResponse::bad_request(msg);
     }
 
@@ -504,6 +511,7 @@ pub async fn get_alert_history(
                     // Anomaly rows: the count IS the observed value; the level
                     // comes from the normalized outcome upstream.
                     level: None,
+                    severity: None,
                     actual_value: Some(anomaly_count as f64),
                     threshold_value: None,
                     threshold_operator: None,
@@ -704,17 +712,12 @@ pub async fn get_alert_history(
         })
     };
     #[cfg(feature = "enterprise")]
-    let siem_ids =
-        if query.alert_id.is_none() && query.alert_ids.is_none() && query.siem == Some(true) {
-            Some(restrict_to_permitted(
-                db::alerts::alert::resolve_siem_alert_ids(&org_id).await,
-                permitted_alert_ids.as_deref(),
-            ))
-        } else {
-            None
-        };
+    let (siem_rows, siem_only) = (
+        o2_enterprise::enterprise::security::history_summary::siem_rows_predicate(&triggers_schema),
+        query.siem == Some(true),
+    );
     #[cfg(not(feature = "enterprise"))]
-    let siem_ids: Option<Vec<String>> = None;
+    let (siem_rows, siem_only): (Option<String>, bool) = (None, false);
     // Add alert ID filter if provided
     // The key field contains the alert ID in the format "alert_name/alert_id"
     if let Some(ref alert_id) = query.alert_id {
@@ -729,11 +732,17 @@ pub async fn get_alert_history(
             return empty();
         }
         where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(&ids)));
-    } else if let Some(ids) = siem_ids {
-        if ids.is_empty() {
+    } else if siem_only {
+        let Some(siem_rows) = siem_rows.as_deref() else {
             return empty();
+        };
+        if let Some(permitted_ids) = permitted_alert_ids.as_deref() {
+            if permitted_ids.is_empty() {
+                return empty();
+            }
+            where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(permitted_ids)));
         }
-        where_clause.push_str(&format!(" AND ({})", alert_ids_predicate(&ids)));
+        where_clause.push_str(&format!(" AND {siem_rows}"));
     } else if let Some(permitted_ids) = permitted_alert_ids {
         // Filter by permitted alerts only
         if permitted_ids.is_empty() {
@@ -758,6 +767,11 @@ pub async fn get_alert_history(
     }
     // If permitted_alert_ids is None, user has access to all alerts
     // No additional filter needed in WHERE clause
+    if let Some(siem_rows) = siem_rows.as_deref()
+        && !crate::request::security::security_allowed(&org_id, &user_email.user_id, "GET").await
+    {
+        where_clause.push_str(&format!(" AND NOT {siem_rows}"));
+    }
     if let Some(raw) = query.outcome.as_deref() {
         match outcome_predicate(raw) {
             Ok(predicate) => where_clause.push_str(&format!(" AND {predicate}")),
@@ -950,6 +964,7 @@ pub async fn get_alert_history(
                 .and_then(|v| v.as_i64())
                 .and_then(|v| config::meta::alerts::level::AlertLevel::from_i32(v as i32))
                 .map(|l| l.to_string()),
+            severity: hit_text(&hit, "severity"),
             actual_value: hit.get("actual_value").and_then(|v| v.as_f64()),
             threshold_value: hit.get("threshold_value").and_then(|v| v.as_f64()),
             threshold_operator: hit
@@ -1148,7 +1163,7 @@ pub async fn get_all_anomaly_history(
         .start_time
         .unwrap_or_else(|| (Utc::now() - Duration::try_days(7).unwrap()).timestamp_micros());
 
-    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+    if let Err(msg) = validate_history_range(start_time, end_time) {
         return MetaHttpResponse::bad_request(msg);
     }
 
@@ -1323,6 +1338,15 @@ pub struct AnomalyBulkHistoryQuery {
     pub end_time: Option<i64>,
 }
 
+/// Like `validate_time_range`, but also rejects end times too large for search to offset.
+pub(crate) fn validate_history_range(start_time: i64, end_time: i64) -> Result<(), &'static str> {
+    openobserve_api_common::request::validate_time_range(start_time, end_time)?;
+    if end_time > MAX_END_TIME_MICROS {
+        return Err("end_time is out of range");
+    }
+    Ok(())
+}
+
 /// Parses a comma-separated id list; ids are KSUIDs, so they need no SQL escaping.
 pub(crate) fn parse_alert_ids(raw: &str) -> Result<Vec<String>, String> {
     let ids: Vec<String> = raw
@@ -1404,6 +1428,16 @@ mod tests {
     use svix_ksuid::KsuidLike as _;
 
     use super::*;
+
+    #[test]
+    fn test_validate_history_range_rejects_out_of_range_times() {
+        assert!(validate_history_range(1, MAX_END_TIME_MICROS).is_ok());
+        assert!(validate_history_range(1, i64::MAX).is_err());
+        assert!(validate_history_range(1, MAX_END_TIME_MICROS + 1).is_err());
+        assert!(validate_history_range(i64::MIN, 2).is_err());
+        assert!(validate_history_range(0, 2).is_err());
+        assert!(validate_history_range(5, 5).is_err());
+    }
 
     #[test]
     fn test_parse_alert_ids_accepts_ksuids_and_rejects_others() {
@@ -1523,6 +1557,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1584,6 +1619,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1634,6 +1670,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1882,6 +1919,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1928,6 +1966,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -1981,6 +2020,7 @@ mod tests {
             group_size: None,
             anomaly_count: None,
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -2024,6 +2064,7 @@ mod tests {
             group_size: Some(3),
             anomaly_count: Some(2),
             level: None,
+            severity: None,
             actual_value: None,
             threshold_value: None,
             threshold_operator: None,
@@ -2171,5 +2212,18 @@ mod tests {
             history_columns(&Schema::new(fields)).ends_with(", success_response"),
             "a sent row such as `destination ops-jira created OPS-141;` must reach the history"
         );
+    }
+
+    #[test]
+    fn the_siem_severity_column_is_read_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        assert!(!history_columns(&Schema::new(fields.clone())).contains("severity"));
+        fields.push(field("severity"));
+        assert!(history_columns(&Schema::new(fields)).ends_with(", severity"));
+        let hit = serde_json::json!({"severity": "low"});
+        assert_eq!(hit_text(&hit, "severity").as_deref(), Some("low"));
     }
 }

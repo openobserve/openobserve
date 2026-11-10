@@ -567,6 +567,7 @@ impl ListAlertsQuery {
             // Resolved by the service layer, which owns the alert cache the
             // infra layer cannot reach (PT-8).
             tag_alert_ids: None,
+            excluded_alert_ids: Vec::new(),
             sort_by: match self.sort_by.as_deref() {
                 Some("priority") => Some(meta_alerts::AlertSortField::Priority),
                 Some("name") => Some(meta_alerts::AlertSortField::Name),

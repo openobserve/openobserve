@@ -3,21 +3,18 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import threatIntel, { RemoveRefused, type IntelTable } from "@/services/threat_intel";
-import {
-  INDICATOR_TYPES,
-  INTEL_SEVERITIES,
-  intelTableName,
-  parseIndicatorList,
-} from "@/utils/security/intel";
+import securityIntel, { MAX_LIST_INDICATORS } from "@/services/securityIntel";
+import { INDICATOR_TYPES, INTEL_SEVERITIES, intelTableName } from "@/utils/security/intel";
 import {
   EXPIRY_DAYS,
   intelAddDefaults,
@@ -37,6 +34,9 @@ const emit = defineEmits<{ "update:open": [open: boolean]; saved: [table: string
 
 const { t } = useI18nTyped();
 const store = useStore();
+// Writing intel lists is authoring; the server refuses it without the grant too.
+const { canAuthor } = useSecurityAccess();
+const shown = computed(() => props.open && canAuthor.value);
 const FORM_ID = "security-intel-add-form";
 
 const schema = makeIntelAddSchema(t);
@@ -60,18 +60,73 @@ const expiryOptions = computed(() =>
 );
 
 async function onSubmit(value: IntelAddForm) {
+  if (!canAuthor.value) return;
   const table = intelTableName(value.list);
   const existing = props.tables.find((tb) => tb.name === table);
   if (existing?.feed) {
     toast({ variant: "error", message: t("siem.intel.form.feedReadOnly", { table }) });
     return;
   }
-  const parsed = parseIndicatorList(value.indicators, value.type === "auto" ? null : value.type);
   const already = new Set(props.existingKeys[table] ?? []);
+  // Stats lag uploads and the page reads a capped number of rows, so take the larger count.
+  const held = Math.max(already.size, existing?.docs ?? 0);
+  let checked;
+  try {
+    checked = (
+      await securityIntel.validate(store.state.selectedOrganization.identifier, {
+        text: value.indicators,
+        forced_type: value.type === "auto" ? null : value.type,
+        held,
+      })
+    ).data;
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: raw(e?.response?.data?.message) || t("siem.intel.form.saveFailed"),
+    });
+    return;
+  }
+  const parsed = checked.parsed ?? { valid: [], invalid: [], duplicates: 0 };
+  if (parsed.invalid.length) {
+    const sample = parsed.invalid
+      .slice(0, 3)
+      .map((i) => `${i.value} (${t("siem.intel.form.line", { n: i.line })})`)
+      .join(", ");
+    toast({
+      variant: "error",
+      message: t("siem.intel.form.invalid", { n: parsed.invalid.length, sample }),
+    });
+    return;
+  }
+  if (parsed.valid.length > checked.max_indicators) {
+    toast({
+      variant: "error",
+      message: t("siem.intel.form.tooMany", {
+        n: parsed.valid.length,
+        max: checked.max_indicators,
+      }),
+    });
+    return;
+  }
+  if (!parsed.valid.length) {
+    toast({ variant: "error", message: t("siem.intel.form.indicatorsRequired") });
+    return;
+  }
   const fresh = parsed.valid.filter((v) => !already.has(`${v.type}:${v.indicator}`));
   if (!fresh.length) {
     toast({ variant: "info", message: t("siem.intel.form.allPresent", { table }) });
     emit("update:open", false);
+    return;
+  }
+  if (fresh.length > checked.room) {
+    toast({
+      variant: "error",
+      message: t("siem.intel.form.listFull", {
+        table,
+        count: held + fresh.length,
+        max: checked.max_indicators,
+      }),
+    });
     return;
   }
   const now = new Date();
@@ -118,7 +173,7 @@ async function onSubmit(value: IntelAddForm) {
 
 <template>
   <ODialog
-    :open="open"
+    :open="shown"
     size="md"
     :title="t('siem.intel.form.addTitle')"
     :sub-title="t('siem.intel.form.addSubtitle')"
@@ -130,7 +185,7 @@ async function onSubmit(value: IntelAddForm) {
     @click:secondary="emit('update:open', false)"
   >
     <OForm
-      v-if="open"
+      v-if="shown"
       :id="FORM_ID"
       :schema="schema"
       :default-values="defaults"
@@ -141,7 +196,7 @@ async function onSubmit(value: IntelAddForm) {
         name="indicators"
         :label="t('siem.intel.form.indicators')"
         :placeholder="t('siem.intel.form.indicatorsPlaceholder')"
-        :help-text="t('siem.intel.form.indicatorsHelp')"
+        :help-text="t('siem.intel.form.indicatorsHelp', { max: MAX_LIST_INDICATORS })"
         :rows="6"
         required
         data-test="security-intel-add-indicators"

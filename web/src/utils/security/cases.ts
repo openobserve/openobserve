@@ -38,6 +38,19 @@ export const TRANSITIONS: Record<CaseStatus, CaseStatus[]> = {
   resolved: ["open"],
 };
 
+/** Closing verdicts the server accepts for a case; mirrors `CaseVerdict`. */
+export const CASE_VERDICTS = [
+  "true_positive",
+  "false_positive",
+  "benign",
+  "duplicate",
+  "stale",
+] as const;
+export type CaseVerdict = (typeof CASE_VERDICTS)[number];
+
+/** The account the server closes cases as when no person did. */
+export const SYSTEM_USER = "system@openobserve.ai";
+
 export interface IncidentEventRaw {
   timestamp: number;
   type?: string;
@@ -55,6 +68,7 @@ export interface TimelineEntry {
     | "comment"
     | "title"
     | "assignment"
+    | "evidence"
     | "analysis"
     | "other";
   icon: IconName;
@@ -112,8 +126,8 @@ export function toTimelineEntry(event: IncidentEventRaw): TimelineEntry {
         ...base,
         kind: "status",
         icon: "task-alt",
-        key: d.user_id ? "resolved" : "autoResolved",
-        actor: d.user_id ?? undefined,
+        key: d.user_id && d.user_id !== SYSTEM_USER ? "resolved" : "autoResolved",
+        actor: d.user_id && d.user_id !== SYSTEM_USER ? d.user_id : undefined,
       };
     case "Reopened":
       return {
@@ -140,6 +154,37 @@ export function toTimelineEntry(event: IncidentEventRaw): TimelineEntry {
         icon: "person",
         key: d.to ? "assigned" : "unassigned",
         params: { to: String(d.to ?? "") },
+        actor: d.user_id ?? undefined,
+      };
+    case "Verdict":
+      return {
+        ...base,
+        kind: "status",
+        icon: "fact-check",
+        key: `verdict.${String(d.verdict ?? "")}`,
+        body: String(d.reason ?? ""),
+        actor: d.user_id,
+      };
+    case "AlertsAttached":
+      return {
+        ...base,
+        kind: "alert",
+        icon: "library-add",
+        key: "alertsAttached",
+        params: { names: (Array.isArray(d.alert_names) ? d.alert_names : []).join(", ") },
+        actor: d.user_id,
+      };
+    case "EventAttached":
+      return {
+        ...base,
+        kind: "evidence",
+        icon: "manage-search",
+        key: "eventAttached",
+        params: {
+          stream: String(d.stream ?? ""),
+          at: d.event_at ? new Date(Number(d.event_at) / 1000).toLocaleString() : "",
+        },
+        actor: d.user_id,
       };
     case "Comment":
       return {
@@ -208,6 +253,38 @@ export function caseDetections(
     seen.set(t.alert_name, entry);
   }
   return [...seen.values()].sort((a, b) => b.count - a.count || b.last - a.last);
+}
+
+/** Span of the case's activity in microseconds; `null` when it is one moment. */
+export function activitySpan(c: {
+  first_alert_at?: number;
+  last_alert_at?: number;
+}): number | null {
+  const first = Number(c.first_alert_at) || 0;
+  const last = Number(c.last_alert_at) || 0;
+  return first && last > first ? last - first : null;
+}
+
+/** How long the case stayed open before it was closed, in microseconds. */
+export function timeToClose(c: { created_at?: number; resolved_at?: number }): number | null {
+  const opened = Number(c.created_at) || 0;
+  const closed = Number(c.resolved_at) || 0;
+  return opened && closed > opened ? closed - opened : null;
+}
+
+/** The firing-time range to search history in: case first/last are event time, not firing time. */
+export function firingRange(
+  triggers: CaseTrigger[] | null | undefined,
+  c: { created_at?: number; updated_at?: number; resolved_at?: number },
+  slackUs: number,
+): { from: string; to: string } | null {
+  const fired = (triggers ?? []).map((t) => Number(t.alert_fired_at)).filter((n) => n > 0);
+  const from = fired.length ? Math.min(...fired) : Number(c.created_at) || 0;
+  const to = fired.length
+    ? Math.max(...fired)
+    : Number(c.resolved_at ?? c.updated_at ?? c.created_at) || 0;
+  if (!from || !to) return null;
+  return { from: String(from - slackUs), to: String(to + slackUs) };
 }
 
 /** Firings newest first. */

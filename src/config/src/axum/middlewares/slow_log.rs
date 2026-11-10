@@ -81,7 +81,7 @@ where
             .unwrap_or_else(|| "-".to_string());
 
         let path =
-            super::mask_share_tokens(req.uri().path_and_query().map(|x| x.as_str()).unwrap_or(""));
+            super::mask_log_url(req.uri().path_and_query().map(|x| x.as_str()).unwrap_or(""));
 
         let method = req.method().to_string();
 

@@ -12,10 +12,14 @@ import {
   type FiringRow,
 } from "./firings";
 import {
+  CASE_VERDICTS,
   TRANSITIONS,
+  activitySpan,
   caseDetections,
   caseFirings,
+  firingRange,
   groupValueRows,
+  timeToClose,
   toTimeline,
   toTimelineEntry,
   toneOfPriority,
@@ -103,6 +107,38 @@ describe("cases", () => {
     expect(toTimelineEntry({ timestamp: 4, type: "Resolved", data: { user_id: null } }).key).toBe(
       "autoResolved",
     );
+  });
+
+  it("reads a system close as automatic and records verdicts, assignment and attachments", () => {
+    const system = toTimelineEntry({
+      timestamp: 6,
+      type: "Resolved",
+      data: { user_id: "system@openobserve.ai" },
+    });
+    expect(system.key).toBe("autoResolved");
+    expect(system.actor).toBeUndefined();
+    const verdict = toTimelineEntry({
+      timestamp: 7,
+      type: "Verdict",
+      data: { user_id: "a@b.c", verdict: "false_positive", reason: "admin script" },
+    });
+    expect(verdict).toMatchObject({
+      key: "verdict.false_positive",
+      body: "admin script",
+      actor: "a@b.c",
+    });
+    const assigned = toTimelineEntry({
+      timestamp: 8,
+      type: "AssignmentChanged",
+      data: { from: null, to: "d@b.c", user_id: "a@b.c" },
+    });
+    expect(assigned).toMatchObject({ key: "assigned", actor: "a@b.c" });
+    const attached = toTimelineEntry({
+      timestamp: 9,
+      type: "AlertsAttached",
+      data: { user_id: "a@b.c", alert_ids: ["1", "2"], alert_names: ["X", "Y"] },
+    });
+    expect(attached).toMatchObject({ key: "alertsAttached", params: { names: "X, Y" } });
   });
 
   it("keeps an event type it does not know instead of dropping it", () => {
@@ -199,5 +235,49 @@ describe("case detections from a real incident payload", () => {
     expect(caseFirings(payload.triggers).map((f) => f.alert_fired_at)).toEqual([
       9_000, 5_000, 1_000,
     ]);
+  });
+});
+
+describe("case times", () => {
+  const MIN = 60_000_000;
+
+  it("measures duration over the activity, so a single firing has none", () => {
+    expect(activitySpan({ first_alert_at: 5 * MIN, last_alert_at: 5 * MIN })).toBeNull();
+    expect(activitySpan({ first_alert_at: 5 * MIN, last_alert_at: 65 * MIN })).toBe(60 * MIN);
+    expect(activitySpan({})).toBeNull();
+  });
+
+  it("measures time to close from when the case opened", () => {
+    expect(timeToClose({ created_at: 10 * MIN, resolved_at: 44 * MIN })).toBe(34 * MIN);
+    expect(timeToClose({ created_at: 10 * MIN })).toBeNull();
+  });
+
+  it("searches firings by when they fired, not by the event time the case spans", () => {
+    const triggers = [
+      { alert_name: "a", alert_fired_at: 100 * MIN },
+      { alert_name: "b", alert_fired_at: 130 * MIN },
+    ];
+    expect(firingRange(triggers, { created_at: 1 }, MIN)).toEqual({
+      from: String(99 * MIN),
+      to: String(131 * MIN),
+    });
+    expect(firingRange([], { created_at: 10 * MIN, resolved_at: 20 * MIN }, 0)).toEqual({
+      from: String(10 * MIN),
+      to: String(20 * MIN),
+    });
+    expect(firingRange(null, {}, 0)).toBeNull();
+  });
+
+  it("offers a stale verdict and reads an attached event", () => {
+    expect(CASE_VERDICTS).toContain("stale");
+    const entry = toTimelineEntry({
+      timestamp: 1,
+      type: "EventAttached",
+      data: { user_id: "a@acme.io", stream: "okta_auth", event_at: 1_700_000_000_000_000 },
+    });
+    expect(entry.kind).toBe("evidence");
+    expect(entry.key).toBe("eventAttached");
+    expect(entry.params.stream).toBe("okta_auth");
+    expect(entry.actor).toBe("a@acme.io");
   });
 });

@@ -516,6 +516,7 @@ describe("IngestMetrics: Get started pick", () => {
       "otelCollector",
       "telegraf",
       "cloudwatchMetrics",
+      "datadogAgentMetrics",
     ]);
     wrapper.unmount();
   });

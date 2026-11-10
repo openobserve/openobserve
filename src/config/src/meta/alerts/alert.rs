@@ -29,6 +29,9 @@ use crate::{
     utils::json,
 };
 
+/// Context attribute that marks an alert as a SIEM detection.
+pub const SIEM_ATTRIBUTE: &str = "siem";
+
 #[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[repr(i16)]
 pub enum RowTemplateType {
@@ -442,6 +445,9 @@ pub struct ListAlertsParams {
     /// against.
     pub tag_alert_ids: Option<Vec<String>>,
 
+    /// Alert ids the caller may not see, dropped in SQL so pagination stays correct.
+    pub excluded_alert_ids: Vec<String>,
+
     /// Optional sort column (PT-3). `None` keeps the historical ordering
     /// (name, then folder name).
     pub sort_by: Option<AlertSortField>,
@@ -481,6 +487,7 @@ impl ListAlertsParams {
             alert_type: AlertTypeFilter::All,
             priority: None,
             tag_alert_ids: None,
+            excluded_alert_ids: Vec::new(),
             sort_by: None,
             sort_desc: false,
             slo_id: None,
@@ -497,6 +504,12 @@ impl ListAlertsParams {
     /// Filter by a tag-resolved alert-ID set (see `tag_alert_ids`).
     pub fn with_tag_alert_ids(mut self, ids: Vec<String>) -> Self {
         self.tag_alert_ids = Some(ids);
+        self
+    }
+
+    /// Drop these alert ids from the result.
+    pub fn without_alert_ids(mut self, ids: Vec<String>) -> Self {
+        self.excluded_alert_ids = ids;
         self
     }
 
@@ -524,6 +537,13 @@ impl ListAlertsParams {
         self.page_size_and_idx = Some((page_size, page_idx));
         self
     }
+}
+
+/// The one rule for whether an alert's context attributes mark it as a SIEM detection.
+pub fn is_siem_detection(attrs: Option<&HashMap<String, String>>) -> bool {
+    attrs
+        .and_then(|attrs| attrs.get(SIEM_ATTRIBUTE))
+        .is_some_and(|v| v == "true")
 }
 
 #[cfg(test)]
@@ -1264,5 +1284,14 @@ mod tests {
         stored.as_object_mut().unwrap().remove("suppress_repeats");
         let alert: Alert = serde_json::from_value(stored).unwrap();
         assert!(!alert.suppress_repeats);
+    }
+
+    #[test]
+    fn test_only_a_true_siem_attribute_marks_a_detection() {
+        let attrs = |v: &str| HashMap::from([(SIEM_ATTRIBUTE.to_string(), v.to_string())]);
+        assert!(is_siem_detection(Some(&attrs("true"))));
+        assert!(!is_siem_detection(Some(&attrs("false"))));
+        assert!(!is_siem_detection(Some(&HashMap::new())));
+        assert!(!is_siem_detection(None));
     }
 }

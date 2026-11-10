@@ -691,7 +691,8 @@
       "scoreConfigs": "스코어 구성",
       "workflows": "워크플로우",
       "syntheticFolders": "Synthetics 폴더",
-      "downtimeFolders": "다운타임 폴더"
+      "downtimeFolders": "다운타임 폴더",
+      "security": "보안"
     },
     "resourcesInline": {
       "dashboards": "대시보드",
@@ -747,7 +748,8 @@
       "fleetManagement": "플릿 관리",
       "incidents": "인시던트",
       "onCallResponses": "온콜 응답",
-      "searchJobs": "검색 작업"
+      "searchJobs": "검색 작업",
+      "security": "보안"
     },
     "denied": {
       "view": "{resource}을(를) 볼 수 없습니다",
@@ -4500,6 +4502,7 @@
       "presetsSubtitle": "프리셋의 권한 부여를 이 역할에 추가합니다. 제거되는 항목은 없습니다.",
       "presetsSectionBuiltin": "기본 제공",
       "presetsSectionJob": "직무별",
+      "presetsSectionSecurity": "보안",
       "presetAddsTooltip": "권한 {count}개 추가 | 권한 {count}개 추가",
       "presetInRole": "역할에 포함됨",
       "presetInRoleTooltip": "이 역할에 이미 이 프리셋의 모든 항목이 있습니다",
@@ -4575,7 +4578,16 @@
       "presetRestored": "{title}: {permissions}이(가) 복원되었습니다. 저장하기 전에 변경 사항을 검토하세요.",
       "presetSummaryRestores": "제거하도록 표시한 권한 {count}개를 유지합니다. | 제거하도록 표시한 권한 {count}개를 유지합니다.",
       "presetRestoreButton": "권한 {count}개 유지 | 권한 {count}개 유지",
-      "effectStillAllowed": "액세스 변경 없음: 더 넓은 권한 부여가 여전히 이를 허용합니다."
+      "effectStillAllowed": "액세스 변경 없음: 더 넓은 권한 부여가 여전히 이를 허용합니다.",
+      "moduleGroupSecurity": "보안",
+      "presetSocAnalystTitle": "SOC 분석가",
+      "presetSocAnalystDescription": "보안 알림과 케이스를 분류하며, 탐지, 스트림, 위협 인텔리전스 목록에 대한 읽기 권한을 가집니다",
+      "presetDetectionEngineerTitle": "탐지 엔지니어",
+      "presetDetectionEngineerDescription": "탐지를 생성, 조정, 활성화, 실행하고 콘텐츠를 설치하며, 함수와 파이프라인과 함께 소스를 연결하고 위협 인텔리전스 목록 같은 보강 테이블을 관리하며, 보안, 케이스, 스트림에 대한 읽기 권한을 가집니다",
+      "presetSecurityAdminTitle": "보안 관리자",
+      "presetSecurityAdminDescription": "탐지와 케이스 삭제, 소스 제외를 포함해 인시던트, 함수, 파이프라인, 보강 테이블, 암호 키와 함께 보안 전체를 관리하며, 스트림에 대한 읽기 권한을 가집니다",
+      "presetSecurityViewerTitle": "보안 뷰어",
+      "presetSecurityViewerDescription": "보안과 그 케이스, 탐지, 소스 스트림을 변경하지 않고 봅니다"
     },
     "rolesPage": {
       "subtitle": "역할 번들 권한 — 사용자, 서비스 계정 또는 그룹에 할당하여 액세스 권한을 부여합니다.",
@@ -7711,6 +7723,28 @@
       "tlsBody": "이 토큰은 평문 HTTP를 통해 재사용될 수 있는 베어러 자격 증명이므로, {brand}에서(기본적으로 비활성화된 {setting}) 또는 그 앞의 신뢰할 수 있는 프록시에서 TLS를 종료하세요."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog 에이전트",
+    "datadogAgent": {
+      "intro": "기존 {product}의 설정을 변경하여 이 조직으로 로그, 메트릭, 트레이스를 전송합니다.",
+      "correlationBody": "로그와 트레이스를 연결하려면 애플리케이션에서 전체 128비트 트레이스 ID를 기록해야 합니다. Java tracer가 하위 64비트만 기록한다면 애플리케이션에 {setting}를 설정하세요.",
+      "profilingBody": "프로파일링은 별도의 대상과 Agent API 키를 사용합니다. 이미 프로파일러를 실행 중인 애플리케이션은 마이그레이션 중 애플리케이션 또는 tracer의 프로파일링을 끄거나 대상을 별도로 설정하세요.",
+      "multiValueTagsBody": "서로 다른 값이 여러 개인 태그는 정렬된 JSON 배열 문자열을 사용합니다. [로 시작하는 단일 값도 시리즈 식별을 유지하도록 단일 요소 JSON 배열로 인코딩됩니다.",
+      "envTitle": "에이전트 구성",
+      "envBody": "{product}에서 이 환경 변수를 설정하고 재시작하세요. {product} {version} 이상이 필요합니다.",
+      "tokenBody": "API 키는 {prefix}로 시작하는 조직 수집 토큰이어야 합니다. 이 조직에는 활성화된 수집 토큰이 없으므로 설정 스니펫이 표시되지 않습니다. 수집 토큰을 생성한 후 이 페이지로 돌아오세요.",
+      "tokenLink": "수집 토큰 열기",
+      "featuresOffBody": "URL 뒤의 줄은 동일한 키로 {vendor} 자체 서버에 전송하는 에이전트 기능을 끕니다. {setting}은(는) {component}도 꺼진 상태로 유지합니다. 최신 에이전트 버전은 이를 실행하며, 이 경우 이 URL의 경로가 유지되지 않습니다.",
+      "logsTitle": "로그",
+      "logsBody": "{product}에서는 로그 수집이 기본적으로 꺼져 있습니다. {setting}을(를) 설정하고 로그 소스를 구성하세요.",
+      "dualTitle": "현재 대상 유지",
+      "dualBody": "기존 대상과 함께 이 조직으로 전송하려면 현재 URL과 API 키를 유지하고 대신 이 항목들을 {file}에 추가하세요. 추가 로그 엔드포인트는 그렇지 않으면 TCP를 사용하므로 로그에는 {setting}이(가) 필요합니다.",
+      "metricsTitle": "메트릭 쿼리",
+      "metricsTypes": "모든 시계열은 에이전트가 전송한 값을 가진 게이지로 저장되며, {typeField}와(과) {intervalField}(으)로 레이블이 지정됩니다.",
+      "metricsCount": "Count 시계열은 각 플러시 간격의 개수를 보관합니다. PromQL에서는 {promql}, SQL에서는 {sql}로 합산하세요.",
+      "metricsRate": "Rate 시계열은 초당 값입니다. 값을 {intervalField}(으)로 곱하여 해당 간격의 개수를 복원하세요.",
+      "metricsCounterFns": "PromQL {rate}와(과) {increase}는 누적 카운터를 기대하므로 이 시계열에서는 의미 있는 결과를 제공하지 않습니다.",
+      "metricsSketch": "분포는 히스토그램 버킷으로 저장되며, 백분위수는 해당 버킷에서 추정됩니다. ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA 값을 높이면 더 많은 저장 행을 대가로 더 세밀한 버킷과 더 정확한 백분위수를 얻을 수 있습니다."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU 익스포터"
   },
@@ -24327,8 +24361,9 @@
       "classMix": "지난 1시간 클래스: {mix}",
       "objects": "OCSF 객체",
       "missingSignals": "확인되지 않음: {fields}",
-      "detections": "{n}개 탐지 | {n}개 탐지",
-      "firing": "{n}개 발생 | {n}개 발생",
+      "detections": "{n}개의 일치하는 규칙 | {n}개의 일치하는 규칙",
+      "firing": "적중이 있는 항목 {n}개 | 적중이 있는 항목 {n}개",
+      "matchingRulesHint": "이 소스에 적용되는 Sigma 카탈로그 규칙입니다. 적중은 현재 기간 내 일치 항목이며 배포된 탐지가 아닙니다.",
       "rulesFor": "{source}에 대한 Sigma 규칙",
       "hits": "{n}개 적중 | {n}개 적중",
       "viewHits": "적중 보기",
@@ -24357,7 +24392,44 @@
       "invertFilter": "포함과 제외 간 전환",
       "removeFilter": "필터 제거",
       "pivotSqlUnsupported": "이 SQL 쿼리는 단순한 SELECT … WHERE가 아니므로 필터를 추가할 수 없습니다. 쿼리를 직접 편집하거나 빌더로 전환하세요.",
-      "topValuesWholeStream": "SQL 모드: 값은 쿼리가 아니라 전체 스트림 기준으로 집계됩니다."
+      "topValuesWholeStream": "SQL 모드: 값은 쿼리가 아니라 전체 스트림 기준으로 집계됩니다.",
+      "allSources": "모든 보안 소스",
+      "sortSqlMode": "직접 작성한 쿼리는 자체 ORDER BY를 사용합니다",
+      "includeFailed": "{name}을(를) 보안에 추가하지 못했습니다",
+      "excludeFailed": "{name}을(를) 보안에서 제거하지 못했습니다",
+      "hunt": {
+        "title": "모든 보안 소스를 한 번에 검색",
+        "hint": "IP 주소, 사용자 또는 호스트를 입력하세요. 각 소스는 고유한 열로 검색되며, 각 행에는 어느 소스에서 왔는지 표시됩니다.",
+        "noMatches": "이 기간에 일치하는 항목이 없습니다",
+        "noMatchesHint": "시간 범위를 넓히거나 한 종류 대신 모든 필드를 검색하세요.",
+        "noFields": "필드는 소스마다 다릅니다. 필드를 보려면 소스 하나를 선택하세요.",
+        "search": "검색",
+        "aliases": "표기 {n}개도 함께 일치 | 표기 {n}개도 함께 일치",
+        "clearAliases": "입력한 이름만 일치",
+        "uncounted": "집계되지 않음: {streams}",
+        "kind": {
+          "any": "모든 필드",
+          "user": "사용자",
+          "ip": "IP 주소",
+          "host": "호스트"
+        },
+        "placeholder": {
+          "any": "IP 주소, 사용자, 호스트 또는 텍스트",
+          "user": "dave, ACME\\dave 또는 dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "호스트 이름"
+        },
+        "column": {
+          "time": "시간",
+          "source": "소스",
+          "user": "사용자",
+          "ip": "소스 IP",
+          "host": "호스트",
+          "action": "작업",
+          "outcome": "결과",
+          "message": "메시지"
+        }
+      }
     },
     "drawer": {
       "event": "보안 이벤트",
@@ -24378,7 +24450,14 @@
       "classUid": "class_uid {n}",
       "eyebrow": "보안 이벤트",
       "source": "소스",
-      "matchedRules": "탐지 {n}개 일치 | 탐지 {n}개 일치"
+      "matchedRules": "탐지 {n}개 일치 | 탐지 {n}개 일치",
+      "openCase": "케이스 열기",
+      "openCaseHint": "이 이벤트에 나오는 호스트, 사용자 또는 주소로 케이스 열기",
+      "addToCase": "케이스에 추가",
+      "pickCase": "열린 케이스에 추가",
+      "caseOpened": "케이스 열림: {title}",
+      "caseUpdated": "이벤트가 {title}에 추가됨",
+      "caseError": "이 이벤트로 케이스를 열 수 없습니다"
     },
     "record": {
       "prev": "이전 레코드",
@@ -24482,7 +24561,20 @@
       "customWindow": "고정 기간 표시 중: {from} → {to}",
       "backToRange": "최근 {range} 범위로 돌아가기",
       "missing": "이 링크가 가리키는 알림이 로드된 기간에 없습니다. 이 범위보다 오래되었거나 최신 행 제한을 초과했을 수 있습니다.",
-      "dismiss": "닫기"
+      "dismiss": "닫기",
+      "triage": {
+        "createCase": "케이스 만들기",
+        "addToCase": "케이스에 추가",
+        "openCase": "케이스 열기",
+        "acknowledge": "조사 시작",
+        "addNote": "메모 추가",
+        "notePlaceholder": "이 발생 항목의 케이스에 메모 추가",
+        "acknowledged": "케이스를 조사 중으로 표시했습니다",
+        "noted": "케이스에 메모를 추가했습니다",
+        "caseOpened": "케이스를 열었습니다",
+        "attached": "발생 항목을 케이스에 추가했습니다",
+        "failed": "케이스를 업데이트할 수 없습니다"
+      }
     },
     "cases": {
       "title": "케이스",
@@ -24510,7 +24602,8 @@
         "lastSeen": "마지막 발견"
       },
       "fact": {
-        "duration": "지속 시간"
+        "duration": "지속 시간",
+        "timeToClose": "종료까지 걸린 시간"
       },
       "durationMinutes": "{n}분",
       "durationHours": "{n}시간",
@@ -24532,7 +24625,8 @@
         "service_discovery": "서비스 검색을 기준으로 상관됨",
         "primary_match": "기본 차원 기준으로 상관됨",
         "secondary_match": "보조 차원 기준으로 상관됨",
-        "alert_id": "동일 탐지"
+        "alert_id": "동일 탐지",
+        "entity": "동일한 호스트, 사용자 또는 주소"
       },
       "commentPlaceholder": "팀에 메모 추가",
       "postComment": "메모 게시",
@@ -24554,7 +24648,16 @@
         "analysisComplete": "근본 원인 분석 완료됨",
         "analysisFailed": "근본 원인 분석 실패: {reason}",
         "analysisCancelled": "근본 원인 분석 취소됨",
-        "other": "{type}"
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "판정: 진양성",
+          "false_positive": "판정: 위양성",
+          "benign": "판정: 무해",
+          "duplicate": "판정: 중복",
+          "stale": "판정: 오래됨 / 과거"
+        },
+        "alertsAttached": "수동으로 추가된 발생 항목: {names}",
+        "eventAttached": "{stream}의 이벤트({at})가 추가됨"
       },
       "analysisHint": "이 케이스에서 발생 항목들을 서로 연결하는 요인을 AI가 요약한 내용입니다.",
       "runAnalysis": "분석",
@@ -24570,7 +24673,42 @@
         "resolved": "케이스 종료"
       },
       "notFound": "케이스를 찾을 수 없음",
-      "timelinePartial": "이 타임라인은 케이스 기록에서 재구성되었으므로 재구성 이전의 메모, 확인 및 분석 활동이 누락되었을 수 있습니다."
+      "timelinePartial": "이 타임라인은 케이스 기록에서 재구성되었으므로 재구성 이전의 메모, 확인 및 분석 활동이 누락되었을 수 있습니다.",
+      "verdict": {
+        "true_positive": "진양성",
+        "false_positive": "위양성",
+        "benign": "무해",
+        "duplicate": "중복",
+        "stale": "오래됨 / 과거"
+      },
+      "close": {
+        "title": "케이스 종료",
+        "verdict": "판정",
+        "verdictRequired": "판정을 선택하세요",
+        "reason": "사유",
+        "reasonPlaceholder": "확인한 내용과 케이스를 종료할 수 있는 이유",
+        "reasonRequired": "사유를 입력하세요",
+        "reasonTooLong": "사유는 {max}자 이하로 입력하세요",
+        "cancel": "취소"
+      },
+      "settings": {
+        "open": "케이스 설정",
+        "title": "케이스 설정",
+        "save": "저장",
+        "saved": "케이스 설정을 저장했습니다",
+        "loadFailed": "케이스 설정을 불러오지 못했습니다",
+        "saveFailed": "케이스 설정을 저장하지 못했습니다",
+        "autoCloseDays": "조용한 케이스 자동 종료 기간(일)",
+        "autoCloseDaysHint": "이 기간(일) 동안 새 발생이 없는 케이스는 자동으로 종료됩니다. 0이면 케이스를 열어 둡니다. 최대 {max}.",
+        "groupWindowMinutes": "발생을 묶는 시간 범위(분)",
+        "groupWindowMinutesHint": "동일한 호스트, 사용자 또는 주소의 활동이 이벤트 시간 기준으로 케이스의 최근 활동으로부터 이 시간(분) 이내이면 해당 케이스에 합류합니다. 0이면 탐지마다 케이스를 하나씩 엽니다. 최대 {max}.",
+        "wholeNumber": "정수를 입력하세요",
+        "range": "0부터 {max} 사이의 값을 입력하세요"
+      },
+      "assignedTo": "{to}에게 할당됨",
+      "unassignedToast": "케이스 할당이 해제되었습니다",
+      "historical": "과거(백필)",
+      "historicalHint": "이 케이스의 모든 발생은 과거 데이터에 대한 백필에서 나온 것이므로 현재 활동을 나타내지 않습니다."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -24592,19 +24730,21 @@
       "legend": {
         "firing": "기간 내 발생 (어두울수록 많음)",
         "covered": "활성화된 탐지로 커버됨",
-        "available": "규칙 사용 가능, 비활성화됨"
+        "available": "규칙 사용 가능, 비활성화됨",
+        "none": "카탈로그에 규칙 없음"
       },
       "columnCount": "{total}개 중 {covered}개 커버됨",
       "cellEnabled": "{n}개 탐지 켜짐 | {n}개 탐지 켜짐",
       "cellAvailable": "{n}개 규칙 사용 가능 | {n}개 규칙 사용 가능",
       "noMatch": "일치하는 기술이 없습니다",
       "unmapped": "알려진 전술이 없는 기술",
-      "footnote": "기술은 기본 제공되는 {n}개의 Sigma 규칙과 사용자의 탐지에서 비롯되며, 배치는 각 규칙에 태그된 전술을 따릅니다.",
+      "footnote": "커버리지는 MITRE ATT&CK Enterprise v{version}의 {total}개 기술을 기준으로 측정되며, 하위 기술은 상위 기술에 포함되어 계산됩니다. {n}개의 Sigma 규칙이 제품에 기본 제공됩니다.",
       "drawerEyebrow": "ATT&CK 기술",
       "state": {
         "firing": "발생",
         "covered": "커버됨",
-        "available": "커버되지 않음"
+        "available": "커버되지 않음",
+        "none": "규칙 없음"
       },
       "fact": {
         "state": "커버리지",
@@ -24629,7 +24769,9 @@
       "openTechnique": "attack.mitre.org에서 {id} 열기",
       "viewOnAttack": "ATT&CK에서 보기",
       "manageDetections": "탐지 관리",
-      "historyNarrowed": "알림 기록의 최대 쿼리 범위로 인해 {from} 이후 발생만 집계됩니다. 이 기간의 더 이전 발생은 계산되지 않습니다."
+      "historyNarrowed": "알림 기록의 최대 쿼리 범위로 인해 {from} 이후 발생만 집계됩니다. 이 기간의 더 이전 발생은 계산되지 않습니다.",
+      "cellNone": "규칙 없음",
+      "coverageError": "ATT&CK 커버리지를 불러오지 못했습니다: {reason}"
     },
     "detections": {
       "title": "탐지",
@@ -24647,7 +24789,8 @@
         "erroring": "오류 발생",
         "enabled": "활성화됨",
         "disabled": "비활성화됨",
-        "all": "모든 탐지"
+        "all": "모든 탐지",
+        "notifyFailing": "알림 전송 실패 중"
       },
       "column": {
         "name": "탐지",
@@ -24660,7 +24803,8 @@
       "state": {
         "enabled": "활성화됨",
         "disabled": "비활성화됨",
-        "erroring": "오류 발생"
+        "erroring": "오류 발생",
+        "notifyFailing": "알림 전송 실패 중"
       },
       "tab": {
         "overview": "개요",
@@ -24722,17 +24866,23 @@
       "libraryEmpty": "해당 필터와 일치하는 규칙이 없습니다",
       "stream": "스트림",
       "streamPlaceholder": "실행할 스트림 선택",
-      "notify": "알림",
-      "notifyPlaceholder": "대상 선택",
-      "noDestinations": "아직 알림 대상이 없습니다. 탐지가 알림을 보내려면 대상이 필요하므로 새 탭에서 만든 뒤 돌아오세요. 이 목록은 자동으로 새로 고쳐집니다.",
+      "notify": "알림 (선택 사항)",
+      "notifyPlaceholder": "없음: 발생은 여전히 케이스를 엽니다",
+      "noDestinations": "아직 알림 대상이 없습니다. 대상이 없어도 디텍션은 여전히 탐지 결과를 생성하고 케이스를 엽니다. 알림도 함께 받으려는 경우에만 대상을 추가하세요.",
       "createDestination": "대상 만들기",
       "reloadDestinations": "새로 고침",
       "lookBack": "조회 기간(분)",
+      "lookBackHelp": "최소 {minutes}분 상관관계 기간이며, 각 실행마다 이 기간을 조회 범위 안에서 이동합니다",
+      "correlationWindowLabel": "상관관계 기간(분)",
+      "backfill": "첫 실행 시 과거 데이터도 확인",
+      "backfillRange": "확인할 과거 데이터",
+      "backfillHours": "지난 1시간 | 지난 {n}시간",
       "runEvery": "실행 주기(분)",
       "silence": "무음 기간(분)",
       "compiles": "{stream}에 대해 컴파일됩니다",
       "compilesAs": "{stream}에 대해 컴파일되며 {source}(으)로 식별됩니다",
       "logsourceMismatch": "이 규칙은 {rule}용으로 작성되었지만 {stream}은(는) {source}(으)로 식별됩니다. 두 항목이 필드 이름을 공유하는 경우에만 일치할 수 있습니다.",
+      "unseenFields": "이 스트림에서 아직 확인되지 않은 필드: {fields}. 탐지를 생성하면 이 열이 추가되어 첫 해당 이벤트 전에 활성화됩니다.",
       "ocsfBridge": "{stream}은(는) OCSF이므로 규칙의 필드가 OCSF 경로에 매핑되며 {guard}이(가) 있는 이벤트에서만 실행됩니다.",
       "ocsfGuard": {
         "class": "class_uid {uid}",
@@ -24760,10 +24910,23 @@
       "validation": {
         "positive": "1분 이상이어야 합니다",
         "nonNegative": "음수일 수 없습니다",
-        "periodGap": "실행 간격보다 짧음: 실행 간격 사이의 분 단위 구간은 확인되지 않습니다"
+        "periodGap": "실행 간격보다 짧음: 실행 간격 사이의 분 단위 구간은 확인되지 않습니다",
+        "belowTimespan": "최소 {minutes}분 상관관계 기간 이상이어야 합니다"
       },
       "nameTaken": "“{name}” 이름의 탐지 또는 알림이 이미 존재합니다. 기존 이력이 이 항목과 병합되므로 다른 스트림을 선택하거나 기존 항목을 먼저 제거하세요.",
-      "loadError": "탐지 규칙을 불러오지 못했습니다"
+      "loadError": "탐지 규칙을 불러오지 못했습니다",
+      "notifyFailingHint": "이 규칙은 발생했지만 마지막 알림을 전달하지 못했습니다. 기록에서 알림 대상을 확인하세요.",
+      "correlationWindow": "상관 규칙의 시간 범위로 정해집니다",
+      "createForbidden": "탐지를 생성하려면 Security 권한이 필요합니다",
+      "preview": {
+        "run": "일치 항목 미리보기",
+        "hint": "최근 24시간에 대해 쿼리를 실행하고 처음 20건의 일치 이벤트를 표시합니다",
+        "empty": "최근 24시간 동안 일치한 항목이 없습니다",
+        "shown": "최근 24시간의 일치 이벤트 {total}건 중 {shown}건",
+        "failed": "쿼리가 실패했습니다: {reason}",
+        "time": "시간"
+      },
+      "queryFailed": "저장되지 않았습니다: 이 탐지의 쿼리를 실행할 수 없습니다({reason})"
     },
     "content": {
       "title": "콘텐츠",
@@ -24833,7 +24996,6 @@
       "noStreamsForRule": "이 규칙과 일치하는 스트림이 없습니다",
       "noStreamsForRuleHint": "{logsource}용으로 작성되었습니다. 해당 소스를 수집하면 여기에 표시됩니다.",
       "runnable": "이 스트림에서 실행 가능",
-      "notRunnable": "여기서는 실행할 수 없음",
       "openInEvents": "이벤트에서 열기",
       "installHere": "이 스트림에 설치",
       "install": "탐지로 설치",
@@ -24855,7 +25017,38 @@
         "severityId": "심각도",
         "statusId": "결과"
       },
-      "cannotRun": "데이터에서 실행할 수 없음"
+      "catalogError": "탐지 카탈로그를 불러오지 못했습니다: {reason}",
+      "notRunnableYet": "아직 실행할 수 없음",
+      "newRulesAvailable": "이제 {stream}에서 새 규칙 {n}개를 실행할 수 있습니다 | 이제 {stream}에서 새 규칙 {n}개를 실행할 수 있습니다",
+      "reviewNewRules": "검토",
+      "reviewingNewRules": "이제 {stream}에서 실행할 수 있는 규칙 {n}개 표시 중 | 이제 {stream}에서 실행할 수 있는 규칙 {n}개 표시 중",
+      "showAllRules": "모든 규칙 표시",
+      "installSelected": "선택 항목 설치",
+      "selectRunnable": "실행 가능 항목 선택",
+      "selectRunnableHint": "표시된 규칙 중 내 데이터에서 실행되고 아직 설치되지 않은 규칙을 모두 선택",
+      "bulk": {
+        "title": "규칙 {n}개 설치 | 규칙 {n}개 설치",
+        "subtitle": "각 규칙은 서버에서 해당 스트림용으로 컴파일되고 이 설정으로 탐지로 저장됩니다.",
+        "stream": "스트림",
+        "everyStream": "각 규칙이 실행되는 모든 스트림",
+        "folder": "알림 폴더",
+        "correlationWindow": "상관관계 규칙은 최소한 자체 기간만큼 과거를 조회합니다.",
+        "nothing": "선택한 규칙 중 이 스트림에서 실행되는 규칙이 없습니다.",
+        "plan": "탐지 {n}개가 생성됩니다: | 탐지 {n}개가 생성됩니다:",
+        "correlation": "상관관계",
+        "confirm": "탐지 {n}개 설치 | 탐지 {n}개 설치",
+        "close": "닫기",
+        "summary": "{total}개 중 {installed}개 설치, {skipped}개 건너뜀, {failed}개 실패",
+        "duplicate": "{name} 이름의 탐지가 이미 있습니다.",
+        "correlationBlocked": "이 스트림에서는 상관관계를 실행할 수 없습니다.",
+        "status": {
+          "installed": "설치됨",
+          "skipped": "건너뜀",
+          "failed": "실패",
+          "pending": "대기 중"
+        },
+        "done": "탐지 {n}개 설치됨 | 탐지 {n}개 설치됨"
+      }
     },
     "entities": {
       "title": "엔터티",
@@ -24865,18 +25058,15 @@
         "graph": "위험 그래프"
       },
       "riskGraph": {
-        "empty": "그래프로 표시할 엔터티가 없습니다",
-        "emptyHint": "보안 소스를 추가하거나 시간 범위를 넓히면 위험 그래프를 볼 수 있습니다.",
-        "showingTop": "위험도 기준 상위 {n}/{total}개 표시 중",
-        "illustrative": "예시: 관계는 관측된 것이 아니라 위험 순위에서 추론된 것입니다.",
-        "baseScore": "기본 {n}",
-        "propagatedScore": "전파 {n}",
-        "tier": {
-          "critical": "심각",
-          "high": "높음",
-          "medium": "중간",
-          "low": "낮음"
-        }
+        "empty": "이 기간에 연결된 항목이 없습니다",
+        "emptyHint": "그래프는 동일한 이벤트 또는 동일한 케이스에 나타난 사용자, IP 주소, 호스트를 연결합니다. 이 기간에는 해당하는 항목이 없습니다. 시간 범위를 넓혀 보세요.",
+        "showingTop": "위험도 기준 상위 {n}개 표시 중 (전체 {total}개)",
+        "legend": "실선: 같은 이벤트에서 확인됨. 점선: 같은 케이스에서 언급됨.",
+        "edgeEvents": "이벤트 {n}건 | 이벤트 {n}건",
+        "edgeCases": "케이스 {n}건 | 케이스 {n}건",
+        "scoreHint": "이를 언급한 케이스: {detection}. 실패한 이벤트: {failure}. 케이스가 언급한 엔터티와 연결됨: {neighbour}.",
+        "nodeFacts": "이벤트 {events}건 · 실패 {failures}건",
+        "nodeCases": "케이스 {n}건 | 케이스 {n}건"
       },
       "kinds": {
         "user": "사용자",
@@ -24917,16 +25107,20 @@
           "ip": "다수의 사용자",
           "host": "다수의 사용자"
         },
-        "external": "공인 주소"
+        "external": "공인 주소",
+        "fail_then_success": "실패 후 성공",
+        "open_case": "열린 케이스"
       },
       "signalHint": {
         "failures": "이 엔터티의 이벤트 중 최소 {rate}%가 실패했고 실패 건수가 최소 {n}건입니다. 결과를 보고하는 소스만 집계합니다.",
         "spread": {
-          "user": "해당 기간 동안 단일 소스에서 {n}개 이상의 소스 IP에서 확인되었습니다.",
-          "ip": "해당 기간 동안 단일 소스에서 {n}명 이상의 사용자가 사용했습니다. NAT 및 VPN 이그레스도 이와 같이 보이며, 비밀번호 스프레이 공격도 마찬가지입니다.",
-          "host": "해당 기간 동안 단일 소스에서 {n}명 이상의 사용자가 접근했습니다."
+          "user": "단일 소스에서 {n}개 이상의 소스 IP에서 확인되었으며, 이 기간에 다른 사용자가 보이는 수준을 크게 웃돕니다.",
+          "ip": "단일 소스에서 {n}명 이상의 사용자가 사용했으며, 이 기간의 다른 주소보다 훨씬 많습니다. NAT 및 VPN 송신 트래픽도 이와 같이 보이고, 패스워드 스프레이 공격도 마찬가지입니다.",
+          "host": "단일 소스에서 {n}명 이상의 사용자가 접근했으며, 이 기간의 다른 호스트보다 훨씬 많습니다."
         },
-        "external": "사설, 루프백 또는 링크 로컬 범위에 속하지 않습니다."
+        "external": "사설, 루프백 또는 링크 로컬 범위에 속하지 않습니다.",
+        "fail_then_success": "실패 이벤트가 최소 {n}개 발생한 후 첫 실패 이후 성공 이벤트가 있습니다. 추측이 성공했을 수 있습니다.",
+        "open_case": "열린 SIEM 케이스가 이 엔터티를 포함합니다."
       },
       "peersChip": {
         "ips": "단일 소스 내 최대 {n}개 소스 IP | 단일 소스 내 최대 {n}개 소스 IP",
@@ -24937,7 +25131,7 @@
       "capped": "각 소스는 가장 활동이 많은 엔터티 {n}개를 반환했습니다. 활동이 적은 엔터티는 나열되지 않으며, 해당 기준에 근접한 엔터티의 집계는 일부만 반영될 수 있습니다. + 표시가 있는 탭 카운트는 잘린 값입니다.",
       "failedStreams": "읽을 수 없음: {streams}",
       "noSources": "읽을 보안 소스가 없습니다",
-      "noSourcesHint": "엔터티는 이름이 보안 데이터로 표시된 스트림이나 이벤트 페이지에서 소스로 추가한 스트림에서 발견됩니다.",
+      "noSourcesHint": "엔티티는 이름이 보안 데이터임을 나타내는 스트림, 또는 보안 → 소스에서 포함한 스트림에서 발견됩니다.",
       "empty": "이 기간에 엔터티가 없습니다",
       "emptyHint": "시간 범위를 넓히거나 소스에 사용자, IP 또는 호스트 필드가 있는지 확인하세요.",
       "refresh": "새로 고침",
@@ -24945,7 +25139,8 @@
       "tab": {
         "activity": "활동",
         "related": "관련 항목",
-        "sources": "소스"
+        "sources": "소스",
+        "cases": "케이스"
       },
       "activity": "시간별 이벤트",
       "chart": {
@@ -24954,6 +25149,9 @@
       },
       "topN": "이벤트 기준 상위 {n}개",
       "noRelated": "이 기간에 관련 항목이 없습니다.",
+      "noCases": "이 엔터티를 포함한 SIEM 케이스가 없습니다.",
+      "caseOpen": "열림",
+      "caseResolved": "해결됨",
       "failedCount": "{n}건 실패 | {n}건 실패",
       "openEvents": "이벤트에서 열기",
       "huntInEvents": "이벤트에서 헌팅",
@@ -24968,7 +25166,9 @@
         "failed": "읽을 수 없음"
       },
       "loadError": "보안 소스를 로드할 수 없습니다",
-      "detailFailed": "이 엔터티의 일부 데이터를 읽을 수 없습니다: {streams}."
+      "detailFailed": "이 엔터티의 일부 데이터를 읽을 수 없습니다: {streams}.",
+      "aliasCount": "+표기 {n}개 | +표기 {n}개",
+      "aliasHint": "이 표기로 기록되었으며 동일한 ID입니다."
     },
     "ueba": {
       "title": "사용자 행동 분석",
@@ -25005,7 +25205,11 @@
         "new_ip": "신규 소스 IP",
         "failure_jump": "실패 급증",
         "new_hours": "비정상 시간대",
-        "first_seen": "최초 발견"
+        "first_seen": "최초 발견",
+        "peer_volume": "동료 그룹보다 훨씬 높음",
+        "peer_failures": "실패가 동료 그룹보다 훨씬 많음",
+        "fail_then_success": "실패 후 성공",
+        "open_case": "열린 케이스"
       },
       "reason": {
         "volume": "{n}개 이벤트, 이전 {baseline}의 예상치 ~{expected}개에 비해 약 {ratio}배입니다.",
@@ -25013,7 +25217,12 @@
         "newIpExternal": "공인 주소 {ip}에서 {n}개 이벤트가 발생했으며, 이전 {baseline}에서는 확인된 적이 없습니다. | 공인 주소 {ip}에서 {n}개 이벤트가 발생했으며, 이전 {baseline}에서는 확인된 적이 없습니다(총 {count}개의 신규 주소).",
         "failureJump": "{n}건의 실패 — 이벤트의 {rate}%, 기준선의 {baseline}%에서 상승.",
         "newHours": "{n}개 이벤트가 {hours} UTC에 발생했으며, 이 사용자가 이전 {baseline}에서 활동한 적 없는 시간대입니다.",
-        "firstSeen": "이전 {baseline}에서 전혀 활동이 없던 사용자에게서 {n}개 이벤트가 발생했습니다."
+        "firstSeen": "이전 {baseline}에서 전혀 활동이 없던 사용자에게서 {n}개 이벤트가 발생했습니다.",
+        "peerVolume": "이벤트 {n}건 (일반 사용자는 약 {median}건). 이 사용자 자신의 기준선은 아직 구축 중입니다.",
+        "peerFailures": "실패 {n}건(이벤트의 {rate}%) (일반 사용자는 약 {median}건). 이 사용자 자신의 기준선은 아직 구축 중입니다.",
+        "newIpBuilding": "공용 주소 {ip}에서 이벤트 {n}개. 이 사용자의 기준선이 아직 구축 중이므로 모든 공용 주소가 표시됩니다. | 공용 주소 {ip}에서 이벤트 {n}개. 이 사용자의 기준선이 아직 구축 중이므로 모든 공용 주소가 표시됩니다(총 {count}개의 공용 주소).",
+        "failThenSuccess": "{ip}에서 실패 {n}회 후 같은 주소에서 성공 이벤트가 발생했습니다.",
+        "openCase": "열린 케이스 \"{title}\"({severity})에 포함됨. | 열린 케이스 {n}개에 포함됨, 최신 케이스 \"{title}\"({severity})."
       },
       "fact": {
         "events": "이벤트",
@@ -25055,7 +25264,10 @@
       "notEvaluated": "기준선 데이터가 불완전하여 이 사용자에 대해 평가되지 않음: {signals}.",
       "hoursNotJudged": "비정상 시간대는 이전 {baseline}의 {share}%를 포괄하는 기준선 이벤트가 최소 {min}개 있어야만 판정됩니다. 이 사용자의 이력이 더 짧아 어떤 시간대도 표시되지 않았습니다.",
       "noHistory": "{streams}의 이전 {baseline}에 데이터가 없어 최초 발견으로 표시되는 사용자가 없습니다.",
-      "volumeNotJudged": "이 사용자의 볼륨은 판정되지 않습니다. 하루 미만의 기간은 기준선의 동일한 시간대와 비교되는데, 이를 위해서는 최소 하루의 이력이 필요합니다."
+      "volumeNotJudged": "이 사용자의 볼륨은 판정되지 않습니다. 하루 미만의 기간은 기준선의 동일한 시간대와 비교되는데, 이를 위해서는 최소 하루의 이력이 필요합니다.",
+      "baselineBuilding": "기준선 구축 중",
+      "baselineBuildingHint": "지금까지 기록은 {span}입니다. 이 사용자 자신의 과거와의 비교는 {baseline} 분량의 기록이 쌓이면 시작되며, 그 전까지는 다른 사용자와 비교해 뚜렷한 이상값만 표시됩니다.",
+      "buildingNotice": "사용자 {n}명의 기준선을 아직 구축 중입니다. {baseline} 분량의 기록이 쌓이기 전에는 다른 사용자와 비교해 뚜렷한 이상값만 표시됩니다. | 사용자 {n}명의 기준선을 아직 구축 중입니다. {baseline} 분량의 기록이 쌓이기 전에는 다른 사용자와 비교해 뚜렷한 이상값만 표시됩니다."
     },
     "intel": {
       "title": "위협 인텔",
@@ -25077,12 +25289,11 @@
       "sighted": "1회 확인 | {n}회 확인",
       "sweeping": "스윕 중… 쿼리 {total}개 중 {done}개",
       "sweptAcross": "보안 소스 {n}개 스윕함 | 보안 소스 {n}개 스윕함",
-      "partial": "이 스윕은 {n}개 쿼리 한도에서 중단되어 일부 컬럼을 검색하지 못했습니다. 쿼리 수는 목록 × 컬럼 수에 따라 늘어납니다. 전체 스윕을 하려면 오래된 목록이나 만료된 지표를 제거하거나 목록을 유형별로 분할하세요.",
       "failedQueries": "{n}개 컬럼을 검색할 수 없어 건너뛰었습니다. | {n}개 컬럼을 검색할 수 없어 건너뛰었습니다.",
       "truncated": "{lists}의 처음 {n}개 행만 읽었으며 나머지는 스윕하지 않았습니다.",
       "noIndicators": "지표 없음",
       "noCoverage": "스윕을 실행하여 어떤 컬럼이 검색되는지 확인하세요",
-      "coverageHint": "{n}개 보안 소스에서 스윕이 검색한 내용입니다. 일치 방식은 나열된 컬럼에 대한 정확 일치이며, 해당 컬럼이 없는 유형은 전혀 탐지할 수 없습니다.",
+      "coverageHint": "{n}개 보안 소스에서 스윕이 검색한 내용입니다. 각 컬럼은 전체 값과 그 안의 전체 토큰(예: 배열, 로그 텍스트, SHA256= 해시)을 기준으로 일치 여부를 확인합니다. 컬럼이 없는 유형은 전혀 포착할 수 없습니다.",
       "indicatorCount": "{n}개 지표 | {n}개 지표",
       "columnsSearched": "{n}개 컬럼 | {n}개 컬럼",
       "blind": "검색 불가",
@@ -25160,7 +25371,7 @@
         "cancel": "취소",
         "indicators": "인디케이터",
         "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "한 줄에 하나씩 입력하거나 쉼표 또는 공백으로 구분하세요. 중복은 무시됩니다.",
+        "indicatorsHelp": "한 줄에 하나씩 입력하거나 쉼표 또는 공백으로 구분하세요. 중복은 무시됩니다. 목록은 최대 {max}개까지 담을 수 있습니다.",
         "indicatorsRequired": "인디케이터를 하나 이상 입력하세요",
         "invalid": "인디케이터로 인식되지 않음 ({n}): {sample}",
         "line": "{n}행",
@@ -25184,7 +25395,7 @@
         "importSubtitle": "인디케이터 열이 필요하며, 유형, 심각도, 출처, 만료는 선택 사항입니다.",
         "importSubmit": "가져오기",
         "file": "CSV 파일",
-        "fileHelp": "인디케이터가 아닌 행은 건너뛰고 개수를 집계합니다.",
+        "fileHelp": "지표가 아닌 행은 건너뛰고 개수에 포함됩니다. 목록은 최대 {max}개 지표, 파일은 최대 {mb} MB까지 지원합니다.",
         "fileRequired": "CSV 파일을 선택하세요",
         "defaultSeverity": "심각도가 없는 행에 적용할 심각도",
         "append": "목록을 교체하지 않고 추가",
@@ -25203,7 +25414,10 @@
         "noIndicatorColumnIn": "{table}에 indicator, ioc 또는 value 열이 없어 지표를 추가할 수 없습니다. 다른 목록을 선택하세요.",
         "replaceTitle": "목록 교체",
         "replaceMessage": "추가(append)를 끄고 가져오면 {table}이(가) 완전히 교체됩니다. 기존의 모든 행과 해당 열, 설정이 제거되고 이 파일의 지표만 남습니다.",
-        "replaceConfirm": "교체"
+        "replaceConfirm": "교체",
+        "tooMany": "지표 {n}개가 붙여넣어졌습니다. 목록 하나에는 최대 {max}개까지 저장할 수 있습니다.",
+        "listFull": "{table}에 지표 {count}개가 들어가게 되지만 목록 하나에는 최대 {max}개까지 저장할 수 있습니다. 여러 목록으로 나누세요.",
+        "fileTooLarge": "파일이 {max}MB보다 큽니다. 더 작은 파일로 나누세요."
       },
       "importCsv": "CSV 가져오기",
       "unreadTables": "{lists}을(를) 읽을 수 없어 해당 지표를 표시하거나 스캔하지 않았습니다. | {lists}을(를) 읽을 수 없어 해당 지표를 표시하거나 스캔하지 않았습니다.",
@@ -25213,12 +25427,15 @@
       "columnsSkipped": "검색하지 않은 열 {n}개 | 검색하지 않은 열 {n}개",
       "skippedHint": "전체 검색되지 않음 — 스캔이 쿼리 한도에 도달했거나 쿼리가 실패했습니다:",
       "caveat": {
-        "capped": "스캔이 쿼리 한도에 도달하여 일부 열은 검색되지 않았습니다.",
         "failed": "열 {n}개를 검색할 수 없습니다. | 열 {n}개를 검색할 수 없습니다.",
         "partial": "쿼리 {n}개가 부분 결과만 반환하여 해당 열은 전체 검색되지 않았습니다. | 쿼리 {n}개가 부분 결과만 반환하여 해당 열은 전체 검색되지 않았습니다.",
         "unsearched": "{types}에 해당하는 열이 있는 스트림이 없습니다.",
-        "cidr": "CIDR 범위 {n}개를 스캔하지 않았습니다. | CIDR 범위 {n}개를 스캔하지 않았습니다."
-      }
+        "cidr": "CIDR 범위 {n}개를 스캔하지 않았습니다. | CIDR 범위 {n}개를 스캔하지 않았습니다.",
+        "checked": "지표 {total}개 중 {checked}개만 완전히 확인되었습니다."
+      },
+      "partialChecked": "부분 결과: 지표 {total}개 중 {checked}개를 확인했습니다. 나머지 건수는 실제보다 적을 수 있습니다.",
+      "partialCapped": "부분 결과: 지표 {total}개 중 {checked}개를 확인했습니다. 스윕이 쿼리 {n}개에서 중단되어 심각도가 낮은 지표는 확인되지 않았습니다.",
+      "inText": "{column}(텍스트 내)"
     },
     "sources": {
       "title": "데이터 소스",
@@ -25238,7 +25455,6 @@
       "exclude": "제외",
       "attached": "{pack}을(를) 연결했습니다.",
       "detached": "팩 연결을 해제했습니다.",
-      "detachedPipelineSkipped": "팩 연결을 해제했습니다. 기록된 파이프라인이 이 스트림 및 팩과 더 이상 일치하지 않아 변경하지 않았습니다.",
       "empty": "아직 로그 스트림이 없습니다. 보안 로그를 일반 스트림처럼 수집하면 여기에 표시됩니다.",
       "noticePackRemoved": "{stream}: SIEM 외부에서 팩이 제거되었습니다. 다시 연결하거나 해제하세요.",
       "noticeNoRecord": "{stream}: 기록 없이 팩이 연결되어 있습니다. 기록하거나 연결을 해제하세요.",
@@ -25249,14 +25465,31 @@
       "blockGlobalFlatten": "{stream}: 전역 플래튼 수준({level})에서는 OCSF 열이 평면으로 유지되지 않습니다.",
       "blockSchemaMissing": "{stream}: 사용자 정의 스키마에 OCSF 열이 없습니다: {columns}.",
       "blockPipelineDisabled": "{stream}: 기존 파이프라인이 비활성화되어 있습니다. 연결하기 전에 활성화하세요.",
-      "attachErrors": {
-        "functionEditedOutside": "함수 {name}이(가) SIEM 외부에서 수정되었습니다.",
-        "pipelineNoAccess": "이 스트림에는 접근 권한이 없는 파이프라인이 있습니다.",
-        "permissionDenied": "이 스트림의 함수 및 파이프라인을 편집하려면 권한이 필요합니다.",
-        "pipelineChanged": "이 스트림의 파이프라인이 변경되어 연결이 차단되었습니다. 새로 고친 후 다시 확인하세요.",
-        "packConflict": "이 스트림에는 이미 팩 {pack}이(가) 있습니다. 먼저 분리하세요.",
-        "noPipeline": "이 스트림에 대한 실시간 파이프라인을 생성하거나 찾을 수 없습니다.",
-        "failed": "연결 실패."
+      "actionFailed": "변경 사항이 저장되지 않았습니다.",
+      "stateExcluded": "제외됨",
+      "excludedBy": "{user}님이 {time}에 제외",
+      "sourceTypeConfidence": "{label} ({n}%)",
+      "notClassified": "아직 분류되지 않음",
+      "lastChange": "{user}님이 {time}에 마지막으로 변경: {summary}",
+      "previewTitle": "{pack}을(를) {stream}에 연결할까요?",
+      "previewSubtitle": "확인할 때까지 아무것도 기록되지 않습니다.",
+      "previewLoading": "연결 시 변경될 내용을 확인하는 중…",
+      "previewPack": "팩",
+      "previewClasses": "기록하는 OCSF 클래스",
+      "previewFunction": "함수",
+      "previewPipeline": "파이프라인",
+      "previewFunctionCreate": "{name} 생성",
+      "previewFunctionReuse": "{name} 재사용(이미 동일함)",
+      "previewPipelineCreate": "{name} 생성: {stream} → 함수 → {stream}",
+      "previewPipelineExtend": "{name}의 소스 바로 다음에 함수 노드를 추가하여 {feeds}에 전달",
+      "previewPipelineAlready": "{name}이(가) 이미 이 팩을 실행 중이므로 레코드만 기록됩니다",
+      "confirmAttach": "연결",
+      "cancel": "취소",
+      "detachedSkipped": "팩 연결이 해제되었습니다. 파이프라인 {id}은(는) 변경되지 않았습니다: {reason}.",
+      "skipReason": {
+        "pipeline_missing": "더 이상 존재하지 않습니다",
+        "other_stream": "현재 다른 스트림을 읽고 있습니다",
+        "other_pack": "현재 다른 팩을 실행 중입니다"
       }
     },
     "nav": {
@@ -25269,13 +25502,60 @@
       "intel": "위협 인텔",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
-      "content": "콘텐츠"
+      "content": "콘텐츠",
+      "sources": "데이터 소스"
     },
     "sigma": {
       "notSupported": "지원되지 않음: {fields}",
       "cannotMatch": "일치할 수 없음: 이 스트림에는 {fields}이(가) 없습니다.",
       "compiledEmpty": "규칙이 빈 결과로 컴파일되었습니다.",
       "assumedAbsent": "이 스트림에는 {fields}이(가) 없다고 가정합니다."
+    },
+    "audit": {
+      "title": "변경 이력",
+      "hint": "최근 7일간 탐지, 소스, 케이스를 변경한 사용자",
+      "when": "일시",
+      "who": "변경자",
+      "area": "영역",
+      "action": "작업",
+      "target": "변경 대상",
+      "empty": "기록된 변경 사항이 없습니다",
+      "emptyHint": "탐지, 보안 소스, 케이스에 대한 변경 사항이 여기에 표시됩니다.",
+      "disabled": "감사 로그가 꺼져 있습니다",
+      "disabledHint": "보안 설정을 변경한 사용자를 기록하려면 이 배포에서 감사 로그를 켜세요.",
+      "category": {
+        "detection": "탐지",
+        "case": "케이스",
+        "source": "소스",
+        "security": "보안"
+      },
+      "verb": {
+        "created": "생성",
+        "changed": "변경",
+        "deleted": "삭제",
+        "enabled": "켰음",
+        "disabled": "껐음"
+      }
+    },
+    "access": {
+      "needsAuthor": "보안에 대한 작성 권한이 필요합니다",
+      "openPreset": "{preset}에서 역할 시작",
+      "askPreset": "관리자에게 {preset} 프리셋을 요청하세요.",
+      "checkFailedTitle": "보안 액세스 권한을 확인할 수 없습니다",
+      "checkFailedHint": "서버가 응답하지 않았습니다. 세션은 계속 로그인된 상태입니다."
+    },
+    "aria": {
+      "addSource": "소스 추가",
+      "addToCase": "케이스에 추가",
+      "caseAssignee": "케이스 담당자",
+      "casePriority": "케이스 우선순위",
+      "filterField": "필터 필드",
+      "filterOperator": "필터 연산자",
+      "filterValue": "필터 값",
+      "huntKind": "헌팅 대상",
+      "indicatorType": "지표 유형",
+      "severityFilter": "심각도 필터",
+      "stream": "스트림"
     }
   },
   "promql": {

@@ -691,7 +691,8 @@
       "scoreConfigs": "スコア構成",
       "workflows": "ワークフロー",
       "syntheticFolders": "合成モニタリングフォルダー",
-      "downtimeFolders": "ダウンタイムフォルダー"
+      "downtimeFolders": "ダウンタイムフォルダー",
+      "security": "セキュリティ"
     },
     "resourcesInline": {
       "dashboards": "ダッシュボード",
@@ -747,7 +748,8 @@
       "fleetManagement": "Fleet 管理",
       "incidents": "インシデント",
       "onCallResponses": "オンコール対応",
-      "searchJobs": "検索ジョブ"
+      "searchJobs": "検索ジョブ",
+      "security": "セキュリティ"
     },
     "denied": {
       "view": "{resource} を表示できません",
@@ -4500,6 +4502,7 @@
       "presetsSubtitle": "プリセットの付与をこのロールに追加します。削除されるものはありません。",
       "presetsSectionBuiltin": "組み込み",
       "presetsSectionJob": "職務別",
+      "presetsSectionSecurity": "セキュリティ",
       "presetAddsTooltip": "{count} 件の権限を追加 | {count} 件の権限を追加",
       "presetInRole": "ロール内",
       "presetInRoleTooltip": "このロールにはこのプリセットの内容がすべて含まれています",
@@ -4575,7 +4578,16 @@
       "presetRestored": "{title}: {permissions}を復元しました。保存する前に変更を確認してください。",
       "presetSummaryRestores": "削除対象としてマークした {count} 件の権限を保持します。 | 削除対象としてマークした {count} 件の権限を保持します。",
       "presetRestoreButton": "{count} 件の権限を保持 | {count} 件の権限を保持",
-      "effectStillAllowed": "アクセスの変更はありません: より広い付与により引き続き許可されています。"
+      "effectStillAllowed": "アクセスの変更はありません: より広い付与により引き続き許可されています。",
+      "moduleGroupSecurity": "セキュリティ",
+      "presetSocAnalystTitle": "SOC アナリスト",
+      "presetSocAnalystDescription": "セキュリティのアラートとケースをトリアージし、検出、ストリーム、脅威インテリジェンスリストへの読み取りアクセスを持ちます",
+      "presetDetectionEngineerTitle": "検出エンジニア",
+      "presetDetectionEngineerDescription": "検出の作成・調整・有効化・実行、コンテンツのインストール、関数とパイプラインを伴うソースの接続、脅威インテリジェンスリストなどのエンリッチメントテーブルの管理を行い、セキュリティ、ケース、ストリームへの読み取りアクセスを持ちます",
+      "presetSecurityAdminTitle": "セキュリティ管理者",
+      "presetSecurityAdminDescription": "検出とケースの削除やソースの除外を含め、インシデント、関数、パイプライン、エンリッチメントテーブル、暗号鍵とともにセキュリティ全体を管理し、ストリームへの読み取りアクセスを持ちます",
+      "presetSecurityViewerTitle": "セキュリティ閲覧者",
+      "presetSecurityViewerDescription": "セキュリティ、そのケース、検出、ソースストリームを変更せずに閲覧します"
     },
     "rolesPage": {
       "subtitle": "ロールには権限がバンドルされています。ユーザー、サービスアカウント、またはグループに割り当ててアクセスを許可します。",
@@ -7711,6 +7723,28 @@
       "tlsBody": "トークンは平文 HTTP 上で再利用可能なベアラー認証情報であるため、{brand} で ({setting}、デフォルトでは無効) またはその前段の信頼できるプロキシで TLS を終端してください。"
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "既存の {product} の設定を更新し、ログ、メトリクス、トレースをこの組織に送信します。",
+      "correlationBody": "ログとトレースを関連付けるには、アプリケーションで完全な 128 ビットのトレース ID を記録する必要があります。Java tracer が下位 64 ビットのみを記録する場合は、アプリケーションで {setting} を設定してください。",
+      "profilingBody": "プロファイリングは独自の送信先と Agent API キーを使用します。既にプロファイラーを実行している場合は、移行中にアプリケーションまたは tracer のプロファイリングを無効にするか、送信先を個別に設定してください。",
+      "multiValueTagsBody": "複数の異なる値を持つタグは、並べ替えた JSON 配列文字列を使用します。[ で始まる単一の値も、系列の識別を保つために要素が 1 つの JSON 配列としてエンコードされます。",
+      "envTitle": "エージェント設定",
+      "envBody": "これらの環境変数を {product} に設定して再起動します。{product} {version} 以降が必要です。",
+      "tokenBody": "API キーは組織の取り込みトークンである必要があり、{prefix} で始まります。この組織には有効な取り込みトークンがないため、セットアップスニペットは表示されません。取り込みトークンを作成してから、このページに戻ってください。",
+      "tokenLink": "取り込みトークンを開く",
+      "featuresOffBody": "The lines after the URLs turn off Agent features that send to {vendor}'s own servers with the same key. {setting} also keeps {component} off, which newer Agent versions run and which does not keep the path in these URLs.",
+      "logsTitle": "ログ",
+      "logsBody": "ログ収集は {product} ではデフォルトで無効です。{setting} を設定し、ログソースを構成してください。",
+      "dualTitle": "現在の宛先を維持",
+      "dualBody": "既存の宛先と併用してこの組織に送信するには、現在の URL と API キーをそのままにし、代わりにこれらのエントリを {file} に追加します。追加のログエンドポイントはそうしないと TCP を使用するため、ログには {setting} が必要です。",
+      "metricsTitle": "メトリクスのクエリ",
+      "metricsTypes": "すべての系列は、エージェントが送信した値を持つゲージとして保存され、{typeField} と {intervalField} でラベル付けされます。",
+      "metricsCount": "Count 系列は各フラッシュ間隔のカウントを保持します。PromQL では {promql}、SQL では {sql} で合計してください。",
+      "metricsRate": "Rate 系列は 1 秒あたりの値です。間隔のカウントを復元するには、値に {intervalField} を掛けます。",
+      "metricsCounterFns": "PromQL の {rate} と {increase} は累積カウンターを想定しているため、これらの系列では意味のある結果は得られません。",
+      "metricsSketch": "ディストリビューションはヒストグラムのバケットとして保存され、パーセンタイルはそれらのバケットから推定されます。ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA を大きくすると、保存される行数が増える代わりに、より細かいバケットとより正確なパーセンタイルが得られます。"
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU エクスポーター"
   },
@@ -24327,8 +24361,9 @@
       "classMix": "過去 1 時間のクラス: {mix}",
       "objects": "OCSF オブジェクト",
       "missingSignals": "未検出: {fields}",
-      "detections": "{n} 件の検出 | {n} 件の検出",
-      "firing": "{n} 件発火 | {n} 件発火",
+      "detections": "{n} 件の一致ルール | {n} 件の一致ルール",
+      "firing": "{n} 件のヒットあり | {n} 件のヒットあり",
+      "matchingRulesHint": "このソースに適用される Sigma カタログのルールです。ヒットは現在のウィンドウ内の一致であり、デプロイ済みの検出ではありません。",
       "rulesFor": "{source} の Sigma ルール",
       "hits": "{n} 件のヒット | {n} 件のヒット",
       "viewHits": "ヒットを表示",
@@ -24357,7 +24392,44 @@
       "invertFilter": "含める/除外を切り替え",
       "removeFilter": "フィルターを削除",
       "pivotSqlUnsupported": "この SQL クエリは単純な SELECT … WHERE ではないため、フィルターを追加できませんでした。クエリを手動で編集するか、ビルダーに切り替えてください。",
-      "topValuesWholeStream": "SQL モード: 値はクエリではなくストリーム全体で集計されます。"
+      "topValuesWholeStream": "SQL モード: 値はクエリではなくストリーム全体で集計されます。",
+      "allSources": "すべてのセキュリティソース",
+      "sortSqlMode": "手書きのクエリは独自の ORDER BY を使用します",
+      "includeFailed": "{name} をセキュリティに追加できませんでした",
+      "excludeFailed": "{name} をセキュリティから削除できませんでした",
+      "hunt": {
+        "title": "すべてのセキュリティソースを一度に検索",
+        "hint": "IP アドレス、ユーザー、ホストを入力してください。各ソースはそれぞれの列で検索され、各行にはどのソースのものかが表示されます。",
+        "noMatches": "この期間に一致するものはありません",
+        "noMatchesHint": "時間範囲を広げるか、種類を限定せず任意のフィールドを検索してください。",
+        "noFields": "フィールドはソースごとに異なります。ソースを 1 つ選ぶと、そのフィールドを参照できます。",
+        "search": "検索",
+        "aliases": "他に {n} 件の表記にも一致 | 他に {n} 件の表記にも一致",
+        "clearAliases": "入力した名前のみに一致",
+        "uncounted": "集計対象外: {streams}",
+        "kind": {
+          "any": "任意のフィールド",
+          "user": "ユーザー",
+          "ip": "IP アドレス",
+          "host": "ホスト"
+        },
+        "placeholder": {
+          "any": "IP アドレス、ユーザー、ホスト、またはテキスト",
+          "user": "dave, ACME\\dave または dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "ホスト名"
+        },
+        "column": {
+          "time": "時刻",
+          "source": "ソース",
+          "user": "ユーザー",
+          "ip": "送信元 IP",
+          "host": "ホスト",
+          "action": "アクション",
+          "outcome": "結果",
+          "message": "メッセージ"
+        }
+      }
     },
     "drawer": {
       "event": "セキュリティイベント",
@@ -24378,7 +24450,14 @@
       "classUid": "class_uid {n}",
       "eyebrow": "セキュリティイベント",
       "source": "ソース",
-      "matchedRules": "{n} 件の検出が一致 | {n} 件の検出が一致"
+      "matchedRules": "{n} 件の検出が一致 | {n} 件の検出が一致",
+      "openCase": "ケースを作成",
+      "openCaseHint": "このイベントに含まれるホスト、ユーザー、またはアドレスでケースを作成",
+      "addToCase": "ケースに追加",
+      "pickCase": "オープン中のケースに追加",
+      "caseOpened": "ケースを作成しました: {title}",
+      "caseUpdated": "イベントを {title} に追加しました",
+      "caseError": "このイベントからケースを作成できませんでした"
     },
     "record": {
       "prev": "前のレコード",
@@ -24482,7 +24561,20 @@
       "customWindow": "固定ウィンドウを表示中: {from} → {to}",
       "backToRange": "直近 {range} に戻る",
       "missing": "このリンクが指すアラートは読み込まれたウィンドウにありません。この範囲より古いか、最新行の上限を超えている可能性があります。",
-      "dismiss": "閉じる"
+      "dismiss": "閉じる",
+      "triage": {
+        "createCase": "ケースを作成",
+        "addToCase": "ケースに追加",
+        "openCase": "ケースを開く",
+        "acknowledge": "調査を開始",
+        "addNote": "メモを追加",
+        "notePlaceholder": "この発火のケースにメモを追加",
+        "acknowledged": "ケースを調査中にしました",
+        "noted": "ケースにメモを追加しました",
+        "caseOpened": "ケースを開きました",
+        "attached": "発火をケースに追加しました",
+        "failed": "ケースを更新できませんでした"
+      }
     },
     "cases": {
       "title": "ケース",
@@ -24510,7 +24602,8 @@
         "lastSeen": "最終検出"
       },
       "fact": {
-        "duration": "期間"
+        "duration": "期間",
+        "timeToClose": "クローズまでの時間"
       },
       "durationMinutes": "{n} 分",
       "durationHours": "{n} 時間",
@@ -24532,7 +24625,8 @@
         "service_discovery": "サービスディスカバリによって相関",
         "primary_match": "プライマリディメンションで相関",
         "secondary_match": "セカンダリディメンションで相関",
-        "alert_id": "同一の検出"
+        "alert_id": "同一の検出",
+        "entity": "同じホスト、ユーザー、またはアドレス"
       },
       "commentPlaceholder": "チームへのメモを追加",
       "postComment": "メモを投稿",
@@ -24554,7 +24648,16 @@
         "analysisComplete": "根本原因分析が完了",
         "analysisFailed": "根本原因分析に失敗: {reason}",
         "analysisCancelled": "根本原因分析をキャンセル",
-        "other": "{type}"
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "判定: 真陽性",
+          "false_positive": "判定: 偽陽性",
+          "benign": "判定: 無害",
+          "duplicate": "判定: 重複",
+          "stale": "判定: 古い / 過去"
+        },
+        "alertsAttached": "手動で追加した発火: {names}",
+        "eventAttached": "{stream} のイベント ({at}) を追加しました"
       },
       "analysisHint": "このケース内の発火同士の関連性を AI が要約します。",
       "runAnalysis": "分析",
@@ -24570,7 +24673,42 @@
         "resolved": "ケースをクローズ"
       },
       "notFound": "ケースが見つかりません",
-      "timelinePartial": "このタイムラインはケースレコードから再構築されたため、再構築前のメモ、確認応答、分析アクティビティが欠落している可能性があります。"
+      "timelinePartial": "このタイムラインはケースレコードから再構築されたため、再構築前のメモ、確認応答、分析アクティビティが欠落している可能性があります。",
+      "verdict": {
+        "true_positive": "真陽性",
+        "false_positive": "偽陽性",
+        "benign": "無害",
+        "duplicate": "重複",
+        "stale": "古い / 過去"
+      },
+      "close": {
+        "title": "ケースをクローズ",
+        "verdict": "判定",
+        "verdictRequired": "判定を選択してください",
+        "reason": "理由",
+        "reasonPlaceholder": "判明した内容と、ケースをクローズできる理由",
+        "reasonRequired": "理由を入力してください",
+        "reasonTooLong": "理由は{max}文字以内にしてください",
+        "cancel": "キャンセル"
+      },
+      "settings": {
+        "open": "ケース設定",
+        "title": "ケース設定",
+        "save": "保存",
+        "saved": "ケース設定を保存しました",
+        "loadFailed": "ケース設定を読み込めませんでした",
+        "saveFailed": "ケース設定を保存できませんでした",
+        "autoCloseDays": "動きのないケースを自動クローズするまでの日数",
+        "autoCloseDaysHint": "この日数のあいだ新しい発火がないケースは自動的にクローズされます。0 にするとケースは開いたままです。最大 {max}。",
+        "groupWindowMinutes": "発火をまとめる時間枠（分）",
+        "groupWindowMinutesHint": "同じホスト、ユーザー、またはアドレスのアクティビティが、イベント時刻でケースの最新アクティビティからこの分数以内であれば、そのケースに追加されます。0 の場合は検出ごとにケースを作成します。最大 {max}。",
+        "wholeNumber": "整数を入力してください",
+        "range": "0 から {max} までの値を入力してください"
+      },
+      "assignedTo": "{to}に割り当て済み",
+      "unassignedToast": "ケースの割り当てを解除しました",
+      "historical": "過去 (バックフィル)",
+      "historicalHint": "このケースのすべての発火は過去データに対するバックフィルによるもので、現在のアクティビティを示すものではありません。"
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -24592,19 +24730,21 @@
       "legend": {
         "firing": "ウィンドウ内で発火（濃いほど多い）",
         "covered": "有効な検知でカバー済み",
-        "available": "利用可能だが未有効のルール"
+        "available": "利用可能だが未有効のルール",
+        "none": "カタログにルールなし"
       },
       "columnCount": "{total}件中{covered}件カバー済み",
       "cellEnabled": "{n}件の検知が有効 | {n}件の検知が有効",
       "cellAvailable": "{n}件のルールが利用可能 | {n}件のルールが利用可能",
       "noMatch": "一致するテクニックはありません",
       "unmapped": "既知の戦術がないテクニック",
-      "footnote": "テクニックは同梱の{n}件のSigmaルールと独自の検知に由来し、配置は各ルールに付けられた戦術に従います。",
+      "footnote": "カバレッジは MITRE ATT&CK Enterprise v{version} の {total} 個のテクニックに対して測定され、サブテクニックは親テクニックに計上されます。{n} 件の Sigma ルールが製品に同梱されています。",
       "drawerEyebrow": "ATT&CKテクニック",
       "state": {
         "firing": "発火",
         "covered": "カバー済み",
-        "available": "未カバー"
+        "available": "未カバー",
+        "none": "ルールなし"
       },
       "fact": {
         "state": "カバレッジ",
@@ -24629,7 +24769,9 @@
       "openTechnique": "attack.mitre.orgで{id}を開く",
       "viewOnAttack": "ATT&CKで表示",
       "manageDetections": "検知を管理",
-      "historyNarrowed": "アラート履歴の最大クエリ範囲により、発火は{from}以降のものに限られます。このウィンドウ内のそれ以前の発火はカウントされません。"
+      "historyNarrowed": "アラート履歴の最大クエリ範囲により、発火は{from}以降のものに限られます。このウィンドウ内のそれ以前の発火はカウントされません。",
+      "cellNone": "ルールなし",
+      "coverageError": "ATT&CK カバレッジを読み込めませんでした: {reason}"
     },
     "detections": {
       "title": "検知",
@@ -24647,7 +24789,8 @@
         "erroring": "エラー中",
         "enabled": "有効",
         "disabled": "無効",
-        "all": "すべての検出"
+        "all": "すべての検出",
+        "notifyFailing": "通知失敗中"
       },
       "column": {
         "name": "検出",
@@ -24660,7 +24803,8 @@
       "state": {
         "enabled": "有効",
         "disabled": "無効",
-        "erroring": "エラー中"
+        "erroring": "エラー中",
+        "notifyFailing": "通知失敗中"
       },
       "tab": {
         "overview": "概要",
@@ -24722,17 +24866,23 @@
       "libraryEmpty": "そのフィルターに一致するルールはありません",
       "stream": "ストリーム",
       "streamPlaceholder": "実行するストリームを選択",
-      "notify": "通知",
-      "notifyPlaceholder": "宛先を選択",
-      "noDestinations": "アラートの宛先がまだありません。検出の通知には宛先が必要なため、新しいタブで作成してから戻ってください。このリストは自動的に更新されます。",
+      "notify": "通知（任意）",
+      "notifyPlaceholder": "なし: 発火してもケースは作成されます",
+      "noDestinations": "アラートの宛先がまだありません。宛先がなくても検出はファインディングを記録しケースを作成します。通知も必要な場合にのみ宛先を追加してください。",
       "createDestination": "宛先を作成",
       "reloadDestinations": "更新",
       "lookBack": "遡及期間 (分)",
+      "lookBackHelp": "少なくとも {minutes} 分の相関ウィンドウ。各実行でそのウィンドウを期間内でスライドします",
+      "correlationWindowLabel": "相関ウィンドウ (分)",
+      "backfill": "初回実行時に過去データもチェック",
+      "backfillRange": "チェックする過去データ",
+      "backfillHours": "過去 1 時間 | 過去 {n} 時間",
       "runEvery": "実行間隔 (分)",
       "silence": "通知抑制時間 (分)",
       "compiles": "{stream} に対してコンパイルされます",
       "compilesAs": "{stream} に対してコンパイルされます (識別: {source})",
       "logsourceMismatch": "このルールは {rule} 向けに書かれていますが、{stream} は {source} として識別されています。両者がフィールド名を共有する場合にのみ一致します。",
+      "unseenFields": "このストリームでまだ確認されていないフィールド: {fields}。検出を作成するとこれらの列が追加され、最初の該当イベントの前に有効になります。",
       "ocsfBridge": "{stream} は OCSF のため、ルールのフィールドは OCSF のパスにマッピングされ、{guard} を持つイベントでのみ実行されます。",
       "ocsfGuard": {
         "class": "class_uid {uid}",
@@ -24760,10 +24910,23 @@
       "validation": {
         "positive": "1 分以上である必要があります",
         "nonNegative": "負の値は指定できません",
-        "periodGap": "実行間隔より短い: 実行間隔内の分はチェックされません"
+        "periodGap": "実行間隔より短い: 実行間隔内の分はチェックされません",
+        "belowTimespan": "{minutes} 分の相関ウィンドウ以上である必要があります"
       },
       "nameTaken": "「{name}」という名前の検出またはアラートはすでに存在します。その履歴はこの検出と統合されるため、別のストリームを選択するか、既存のものを先に削除してください。",
-      "loadError": "検出ルールの読み込みに失敗しました"
+      "loadError": "検出ルールの読み込みに失敗しました",
+      "notifyFailingHint": "このルールは発火しましたが、最後の通知を配信できませんでした。履歴で通知先を確認してください。",
+      "correlationWindow": "相関ルールの期間で決まります",
+      "createForbidden": "検知を作成するには Security 権限が必要です",
+      "preview": {
+        "run": "一致をプレビュー",
+        "hint": "直近24時間のクエリを実行し、最初の20件の一致イベントを表示します",
+        "empty": "直近24時間に一致したものはありません",
+        "shown": "直近24時間の一致イベント{total}件中{shown}件",
+        "failed": "クエリが失敗しました: {reason}",
+        "time": "時刻"
+      },
+      "queryFailed": "保存されませんでした: この検知のクエリは実行できません({reason})"
     },
     "content": {
       "title": "コンテンツ",
@@ -24833,7 +24996,6 @@
       "noStreamsForRule": "このルールに一致するストリームはありません",
       "noStreamsForRuleHint": "このルールは {logsource} 向けに作成されています。そのソースを取り込むと、ここに表示されます。",
       "runnable": "このストリームで実行可能",
-      "notRunnable": "ここでは実行できません",
       "openInEvents": "イベントで開く",
       "installHere": "このストリームにインストール",
       "install": "検出としてインストール",
@@ -24855,7 +25017,38 @@
         "severityId": "重大度",
         "statusId": "結果"
       },
-      "cannotRun": "データ上では実行できません"
+      "catalogError": "検出カタログを読み込めませんでした: {reason}",
+      "notRunnableYet": "まだ実行できません",
+      "newRulesAvailable": "{stream} で新たに {n} 件のルールを実行できるようになりました | {stream} で新たに {n} 件のルールを実行できるようになりました",
+      "reviewNewRules": "確認",
+      "reviewingNewRules": "{stream} で実行できるようになった {n} 件のルールを表示中 | {stream} で実行できるようになった {n} 件のルールを表示中",
+      "showAllRules": "すべてのルールを表示",
+      "installSelected": "選択項目をインストール",
+      "selectRunnable": "実行可能なものを選択",
+      "selectRunnableHint": "表示中のルールのうち、データで実行でき、まだインストールされていないものをすべて選択",
+      "bulk": {
+        "title": "{n} 件のルールをインストール | {n} 件のルールをインストール",
+        "subtitle": "各ルールはサーバー上でストリーム向けにコンパイルされ、これらの設定で検出として保存されます。",
+        "stream": "ストリーム",
+        "everyStream": "各ルールが実行されるすべてのストリーム",
+        "folder": "アラートフォルダー",
+        "correlationWindow": "相関ルールは少なくとも自身のウィンドウ分を遡ります。",
+        "nothing": "選択したルールはいずれもこのストリームで実行できません。",
+        "plan": "{n} 件の検出が作成されます: | {n} 件の検出が作成されます:",
+        "correlation": "相関",
+        "confirm": "{n} 件の検出をインストール | {n} 件の検出をインストール",
+        "close": "閉じる",
+        "summary": "{total} 件中 {installed} 件インストール、{skipped} 件スキップ、{failed} 件失敗",
+        "duplicate": "{name} という名前の検出はすでに存在します。",
+        "correlationBlocked": "この相関はこのストリームでは実行できません。",
+        "status": {
+          "installed": "インストール済み",
+          "skipped": "スキップ",
+          "failed": "失敗",
+          "pending": "待機中"
+        },
+        "done": "{n} 件の検出をインストールしました | {n} 件の検出をインストールしました"
+      }
     },
     "entities": {
       "title": "エンティティ",
@@ -24865,18 +25058,15 @@
         "graph": "リスクグラフ"
       },
       "riskGraph": {
-        "empty": "グラフ化するエンティティがありません",
-        "emptyHint": "リスクグラフを表示するには、セキュリティソースを追加するか、時間範囲を広げてください。",
-        "showingTop": "リスク順に上位 {n} / {total} を表示中",
-        "illustrative": "例示用: 関係はリスク順位から推定されたものであり、観測されたものではありません。",
-        "baseScore": "基本 {n}",
-        "propagatedScore": "伝播 {n}",
-        "tier": {
-          "critical": "クリティカル",
-          "high": "高",
-          "medium": "中",
-          "low": "低"
-        }
+        "empty": "この期間内にリンクされたものはありません",
+        "emptyHint": "グラフは、同じイベントまたは同じケースに現れたユーザー、IP アドレス、ホストをリンクします。この期間内には該当がありませんでした。時間範囲を広げてください。",
+        "showingTop": "リスク順に上位 {n} 件を表示中（全 {total} 件）",
+        "legend": "実線: 同じイベントで確認。破線: 同じケースで言及。",
+        "edgeEvents": "{n}件のイベント | {n}件のイベント",
+        "edgeCases": "{n}件のケース | {n}件のケース",
+        "scoreHint": "言及しているケース: {detection}。失敗イベント: {failure}。ケースが言及するエンティティとの関連: {neighbour}。",
+        "nodeFacts": "{events}件のイベント · {failures}件が失敗",
+        "nodeCases": "{n}件のケース | {n}件のケース"
       },
       "kinds": {
         "user": "ユーザー",
@@ -24917,16 +25107,20 @@
           "ip": "ユーザーが多い",
           "host": "ユーザーが多い"
         },
-        "external": "パブリックアドレス"
+        "external": "パブリックアドレス",
+        "fail_then_success": "失敗後の成功",
+        "open_case": "オープン中のケース"
       },
       "signalHint": {
         "failures": "このエンティティのイベントの少なくとも {rate}% が失敗し、失敗数は {n} 件以上です。結果を報告するソースのみをカウントします。",
         "spread": {
-          "user": "ウィンドウ中に、単一のソース内で {n} 個以上の送信元 IP から確認されました。",
-          "ip": "ウィンドウ中に、単一のソース内で {n} 人以上のユーザーによって使用されました。NAT や VPN の出口も同じように見えます。パスワードスプレーも同様です。",
-          "host": "ウィンドウ中に、単一のソース内で {n} 人以上のユーザーによってアクセスされました。"
+          "user": "単一のソース内で {n} 個以上の送信元 IP から見られており、この期間内の他のユーザーと比べて明らかに多い状態です。",
+          "ip": "単一のソース内で {n} 人以上のユーザーに使用されており、この期間内の他のアドレスと比べて明らかに多い状態です。NAT や VPN の出口もこのように見えますが、パスワードスプレーも同様です。",
+          "host": "単一のソース内で {n} 人以上のユーザーにアクセスされており、この期間内の他のホストと比べて明らかに多い状態です。"
         },
-        "external": "プライベート、ループバック、リンクローカルのいずれの範囲にも含まれません。"
+        "external": "プライベート、ループバック、リンクローカルのいずれの範囲にも含まれません。",
+        "fail_then_success": "少なくとも {n} 件の失敗イベントの後、最初の失敗以降に成功イベントがあります。推測が成功した可能性があります。",
+        "open_case": "オープン中の SIEM ケースがこのエンティティを含んでいます。"
       },
       "peersChip": {
         "ips": "1 つのソース内で最大 {n} 個の送信元 IP | 1 つのソース内で最大 {n} 個の送信元 IP",
@@ -24937,7 +25131,7 @@
       "capped": "各ソースは、イベント数が最も多い {n} 件のエンティティを返しました。それ以外のエンティティは表示されず、その境界付近のエンティティのカウントは不完全な場合があります。+ の付いたタブのカウントは打ち切られています。",
       "failedStreams": "読み取れませんでした: {streams}",
       "noSources": "読み取るセキュリティソースがありません",
-      "noSourcesHint": "エンティティは、名前にセキュリティデータであることを示すストリーム、またはイベントページでソースとして追加したストリームで検出されます。",
+      "noSourcesHint": "エンティティは、名前にセキュリティデータであることを示すストリーム、または「セキュリティ」→「ソース」で追加したストリームから検出されます。",
       "empty": "このウィンドウにエンティティはありません",
       "emptyHint": "時間範囲を広げるか、ソースにユーザー、IP、ホストのフィールドが含まれていることを確認してください。",
       "refresh": "更新",
@@ -24945,7 +25139,8 @@
       "tab": {
         "activity": "アクティビティ",
         "related": "関連",
-        "sources": "ソース"
+        "sources": "ソース",
+        "cases": "ケース"
       },
       "activity": "イベントの推移",
       "chart": {
@@ -24954,6 +25149,9 @@
       },
       "topN": "イベント数上位 {n}",
       "noRelated": "このウィンドウに関連するものはありません。",
+      "noCases": "このエンティティを含む SIEM ケースはありません。",
+      "caseOpen": "オープン",
+      "caseResolved": "解決済み",
       "failedCount": "{n} 件失敗 | {n} 件失敗",
       "openEvents": "イベントで開く",
       "huntInEvents": "イベントでハントする",
@@ -24968,7 +25166,9 @@
         "failed": "読み込めませんでした"
       },
       "loadError": "セキュリティソースを読み込めませんでした",
-      "detailFailed": "このエンティティのデータの一部を読み込めませんでした: {streams}。"
+      "detailFailed": "このエンティティのデータの一部を読み込めませんでした: {streams}。",
+      "aliasCount": "+{n}件の表記 | +{n}件の表記",
+      "aliasHint": "この表記でログに記録されています。同一のアイデンティティです。"
     },
     "ueba": {
       "title": "ユーザー行動分析",
@@ -25005,7 +25205,11 @@
         "new_ip": "新しいソース IP",
         "failure_jump": "失敗の急増",
         "new_hours": "異常な時間帯",
-        "first_seen": "初観測"
+        "first_seen": "初観測",
+        "peer_volume": "ピアを大きく上回る",
+        "peer_failures": "失敗がピアを大きく上回る",
+        "fail_then_success": "失敗後の成功",
+        "open_case": "オープン中のケース"
       },
       "reason": {
         "volume": "{n} 件のイベント、直前の {baseline} から予想される ~{expected} の約 {ratio} 倍です。",
@@ -25013,7 +25217,12 @@
         "newIpExternal": "パブリックアドレス {ip} からの {n} 件のイベント、直前の {baseline} では未観測。 | パブリックアドレス {ip} からの {n} 件のイベント、直前の {baseline} では未観測（新規アドレスは合計 {count} 件）。",
         "failureJump": "{n} 件の失敗 — イベントの {rate}%、ベースラインの {baseline}% から増加。",
         "newHours": "UTC {hours} に {n} 件のイベント、このユーザーが直前の {baseline} で活動したことのない時間帯です。",
-        "firstSeen": "直前の {baseline} でまったく活動のないユーザーからの {n} 件のイベント。"
+        "firstSeen": "直前の {baseline} でまったく活動のないユーザーからの {n} 件のイベント。",
+        "peerVolume": "{n}件のイベント(一般的なユーザーは約{median}件)。このユーザー自身のベースラインはまだ構築中です。",
+        "peerFailures": "失敗{n}件(イベントの{rate}%)(一般的なユーザーは約{median}件)。このユーザー自身のベースラインはまだ構築中です。",
+        "newIpBuilding": "パブリックアドレス {ip} からの {n} 件のイベント。このユーザーのベースラインはまだ構築中のため、すべてのパブリックアドレスにフラグが付きます。 | パブリックアドレス {ip} からの {n} 件のイベント。このユーザーのベースラインはまだ構築中のため、すべてのパブリックアドレスにフラグが付きます (パブリックアドレスは合計 {count} 件)。",
+        "failThenSuccess": "{ip} から {n} 件の失敗の後、同じアドレスから成功イベントがありました。",
+        "openCase": "オープン中のケース「{title}」({severity}) に含まれています。 | {n} 件のオープン中のケースに含まれています。最新は「{title}」({severity})。"
       },
       "fact": {
         "events": "イベント",
@@ -25055,7 +25264,10 @@
       "notEvaluated": "ベースラインデータが不完全だったため、このユーザーでは評価されませんでした：{signals}。",
       "hoursNotJudged": "異常な時間帯は、直前の {baseline} の {share}% をカバーする少なくとも {min} 件のベースラインイベントがある場合にのみ判定されます。このユーザーの履歴は短いため、どの時間帯もフラグ付けされません。",
       "noHistory": "過去の {baseline} に {streams} のデータがないため、その中のユーザーは初回検出と判定されません。",
-      "volumeNotJudged": "このユーザーではボリュームは判定されません。1 日未満のウィンドウはベースラインの同じ時刻帯と比較されますが、それには少なくとも 1 日分の履歴が必要です。"
+      "volumeNotJudged": "このユーザーではボリュームは判定されません。1 日未満のウィンドウはベースラインの同じ時刻帯と比較されますが、それには少なくとも 1 日分の履歴が必要です。",
+      "baselineBuilding": "ベースライン構築中",
+      "baselineBuildingHint": "これまでの履歴は{span}です。このユーザー自身の過去との比較は、{baseline}分の履歴がそろってから始まります。それまでは他のユーザーと比べて明らかな外れ値のみ検出します。",
+      "buildingNotice": "{n}人のユーザーでベースラインを構築中です。{baseline}分の履歴がそろうまでは、他のユーザーと比べて明らかな外れ値のみ検出します。 | {n}人のユーザーでベースラインを構築中です。{baseline}分の履歴がそろうまでは、他のユーザーと比べて明らかな外れ値のみ検出します。"
     },
     "intel": {
       "title": "脅威インテリジェンス",
@@ -25077,12 +25289,11 @@
       "sighted": "1 回検出 | {n} 回検出",
       "sweeping": "スイープ中… {done} / {total} クエリ",
       "sweptAcross": "{n} 件のセキュリティソースをスイープしました | {n} 件のセキュリティソースをスイープしました",
-      "partial": "このスイープは {n} クエリの上限で停止したため、一部の列は検索されませんでした。クエリ数はリスト数 × 列数に比例して増加します。完全なスイープを行うには、古いリストや期限切れのインジケーターを削除するか、リストをタイプ別に分割してください。",
       "failedQueries": "{n} 列を検索できず、スキップしました。 | {n} 列を検索できず、スキップしました。",
       "truncated": "{lists} の先頭 {n} 行のみ読み取られ、残りはスイープされませんでした。",
       "noIndicators": "インジケーターなし",
       "noCoverage": "スイープを実行して検索対象の列を確認",
-      "coverageHint": "スイープが {n} 個のセキュリティソース全体で検索した内容です。照合は一覧の列に対する完全一致で、列がないタイプは一切検知できません。",
+      "coverageHint": "スイープが {n} 個のセキュリティソースを検索した内容です。各列はその値全体と、その中のトークン全体（配列、ログテキスト、SHA256= ハッシュなど）に対して照合されます。列のないタイプは一切検知できません。",
       "indicatorCount": "{n} 件のインジケーター | {n} 件のインジケーター",
       "columnsSearched": "{n} 列 | {n} 列",
       "blind": "検索不可",
@@ -25160,7 +25371,7 @@
         "cancel": "キャンセル",
         "indicators": "インジケーター",
         "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "1 行に 1 つ、またはカンマやスペースで区切って入力してください。重複は無視されます。",
+        "indicatorsHelp": "1 行に 1 つ、またはカンマやスペースで区切って入力してください。重複は無視されます。リストには最大 {max} 件まで登録できます。",
         "indicatorsRequired": "インジケーターを 1 つ以上入力してください",
         "invalid": "インジケーターとして認識されません ({n}): {sample}",
         "line": "{n} 行目",
@@ -25184,7 +25395,7 @@
         "importSubtitle": "インジケーター列が必要です。type、severity、source、expiry は任意です。",
         "importSubmit": "インポート",
         "file": "CSV ファイル",
-        "fileHelp": "インジケーターではない行はスキップされ、件数がカウントされます。",
+        "fileHelp": "インジケーターでない行はスキップされ、件数としてカウントされます。リストには最大 {max} 件のインジケーター、ファイルは最大 {mb} MB までです。",
         "fileRequired": "CSV ファイルを選択してください",
         "defaultSeverity": "重大度が未設定の行に適用する重大度",
         "append": "リストを置き換えずに追加する",
@@ -25203,7 +25414,10 @@
         "noIndicatorColumnIn": "{table} には indicator、ioc、value 列がないため、インジケーターを追加できません。別のリストを選択してください。",
         "replaceTitle": "リストを置き換える",
         "replaceMessage": "追加モードをオフにしてインポートすると、{table} は完全に置き換えられます。既存のすべての行、その列と設定が削除され、このファイルのインジケーターだけが残ります。",
-        "replaceConfirm": "置き換える"
+        "replaceConfirm": "置き換える",
+        "tooMany": "{n}件のインジケーターが貼り付けられました。1つのリストには最大{max}件までです。",
+        "listFull": "{table} に{count}件のインジケーターが含まれることになりますが、1つのリストには最大{max}件までです。複数のリストに分割してください。",
+        "fileTooLarge": "ファイルが{max} MBを超えています。小さなファイルに分割してください。"
       },
       "importCsv": "CSV をインポート",
       "unreadTables": "{lists} を読み取れませんでした。そのインジケーターは表示もスイープもされません。 | {lists} を読み取れませんでした。それらのインジケーターは表示もスイープもされません。",
@@ -25213,12 +25427,15 @@
       "columnsSkipped": "{n} 件の列は検索されませんでした | {n} 件の列は検索されませんでした",
       "skippedHint": "完全には検索されていません — スイープがクエリ上限に達したか、クエリが失敗しました：",
       "caveat": {
-        "capped": "スイープがクエリ上限に達したため、一部の列は検索されませんでした。",
         "failed": "{n} 件の列を検索できませんでした。 | {n} 件の列を検索できませんでした。",
         "partial": "{n} 件のクエリが部分的な結果しか返さなかったため、該当する列は完全には検索されませんでした。 | {n} 件のクエリが部分的な結果しか返さなかったため、該当する列は完全には検索されませんでした。",
         "unsearched": "次の列を持つストリームはありません：{types}。",
-        "cidr": "{n} 件の CIDR 範囲はスイープされませんでした。 | {n} 件の CIDR 範囲はスイープされませんでした。"
-      }
+        "cidr": "{n} 件の CIDR 範囲はスイープされませんでした。 | {n} 件の CIDR 範囲はスイープされませんでした。",
+        "checked": "インジケーター{total}件中{checked}件のみが完全に確認されました。"
+      },
+      "partialChecked": "部分的な結果: インジケーター{total}件中{checked}件を確認しました。残りの件数は実際より少ない可能性があります。",
+      "partialCapped": "部分的な結果: インジケーター{total}件中{checked}件を確認しました。スイープはクエリ{n}件で停止し、重大度の低いインジケーターは確認されていません。",
+      "inText": "{column}(テキスト内)"
     },
     "sources": {
       "title": "データソース",
@@ -25238,8 +25455,7 @@
       "exclude": "除外",
       "attached": "{pack} をアタッチしました。",
       "detached": "パックをデタッチしました。",
-      "detachedPipelineSkipped": "パックをデタッチしました。記録されたパイプラインがこのストリームとパックに一致しなくなったため、変更されていません。",
-      "empty": "ログストリームがまだありません。セキュリティログを任意のストリームとして取り込むと、ここに表示されます。",
+      "empty": "ログストリームがまだありません。セキュリティログを通常のストリームとして取り込むと、ここに表示されます。",
       "noticePackRemoved": "{stream}：SIEM の外部でパックが削除されました。再アタッチするかクリアしてください。",
       "noticeNoRecord": "{stream}：記録なしでパックがアタッチされています。記録するかデタッチしてください。",
       "noticeNotWriting": "{stream}：パイプラインがこのストリームに書き込まなくなりました。",
@@ -25249,14 +25465,31 @@
       "blockGlobalFlatten": "{stream}：グローバルのフラット化レベル（{level}）では OCSF 列をフラットに保てません。",
       "blockSchemaMissing": "{stream}：ユーザー定義スキーマに OCSF 列がありません：{columns}。",
       "blockPipelineDisabled": "{stream}：既存のパイプラインが無効です。アタッチする前に有効にしてください。",
-      "attachErrors": {
-        "functionEditedOutside": "関数 {name} は SIEM の外部で編集されました。",
-        "pipelineNoAccess": "このストリームには、アクセス権のないパイプラインがあります。",
-        "permissionDenied": "このストリームの関数とパイプラインを編集するには権限が必要です。",
-        "pipelineChanged": "このストリームのパイプラインが変更されたため、アタッチできなくなりました。更新して再確認してください。",
-        "packConflict": "このストリームにはすでにパック {pack} があります。先にデタッチしてください。",
-        "noPipeline": "このストリームのリアルタイムパイプラインを作成または検出できませんでした。",
-        "failed": "アタッチに失敗しました。"
+      "actionFailed": "変更は保存されませんでした。",
+      "stateExcluded": "除外済み",
+      "excludedBy": "{user}が{time}に除外",
+      "sourceTypeConfidence": "{label}({n}%)",
+      "notClassified": "未分類",
+      "lastChange": "{user}が{time}に最終変更: {summary}",
+      "previewTitle": "{pack} を {stream} にアタッチしますか?",
+      "previewSubtitle": "確定するまで何も書き込まれません。",
+      "previewLoading": "アタッチによる変更内容を確認しています…",
+      "previewPack": "パック",
+      "previewClasses": "書き込む OCSF クラス",
+      "previewFunction": "関数",
+      "previewPipeline": "パイプライン",
+      "previewFunctionCreate": "{name} を作成",
+      "previewFunctionReuse": "{name} を再利用 (同一内容)",
+      "previewPipelineCreate": "{name} を作成: {stream} → 関数 → {stream}",
+      "previewPipelineExtend": "{name} のソース直後に関数ノードを追加し、{feeds} に渡します",
+      "previewPipelineAlready": "{name} はすでにこのパックを実行しています。レコードのみ書き込まれます",
+      "confirmAttach": "アタッチ",
+      "cancel": "キャンセル",
+      "detachedSkipped": "パックをデタッチしました。パイプライン {id} は変更されませんでした: {reason}。",
+      "skipReason": {
+        "pipeline_missing": "すでに存在しません",
+        "other_stream": "現在は別のストリームを読み取っています",
+        "other_pack": "現在は別のパックを実行しています"
       }
     },
     "nav": {
@@ -25269,13 +25502,60 @@
       "intel": "脅威インテリジェンス",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
-      "content": "コンテンツ"
+      "content": "コンテンツ",
+      "sources": "データソース"
     },
     "sigma": {
       "notSupported": "非対応: {fields}",
       "cannotMatch": "マッチできません: このストリームには {fields} がありません",
       "compiledEmpty": "ルールのコンパイル結果が空です",
       "assumedAbsent": "このストリームには {fields} が存在しないものと仮定します"
+    },
+    "audit": {
+      "title": "変更履歴",
+      "hint": "過去7日間に検知、ソース、ケースを変更したユーザー",
+      "when": "日時",
+      "who": "変更者",
+      "area": "領域",
+      "action": "操作",
+      "target": "変更内容",
+      "empty": "記録された変更はありません",
+      "emptyHint": "検知、セキュリティソース、ケースへの変更がここに表示されます。",
+      "disabled": "監査ログがオフです",
+      "disabledHint": "セキュリティ設定の変更者を記録するには、このデプロイメントで監査ログを有効にしてください。",
+      "category": {
+        "detection": "検知",
+        "case": "ケース",
+        "source": "ソース",
+        "security": "セキュリティ"
+      },
+      "verb": {
+        "created": "作成",
+        "changed": "変更",
+        "deleted": "削除",
+        "enabled": "オンにしました",
+        "disabled": "オフにしました"
+      }
+    },
+    "access": {
+      "needsAuthor": "セキュリティの作成権限が必要です",
+      "openPreset": "{preset} からロールを作成",
+      "askPreset": "管理者に {preset} プリセットを依頼してください。",
+      "checkFailedTitle": "セキュリティへのアクセスを確認できませんでした",
+      "checkFailedHint": "サーバーが応答しませんでした。セッションはサインインしたままです。"
+    },
+    "aria": {
+      "addSource": "ソースを追加",
+      "addToCase": "ケースに追加",
+      "caseAssignee": "ケースの担当者",
+      "casePriority": "ケースの優先度",
+      "filterField": "フィルターフィールド",
+      "filterOperator": "フィルター演算子",
+      "filterValue": "フィルター値",
+      "huntKind": "ハンティング対象",
+      "indicatorType": "インジケーターの種類",
+      "severityFilter": "重大度フィルター",
+      "stream": "ストリーム"
     }
   },
   "promql": {

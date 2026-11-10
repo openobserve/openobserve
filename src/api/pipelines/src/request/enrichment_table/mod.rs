@@ -59,6 +59,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 pub async fn save_enrichment_table(
     Path((org_id, table_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] openobserve_api_common::extractors::Headers(user_email): openobserve_api_common::extractors::Headers<openobserve_core::auth::UserEmail>,
     headers: HeaderMap,
     payload: Multipart,
 ) -> Response {
@@ -76,6 +77,17 @@ pub async fn save_enrichment_table(
 
     // Format the table name to normalize it (lowercase, replace special chars)
     let table_name = format_stream_name(table_name.trim().to_string());
+    #[cfg(feature = "enterprise")]
+    if !openobserve_core::security::intel_list_write_allowed(
+        &org_id,
+        &user_email.user_id,
+        &table_name,
+        "POST",
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden(openobserve_core::security::INTEL_LIST_REFUSED);
+    }
 
     // Reject if a URL enrichment already exists with this name
     // to prevent cross-type silent overwrite
@@ -229,6 +241,7 @@ pub struct EnrichmentTableUrlRequest {
 pub async fn save_enrichment_table_from_url(
     Path((org_id, table_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] openobserve_api_common::extractors::Headers(user_email): openobserve_api_common::extractors::Headers<openobserve_core::auth::UserEmail>,
     Json(body): Json<EnrichmentTableUrlRequest>,
 ) -> Response {
     use config::meta::enrichment_table::{EnrichmentTableStatus, EnrichmentTableUrlJob};
@@ -285,6 +298,17 @@ pub async fn save_enrichment_table_from_url(
 
     // Format the table name to normalize it (lowercase, replace special chars)
     let table_name = format_stream_name(table_name.trim().to_string());
+    #[cfg(feature = "enterprise")]
+    if !openobserve_core::security::intel_list_write_allowed(
+        &org_id,
+        &user_email.user_id,
+        &table_name,
+        "POST",
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden(openobserve_core::security::INTEL_LIST_REFUSED);
+    }
     if let Some(violation) = infra::file_list::stream_key_violation(
         &org_id,
         config::meta::stream::StreamType::EnrichmentTables,

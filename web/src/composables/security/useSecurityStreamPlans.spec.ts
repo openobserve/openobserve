@@ -119,6 +119,16 @@ describe("runSql", () => {
     });
   });
 
+  it("rejects a denied search with its status on the response, as an axios error carries it", async () => {
+    stream.mockImplementation(
+      replay([], { error: { content: { status: 403, message: "denied" } } }),
+    );
+    await expect(runSql("org", "SELECT", 1, 2)).rejects.toMatchObject({
+      status: 403,
+      response: { status: 403 },
+    });
+  });
+
   it("cancels the stream on the server when aborted", async () => {
     stream.mockImplementation(() => {});
     const controller = new AbortController();
