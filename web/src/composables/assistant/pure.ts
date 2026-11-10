@@ -172,6 +172,7 @@ export type { QueryRun } from "./actions/appliers/query";
 export { canAlwaysAllow, recordedLedger } from "./actions/appliers/approval";
 export {
   approvalDiff,
+  approvalCoversTargets,
   approvalEditor,
   approvalToolEntity,
   approvalNotifies,

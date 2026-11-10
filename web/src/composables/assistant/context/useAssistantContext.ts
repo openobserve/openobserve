@@ -118,7 +118,9 @@ export function useAssistantContext(
   const dataLevel = computed(() => store.state.capability.dataLevel);
   const stagedChips = computed(() =>
     staged(composer.value?.chips ?? []).map((chip) =>
-      withheldAtLevel(chip, dataLevel.value) ? { ...chip, sent: "not_read" as const } : chip,
+      withheldAtLevel(chip, dataLevel.value)
+        ? { ...chip, sent: "not_read" as const, withheldAt: dataLevel.value }
+        : chip,
     ),
   );
   // With the interactive incident agent every chat turn carries the page's incident id, so it reads as sent.

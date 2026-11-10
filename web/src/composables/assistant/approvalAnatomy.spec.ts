@@ -186,6 +186,24 @@ describe("N3: a downtime (bulk mute) card", () => {
   it("ends at its start plus its duration, from the microsecond request body", () => {
     expect(approvalUntil(approvalOf(DOWNTIME_FRAME))).toBe(1794226306391 + 1_200_000);
   });
+
+  it("ends at the schedule's end when the window is nested under schedule, as the API takes it", () => {
+    const nested = approvalOf({
+      ...DOWNTIME_FRAME,
+      args: {
+        request_body: {
+          name: "Bulk mute",
+          schedule: {
+            repeat: "none",
+            starts_at: 1794226306391000,
+            ends_at: 1794229906391000,
+            duration_secs: 3600,
+          },
+        },
+      },
+    });
+    expect(approvalUntil(nested)).toBe(1794229906391);
+  });
 });
 
 describe("N2: a multi-target card keeps each target's own change", () => {

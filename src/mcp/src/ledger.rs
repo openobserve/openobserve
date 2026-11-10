@@ -152,15 +152,18 @@ pub enum ResourceKind {
     Pipeline,
     Function,
     Destination,
+    /// Only its create is undoable: a downtime is cancelled, never rewritten or re-created.
+    Downtime,
 }
 
 impl ResourceKind {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Dashboard,
         Self::Alert,
         Self::Pipeline,
         Self::Function,
         Self::Destination,
+        Self::Downtime,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -170,6 +173,7 @@ impl ResourceKind {
             Self::Pipeline => "pipeline",
             Self::Function => "function",
             Self::Destination => "destination",
+            Self::Downtime => "downtime",
         }
     }
 
@@ -184,6 +188,7 @@ impl ResourceKind {
             Self::Pipeline => "/api/{org_id}/pipelines",
             Self::Function => "/api/{org_id}/functions",
             Self::Destination => "/api/{org_id}/alerts/destinations",
+            Self::Downtime => "/api/v2/{org_id}/downtimes",
         }
     }
 
@@ -194,6 +199,7 @@ impl ResourceKind {
             Self::Pipeline => "/api/{org_id}/pipelines/{pipeline_id}",
             Self::Function => "/api/{org_id}/functions/{name}",
             Self::Destination => "/api/{org_id}/alerts/destinations/{destination_name}",
+            Self::Downtime => "/api/v2/{org_id}/downtimes/{downtime_id}",
         }
     }
 
@@ -201,6 +207,7 @@ impl ResourceKind {
         match self {
             Self::Dashboard => &["dashboardId", "dashboard_id"],
             Self::Alert => &["id", "alert_id"],
+            Self::Downtime => &["id"],
             Self::Pipeline => &["pipeline_id", "id"],
             Self::Function | Self::Destination => &["name"],
         }
@@ -246,6 +253,17 @@ impl ResourceKind {
             Self::Pipeline => &["version", "paused_at", "last_error", "updated_at"],
             Self::Function => &["streams"],
             Self::Dashboard | Self::Destination => &["updated_at"],
+            Self::Downtime => &[
+                "status",
+                "current_window",
+                "next_window",
+                "matched_alerts",
+                "matched_anomalies",
+                "matched_synthetics",
+                "matched_slos",
+                "affected",
+                "notification_log",
+            ],
         }
     }
 
@@ -253,7 +271,7 @@ impl ResourceKind {
     fn replay_query(self) -> &'static [&'static str] {
         match self {
             Self::Dashboard | Self::Alert => &["folder"],
-            Self::Pipeline | Self::Function | Self::Destination => &[],
+            Self::Pipeline | Self::Function | Self::Destination | Self::Downtime => &[],
         }
     }
 
@@ -791,7 +809,10 @@ fn undo_reason(
     if !ok {
         return Some(REASON_FAILED);
     }
-    if plan.kind.is_none() || (plan.op == Op::Other && !plan.mutes) {
+    if plan.kind.is_none()
+        || (plan.op == Op::Other && !plan.mutes)
+        || (plan.kind == Some(ResourceKind::Downtime) && plan.op != Op::Create)
+    {
         return Some(REASON_UNSUPPORTED);
     }
     if resource_id.is_none() {
@@ -825,6 +846,9 @@ fn reverse_request(target: &UndoTarget<'_>, current: &Snapshot) -> Result<Reques
     let kind = target.kind;
     match (target.op, current) {
         (_, Snapshot::Failed) => Err(UndoOutcome::Unavailable),
+        (Op::Create, current) if kind == ResourceKind::Downtime => {
+            cancel_request(target, after.as_ref(), current).map_err(|c| changed(c.as_ref()))
+        }
         (Op::Delete, Snapshot::Found(c)) => Err(changed(Some(c))),
         (Op::Create | Op::Update, Snapshot::Missing) => Err(changed(None)),
         (Op::Create | Op::Update, Snapshot::Found(c))
@@ -909,6 +933,34 @@ fn unmute_request(
         method: Method::POST,
         segments,
         query,
+        body: None,
+    })
+}
+
+/// A created downtime is cancelled, as long as nobody cancelled or edited it since; `Err` carries
+/// the current row.
+fn cancel_request(
+    target: &UndoTarget<'_>,
+    after: Option<&Value>,
+    current: &Snapshot,
+) -> Result<Request, Option<Value>> {
+    let Snapshot::Found(current) = current else {
+        return Err(None);
+    };
+    let version = |v: &Value| v.get("version").and_then(Value::as_i64);
+    let left = after.map(|a| &a["object"]);
+    if current.get("cancelled_at").is_some_and(|at| !at.is_null())
+        || left.and_then(version).is_none()
+        || left.and_then(version) != version(current)
+    {
+        return Err(Some(current.clone()));
+    }
+    let mut segments = path_segments(target.kind.item(), target.org_id, target.resource_id);
+    segments.push("cancel".to_string());
+    Ok(Request {
+        method: Method::POST,
+        segments,
+        query: Map::new(),
         body: None,
     })
 }
@@ -1449,6 +1501,72 @@ mod tests {
                 ]
             )
         );
+    }
+
+    #[test]
+    fn a_created_downtime_is_undone_by_cancelling_it_and_only_its_create_is_undoable() {
+        let create = || {
+            planned(
+                "POST",
+                "/api/v2/{org_id}/downtimes",
+                json!({"request_body": {"name": "Bulk mute", "targets": []}}),
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            (create().kind, create().op),
+            (Some(ResourceKind::Downtime), Op::Create)
+        );
+        let row_at = json!({"id": "dt1", "name": "Bulk mute", "version": 1, "status": "active"});
+        let row = recorded(
+            create(),
+            None,
+            Some(Snapshot::Found(row_at.clone())),
+            Some("dt1".into()),
+            (true, 201),
+        );
+        assert!(row.undoable, "{:?}", row.undo_reason);
+        assert_eq!(row.resource_type, "downtime");
+        assert_eq!(row.resource_name.as_deref(), Some("Bulk mute"));
+
+        let edit = planned(
+            "PUT",
+            "/api/v2/{org_id}/downtimes/{downtime_id}",
+            json!({"downtime_id": "dt1", "request_body": {}}),
+        )
+        .unwrap();
+        let edit = recorded(
+            edit,
+            Some(Snapshot::Found(row_at.clone())),
+            Some(Snapshot::Found(row_at.clone())),
+            Some("dt1".into()),
+            (true, 200),
+        );
+        assert_eq!(edit.undo_reason, Some(REASON_UNSUPPORTED));
+
+        let after = row.after.unwrap();
+        let t = UndoTarget {
+            resource_id: "dt1",
+            ..target(Op::Create, ResourceKind::Downtime, None, Some(&after))
+        };
+        let ended = json!({"id": "dt1", "version": 1, "status": "ended", "matched_alerts": 0});
+        let request = reverse_request(&t, &Snapshot::Found(ended)).unwrap();
+        assert_eq!(request.method, Method::POST);
+        assert_eq!(
+            request.segments,
+            ["api", "v2", "o", "downtimes", "dt1", "cancel"]
+        );
+        assert!(request.body.is_none());
+        for current in [
+            Snapshot::Missing,
+            Snapshot::Found(json!({"id": "dt1", "version": 2})),
+            Snapshot::Found(json!({"id": "dt1", "version": 1, "cancelled_at": 5})),
+        ] {
+            assert!(matches!(
+                reverse_request(&t, &current).unwrap_err(),
+                UndoOutcome::ChangedSince { .. }
+            ));
+        }
     }
 
     #[test]

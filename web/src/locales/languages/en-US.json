@@ -11670,7 +11670,9 @@
       "pastedText": "Pasted text · {count} line | Pasted text · {count} lines",
       "pastedAsChip": "Long paste attached as text.",
       "pasteInline": "Paste into the message instead",
-      "pasteInlineShort": "Paste into the message"
+      "pasteInlineShort": "Paste into the message",
+      "withheld": "not sent at this data level",
+      "withheldLine": "Not sent at this data level ({level}). Admins can change it in assistant settings."
     },
     "credits": {
       "copyRequest": "Please add AI credits for {org}: {used} of {limit} included credits used as of {date}.",

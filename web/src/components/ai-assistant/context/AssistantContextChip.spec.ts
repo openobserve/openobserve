@@ -68,6 +68,23 @@ describe("AssistantContextChip", () => {
     expect(wrapper.emitted("open")).toBeUndefined();
   });
 
+  it("a chip withheld at the org's data level says it was not sent, even compact", () => {
+    const wrapper = mountChip({
+      chip: { ...ROW, sent: "not_read", withheldAt: "aggregates" },
+      compact: true,
+    });
+    expect(
+      wrapper.get('[data-test="assistant-context-chip-log_row"]').attributes("data-state"),
+    ).toBe("not_read");
+    expect(wrapper.get('[data-test="assistant-context-chip-withheld"]').classes()).toContain(
+      "text-text-secondary",
+    );
+    expect(
+      wrapper.get('[data-test="assistant-context-chip-button"]').attributes("aria-label"),
+    ).toBe("Log row · cart · 13:57, not sent at this data level");
+    expect(mountChip().find('[data-test="assistant-context-chip-withheld"]').exists()).toBe(false);
+  });
+
   it("shows an image chip's thumbnail in place of the kind icon", () => {
     const wrapper = mountChip({
       chip: { ...ROW, kind: "image", label: raw("shot.png") },

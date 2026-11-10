@@ -117,7 +117,8 @@ describe("approvalDiffRows", () => {
     );
     expect(rows["Duration"]).toBe("20 minutes");
     expect(rows["Targets"]).toBe("latency_high, update_target");
-    expect(rows["Starts at"]).toMatch(/^\d{1,2}:\d{2}/);
+    // A start older than today carries its weekday or date before the clock time.
+    expect(rows["Starts at"]).toMatch(/\b\d{1,2}:\d{2}$/);
     expect(Object.values(rows).join(" ")).not.toMatch(/1794226306391000|\{|\[/);
   });
 });
