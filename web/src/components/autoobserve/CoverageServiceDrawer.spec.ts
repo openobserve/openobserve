@@ -149,6 +149,19 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
   });
 });
 
+describe("CoverageServiceDrawer header for a logs-only service (T2-7)", () => {
+  it("offers Open in Logs instead of Traces and the Service Catalog", () => {
+    const row = liveRow(
+      { errors: cell("none"), latency: cell("none"), absence: cell("none") },
+      [{ type: "logs", name: "ingest_e" }],
+    );
+    const wrapper = mountDrawer(row, "gap");
+    expect(wrapper.find('[data-test="autoobserve-coverage-drawer-logs"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="autoobserve-coverage-drawer-traces"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="autoobserve-coverage-drawer-catalog"]').exists()).toBe(false);
+  });
+});
+
 describe("CoverageServiceDrawer in live mode", () => {
   it("shows the table's three checks, with their cell words and dots, and nothing else", () => {
     const row = liveRow({

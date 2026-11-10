@@ -39,7 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <span class="text-text-secondary block truncate text-xs">{{ subTitle }}</span>
         </div>
-        <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+        <OTooltip
+          v-if="!logsOnly"
+          :content="tracesLock.lockedReason.value"
+          :disabled="!tracesLock.locked.value"
+        >
           <span class="inline-flex">
             <OButton
               variant="outline"
@@ -55,7 +59,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </span>
         </OTooltip>
-        <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+        <OButton
+          v-else
+          variant="outline"
+          size="sm-action"
+          icon-left="search"
+          :aria-label="t('autoobserve.coverage.openLogs')"
+          data-test="autoobserve-coverage-drawer-logs"
+          @click="openTraces()"
+          ><span class="max-md:sr-only">{{ t("autoobserve.coverage.openLogs") }}</span></OButton
+        >
+        <OTooltip
+          v-if="!logsOnly"
+          :content="tracesLock.lockedReason.value"
+          :disabled="!tracesLock.locked.value"
+        >
           <span class="inline-flex">
             <OButton
               variant="outline"
@@ -412,7 +430,7 @@ import {
   justAdded,
   ownedAlertIds,
   probeScope,
-  tracesRoute,
+  serviceRoute,
 } from "./insight/coverageCta";
 import { useServiceAddress } from "./insight/targets/serviceAddress";
 import { loadOwnedAlerts, type OwnedAlert } from "./insight/targets/ownership";
@@ -683,11 +701,28 @@ const openCheck = (check: LiveCheck) => {
 const extraValue = (cell: CoverageCell): I18nText =>
   cell.detector ? raw(cell.detector) : liveCellWord(t, cell.engine?.stateKey ?? "none");
 
-// Open in Traces lands on this service's spans; the catalog stays plain navigation (CTA-MAP §2).
+// A logs-only service has no spans and no catalog entry, so its one way out is Logs.
+const logsOnly = computed(
+  () =>
+    !!props.live &&
+    !!props.row.identity?.streams.length &&
+    !props.row.identity.streams.some((s) => s.type === "traces"),
+);
+
+// Open in Traces (or Logs) lands on the scope the charts read; the catalog stays plain navigation (CTA-MAP §2).
 const openTraces = (tab?: string) => {
   const org = store.state.selectedOrganization?.identifier;
-  if (!tab && props.row.identity) {
-    void router.push(tracesRoute(props.row, String(org ?? ""), Date.now() * 1000));
+  const to =
+    !tab && props.row.identity
+      ? serviceRoute(
+          props.row,
+          String(org ?? ""),
+          Date.now() * 1000,
+          props.live ? serviceCharts.scopes.value : {},
+        )
+      : null;
+  if (to) {
+    void router.push(to);
     return;
   }
   void router.push({ name: "traces", query: { org_identifier: org, ...(tab ? { tab } : {}) } });

@@ -61,9 +61,14 @@ const NO_FACTS: ServiceChartFacts = {
 
 export const quoteIdent = (name: string) => `"${name.replace(/"/g, "")}"`;
 
-export const filterSql = (filters: Record<string, string> | undefined): string =>
+/** A null value means the field must be absent, as on a service that has no namespace. */
+export const filterSql = (filters: Record<string, string | null> | undefined): string =>
   Object.entries(filters ?? {})
-    .map(([field, value]) => `${quoteIdent(field)} = '${escapeSingleQuotes(String(value))}'`)
+    .map(([field, value]) =>
+      value === null
+        ? `(${quoteIdent(field)} IS NULL OR ${quoteIdent(field)} = '')`
+        : `${quoteIdent(field)} = '${escapeSingleQuotes(String(value))}'`,
+    )
     .join(" AND ");
 
 export const pickErrorField = (fields: Map<string, string>): ErrorRule | null => {
@@ -79,7 +84,7 @@ const errorCondition = (rule: ErrorRule) =>
 
 const bucketSql = (
   stream: string,
-  filters: Record<string, string>,
+  filters: Record<string, string | null>,
   range: ChartRange,
   cols: string[],
 ) =>
@@ -88,7 +93,7 @@ const bucketSql = (
 
 export const tracesSql = (
   stream: string,
-  filters: Record<string, string>,
+  filters: Record<string, string | null>,
   range: ChartRange,
   want: { errors: boolean; latency: boolean },
 ) =>
@@ -99,7 +104,7 @@ export const tracesSql = (
 
 export const logsSql = (
   stream: string,
-  filters: Record<string, string>,
+  filters: Record<string, string | null>,
   range: ChartRange,
   rule: ErrorRule | null,
 ) =>

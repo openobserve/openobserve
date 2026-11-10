@@ -182,6 +182,45 @@ describe("useServiceCharts on a traces service", () => {
     expect(charts().latency.facts.current).toBe(250);
   });
 
+  it("charts a service with no namespace on its own spans, not every namespace's (T2-8)", async () => {
+    api.getStream.mockResolvedValue(
+      schema({
+        _timestamp: "Int64",
+        span_status: "Utf8",
+        duration: "Int64",
+        service_k8s_namespace_name: "Utf8",
+      }),
+    );
+    mountCharts(row("svc-b", TRACES));
+    await flushPromises();
+    expect(sqlOf(calls()[0])).toContain(
+      `WHERE "service_name" = 'svc-b' AND ("service_k8s_namespace_name" IS NULL OR "service_k8s_namespace_name" = '')`,
+    );
+  });
+
+  it("adds no namespace predicate for a service in a namespace", async () => {
+    api.getStream.mockResolvedValue(
+      schema({ _timestamp: "Int64", span_status: "Utf8", service_k8s_namespace_name: "Utf8" }),
+    );
+    api.correlate.mockResolvedValue(
+      correlation(
+        "svc-b",
+        [
+          info("app_traces", "traces", {
+            service_name: "svc-b",
+            service_k8s_namespace_name: "ns-b",
+          }),
+        ],
+        [],
+      ),
+    );
+    const inNs = row("svc-b", TRACES);
+    inNs.identity!.namespace = "ns-b";
+    mountCharts(inNs);
+    await flushPromises();
+    expect(sqlOf(calls()[0])).not.toContain("IS NULL");
+  });
+
   it("re-queries on a range change without a second _correlate", async () => {
     const { rangeRef } = mountCharts(row("svc-b", TRACES));
     await flushPromises();

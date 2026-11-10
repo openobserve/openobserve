@@ -16,7 +16,7 @@
 import type { RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
-import { buildTracesRoute } from "@/utils/metrics/metricDrilldown";
+import { buildLogsRoute, buildTracesRoute } from "@/utils/metrics/metricDrilldown";
 import {
   baselineSql,
   errorFieldOf,
@@ -535,3 +535,25 @@ export const tracesRoute = (row: CoverageRow, org: string, nowUs: number): Route
     timeRange: { start_time: nowUs - HOUR_US, end_time: nowUs },
     org,
   });
+
+/** The filters each stream's charts read, so the page it opens shows the same scope. */
+export type ChartScopes = Partial<Record<"traces" | "logs", Record<string, string>>>;
+
+/** The last hour of this service where its data is: Traces on its traces stream, else Logs on its logs stream. */
+export const serviceRoute = (
+  row: CoverageRow,
+  org: string,
+  nowUs: number,
+  scopes: ChartScopes = {},
+): RouteLocationRaw | null => {
+  const timeRange = { start_time: nowUs - HOUR_US, end_time: nowUs };
+  const traces = streamOf(row, "traces");
+  if (traces) {
+    const filters = scopes.traces ?? { service_name: nameOf(row) };
+    return buildTracesRoute({ stream: traces.name, filters, timeRange, org });
+  }
+  const logs = streamOf(row, "logs");
+  if (!logs) return null;
+  const filters = scopes.logs ?? { service_name: nameOf(row) };
+  return buildLogsRoute({ stream: logs.name, filters, timeRange, org });
+};

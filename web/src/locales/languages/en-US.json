@@ -30389,6 +30389,7 @@
       "tipNormal": "Normal {low} – {high}",
       "openTraces": "Open in Traces",
       "openCatalog": "Service Catalog",
+      "openLogs": "Open in Logs",
       "rangeLabel": "Time range",
       "logPatternsValue": "{known} known · {fresh} new today",
       "drawerSubtitle": "{stream} · {detectors} · {library}",

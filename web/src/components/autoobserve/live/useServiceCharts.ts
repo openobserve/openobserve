@@ -13,7 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, onBeforeUnmount, reactive, ref, watch, type Ref } from "vue";
+import { scopeFieldsOf } from "@/utils/alerts/prefill/fromAutoObserve";
+import {
+  computed,
+  onBeforeUnmount,
+  reactive,
+  readonly,
+  ref,
+  shallowRef,
+  watch,
+  type Ref,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import useHttpStreaming from "@/composables/useStreamingSearch";
@@ -69,7 +79,7 @@ interface ChartState extends Omit<ServiceChart, "reason" | "detail"> {
 interface Source {
   kind: ChartSource;
   name: string;
-  filters: Record<string, string>;
+  filters: Record<string, string | null>;
   wide: boolean;
   fields: Map<string, string>;
 }
@@ -189,16 +199,26 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
     running.clear();
   };
 
-  const schemaOf = async (kind: ChartSource, info?: StreamInfo): Promise<Source | undefined> => {
+  const schemaOf = async (
+    kind: ChartSource,
+    info: StreamInfo | undefined,
+    id: LiveIdentity,
+  ): Promise<Source | undefined> => {
     if (!info) return undefined;
     const stream = await getStream(info.stream_name, kind, true).catch((err: unknown) => {
       throw new SchemaError(info.stream_name, err);
     });
     const schema: { name: string; type: string }[] = stream?.schema ?? [];
+    const filters: Record<string, string | null> = { ...(info.filters ?? {}) };
+    // Without this the "no namespace" entity would chart every namespace's rows under its name.
+    const nsField = id.namespace
+      ? null
+      : scopeFieldsOf(kind).namespace.find((f) => schema.some((s) => s.name === f));
+    if (nsField && !(nsField in filters)) filters[nsField] = null;
     return {
       kind,
       name: info.stream_name,
-      filters: info.filters ?? {},
+      filters,
       wide: !!info.dropped_dimensions?.length,
       fields: new Map(schema.map((f) => [f.name, f.type])),
     };
@@ -208,8 +228,8 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
     const answer = await correlateOnce(org(), id);
     if (!answer || answer.service_name !== id.serviceName) return {};
     const [traces, logs] = await Promise.all([
-      schemaOf("traces", firstScoped(answer.related_streams?.traces)),
-      schemaOf("logs", firstScoped(answer.related_streams?.logs)),
+      schemaOf("traces", firstScoped(answer.related_streams?.traces), id),
+      schemaOf("logs", firstScoped(answer.related_streams?.logs), id),
     ]);
     return { traces, logs };
   };
@@ -366,8 +386,12 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
     setAll({ status: "failed", reason: "failedMatch", message, retry: () => void load() });
   };
 
+  // The equality filters each source's charts read, for the pages the drawer opens.
+  const scopes = shallowRef<Partial<Record<ChartSource, Record<string, string>>>>({});
+
   const load = async () => {
     const gen = ++generation;
+    scopes.value = {};
     cancelAll();
     nowMs.value = Date.now();
     LIVE_SIGNALS.forEach((s) => set(s, blank(s)));
@@ -386,6 +410,20 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
       if (gen !== generation) return;
       resolved = { key: id.serviceId, sources };
     }
+    scopes.value = Object.fromEntries(
+      Object.entries(sources).flatMap(([kind, src]) =>
+        src
+          ? [
+              [
+                kind,
+                Object.fromEntries(
+                  Object.entries(src.filters).filter((e): e is [string, string] => e[1] !== null),
+                ),
+              ],
+            ]
+          : [],
+      ),
+    );
     if (!sources.traces && !sources.logs) return noMatch();
     plan(sources, nowMs.value).forEach(runQuery);
   };
@@ -425,5 +463,5 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
     return { start, end: last };
   });
 
-  return { charts, span };
+  return { charts, span, scopes: readonly(scopes) };
 };

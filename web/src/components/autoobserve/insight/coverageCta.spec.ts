@@ -19,7 +19,7 @@ import config from "@/aws-exports";
 import { gt, raw } from "@/types/i18n";
 import type { CoverageCell, CoverageRow } from "../fixtures";
 import { b64DecodeUnicode } from "@/utils/zincutils";
-import { cellInsight, gapInsight, tracesRoute } from "./coverageCta";
+import { cellInsight, gapInsight, serviceRoute, tracesRoute } from "./coverageCta";
 import { serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import type { CoverageCell as Cell } from "../fixtures";
 
@@ -350,5 +350,27 @@ describe("drawer header", () => {
     expect(to.query.stream).toBe("default");
     expect(b64DecodeUnicode(to.query.query)).toContain("service_name");
     expect(b64DecodeUnicode(to.query.query)).toContain("svc-ingest-c");
+  });
+});
+
+describe("Open the service where its data is (T2-7)", () => {
+  type To = { name?: string; path?: string; query: Record<string, string> };
+  it("opens Traces on the same scope the charts read, namespace included", () => {
+    const to = serviceRoute(row([TRACES]), "demo-org", 1_000_000, {
+      traces: { service_name: "svc-a", service_k8s_namespace_name: "ns-b" },
+    }) as To;
+    expect(to.name).toBe("traces");
+    const where = b64DecodeUnicode(to.query.query) ?? "";
+    expect(where).toContain("svc-a");
+    expect(where).toContain("ns-b");
+  });
+
+  it("opens Logs for a service that sends only logs", () => {
+    const to = serviceRoute(row([LOGS]), "demo-org", 1_000_000, {
+      logs: { service_name: "svc-ingest-e" },
+    }) as To;
+    expect(to.path).toBe("/logs");
+    expect(to.query.stream).toBe("ingest_c");
+    expect(b64DecodeUnicode(to.query.query)).toContain("svc-ingest-e");
   });
 });
