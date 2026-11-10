@@ -66,7 +66,7 @@ const answered = (status: number, data: unknown) =>
   );
 
 const FORBIDDEN =
-  "You don't have access to Alert Calibration. Ask an org admin for read access to Alert Calibration.";
+  "You don't have access to Alert calibration. Ask an org admin for read access to it.";
 const UNREACHABLE = "Couldn't reach the server. Check your connection and try again.";
 const RUNS = "Alert calibration runs couldn't be loaded. Try again in a moment.";
 

@@ -11307,7 +11307,7 @@
     "SearchSQLCancelled": "Error: Search SQL was cancelled."
   },
   "alertCalibration": {
-    "title": "Alert Calibration",
+    "title": "Alert calibration",
     "subtitle": "How your alerts behave, measured from their own run history",
     "configure": "Configure",
     "runNow": "Run now",

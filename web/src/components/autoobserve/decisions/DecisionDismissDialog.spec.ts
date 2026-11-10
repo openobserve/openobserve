@@ -257,7 +257,7 @@ describe("DecisionDismissDialog", () => {
       "until_reopened",
     ]);
     expect(byTest("decision-dismiss-duration")?.textContent).toContain("Hide for");
-    expect(byTest("decision-dismiss-duration")?.textContent).toContain("Until reopened");
+    expect(byTest("decision-dismiss-duration")?.textContent).toContain("Until undone");
     expect(byTest("decision-dismiss-note")).toBeTruthy();
     wrapper?.unmount();
     await mountDialog();

@@ -539,7 +539,7 @@ describe("AddAlert calibration handoff", () => {
     expect(vm().formData.pending_period_sec).toBe(1);
     expect(vm().alertDraft.hasUnsavedChanges()).toBe(false);
     expect(banner()?.getAttribute("data-severity")).toBe("info");
-    expect(bannerText()).toBe("Opened from an Alert Calibration finding.");
+    expect(bannerText()).toBe("Opened from an Alert calibration finding.");
   });
 
   it("Save after a handoff is the ordinary save", async () => {

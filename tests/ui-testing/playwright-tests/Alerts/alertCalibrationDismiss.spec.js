@@ -218,7 +218,7 @@ test.describe("Alert Calibration dismiss and reopen", () => {
       await mine.click();
       await pm.alertCalibrationPage.expectToast(
         "success",
-        "Reopened. The finding is eligible for the next analysis.",
+        "Undone. The finding is shown again.",
       );
       await pm.alertCalibrationPage.expectDismissedCount(before);
       if (before === 0) {
@@ -299,7 +299,7 @@ test.describe("Alert Calibration dismiss and reopen", () => {
       await fold.locator(dismiss.cardReopen).click();
       await pm.alertCalibrationPage.expectToast(
         "success",
-        "Reopened. The finding is eligible for the next analysis.",
+        "Undone. The finding is shown again.",
       );
       await expect(fold).toHaveCount(0, { timeout: 15000 });
       await expect(card.locator(dismiss.cardBadge)).toHaveCount(0);
