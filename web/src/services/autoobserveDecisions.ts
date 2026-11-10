@@ -87,6 +87,9 @@ export interface DecisionView {
   /** An apply's alert and fields, on servers that list applies. */
   change?: { alert: { id: string; title: string }; fields: FieldChange[] };
   via?: "apply" | "editor";
+  /** When and by whom an apply was undone, on servers that keep `decided_at` as the change time. */
+  undone_at?: number | null;
+  undone_by?: string | null;
 }
 
 export interface Preview {

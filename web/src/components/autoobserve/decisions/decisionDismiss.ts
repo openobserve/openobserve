@@ -169,9 +169,14 @@ export const makeDecisionDismissSchema = (
           message: t("insight.decisions.dismiss.untilRequired"),
         });
       } else if (!isUntilInRange(until, now())) {
+        const today = now();
+        // A day outside the window is the date's fault; on its first or last day the time decides.
+        const dateOut =
+          form.untilDate < localDate(today) ||
+          form.untilDate > localDate(today + PLANNED_WORK_MAX_MS);
         ctx.addIssue({
           code: "custom",
-          path: ["untilTime"],
+          path: [dateOut ? "untilDate" : "untilTime"],
           message: t("insight.decisions.dismiss.untilInvalid"),
         });
       }

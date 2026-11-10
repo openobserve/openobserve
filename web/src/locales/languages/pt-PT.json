@@ -11435,7 +11435,6 @@
       "emptyDescription": "A calibração de alertas escreve um resumo sempre que é executada. Execute-a agora para ver o que encontra.",
       "filteredTitle": "Nenhuma execução corresponde a este filtro",
       "filteredDescription": "Amplie o filtro ou limpe a pesquisa.",
-      "errorTitle": "Execuções indisponíveis",
       "runsCapped": "A pesquisa de execuções parou nas últimas {count} linhas, pelo que as execuções mais antigas não estão listadas.",
       "searchCapped": "A pesquisa por nome de alerta parou em {count} execuções correspondentes, pelo que outras execuções correspondentes não são mostradas."
     },

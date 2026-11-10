@@ -82,7 +82,7 @@ import {
   useDecisionRoute,
 } from "@/composables/autoobserve/useDecisionRoute";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { APPLY_FIELDS, applyCopy } from "@/components/alert_calibration/applySuggestion";
+import { applyCopy } from "@/components/alert_calibration/applySuggestion";
 import { decisionCopy } from "../insight/insightCopy";
 import { useAppliedChanges, type AppliedEntry } from "./appliedChanges";
 
@@ -113,19 +113,32 @@ const alertHref = (entry: AppliedEntry): string | null => {
 const copy = computed(() => applyCopy(t, locale.value));
 
 const detailOf = (entry: AppliedEntry): I18nText => {
-  const changes = entry.fields.flatMap((f) => {
-    if (!(f.field in APPLY_FIELDS)) return [];
-    const key = APPLY_FIELDS[f.field as keyof typeof APPLY_FIELDS];
-    return [
-      `${copy.value.fieldLabel(key)} ${copy.value.value(key, f.from)} → ${copy.value.value(key, f.to)}`,
-    ];
-  });
+  const changes = copy.value.appliedLines(entry.fields);
   const me = store.state.userInfo?.email;
-  const by = t("insight.decisions.applied.by", {
-    actor: entry.view.actor === me ? t("insight.decisions.applied.you") : raw(entry.view.actor),
-    when: decisionCopy(t, locale.value).when(entry.view.decided_at),
+  const params = (actor: string, at: number) => ({
+    actor: actor === me ? t("insight.decisions.applied.you") : raw(actor),
+    when: decisionCopy(t, locale.value).when(at),
   });
-  return raw([...changes, String(by)].join(" · "));
+  const { view } = entry;
+  if (view.state !== "undone")
+    return raw(
+      [
+        ...changes,
+        String(t("insight.decisions.applied.by", params(view.actor, view.decided_at))),
+      ].join(" · "),
+    );
+  // Without undone_at the server moved decided_at and actor to the undo, so they describe the undo.
+  const lines =
+    view.undone_at != null
+      ? [
+          t("insight.decisions.applied.by", params(view.actor, view.decided_at)),
+          t(
+            "insight.decisions.applied.undoneBy",
+            params(view.undone_by ?? view.actor, view.undone_at),
+          ),
+        ]
+      : [t("insight.decisions.applied.undoneBy", params(view.actor, view.decided_at))];
+  return raw([...changes, ...lines.map(String)].join(" · "));
 };
 
 function undo(entry: AppliedEntry) {

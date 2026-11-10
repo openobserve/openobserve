@@ -11435,7 +11435,6 @@
       "emptyDescription": "La calibrazione degli avvisi scrive un digest a ogni esecuzione. Eseguila ora per vedere cosa rileva.",
       "filteredTitle": "Nessuna esecuzione corrisponde a questo filtro",
       "filteredDescription": "Amplia il filtro o cancella la ricerca.",
-      "errorTitle": "Esecuzioni non disponibili",
       "runsCapped": "La ricerca delle esecuzioni si è fermata alle ultime {count} righe, quindi le esecuzioni precedenti non sono elencate.",
       "searchCapped": "La ricerca per nome dell'avviso si è fermata a {count} esecuzioni corrispondenti, quindi le altre esecuzioni corrispondenti non sono mostrate."
     },

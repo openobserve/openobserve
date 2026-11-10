@@ -46,12 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alertCalibration.settings.noConfig") }}
         </OBanner>
 
-        <AlertCalibrationSettingsForm :key="config?.updated_at ?? 'defaults'" :config="config" />
+        <AlertCalibrationSettingsForm
+          :key="config?.updated_at ?? 'defaults'"
+          :config="config"
+          :read-only="!canEdit"
+        />
 
         <OFormSection :title="t('alertCalibration.settings.runNowHeading')">
           <div class="flex flex-col gap-3">
             <OText variant="body" as="p">{{ t("alertCalibration.runNowHint") }}</OText>
-            <div class="flex flex-wrap items-center gap-3">
+            <div v-if="canRun" class="flex flex-wrap items-center gap-3">
               <OButton
                 variant="outline"
                 size="sm-action"
@@ -96,7 +100,10 @@ import { useOrgId } from "@/composables/query";
 import { useI18nTyped } from "@/types/i18n";
 import { readErrorCopy } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
-import { useRequestAlertCalibrationRun } from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
+import {
+  useAlertCalibrationRights,
+  useRequestAlertCalibrationRun,
+} from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import AlertCalibrationSettingsForm from "./AlertCalibrationSettingsForm.vue";
@@ -109,6 +116,7 @@ const orgId = useOrgId();
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);
 const { pending, runNow } = useRequestAlertCalibrationRun();
+const { canRun, canEdit } = useAlertCalibrationRights();
 
 const reload = () => void configQuery.refetch();
 

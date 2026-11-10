@@ -469,6 +469,32 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(w.emitted("disconnect")).toBeUndefined();
   });
 
+  it("a_reader_without_manage_slack_gets_every_write_on_the_card_off", async () => {
+    const w = mount(SlackWorkspaceCard, {
+      props: { installation: installationView(), isCloud: false, readOnly: true },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n, makeSlackStore()],
+        config: { errorHandler },
+        stubs: {
+          OTable: OTableStub,
+          ConfirmDialog: NamedConfirmDialogStub,
+          SlackCredentialsDialog: CredentialsStub,
+        },
+      },
+    });
+    await flushPromises();
+    for (const test of [
+      "slack-test-connection",
+      "slack-reinstall",
+      "slack-update-credentials",
+      "slack-forget-token",
+      "slack-help-contact-save",
+    ]) {
+      expect(w.find(`[data-test="${test}"]`).attributes("disabled"), test).toBeDefined();
+    }
+  });
+
   it("a managed workspace shows Managed by your instance admin with the _meta contact", () => {
     const w = mountCard(managedView());
     const banner = w.find('[data-test="slack-managed-banner"]');

@@ -406,6 +406,16 @@ describe("Slack settings: several workspaces (R-89)", () => {
     expect(w.findComponent({ name: "SlackWorkspaceCard" }).props("installation")).toEqual(instance);
   });
 
+  it("a_reader_without_manage_slack_cannot_add_another_workspace", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({ installations: [installationView()] }) as any,
+    );
+    vi.mocked(slack.getInsightsSettings).mockReturnValue(ok({ can_edit: false }) as any);
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    expect(w.find('[data-test="slack-add-workspace"]').attributes("disabled")).toBeDefined();
+  });
+
   it("Add another workspace opens the setup for another team", async () => {
     const available = [{ installation_id: "i9", team_name: "Other WS" }];
     vi.mocked(slack.listInstallations).mockReturnValue(

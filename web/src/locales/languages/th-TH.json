@@ -11432,7 +11432,6 @@
       "emptyDescription": "Alert calibration writes a digest every time it runs. Run it now to see what it finds.",
       "filteredTitle": "No runs match this filter",
       "filteredDescription": "Widen the filter, or clear the search.",
-      "errorTitle": "Runs unavailable",
       "runsCapped": "The runs search stopped at its latest {count} rows, so older runs are not listed.",
       "searchCapped": "The alert name search stopped at {count} matching runs, so other matching runs are not shown."
     },

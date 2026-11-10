@@ -11522,7 +11522,7 @@
       "foldUntilReopened": "Hidden until undone",
       "emptyTitle": "No dismissed findings",
       "emptyDescription": "Findings you dismiss are listed here until they end or are undone.",
-      "loadFailedTitle": "Dismissed findings couldn't be loaded",
+      "loadFailedTitle": "Couldn't load dismissed findings",
       "statesUnknown": "Dismissed findings couldn't be loaded, so some findings below may already be dismissed.",
       "capped": "Showing {shown} of {total} dismissed finding. | Showing {shown} of {total} dismissed findings.",
       "endedNote": "Ended dismissals are not listed. Their findings return only when a later run detects them again.",
@@ -11796,13 +11796,14 @@
       "noAccessTitle": "You don't have access to Alert calibration",
       "noAccessDescription": "Ask an org admin for read access to it.",
       "unreachable": "Couldn't reach the server. Check your connection and try again.",
+      "failed": "Something went wrong while loading them. Try again in a moment.",
       "runs": "Alert calibration runs couldn't be loaded. Try again in a moment.",
       "run": "This run couldn't be loaded. Try again in a moment.",
       "settings": "Alert calibration settings couldn't be loaded. Try again in a moment."
     },
     "digests": {
       "schedule": "Schedule",
-      "runsEvery": "Runs every",
+      "betweenRuns": "{unit} between runs",
       "off": "Off",
       "notConfigured": "Not configured",
       "noScheduledRun": "No scheduled run",
@@ -11824,7 +11825,7 @@
       "emptyDescription": "Alert calibration writes a digest every time it runs. Run it now to see what it finds.",
       "filteredTitle": "No runs match this filter",
       "filteredDescription": "Widen the filter, or clear the search.",
-      "errorTitle": "Runs unavailable",
+      "loadFailedTitle": "Couldn't load runs",
       "runsCapped": "The runs search stopped at its latest {count} rows, so older runs are not listed.",
       "searchCapped": "The alert name search stopped at {count} matching runs, so other matching runs are not shown."
     },
@@ -11889,8 +11890,10 @@
       "notEnabledDescription": "Turn it on in the settings. The first run is due as soon as it is on.",
       "emptyTitle": "No runs in the last {days} days",
       "emptyDescription": "The dashboard fills in once alert calibration has run.",
-      "loadFailedTitle": "Findings couldn't be loaded",
+      "loadFailedTitle": "Couldn't load findings",
       "findingGone": "This finding is no longer open.",
+      "findingDismissed": "This finding is dismissed. Undo it from Dismissed.",
+      "findingGoneScoped": "This finding is not open in the latest run, or it is on an alert you can't access.",
       "applied": "Applied"
     },
     "lastRun": {
@@ -11920,6 +11923,8 @@
       "savedCadence": "Saved. The new cadence applies from the next run, and a shorter one can bring that run forward.",
       "saveFailed": "The settings could not be saved: {message}",
       "lastSaved": "Last saved {time}",
+      "readOnly": "You can view these settings. Ask an admin for edit access to Alert calibration to change them.",
+      "saveDenied": "You don't have permission to change Alert calibration settings. Ask an admin for edit access to it.",
       "runNowHeading": "Run now",
       "findingsKept": "Findings are kept with this organization's own records for its retention period. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
@@ -34442,6 +34447,7 @@
         "effectUntil": "Hidden for everyone in {org} until {when}, then shown again if it is still true. Recorded with your name and reason. Undo from Dismissed.",
         "effectUndone": "Hidden for everyone in {org} until someone undoes it. Recorded with your name and reason. Undo from Dismissed.",
         "effectLoading": "Checking what this changes…",
+        "effectNeedsChoice": "Finish the choices above to see what this hides.",
         "effectFailed": "Couldn't check what this changes, so nothing can be dismissed yet. Close and try again."
       },
       "saved": {
@@ -34533,6 +34539,7 @@
       "applied": {
         "title": "Applied changes",
         "by": "by {actor} at {when}",
+        "undoneBy": "undone by {actor} at {when}",
         "undone": "Undone",
         "you": "you"
       }

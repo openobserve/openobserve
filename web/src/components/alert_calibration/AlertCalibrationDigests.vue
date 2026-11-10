@@ -178,13 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <LiveNoticeState
               size="block"
               :notice="
-                readNotice(
-                  t,
-                  runs.error.value,
-                  t('alertCalibration.digests.errorTitle'),
-                  runsError ?? raw(''),
-                )
+                readNotice(t, runs.error.value, t('alertCalibration.digests.loadFailedTitle'))
               "
+              :detail="readFailedDetail(runs.error.value)"
               :busy="runs.loading.value"
               data-test="alert-calibration-digests-error"
               retry-test="alert-calibration-digests-retry"
@@ -226,7 +222,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { readErrorCopy } from "@/services/alert_calibration";
 import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
-import { readNotice } from "./notices";
+import { readFailedDetail, readNotice } from "./notices";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
@@ -322,18 +318,18 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "schedule",
-      // "1 · Runs every · day" reads as a sentence; an off schedule keeps its noun.
+      // "1 · day between runs" reads as one phrase; an off schedule keeps its noun.
       label: c?.enabled
-        ? t("alertCalibration.digests.runsEvery")
+        ? t("alertCalibration.digests.betweenRuns", { unit: cadence.unit })
         : t("alertCalibration.digests.schedule"),
       value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : raw("—"),
       sub: c
         ? c.enabled
-          ? cadence.unit
+          ? undefined
           : t("alertCalibration.digests.noScheduledRun")
         : t("alertCalibration.digests.notConfigured"),
       icon: "schedule",
-      tone: c?.enabled ? "success" : "neutral",
+      tone: "neutral",
     },
   ];
 });

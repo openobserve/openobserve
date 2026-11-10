@@ -38,24 +38,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-col gap-3">
       <p
-        v-if="readNotice && !writeNotice"
+        v-if="topNotice"
         class="flex items-start gap-1.5 text-sm"
-        :class="NOTICE_TONE[readNotice.variant]"
-        :role="readNotice.variant === 'error' ? 'alert' : undefined"
-        :data-severity="readNotice.variant"
+        :class="NOTICE_TONE[topNotice.variant]"
+        :role="topNotice.variant === 'error' ? 'alert' : undefined"
+        :data-severity="topNotice.variant"
         data-test="review-change-notice"
       >
         <OIcon
-          :name="readNotice.variant === 'info' ? 'info-outline' : 'warning'"
+          :name="topNotice.variant === 'info' ? 'info-outline' : 'warning'"
           size="xs"
           class="mt-1 shrink-0"
         />
-        <span>{{ readNotice.text }}</span>
+        <span>{{ topNotice.text }}</span>
       </p>
-      <p v-if="where" class="text-text-secondary text-xs" data-test="review-change-where">
+      <p v-if="where && !gone" class="text-text-secondary text-xs" data-test="review-change-where">
         {{ where }}
       </p>
+      <!-- A gone finding's values are from before the alert moved on, so they are not shown as current. -->
       <div
+        v-if="!gone"
         class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-3 gap-y-1.5 max-sm:grid-cols-[auto_auto_minmax(0,1fr)]"
         data-test="review-change-fields"
       >
@@ -260,6 +262,15 @@ const readNotice = computed<{ variant: Variant; text: I18nText } | null>(() => {
   }
   return null;
 });
+
+// The write notice lives in the note slot, which is gone once Apply is, so it then moves to the top.
+const topNotice = computed(() =>
+  canApplyHere.value
+    ? writeNotice.value
+      ? null
+      : readNotice.value
+    : (readNotice.value ?? writeNotice.value),
+);
 
 /** A refused reader is never promised an undoable apply. */
 const isLocked = computed(() => !!preview.data.value?.locked || !!refusalOf(preview.error.value));

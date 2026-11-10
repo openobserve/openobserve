@@ -44,6 +44,8 @@ import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
 import SlackSwitchAllCard from "./SlackSwitchAllCard.vue";
 import SlackUninstallDialog from "./SlackUninstallDialog.vue";
 import SlackWorkspaceCard from "./SlackWorkspaceCard.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { provideSlackReadOnly } from "./slackReadOnly";
 
 type DialogMode = "disconnect" | "uninstall";
 
@@ -97,6 +99,9 @@ const showInsights = computed(
     !insights.isPending.value &&
     !INSIGHTS_OFF_STATUSES.has(statusOf(insights.error.value) ?? 0),
 );
+// Only an explicit refusal limits the page; a server that does not say keeps every control.
+const readOnly = computed(() => insights.data.value?.can_edit === false);
+provideSlackReadOnly(readOnly);
 const sectionLinks = computed(() => [
   { id: "general", label: t("slackApp.sections.general") },
   { id: "autoobserve", label: t("slackApp.sections.autoobserve") },
@@ -241,10 +246,16 @@ const openDialog = (mode: DialogMode): void => {
               size="sm-action"
               icon-left="add"
               class="ms-auto"
+              :disabled="readOnly"
               data-test="slack-add-workspace"
               @click="adding = true"
             >
               {{ t("slackApp.workspaces.addAnother") }}
+              <OTooltip
+                v-if="readOnly"
+                side="bottom"
+                :content="t('slackApp.connect.permissionHint')"
+              />
             </OButton>
           </div>
           <SlackSwitchAllCard :key="`switch-${current.id}`" :installation="current" />
@@ -252,7 +263,7 @@ const openDialog = (mode: DialogMode): void => {
             :key="current.id"
             :installation="current"
             :is-cloud="isCloud"
-            :read-only="insights.data.value?.can_edit === false"
+            :read-only="readOnly"
             @disconnect="openDialog('disconnect')"
             @uninstall="openDialog('uninstall')"
           >

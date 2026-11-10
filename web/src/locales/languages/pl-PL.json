@@ -11435,7 +11435,6 @@
       "emptyDescription": "Kalibracja alertów zapisuje podsumowanie przy każdym uruchomieniu. Uruchom ją teraz, aby zobaczyć, co wykryje.",
       "filteredTitle": "Żadne uruchomienie nie pasuje do tego filtra",
       "filteredDescription": "Rozszerz filtr lub wyczyść wyszukiwanie.",
-      "errorTitle": "Uruchomienia niedostępne",
       "runsCapped": "Wyszukiwanie uruchomień zatrzymało się na najnowszych {count} wierszach, więc starsze uruchomienia nie są wyświetlane.",
       "searchCapped": "Wyszukiwanie nazwy alertu zatrzymało się na {count} pasujących uruchomieniach, więc inne pasujące uruchomienia nie są wyświetlane."
     },

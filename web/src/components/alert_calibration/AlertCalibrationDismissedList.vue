@@ -24,14 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LiveNoticeState
       v-else-if="unknown"
       size="block"
-      :notice="
-        readNotice(
-          t,
-          query.error.value,
-          t('alertCalibration.dismiss.loadFailedTitle'),
-          readErrorCopy(t, query.error.value),
-        )
-      "
+      :notice="readNotice(t, query.error.value, t('alertCalibration.dismiss.loadFailedTitle'))"
+      :detail="readFailedDetail(query.error.value)"
       data-test="alert-calibration-dismissed-error"
       retry-test="alert-calibration-dismissed-retry"
       @retry="query.refetch()"
@@ -115,9 +109,8 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { readErrorCopy } from "@/services/alert_calibration";
 import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
-import { readNotice } from "./notices";
+import { readFailedDetail, readNotice } from "./notices";
 import {
   useActiveDismissals,
   useReopenDismissal,

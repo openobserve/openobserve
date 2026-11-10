@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     {{ t("alertCalibration.configure") }}
   </OButton>
   <OButton
-    v-else
+    v-else-if="canRun"
     variant="primary"
     size="sm"
     icon-left="play-arrow"
@@ -51,7 +51,10 @@ import { useOrgId } from "@/composables/query";
 import { useI18nTyped } from "@/types/i18n";
 import { httpStatus, type AlertCalibrationConfig } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
-import { useRequestAlertCalibrationRun } from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
+import {
+  useAlertCalibrationRights,
+  useRequestAlertCalibrationRun,
+} from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
 
 /** `run` is the header's primary action; `configure` goes in its overflow, so a phone folds it away. */
 const props = defineProps<{ config: AlertCalibrationConfig | null; part: "run" | "configure" }>();
@@ -60,6 +63,7 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const orgId = useOrgId();
 const { pending, denied, runNow } = useRequestAlertCalibrationRun();
+const { canRun } = useAlertCalibrationRights();
 // The page reads the same config; a 403 on it means this reader can neither run nor configure.
 const configRead = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const noAccess = computed(() => httpStatus(configRead.error.value) === 403);
