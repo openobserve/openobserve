@@ -187,6 +187,25 @@ describe("DecisionDismissDialog", () => {
     expect(errors("", now)).toEqual([t("insight.decisions.dismiss.reasonRequired")]);
   });
 
+  it("an_end_out_of_range_is_flagged_on_the_part_that_is_out_of_range", () => {
+    const now = new Date(2026, 10, 9, 14, 5).getTime();
+    const schema = makeDecisionDismissSchema(t, () => now);
+    const paths = (untilDate: string, untilTime: string) => {
+      const form = {
+        ...decisionDismissDefaults(now),
+        reason: "planned_work",
+        untilDate,
+        untilTime,
+      };
+      const result = schema.safeParse(form);
+      return result.success ? [] : result.error.issues.map((issue) => issue.path.join("."));
+    };
+    expect(paths("2026-11-26", "03:00")).toEqual(["untilDate"]);
+    expect(paths("2026-11-08", "16:00")).toEqual(["untilDate"]);
+    expect(paths("2026-11-09", "13:00")).toEqual(["untilTime"]);
+    expect(paths("2026-11-16", "15:00")).toEqual(["untilTime"]);
+  });
+
   it.each(["not_needed", "false_positive", "will_fix_later"])(
     "sends_the_body_for_%s_with_the_routes_default_term",
     async (reason) => {
@@ -341,8 +360,39 @@ describe("DecisionDismissDialog", () => {
     });
   });
 
+  it("before_a_reason_the_effect_line_asks_for_one_instead_of_describing_another_term", async () => {
+    await mountDialog(calTarget);
+    await chooseDuration("until_reopened");
+    const effect = byTest("decision-dismiss-effect");
+    expect(effect?.getAttribute("data-state")).toBe("incomplete");
+    expect(effect?.textContent?.trim()).toBe("Finish the choices above to see what this hides.");
+    expect(effect?.textContent).not.toContain("until");
+  });
+
+  it("a_planned_work_end_out_of_range_never_shows_the_effect_of_another_term", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 11, 10, 0));
+    try {
+      await mountDialog(calTarget);
+      await chooseReason("planned_work");
+      expect(byTest("decision-dismiss-effect")?.getAttribute("data-state")).toBe("ready");
+      const time = document.body.querySelector<HTMLInputElement>(
+        '[data-test="decision-dismiss-until-time"] input',
+      )!;
+      time.value = "08:00";
+      time.dispatchEvent(new Event("change", { bubbles: true }));
+      await settle();
+      const effect = byTest("decision-dismiss-effect");
+      expect(effect?.getAttribute("data-state")).toBe("incomplete");
+      expect(effect?.textContent?.trim()).toBe("Finish the choices above to see what this hides.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows_the_effect_from_the_preview_without_ids", async () => {
     await mountDialog();
+    await chooseReason("not_needed");
     const effect = byTest("decision-dismiss-effect");
     expect(effect?.getAttribute("data-state")).toBe("ready");
     expect(effect?.textContent).toContain("Hidden for everyone in default Organization until");
@@ -525,8 +575,8 @@ describe("AlertCalibrationDismissDialog transport", () => {
     vi.mocked(autoobserveDecisions.list).mockResolvedValue({ data: fixture.list } as never);
     await wrapper!.setProps({ open: true });
     await settle();
-    expect(byTest("decision-dismiss-effect")?.getAttribute("data-state")).toBe("ready");
     await chooseReason("not_needed");
+    expect(byTest("decision-dismiss-effect")?.getAttribute("data-state")).toBe("ready");
     await submit();
     expect(autoobserveDecisions.decide).toHaveBeenCalledTimes(1);
     expect(alertCalibration.dismissFinding).not.toHaveBeenCalled();

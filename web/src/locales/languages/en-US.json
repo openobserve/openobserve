@@ -34436,6 +34436,7 @@
         "effectUntil": "Hidden for everyone in {org} until {when}, then shown again if it is still true. Recorded with your name and reason. Undo from Dismissed.",
         "effectUndone": "Hidden for everyone in {org} until someone undoes it. Recorded with your name and reason. Undo from Dismissed.",
         "effectLoading": "Checking what this changes…",
+        "effectNeedsChoice": "Finish the choices above to see what this hides.",
         "effectFailed": "Couldn't check what this changes, so nothing can be dismissed yet. Close and try again."
       },
       "saved": {

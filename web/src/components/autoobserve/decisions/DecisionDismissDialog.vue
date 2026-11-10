@@ -49,12 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="option === 'planned_work'"
-                class="flex flex-wrap items-end gap-2 ps-6"
+                class="flex flex-wrap items-start gap-2 ps-6"
                 data-test="decision-dismiss-until"
               >
-                <OText variant="meta" as="span" class="pb-2">
-                  {{ t("insight.decisions.dismiss.until") }}
-                </OText>
                 <OFormDate
                   class="min-w-36 flex-1"
                   name="untilDate"
@@ -262,10 +259,13 @@ const effectState = computed(() => {
   if (locked.value) return "locked";
   if (props.transport === "failed") return "error";
   if (preview.error.value && !preview.data.value) return "error";
-  return preview.data.value ? "ready" : "loading";
+  if (!preview.data.value) return "loading";
+  // Without a reason or with an end out of range the preview is of another term, so it is not shown as this one's.
+  return "reason" in params.value ? "ready" : "incomplete";
 });
 const effectText = computed(() => {
   if (effectState.value === "error") return t("insight.decisions.dismiss.effectFailed");
+  if (effectState.value === "incomplete") return t("insight.decisions.dismiss.effectNeedsChoice");
   const data = preview.data.value;
   return data
     ? copy.value.effect(data, orgName.value)
