@@ -301,6 +301,11 @@ pub async fn read(
     }
 }
 
+/// A file built before the org's last settings or redaction change is never served.
+pub fn withheld(header: &Header, live: &Live) -> bool {
+    header.settings_rev != live.settings_rev
+}
+
 /// The due rules in order; an edit or a masked screen after one failure skips the backoff once.
 pub fn due(
     header: &Header,
@@ -1039,6 +1044,10 @@ async fn serve_file(
     if header.published_by != live.published_by {
         store::evict(key).await;
         return serve_cold(engine, flights, key, None, req, intents, live).await;
+    }
+    // A settings or redaction change can hide values the file still holds: rebuild before serving.
+    if withheld(&header, live) {
+        return serve_cold(engine, flights, key, Some(header), req, intents, live).await;
     }
     let link = req.link;
     let eff = effective_secs(link, &req.range);
@@ -2085,6 +2094,47 @@ pub(super) mod tests {
         assert_eq!(build_no(&rebuilt, "p1"), 2);
         assert_ne!(rebuilt.rev, first.rev);
         assert!(store::read_header(&key).await.unwrap().incarnation > old_incarnation);
+    }
+
+    #[tokio::test]
+    async fn a_settings_change_rebuilds_an_absolute_file_before_serving_it() {
+        let link = link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]));
+        let range = TimeRange::Absolute {
+            start: 0,
+            end: 3_600_000_000,
+        };
+        let dash = dashboard(&[("p1", "s1")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        let first = data(&read_at(engine, flights, &link, &dash, range, now).await).clone();
+        assert_eq!(build_no(&first, "p1"), 1);
+        // A redaction pattern was attached: the org's settings rev moved.
+        engine.settings_rev.store(now + 1, Ordering::SeqCst);
+        let next = data(&read_at(engine, flights, &link, &dash, range, now + MIN).await).clone();
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 2);
+        assert_eq!(build_no(&next, "p1"), 2);
+        assert_eq!((next.stale, next.settings_rev), (false, now + 1));
+    }
+
+    #[tokio::test]
+    async fn a_settings_change_never_serves_the_old_body_while_the_rebuild_fails() {
+        let link = link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]));
+        let range = TimeRange::Absolute {
+            start: 0,
+            end: 3_600_000_000,
+        };
+        let dash = dashboard(&[("p1", "s1")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        data(&read_at(engine, flights, &link, &dash, range, now).await);
+        engine.settings_rev.store(now + 1, Ordering::SeqCst);
+        engine.panic.store(true, Ordering::SeqCst);
+        for at in [now + MIN, now + 2 * MIN] {
+            let served = read_at(engine, flights, &link, &dash, range, at).await;
+            assert!(!matches!(served, Served::Data { .. }), "{served:?}");
+        }
     }
 
     #[tokio::test]

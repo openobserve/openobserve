@@ -85,6 +85,9 @@ pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
 
 pub async fn update(id: &str, new_pattern: &str) -> Result<(), errors::Error> {
     infra::table::re_pattern::update_pattern(id, new_pattern).await?;
+    if let Some(entry) = infra::table::re_pattern::get(id).await? {
+        invalidate_public_dashboards(&entry.org).await?;
+    }
 
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
@@ -160,6 +163,22 @@ pub async fn remove(org_id: &str, pattern_id: &str) -> Result<(), errors::Error>
     Ok(())
 }
 
+/// Makes every stored public dashboard result of `org` rebuild before it is served again, so
+/// anonymous viewers never keep values that a new or changed redaction pattern now hides.
+pub async fn invalidate_public_dashboards(org: &str) -> Result<(), errors::Error> {
+    let db = infra::db::get_orm_client_rw().await;
+    infra::table::public_dashboards::bump_settings_rev(
+        db,
+        org,
+        "re_pattern",
+        config::utils::time::now_micros(),
+    )
+    .await
+    .inspect_err(|e| {
+        log::error!("[re_pattern] failed to invalidate public dashboards of {org}: {e}")
+    })
+}
+
 pub async fn process_association_changes(
     org: &str,
     stream: &str,
@@ -225,6 +244,7 @@ pub async fn process_association_changes(
         .collect();
 
     infra::table::re_pattern_stream_map::batch_process(added, removed).await?;
+    invalidate_public_dashboards(org).await?;
 
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;

@@ -94,6 +94,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 RePatternsMessage::Update { id, pattern } => {
                     log::info!("[SUPER_CLUSTER:DB] updating pattern {id}",);
                     infra::table::re_pattern::update_pattern(&id, &pattern).await?;
+                    if let Some(entry) = infra::table::re_pattern::get(&id).await? {
+                        db::re_pattern::invalidate_public_dashboards(&entry.org).await?;
+                    }
 
                     let mgr = get_pattern_manager().await?;
                     mgr.update_pattern(id.clone(), pattern)?;
@@ -174,6 +177,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     let mgr = get_pattern_manager().await?;
                     mgr.update_associations(&org, stype, &stream, update.remove, update.add)?;
                     infra::table::re_pattern_stream_map::batch_process(added, removed).await?;
+                    db::re_pattern::invalidate_public_dashboards(&org).await?;
 
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
