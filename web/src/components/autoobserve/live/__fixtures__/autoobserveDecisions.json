@@ -65,10 +65,12 @@
     "current": null,
     "locked": {
       "code": "decision_refused",
+      "reason": "folder",
       "verb": "dismiss",
       "message": "You can't dismiss this in folder infra. Ask an admin of this organization.",
       "folder": "infra",
       "owners": [],
+      "owners_scope": null,
       "can_act": [
         {
           "email": "ada@demo-org.test"
@@ -190,10 +192,12 @@
   },
   "refused": {
     "code": "decision_refused",
+    "reason": "folder",
     "verb": "dismiss",
     "message": "You can't dismiss this in folder infra. Ask an admin of this organization.",
     "folder": "infra",
     "owners": [],
+    "owners_scope": null,
     "can_act": [
       {
         "email": "ada@demo-org.test"

@@ -42,10 +42,12 @@ const keysOf = <T>(keys: Record<keyof T, true>) => Object.keys(keys).sort();
 const SUBJECT = keysOf<SubjectInfo>({ title: true, folder: true, team: true });
 const REFUSAL = keysOf<Refusal>({
   code: true,
+  reason: true,
   verb: true,
   message: true,
   folder: true,
   owners: true,
+  owners_scope: true,
   can_act: true,
   more: true,
 });

@@ -30,10 +30,14 @@ export interface PersonRef {
 /** The 403 body every decision route sends, and a preview's `locked`; `message` is written for people. */
 export interface Refusal {
   code: string;
+  /** The grant the caller lacks: the folder's, the Security permission (detections) or the org's. */
+  reason: "folder" | "security" | "org";
   verb: string;
   message: string;
   folder: string | null;
+  /** Emails of whom to ask; empty when nobody can be asked, which hides Ask admins. */
   owners: string[];
+  owners_scope: "folder" | "org" | null;
   can_act: PersonRef[];
   more: number;
 }

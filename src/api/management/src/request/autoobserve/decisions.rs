@@ -38,7 +38,8 @@ use o2_enterprise::enterprise::{
         contract::EntityRef,
         decisions::{
             self, Access, BODY_INVALID, CAN_ACT_SHOWN, Caller, Ctx, DecideBody, DecisionError,
-            Family, ListQuery, PreviewQuery, QUERY_INVALID, Source, SubjectInfo, UndoRequest,
+            Family, ListQuery, Owners, OwnersScope, PreviewQuery, QUERY_INVALID, RefusalReason,
+            Source, SubjectInfo, UndoRequest,
         },
         names::{dims, kinds},
     },
@@ -72,6 +73,7 @@ use crate::{
 
 const DISABLED_MESSAGE: &str =
     "AutoObserve decisions are disabled (O2_AUTOOBSERVE_DECISIONS_ENABLED=false)";
+const OWNERS_SHOWN: usize = 10;
 
 struct LiveAccess<'a> {
     org_id: &'a str,
@@ -133,6 +135,30 @@ impl Access for LiveAccess<'_> {
             && security::guard_siem(self.org_id, self.user_id, "POST", detection)
                 .await
                 .is_ok()
+    }
+
+    /// Only a caller the folder already lets edit is refused for Security alone.
+    async fn lacks_security(&self, alert_id: &str) -> bool {
+        let detection = security::is_siem_alert(self.org_id, alert_id).await;
+        if !detection {
+            return false;
+        }
+        let may_put = !rbac_enforced().await
+            || alert_allows(self.org_id, self.user_id, alert_id, "PUT").await == Some(true);
+        may_put
+            && security::guard_siem(self.org_id, self.user_id, "POST", detection)
+                .await
+                .is_err()
+    }
+
+    async fn owners(&self, subject: &EntityRef, reason: RefusalReason) -> Owners {
+        let folder_admins = match (reason, alert_folder_id(self.org_id, subject).await) {
+            (RefusalReason::Folder, Some(folder)) if rbac_enforced().await => {
+                folder_admins(self.org_id, &folder).await
+            }
+            _ => Vec::new(),
+        };
+        pick_owners(folder_admins, org_admins(self.org_id).await, self.user_id)
     }
 
     async fn suggested_change(
@@ -475,6 +501,82 @@ async fn describe(org_id: &str, subject: &EntityRef) -> SubjectInfo {
     }
 }
 
+async fn alert_folder_id(org_id: &str, subject: &EntityRef) -> Option<String> {
+    let id = (subject.kind == kinds::ALERT)
+        .then(|| subject.key_dims.get(dims::ENTITY_ID))
+        .flatten()?;
+    let found = Ksuid::from_str(id).ok()?;
+    let (folder, _) = alert::get_by_id(get_orm_client_ro().await, org_id, found)
+        .await
+        .ok()?;
+    Some(folder.folder_id)
+}
+
+/// Users of every role holding All on this alert folder or on all of them; groups are not followed.
+async fn folder_admins(org_id: &str, folder_id: &str) -> Vec<String> {
+    use o2_openfga::authorizer::roles::{get_all_roles, get_role_permissions, get_users_with_role};
+
+    let objects = [
+        format!("afolder:{folder_id}"),
+        format!("afolder:_all_{org_id}"),
+    ];
+    let Ok(roles) = get_all_roles(org_id, None).await else {
+        return Vec::new();
+    };
+    let mut out = BTreeSet::new();
+    for role in roles {
+        let Ok(grants) = get_role_permissions(org_id, &role, "afolder").await else {
+            continue;
+        };
+        let owns = grants.iter().any(|g| {
+            g.permission == o2_dex::meta::auth::Permission::AllowAll && objects.contains(&g.object)
+        });
+        if owns && let Ok(users) = get_users_with_role(org_id, &role).await {
+            out.extend(users);
+        }
+    }
+    out.into_iter().collect()
+}
+
+async fn org_admins(org_id: &str) -> Vec<String> {
+    infra::table::org_users::list_users_by_org(org_id)
+        .await
+        .map(|members| {
+            members
+                .into_iter()
+                .filter(|m| m.role == UserRole::Admin)
+                .map(|m| m.email)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Folder admins when there are any besides the caller, else the org's admins; never the caller.
+fn pick_owners(folder_admins: Vec<String>, org_admins: Vec<String>, caller: &str) -> Owners {
+    let others = |emails: Vec<String>| {
+        let mut kept: Vec<String> = emails
+            .into_iter()
+            .filter(|e| !e.eq_ignore_ascii_case(caller))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        kept.truncate(OWNERS_SHOWN);
+        kept
+    };
+    let folder = others(folder_admins);
+    if !folder.is_empty() {
+        return Owners {
+            scope: Some(OwnersScope::Folder),
+            emails: folder,
+        };
+    }
+    let org = others(org_admins);
+    Owners {
+        scope: (!org.is_empty()).then_some(OwnersScope::Org),
+        emails: org,
+    }
+}
+
 async fn can_act(org_id: &str) -> Vec<PersonRef> {
     let Ok(members) = infra::table::org_users::list_users_by_org(org_id).await else {
         return Vec::new();
@@ -629,7 +731,13 @@ mod tests {
                 name: None,
             })
             .collect();
-        Refusal::new("dismiss", Some("infra".into()), vec![], people)
+        Refusal::new(
+            "dismiss",
+            RefusalReason::Folder,
+            Some("infra".into()),
+            Owners::default(),
+            people,
+        )
     }
 
     fn fixture() -> Fixture {
@@ -767,6 +875,32 @@ mod tests {
             )
             .body(),
         }
+    }
+
+    #[test]
+    fn owners_are_the_folder_admins_else_the_org_admins_and_never_the_caller() {
+        let emails = |v: &[&str]| v.iter().map(|e| e.to_string()).collect::<Vec<_>>();
+        let folder = pick_owners(
+            emails(&["pay-lead@x.test", "ops-lead@x.test", "pay-lead@x.test"]),
+            emails(&["admin@x.test"]),
+            "OPS-LEAD@x.test",
+        );
+        assert_eq!(folder.scope, Some(OwnersScope::Folder));
+        assert_eq!(folder.emails, emails(&["pay-lead@x.test"]));
+        let org = pick_owners(
+            emails(&["ops-lead@x.test"]),
+            emails(&["b@x.test", "a@x.test"]),
+            "ops-lead@x.test",
+        );
+        assert_eq!(org.scope, Some(OwnersScope::Org));
+        assert_eq!(org.emails, emails(&["a@x.test", "b@x.test"]));
+        let nobody = pick_owners(vec![], emails(&["me@x.test"]), "me@x.test");
+        assert_eq!((nobody.scope, nobody.emails.len()), (None, 0));
+        let many: Vec<String> = (0..15).map(|i| format!("u{i:02}@x.test")).collect();
+        assert_eq!(
+            pick_owners(many, vec![], "me@x.test").emails.len(),
+            OWNERS_SHOWN
+        );
     }
 
     #[test]
@@ -953,6 +1087,10 @@ mod tests {
 
             async fn may_edit_alert(&self, alert_id: &str) -> bool {
                 self.live.may_edit_alert(alert_id).await
+            }
+
+            async fn lacks_security(&self, alert_id: &str) -> bool {
+                self.live.lacks_security(alert_id).await
             }
 
             async fn suggested_change(
@@ -1192,7 +1330,14 @@ mod tests {
 
             let shown = preview(&ctx).await;
             assert!(!shown.may);
-            assert_eq!(shown.locked.map(|l| l.verb).as_deref(), Some("apply"));
+            let locked = shown.locked.unwrap();
+            assert_eq!(locked.verb, "apply");
+            assert_eq!(locked.reason, RefusalReason::Security);
+            assert!(
+                locked.message.contains("Security permission"),
+                "{}",
+                locked.message
+            );
             let refused = apply(&ctx).await;
             assert!(is_refused(&refused), "{refused:?}");
             assert_eq!((alerts.of(&alert_id), alerts.writes.load(SeqCst)), (0, 0));
