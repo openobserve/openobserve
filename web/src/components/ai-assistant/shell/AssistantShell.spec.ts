@@ -1293,7 +1293,7 @@ describe("AssistantShell history states", () => {
     ]);
   });
 
-  it("reaches Pop out from the bar's Open as menu", async () => {
+  it("reaches Floating window from the bar's Open as menu", async () => {
     fake.current = fakeAssistant();
     const { store } = fake.current;
     open(store);

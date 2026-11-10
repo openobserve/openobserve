@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #agent>
               <AssistantAgentPicker :sid="sid" :disabled="inertKind !== null || accessLost" />
             </template>
+            <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
             <AssistantIconButton
               v-if="!replying"
               :label="t('assistant.composer.attachImage')"
@@ -92,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="assistant-attach-image"
               @click="openPicker"
             />
-            <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
             <AssistantIconButton
               v-if="coarse && recallEntries.length > 0"
               :label="t('assistant.composer.recentPrompts')"
