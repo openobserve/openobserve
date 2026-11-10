@@ -464,7 +464,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :config="anomalyConfig"
                   :preview-sql="anomalyPreviewSql"
                   :stored-intervals="anomalyStoredIntervals"
-                  @run-preview="($refs.anomalyPreviewRef as any)?.loadPreview?.()"
                 />
               </div>
 

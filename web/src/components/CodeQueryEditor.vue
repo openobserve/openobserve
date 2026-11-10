@@ -1024,7 +1024,7 @@ export default defineComponent({
         emit("update:query", newValue, e, origin);
 
         // Check for natural language after user stops typing (debounced)
-        if (newValue && !props.assistantChord) checkForNaturalLanguage(newValue);
+        if (newValue) checkForNaturalLanguage(newValue);
 
         validateDoubleQuotes();
       }, props.debounceTime);
@@ -1113,10 +1113,10 @@ export default defineComponent({
       });
       if (props.assistantChord)
         chordAction = editorObj.addAction({
-          id: "o2.assistantHelper",
-          label: t("shortcuts.actions.assistantHelper"),
+          id: "o2.assistantOpen",
+          label: t("shortcuts.actions.assistantOpen"),
           keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI],
-          // A build where the door does not render keeps Monaco's own suggest on the chord.
+          // With no card or dock to focus, the chord stays Monaco's own suggest.
           run: () => {
             if (props.assistantChord?.() === false)
               editorObj?.trigger("keyboard", "editor.action.triggerSuggest", {});

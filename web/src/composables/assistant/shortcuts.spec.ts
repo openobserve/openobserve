@@ -226,12 +226,7 @@ describe("assistantHistory beside page scopes", () => {
 describe("cheatsheet visibility", () => {
   it("hides every assistant row with the flag off", () => {
     window.__O2_ASSISTANT_V2__ = false;
-    for (const id of [
-      "assistantOpen",
-      "assistantHistory",
-      "assistantHelper",
-      "assistantComposerSend",
-    ])
+    for (const id of ["assistantOpen", "assistantHistory", "assistantComposerSend"])
       expect(visible(id, CAPS)).toBe(false);
   });
 

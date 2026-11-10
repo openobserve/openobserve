@@ -11,7 +11,6 @@ import { AssistantPage } from "../../pages/assistantPage.js";
 // Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
 const loadHarness = () => import("./harness/setup.mjs");
 
-// The query helper door is `ai-entry-query-generate` in every host (`60` §6, door id table).
 const DOOR_ID = /^ai-entry-[a-z-]+-(explain|troubleshoot|add|ask|fix|generate)$/;
 const fixture = (name) => JSON.parse(readFileSync(join(__dirname, "harness", "fixtures", name), "utf8"));
 

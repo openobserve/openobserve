@@ -139,13 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
         </ul>
       </div>
-      <OText
-        variant="meta"
-        as="p"
-        :class="liveIncidents ? 'col-span-2' : undefined"
-        data-test="threads-bar-keys"
-        >{{ t("assistant.threadsBar.keys") }}</OText
-      >
     </div>
     <div ref="row" class="flex max-w-full min-w-0 items-center gap-2">
       <OButton

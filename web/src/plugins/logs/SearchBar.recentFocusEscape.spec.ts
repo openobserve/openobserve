@@ -13,14 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 interface FocusDropdownVm {
   recentFocusOpen: boolean;
@@ -31,17 +30,10 @@ interface FocusDropdownVm {
 describe("logs recent-searches focus dropdown and the editor's Escape", () => {
   let wrapper: VueWrapper | null = null;
 
-  beforeEach(() => {
-    window.__O2_ASSISTANT_V2__ = false;
-    resetAssistantV2ForTests();
-  });
-
   afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
     vi.clearAllMocks();
-    delete window.__O2_ASSISTANT_V2__;
-    resetAssistantV2ForTests();
   });
 
   it("closes the dropdown on Escape and still lets the editor handle it", async () => {
@@ -106,34 +98,6 @@ describe("logs recent-searches focus dropdown and the editor's Escape", () => {
     vm.recentFocusOpen = false;
     await nextTick();
     expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
-  });
-
-  it("withholds the editor's own placeholder while the dropdown is open with the assistant on", async () => {
-    window.__O2_ASSISTANT_V2__ = true;
-    resetAssistantV2ForTests();
-    wrapper = mount(SearchBar, {
-      attachTo: document.body,
-      global: {
-        provide: { store },
-        plugins: [i18n, router],
-        stubs: { QueryEditor: true, RecentSearchesFocusDropdown: true },
-      },
-    });
-    const vm = wrapper.vm as unknown as FocusDropdownVm & {
-      queryEditorPlaceholder: string | undefined;
-      editorPlaceholder: string;
-    };
-    vm.recentFocusOpen = false;
-    await nextTick();
-    expect(vm.queryEditorPlaceholder).toBe(vm.editorPlaceholder);
-
-    vm.recentFocusOpen = true;
-    await nextTick();
-    expect(vm.queryEditorPlaceholder).toBeUndefined();
-
-    vm.recentFocusOpen = false;
-    await nextTick();
-    expect(vm.queryEditorPlaceholder).toBe(vm.editorPlaceholder);
   });
 
   it("opens when an edit clears the focused editor and closes on the next character", async () => {

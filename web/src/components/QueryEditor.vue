@@ -5,41 +5,11 @@
 -->
 
 <template>
-  <div
-    :class="
-      inlineDoor
-        ? 'relative grid w-full grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)_auto] outline-transparent'
-        : 'relative flex w-full flex-col outline-transparent'
-    "
-    :style="rootStyle"
-  >
-    <template v-if="helper?.visible">
-      <InlineHelperToolbar
-        v-if="!inlineDoor && toolbarProps"
-        v-bind="toolbarProps"
-        v-on="toolbarEvents"
-      />
-      <div
-        ref="helperSlot"
-        :class="[
-          'min-w-0 shrink-0',
-          inlineDoor && 'col-span-2',
-          inlineDoor && hasExpandButton && 'pe-10',
-        ]"
-      >
-        <InlineQueryHelper
-          ref="helperEl"
-          v-model:open="helper.open"
-          :host="helper.host"
-          :prefill="helper.prefill"
-          :entry-kind="helper.entryKind"
-        />
-      </div>
-    </template>
+  <div class="relative flex w-full flex-col outline-transparent" :style="rootStyle">
     <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
     <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
-      v-if="!assistantV2 && isAIMode"
+      v-if="isAIMode"
       :data-test="`${dataTestPrefix}-ai-input-bar`"
       :class="[
         'border-b-card-glass-border bg-gradient-ai-faint z-10 flex h-9 shrink-0 items-center gap-2 border-b px-2',
@@ -111,22 +81,7 @@
     </div>
 
     <!-- Code Editor with relative positioning for floating button -->
-    <div
-      ref="editorArea"
-      :class="
-        growsWithHelper
-          ? 'relative min-h-0 flex-none overflow-hidden'
-          : 'relative min-h-0 flex-1 overflow-hidden'
-      "
-      :style="growsWithHelper ? { height: editorHeight } : undefined"
-    >
-      <AssistantDiffBlock
-        v-if="helper?.pending"
-        :key="helper.pending.id"
-        :proposal="helper.pending"
-        :reserve-end="hasExpandButton"
-        class="absolute inset-0 z-10"
-      />
+    <div class="relative min-h-0 flex-1 overflow-hidden">
       <div
         v-if="placeholder && !query && !editorFocused"
         class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
@@ -152,13 +107,13 @@
         :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
         :free-text-decorations="freeTextDecorations ?? null"
-        :assistant-chord="helper?.onChord"
+        :assistant-chord="assistantChord"
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
         :recent-queries="recentQueries ?? []"
         :transform-generated-query="transformGeneratedQuery ?? undefined"
         @update:query="handleQueryUpdate"
-        @user-edit="onUserEdit"
+        @user-edit="(isBlank: boolean, wasBlank: boolean) => emit('user-edit', isBlank, wasBlank)"
         @run-query="emit('run-query')"
         @focus="handleEditorFocus"
         @blur="handleEditorBlur"
@@ -171,7 +126,7 @@
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <OButton
-        v-if="!assistantV2 && aiFeatureVisible && !hideNlToggle && !isAIMode"
+        v-if="aiFeatureVisible && !hideNlToggle && !isAIMode"
         :data-test="`${dataTestPrefix}-ai-toggle-btn`"
         variant="ghost"
         size="icon-toolbar"
@@ -200,32 +155,11 @@
         />
       </OButton>
     </div>
-    <InlineHelperToolbar
-      v-if="inlineDoor && toolbarProps"
-      v-bind="toolbarProps"
-      inline
-      :reserve-end="hasExpandButton"
-      v-on="toolbarEvents"
-    />
-    <div
-      v-if="helper?.visible"
-      ref="hintSlot"
-      :class="['min-w-0 shrink-0', inlineDoor && 'col-span-2']"
-    >
-      <InlineHelperHint
-        :text="query ?? ''"
-        :language="helper.host.language"
-        :enabled="helper.usable && !helper.blocked && !helper.open"
-        :edit-tick="helper.editTick"
-        :focused="helper.focused"
-        @ask="(sentence) => helper?.openFrom('hint', { text: sentence, mode: 'replace' })"
-      />
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
@@ -242,26 +176,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { isAssistantV2 } from "@/composables/assistant/flags";
+import { assistantFocusCard, focusDockComposer } from "@/composables/assistant";
 import type { QueryEditorAssistant } from "@/composables/assistant/pure";
-import { useQueryEditorHelper } from "@/components/ai-assistant/helper/useQueryEditorHelper";
-
-const InlineHelperToolbar = defineAsyncComponent(
-  () => import("@/components/ai-assistant/helper/InlineHelperToolbar.vue"),
-);
-const AssistantDiffBlock = defineAsyncComponent(
-  () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),
-);
-const InlineQueryHelper = defineAsyncComponent(
-  () => import("@/components/ai-assistant/helper/InlineQueryHelper.vue"),
-);
-const InlineHelperHint = defineAsyncComponent(
-  () => import("@/components/ai-assistant/helper/InlineHelperHint.vue"),
-);
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
-
-// A pending diff over a one-line editor is unreadable, so the host is asked for this much more.
-const DIFF_ROOM_PX = 160;
 
 interface QueryChangeOrigin {
   /** false when the editor was written to (setValue), rather than typed in. */
@@ -306,14 +224,10 @@ interface Props {
   // Testing
   dataTestPrefix?: string;
 
-  /** The host's side of the Ask AI helper; without it the editor shows no AI control. */
-  assistant?: QueryEditorAssistant | null;
-  /** `off` for editors that must never offer the helper. */
-  helper?: "on" | "off";
-  /** Drawn inside the editor area, under any helper row, while the editor is empty and unfocused. */
+  /** Drawn inside the editor area while the editor is empty and unfocused. */
   placeholder?: string;
-  /** `inline` puts the door beside the editor and reports the rows it adds through `helper-space`. */
-  helperLayout?: "row" | "inline";
+  /** The host's assistant adapter; its id routes Ctrl+I to that host's pending card or dock. */
+  assistant?: QueryEditorAssistant | null;
   editorId?: string; // Monaco host id; defaults to `<dataTestPrefix>-editor-<language>`
 }
 
@@ -334,9 +248,8 @@ const props = withDefaults(defineProps<Props>(), {
   disableAiReason: raw(""),
   hasExpandButton: false,
   dataTestPrefix: "query-editor",
-  assistant: null,
-  helper: "on",
   placeholder: undefined,
+  assistant: null,
 });
 
 const emit = defineEmits<{
@@ -352,7 +265,6 @@ const emit = defineEmits<{
   "generation-start": [];
   "generation-end": [];
   "generation-success": [payload: { type: string; message: string }];
-  "helper-space": [px: number];
 }>();
 
 const store = useStore();
@@ -385,78 +297,16 @@ const onAiToggleClick = () => {
 const isNaturalLanguageDetected = ref(false);
 const isGenerating = ref(false);
 const editorRef = ref<any>(null);
-const editorArea = ref<HTMLElement | null>(null);
-const helperEl = ref<{ focusPrompt(): void } | null>(null);
-const helperSlot = ref<HTMLElement | null>(null);
-const hintSlot = ref<HTMLElement | null>(null);
 const editorFocused = ref(false);
 
-// Read once: the flag never changes in a running app, so the legacy bar and the helper never both mount.
-const assistantV2 = isAssistantV2();
-// Built for any editor whose host passes an adapter; `helper="off"` and read-only hide it reactively.
-const helper =
-  assistantV2 && props.assistant
-    ? reactive(
-        useQueryEditorHelper({
-          assistant: () => props.assistant,
-          enabled: () => props.helper !== "off" && !props.readOnly,
-          query: () => props.query,
-          language: () => (currentLanguage.value === "javascript" ? "js" : currentLanguage.value),
-          editor: () =>
-            editorRef.value
-              ? {
-                  getValue: () => editorRef.value?.getValue?.(),
-                  replaceValue: (text: string) => editorRef.value?.replaceValue?.(text),
-                  focus: () => editorRef.value?.editorObj?.focus?.(),
-                }
-              : null,
-          area: () => editorArea.value,
-          write: (text) => emit("update:query", text),
-          focusPrompt: () => helperEl.value?.focusPrompt(),
-        }),
-      )
-    : null;
-const inlineDoor = computed(() => !!helper?.visible && props.helperLayout === "inline");
-const toolbarProps = computed(() =>
-  helper
-    ? {
-        hostId: helper.host.id,
-        label: helper.label,
-        dockOpen: helper.dockOpen,
-        blocked: helper.blocked,
-        status: helper.status,
+// Monaco keeps Ctrl+I from the global chord, so a pending card or open dock is focused here; otherwise Monaco suggests.
+const assistantChord =
+  isAssistantV2() && props.assistant
+    ? () => {
+        const id = props.assistant?.id;
+        return assistantFocusCard() || (!!id && focusDockComposer(id));
       }
-    : null,
-);
-const toolbarEvents = {
-  open: () => helper?.openFrom("editor_button"),
-  revert: (target: "assistant" | "original") => helper?.proposal?.revert(target),
-  "ask-again": (prompt: string) =>
-    helper?.openFrom("editor_button", { text: prompt, mode: "edit" }),
-};
-const growsWithHelper = computed(() => !!helper?.visible && props.editorHeight !== "100%");
-let spaceObserver: ResizeObserver | null = null;
-let reportedSpace = 0;
-
-watch(
-  [helperSlot, hintSlot, inlineDoor],
-  ([row, hint, inline]) => {
-    spaceObserver?.disconnect();
-    spaceObserver = null;
-    if (inline && typeof ResizeObserver !== "undefined") {
-      spaceObserver = new ResizeObserver(reportHelperSpace);
-      if (row) spaceObserver.observe(row);
-      if (hint) spaceObserver.observe(hint);
-    }
-    reportHelperSpace();
-  },
-  { flush: "post" },
-);
-watch(() => !!helper?.pending, reportHelperSpace, { flush: "post" });
-onBeforeUnmount(() => {
-  spaceObserver?.disconnect();
-  if (reportedSpace) emit("helper-space", 0);
-});
+    : undefined;
 
 // AI Input Bar state
 const aiInputText = ref("");
@@ -514,25 +364,11 @@ const isAIMode = computed(() => {
 
 // Computed: Root container style - sets overall height
 const rootStyle = computed(() => {
-  // The helper row and hint add to the host; the editor keeps its own height.
-  if (growsWithHelper.value) return {};
   if (props.editorHeight === "100%") {
     return { height: "100%" };
   }
   return { height: props.editorHeight };
 });
-
-// The rows the helper adds above and below the editor, which an inline host must make room for.
-function reportHelperSpace(): void {
-  const px = inlineDoor.value
-    ? (helperSlot.value?.offsetHeight ?? 0) +
-      (hintSlot.value?.offsetHeight ?? 0) +
-      (helper?.pending ? DIFF_ROOM_PX : 0)
-    : 0;
-  if (px === reportedSpace) return;
-  reportedSpace = px;
-  emit("helper-space", px);
-}
 
 // Handle query update from editor
 const handleQueryUpdate = (newQuery: string, _event?: unknown, origin?: QueryChangeOrigin) => {
@@ -541,19 +377,12 @@ const handleQueryUpdate = (newQuery: string, _event?: unknown, origin?: QueryCha
 
 const handleEditorFocus = () => {
   editorFocused.value = true;
-  if (helper) helper.focused = true;
   emit("focus");
 };
 
 const handleEditorBlur = () => {
   editorFocused.value = false;
-  if (helper) helper.focused = false;
   emit("blur");
-};
-
-const onUserEdit = (isBlank: boolean, wasBlank: boolean) => {
-  helper?.onUserEdit();
-  emit("user-edit", isBlank, wasBlank);
 };
 
 // Handle auto-detection from editor

@@ -1775,7 +1775,7 @@ describe("dictation (WP-48)", () => {
     expect(ctx.status()).toBe("Dictation cancelled.");
   });
 
-  it("shows listening with nothing under the frame, and says the start once", async () => {
+  it("shows listening in the bottom row beside the image button, and says the start once", async () => {
     const ctx = voiceSetup();
     await listen(ctx);
     expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("true");
@@ -1783,11 +1783,12 @@ describe("dictation (WP-48)", () => {
     const wave = ctx.wrapper.get('[data-test="assistant-dictate-wave"]');
     expect(wave.findAll(".assistant-wave")).toHaveLength(14);
     expect(wave.get('[data-test="assistant-dictate-elapsed"]').text()).toBe("0:00");
-    const bar = ctx.wrapper.get('[data-test="assistant-composer-bar"]');
-    expect(bar.element.contains(wave.element)).toBe(false);
-    expect(
-      ctx.textarea().element.parentElement!.parentElement!.parentElement!.contains(wave.element),
-    ).toBe(true);
+    const right = ctx.wrapper.get('[data-test="assistant-composer-bar-right"]').element;
+    expect(wave.element.parentElement).toBe(right);
+    expect(wave.element.previousElementSibling).toBe(
+      ctx.wrapper.get('[data-test="assistant-attach-image"]').element,
+    );
+    expect(ctx.textarea().classes()).not.toContain("pe-24!");
     expect(mic(ctx.wrapper).attributes("data-on")).toBeDefined();
     expect(mic(ctx.wrapper).element.parentElement).toBe(
       ctx.wrapper.get('[data-test="assistant-composer-bar-right"]').element,
