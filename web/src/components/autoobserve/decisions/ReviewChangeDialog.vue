@@ -291,7 +291,13 @@ async function apply() {
       },
       title,
     );
-    recordApplied({ org, view: result.decision, title, fields: fields.value });
+    recordApplied({
+      org,
+      view: result.decision,
+      title,
+      fields: fields.value,
+      alertId: props.target.alertId,
+    });
     emit("update:open", false);
   } catch (error) {
     writeNotice.value = writeNoticeOf(error);

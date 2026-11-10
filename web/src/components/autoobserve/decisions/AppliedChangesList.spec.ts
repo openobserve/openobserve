@@ -42,6 +42,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import autoobserveDecisions, { type DecisionView } from "@/services/autoobserveDecisions";
 import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
 import { useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
+import { createMemoryHistory, createRouter } from "vue-router";
 import AppliedChangesList from "./AppliedChangesList.vue";
 import { clearAppliedSession, recordApplied, useAppliedChanges } from "./appliedChanges";
 import { autoobserveKeys } from "@/services/autoobserve.querykeys";
@@ -134,6 +135,62 @@ describe("What I've changed (W5, D2)", () => {
       /^Hold for .+ → 2 minutes · by ops@example\.com at /,
     );
     expect(w.find('[data-test="fallback"]').exists()).toBe(false);
+  });
+
+  it("an_undone_apply_is_read_back_after_a_reload_and_stays_undone", async () => {
+    api.list.mockResolvedValue(
+      list([
+        view({
+          state: "undone",
+          change: {
+            alert: { id: "al-1", title: "T3-nodest-ops-a" },
+            fields: [{ field: "destinations", from: [], to: ["ops-webhook"] }],
+          },
+        }),
+      ]),
+    );
+    const w = await mountList();
+    const reads = api.list.mock.calls.map((c) => c[1]).filter((p) => p.limit !== 1);
+    expect(reads.length).toBeGreaterThan(0);
+    for (const params of reads) expect(params).not.toHaveProperty("state");
+    expect(w.find('[data-test="autoobserve-applied-undone"]').exists()).toBe(true);
+    expect(w.find('[data-test="autoobserve-applied-undo"]').exists()).toBe(false);
+    expect(w.find('[data-test="fallback"]').exists()).toBe(false);
+  });
+
+  it("the_alert_name_links_to_the_alert", async () => {
+    api.list.mockResolvedValue(
+      list([
+        view({
+          change: {
+            alert: { id: "al-1", title: "disk latency" },
+            fields: [{ field: "pending_period_secs", from: 0, to: 120 }],
+          },
+        }),
+      ]),
+    );
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: { render: () => h("div") } },
+        {
+          path: "/alerts/detail/:alert_id",
+          name: "alertDetail",
+          component: { render: () => h("div") },
+        },
+      ],
+    });
+    await router.push("/");
+    wrapper = mount(AppliedChangesList, {
+      attachTo: document.body,
+      global: { plugins: [i18n, store, router, withQueryClient(queryClient)] },
+    });
+    await flushPromises();
+    await flushPromises();
+    const link = wrapper.find('[data-test="autoobserve-applied-alert-link"]');
+    expect(link.text()).toBe("disk latency");
+    expect(link.attributes("href")).toContain("/alerts/detail/al-1");
+    expect(link.attributes("href")).toContain("org_identifier=demo-org");
   });
 
   it("an older server that lists no applies falls back to this session's", async () => {

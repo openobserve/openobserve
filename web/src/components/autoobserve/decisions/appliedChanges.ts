@@ -31,6 +31,8 @@ export interface AppliedEntry {
   view: DecisionView;
   title: string;
   fields: FieldChange[];
+  /** The changed alert, when the write knew it and the view does not carry it. */
+  alertId?: string;
 }
 
 // Applies written from this browser, so an older server that lists none still shows them until reload.
@@ -57,6 +59,7 @@ export const markUndone = (
       view: undone,
       title: title ?? view.change?.alert.title ?? known?.title ?? "",
       fields: view.change?.fields ?? known?.fields ?? [],
+      ...(known?.alertId ? { alertId: known.alertId } : {}),
     };
     next = known ? next.map((e) => (e === known ? entry : e)) : [entry, ...next];
   }

@@ -28,6 +28,7 @@ import autoobserveDecisions, {
   isRouteDisabled,
   type BatchResult,
   type DecisionFamily,
+  type DecisionListParams,
   type DecisionRequest,
   type DecisionResult,
   type DecisionView,
@@ -111,23 +112,43 @@ const LIST_READ_PAGES = 20;
 /** Only dismissals and marks are undone from the Dismissed list; an apply's Undo would revert the alert. */
 export const isDismissedDecision = (view: DecisionView): boolean => view.action !== "apply";
 
+/** Reads every row the list route returns for these filters, a server page at a time. */
+async function readEvery(
+  org: string,
+  filters: Pick<DecisionListParams, "state" | "family">,
+  signal?: AbortSignal,
+): Promise<DecisionView[]> {
+  const rows: DecisionView[] = [];
+  for (let page = 0; page < LIST_READ_PAGES; page += 1) {
+    const params = { ...filters, limit: LIST_READ_LIMIT, offset: rows.length };
+    const read = (await autoobserveDecisions.list(org, params, signal)).data;
+    rows.push(...read.decisions);
+    if (!read.decisions.length || rows.length >= read.total) break;
+  }
+  return rows;
+}
+
 /** Every dismissal and mark in force: the server lists applies with them, so this reads all and pages here. */
 export const dismissedDecisionsQuery = (org: string, family: DecisionFamily | null) =>
   queryOptions({
     queryKey: autoobserveKeys.dismissedDecisions(org, family ?? "all"),
     queryFn: async ({ signal }): Promise<{ decisions: DecisionView[]; total: number }> => {
-      const rows: DecisionView[] = [];
-      for (let page = 0; page < LIST_READ_PAGES; page += 1) {
-        const params = { state: "active" as const, limit: LIST_READ_LIMIT, offset: rows.length };
-        const read = (
-          await autoobserveDecisions.list(org, family ? { ...params, family } : params, signal)
-        ).data;
-        rows.push(...read.decisions);
-        if (!read.decisions.length || rows.length >= read.total) break;
-      }
-      const decisions = rows.filter(isDismissedDecision);
+      const filters = family ? { state: "active" as const, family } : { state: "active" as const };
+      const decisions = (await readEvery(org, filters, signal)).filter(isDismissedDecision);
       return { decisions, total: decisions.length };
     },
+    placeholderData: keepPreviousInOrg(org),
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Every apply, undone ones included: without `state` the server keeps listing an apply after its Undo. */
+export const appliedDecisionsQuery = (org: string) =>
+  queryOptions({
+    queryKey: autoobserveKeys.appliedDecisions(org),
+    queryFn: async ({ signal }): Promise<DecisionView[]> =>
+      (await readEvery(org, { family: "alert_finding" }, signal)).filter(
+        (view) => view.action === "apply",
+      ),
     placeholderData: keepPreviousInOrg(org),
     staleTime: NORMAL_STALE_TIME,
   });

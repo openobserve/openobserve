@@ -32,6 +32,8 @@ export const autoobserveKeys = {
   pagingSettings: (org: string) => orgKey(org, "autoobserve", "settings", "paging"),
   decisionsEnabled: (org: string) => orgKey(org, "autoobserve", "decisions", "enabled"),
   decisionsPages: (org: string) => orgKey(org, "autoobserve", "decisions", "page"),
+  appliedDecisions: (org: string) =>
+    orgKey(org, "autoobserve", "decisions", "page", "applied"),
   dismissedDecisions: (org: string, family: string) =>
     orgKey(org, "autoobserve", "decisions", "page", "dismissed", family),
   decisionsPage: (org: string, family: string, limit: number, offset: number) =>
