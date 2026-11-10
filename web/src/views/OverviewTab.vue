@@ -1025,7 +1025,8 @@ const loadUserStreams = async (force = false) => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false) => {
   sectionFailure.anomalies = null;
-  if (anomalyLocked.value) {
+  // the OSS build does not register the anomaly routes, and their 401 would end the session
+  if (!anomalyEnabled.value) {
     anomalies.value = [];
     anomalyConfigCount.value = null;
     return;
