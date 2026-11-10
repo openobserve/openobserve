@@ -30612,7 +30612,7 @@
     },
     "view": {
       "standard": "Padrão",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "A vista Padrão dá a leitura resumida: o que precisa de si e o que aconteceu nos últimos 7 dias",
       "nerdTooltip": "A vista Nerd mostra todos os detetores, loops e definições por completo",
       "label": "Vista"

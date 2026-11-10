@@ -30612,7 +30612,7 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "La vue Standard donne la lecture rapide : ce qui vous concerne et ce qui s'est passé ces 7 derniers jours",
       "nerdTooltip": "La vue Nerd montre en intégralité chaque détecteur, boucle et réglage",
       "label": "Vue"

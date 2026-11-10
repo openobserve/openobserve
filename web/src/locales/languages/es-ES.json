@@ -30612,7 +30612,7 @@
     },
     "view": {
       "standard": "Estándar",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "La vista Estándar ofrece la lectura breve: qué te necesita y qué ocurrió en los últimos 7 días",
       "nerdTooltip": "La vista Nerd muestra cada detector, bucle y ajuste en su totalidad",
       "label": "Vista"

@@ -256,13 +256,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="autoobserve-live-issues-no-match"
         @action="clearSearch"
       />
-      <OEmptyState
+      <LiveNoticeState
         v-else-if="!rows.length && !issues.paging.value"
+        :notice="pagingOffNotice"
         size="block"
-        variant="neutral"
-        icon="toggle-off"
-        :title="copy.offTitle"
-        :description="copy.offDesc"
         data-test="autoobserve-live-issues-empty-off"
       />
       <OEmptyState
@@ -330,7 +327,7 @@ import {
   statusLabel,
   type AnalysisLine,
 } from "./incidentsCopy";
-import { formatWhen, liveNotice, type LiveFailure } from "./liveCopy";
+import { formatWhen, liveNotice, type LiveFailure, type LiveNoticeView } from "./liveCopy";
 import { useLiveZone } from "./liveModel";
 import { useLiveIssues } from "./useLiveIssues";
 
@@ -381,6 +378,14 @@ const zone = useLiveZone();
 const issues = useLiveIssues(toRef(props, "range"));
 
 const copy = computed(() => issuesCopy(t));
+const pagingOffNotice = computed<LiveNoticeView>(() => ({
+  title: copy.value.offTitle,
+  description: copy.value.offDesc,
+  severity: "neutral",
+  retry: false,
+  details: false,
+  icon: "toggle-off",
+}));
 const state = computed(() => issues.state.value);
 const skeleton = computed(() => issues.skeleton.value);
 const rows = computed(() => issues.rows.value);

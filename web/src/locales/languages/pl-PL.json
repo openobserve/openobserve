@@ -30612,7 +30612,7 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Widok standardowy daje krótki przegląd: co wymaga Twojej uwagi i co wydarzyło się w ciągu ostatnich 7 dni",
       "nerdTooltip": "Widok nerd pokazuje w pełni każdy detektor, pętlę i ustawienie",
       "label": "Widok"

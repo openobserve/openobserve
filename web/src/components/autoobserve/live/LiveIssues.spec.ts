@@ -168,6 +168,7 @@ describe("LiveIssues", () => {
     const w = mountTable();
     await loaded();
     expect(w.find(sel("empty-off")).text()).toContain("Paging is off");
+    expect(w.find(sel("empty-off")).find('[data-test="o2-icon"], svg').exists()).toBe(true);
     expect(w.find('[role="alert"]').exists()).toBe(false);
   });
 

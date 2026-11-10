@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ul v-else-if="settled" class="flex flex-col gap-2.5" data-test="autoobserve2-paged-list">
         <li v-for="(row, index) in shown" :key="row.id">
           <article
-            class="border-border-subtle bg-surface-base rounded-default flex flex-col gap-1.5 border px-3 py-2.5"
+            class="border-border-subtle bg-surface-base rounded-default flex flex-col gap-1.5 border py-3.5 ps-4 pe-3.5"
             :data-test="`autoobserve2-paged-row-${index}`"
           >
             <OTruncatedText

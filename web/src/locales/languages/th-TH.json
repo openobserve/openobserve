@@ -30609,9 +30609,9 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
-      "nerdTooltip": "Nerd view shows every detector, loop and setting in full",
+      "nerdTooltip": "The detailed view shows every detector, loop and setting in full",
       "label": "ดู"
     },
     "rail": {

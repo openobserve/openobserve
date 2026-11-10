@@ -30612,7 +30612,7 @@
     },
     "view": {
       "standard": "Standart",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Standart görünüm kısa özeti verir: size neyin ihtiyacı olduğu ve son 7 günde ne olduğu",
       "nerdTooltip": "Nerd görünümü her dedektörü, döngüyü ve ayarı tam olarak gösterir",
       "label": "Görünüm"

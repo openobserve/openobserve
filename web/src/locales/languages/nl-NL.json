@@ -30612,7 +30612,7 @@
     },
     "view": {
       "standard": "Standaard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Standaardweergave geeft de korte versie: wat jou nodig heeft en wat er de afgelopen 7 dagen is gebeurd",
       "nerdTooltip": "Nerdweergave toont elke detector, lus en instelling volledig",
       "label": "Weergave"

@@ -80,3 +80,12 @@ describe("TopBar", () => {
     expect(none.text()).toBe("");
   });
 });
+
+describe("ViewSwitch label (T5-28)", () => {
+  it("names the full view by what it shows, not 'Nerd'", async () => {
+    const { default: ViewSwitch } = await import("./ViewSwitch.vue");
+    const { default: router } = await import("@/test/unit/helpers/router");
+    const w = mount(ViewSwitch, { global: { plugins: [i18n, router] } });
+    expect(w.find('[data-test="autoobserve-view-nerd"]').text()).toBe("Detailed");
+  });
+});

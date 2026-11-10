@@ -30612,7 +30612,7 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "La vista Standard offre la lettura rapida: cosa richiede il tuo intervento e cosa è successo negli ultimi 7 giorni",
       "nerdTooltip": "La vista Nerd mostra ogni rilevatore, ciclo e impostazione per intero",
       "label": "Vista"
