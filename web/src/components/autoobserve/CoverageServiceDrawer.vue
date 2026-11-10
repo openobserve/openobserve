@@ -32,12 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <polygon :points="HEX_POINTS" :class="STATE_FILL[state]" />
         </svg>
         <div class="min-w-0 flex-1">
-          <span
-            class="text-text-heading block truncate text-base font-semibold"
+          <OTruncatedText
+            class="text-text-heading block text-base font-semibold"
             data-test="autoobserve-coverage-drawer-title"
-            >{{ row.service }}</span
+            >{{ row.service }}</OTruncatedText
           >
-          <span class="text-text-secondary block truncate text-xs">{{ subTitle }}</span>
+          <OTruncatedText
+            class="text-text-secondary block text-xs"
+            data-test="autoobserve-coverage-drawer-subtitle"
+            >{{ subTitle }}</OTruncatedText
+          >
         </div>
         <OTooltip
           v-if="!logsOnly"

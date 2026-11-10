@@ -138,6 +138,9 @@ describe("BulkReviewDrawer — review", () => {
     await mountDrawer();
     await openWith();
     expect(text("bulk-review-title")).toBe("Add 12 no-data alerts");
+    expect(wrapper!.findComponent({ name: "ODrawer" }).props("ariaLabel")).toBe(
+      "Add 12 no-data alerts",
+    );
     expect(text("bulk-review-rule")).toContain("Nothing is saved until you click Add alerts.");
     expect(text("bulk-review-footer")).toBe(
       "11 alerts will be created: 5 in folder ingest, 3 in folder default, 3 in folder payments. Each description says it came from an AutoObserve suggestion.",
@@ -206,9 +209,9 @@ describe("BulkReviewDrawer — rows that can't be added (T2-11, T2-18, T2-24)", 
     };
     await openWith([unread("y:errors", "errors"), unread("y:no_data", "no_data")] as never);
     expect(review.reviewRows.value.find((r) => r.key === "y:errors")?.prefill).toBeNull();
-    const box = wrapper!.findAllComponents({ name: "BulkRowMark" }).find(
-      (c) => c.attributes("data-test") === "bulk-review-tick-y:errors",
-    )!;
+    const box = wrapper!
+      .findAllComponents({ name: "BulkRowMark" })
+      .find((c) => c.attributes("data-test") === "bulk-review-tick-y:errors")!;
     expect(box.props("disabled")).toBe(true);
     expect(box.props("checked")).toBe(false);
   });
@@ -660,9 +663,7 @@ describe("BulkReviewDrawer — AutoObserve is the destination", () => {
   it("takes the folder of the service's own alerts even when they notify no one (T2-10)", async () => {
     api.list.mockResolvedValue({
       data: {
-        list: [
-          { alert_id: "al-1", folder_id: "f-pay", folder_name: "payments", destinations: [] },
-        ],
+        list: [{ alert_id: "al-1", folder_id: "f-pay", folder_name: "payments", destinations: [] }],
       },
     });
     await mountDrawer();

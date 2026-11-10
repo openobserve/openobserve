@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="xxl"
     :close-guard="() => !running"
     :return-focus-to="() => state.opener"
+    :aria-label="String(title)"
     data-test="bulk-review-drawer"
     @update:open="(open: boolean) => !open && closeBulkReview()"
   >
