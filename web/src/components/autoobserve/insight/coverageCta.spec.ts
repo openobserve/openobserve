@@ -333,10 +333,29 @@ describe("Other checks (flagged surface 3)", () => {
     expect(target.prefill.locations).toEqual(["pub-1", "pub-2"]);
   });
 
-  it("adds a restarts alert", () => {
-    const parts = cellInsight(gt, "en-US", row([LOGS]), "workload_health", gapCell());
+  it("adds a restarts alert on the service's restart events", () => {
+    const events = { type: "logs", name: "k8s_events" };
+    const parts = cellInsight(gt, "en-US", row([LOGS, events]), "workload_health", gapCell());
     expect(parts?.why).toBe("No alert watches restarts of svc-ingest-c.");
     expect(parts?.cta?.label).toBe("Add alert");
+  });
+
+  it("without restart events, says so and offers to set the data up, not a pod alert (T2-23)", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS]), "workload_health", gapCell());
+    expect(parts?.why).toBe(
+      "No restart events arrive for svc-ingest-c, so its restarts can't be watched yet.",
+    );
+    expect(parts?.next).toBeNull();
+    expect(parts?.cta?.label).toBe("Set up data");
+  });
+
+  it("names a cluster to set up only for a service that has one (T2-23)", () => {
+    const none = cellInsight(gt, "en-US", row([LOGS]), "saturation", gapCell());
+    expect(none?.cta?.note).toBeNull();
+    const placed = row([LOGS]);
+    placed.identity!.cluster = "cluster-k";
+    const some = cellInsight(gt, "en-US", placed, "saturation", gapCell());
+    expect(some?.cta?.note).toBe("Opens Kubernetes setup for its cluster.");
   });
 });
 

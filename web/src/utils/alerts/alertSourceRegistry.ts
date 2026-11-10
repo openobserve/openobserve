@@ -48,6 +48,8 @@ export interface AlertSourceDefinition {
   enterpriseOnly?: boolean;
   /** Its `meta` carries the new alert's description and destinations, which the form applies. */
   metaSettings?: boolean;
+  /** Its query holds the condition and its own window, so the dialog asks no Alert on and names no time range. */
+  conditionInQuery?: boolean;
 }
 
 export const DEFAULT_ALERT_SOURCE: AlertSourceDefinition = {
@@ -174,6 +176,7 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     showQueryPreview: true,
     enterpriseOnly: true,
     metaSettings: true,
+    conditionInQuery: true,
   },
 };
 

@@ -164,6 +164,23 @@ describe("CreateAlertFromSourceDialog", () => {
     expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
   });
 
+  describe("a source whose condition is inside its query (T2-23)", () => {
+    it("asks no Alert on question, and says the window is the alert's own", async () => {
+      const config = (await import("@/aws-exports")).default;
+      const was = config.isEnterprise;
+      config.isEnterprise = "true";
+      try {
+        wrapper = mountDialog(
+          prefill({ source: "autoobserve", periodMinutes: 15, triggerThreshold: 1 }),
+        );
+        expect(wrapper.find('[data-test="create-alert-threshold-shape"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="create-alert-window"]').text()).toBe("Last 15 minutes");
+      } finally {
+        config.isEnterprise = was;
+      }
+    });
+  });
+
   describe("a threshold the source could not measure (F1)", () => {
     const asking = (value: number | null) =>
       prefill({

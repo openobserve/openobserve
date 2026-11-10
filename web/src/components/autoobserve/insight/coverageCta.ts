@@ -168,6 +168,10 @@ const bulkTarget = (
   },
 });
 
+// Only a service with a known cluster has a cluster to set Kubernetes up for.
+const kubeNote = (t: TranslateFn, row: CoverageRow): I18nText | null =>
+  row.identity?.cluster ? t("insight.note.setUpKubernetes") : null;
+
 const setUpData = (t: TranslateFn, org: string, note: I18nText | null = null) =>
   ctaOf(
     t,
@@ -404,7 +408,7 @@ const metricsCopy = (
     return {
       why: t("insight.kind.cell.noMetrics", { service }),
       next: null,
-      cta: setUpData(t, org, t("insight.note.setUpKubernetes")),
+      cta: setUpData(t, org, kubeNote(t, row)),
       ai: ai(key, row, t("insight.ai.cell.kubernetes", { service })),
     };
   const build = key === "saturation" ? memoryAlert : nodeAlert;
@@ -416,11 +420,24 @@ const metricsCopy = (
   };
 };
 
-const restartCopy = (t: TranslateFn, row: CoverageRow, owned: OwnedAlert[]): CellCopy => {
+const restartCopy = (
+  t: TranslateFn,
+  row: CoverageRow,
+  org: string,
+  owned: OwnedAlert[],
+): CellCopy => {
   const service = raw(nameOf(row));
   const own = ownership(nameOf(row), owned);
   const events = row.identity?.streams.find((s) => s.type === "logs" && /event/i.test(s.name));
-  const scope = scopeOf(row, events ?? { type: "logs", name: "" });
+  // Without restart events there is nothing to alert on, so the step is getting that data in.
+  if (!events)
+    return {
+      why: t("insight.kind.cell.noRestartEvents", { service }),
+      next: null,
+      cta: setUpData(t, org, kubeNote(t, row)),
+      ai: ai("workload_health", row, t("insight.ai.cell.kubernetes", { service })),
+    };
+  const scope = scopeOf(row, events);
   return {
     why: t("insight.kind.cell.restartsWhy", { service }),
     next: t("insight.kind.cell.restartsNext"),
@@ -479,7 +496,7 @@ const gapCopy = (
     case "node":
       return metricsCopy(t, row, key, org, owned);
     case "workload_health":
-      return restartCopy(t, row, owned);
+      return restartCopy(t, row, org, owned);
     case "external_probe":
       return syntheticCopy(t, row, synthetic, owned);
     default:
