@@ -30805,6 +30805,7 @@
       "clearKind": "Show all suggestions",
       "kindEmptyTitle": "No open suggestions of the kind {kind}",
       "kindEmptyDesc": "{count} other suggestion is open. | {count} other suggestions are open.",
+      "folder": "Folder {folder}",
       "columns": {
         "suggestion": "Suggestion",
         "where": "Where",

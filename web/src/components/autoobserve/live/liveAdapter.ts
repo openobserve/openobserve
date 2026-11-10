@@ -876,9 +876,17 @@ export const toRequests = (
   });
 };
 
-const whereOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText =>
-  whereText(t, s.subject.key_dims.k8s_cluster_name, s.subject.key_dims.k8s_namespace_name) ??
-  raw("—");
+// An alert finding lives in a folder, not a cluster; the server names it when it knows it.
+const whereOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
+  if (isAlertFindingKind(s.kind)) {
+    const folder = str(s.evidence.folder);
+    return folder ? t("autoobserveLive.suggestions.folder", { folder: raw(folder) }) : raw("—");
+  }
+  return (
+    whereText(t, s.subject.key_dims.k8s_cluster_name, s.subject.key_dims.k8s_namespace_name) ??
+    raw("—")
+  );
+};
 
 export const toSuggestionRows = (
   t: TranslateFn,

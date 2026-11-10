@@ -116,6 +116,45 @@ describe("alert_no_destination suggestions (C7)", () => {
   });
 });
 
+describe("alert_no_destination on Home: Review change and Where (T3-17, C12)", () => {
+  const withChange = () =>
+    finding(
+      "alert_no_destination",
+      { rule_id: "no_destination", severity: "high", firings: 4, folder: "ops" },
+      {
+        actions: [
+          {
+            type: "apply_suggestion",
+            alert_id: "alert-1",
+            patch: [{ field: "destinations", from: [], to: ["pay-webhook"] }],
+          },
+          { type: "review_alert", alert_id: "alert-1", focus: "settings" },
+        ] as never,
+      },
+    );
+
+  it("offers Review change on the card and the row when the server sends the change", () => {
+    const [request] = toRequests(gt, ZONE, [withChange()], NOW_MS);
+    expect(request.insight.cta?.label).toBe("Review change");
+    expect(request.insight.cta?.target).toMatchObject({ type: "review_change" });
+    expect(request.insight.secondary.map((c) => c.label)).toContain("Review alert");
+    const [row] = toSuggestionRows(gt, ZONE, [withChange()], NOW_MS);
+    expect(row.insight.cta?.label).toBe("Review change");
+  });
+
+  it("puts the alert's folder in Where, and a dash only when the server doesn't know it", () => {
+    expect(toSuggestionRows(gt, ZONE, [withChange()], NOW_MS)[0].where).toBe("Folder ops");
+    expect(toSuggestionRows(gt, ZONE, [noDestination()], NOW_MS)[0].where).toBe("—");
+    const [notWorking] = toSuggestionRows(
+      gt,
+      ZONE,
+      [finding("alert_not_working", { rule_id: "failure", pattern: "syntax", folder: "pay" })],
+      NOW_MS,
+    );
+    expect(notWorking.where).toBe("Folder pay");
+  });
+});
+
 describe("one label for a kind (filter chip and row)", () => {
   it("alert_not_working's filter chip says what its rows say", () => {
     const [row] = toSuggestionRows(
