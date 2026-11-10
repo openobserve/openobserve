@@ -91,15 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <!-- The note promises an undoable apply, so it shows only where Apply is offered. -->
       <div v-if="canApplyHere" class="grid">
-        <OText
-          variant="meta"
-          as="p"
-          class="col-start-1 row-start-1"
+        <p
+          class="text-text-secondary col-start-1 row-start-1 text-xs"
           :class="{ invisible: !!writeNotice || isLocked }"
           :aria-hidden="writeNotice || isLocked ? 'true' : undefined"
           data-test="review-change-note"
-          >{{ t("insight.decisions.apply.note") }}</OText
         >
+          {{ t("insight.decisions.apply.note") }}
+        </p>
         <p
           v-if="writeNotice"
           class="col-start-1 row-start-1 flex items-start gap-1.5 text-xs"

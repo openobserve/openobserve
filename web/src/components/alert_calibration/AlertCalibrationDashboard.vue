@@ -595,8 +595,9 @@ const dismissedTotal = computed<number | null>(() => {
 });
 const dismissedLabel = computed(() => copy.value.filterDismissed(dismissedTotal.value));
 const view = computed(() => (route.query.findings === "dismissed" ? "dismissed" : "open"));
+// A reader the page refuses is not offered the Dismissed view beside the refusal.
 const dismissedReachable = computed(
-  () => view.value === "dismissed" || (dismissedTotal.value ?? 0) > 0,
+  () => !forbidden.value && (view.value === "dismissed" || (dismissedTotal.value ?? 0) > 0),
 );
 const onView = (value: unknown) => {
   if (!value || value === view.value) return;

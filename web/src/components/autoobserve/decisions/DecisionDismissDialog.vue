@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="error" size="xs" class="mt-0.5" />
             <span>{{ effectText }}</span>
           </p>
-          <OText v-else variant="meta" as="p">{{ effectText }}</OText>
+          <p v-else class="text-text-secondary text-xs">{{ effectText }}</p>
         </div>
       </div>
     </OForm>
