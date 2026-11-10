@@ -115,7 +115,9 @@ test.describe('Bulk review drawer', { tag: ['@autoobserve', '@enterprise'] }, ()
     await bulk.tickOnly(GROUPS, ['ingest-e', 'ingest-f', 'j']);
     await bulk.create.click();
     await expect(bulk.failures).toContainText("1 of 3 alerts wasn't created.", { timeout: 30000 });
-    await expect(bulk.failure('j')).toHaveText("svc-j: you can't write to folder payments.");
+    await expect(bulk.failure('j')).toHaveText(
+      "svc-j: You can't create alerts. Your role is missing the Create permission on Alerts. The alert was going to folder payments.",
+    );
     await expect(bulk.retry('j')).toHaveCount(0);
     await expect(bulk.rowResult('ingest-e', 'created')).toBeVisible();
     await expect(bulk.rowResult('j', 'failed')).toBeVisible();
