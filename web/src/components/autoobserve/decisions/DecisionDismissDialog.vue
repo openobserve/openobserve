@@ -32,82 +32,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The schema words a bad end date; the browser's own bubble would use another date format. -->
     <OForm :id="formId" :form="form" novalidate>
       <div class="flex flex-col gap-3">
-        <OFormRadioGroup
-          name="reason"
-          :label="t('insight.decisions.dismiss.reason')"
-          required
-          :disabled="!ready || !!locked || submitting"
-          data-test="decision-dismiss-reason"
-        >
-          <template v-for="option in DECISION_DISMISS_REASONS" :key="option">
-            <ORadio
-              :value="option"
-              :label="copy.reasonLabel(option)"
-              :data-test="`decision-dismiss-reason-${option}`"
-            />
-            <div
-              v-if="option === 'planned_work'"
-              class="flex flex-wrap items-end gap-2 ps-6"
-              data-test="decision-dismiss-until"
-            >
-              <OText variant="meta" as="span" class="pb-2">
-                {{ t("insight.decisions.dismiss.until") }}
-              </OText>
-              <OFormDate
-                class="min-w-36 flex-1"
-                name="untilDate"
-                :label="t('insight.decisions.dismiss.untilDate')"
-                :min="firstDay"
-                :max="lastDay"
-                size="sm"
-                :disabled="untilDisabled"
-                data-test="decision-dismiss-until-date"
-              />
-              <OFormTime
-                class="min-w-28 flex-1"
-                name="untilTime"
-                :label="t('insight.decisions.dismiss.untilTime')"
-                format24
-                size="sm"
-                :disabled="untilDisabled"
-                data-test="decision-dismiss-until-time"
-              />
-            </div>
-            <OText
-              v-if="option === 'false_positive'"
-              variant="meta"
-              as="p"
-              class="ps-6"
-              data-test="decision-dismiss-false-positive-help"
-            >
-              {{ t("insight.decisions.dismiss.falsePositiveHelp") }}
-            </OText>
-          </template>
-        </OFormRadioGroup>
-
-        <template v-if="isFinding">
-          <OFormOptionGroup
-            name="duration"
-            type="radio"
-            orientation="horizontal"
-            :label="t('alertCalibration.dismiss.duration')"
-            :options="durationOptions"
-            :disabled="durationDisabled"
-            data-test="decision-dismiss-duration"
-          />
-          <OFormTextarea
-            name="note"
-            :label="t('alertCalibration.dismiss.note')"
-            :help-text="t('insight.decisions.dismiss.noteHelp')"
-            :maxlength="NOTE_MAX_CHARS"
-            :rows="2"
+        <!-- A refused reader can choose nothing, so only the refusal is shown. -->
+        <template v-if="!locked">
+          <OFormRadioGroup
+            name="reason"
+            :label="t('insight.decisions.dismiss.reason')"
+            required
             :disabled="!ready || !!locked || submitting"
-            data-test="decision-dismiss-note"
-          />
+            data-test="decision-dismiss-reason"
+          >
+            <template v-for="option in DECISION_DISMISS_REASONS" :key="option">
+              <ORadio
+                :value="option"
+                :label="copy.reasonLabel(option)"
+                :data-test="`decision-dismiss-reason-${option}`"
+              />
+              <div
+                v-if="option === 'planned_work'"
+                class="flex flex-wrap items-end gap-2 ps-6"
+                data-test="decision-dismiss-until"
+              >
+                <OText variant="meta" as="span" class="pb-2">
+                  {{ t("insight.decisions.dismiss.until") }}
+                </OText>
+                <OFormDate
+                  class="min-w-36 flex-1"
+                  name="untilDate"
+                  :label="t('insight.decisions.dismiss.untilDate')"
+                  :min="firstDay"
+                  :max="lastDay"
+                  size="sm"
+                  :disabled="untilDisabled"
+                  data-test="decision-dismiss-until-date"
+                />
+                <OFormTime
+                  class="min-w-28 flex-1"
+                  name="untilTime"
+                  :label="t('insight.decisions.dismiss.untilTime')"
+                  format24
+                  size="sm"
+                  :disabled="untilDisabled"
+                  data-test="decision-dismiss-until-time"
+                />
+              </div>
+              <OText
+                v-if="option === 'false_positive'"
+                variant="meta"
+                as="p"
+                class="ps-6"
+                data-test="decision-dismiss-false-positive-help"
+              >
+                {{ t("insight.decisions.dismiss.falsePositiveHelp") }}
+              </OText>
+            </template>
+          </OFormRadioGroup>
+
+          <template v-if="isFinding">
+            <OFormOptionGroup
+              name="duration"
+              type="radio"
+              orientation="horizontal"
+              :label="t('alertCalibration.dismiss.duration')"
+              :options="durationOptions"
+              :disabled="durationDisabled"
+              data-test="decision-dismiss-duration"
+            />
+            <OFormTextarea
+              name="note"
+              :label="t('alertCalibration.dismiss.note')"
+              :help-text="t('insight.decisions.dismiss.noteHelp')"
+              :maxlength="NOTE_MAX_CHARS"
+              :rows="2"
+              :disabled="!ready || !!locked || submitting"
+              data-test="decision-dismiss-note"
+            />
+          </template>
         </template>
 
         <div
-          class="border-border-default flex min-h-16 flex-col gap-1 border-t pt-3"
+          class="flex flex-col gap-1"
+          :class="{ 'border-border-default min-h-16 border-t pt-3': !locked }"
           data-test="decision-dismiss-effect"
           :data-state="effectState"
         >

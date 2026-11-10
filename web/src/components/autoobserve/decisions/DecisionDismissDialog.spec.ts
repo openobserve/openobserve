@@ -364,9 +364,22 @@ describe("DecisionDismissDialog", () => {
     expect(byTest("decision-dismiss-locked")?.querySelector("[data-test], svg, span")).toBeTruthy();
     expect(byTest("decision-dismiss-locked")?.getAttribute("data-severity")).toBe("error");
     expect(submitButton().disabled).toBe(true);
-    await chooseReason("not_needed");
     await submit();
     expect(autoobserveDecisions.decide).not.toHaveBeenCalled();
+  });
+
+  it("a_refused_reader_sees_only_the_refusal_not_the_disabled_form", async () => {
+    vi.mocked(autoobserveDecisions.preview).mockResolvedValue({
+      data: fixture.preview_locked,
+    } as never);
+    await mountDialog();
+    expect(byTest("decision-dismiss-locked")?.textContent).toContain(
+      fixture.preview_locked.locked.message,
+    );
+    expect(byTest("decision-dismiss-reason")).toBeNull();
+    expect(byTest("decision-dismiss-duration")).toBeNull();
+    expect(byTest("decision-dismiss-note")).toBeNull();
+    expect(submitButton().disabled).toBe(true);
   });
 
   it("locks_from_a_403_refusal_and_says_it_in_red", async () => {
