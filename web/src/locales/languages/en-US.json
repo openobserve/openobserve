@@ -11891,6 +11891,8 @@
       "emptyDescription": "The dashboard fills in once alert calibration has run.",
       "loadFailedTitle": "Findings couldn't be loaded",
       "findingGone": "This finding is no longer open.",
+      "findingDismissed": "This finding is dismissed. Undo it from Dismissed.",
+      "findingGoneScoped": "This finding is not open in the latest run, or it is on an alert you can't access.",
       "applied": "Applied"
     },
     "lastRun": {

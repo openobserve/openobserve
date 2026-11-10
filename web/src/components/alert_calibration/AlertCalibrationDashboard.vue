@@ -129,7 +129,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText variant="card-title" as="h2">{{
               t("alertCalibration.dashboard.attention")
             }}</OText>
-            <OText variant="meta" as="p">{{
+            <!-- A linked finding's state takes the caption's line, so nothing below moves. -->
+            <OText
+              v-if="view === 'open' && focusGoneText"
+              variant="meta"
+              as="p"
+              data-test="alert-calibration-dashboard-finding-gone"
+              >{{ focusGoneText }}</OText
+            >
+            <OText v-else variant="meta" as="p">{{
               t("alertCalibration.dashboard.attentionCaption")
             }}</OText>
             <OText variant="meta" as="p" data-test="alert-calibration-dashboard-latest-age">
@@ -151,15 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DecisionsDismissedList v-if="decisionRoute.transport.value === 'decision'" />
           <AlertCalibrationDismissedList v-else-if="decisionRoute.transport.value !== 'pending'" />
         </template>
-
-        <OText
-          v-if="view === 'open' && focusGone"
-          variant="meta"
-          as="p"
-          data-test="alert-calibration-dashboard-finding-gone"
-        >
-          {{ t("alertCalibration.dashboard.findingGone") }}
-        </OText>
 
         <OBanner
           v-if="view === 'open' && dismissals.unknown.value"
@@ -633,6 +632,18 @@ const isFocused = (finding: FindingRecord) =>
 const focusGone = computed(
   () => !!focusId.value && !!data.data.value && !open.value.some((f) => isFocused(f)),
 );
+/** Why a linked finding is not on the board: dismissed, so its Undo is under Dismissed, or outside what this reader sees. */
+const focusGoneText = computed(() => {
+  if (!focusGone.value) return null;
+  const id = focusId.value;
+  const dismissed =
+    (data.data.value?.findings ?? []).some((f) => f.finding_id === id) ||
+    (decisionDismissed.data.value?.decisions ?? []).some((v) => v.id === id);
+  if (dismissed) return t("alertCalibration.dashboard.findingDismissed");
+  return latest.value && isScoped(latest.value)
+    ? t("alertCalibration.dashboard.findingGoneScoped")
+    : t("alertCalibration.dashboard.findingGone");
+});
 watch(
   () => !loading.value && open.value.some((f) => isFocused(f)),
   async (found) => {

@@ -920,6 +920,47 @@ describe("AlertCalibrationDashboard dismissals", () => {
     wrapper.unmount();
   });
 
+  it("a_link_to_a_dismissed_finding_points_to_dismissed_where_its_undo_is", async () => {
+    serve([nodest(1), nodest(2)], 2);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(2)]));
+    const wrapper = await mountPage({ finding: fid(2) });
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-finding-gone"]').text()).toBe(
+      "This finding is dismissed. Undo it from Dismissed.",
+    );
+    wrapper.unmount();
+  });
+
+  it("a_scoped_reader_is_told_the_finding_may_be_on_an_alert_they_cannot_access", async () => {
+    serve([nodest(1)], 1, { visibility: "scoped" } as Partial<DigestRecord>);
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === ""
+        ? ([{ ...run, finding_count: 1, visibility: "scoped" }] as never)
+        : ([{ ...nodest(1), finding_count: 1, visibility: "scoped" }] as never),
+    );
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+    const wrapper = await mountPage({ finding: fid(9) });
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-finding-gone"]').text()).toBe(
+      "This finding is not open in the latest run, or it is on an alert you can't access.",
+    );
+    wrapper.unmount();
+  });
+
+  it("the_gone_line_takes_the_caption_s_place_so_the_groups_never_move", async () => {
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+    const wrapper = await mountPage({ finding: fid(9) });
+    await settle();
+    const attention = wrapper.find('[data-test="alert-calibration-dashboard-attention"]');
+    expect(attention.text()).not.toContain("From the latest run.");
+    const gone = wrapper.find('[data-test="alert-calibration-dashboard-finding-gone"]');
+    expect(gone.element.nextElementSibling?.getAttribute("data-test")).toBe(
+      "alert-calibration-dashboard-latest-age",
+    );
+    wrapper.unmount();
+  });
+
   it("the_filter_lives_in_the_url", async () => {
     serve([nodest(1)], 1);
     vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(7)]));
