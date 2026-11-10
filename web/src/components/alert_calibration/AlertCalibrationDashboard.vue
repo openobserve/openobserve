@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-calibration-dashboard-open-alert"
                     @click="openAlert(finding)"
                   >
-                    {{ t("alertCalibration.dashboard.openAlert") }}
+                    {{ insightCtaLabel(t, "openAlert") }}
                   </OButton>
                   <OButton
                     v-if="ctasOf(finding).logs"

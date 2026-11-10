@@ -11533,7 +11533,7 @@
       "reopenGone": "This dismissal no longer exists, or you can no longer see its alert. The list was refreshed.",
       "reopenFailed": "Nothing was undone. Try again.",
       "stat": "Dismissed",
-      "statSub": "Hidden from this run"
+      "statSub": "Hidden when this run was made"
     },
     "tabs": {
       "runs": "Runs",
@@ -11795,6 +11795,7 @@
     },
     "digests": {
       "schedule": "Schedule",
+      "runsEvery": "Runs every",
       "off": "Off",
       "notConfigured": "Not configured",
       "noScheduledRun": "No scheduled run",
@@ -11805,7 +11806,7 @@
       "scopeAll": "All runs",
       "scopeFindings": "With findings",
       "scopeGaps": "Coverage gaps",
-      "searchPlaceholder": "Search runs by alert name",
+      "searchPlaceholder": "Search by alert name",
       "colRun": "Run",
       "colFindings": "Findings",
       "colCoverage": "Coverage",
@@ -11833,7 +11834,7 @@
       "statFindings": "Findings",
       "statAlertsInScope": "Alerts in scope",
       "statDeclined": "Declined",
-      "statDeclinedSub": "Declined, not cleared",
+      "statDeclinedSub": "Not cleared",
       "statDeclinedTooltip": "Rule and alert pairs a rule would not judge. A gate, not a clearance. A floor not met is only counted; a rule that could not run, or looked and declined, is listed below with its reason.",
       "limitations": "Limits of the evidence",
       "declinedHeading": "Declined with a reason",
@@ -11913,7 +11914,7 @@
       "saveFailed": "The settings could not be saved: {message}",
       "lastSaved": "Last saved {time}",
       "runNowHeading": "Run now",
-      "findingsDesc": "Findings are written to the {stream} stream of this organization and kept for that stream's retention. Alert calibration sends no notifications.",
+      "findingsDesc": "Findings are kept with this organization's own records for its retention period. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
       "windowRange": "Choose a window between 1 minute and 90 days."
     },

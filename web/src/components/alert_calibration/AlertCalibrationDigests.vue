@@ -323,7 +323,10 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "schedule",
-      label: t("alertCalibration.digests.schedule"),
+      // "1 · Runs every · day" reads as a sentence; an off schedule keeps its noun.
+      label: c?.enabled
+        ? t("alertCalibration.digests.runsEvery")
+        : t("alertCalibration.digests.schedule"),
       value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : raw("—"),
       sub: c
         ? c.enabled
