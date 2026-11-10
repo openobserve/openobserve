@@ -396,13 +396,38 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     );
     expect(createButton().disabled).toBe(true);
     const input = document.querySelector<HTMLInputElement>(
-      '[data-test="bulk-review-threshold-errs"] input',
+      '[data-test="bulk-review-firesWhen-errs"] [data-test="bulk-review-threshold-errs"] input',
     )!;
     input.value = "40";
     input.dispatchEvent(new Event("input"));
     await flushPromises();
     expect(createButton().disabled).toBe(false);
-    expect(text("bulk-review-firesWhen-errs")).toBe("errors above 40 an hour");
+    expect(review.reviewRows.value.find((r) => r.key === "errs")?.threshold).toBe(40);
+  });
+
+  it("keeps a row one line tall when its week has no usual level (T5-N5)", async () => {
+    api.schema.mockResolvedValue({
+      data: {
+        schema: [
+          { name: "service_name" },
+          { name: "k8s_namespace_name" },
+          { name: "level", type: "Utf8" },
+        ],
+      },
+    });
+    measureBaseline.mockResolvedValue(null);
+    await mountDrawer();
+    const [row] = fieldRows(IDS);
+    await openWith([{ ...row, key: "errs", kind: "errors", usually: null }]);
+    await flushPromises();
+    const service = document.querySelector(
+      '[data-test="bulk-review-service-errs"]',
+    )!.parentElement!;
+    expect(service.querySelector('[data-test="bulk-review-threshold-errs"]')).toBeNull();
+    expect(q("bulk-review-cant-errs")!.className).toContain("truncate");
+    const field = q("bulk-review-threshold-errs")!;
+    expect(field.querySelector("label")).toBeNull();
+    expect(field.querySelector("input")?.getAttribute("aria-label")).toBe("Fire above");
   });
 
   it("keeps Create off while a ticked row waits for its stream fields", async () => {

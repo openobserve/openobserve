@@ -178,8 +178,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ compactLine(row) }}
             </span>
-            <span
+            <!-- One line on a wide screen, so a row that resolves to a threshold ask keeps its height. -->
+            <OTruncatedText
               v-if="!row.prefill || row.block"
+              :lines="isMobile ? 2 : 1"
               :class="[
                 'text-xs',
                 row.block?.code === 'schemaFailed'
@@ -189,9 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`bulk-review-cant-${row.key}`"
             >
               {{ blockLine(t, row, reviewRows) }}
-            </span>
+            </OTruncatedText>
             <OInput
-              v-if="row.block?.code === 'noBaseline' || state.thresholds[row.key]"
+              v-if="isMobile && asksThreshold(row)"
               :model-value="typed[row.key] ?? state.thresholds[row.key] ?? ''"
               type="number"
               size="sm"
@@ -217,12 +219,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-body">{{ row.stream.name }}</span>
         </template>
         <template #cell-firesWhen="{ row }">
-          <span
+          <div
             class="text-text-body block py-1 whitespace-normal"
             :data-test="`bulk-review-firesWhen-${row.key}`"
           >
-            {{ firesWhenOf(t, kind, row) }}
-          </span>
+            <OInput
+              v-if="asksThreshold(row)"
+              :model-value="typed[row.key] ?? state.thresholds[row.key] ?? ''"
+              type="number"
+              size="sm"
+              :aria-label="t('insight.threshold.label')"
+              :suffix="String(t(`insight.threshold.${thresholdKind(row)}Suffix`))"
+              :disabled="locked"
+              :error="badThreshold(row.key)"
+              :error-message="badThreshold(row.key) ? t('insight.threshold.invalid') : undefined"
+              :data-test="`bulk-review-threshold-${row.key}`"
+              @update:model-value="(v: string | number) => typeThreshold(row.key, v)"
+            />
+            <template v-else>{{ firesWhenOf(t, kind, row) }}</template>
+          </div>
         </template>
         <template #cell-usually="{ row }">
           <span class="text-text-body tabular-nums">{{ usuallyOf(t, locale, row, kind) }}</span>
@@ -297,6 +312,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import alertsService from "@/services/alerts";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -435,6 +451,9 @@ const compactLine = (row: ReviewRow) =>
     .filter(Boolean)
     .join(" · ");
 
+const asksThreshold = (row: ReviewRow) =>
+  row.block?.code === "noBaseline" || !!state.thresholds[row.key];
+
 const columns = computed<OTableColumnDef<ReviewRow>[]>(() => [
   { id: "tick", header: raw(""), size: 44 },
   { id: "service", header: t("insight.bulk.column.service"), meta: { autoWidth: true } },
@@ -442,8 +461,8 @@ const columns = computed<OTableColumnDef<ReviewRow>[]>(() => [
     ? []
     : [
         { id: "stream", header: t("insight.bulk.column.stream"), size: 130 },
-        { id: "firesWhen", header: t("insight.bulk.column.firesWhen"), size: 150 },
-        { id: "usually", header: t("insight.bulk.column.usually"), size: 120 },
+        { id: "firesWhen", header: t("insight.bulk.column.firesWhen"), size: 220 },
+        { id: "usually", header: t("insight.bulk.column.usually"), size: 140 },
       ]),
 ]);
 
