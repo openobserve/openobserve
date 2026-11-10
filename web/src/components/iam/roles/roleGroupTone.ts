@@ -20,6 +20,7 @@ const GROUP_TONE: Record<string, string> = {
   alerting: "bg-icon-chip-orange-bg text-icon-chip-orange-text",
   pipelines: "bg-badge-teal-soft-bg text-badge-teal-soft-text",
   monitoring: "bg-icon-chip-info-bg text-icon-chip-info-text",
+  security: "bg-badge-indigo-soft-bg text-badge-indigo-soft-text",
   ai: "bg-icon-chip-primary-bg text-icon-chip-primary-text",
   access: "bg-icon-chip-success-bg text-icon-chip-success-text",
 };

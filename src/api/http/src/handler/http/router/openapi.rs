@@ -108,6 +108,7 @@ use crate::{
         rum::ingest::data,
         rum::ingest::sessionreplay,
         openobserve_api_management::request::ingest_rejections::recent_rejections,
+        openobserve_api_management::request::security::get_security_access,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
         openobserve_api_search::search::query_functions::list,
@@ -1067,7 +1068,7 @@ use crate::{
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
-        (name = "Security", description = "Built-in OCSF mapping packs for security sources (enterprise)"),
+        (name = "Security", description = "Security sources, OCSF packs, detections, cases and investigation (enterprise)"),
         (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
         (name = "AnnotationQueues", description = "Annotation queues for human review of LLM traces (enterprise)"),
         (name = "Annotations", description = "Annotations on traces and spans (enterprise)"),
@@ -1119,6 +1120,30 @@ pub struct ApiDoc;
 #[cfg(feature = "enterprise")]
 #[derive(OpenApi)]
 #[openapi(paths(
+    openobserve_api_management::request::security::cases::get_case_settings,
+    openobserve_api_management::request::security::cases::update_case_settings,
+    openobserve_api_management::request::security::cases::lookup_cases,
+    openobserve_api_management::request::security::cases::promote_to_case,
+    openobserve_api_management::request::security::audit::list_security_audit,
+    openobserve_api_management::request::security::investigate::list_entities,
+    openobserve_api_management::request::security::investigate::get_entity_graph,
+    openobserve_api_management::request::security::investigate::get_entity_detail,
+    openobserve_api_management::request::security::investigate::score_users,
+    openobserve_api_management::request::security::investigate::search_events,
+    openobserve_api_management::request::security::intel::sweep,
+    openobserve_api_management::request::security::intel::sightings,
+    openobserve_api_management::request::security::intel::validate,
+    openobserve_api_management::request::security::list_ocsf_packs,
+    openobserve_api_management::request::security::sources::list_sources,
+    openobserve_api_management::request::security::sources::list_source_types,
+    openobserve_api_management::request::security::sources::match_source,
+    openobserve_api_management::request::security::sources::classify_sources,
+    openobserve_api_management::request::security::sources::attach_pack,
+    openobserve_api_management::request::security::sources::detach_pack,
+    openobserve_api_management::request::security::sigma::get_catalog,
+    openobserve_api_management::request::security::sigma::compile,
+    openobserve_api_management::request::security::sigma::get_mitre_coverage,
+    openobserve_api_management::request::security::sigma::get_detection_evidence,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -1200,7 +1225,6 @@ pub struct ApiDoc;
     openobserve_api_management::request::anomaly_detection::detect_anomalies,
     openobserve_api_management::request::anomaly_detection::get_detection_history,
     openobserve_api_management::request::alerts::history::get_all_anomaly_history,
-    openobserve_api_management::request::security::list_ocsf_packs,
     openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
     openobserve_api_management::request::workflows::save_workflow,
     openobserve_api_management::request::workflows::list_workflows,
@@ -2323,6 +2347,160 @@ mod tests {
             "OcsfPackKind",
         ] {
             assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sources_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id) in [
+            (
+                "/api/{org_id}/security/sources",
+                "get",
+                "ListSecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/types",
+                "get",
+                "ListSecuritySourceTypes",
+            ),
+            (
+                "/api/{org_id}/security/sources/match",
+                "post",
+                "MatchSecuritySource",
+            ),
+            (
+                "/api/{org_id}/security/sources/classify",
+                "post",
+                "ClassifySecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/attach",
+                "post",
+                "AttachSecuritySourcePack",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/detach",
+                "post",
+                "DetachSecuritySourcePack",
+            ),
+        ] {
+            assert_eq!(spec["paths"][path][method]["operationId"], id, "{path}");
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "SourceListing",
+            "SourceRow",
+            "SourceType",
+            "MatchResponse",
+            "AttachError",
+            "AttachPlan",
+            "DetachSkip",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn security_access_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/access"]["get"];
+        assert_eq!(op["operationId"], "GetSecurityAccess", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAccessResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_investigation_paths_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, id, schema) in [
+            (
+                "/api/{org_id}/security/entities",
+                "ListSecurityEntities",
+                "EntitiesResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/graph",
+                "GetSecurityEntityGraph",
+                "EntityGraphResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/detail",
+                "GetSecurityEntityDetail",
+                "EntityDetailResponse",
+            ),
+            (
+                "/api/{org_id}/security/ueba",
+                "ScoreSecurityUsers",
+                "UebaReport",
+            ),
+            (
+                "/api/{org_id}/security/events/search",
+                "SearchSecurityEvents",
+                "EventSearchResponse",
+            ),
+        ] {
+            let op = &spec["paths"][path]["post"];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_audit_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/audit"]["get"];
+        assert_eq!(op["operationId"], "ListSecurityAudit", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAuditResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sigma_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id, schema) in [
+            (
+                "/api/{org_id}/security/sigma/catalog",
+                "get",
+                "GetSigmaCatalog",
+                "SigmaCatalogResponse",
+            ),
+            (
+                "/api/{org_id}/security/sigma/compile",
+                "post",
+                "CompileSigmaRule",
+                "SigmaCompileResponse",
+            ),
+            (
+                "/api/{org_id}/security/mitre/coverage",
+                "get",
+                "GetMitreCoverage",
+                "MitreCoverage",
+            ),
+            (
+                "/api/{org_id}/security/detections/{alert_id}/evidence",
+                "get",
+                "GetDetectionEvidence",
+                "DetectionEvidence",
+            ),
+        ] {
+            let op = &spec["paths"][path][method];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
         }
     }
 

@@ -397,7 +397,7 @@ pub async fn resolve_target(org_id: &str, alert_id: &str) -> Result<AckTarget, A
             evaluates_through_silence: config::meta::alerts::dispatch::evaluates_through_silence(
                 multi_alert,
                 multi_level,
-            ),
+            ) || siem_evaluates_through_silence(&alert),
         });
     }
     match crate::alerts::composite::get_composite(org_id, alert_id).await {
@@ -1087,10 +1087,17 @@ async fn gather_facts(
     }
 }
 
-/// OpenFGA edit on the alert, or on any alert of the incident (D24).
+/// Edit on the alert or any of the incident's (D24); Security triage stands in for detections.
 #[cfg(feature = "enterprise")]
 async fn may_edit_any_alert(p: &Problem, actor: &str) -> bool {
+    let siem = db::alerts::alert::resolve_siem_alert_ids(p.org_id()).await;
+    let triage =
+        !siem.is_empty() && crate::security::security_allowed(p.org_id(), actor, "PUT").await;
+    let siem = &siem;
     may_edit_any_alert_with(p, |target: AckTarget| async move {
+        if triage_admits(triage, siem, &target.alert_id) {
+            return true;
+        }
         crate::auth::check_permissions(
             &target.alert_id,
             &target.org_id,
@@ -1105,6 +1112,12 @@ async fn may_edit_any_alert(p: &Problem, actor: &str) -> bool {
         .await
     })
     .await
+}
+
+/// Security triage stands in for alert edit, but only on a security detection.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn triage_admits(triage: bool, siem_ids: &[String], alert_id: &str) -> bool {
+    triage && siem_ids.iter().any(|id| id == alert_id)
 }
 
 /// The members of every team with an open page on the problem, owner or impacted.
@@ -2010,6 +2023,19 @@ async fn incident_of(_target: &AckTarget) -> Result<Option<String>, AckError> {
     Ok(None)
 }
 
+/// A security detection keeps evaluating through silence, so an unack never pauses it.
+#[cfg(feature = "enterprise")]
+fn siem_evaluates_through_silence(alert: &config::meta::alerts::alert::Alert) -> bool {
+    o2_enterprise::enterprise::security::detection::evaluates_through_silence(
+        alert.context_attributes.as_ref(),
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn siem_evaluates_through_silence(_alert: &config::meta::alerts::alert::Alert) -> bool {
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2724,5 +2750,29 @@ mod tests {
         ] {
             assert_eq!(source_of_page(page_source), source, "{page_source}");
         }
+    }
+
+    #[test]
+    fn security_triage_admits_an_ack_only_on_a_security_detection() {
+        let siem = vec!["siem-1".to_string()];
+        assert!(triage_admits(true, &siem, "siem-1"));
+        assert!(!triage_admits(true, &siem, "ops-1"));
+        assert!(!triage_admits(false, &siem, "siem-1"));
+        assert!(!triage_admits(true, &[], "siem-1"));
+    }
+
+    #[test]
+    fn a_security_detection_keeps_evaluating_through_an_unack_only_with_enterprise() {
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        assert!(!siem_evaluates_through_silence(&alert));
+        alert.context_attributes = Some(
+            [("siem".to_string(), "true".to_string())]
+                .into_iter()
+                .collect(),
+        );
+        assert_eq!(
+            siem_evaluates_through_silence(&alert),
+            cfg!(feature = "enterprise")
+        );
     }
 }

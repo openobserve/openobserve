@@ -13,8 +13,11 @@ import {
   streamsForRule,
   toMicros,
 } from "./content";
-import { sigmaCatalog } from "./sigma";
-import { SOURCE_TYPE_BY_ID } from "./sourceTypes";
+import type { CatalogRule } from "@/services/securitySigma";
+import {
+  SOURCE_TYPES_FIXTURE,
+  SOURCE_TYPE_BY_ID,
+} from "@/views/Security/__fixtures__/securitySourceTypes";
 
 const meta = (over: Record<string, unknown>) =>
   ({
@@ -43,22 +46,52 @@ describe("installedBySigmaId", () => {
   });
 });
 
+const catalogRule = (key: string, sources: string[], logsourceLabel: string): CatalogRule => ({
+  key,
+  id: key,
+  title: key,
+  description: null,
+  status: null,
+  author: null,
+  date: null,
+  modified: null,
+  level: "high",
+  tags: [],
+  techniques: [],
+  tactics: [],
+  falsepositives: [],
+  references: [],
+  logsource: {},
+  logsourceLabel,
+  correlation: false,
+  timespanMinutes: null,
+  yaml: "",
+  sources,
+});
+
+const ctRule = catalogRule(
+  "ct1",
+  ["aws_cloudtrail", "ocsf_native"],
+  "product=aws service=cloudtrail",
+);
+const oktaRule = catalogRule("okta1", ["okta_system_log"], "product=okta service=okta");
+const ct2 = catalogRule("ct2", ["aws_cloudtrail"], "product=aws service=cloudtrail");
+
 describe("source matching", () => {
   const cloudtrail = SOURCE_TYPE_BY_ID.get("aws_cloudtrail")!;
-  const ctRule = sigmaCatalog().find((r) => r.logsource.service === "cloudtrail")!;
 
   it("links a rule to the source types it was written for, and back", () => {
-    expect(sourcesForRule(ctRule).map((s) => s.id)).toContain("aws_cloudtrail");
-    expect(rulesForSource(cloudtrail, sigmaCatalog())).toContain(ctRule);
+    expect(sourcesForRule(ctRule, SOURCE_TYPES_FIXTURE).map((s) => s.id)).toEqual([
+      "ocsf_native",
+      "aws_cloudtrail",
+    ]);
+    expect(rulesForSource(cloudtrail, [ctRule, oktaRule, ct2])).toEqual([ctRule, ct2]);
   });
 
   it("finds the org's streams a rule can run on", () => {
     const bySource = streamsBySource([
-      {
-        name: "ct",
-        fields: ["eventname", "eventsource", "awsregion", "sourceipaddress", "useridentity_type"],
-      },
-      { name: "empty", fields: [] },
+      { name: "ct", fields: ["eventname", "eventsource"], sourceId: "aws_cloudtrail" },
+      { name: "empty", fields: [], sourceId: null },
     ]);
     expect(bySource.get("aws_cloudtrail")).toEqual(["ct"]);
     expect(streamsForRule(ctRule, bySource)).toEqual(["ct"]);
@@ -66,35 +99,42 @@ describe("source matching", () => {
 });
 
 describe("checksByRule", () => {
-  const ctFields = [
-    "eventname",
-    "eventsource",
-    "awsregion",
-    "sourceipaddress",
-    "useridentity_type",
-  ];
-
-  it("records per stream whether each applicable rule can run there", () => {
-    const bySource = streamsBySource([{ name: "ct", fields: ctFields }]);
-    const checks = checksByRule(bySource, new Map([["ct", ctFields]]));
-    const ctRules = sigmaCatalog().filter((r) => r.logsource.service === "cloudtrail");
-    for (const rule of ctRules) {
-      expect(checks.get(rule)?.map((c) => c.stream)).toEqual(["ct"]);
-    }
-    // Some CloudTrail rules need fields this minimal stream lacks.
-    const verdicts = ctRules.map((r) => checks.get(r)![0].compiled.runnable);
-    expect(verdicts).toContain(true);
-    expect(verdicts).toContain(false);
+  it("records per stream how each rule the server compiled runs there", () => {
+    const cloudtrail = SOURCE_TYPE_BY_ID.get("aws_cloudtrail")!;
+    const compiled = (runnable: boolean) => ({
+      where: runnable ? "x" : "",
+      runnable,
+      unsupported: [],
+      assumedAbsent: [],
+      fields: [],
+    });
+    const checks = checksByRule([
+      {
+        stream: "ct",
+        source: cloudtrail,
+        applicable: [
+          { key: "ct1", compiled: compiled(true) },
+          { key: "ct2", compiled: compiled(false) },
+        ],
+      },
+      {
+        stream: "ct_b",
+        source: cloudtrail,
+        applicable: [{ key: "ct1", compiled: compiled(true) }],
+      },
+    ]);
+    expect(checks.get("ct1")?.map((c) => c.stream)).toEqual(["ct", "ct_b"]);
+    expect(checks.get("ct2")?.[0].compiled.runnable).toBe(false);
   });
 });
 
 describe("groupByLogsource", () => {
   it("counts rules per logsource, busiest first", () => {
-    const groups = groupByLogsource(sigmaCatalog());
-    expect(groups.reduce((n, g) => n + g.count, 0)).toBe(sigmaCatalog().length);
-    for (let i = 1; i < groups.length; i++) {
-      expect(groups[i - 1].count).toBeGreaterThanOrEqual(groups[i].count);
-    }
+    const groups = groupByLogsource([ctRule, oktaRule, ct2]);
+    expect(groups).toEqual([
+      { key: "product=aws service=cloudtrail", label: "product=aws service=cloudtrail", count: 2 },
+      { key: "product=okta service=okta", label: "product=okta service=okta", count: 1 },
+    ]);
   });
 });
 
@@ -108,5 +148,10 @@ describe("detection state", () => {
     expect(detectionState({ enabled: true, last_outcome: "error" })).toBe("erroring");
     expect(detectionState({ enabled: true, last_outcome: "firing" })).toBe("enabled");
     expect(detectionState({ enabled: false, last_outcome: "error" })).toBe("disabled");
+  });
+
+  it("flags a rule whose notifications fail as notify failing, not healthy", () => {
+    expect(detectionState({ enabled: true, last_outcome: "notify_failed" })).toBe("notifyFailing");
+    expect(detectionState({ enabled: false, last_outcome: "notify_failed" })).toBe("disabled");
   });
 });

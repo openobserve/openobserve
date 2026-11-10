@@ -691,7 +691,8 @@
       "scoreConfigs": "Cấu hình điểm",
       "workflows": "Quy trình làm việc",
       "syntheticFolders": "Thư mục Synthetics",
-      "downtimeFolders": "Thư mục thời gian bảo trì"
+      "downtimeFolders": "Thư mục thời gian bảo trì",
+      "security": "Bảo mật"
     },
     "resourcesInline": {
       "dashboards": "bảng điều khiển",
@@ -747,7 +748,8 @@
       "fleetManagement": "quản lý Fleet",
       "incidents": "sự cố",
       "onCallResponses": "phản hồi trực",
-      "searchJobs": "tác vụ tìm kiếm"
+      "searchJobs": "tác vụ tìm kiếm",
+      "security": "Bảo mật"
     },
     "denied": {
       "view": "Bạn không thể xem {resource}",
@@ -4500,6 +4502,7 @@
       "presetsSubtitle": "Thêm các quyền của một cấu hình sẵn vào vai trò này. Không có gì bị xóa.",
       "presetsSectionBuiltin": "Tích hợp sẵn",
       "presetsSectionJob": "Theo công việc",
+      "presetsSectionSecurity": "Bảo mật",
       "presetAddsTooltip": "Thêm {count} quyền | Thêm {count} quyền",
       "presetInRole": "Có trong vai trò",
       "presetInRoleTooltip": "Vai trò này đã có mọi thứ trong cấu hình sẵn này",
@@ -4575,7 +4578,16 @@
       "presetRestored": "{title}: đã khôi phục {permissions}. Hãy xem lại thay đổi trước khi lưu.",
       "presetSummaryRestores": "Giữ lại {count} quyền mà bạn đã đánh dấu để xóa. | Giữ lại {count} quyền mà bạn đã đánh dấu để xóa.",
       "presetRestoreButton": "Giữ lại {count} quyền | Giữ lại {count} quyền",
-      "effectStillAllowed": "Không thay đổi quyền truy cập: một quyền rộng hơn vẫn cho phép điều này."
+      "effectStillAllowed": "Không thay đổi quyền truy cập: một quyền rộng hơn vẫn cho phép điều này.",
+      "moduleGroupSecurity": "Bảo mật",
+      "presetSocAnalystTitle": "Chuyên viên phân tích SOC",
+      "presetSocAnalystDescription": "Phân loại cảnh báo và vụ việc Bảo mật, với quyền đọc phát hiện, luồng và danh sách tình báo mối đe dọa",
+      "presetDetectionEngineerTitle": "Kỹ sư phát hiện",
+      "presetDetectionEngineerDescription": "Tạo, tinh chỉnh, bật và chạy phát hiện, cài đặt nội dung, gắn nguồn cùng hàm và pipeline của chúng, và duy trì bảng làm giàu như danh sách tình báo mối đe dọa, với quyền đọc Bảo mật, vụ việc và luồng",
+      "presetSecurityAdminTitle": "Quản trị viên bảo mật",
+      "presetSecurityAdminDescription": "Quản lý toàn bộ Bảo mật, gồm xóa phát hiện và vụ việc và loại trừ nguồn, cùng sự cố, hàm, pipeline, bảng làm giàu và khóa mã hóa, và quyền đọc luồng",
+      "presetSecurityViewerTitle": "Người xem bảo mật",
+      "presetSecurityViewerDescription": "Xem Bảo mật, các vụ việc, phát hiện và luồng nguồn mà không thay đổi chúng"
     },
     "rolesPage": {
       "subtitle": "Vai trò gói quyền — gán chúng cho Người dùng, Tài khoản dịch vụ hoặc Nhóm để cấp quyền truy cập.",
@@ -7711,6 +7723,28 @@
       "tlsBody": "Token là thông tin xác thực bearer có thể bị phát lại qua HTTP dạng văn bản thuần, nên hãy kết thúc TLS tại {brand} ({setting}, mặc định bị tắt) hoặc tại một proxy tin cậy đứng trước nó."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Cập nhật cấu hình {product} hiện có để gửi nhật ký, chỉ số và dấu vết tới tổ chức này.",
+      "correlationBody": "Để liên kết nhật ký với dấu vết, ứng dụng phải ghi ID dấu vết 128 bit đầy đủ. Nếu Java tracer chỉ ghi 64 bit thấp, hãy đặt {setting} trên ứng dụng.",
+      "profilingBody": "Việc lập hồ sơ dùng đích riêng và khóa API của Agent. Nếu ứng dụng đã chạy trình lập hồ sơ, hãy tắt tính năng lập hồ sơ của ứng dụng hoặc tracer khi di chuyển, hoặc cấu hình đích riêng.",
+      "multiValueTagsBody": "Thẻ có nhiều giá trị khác nhau dùng chuỗi mảng JSON được sắp xếp. Một giá trị đơn bắt đầu bằng [ cũng được mã hóa thành mảng JSON một phần tử để giữ nguyên danh tính chuỗi.",
+      "envTitle": "Cấu hình Agent",
+      "envBody": "Đặt các biến môi trường này trên {product} và khởi động lại nó. Yêu cầu {product} {version} trở lên.",
+      "tokenBody": "Khóa API phải là token tiếp nhận dữ liệu của tổ chức, bắt đầu bằng {prefix}. Tổ chức này không có token tiếp nhận dữ liệu nào được bật, vì vậy không có đoạn mã thiết lập nào được hiển thị. Hãy tạo token tiếp nhận dữ liệu, sau đó quay lại trang này.",
+      "tokenLink": "Mở token tiếp nhận dữ liệu",
+      "featuresOffBody": "Các dòng sau URL tắt những tính năng của Agent gửi đến máy chủ riêng của {vendor} bằng cùng khóa đó. {setting} cũng giữ {component} ở trạng thái tắt, thành phần mà các phiên bản Agent mới hơn chạy và không giữ đường dẫn trong các URL này.",
+      "logsTitle": "Nhật ký",
+      "logsBody": "Thu thập nhật ký mặc định bị tắt trong {product}. Đặt {setting} và cấu hình các nguồn nhật ký của bạn.",
+      "dualTitle": "Giữ đích hiện tại của bạn",
+      "dualBody": "Để gửi đến tổ chức này song song với một đích hiện có, hãy giữ nguyên các URL và khóa API hiện tại và thêm các mục này vào {file} thay vào đó. Nhật ký cần {setting}, vì nếu không các endpoint nhật ký bổ sung sẽ dùng TCP.",
+      "metricsTitle": "Truy vấn chỉ số",
+      "metricsTypes": "Mỗi chuỗi được lưu dưới dạng gauge với giá trị mà Agent đã gửi, được gắn nhãn bằng {typeField} và {intervalField}.",
+      "metricsCount": "Chuỗi Count chứa số đếm cho mỗi khoảng flush. Hãy cộng chúng bằng {promql} trong PromQL hoặc {sql} trong SQL.",
+      "metricsRate": "Chuỗi Rate tính theo giây. Nhân giá trị với {intervalField} để khôi phục số đếm cho khoảng đó.",
+      "metricsCounterFns": "PromQL {rate} và {increase} mong đợi bộ đếm tích lũy, nên chúng không cho kết quả có ý nghĩa trên các chuỗi này.",
+      "metricsSketch": "Phân phối được lưu dưới dạng các bucket histogram, và phân vị được ước tính từ các bucket đó. ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA cao hơn cho các bucket mịn hơn và phân vị chính xác hơn, đổi lại là nhiều dòng được lưu hơn."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU exporter"
   },
@@ -24327,8 +24361,9 @@
       "classMix": "Các lớp trong một giờ qua: {mix}",
       "objects": "Đối tượng OCSF",
       "missingSignals": "Chưa thấy: {fields}",
-      "detections": "{n} phát hiện | {n} phát hiện",
-      "firing": "{n} đang kích hoạt | {n} đang kích hoạt",
+      "detections": "{n} quy tắc khớp | {n} quy tắc khớp",
+      "firing": "{n} có kết quả khớp | {n} có kết quả khớp",
+      "matchingRulesHint": "Các quy tắc trong danh mục Sigma áp dụng cho nguồn này. Kết quả là các lần khớp trong cửa sổ hiện tại, không phải phát hiện đã triển khai.",
       "rulesFor": "Quy tắc Sigma cho {source}",
       "hits": "{n} lượt khớp | {n} lượt khớp",
       "viewHits": "Xem kết quả khớp",
@@ -24357,7 +24392,44 @@
       "invertFilter": "Chuyển đổi giữa bao gồm và loại trừ",
       "removeFilter": "Xóa bộ lọc",
       "pivotSqlUnsupported": "Truy vấn SQL này không phải là một SELECT … WHERE đơn giản, nên không thể thêm bộ lọc vào đó. Hãy chỉnh sửa truy vấn thủ công, hoặc chuyển sang Builder.",
-      "topValuesWholeStream": "Chế độ SQL: các giá trị được đếm trên toàn bộ stream, không phải trên truy vấn của bạn."
+      "topValuesWholeStream": "Chế độ SQL: các giá trị được đếm trên toàn bộ stream, không phải trên truy vấn của bạn.",
+      "allSources": "Tất cả nguồn bảo mật",
+      "sortSqlMode": "Truy vấn viết tay tự đặt ORDER BY riêng",
+      "includeFailed": "Không thể thêm {name} vào Bảo mật",
+      "excludeFailed": "Không thể xóa {name} khỏi Bảo mật",
+      "hunt": {
+        "title": "Tìm trong tất cả nguồn bảo mật cùng lúc",
+        "hint": "Nhập địa chỉ IP, người dùng hoặc máy chủ. Mỗi nguồn được tìm theo các cột riêng, và mỗi hàng cho biết nó đến từ nguồn nào.",
+        "noMatches": "Không có kết quả khớp trong khoảng này",
+        "noMatchesHint": "Hãy mở rộng khoảng thời gian hoặc tìm trong bất kỳ trường nào thay vì chỉ một loại.",
+        "noFields": "Các trường khác nhau tùy nguồn. Hãy chọn một nguồn để duyệt các trường của nguồn đó.",
+        "search": "Tìm kiếm",
+        "aliases": "Khớp thêm {n} cách viết | Khớp thêm {n} cách viết",
+        "clearAliases": "Chỉ khớp tên đã nhập",
+        "uncounted": "Không được tính: {streams}",
+        "kind": {
+          "any": "Bất kỳ trường nào",
+          "user": "Người dùng",
+          "ip": "Địa chỉ IP",
+          "host": "Máy chủ"
+        },
+        "placeholder": {
+          "any": "Địa chỉ IP, người dùng, máy chủ hoặc văn bản",
+          "user": "dave, ACME\\dave hoặc dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "Tên máy chủ"
+        },
+        "column": {
+          "time": "Thời gian",
+          "source": "Nguồn",
+          "user": "Người dùng",
+          "ip": "IP nguồn",
+          "host": "Máy chủ",
+          "action": "Hành động",
+          "outcome": "Kết quả",
+          "message": "Thông điệp"
+        }
+      }
     },
     "drawer": {
       "event": "Sự kiện bảo mật",
@@ -24378,7 +24450,14 @@
       "classUid": "class_uid {n}",
       "eyebrow": "Sự kiện bảo mật",
       "source": "Nguồn",
-      "matchedRules": "{n} phát hiện khớp | {n} phát hiện khớp"
+      "matchedRules": "{n} phát hiện khớp | {n} phát hiện khớp",
+      "openCase": "Mở vụ việc",
+      "openCaseHint": "Mở vụ việc cho host, người dùng hoặc địa chỉ mà sự kiện này nêu tên",
+      "addToCase": "Thêm vào vụ việc",
+      "pickCase": "Thêm vào vụ việc đang mở",
+      "caseOpened": "Đã mở vụ việc: {title}",
+      "caseUpdated": "Đã thêm sự kiện vào {title}",
+      "caseError": "Không thể mở vụ việc từ sự kiện này"
     },
     "record": {
       "prev": "Bản ghi trước",
@@ -24482,7 +24561,20 @@
       "customWindow": "Đang hiển thị cửa sổ cố định: {from} → {to}",
       "backToRange": "Quay lại {range} gần nhất",
       "missing": "Cảnh báo mà liên kết này trỏ tới không nằm trong cửa sổ đã tải. Cảnh báo có thể cũ hơn phạm vi này hoặc vượt quá giới hạn dòng mới nhất.",
-      "dismiss": "Bỏ qua"
+      "dismiss": "Bỏ qua",
+      "triage": {
+        "createCase": "Tạo vụ việc",
+        "addToCase": "Thêm vào vụ việc",
+        "openCase": "Mở vụ việc",
+        "acknowledge": "Bắt đầu điều tra",
+        "addNote": "Thêm ghi chú",
+        "notePlaceholder": "Thêm ghi chú vào vụ việc của lượt kích hoạt này",
+        "acknowledged": "Vụ việc đã chuyển sang đang điều tra",
+        "noted": "Đã thêm ghi chú vào vụ việc",
+        "caseOpened": "Đã mở vụ việc",
+        "attached": "Đã thêm lượt kích hoạt vào vụ việc",
+        "failed": "Không thể cập nhật vụ việc"
+      }
     },
     "cases": {
       "title": "Vụ việc",
@@ -24510,7 +24602,8 @@
         "lastSeen": "Lần xuất hiện cuối"
       },
       "fact": {
-        "duration": "Thời lượng"
+        "duration": "Thời lượng",
+        "timeToClose": "Thời gian đóng"
       },
       "durationMinutes": "{n} phút",
       "durationHours": "{n} giờ",
@@ -24532,7 +24625,8 @@
         "service_discovery": "Tương quan qua khám phá dịch vụ",
         "primary_match": "Tương quan theo chiều chính",
         "secondary_match": "Tương quan theo chiều phụ",
-        "alert_id": "Cùng một phát hiện"
+        "alert_id": "Cùng một phát hiện",
+        "entity": "Cùng host, người dùng hoặc địa chỉ"
       },
       "commentPlaceholder": "Thêm ghi chú cho nhóm",
       "postComment": "Đăng ghi chú",
@@ -24554,7 +24648,16 @@
         "analysisComplete": "Đã hoàn tất phân tích nguyên nhân gốc",
         "analysisFailed": "Phân tích nguyên nhân gốc thất bại: {reason}",
         "analysisCancelled": "Đã hủy phân tích nguyên nhân gốc",
-        "other": "{type}"
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "Kết luận: dương tính thật",
+          "false_positive": "Kết luận: dương tính giả",
+          "benign": "Kết luận: lành tính",
+          "duplicate": "Kết luận: trùng lặp",
+          "stale": "Kết luận: cũ / lịch sử"
+        },
+        "alertsAttached": "Lượt kích hoạt thêm thủ công: {names}",
+        "eventAttached": "Đã thêm sự kiện từ {stream} lúc {at}"
       },
       "analysisHint": "Tóm tắt bằng AI về những gì liên kết các lần kích hoạt trong vụ việc này.",
       "runAnalysis": "Phân tích",
@@ -24570,7 +24673,42 @@
         "resolved": "Đóng vụ việc"
       },
       "notFound": "Không tìm thấy vụ việc",
-      "timelinePartial": "Dòng thời gian này được dựng lại từ hồ sơ vụ việc, nên các ghi chú, xác nhận và hoạt động phân tích trước khi dựng lại có thể bị thiếu."
+      "timelinePartial": "Dòng thời gian này được dựng lại từ hồ sơ vụ việc, nên các ghi chú, xác nhận và hoạt động phân tích trước khi dựng lại có thể bị thiếu.",
+      "verdict": {
+        "true_positive": "Dương tính thật",
+        "false_positive": "Dương tính giả",
+        "benign": "Lành tính",
+        "duplicate": "Trùng lặp",
+        "stale": "Cũ / lịch sử"
+      },
+      "close": {
+        "title": "Đóng vụ việc",
+        "verdict": "Kết luận",
+        "verdictRequired": "Chọn kết luận",
+        "reason": "Lý do",
+        "reasonPlaceholder": "Bạn đã phát hiện gì và vì sao có thể đóng vụ việc",
+        "reasonRequired": "Hãy nêu lý do",
+        "reasonTooLong": "Lý do tối đa {max} ký tự",
+        "cancel": "Hủy"
+      },
+      "settings": {
+        "open": "Cài đặt vụ việc",
+        "title": "Cài đặt vụ việc",
+        "save": "Lưu",
+        "saved": "Đã lưu cài đặt vụ việc",
+        "loadFailed": "Không thể tải cài đặt vụ việc",
+        "saveFailed": "Không thể lưu cài đặt vụ việc",
+        "autoCloseDays": "Đóng vụ việc không hoạt động sau (ngày)",
+        "autoCloseDaysHint": "Vụ việc không có lượt kích hoạt mới trong số ngày này sẽ tự đóng. 0 giữ vụ việc luôn mở. Tối đa {max}.",
+        "groupWindowMinutes": "Gộp lượt kích hoạt trong vòng (phút)",
+        "groupWindowMinutesHint": "Hoạt động trên cùng host, người dùng hoặc địa chỉ trong vòng số phút này kể từ hoạt động gần nhất của một vụ việc, theo thời gian sự kiện, sẽ được gộp vào vụ việc đó. 0 sẽ mở một vụ việc cho mỗi phát hiện. Tối đa {max}.",
+        "wholeNumber": "Nhập một số nguyên",
+        "range": "Nhập giá trị từ 0 đến {max}"
+      },
+      "assignedTo": "Giao cho {to}",
+      "unassignedToast": "Đã bỏ giao vụ việc",
+      "historical": "Lịch sử (backfill)",
+      "historicalHint": "Mọi lần kích hoạt trong vụ việc này đều đến từ backfill trên dữ liệu cũ, nên nó không phản ánh hoạt động hiện tại."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -24592,19 +24730,21 @@
       "legend": {
         "firing": "Đã kích hoạt trong khoảng thời gian (đậm hơn = nhiều hơn)",
         "covered": "Được bao phủ bởi một phát hiện đang bật",
-        "available": "Có quy tắc, chưa bật"
+        "available": "Có quy tắc, chưa bật",
+        "none": "Không có quy tắc trong danh mục"
       },
       "columnCount": "{covered} trong {total} đã bao phủ",
       "cellEnabled": "{n} phát hiện đang bật | {n} phát hiện đang bật",
       "cellAvailable": "{n} quy tắc khả dụng | {n} quy tắc khả dụng",
       "noMatch": "Không có kỹ thuật nào khớp",
       "unmapped": "Các kỹ thuật không có chiến thuật đã biết",
-      "footnote": "Các kỹ thuật đến từ {n} quy tắc Sigma được cung cấp sẵn và các phát hiện của riêng bạn; vị trí được xác định theo các chiến thuật gắn với từng quy tắc.",
+      "footnote": "Độ bao phủ được đo so với {total} kỹ thuật của MITRE ATT&CK Enterprise v{version}, trong đó kỹ thuật con được tính cho kỹ thuật cha; sản phẩm đi kèm {n} quy tắc Sigma.",
       "drawerEyebrow": "Kỹ thuật ATT&CK",
       "state": {
         "firing": "Đang kích hoạt",
         "covered": "Đã bao phủ",
-        "available": "Chưa bao phủ"
+        "available": "Chưa bao phủ",
+        "none": "Không có quy tắc"
       },
       "fact": {
         "state": "Mức bao phủ",
@@ -24629,7 +24769,9 @@
       "openTechnique": "Mở {id} trên attack.mitre.org",
       "viewOnAttack": "Xem trên ATT&CK",
       "manageDetections": "Quản lý phát hiện",
-      "historyNarrowed": "Phạm vi truy vấn tối đa của lịch sử cảnh báo chỉ giới hạn các lần kích hoạt từ {from} trở đi; các lần kích hoạt trước đó trong khoảng thời gian này không được tính."
+      "historyNarrowed": "Phạm vi truy vấn tối đa của lịch sử cảnh báo chỉ giới hạn các lần kích hoạt từ {from} trở đi; các lần kích hoạt trước đó trong khoảng thời gian này không được tính.",
+      "cellNone": "Không có quy tắc",
+      "coverageError": "Không thể tải độ bao phủ ATT&CK: {reason}"
     },
     "detections": {
       "title": "Phát hiện",
@@ -24647,7 +24789,8 @@
         "erroring": "Đang lỗi",
         "enabled": "Đã bật",
         "disabled": "Đã tắt",
-        "all": "Tất cả phát hiện"
+        "all": "Tất cả phát hiện",
+        "notifyFailing": "Gửi thông báo thất bại"
       },
       "column": {
         "name": "Phát hiện",
@@ -24660,7 +24803,8 @@
       "state": {
         "enabled": "Đã bật",
         "disabled": "Đã tắt",
-        "erroring": "Đang lỗi"
+        "erroring": "Đang lỗi",
+        "notifyFailing": "Gửi thông báo thất bại"
       },
       "tab": {
         "overview": "Tổng quan",
@@ -24722,17 +24866,23 @@
       "libraryEmpty": "Không có quy tắc nào khớp với bộ lọc đó",
       "stream": "Stream",
       "streamPlaceholder": "Chọn stream để chạy",
-      "notify": "Thông báo",
-      "notifyPlaceholder": "Chọn một đích",
-      "noDestinations": "Chưa có đích cảnh báo nào. Phát hiện cần một đích để thông báo, vì vậy hãy tạo đích trong tab mới rồi quay lại; danh sách này sẽ tự làm mới.",
+      "notify": "Thông báo (tùy chọn)",
+      "notifyPlaceholder": "Không có: các lần kích hoạt vẫn mở hồ sơ",
+      "noDestinations": "Chưa có đích cảnh báo nào. Các phát hiện vẫn đưa ra kết quả và mở hồ sơ khi không có đích; chỉ thêm đích nếu bạn cũng muốn nhận thông báo.",
       "createDestination": "Tạo đích",
       "reloadDestinations": "Làm mới",
       "lookBack": "Khoảng xem lại (phút)",
+      "lookBackHelp": "Ít nhất bằng cửa sổ tương quan {minutes} phút; mỗi lần chạy trượt cửa sổ đó qua khoảng này",
+      "correlationWindowLabel": "Cửa sổ tương quan (phút)",
+      "backfill": "Kiểm tra cả dữ liệu cũ ở lần chạy đầu tiên",
+      "backfillRange": "Dữ liệu cũ cần kiểm tra",
+      "backfillHours": "Giờ qua | {n} giờ qua",
       "runEvery": "Chu kỳ chạy (phút)",
       "silence": "Im lặng trong (phút)",
       "compiles": "Biên dịch trên {stream}",
       "compilesAs": "Biên dịch trên {stream}, được nhận diện là {source}",
       "logsourceMismatch": "Quy tắc này được viết cho {rule}, nhưng {stream} được nhận diện là {source}. Nó chỉ có thể khớp ở những nơi cả hai có chung tên trường.",
+      "unseenFields": "Trường chưa xuất hiện trên stream này: {fields}. Khi tạo phát hiện, các cột này sẽ được thêm để nó sẵn sàng trước sự kiện đầu tiên như vậy.",
       "ocsfBridge": "{stream} là OCSF, vì vậy các trường của quy tắc được ánh xạ tới các đường dẫn OCSF và nó chỉ chạy trên các sự kiện có {guard}.",
       "ocsfGuard": {
         "class": "class_uid {uid}",
@@ -24760,10 +24910,23 @@
       "validation": {
         "positive": "Phải ít nhất 1 phút",
         "nonNegative": "Không thể là số âm",
-        "periodGap": "Ngắn hơn khoảng thời gian chạy: số phút giữa các lần chạy sẽ không bao giờ được kiểm tra"
+        "periodGap": "Ngắn hơn khoảng thời gian chạy: số phút giữa các lần chạy sẽ không bao giờ được kiểm tra",
+        "belowTimespan": "Phải ít nhất bằng cửa sổ tương quan {minutes} phút"
       },
       "nameTaken": "Đã tồn tại một quy tắc phát hiện hoặc cảnh báo có tên “{name}”. Lịch sử của nó sẽ được gộp với mục này, vì vậy hãy chọn một stream khác hoặc xóa mục hiện có trước.",
-      "loadError": "Không tải được quy tắc phát hiện"
+      "loadError": "Không tải được quy tắc phát hiện",
+      "notifyFailingHint": "Quy tắc này đã kích hoạt nhưng thông báo gần nhất không gửi được. Hãy kiểm tra các đích nhận trong Lịch sử.",
+      "correlationWindow": "Được xác định bởi khoảng thời gian của tương quan",
+      "createForbidden": "Tạo phát hiện cần quyền Bảo mật",
+      "preview": {
+        "run": "Xem trước kết quả khớp",
+        "hint": "Chạy truy vấn trên 24 giờ qua và hiển thị 20 sự kiện khớp đầu tiên",
+        "empty": "Không có gì khớp trong 24 giờ qua",
+        "shown": "{shown} trên {total} sự kiện khớp trong 24 giờ qua",
+        "failed": "Truy vấn thất bại: {reason}",
+        "time": "Thời gian"
+      },
+      "queryFailed": "Chưa lưu: truy vấn của phát hiện này không chạy được ({reason})"
     },
     "content": {
       "title": "Nội dung",
@@ -24833,7 +24996,6 @@
       "noStreamsForRule": "Không có stream nào của bạn khớp với quy tắc này",
       "noStreamsForRuleHint": "Quy tắc này được viết cho {logsource}. Hãy tiếp nhận nguồn đó và nó sẽ xuất hiện ở đây.",
       "runnable": "Chạy trên stream này",
-      "notRunnable": "Không thể chạy ở đây",
       "openInEvents": "Mở trong Sự kiện",
       "installHere": "Cài đặt trên stream này",
       "install": "Cài đặt thành phát hiện",
@@ -24855,7 +25017,38 @@
         "severityId": "Mức độ nghiêm trọng",
         "statusId": "Kết quả"
       },
-      "cannotRun": "Không thể chạy trên dữ liệu của bạn"
+      "catalogError": "Không thể tải danh mục phát hiện: {reason}",
+      "notRunnableYet": "Chưa thể chạy",
+      "newRulesAvailable": "{n} quy tắc mới giờ có thể chạy trên {stream} | {n} quy tắc mới giờ có thể chạy trên {stream}",
+      "reviewNewRules": "Xem xét",
+      "reviewingNewRules": "Đang hiển thị {n} quy tắc giờ có thể chạy trên {stream} | Đang hiển thị {n} quy tắc giờ có thể chạy trên {stream}",
+      "showAllRules": "Hiển thị tất cả quy tắc",
+      "installSelected": "Cài đặt mục đã chọn",
+      "selectRunnable": "Chọn quy tắc chạy được",
+      "selectRunnableHint": "Chọn mọi quy tắc đang hiển thị chạy được trên dữ liệu của bạn và chưa được cài đặt",
+      "bulk": {
+        "title": "Cài đặt {n} quy tắc | Cài đặt {n} quy tắc",
+        "subtitle": "Mỗi quy tắc được biên dịch cho stream của nó trên máy chủ và lưu thành một phát hiện với các thiết lập này.",
+        "stream": "Stream",
+        "everyStream": "Mọi stream mà mỗi quy tắc chạy trên đó",
+        "folder": "Thư mục cảnh báo",
+        "correlationWindow": "Quy tắc tương quan nhìn lại ít nhất bằng cửa sổ của chính nó.",
+        "nothing": "Không quy tắc nào được chọn chạy trên stream này.",
+        "plan": "Sẽ tạo {n} phát hiện: | Sẽ tạo {n} phát hiện:",
+        "correlation": "Tương quan",
+        "confirm": "Cài đặt {n} phát hiện | Cài đặt {n} phát hiện",
+        "close": "Đóng",
+        "summary": "{installed} đã cài, {skipped} bỏ qua, {failed} thất bại trên tổng {total}",
+        "duplicate": "Đã tồn tại phát hiện tên {name}.",
+        "correlationBlocked": "Quy tắc tương quan không thể chạy trên stream này.",
+        "status": {
+          "installed": "Đã cài đặt",
+          "skipped": "Đã bỏ qua",
+          "failed": "Thất bại",
+          "pending": "Đang chờ"
+        },
+        "done": "Đã cài đặt {n} phát hiện | Đã cài đặt {n} phát hiện"
+      }
     },
     "entities": {
       "title": "Thực thể",
@@ -24865,18 +25058,15 @@
         "graph": "Biểu đồ rủi ro"
       },
       "riskGraph": {
-        "empty": "Không có thực thể để vẽ biểu đồ",
-        "emptyHint": "Thêm nguồn bảo mật hoặc mở rộng khoảng thời gian để xem biểu đồ rủi ro.",
-        "showingTop": "Đang hiển thị {n} hàng đầu trong {total} theo rủi ro",
-        "illustrative": "Minh họa: các mối quan hệ được suy ra từ xếp hạng rủi ro, không phải quan sát được.",
-        "baseScore": "cơ sở {n}",
-        "propagatedScore": "lan truyền {n}",
-        "tier": {
-          "critical": "Nghiêm trọng",
-          "high": "Cao",
-          "medium": "Trung bình",
-          "low": "Thấp"
-        }
+        "empty": "Không có liên kết nào trong khoảng thời gian này",
+        "emptyHint": "Biểu đồ liên kết người dùng, địa chỉ IP và máy chủ xuất hiện trong cùng một sự kiện hoặc cùng một hồ sơ. Không có liên kết nào như vậy trong khoảng thời gian này; hãy mở rộng phạm vi thời gian.",
+        "showingTop": "Đang hiển thị {n} mục hàng đầu trong tổng số {total} theo mức rủi ro",
+        "legend": "Nét liền: xuất hiện trong cùng một sự kiện. Nét đứt: được cùng một vụ việc nêu tên.",
+        "edgeEvents": "{n} sự kiện | {n} sự kiện",
+        "edgeCases": "{n} vụ việc | {n} vụ việc",
+        "scoreHint": "Vụ việc nêu tên: {detection}. Sự kiện thất bại: {failure}. Liên kết với thực thể mà vụ việc nêu tên: {neighbour}.",
+        "nodeFacts": "{events} sự kiện · {failures} thất bại",
+        "nodeCases": "{n} vụ việc | {n} vụ việc"
       },
       "kinds": {
         "user": "Người dùng",
@@ -24917,16 +25107,20 @@
           "ip": "Nhiều người dùng",
           "host": "Nhiều người dùng"
         },
-        "external": "Địa chỉ công khai"
+        "external": "Địa chỉ công khai",
+        "fail_then_success": "Thành công sau các lần thất bại",
+        "open_case": "Vụ việc đang mở"
       },
       "signalHint": {
         "failures": "Ít nhất {rate}% sự kiện của thực thể này bị lỗi, với tối thiểu {n} lần lỗi, chỉ tính các nguồn có báo cáo kết quả.",
         "spread": {
-          "user": "Được thấy từ {n} IP nguồn trở lên trong một nguồn duy nhất trong khoảng thời gian này.",
-          "ip": "Được {n} người dùng trở lên sử dụng trong một nguồn duy nhất trong khoảng thời gian này. NAT và lưu lượng ra qua VPN cũng trông như vậy; tấn công phun mật khẩu cũng vậy.",
-          "host": "Được {n} người dùng trở lên truy cập trong một nguồn duy nhất trong khoảng thời gian này."
+          "user": "Được thấy từ {n} địa chỉ IP nguồn trở lên trong một nguồn duy nhất, cao hơn hẳn mức các người dùng khác thể hiện trong khoảng thời gian này.",
+          "ip": "Được {n} người dùng trở lên sử dụng trong một nguồn duy nhất, cao hơn hẳn các địa chỉ khác trong khoảng thời gian này. Lưu lượng ra qua NAT và VPN cũng có dạng này; tấn công rải mật khẩu cũng vậy.",
+          "host": "Được {n} người dùng trở lên truy cập trong một nguồn duy nhất, cao hơn hẳn các máy chủ khác trong khoảng thời gian này."
         },
-        "external": "Không thuộc dải riêng tư, loopback hay link-local."
+        "external": "Không thuộc dải riêng tư, loopback hay link-local.",
+        "fail_then_success": "Ít nhất {n} sự kiện thất bại, sau đó có một sự kiện thành công sau lần thất bại đầu tiên: một lần đoán có thể đã thành công.",
+        "open_case": "Một vụ việc SIEM đang mở nêu tên thực thể này."
       },
       "peersChip": {
         "ips": "Tối đa {n} IP nguồn trong một nguồn | Tối đa {n} IP nguồn trong một nguồn",
@@ -24937,7 +25131,7 @@
       "capped": "Mỗi nguồn trả về {n} thực thể sôi động nhất; những thực thể ít hoạt động hơn không được liệt kê và số liệu của các thực thể gần ngưỡng đó có thể không đầy đủ. Số đếm trên tab có dấu + là đã bị cắt.",
       "failedStreams": "Không thể đọc: {streams}",
       "noSources": "Không có nguồn bảo mật để đọc",
-      "noSourcesHint": "Thực thể được tìm thấy trong các stream có tên đánh dấu là dữ liệu bảo mật, hoặc các stream bạn đã thêm làm nguồn trên trang Sự kiện.",
+      "noSourcesHint": "Các thực thể được tìm thấy trong những stream có tên cho biết đó là dữ liệu bảo mật, hoặc trong những stream bạn đã đưa vào mục Bảo mật → Nguồn.",
       "empty": "Không có thực thể trong khoảng thời gian này",
       "emptyHint": "Mở rộng khoảng thời gian, hoặc kiểm tra xem nguồn của bạn có chứa trường người dùng, IP hay máy chủ không.",
       "refresh": "Làm mới",
@@ -24945,7 +25139,8 @@
       "tab": {
         "activity": "Hoạt động",
         "related": "Liên quan",
-        "sources": "Nguồn"
+        "sources": "Nguồn",
+        "cases": "Vụ việc"
       },
       "activity": "Sự kiện theo thời gian",
       "chart": {
@@ -24954,6 +25149,9 @@
       },
       "topN": "top {n} theo số sự kiện",
       "noRelated": "Không có gì liên quan trong khoảng thời gian này.",
+      "noCases": "Không có vụ việc SIEM nào nêu tên thực thể này.",
+      "caseOpen": "Đang mở",
+      "caseResolved": "Đã giải quyết",
       "failedCount": "{n} lỗi | {n} lỗi",
       "openEvents": "Mở trong Sự kiện",
       "huntInEvents": "Điều tra trong Sự kiện",
@@ -24968,7 +25166,9 @@
         "failed": "Không thể đọc"
       },
       "loadError": "Không thể tải nguồn bảo mật",
-      "detailFailed": "Một phần dữ liệu của thực thể này không thể đọc được: {streams}."
+      "detailFailed": "Một phần dữ liệu của thực thể này không thể đọc được: {streams}.",
+      "aliasCount": "+{n} cách viết | +{n} cách viết",
+      "aliasHint": "Được ghi log với cách viết này; đây là cùng một danh tính."
     },
     "ueba": {
       "title": "Phân tích hành vi người dùng",
@@ -25005,7 +25205,11 @@
         "new_ip": "IP nguồn mới",
         "failure_jump": "Lỗi tăng vọt",
         "new_hours": "Khung giờ bất thường",
-        "first_seen": "Lần đầu xuất hiện"
+        "first_seen": "Lần đầu xuất hiện",
+        "peer_volume": "Cao hơn hẳn nhóm tương đương",
+        "peer_failures": "Số lần thất bại cao hơn hẳn nhóm tương đương",
+        "fail_then_success": "Thành công sau các lần thất bại",
+        "open_case": "Vụ việc đang mở"
       },
       "reason": {
         "volume": "{n} sự kiện, khoảng {ratio}× so với ~{expected} dự kiến từ {baseline} trước đó.",
@@ -25013,7 +25217,12 @@
         "newIpExternal": "{n} sự kiện từ địa chỉ công cộng {ip}, chưa từng thấy trong {baseline} trước đó. | {n} sự kiện từ địa chỉ công cộng {ip}, chưa từng thấy trong {baseline} trước đó (tổng cộng {count} địa chỉ mới).",
         "failureJump": "{n} lỗi — chiếm {rate}% sự kiện, tăng từ {baseline}% ở mức cơ sở.",
         "newHours": "{n} sự kiện lúc {hours} UTC, những giờ mà người dùng này chưa từng hoạt động trong {baseline} trước đó.",
-        "firstSeen": "{n} sự kiện từ một người dùng không có bất kỳ hoạt động nào trong {baseline} trước đó."
+        "firstSeen": "{n} sự kiện từ một người dùng không có bất kỳ hoạt động nào trong {baseline} trước đó.",
+        "peerVolume": "{n} sự kiện, trong khi người dùng điển hình có khoảng {median}. Đường cơ sở riêng của người dùng này vẫn đang được xây dựng.",
+        "peerFailures": "{n} lần thất bại ({rate}% số sự kiện), trong khi người dùng điển hình có khoảng {median}. Đường cơ sở riêng của người dùng này vẫn đang được xây dựng.",
+        "newIpBuilding": "{n} sự kiện từ địa chỉ công khai {ip}. Đường cơ sở riêng của người dùng này vẫn đang được xây dựng, nên mọi địa chỉ công khai đều bị gắn cờ. | {n} sự kiện từ địa chỉ công khai {ip}. Đường cơ sở riêng của người dùng này vẫn đang được xây dựng, nên mọi địa chỉ công khai đều bị gắn cờ (tổng cộng {count} địa chỉ công khai).",
+        "failThenSuccess": "{n} lần thất bại từ {ip}, sau đó là một sự kiện thành công từ cùng địa chỉ.",
+        "openCase": "Được nêu tên trong vụ việc đang mở \"{title}\" ({severity}). | Được nêu tên trong {n} vụ việc đang mở, mới nhất là \"{title}\" ({severity})."
       },
       "fact": {
         "events": "Sự kiện",
@@ -25055,7 +25264,10 @@
       "notEvaluated": "Không được đánh giá cho người dùng này vì dữ liệu đường cơ sở không đầy đủ: {signals}.",
       "hoursNotJudged": "Giờ bất thường chỉ được xét khi có ít nhất {min} sự kiện đường cơ sở bao phủ {share}% của {baseline} trước đó. Lịch sử của người dùng này ngắn hơn, nên không giờ nào bị gắn cờ.",
       "noHistory": "Không có dữ liệu trong {baseline} trước đó cho {streams}, nên không ai ở đó bị coi là lần đầu xuất hiện.",
-      "volumeNotJudged": "Khối lượng không được xét cho người dùng này: các khoảng thời gian dưới một ngày được so sánh với cùng giờ trong ngày ở đường cơ sở, việc này cần ít nhất một ngày lịch sử."
+      "volumeNotJudged": "Khối lượng không được xét cho người dùng này: các khoảng thời gian dưới một ngày được so sánh với cùng giờ trong ngày ở đường cơ sở, việc này cần ít nhất một ngày lịch sử.",
+      "baselineBuilding": "Đang xây dựng đường cơ sở",
+      "baselineBuildingHint": "Hiện có {span} lịch sử. Việc so sánh với quá khứ của chính người dùng này sẽ bắt đầu khi có đủ lịch sử {baseline}; trong lúc đó chỉ đánh dấu các giá trị ngoại lai rõ rệt so với người dùng khác.",
+      "buildingNotice": "Đường cơ sở vẫn đang được xây dựng cho {n} người dùng: cho đến khi có đủ lịch sử {baseline}, chỉ đánh dấu các giá trị ngoại lai rõ rệt so với người dùng khác. | Đường cơ sở vẫn đang được xây dựng cho {n} người dùng: cho đến khi có đủ lịch sử {baseline}, chỉ đánh dấu các giá trị ngoại lai rõ rệt so với người dùng khác."
     },
     "intel": {
       "title": "Tình báo mối đe dọa",
@@ -25077,12 +25289,11 @@
       "sighted": "Đã thấy một lần | Đã thấy {n} lần",
       "sweeping": "Đang quét… {done} trên {total} truy vấn",
       "sweptAcross": "Đã quét {n} nguồn bảo mật | Đã quét {n} nguồn bảo mật",
-      "partial": "Lần quét này đã dừng ở giới hạn {n} truy vấn, nên một số cột chưa được tìm kiếm. Số truy vấn tăng theo danh sách × cột: hãy xóa các danh sách cũ hoặc chỉ dấu đã hết hạn, hoặc chia danh sách theo loại, để có một lần quét đầy đủ.",
       "failedQueries": "{n} cột không thể tìm kiếm và đã bị bỏ qua. | {n} cột không thể tìm kiếm và đã bị bỏ qua.",
       "truncated": "Chỉ {n} dòng đầu tiên của {lists} được đọc; phần còn lại không được quét.",
       "noIndicators": "Không có chỉ dấu",
       "noCoverage": "Chạy quét để xem những cột nào được tìm kiếm",
-      "coverageHint": "Những gì một lần quét đã tìm kiếm trên {n} nguồn bảo mật. Việc khớp là chính xác trên các cột được liệt kê; một loại không có cột nào thì hoàn toàn không thể được phát hiện.",
+      "coverageHint": "Lần quét đã tìm kiếm trên {n} nguồn bảo mật. Mỗi cột được khớp theo toàn bộ giá trị và theo toàn bộ token bên trong, ví dụ mảng, văn bản nhật ký và băm SHA256=; một loại không có cột thì hoàn toàn không thể được phát hiện.",
       "indicatorCount": "{n} chỉ dấu | {n} chỉ dấu",
       "columnsSearched": "{n} cột | {n} cột",
       "blind": "Không thể tìm kiếm",
@@ -25160,7 +25371,7 @@
         "cancel": "Hủy",
         "indicators": "Chỉ báo",
         "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "Mỗi dòng một giá trị, hoặc phân tách bằng dấu phẩy hoặc dấu cách. Giá trị trùng lặp sẽ bị bỏ qua.",
+        "indicatorsHelp": "Mỗi dòng một mục, hoặc phân tách bằng dấu phẩy hoặc dấu cách. Mục trùng lặp sẽ bị bỏ qua. Mỗi danh sách chứa tối đa {max}.",
         "indicatorsRequired": "Nhập ít nhất một chỉ báo",
         "invalid": "Không được nhận diện là chỉ báo ({n}): {sample}",
         "line": "dòng {n}",
@@ -25184,7 +25395,7 @@
         "importSubtitle": "Cần có cột chỉ báo; loại, mức độ nghiêm trọng, nguồn và ngày hết hạn là tùy chọn.",
         "importSubmit": "Nhập",
         "file": "Tệp CSV",
-        "fileHelp": "Các hàng không phải là chỉ báo sẽ bị bỏ qua và được đếm.",
+        "fileHelp": "Các dòng không phải chỉ báo sẽ bị bỏ qua và được đếm. Mỗi danh sách chứa tối đa {max} chỉ báo; tệp tối đa {mb} MB.",
         "fileRequired": "Chọn tệp CSV",
         "defaultSeverity": "Mức độ nghiêm trọng cho các hàng không có",
         "append": "Thêm vào danh sách thay vì thay thế nó",
@@ -25203,7 +25414,10 @@
         "noIndicatorColumnIn": "{table} không có cột indicator, ioc hoặc value, nên không thể thêm chỉ báo vào đó. Hãy chọn danh sách khác.",
         "replaceTitle": "Thay thế danh sách",
         "replaceMessage": "Nhập với chế độ nối thêm đã tắt sẽ thay thế toàn bộ {table}: mọi hàng hiện có, các cột và cài đặt của nó đều bị xóa và chỉ còn các chỉ báo của tệp này.",
-        "replaceConfirm": "Thay thế"
+        "replaceConfirm": "Thay thế",
+        "tooMany": "Đã dán {n} chỉ báo; một danh sách chứa tối đa {max}.",
+        "listFull": "{table} sẽ chứa {count} chỉ báo; một danh sách chứa tối đa {max}. Hãy chia chúng ra nhiều danh sách.",
+        "fileTooLarge": "Tệp lớn hơn {max} MB. Hãy chia thành các tệp nhỏ hơn."
       },
       "importCsv": "Nhập CSV",
       "unreadTables": "Không thể đọc {lists}; các chỉ báo của nó không được hiển thị hoặc quét. | Không thể đọc {lists}; các chỉ báo của nó không được hiển thị hoặc quét.",
@@ -25213,12 +25427,15 @@
       "columnsSkipped": "{n} cột không được tìm kiếm | {n} cột không được tìm kiếm",
       "skippedHint": "Chưa được tìm kiếm đầy đủ — quá trình quét đã chạm giới hạn truy vấn hoặc truy vấn thất bại:",
       "caveat": {
-        "capped": "Quá trình quét đã chạm giới hạn truy vấn, nên một số cột không được tìm kiếm.",
         "failed": "Không thể tìm kiếm {n} cột. | Không thể tìm kiếm {n} cột.",
         "partial": "{n} truy vấn chỉ trả về kết quả một phần, nên các cột đó không được tìm kiếm đầy đủ. | {n} truy vấn chỉ trả về kết quả một phần, nên các cột đó không được tìm kiếm đầy đủ.",
         "unsearched": "Không có stream nào có cột cho: {types}.",
-        "cidr": "{n} dải CIDR không được quét. | {n} dải CIDR không được quét."
-      }
+        "cidr": "{n} dải CIDR không được quét. | {n} dải CIDR không được quét.",
+        "checked": "Chỉ {checked} trên {total} chỉ báo được kiểm tra đầy đủ."
+      },
+      "partialChecked": "Kết quả một phần: đã kiểm tra {checked} trên {total} chỉ báo. Số liệu của phần còn lại có thể thấp hơn thực tế.",
+      "partialCapped": "Kết quả một phần: đã kiểm tra {checked} trên {total} chỉ báo. Lượt quét dừng ở {n} truy vấn; các chỉ báo ít nghiêm trọng nhất chưa được kiểm tra.",
+      "inText": "{column} (trong văn bản)"
     },
     "sources": {
       "title": "Nguồn dữ liệu",
@@ -25238,8 +25455,7 @@
       "exclude": "Loại trừ",
       "attached": "Đã đính kèm {pack}.",
       "detached": "Đã gỡ đính kèm gói.",
-      "detachedPipelineSkipped": "Đã gỡ đính kèm gói. Pipeline đã ghi nhận không còn khớp với stream và gói này, nên nó được giữ nguyên.",
-      "empty": "Chưa có stream nhật ký nào. Hãy tiếp nhận nhật ký bảo mật như bất kỳ stream nào và chúng sẽ xuất hiện ở đây.",
+      "empty": "Chưa có stream nhật ký nào. Hãy tiếp nhận nhật ký bảo mật dưới dạng bất kỳ stream nào và chúng sẽ xuất hiện tại đây.",
       "noticePackRemoved": "{stream}: gói đã bị gỡ bên ngoài SIEM. Hãy đính kèm lại hoặc xóa nó.",
       "noticeNoRecord": "{stream}: một gói đã được đính kèm mà không có bản ghi. Hãy ghi nhận hoặc gỡ đính kèm.",
       "noticeNotWriting": "{stream}: pipeline không còn ghi vào stream này nữa.",
@@ -25249,14 +25465,31 @@
       "blockGlobalFlatten": "{stream}: mức làm phẳng chung ({level}) sẽ không giữ các cột OCSF ở dạng phẳng.",
       "blockSchemaMissing": "{stream}: lược đồ do người dùng định nghĩa thiếu các cột OCSF: {columns}.",
       "blockPipelineDisabled": "{stream}: pipeline hiện có đã bị tắt; hãy bật nó trước khi đính kèm.",
-      "attachErrors": {
-        "functionEditedOutside": "Hàm {name} đã được chỉnh sửa bên ngoài SIEM.",
-        "pipelineNoAccess": "Stream này có một pipeline mà bạn không có quyền truy cập.",
-        "permissionDenied": "Bạn cần quyền để chỉnh sửa hàm và pipeline cho stream này.",
-        "pipelineChanged": "Pipeline của stream này đã thay đổi và giờ chặn việc gắn; hãy làm mới và kiểm tra lại.",
-        "packConflict": "Stream này đã có pack {pack}; hãy gỡ nó trước.",
-        "noPipeline": "Không thể tạo hoặc tìm pipeline thời gian thực cho stream này.",
-        "failed": "Gắn thất bại."
+      "actionFailed": "Thay đổi chưa được lưu.",
+      "stateExcluded": "Đã loại trừ",
+      "excludedBy": "Bị {user} loại trừ lúc {time}",
+      "sourceTypeConfidence": "{label} ({n}%)",
+      "notClassified": "Chưa được phân loại",
+      "lastChange": "Thay đổi gần nhất bởi {user} lúc {time}: {summary}",
+      "previewTitle": "Đính kèm {pack} vào {stream}?",
+      "previewSubtitle": "Không có gì được ghi cho đến khi bạn xác nhận.",
+      "previewLoading": "Đang kiểm tra những gì việc đính kèm sẽ thay đổi…",
+      "previewPack": "Gói",
+      "previewClasses": "Lớp OCSF được ghi",
+      "previewFunction": "Hàm",
+      "previewPipeline": "Pipeline",
+      "previewFunctionCreate": "Tạo {name}",
+      "previewFunctionReuse": "Dùng lại {name}, vốn đã giống hệt",
+      "previewPipelineCreate": "Tạo {name}: {stream} → hàm → {stream}",
+      "previewPipelineExtend": "Thêm một nút hàm vào {name}, ngay sau nguồn, cấp dữ liệu cho {feeds}",
+      "previewPipelineAlready": "{name} đã chạy gói này; chỉ ghi bản ghi",
+      "confirmAttach": "Đính kèm",
+      "cancel": "Hủy",
+      "detachedSkipped": "Đã gỡ gói. Pipeline {id} không thay đổi: {reason}.",
+      "skipReason": {
+        "pipeline_missing": "nó không còn tồn tại",
+        "other_stream": "giờ nó đọc một stream khác",
+        "other_pack": "giờ nó chạy một gói khác"
       }
     },
     "nav": {
@@ -25269,13 +25502,60 @@
       "intel": "Tình báo mối đe dọa",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
-      "content": "Nội dung"
+      "content": "Nội dung",
+      "sources": "Nguồn dữ liệu"
     },
     "sigma": {
       "notSupported": "Không được hỗ trợ: {fields}",
       "cannotMatch": "Không thể khớp: stream này không có {fields}",
       "compiledEmpty": "Quy tắc biên dịch thành rỗng",
       "assumedAbsent": "Giả định rằng stream này không bao giờ có {fields}"
+    },
+    "audit": {
+      "title": "Nhật ký thay đổi",
+      "hint": "Ai đã thay đổi các phát hiện, nguồn và vụ việc trong 7 ngày qua",
+      "when": "Thời gian",
+      "who": "Người thay đổi",
+      "area": "Khu vực",
+      "action": "Hành động",
+      "target": "Nội dung thay đổi",
+      "empty": "Chưa ghi nhận thay đổi nào",
+      "emptyHint": "Các thay đổi đối với phát hiện, nguồn bảo mật và vụ việc sẽ hiển thị tại đây.",
+      "disabled": "Ghi nhật ký kiểm toán đang tắt",
+      "disabledHint": "Bật ghi nhật ký kiểm toán cho hệ thống này để ghi lại ai đã thay đổi cài đặt Bảo mật.",
+      "category": {
+        "detection": "Phát hiện",
+        "case": "Vụ việc",
+        "source": "Nguồn",
+        "security": "Bảo mật"
+      },
+      "verb": {
+        "created": "Đã tạo",
+        "changed": "Đã thay đổi",
+        "deleted": "Đã xóa",
+        "enabled": "Đã bật",
+        "disabled": "Đã tắt"
+      }
+    },
+    "access": {
+      "needsAuthor": "Cần quyền Tạo trên Bảo mật",
+      "openPreset": "Tạo vai trò từ {preset}",
+      "askPreset": "Hãy yêu cầu quản trị viên cấp cấu hình sẵn {preset}.",
+      "checkFailedTitle": "Không thể kiểm tra quyền truy cập Bảo mật của bạn",
+      "checkFailedHint": "Máy chủ không phản hồi. Phiên của bạn vẫn đang đăng nhập."
+    },
+    "aria": {
+      "addSource": "Thêm nguồn",
+      "addToCase": "Thêm vào vụ việc",
+      "caseAssignee": "Người được giao vụ việc",
+      "casePriority": "Mức ưu tiên vụ việc",
+      "filterField": "Trường lọc",
+      "filterOperator": "Toán tử lọc",
+      "filterValue": "Giá trị lọc",
+      "huntKind": "Nội dung cần săn tìm",
+      "indicatorType": "Loại chỉ báo",
+      "severityFilter": "Bộ lọc mức độ nghiêm trọng",
+      "stream": "Stream"
     }
   },
   "promql": {
