@@ -449,7 +449,6 @@ import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
 import {
   countOrDash,
   coverageNoteRows,
-  coverageVerdict,
   findingsByRule,
   isScoped,
   latestEmission,
