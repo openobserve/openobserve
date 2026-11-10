@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-subtle border-s-border-strong border-s-4 px-3 py-2"
             >
               <OText variant="meta" as="p">
-                {{ t("alertCalibration.settings.findingsDesc", { stream: DIGEST_STREAM }) }}
+                {{ t("alertCalibration.settings.findingsKept") }}
               </OText>
             </blockquote>
           </div>
@@ -98,7 +98,6 @@ import { readErrorCopy } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useRequestAlertCalibrationRun } from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
-import { DIGEST_STREAM } from "./digests";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import AlertCalibrationSettingsForm from "./AlertCalibrationSettingsForm.vue";
 

@@ -11521,7 +11521,6 @@
       "loadFailed": "Não foi possível carregar as definições: {message}",
       "lastSaved": "Guardado pela última vez {time}",
       "runNowHeading": "Executar agora",
-      "findingsDesc": "Os achados são escritos no stream {stream} desta organização e mantidos conforme a retenção desse stream. A calibração de alertas não envia notificações.",
       "frequencyRange": "Escolha uma cadência entre 1 hora e 30 dias.",
       "windowRange": "Escolha uma janela entre 1 minuto e 90 dias."
     }

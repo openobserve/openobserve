@@ -11521,7 +11521,6 @@
       "loadFailed": "Die Einstellungen konnten nicht geladen werden: {message}",
       "lastSaved": "Zuletzt gespeichert {time}",
       "runNowHeading": "Jetzt ausführen",
-      "findingsDesc": "Ergebnisse werden in den Stream {stream} dieser Organisation geschrieben und gemäß der Aufbewahrung dieses Streams aufbewahrt. Die Alarmkalibrierung sendet keine Benachrichtigungen.",
       "frequencyRange": "Wählen Sie einen Rhythmus zwischen 1 Stunde und 30 Tagen.",
       "windowRange": "Wählen Sie ein Fenster zwischen 1 Minute und 90 Tagen."
     }

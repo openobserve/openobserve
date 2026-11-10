@@ -11521,7 +11521,6 @@
       "loadFailed": "Nie udało się wczytać ustawień: {message}",
       "lastSaved": "Ostatnio zapisano {time}",
       "runNowHeading": "Uruchom teraz",
-      "findingsDesc": "Ustalenia są zapisywane w strumieniu {stream} tej organizacji i przechowywane zgodnie z okresem retencji tego strumienia. Kalibracja alertów nie wysyła żadnych powiadomień.",
       "frequencyRange": "Wybierz częstotliwość od 1 godziny do 30 dni.",
       "windowRange": "Wybierz okno od 1 minuty do 90 dni."
     }

@@ -11521,7 +11521,6 @@
       "loadFailed": "无法加载设置：{message}",
       "lastSaved": "上次保存于 {time}",
       "runNowHeading": "立即运行",
-      "findingsDesc": "发现结果会写入该组织的 {stream} 数据流，并按该数据流的保留期保存。告警校准不会发送任何通知。",
       "frequencyRange": "请选择介于 1 小时到 30 天之间的运行周期。",
       "windowRange": "请选择介于 1 分钟到 90 天之间的窗口。"
     }

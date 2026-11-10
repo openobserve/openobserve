@@ -11516,7 +11516,6 @@
       "loadFailed": "無法載入設定：{message}",
       "lastSaved": "上次儲存 {time}",
       "runNowHeading": "立即執行",
-      "findingsDesc": "發現會寫入此組織的 {stream} 串流，並依該串流的保留期保存。警示校準不會傳送任何通知。",
       "frequencyRange": "請選擇介於 1 小時到 30 天之間的執行頻率。",
       "windowRange": "請選擇介於 1 分鐘到 90 天之間的時間範圍。"
     }

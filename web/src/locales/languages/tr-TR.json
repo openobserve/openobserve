@@ -11521,7 +11521,6 @@
       "loadFailed": "Ayarlar yüklenemedi: {message}",
       "lastSaved": "Son kaydedilme {time}",
       "runNowHeading": "Şimdi çalıştır",
-      "findingsDesc": "Bulgular bu kuruluşun {stream} akışına yazılır ve o akışın saklama süresi boyunca tutulur. Uyarı kalibrasyonu hiçbir bildirim göndermez.",
       "frequencyRange": "1 saat ile 30 gün arasında bir periyot seçin.",
       "windowRange": "1 dakika ile 90 gün arasında bir pencere seçin."
     }

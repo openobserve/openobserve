@@ -11521,7 +11521,6 @@
       "loadFailed": "Les réglages n'ont pas pu être chargés : {message}",
       "lastSaved": "Dernier enregistrement {time}",
       "runNowHeading": "Exécuter maintenant",
-      "findingsDesc": "Les constats sont écrits dans le flux {stream} de cette organisation et conservés selon la rétention de ce flux. La calibration des alertes n'envoie aucune notification.",
       "frequencyRange": "Choisissez une cadence entre 1 heure et 30 jours.",
       "windowRange": "Choisissez une fenêtre entre 1 minute et 90 jours."
     }

@@ -11916,7 +11916,7 @@
       "saveFailed": "The settings could not be saved: {message}",
       "lastSaved": "Last saved {time}",
       "runNowHeading": "Run now",
-      "findingsDesc": "Findings are kept with this organization's own records for its retention period. Alert calibration sends no notifications.",
+      "findingsKept": "Findings are kept with this organization's own records for its retention period. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
       "windowRange": "Choose a window between 1 minute and 90 days."
     },
