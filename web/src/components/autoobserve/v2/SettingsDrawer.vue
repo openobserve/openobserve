@@ -159,7 +159,7 @@ import DrawerSection from "./DrawerSection.vue";
 import { useAutonomy, useCompletedFixes } from "./useDecisions";
 import { DEFAULT_AUTONOMY } from "../data/facts";
 import {
-  ALL_SERVICES,
+  allServices,
   DESTINATION_OPTIONS,
   settingsKinds,
   say,
@@ -217,7 +217,7 @@ const dayOptions = computed(() =>
 );
 
 const excluded = ref<string[]>([]);
-const serviceOptions = ALL_SERVICES.map((name) => ({ value: name, label: raw(name) }));
+const serviceOptions = allServices().map((name) => ({ value: name, label: raw(name) }));
 
 const SAVED_MS = 2000;
 

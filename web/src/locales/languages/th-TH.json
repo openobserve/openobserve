@@ -30584,15 +30584,15 @@
       "intro": "Here's what I do, in five steps.",
       "gotIt": "Got it",
       "s1Title": "I find your services",
-      "s1": "I look through the data you already send and find every service in it. When a new one appears, I start watching it the same day; you don't need to ask.",
-      "s2Title": "I watch them",
-      "s2": "I learn what normal looks like for each service: its errors, slowness and traffic for each hour of the day, with weekly patterns sharpening over time. Until I know, I use basic safety checks.",
-      "s3Title": "I stay quiet unless it's real",
-      "s3": "Most odd moments aren't problems. I page your team when something hurts customers, send a message that won't wake anyone for smaller issues, and keep minor things for the Friday summary.",
-      "s4Title": "I explain every page",
-      "s4": "Every message says what broke, since when, and my best read on why, with how sure I am.",
-      "s5Title": "I fix what you've allowed",
-      "s5": "I only fix things you've said I may. A fix that works earns a little trust, and one that doesn't help counts against me. If I keep needing the same fix, that's a bug I report to your team, not a habit I automate."
+      "s1": "I look through the data you already send and find the services in it. A new service shows up after my next check; you don't need to add it.",
+      "s2Title": "I learn what normal looks like",
+      "s2": "I learn how much data each stream normally sends from 14 days of its history. Until a stream has that history, I say it is still learning and don't judge it.",
+      "s3Title": "I page only when a stream stops",
+      "s3": "When a stream stops sending data, I open an incident and, if paging is on, page the on-call team that owns the service. Sharp drops and rises show as findings and never page. Smaller things wait for the daily digest.",
+      "s4Title": "I say what happened",
+      "s4": "Every incident says what stopped and since when. With AI analysis on, it also carries a best read on why.",
+      "s5Title": "You decide what changes",
+      "s5": "I suggest alerts for what nothing watches and fixes for alerts that can't fire. Nothing changes until you review and apply it, and you can undo what you applied."
     },
     "topbar": {
       "brand": "AutoObserve",
@@ -30609,9 +30609,9 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
-      "nerdTooltip": "Nerd view shows every detector, loop and setting in full",
+      "nerdTooltip": "The detailed view shows every detector, loop and setting in full",
       "label": "ดู"
     },
     "rail": {
@@ -32546,7 +32546,7 @@
     "paging": {
       "title": "Paging",
       "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show here as findings and never page.",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
       "routing": "On-call routing",
       "unavailable": "Paging is turned off for this deployment.",
       "denied": "{denied} {askAdmin}",

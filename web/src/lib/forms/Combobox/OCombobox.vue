@@ -335,13 +335,13 @@ const hasInsideLabel = computed(
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
-      class="text-input-error-text text-xs leading-none"
+      class="text-input-error-text text-xs leading-snug"
       role="alert"
     >
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span v-else-if="helpText" class="text-input-help-text text-xs leading-none">
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-snug">
       {{ helpText }}
     </span>
   </div>

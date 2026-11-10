@@ -42,6 +42,11 @@ export interface AnalysisLine {
   shared: I18nText;
 }
 
+export interface SharedAnalysis {
+  text: I18nText;
+  covers: (line: AnalysisLine) => boolean;
+}
+
 export interface IncidentRoute {
   name: "incidentDetail" | "incidentList";
   params?: { id: string };
@@ -71,6 +76,12 @@ const FINDING_KEY: Record<AutoObserveFindingKind, I18nKey> = {
   stream_silence: "autoobserveLive.incidents.finding.stream_silence",
   stream_drop: "autoobserveLive.incidents.finding.stream_drop",
   stream_rise: "autoobserveLive.incidents.finding.stream_rise",
+};
+
+const GROUP_KEY: Record<AutoObserveFindingKind, I18nKey> = {
+  stream_silence: "insight.kind.paged.stream_silence.headline",
+  stream_drop: "insight.kind.paged.stream_drop.headline",
+  stream_rise: "insight.kind.paged.stream_rise.headline",
 };
 
 const FINDING_AI_KEY: Record<AutoObserveFindingKind, I18nKey> = {
@@ -119,11 +130,58 @@ const sharedAs = (analysis: AnalysisLine, shared: I18nText): AnalysisLine => ({
 const isFindingKind = (kind: string | null): kind is AutoObserveFindingKind =>
   kind !== null && Object.prototype.hasOwnProperty.call(FINDING_KEY, kind);
 
-// An unknown kind or an unreadable stream falls back to the server's own English title.
+// A group reads as the home card's headline; an unknown kind or unreadable stream falls back to the server's English title.
 export const findingSentence = (t: TranslateFn, item: AutoObserveIncidentItem): I18nText => {
   const { kind, stream_name, stream_type } = item.finding;
+  const members = item.members?.length ?? 0;
+  if (members > 1 && isFindingKind(kind)) return t(GROUP_KEY[kind], { count: members });
   if (!isFindingKind(kind) || !stream_name || !stream_type) return raw(item.incident.title);
   return t(FINDING_KEY[kind], { stream: raw(stream_name), type: raw(stream_type) });
+};
+
+/** The lead stream, plus how many more streams the group holds. */
+export const issuesStreamLabel = (
+  t: TranslateFn,
+  item: AutoObserveIncidentItem,
+): I18nText | null => {
+  const lead = item.finding.stream_name;
+  if (!lead) return null;
+  const more = (item.members?.length ?? 0) - 1;
+  return more > 0
+    ? t("autoobserveLive.issues.streamMore", { stream: raw(lead), count: more })
+    : raw(lead);
+};
+
+/** Every stream name an incident holds, for search. */
+export const issuesStreamNames = (item: AutoObserveIncidentItem): string[] => [
+  ...(item.finding.stream_name ? [item.finding.stream_name] : []),
+  ...(item.members ?? []).flatMap((m) => m.stream_name ?? []),
+];
+
+export interface PageCell {
+  text: I18nText;
+  tone: "neutral" | "warning" | "error";
+}
+
+/** Who an incident paged, in the words of the home card; null when the server recorded nothing. */
+export const issuesPageCell = (t: TranslateFn, item: AutoObserveIncidentItem): PageCell | null => {
+  switch (item.page?.outcome) {
+    case "paged":
+      return {
+        tone: "neutral",
+        text: item.page.team_name
+          ? t("insight.kind.paged.page.paged", { team: raw(item.page.team_name) })
+          : t("insight.kind.paged.page.pagedTeam"),
+      };
+    case "unrouted":
+      return { tone: "warning", text: t("autoobserveLive.issues.page.unrouted") };
+    case "failed":
+      return { tone: "error", text: t("autoobserveLive.issues.page.failed") };
+    case "pending":
+      return { tone: "neutral", text: t("autoobserveLive.issues.page.pending") };
+    default:
+      return null;
+  }
 };
 
 /** What Ask AI hands the chat for a paged finding; null when the finding is unreadable. */
@@ -160,8 +218,15 @@ export const findingLogs = (
 ): RouteLocationRaw | null => {
   const { stream_name, stream_type, first_seen_at } = item.finding;
   if (!stream_name || !stream_type) return null;
+  // Only Logs searches several streams at once, so a group opens every member of the lead's type there.
+  const peers =
+    stream_type === "logs"
+      ? (item.members ?? []).filter((m) => m.stream_type === stream_type && m.stream_name)
+      : [];
+  const streams = [...new Set([stream_name, ...peers.map((m) => m.stream_name as string)])];
+  const signalAt = Math.min(first_seen_at, ...peers.map((m) => m.first_seen_at));
   return logsForFinding(
-    { stream_type, stream_name, signal_at: first_seen_at, lead_us: PAGED_LEAD_US },
+    { stream_type, stream_name: streams.join(","), signal_at: signalAt, lead_us: PAGED_LEAD_US },
     now * 1000,
   );
 };
@@ -258,13 +323,28 @@ export const analysisLine = (
 };
 
 // Two or more rows with one reason state it once, so the same sentence never repeats down the table.
-export const sharedAnalysis = (lines: readonly AnalysisLine[]): I18nText | null => {
-  const [first] = lines;
-  if (lines.length < 2 || !first.shared) return null;
-  const same = lines.every(
-    (l) => l.label === first.label && l.detail === first.detail && l.shared === first.shared,
-  );
-  return same ? first.shared : null;
+export const sharedAnalysis = (
+  t: TranslateFn,
+  lines: readonly AnalysisLine[],
+): SharedAnalysis | null => {
+  const keyOf = (l: AnalysisLine) =>
+    l.shared ? `${l.label}\u0000${l.detail}\u0000${l.shared}` : "";
+  const counts = new Map<string, number>();
+  for (const l of lines) {
+    const key = keyOf(l);
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let best: { key: string; count: number } | null = null;
+  for (const [key, count] of counts) if (!best || count > best.count) best = { key, count };
+  if (!best || best.count < 2) return null;
+  const key = best.key;
+  const line = lines.find((l) => keyOf(l) === key) as AnalysisLine;
+  // When other states sit beside it, the state's chip label says which rows the sentence is about.
+  const text =
+    best.count === lines.length
+      ? line.shared
+      : t("autoobserveLive.incidents.sharedFor", { label: line.label, reason: line.shared });
+  return { text, covers: (l) => keyOf(l) === key };
 };
 
 // The server's error text can name internal hosts, so the details give only the status and the time.
@@ -321,6 +401,7 @@ export const pagedCopy = (t: TranslateFn) => ({
   viewAnalysis: t("autoobserveLive.incidents.viewAnalysis"),
   showNew: t("autoobserveLive.incidents.showNew"),
   seeAll: t("autoobserveLive.incidents.seeAll"),
+  seeAllIssues: t("autoobserveLive.incidents.seeAllIssues"),
   emptyTitle: t("autoobserveLive.incidents.empty.title"),
   emptyDesc: t("autoobserveLive.incidents.empty.desc"),
   offTitle: t("autoobserveLive.incidents.emptyOff.title"),
@@ -387,13 +468,14 @@ export const issuesCopy = (t: TranslateFn) => ({
   searchPlaceholder: t("autoobserveLive.issues.searchPlaceholder"),
   priorityLabel: t("autoobserve2.recent.priorityLabel"),
   allPriorities: t("autoobserve2.recent.all"),
-  open: t("autoobserve.issues.open"),
+  open: t("autoobserveLive.issues.filterOpen"),
   resolved: t("autoobserve.issues.recent"),
   allStatuses: t("autoobserve.issues.all"),
   colIncident: t("autoobserveLive.issues.columns.incident"),
   colSeverity: t("autoobserveLive.issues.columns.severity"),
   colStatus: t("autoobserveLive.issues.columns.status"),
   colStream: t("autoobserveLive.issues.columns.stream"),
+  colPage: t("autoobserveLive.issues.columns.page"),
   colOpened: t("autoobserveLive.issues.columns.opened"),
   colAnalysis: t("autoobserveLive.issues.columns.analysis"),
   clearSearch: t("autoobserve.issues.clearSearch"),

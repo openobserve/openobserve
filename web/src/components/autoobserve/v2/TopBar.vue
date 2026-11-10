@@ -15,132 +15,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
-    data-test="autoobserve2-topbar"
-  >
-    <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-      <h1 class="text-text-heading flex items-center gap-2 font-semibold">
-        <span
-          class="bg-accent text-text-inverse rounded-default flex size-7 items-center justify-center"
-        >
-          <OIcon name="auto-awesome" size="sm" />
-        </span>
-        {{ t("autoobserve2.topbar.brand") }}
-      </h1>
-      <span class="text-text-muted max-sm:hidden" aria-hidden="true">·</span>
-      <span class="text-text-body">{{ live ? date : today }}</span>
-      <span
-        v-if="live"
-        class="text-text-body flex min-w-32 items-center gap-x-3"
-        :aria-hidden="checked.kind === 'none' ? 'true' : undefined"
-        data-test="autoobserve2-topbar-checked"
-      >
-        <template v-if="checked.kind !== 'none'">
-          <span class="text-text-muted max-sm:hidden" aria-hidden="true">·</span>
-          <OSkeleton v-if="checked.kind === 'loading'" animation="none" class="h-3 w-28" />
-          <span v-else>{{ checked.text }}</span>
-        </template>
-      </span>
-      <template v-else>
-        <span class="text-text-muted max-sm:hidden" aria-hidden="true">·</span>
-        <span class="text-text-body">{{
-          t("autoobserve2.topbar.checked", { count: LAST_CHECKED }, LAST_CHECKED)
-        }}</span>
-      </template>
-    </div>
-    <nav class="flex flex-wrap items-center gap-1" data-test="autoobserve2-nav">
-      <ViewSwitch class="me-1" />
-      <div
-        class="items-center"
-        :class="searchOpen ? 'flex' : 'hidden sm:flex'"
-        data-test="autoobserve2-nav-search"
-      >
-        <label :for="SEARCH_ID" class="sr-only">{{ t("autoobserve2.nav.searchLabel") }}</label>
-        <OInput
-          :id="SEARCH_ID"
-          v-model="search"
-          size="sm"
-          class="w-44"
-          :placeholder="t('autoobserve2.nav.searchPlaceholder')"
-          data-test="autoobserve2-nav-search-input"
-          @keydown.enter="submit"
-          @blur="collapse"
-        >
-          <template #icon-left>
-            <OIcon name="search" size="sm" class="text-text-secondary" />
-          </template>
-        </OInput>
-      </div>
-      <OButton
-        v-if="!searchOpen"
-        variant="ghost-muted"
-        size="icon-sm"
-        class="sm:hidden"
-        :aria-label="t('autoobserve2.nav.searchLabel')"
-        data-test="autoobserve2-nav-search-open"
-        @click="openSearch"
-      >
-        <OIcon name="search" size="sm" />
-      </OButton>
-      <OButton
-        variant="ghost-muted"
+  <nav class="flex items-center gap-1" data-test="autoobserve2-nav">
+    <ViewSwitch class="me-1" />
+    <div
+      class="items-center"
+      :class="searchOpen ? 'flex' : 'hidden sm:flex'"
+      data-test="autoobserve2-nav-search"
+    >
+      <label :for="SEARCH_ID" class="sr-only">{{ t("autoobserve2.nav.searchLabel") }}</label>
+      <OInput
+        :id="SEARCH_ID"
+        v-model="search"
         size="sm"
-        icon-left="history"
-        data-test="autoobserve2-nav-history"
-        @click="emit('open', 'history')"
+        class="w-44"
+        :placeholder="t('autoobserve2.nav.searchPlaceholder')"
+        data-test="autoobserve2-nav-search-input"
+        @keydown.enter="submit"
+        @blur="collapse"
       >
-        {{ t("autoobserve2.nav.history") }}
-      </OButton>
-      <OButton
-        variant="ghost-muted"
-        size="icon-sm"
-        :aria-label="t('autoobserve2.nav.settings')"
-        data-test="autoobserve2-nav-settings"
-        @click="emit('open', 'settings')"
-      >
-        <OIcon name="settings" size="sm" />
-        <OTooltip :content="t('autoobserve2.nav.settings')" />
-      </OButton>
-      <OButton
-        variant="ghost-muted"
-        size="icon-sm"
-        :aria-label="t('autoobserve2.nav.howItWorks')"
-        data-test="autoobserve2-nav-how-it-works"
-        @click="emit('open', 'howItWorks')"
-      >
-        <OIcon name="help-outline" size="sm" />
-        <OTooltip :content="t('autoobserve2.nav.howItWorks')" />
-      </OButton>
-    </nav>
-  </div>
+        <template #icon-left>
+          <OIcon name="search" size="sm" class="text-text-secondary" />
+        </template>
+      </OInput>
+    </div>
+    <OButton
+      v-if="!searchOpen"
+      variant="ghost-muted"
+      size="icon-sm"
+      class="sm:hidden"
+      :aria-label="t('autoobserve2.nav.searchLabel')"
+      data-test="autoobserve2-nav-search-open"
+      @click="openSearch"
+    >
+      <OIcon name="search" size="sm" />
+    </OButton>
+    <OButton
+      variant="ghost-muted"
+      size="sm"
+      icon-left="history"
+      data-test="autoobserve2-nav-history"
+      @click="emit('open', 'history')"
+    >
+      {{ t("autoobserve2.nav.history") }}
+    </OButton>
+    <OButton
+      variant="ghost-muted"
+      size="icon-sm"
+      :aria-label="t('autoobserve2.nav.settings')"
+      data-test="autoobserve2-nav-settings"
+      @click="emit('open', 'settings')"
+    >
+      <OIcon name="settings" size="sm" />
+      <OTooltip :content="t('autoobserve2.nav.settings')" />
+    </OButton>
+    <OButton
+      variant="ghost-muted"
+      size="icon-sm"
+      :aria-label="t('autoobserve2.nav.howItWorks')"
+      data-test="autoobserve2-nav-how-it-works"
+      @click="emit('open', 'howItWorks')"
+    >
+      <OIcon name="help-outline" size="sm" />
+      <OTooltip :content="t('autoobserve2.nav.howItWorks')" />
+    </OButton>
+  </nav>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { nextTick, ref } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ViewSwitch from "./ViewSwitch.vue";
-import { DEMO_DATE } from "../data/facts";
-import { LAST_CHECKED } from "./fixtures";
-import type { CheckedView } from "../live/liveCopy";
-
-withDefaults(defineProps<{ live?: boolean; date?: I18nText; checked?: CheckedView }>(), {
-  live: false,
-  date: () => raw(""),
-  checked: () => ({ kind: "none" }),
-});
 
 const emit = defineEmits<{
   open: [drawer: "history" | "settings" | "howItWorks"];
   search: [query: string];
 }>();
 
-const { t, locale } = useI18nTyped();
+const { t } = useI18nTyped();
 
 const SEARCH_ID = "autoobserve2-nav-search-field";
 
@@ -162,14 +117,4 @@ const submit = () => {
   const query = search.value.trim();
   if (query) emit("search", query);
 };
-
-// The date follows the demo dataset so "Today" in every entry matches it; the greeting follows the viewer.
-const today = computed(() =>
-  new Date(Date.UTC(...DEMO_DATE, 12)).toLocaleDateString(locale.value, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  }),
-);
 </script>

@@ -129,6 +129,19 @@ describe("useLiveAutoObserve groups the rail from every gap (F8)", () => {
     expect(wrapper.find('[data-test="rail"]').text()).toBe("coverage_gap-group:7");
   });
 
+  it("reads past the gaps, so a page of gaps can't hide the rail's other cards (W2)", async () => {
+    vi.mocked(autoobserve.coverage).mockResolvedValue({ data: coverage() } as never);
+    vi.mocked(autoobserve.suggestions).mockResolvedValue({
+      data: { suggestions: [gap(0)], total: 1, limit: 5, offset: 0 },
+    } as never);
+    mount(RailHarness, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    const railCall = vi
+      .mocked(autoobserve.suggestions)
+      .mock.calls.find(([, params]) => params.kind === undefined);
+    expect(railCall?.[1].limit).toBeGreaterThanOrEqual(50);
+  });
+
   it("pages past the server's largest page, so a group of 501 gaps reads all 501 (F8)", async () => {
     vi.mocked(autoobserve.coverage).mockResolvedValue({ data: coverage() } as never);
     vi.mocked(autoobserve.suggestions).mockClear();

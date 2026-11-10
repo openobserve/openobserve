@@ -27,7 +27,7 @@ import { LIVE_CHECKS, type CoverageCell, type LiveCheck } from "../fixtures";
 
 export type LiveFailure = "denied" | "off" | "unavailable" | "failed";
 
-export type LiveSurface = "coverage" | "suggestions" | "incidents";
+export type LiveSurface = "coverage" | "suggestions" | "incidents" | "issues" | "history";
 
 export type LiveEmptySurface = "changes" | "history" | "settings";
 
@@ -108,6 +108,42 @@ const NOTICE_KEY: Record<LiveSurface, Record<LiveFailure, { title: I18nKey; desc
       desc: "autoobserveLive.notice.suggestions.failedDesc",
     },
   },
+  issues: {
+    denied: {
+      title: "autoobserveLive.notice.issues.deniedTitle",
+      desc: "autoobserveLive.notice.issues.deniedDesc",
+    },
+    off: {
+      title: "autoobserveLive.notice.offTitle",
+      desc: "autoobserveLive.notice.issues.offDesc",
+    },
+    unavailable: {
+      title: "autoobserveLive.notice.issues.unavailableTitle",
+      desc: "autoobserveLive.notice.issues.unavailableDesc",
+    },
+    failed: {
+      title: "autoobserveLive.notice.issues.failedTitle",
+      desc: "autoobserveLive.notice.issues.failedDesc",
+    },
+  },
+  history: {
+    denied: {
+      title: "autoobserveLive.notice.history.deniedTitle",
+      desc: "autoobserveLive.notice.history.deniedDesc",
+    },
+    off: {
+      title: "autoobserveLive.notice.offTitle",
+      desc: "autoobserveLive.notice.history.offDesc",
+    },
+    unavailable: {
+      title: "autoobserveLive.notice.history.unavailableTitle",
+      desc: "autoobserveLive.notice.history.unavailableDesc",
+    },
+    failed: {
+      title: "autoobserveLive.notice.history.failedTitle",
+      desc: "autoobserveLive.notice.history.failedDesc",
+    },
+  },
   incidents: {
     denied: {
       title: "autoobserveLive.notice.incidents.deniedTitle",
@@ -141,12 +177,22 @@ const LOAD_KEY: Record<LiveSurface, Record<Exclude<LivePhase, "idle">, I18nKey>>
     loading: "autoobserveLive.incidents.loading",
     loaded: "autoobserveLive.incidents.loaded",
   },
+  issues: {
+    loading: "autoobserveLive.issues.loading",
+    loaded: "autoobserveLive.issues.loaded",
+  },
+  history: {
+    loading: "autoobserveLive.history.loading",
+    loaded: "autoobserveLive.history.loaded",
+  },
 };
 
 const WHAT_KEY: Record<LiveSurface, I18nKey> = {
   coverage: "autoobserveLive.notice.what.coverage",
   suggestions: "autoobserveLive.notice.what.suggestions",
   incidents: "autoobserveLive.notice.what.incidents",
+  issues: "autoobserveLive.notice.what.issues",
+  history: "autoobserveLive.notice.what.history",
 };
 
 // A denial or a turned-off engine cannot change on a retry, so neither offers one.
@@ -200,6 +246,20 @@ export const liveNotice = (
   const keys = NOTICE_KEY[surface][failure];
   return { failure, title: t(keys.title), description: t(keys.desc), ...NOTICE_LOOK[failure] };
 };
+
+/** The notice a failed paging read shows; a denial cannot change on a retry, anything else can. */
+export const pagingLoadNotice = (t: TranslateFn, failure: LiveFailure): LiveNoticeView =>
+  failure === "denied"
+    ? {
+        title: t("autoobserveLive.paging.deniedTitle"),
+        description: t("autoobserveLive.paging.deniedDesc"),
+        ...NOTICE_LOOK.denied,
+      }
+    : {
+        title: t("autoobserveLive.paging.failedTitle"),
+        description: t("autoobserveLive.paging.failedDesc"),
+        ...NOTICE_LOOK.failed,
+      };
 
 // A surface with no backend yet says what will appear and what to do now, never sample data.
 export const liveSurfaceEmpty = (t: TranslateFn, surface: LiveEmptySurface): LiveSurfaceEmpty => {

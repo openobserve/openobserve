@@ -207,4 +207,12 @@ describe("AutoObserve Nerd view", () => {
       expect(wrapper.find('[data-test^="autoobserve-live-empty-"]').exists(), tab).toBe(false);
     }
   });
+
+  it("a picked tab is kept in the URL, so reload and Back return to it", async () => {
+    const wrapper = mountNerd();
+    await flushPromises();
+    await wrapper.find('[data-test="autoobserve-tab-coverage"]').trigger("mousedown");
+    await flushPromises();
+    expect(replace).toHaveBeenCalledWith({ query: expect.objectContaining({ tab: "coverage" }) });
+  });
 });

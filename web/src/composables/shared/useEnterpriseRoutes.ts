@@ -396,7 +396,15 @@ const useEnterpriseRoutes = () => {
     routes.push({
       path: "autoobserve",
       name: "autoobserve",
-      component: () => import("@/views/AutoObserveHome.vue"),
+      // The sample scenarios render synchronously, so their facts finish loading before the view does.
+      component: async () => {
+        const [view, facts] = await Promise.all([
+          import("@/views/AutoObserveHome.vue"),
+          import("@/components/autoobserve/data/facts"),
+        ]);
+        await facts.factsReady;
+        return view;
+      },
       meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

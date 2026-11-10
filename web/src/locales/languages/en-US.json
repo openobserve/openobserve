@@ -30765,6 +30765,8 @@
       "seeAll": "See all",
       "drawerTitle": "Suggestions",
       "drawerLine": "Ranked by what matters most first. Open a row for what I found.",
+      "focusGone": "This suggestion is no longer open.",
+      "clearKind": "Show all suggestions",
       "columns": {
         "suggestion": "Suggestion",
         "where": "Where",
@@ -30779,7 +30781,9 @@
       "what": {
         "coverage": "coverage",
         "suggestions": "suggestions",
-        "incidents": "paged findings"
+        "incidents": "paged findings",
+        "issues": "issues",
+        "history": "history"
       },
       "coverage": {
         "deniedTitle": "You don't have permission to see coverage",
@@ -30809,6 +30813,15 @@
         "pageEmptyTitle": "The top suggestions were already handled",
         "pageEmptyDesc": "Open the full list for the ones still waiting."
       },
+      "history": {
+        "deniedTitle": "You don't have permission to see history",
+        "deniedDesc": "History lists the incidents AutoObserve opened, so seeing it needs permission to list incidents in this organization. Ask an organization admin for it.",
+        "offDesc": "History appears here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "History is temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load history",
+        "failedDesc": "Something went wrong while loading it. Try again in a moment."
+      },
       "incidents": {
         "deniedTitle": "You don't have permission to see paged findings",
         "deniedDesc": "Paged findings open incidents, so seeing them needs permission to list incidents in this organization. Ask an organization admin for it.",
@@ -30817,16 +30830,37 @@
         "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
         "failedTitle": "Couldn't load paged findings",
         "failedDesc": "Something went wrong while loading them. Try again in a moment."
+      },
+      "issues": {
+        "deniedTitle": "You don't have permission to see issues",
+        "deniedDesc": "Issues are incidents AutoObserve opened, so seeing them needs permission to list incidents in this organization. Ask an organization admin for it.",
+        "offDesc": "Issues appear here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "Issues are temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load issues",
+        "failedDesc": "Something went wrong while loading them. Try again in a moment."
       }
     },
     "time": {
       "justNow": "just now",
       "ago": "{time} ago"
     },
+    "history": {
+      "incident": "Opened an incident: {title}",
+      "dismissed": "{actor} dismissed {title}",
+      "accepted": "{actor} accepted {title}",
+      "changed": "{actor} changed {title}",
+      "untitled": "a suggestion",
+      "openIncident": "Open incident",
+      "newest": "Showing the {count} newest. Older incidents are on the Issues page.",
+      "loading": "Loading history",
+      "loaded": "History loaded"
+    },
     "incidents": {
       "title": "Paged findings",
       "subtitle": "Findings that opened an incident for your on-call team, with its analysis.",
       "pagingNote": "Paging is off for this organization, so AutoObserve opens no incidents.",
+      "sharedFor": "{label}: {reason}",
       "finding": {
         "stream_silence": "{stream} ({type}) stopped sending data",
         "stream_drop": "{stream} ({type}) volume dropped sharply",
@@ -30839,6 +30873,7 @@
       "showNew": "Show",
       "more": "Showing the {count} newest",
       "seeAll": "See all incidents",
+      "seeAllIssues": "See all issues",
       "failedDetail": {
         "status": "The request failed with status {status} at {time}.",
         "noResponse": "The request got no response at {time}."
@@ -30870,12 +30905,22 @@
         "status": "Status",
         "stream": "Stream",
         "opened": "Opened",
-        "analysis": "Analysis"
+        "analysis": "Analysis",
+        "page": "Who was paged"
       },
       "count": "No issues | {count} issue | {count} issues",
       "capNote": "Showing the newest {count} issues. Narrow the range to see older ones.",
       "emptyRange": "No issues {within}",
       "streamType": "{type} stream",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "Open",
+      "loading": "Loading issues…",
+      "loaded": "Issues loaded",
+      "page": {
+        "unrouted": "Nobody paged",
+        "failed": "Paging failed",
+        "pending": "Not confirmed yet"
+      },
       "today": "Today",
       "yesterday": "Yesterday",
       "shared": {
@@ -30915,11 +30960,15 @@
     "paging": {
       "title": "Paging",
       "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show here as findings and never page.",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
       "routing": "On-call routing",
       "unavailable": "Paging is turned off for this deployment.",
       "denied": "{denied} {askAdmin}",
       "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "You don't have permission to see the paging setting",
+      "deniedDesc": "Paging is set once for the whole organization. Ask an organization admin for access.",
+      "failedTitle": "Couldn't load the paging setting",
+      "failedDesc": "Something went wrong while loading it. Try again in a moment.",
       "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
     },
     "learning": {
@@ -30934,6 +30983,7 @@
     }
   },
   "autoobserve2": {
+    "backToHome": "Back to AutoObserve",
     "demoTag": "Demo",
     "scenarioLabel": "Demo scenario",
     "scenarios": {
@@ -31544,15 +31594,15 @@
       "intro": "Here's what I do, in five steps.",
       "gotIt": "Got it",
       "s1Title": "I find your services",
-      "s1": "I look through the data you already send and find every service in it. When a new one appears, I start watching it the same day; you don't need to ask.",
-      "s2Title": "I watch them",
-      "s2": "I learn what normal looks like for each service: its errors, slowness and traffic for each hour of the day, with weekly patterns sharpening over time. Until I know, I use basic safety checks.",
-      "s3Title": "I stay quiet unless it's real",
-      "s3": "Most odd moments aren't problems. I page your team when something hurts customers, send a message that won't wake anyone for smaller issues, and keep minor things for the Friday summary.",
-      "s4Title": "I explain every page",
-      "s4": "Every message says what broke, since when, and my best read on why, with how sure I am.",
-      "s5Title": "I fix what you've allowed",
-      "s5": "I only fix things you've said I may. A fix that works earns a little trust, and one that doesn't help counts against me. If I keep needing the same fix, that's a bug I report to your team, not a habit I automate."
+      "s1": "I look through the data you already send and find the services in it. A new service shows up after my next check; you don't need to add it.",
+      "s2Title": "I learn what normal looks like",
+      "s2": "I learn how much data each stream normally sends from 14 days of its history. Until a stream has that history, I say it is still learning and don't judge it.",
+      "s3Title": "I page only when a stream stops",
+      "s3": "When a stream stops sending data, I open an incident and, if paging is on, page the on-call team that owns the service. Sharp drops and rises show as findings and never page. Smaller things wait for the daily digest.",
+      "s4Title": "I say what happened",
+      "s4": "Every incident says what stopped and since when. With AI analysis on, it also carries a best read on why.",
+      "s5Title": "You decide what changes",
+      "s5": "I suggest alerts for what nothing watches and fixes for alerts that can't fire. Nothing changes until you review and apply it, and you can undo what you applied."
     },
     "topbar": {
       "brand": "AutoObserve",
@@ -31569,9 +31619,9 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
-      "nerdTooltip": "Nerd view shows every detector, loop and setting in full",
+      "nerdTooltip": "The detailed view shows every detector, loop and setting in full",
       "label": "View"
     },
     "rail": {
@@ -34614,29 +34664,43 @@
           "paged": "Paged {team}",
           "pagedTeam": "Paged the on-call team",
           "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
-          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand."
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
+          "pending": "Paging on-call: the on-call service hasn't confirmed the page yet."
         },
         "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "recoveredAt": "Back at {time}.",
         "stream_silence": {
           "headline": "{count} streams stopped sending data",
           "why": "No data has arrived on {stream} ({type}) since {time}.",
           "whyMany": "{streams} have sent no data since {time}.",
           "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
-          "nextMany": "One cause is likely, such as a shared collector."
+          "nextMany": "One cause is likely, such as a shared collector.",
+          "whyOne": "{stream} has sent no data since {time}.",
+          "recovered": "{stream} ({type}) is sending data again. It stopped at {time}.",
+          "recoveredMany": "{streams} are sending data again. They stopped at {time}.",
+          "recoveredSome": "Sending again: {streams}."
         },
         "stream_drop": {
           "headline": "{count} streams dropped sharply",
           "why": "{stream} ({type}) has received much less data than usual since {time}.",
           "whyMany": "{streams} have received much less data than usual since {time}.",
           "next": "Check whether a sender stopped or a filter changed.",
-          "nextMany": "One cause is likely, such as a shared collector or filter."
+          "nextMany": "One cause is likely, such as a shared collector or filter.",
+          "whyOne": "{stream} has received much less data than usual since {time}.",
+          "recovered": "{stream} ({type}) is back to its usual volume. It dropped at {time}.",
+          "recoveredMany": "{streams} are back to their usual volume. They dropped at {time}.",
+          "recoveredSome": "Back to usual: {streams}."
         },
         "stream_rise": {
           "headline": "{count} streams rose sharply",
           "why": "{stream} ({type}) has received much more data than usual since {time}.",
           "whyMany": "{streams} have received much more data than usual since {time}.",
           "next": "Check for a retry loop or a new sender writing to it.",
-          "nextMany": "One cause is likely, such as a shared sender retrying."
+          "nextMany": "One cause is likely, such as a shared sender retrying.",
+          "whyOne": "{stream} has received much more data than usual since {time}.",
+          "recovered": "{stream} ({type}) is back to its usual volume. It rose at {time}.",
+          "recoveredMany": "{streams} are back to their usual volume. They rose at {time}.",
+          "recoveredSome": "Back to usual: {streams}."
         }
       }
     },

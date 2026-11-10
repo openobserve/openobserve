@@ -46,7 +46,6 @@ import {
 } from "./liveAdapter";
 import {
   GAP_PAGE_SIZE,
-  RAIL_CAP,
   checkedView,
   learningLine,
   liveErrorDetail,
@@ -187,6 +186,9 @@ export const useLiveZone = () => {
 };
 
 // The fixture views mount this too, so nothing is fetched until the page is in live mode.
+// Gaps fold into one card, so the rail reads well past its cap to still fill it with other kinds.
+const RAIL_FETCH = 100;
+
 export const useLiveAutoObserve = () => {
   const store = useStore();
   const live = useLiveMode();
@@ -199,7 +201,7 @@ export const useLiveAutoObserve = () => {
     Object.assign(autoobserveCoverageQuery(org.value, "strict"), { enabled: enabled.value }),
   );
   const suggestions = useQuery(() =>
-    Object.assign(autoobserveSuggestionsPageQuery(org.value, RAIL_CAP, 0), {
+    Object.assign(autoobserveSuggestionsPageQuery(org.value, RAIL_FETCH, 0), {
       enabled: enabled.value,
     }),
   );

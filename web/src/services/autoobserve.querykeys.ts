@@ -21,8 +21,10 @@ export const autoobserveKeys = {
   coverage: (org: string, view: AutoObserveCoverageView) =>
     orgKey(org, "autoobserve", "coverage", view),
   suggestions: (org: string) => orgKey(org, "autoobserve", "suggestions"),
-  suggestionsPage: (org: string, limit: number, offset: number) =>
-    orgKey(org, "autoobserve", "suggestions", "proposed", limit, offset),
+  suggestionsPage: (org: string, limit: number, offset: number, kind?: string) =>
+    orgKey(org, "autoobserve", "suggestions", "proposed", limit, offset, ...(kind ? [kind] : [])),
+  suggestionRank: (org: string, id: string, kind?: string) =>
+    orgKey(org, "autoobserve", "suggestions", "rank", id, kind ?? ""),
   gapSuggestions: (org: string, pageSize: number) =>
     orgKey(org, "autoobserve", "suggestions", "proposed", "coverage_gap", pageSize),
   incidentsPage: (org: string, limit: number, offset: number) =>

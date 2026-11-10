@@ -168,6 +168,7 @@ describe("LiveIssues", () => {
     const w = mountTable();
     await loaded();
     expect(w.find(sel("empty-off")).text()).toContain("Paging is off");
+    expect(w.find(sel("empty-off")).find('[data-test="o2-icon"], svg').exists()).toBe(true);
     expect(w.find('[role="alert"]').exists()).toBe(false);
   });
 
@@ -227,7 +228,7 @@ describe("LiveIssues", () => {
     await loaded();
     const denied = w.find(sel("denied"));
     expect(denied.attributes("role")).toBe("alert");
-    expect(denied.text()).toContain("You don't have permission to see paged findings");
+    expect(denied.text()).toContain("You don't have permission to see issues");
     expect(w.find(sel("retry")).exists()).toBe(false);
     expect(w.find(sel("count-skeleton")).exists()).toBe(false);
   });
@@ -411,5 +412,94 @@ describe("LiveIssues", () => {
     expect(w.find(sel("refresh-failed")).exists()).toBe(true);
     expect(w.find(sel("shared-analysis")).exists()).toBe(false);
     expect(w.findAll(sel("analysis-detail"))).toHaveLength(2);
+  });
+
+  describe("rows say what the home card says (W2)", () => {
+    const member = (name: string) => ({
+      id: `f-${name}`,
+      title: `${name} (logs) stopped sending data`,
+      stream_type: "logs",
+      stream_name: name,
+      first_seen_at: NOW * 1000 - HOUR_US,
+      recovered_at: null,
+    });
+    const cohort = () => {
+      const base = at(0, 1, "inc-cohort");
+      return {
+        ...base,
+        finding: { ...base.finding, kind: "stream_silence", stream_name: "batch_x1" },
+        members: [member("batch_x1"), member("batch_x2"), member("batch_x3")],
+      } as AutoObserveIncidentItem;
+    };
+    const paged = (i: number, outcome: string, team: string | null) =>
+      ({
+        ...at(4, 1 + i, `inc-p-${i}`),
+        page: { outcome, team_id: team, team_name: team },
+      }) as AutoObserveIncidentItem;
+
+    it("a group reads as the group, names its lead plus the rest, and every member is searchable", async () => {
+      api.mockResolvedValue(page([cohort()]));
+      const w = mountTable();
+      await loaded();
+      expect(sentences(w)).toEqual(["3 streams stopped sending data"]);
+      expect(w.find(sel("stream")).text()).toBe("batch_x1 +2");
+      await w.find(`${sel("search")} input`).setValue("batch_x3");
+      await flushPromises();
+      expect(sentences(w)).toEqual(["3 streams stopped sending data"]);
+    });
+
+    it("each row says who was paged, with failures red and nobody amber", async () => {
+      api.mockResolvedValue(
+        page([
+          paged(0, "paged", "SRE"),
+          paged(1, "unrouted", null),
+          paged(2, "failed", "SRE"),
+          paged(3, "pending", null),
+        ]),
+      );
+      const w = mountTable();
+      await loaded();
+      const cells = w.findAll(sel("page"));
+      expect(cells.map((c) => c.text())).toEqual([
+        "Paged SRE",
+        "Nobody paged",
+        "Paging failed",
+        "Not confirmed yet",
+      ]);
+      expect(cells[1].attributes("data-tone")).toBe("warning");
+      expect(cells[2].attributes("data-tone")).toBe("error");
+      expect(cells[0].attributes("data-tone")).toBe("neutral");
+    });
+
+    it("the status filter says Open, the word the status chip uses", async () => {
+      api.mockResolvedValue(page([at(4, 1)]));
+      const w = mountTable();
+      await loaded();
+      expect(w.find(sel("filter-open")).text()).toBe("Open");
+    });
+
+    it("a denial shows no search, filters or zero counts around it", async () => {
+      api.mockRejectedValue(httpError(403));
+      const w = mountTable();
+      await loaded();
+      expect(w.find(sel("denied")).exists()).toBe(true);
+      expect(w.find(sel("search")).exists()).toBe(false);
+      expect(w.find(sel("priority")).exists()).toBe(false);
+      expect(w.find(sel("filter")).exists()).toBe(false);
+    });
+
+    it("while loading, the priority counts are blank, not zero", async () => {
+      api.mockReturnValue(new Promise(() => {}) as never);
+      const w = mountTable();
+      await flushPromises();
+      expect(w.find(sel("priority")).findAll(".tabular-nums")).toHaveLength(0);
+    });
+
+    it("a failed load names the page's own noun", async () => {
+      api.mockRejectedValue(httpError(500));
+      const w = mountTable();
+      await loaded();
+      expect(w.find(sel("error")).text()).toContain("Couldn't load issues");
+    });
   });
 });

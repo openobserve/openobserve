@@ -29,6 +29,7 @@ import { b64DecodeUnicode } from "@/utils/zincutils";
 import { ASK_AI_KEY, type InsightAskPayload } from "../insight/insightCta";
 import { analysisLink, incidentLink } from "./incidentsCopy";
 import LivePaged from "./LivePaged.vue";
+import oncall from "@/services/oncall";
 
 const routeQuery: Record<string, string> = { live: "1" };
 const push = vi.fn();
@@ -36,6 +37,10 @@ vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRoute: () => ({ query: routeQuery }),
   useRouter: () => ({ push }),
+}));
+
+vi.mock("@/services/oncall", () => ({
+  default: { getRoutingConfig: vi.fn(() => Promise.resolve({ data: { default_team_id: null } })) },
 }));
 
 vi.mock("@/services/autoobserve", () => ({
@@ -173,10 +178,10 @@ describe("LivePaged (D9-web)", () => {
     await flushPromises();
     expect(rows(many)).toHaveLength(3);
     expect(many.find(sel("more")).text()).toBe("Showing the 3 newest");
+    expect(many.find(sel("see-all")).text()).toBe("See all issues");
     await many.find(sel("see-all")).trigger("click");
     expect(push).toHaveBeenCalledWith({
-      name: "incidentList",
-      query: { org_identifier: "demo-org" },
+      query: expect.objectContaining({ org_identifier: "demo-org", page: "issues" }),
     });
   });
 
@@ -454,12 +459,14 @@ describe("LivePaged (D9-web)", () => {
       expect(w.find(sel("see-all")).exists()).toBe(true);
     });
 
-    it("mixed reasons stay on their rows", async () => {
+    it("mixed reasons state the common one once and keep only the exception on its row (T1-16)", async () => {
       api.mockResolvedValueOnce(page([notRun(0), notRun(1, null), notRun(2)]));
       const w = mountCard();
       await flushPromises();
-      expect(details(w)).toHaveLength(3);
-      expect(w.find(sel("shared-analysis")).exists()).toBe(false);
+      expect(details(w)).toHaveLength(1);
+      expect(details(w)[0]).not.toBe(OFF_ONE);
+      expect(w.findAll(sel("shared-analysis"))).toHaveLength(1);
+      expect(w.find(sel("shared-analysis")).text()).toBe(`Not analyzed: ${OFF_MANY}`);
     });
 
     it("a failed refresh keeps the shared reason visible", async () => {
@@ -588,7 +595,20 @@ describe("LivePaged (D9-web)", () => {
       expect(w.text()).not.toContain("for your on-call team");
     });
 
-    it("each outcome draws its own line; pending and absent draw none", async () => {
+    it("an unrouted card stops offering routing setup once the org has a default team", async () => {
+      vi.mocked(oncall.getRoutingConfig).mockResolvedValueOnce({
+        data: { default_team_id: "t-default" },
+      } as never);
+      api.mockResolvedValueOnce(page([withPage(1, "unrouted", null)]));
+      const w = mountCard({ cap: 10 });
+      await flushPromises();
+      await flushPromises();
+      expect(rows(w)[0].find(sel("page")).text()).toContain("Nobody was paged");
+      expect(rows(w)[0].find(sel("routing")).exists()).toBe(false);
+      expect(rows(w)[0].text()).not.toContain("Set up on-call routing");
+    });
+
+    it("each outcome draws its own line, pending included", async () => {
       api.mockResolvedValueOnce(
         page([
           withPage(0, "paged", "SRE"),
@@ -606,7 +626,8 @@ describe("LivePaged (D9-web)", () => {
       expect(lines[1].attributes("data-tone")).toBe("warning");
       expect(lines[2].text()).toContain("Paging failed");
       expect(lines[2].attributes("data-tone")).toBe("error");
-      expect(lines[3].exists()).toBe(false);
+      expect(lines[3].text()).toContain("hasn't confirmed the page yet");
+      expect(lines[3].attributes("data-tone")).toBe("neutral");
       expect(rows(w)[0].findAll(sel("routing"))).toHaveLength(0);
       await rows(w)[1].find(sel("routing")).trigger("click");
       expect(push).toHaveBeenCalledWith({

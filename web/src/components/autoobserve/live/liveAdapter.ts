@@ -747,6 +747,12 @@ const todayOf = (t: TranslateFn, s: AutoObserveSuggestion, parts: Parts): Insigh
   tags: tagsFor(t, s),
 });
 
+// Null for a kind this page doesn't know, so a stale link never filters to an empty list.
+export const suggestionKindLabel = (t: TranslateFn, kind: string): I18nText | null => {
+  const known = Object.hasOwn(SUGGESTION_KIND, kind) ? SUGGESTION_KIND[kind] : undefined;
+  return known ? t(known.label) : null;
+};
+
 export const insightOf = (
   t: TranslateFn,
   zone: Zone,

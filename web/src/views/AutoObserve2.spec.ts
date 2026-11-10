@@ -25,6 +25,7 @@ import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
 import { MAIN_PAGED_CAP } from "@/components/autoobserve/live/incidentsCopy";
 import ThisWeek from "@/components/autoobserve/v2/ThisWeek.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
+import TopBarStatus from "@/components/autoobserve/v2/TopBarStatus.vue";
 import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
 import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
 import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
@@ -33,6 +34,7 @@ import HistoryDrawer from "@/components/autoobserve/v2/HistoryDrawer.vue";
 import SettingsDrawer from "@/components/autoobserve/v2/SettingsDrawer.vue";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
+import LiveHistory from "@/components/autoobserve/live/LiveHistory.vue";
 import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
 import AutoObserve2 from "./AutoObserve2.vue";
 
@@ -65,9 +67,16 @@ const quiet = SCENARIOS.find(
   (s) => scenarioData(s).requests.filter((r) => r.kind !== "fixNow").length === 0,
 );
 
+// The page header is the shared layout's; its slots render so the body and actions stay reachable.
+const PageLayoutStub = {
+  props: ["title", "subtitle", "back", "icon", "titleDataTest"],
+  template:
+    "<div><h1 :data-test='titleDataTest'>{{ title }}</h1><p>{{ subtitle }}</p><slot name='subtitle' /><slot name='actions' /><slot /></div>",
+};
+
 const mountView = () =>
   shallowMount(AutoObserve2, {
-    global: { plugins: [i18n, store] },
+    global: { plugins: [i18n, store], stubs: { OPageLayout: PageLayoutStub } },
   });
 
 const DrawerStub = {
@@ -85,9 +94,11 @@ const mountOpen = () =>
         LivePaged: true,
         LiveSuggestions: true,
         AllSuggestionsDrawer: true,
+        LiveHistory: true,
         HowItWorksDrawer: true,
         AutoObserveIssueDrawer: true,
         TopBar: true,
+        OPageLayout: PageLayoutStub,
       },
     },
   });
@@ -146,14 +157,15 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(wrapper.findComponent(ThisWeek).exists()).toBe(true);
     expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(true);
     expect(wrapper.findComponent(LivePaged).exists()).toBe(false);
-    expect(wrapper.findComponent(TopBar).props("live")).toBe(false);
+    expect(wrapper.findComponent(TopBarStatus).props("live")).toBe(false);
   });
 
   it("live mode hides only the scenario picker; the footer keeps See changes", () => {
     Object.assign(routeQuery, { live: "1", scenario: SCENARIOS[0] });
     const wrapper = mountView();
     expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(false);
-    const bar = wrapper.findComponent(TopBar);
+    expect(wrapper.findComponent(TopBar).exists()).toBe(true);
+    const bar = wrapper.findComponent(TopBarStatus);
     expect(bar.props("live")).toBe(true);
     expect(bar.props("checked")).toEqual({ kind: "loading" });
     expect(wrapper.findComponent(PageFooter).exists()).toBe(true);
@@ -216,6 +228,36 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     }
   });
 
+  it("a Slack suggestion link opens All suggestions on that item, and closing drops the link", async () => {
+    Object.assign(routeQuery, { suggestion: "sug-9" });
+    const wrapper = mountView();
+    await flushPromises();
+    const drawer = wrapper.findComponent(AllSuggestionsDrawer);
+    expect(drawer.props("open")).toBe(true);
+    expect(drawer.props("focusId")).toBe("sug-9");
+    expect(drawer.props("kind")).toBeNull();
+    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(false);
+    drawer.vm.$emit("update:open", false);
+    await flushPromises();
+    const query = replace.mock.calls.at(-1)?.[0].query;
+    expect(query.suggestion).toBeUndefined();
+    expect(query.suggestions).toBeUndefined();
+  });
+
+  it("a Slack grouped link opens All suggestions filtered to its kind", async () => {
+    localStorage.removeItem("autoobserve2.howItWorksSeen");
+    Object.assign(routeQuery, { suggestions: "no_absence_check" });
+    const wrapper = mountView();
+    await flushPromises();
+    const drawer = wrapper.findComponent(AllSuggestionsDrawer);
+    expect(drawer.props("open")).toBe(true);
+    expect(drawer.props("kind")).toBe("no_absence_check");
+    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(false);
+    drawer.vm.$emit("update:kind", null);
+    await flushPromises();
+    expect(replace.mock.calls.at(-1)?.[0].query.suggestions).toBeUndefined();
+  });
+
   it("live mode keeps the Changes page with an honest empty state, never the fixture ledger", async () => {
     Object.assign(routeQuery, { page: "activity", change: "c-1" });
     const wrapper = mountOpen();
@@ -233,19 +275,19 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(wrapper.findComponent(AllSuggestionsDrawer).props("open")).toBe(true);
   });
 
-  it("live History lists no fixture entries and sends the reader to the Issues page", async () => {
+  it("live History shows the live feed, no fixture entries, and can send the reader to Issues (G6)", async () => {
     const wrapper = mountOpen();
     await flushPromises();
     const history = wrapper.findComponent(HistoryDrawer);
     expect(history.props("entries")).toEqual([]);
     expect(wrapper.find('[data-test="autoobserve2-history-filter"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="autoobserve-live-empty-history"]').text()).toContain(
-      "No history yet",
-    );
+    const feed = wrapper.findComponent(LiveHistory);
+    expect(feed.exists()).toBe(true);
     wrapper.findComponent(TopBar).vm.$emit("open", "history");
     await flushPromises();
     expect(history.props("open")).toBe(true);
-    await wrapper.find('[data-test="autoobserve-live-empty-history-action"]').trigger("click");
+    feed.vm.$emit("see-issues");
+    await flushPromises();
     expect(history.props("open")).toBe(false);
     expect(push).toHaveBeenCalledTimes(1);
     expect(push.mock.calls[0][0].query.page).toBe("issues");
@@ -277,17 +319,13 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(wrapper.find('[data-test^="autoobserve-live-empty-"]').exists()).toBe(false);
   });
 
-  it("live mode keeps the scenario surface as a live-data note with a next step", async () => {
+  it("live mode shows no scenario surface and makes no claim about samples", async () => {
     const wrapper = mountOpen();
     await flushPromises();
     expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="autoobserve2-scenario-select"]').exists()).toBe(false);
-    const note = wrapper.find('[data-test="autoobserve2-scenario-live"]');
-    expect(note.text()).toContain("Live data");
-    expect(note.text()).toContain("Sample scenarios aren't shown");
-    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(false);
-    await wrapper.find('[data-test="autoobserve2-scenario-live-action"]').trigger("click");
-    expect(wrapper.findComponent(HowItWorksDrawer).props("open")).toBe(true);
+    expect(wrapper.find('[data-test="autoobserve2-scenario-live"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Sample scenarios");
   });
 
   it("fixture=1 shows the scenario picker and no live-data note", () => {

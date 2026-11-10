@@ -30612,7 +30612,7 @@
     },
     "view": {
       "standard": "Padrão",
-      "nerd": "Nerd",
+      "nerd": "Detailed",
       "standardTooltip": "A vista Padrão dá a leitura resumida: o que precisa de si e o que aconteceu nos últimos 7 dias",
       "nerdTooltip": "A vista Nerd mostra todos os detetores, loops e definições por completo",
       "label": "Vista"
@@ -32555,7 +32555,7 @@
     "paging": {
       "title": "Paging",
       "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show here as findings and never page.",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
       "routing": "On-call routing",
       "unavailable": "Paging is turned off for this deployment.",
       "denied": "{denied} {askAdmin}",

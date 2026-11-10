@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       variant="ghost-primary"
       size="sm"
-      class="self-start"
+      class="-ms-3 self-start"
       data-test="autoobserve-paging-routing"
       @click="openRouting"
     >

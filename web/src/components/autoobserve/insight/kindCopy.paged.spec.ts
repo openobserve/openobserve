@@ -94,8 +94,7 @@ describe("pagedFindingCopy (W2)", () => {
     expect(c.page?.routing).toBe(false);
   });
 
-  it("pending and absent make no claim", () => {
-    expect(copy(item({ page: page("pending") })).page).toBeNull();
+  it("an absent page makes no claim", () => {
     expect(copy(item()).page).toBeNull();
   });
 
@@ -156,5 +155,51 @@ describe("pagedFindingCopy (W2)", () => {
     const c = copy(i);
     expect(c.why).toBeNull();
     expect(c.next).toBeNull();
+  });
+
+  const BACK_US = Date.UTC(2026, 10, 9, 9, 25) * 1000;
+  const recovered = (i: AutoObserveIncidentItem, n: number[]) => {
+    for (const k of n) i.members![k] = { ...i.members![k], recovered_at: BACK_US };
+    return i;
+  };
+  const resolved = (i: AutoObserveIncidentItem) => {
+    i.incident.status = "resolved";
+    return i;
+  };
+
+  it("a resolved group says its streams came back, when, and drops the next step", () => {
+    const c = copy(resolved(recovered(item({ members: 3 }), [0, 1, 2])));
+    expect(c.why).toBe(
+      "ingest_1, ingest_2, and ingest_3 are sending data again. They stopped at 9:12 AM. Back at 9:25 AM.",
+    );
+    expect(c.next).toBeNull();
+  });
+
+  it("a resolved single stream says it came back", () => {
+    const i = resolved(item());
+    const c = copy(i);
+    expect(c.why).toBe("ingest_a (logs) is sending data again. It stopped at 9:12 AM.");
+    expect(c.next).toBeNull();
+  });
+
+  it("a partly recovered group lists the stopped streams and names the ones back", () => {
+    const c = copy(recovered(item({ members: 3 }), [1]));
+    expect(c.why).toBe(
+      "ingest_1 and ingest_3 have sent no data since 9:12 AM. Sending again: ingest_2.",
+    );
+    expect(c.next).toBe("One cause is likely, such as a shared collector.");
+  });
+
+  it("a resolved drop says the volume is back to usual", () => {
+    const c = copy(resolved(item({ kind: "stream_drop" })));
+    expect(c.why).toBe("ingest_a (logs) is back to its usual volume. It dropped at 9:12 AM.");
+  });
+
+  it("a pending page says the page is waiting on the on-call service", () => {
+    expect(copy(item({ page: page("pending") })).page).toEqual({
+      tone: "neutral",
+      text: "Paging on-call: the on-call service hasn't confirmed the page yet.",
+      routing: false,
+    });
   });
 });
