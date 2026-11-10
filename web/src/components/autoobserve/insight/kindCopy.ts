@@ -19,6 +19,7 @@ import type {
   AutoObserveCell,
   AutoObserveCoverageRow,
   AutoObserveIncidentItem,
+  AutoObserveIncidentMember,
   AutoObserveSuggestion,
 } from "@/services/autoobserve";
 import { formatWhen } from "../live/liveCopy";
@@ -835,6 +836,8 @@ const pageLine = (t: TranslateFn, item: AutoObserveIncidentItem): PageLine | nul
       return { tone: "warning", text: t("insight.kind.paged.page.unrouted"), routing: true };
     case "failed":
       return { tone: "error", text: t("insight.kind.paged.page.failed"), routing: false };
+    case "pending":
+      return { tone: "neutral", text: t("insight.kind.paged.page.pending"), routing: false };
     default:
       return null;
   }
@@ -854,30 +857,61 @@ export const pagedFindingCopy = (
   const time = formatWhen(first_seen_at / 1000, zone.locale, zone.timeZone, nowMs);
   const members = item.members ?? [];
   const many = members.length > 1;
-  const shown = members.flatMap((m) => m.stream_name ?? []).slice(0, GROUP_NAMES);
-  const rest = members.length - shown.length;
-  const streams = listOf(
-    zone.locale,
-    [
-      ...shown,
-      ...(rest > 0
-        ? [String(t("autoobserveLive.suggestions.moreNames", { count: rest }, rest))]
-        : []),
-    ],
-    "conjunction",
-  );
-  const why = many
-    ? t(`insight.kind.paged.${kind}.whyMany`, { streams, time })
+  const names = (list: AutoObserveIncidentMember[]) => {
+    const shown = list.flatMap((m) => m.stream_name ?? []).slice(0, GROUP_NAMES);
+    const rest = list.length - shown.length;
+    return listOf(
+      zone.locale,
+      [
+        ...shown,
+        ...(rest > 0
+          ? [String(t("autoobserveLive.suggestions.moreNames", { count: rest }, rest))]
+          : []),
+      ],
+      "conjunction",
+    );
+  };
+  const headline = many
+    ? t(`insight.kind.paged.${kind}.headline`, { count: count(members.length, zone.locale) })
+    : null;
+  // A resolved incident has no next step, and its streams read as back, not stopped.
+  if (item.incident.status === "resolved") {
+    const backAt = Math.max(0, ...members.map((m) => m.recovered_at ?? 0));
+    const why = many
+      ? t(`insight.kind.paged.${kind}.recoveredMany`, { streams: names(members), time })
+      : t(`insight.kind.paged.${kind}.recovered`, {
+          stream: raw(stream_name),
+          type: raw(stream_type),
+          time,
+        });
+    const at = backAt
+      ? ` ${t("insight.kind.paged.recoveredAt", {
+          time: formatWhen(backAt / 1000, zone.locale, zone.timeZone, nowMs),
+        })}`
+      : "";
+    return { headline, page, why: raw(`${why}${at}`), next: null };
+  }
+  const stopped = members.filter((m) => m.recovered_at == null);
+  const back = members.filter((m) => m.recovered_at != null);
+  const still = back.length && stopped.length ? stopped : members;
+  const whyBase = many
+    ? t(`insight.kind.paged.${kind}.${still.length > 1 ? "whyMany" : "whyOne"}`, {
+        streams: names(still),
+        stream: raw(still[0]?.stream_name ?? stream_name),
+        time,
+      })
     : t(`insight.kind.paged.${kind}.why`, {
         stream: raw(stream_name),
         type: raw(stream_type),
         time,
       });
+  const why =
+    many && back.length && stopped.length
+      ? raw(`${whyBase} ${t(`insight.kind.paged.${kind}.recoveredSome`, { streams: names(back) })}`)
+      : whyBase;
   const next = String(t(`insight.kind.paged.${kind}.${many ? "nextMany" : "next"}`));
   return {
-    headline: many
-      ? t(`insight.kind.paged.${kind}.headline`, { count: count(members.length, zone.locale) })
-      : null,
+    headline,
     page,
     why,
     next: raw(page?.routing ? `${next} ${t("insight.kind.paged.nextRouting")}` : next),

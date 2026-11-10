@@ -588,7 +588,7 @@ describe("LivePaged (D9-web)", () => {
       expect(w.text()).not.toContain("for your on-call team");
     });
 
-    it("each outcome draws its own line; pending and absent draw none", async () => {
+    it("each outcome draws its own line, pending included", async () => {
       api.mockResolvedValueOnce(
         page([
           withPage(0, "paged", "SRE"),
@@ -606,7 +606,8 @@ describe("LivePaged (D9-web)", () => {
       expect(lines[1].attributes("data-tone")).toBe("warning");
       expect(lines[2].text()).toContain("Paging failed");
       expect(lines[2].attributes("data-tone")).toBe("error");
-      expect(lines[3].exists()).toBe(false);
+      expect(lines[3].text()).toContain("hasn't confirmed the page yet");
+      expect(lines[3].attributes("data-tone")).toBe("neutral");
       expect(rows(w)[0].findAll(sel("routing"))).toHaveLength(0);
       await rows(w)[1].find(sel("routing")).trigger("click");
       expect(push).toHaveBeenCalledWith({
