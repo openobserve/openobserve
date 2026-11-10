@@ -1623,23 +1623,26 @@ async fn handle_composite_alert_trigger(
                     .await
             };
             delivery_error = composite_delivery_error(&delivery_result, incident_notify_error);
+            let cycle_ends = composite_cycle_ends(
+                &delivery_result,
+                trigger.retries,
+                get_scheduler_max_retries(),
+            );
             match delivery_result {
-                Ok(outcome) if outcome.failed.is_empty() => {
-                    scheduled_data.notified_destinations.clear();
+                Ok(outcome) if cycle_ends => {
                     scheduled_data.last_notified_level = Some(evaluated.level.to_i32());
                     scheduled_data.delivery_silenced_until = definition
                         .definition
                         .silence_seconds
                         .checked_mul(1_000_000)
                         .and_then(|window| now.checked_add(window));
-                    trigger.retries = 0;
+                    if outcome.failed.is_empty() {
+                        trigger.retries = 0;
+                    }
                 }
                 Ok(outcome) => {
-                    for destination in outcome.succeeded {
-                        if !scheduled_data.notified_destinations.contains(&destination) {
-                            scheduled_data.notified_destinations.push(destination);
-                        }
-                    }
+                    scheduled_data.notified_destinations =
+                        merge_ledger(&scheduled_data.notified_destinations, &outcome.succeeded);
                     trigger.retries = trigger.retries.saturating_add(1);
                     delivery_retry_at = Some(now.saturating_add(10_000_000));
                 }
@@ -1649,8 +1652,10 @@ async fn handle_composite_alert_trigger(
                         trigger.org,
                         definition.definition.id
                     );
-                    trigger.retries = trigger.retries.saturating_add(1);
-                    delivery_retry_at = Some(now.saturating_add(10_000_000));
+                    if !cycle_ends {
+                        trigger.retries = trigger.retries.saturating_add(1);
+                        delivery_retry_at = Some(now.saturating_add(10_000_000));
+                    }
                 }
             }
         }
@@ -1757,6 +1762,12 @@ async fn handle_composite_alert_trigger(
             now,
         )
         .await;
+    }
+
+    // A list kept past the cycle would skip those destinations on the next firing.
+    if delivery_retry_at.is_none() {
+        scheduled_data.notified_destinations.clear();
+        trigger.retries = 0;
     }
 
     log::info!(
@@ -1876,6 +1887,18 @@ fn composite_delivery_error(
             delivery_error.unwrap_or_default(),
             incident_error,
         )),
+    }
+}
+
+/// Whether this send ends a composite's notification cycle instead of retrying what failed.
+fn composite_cycle_ends(
+    delivery: &Result<NotificationOutcome, AlertError>,
+    retries: i32,
+    max_retries: i32,
+) -> bool {
+    match delivery {
+        Ok(outcome) => outcome.failed.is_empty() || retries + 1 >= max_retries,
+        Err(_) => retries + 1 >= max_retries,
     }
 }
 
@@ -9074,6 +9097,33 @@ mod tests {
         let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].stream_name.as_str(), "output-stream");
+    }
+
+    #[test]
+    fn test_a_failed_composite_send_retries_only_up_to_the_limit() {
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(!composite_cycle_ends(&failed, 0, 3));
+        assert!(!composite_cycle_ends(&failed, 1, 3));
+        assert!(composite_cycle_ends(&failed, 2, 3));
+    }
+
+    #[test]
+    fn test_a_composite_partial_failure_retries_only_up_to_the_limit() {
+        let partial = Ok(NotificationOutcome {
+            succeeded: vec!["a".to_string()],
+            failed: vec!["b".to_string()],
+            ..Default::default()
+        });
+        assert!(!composite_cycle_ends(&partial, 0, 3));
+        assert!(!composite_cycle_ends(&partial, 1, 3));
+        assert!(composite_cycle_ends(&partial, 2, 3));
+        let delivered = Ok(NotificationOutcome {
+            succeeded: vec!["a".to_string(), "b".to_string()],
+            ..Default::default()
+        });
+        assert!(composite_cycle_ends(&delivered, 0, 3));
     }
 
     #[test]

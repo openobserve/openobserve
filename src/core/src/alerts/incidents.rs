@@ -41,6 +41,9 @@ const UNKNOWN_SERVICE: &str = "unknown";
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 /// How many of an alert's latest firings a Firing run after a window looks through for open pages.
 const MUTED_RESOLVES_SCANNED: u64 = 10;
+/// Pause between two attempts of one incident notification.
+#[cfg(feature = "enterprise")]
+const INCIDENT_NOTIFY_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -477,7 +480,7 @@ async fn send_incident_notifications_inner(
             &incident_url,
         );
         for dest_name in &send.dest_names {
-            match crate::alerts::alert::send_templated_to_destination(
+            match notify_incident_destination(
                 org_id,
                 &subject,
                 dest_name,
@@ -510,6 +513,45 @@ async fn send_incident_notifications_inner(
         );
         Some(error)
     }
+}
+
+/// Retries a failed send in place: later firings join as repeats and never re-send it.
+#[cfg(feature = "enterprise")]
+async fn notify_incident_destination(
+    org_id: &str,
+    subject: &str,
+    dest_name: &str,
+    alert_template: Option<&config::meta::destinations::Template>,
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+) -> Result<String, anyhow::Error> {
+    let attempts = infra::scheduler::get_scheduler_max_retries();
+    let mut attempt = 1;
+    loop {
+        match crate::alerts::alert::send_templated_to_destination(
+            org_id,
+            subject,
+            dest_name,
+            alert_template,
+            ctx,
+        )
+        .await
+        {
+            Err(error) if retries_incident_notify(attempt, attempts) => {
+                log::warn!(
+                    "[incidents] notify {dest_name} failed for {org_id}, attempt {attempt}/{attempts}: {error}"
+                );
+                attempt += 1;
+                tokio::time::sleep(INCIDENT_NOTIFY_RETRY_DELAY).await;
+            }
+            result => return result,
+        }
+    }
+}
+
+/// Whether a failed incident send is tried again within the scheduler retry limit.
+#[cfg(feature = "enterprise")]
+fn retries_incident_notify(attempt: i32, attempts: i32) -> bool {
+    attempt < attempts
 }
 
 /// Point `ctx` at the incident: its link, and the `incident_*` template variables.
@@ -4701,5 +4743,14 @@ mod tests {
         assert_eq!(names, ["allowed"]);
         let ids: Vec<_> = composites.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(ids, ["c_allowed"]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_incident_notification_retries_only_up_to_the_limit() {
+        assert!(retries_incident_notify(1, 3));
+        assert!(retries_incident_notify(2, 3));
+        assert!(!retries_incident_notify(3, 3));
+        assert!(!retries_incident_notify(1, 0));
     }
 }
