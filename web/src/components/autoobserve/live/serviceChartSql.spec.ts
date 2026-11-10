@@ -81,7 +81,7 @@ describe("pickErrorField and logsSql", () => {
     ).toEqual({ kind: "level", field: "severity_text" });
     const sql = logsSql("k8s_app_logs", FILTERS, "24h", { kind: "level", field: "level" });
     expect(sql).toContain(
-      `count(*) FILTER (WHERE lower("level") IN ('error', 'err', 'fatal', 'critical', 'crit', 'alert', 'emerg', 'emergency')) AS e`,
+      `count(*) FILTER (WHERE lower("level") IN ('error', 'fatal', 'critical', 'err', 'crit', 'alert', 'emerg', 'emergency')) AS e`,
     );
     expect(sql).toContain(`WHERE "service_name" = 'svc-b'`);
   });

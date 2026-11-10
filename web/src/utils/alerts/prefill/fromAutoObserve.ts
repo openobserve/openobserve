@@ -69,7 +69,17 @@ const SILENCE_MINUTES = 60;
 const MIN_LATENCY_SPANS = 20;
 const UTILIZATION_LIMIT = 0.9;
 const RESTART_REASONS = ["BackOff", "OOMKilling"];
-const ERROR_LEVELS = ["error", "fatal", "critical", "err", "crit", "alert", "emerg"];
+/** Log levels that count as errors; the service charts and every drafted alert read the same list. */
+export const ERROR_LEVELS = [
+  "error",
+  "fatal",
+  "critical",
+  "err",
+  "crit",
+  "alert",
+  "emerg",
+  "emergency",
+];
 
 /** Who owns a service's alerts: the folder most of them live in, else the org default (PD-4). */
 export interface TeamPick {

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { ERROR_LEVELS } from "@/utils/alerts/prefill/fromAutoObserve";
 import {
   STEPS,
   type ChartRange,
@@ -43,7 +44,6 @@ export const LIVE_SIGNALS: LiveChartSignal[] = ["requests", "errors", "latency"]
 
 // The first text field present wins, so a stream with several level fields uses the most specific one.
 const LEVEL_FIELDS = ["severity_text", "level", "severity", "log_level"];
-const ERROR_LEVELS = ["error", "err", "fatal", "critical", "crit", "alert", "emerg", "emergency"];
 // lower() fails on a numeric column, and real deployments store severity or level as a number.
 const TEXT_TYPES = new Set(["Utf8", "LargeUtf8", "Utf8View"]);
 const BUCKET: Record<ChartRange, string> = {
