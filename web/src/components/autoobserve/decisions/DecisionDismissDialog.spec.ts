@@ -155,6 +155,15 @@ describe("DecisionDismissDialog", () => {
     wrapper = null;
   });
 
+  it("leaves_date_checks_to_the_schema_not_the_browser", async () => {
+    await mountDialog();
+    expect(
+      document.body
+        .querySelector('[data-test="decision-dismiss-dialog"] form')
+        ?.hasAttribute("novalidate"),
+    ).toBe(true);
+  });
+
   it("planned_work_needs_an_end_within_seven_days", () => {
     const now = new Date(2026, 10, 9, 14, 5).getTime();
     const schema = makeDecisionDismissSchema(t, () => now);

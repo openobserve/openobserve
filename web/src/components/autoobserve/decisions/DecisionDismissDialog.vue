@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
-    <OForm :id="formId" :form="form">
+    <!-- The schema words a bad end date; the browser's own bubble would use another date format. -->
+    <OForm :id="formId" :form="form" novalidate>
       <div class="flex flex-col gap-3">
         <OFormRadioGroup
           name="reason"
