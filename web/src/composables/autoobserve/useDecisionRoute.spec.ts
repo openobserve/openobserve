@@ -127,6 +127,60 @@ describe("useDecisionRoute", () => {
     vi.restoreAllMocks();
   });
 
+  it("the_written_toast_closes_when_its_undo_is_clicked", async () => {
+    vi.mocked(autoobserveDecisions.decide).mockResolvedValue(decided("f1") as never);
+    await mountRoute();
+    await route.decide(body("f1"), "nightly-summary");
+    await settle();
+    const record = openToasts()[0];
+    record.action!.handler();
+    await settle();
+    expect(toastRecords.find((r) => r.id === record.id)?.open).toBe(false);
+  });
+
+  it("a_batch_that_marked_one_alert_names_it", async () => {
+    vi.mocked(autoobserveDecisions.decideBatch).mockResolvedValue({
+      data: {
+        results: [
+          { index: 0, family: "alert_finding", id: "f1", status: 200, result: decided("f1").data },
+        ],
+        written: 1,
+        unchanged: 0,
+        failed: 0,
+      },
+    } as never);
+    await mountRoute();
+    await route.decideBatch([body("f1")], () => "nightly-summary");
+    await settle();
+    expect(String(openToasts()[0].message)).toBe("Nightly-summary marked as intended report.");
+  });
+
+  it("an_undo_the_server_answers_unchanged_says_already_undone_not_undone", async () => {
+    vi.mocked(autoobserveDecisions.undo).mockResolvedValue({
+      data: { ...fixture.undone, change: "unchanged" },
+    } as never);
+    await mountRoute();
+    await route.undo([{ org: "default", view: view("f1"), title: "ingress-upstream-blips" }]);
+    await settle();
+    const toasts = openToasts();
+    expect(toasts).toHaveLength(1);
+    expect(String(toasts[0].message)).toBe("Already undone. Nothing changed.");
+    expect(toasts[0].variant).toBe("info");
+  });
+
+  it("a_group_undo_counts_only_what_it_changed", async () => {
+    vi.mocked(autoobserveDecisions.undo)
+      .mockResolvedValueOnce({ data: fixture.undone } as never)
+      .mockResolvedValueOnce({ data: { ...fixture.undone, change: "unchanged" } } as never);
+    await mountRoute();
+    await route.undo([
+      { org: "default", view: view("f1"), title: "a" },
+      { org: "default", view: view("f2"), title: "b" },
+    ]);
+    await settle();
+    expect(String(openToasts()[0].message)).toBe("Undone: a is shown again.");
+  });
+
   it("a_write_that_lands_after_an_org_switch_shows_no_toast_and_refreshes_its_own_org", async () => {
     await mountRoute();
     const answer = deferred<{ data: DecisionResult }>();
@@ -168,8 +222,8 @@ describe("useDecisionRoute", () => {
     vi.mocked(autoobserveDecisions.decideBatch)
       .mockResolvedValueOnce(batchOf("f1") as never)
       .mockResolvedValueOnce(batchOf("f2") as never);
-    await route.decideBatch([body("f1")], () => "nightly-summary");
-    await route.decideBatch([body("f2")], () => "daily-cost");
+    await route.decideBatch([body("f1")], () => "Nightly-summary");
+    await route.decideBatch([body("f2")], () => "Nightly-summary");
     expect(openToasts()).toHaveLength(1);
     expect(openToasts()[0].count).toBe(2);
     openToasts()[0].action?.handler();

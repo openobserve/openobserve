@@ -51,6 +51,17 @@ describe("slackInsightsCopy", () => {
     expect(digestWhen(t, "en-US", at("2026-11-08T14:00:00Z"), NY, NOW)).toBe("Nov 8 09:00");
   });
 
+  it("counts the calibration findings the digest posted, when the server sends them", () => {
+    expect(
+      digestCounts(t, "en-US", {
+        needs_attention: 0,
+        suggestions: 21,
+        calibration_runs: 1,
+        calibration_findings: 2,
+      }),
+    ).toBe("21 suggestions, 2 calibration findings");
+  });
+
   it("lists only the digest counts above zero, with plurals", () => {
     expect(
       digestCounts(t, "en-US", { needs_attention: 1, suggestions: 0, calibration_runs: 2 }),

@@ -19,20 +19,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="copy.title(alertTitle)"
-    :neutral-button-label="t('common.cancel')"
-    neutral-button-variant="ghost"
-    :secondary-button-label="t('insight.decisions.apply.edit')"
+    :neutral-button-label="canApplyHere ? t('insight.decisions.apply.edit') : undefined"
+    neutral-button-variant="outline"
+    :neutral-button-loading="opening"
+    :secondary-button-label="t('common.cancel')"
     secondary-button-variant="outline"
-    :secondary-button-loading="opening"
-    :primary-button-label="canApplyHere ? t('insight.decisions.apply.button') : undefined"
-    primary-button-data-test="review-change-apply"
-    :primary-button-disabled="!applicable"
-    :primary-button-loading="applying"
+    :primary-button-label="
+      canApplyHere ? t('insight.decisions.apply.button') : t('insight.decisions.apply.edit')
+    "
+    :primary-button-data-test="canApplyHere ? 'review-change-apply' : 'review-change-edit'"
+    :primary-button-disabled="canApplyHere && !applicable"
+    :primary-button-loading="canApplyHere ? applying : opening"
     data-test="review-change-dialog"
     @update:open="emit('update:open', $event)"
-    @click:neutral="emit('update:open', false)"
-    @click:secondary="openEditor"
-    @click:primary="apply"
+    @click:neutral="openEditor"
+    @click:secondary="emit('update:open', false)"
+    @click:primary="canApplyHere ? apply() : openEditor()"
   >
     <div class="flex flex-col gap-3">
       <p
@@ -89,15 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <!-- The note promises an undoable apply, so it shows only where Apply is offered. -->
       <div v-if="canApplyHere" class="grid">
-        <OText
-          variant="meta"
-          as="p"
-          class="col-start-1 row-start-1"
-          :class="{ invisible: !!writeNotice }"
-          :aria-hidden="writeNotice ? 'true' : undefined"
+        <p
+          class="text-text-secondary col-start-1 row-start-1 text-xs"
+          :class="{ invisible: !!writeNotice || isLocked }"
+          :aria-hidden="writeNotice || isLocked ? 'true' : undefined"
           data-test="review-change-note"
-          >{{ t("insight.decisions.apply.note") }}</OText
         >
+          {{ t("insight.decisions.apply.note") }}
+        </p>
         <p
           v-if="writeNotice"
           class="col-start-1 row-start-1 flex items-start gap-1.5 text-xs"
@@ -227,10 +228,13 @@ const rows = computed(() =>
 const where = computed<I18nText | null>(() => {
   const alert = change.value?.alert;
   if (!alert) return null;
-  const params = {
-    folder: raw(alert.folder ?? "default"),
-    destinations: copy.value.value("destinations", alert.destinations),
-  };
+  const folder = raw(alert.folder ?? "default");
+  if (!alert.destinations.length) {
+    return alert.team
+      ? t("insight.decisions.apply.whereTeamNoOne", { folder, team: raw(alert.team) })
+      : t("insight.decisions.apply.whereNoOne", { folder });
+  }
+  const params = { folder, destinations: copy.value.value("destinations", alert.destinations) };
   return alert.team
     ? t("insight.decisions.apply.whereTeam", { ...params, team: raw(alert.team) })
     : t("insight.decisions.apply.where", params);
@@ -247,15 +251,18 @@ const readNotice = computed<{ variant: Variant; text: I18nText } | null>(() => {
   if (offline.value) return { variant: "info", text: t("insight.decisions.apply.offline") };
   if (gone.value) return { variant: "warning", text: t("insight.decisions.apply.gone") };
   const locked = preview.data.value?.locked;
-  if (locked) return { variant: "error", text: raw(locked.message) };
+  if (locked) return { variant: "error", text: decisions.value.refusalText(locked) };
   if (preview.isError.value) {
     const refusal = refusalOf(preview.error.value);
     return refusal
-      ? { variant: "error", text: raw(refusal.message) }
+      ? { variant: "error", text: decisions.value.refusalText(refusal) }
       : { variant: "error", text: t("insight.decisions.apply.loadFailed") };
   }
   return null;
 });
+
+/** A refused reader is never promised an undoable apply. */
+const isLocked = computed(() => !!preview.data.value?.locked || !!refusalOf(preview.error.value));
 
 const applicable = computed(
   () =>
@@ -271,8 +278,12 @@ const writeNoticeOf = (error: unknown): { variant: Variant; text: I18nText } => 
     ?.response;
   if (response?.status === 409 && response.data?.error === "alert_changed")
     return { variant: "warning", text: t("insight.decisions.apply.changed") };
+  if (isItemGone(error)) return { variant: "warning", text: t("insight.decisions.apply.gone") };
   return decisions.value.writeError(error);
 };
+
+const statusOf = (error: unknown) =>
+  (error as { response?: { status?: number } } | null)?.response?.status;
 
 async function apply() {
   const current = preview.data.value;
@@ -291,10 +302,18 @@ async function apply() {
       },
       title,
     );
-    recordApplied({ org, view: result.decision, title, fields: fields.value });
+    recordApplied({
+      org,
+      view: result.decision,
+      title,
+      fields: fields.value,
+      alertId: props.target.alertId,
+    });
     emit("update:open", false);
   } catch (error) {
     writeNotice.value = writeNoticeOf(error);
+    // A conflict or a gone finding means the alert moved on, so the values shown are re-read.
+    if (isItemGone(error) || statusOf(error) === 409) void preview.refetch();
   } finally {
     applying.value = false;
   }

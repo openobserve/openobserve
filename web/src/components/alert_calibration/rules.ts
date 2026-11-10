@@ -399,6 +399,35 @@ export const PATTERN_EVIDENCE: Record<NotWorkingPattern, EvidenceField[]> = {
   ],
 };
 
+/** A short-blips noise finding writes its own columns and none of the noise ones. */
+const SHORT_BLIPS_EVIDENCE: EvidenceField[] = [
+  {
+    column: "evidence_shortblips_complete_episodes",
+    labelKey: "alertCalibration.evidence.blipEpisodes",
+    format: "count",
+  },
+  {
+    column: "evidence_shortblips_would_not_alert",
+    labelKey: "alertCalibration.evidence.blipsWouldNotAlert",
+    format: "count",
+  },
+  {
+    column: "evidence_shortblips_interval_secs",
+    labelKey: "alertCalibration.evidence.checkInterval",
+    format: "seconds",
+  },
+  {
+    column: "evidence_shortblips_current_pending_secs",
+    labelKey: "alertCalibration.evidence.holdNow",
+    format: "seconds",
+  },
+  {
+    column: "evidence_shortblips_suggested_pending_secs",
+    labelKey: "alertCalibration.evidence.holdSuggested",
+    format: "seconds",
+  },
+];
+
 const isNotWorkingPattern = (value: unknown): value is NotWorkingPattern =>
   typeof value === "string" && Object.hasOwn(PATTERN_EVIDENCE, value);
 
@@ -419,6 +448,9 @@ export const evidenceFor = (record: DigestRecord & { rule_id: RuleId }): Evidenc
     if (record.evidence_failure_evaluation_errors == null) {
       return ERROR_ROWS.filter((field) => isShown(record, field));
     }
+  }
+  if (record.rule_id === "noise" && record.pattern === "short_blips") {
+    return SHORT_BLIPS_EVIDENCE.filter((field) => isShown(record, field));
   }
   return RULE_META[record.rule_id].evidence.filter(
     (field) => !field.optional || record[field.column] != null,

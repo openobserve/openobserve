@@ -65,20 +65,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <template v-if="view === 'dismissed'">
-        <AlertCalibrationDismissedList />
-        <DecisionsDismissedList v-if="decisionRoute.enabled.value" />
+        <DecisionsDismissedList v-if="decisionRoute.transport.value === 'decision'" />
+        <AlertCalibrationDismissedList v-else-if="decisionRoute.transport.value !== 'pending'" />
       </template>
 
-      <OEmptyState
-        v-else-if="data.error.value"
-        size="hero"
-        illustration="broken-panel"
-        variant="error"
-        :title="t('alertCalibration.digests.errorTitle')"
-        :description="readErrorCopy(t, data.error.value)"
-        :action-label="t('alertCalibration.retry')"
-        action-icon="refresh"
-        @action="refresh"
+      <LiveNoticeState
+        v-else-if="forbidden || data.error.value"
+        size="block"
+        :notice="boardNotice"
+        :busy="data.loading.value"
+        :data-test="
+          forbidden ? 'alert-calibration-dashboard-no-access' : 'alert-calibration-dashboard-error'
+        "
+        retry-test="alert-calibration-dashboard-retry"
+        @retry="refresh"
       />
 
       <OEmptyState
@@ -148,9 +148,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <template v-if="view === 'dismissed'">
-          <AlertCalibrationDismissedList />
-          <DecisionsDismissedList v-if="decisionRoute.enabled.value" />
+          <DecisionsDismissedList v-if="decisionRoute.transport.value === 'decision'" />
+          <AlertCalibrationDismissedList v-else-if="decisionRoute.transport.value !== 'pending'" />
         </template>
+
+        <OText
+          v-if="view === 'open' && focusGone"
+          variant="meta"
+          as="p"
+          data-test="alert-calibration-dashboard-finding-gone"
+        >
+          {{ t("alertCalibration.dashboard.findingGone") }}
+        </OText>
 
         <OBanner
           v-if="view === 'open' && dismissals.unknown.value"
@@ -201,7 +210,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="glass"
           :data-test="`alert-calibration-dashboard-rule-${group.rule_id}`"
         >
-          <OCollapsible :icon="RULE_META[group.rule_id].icon" trigger-class="px-4 py-3">
+          <OCollapsible
+            :icon="RULE_META[group.rule_id].icon"
+            trigger-class="px-4 py-3"
+            :default-open="group.findings.some((f) => isFocused(f))"
+          >
             <template #trigger>
               <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">
                 {{ t(ruleLabelKey(group.rule_id, version)) }}
@@ -209,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 v-if="group.severity"
                 :variant="SEVERITY_BADGE[group.severity]"
-                size="xs"
+                size="sm"
                 shape="rounded"
               >
                 {{ t(SEVERITY_LABEL[group.severity]) }}
@@ -217,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 v-if="group.pending"
                 variant="warning-soft"
-                size="xs"
+                size="sm"
                 shape="rounded"
                 data-test="alert-calibration-dashboard-group-pending"
               >
@@ -226,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 v-else-if="!RULE_META[group.rule_id].clusterWide"
                 :variant="group.findings.length ? 'default-soft' : 'default-outline'"
-                size="xs"
+                size="sm"
                 shape="rounded"
               >
                 {{
@@ -266,9 +279,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     finding.finding_id ?? finding.alert_id ?? finding.alert_name ?? finding.rule_id
                   "
                   class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2"
+                  :class="{ 'ring-accent ring-2 ring-inset': isFocused(finding) }"
+                  :data-focused="isFocused(finding) || undefined"
                   :data-test="`alert-calibration-dashboard-alert-${finding.alert_id}`"
                 >
-                  <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="xs" shape="rounded">
+                  <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="sm" shape="rounded">
                     {{ t(SEVERITY_LABEL[finding.severity]) }}
                   </OBadge>
                   <div class="flex min-w-0 flex-1 basis-56 flex-wrap items-baseline gap-x-2">
@@ -277,9 +292,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       titleAfterName(finding)
                     }}</OText>
                   </div>
+                  <template v-if="appliedOf(finding)">
+                    <OBadge
+                      variant="default-soft"
+                      size="sm"
+                      shape="rounded"
+                      data-test="alert-calibration-dashboard-applied"
+                    >
+                      {{ t("alertCalibration.dashboard.applied") }}
+                    </OBadge>
+                    <OButton
+                      variant="outline"
+                      size="xs"
+                      :loading="decisionRoute.isUndoing(appliedOf(finding)!.decision_id)"
+                      data-test="alert-calibration-dashboard-undo-apply"
+                      @click="undoApply(finding)"
+                    >
+                      {{ insightCtaLabel(t, "undo") }}
+                    </OButton>
+                  </template>
                   <OButton
-                    v-if="changeOf(finding)"
-                    variant="ghost-primary"
+                    v-else-if="changeOf(finding)"
+                    variant="outline"
                     size="xs"
                     data-test="alert-calibration-dashboard-review-change"
                     @click="reviewChange(finding)"
@@ -288,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="ctasOf(finding).review"
-                    variant="ghost-primary"
+                    variant="outline"
                     size="xs"
                     :loading="reviewing === finding.finding_id"
                     data-test="alert-calibration-dashboard-review-alert"
@@ -298,17 +332,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="finding.alert_id"
-                    variant="ghost-muted"
+                    variant="ghost-primary"
                     size="xs"
-                    icon-left="open-in-new"
                     data-test="alert-calibration-dashboard-open-alert"
                     @click="openAlert(finding)"
                   >
-                    {{ t("alertCalibration.dashboard.openAlert") }}
+                    {{ insightCtaLabel(t, "openAlert") }}
                   </OButton>
                   <OButton
                     v-if="ctasOf(finding).logs"
-                    variant="ghost-muted"
+                    variant="ghost-primary"
                     size="xs"
                     data-test="alert-calibration-dashboard-logs"
                     @click="openLogs(finding)"
@@ -319,7 +352,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="canAsk && ctasOf(finding).ai"
                     variant="ghost-primary"
                     size="xs"
-                    icon-left="auto-awesome"
                     data-test="alert-calibration-dashboard-ask-ai"
                     @click="ask(finding)"
                   >
@@ -327,9 +359,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="isDismissable(finding)"
-                    variant="ghost-muted"
+                    variant="ghost-primary"
                     size="xs"
-                    icon-left="visibility-off"
                     data-test="alert-calibration-dashboard-dismiss"
                     @click="openDismiss(finding)"
                   >
@@ -339,9 +370,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ul>
               <div class="border-border-default flex justify-end border-t px-3 py-1.5">
                 <OButton
-                  variant="ghost-muted"
+                  variant="ghost-primary"
                   size="xs"
-                  icon-left="fact-check"
                   data-test="alert-calibration-dashboard-view-evidence"
                   @click="viewEvidence(group.rule_id)"
                 >
@@ -366,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from "vue";
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
@@ -385,7 +415,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
-import { readErrorCopy } from "@/services/alert_calibration";
+import { httpStatus, readErrorCopy } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import { useActiveDismissals } from "@/composables/alertCalibration/useDismissals";
@@ -395,7 +425,11 @@ import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import AlertCalibrationDismissedList from "./AlertCalibrationDismissedList.vue";
 import DecisionsDismissedList from "@/components/autoobserve/decisions/DecisionsDismissedList.vue";
-import { useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
+import {
+  appliedDecisionsQuery,
+  dismissedDecisionsQuery,
+  useDecisionRoute,
+} from "@/composables/autoobserve/useDecisionRoute";
 import ReviewChangeDialog from "@/components/autoobserve/decisions/ReviewChangeDialog.vue";
 import type { ReviewChangeTarget } from "@/components/autoobserve/decisions/appliedChanges";
 import { applySuggestionsOf } from "./applySuggestion";
@@ -410,6 +444,8 @@ import {
   type DismissableFinding,
 } from "./dismissals";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
+import { readNotice } from "./notices";
+import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
 import {
   countOrDash,
   coverageNoteRows,
@@ -428,7 +464,7 @@ import {
   type RuleId,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
+import { coverageBadge, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
 import { RULE_META, ruleLabelKey, rulesShownFor } from "./rules";
 import { openAlertReview } from "./reviewAlert";
 import { rowCtas, type RowCtas } from "./rowCtas";
@@ -490,6 +526,18 @@ const loading = computed(
     !dismissals.settled.value,
 );
 const latest = computed(() => data.data.value?.latest ?? null);
+const boardNotice = computed(() =>
+  readNotice(
+    t,
+    forbidden.value ? { response: { status: 403 } } : data.error.value,
+    t("alertCalibration.dashboard.loadFailedTitle"),
+    readErrorCopy(t, data.error.value),
+  ),
+);
+/** A 403 is a missing permission, not a failure, so it gets no Retry. */
+const forbidden = computed(
+  () => httpStatus(data.error.value) === 403 || httpStatus(configQuery.error.value) === 403,
+);
 const version = computed(() => latest.value?.schema_version ?? 1);
 /** The list and the records read can reach nodes of different cache freshness, so either one's unknown count makes the board unknown. */
 const countsPending = computed(
@@ -513,15 +561,43 @@ const hiddenTotal = computed(
 );
 const allDismissed = computed(() => openTotal.value === 0 && hiddenTotal.value > 0);
 
-/** The list's own total, kept apart from the run's counts (P5a-Q4). */
-const dismissedLabel = computed(() =>
-  copy.value.filterDismissed(
-    dismissals.unknown.value ? null : (dismissals.query.data.value?.total ?? 0),
-  ),
+const appliedRead = useQuery(() => ({
+  ...appliedDecisionsQuery(orgId.value),
+  enabled: decisionRoute.transport.value === "decision",
+}));
+/** The applies still in force, by finding: the run's words describe the alert before the change. */
+const appliedById = computed(
+  () =>
+    new Map(
+      (appliedRead.data.value ?? [])
+        .filter((view) => view.state === "applied")
+        .map((view) => [view.id, view] as const),
+    ),
 );
+const appliedOf = (finding: FindingRecord) =>
+  finding.finding_id ? (appliedById.value.get(finding.finding_id) ?? null) : null;
+const undoApply = (finding: FindingRecord) => {
+  const view = appliedOf(finding);
+  if (view)
+    void decisionRoute.undo([{ org: orgId.value, view, title: finding.alert_name ?? null }]);
+};
+
+const decisionDismissed = useQuery(() => ({
+  ...dismissedDecisionsQuery(orgId.value, null),
+  enabled: decisionRoute.transport.value === "decision",
+}));
+/** The total of the list the Dismissed view shows, kept apart from the run's counts (P5a-Q4). */
+const dismissedTotal = computed<number | null>(() => {
+  if (decisionRoute.transport.value === "decision") {
+    return decisionDismissed.data.value?.total ?? null;
+  }
+  return dismissals.unknown.value ? null : (dismissals.query.data.value?.total ?? 0);
+});
+const dismissedLabel = computed(() => copy.value.filterDismissed(dismissedTotal.value));
 const view = computed(() => (route.query.findings === "dismissed" ? "dismissed" : "open"));
+// A reader the page refuses is not offered the Dismissed view beside the refusal.
 const dismissedReachable = computed(
-  () => view.value === "dismissed" || (dismissals.query.data.value?.total ?? 0) > 0,
+  () => !forbidden.value && (view.value === "dismissed" || (dismissedTotal.value ?? 0) > 0),
 );
 const onView = (value: unknown) => {
   if (!value || value === view.value) return;
@@ -530,6 +606,27 @@ const onView = (value: unknown) => {
   else delete query.findings;
   void router.replace({ query });
 };
+
+/** A Slack link names one finding; the board opens its group and marks its row. */
+const focusId = computed(() =>
+  typeof route.query.finding === "string" ? route.query.finding : null,
+);
+const isFocused = (finding: FindingRecord) =>
+  !!focusId.value && finding.finding_id === focusId.value;
+const focusGone = computed(
+  () => !!focusId.value && !!data.data.value && !open.value.some((f) => isFocused(f)),
+);
+watch(
+  () => !loading.value && open.value.some((f) => isFocused(f)),
+  async (found) => {
+    if (!found) return;
+    await nextTick();
+    document
+      .querySelector('[data-focused="true"]')
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  },
+  { immediate: true },
+);
 
 const dismissTarget = shallowRef<DismissableFinding | null>(null);
 const dismissOpen = ref(false);
@@ -580,7 +677,7 @@ const alertCount = (findings: FindingRecord[]) =>
 const latestStats = computed<StatItem[]>(() => {
   const run = latest.value;
   if (!run) return [];
-  const verdict = COVERAGE_BADGE[coverageVerdict(run)];
+  const verdict = coverageBadge(run);
   const scope = visibilityCopy(t, run).alertsInScope;
   return [
     {
@@ -678,6 +775,10 @@ function refresh() {
   void configQuery.refetch();
   void data.load();
   void dismissals.query.refetch();
+  if (decisionRoute.transport.value === "decision") {
+    void decisionDismissed.refetch();
+    void appliedRead.refetch();
+  }
 }
 
 onMounted(() => void data.load());

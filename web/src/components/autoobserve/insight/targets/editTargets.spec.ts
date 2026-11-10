@@ -182,10 +182,10 @@ describe("the editor's reading of prefill=autoobserve", () => {
       "Opened from an AutoObserve suggestion.",
     );
     expect(handoffCopy("autoobserve", base).applied(fields)).toBe(
-      "Suggested by AutoObserve: Destinations None → ops-webhook. Review, then click Save.",
+      "Suggested by AutoObserve: Destinations No destination → ops-webhook. Review, then click Save.",
     );
     expect(handoffCopy("calibration", base).review()).toBe(
-      "Opened from an Alert Calibration finding.",
+      "Opened from an Alert calibration finding.",
     );
   });
 });

@@ -118,7 +118,8 @@ const alertCalibration = {
       }),
   requestRun: (org: string) =>
     http()
-      .post(`${base(org)}/digests/run`)
+      // The page words a refused run itself, so the access boundary records no 403.
+      .post(`${base(org)}/digests/run`, undefined, { silentForbidden: true })
       .then((res) => {
         analytics.track("alert_calibration_run_requested");
         return res;

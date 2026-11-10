@@ -28,7 +28,6 @@ const props = defineProps<{ sections: SlackPageSectionLink[] }>();
 
 const { t } = useI18nTyped();
 const active = ref(props.sections[0]?.id ?? "");
-let observer: IntersectionObserver | null = null;
 
 const elementOf = (id: string) => document.getElementById(`slack-section-${id}`);
 
@@ -38,24 +37,38 @@ const go = (id: string): void => {
   elementOf(id)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
 };
 
-onMounted(() => {
-  if (typeof IntersectionObserver === "undefined") return;
-  // The section whose top crosses the upper third of the view is the one being read.
-  observer = new IntersectionObserver(
-    (entries) => {
-      const hit = entries.find((e) => e.isIntersecting);
-      if (hit) active.value = hit.target.id.replace("slack-section-", "");
-    },
-    // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only
-    { rootMargin: "0px 0px -66% 0px" },
-  );
+/** The last section whose top has reached the upper third; at the end of the page, the last section. */
+function pick(scroller: Element | null): void {
+  const band = window.innerHeight / 3;
+  let current = props.sections[0]?.id ?? "";
   for (const section of props.sections) {
-    const el = elementOf(section.id);
-    if (el) observer.observe(el);
+    const top = elementOf(section.id)?.getBoundingClientRect().top;
+    if (top !== undefined && top <= band) current = section.id;
   }
+  // A short last section never reaches the band, so the end of the scroll stands for it.
+  const atEnd =
+    !!scroller && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+  const last = props.sections.at(-1);
+  if (atEnd && last && elementOf(last.id)) current = last.id;
+  active.value = current;
+}
+
+let frame = 0;
+const onScroll = (event: Event): void => {
+  const target = event.target instanceof Element ? event.target : document.scrollingElement;
+  cancelAnimationFrame(frame);
+  frame = requestAnimationFrame(() => pick(target));
+};
+
+onMounted(() => {
+  // The page scrolls inside the settings frame, so the listener captures any scroller.
+  document.addEventListener("scroll", onScroll, { capture: true, passive: true });
 });
 
-onBeforeUnmount(() => observer?.disconnect());
+onBeforeUnmount(() => {
+  cancelAnimationFrame(frame);
+  document.removeEventListener("scroll", onScroll, { capture: true });
+});
 </script>
 
 <template>

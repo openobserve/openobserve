@@ -242,7 +242,7 @@ describe("dismissals", () => {
     ]);
     expect(
       copy.foldParts(view({ reason: "made_up" as never, duration_days: null, expires_at: null })),
-    ).toEqual(["Dismissed by u-ops@example.com", "Another reason", "Hidden until reopened"]);
+    ).toEqual(["Dismissed by u-ops@example.com", "Another reason", "Hidden until undone"]);
   });
 
   it("one_decision_reads_the_same_in_both_lists_and_a_mark_says_it_is_a_mark", () => {
@@ -268,7 +268,7 @@ describe("dismissals", () => {
     const mark = view({ reason: "intended_report", duration_days: null, expires_at: null });
     expect(copy.foldParts(mark)).toEqual([
       "Marked as intended report by u-ops@example.com",
-      "Hidden until reopened",
+      "Hidden until undone",
     ]);
     expect(copy.badge(mark)).toBe("Intended report");
     expect(copy.badge(view())).toBe("Dismissed");

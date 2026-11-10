@@ -11521,7 +11521,6 @@
       "loadFailed": "De instellingen konden niet worden geladen: {message}",
       "lastSaved": "Laatst opgeslagen {time}",
       "runNowHeading": "Nu uitvoeren",
-      "findingsDesc": "Bevindingen worden naar de stream {stream} van deze organisatie geschreven en bewaard volgens de retentie van die stream. Alarmkalibratie verstuurt geen meldingen.",
       "frequencyRange": "Kies een cadans tussen 1 uur en 30 dagen.",
       "windowRange": "Kies een venster tussen 1 minuut en 90 dagen."
     }

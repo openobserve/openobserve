@@ -98,6 +98,23 @@ const markRow: DecisionView = {
   subject: { title: "nightly-summary", folder: "data", team: null },
 };
 
+const applyRow: DecisionView = {
+  ...row,
+  decision_id: "alert_finding:f-nodest-b:apply",
+  family: "alert_finding",
+  id: "f-nodest-b",
+  action: "apply",
+  state: "applied",
+  reason: null,
+  until: row.decided_at + 30 * 86_400_000_000,
+  subject: { title: "T3-nodest-ops-b", folder: "ops", team: null },
+  change: {
+    alert: { id: "a-ops-b", title: "T3-nodest-ops-b" },
+    fields: [{ field: "destinations", from: [], to: ["ops-webhook"] }],
+  },
+  via: "apply",
+};
+
 const mountList = async () => {
   wrapper = mount(DecisionsDismissedList, {
     attachTo: document.body,
@@ -128,7 +145,7 @@ describe("DecisionsDismissedList", () => {
     await mountList();
     expect(vi.mocked(autoobserveDecisions.list).mock.calls.map((c) => c[1])).toContainEqual({
       state: "active",
-      limit: 20,
+      limit: 500,
       offset: 0,
     });
     expect(all("decision-dismissed-kind").map((k) => k.textContent?.trim())).toEqual([
@@ -163,9 +180,10 @@ describe("DecisionsDismissedList", () => {
     expect(vi.mocked(autoobserveDecisions.list).mock.calls.at(-1)?.[1]).toEqual({
       state: "active",
       family: "alert_finding",
-      limit: 20,
+      limit: 500,
       offset: 0,
     });
+    expect(byTest("decision-dismissed-range")?.textContent?.trim()).toBe("1–20 of 45");
   });
 
   it("each_kind_says_its_own_empty_line", async () => {
@@ -212,7 +230,7 @@ describe("DecisionsDismissedList", () => {
     vi.mocked(autoobserveDecisions.list).mockResolvedValue({ data: fixture.list } as never);
     await mountList();
     const paged = vi.mocked(autoobserveDecisions.list).mock.calls.map((call) => call[1]);
-    expect(paged).toContainEqual({ state: "active", limit: 20, offset: 0 });
+    expect(paged).toContainEqual({ state: "active", limit: 500, offset: 0 });
     const rows = all("decision-dismissed-row");
     expect(rows).toHaveLength(1);
     expect(rows[0].textContent).toContain("cluster-d k8s_events");
@@ -248,12 +266,74 @@ describe("DecisionsDismissedList", () => {
     await settle();
     (byTest("decision-dismissed-next") as HTMLButtonElement).click();
     await settle();
-    expect(vi.mocked(autoobserveDecisions.list).mock.calls.at(-1)?.[1]).toMatchObject({
-      limit: 20,
-      offset: 40,
-    });
     expect(all("decision-dismissed-row")).toHaveLength(5);
     expect(byTest("decision-dismissed-range")?.textContent?.trim()).toBe("41–45 of 45");
     expect((byTest("decision-dismissed-next") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("more_than_one_server_read_of_rows_lists_them_all", async () => {
+    serve(620);
+    await mountList();
+    const reads = vi.mocked(autoobserveDecisions.list).mock.calls.filter((c) => c[1].limit === 500);
+    expect(reads.map((c) => c[1].offset)).toEqual([0, 500]);
+    expect(byTest("decision-dismissed-range")?.textContent?.trim()).toBe("1–20 of 620");
+  });
+
+  it("an_applied_change_is_never_listed_counted_or_undone_here", async () => {
+    vi.mocked(autoobserveDecisions.list).mockResolvedValue({
+      data: { decisions: [applyRow, markRow], total: 2, limit: 500, offset: 0 },
+    } as never);
+    await mountList();
+    const rows = all("decision-dismissed-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain("nightly-summary");
+    expect(byTest("decision-dismissed")?.textContent).not.toContain("T3-nodest-ops-b");
+    expect(byTest("decision-dismissed")?.textContent).not.toContain("Another reason");
+    expect(byTest("decision-dismissed-total")?.textContent?.trim()).toBe("1");
+    for (const undo of all("decision-dismissed-undo")) (undo as HTMLButtonElement).click();
+    await settle();
+    expect(vi.mocked(autoobserveDecisions.undo).mock.calls.map((c) => c[1])).toEqual([
+      "alert_finding:f-nightly",
+    ]);
+  });
+
+  it("applies_between_dismissals_never_leave_a_page_short_or_the_total_wrong", async () => {
+    const dismissals = rowsOf(25);
+    const mixed = dismissals.flatMap((d, i) =>
+      i % 2 ? [d] : [d, { ...applyRow, decision_id: `alert_finding:f-${i}:apply`, id: `f-${i}` }],
+    );
+    vi.mocked(autoobserveDecisions.list).mockImplementation(((
+      _org: string,
+      params: DecisionListParams,
+    ) =>
+      Promise.resolve({
+        data: {
+          decisions: mixed.slice(params.offset, params.offset + params.limit),
+          total: mixed.length,
+          limit: params.limit,
+          offset: params.offset,
+        },
+      })) as never);
+    await mountList();
+    expect(all("decision-dismissed-row")).toHaveLength(20);
+    expect(byTest("decision-dismissed-range")?.textContent?.trim()).toBe("1–20 of 25");
+    (byTest("decision-dismissed-next") as HTMLButtonElement).click();
+    await settle();
+    expect(all("decision-dismissed-row")).toHaveLength(5);
+    expect(byTest("decision-dismissed-total")?.textContent?.trim()).toBe("25");
+  });
+
+  it("a_note_shows_under_its_row_as_plain_text", async () => {
+    vi.mocked(autoobserveDecisions.list).mockResolvedValue({
+      data: {
+        decisions: [{ ...markRow, note: "<b>retired</b> & @here", has_note: true }],
+        total: 1,
+        limit: 500,
+        offset: 0,
+      },
+    } as never);
+    await mountList();
+    expect(byTest("decision-dismissed-note")?.textContent?.trim()).toBe("<b>retired</b> & @here");
+    expect(byTest("decision-dismissed-note")?.querySelector("b")).toBeNull();
   });
 });

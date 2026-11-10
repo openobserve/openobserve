@@ -29,9 +29,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OIcon name="check" size="sm" class="text-text-secondary mt-0.5 shrink-0" />
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <OTruncatedText class="text-text-heading text-sm font-medium">{{
-          entry.title
-        }}</OTruncatedText>
+        <OTruncatedText class="text-text-heading text-sm font-medium">
+          <a
+            v-if="alertHref(entry)"
+            :href="alertHref(entry)!"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-text-link hover:underline"
+            data-test="autoobserve-applied-alert-link"
+            >{{ entry.title }}</a
+          >
+          <template v-else>{{ entry.title }}</template>
+        </OTruncatedText>
         <p class="text-text-secondary text-xs" data-test="autoobserve-applied-detail">
           {{ detailOf(entry) }}
         </p>
@@ -39,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="entry.view.state === 'undone'"
         variant="default"
-        size="xs"
+        size="sm"
         :label="t('insight.decisions.applied.undone')"
         data-test="autoobserve-applied-undone"
       />
@@ -67,25 +76,39 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
-import { decisionsPageQuery, useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
+import { useRouter } from "vue-router";
+import {
+  appliedDecisionsQuery,
+  useDecisionRoute,
+} from "@/composables/autoobserve/useDecisionRoute";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { APPLY_FIELDS, applyCopy } from "@/components/alert_calibration/applySuggestion";
 import { decisionCopy } from "../insight/insightCopy";
 import { useAppliedChanges, type AppliedEntry } from "./appliedChanges";
 
-const LISTED = 50;
-
 const { t, locale } = useI18nTyped();
 const store = useStore();
 const orgId = useOrgId();
 const route = useDecisionRoute();
+const router = useRouter();
 
 const listed = useQuery(() => ({
-  ...decisionsPageQuery(orgId.value, "alert_finding", LISTED, 0),
+  ...appliedDecisionsQuery(orgId.value),
   enabled: route.enabled.value,
 }));
 
-const entries = useAppliedChanges(orgId, () => listed.data.value?.decisions ?? []);
+const entries = useAppliedChanges(orgId, () => listed.data.value ?? []);
+
+/** A new tab, so this list stays where it was; a session row from an older server names no alert. */
+const alertHref = (entry: AppliedEntry): string | null => {
+  const alertId = entry.view.change?.alert.id ?? entry.alertId;
+  if (!router || !alertId) return null;
+  return router.resolve({
+    name: "alertDetail",
+    params: { alert_id: alertId },
+    query: { org_identifier: entry.org },
+  }).href;
+};
 
 const copy = computed(() => applyCopy(t, locale.value));
 

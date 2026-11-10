@@ -115,7 +115,17 @@ export function digestCounts(
       t("slackApp.insights.counts.suggestions", { count: counts.suggestions }, counts.suggestions),
     );
   }
-  if (counts.calibration_runs > 0) {
+  if (counts.calibration_findings !== undefined) {
+    if (counts.calibration_findings > 0) {
+      parts.push(
+        t(
+          "slackApp.insights.counts.calibrationFindings",
+          { count: counts.calibration_findings },
+          counts.calibration_findings,
+        ),
+      );
+    }
+  } else if (counts.calibration_runs > 0) {
     parts.push(
       t(
         "slackApp.insights.counts.calibrationRuns",
@@ -284,7 +294,8 @@ export function saveFailure(
   if (kind === "forbidden") {
     return { kind, message: t("slackApp.insights.failed.forbidden"), detail: null };
   }
-  const reason = serverMessageOf(error);
+  // The template ends the reason's sentence, so a server message's own full stop is dropped.
+  const reason = serverMessageOf(error)?.replace(/[.!?]+\s*$/, "");
   return {
     kind,
     message: reason

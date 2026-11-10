@@ -166,6 +166,22 @@ describe("ReviewChangeDialog (W5)", () => {
     expect(applyButton()?.disabled).toBe(false);
   });
 
+  it("an_empty_destination_list_reads_as_no_destination_not_none", async () => {
+    api.preview.mockResolvedValue({
+      data: preview({
+        change: {
+          alert: { title: "ops-a", folder: "ops", team: null, destinations: [] },
+          fields: [{ field: "destinations", from: [], to: ["ops-webhook"] }],
+        },
+      }),
+    } as never);
+    await mountDialog();
+    expect(q("review-change-where")?.textContent?.trim()).toBe("Folder ops · notifies no one");
+    const row = q("review-change-row-destinations")!;
+    expect(row.textContent).toContain("No destination");
+    expect(row.textContent).not.toContain("None");
+  });
+
   it("names the team when the preview knows it", async () => {
     api.preview.mockResolvedValue({
       data: preview({
@@ -222,7 +238,24 @@ describe("ReviewChangeDialog (W5)", () => {
     expect(notice.textContent?.trim()).toBe("This alert changed. Open it to review.");
     expect(notice.dataset.severity).toBe("warning");
     expect(applyButton()?.disabled).toBe(true);
-    expect(q("o-dialog-secondary-btn")?.textContent).toContain("Edit in alert editor");
+    expect(q("o-dialog-neutral-btn")?.textContent).toContain("Edit in alert editor");
+  });
+
+  it("an_apply_the_server_no_longer_lists_says_the_suggestion_is_gone_and_rereads_the_alert", async () => {
+    api.decide.mockRejectedValue(
+      httpError(404, { code: 404, error: "not_found", message: "This item is no longer listed." }),
+    );
+    await mountDialog();
+    const reads = api.preview.mock.calls.length;
+    applyButton()!.click();
+    await flushPromises();
+    const notice = q("review-change-notice")!;
+    expect(notice.textContent?.trim()).toBe(
+      "This suggestion is no longer available. Open the alert to review it.",
+    );
+    expect(notice.dataset.severity).toBe("warning");
+    expect(applyButton()?.disabled).toBe(true);
+    expect(api.preview.mock.calls.length).toBeGreaterThan(reads);
   });
 
   it("a write failure takes the note's place below the change, so nothing above it moves", async () => {
@@ -242,10 +275,12 @@ describe("ReviewChangeDialog (W5)", () => {
     api.decide.mockRejectedValue(
       httpError(403, {
         code: "decision_refused",
+        reason: "folder",
         verb: "apply",
         message: "You can't apply this change: it needs permission to edit alerts in folder infra.",
         folder: "infra",
         owners: [],
+        owners_scope: null,
         can_act: [],
         more: 0,
       }),
@@ -266,10 +301,12 @@ describe("ReviewChangeDialog (W5)", () => {
         may: false,
         locked: {
           code: "decision_refused",
+          reason: "folder",
           verb: "apply",
           message: "Ask alice to apply this; you can't edit alerts in folder infra.",
           folder: "infra",
           owners: [],
+          owners_scope: null,
           can_act: [],
           more: 0,
         },
@@ -278,11 +315,46 @@ describe("ReviewChangeDialog (W5)", () => {
     await mountDialog();
     expect(q("review-change-notice")?.textContent).toContain("folder infra");
     expect(applyButton()?.disabled).toBe(true);
+    expect(q("review-change-note")?.classList.contains("invisible")).toBe(true);
+  });
+
+  it("a_refusal_with_owners_names_who_to_ask_and_counts_the_rest", async () => {
+    api.preview.mockResolvedValue({
+      data: preview({
+        may: false,
+        locked: {
+          code: "decision_refused",
+          reason: "security",
+          verb: "apply",
+          message:
+            "You can't apply this: it is a security detection, and changing one also needs the Security permission. Ask an admin of this organization.",
+          folder: "ops",
+          owners: ["a@x.test", "b@x.test", "c@x.test", "d@x.test", "e@x.test"],
+          owners_scope: "org",
+          can_act: [],
+          more: 0,
+        },
+      }),
+    } as never);
+    await mountDialog();
+    const text = q("review-change-notice")?.textContent ?? "";
+    expect(text).toContain("needs the Security permission");
+    expect(text).toContain(
+      "Ask an admin of this organization: a@x.test, b@x.test, c@x.test and 2 more.",
+    );
+    expect(text.match(/Ask /g)?.length).toBe(1);
+  });
+
+  it("cancel_sits_beside_apply_and_edit_takes_the_left_slot", async () => {
+    await mountDialog();
+    expect(q("o-dialog-secondary-btn")?.textContent?.trim()).toBe("Cancel");
+    expect(q("o-dialog-neutral-btn")?.textContent?.trim()).toBe("Edit in alert editor");
+    expect(applyButton()?.textContent?.trim()).toBe("Apply");
   });
 
   it("Edit in alert editor hands the stored change to the editor in the alert's folder", async () => {
     await mountDialog();
-    q("o-dialog-secondary-btn")!.click();
+    q("o-dialog-neutral-btn")!.click();
     await flushPromises();
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -307,7 +379,7 @@ describe("ReviewChangeDialog (W5)", () => {
     );
     expect(notice.dataset.severity).toBe("warning");
     expect(applyButton()).toBeNull();
-    expect(q("o-dialog-secondary-btn")?.textContent).toContain("Edit in alert editor");
+    expect(q("review-change-edit")?.textContent).toContain("Edit in alert editor");
     expect(q("review-change-note")).toBeNull();
   });
 

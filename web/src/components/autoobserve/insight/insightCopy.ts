@@ -44,6 +44,7 @@ import { insightCtaLabel, type AiFinding, type CtaAction } from "./insightCta";
 import { gapGroupCopy, kindCopy, type CtaContext } from "./kindCopy";
 import {
   refusalOf,
+  type Refusal,
   type BatchItemResult,
   type DecisionView,
   type Preview,
@@ -639,10 +640,30 @@ export function decisionCopy(t: TranslateFn, locale: string) {
   /** A recorded decision reads as the calibration list reads the same row. */
   const recordReason = (reason: string | null): I18nText => t(recordReasonKey(reason));
 
+  /** Names the first few and counts the rest, so a long list stays one line. */
+  const names = (values: string[]): I18nText => {
+    const shown = values.slice(0, FAILURES_SHOWN);
+    const rest = values.length - shown.length;
+    if (rest <= 0) return raw(new Intl.ListFormat(locale, { type: "conjunction" }).format(shown));
+    return t("insight.decisions.namesMore", {
+      names: raw(new Intl.ListFormat(locale, { type: "unit" }).format(shown)),
+      count: countText(rest, locale),
+    });
+  };
+
+  /** The server's sentence already ends with whom to ask by role, so the names complete it. */
+  const refusalText = (refusal: Refusal): I18nText =>
+    refusal.owners.length
+      ? t("insight.decisions.askOwners", {
+          refusal: raw(refusal.message.replace(/\.\s*$/, "")),
+          names: names(refusal.owners),
+        })
+      : raw(refusal.message);
+
   /** By status only: the server's words are shown for a refusal alone, which is written for people. */
   const writeError = (error: unknown): DecisionNotice => {
     const refusal = refusalOf(error);
-    if (refusal) return { variant: "error", text: raw(refusal.message) };
+    if (refusal) return { variant: "error", text: refusalText(refusal) };
     switch ((error as { response?: { status?: number } } | null)?.response?.status) {
       case 400:
         return { variant: "error", text: t("insight.decisions.error.invalid") };
@@ -661,7 +682,7 @@ export function decisionCopy(t: TranslateFn, locale: string) {
 
   const undoError = (error: unknown): DecisionNotice => {
     const refusal = refusalOf(error);
-    if (refusal) return { variant: "error", text: raw(refusal.message) };
+    if (refusal) return { variant: "error", text: refusalText(refusal) };
     switch ((error as { response?: { status?: number } } | null)?.response?.status) {
       case 404:
         return { variant: "error", text: t("insight.decisions.undoError.gone") };
@@ -676,17 +697,6 @@ export function decisionCopy(t: TranslateFn, locale: string) {
   const itemError = (item: BatchItemResult): I18nText =>
     writeError({ response: { status: item.status, data: item.error } }).text;
 
-  /** Names the first few and counts the rest, so a long list stays one line. */
-  const names = (values: string[]): I18nText => {
-    const shown = values.slice(0, FAILURES_SHOWN);
-    const rest = values.length - shown.length;
-    if (rest <= 0) return raw(new Intl.ListFormat(locale, { type: "conjunction" }).format(shown));
-    return t("insight.decisions.namesMore", {
-      names: raw(new Intl.ListFormat(locale, { type: "unit" }).format(shown)),
-      count: countText(rest, locale),
-    });
-  };
-
   const statusOf = (error: unknown) =>
     (error as { response?: { status?: number } } | null)?.response?.status;
   /** A refusal, a conflict or a missing decision fails the same way again; anything else may pass on a retry. */
@@ -697,7 +707,7 @@ export function decisionCopy(t: TranslateFn, locale: string) {
   /** Why part of an undo failed, from its first failure; a plain failure says nothing, its Retry does. */
   const undoPartialReason = (error: unknown, n: number): I18nText | null => {
     const refusal = refusalOf(error);
-    if (refusal) return raw(refusal.message);
+    if (refusal) return refusalText(refusal);
     if (statusOf(error) === 409) return t("insight.decisions.undoPartial.changed", {}, n);
     if (statusOf(error) === 404) return t("insight.decisions.undoPartial.gone", {}, n);
     return null;
@@ -730,10 +740,12 @@ export function decisionCopy(t: TranslateFn, locale: string) {
     undoError,
     itemError,
     names,
+    refusalText,
     undoRetryable,
     undoOutcome,
     failuresShown: FAILURES_SHOWN,
     undo: () => t("insight.decisions.undo"),
+    alreadyUndone: () => t("insight.decisions.undoError.already"),
     retry: () => t("insight.decisions.retry"),
     dismissTitle: (subject: string | null | undefined) =>
       t("insight.decisions.dismiss.title", { title: title(subject) }),

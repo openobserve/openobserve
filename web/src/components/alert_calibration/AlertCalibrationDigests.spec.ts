@@ -168,6 +168,18 @@ describe("AlertCalibrationDigests", () => {
     wrapper.unmount();
   });
 
+  it("a_reader_without_access_sees_no_access_not_a_failure", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(
+      serverError(403, { message: "Unauthorized Access" }),
+    );
+    const wrapper = await mountPage();
+    const notice = wrapper.find('[data-test="alert-calibration-digests-error"]');
+    expect(notice.text()).toContain("You don't have access to Alert calibration");
+    expect(notice.find('[data-test="alert-calibration-digests-retry"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Runs unavailable");
+    wrapper.unmount();
+  });
+
   it("a failed runs read shows the plain error copy, never the server's words", async () => {
     vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, "internal"));
     const wrapper = await mountPage();

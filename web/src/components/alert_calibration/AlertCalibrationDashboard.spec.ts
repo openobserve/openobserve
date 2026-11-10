@@ -28,6 +28,7 @@ import AlertCalibrationDashboard from "./AlertCalibrationDashboard.vue";
 import type { DigestRecord, RunRow } from "./digests";
 import analytics from "@/services/product_analytics";
 import { openAlertReview } from "./reviewAlert";
+import autoobserveDecisions, { type DecisionView } from "@/services/autoobserveDecisions";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("./reviewAlert", () => ({ openAlertReview: vi.fn() }));
@@ -409,7 +410,7 @@ describe("AlertCalibrationDashboard", () => {
     vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, "internal"));
     const wrapper = await mountPage();
     const board = wrapper.find('[data-test="alert-calibration-dashboard-no-board"]');
-    expect(board.text()).toContain("Runs unavailable");
+    expect(board.text()).toContain("Findings couldn't be loaded");
     expect(board.text()).toContain(
       "Alert calibration runs couldn't be loaded. Try again in a moment.",
     );
@@ -820,6 +821,105 @@ describe("AlertCalibrationDashboard dismissals", () => {
     wrapper.unmount();
   });
 
+  it("with_the_decision_route_on_the_dismissed_view_is_one_list_counted_without_applies", async () => {
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(7)]));
+    const base = {
+      family: "alert_finding",
+      state: "active",
+      note: null,
+      has_note: false,
+      actor: "root@example.com",
+      source: "ui",
+      decided_at: NOW - 1000,
+      revision: 1,
+    } as const;
+    const dismissed: DecisionView = {
+      ...base,
+      decision_id: `alert_finding:${fid(7)}`,
+      id: fid(7),
+      action: "dismiss",
+      reason: "will_fix_later",
+      until: NOW + 90 * DAY_MICROS,
+      subject: { title: "ops-b", folder: "ops", team: null },
+    };
+    const applied: DecisionView = {
+      ...base,
+      decision_id: `alert_finding:${fid(7)}:apply`,
+      id: fid(7),
+      action: "apply",
+      state: "applied",
+      reason: null,
+      until: NOW + 30 * DAY_MICROS,
+      subject: { title: "ops-b", folder: "ops", team: null },
+    };
+    vi.mocked(autoobserveDecisions.list).mockResolvedValue({
+      data: { decisions: [dismissed, applied], total: 2, limit: 500, offset: 0 },
+    } as never);
+    try {
+      const wrapper = await mountPage({ findings: "dismissed" });
+      await settle();
+      expect(wrapper.find('[data-test="decision-dismissed"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-calibration-dismissed"]').exists()).toBe(false);
+      expect(wrapper.findAll('[data-test="decision-dismissed-row"]')).toHaveLength(1);
+      expect(filterText()).toContain("Dismissed (1)");
+      wrapper.unmount();
+    } finally {
+      vi.mocked(autoobserveDecisions.list).mockImplementation(() =>
+        Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } })),
+      );
+    }
+  });
+
+  it("a_reader_without_access_sees_the_no_access_state_without_retry", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(
+      serverError(403, { code: 403, message: "Unauthorized Access" }),
+    );
+    const wrapper = await mountPage();
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-no-access"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("Runs unavailable");
+    expect(wrapper.text()).not.toContain("Retry");
+    wrapper.unmount();
+  });
+
+  it("a_failed_read_names_the_dashboard_not_the_runs", async () => {
+    vi.mocked(alertCalibration.readDigests).mockRejectedValue(serverError(500, {}));
+    const wrapper = await mountPage();
+    await settle();
+    expect(wrapper.text()).not.toContain("Runs unavailable");
+    expect(wrapper.text()).toContain("Findings couldn't be loaded");
+    wrapper.unmount();
+  });
+
+  it("a_finding_link_opens_its_group_and_marks_the_row", async () => {
+    serve([nodest(1), nodest(2)], 2);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const wrapper = await mountPage({ finding: fid(2) });
+    await settle();
+    const row = wrapper.find('[data-test="alert-calibration-dashboard-alert-a2"]');
+    expect(row.exists()).toBe(true);
+    expect(row.attributes("data-focused")).toBe("true");
+    expect(scroll).toHaveBeenCalled();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-finding-gone"]').exists()).toBe(
+      false,
+    );
+    wrapper.unmount();
+  });
+
+  it("a_link_to_a_finding_no_longer_open_says_so_in_one_neutral_line", async () => {
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+    const wrapper = await mountPage({ finding: fid(9) });
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-finding-gone"]').text()).toBe(
+      "This finding is no longer open.",
+    );
+    wrapper.unmount();
+  });
+
   it("the_filter_lives_in_the_url", async () => {
     serve([nodest(1)], 1);
     vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(7)]));
@@ -1070,6 +1170,64 @@ describe("AlertCalibrationDashboard row next steps", () => {
     expect(w.findAll('[data-test="alert-calibration-dashboard-review-alert"]')).toHaveLength(0);
     expect(rowButtons(w)).toContain("Open alert");
     w.unmount();
+  });
+
+  it("an_applied_finding_says_so_on_its_row_with_undo_instead_of_review_change", async () => {
+    const withChange = record({
+      ...findings[1],
+      finding_id: fid(7),
+      insight_actions: JSON.stringify([
+        {
+          type: "apply_suggestion",
+          alert_id: "a2",
+          patch: [{ field: "pending_period_secs", from: 0, to: 120 }],
+        },
+      ]),
+    } as Partial<DigestRecord>);
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([run] as never) : ([findings[0], withChange] as never),
+    );
+    const applied: DecisionView = {
+      decision_id: `alert_finding:${fid(7)}:apply`,
+      family: "alert_finding",
+      id: fid(7),
+      action: "apply",
+      state: "applied",
+      reason: null,
+      note: null,
+      has_note: false,
+      actor: "root@example.com",
+      source: "ui",
+      decided_at: NOW - 1000,
+      until: null,
+      revision: 2,
+      change: {
+        alert: { id: "a2", title: "cpu" },
+        fields: [{ field: "pending_period_secs", from: 0, to: 120 }],
+      },
+    };
+    vi.mocked(autoobserveDecisions.list).mockResolvedValue({
+      data: { decisions: [applied], total: 1, limit: 500, offset: 0 },
+    } as never);
+    try {
+      const wrapper = await mountPage();
+      await settle();
+      await wrapper
+        .find('[data-test="alert-calibration-dashboard-rule-noise"] button')
+        .trigger("click");
+      await settle();
+      const row = wrapper.find('[data-test="alert-calibration-dashboard-alert-a2"]');
+      expect(row.find('[data-test="alert-calibration-dashboard-applied"]').text()).toBe("Applied");
+      expect(row.find('[data-test="alert-calibration-dashboard-review-change"]').exists()).toBe(
+        false,
+      );
+      expect(row.find('[data-test="alert-calibration-dashboard-undo-apply"]').text()).toBe("Undo");
+      wrapper.unmount();
+    } finally {
+      vi.mocked(autoobserveDecisions.list).mockImplementation(() =>
+        Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } })),
+      );
+    }
   });
 
   it("a finding that stores a change offers Review change on its row, opening the dialog (W5)", async () => {

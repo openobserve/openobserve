@@ -254,11 +254,11 @@ describe("AlertCalibrationDismissDialog", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("says the scope changes with the chosen duration, and that until reopened has no date", async () => {
+  it("says the scope changes with the chosen duration, and that until undone has no date", async () => {
     await mountDialog();
     await chooseDuration("until_reopened");
     expect(notice()?.textContent?.trim()).toBe(
-      "Hidden for everyone in default Organization until someone reopens it. Recorded with your name and reason. Undo from Dismissed.",
+      "Hidden for everyone in default Organization until someone undoes it. Recorded with your name and reason. Undo from Dismissed.",
     );
   });
 

@@ -45,6 +45,7 @@ import { resolvableTimezones } from "@/utils/oncall";
 import { alertRoutesByChannel } from "@/utils/slackAppDestination";
 import { isSlackUrl } from "@/utils/slackLink";
 import SlackInsightsRow from "./SlackInsightsRow.vue";
+import { makeInsightsSchema } from "./SlackSettings.schema";
 import {
   channelLabel,
   editSummary,
@@ -121,18 +122,22 @@ const refreshFailed = ref(false);
 const put = useMutation(() => putInsightsSettingsMutation(org.value));
 const form = useOForm<InsightsFormValues>({
   defaultValues: defaults.value,
+  schema: makeInsightsSchema(t),
   onSubmit: (value) => save(value),
 });
 const values = form.useStore((s) => s.values);
 // What the in-flight save sent; a field edited since then keeps its edit when the answer arrives.
 const submitted = ref<InsightsFormValues | null>(null);
+// What the form showed before Refresh, so a refused save's edits survive the re-read.
+const kept = ref<InsightsFormValues | null>(null);
 // A new answer (a save, Refresh, another org) replaces what the form shows.
 watch(
   () => [JSON.stringify(defaults.value), data.value?.revision],
   () => {
-    const sent = submitted.value;
+    const sent = submitted.value ?? kept.value;
     const shown = { ...values.value };
     submitted.value = null;
+    kept.value = null;
     form.reset(defaults.value);
     if (!sent) return;
     const edited = new Set(FIELDS.filter((field) => shown[field] !== sent[field]));
@@ -354,6 +359,7 @@ const openPicker = (): void => {
 
 const refresh = async (): Promise<void> => {
   refreshFailed.value = false;
+  kept.value = { ...defaults.value };
   const result = await settings.refetch();
   if (result.isError) {
     refreshFailed.value = true;
@@ -400,7 +406,7 @@ async function save(value: InsightsFormValues): Promise<void> {
       data-test="slack-insights-load-error"
       @action="settings.refetch()"
     />
-    <OForm v-else-if="data" :form="form">
+    <OForm v-else-if="data" :form="form" novalidate>
       <OCard variant="outlined" class="overflow-hidden">
         <div
           v-if="!canEdit"
@@ -525,7 +531,9 @@ async function save(value: InsightsFormValues): Promise<void> {
         </SlackInsightsRow>
 
         <SlackInsightsRow :label="t('slackApp.insights.digestTime')" :help="help.digest">
-          <span class="text-text-label text-xs">{{ t("slackApp.insights.timeAndZone") }}</span>
+          <span class="text-input-label-text text-compact font-medium">{{
+            t("slackApp.insights.timeAndZone")
+          }}</span>
           <div class="flex w-full items-start gap-2">
             <div class="w-30 shrink-0">
               <OFormTime
@@ -619,7 +627,7 @@ async function save(value: InsightsFormValues): Promise<void> {
               </template>
             </OBanner>
             <template v-else-if="removed">{{ t("slackApp.insights.removedFooter") }}</template>
-            <template v-else>{{ t("slackApp.insights.unsaved") }}</template>
+            <template v-else-if="dirty">{{ t("slackApp.insights.unsaved") }}</template>
           </div>
           <OButton
             type="submit"

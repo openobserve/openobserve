@@ -86,9 +86,10 @@ test.describe('Slack AutoObserve settings', { tag: ['@slack', '@enterprise'] }, 
       await slack.insights.waitLoaded();
       await expect(slack.insights.lock).toHaveCount(0);
       await expect(slack.insights.save).toBeDisabled();
-      await expect(slack.insights.status).toContainText('Nothing is saved until you save.');
+      await expect(slack.insights.status).not.toContainText('Nothing is saved until you save.');
 
       await slack.insights.pickChannel('alerts');
+      await expect(slack.insights.status).toContainText('Nothing is saved until you save.');
       await slack.insights.setTime('07:45');
       await expect(slack.insights.trial).toHaveAttribute('aria-checked', 'false');
       await slack.insights.trial.click();

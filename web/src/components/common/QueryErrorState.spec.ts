@@ -336,14 +336,14 @@ describe("QueryErrorState protected-stream refusal", () => {
     expect(title.text()).toBe("Alert calibration records can't be searched here");
     expect(title.classes()).toContain("text-status-error-text");
     expect(wrapper.text()).toContain(
-      "They are shown on the Alert Calibration page, filtered to the alerts you can access.",
+      "They are shown on the Alert calibration page, filtered to the alerts you can access.",
     );
     expect(wrapper.findComponent(OEmptyState).props("illustration")).toBe("lock");
     expect(wrapper.find(FIX_CARD).exists()).toBe(false);
     expect(wrapper.find('[data-test="query-error-ask-ai-btn"]').exists()).toBe(false);
 
     const card = wrapper.get('[data-test="query-error-open-calibration-card"]');
-    expect(card.text()).toContain("Open Alert Calibration");
+    expect(card.text()).toContain("Open Alert calibration");
     expect(card.text()).toContain("See the runs and findings you have access to");
     await card.trigger("click");
     await flushPromises();

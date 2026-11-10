@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBadge>
             <OBadge
               v-else
-              variant="error-soft"
+              variant="warning-soft"
               size="sm"
               shape="rounded"
               :count="row.finding_count ?? undefined"
@@ -142,11 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-coverage="{ row }">
             <span class="relative inline-flex">
-              <OBadge
-                :variant="COVERAGE_BADGE[coverageVerdict(row)].variant"
-                size="sm"
-                shape="rounded"
-              >
+              <OBadge :variant="coverageBadge(row).variant" size="sm" shape="rounded">
                 {{ t(COVERAGE_BADGE[coverageVerdict(row)].labelKey) }}
               </OBadge>
               <OTooltip v-if="coverageNotes(t, row).length" side="left" max-width="25rem">
@@ -179,15 +175,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #error>
-            <OEmptyState
-              size="hero"
-              illustration="broken-panel"
-              variant="error"
-              :title="t('alertCalibration.digests.errorTitle')"
-              :description="runsError ?? undefined"
-              :action-label="t('alertCalibration.retry')"
-              action-icon="refresh"
-              @action="refresh"
+            <LiveNoticeState
+              size="block"
+              :notice="
+                readNotice(
+                  t,
+                  runs.error.value,
+                  t('alertCalibration.digests.errorTitle'),
+                  runsError ?? raw(''),
+                )
+              "
+              :busy="runs.loading.value"
+              data-test="alert-calibration-digests-error"
+              retry-test="alert-calibration-digests-retry"
+              @retry="refresh"
             />
           </template>
 
@@ -224,6 +225,8 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { readErrorCopy } from "@/services/alert_calibration";
+import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
+import { readNotice } from "./notices";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
@@ -244,7 +247,7 @@ import {
   visibilityCopy,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, formatMinutes, splitMinutes } from "./format";
+import { COVERAGE_BADGE, coverageBadge, formatMinutes, splitMinutes } from "./format";
 
 type Scope = "all" | "findings" | "gaps";
 
@@ -306,7 +309,7 @@ const stats = computed<StatItem[]>(() => {
       key: "latest",
       label: t("alertCalibration.digests.latestFindings"),
       value: countOrDash(run?.finding_count, locale.value),
-      sub: run ? t(COVERAGE_BADGE[coverageVerdict(run)].labelKey) : undefined,
+      sub: run ? t(coverageBadge(run).labelKey) : undefined,
       icon: "fact-check",
       tone: (run?.finding_count ?? 0) > 0 ? "warning" : "neutral",
     },
@@ -319,7 +322,10 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "schedule",
-      label: t("alertCalibration.digests.schedule"),
+      // "1 · Runs every · day" reads as a sentence; an off schedule keeps its noun.
+      label: c?.enabled
+        ? t("alertCalibration.digests.runsEvery")
+        : t("alertCalibration.digests.schedule"),
       value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : raw("—"),
       sub: c
         ? c.enabled

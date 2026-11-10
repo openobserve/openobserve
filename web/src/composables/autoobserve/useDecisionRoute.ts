@@ -28,6 +28,7 @@ import autoobserveDecisions, {
   isRouteDisabled,
   type BatchResult,
   type DecisionFamily,
+  type DecisionListParams,
   type DecisionRequest,
   type DecisionResult,
   type DecisionView,
@@ -103,6 +104,55 @@ export const decisionsPageQuery = (
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** The server's own cap on one list read. */
+const LIST_READ_LIMIT = 500;
+/** Stops a list that keeps growing between reads from paging forever. */
+const LIST_READ_PAGES = 20;
+
+/** Only dismissals and marks are undone from the Dismissed list; an apply's Undo would revert the alert. */
+export const isDismissedDecision = (view: DecisionView): boolean => view.action !== "apply";
+
+/** Reads every row the list route returns for these filters, a server page at a time. */
+async function readEvery(
+  org: string,
+  filters: Pick<DecisionListParams, "state" | "family">,
+  signal?: AbortSignal,
+): Promise<DecisionView[]> {
+  const rows: DecisionView[] = [];
+  for (let page = 0; page < LIST_READ_PAGES; page += 1) {
+    const params = { ...filters, limit: LIST_READ_LIMIT, offset: rows.length };
+    const read = (await autoobserveDecisions.list(org, params, signal)).data;
+    rows.push(...read.decisions);
+    if (!read.decisions.length || rows.length >= read.total) break;
+  }
+  return rows;
+}
+
+/** Every dismissal and mark in force: the server lists applies with them, so this reads all and pages here. */
+export const dismissedDecisionsQuery = (org: string, family: DecisionFamily | null) =>
+  queryOptions({
+    queryKey: autoobserveKeys.dismissedDecisions(org, family ?? "all"),
+    queryFn: async ({ signal }): Promise<{ decisions: DecisionView[]; total: number }> => {
+      const filters = family ? { state: "active" as const, family } : { state: "active" as const };
+      const decisions = (await readEvery(org, filters, signal)).filter(isDismissedDecision);
+      return { decisions, total: decisions.length };
+    },
+    placeholderData: keepPreviousInOrg(org),
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Every apply, undone ones included: without `state` the server keeps listing an apply after its Undo. */
+export const appliedDecisionsQuery = (org: string) =>
+  queryOptions({
+    queryKey: autoobserveKeys.appliedDecisions(org),
+    queryFn: async ({ signal }): Promise<DecisionView[]> =>
+      (await readEvery(org, { family: "alert_finding" }, signal)).filter(
+        (view) => view.action === "apply",
+      ),
+    placeholderData: keepPreviousInOrg(org),
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 export const newRequestId = (): string =>
   typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
@@ -164,6 +214,8 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
     setUndoing(ids, true);
     const failed: { item: Written; error: unknown }[] = [];
     const undone: Written[] = [];
+    // Another tab or Slack got there first: the server answers 200 with nothing changed.
+    const already: Written[] = [];
     try {
       await Promise.all(
         written.map(async (item) => {
@@ -175,7 +227,8 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
               }),
             );
             const revision = result?.data?.decision?.revision ?? item.view.revision;
-            undone.push({ ...item, view: { ...item.view, revision } });
+            const done = { ...item, view: { ...item.view, revision } };
+            (result?.data?.change === "unchanged" ? already : undone).push(done);
           } catch (error) {
             failed.push({ item, error });
           }
@@ -184,18 +237,22 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
     } finally {
       setUndoing(ids, false);
       for (const org of new Set(written.map((w) => w.org))) refreshAfterWrite(org);
-      const undoneApplies = undone.filter((w) => w.view.action === "apply");
+      const undoneApplies = [...undone, ...already].filter((w) => w.view.action === "apply");
       for (const org of new Set(undoneApplies.map((w) => w.org))) dropFolderRows(org);
     }
     // Every Undo (toast, row, retry) passes here, so this session's What I've changed rows follow one source.
-    markUndone(undone);
+    markUndone([...undone, ...already]);
     if (written[0].org !== orgId.value) return !failed.length;
+    if (!failed.length && !undone.length) {
+      toast({ message: copy().alreadyUndone(), variant: "info" });
+      return true;
+    }
     if (!failed.length) {
       toast({
         message: copy().undone(
-          written.length,
-          written.length === 1 ? written[0].title : null,
-          written.every((w) => w.view.action === "apply"),
+          undone.length,
+          undone.length === 1 ? undone[0].title : null,
+          undone.every((w) => w.view.action === "apply"),
         ),
         variant: "success",
       });
@@ -228,6 +285,7 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
       if (!toastRecords.some((r) => r.id === key && r.open)) undoGroups.delete(key);
     }
     let key = "";
+    let close: (() => void) | null = null;
     const handle = toast({
       message,
       variant,
@@ -236,10 +294,13 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
         handler: () => {
           const group = undoGroups.get(key);
           undoGroups.delete(key);
+          // The undo ends in its own toast, so this one must not keep a live-looking Undo.
+          close?.();
           if (group) void undo(group);
         },
       },
     });
+    close = handle;
     key = handle.id;
     const group = undoGroups.get(key);
     if (group) group.push(...items);
@@ -270,7 +331,12 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
         ? [{ org, view: item.result.decision, title: titleOf(item.id) }]
         : [],
     );
-    toastWritten(written, copy().marked(written.length));
+    toastWritten(
+      written,
+      written.length === 1
+        ? copy().saved(written[0].view, written[0].title)
+        : copy().marked(written.length),
+    );
     return result;
   }
 

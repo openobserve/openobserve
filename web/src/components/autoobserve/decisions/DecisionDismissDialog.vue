@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
-    <OForm :id="formId" :form="form">
+    <!-- The schema words a bad end date; the browser's own bubble would use another date format. -->
+    <OForm :id="formId" :form="form" novalidate>
       <div class="flex flex-col gap-3">
         <OFormRadioGroup
           name="reason"
@@ -124,11 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </p>
           <p
             v-else-if="locked"
-            class="text-text-secondary flex items-start gap-1 text-sm"
+            class="text-status-error-text flex items-start gap-1 text-sm"
+            data-severity="error"
             data-test="decision-dismiss-locked"
           >
-            <OIcon name="lock" size="xs" class="text-icon-locked mt-0.5" />
-            <span>{{ locked.message }}</span>
+            <OIcon name="lock" size="xs" class="mt-0.5" />
+            <span>{{ copy.refusalText(locked) }}</span>
           </p>
           <p
             v-else-if="effectState === 'error'"
@@ -138,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="error" size="xs" class="mt-0.5" />
             <span>{{ effectText }}</span>
           </p>
-          <OText v-else variant="meta" as="p">{{ effectText }}</OText>
+          <p v-else class="text-text-secondary text-xs">{{ effectText }}</p>
         </div>
       </div>
     </OForm>

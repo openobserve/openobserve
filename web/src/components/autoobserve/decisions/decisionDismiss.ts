@@ -114,9 +114,12 @@ function termOf(
   return { until };
 }
 
-/** No reason is preselected, so the reader always says why; planned work ends two whole hours out. */
+/** No reason is preselected, so the reader always says why; planned work ends two whole local hours out. */
 export function decisionDismissDefaults(nowMs: number): DecisionDismissForm {
-  const end = Math.ceil(nowMs / HOUR_MS) * HOUR_MS + HOUR_MS;
+  // A whole hour is the reader's, not UTC's: a half-hour zone would land on :30.
+  const local = new Date(nowMs);
+  local.setMinutes(0, 0, 0);
+  const end = local.getTime() + 2 * HOUR_MS;
   return {
     reason: "",
     untilDate: localDate(end),

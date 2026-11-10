@@ -11521,7 +11521,6 @@
       "loadFailed": "Không thể tải cài đặt: {message}",
       "lastSaved": "Lưu lần cuối {time}",
       "runNowHeading": "Chạy ngay",
-      "findingsDesc": "Các phát hiện được ghi vào stream {stream} của tổ chức này và được lưu theo thời gian lưu trữ của stream đó. Hiệu chỉnh cảnh báo không gửi thông báo nào.",
       "frequencyRange": "Chọn tần suất từ 1 giờ đến 30 ngày.",
       "windowRange": "Chọn cửa sổ từ 1 phút đến 90 ngày."
     }

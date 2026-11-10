@@ -1038,7 +1038,7 @@ describe("AlertCalibrationFindingCard", () => {
     expect(fold.text()).toContain("Dismissed by u-ops@example.com");
     expect(fold.text()).toContain("Will fix later");
     expect(fold.text()).toContain("Hidden until Feb 3, 2027");
-    expect(fold.find('[data-test="alert-calibration-finding-reopen"]').text()).toBe("Reopen");
+    expect(fold.find('[data-test="alert-calibration-finding-reopen"]').text()).toBe("Undo");
     expect(folded.find("dl").exists()).toBe(false);
     expect(folded.find('[data-test="alert-calibration-finding-actions"]').exists()).toBe(false);
     expect(folded.find('[data-test="alert-calibration-finding-dismiss"]').exists()).toBe(false);
@@ -1154,7 +1154,7 @@ describe("AlertCalibrationFindingCard", () => {
       global: { plugins: [store] },
     });
     expect(wrapper.find('[data-test="alert-calibration-finding-fold"]').text()).toContain(
-      "Hidden until reopened",
+      "Hidden until undone",
     );
     await wrapper.find('[data-test="alert-calibration-finding-reopen"]').trigger("click");
     await flushPromises();

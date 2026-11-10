@@ -204,7 +204,7 @@ export function applyCopy(t: TranslateFn, locale: string) {
   const fieldLabel = (key: PatchKey): I18nText => t(FIELD_LABEL[key]);
 
   const value = (key: PatchKey, v: PatchValue): I18nText => {
-    if (Array.isArray(v)) return v.length ? list(v) : t("common.none");
+    if (Array.isArray(v)) return v.length ? list(v) : t("alertCalibration.apply.noDestination");
     return key === "silenceMinutes" ? formatMinutes(t, v) : formatSeconds(t, v);
   };
 

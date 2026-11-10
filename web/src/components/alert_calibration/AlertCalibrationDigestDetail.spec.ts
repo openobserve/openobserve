@@ -480,7 +480,7 @@ describe("AlertCalibrationDigestDetail dismissed tile", () => {
     const written = await mountDetail([{ ...finding(1, 1), dismissed_count: 2 }]);
     await flushPromises();
     expect(tile(written)?.value).toBe("2");
-    expect(tile(written)?.sub).toBe("Hidden from this run");
+    expect(tile(written)?.sub).toBe("Hidden when this run was made");
     expect(tile(written)?.label).toBe("Dismissed");
     written.unmount();
 

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     size="md"
-    :title="t('insight.decisions.mark.title')"
+    :title="t('insight.decisions.mark.title', {}, alerts.length)"
     :primary-button-label="t('insight.decisions.mark.button', { count: copy.count(chosen.length) })"
     primary-button-data-test="decision-mark-submit"
     :primary-button-disabled="!chosen.length || submitting || !current || previews.isFetching.value"
@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-col gap-3">
       <OText as="p" data-test="decision-mark-intro">
-        {{ t("insight.decisions.mark.intro") }}
-        <strong>{{ t("insight.decisions.mark.keeps") }}</strong>
-        {{ t("insight.decisions.mark.untick") }}
+        {{ t("insight.decisions.mark.intro", {}, alerts.length) }}
+        <strong>{{ t("insight.decisions.mark.keeps", {}, alerts.length) }}</strong>
+        <template v-if="alerts.length > 1">{{ t("insight.decisions.mark.untick") }}</template>
       </OText>
 
       <OText
@@ -235,7 +235,7 @@ const scopeLine = computed<I18nText>(() => {
   ];
   if (lockedRows.value.length) {
     const first = previewById.value.get(lockedRows.value[0].id)?.locked;
-    if (first) parts.push(raw(first.message));
+    if (first) parts.push(copy.value.refusalText(first));
     parts.push(
       t(
         "insight.decisions.mark.locked",

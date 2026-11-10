@@ -223,8 +223,16 @@ describe("AlertCalibrationDismissedList", () => {
     expect(alertCalibration.reopenDismissal).toHaveBeenCalledWith("default", "f".repeat(64), 3);
   });
 
-  it("a failed first read shows the error state and retries", async () => {
+  it("a refused first read says what access is missing, with no Retry", async () => {
     vi.mocked(alertCalibration.listDismissals).mockRejectedValue(httpError(403));
+    await mountList();
+    const error = wrapper?.find('[data-test="alert-calibration-dismissed-error"]');
+    expect(error?.text()).toContain("You don't have access to Alert calibration");
+    expect(error?.find('[data-test="alert-calibration-dismissed-retry"]').exists()).toBe(false);
+  });
+
+  it("a failed first read shows the error state and retries", async () => {
+    vi.mocked(alertCalibration.listDismissals).mockRejectedValue(httpError(500));
     await mountList();
     const error = wrapper?.find('[data-test="alert-calibration-dismissed-error"]');
     expect(error?.text()).toContain("Dismissed findings couldn't be loaded");

@@ -98,7 +98,11 @@ const toggle = async (w: VueWrapper, id: string) => {
 };
 const save = async (w: VueWrapper) => {
   await w.find("form").trigger("submit");
-  await flushPromises();
+  // The schema validates asynchronously before the save starts.
+  for (let i = 0; i < 5; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+  }
 };
 const switchOn = (w: VueWrapper, id: string) =>
   find(w, id).find('button[role="switch"]').attributes("aria-checked") === "true";
@@ -158,13 +162,34 @@ describe("SlackInsightsSection: load (S7a)", () => {
     expect(text).toContain("Allow changes from Slack");
     expect(find(w, "slack-insights-channel-select").text()).toContain("#ops-insights");
     expect(find(w, "slack-insights-channel-line").text()).toContain(
-      "Last digest today 09:00: 2 need attention, 30 suggestions, 1 calibration run. See what your channel got.",
+      "Last digest today 09:00: 2 need attention, 30 suggestions, 1 calibration run.",
     );
     expect(find(w, "slack-insights-open-digest").attributes("href")).toBe(
       fixture.adminOneChannel.last_digest.link,
     );
     expect(text).toContain("America/New_York");
+    expect(find(w, "slack-insights-status").text()).toBe("");
+  });
+
+  it("says nothing is saved yet only once something changed", async () => {
+    const w = await mountSection(settings("adminOneChannel"));
+    expect(find(w, "slack-insights-status").text()).not.toContain("Nothing is saved");
+    await toggle(w, "slack-insights-trial");
     expect(find(w, "slack-insights-status").text()).toBe("Nothing is saved until you save.");
+  });
+
+  it("promises no link when the last digest has none", async () => {
+    const data = settings("adminOneChannel");
+    data.last_digest!.link = "";
+    const w = await mountSection(data);
+    expect(find(w, "slack-insights-channel-line").text()).not.toContain("See what");
+    expect(find(w, "slack-insights-open-digest").exists()).toBe(false);
+  });
+
+  it("names the digest time field for screen readers on the field itself", async () => {
+    const w = await mountSection(settings("adminOneChannel"));
+    const input = find(w, "slack-insights-time").find("input");
+    expect(input.attributes("aria-label")).toBe("Digest time");
   });
 
   it("keeps Save off until a value differs from the saved one", async () => {
@@ -348,6 +373,46 @@ describe("SlackInsightsSection: save failed (S7f)", () => {
     await flushPromises();
     expect(slack.getInsightsSettings).toHaveBeenCalledTimes(2);
     expect(find(w, "slack-insights-save-error").exists()).toBe(false);
+  });
+
+  it("keeps the reader's edits on top of the fresh settings after Refresh", async () => {
+    vi.mocked(slack.putInsightsSettings).mockRejectedValue(failure("staleRevision"));
+    const w = await mountSection(settings("adminOneChannel"));
+    const before = switchOn(w, "slack-insights-trial");
+    await toggle(w, "slack-insights-trial");
+    await save(w);
+    const fresh = settings("adminOneChannel");
+    fresh.revision = (fresh.revision ?? 0) + 1;
+    vi.mocked(slack.getInsightsSettings).mockReturnValue(ok(fresh) as any);
+    await find(w, "slack-insights-refresh").trigger("click");
+    await flushPromises();
+    expect(switchOn(w, "slack-insights-trial")).toBe(!before);
+    expect(find(w, "slack-insights-save").attributes("disabled")).toBeUndefined();
+  });
+
+  it("a_cleared_digest_time_is_caught_on_the_field_and_never_sent", async () => {
+    const w = await mountSection(settings("adminOneChannel"));
+    const input = find(w, "slack-insights-time").find("input");
+    await input.setValue("");
+    await input.trigger("blur");
+    await toggle(w, "slack-insights-trial");
+    await save(w);
+    expect(slack.putInsightsSettings).not.toHaveBeenCalled();
+    expect(w.text()).toContain("Choose a digest time as HH:MM.");
+  });
+
+  it("joins the server's reason and the next sentence as two sentences", async () => {
+    vi.mocked(slack.putInsightsSettings).mockRejectedValue(
+      Object.assign(new Error("bad"), {
+        response: { status: 400, data: { code: 400, message: "T5 simulated failure" } },
+      }),
+    );
+    const w = await mountSection(settings("adminOneChannel"));
+    await toggle(w, "slack-insights-trial");
+    await save(w);
+    expect(find(w, "slack-insights-save-error").text()).toContain(
+      "OpenObserve refused them: T5 simulated failure. Your changes are still here.",
+    );
   });
 
   it("keeps the red error, and says so, when Refresh after a 409 fails (F4)", async () => {

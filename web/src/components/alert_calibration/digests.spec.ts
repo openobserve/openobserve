@@ -48,6 +48,8 @@ import {
   skipDetailLabel,
   skipReasonLabel,
   splitMinutes,
+  coverageBadge,
+  SEVERITY_BADGE,
 } from "./format";
 import { evidenceFor, ruleLabelKey, rulesShownFor } from "./rules";
 
@@ -646,5 +648,47 @@ describe("countOrDash", () => {
     [undefined, "en-US", "—"],
   ])("%s in %s reads %s", (count, locale, shown) => {
     expect(countOrDash(count, locale)).toBe(shown);
+  });
+});
+
+describe("a short-blips noise finding", () => {
+  it("shows its own numbers, not the noise rows it never writes", () => {
+    const blips = record({
+      rule_id: "noise",
+      pattern: "short_blips",
+      evidence_shortblips_complete_episodes: 89,
+      evidence_shortblips_would_not_alert: 51,
+      evidence_shortblips_interval_secs: 120,
+      evidence_shortblips_current_pending_secs: 0,
+      evidence_shortblips_suggested_pending_secs: 120,
+    });
+    expect(evidenceFor({ ...blips, rule_id: "noise" }).map((f) => f.column)).toEqual([
+      "evidence_shortblips_complete_episodes",
+      "evidence_shortblips_would_not_alert",
+      "evidence_shortblips_interval_secs",
+      "evidence_shortblips_current_pending_secs",
+      "evidence_shortblips_suggested_pending_secs",
+    ]);
+  });
+
+  it("keeps the noise rows for a noise finding without the pattern", () => {
+    const noisy = record({ rule_id: "noise", evidence_noise_firings: 40 });
+    expect(evidenceFor({ ...noisy, rule_id: "noise" }).map((f) => f.column)).toEqual([
+      "evidence_noise_firings",
+      "evidence_noise_mean_time_to_normal_secs",
+      "evidence_noise_incident_linkage_ratio",
+    ]);
+  });
+});
+
+describe("the colours a run's words take", () => {
+  it("never paints full coverage green when no alert was in scope", () => {
+    expect(coverageBadge(run({ alerts_in_scope: 0 })).tone).toBe("neutral");
+    expect(coverageBadge(run({ alerts_in_scope: 0 })).variant).toBe("default-soft");
+    expect(coverageBadge(run({ alerts_in_scope: 4 })).tone).toBe("success");
+  });
+
+  it("shows High severity in the same orange Incidents uses for High", () => {
+    expect(SEVERITY_BADGE.High).toBe("orange-soft");
   });
 });

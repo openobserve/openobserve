@@ -27,16 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 flex-1 flex-col gap-1">
         <OText variant="body-strong" as="div">{{ finding.title }}</OText>
         <div class="flex flex-wrap items-center gap-1.5">
-          <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="xs" shape="rounded">
+          <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="sm" shape="rounded">
             {{ t(SEVERITY_LABEL[finding.severity]) }}
           </OBadge>
-          <OBadge variant="default-soft" size="xs" shape="rounded">
+          <OBadge variant="default-soft" size="sm" shape="rounded">
             {{ t(CONFIDENCE_LABEL[finding.confidence]) }}
           </OBadge>
           <OBadge
             v-if="tier"
             variant="primary-soft"
-            size="xs"
+            size="sm"
             shape="rounded"
             data-test="alert-calibration-finding-tier"
           >
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OBadge
             v-if="quality"
             variant="warning-soft"
-            size="xs"
+            size="sm"
             shape="rounded"
             data-test="alert-calibration-finding-quality"
           >
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBadge>
           <OBadge
             variant="default-outline"
-            size="xs"
+            size="sm"
             shape="rounded"
             data-test="alert-calibration-finding-rule"
             >{{ t(ruleLabelKey(finding.rule_id, schemaVersion(finding))) }}</OBadge
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OBadge
             v-if="folded"
             variant="default-soft"
-            size="xs"
+            size="sm"
             shape="rounded"
             data-test="alert-calibration-finding-dismissed"
           >
@@ -79,9 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OButton
         v-if="finding.alert_id"
-        variant="ghost-muted"
+        variant="ghost-primary"
         size="xs"
-        icon-left="open-in-new"
         class="shrink-0"
         data-test="alert-calibration-finding-open-alert"
         @click="openAlert"
@@ -253,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCardSection>
 
+    <ReviewChangeDialog v-if="changeTarget" v-model:open="changeOpen" :target="changeTarget" />
     <AlertCalibrationApplyDialog
       v-if="applyAction"
       v-model:open="applyOpen"
@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref, shallowRef } from "vue";
 import { useRouter } from "vue-router";
 import { format } from "date-fns";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -320,6 +320,8 @@ import {
   resourceOptions,
 } from "./format";
 import AlertCalibrationApplyDialog from "./AlertCalibrationApplyDialog.vue";
+import ReviewChangeDialog from "@/components/autoobserve/decisions/ReviewChangeDialog.vue";
+import type { ReviewChangeTarget } from "@/components/autoobserve/decisions/appliedChanges";
 import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import { useReopenDismissal } from "@/composables/alertCalibration/useDismissals";
 import { useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
@@ -455,7 +457,22 @@ interface ActionRow {
 const applyAction = ref<ApplySuggestion | null>(null);
 const applyOpen = ref(false);
 
+const changeTarget = shallowRef<ReviewChangeTarget | null>(null);
+const changeOpen = ref(false);
+
+/** With the decision route on, Review change is the dialog every surface opens; the editor handoff is for today's routes. */
 const openApply = (action: ApplySuggestion) => {
+  const { finding_id: findingId, alert_id: alertId } = props.finding;
+  if (decisionRoute.transport.value === "decision" && findingId && alertId) {
+    changeTarget.value = {
+      findingId,
+      alertId,
+      alertName: props.finding.alert_name ?? alertId,
+      action,
+    };
+    changeOpen.value = true;
+    return;
+  }
   applyAction.value = action;
   applyOpen.value = true;
 };

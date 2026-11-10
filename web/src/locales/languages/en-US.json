@@ -11411,13 +11411,14 @@
     "SearchStreamProtected": "Error: This stream holds internal records and can't be searched in Logs."
   },
   "alertCalibration": {
-    "title": "Alert Calibration",
+    "title": "Alert calibration",
     "subtitle": "How your alerts behave, measured from their own run history",
     "configure": "Configure",
     "runNow": "Run now",
     "runNowHint": "Asks for a run now instead of waiting for the next one. If a run is already due or in progress, it answers the request instead.",
     "runRequested": "Run requested. Its findings appear here when it finishes.",
     "runFailed": "The run could not be requested: {message}",
+    "runDenied": "You don't have permission to run Alert calibration. Ask an admin for edit access to it.",
     "runNeedsConfig": "Turn alert calibration on in its settings to run it.",
     "refresh": "Refresh",
     "retry": "Retry",
@@ -11441,11 +11442,12 @@
       "denied": "You don't have access to this alert. Ask an admin for access to its folder.",
       "failed": "Couldn't load this alert.",
       "unsupported": "This suggestion applies only to scheduled alerts.",
+      "noDestination": "No destination",
       "change": "{setting} {current} → {suggested}",
       "more": "{count} more",
       "editor": {
-        "applied": "Suggested by Alert Calibration: {changes}. Review, then click Save.",
-        "review": "Opened from an Alert Calibration finding.",
+        "applied": "Suggested by Alert calibration: {changes}. Review, then click Save.",
+        "review": "Opened from an Alert calibration finding.",
         "notApplied": {
           "draft": "The suggestion was not applied because this alert has unsaved changes. Save or discard them, then apply it again from the finding.",
           "stale": "The suggestion was not applied because this alert changed after the analysis.",
@@ -11459,7 +11461,7 @@
       "title": "Dismiss finding on {alert}",
       "alertFallback": "this alert",
       "scopeUntil": "Hidden for everyone in {org} until {date}, then shown again if it still fails. Recorded with your name and reason. Undo from Dismissed.",
-      "scopeNoEnd": "Hidden for everyone in {org} until someone reopens it. Recorded with your name and reason. Undo from Dismissed.",
+      "scopeNoEnd": "Hidden for everyone in {org} until someone undoes it. Recorded with your name and reason. Undo from Dismissed.",
       "reason": "Reason",
       "reasons": {
         "expected": "Expected for this alert",
@@ -11477,14 +11479,14 @@
       "duration": "Hide for",
       "untilReopened": "Until undone",
       "endsOn": "Hidden until {date}. After that, the finding shows again only if a later run still detects it.",
-      "endsNever": "Hidden until someone reopens it.",
+      "endsNever": "Hidden until someone undoes it.",
       "saved": "Dismissed until {date}. Find it under Dismissed.",
-      "savedNoEnd": "Dismissed until reopened. Find it under Dismissed.",
+      "savedNoEnd": "Dismissed until undone. Find it under Dismissed.",
       "savedUndo": "Dismissed until {date}: {alert}.",
-      "savedUndoNoEnd": "Dismissed until reopened: {alert}.",
+      "savedUndoNoEnd": "Dismissed until undone: {alert}.",
       "undo": "Undo",
       "error": {
-        "denied": "You don't have permission to dismiss findings. Ask an admin for edit access to Alert Calibration.",
+        "denied": "You don't have permission to dismiss findings. Ask an admin for edit access to Alert calibration.",
         "gone": "This alert no longer exists, or you can no longer see it. The page was refreshed.",
         "changed": "This finding's dismissal changed while you were editing. The page now shows its current state; check it and dismiss again.",
         "throttled": "Too many requests. Wait a moment, then try again.",
@@ -11517,21 +11519,21 @@
       "byActor": "Dismissed by {actor}",
       "markedBy": "Marked as intended report by {actor}",
       "foldUntil": "Hidden until {date}",
-      "foldUntilReopened": "Hidden until reopened",
+      "foldUntilReopened": "Hidden until undone",
       "emptyTitle": "No dismissed findings",
-      "emptyDescription": "Findings you dismiss are listed here until they end or are reopened.",
+      "emptyDescription": "Findings you dismiss are listed here until they end or are undone.",
       "loadFailedTitle": "Dismissed findings couldn't be loaded",
       "statesUnknown": "Dismissed findings couldn't be loaded, so some findings below may already be dismissed.",
       "capped": "Showing {shown} of {total} dismissed finding. | Showing {shown} of {total} dismissed findings.",
       "endedNote": "Ended dismissals are not listed. Their findings return only when a later run detects them again.",
-      "reopen": "Reopen",
-      "reopened": "Reopened. The finding is eligible for the next analysis.",
+      "reopen": "Undo",
+      "reopened": "Undone. The finding is shown again.",
       "reopenChanged": "This dismissal changed since you loaded it. The list was refreshed; check it and try again.",
-      "reopenDenied": "You don't have permission to reopen findings. Ask an admin for edit access to Alert Calibration.",
+      "reopenDenied": "You don't have permission to undo dismissals. Ask an admin for edit access to Alert calibration.",
       "reopenGone": "This dismissal no longer exists, or you can no longer see its alert. The list was refreshed.",
-      "reopenFailed": "The finding couldn't be reopened. Try again.",
+      "reopenFailed": "Nothing was undone. Try again.",
       "stat": "Dismissed",
-      "statSub": "Hidden from this run"
+      "statSub": "Hidden when this run was made"
     },
     "tabs": {
       "runs": "Runs",
@@ -11605,7 +11607,12 @@
       "successTimes": "Successful evaluation time",
       "nearLimit": "Near the time limit",
       "successTimesValue": "median {p50} · 90th percentile {p90} · longest {max}",
-      "nearLimitValue": "{count} of {total} successful evaluation took {near} or more | {count} of {total} successful evaluations took {near} or more"
+      "nearLimitValue": "{count} of {total} successful evaluation took {near} or more | {count} of {total} successful evaluations took {near} or more",
+      "blipEpisodes": "Firings that ended",
+      "blipsWouldNotAlert": "Would not fire with the suggested hold",
+      "checkInterval": "Check interval",
+      "holdNow": "Hold for now",
+      "holdSuggested": "Suggested hold"
     },
     "errorClass": {
       "streamMissing": "Stream not found",
@@ -11780,7 +11787,9 @@
       "errorClassesUnassessed": "Error types were not read for {count} alert, so its card shows counts only. | Error types were not read for {count} alerts, so their cards show counts only."
     },
     "readError": {
-      "forbidden": "You don't have access to Alert Calibration. Ask an org admin for read access to Alert Calibration.",
+      "forbidden": "You don't have access to Alert calibration. Ask an org admin for read access to it.",
+      "noAccessTitle": "You don't have access to Alert calibration",
+      "noAccessDescription": "Ask an org admin for read access to it.",
       "unreachable": "Couldn't reach the server. Check your connection and try again.",
       "runs": "Alert calibration runs couldn't be loaded. Try again in a moment.",
       "run": "This run couldn't be loaded. Try again in a moment.",
@@ -11788,6 +11797,7 @@
     },
     "digests": {
       "schedule": "Schedule",
+      "runsEvery": "Runs every",
       "off": "Off",
       "notConfigured": "Not configured",
       "noScheduledRun": "No scheduled run",
@@ -11798,7 +11808,7 @@
       "scopeAll": "All runs",
       "scopeFindings": "With findings",
       "scopeGaps": "Coverage gaps",
-      "searchPlaceholder": "Search runs by alert name",
+      "searchPlaceholder": "Search by alert name",
       "colRun": "Run",
       "colFindings": "Findings",
       "colCoverage": "Coverage",
@@ -11826,7 +11836,7 @@
       "statFindings": "Findings",
       "statAlertsInScope": "Alerts in scope",
       "statDeclined": "Declined",
-      "statDeclinedSub": "Declined, not cleared",
+      "statDeclinedSub": "Not cleared",
       "statDeclinedTooltip": "Rule and alert pairs a rule would not judge. A gate, not a clearance. A floor not met is only counted; a rule that could not run, or looked and declined, is listed below with its reason.",
       "limitations": "Limits of the evidence",
       "declinedHeading": "Declined with a reason",
@@ -11873,7 +11883,10 @@
       "notEnabledTitle": "Alert calibration is not running for this organization",
       "notEnabledDescription": "Turn it on in the settings. The first run is due as soon as it is on.",
       "emptyTitle": "No runs in the last {days} days",
-      "emptyDescription": "The dashboard fills in once alert calibration has run."
+      "emptyDescription": "The dashboard fills in once alert calibration has run.",
+      "loadFailedTitle": "Findings couldn't be loaded",
+      "findingGone": "This finding is no longer open.",
+      "applied": "Applied"
     },
     "lastRun": {
       "succeeded": "The last run succeeded {time}.",
@@ -11903,7 +11916,7 @@
       "saveFailed": "The settings could not be saved: {message}",
       "lastSaved": "Last saved {time}",
       "runNowHeading": "Run now",
-      "findingsDesc": "Findings are written to the {stream} stream of this organization and kept for that stream's retention. Alert calibration sends no notifications.",
+      "findingsKept": "Findings are kept with this organization's own records for its retention period. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
       "windowRange": "Choose a window between 1 minute and 90 days."
     },
@@ -21371,8 +21384,8 @@
     "serverError": "Server error",
     "serverErrorDesc": "An internal error occurred on the server.",
     "protectedStream": "Alert calibration records can't be searched here",
-    "protectedStreamDesc": "They are shown on the Alert Calibration page, filtered to the alerts you can access.",
-    "openCalibration": "Open Alert Calibration",
+    "protectedStreamDesc": "They are shown on the Alert calibration page, filtered to the alerts you can access.",
+    "openCalibration": "Open Alert calibration",
     "openCalibrationDesc": "See the runs and findings you have access to",
     "protectedStreamInternal": "Internal records can't be searched here",
     "protectedStreamInternalDesc": "This stream holds records OpenObserve keeps for its own use, so search leaves it out.",
@@ -31716,6 +31729,7 @@
     "connect": {
       "title": "Connect a Slack workspace",
       "description": "Your team asks OpenObserve questions from Slack and gets answers with their own permissions.",
+      "autoobserveHint": "Once connected, AutoObserve can post a daily digest to a channel you pick.",
       "stepCheckTitle": "Check this server",
       "stepCreateTitle": "Create the app",
       "stepInstallTitle": "Install and link people",
@@ -32081,7 +32095,8 @@
       "loadFailed": "Couldn't load your linked accounts"
     },
     "workspaces": {
-      "addAnother": "Add another workspace"
+      "addAnother": "Add another workspace",
+      "noAccess": "Slack settings need the Manage Slack permission. Ask an admin of this organization."
     },
     "sections": {
       "onThisPage": "On this page",
@@ -32101,16 +32116,17 @@
       "picked": "✓ Picked",
       "privateChannel": "Private",
       "alertRoutes": "{count} alert route posts here | {count} alert routes post here",
-      "lastDigest": "Last digest {when}: {counts}. See what your channel got.",
+      "lastDigest": "Last digest {when}: {counts}.",
       "lastDigestIn": "Last digest {when} in {channel}.",
-      "lastDigestNoCounts": "Last digest {when}. See what your channel got.",
+      "lastDigestNoCounts": "Last digest {when}.",
       "openLastDigest": "Open last digest",
       "today": "today {time}",
       "onDate": "{date} {time}",
       "counts": {
         "needsAttention": "{count} needs attention | {count} need attention",
         "suggestions": "{count} suggestion | {count} suggestions",
-        "calibrationRuns": "{count} calibration run | {count} calibration runs"
+        "calibrationRuns": "{count} calibration run | {count} calibration runs",
+        "calibrationFindings": "{count} calibration finding | {count} calibration findings"
       },
       "noChannel": "Nothing posts yet: no channel is picked.",
       "noChannelCounts": "AutoObserve has {attention} and {suggestions} in {org} today.",
@@ -32129,14 +32145,15 @@
       "timeAndZone": "Time and time zone",
       "time": "Digest time",
       "zone": "Time zone",
+      "timeInvalid": "Choose a digest time as HH:MM.",
       "trial": "Post trial findings as they happen",
       "trialHelp": "Checks in their 28-day trial are not proven yet. Off: what they find waits for the digest, with how often they were right. On: an outage they find posts right away, at most 5 an hour; it still doesn't page anyone.",
       "trialOffShort": "Off: what checks in their 28-day trial find waits for the digest.",
-      "trialOnShort": "On: an outage that checks in their 28-day trial find posts right away.",
+      "trialOnShort": "On: an outage found by a check in its 28-day trial posts right away.",
       "allow": "Allow changes from Slack",
-      "allowHelp": "Covers the Review change, Dismiss and Mark as intended buttons in Slack. Off: Slack shows findings and suggestions read-only, with Open in OpenObserve. On: people with permission can do any of the three from Slack after seeing what changes; each change names who made it and can be undone.",
-      "allowOffShort": "Off: Review change, Dismiss and Mark as intended are read-only in Slack.",
-      "allowOnShort": "On: people with permission can use Review change, Dismiss and Mark as intended from Slack.",
+      "allowHelp": "Covers the Dismiss button on findings posted to Slack. Off: Slack shows findings and suggestions read-only, with Open in OpenObserve. On: people with permission can dismiss from Slack after seeing what changes; each dismissal names who made it and can be undone.",
+      "allowOffShort": "Off: Dismiss is read-only in Slack.",
+      "allowOnShort": "On: people with permission can dismiss from Slack.",
       "on": "On",
       "off": "Off",
       "noChannelValue": "No channel",
@@ -32160,7 +32177,7 @@
         "noAnswer": "OpenObserve didn't answer. Your changes are still here; save again.",
         "notInChannel": "OpenObserve isn't in {channel}, so it can't post there. In Slack, type /invite {'@'}OpenObserve in {channel}, then save again.",
         "forbidden": "they need the Manage Slack permission. Ask an admin of this organization.",
-        "refused": "OpenObserve refused them: {reason} Your changes are still here.",
+        "refused": "OpenObserve refused them: {reason}. Your changes are still here.",
         "unknown": "something went wrong. Your changes are still here; save again.",
         "refreshFailed": "Refresh didn't work either. Try again.",
         "refresh": "Refresh"
@@ -34360,7 +34377,7 @@
     },
     "decisions": {
       "reasons": {
-        "not_needed": "Not needed for these sources",
+        "not_needed": "Not needed",
         "planned_work": "Planned work",
         "false_positive": "Wrong: this didn't happen",
         "will_fix_later": "Will fix later",
@@ -34374,6 +34391,7 @@
       "undo": "Undo",
       "retry": "Retry",
       "namesMore": "{names} and {count} more",
+      "askOwners": "{refusal}: {names}.",
       "dismiss": {
         "title": "Dismiss “{title}”?",
         "button": "Dismiss",
@@ -34418,7 +34436,8 @@
       "undoError": {
         "changed": "This changed since it was saved, so nothing was undone. Refresh and try again.",
         "gone": "This is no longer dismissed, so there is nothing to undo.",
-        "failed": "Nothing was undone. Try again."
+        "failed": "Nothing was undone. Try again.",
+        "already": "Already undone. Nothing changed."
       },
       "undoPartial": {
         "summary": "{done} of {total} undone. Not undone: {names}.",
@@ -34427,9 +34446,9 @@
       },
       "mark": {
         "action": "Mark as intended report",
-        "title": "Mark alerts as intended reports",
-        "intro": "They stop showing as noise.",
-        "keeps": "The alerts keep sending exactly as before.",
+        "title": "Mark alert as intended report | Mark alerts as intended reports",
+        "intro": "It stops showing as noise. | They stop showing as noise.",
+        "keeps": "The alert keeps sending exactly as before. | The alerts keep sending exactly as before.",
         "untick": "Untick any that are not meant as reports.",
         "team": "{team} team",
         "folder": "folder {folder}",
@@ -34466,6 +34485,8 @@
         "button": "Apply",
         "where": "Folder {folder} · notifies {destinations}",
         "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "whereNoOne": "Folder {folder} · notifies no one",
+        "whereTeamNoOne": "Folder {folder} · team {team} · notifies no one",
         "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
         "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
         "changed": "This alert changed. Open it to review.",

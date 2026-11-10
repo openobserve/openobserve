@@ -138,7 +138,7 @@ describe("applyCopy", () => {
   it("lists up to three names and counts the rest", () => {
     expect(copy.list(["a"])).toBe("a");
     expect(copy.list(["a", "b", "c", "d", "e"])).toBe("a, b, c, and 2 more");
-    expect(copy.value("destinations", [])).toBe("None");
+    expect(copy.value("destinations", [])).toBe("No destination");
   });
 
   it("names the missing destinations in the singular and the plural", () => {

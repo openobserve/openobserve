@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</OText>
         <OBadge
           variant="default-soft"
-          size="xs"
+          size="sm"
           shape="rounded"
           data-test="alert-calibration-skip-group-count"
           >{{ rows.length }}</OBadge
