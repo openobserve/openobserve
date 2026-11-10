@@ -16,7 +16,7 @@
 //! Vector/matrix selector evaluation and data loading. Reads `ctx`,
 //! `label_selector`, and `skip_labels`; writes `result_type`.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::{NAME_LABEL, is_stale_marker, value::*};
 use datafusion::error::{DataFusionError, Result};
@@ -292,13 +292,9 @@ impl Engine {
         }
 
         let start = std::time::Instant::now();
+        let query_exemplars = self.ctx.query_ctx.query_exemplars;
         metric_values.par_iter_mut().for_each(|metric| {
-            metric.samples.sort_unstable_by_key(|k| k.timestamp);
-            if self.ctx.query_ctx.query_exemplars
-                && let Some(exemplars) = &mut metric.exemplars
-            {
-                exemplars.sort_by_key(|k| k.timestamp);
-            }
+            sort_series(metric, query_exemplars);
         });
         log::info!(
             "[trace_id: {}] [PromQL] sort samples by timestamps took: {:?}",
@@ -630,6 +626,32 @@ fn flatten_loaded_metrics(metrics: LoadedMetrics) -> Vec<RangeValue> {
     }
 }
 
+/// Orders a series by time and drops the second copy of what two contexts both returned.
+fn sort_series(metric: &mut RangeValue, with_exemplars: bool) {
+    metric.samples.sort_unstable_by_key(|k| k.timestamp);
+    metric.samples.dedup_by_key(|k| k.timestamp);
+    if with_exemplars && let Some(exemplars) = &mut metric.exemplars {
+        exemplars.sort_by_key(|k| k.timestamp);
+        dedup_exemplars(exemplars);
+    }
+}
+
+/// Distinct exemplars may share a timestamp, so a copy is not always adjacent to its original.
+fn dedup_exemplars(exemplars: &mut Vec<Arc<Exemplar>>) {
+    let mut kept: Vec<Arc<Exemplar>> = Vec::with_capacity(exemplars.len());
+    for exemplar in exemplars.drain(..) {
+        let is_copy = kept
+            .iter()
+            .rev()
+            .take_while(|k| k.timestamp == exemplar.timestamp)
+            .any(|k| k.value.to_bits() == exemplar.value.to_bits() && k.labels == exemplar.labels);
+        if !is_copy {
+            kept.push(exemplar);
+        }
+    }
+    *exemplars = kept;
+}
+
 /// A single DataFusion context is the common case and its series are already
 /// deduplicated, so flatten it; series from multiple contexts must be merged
 /// by series hash.
@@ -735,6 +757,66 @@ mod tests {
         assert_eq!(metrics.len(), 2);
         assert_eq!(metrics[&11].samples.len(), 2);
         assert_eq!(metrics[&22].samples.len(), 1);
+    }
+
+    #[test]
+    fn test_sort_series_keeps_one_copy_of_a_sample_read_from_wal_and_storage() {
+        let mut metric = range_value(200, 2.0);
+        metric.extend(range_value(100, 1.0));
+        metric.extend(range_value(200, 2.0));
+        metric.extend(range_value(100, 1.0));
+
+        sort_series(&mut metric, false);
+
+        let samples: Vec<_> = metric
+            .samples
+            .iter()
+            .map(|s| (s.timestamp, s.value))
+            .collect();
+        assert_eq!(samples, vec![(100, 1.0), (200, 2.0)]);
+    }
+
+    #[test]
+    fn test_sort_series_keeps_distinct_exemplars_that_share_a_timestamp() {
+        let exemplar = |timestamp: i64, trace_id: &str| {
+            Arc::new(Exemplar {
+                timestamp,
+                value: 1.0,
+                labels: vec![Arc::new(Label::new("trace_id", trace_id))],
+            })
+        };
+        let copy = || {
+            Some(vec![
+                exemplar(200, "c"),
+                exemplar(100, "a"),
+                exemplar(100, "b"),
+            ])
+        };
+        let mut metric = RangeValue {
+            exemplars: copy(),
+            ..Default::default()
+        };
+        metric.extend(RangeValue {
+            exemplars: copy(),
+            ..Default::default()
+        });
+
+        sort_series(&mut metric, true);
+
+        let exemplars: Vec<_> = metric
+            .exemplars
+            .unwrap()
+            .iter()
+            .map(|e| (e.timestamp, e.labels[0].value.clone()))
+            .collect();
+        assert_eq!(
+            exemplars,
+            vec![
+                (100, "a".to_string()),
+                (100, "b".to_string()),
+                (200, "c".to_string())
+            ]
+        );
     }
 
     #[test]
