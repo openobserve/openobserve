@@ -180,7 +180,11 @@ impl std::fmt::Display for RequestEncoding {
 
 // `Default` turns every option off; callers still set `sql`, the time range and `size`.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-#[schema(as = SearchQuery)]
+#[schema(as = SearchQuery, description = "Search query options: `timezone` defaults to UTC when unset \
+    or empty and accepts fixed offsets or IANA names; named zones use one fixed offset at the \
+    resolved request end for all partitions and deltas; an explicit `histogram()` timezone must \
+    be a string literal and takes precedence, while an invalid timezone fails any histogram \
+    call that uses it.")]
 pub struct Query {
     pub sql: String,
     // Unix microseconds; `Default` leaves both ends at 0, so always set the range.
@@ -221,9 +225,9 @@ pub struct Query {
     /// Seconds; 0 uses the SQL `histogram()` interval, falling back to one from the time range.
     #[serde(default)]
     pub histogram_interval: i64,
-    /// Default fixed-offset timezone (e.g. "+08:00") applied to histogram() buckets
-    /// that don't carry their own 3rd timezone argument. None / "UTC" / "" => UTC.
+    /// Default histogram timezone; SQL timezone string literals take precedence.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(examples("+08:00", "America/Los_Angeles"))]
     pub timezone: Option<String>,
     /// Adds the structured `profile` column to EXPLAIN ANALYZE output.
     #[serde(default)]
@@ -668,6 +672,7 @@ pub struct SearchPartitionRequest {
     pub sampling_ratio: Option<f64>,
     #[serde(default)]
     pub search_type: Option<SearchEventType>,
+    /// Histogram zone must match the search request's `query.timezone` and resolved time bounds.
     #[serde(default)]
     pub timezone: Option<String>,
 }
