@@ -28,6 +28,9 @@ import type { TurnState, TurnTerminal } from "./turnStates";
 /** UUIDv7, the server session id. */
 export type Sid = string;
 
+/** The org's data-sharing level, strictest first. */
+export type DataLevel = "schema" | "aggregates" | "raw";
+
 /** The pickable agents; `sre-rca` reads as `sre`, and no other id ever renders as an agent. */
 export type AgentId = "o2-ai" | "sre" | "generate-query";
 
@@ -603,6 +606,8 @@ export interface AssistantCapability {
   feedbackStored?: boolean;
   /** `mode: "chat"` with `incident_id` reaches the interactive incident agent (`rca_chat_mode`). */
   rcaChatMode?: boolean;
+  /** The org's data-sharing level (`data_sharing_level`); absent reads as raw. */
+  dataLevel?: DataLevel;
   /** Absent off Cloud; doors read it for the cost line (`80` §3.3). */
   creditMode?: CreditMode;
   isAdmin: boolean;
@@ -1044,6 +1049,8 @@ export interface RequestTurn {
   attachments: boolean;
   /** A chat about an incident names `mode: "chat"`, or the server runs the autonomous analysis agent. */
   rcaChatMode?: boolean;
+  /** Below raw, row, cell and span chips are not attached. */
+  dataLevel?: DataLevel;
   now: number;
   replyToApproval?: string;
   replacesTurnId?: string;
@@ -1081,6 +1088,8 @@ export interface TurnEngine {
   retrySave(sid: Sid, turnId: string): Promise<void>;
   /** The last ended turn still has the snapshot a Retry resends (HT-03 AC 5). */
   canRetry?(sid: Sid): boolean;
+  /** Lets go of the last ended turn's snapshot (its images included) once the chat no longer needs a Retry. */
+  forget?(sid: Sid): void;
   /** The running turn's frames so far, for a browser-only save of the turn as `StoredTurn`. */
   turnFrames?(sid: Sid): { turnId: string; frames: unknown[] } | null;
   /** `turn_busy`'s Stop it: cancels a turn this tab is not running (`80` §1.3). */

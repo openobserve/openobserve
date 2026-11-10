@@ -430,7 +430,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :to="composerDock"
       :disabled="!composerDock"
     >
-      <RcaSteerComposer
+      <!-- Assistant flag off keeps the incident page's original composer and its Ctrl/Cmd+Enter send. -->
+      <component
+        :is="legacy ? RcaSteerComposerLegacy : RcaSteerComposer"
         ref="composer"
         :run-id="thread?.run_id ?? ''"
         :waiting-input="runState === 'waiting_input'"
@@ -517,6 +519,7 @@ import {
 } from "@/utils/incidents/rcaSteering";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import RcaSteerComposer from "./RcaSteerComposer.vue";
+import RcaSteerComposerLegacy from "./RcaSteerComposerLegacy.vue";
 import RcaThreadStep from "./RcaThreadStep.vue";
 
 const props = withDefaults(
@@ -810,7 +813,7 @@ watch(latestEntryKey, () => {
   if (atBottom) void scrollToLatest();
 });
 
-const composer = ref<InstanceType<typeof RcaSteerComposer> | null>(null);
+const composer = ref<{ focus: () => Promise<void> } | null>(null);
 
 /** "Tell the agent": focus the steer box. */
 const focusComposer = () => composer.value?.focus();

@@ -154,6 +154,7 @@ export {
   watchPrefs,
 } from "./prefs";
 export { assistantDashboardDraft, clearDashboardDraft } from "./actions/appliers/drafts";
+export { queuedDraftSid } from "./drafts";
 export {
   assistantObjectNameKey,
   focusDockComposer,

@@ -61,6 +61,7 @@ export interface AssistantCapabilitiesResponse {
   /** `POST /ai/feedback` stores the vote with its turn. */
   feedback_stored?: boolean;
   rca_chat_mode?: boolean;
+  data_sharing_level?: string;
   rca_feedback?: boolean;
   gate?: string;
 }

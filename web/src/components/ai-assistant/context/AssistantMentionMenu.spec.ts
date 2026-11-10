@@ -52,7 +52,7 @@ vi.mock("@/composables/useBreakpoint", async () => {
   };
 });
 
-// As the API answers: no folder and no title lists the default folder; a title alone searches every folder.
+// As the API answers: no folder and no title lists the default folder; a title alone, even empty, searches every folder.
 const DASHBOARDS = [
   { dashboard_id: "d1", title: "Checkout", folder_id: "default", folder_name: "default" },
   { dashboard_id: "d2", title: "Payments SLOs", folder_id: "f2", folder_name: "Payments" },
@@ -66,6 +66,10 @@ vi.mock("@/services/dashboards", () => ({
         title ? row.title.toLowerCase().includes(title) : row.folder_id === (folder || "default"),
       );
       return { data: { dashboards: rows } };
+    }),
+    listAcrossFolders: vi.fn(async () => {
+      if (dashboardsApi.forbidden) throw { response: { status: 403 } };
+      return { data: { dashboards: DASHBOARDS } };
     }),
   },
 }));
@@ -327,6 +331,14 @@ describe("AssistantMentionMenu", () => {
     expect(labels.some((label) => label.includes("Payments SLOs"))).toBe(true);
     const { default: api } = await import("@/services/dashboards");
     expect(vi.mocked(api.list).mock.calls.at(-1)?.[6]).toBe("");
+  });
+
+  it("M1-R: a bare @ lists dashboards from every folder, not only the default one", async () => {
+    queryClient.clear();
+    const { options } = await open("");
+    const labels = options().map((o) => o.textContent ?? "");
+    expect(labels.some((label) => label.includes("Checkout"))).toBe(true);
+    expect(labels.some((label) => label.includes("Payments SLOs"))).toBe(true);
   });
 
   it("M2: gives streams whose names differ only by punctuation distinct option ids", async () => {

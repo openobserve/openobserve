@@ -26,6 +26,7 @@ export interface RcaFollowTarget {
 
 // One panel per tab, so one followed run; the chat underneath stays mounted and comes back on close.
 const followed = shallowRef<RcaFollowTarget | null>(null);
+let followedKey: string | null = null;
 
 /** The run the side panel shows, if any. */
 export function followedRcaRun(): Readonly<ShallowRef<RcaFollowTarget | null>> {
@@ -35,6 +36,11 @@ export function followedRcaRun(): Readonly<ShallowRef<RcaFollowTarget | null>> {
 /** Clears the followed run, so the panel shows its chat again. */
 export function stopFollowingRca(): void {
   followed.value = null;
+}
+
+/** Ends a follow made under another user or org, so the panel never shows or acts on that run. */
+export function keepRcaFollowFor(userOrgKey: string | null): void {
+  if (followed.value && followedKey !== userOrgKey) stopFollowingRca();
 }
 
 /** Re-analyze started a new run on the followed incident, so the panel follows that run instead. */
@@ -50,6 +56,7 @@ export function useRcaFollow(): {
   const store = useAssistantStore();
   return {
     follow(target, invoker = null) {
+      followedKey = store.state.userOrgKey;
       followed.value = { ...target };
       store.open({ kind: "sidebar" }, { focus: "none", invoker });
     },

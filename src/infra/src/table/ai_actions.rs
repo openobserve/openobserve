@@ -59,6 +59,8 @@ pub struct ConfirmedTarget<'a> {
     pub resource_type: &'a str,
     pub resource_id: Option<&'a str>,
     pub resource_name: Option<&'a str>,
+    /// Rows earlier items of the same `/confirm` already took.
+    pub taken: &'a [String],
 }
 
 fn db_err(e: impl ToString) -> errors::Error {
@@ -382,11 +384,25 @@ pub async fn stamp_execution_with<C: ConnectionTrait>(
     if let Some(resource_id) = target.resource_id {
         find = find.filter(Column::ResourceId.eq(resource_id));
     }
-    let Some(mut row) = find
-        .order_by_desc(Column::CreatedAt)
-        .one(conn)
+    if !target.taken.is_empty() {
+        find = find.filter(Column::Id.is_not_in(target.taken.iter().cloned()));
+    }
+    // Oldest first: a card runs its targets in order, so the n-th item owns the n-th execution.
+    let candidates = find
+        .order_by_asc(Column::CreatedAt)
+        .order_by_asc(Column::Id)
+        .all(conn)
         .await
-        .map_err(db_err)?
+        .map_err(db_err)?;
+    let name = target.resource_name.filter(|name| !name.is_empty());
+    let named = |row: &&Model| name.is_some() && row.resource_name.as_deref() == name;
+    let unnamed = |row: &&Model| row.resource_name.is_none();
+    let Some(mut row) = candidates
+        .iter()
+        .find(named)
+        .or_else(|| candidates.iter().find(unnamed))
+        .or_else(|| candidates.first())
+        .cloned()
     else {
         return Ok(None);
     };
@@ -394,7 +410,6 @@ pub async fn stamp_execution_with<C: ConnectionTrait>(
         .col_expr(Column::ApprovalKind, Expr::value(APPROVAL_APPROVED))
         .col_expr(Column::ApprovedBy, Expr::value(fit(approved_by, 256)));
     // A call such as a mute names no object in its body, so the card's target names the row.
-    let name = target.resource_name.filter(|name| !name.is_empty());
     if let (None, Some(name)) = (&row.resource_name, name) {
         let name = fit(name, 256);
         update = update.col_expr(Column::ResourceName, Expr::value(name.clone()));
@@ -566,6 +581,7 @@ mod tests {
             resource_type: "alert",
             resource_id: Some("a1"),
             resource_name: None,
+            taken: &[],
         };
         let late = stamp_execution_with(&db, "o", "s", target, ("ap1", "a@x"))
             .await
@@ -612,6 +628,7 @@ mod tests {
             resource_type: "alert",
             resource_id: None,
             resource_name: Some(name),
+            taken: &[],
         };
         let stamped = stamp_execution_with(&db, "o", "s", card("renamed"), ("ap1", "a@x"))
             .await
@@ -642,6 +659,50 @@ mod tests {
             .await
             .unwrap();
         assert!(none.is_none());
+    }
+
+    #[tokio::test]
+    async fn gathered_items_without_ids_each_stamp_their_own_execution() {
+        let db = db().await;
+        let execution = |name: Option<&str>, at| Model {
+            approval_id: Some("ap1".to_string()),
+            resource_type: "panel".to_string(),
+            resource_id: None,
+            resource_name: name.map(str::to_string),
+            ..action("a@x", at)
+        };
+        let first = insert_with(&db, execution(None, 1)).await.unwrap();
+        let second = insert_with(&db, execution(None, 2)).await.unwrap();
+        let named_cpu = insert_with(&db, execution(Some("CPU"), 3)).await.unwrap();
+        let mut taken = Vec::new();
+        for (name, expected) in [
+            ("Mem", &first.id),
+            ("CPU", &named_cpu.id),
+            ("Disk", &second.id),
+        ] {
+            let target = ConfirmedTarget {
+                resource_type: "panel",
+                resource_id: None,
+                resource_name: Some(name),
+                taken: &taken,
+            };
+            let row = stamp_execution_with(&db, "o", "s", target, ("ap1", "a@x"))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(&row.id, expected, "{name}");
+            taken.push(row.id);
+        }
+        let target = ConfirmedTarget {
+            resource_type: "panel",
+            resource_id: None,
+            resource_name: Some("Net"),
+            taken: &taken,
+        };
+        let spent = stamp_execution_with(&db, "o", "s", target, ("ap1", "a@x"))
+            .await
+            .unwrap();
+        assert!(spent.is_none(), "every execution is already taken");
     }
 
     #[tokio::test]

@@ -391,8 +391,8 @@ function itemOf(raw: unknown, card: Pick<ApprovalBlockData, "targets">): Approva
       (item.detail ?? item.message) !== undefined && {
         message: text(item.detail ?? item.message).slice(0, MAX_MESSAGE_CHARS),
       }),
-    // Only the server's own ledger can restore an object, so Undo needs the id it issued.
-    ...(item.undoable === true && ledgerId && { undoable: true, ledgerId }),
+    // Only the server's own ledger can restore an object, and only a write that happened can be undone.
+    ...(done && item.undoable === true && ledgerId && { undoable: true, ledgerId }),
   };
 }
 

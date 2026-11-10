@@ -15,9 +15,10 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computed, ref } from "vue";
+import { computed, defineComponent, inject, ref } from "vue";
 
 import type { AssistantCapability, GateCode, Starter } from "@/composables/assistant";
+import { assistantSessionSourceKey } from "@/composables/assistant/pure";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { HistoryDeps } from "@/composables/assistant/useAssistantHistory";
@@ -908,6 +909,35 @@ describe("WP-06 conversation wiring", () => {
     await wrapper.get('[data-test="assistant-turn-outcome-action"]').trigger("click");
     expect(wrapper.find('[data-test="assistant-turn-outcome-open-here"]').exists()).toBe(true);
     open.mockRestore();
+  });
+});
+
+describe("AssistantShell message sources", () => {
+  it("lets go of a dropped chat's transcript source (R2-03)", async () => {
+    fake.current = fakeAssistant();
+    let source!: NonNullable<ReturnType<typeof inject<(sid: string) => unknown>>>;
+    const Probe = defineComponent({
+      setup() {
+        source = inject(assistantSessionSourceKey)!;
+        return () => null;
+      },
+    });
+    mount(AssistantShell, {
+      props: { placement: "sidebar" },
+      slots: { "chrome-start": Probe },
+      global: { plugins: [fakeRouter(), fakeVuex()] },
+      attachTo: document.body,
+    });
+    const { store } = fake.current;
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    await flushPromises();
+    const first = source(sid);
+    expect(source(sid)).toBe(first);
+    store.dropSession(sid);
+    await flushPromises();
+    expect(source(sid)).not.toBe(first);
   });
 });
 

@@ -42,6 +42,7 @@ import {
   truncateChip,
   wireDataOf,
   wireTimeRange,
+  withheldAtLevel,
   type TimeWindow,
 } from "./contextChips";
 import type { ContextChip, PageContext } from "./types";
@@ -84,7 +85,9 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
   };
   const window = timeWindowOf(page, composer.timeOverride, now);
   sentWindows.set(session.sid, window);
-  const attached = composer.chips.filter((chip) => serializedNameOf(chip) !== undefined);
+  const attached = composer.chips.filter(
+    (chip) => serializedNameOf(chip) !== undefined && !withheldAtLevel(chip, turn?.dataLevel),
+  );
   const typed = turn?.attachments ?? false;
   // B-09 has no pasted-text kind, so a paste always rides in the message body.
   const typedChips = typed ? attached.filter((chip) => chip.kind !== "pasted_text") : [];

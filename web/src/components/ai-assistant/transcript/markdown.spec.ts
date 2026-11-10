@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { Marked } from "marked";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { computed, defineComponent, h, nextTick } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 import {
   AssistantMarkdownCode,
@@ -94,6 +95,40 @@ const render = (text: string, state: "open" | "closed" = "closed") =>
 function mountHtml(html: string) {
   return mount(AssistantMarkdownPart, {
     props: { part: { kind: "html", key: "m", html } },
+    attachTo: document.body,
+  });
+}
+
+const BLANK = { render: () => null };
+
+// The app's entity routes as the real router nests them, under the `/web` base and behind its catch-all.
+function appRouter() {
+  return createRouter({
+    history: createMemoryHistory("/web"),
+    routes: [
+      {
+        path: "/",
+        component: BLANK,
+        children: [
+          { path: "logs", name: "logs", component: BLANK },
+          { path: "traces", name: "traces", component: BLANK },
+          { path: "alerts/detail/:alert_id", name: "alertDetail", component: BLANK },
+          { path: "/dashboards/view", name: "viewDashboard", component: BLANK },
+          { path: "/:catchAll(.*)*", name: "notFound", component: BLANK },
+        ],
+      },
+    ],
+  });
+}
+
+function mountEntityHtml(
+  html: string,
+  props: { org?: string; openable?: boolean } = {},
+  router = appRouter(),
+) {
+  return mount(AssistantMarkdownPart, {
+    props: { part: { kind: "html", key: "m", html }, org: "chat-org", ...props },
+    global: { plugins: [router] },
     attachTo: document.body,
   });
 }
@@ -186,6 +221,19 @@ describe("markdown.ts strict profile", () => {
       wrapper.unmount();
     }
     expect((window as unknown as { __pwned?: number }).__pwned).toBeUndefined();
+  });
+
+  it.each([
+    [`a <code><<x>strong class="${CLASSES.calloutCause}">Root cause</strong>`, "strong"],
+    ['a <code><<x>img src="data:image/png;base64,AAAA" alt="x">', "img"],
+    ['a <pre><<x>a href="https://evil.example">go</a>', "a"],
+  ])("keeps raw HTML after an inline <code> or <pre> as text: %s (SR-02)", (input, tag) => {
+    const html = htmlOf(parse(input).parts);
+    expect(html).not.toMatch(new RegExp(`<${tag}[\\s>]`));
+    const wrapper = mountHtml(html);
+    expect(wrapper.element.querySelectorAll(tag)).toHaveLength(0);
+    expect(wrapper.text()).toContain(`<${tag}`);
+    wrapper.unmount();
   });
 
   it.each([
@@ -1663,10 +1711,7 @@ describe("assistant answer styling (K1, K2)", () => {
     const sql = btoa("SELECT * FROM secrets");
     const href = `${window.location.origin}/web/logs?stream=checkout&stream_type=logs&query=${sql}&sql_mode=true&type=rca_evidence_query&org_identifier=other&from=1&to=2`;
     const html = htmlOf(parse(`Errors rose in [checkout](${href}).`, window.location.origin).parts);
-    const wrapper = mount(AssistantMarkdownPart, {
-      props: { part: { kind: "html", key: "m", html }, org: "chat-org" },
-      attachTo: document.body,
-    });
+    const wrapper = mountEntityHtml(html);
     const link = wrapper.get("a[data-entity]");
     const params = new URL(link.attributes("href")!, "http://localhost").searchParams;
     expect(link.attributes("data-entity")).toBe("stream");
@@ -1684,13 +1729,74 @@ describe("assistant answer styling (K1, K2)", () => {
   it("keeps only a dashboard link's identifying params and pins the chat's org (WT-01)", () => {
     const href = `${window.location.origin}/web/dashboards/view?dashboard=d1&folder=f1&org_identifier=other&var-q=1&type=search_scheduler`;
     const html = htmlOf(parse(`See [latency](${href}).`, window.location.origin).parts);
-    const wrapper = mount(AssistantMarkdownPart, {
-      props: { part: { kind: "html", key: "m", html }, org: "chat-org" },
-      attachTo: document.body,
-    });
+    const wrapper = mountEntityHtml(html);
     expect(wrapper.get("a[data-entity]").attributes("href")).toBe(
       "/web/dashboards/view?dashboard=d1&folder=f1&org_identifier=chat-org",
     );
+    wrapper.unmount();
+  });
+
+  it("rebuilds an alert link through its named route with the alert id kept (SR-01)", () => {
+    const href = `${window.location.origin}/web/alerts/detail/a1?folder=f1&org_identifier=other`;
+    const wrapper = mountEntityHtml(
+      htmlOf(parse(`See [cpu](${href}).`, window.location.origin).parts),
+    );
+    expect(wrapper.get("a[data-entity]").attributes("href")).toBe(
+      "/web/alerts/detail/a1?folder=f1&org_identifier=chat-org",
+    );
+    wrapper.unmount();
+  });
+
+  it.each([["/.//evil.com/logs?stream=a"], ["/api/o/logs?stream=x"], ["//evil.com/logs?stream=a"]])(
+    "never makes the model link %s an in-app entity link (SR-01)",
+    (path) => {
+      const origin = window.location.origin;
+      const fromModel = htmlOf(parse(`Errors rose in [checkout](${path}).`, origin).parts);
+      const forged = `<p><a href="${origin}${path}" class="${CLASSES.entityLink}"><span class="${CLASSES.entityStream}"></span>checkout</a></p>`;
+      for (const html of [fromModel, forged]) {
+        const wrapper = mountEntityHtml(html);
+        const anchors = [...wrapper.element.querySelectorAll("a")];
+        expect(anchors.filter((a) => a.hasAttribute("data-entity"))).toHaveLength(0);
+        expect(anchors.filter((a) => a.getAttribute("class") === CLASSES.entityLink)).toHaveLength(
+          0,
+        );
+        for (const a of anchors) expect(a.getAttribute("href")).not.toMatch(/^\/\/|^\/[^/]*\/\//);
+        expect(wrapper.text()).toContain("checkout");
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it("opens an entity link through its named route on a plain click (SR-01)", async () => {
+    const router = appRouter();
+    const href = `${window.location.origin}/web/logs?stream=checkout&from=1&to=2`;
+    const wrapper = mountEntityHtml(
+      htmlOf(parse(`Errors rose in [checkout](${href}).`, window.location.origin).parts),
+      {},
+      router,
+    );
+    await wrapper.get("a[data-entity]").trigger("click", { button: 0 });
+    await router.isReady();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("logs");
+    expect(router.currentRoute.value.query).toMatchObject({
+      stream: "checkout",
+      org_identifier: "chat-org",
+    });
+    wrapper.unmount();
+  });
+
+  it.each([
+    ["another org's chat", { openable: false }],
+    ["a page with no org", { org: "" }],
+  ])("renders entity links as text in %s (SR-03)", (_, props) => {
+    const href = `${window.location.origin}/web/logs?stream=checkout`;
+    const wrapper = mountEntityHtml(
+      htmlOf(parse(`Errors rose in [checkout](${href}).`, window.location.origin).parts),
+      props,
+    );
+    expect(wrapper.element.querySelectorAll("a")).toHaveLength(0);
+    expect(wrapper.text()).toBe("Errors rose in checkout.");
     wrapper.unmount();
   });
 

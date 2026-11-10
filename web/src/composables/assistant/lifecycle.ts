@@ -48,6 +48,9 @@ export const STOP_RELAY_MS = 3_000;
 /** The owning tab says it is alive this often while a turn runs (PO B1); receivers trust a beat for 5 s. */
 export const TURN_HEARTBEAT_MS = 2_000;
 
+/** Another tab's working turn stops lighting the header after this long without a beat; throttled hidden tabs beat about once a minute. */
+export const TURN_LIGHT_STALE_MS = 150_000;
+
 /** One `{org, sid, origin, turnId, at}` of the user's live-turn ledger (ids only). */
 export interface LiveTurn {
   org: string;
@@ -226,6 +229,10 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
   );
   const cardLive = (entry: { at: number; expiresAt?: number }, now: number) =>
     now - entry.at < APPROVAL_STALE_MS && (entry.expiresAt === undefined || now < entry.expiresAt);
+  const lightLive = (entry: { at: number; beatAt?: number }, now: number) =>
+    now - entry.at < LIVE_TURN_TTL_MS && now - (entry.beatAt ?? entry.at) < TURN_LIGHT_STALE_MS;
+  // Read by remoteLight, so the header drops a silent tab's turn without any other traffic.
+  const lightTick = ref(0);
   const offs: (() => void)[] = [];
 
   // An expired card leaves the map on time, so the computeds reading it update without other traffic.
@@ -236,8 +243,12 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
       expiry = null;
       const now = deps.now();
       for (const [sid, entry] of remote)
-        if (entry.state === "needs_you" && !cardLive(entry, now)) remote.delete(sid);
-      if ([...remote.values()].some((entry) => entry.state === "needs_you")) expireLater();
+        if (
+          entry.state === "needs_you" ? !cardLive(entry, now) : now - entry.at >= LIVE_TURN_TTL_MS
+        )
+          remote.delete(sid);
+      lightTick.value += 1;
+      if (remote.size) expireLater();
     }, APPROVAL_HEARTBEAT_MS);
   };
 
@@ -255,8 +266,10 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
       // A card here is stale once another tab continues the same chat.
       if (local?.pendingApproval)
         void store.decideApproval(hint.sid, { approved: false, reason: "withdrawn" });
-      if (!local || !isRunning(local.turn))
+      if (!local || !isRunning(local.turn)) {
         remote.set(hint.sid, { org: hint.org, state: "working", at: deps.now() });
+        expireLater();
+      }
     }),
     hints.on("turn_heartbeat", (hint) => {
       const local = store.state.sessions[hint.sid];
@@ -268,6 +281,7 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
         hint.sid,
         known ? { ...known, beatAt: at } : { org: hint.org, state: "working", at, beatAt: at },
       );
+      expireLater();
     }),
     hints.on("turn_ended", (hint) => void remote.delete(hint.sid)),
     hints.on("approval_pending", (hint) => {
@@ -314,13 +328,12 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
     signedOutElsewhere: computed(() => signedOut.value),
     otherAccountSignedIn: computed(() => otherAccount.value),
     remoteLight() {
+      void lightTick.value;
       const org = deps.currentOrg();
       let working: Sid | null = null;
       for (const [sid, entry] of remote) {
         if (
-          entry.state === "needs_you"
-            ? !cardLive(entry, deps.now())
-            : deps.now() - entry.at >= LIVE_TURN_TTL_MS
+          entry.state === "needs_you" ? !cardLive(entry, deps.now()) : !lightLive(entry, deps.now())
         )
           continue;
         if (org && entry.org && entry.org !== org) continue;

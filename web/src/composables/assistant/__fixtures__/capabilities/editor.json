@@ -49,5 +49,6 @@
   "rca_chat_mode": true,
   "answer_locale": true,
   "context_used": true,
-  "attachments": true
+  "attachments": true,
+  "data_sharing_level": "raw"
 }

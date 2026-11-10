@@ -43,6 +43,7 @@ import {
   timeChipOf,
   timeRangeText,
   timeWindowOf,
+  withheldAtLevel,
   type SeesRow,
   type TimeWindow,
 } from "./contextChips";
@@ -114,7 +115,12 @@ export function useAssistantContext(
     return timeWindowOf(page.value, composer.value?.timeOverride ?? null);
   });
   const timeChip = computed(() => timeChipOf(window.value, org.value, t));
-  const stagedChips = computed(() => staged(composer.value?.chips ?? []));
+  const dataLevel = computed(() => store.state.capability.dataLevel);
+  const stagedChips = computed(() =>
+    staged(composer.value?.chips ?? []).map((chip) =>
+      withheldAtLevel(chip, dataLevel.value) ? { ...chip, sent: "not_read" as const } : chip,
+    ),
+  );
   // With the interactive incident agent every chat turn carries the page's incident id, so it reads as sent.
   const incidentSent = computed(() => store.state.capability.rcaChatMode === true);
   const pageChips = computed(() =>
@@ -155,7 +161,9 @@ export function useAssistantContext(
     );
     if (incidentSent.value)
       for (const row of rows) if (row.id === "incident_id") row.group = "sent";
-    const attached = stagedChips.value.filter((chip) => !!serializedNameOf(chip));
+    const attached = stagedChips.value.filter(
+      (chip) => !!serializedNameOf(chip) && chip.sent !== "not_read",
+    );
     if (attached.length === 0) return rows;
     return [
       ...rows,

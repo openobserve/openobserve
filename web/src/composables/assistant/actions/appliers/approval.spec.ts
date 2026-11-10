@@ -212,6 +212,43 @@ describe("approval applier", () => {
     expect(session.annotations[approvalAnnotationKey("c9")].ledger).toHaveLength(2);
   });
 
+  it("AE-02: a failed item never carries Undo, even when the server sent a ledger id for it", async () => {
+    const { sid, env, session, dispatcher } = withCard();
+    env.confirm.mockResolvedValueOnce({
+      items: [
+        {
+          name: "checkout-latency-old",
+          type: "alert",
+          status: "done",
+          ledger_id: "led-7",
+          undoable: true,
+        },
+        {
+          name: "payments-5xx-staging",
+          type: "alert",
+          status: "failed",
+          status_code: 409,
+          ledger_id: "led-8",
+          undoable: true,
+        },
+      ],
+    });
+    await dispatcher.approvals(sid, {
+      kind: "approval",
+      approvalId: "c9",
+      decision: { approved: true, scope: "once" },
+    });
+    const items = session.annotations[approvalAnnotationKey("c9")].approvalResult?.items ?? [];
+    expect(items.map((item) => [item.status, item.undoable, item.ledgerId])).toEqual([
+      ["done", true, "led-7"],
+      ["failed", undefined, undefined],
+    ]);
+    expect(session.ledger.map((entry) => [entry.id, entry.undoable])).toEqual([
+      ["led-7", true],
+      ["c9:1", false],
+    ]);
+  });
+
   it("binds Undo from the `items` rows a newer server answers with, and ignores bare item ids", async () => {
     const { sid, env, session, dispatcher } = withCard();
     env.confirm.mockResolvedValueOnce({

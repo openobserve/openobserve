@@ -370,6 +370,18 @@ describe("B-06 capabilities", () => {
     expect(sessionStorage.getItem("o2.assistant.denied:k1")).toBeNull();
   });
 
+  it("reads the org's data level from capabilities and ignores a value it does not know (PSO-05)", async () => {
+    const reported = setup({
+      role: "viewer",
+      b06: { can_chat: true, data_sharing_level: "aggregates" },
+    });
+    await flushPromises();
+    expect(cap(reported.handle).dataLevel).toBe("aggregates");
+    const unknown = setup({ role: "viewer", b06: { can_chat: true, data_sharing_level: "rows" } });
+    await flushPromises();
+    expect(cap(unknown.handle).dataLevel).toBeUndefined();
+  });
+
   it("lets a 403 newer than the last read win over can_chat true until a newer read", async () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
     const { handle, deps, emitB06 } = setup({ role: "viewer", b06: { can_chat: true } });

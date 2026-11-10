@@ -1089,6 +1089,37 @@ describe("AssistantApprovalResult", () => {
       );
     });
 
+    it("AE-02: gathered targets that share a name and have no id each bind Undo to their own ledger row", async () => {
+      const twins = [
+        { type: "alert", name: "lat", status: "done" as const, undoable: true, ledgerId: "led-1" },
+        { type: "alert", name: "lat", status: "done" as const, undoable: true, ledgerId: "led-2" },
+      ];
+      const { wrapper, evidence } = mountRecord(
+        {
+          outcome: { state: "done", at: 1_760_000_000_000 },
+          result: { status: "done", items: twins, resolvedBy: "ada", resolvedAt: 1 },
+        },
+        { blocks: [gatheredBlock] },
+      );
+      const unnamed = (id: string) => ({
+        ...ledger(id, "", "lat"),
+        resource: { type: "alert", name: "lat" },
+      });
+      evidence.store.state.sessions[evidence.sid]!.ledger.push(unnamed("led-1"), unnamed("led-2"));
+      await nextTick();
+      const row = (key: string) =>
+        wrapper.get(`[data-test="assistant-approval-result-item-${key}"]`);
+      expect(row("0").find('[data-test="assistant-approval-result-undo-led-1"]').exists()).toBe(
+        true,
+      );
+      expect(row("1").find('[data-test="assistant-approval-result-undo-led-2"]').exists()).toBe(
+        true,
+      );
+      expect(row("1").find('[data-test="assistant-approval-result-undo-led-1"]').exists()).toBe(
+        false,
+      );
+    });
+
     it("P2-3: a reopened gathered record keeps its rows, its partial failure and its Always line", async () => {
       vi.spyOn(assistantSettings, "grants").mockResolvedValue([
         {
@@ -1252,6 +1283,30 @@ describe("AssistantApprovalResult", () => {
       expect(allowedLine(wrapper)).toBe("Approval revoked. The assistant will ask next time.");
       expect(wrapper.find('[data-test="assistant-approval-result-revoke"]').exists()).toBe(false);
       expect(revoke).not.toHaveBeenCalled();
+    });
+
+    it("AE-06: a reopened Always record whose grant the server never stored reads not saved, not revoked", async () => {
+      vi.spyOn(assistantSettings, "grants").mockResolvedValue([]);
+      const notStored: ContentBlock = {
+        type: "approval_result",
+        resolved: {
+          id: "c9",
+          approved: true,
+          recorded: true,
+          scope: "always",
+          items: doneItems,
+          at: 1,
+          grantNotStored: { reason: "read-only" },
+        },
+      };
+      const { wrapper } = mountRecord(null, { blocks: [gatheredBlock, notStored] });
+      await flushPromises();
+      const always = wrapper.get('[data-test="assistant-approval-result-always"]');
+      expect(always.attributes("data-grant")).toBe("not_stored");
+      expect(always.text()).toBe(
+        "Approved this once. It wasn't saved for later, so the assistant will ask next time.",
+      );
+      expect(wrapper.find('[data-test="assistant-approval-result-revoke"]').exists()).toBe(false);
     });
 
     it("B-approvals-rca-V3: a grant revoked from another record turns this one to revoked too", async () => {

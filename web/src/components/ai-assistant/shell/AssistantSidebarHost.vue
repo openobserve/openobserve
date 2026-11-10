@@ -191,7 +191,7 @@ import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { readFromAnswerStart } from "./answerStart";
 import { tearOffRequest } from "./assistantWindowHost";
 import { closeLockedPanel, lockedPanelMoved, useLockedPanel } from "./lockedPanel";
-import { followedRcaRun, followNewRun, stopFollowingRca } from "./rcaFollow";
+import { followedRcaRun, followNewRun, keepRcaFollowFor, stopFollowingRca } from "./rcaFollow";
 import { useOpeningMotion } from "./useOpeningMotion";
 
 // The run view carries the whole RCA thread, so it loads only when a run is followed.
@@ -253,6 +253,7 @@ const visible = computed(
 );
 
 const followed = followedRcaRun();
+watch(() => store.state.userOrgKey, keepRcaFollowFor, { immediate: true });
 const { opening } = useOpeningMotion(() => visible.value && lgUp.value);
 
 const activeSession = computed(

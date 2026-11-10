@@ -340,21 +340,39 @@ pub async fn undo_action(
         }
     }
     let auth = extract_auth_str_from_headers(&headers).await;
-    let target = UndoTarget {
-        org_id: &org_id,
-        kind,
-        op: Op::parse(&row.op),
-        resource_id: &resource_id,
-        before: row.before.as_deref(),
-        after: row.after.as_deref(),
-    };
-    let outcome = ledger::undo(target, &auth).await;
-    if !matches!(outcome, UndoOutcome::Done { .. })
-        && let Err(e) = ai_actions::clear_undone(&org_id, &id).await
-    {
-        log::error!("[org_id:{org_id}] cannot release the undo claim of {id}: {e}");
+    // Once claimed, the undo runs to its end even if the caller hangs up.
+    detached(async move {
+        let target = UndoTarget {
+            org_id: &org_id,
+            kind,
+            op: Op::parse(&row.op),
+            resource_id: &resource_id,
+            before: row.before.as_deref(),
+            after: row.after.as_deref(),
+        };
+        let outcome = ledger::undo(target, &auth).await;
+        if !matches!(outcome, UndoOutcome::Done { .. })
+            && let Err(e) = ai_actions::clear_undone(&org_id, &id).await
+        {
+            log::error!("[org_id:{org_id}] cannot release the undo claim of {id}: {e}");
+        }
+        finish_undo(row, outcome, &user_id, now).await
+    })
+    .await
+}
+
+/// Runs `work` on its own task, so dropping the request future does not cut it short.
+async fn detached<F>(work: F) -> Response
+where
+    F: std::future::Future<Output = Response> + Send + 'static,
+{
+    match tokio::spawn(work).await {
+        Ok(response) => response,
+        Err(e) => {
+            log::error!("[AI] undo task ended without an answer: {e}");
+            error::history_unavailable("The undo did not finish; please check Activity")
+        }
     }
-    finish_undo(row, outcome, &user_id, now).await
 }
 
 /// Registers [`LedgerRecorder`] with the MCP executor; called once at startup.
@@ -379,9 +397,12 @@ pub(crate) async fn record_confirm(
     };
     let since = now_micros() - CONFIRM_MATCH_WINDOW_MICROS;
     let mut rows = Vec::with_capacity(items.len());
+    let mut taken = Vec::new();
     for item in items {
         let approval = (approval_id.as_str(), user_id);
-        rows.push(confirmed_action(org_id, session_id, approval, item, since).await);
+        let row = confirmed_action(org_id, session_id, approval, item, (since, &taken)).await;
+        taken.extend(row.as_ref().map(|row| row.id.clone()));
+        rows.push(row_of_done(item, row));
     }
     rows
 }
@@ -417,13 +438,14 @@ async fn confirmed_action(
     session_id: &str,
     approval: (&str, &str),
     item: &Value,
-    since: i64,
+    (since, taken): (i64, &[String]),
 ) -> Option<ai_actions::Model> {
     let (kind, id, name) = card_target(item)?;
     let card = ai_actions::ConfirmedTarget {
         resource_type: &kind,
         resource_id: id.as_deref(),
         resource_name: name.as_deref(),
+        taken,
     };
     match ai_actions::stamp_execution(org_id, session_id, card, approval).await {
         Ok(Some(row)) => return Some(row),
@@ -449,6 +471,11 @@ async fn confirmed_action(
         Err(e) => log::error!("[org_id:{org_id}] cannot stamp a confirmed action: {e}"),
     }
     None
+}
+
+/// The ledger row an item names for Undo; only a change that happened can be undone.
+fn row_of_done(item: &Value, row: Option<ai_actions::Model>) -> Option<ai_actions::Model> {
+    row.filter(|_| text(item, "status").as_deref() == Some(STATUS_DONE))
 }
 
 /// An item's `(type, id, name)`; o2-ai sends an empty id for a create, which has none yet.
@@ -951,6 +978,36 @@ mod tests {
             .await
             .unwrap();
         (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[tokio::test]
+    async fn detached_work_finishes_after_the_caller_hangs_up() {
+        let (started_tx, started) = tokio::sync::oneshot::channel();
+        let (go, go_rx) = tokio::sync::oneshot::channel::<()>();
+        let (done_tx, done) = tokio::sync::oneshot::channel();
+        let request = tokio::spawn(detached(async move {
+            started_tx.send(()).unwrap();
+            go_rx.await.unwrap();
+            done_tx.send(()).unwrap();
+            StatusCode::OK.into_response()
+        }));
+        started.await.unwrap();
+        request.abort();
+        assert!(request.await.unwrap_err().is_cancelled());
+        go.send(()).unwrap();
+        done.await.expect("the work ran to its end");
+    }
+
+    #[test]
+    fn only_a_done_item_names_a_ledger_row_for_undo() {
+        let row = || Some(ledger_row(action(), None, NOW));
+        let done = json!({"key": "apr_1:0", "type": "alert", "status": "done"});
+        assert!(row_of_done(&done, row()).is_some());
+        for status in ["skipped", "failed", "not_attempted"] {
+            let item = json!({"key": "apr_1:1", "type": "alert", "status": status});
+            assert!(row_of_done(&item, row()).is_none(), "{status}");
+        }
+        assert!(row_of_done(&json!({"type": "alert"}), row()).is_none());
     }
 
     #[test]

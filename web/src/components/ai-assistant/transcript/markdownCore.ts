@@ -433,9 +433,8 @@ function instance(): Marked {
       },
       text(token) {
         if ("tokens" in token && token.tokens) return this.parser.parseInline(token.tokens);
-        return spend(
-          slots("escaped" in token && token.escaped ? token.text : escapeHtml(token.text)),
-        );
+        // marked flags text after a raw `<code>`/`<pre>` tag as escaped while it is still raw HTML (SR-02).
+        return spend(slots(escapeHtml(token.text)));
       },
       // Raw HTML from the model is stripped; the text between its tags stays (EB-01 AC 3, SEC-04).
       html({ text, block }) {
@@ -988,6 +987,8 @@ function linkHtml(href: string | null | undefined, label: string): string {
 /** The app object a same-origin link opens: a stream, a service, a dashboard or an alert; null for any other page. */
 export function entityKindOf(url: URL): EntityKind | null {
   const path = url.pathname;
+  // An empty segment makes `origin + path` read as a protocol-relative link to another host (SR-01).
+  if (path.includes("//")) return null;
   const query = url.searchParams;
   if (/\/logs\/?$/.test(path) && query.get("stream")) return "stream";
   if (/\/traces\/?$/.test(path) && query.get("tab") === "services-catalog" && query.get("service"))
@@ -1006,8 +1007,14 @@ function entityLinkHtml(url: URL, kind: EntityKind, label: string): string {
   return `<a href="${attr}" class="${CLASSES.entityLink}"><span class="${ENTITY_GLYPHS[kind]}"></span>${label}</a>`;
 }
 
-/** An entity link's in-app href rebuilt from its identifying params only; `org` pins the org, and a stream link only re-applies. */
+/** An entity link's in-app path with only its identifying params. */
 export function entityHref(url: URL, kind: EntityKind, org = ""): string {
+  const search = entityQuery(url, kind, org).toString();
+  return search ? `${url.pathname}?${search}` : url.pathname;
+}
+
+/** An entity link's query reduced to its identifying params; `org` pins the org, and a stream link only re-applies. */
+export function entityQuery(url: URL, kind: EntityKind, org = ""): URLSearchParams {
   const params = new URLSearchParams();
   for (const key of ENTITY_PARAMS[kind]) {
     const value = url.searchParams.get(key);
@@ -1022,8 +1029,7 @@ export function entityHref(url: URL, kind: EntityKind, org = ""): string {
     params.set("type", STREAM_LINK_TYPE);
   }
   if (org) params.set("org_identifier", org);
-  const search = params.toString();
-  return search ? `${url.pathname}?${search}` : url.pathname;
+  return params;
 }
 
 /** An href as a URL against the page origin, or `null`; the sanitiser re-checks links with it. */

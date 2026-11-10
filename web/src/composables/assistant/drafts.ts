@@ -56,6 +56,11 @@ export function draftKey(userOrgKey: string, sid: Sid): string {
   return `${DRAFT_PREFIX}${userOrgKey}:${sid}`;
 }
 
+/** The key a chat's queued message is stored under, beside the chat's own draft. */
+export function queuedDraftSid(sid: Sid): Sid {
+  return `${sid}:queued`;
+}
+
 export function createDraftStore(options: DraftStoreOptions = {}): DraftStore {
   const delayMs = options.delayMs ?? DRAFT_DEBOUNCE_MS;
   const storageBlocked = ref(false);

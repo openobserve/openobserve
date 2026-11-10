@@ -208,6 +208,18 @@ describe("sessions", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("refuses a regenerate or an edit into a chat of another user+org, never reaching the engine (S2-3)", async () => {
+    const { store, deps } = makeStore();
+    const sid = newSession(store);
+    store.state.sessions[sid].userOrgKey = "someone-else";
+    const send = vi.spyOn(deps.engine, "send");
+    await expect(store.regenerate(sid)).resolves.toMatchObject({ state: "refused" });
+    await expect(
+      store.editResend(sid, { text: "x", chips: [], images: [], editedFrom: 1 }),
+    ).resolves.toMatchObject({ state: "refused" });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("opens a known session without a load and loads an unknown one through history", async () => {
     const open = vi.fn().mockResolvedValue("loaded");
     const { store } = makeStore({ history: { ...inertAssistantDeps().history, open } });
@@ -930,6 +942,23 @@ describe("idle-session release (rule 10)", () => {
     flush();
     await flushPromises();
     expect(store.state.sessions[saving].messages).toEqual([]);
+  });
+
+  it("lets go of a released chat's turn snapshot unless a Retry still needs it (S2-2)", () => {
+    const forget = vi.fn();
+    const engine = { ...inertAssistantDeps().engine, forget };
+    const { store } = makeStore({ ...reloadable(), engine });
+    const [done, failed] = fill(store, 2);
+    store.state.sessions[done].turn = { state: "done", saved: "server" };
+    store.state.sessions[failed].turn = {
+      state: "failed",
+      error: { code: "stream_dropped" },
+    } as never;
+    fill(store, IDLE_SESSION_LIMIT + 2);
+    expect(store.state.sessions[done].messages).toEqual([]);
+    expect(store.state.sessions[failed].messages).toEqual([]);
+    expect(forget).toHaveBeenCalledWith(done);
+    expect(forget).not.toHaveBeenCalledWith(failed);
   });
 
   it("re-reads a released session through history when it is opened", async () => {

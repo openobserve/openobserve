@@ -23,6 +23,7 @@ use std::{
     time::Duration,
 };
 
+use common::meta::organization::{AiDataSharingLevel, OrgAiSettings};
 use config::{
     meta::{
         alerts::{
@@ -63,7 +64,9 @@ use o2_enterprise::enterprise::{
             lease::{self, LeaseError, TurnLease},
             spawn_headless_turn,
         },
-        client::{QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER, get_agent_client},
+        client::{
+            POLICY_CONTEXT_KEY, QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER, get_agent_client,
+        },
         toolsets::{CliEntry, McpEntry, SkillEntry, push::load_agent_tools},
     },
     alerts::rca_service,
@@ -460,16 +463,16 @@ async fn start_turn(
     )
     .await?;
 
-    // The turn ends at `rca_timeout_secs`; o2-ai warns the agent before it, so a long
-    // investigation submits what it found instead of failing `timeout` with no report.
-    let mut context = run.context.clone();
-    if let Some(fields) = context.as_object_mut() {
-        fields.insert(
-            TURN_SECONDS_FIELD.to_string(),
-            serde_json::Value::from(get_o2_config().incidents.rca_timeout_secs),
-        );
-    }
-    let mut request = QueryRequest::new(prompt, context);
+    let settings = crate::ai_policy::org_settings(&run.org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[RCA] org {} assistant settings unreadable: {e}",
+                run.org_id
+            );
+        })
+        .ok();
+    let mut request = rca_request(prompt, &run.context, settings.as_ref());
     request.mcps = (!mcps.is_empty()).then_some(mcps);
     request.clis = (!clis.is_empty()).then_some(clis);
     request.skills = (!skills.is_empty()).then_some(skills);
@@ -541,6 +544,28 @@ async fn probe_health<T, E: std::fmt::Display>(
             "health check timed out".to_string(),
         )),
     }
+}
+
+/// The agent request of an RCA turn, bound to the org's data and permission levels.
+fn rca_request(prompt: String, context: &Value, settings: Option<&OrgAiSettings>) -> QueryRequest {
+    // The turn ends at `rca_timeout_secs`; o2-ai warns the agent before it, so a long
+    // investigation submits what it found instead of failing `timeout` with no report.
+    let mut context = context.clone();
+    if let Some(fields) = context.as_object_mut() {
+        fields.insert(
+            TURN_SECONDS_FIELD.to_string(),
+            serde_json::Value::from(get_o2_config().incidents.rca_timeout_secs),
+        );
+        fields.insert(POLICY_CONTEXT_KEY.to_string(), rca_policy(settings));
+    }
+    QueryRequest::new(prompt, context)
+}
+
+/// The org's data level only (strictest if unreadable); without a tier o2-ai keeps RCA's signed
+/// writes.
+fn rca_policy(settings: Option<&OrgAiSettings>) -> Value {
+    let level = settings.map_or(AiDataSharingLevel::Schema, |s| s.data_sharing_level);
+    json!({ "data_sharing_level": level.as_str() })
 }
 
 /// Expose only the context actually provided to this run.
@@ -2264,6 +2289,27 @@ mod tests {
             incident_row, new_incident, start, stored, timeline,
         },
     };
+
+    #[test]
+    fn an_rca_turn_carries_the_orgs_data_level_and_no_write_tier() {
+        let settings = OrgAiSettings {
+            permission_tier: common::meta::organization::AiPermissionTier::Propose,
+            data_sharing_level: AiDataSharingLevel::Aggregates,
+            ..Default::default()
+        };
+        let request = rca_request("p".into(), &json!({"run_id": "r1"}), Some(&settings));
+        // A tier or grants would make o2-ai card RCA's writes on a session nobody watches.
+        assert_eq!(
+            request.context["policy"],
+            json!({"data_sharing_level": "aggregates"})
+        );
+        assert_eq!(request.context["run_id"], "r1");
+        let unread = rca_request("p".into(), &json!({}), None);
+        assert_eq!(
+            unread.context["policy"],
+            json!({"data_sharing_level": "schema"})
+        );
+    }
 
     // ---- the prompt ----
 

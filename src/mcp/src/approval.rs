@@ -484,6 +484,17 @@ mod tests {
     }
 
     #[test]
+    fn large_and_exponent_numbers_hash_as_o2_ai_sent_them() {
+        let vector: Value = serde_json::from_str(VECTOR).unwrap();
+        let text = |k: &str| vector[k].as_str().unwrap().to_string();
+        let wire: Value = serde_json::from_str(&text("number_arguments_wire")).unwrap();
+        let mut canonical = String::new();
+        canonical_json(&wire, &mut canonical);
+        assert_eq!(canonical, text("number_canonical_arguments"));
+        assert_eq!(arguments_sha256(&wire), text("number_arguments_sha256"));
+    }
+
+    #[test]
     fn a_missing_or_garbled_assertion_is_refused() {
         assert_eq!(verify(&key(), None, &claim(), NOW), Err(Refusal::Missing));
         for garbled in ["apr_1", "apr_1.x.ab", "apr_1.10.zz", ".10.ab"] {

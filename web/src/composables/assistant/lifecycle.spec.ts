@@ -29,6 +29,7 @@ import {
   APPROVAL_STALE_MS,
   LIVE_TURN_TTL_MS,
   TURN_HEARTBEAT_MS,
+  TURN_LIGHT_STALE_MS,
   STOP_RELAY_MS,
   createLifecycle,
   readLiveTurns,
@@ -545,6 +546,28 @@ describe("other tabs", () => {
     });
     receive({ v: 1, type: "approval_resolved", sid: "z", approved: true, at: 2 });
     expect(lifecycle.remoteLight()).toBeNull();
+  });
+});
+
+describe("header light for a silent tab", () => {
+  it("goes out once another tab's working turn stops beating, as after a crash (S2-4)", () => {
+    vi.useFakeTimers();
+    try {
+      const { lifecycle, receive } = setup();
+      const light = computed(() => lifecycle.remoteLight());
+      const hint = { v: 1, org: "org1", sid: "y", turnId: "t", at: 1 } as const;
+      receive({ ...hint, type: "turn_started", origin: "chat" });
+      receive({ ...hint, type: "turn_heartbeat" });
+      expect(light.value).toEqual({ state: "working", sid: "y" });
+      vi.advanceTimersByTime(TURN_LIGHT_STALE_MS - APPROVAL_HEARTBEAT_MS);
+      expect(light.value).toEqual({ state: "working", sid: "y" });
+      vi.advanceTimersByTime(APPROVAL_HEARTBEAT_MS * 2);
+      expect(light.value).toBeNull();
+      receive({ ...hint, type: "turn_heartbeat" });
+      expect(light.value).toEqual({ state: "working", sid: "y" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

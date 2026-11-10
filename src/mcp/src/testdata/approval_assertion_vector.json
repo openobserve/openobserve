@@ -11,5 +11,8 @@
   "canonical_arguments": "{\"alert_id\":\"a1\",\"request_body\":{\"enabled\":true,\"name\":\"Disk é\",\"tags\":[\"x\",\"y\"],\"threshold\":3}}",
   "arguments_sha256": "59e3bc204779c4a611d876cde9c76605b31881aa4663a38e1ec554e62b8ddbb0",
   "expiry": 1760000060,
-  "assertion": "apr_0123456789abcdef0123.1760000060.946c2e432cb5527c9ae488abe7dc41dd5035ce460357dd5e16ab82cb994be57e"
+  "assertion": "apr_0123456789abcdef0123.1760000060.946c2e432cb5527c9ae488abe7dc41dd5035ce460357dd5e16ab82cb994be57e",
+  "number_arguments_wire": "{\"big_int\": 12345678901234567890123, \"exp\": 1e+16, \"small\": 1.5e-07, \"neg_zero\": -0.0, \"tenth\": 0.1, \"max_u64_plus\": 18446744073709551616, \"neg\": -9223372036854775809, \"int\": 3, \"whole_float\": 2.0}",
+  "number_canonical_arguments": "{\"big_int\":12345678901234567890123,\"exp\":1e+16,\"int\":3,\"max_u64_plus\":18446744073709551616,\"neg\":-9223372036854775809,\"neg_zero\":-0.0,\"small\":1.5e-07,\"tenth\":0.1,\"whole_float\":2.0}",
+  "number_arguments_sha256": "941ba27e72ae2703654c204040aa042596d08bd37011809014b804ac86d95efe"
 }

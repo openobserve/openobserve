@@ -111,6 +111,7 @@ import { useRcaTrigger } from "@/composables/useRcaTrigger";
 import { RCA_BADGE_VARIANT, rcaCellModel, rcaFollowTarget } from "@/utils/incidents/rcaCell";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { useRcaFollow } from "@/components/ai-assistant/shell/rcaFollow";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -158,8 +159,10 @@ const detailTitle = computed(
 
 const starting = ref(false);
 
+// Only the revamped assistant mounts a host that can follow a run.
+const assistantV2 = isAssistantV2();
 const followTarget = computed(() =>
-  rcaFollowTarget(props.incident, store.state.selectedOrganization.identifier),
+  assistantV2 ? rcaFollowTarget(props.incident, store.state.selectedOrganization.identifier) : null,
 );
 const follow = (event: MouseEvent) => {
   const target = followTarget.value;

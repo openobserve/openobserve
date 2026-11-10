@@ -1011,6 +1011,13 @@ provide(assistantSessionSourceKey, (sid) => {
   }
   return source;
 });
+watch(
+  () => Object.keys(store.state.sessions).join("\n"),
+  (keys) => {
+    const live = new Set(keys.split("\n"));
+    for (const sid of messageSources.keys()) if (!live.has(sid)) messageSources.delete(sid);
+  },
+);
 
 const transcriptHost: AssistantTranscriptHost = {
   session: (sid) => store.state.sessions[sid] ?? null,

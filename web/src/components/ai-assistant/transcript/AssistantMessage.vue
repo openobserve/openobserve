@@ -157,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :lead="item.key === leadKey && part.key === item.parts[0]?.key"
             :live="item.live"
             :org="org"
+            :openable="entitiesOpenable"
           />
           <AssistantMarkdownCode
             v-else-if="fenceBlock(item.key, part)"
@@ -576,6 +577,11 @@ const lastTextIndex = computed(() => {
 });
 
 const org = computed(() => props.turn?.org ?? "");
+// An entity link follows the link cards' gates: a chat of another org would open its targets in this one.
+const entitiesOpenable = computed(() => {
+  const current = evidence?.currentOrg();
+  return (props.turn?.openable ?? true) && !(current && org.value && current !== org.value);
+});
 const steps = computed(() =>
   props.message.role === "assistant" ? stepsOf(props.message, org.value) : [],
 );

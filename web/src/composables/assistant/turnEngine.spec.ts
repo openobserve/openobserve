@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toRaw } from "vue";
 
 import { trackAssistant, trackAssistantAdmitted } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
@@ -95,6 +96,7 @@ function setup(
     approvals?: Pick<ApprovalsService, "onConfirmationRequired" | "onResolved">;
     page?: Record<string, unknown>;
     pageRead?: Promise<void>;
+    dataLevel?: "schema" | "aggregates" | "raw";
   } = {},
 ) {
   const persistence = { value: opts.persistence ?? true };
@@ -121,6 +123,7 @@ function setup(
     noteAdmitted: vi.fn(),
     persistence: () => persistence.value,
     rcaChatMode: () => opts.rcaChatMode === true,
+    dataLevel: () => opts.dataLevel,
   };
   let visible: (() => void) | null = null;
   const visibility = {
@@ -607,6 +610,22 @@ describe("turnEngine: send", () => {
     await settle();
     expect(builder).toHaveBeenCalled();
     expect(h.last().req.message.text).toBe("serialized");
+  });
+
+  it("hands the org's data level to the request builder (PSO-05)", async () => {
+    const h = setup({ dataLevel: "schema" });
+    const builder = vi.fn((session: AssistantSession) => ({
+      org: session.org,
+      sid: session.sid,
+      turnId: session.turnMeta.turnId ?? "",
+      message: { text: "serialized" },
+      context: { currentPage: "x", client: {} as never, user_timezone: "UTC" },
+    }));
+    h.engine.setRequestBuilder(builder);
+    h.type("why?");
+    void h.store.send(h.current.sid);
+    await settle();
+    expect(builder.mock.calls[0][3]).toMatchObject({ dataLevel: "schema" });
   });
 
   it("refuses an empty composer without sending", async () => {
@@ -1965,6 +1984,31 @@ describe("turnEngine: WP-06 outcomes, Regenerate and Edit and resend", () => {
     expect(h.store.canRetry(h.current.sid)).toBe(true);
   });
 
+  it.each(["dropSession", "reset"] as const)(
+    "lets go of the ended turn's snapshot on %s, so a chat back under the same id offers no Retry (S2-2)",
+    async (how) => {
+      const h = setup();
+      h.results.push(refusal(429, { code: 429, error_code: "turn_limit", message: "busy" }));
+      h.type("why?");
+      const sid = h.current.sid;
+      await h.store.send(sid);
+      expect(h.store.canRetry(sid)).toBe(true);
+      const ended = structuredClone(toRaw(h.session().turn));
+      if (how === "dropSession") h.store.dropSession(sid);
+      else h.store.reset();
+      h.store.adoptSession(sid, {
+        title: null,
+        titleSource: "generated",
+        origin: ORIGIN,
+        messages: [],
+        record: {},
+        chatId: null,
+      });
+      h.store.state.sessions[sid].turn = ended;
+      expect(h.store.canRetry(sid)).toBe(false);
+    },
+  );
+
   it("regenerates the latest prompt as a new attempt; the old answer becomes a version and the draft stays (EB-09 AC 2)", async () => {
     const h = setup();
     h.type("why?");
@@ -2201,6 +2245,23 @@ describe("turnEngine: WP-06 outcomes, Regenerate and Edit and resend", () => {
       editedFrom: 1,
     });
     expect(h.session().composer.text).toBe("draft in progress");
+    h.feed({ type: "message_delta", content: "ok" }, { type: "complete", persisted: true });
+    h.end();
+    await edit;
+  });
+
+  it("asks an edit about the thread's kept window, as a follow-up would (S2-3)", async () => {
+    const h = setup();
+    h.store.setTimeOverride(h.current.sid, { from: 5_000, to: 9_000 });
+    const edit = h.store.editResend(h.current.sid, {
+      text: "edited",
+      chips: [],
+      images: [],
+      editedFrom: 1,
+    });
+    await settle();
+    const window = turnAnnotationKey(h.session().turnMeta.turnId!, "window");
+    expect(h.session().annotations[window]?.window).toEqual({ from: 5_000, to: 9_000 });
     h.feed({ type: "message_delta", content: "ok" }, { type: "complete", persisted: true });
     h.end();
     await edit;

@@ -361,6 +361,8 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
   if (input.b06?.turn_versions === true) capability.turnVersions = true;
   if (input.b06?.feedback_stored === true) capability.feedbackStored = true;
   if (input.b06?.rca_chat_mode === true) capability.rcaChatMode = true;
+  const level = input.b06?.data_sharing_level;
+  if (level === "schema" || level === "aggregates" || level === "raw") capability.dataLevel = level;
   if (input.agents) capability.agents = input.agents;
   if (gate !== "available") return capability;
   if (!persistence) capability.reasonCode = "local_only";

@@ -115,7 +115,7 @@ function seedMentionGroups(): void {
   queryClient.setQueryData(streamKeys.nameList("default", "traces"), []);
   queryClient.setQueryData(alertKeys.list("default", "", undefined, undefined), []);
   queryClient.setQueryData(pipelineKeys.list("default"), []);
-  queryClient.setQueryData(dashboardKeys.byFolder("default", "default"), []);
+  queryClient.setQueryData(dashboardKeys.search("default", ""), []);
 }
 
 async function type(textarea: ReturnType<ReturnType<typeof setup>["textarea"]>, value: string) {
