@@ -78,6 +78,8 @@ use variables::{PanelVars, QueryVars};
 
 const MAX_RANGES: usize = 10;
 const MIN_RANGE_SECS: i64 = 60;
+/// The smallest absolute end accepted; an end in milliseconds is always below it.
+const MIN_ABSOLUTE_END_MICROS: i64 = 1_000_000_000_000_000;
 const MAX_RANGE_SECS: i64 = 365 * 86_400;
 const MAX_FROZEN_VARIABLES_BYTES: usize = 64 * 1024;
 /// The live heatmap's column bound and least step when no step is configured.
@@ -2821,6 +2823,13 @@ fn check_range(range: &TimeRange, now: i64) -> Result<(), String> {
         TimeRange::Absolute { start, .. } if *start < 0 => {
             return Err("an absolute time range can't start before 1970".to_string());
         }
+        // 10^15 us is 2001-09-09; a millisecond value stays far below it until the year 33658.
+        TimeRange::Absolute { end, .. } if *end < MIN_ABSOLUTE_END_MICROS => {
+            return Err(
+                "an absolute time range must be in microseconds since 1970, not milliseconds"
+                    .to_string(),
+            );
+        }
         TimeRange::Absolute { start, end } if start >= end => {
             return Err("an absolute time range must start before it ends".to_string());
         }
@@ -3025,7 +3034,7 @@ mod tests {
 
     #[test]
     fn each_range_is_checked_by_type() {
-        let now = 1_000 * 86_400 * 1_000_000;
+        let now = 20_000 * 86_400 * 1_000_000;
         let abs = |start: i64, end: i64| TimeRange::Absolute { start, end };
         let day = 86_400 * 1_000_000;
         assert!(check_range(&rel(30), now).is_err());
@@ -3040,7 +3049,19 @@ mod tests {
         assert!(check_range(&abs(now - 365 * day, now), now).is_ok());
         assert!(check_range(&abs(now - 366 * day, now), now).is_err());
         assert!(check_range(&abs(now, now - day), now).is_err());
-        assert!(check_range(&abs(0, day), now).is_ok());
+        // An API caller that sends milliseconds gets a 400, not an empty 1970 dashboard.
+        let ms = now / 1_000;
+        assert_eq!(
+            check_range(&abs(ms - 86_400_000, ms), now).unwrap_err(),
+            "an absolute time range must be in microseconds since 1970, not milliseconds"
+        );
+        assert!(
+            check_range(
+                &abs(MIN_ABSOLUTE_END_MICROS - day, MIN_ABSOLUTE_END_MICROS),
+                now
+            )
+            .is_ok()
+        );
         assert_eq!(
             check_range(&abs(-1, day), now).unwrap_err(),
             "an absolute time range can't start before 1970"
@@ -3545,6 +3566,35 @@ mod tests {
                 "max_links must be between 1 and 50, the limit this server allows"
             );
         }
+    }
+
+    /// A redaction change moves only the rev: a new row reads as the defaults, an old row keeps
+    /// its switch and limit.
+    #[tokio::test]
+    async fn a_settings_rev_bump_moves_only_the_rev() {
+        let db = replication::tests::db().await;
+        pd_table::bump_settings_rev(&db, "new", "re_pattern", 5)
+            .await
+            .unwrap();
+        let row = pd_table::get_settings(&db, "new").await.unwrap().unwrap();
+        assert_eq!((row.rev, row.enabled, row.max_links), (5, true, None));
+        assert_eq!(row.max_links_set_by, None);
+
+        pd_table::upsert_settings(&db, "o", false, Some(7), "admin", 100)
+            .await
+            .unwrap();
+        // A clock behind the stored rev still moves it forward.
+        pd_table::bump_settings_rev(&db, "o", "re_pattern", 50)
+            .await
+            .unwrap();
+        let row = pd_table::get_settings(&db, "o").await.unwrap().unwrap();
+        assert_eq!((row.rev, row.enabled, row.max_links), (101, false, Some(7)));
+        assert_eq!(row.updated_by, "admin");
+        pd_table::bump_settings_rev(&db, "o", "re_pattern", 500)
+            .await
+            .unwrap();
+        let row = pd_table::get_settings(&db, "o").await.unwrap().unwrap();
+        assert_eq!(row.rev, 500);
     }
 
     /// Downgraded from 50 to 3 with 5 links: the 5 stay live and no sixth can be created.
