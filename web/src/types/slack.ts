@@ -546,6 +546,8 @@ export interface SlackInsightsDigestCounts {
   needs_attention: number;
   suggestions: number;
   calibration_runs: number;
+  /** Findings the digest posted; absent on servers that only counted runs. */
+  calibration_findings?: number;
 }
 
 export interface SlackInsightsLastDigest {

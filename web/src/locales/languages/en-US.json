@@ -32071,7 +32071,8 @@
       "counts": {
         "needsAttention": "{count} needs attention | {count} need attention",
         "suggestions": "{count} suggestion | {count} suggestions",
-        "calibrationRuns": "{count} calibration run | {count} calibration runs"
+        "calibrationRuns": "{count} calibration run | {count} calibration runs",
+        "calibrationFindings": "{count} calibration finding | {count} calibration findings"
       },
       "noChannel": "Nothing posts yet: no channel is picked.",
       "noChannelCounts": "AutoObserve has {attention} and {suggestions} in {org} today.",
