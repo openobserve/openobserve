@@ -38,6 +38,7 @@ import {
 import { say, type Msg, type Request, type RequestCopy } from "../v2/fixtures";
 import type { LookKind } from "../v2/changes";
 import { TIER_LABEL } from "@/components/alert_calibration/format";
+import { isAlertFindingKind } from "@/components/alert_calibration/dismissals";
 import {
   agoText,
   coverageWord,
@@ -189,6 +190,11 @@ const SUGGESTION_KIND: Record<string, { label: I18nKey; look: LookKind; tag?: Ba
   },
   coverage_lost: { label: "autoobserveLive.suggestions.kinds.coverage_lost", look: "watching" },
   alert_not_working: { label: "alertCalibration.rules.notWorking", look: "notify" },
+  alert_no_destination: {
+    label: "autoobserveLive.suggestions.kinds.alert_no_destination",
+    look: "notify",
+    tag: "error-soft",
+  },
   source_silence: {
     label: "insight.kind.chip.stoppedSending",
     look: "watching",
@@ -644,7 +650,12 @@ const alertParts = (
 ): Parts => {
   const runAt = num(s.last_seen_at);
   return {
-    headline: alertFindingHeadline(t, s),
+    headline:
+      s.kind === "alert_no_destination"
+        ? t("autoobserveLive.suggestions.body.alertNoDestination", {
+            monitor: raw(str(s.evidence.alert_name)),
+          })
+        : alertFindingHeadline(t, s),
     why:
       runAt === null || nowMs === undefined
         ? null
@@ -655,7 +666,7 @@ const alertParts = (
 
 const partsFor = (t: TranslateFn, zone: Zone, s: AutoObserveSuggestion, nowMs?: number): Parts => {
   const { locale, timeZone } = zone;
-  if (s.kind === "alert_not_working") return alertParts(t, locale, s, nowMs);
+  if (isAlertFindingKind(s.kind)) return alertParts(t, locale, s, nowMs);
   if (s.kind === "blind_guardrail") return blindParts(t, zone, s);
   if (s.kind === "silent_coverage") return silentParts(t, locale, s);
   if (s.kind === "discovery_unusable")
@@ -735,7 +746,7 @@ const severityTag = (t: TranslateFn, s: AutoObserveSuggestion) => {
 
 const tagsFor = (t: TranslateFn, s: AutoObserveSuggestion): RequestCopy["tags"] => {
   const tags: { label: I18nText; variant: BadgeVariant }[] = [];
-  if (s.kind === "alert_not_working") {
+  if (isAlertFindingKind(s.kind)) {
     if (s.tier && Object.hasOwn(TIER_LABEL, s.tier))
       tags.push({ label: t(TIER_LABEL[s.tier]), variant: "default-soft" });
     return tags;
@@ -883,7 +894,7 @@ export const toSuggestionRows = (
       kind: insight.chip.label,
       kindVariant: insight.chip.variant,
       note: nextLine(t, insight, parts),
-      severity: s.kind === "alert_not_working" ? null : severityTag(t, s),
+      severity: isAlertFindingKind(s.kind) ? null : severityTag(t, s),
       detail: parts.body,
     };
   });

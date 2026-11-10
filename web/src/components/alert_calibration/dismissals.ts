@@ -177,10 +177,14 @@ export function isDismissable(record: FindingRecord): record is DismissableFindi
   );
 }
 
+/** The AutoObserve kinds that are calibration findings, decided through the `alert_finding` family. */
+export const isAlertFindingKind = (kind: string): boolean =>
+  kind === "alert_not_working" || kind === "alert_no_destination";
+
 export function dismissableOf(
   item: Pick<AutoObserveSuggestion, "kind" | "evidence" | "subject">,
 ): DismissTarget | null {
-  if (item.kind !== "alert_not_working") return null;
+  if (!isAlertFindingKind(item.kind)) return null;
   const { finding_id, rule_id, pattern, alert_name } = item.evidence;
   const scopeKey = item.subject.key_dims.entity_id;
   if (typeof finding_id !== "string" || !FINDING_ID.test(finding_id)) return null;

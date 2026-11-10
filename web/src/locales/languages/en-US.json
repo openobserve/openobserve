@@ -30730,6 +30730,7 @@
         "coverage_lost": "Coverage lost",
         "blind_guardrail": "Not working",
         "discovery_unusable": "Data quality",
+        "alert_no_destination": "Notifies no one",
         "other": "Other"
       },
       "severity": {
@@ -30766,6 +30767,7 @@
         "alertMemory": "{monitor} keeps running out of memory",
         "alertOtherError": "{monitor} keeps failing with an error",
         "alertNotWorkingGeneric": "{monitor} is not working",
+        "alertNoDestination": "{monitor} fired and notifies no one",
         "alertStreamGone": "{monitor} keeps failing because its stream doesn't exist",
         "alertFieldGone": "{monitor} keeps failing because a field it uses doesn't exist",
         "other": "I found something this page can't show yet"
@@ -34249,6 +34251,7 @@
       "whyNever": "{failed} of {total} run failed since {time}, so it cannot fire. | {failed} of {total} runs failed since {time}, so it cannot fire.",
       "whyCount": "{failed} of {total} run failed in the last calibration window. | {failed} of {total} runs failed in the last calibration window.",
       "whyEmptyScope": "No rows matched its filters in the last {window}, so it cannot fire.",
+      "nextNoDestination": "Choose who gets notified.",
       "errorType": {
         "stream_missing": "stream-not-found errors",
         "field_missing": "field-not-found errors",

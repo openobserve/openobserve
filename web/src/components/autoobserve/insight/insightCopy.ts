@@ -33,6 +33,7 @@ import {
 } from "@/components/alert_calibration/rules";
 import {
   dismissableOf,
+  isAlertFindingKind,
   recordReasonKey,
   type DismissTarget,
 } from "@/components/alert_calibration/dismissals";
@@ -148,7 +149,7 @@ export interface DecisionNotice {
   text: I18nText;
 }
 
-const NOT_WORKING = "alert_not_working";
+const NO_DESTINATION = "alert_no_destination";
 
 const HOUR_US = 3_600_000_000;
 
@@ -161,6 +162,7 @@ const TONE_VARIANT: Record<InsightTone, BadgeVariant> = {
 // An alert or monitor that cannot fire or tells no one is a failure; a missing check is a gap.
 const KIND_TONE: Record<string, InsightTone> = {
   alert_not_working: "failure",
+  alert_no_destination: "failure",
   silent_coverage: "failure",
   blind_guardrail: "failure",
   coverage_gap: "gap",
@@ -409,7 +411,7 @@ const reviewCta = (
     type: "review_alert",
     action,
     alertName: text(item.evidence.alert_name) || text(item.evidence.monitor_name),
-    findingId: item.kind === NOT_WORKING ? text(item.evidence.finding_id) : "",
+    findingId: isAlertFindingKind(item.kind) ? text(item.evidence.finding_id) : "",
   },
   note: t(REVIEW_NOTE[action.focus ?? "unfocused"]),
 });
@@ -460,6 +462,16 @@ const notWorkingAi = (
   today: InsightToday,
 ): AiFinding => {
   const alert = text(item.evidence.alert_name) || text(item.evidence.monitor_name);
+  if (item.kind === NO_DESTINATION)
+    return {
+      kind: item.kind,
+      subject: alert,
+      request: t("insight.ai.silent.ask", { monitor: raw(alert) }),
+      facts: [
+        ["Alert", alert],
+        ["Finding", String(today.headline)],
+      ],
+    };
   const why = alertWhy(t, zone, item);
   return {
     kind: item.kind,
@@ -520,13 +532,18 @@ const notWorkingParts = (
   const stream = evidenceLogsStream(item);
   const logs = stream && review?.key !== `logs-${stream}` ? logsCta(t, item, stream, nowMs) : null;
   const calibration = calibrationCta(t, item);
+  const silent = item.kind === NO_DESTINATION;
   return {
     id: item.id,
-    chip: { label: t("insight.chip.notWorking"), variant: TONE_VARIANT.failure, tone: "failure" },
+    chip: {
+      label: t(silent ? "insight.kind.chip.notifiesNoOne" : "insight.chip.notWorking"),
+      variant: TONE_VARIANT.failure,
+      tone: "failure",
+    },
     headline: today.headline,
-    why: alertWhy(t, zone, item),
+    why: silent ? null : alertWhy(t, zone, item),
     whyDetail: null,
-    next: alertNext(t, item),
+    next: silent ? t("insight.alert.nextNoDestination") : alertNext(t, item),
     cta,
     secondary: [change ? review : null, logs, calibration].filter(
       (c): c is InsightCta => c !== null,
@@ -611,7 +628,7 @@ export const insightCopy = (
   ctx: CtaContext = {},
 ): InsightParts =>
   forBuild(
-    item.kind === NOT_WORKING
+    isAlertFindingKind(item.kind)
       ? notWorkingParts(t, zone, item, today, nowMs)
       : todayParts(t, zone, item, today, nowMs, ctx),
   );
