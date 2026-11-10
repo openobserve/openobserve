@@ -27,6 +27,9 @@ export const OUTCOME_FAILURE_WORDS = [
 const EXTRA_FAILURE_PHRASES = ["audit failure"];
 const EXTRA_SUCCESS_PHRASES = ["audit success"];
 
+/** A Windows NTSTATUS such as `0xC000006D`; `0x0` is success. */
+const NTSTATUS = /^0x([0-9a-f]+)$/;
+
 /** 1 = success, 2 = failure, 99 = a value this cannot interpret, 0 = empty. */
 export function classifyOutcome(value: unknown): number {
   const word = String(value ?? "")
@@ -34,6 +37,8 @@ export function classifyOutcome(value: unknown): number {
     .toLowerCase();
   if (EXTRA_FAILURE_PHRASES.includes(word)) return 2;
   if (EXTRA_SUCCESS_PHRASES.includes(word)) return 1;
+  const ntstatus = NTSTATUS.exec(word);
+  if (ntstatus) return /^0+$/.test(ntstatus[1]) ? 1 : 2;
   return toOcsfStatus(value);
 }
 

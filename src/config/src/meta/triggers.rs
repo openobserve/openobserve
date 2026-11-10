@@ -199,6 +199,10 @@ pub struct ScheduledTriggerData {
     /// rendering) is its only consumer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chart_id: Option<String>,
+    /// SIEM detections only: enterprise evaluation memory (covered window, rows alerted on).
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub siem: Option<json::Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -424,6 +428,8 @@ mod tests {
             last_notified_level: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
         };
         data.reset();
         assert!(data.period_end_time.is_none());
@@ -491,6 +497,8 @@ mod tests {
             last_notified_level: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
         };
         let json = data.to_json_string();
         let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
@@ -687,6 +695,8 @@ mod tests {
             last_notified_level: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
             backfill_job: Some(BackfillJob {
                 current_position: 42,
                 deletion_status: DeletionStatus::Pending,

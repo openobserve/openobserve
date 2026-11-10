@@ -24,8 +24,13 @@ const SHARED_PREFIXES = [
 
 const under = (path: string, prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
 
-/** The mode a route implies, or the current one for a shared route. */
-export function solutionModeForPath(path: string, current: SolutionMode): SolutionMode {
+/** The mode a route implies, or the current one for a shared route; observability for a user who may not open Security. */
+export function solutionModeForPath(
+  path: string,
+  current: SolutionMode,
+  canOpenSecurity = true,
+): SolutionMode {
+  if (!canOpenSecurity) return "observability";
   if (under(path, "/security")) return "security";
   if (SHARED_PREFIXES.some((prefix) => under(path, prefix))) return current;
   return "observability";

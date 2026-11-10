@@ -2,7 +2,7 @@
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
@@ -29,43 +29,25 @@ import SecurityRecordDrawer, {
   type RecordTab,
 } from "@/components/security/SecurityRecordDrawer.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
-import {
-  createLimiter,
-  runPool,
-  runSql,
-  useSecurityStreamPlans,
-} from "@/composables/security/useSecurityStreamPlans";
+import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
+import { forbiddenReason, isForbiddenError } from "@/composables/security/useSecurityAccess";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
+import { useSecurityStreamPlans } from "@/composables/security/useSecurityStreamPlans";
 import { useTableRowNavigation } from "@/composables/security/useTableRowNavigation";
-import {
-  LARGE_STREAM_SLICE_US,
-  estimateRowsInWindow,
-  isExternalIp,
-  shouldLimitWindow,
-  type StreamPlan,
-} from "@/utils/security/entities";
-import {
-  NOVELTY_SIGNALS,
-  UEBA_THRESHOLDS,
-  buildProfiles,
-  hoursSql,
-  ipsSql,
-  scoreAll,
-  withholdSignals,
-  type HourHit,
-  type IpHit,
+import securityInvestigate, {
+  type UebaReport,
   type UebaSignal,
   type UebaSignalKind,
-  type UebaWindows,
-  type UserProfile,
   type UserRisk,
-} from "@/utils/security/ueba";
+} from "@/services/securityInvestigate";
 import {
   severityRailColor,
   severityTagValue,
   toneLabelKey,
   type SeverityTone,
 } from "@/utils/security/severity";
-import { b64EncodeUnicode, formatCompactCount, formatEventCount } from "@/utils/formatters";
+import { formatCompactCount, formatEventCount } from "@/utils/formatters";
+import { huntLinkQuery } from "@/utils/security/huntLink";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -106,225 +88,88 @@ const {
   unreadable,
   loading: plansLoading,
   error: plansError,
+  failure: plansFailure,
   load: loadPlans,
 } = useSecurityStreamPlans();
 
-// Hitting a row cap (~2,000 users for hours) withholds the signals that need every row.
-const HOURS_LIMIT = 50000;
-const IPS_LIMIT = 20000;
 type StreamStatus = "loading" | "done" | "failed";
-type Pair = { stream: string; hours: HourHit[]; ips: IpHit[]; failureKnown: boolean };
-type Span = readonly [number, number];
 
-interface StreamRun {
-  plan: StreamPlan;
-  /** Estimated rows over the full windows, set when the run was cut to the slices around now. */
-  limitedRows: number | null;
-  now: Pair;
-  base: Pair;
-  /** The current window came back cut short. */
-  nowCut: boolean;
-  /** A baseline aggregate came back cut short. */
-  baseCut: { hours: boolean; ips: boolean };
-  hasHistory: boolean;
-  pending: number;
-  failed: boolean;
-  ctrl: AbortController;
-}
+/** The server's thresholds, for the drawer's explanations of what could not be judged. */
+const UEBA_THRESHOLDS = {
+  volumeMinEvents: 20,
+  volumeRatio: 3,
+  hoursMinBaseline: 20,
+  hoursMinSpanShare: 0.9,
+};
 
-const risks = ref<UserRisk[]>([]);
-/** Users with events from a stream read only over its slices, so their counts are low. */
-const limitedUsers = ref<Set<string>>(new Set());
-/** Signals withheld org-wide because a baseline aggregate came back incomplete. */
-const withheld = ref<UebaSignalKind[]>([]);
-/** The current window was cut short: counts are lower bounds. */
-const currentPartial = ref(false);
-/** Streams left out entirely — unreadable, or a query for them failed. */
-const excludedStreams = ref<string[]>([]);
-/** Streams with no data in the baseline window: their users cannot be "first seen". */
-const noHistoryStreams = ref<string[]>([]);
-const streamStatus = ref<Record<string, StreamStatus>>({});
-const limitedStreams = ref<{ stream: string; rows: number }[]>([]);
-const lastRunAt = ref<number | null>(null);
-/** Some stream of the current run has been scored, so the table has something to show. */
-const answered = ref(false);
-/** A refresh is between its start and its last answer, plan stage included. */
-const running = ref(false);
-/** Scores so far lack streams still loading, so novelty signals are held back. */
-const provisional = ref(false);
-const loading = computed(
-  () =>
-    running.value || plansLoading.value || Object.values(streamStatus.value).includes("loading"),
+const report = shallowRef<UebaReport | null>(null);
+/** The scoring request itself failed. */
+const runError = ref("");
+const runFailure = shallowRef<unknown>(null);
+/** A refusal from the plan stage or the scoring read; the server's 403 names the streams it could not read. */
+const refusal = computed(
+  () => [plansFailure.value, runFailure.value].find((e) => isForbiddenError(e)) ?? null,
 );
+const accessDenials = computed(() =>
+  refusal.value ? [viewDenial("streams", "list", failedRequests(refusal.value))] : [],
+);
+const lastRunAt = ref<number | null>(null);
+/** Some run has been scored, so the table has something to show. */
+const answered = ref(false);
+/** A refresh is between its start and its answer, plan stage included. */
+const running = ref(false);
+const loading = computed(() => running.value || plansLoading.value);
 let seq = 0;
-let runs = new Map<string, StreamRun>();
 let controller: AbortController | null = null;
-/** Every page query shares these slots. */
-const limit = createLimiter();
 /** Large streams the user chose to read over the whole window; reset with the window. */
 const fullWindow = new Set<string>();
 
-function pageWindows(): UebaWindows {
-  return {
-    currentStart: currentStart.value,
-    currentEnd: nowUs.value,
-    baselineStart: baselineStart.value,
-  };
-}
-
-const blankPair = (plan: StreamPlan): Pair => ({
-  stream: plan.stream,
-  hours: [],
-  ips: [],
-  failureKnown: !!plan.failure,
+const risks = computed<UserRisk[]>(() => report.value?.risks ?? []);
+/** Users with events from a stream read only over its slices, so their counts are low. */
+const limitedUsers = computed(() => new Set(report.value?.limitedUsers ?? []));
+/** Signals withheld org-wide because a baseline aggregate came back incomplete. */
+const withheld = computed<UebaSignalKind[]>(() => report.value?.withheld ?? []);
+const currentPartial = computed(() => !!report.value?.currentPartial);
+/** Streams left out entirely: unreadable, or a query for them failed. */
+const excludedStreams = computed(() =>
+  [...new Set([...unreadable.value, ...(report.value?.excludedStreams ?? [])])].sort(),
+);
+const noHistoryStreams = computed(() => report.value?.noHistoryStreams ?? []);
+const limitedStreams = computed(() => report.value?.limitedStreams ?? []);
+const streamStatus = computed<Record<string, StreamStatus>>(() => {
+  const status: Record<string, StreamStatus> = {};
+  const excluded = new Set(report.value?.excludedStreams ?? []);
+  for (const plan of plans.value) {
+    status[plan.stream] = running.value ? "loading" : excluded.has(plan.stream) ? "failed" : "done";
+  }
+  for (const name of unreadable.value) status[name] = "failed";
+  return status;
 });
 
-/** Queues one stream's four aggregates; it is scored once all of them have answered. */
-function startRun(plan: StreamPlan, mine: number, signal: AbortSignal) {
-  const h = hoursSql(plan, HOURS_LIMIT);
-  if (!h) return [];
-  const i = ipsSql(plan, IPS_LIMIT);
-  const w = pageWindows();
-  const estimate = estimateRowsInWindow(plan.volume, w.baselineStart, w.currentEnd);
-  const limited =
-    !fullWindow.has(plan.stream) && shouldLimitWindow(estimate, w.currentEnd - w.baselineStart);
-  const spans: Record<"now" | "base", Span> = limited
-    ? {
-        now: [Math.max(w.currentStart, w.currentEnd - LARGE_STREAM_SLICE_US), w.currentEnd],
-        base: [w.currentStart - LARGE_STREAM_SLICE_US, w.currentStart],
-      }
-    : { now: [w.currentStart, w.currentEnd], base: [w.baselineStart, w.currentStart] };
-  const ctrl = new AbortController();
-  signal.addEventListener("abort", () => ctrl.abort(), { once: true });
-  const jobs = (["now", "base"] as const).flatMap((win) => [
-    { agg: "hours" as const, win, sql: h },
-    ...(i ? [{ agg: "ips" as const, win, sql: i }] : []),
-  ]);
-  const run: StreamRun = {
-    plan,
-    limitedRows: limited ? estimate : null,
-    now: blankPair(plan),
-    base: blankPair(plan),
-    nowCut: false,
-    baseCut: { hours: false, ips: false },
-    hasHistory: false,
-    pending: jobs.length,
-    failed: false,
-    ctrl,
-  };
-  runs.get(plan.stream)?.ctrl.abort();
-  runs.set(plan.stream, run);
-  return jobs.map(
-    ({ agg, win, sql }) =>
-      () =>
-        limit(async () => {
-          try {
-            const res = await runSql(orgId.value, sql, ...spans[win], -1, { signal: ctrl.signal });
-            const cap = agg === "hours" ? HOURS_LIMIT : IPS_LIMIT;
-            const cut = res.hits.length >= cap || res.partial || !!res.functionError;
-            if (win === "base") {
-              if (agg === "hours" && res.hits.length) run.hasHistory = true;
-              // A baseline missing rows makes "never seen before" unknowable.
-              if (cut) run.baseCut[agg] = true;
-            } else if (cut) run.nowCut = true;
-            run[win][agg] = res.hits as never;
-          } catch {
-            run.failed = true;
-          }
-          run.pending -= 1;
-          if (mine !== seq || runs.get(plan.stream) !== run) return;
-          if (!run.pending) {
-            answered.value = true;
-            publishRisks();
-          }
-          publishStatus();
-        }),
-  );
-}
-
-function publishStatus() {
-  const status: Record<string, StreamStatus> = {};
-  for (const plan of plans.value) status[plan.stream] = "done";
-  for (const name of unreadable.value) status[name] = "failed";
-  for (const [stream, run] of runs) {
-    status[stream] = run.pending ? "loading" : run.failed ? "failed" : "done";
+/** Scores every planned stream's users on the server. */
+async function score(mine: number, signal: AbortSignal) {
+  try {
+    const res = await securityInvestigate.ueba(
+      orgId.value,
+      {
+        currentStart: currentStart.value,
+        currentEnd: nowUs.value,
+        baselineStart: baselineStart.value,
+        plans: plans.value.filter((p) => p.columns.user),
+        fullWindow: [...fullWindow],
+      },
+      signal,
+    );
+    if (mine !== seq) return;
+    report.value = res.data;
+    runError.value = "";
+    runFailure.value = null;
+    answered.value = true;
+  } catch (e: any) {
+    if (mine !== seq || signal.aborted) return;
+    runFailure.value = e;
+    runError.value = e?.response?.data?.message ?? e?.message ?? "";
   }
-  streamStatus.value = status;
-  limitedStreams.value = [...runs.values()]
-    .filter((r) => r.limitedRows !== null)
-    .map((r) => ({ stream: r.plan.stream, rows: r.limitedRows! }))
-    .sort((a, b) => a.stream.localeCompare(b.stream));
-}
-
-/** Profiles of the runs folded so far; a run that is no longer current forces a rebuild. */
-let folded = {
-  runs: new Set<StreamRun>(),
-  now: new Map<string, UserProfile>(),
-  base: new Map<string, UserProfile>(),
-};
-
-function foldProfiles(ok: StreamRun[]) {
-  const live = new Set(ok);
-  if ([...folded.runs].some((r) => !live.has(r))) {
-    folded = { runs: new Set(), now: new Map(), base: new Map() };
-  }
-  const fresh = ok.filter((r) => !folded.runs.has(r));
-  if (!fresh.length) return folded;
-  folded = {
-    runs: new Set([...folded.runs, ...fresh]),
-    now: buildProfiles(
-      fresh.map((r) => r.now),
-      folded.now,
-    ),
-    base: buildProfiles(
-      fresh.map((r) => r.base),
-      folded.base,
-    ),
-  };
-  return folded;
-}
-
-/** Scores every stream that has answered; a failed stream is dropped whole. */
-function publishRisks() {
-  const all = [...runs.values()];
-  const ok = all.filter((r) => !r.pending && !r.failed);
-  const profiles = foldProfiles(ok);
-  // A stream still loading may hold the history that makes a user not new.
-  const final = !all.some((r) => r.pending);
-  const cutStreams = new Set(ok.filter((r) => r.limitedRows !== null).map((r) => r.plan.stream));
-  const complete = {
-    hours: !ok.some((r) => r.baseCut.hours),
-    ips: !ok.some((r) => r.baseCut.ips),
-    streamsWithHistory: new Set(ok.filter((r) => r.hasHistory).map((r) => r.plan.stream)),
-  };
-  const scored = scoreAll(profiles.now, profiles.base, pageWindows(), complete);
-  const touchesCut = (r: UserRisk) =>
-    [...r.current.streams, ...(r.baseline?.streams ?? [])].some((st) => cutStreams.has(st));
-  // A cut stream's one-slice baseline cannot say "never seen", nor weigh its user's volume or failure rate.
-  const held = (r: UserRisk): UebaSignalKind[] => [
-    ...(!final || cutStreams.size ? NOVELTY_SIGNALS : []),
-    ...(touchesCut(r) ? (["volume", "failure_jump"] as UebaSignalKind[]) : []),
-  ];
-  risks.value = scored
-    .map((r) => (held(r).length ? withholdSignals(r, held(r)) : r))
-    .sort((a, b) => b.score - a.score || b.current.events - a.current.events);
-  limitedUsers.value = new Set(scored.filter(touchesCut).map((r) => r.user));
-  provisional.value = !final;
-  if (!final) return;
-  withheld.value = [
-    ...(complete.hours
-      ? []
-      : (["volume", "new_hours", "first_seen", "failure_jump"] as UebaSignalKind[])),
-    ...(complete.ips ? [] : (["new_ip"] as UebaSignalKind[])),
-  ];
-  currentPartial.value = ok.some((r) => r.nowCut);
-  noHistoryStreams.value = ok
-    .filter((r) => !r.hasHistory && r.limitedRows === null)
-    .map((r) => r.plan.stream)
-    .sort();
-  excludedStreams.value = [
-    ...new Set([...unreadable.value, ...all.filter((r) => r.failed).map((r) => r.plan.stream)]),
-  ].sort();
 }
 
 async function refresh() {
@@ -334,27 +179,17 @@ async function refresh() {
   const ctrl = new AbortController();
   controller = ctrl;
   nowUs.value = Date.now() * 1000;
-  streamStatus.value = {};
-  limitedStreams.value = [];
-  withheld.value = [];
-  currentPartial.value = false;
-  excludedStreams.value = [];
-  noHistoryStreams.value = [];
   answered.value = false;
   running.value = true;
+  runFailure.value = null;
   await loadPlans(orgId.value, baselineStart.value, nowUs.value, {
     signal: ctrl.signal,
     requireUser: true,
   });
   if (mine !== seq) return;
-  for (const run of runs.values()) run.ctrl.abort();
-  runs = new Map();
-  const tasks = plans.value.flatMap((plan) => startRun(plan, mine, ctrl.signal));
-  publishStatus();
-  await runPool(tasks);
+  if (plans.value.some((p) => p.columns.user)) await score(mine, ctrl.signal);
+  else report.value = null;
   if (mine !== seq) return;
-  publishRisks();
-  publishStatus();
   running.value = false;
   lastRunAt.value = Date.now();
   const want = pendingUser.value ?? selected.value?.user ?? null;
@@ -371,15 +206,13 @@ function reselect(user: string) {
 
 /** Re-scores one large stream over the full windows instead of its slices. */
 async function runFullWindow(stream: string) {
-  const plan = plans.value.find((p) => p.stream === stream);
-  if (!plan || !controller || plansLoading.value) return;
+  if (!controller || plansLoading.value || running.value) return;
   fullWindow.add(stream);
-  const mine = seq;
-  const tasks = startRun(plan, mine, controller.signal);
-  publishStatus();
-  await runPool(tasks);
+  const mine = ++seq;
+  running.value = true;
+  await score(mine, controller.signal);
   if (mine !== seq) return;
-  publishRisks();
+  running.value = false;
   lastRunAt.value = Date.now();
   if (selected.value) reselect(selected.value.user);
 }
@@ -418,7 +251,7 @@ const filtered = computed(() => {
   return risks.value.filter(
     (r) =>
       (toneFilter.value === "all" || r.tone === toneFilter.value) &&
-      (!needle || r.user.toLowerCase().includes(needle)),
+      (!needle || [r.user, ...r.current.aliases].some((v) => v.toLowerCase().includes(needle))),
   );
 });
 
@@ -428,7 +261,7 @@ const columns = computed<OTableColumnDef<UserRisk>[]>(() => [
     header: t("siem.ueba.col.user"),
     accessorKey: "user",
     meta: { isName: true },
-    size: 200,
+    size: 280,
   },
   { id: "score", header: t("siem.ueba.col.risk"), accessorKey: "score", sortable: true, size: 170 },
   {
@@ -456,7 +289,7 @@ const columns = computed<OTableColumnDef<UserRisk>[]>(() => [
   {
     id: "ips",
     header: t("siem.ueba.col.ips"),
-    accessorFn: (r: UserRisk) => r.current.ips.size,
+    accessorFn: (r: UserRisk) => Object.keys(r.current.ips).length,
     sortable: true,
     size: 110,
     hideable: true,
@@ -470,6 +303,10 @@ const SIGNAL_TAG: Record<UebaSignalKind, BadgeVariant> = {
   failure_jump: "error-soft",
   new_hours: "amber-soft",
   first_seen: "blue-soft",
+  peer_volume: "orange-soft",
+  peer_failures: "error-soft",
+  fail_then_success: "error-soft",
+  open_case: "orange-soft",
 };
 const SIGNAL_ICON: Record<UebaSignalKind, string> = {
   volume: "trending-up",
@@ -477,6 +314,10 @@ const SIGNAL_ICON: Record<UebaSignalKind, string> = {
   failure_jump: "error-outline",
   new_hours: "schedule",
   first_seen: "person-add",
+  peer_volume: "groups",
+  peer_failures: "groups",
+  fail_then_success: "key",
+  open_case: "assignment",
 };
 
 function reason(sig: UebaSignal): I18nText {
@@ -490,6 +331,12 @@ function reason(sig: UebaSignal): I18nText {
         baseline: windowDef.value.baselineLabel,
       });
     case "new_ip":
+      if (Number(e.building))
+        return t(
+          "siem.ueba.reason.newIpBuilding",
+          { ip: e.ip, n: e.n, count: e.count },
+          Number(e.count),
+        );
       return t(
         Number(e.external) ? "siem.ueba.reason.newIpExternal" : "siem.ueba.reason.newIp",
         { ip: e.ip, n: e.n, count: e.count, baseline: windowDef.value.baselineLabel },
@@ -505,8 +352,26 @@ function reason(sig: UebaSignal): I18nText {
       });
     case "first_seen":
       return t("siem.ueba.reason.firstSeen", { n: e.n, baseline: windowDef.value.baselineLabel });
+    case "peer_volume":
+      return t("siem.ueba.reason.peerVolume", {
+        n: formatEventCount(Number(e.n)),
+        median: formatEventCount(Number(e.median)),
+      });
+    case "peer_failures":
+      return t("siem.ueba.reason.peerFailures", { n: e.n, rate: e.rate, median: e.median });
+    case "fail_then_success":
+      return t("siem.ueba.reason.failThenSuccess", { n: e.n, ip: e.ip });
+    case "open_case":
+      return t(
+        "siem.ueba.reason.openCase",
+        { n: e.n, title: raw(String(e.title)), severity: raw(String(e.severity)) },
+        Number(e.n),
+      );
   }
 }
+
+/** Raw spellings that differ from the canonical user, so the stored value stays visible. */
+const otherAliases = (r: UserRisk) => r.current.aliases.filter((a) => a !== r.user);
 
 const RISK_BAR: Record<SeverityTone, "danger" | "warning" | "default"> = {
   critical: "danger",
@@ -603,12 +468,13 @@ const notices = computed<SecurityNotice[]>(() => {
       dataTest: "security-ueba-partial",
     });
   }
-  if (provisional.value) {
+  const building = risks.value.filter((r) => r.baselineState === "building").length;
+  if (building) {
     out.push({
-      key: "provisional",
+      key: "building",
       tone: "info",
-      text: t("siem.ueba.provisional"),
-      dataTest: "security-ueba-provisional",
+      text: t("siem.ueba.buildingNotice", { n: building, baseline }, building),
+      dataTest: "security-ueba-building",
     });
   }
   const limited = limitedStreams.value;
@@ -728,13 +594,13 @@ const facts = computed<RecordFact[]>(() => {
 const ipRows = computed(() => {
   const r = selected.value;
   if (!r) return [];
-  return [...r.current.ips.entries()]
+  const base = r.baseline?.ips ?? {};
+  return Object.entries(r.current.ips)
     .map(([ip, c]) => ({
       ip,
       ...c,
       // "New" only where new-IP was actually judged for this user.
-      isNew: !r.withheld.includes("new_ip") && !!r.baseline?.ips.size && !r.baseline.ips.has(ip),
-      external: isExternalIp(ip),
+      isNew: !r.withheld.includes("new_ip") && Object.keys(base).length > 0 && !(ip in base),
     }))
     .sort((a, b) => b.events - a.events);
 });
@@ -742,17 +608,17 @@ const ipRows = computed(() => {
 /** 24 cells per row; intensity is a share of that row's busiest hour. */
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const INTENSITY = ["opacity-10", "opacity-25", "opacity-50", "opacity-75", "opacity-100"];
-function hourClass(map: Map<number, number> | undefined, h: number, isNow: boolean) {
-  const n = map?.get(h) ?? 0;
+function hourClass(map: Record<string, number> | undefined, h: number, isNow: boolean) {
+  const n = map?.[h] ?? 0;
   if (!n) return "bg-surface-subtle";
-  const max = Math.max(...(map ? [...map.values()] : [1]));
+  const max = Math.max(...(map ? Object.values(map) : [1]));
   const level = INTENSITY[Math.min(4, Math.floor((n / max) * 4.999))];
   // Red only when "unusual hours" was actually judged for this user.
   const unusual =
     isNow &&
     !!selected.value?.hoursEligible &&
     !!selected.value.baseline &&
-    !selected.value.baseline.hours.has(h);
+    !(h in selected.value.baseline.hours);
   return `${unusual ? "bg-badge-error-solid-bg" : "bg-accent"} ${level}`;
 }
 
@@ -785,19 +651,16 @@ function openIp(ip: string) {
     query: { org_identifier: orgId.value, kind: "ip", period: win.value, entity: ip },
   });
 }
+// Every source and spelling at once: a user's events rarely sit in one stream.
 function openEvents() {
   const r = selected.value;
   if (!r) return;
-  const stream = [...r.current.streams][0];
-  const column = plans.value.find((p) => p.stream === stream)?.columns.user;
-  if (!stream || !column) return;
   router.push({
     path: "/security/events",
     query: {
       org_identifier: orgId.value,
-      stream,
       period: win.value,
-      filters: b64EncodeUnicode(JSON.stringify([{ field: column, op: "=", value: r.user }])) ?? "",
+      ...huntLinkQuery({ kind: "user", value: r.user, aliases: r.current.aliases }),
     },
   });
 }
@@ -881,8 +744,15 @@ const noUserSources = computed(
         /></OTag>
       </div>
 
+      <SecurityAccessLock
+        v-if="accessDenials.length"
+        :denials="accessDenials"
+        :reason="raw(forbiddenReason(refusal))"
+        size="hero"
+        data-test="security-ueba-access-lock"
+      />
       <OEmptyState
-        v-if="noUserSources"
+        v-else-if="noUserSources"
         size="hero"
         icon="person"
         :title="t('siem.ueba.noSources')"
@@ -895,7 +765,7 @@ const noUserSources = computed(
         :columns="columns"
         row-key="user"
         :loading="tableLoading"
-        :error="plansError || null"
+        :error="plansError || runError || null"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
         :show-global-filter="false"
@@ -947,12 +817,37 @@ const noUserSources = computed(
             <OIcon name="person" size="sm" class="text-text-secondary shrink-0" />
             <span class="text-text-heading truncate font-medium">{{ row.user }}</span>
             <OTag
+              v-if="otherAliases(row).length"
+              variant="default-soft"
+              size="xs"
+              class="shrink-0"
+              :data-test="`security-ueba-aliases-${row.user}`"
+              >{{ t("siem.entities.aliasCount", otherAliases(row).length)
+              }}<OTooltip :content="raw(row.current.aliases.join(', '))"
+            /></OTag>
+            <OTag
               v-if="limitedUsers.has(row.user)"
               variant="default-soft"
               size="xs"
               :data-test="`security-ueba-limited-row-${row.user}`"
               >{{ t("siem.ueba.limitedTag", { slice: t("siem.range.1h") })
               }}<OTooltip :content="t('siem.ueba.limitedTagHint', { slice: t('siem.range.1h') })"
+            /></OTag>
+            <OTag
+              v-if="row.baselineState === 'building'"
+              variant="default-soft"
+              icon="hourglass-empty"
+              size="xs"
+              class="shrink-0"
+              :data-test="`security-ueba-building-${row.user}`"
+              >{{ t("siem.ueba.baselineBuilding")
+              }}<OTooltip
+                :content="
+                  t('siem.ueba.baselineBuildingHint', {
+                    span: fmtSpan(row.baselineSpanUs),
+                    baseline: windowDef.baselineLabel,
+                  })
+                "
             /></OTag>
           </div>
         </template>
@@ -999,7 +894,7 @@ const noUserSources = computed(
           }}</span>
         </template>
         <template #cell-ips="{ row }">
-          <span class="tabular-nums">{{ row.current.ips.size || "—" }}</span>
+          <span class="tabular-nums">{{ Object.keys(row.current.ips).length || "—" }}</span>
         </template>
 
         <template #error="{ message }">
@@ -1060,6 +955,22 @@ const noUserSources = computed(
           "
           size="sm"
         />
+        <OTag
+          v-if="selected.baselineState === 'building'"
+          variant="default-soft"
+          icon="hourglass-empty"
+          size="sm"
+          data-test="security-ueba-drawer-building"
+          >{{ t("siem.ueba.baselineBuilding") }}</OTag
+        >
+        <OTag
+          v-for="alias in otherAliases(selected)"
+          :key="alias"
+          variant="default-soft"
+          size="sm"
+          class="font-mono"
+          >{{ alias }}<OTooltip :content="t('siem.entities.aliasHint')"
+        /></OTag>
         <OTag
           v-for="s in [...selected.current.streams]"
           :key="s"
@@ -1181,7 +1092,7 @@ const noUserSources = computed(
                   :content="
                     t('siem.ueba.hourCell', {
                       h: String(h).padStart(2, '0'),
-                      n: row.map?.get(h) ?? 0,
+                      n: row.map?.[h] ?? 0,
                     })
                   "
               /></span>

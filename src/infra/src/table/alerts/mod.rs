@@ -814,6 +814,15 @@ async fn list_models<C: ConnectionTrait>(
             query.filter(cond)
         }
     };
+    let query = if params.excluded_alert_ids.is_empty() {
+        query
+    } else {
+        let mut cond = Condition::all();
+        for chunk in params.excluded_alert_ids.chunks(TAG_ID_PREDICATE_CHUNK) {
+            cond = cond.add(alerts::Column::Id.is_not_in(chunk.to_vec()));
+        }
+        query.filter(cond)
+    };
 
     // Apply ordering (PT-3).
     //
@@ -2273,6 +2282,27 @@ pub(super) mod tests {
                 vec![a2],
                 "only the alert satisfying BOTH filters"
             );
+        }
+
+        #[tokio::test]
+        async fn excluded_ids_are_dropped_and_intersect_the_tag_predicate() {
+            let db = db_with_folder().await;
+            let (a1, a2, p1) = (alert_id(), alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&a1, "a1")).await;
+            insert_alert(&db, AlertSpec::plain(&a2, "a2")).await;
+            insert_alert(&db, AlertSpec::plain(&p1, "p1")).await;
+
+            let params = ListAlertsParams::new(ORG).without_alert_ids(vec![a2.clone()]);
+            let mut kept = ids_of(&db, params).await;
+            kept.sort();
+            let mut expected = vec![a1.clone(), p1.clone()];
+            expected.sort();
+            assert_eq!(kept, expected);
+
+            let params = ListAlertsParams::new(ORG)
+                .with_tag_alert_ids(vec![a2.clone(), p1.clone()])
+                .without_alert_ids(vec![a2]);
+            assert_eq!(ids_of(&db, params).await, vec![p1]);
         }
 
         /// An empty resolved tag set means "no alert carries these tags" and

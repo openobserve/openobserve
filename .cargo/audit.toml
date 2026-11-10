@@ -24,5 +24,7 @@ ignore = [
   "RUSTSEC-2026-0391", # from zstd 0.13, used by arrow, parquet, datafusion and tonic; the fix is in zstd 0.14, which they have not adopted
   "RUSTSEC-2026-0398", # from zstd-safe 7, the zstd 0.13 line above; fixed in zstd-safe 8, which needs zstd 0.14
   "RUSTSEC-2026-0403", # from zstd-safe 7, the zstd 0.13 line above; fixed in zstd-safe 8, which needs zstd 0.14
+  "RUSTSEC-2026-0459", # from libsqlite3-sys 0.30 via sqlx-sqlite; only our own data dir's database is opened, never untrusted files; fix needs >=0.39 but sqlx-sqlite 0.9 still caps it below 0.38
+  "RUSTSEC-2026-0462", # from rmcp (0.12/0.13) via rmcp-openapi; affects the Streamable HTTP clients, we only enable the server features; fix requires rmcp 3.9 (major bump of the rmcp-openapi fork)
 ]
 informational_warnings = ["unmaintained"] # warn for categories of informational advisories

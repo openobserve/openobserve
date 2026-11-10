@@ -548,7 +548,7 @@ pub async fn update_stream_settings(
         settings.is_llm_stream = v;
     }
     if let Some(v) = new_settings.security {
-        settings.security = Some(v);
+        settings.security = v;
     }
 
     // partition_keys: remove-then-add, dedup (by `field`) deferred to normalize.
@@ -2345,7 +2345,7 @@ mod tests {
             update_settings_test_stream(
                 name,
                 UpdateStreamSettings {
-                    security: Some(security(pack_version)),
+                    security: Some(Some(security(pack_version))),
                     ..Default::default()
                 },
             )
@@ -2362,5 +2362,16 @@ mod tests {
         // read what was persisted, not what this node cached
         evict_settings_test_stream(name).await;
         assert_eq!(settings_test_stream(name).await.security, Some(security(2)));
+
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                security: Some(None),
+                ..Default::default()
+            },
+        )
+        .await;
+        evict_settings_test_stream(name).await;
+        assert_eq!(settings_test_stream(name).await.security, None);
     }
 }

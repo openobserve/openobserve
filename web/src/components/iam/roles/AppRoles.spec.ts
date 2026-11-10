@@ -165,6 +165,21 @@ describe("AppRoles - addRole", () => {
   });
 });
 
+describe("AppRoles - start-from deep link", () => {
+  it("opens Add role on the linked preset and drops the parameter", async () => {
+    await router.push({
+      name: "roles",
+      query: { org_identifier: "default", startFrom: "soc_analyst" },
+    });
+    const wrapper = await mountAppRoles();
+    await flushPromises();
+    expect((wrapper.vm as any).showAddGroup).toBe(true);
+    expect((wrapper.vm as any).deepLinkStartFrom).toBe("soc_analyst");
+    expect(router.currentRoute.value.query.startFrom).toBeUndefined();
+    wrapper.unmount();
+  });
+});
+
 // 4. editRole
 describe("AppRoles - editRole", () => {
   it("navigates to editRole route with role_name param", async () => {

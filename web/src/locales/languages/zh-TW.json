@@ -691,7 +691,8 @@
       "scoreConfigs": "評分設定",
       "workflows": "工作流程",
       "syntheticFolders": "合成監控資料夾",
-      "downtimeFolders": "停機時段資料夾"
+      "downtimeFolders": "停機時段資料夾",
+      "security": "安全"
     },
     "resourcesInline": {
       "dashboards": "儀表板",
@@ -747,7 +748,8 @@
       "fleetManagement": "機群管理",
       "incidents": "事件",
       "onCallResponses": "值班回應",
-      "searchJobs": "搜尋作業"
+      "searchJobs": "搜尋作業",
+      "security": "安全"
     },
     "denied": {
       "view": "您無法檢視{resource}",
@@ -4500,6 +4502,7 @@
       "presetsSubtitle": "將預設集的授權新增至此角色。不會移除任何項目。",
       "presetsSectionBuiltin": "內建",
       "presetsSectionJob": "依職務",
+      "presetsSectionSecurity": "安全",
       "presetAddsTooltip": "新增 {count} 個權限 | 新增 {count} 個權限",
       "presetInRole": "已在角色中",
       "presetInRoleTooltip": "此角色已擁有此預設集中的所有項目",
@@ -4575,7 +4578,16 @@
       "presetRestored": "{title}：已還原 {permissions}。儲存前請先檢閱變更。",
       "presetSummaryRestores": "保留您標記為移除的 {count} 個權限。 | 保留您標記為移除的 {count} 個權限。",
       "presetRestoreButton": "保留 {count} 個權限 | 保留 {count} 個權限",
-      "effectStillAllowed": "存取權限沒有變更：更廣泛的授權仍允許此操作。"
+      "effectStillAllowed": "存取權限沒有變更：更廣泛的授權仍允許此操作。",
+      "moduleGroupSecurity": "安全",
+      "presetSocAnalystTitle": "SOC 分析師",
+      "presetSocAnalystDescription": "分流安全警示與案例，並可讀取偵測、串流與威脅情報清單",
+      "presetDetectionEngineerTitle": "偵測工程師",
+      "presetDetectionEngineerDescription": "建立、調整、啟用與執行偵測，安裝內容，連同函式與管線一起接入資料來源，並維護威脅情報清單等擴充表，可讀取安全模組、案例與串流",
+      "presetSecurityAdminTitle": "安全管理員",
+      "presetSecurityAdminDescription": "管理整個安全模組，包括刪除偵測與案例、排除資料來源，以及事件、函式、管線、擴充表與加密金鑰，並可讀取串流",
+      "presetSecurityViewerTitle": "安全檢視者",
+      "presetSecurityViewerDescription": "檢視安全模組及其案例、偵測與來源串流，但不能變更"
     },
     "rolesPage": {
       "subtitle": "角色會綑綁多個權限——將角色指派給使用者、服務帳戶或群組，即可授予存取權限。",
@@ -7711,6 +7723,28 @@
       "tlsBody": "權杖是持有人憑證，可透過純文字 HTTP 重送，因此請在 {brand} 終止 TLS（{setting}，預設為停用），或在其前方的受信任 Proxy 終止 TLS。"
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "更新現有 {product} 的設定，將日誌、指標和追蹤傳送至此組織。",
+      "correlationBody": "要關聯日誌和追蹤，應用程式必須記錄完整的 128 位元追蹤 ID。如果 Java tracer 僅記錄低 64 位元，請在應用程式上設定 {setting}。",
+      "profilingBody": "效能分析使用獨立的目的地和 Agent API 金鑰。如果應用程式已啟用效能分析，請在遷移期間關閉應用程式或 tracer 的效能分析，或另外設定其目的地。",
+      "multiValueTagsBody": "同一標籤的多個相異值會儲存為排序後的 JSON 陣列字串。以 [ 開頭的單一值也會編碼為單元素 JSON 陣列，以保留序列身分。",
+      "envTitle": "Agent 設定",
+      "envBody": "在 {product} 上設定這些環境變數並重新啟動。需要 {product} {version} 或更新版本。",
+      "tokenBody": "API 金鑰必須是組織資料擷取權杖，開頭為 {prefix}。此組織沒有已啟用的資料擷取權杖，因此不顯示設定片段。請建立資料擷取權杖，然後返回此頁面。",
+      "tokenLink": "開啟資料擷取權杖",
+      "featuresOffBody": "The lines after the URLs turn off Agent features that send to {vendor}'s own servers with the same key. {setting} also keeps {component} off, which newer Agent versions run and which does not keep the path in these URLs.",
+      "logsTitle": "日誌",
+      "logsBody": "在 {product} 中，日誌收集預設為關閉。請設定 {setting} 並配置您的日誌來源。",
+      "dualTitle": "保留您目前的目標",
+      "dualBody": "若要同時傳送到此組織與現有目標，請保留目前的 URL 與 API 金鑰，並改為將這些項目新增到 {file}。日誌需要 {setting}，否則額外的日誌端點會使用 TCP。",
+      "metricsTitle": "查詢指標",
+      "metricsTypes": "每個序列都會儲存為 gauge，其值為 Agent 傳送的值，並以 {typeField} 和 {intervalField} 標記。",
+      "metricsCount": "Count 序列會保存每個 flush 間隔的計數。請在 PromQL 中使用 {promql}，或在 SQL 中使用 {sql} 將它們加總。",
+      "metricsRate": "Rate 序列以每秒為單位。將值乘以 {intervalField}，即可還原該間隔的計數。",
+      "metricsCounterFns": "PromQL 的 {rate} 和 {increase} 預期的是累計計數器，因此對這些序列不會產生有意義的結果。",
+      "metricsSketch": "分佈會儲存為直方圖桶，百分位數則根據這些桶估算。較高的 ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA 會提供更細緻的桶與更精確的百分位數，代價是儲存更多資料列。"
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU 匯出器"
   },
@@ -24322,8 +24356,9 @@
       "classMix": "過去一小時的類別：{mix}",
       "objects": "OCSF 物件",
       "missingSignals": "未出現：{fields}",
-      "detections": "{n} 項偵測 | {n} 項偵測",
-      "firing": "{n} 觸發中 | {n} 觸發中",
+      "detections": "{n} 條符合的規則 | {n} 條符合的規則",
+      "firing": "{n} 項有命中 | {n} 項有命中",
+      "matchingRulesHint": "適用於此來源的 Sigma 目錄規則。命中是指目前時間窗口內的符合項目，而非已部署的偵測。",
       "rulesFor": "{source} 的 Sigma 規則",
       "hits": "{n} 次命中 | {n} 次命中",
       "viewHits": "查看命中",
@@ -24352,7 +24387,44 @@
       "invertFilter": "切換包含與排除",
       "removeFilter": "移除篩選條件",
       "pivotSqlUnsupported": "此 SQL 查詢不是單純的 SELECT … WHERE，因此無法將篩選條件加入其中。請手動編輯查詢，或切換至 Builder。",
-      "topValuesWholeStream": "SQL 模式：值是依整個串流計算，而非依您的查詢。"
+      "topValuesWholeStream": "SQL 模式：值是依整個串流計算，而非依您的查詢。",
+      "allSources": "所有安全資料來源",
+      "sortSqlMode": "手寫查詢會自行設定 ORDER BY",
+      "includeFailed": "無法將 {name} 加入安全",
+      "excludeFailed": "無法從安全移除 {name}",
+      "hunt": {
+        "title": "一次搜尋所有安全資料來源",
+        "hint": "輸入 IP 位址、使用者或主機。每個資料來源會以其自身的欄位搜尋，每一列都會標明來自哪個資料來源。",
+        "noMatches": "此時間範圍內沒有符合項目",
+        "noMatchesHint": "請擴大時間範圍，或搜尋任意欄位而不限定某一類。",
+        "noFields": "欄位因資料來源而異。請選擇一個資料來源以瀏覽其欄位。",
+        "search": "搜尋",
+        "aliases": "另外符合 {n} 種拼寫 | 另外符合 {n} 種拼寫",
+        "clearAliases": "僅符合輸入的名稱",
+        "uncounted": "未計入：{streams}",
+        "kind": {
+          "any": "任意欄位",
+          "user": "使用者",
+          "ip": "IP 位址",
+          "host": "主機"
+        },
+        "placeholder": {
+          "any": "IP 位址、使用者、主機或文字",
+          "user": "dave, ACME\\dave 或 dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "主機名稱"
+        },
+        "column": {
+          "time": "時間",
+          "source": "來源",
+          "user": "使用者",
+          "ip": "來源 IP",
+          "host": "主機",
+          "action": "動作",
+          "outcome": "結果",
+          "message": "訊息"
+        }
+      }
     },
     "drawer": {
       "event": "安全事件",
@@ -24373,7 +24445,14 @@
       "classUid": "class_uid {n}",
       "eyebrow": "安全事件",
       "source": "來源",
-      "matchedRules": "{n} 條偵測規則符合 | {n} 條偵測規則符合"
+      "matchedRules": "{n} 條偵測規則符合 | {n} 條偵測規則符合",
+      "openCase": "開立案件",
+      "openCaseHint": "針對此事件所指的主機、使用者或位址開立案件",
+      "addToCase": "加入案件",
+      "pickCase": "加入未結案件",
+      "caseOpened": "已開立案件：{title}",
+      "caseUpdated": "事件已加入 {title}",
+      "caseError": "無法從此事件開立案件"
     },
     "record": {
       "prev": "上一筆記錄",
@@ -24477,7 +24556,20 @@
       "customWindow": "顯示固定時間範圍：{from} → {to}",
       "backToRange": "返回最近 {range}",
       "missing": "此連結指向的警示不在已載入的時間範圍內。它可能早於此範圍，或超出最新資料列的筆數上限。",
-      "dismiss": "關閉"
+      "dismiss": "關閉",
+      "triage": {
+        "createCase": "建立案件",
+        "addToCase": "新增至案件",
+        "openCase": "開啟案件",
+        "acknowledge": "開始調查",
+        "addNote": "新增備註",
+        "notePlaceholder": "為此觸發所屬的案件新增備註",
+        "acknowledged": "案件已標記為調查中",
+        "noted": "備註已新增至案件",
+        "caseOpened": "案件已開啟",
+        "attached": "觸發已新增至案件",
+        "failed": "無法更新案件"
+      }
     },
     "cases": {
       "title": "案件",
@@ -24505,7 +24597,8 @@
         "lastSeen": "最後出現"
       },
       "fact": {
-        "duration": "持續時間"
+        "duration": "持續時間",
+        "timeToClose": "結案時間"
       },
       "durationMinutes": "{n} 分鐘",
       "durationHours": "{n} 小時",
@@ -24527,7 +24620,8 @@
         "service_discovery": "由服務探索關聯",
         "primary_match": "依主要維度關聯",
         "secondary_match": "依次要維度關聯",
-        "alert_id": "相同偵測"
+        "alert_id": "相同偵測",
+        "entity": "相同主機、使用者或位址"
       },
       "commentPlaceholder": "為團隊新增備註",
       "postComment": "發布備註",
@@ -24549,7 +24643,16 @@
         "analysisComplete": "已完成根本原因分析",
         "analysisFailed": "根本原因分析失敗：{reason}",
         "analysisCancelled": "已取消根本原因分析",
-        "other": "{type}"
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "結論：真陽性",
+          "false_positive": "結論：誤報",
+          "benign": "結論：良性",
+          "duplicate": "結論：重複",
+          "stale": "判定：過時 / 歷史"
+        },
+        "alertsAttached": "手動新增的觸發：{names}",
+        "eventAttached": "已加入來自 {stream} 的事件（{at}）"
       },
       "analysisHint": "以 AI 摘要說明此案件中各次觸發之間的關聯。",
       "runAnalysis": "分析",
@@ -24565,7 +24668,42 @@
         "resolved": "關閉案件"
       },
       "notFound": "找不到案件",
-      "timelinePartial": "此時間軸是從案件記錄重建而成，因此重建前的備註、接手與分析活動可能遺失。"
+      "timelinePartial": "此時間軸是從案件記錄重建而成，因此重建前的備註、接手與分析活動可能遺失。",
+      "verdict": {
+        "true_positive": "真陽性",
+        "false_positive": "誤報",
+        "benign": "良性",
+        "duplicate": "重複",
+        "stale": "過時 / 歷史"
+      },
+      "close": {
+        "title": "關閉案件",
+        "verdict": "結論",
+        "verdictRequired": "請選擇結論",
+        "reason": "原因",
+        "reasonPlaceholder": "說明你的發現以及案件可以關閉的原因",
+        "reasonRequired": "請填寫原因",
+        "reasonTooLong": "原因不得超過 {max} 個字元",
+        "cancel": "取消"
+      },
+      "settings": {
+        "open": "案件設定",
+        "title": "案件設定",
+        "save": "儲存",
+        "saved": "案件設定已儲存",
+        "loadFailed": "無法載入案件設定",
+        "saveFailed": "無法儲存案件設定",
+        "autoCloseDays": "靜默案件自動關閉天數",
+        "autoCloseDaysHint": "連續這麼多天沒有新觸發的案件會自動關閉。0 表示案件保持開啟。最多 {max}。",
+        "groupWindowMinutes": "觸發合併時間範圍（分鐘）",
+        "groupWindowMinutesHint": "依事件時間計算，在案件最近一次活動後的這麼多分鐘內，同一主機、使用者或位址上的活動會併入該案件。0 表示每個偵測各開一個案件。最多 {max}。",
+        "wholeNumber": "請輸入整數",
+        "range": "請輸入 0 到 {max} 之間的值"
+      },
+      "assignedTo": "已指派給 {to}",
+      "unassignedToast": "案件已取消指派",
+      "historical": "歷史（回填）",
+      "historicalHint": "此案件中的每次觸發都來自對過去資料的回填，因此不代表目前的活動。"
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -24587,19 +24725,21 @@
       "legend": {
         "firing": "在時間範圍內觸發（顏色越深表示次數越多）",
         "covered": "由已啟用的偵測涵蓋",
-        "available": "規則可用但未啟用"
+        "available": "規則可用但未啟用",
+        "none": "目錄中沒有規則"
       },
       "columnCount": "{total} 個中已涵蓋 {covered} 個",
       "cellEnabled": "{n} 個偵測已啟用 | {n} 個偵測已啟用",
       "cellAvailable": "{n} 條規則可用 | {n} 條規則可用",
       "noMatch": "沒有符合的技術",
       "unmapped": "沒有已知戰術的技術",
-      "footnote": "這些技術來自內建的 {n} 條 Sigma 規則與您自己的偵測；其分類依每條規則所標記的戰術而定。",
+      "footnote": "涵蓋範圍是依 MITRE ATT&CK Enterprise v{version} 的 {total} 項技術衡量，子技術會計入其父技術；產品內建 {n} 條 Sigma 規則。",
       "drawerEyebrow": "ATT&CK 技術",
       "state": {
         "firing": "觸發中",
         "covered": "已涵蓋",
-        "available": "未涵蓋"
+        "available": "未涵蓋",
+        "none": "無規則"
       },
       "fact": {
         "state": "涵蓋狀態",
@@ -24624,7 +24764,9 @@
       "openTechnique": "在 attack.mitre.org 開啟 {id}",
       "viewOnAttack": "在 ATT&CK 上檢視",
       "manageDetections": "管理偵測",
-      "historyNarrowed": "警示歷史的最大查詢範圍會將觸發紀錄限制為自 {from} 起；此時間範圍內較早的觸發不計入。"
+      "historyNarrowed": "警示歷史的最大查詢範圍會將觸發紀錄限制為自 {from} 起；此時間範圍內較早的觸發不計入。",
+      "cellNone": "無規則",
+      "coverageError": "無法載入 ATT&CK 涵蓋範圍：{reason}"
     },
     "detections": {
       "title": "偵測",
@@ -24642,7 +24784,8 @@
         "erroring": "錯誤中",
         "enabled": "已啟用",
         "disabled": "已停用",
-        "all": "所有偵測"
+        "all": "所有偵測",
+        "notifyFailing": "通知失敗"
       },
       "column": {
         "name": "偵測",
@@ -24655,7 +24798,8 @@
       "state": {
         "enabled": "已啟用",
         "disabled": "已停用",
-        "erroring": "錯誤中"
+        "erroring": "錯誤中",
+        "notifyFailing": "通知失敗"
       },
       "tab": {
         "overview": "總覽",
@@ -24717,17 +24861,23 @@
       "libraryEmpty": "沒有規則符合該篩選條件",
       "stream": "串流",
       "streamPlaceholder": "選擇要執行於的串流",
-      "notify": "通知",
-      "notifyPlaceholder": "選擇目標",
-      "noDestinations": "尚無警示目標。偵測需要一個目標才能通知，請在新分頁中建立後再回來；此清單會自動重新整理。",
+      "notify": "通知（選填）",
+      "notifyPlaceholder": "無：觸發事件仍會開啟案件",
+      "noDestinations": "尚無警示目標。即使沒有目標，偵測仍會產生發現項目並開啟案件；僅在您同時需要通知時，才新增目標。",
       "createDestination": "建立目標",
       "reloadDestinations": "重新整理",
       "lookBack": "回溯範圍（分鐘）",
+      "lookBackHelp": "至少為 {minutes} 分鐘的關聯窗口；每次執行都會在此範圍內滑動該窗口",
+      "correlationWindowLabel": "關聯窗口（分鐘）",
+      "backfill": "首次執行時也檢查過去的資料",
+      "backfillRange": "要檢查的過去資料",
+      "backfillHours": "最近 1 小時 | 最近 {n} 小時",
       "runEvery": "執行頻率（分鐘）",
       "silence": "靜默時間（分鐘）",
       "compiles": "針對 {stream} 編譯",
       "compilesAs": "針對 {stream} 編譯，識別為 {source}",
       "logsourceMismatch": "此規則為 {rule} 撰寫，但 {stream} 被識別為 {source}。只有在兩者欄位名稱相同時才能比對。",
+      "unseenFields": "此串流上尚未出現的欄位：{fields}。建立偵測時會新增這些欄位，使其在第一個此類事件到來前即已就緒。",
       "ocsfBridge": "{stream} 為 OCSF，因此規則的欄位會對應至 OCSF 路徑，且僅會對具有 {guard} 的事件執行。",
       "ocsfGuard": {
         "class": "class_uid {uid}",
@@ -24755,10 +24905,23 @@
       "validation": {
         "positive": "必須至少 1 分鐘",
         "nonNegative": "不能為負值",
-        "periodGap": "短於執行間隔：兩次執行之間的分鐘數永遠不會被檢查"
+        "periodGap": "短於執行間隔：兩次執行之間的分鐘數永遠不會被檢查",
+        "belowTimespan": "必須至少為 {minutes} 分鐘的關聯窗口"
       },
       "nameTaken": "已有名為「{name}」的偵測或警示。其歷史記錄會與此項目合併，因此請選擇其他串流，或先移除現有項目。",
-      "loadError": "載入偵測規則失敗"
+      "loadError": "載入偵測規則失敗",
+      "notifyFailingHint": "此規則已觸發，但其最近一次通知未能送達。請在「歷程記錄」中檢查其通知目標。",
+      "correlationWindow": "由關聯規則的時間跨度決定",
+      "createForbidden": "建立偵測需要安全權限",
+      "preview": {
+        "run": "預覽符合項目",
+        "hint": "對最近 24 小時執行查詢，並顯示前 20 筆符合的事件",
+        "empty": "最近 24 小時內沒有符合項目",
+        "shown": "最近 24 小時內共 {total} 筆符合的事件，顯示 {shown} 筆",
+        "failed": "查詢失敗：{reason}",
+        "time": "時間"
+      },
+      "queryFailed": "未儲存：此偵測的查詢無法執行（{reason}）"
     },
     "content": {
       "title": "內容",
@@ -24828,7 +24991,6 @@
       "noStreamsForRule": "您的串流皆不符合此規則",
       "noStreamsForRuleHint": "此規則為 {logsource} 撰寫。擷取該來源後，就會顯示在這裡。",
       "runnable": "可在此串流上執行",
-      "notRunnable": "無法在此執行",
       "openInEvents": "在事件中開啟",
       "installHere": "安裝到此串流",
       "install": "安裝為偵測",
@@ -24850,7 +25012,38 @@
         "severityId": "嚴重性",
         "statusId": "結果"
       },
-      "cannotRun": "無法在您的資料上執行"
+      "catalogError": "無法載入偵測目錄：{reason}",
+      "notRunnableYet": "尚無法執行",
+      "newRulesAvailable": "{stream} 上現在可以執行 {n} 條新規則 | {stream} 上現在可以執行 {n} 條新規則",
+      "reviewNewRules": "檢視",
+      "reviewingNewRules": "正在顯示 {stream} 上現在可以執行的 {n} 條規則 | 正在顯示 {stream} 上現在可以執行的 {n} 條規則",
+      "showAllRules": "顯示全部規則",
+      "installSelected": "安裝所選項目",
+      "selectRunnable": "選取可執行項目",
+      "selectRunnableHint": "選取目前顯示、可在您的資料上執行且尚未安裝的所有規則",
+      "bulk": {
+        "title": "安裝 {n} 條規則 | 安裝 {n} 條規則",
+        "subtitle": "每條規則都會在伺服器上針對其串流編譯，並以這些設定儲存為偵測。",
+        "stream": "串流",
+        "everyStream": "每條規則執行的所有串流",
+        "folder": "警示資料夾",
+        "correlationWindow": "關聯規則的回溯時間至少等於其自身的時間窗口。",
+        "nothing": "所選規則皆不在此串流上執行。",
+        "plan": "將建立 {n} 項偵測： | 將建立 {n} 項偵測：",
+        "correlation": "關聯",
+        "confirm": "安裝 {n} 項偵測 | 安裝 {n} 項偵測",
+        "close": "關閉",
+        "summary": "共 {total} 項：已安裝 {installed} 項，略過 {skipped} 項，失敗 {failed} 項",
+        "duplicate": "名為 {name} 的偵測已存在。",
+        "correlationBlocked": "此關聯規則無法在這個串流上執行。",
+        "status": {
+          "installed": "已安裝",
+          "skipped": "已略過",
+          "failed": "失敗",
+          "pending": "等待中"
+        },
+        "done": "已安裝 {n} 項偵測 | 已安裝 {n} 項偵測"
+      }
     },
     "entities": {
       "title": "實體",
@@ -24860,18 +25053,15 @@
         "graph": "風險圖"
       },
       "riskGraph": {
-        "empty": "沒有可繪製的實體",
-        "emptyHint": "新增安全來源或擴大時間範圍以查看風險圖。",
-        "showingTop": "依風險顯示前 {n} 個，共 {total} 個",
-        "illustrative": "僅供示意：關聯是從風險排名推斷而來，並非實際觀察所得。",
-        "baseScore": "基礎 {n}",
-        "propagatedScore": "傳播 {n}",
-        "tier": {
-          "critical": "嚴重",
-          "high": "高",
-          "medium": "中",
-          "low": "低"
-        }
+        "empty": "此時間範圍內沒有關聯項目",
+        "emptyHint": "此圖表會連結出現在同一事件或同一案件中的使用者、IP 位址與主機。此時間範圍內沒有這類關聯；請擴大時間範圍。",
+        "showingTop": "依風險顯示前 {n} 項，共 {total} 項",
+        "legend": "實線：出現在同一事件中。虛線：被同一案件提及。",
+        "edgeEvents": "{n} 個事件 | {n} 個事件",
+        "edgeCases": "{n} 個案件 | {n} 個案件",
+        "scoreHint": "提及它的案件：{detection}。失敗事件：{failure}。與案件提及的實體關聯：{neighbour}。",
+        "nodeFacts": "{events} 個事件 · {failures} 個失敗",
+        "nodeCases": "{n} 個案件 | {n} 個案件"
       },
       "kinds": {
         "user": "使用者",
@@ -24912,16 +25102,20 @@
           "ip": "大量使用者",
           "host": "大量使用者"
         },
-        "external": "公開位址"
+        "external": "公開位址",
+        "fail_then_success": "多次失敗後成功",
+        "open_case": "未結案件"
       },
       "signalHint": {
         "failures": "此實體至少 {rate}% 的事件失敗，且失敗次數至少 {n} 次，僅計入有回報結果的來源。",
         "spread": {
-          "user": "在所選時間範圍內，於單一來源中來自 {n} 個或更多來源 IP。",
-          "ip": "在所選時間範圍內，於單一來源中被 {n} 個或更多使用者使用。NAT 與 VPN 出口流量也會呈現這種情況；密碼噴灑攻擊亦然。",
-          "host": "在所選時間範圍內，於單一來源中被 {n} 個或更多使用者存取。"
+          "user": "在單一來源中被 {n} 個以上的來源 IP 觀察到，遠高於其他使用者在此時間範圍內的活動。",
+          "ip": "在單一來源中由 {n} 個以上的使用者使用，遠高於此時間範圍內的其他位址。NAT 與 VPN 出口也會呈現這種情況；密碼噴灑亦然。",
+          "host": "在單一來源中被 {n} 個以上的使用者存取，遠高於此時間範圍內的其他主機。"
         },
-        "external": "不在私人、迴路或連結本地範圍內。"
+        "external": "不在私人、迴路或連結本地範圍內。",
+        "fail_then_success": "至少 {n} 次失敗事件，之後在首次失敗後出現一次成功：可能是猜測得逞。",
+        "open_case": "有一個未結的 SIEM 案件提及此實體。"
       },
       "peersChip": {
         "ips": "單一來源最多 {n} 個來源 IP | 單一來源最多 {n} 個來源 IP",
@@ -24932,7 +25126,7 @@
       "capped": "每個來源僅回傳活動量最高的 {n} 個實體；活動較少者未列出，接近此截斷值的實體計數可能不完整。標示 + 的分頁計數已遭截斷。",
       "failedStreams": "無法讀取：{streams}",
       "noSources": "沒有可讀取的安全來源",
-      "noSourcesHint": "實體來自名稱標示為安全資料的串流，或您在「事件」頁面新增為來源的串流。",
+      "noSourcesHint": "實體會出現在名稱標示為安全資料的串流中，或您納入「安全性 → 來源」的串流中。",
       "empty": "此時間範圍內沒有實體",
       "emptyHint": "擴大時間範圍，或確認您的來源包含使用者、IP 或主機欄位。",
       "refresh": "重新整理",
@@ -24940,7 +25134,8 @@
       "tab": {
         "activity": "活動",
         "related": "相關",
-        "sources": "來源"
+        "sources": "來源",
+        "cases": "案件"
       },
       "activity": "事件隨時間變化",
       "chart": {
@@ -24949,6 +25144,9 @@
       },
       "topN": "依事件數前 {n} 名",
       "noRelated": "此時間範圍內沒有相關項目。",
+      "noCases": "沒有 SIEM 案件提及此實體。",
+      "caseOpen": "未結",
+      "caseResolved": "已解決",
       "failedCount": "{n} 次失敗 | {n} 次失敗",
       "openEvents": "在事件中開啟",
       "huntInEvents": "在事件中追查",
@@ -24963,7 +25161,9 @@
         "failed": "無法讀取"
       },
       "loadError": "無法載入安全性來源",
-      "detailFailed": "此實體的部分資料無法讀取：{streams}。"
+      "detailFailed": "此實體的部分資料無法讀取：{streams}。",
+      "aliasCount": "+{n} 種拼寫 | +{n} 種拼寫",
+      "aliasHint": "以此拼寫記錄，屬於同一身分。"
     },
     "ueba": {
       "title": "使用者行為分析",
@@ -25000,7 +25200,11 @@
         "new_ip": "新來源 IP",
         "failure_jump": "失敗次數激增",
         "new_hours": "異常時段",
-        "first_seen": "首次出現"
+        "first_seen": "首次出現",
+        "peer_volume": "遠高於同儕使用者",
+        "peer_failures": "失敗數遠高於同儕使用者",
+        "fail_then_success": "多次失敗後成功",
+        "open_case": "未結案件"
       },
       "reason": {
         "volume": "{n} 個事件，約為根據先前 {baseline} 預期 ~{expected} 的 {ratio} 倍。",
@@ -25008,7 +25212,12 @@
         "newIpExternal": "{n} 個事件來自公網位址 {ip}，在先前 {baseline} 中從未出現。 | {n} 個事件來自公網位址 {ip}，在先前 {baseline} 中從未出現（總計 {count} 個新位址）。",
         "failureJump": "{n} 次失敗 — 佔事件的 {rate}%，高於基準期間的 {baseline}%。",
         "newHours": "{n} 個事件發生於 UTC {hours}，這些時段該使用者在先前 {baseline} 中從未活動。",
-        "firstSeen": "{n} 個事件來自一名在先前 {baseline} 完全沒有活動的使用者。"
+        "firstSeen": "{n} 個事件來自一名在先前 {baseline} 完全沒有活動的使用者。",
+        "peerVolume": "{n} 個事件，而典型使用者約為 {median} 個。該使用者自身的基準仍在建立中。",
+        "peerFailures": "{n} 次失敗（占事件的 {rate}%），而典型使用者約為 {median} 次。該使用者自身的基準仍在建立中。",
+        "newIpBuilding": "來自公用位址 {ip} 的 {n} 個事件。此使用者自身的基準仍在建立中，因此任何公用位址都會被標記。 | 來自公用位址 {ip} 的 {n} 個事件。此使用者自身的基準仍在建立中，因此任何公用位址都會被標記（總計 {count} 個公用位址）。",
+        "failThenSuccess": "來自 {ip} 的 {n} 次失敗，之後同一位址出現一次成功事件。",
+        "openCase": "被未結案件「{title}」（{severity}）提及。 | 被 {n} 個未結案件提及，最新的是「{title}」（{severity}）。"
       },
       "fact": {
         "events": "事件",
@@ -25050,7 +25259,10 @@
       "notEvaluated": "由於基準資料不完整，未為此使用者評估：{signals}。",
       "hoursNotJudged": "異常時段僅在有至少 {min} 個基準事件、涵蓋前 {baseline} 之 {share}% 時才會判定。此使用者的歷史較短，因此不會標記任何小時。",
       "noHistory": "前 {baseline} 中沒有 {streams} 的資料，因此其中沒有人會被判定為首次出現。",
-      "volumeNotJudged": "未為此使用者判定流量：短於一天的時間範圍會與基準中相同的一天中的小時比較，這需要至少一天的歷史資料。"
+      "volumeNotJudged": "未為此使用者判定流量：短於一天的時間範圍會與基準中相同的一天中的小時比較，這需要至少一天的歷史資料。",
+      "baselineBuilding": "基準建立中",
+      "baselineBuildingHint": "目前已有 {span} 的歷史。待累積滿 {baseline} 的完整歷史後，才會開始與該使用者自身的過去比較；在此期間，僅標記相對其他使用者的明顯異常值。",
+      "buildingNotice": "{n} 位使用者的基準仍在建立中：在累積滿 {baseline} 的完整歷史之前，僅標記相對其他使用者的明顯異常值。 | {n} 位使用者的基準仍在建立中：在累積滿 {baseline} 的完整歷史之前，僅標記相對其他使用者的明顯異常值。"
     },
     "intel": {
       "title": "威脅情報",
@@ -25072,12 +25284,11 @@
       "sighted": "已出現 1 次 | 已出現 {n} 次",
       "sweeping": "掃描中… {done} / {total} 個查詢",
       "sweptAcross": "已掃描 {n} 個安全來源 | 已掃描 {n} 個安全來源",
-      "partial": "本次掃描在達到 {n} 筆查詢的上限時停止，因此有些欄位未被搜尋。查詢數會隨清單 × 欄位增加：請移除過期清單或已失效的指標，或依類型拆分清單，以完成完整掃描。",
       "failedQueries": "{n} 個欄位無法搜尋，已略過。 | {n} 個欄位無法搜尋，已略過。",
       "truncated": "僅讀取了 {lists} 的前 {n} 列，其餘未掃描。",
       "noIndicators": "無指標",
       "noCoverage": "執行掃描以查看搜尋了哪些欄位",
-      "coverageHint": "掃描在 {n} 個安全來源中搜尋的內容。比對採精確方式，僅限列出的欄位；若某類型沒有對應欄位，則完全無從發現。",
+      "coverageHint": "一次掃描在 {n} 個安全來源中搜尋的內容。每個欄位都會比對其完整值，以及其中的完整詞元（例如陣列、日誌文字與 SHA256= 雜湊）；沒有對應欄位的類型則完全無法被發現。",
       "indicatorCount": "{n} 個指標 | {n} 個指標",
       "columnsSearched": "{n} 個欄位 | {n} 個欄位",
       "blind": "無法搜尋",
@@ -25155,7 +25366,7 @@
         "cancel": "取消",
         "indicators": "指標",
         "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "每行一個，或以逗號或空格分隔。重複項目會被忽略。",
+        "indicatorsHelp": "每行一個，或以逗號或空格分隔。重複項目會被忽略。每個清單最多可容納 {max} 個。",
         "indicatorsRequired": "請輸入至少一個指標",
         "invalid": "無法辨識為指標（{n}）：{sample}",
         "line": "第 {n} 行",
@@ -25179,7 +25390,7 @@
         "importSubtitle": "需要一個指標欄位；類型、嚴重度、來源與到期時間為選填。",
         "importSubmit": "匯入",
         "file": "CSV 檔",
-        "fileHelp": "非指標的資料列會被略過並計數。",
+        "fileHelp": "非指標的資料列會被略過並列入計數。每個清單最多可容納 {max} 個指標；檔案大小上限為 {mb} MB。",
         "fileRequired": "請選擇 CSV 檔",
         "defaultSeverity": "未指定嚴重度之資料列的嚴重度",
         "append": "新增至清單而非取代清單",
@@ -25198,7 +25409,10 @@
         "noIndicatorColumnIn": "{table} 沒有 indicator、ioc 或 value 欄位，因此無法將入侵指標新增至其中。請選擇其他清單。",
         "replaceTitle": "取代清單",
         "replaceMessage": "關閉附加後匯入會完全取代 {table}：所有現有資料列、其欄位與設定都會被移除，只保留此檔案的入侵指標。",
-        "replaceConfirm": "取代"
+        "replaceConfirm": "取代",
+        "tooMany": "已貼上 {n} 個指標；一個清單最多 {max} 個。",
+        "listFull": "{table} 將包含 {count} 個指標；一個清單最多 {max} 個。請拆分到多個清單。",
+        "fileTooLarge": "檔案大於 {max} MB。請拆分為較小的檔案。"
       },
       "importCsv": "匯入 CSV",
       "unreadTables": "無法讀取 {lists}；其入侵指標不會顯示，也不會被掃描。 | 無法讀取 {lists}；其入侵指標不會顯示，也不會被掃描。",
@@ -25208,12 +25422,15 @@
       "columnsSkipped": "{n} 個欄位未搜尋 | {n} 個欄位未搜尋",
       "skippedHint": "未完整搜尋 — 掃描達到查詢上限或查詢失敗：",
       "caveat": {
-        "capped": "掃描已達查詢上限，因此部分欄位未被搜尋。",
         "failed": "{n} 個欄位無法搜尋。 | {n} 個欄位無法搜尋。",
         "partial": "{n} 個查詢只回傳部分結果，因此那些欄位未被完整搜尋。 | {n} 個查詢只回傳部分結果，因此那些欄位未被完整搜尋。",
         "unsearched": "沒有串流含有這些項目的欄位：{types}。",
-        "cidr": "{n} 個 CIDR 範圍未被掃描。 | {n} 個 CIDR 範圍未被掃描。"
-      }
+        "cidr": "{n} 個 CIDR 範圍未被掃描。 | {n} 個 CIDR 範圍未被掃描。",
+        "checked": "{total} 個指標中只有 {checked} 個被完整檢查。"
+      },
+      "partialChecked": "結果不完整：已檢查 {total} 個指標中的 {checked} 個。其餘指標的計數可能偏低。",
+      "partialCapped": "結果不完整：已檢查 {total} 個指標中的 {checked} 個。掃描在 {n} 個查詢處停止；嚴重程度最低的指標未被檢查。",
+      "inText": "{column}（文字中）"
     },
     "sources": {
       "title": "資料來源",
@@ -25233,8 +25450,7 @@
       "exclude": "排除",
       "attached": "已附加 {pack}。",
       "detached": "套件已卸離。",
-      "detachedPipelineSkipped": "套件已卸離。記錄的管線已不再符合此串流與套件，因此保持不變。",
-      "empty": "尚無日誌串流。像一般串流一樣擷取安全日誌，它們就會出現在這裡。",
+      "empty": "尚無日誌串流。將安全日誌擷取為任何串流，它們就會出現在這裡。",
       "noticePackRemoved": "{stream}：套件已在 SIEM 之外移除。請重新附加或清除。",
       "noticeNoRecord": "{stream}：已附加套件但沒有記錄。請記錄或卸離。",
       "noticeNotWriting": "{stream}：管線已不再寫入此串流。",
@@ -25244,14 +25460,31 @@
       "blockGlobalFlatten": "{stream}：全域展平層級（{level}）無法讓 OCSF 欄位保持展平。",
       "blockSchemaMissing": "{stream}：使用者定義的結構描述缺少 OCSF 欄位：{columns}。",
       "blockPipelineDisabled": "{stream}：現有管線已停用；請先啟用再附加。",
-      "attachErrors": {
-        "functionEditedOutside": "函式 {name} 已在 SIEM 外部被編輯。",
-        "pipelineNoAccess": "此串流包含您無權存取的管線。",
-        "permissionDenied": "您需要權限才能編輯此串流的函式與管線。",
-        "pipelineChanged": "此串流的管線已變更，現在會阻擋附加；請重新整理並重新檢查。",
-        "packConflict": "此串流已有套件 {pack}；請先將其卸離。",
-        "noPipeline": "無法為此串流建立或找到即時管線。",
-        "failed": "附加失敗。"
+      "actionFailed": "變更未儲存。",
+      "stateExcluded": "已排除",
+      "excludedBy": "{user} 於 {time} 排除",
+      "sourceTypeConfidence": "{label}（{n}%）",
+      "notClassified": "尚未分類",
+      "lastChange": "{user} 於 {time} 最後變更：{summary}",
+      "previewTitle": "將 {pack} 附加到 {stream}？",
+      "previewSubtitle": "在您確認之前不會寫入任何內容。",
+      "previewLoading": "正在檢查附加後會變更哪些項目…",
+      "previewPack": "套件",
+      "previewClasses": "寫入的 OCSF 類別",
+      "previewFunction": "函式",
+      "previewPipeline": "管線",
+      "previewFunctionCreate": "建立 {name}",
+      "previewFunctionReuse": "重複使用 {name}（已完全相同）",
+      "previewPipelineCreate": "建立 {name}：{stream} → 函式 → {stream}",
+      "previewPipelineExtend": "在 {name} 中緊接來源之後新增一個函式節點，輸出至 {feeds}",
+      "previewPipelineAlready": "{name} 已在執行此套件；只會寫入記錄",
+      "confirmAttach": "附加",
+      "cancel": "取消",
+      "detachedSkipped": "套件已卸離。管線 {id} 未變更：{reason}。",
+      "skipReason": {
+        "pipeline_missing": "已不存在",
+        "other_stream": "目前讀取的是另一個串流",
+        "other_pack": "目前執行的是另一個套件"
       }
     },
     "nav": {
@@ -25264,13 +25497,60 @@
       "intel": "威脅情報",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
-      "content": "內容"
+      "content": "內容",
+      "sources": "資料來源"
     },
     "sigma": {
       "notSupported": "不支援：{fields}",
       "cannotMatch": "無法比對：此串流沒有 {fields}",
       "compiledEmpty": "規則編譯後為空",
       "assumedAbsent": "假設此串流從未包含 {fields}"
+    },
+    "audit": {
+      "title": "變更日誌",
+      "hint": "過去 7 天內誰變更了偵測、資料來源和案件",
+      "when": "時間",
+      "who": "變更者",
+      "area": "區域",
+      "action": "操作",
+      "target": "變更內容",
+      "empty": "沒有變更記錄",
+      "emptyHint": "偵測、安全資料來源和案件的變更會顯示在這裡。",
+      "disabled": "稽核日誌已關閉",
+      "disabledHint": "請為此部署開啟稽核日誌，以記錄誰變更了安全設定。",
+      "category": {
+        "detection": "偵測",
+        "case": "案件",
+        "source": "資料來源",
+        "security": "安全"
+      },
+      "verb": {
+        "created": "已建立",
+        "changed": "已變更",
+        "deleted": "已刪除",
+        "enabled": "已開啟",
+        "disabled": "已關閉"
+      }
+    },
+    "access": {
+      "needsAuthor": "需要安全模組的建立權限",
+      "openPreset": "從 {preset} 建立角色",
+      "askPreset": "請向管理員申請 {preset} 預設集。",
+      "checkFailedTitle": "無法檢查您的安全存取權限",
+      "checkFailedHint": "伺服器沒有回應。您的工作階段仍處於登入狀態。"
+    },
+    "aria": {
+      "addSource": "新增來源",
+      "addToCase": "加入案件",
+      "caseAssignee": "案件負責人",
+      "casePriority": "案件優先順序",
+      "filterField": "篩選欄位",
+      "filterOperator": "篩選運算子",
+      "filterValue": "篩選值",
+      "huntKind": "獵捕目標",
+      "indicatorType": "指標類型",
+      "severityFilter": "嚴重性篩選",
+      "stream": "串流"
     }
   },
   "promql": {

@@ -604,6 +604,10 @@ pub struct OrganizationSetting {
     /// Show raw tool input and output in incident investigation threads.
     #[serde(default)]
     pub ai_rca_thread_tool_output: bool,
+    /// Set through the Security case settings route, which checks the Security grant.
+    #[cfg(feature = "enterprise")]
+    #[serde(default)]
+    pub security_cases: o2_enterprise::enterprise::security::cases::CaseSettings,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -657,6 +661,8 @@ impl Default for OrganizationSetting {
             usage_stream_enabled: default_usage_stream_enabled(),
             red_insights_enabled: false,
             ai_rca_thread_tool_output: false,
+            #[cfg(feature = "enterprise")]
+            security_cases: Default::default(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             #[cfg(feature = "enterprise")]
@@ -1602,6 +1608,8 @@ mod tests {
             red_insights_enabled: false,
             ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
+            security_cases: Default::default(),
+            #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             #[cfg(feature = "enterprise")]
             data_retention: DataRetentionDefaults::default(),
@@ -1641,6 +1649,8 @@ mod tests {
             usage_stream_enabled: false,
             red_insights_enabled: false,
             ai_rca_thread_tool_output: false,
+            #[cfg(feature = "enterprise")]
+            security_cases: Default::default(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             #[cfg(feature = "enterprise")]

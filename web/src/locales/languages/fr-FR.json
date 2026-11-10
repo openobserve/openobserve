@@ -691,7 +691,8 @@
       "scoreConfigs": "Configurations de score",
       "workflows": "Workflows",
       "syntheticFolders": "Dossiers synthétiques",
-      "downtimeFolders": "Dossiers de plages de maintenance"
+      "downtimeFolders": "Dossiers de plages de maintenance",
+      "security": "Sécurité"
     },
     "resourcesInline": {
       "dashboards": "tableaux de bord",
@@ -747,7 +748,8 @@
       "fleetManagement": "gestion de flotte",
       "incidents": "incidents",
       "onCallResponses": "réponses d'astreinte",
-      "searchJobs": "tâches de recherche"
+      "searchJobs": "tâches de recherche",
+      "security": "Sécurité"
     },
     "denied": {
       "view": "Vous ne pouvez pas afficher {resource}",
@@ -4500,6 +4502,7 @@
       "presetsSubtitle": "Ajoutez les autorisations d'un préréglage à ce rôle. Rien n'est retiré.",
       "presetsSectionBuiltin": "Intégrés",
       "presetsSectionJob": "Par métier",
+      "presetsSectionSecurity": "Sécurité",
       "presetAddsTooltip": "Ajoute {count} permission | Ajoute {count} permissions",
       "presetInRole": "Dans le rôle",
       "presetInRoleTooltip": "Ce rôle possède déjà tout le contenu de ce préréglage",
@@ -4575,7 +4578,16 @@
       "presetRestored": "{title} a restauré {permissions}. Vérifiez les modifications avant d'enregistrer.",
       "presetSummaryRestores": "Conserve {count} permission que vous avez marquée pour suppression. | Conserve {count} permissions que vous avez marquées pour suppression.",
       "presetRestoreButton": "Conserver {count} permission | Conserver {count} permissions",
-      "effectStillAllowed": "Aucun changement d'accès : une permission plus large l'autorise toujours."
+      "effectStillAllowed": "Aucun changement d'accès : une permission plus large l'autorise toujours.",
+      "moduleGroupSecurity": "Sécurité",
+      "presetSocAnalystTitle": "Analyste SOC",
+      "presetSocAnalystDescription": "Trier les alertes et les cas de Sécurité, avec un accès en lecture aux détections, aux flux et aux listes de renseignement sur les menaces",
+      "presetDetectionEngineerTitle": "Ingénieur détection",
+      "presetDetectionEngineerDescription": "Créer, ajuster, activer et exécuter des détections, installer du contenu, rattacher des sources avec leurs fonctions et pipelines, et gérer les tables d'enrichissement comme les listes de renseignement sur les menaces, avec un accès en lecture à Sécurité, aux cas et aux flux",
+      "presetSecurityAdminTitle": "Administrateur Sécurité",
+      "presetSecurityAdminDescription": "Gérer toute la Sécurité, y compris supprimer des détections et des cas et exclure des sources, avec les incidents, fonctions, pipelines, tables d'enrichissement et clés de chiffrement, et un accès en lecture aux flux",
+      "presetSecurityViewerTitle": "Lecteur Sécurité",
+      "presetSecurityViewerDescription": "Consulter Sécurité, ses cas, ses détections et ses flux sources sans les modifier"
     },
     "rolesPage": {
       "subtitle": "Les rôles regroupent des autorisations : attribuez-les à des utilisateurs, à des comptes de service ou à des groupes pour accorder l'accès.",
@@ -7711,6 +7723,28 @@
       "tlsBody": "Le jeton est un identifiant bearer rejouable en HTTP en clair, donc terminez TLS au niveau de {brand} ({setting}, désactivé par défaut) ou d'un proxy de confiance placé devant."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Modifiez la configuration de votre {product} existant pour envoyer les journaux, métriques et traces à cette organisation.",
+      "correlationBody": "Pour corréler journaux et traces, les applications doivent journaliser un ID de trace complet de 128 bits. Si votre tracer Java ne journalise que les 64 bits de poids faible, définissez {setting} sur l’application.",
+      "profilingBody": "Le profilage utilise une destination distincte et la clé API de l’Agent. Si une application utilise déjà un profileur, désactivez le profilage de l’application ou du tracer pendant la migration, ou configurez sa destination séparément.",
+      "multiValueTagsBody": "Les tags comportant plusieurs valeurs distinctes utilisent une chaîne de tableau JSON trié. Une valeur unique commençant par [ est aussi encodée dans un tableau JSON à un élément pour préserver l’identité de la série.",
+      "envTitle": "Configuration de l’Agent",
+      "envBody": "Définissez ces variables d’environnement sur le {product} et redémarrez-le. Nécessite {product} {version} ou une version ultérieure.",
+      "tokenBody": "La clé API doit être un jeton d'ingestion d'organisation, qui commence par {prefix}. Cette organisation n'a aucun jeton d'ingestion activé, aucun extrait de configuration n'est donc affiché. Créez un jeton d'ingestion, puis revenez à cette page.",
+      "tokenLink": "Ouvrir les jetons d’ingestion",
+      "featuresOffBody": "Les lignes après les URL désactivent les fonctionnalités de l’Agent qui envoient vers les serveurs propres de {vendor} avec la même clé. {setting} maintient également {component} désactivé, que les versions plus récentes de l’Agent exécutent et qui ne conserve pas le chemin dans ces URL.",
+      "logsTitle": "Logs",
+      "logsBody": "La collecte de logs est désactivée par défaut dans le {product}. Définissez {setting} et configurez vos sources de logs.",
+      "dualTitle": "Conserver votre destination actuelle",
+      "dualBody": "Pour envoyer vers cette organisation en parallèle d’une destination existante, conservez les URL et la clé API actuelles et ajoutez plutôt ces entrées à {file}. Les logs nécessitent {setting}, car sinon les points de terminaison de logs supplémentaires utilisent TCP.",
+      "metricsTitle": "Interrogation des métriques",
+      "metricsTypes": "Chaque série est stockée sous forme de gauge avec la valeur envoyée par l’Agent, étiquetée avec {typeField} et {intervalField}.",
+      "metricsCount": "Les séries de type count contiennent le décompte pour chaque intervalle de vidage. Additionnez-les avec {promql} en PromQL ou {sql} en SQL.",
+      "metricsRate": "Les séries de type rate sont exprimées par seconde. Multipliez la valeur par {intervalField} pour retrouver le décompte de l’intervalle.",
+      "metricsCounterFns": "Les fonctions PromQL {rate} et {increase} attendent des compteurs cumulatifs ; elles ne donnent donc pas de résultats significatifs sur ces séries.",
+      "metricsSketch": "Les distributions sont stockées sous forme de buckets d’histogramme, et les centiles sont estimés à partir de ces buckets. Une valeur plus élevée de ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA donne des buckets plus fins et des centiles plus précis, au prix d’un plus grand nombre de lignes stockées."
+    },
     "gpu": "GPU",
     "gpuExporter": "Exportateur GPU"
   },
@@ -24327,8 +24361,9 @@
       "classMix": "Classes dans la dernière heure : {mix}",
       "objects": "Objets OCSF",
       "missingSignals": "Non observés : {fields}",
-      "detections": "{n} détection | {n} détections",
-      "firing": "{n} en déclenchement | {n} en déclenchement",
+      "detections": "{n} règle correspondante | {n} règles correspondantes",
+      "firing": "{n} avec des correspondances | {n} avec des correspondances",
+      "matchingRulesHint": "Règles du catalogue Sigma applicables à cette source. Les résultats sont des correspondances dans la fenêtre actuelle, pas des détections déployées.",
       "rulesFor": "Règles Sigma pour {source}",
       "hits": "{n} résultat | {n} résultats",
       "viewHits": "Voir les résultats",
@@ -24357,7 +24392,44 @@
       "invertFilter": "Basculer entre l’inclusion et l’exclusion",
       "removeFilter": "Supprimer le filtre",
       "pivotSqlUnsupported": "Cette requête SQL n’est pas un simple SELECT … WHERE, le filtre n’a donc pas pu y être ajouté. Modifiez la requête manuellement ou passez en mode Builder.",
-      "topValuesWholeStream": "Mode SQL : les valeurs sont comptées sur l’ensemble du flux, et non sur votre requête."
+      "topValuesWholeStream": "Mode SQL : les valeurs sont comptées sur l’ensemble du flux, et non sur votre requête.",
+      "allSources": "Toutes les sources de sécurité",
+      "sortSqlMode": "Une requête écrite à la main définit son propre ORDER BY",
+      "includeFailed": "Impossible d'ajouter {name} à Sécurité",
+      "excludeFailed": "Impossible de retirer {name} de Sécurité",
+      "hunt": {
+        "title": "Rechercher dans toutes les sources de sécurité à la fois",
+        "hint": "Saisissez une adresse IP, un utilisateur ou un hôte. Chaque source est interrogée avec ses propres colonnes, et chaque ligne indique de quelle source elle provient.",
+        "noMatches": "Aucune correspondance dans cette période",
+        "noMatchesHint": "Élargissez la plage de temps ou recherchez dans n'importe quel champ plutôt que dans un seul type.",
+        "noFields": "Les champs diffèrent selon la source. Choisissez une source pour parcourir ses champs.",
+        "search": "Rechercher",
+        "aliases": "Correspond aussi à {n} orthographe | Correspond aussi à {n} orthographes",
+        "clearAliases": "Correspondre uniquement au nom saisi",
+        "uncounted": "Non comptabilisé : {streams}",
+        "kind": {
+          "any": "Tout champ",
+          "user": "Utilisateur",
+          "ip": "Adresse IP",
+          "host": "Hôte"
+        },
+        "placeholder": {
+          "any": "Adresse IP, utilisateur, hôte ou texte",
+          "user": "dave, ACME\\dave ou dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "Nom d'hôte"
+        },
+        "column": {
+          "time": "Heure",
+          "source": "Source",
+          "user": "Utilisateur",
+          "ip": "IP source",
+          "host": "Hôte",
+          "action": "Action",
+          "outcome": "Résultat",
+          "message": "Message"
+        }
+      }
     },
     "drawer": {
       "event": "Événement de sécurité",
@@ -24378,7 +24450,14 @@
       "classUid": "class_uid {n}",
       "eyebrow": "Événement de sécurité",
       "source": "Source",
-      "matchedRules": "{n} détection correspondante | {n} détections correspondantes"
+      "matchedRules": "{n} détection correspondante | {n} détections correspondantes",
+      "openCase": "Ouvrir un cas",
+      "openCaseHint": "Ouvrir un cas sur l’hôte, l’utilisateur ou l’adresse que cite cet événement",
+      "addToCase": "Ajouter au cas",
+      "pickCase": "Ajouter à un cas ouvert",
+      "caseOpened": "Cas ouvert : {title}",
+      "caseUpdated": "Événement ajouté à {title}",
+      "caseError": "Impossible d’ouvrir un cas à partir de cet événement"
     },
     "record": {
       "prev": "Enregistrement précédent",
@@ -24482,7 +24561,20 @@
       "customWindow": "Fenêtre fixe affichée : {from} → {to}",
       "backToRange": "Revenir à la plage {range}",
       "missing": "L'alerte vers laquelle ce lien pointe ne figure pas dans la fenêtre chargée. Elle est peut-être plus ancienne que cette plage ou au-delà de la limite des lignes les plus récentes.",
-      "dismiss": "Fermer"
+      "dismiss": "Fermer",
+      "triage": {
+        "createCase": "Créer un cas",
+        "addToCase": "Ajouter au cas",
+        "openCase": "Ouvrir le cas",
+        "acknowledge": "Commencer l'investigation",
+        "addNote": "Ajouter une note",
+        "notePlaceholder": "Ajoutez une note au cas de ce déclenchement",
+        "acknowledged": "Cas marqué comme en cours d'investigation",
+        "noted": "Note ajoutée au cas",
+        "caseOpened": "Cas ouvert",
+        "attached": "Déclenchement ajouté au cas",
+        "failed": "Impossible de mettre à jour le cas"
+      }
     },
     "cases": {
       "title": "Cas",
@@ -24510,7 +24602,8 @@
         "lastSeen": "Dernière apparition"
       },
       "fact": {
-        "duration": "Durée"
+        "duration": "Durée",
+        "timeToClose": "Délai de clôture"
       },
       "durationMinutes": "{n} min",
       "durationHours": "{n} h",
@@ -24532,7 +24625,8 @@
         "service_discovery": "Corrélé via la découverte de services",
         "primary_match": "Corrélé sur les dimensions primaires",
         "secondary_match": "Corrélé sur les dimensions secondaires",
-        "alert_id": "Même détection"
+        "alert_id": "Même détection",
+        "entity": "Même hôte, utilisateur ou adresse"
       },
       "commentPlaceholder": "Ajouter une note pour l'équipe",
       "postComment": "Publier la note",
@@ -24554,7 +24648,16 @@
         "analysisComplete": "Analyse des causes racines terminée",
         "analysisFailed": "Échec de l'analyse des causes racines : {reason}",
         "analysisCancelled": "Analyse des causes racines annulée",
-        "other": "{type}"
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "Verdict : vrai positif",
+          "false_positive": "Verdict : faux positif",
+          "benign": "Verdict : bénin",
+          "duplicate": "Verdict : doublon",
+          "stale": "Verdict : obsolète / historique"
+        },
+        "alertsAttached": "Déclenchements ajoutés manuellement : {names}",
+        "eventAttached": "Événement de {stream} à {at} ajouté"
       },
       "analysisHint": "Un résumé IA de ce qui relie les déclenchements de ce cas.",
       "runAnalysis": "Analyser",
@@ -24570,7 +24673,42 @@
         "resolved": "Clore le cas"
       },
       "notFound": "Cas introuvable",
-      "timelinePartial": "Cette chronologie a été reconstruite à partir de l'enregistrement du cas ; les notes, les prises en charge et les activités d'analyse antérieures à la reconstruction peuvent donc manquer."
+      "timelinePartial": "Cette chronologie a été reconstruite à partir de l'enregistrement du cas ; les notes, les prises en charge et les activités d'analyse antérieures à la reconstruction peuvent donc manquer.",
+      "verdict": {
+        "true_positive": "Vrai positif",
+        "false_positive": "Faux positif",
+        "benign": "Bénin",
+        "duplicate": "Doublon",
+        "stale": "Obsolète / historique"
+      },
+      "close": {
+        "title": "Fermer le cas",
+        "verdict": "Verdict",
+        "verdictRequired": "Choisissez un verdict",
+        "reason": "Motif",
+        "reasonPlaceholder": "Ce que vous avez constaté et pourquoi le cas peut être fermé",
+        "reasonRequired": "Indiquez un motif",
+        "reasonTooLong": "Limitez le motif à {max} caractères maximum",
+        "cancel": "Annuler"
+      },
+      "settings": {
+        "open": "Paramètres des cas",
+        "title": "Paramètres des cas",
+        "save": "Enregistrer",
+        "saved": "Paramètres des cas enregistrés",
+        "loadFailed": "Impossible de charger les paramètres des cas",
+        "saveFailed": "Impossible d'enregistrer les paramètres des cas",
+        "autoCloseDays": "Clore les cas inactifs après (jours)",
+        "autoCloseDaysHint": "Un cas sans nouveau déclenchement pendant ce nombre de jours se clôt automatiquement. 0 garde les cas ouverts. Au maximum {max}.",
+        "groupWindowMinutes": "Regrouper les déclenchements sur (minutes)",
+        "groupWindowMinutesHint": "L’activité sur le même hôte, utilisateur ou adresse dans ce nombre de minutes après la dernière activité d’un cas, selon l’heure de l’événement, rejoint ce cas. 0 ouvre un cas par détection. Au maximum {max}.",
+        "wholeNumber": "Saisissez un nombre entier",
+        "range": "Saisissez une valeur de 0 à {max}"
+      },
+      "assignedTo": "Assigné à {to}",
+      "unassignedToast": "Cas non assigné",
+      "historical": "Historique (backfill)",
+      "historicalHint": "Chaque déclenchement de ce cas provient d’un backfill sur des données passées ; il ne décrit donc aucune activité actuelle."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -24592,19 +24730,21 @@
       "legend": {
         "firing": "Déclenchements sur la période (plus foncé = plus)",
         "covered": "Couvertes par une détection activée",
-        "available": "Règle disponible, non activée"
+        "available": "Règle disponible, non activée",
+        "none": "Aucune règle dans le catalogue"
       },
       "columnCount": "{covered} sur {total} couvertes",
       "cellEnabled": "{n} détection active | {n} détections actives",
       "cellAvailable": "{n} règle disponible | {n} règles disponibles",
       "noMatch": "Aucune technique ne correspond",
       "unmapped": "Techniques sans tactique connue",
-      "footnote": "Les techniques proviennent des {n} règles Sigma fournies et de vos propres détections ; leur placement suit les tactiques associées à chaque règle.",
+      "footnote": "La couverture est mesurée par rapport aux {total} techniques de MITRE ATT&CK Enterprise v{version}, les sous-techniques étant comptabilisées dans leur technique parente ; {n} règles Sigma sont fournies avec le produit.",
       "drawerEyebrow": "Technique ATT&CK",
       "state": {
         "firing": "Déclenchée",
         "covered": "Couverte",
-        "available": "Non couverte"
+        "available": "Non couverte",
+        "none": "Aucune règle"
       },
       "fact": {
         "state": "Couverture",
@@ -24629,7 +24769,9 @@
       "openTechnique": "Ouvrir {id} sur attack.mitre.org",
       "viewOnAttack": "Voir sur ATT&CK",
       "manageDetections": "Gérer les détections",
-      "historyNarrowed": "La plage de requête maximale de l'historique des alertes limite les déclenchements à ceux depuis {from} ; les déclenchements antérieurs dans cette fenêtre ne sont pas comptés."
+      "historyNarrowed": "La plage de requête maximale de l'historique des alertes limite les déclenchements à ceux depuis {from} ; les déclenchements antérieurs dans cette fenêtre ne sont pas comptés.",
+      "cellNone": "Aucune règle",
+      "coverageError": "Impossible de charger la couverture ATT&CK : {reason}"
     },
     "detections": {
       "title": "Détections",
@@ -24647,7 +24789,8 @@
         "erroring": "En erreur",
         "enabled": "Activées",
         "disabled": "Désactivées",
-        "all": "Toutes les détections"
+        "all": "Toutes les détections",
+        "notifyFailing": "Échec de notification"
       },
       "column": {
         "name": "Détection",
@@ -24660,7 +24803,8 @@
       "state": {
         "enabled": "Activée",
         "disabled": "Désactivée",
-        "erroring": "En erreur"
+        "erroring": "En erreur",
+        "notifyFailing": "Échec de notification"
       },
       "tab": {
         "overview": "Vue d'ensemble",
@@ -24722,17 +24866,23 @@
       "libraryEmpty": "Aucune règle ne correspond à ce filtre",
       "stream": "Flux",
       "streamPlaceholder": "Choisissez le flux sur lequel exécuter",
-      "notify": "Notifier",
-      "notifyPlaceholder": "Choisissez une destination",
-      "noDestinations": "Aucune destination d'alerte n'existe encore. Une détection en a besoin pour notifier ; créez-la dans un nouvel onglet puis revenez ; cette liste s'actualise automatiquement.",
+      "notify": "Notifier (facultatif)",
+      "notifyPlaceholder": "Aucune : les déclenchements ouvrent quand même des cas",
+      "noDestinations": "Aucune destination d'alerte n'existe encore. Les détections génèrent quand même des constats et ouvrent des cas sans destination ; ajoutez une destination uniquement si vous souhaitez aussi recevoir des notifications.",
       "createDestination": "Créer une destination",
       "reloadDestinations": "Actualiser",
       "lookBack": "Période d'analyse (minutes)",
+      "lookBackHelp": "Au moins la fenêtre de corrélation de {minutes} minutes ; chaque exécution fait glisser cette fenêtre sur la période",
+      "correlationWindowLabel": "Fenêtre de corrélation (minutes)",
+      "backfill": "Vérifier aussi les données passées lors de la première exécution",
+      "backfillRange": "Données passées à vérifier",
+      "backfillHours": "Dernière heure | {n} dernières heures",
       "runEvery": "Intervalle d'exécution (minutes)",
       "silence": "Rester silencieux pendant (minutes)",
       "compiles": "Se compile sur {stream}",
       "compilesAs": "Se compile sur {stream}, identifié comme {source}",
       "logsourceMismatch": "Cette règle est écrite pour {rule}, mais {stream} est identifié comme {source}. Elle ne peut correspondre que là où les deux partagent les mêmes noms de champs.",
+      "unseenFields": "Champ pas encore vu sur ce flux : {fields}. La création de la détection ajoute ces colonnes afin qu’elle soit active avant le premier événement de ce type.",
       "ocsfBridge": "{stream} est OCSF, donc les champs de la règle sont mappés vers les chemins OCSF et elle ne s'exécute que sur les événements avec {guard}.",
       "ocsfGuard": {
         "class": "class_uid {uid}",
@@ -24760,10 +24910,23 @@
       "validation": {
         "positive": "Doit être d'au moins 1 minute",
         "nonNegative": "Ne peut pas être négatif",
-        "periodGap": "Plus court que l’intervalle d’exécution : les minutes entre deux exécutions ne seraient jamais vérifiées"
+        "periodGap": "Plus court que l’intervalle d’exécution : les minutes entre deux exécutions ne seraient jamais vérifiées",
+        "belowTimespan": "Doit être au moins égal à la fenêtre de corrélation de {minutes} minutes"
       },
       "nameTaken": "Une détection ou une alerte nommée « {name} » existe déjà. Son historique fusionnerait avec le sien ; choisissez un autre flux ou supprimez d’abord l’élément existant.",
-      "loadError": "Échec du chargement des règles de détection"
+      "loadError": "Échec du chargement des règles de détection",
+      "notifyFailingHint": "Cette règle s'est déclenchée, mais sa dernière notification n'a pas pu être livrée. Vérifiez ses destinations dans l'historique.",
+      "correlationWindow": "Défini par la durée de la corrélation",
+      "createForbidden": "La création d'une détection nécessite l'autorisation Security",
+      "preview": {
+        "run": "Prévisualiser les correspondances",
+        "hint": "Exécute la requête sur les dernières 24 heures et affiche les 20 premiers événements correspondants",
+        "empty": "Aucune correspondance au cours des dernières 24 heures",
+        "shown": "{shown} sur {total} événements correspondants au cours des dernières 24 heures",
+        "failed": "La requête a échoué : {reason}",
+        "time": "Heure"
+      },
+      "queryFailed": "Non enregistrée : la requête de cette détection ne s'exécute pas ({reason})"
     },
     "content": {
       "title": "Contenu",
@@ -24833,7 +24996,6 @@
       "noStreamsForRule": "Aucun de vos flux ne correspond à cette règle",
       "noStreamsForRuleHint": "Elle a été écrite pour {logsource}. Ingérez cette source et elle apparaîtra ici.",
       "runnable": "S'exécute sur ce flux",
-      "notRunnable": "Ne peut pas s'exécuter ici",
       "openInEvents": "Ouvrir dans Événements",
       "installHere": "Installer sur ce flux",
       "install": "Installer comme détection",
@@ -24855,7 +25017,38 @@
         "severityId": "Gravité",
         "statusId": "Résultat"
       },
-      "cannotRun": "Impossible de l'exécuter sur vos données"
+      "catalogError": "Impossible de charger le catalogue de détections : {reason}",
+      "notRunnableYet": "Pas encore exécutable",
+      "newRulesAvailable": "{n} nouvelle règle peut maintenant s'exécuter sur {stream} | {n} nouvelles règles peuvent maintenant s'exécuter sur {stream}",
+      "reviewNewRules": "Examiner",
+      "reviewingNewRules": "{n} règle qui peut maintenant s'exécuter sur {stream} | {n} règles qui peuvent maintenant s'exécuter sur {stream}",
+      "showAllRules": "Afficher toutes les règles",
+      "installSelected": "Installer la sélection",
+      "selectRunnable": "Sélectionner les exécutables",
+      "selectRunnableHint": "Sélectionner toutes les règles affichées qui s’exécutent sur vos données et ne sont pas encore installées",
+      "bulk": {
+        "title": "Installer {n} règle | Installer {n} règles",
+        "subtitle": "Chaque règle est compilée pour son flux sur le serveur et enregistrée comme détection avec ces paramètres.",
+        "stream": "Flux",
+        "everyStream": "Chaque flux sur lequel chaque règle s’exécute",
+        "folder": "Dossier d’alertes",
+        "correlationWindow": "Une règle de corrélation remonte au moins sur sa propre fenêtre.",
+        "nothing": "Aucune des règles sélectionnées ne s’exécute sur ce flux.",
+        "plan": "{n} détection sera créée : | {n} détections seront créées :",
+        "correlation": "Corrélation",
+        "confirm": "Installer {n} détection | Installer {n} détections",
+        "close": "Fermer",
+        "summary": "{installed} installées, {skipped} ignorées, {failed} en échec sur {total}",
+        "duplicate": "Une détection nommée {name} existe déjà.",
+        "correlationBlocked": "La corrélation ne peut pas s’exécuter sur ce flux.",
+        "status": {
+          "installed": "Installée",
+          "skipped": "Ignorée",
+          "failed": "Échec",
+          "pending": "En attente"
+        },
+        "done": "{n} détection installée | {n} détections installées"
+      }
     },
     "entities": {
       "title": "Entités",
@@ -24865,18 +25058,15 @@
         "graph": "Graphe des risques"
       },
       "riskGraph": {
-        "empty": "Aucune entité à représenter",
-        "emptyHint": "Ajoutez des sources de sécurité ou élargissez la plage temporelle pour voir le graphe des risques.",
+        "empty": "Aucun lien dans cette fenêtre",
+        "emptyHint": "Le graphe relie les utilisateurs, les adresses IP et les hôtes qui apparaissent dans le même événement ou le même cas. Aucun ne l'a fait dans cette fenêtre ; élargissez la plage temporelle.",
         "showingTop": "Affichage des {n} premiers sur {total} par risque",
-        "illustrative": "Illustratif : les relations sont déduites du classement des risques, et non observées.",
-        "baseScore": "base {n}",
-        "propagatedScore": "propagé {n}",
-        "tier": {
-          "critical": "Critique",
-          "high": "Élevé",
-          "medium": "Moyen",
-          "low": "Faible"
-        }
+        "legend": "Trait plein : vus dans le même événement. Trait pointillé : nommés par le même cas.",
+        "edgeEvents": "{n} événement | {n} événements",
+        "edgeCases": "{n} cas | {n} cas",
+        "scoreHint": "Cas qui la nomment : {detection}. Événements en échec : {failure}. Liée à une entité nommée par un cas : {neighbour}.",
+        "nodeFacts": "{events} événements · {failures} en échec",
+        "nodeCases": "{n} cas | {n} cas"
       },
       "kinds": {
         "user": "Utilisateurs",
@@ -24917,16 +25107,20 @@
           "ip": "Nombreux utilisateurs",
           "host": "Nombreux utilisateurs"
         },
-        "external": "Adresse publique"
+        "external": "Adresse publique",
+        "fail_then_success": "Succès après échecs",
+        "open_case": "Cas ouvert"
       },
       "signalHint": {
         "failures": "Au moins {rate} % des événements de cette entité ont échoué, avec au moins {n} échecs, en ne comptant que les sources qui rapportent un résultat.",
         "spread": {
-          "user": "Vu depuis {n} adresses IP sources ou plus dans une même source pendant la fenêtre.",
-          "ip": "Utilisée par {n} utilisateurs ou plus dans une même source pendant la fenêtre. Les sorties NAT et VPN produisent le même motif, tout comme le password spraying.",
-          "host": "Accédé par {n} utilisateurs ou plus dans une même source pendant la fenêtre."
+          "user": "Vu depuis {n} adresses IP sources ou plus dans une même source, bien au-dessus de ce que les autres utilisateurs présentent dans cette fenêtre.",
+          "ip": "Utilisée par {n} utilisateurs ou plus dans une même source, bien au-dessus des autres adresses dans cette fenêtre. Les sorties NAT et VPN ressemblent aussi à cela ; le password spraying également.",
+          "host": "Accédé par {n} utilisateurs ou plus dans une même source, bien au-dessus des autres hôtes dans cette fenêtre."
         },
-        "external": "Ne fait pas partie d'une plage privée, de bouclage ou link-local."
+        "external": "Ne fait pas partie d'une plage privée, de bouclage ou link-local.",
+        "fail_then_success": "Au moins {n} événements en échec, puis un succès après le premier échec : une tentative qui a peut-être réussi.",
+        "open_case": "Un cas SIEM ouvert cite cette entité."
       },
       "peersChip": {
         "ips": "Jusqu'à {n} IP source dans une source | Jusqu'à {n} IP sources dans une source",
@@ -24937,7 +25131,7 @@
       "capped": "Chaque source a renvoyé ses {n} entités les plus actives ; les moins actives ne sont pas listées, et les décomptes des entités proches de ce seuil peuvent être partiels. Les décomptes d'onglets marqués + sont tronqués.",
       "failedStreams": "Lecture impossible : {streams}",
       "noSources": "Aucune source de sécurité à lire",
-      "noSourcesHint": "Les entités sont trouvées dans les flux dont le nom les désigne comme données de sécurité, ou que vous avez ajoutés comme source sur la page Événements.",
+      "noSourcesHint": "Les entités sont trouvées dans les flux dont le nom les identifie comme données de sécurité, ou que vous avez inclus sous Sécurité → Sources.",
       "empty": "Aucune entité dans cette fenêtre",
       "emptyHint": "Élargissez la plage temporelle ou vérifiez que vos sources contiennent des champs utilisateur, IP ou hôte.",
       "refresh": "Actualiser",
@@ -24945,7 +25139,8 @@
       "tab": {
         "activity": "Activité",
         "related": "Liés",
-        "sources": "Sources"
+        "sources": "Sources",
+        "cases": "Cas"
       },
       "activity": "Événements au fil du temps",
       "chart": {
@@ -24954,6 +25149,9 @@
       },
       "topN": "top {n} par événements",
       "noRelated": "Aucun élément associé dans cette fenêtre.",
+      "noCases": "Aucun cas SIEM ne cite cette entité.",
+      "caseOpen": "Ouvert",
+      "caseResolved": "Résolu",
       "failedCount": "{n} échec | {n} échecs",
       "openEvents": "Ouvrir dans Événements",
       "huntInEvents": "Enquêter dans Événements",
@@ -24968,7 +25166,9 @@
         "failed": "Lecture impossible"
       },
       "loadError": "Impossible de charger les sources de sécurité",
-      "detailFailed": "Certaines données de cette entité n’ont pas pu être lues : {streams}."
+      "detailFailed": "Certaines données de cette entité n’ont pas pu être lues : {streams}.",
+      "aliasCount": "+{n} graphie | +{n} graphies",
+      "aliasHint": "Journalisée avec cette graphie ; c'est la même identité."
     },
     "ueba": {
       "title": "Analyse du comportement des utilisateurs",
@@ -25005,7 +25205,11 @@
         "new_ip": "Nouvelle IP source",
         "failure_jump": "Pic d’échecs",
         "new_hours": "Heures inhabituelles",
-        "first_seen": "Première apparition"
+        "first_seen": "Première apparition",
+        "peer_volume": "Très au-dessus de ses pairs",
+        "peer_failures": "Échecs très au-dessus de ses pairs",
+        "fail_then_success": "Succès après échecs",
+        "open_case": "Cas ouvert"
       },
       "reason": {
         "volume": "{n} événements, soit environ {ratio}× les ~{expected} attendus sur les {baseline} précédents.",
@@ -25013,7 +25217,12 @@
         "newIpExternal": "{n} événements depuis l’adresse publique {ip}, jamais vue au cours des {baseline} précédents. | {n} événements depuis l’adresse publique {ip}, jamais vue au cours des {baseline} précédents ({count} nouvelles adresses au total).",
         "failureJump": "{n} échecs — {rate} % des événements, contre {baseline} % dans la période de référence.",
         "newHours": "{n} événements à {hours} UTC, des heures auxquelles cet utilisateur n’a jamais été actif pendant les {baseline} précédents.",
-        "firstSeen": "{n} événements d’un utilisateur sans aucune activité lors des {baseline} précédents."
+        "firstSeen": "{n} événements d’un utilisateur sans aucune activité lors des {baseline} précédents.",
+        "peerVolume": "{n} événements alors qu'un utilisateur typique en avait environ {median}. La référence propre à cet utilisateur est encore en cours de constitution.",
+        "peerFailures": "{n} échecs ({rate} % des événements) alors qu'un utilisateur typique en avait environ {median}. La référence propre à cet utilisateur est encore en cours de constitution.",
+        "newIpBuilding": "{n} événements depuis l’adresse publique {ip}. La référence propre à cet utilisateur est encore en cours de constitution, donc toute adresse publique est signalée. | {n} événements depuis l’adresse publique {ip}. La référence propre à cet utilisateur est encore en cours de constitution, donc toute adresse publique est signalée ({count} adresses publiques au total).",
+        "failThenSuccess": "{n} échecs depuis {ip}, puis un événement réussi depuis la même adresse.",
+        "openCase": "Cité par le cas ouvert « {title} » ({severity}). | Cité par {n} cas ouverts, le plus récent étant « {title} » ({severity})."
       },
       "fact": {
         "events": "Événements",
@@ -25055,7 +25264,10 @@
       "notEvaluated": "Non évalués pour cet utilisateur car les données de référence étaient incomplètes : {signals}.",
       "hoursNotJudged": "Les heures inhabituelles ne sont évaluées qu'avec au moins {min} événements de référence couvrant {share}% des {baseline} précédents. L'historique de cet utilisateur est plus court, aucune heure n'est donc signalée.",
       "noHistory": "Aucune donnée dans les {baseline} précédents pour {streams} ; personne n'y est donc considéré comme vu pour la première fois.",
-      "volumeNotJudged": "Le volume n'est pas évalué pour cet utilisateur : les fenêtres de moins d'un jour sont comparées aux mêmes heures de la journée dans la référence, ce qui nécessite au moins un jour d'historique."
+      "volumeNotJudged": "Le volume n'est pas évalué pour cet utilisateur : les fenêtres de moins d'un jour sont comparées aux mêmes heures de la journée dans la référence, ce qui nécessite au moins un jour d'historique.",
+      "baselineBuilding": "Référence en cours de constitution",
+      "baselineBuildingHint": "{span} d'historique pour l'instant. La comparaison avec le passé propre à cet utilisateur démarre dès qu'un historique complet de {baseline} existe ; entre-temps, seules les valeurs aberrantes nettes par rapport aux autres utilisateurs sont signalées.",
+      "buildingNotice": "La référence est encore en cours de constitution pour {n} utilisateur : tant qu'un historique complet de {baseline} n'existe pas, seules les valeurs aberrantes nettes par rapport aux autres utilisateurs sont signalées. | Les références sont encore en cours de constitution pour {n} utilisateurs : tant qu'un historique complet de {baseline} n'existe pas, seules les valeurs aberrantes nettes par rapport aux autres utilisateurs sont signalées."
     },
     "intel": {
       "title": "Renseignement sur les menaces",
@@ -25077,12 +25289,11 @@
       "sighted": "Vu une fois | Vu {n} fois",
       "sweeping": "Balayage… {done} sur {total} requêtes",
       "sweptAcross": "{n} source de sécurité balayée | {n} sources de sécurité balayées",
-      "partial": "Cette analyse s'est arrêtée à sa limite de {n} requêtes, donc certaines colonnes n'ont pas été recherchées. Le nombre de requêtes augmente avec les listes × colonnes : supprimez les listes obsolètes ou les indicateurs expirés, ou répartissez les listes par type, pour une analyse complète.",
       "failedQueries": "{n} colonne n'a pas pu être recherchée et a été ignorée. | {n} colonnes n'ont pas pu être recherchées et ont été ignorées.",
       "truncated": "Seules les {n} premières lignes de {lists} ont été lues ; le reste n'a pas été analysé.",
       "noIndicators": "Aucun indicateur",
       "noCoverage": "Lancez une analyse pour voir quelles colonnes sont recherchées",
-      "coverageHint": "Ce qu'une analyse a recherché dans {n} sources de sécurité. La correspondance est exacte, sur les colonnes indiquées ; un type sans colonne ne peut pas du tout être repéré.",
+      "coverageHint": "Ce qu'une analyse a parcouru dans {n} sources de sécurité. Chaque colonne est mise en correspondance sur sa valeur entière et sur les jetons entiers qu'elle contient, comme les tableaux, le texte des logs et les hachages SHA256= ; un type sans colonne ne peut pas être repéré du tout.",
       "indicatorCount": "{n} indicateur | {n} indicateurs",
       "columnsSearched": "{n} colonne | {n} colonnes",
       "blind": "Non recherchable",
@@ -25160,7 +25371,7 @@
         "cancel": "Annuler",
         "indicators": "Indicateurs",
         "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "Un par ligne, ou séparés par des virgules ou des espaces. Les doublons sont ignorés.",
+        "indicatorsHelp": "Un par ligne, ou séparés par des virgules ou des espaces. Les doublons sont ignorés. Une liste contient jusqu'à {max}.",
         "indicatorsRequired": "Saisissez au moins un indicateur",
         "invalid": "Éléments non reconnus comme indicateurs ({n}) : {sample}",
         "line": "ligne {n}",
@@ -25184,7 +25395,7 @@
         "importSubtitle": "Nécessite une colonne d’indicateur ; le type, la sévérité, la source et l’expiration sont facultatifs.",
         "importSubmit": "Importer",
         "file": "Fichier CSV",
-        "fileHelp": "Les lignes qui ne sont pas des indicateurs sont ignorées et comptabilisées.",
+        "fileHelp": "Les lignes qui ne sont pas des indicateurs sont ignorées et comptabilisées. Une liste contient jusqu'à {max} indicateurs ; les fichiers jusqu'à {mb} MB.",
         "fileRequired": "Choisissez un fichier CSV",
         "defaultSeverity": "Sévérité par défaut des lignes sans sévérité",
         "append": "Ajouter à la liste au lieu de la remplacer",
@@ -25203,7 +25414,10 @@
         "noIndicatorColumnIn": "{table} n'a pas de colonne indicator, ioc ou value, il est donc impossible d'y ajouter des indicateurs. Choisissez une autre liste.",
         "replaceTitle": "Remplacer la liste",
         "replaceMessage": "Un import avec l'ajout désactivé remplace entièrement {table} : toutes les lignes existantes ainsi que ses colonnes et ses paramètres sont supprimés, et seuls les indicateurs de ce fichier restent.",
-        "replaceConfirm": "Remplacer"
+        "replaceConfirm": "Remplacer",
+        "tooMany": "{n} indicateurs collés ; une liste en contient au maximum {max}.",
+        "listFull": "{table} contiendrait {count} indicateurs ; une liste en contient au maximum {max}. Répartissez-les sur plusieurs listes.",
+        "fileTooLarge": "Le fichier dépasse {max} Mo. Divisez-le en fichiers plus petits."
       },
       "importCsv": "Importer un CSV",
       "unreadTables": "Impossible de lire {lists} ; ses indicateurs ne sont ni affichés ni analysés. | Impossible de lire {lists} ; leurs indicateurs ne sont ni affichés ni analysés.",
@@ -25213,12 +25427,15 @@
       "columnsSkipped": "{n} colonne non analysée | {n} colonnes non analysées",
       "skippedHint": "Analyse incomplète — le balayage a atteint sa limite de requêtes ou la requête a échoué :",
       "caveat": {
-        "capped": "Le balayage a atteint sa limite de requêtes, donc certaines colonnes n'ont pas été analysées.",
         "failed": "{n} colonne n'a pas pu être analysée. | {n} colonnes n'ont pas pu être analysées.",
         "partial": "{n} requête n'a renvoyé que des résultats partiels, donc ces colonnes n'ont pas été entièrement analysées. | {n} requêtes n'ont renvoyé que des résultats partiels, donc ces colonnes n'ont pas été entièrement analysées.",
         "unsearched": "Aucun flux n'a de colonne pour : {types}.",
-        "cidr": "{n} plage CIDR n'a pas été analysée. | {n} plages CIDR n'ont pas été analysées."
-      }
+        "cidr": "{n} plage CIDR n'a pas été analysée. | {n} plages CIDR n'ont pas été analysées.",
+        "checked": "Seuls {checked} indicateurs sur {total} ont été entièrement vérifiés."
+      },
+      "partialChecked": "Résultat partiel : {checked} indicateurs sur {total} vérifiés. Les totaux pour les autres peuvent être trop bas.",
+      "partialCapped": "Résultat partiel : {checked} indicateurs sur {total} vérifiés. Le balayage s'arrête à {n} requêtes ; les indicateurs les moins graves n'ont pas été vérifiés.",
+      "inText": "{column} (dans le texte)"
     },
     "sources": {
       "title": "Sources de données",
@@ -25238,8 +25455,7 @@
       "exclude": "Exclure",
       "attached": "Pack {pack} attaché.",
       "detached": "Pack détaché.",
-      "detachedPipelineSkipped": "Pack détaché. Le pipeline enregistré ne correspond plus à ce flux ni à ce pack ; il a donc été laissé inchangé.",
-      "empty": "Aucun flux de logs pour l'instant. Ingérez les logs de sécurité comme n'importe quel flux ; ils apparaîtront ici.",
+      "empty": "Aucun flux de logs pour l'instant. Ingérez des logs de sécurité comme n'importe quel flux et ils apparaîtront ici.",
       "noticePackRemoved": "{stream} : pack supprimé en dehors du SIEM. Rattachez-le ou effacez-le.",
       "noticeNoRecord": "{stream} : un pack est attaché sans enregistrement. Enregistrez-le ou détachez-le.",
       "noticeNotWriting": "{stream} : le pipeline n'écrit plus dans ce flux.",
@@ -25249,14 +25465,31 @@
       "blockGlobalFlatten": "{stream} : le niveau d'aplatissement global ({level}) ne conserverait pas les colonnes OCSF à plat.",
       "blockSchemaMissing": "{stream} : le schéma défini par l'utilisateur ne contient pas les colonnes OCSF : {columns}.",
       "blockPipelineDisabled": "{stream} : le pipeline existant est désactivé ; activez-le avant de l'attacher.",
-      "attachErrors": {
-        "functionEditedOutside": "La fonction {name} a été modifiée en dehors du SIEM.",
-        "pipelineNoAccess": "Ce flux possède un pipeline auquel vous n'avez pas accès.",
-        "permissionDenied": "Vous avez besoin d'une autorisation pour modifier les fonctions et les pipelines de ce flux.",
-        "pipelineChanged": "Le pipeline de ce flux a changé et bloque désormais l'attachement ; actualisez et vérifiez à nouveau.",
-        "packConflict": "Ce flux possède déjà le pack {pack} ; détachez-le d'abord.",
-        "noPipeline": "Impossible de créer ou de trouver un pipeline en temps réel pour ce flux.",
-        "failed": "Échec de l'attachement."
+      "actionFailed": "La modification n'a pas été enregistrée.",
+      "stateExcluded": "Exclue",
+      "excludedBy": "Exclue par {user} le {time}",
+      "sourceTypeConfidence": "{label} ({n} %)",
+      "notClassified": "Pas encore classée",
+      "lastChange": "Dernière modification par {user} le {time} : {summary}",
+      "previewTitle": "Attacher {pack} à {stream} ?",
+      "previewSubtitle": "Rien n’est écrit tant que vous n’avez pas confirmé.",
+      "previewLoading": "Vérification de ce que l’attachement modifierait…",
+      "previewPack": "Pack",
+      "previewClasses": "Classe OCSF écrite",
+      "previewFunction": "Fonction",
+      "previewPipeline": "Pipeline",
+      "previewFunctionCreate": "Créer {name}",
+      "previewFunctionReuse": "Réutiliser {name}, déjà identique",
+      "previewPipelineCreate": "Créer {name} : {stream} → fonction → {stream}",
+      "previewPipelineExtend": "Ajouter un nœud de fonction à {name}, juste après la source, alimentant {feeds}",
+      "previewPipelineAlready": "{name} exécute déjà ce pack ; seul l’enregistrement est écrit",
+      "confirmAttach": "Attacher",
+      "cancel": "Annuler",
+      "detachedSkipped": "Pack détaché. Le pipeline {id} n’a pas été modifié : {reason}.",
+      "skipReason": {
+        "pipeline_missing": "il n’existe plus",
+        "other_stream": "il lit désormais un autre flux",
+        "other_pack": "il exécute désormais un autre pack"
       }
     },
     "nav": {
@@ -25269,13 +25502,60 @@
       "intel": "Renseignement sur les menaces",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
-      "content": "Contenu"
+      "content": "Contenu",
+      "sources": "Sources de données"
     },
     "sigma": {
       "notSupported": "Non pris en charge : {fields}",
       "cannotMatch": "Correspondance impossible : ce flux ne contient pas {fields}",
       "compiledEmpty": "La compilation de la règle ne produit rien",
       "assumedAbsent": "En supposant que ce flux ne contient jamais {fields}"
+    },
+    "audit": {
+      "title": "Journal des modifications",
+      "hint": "Qui a modifié les détections, les sources et les cas au cours des 7 derniers jours",
+      "when": "Quand",
+      "who": "Modifié par",
+      "area": "Domaine",
+      "action": "Action",
+      "target": "Ce qui a changé",
+      "empty": "Aucune modification enregistrée",
+      "emptyHint": "Les modifications des détections, des sources Security et des cas s'affichent ici.",
+      "disabled": "La journalisation d'audit est désactivée",
+      "disabledHint": "Activez la journalisation d'audit pour ce déploiement afin d'enregistrer qui modifie les paramètres Security.",
+      "category": {
+        "detection": "Détection",
+        "case": "Cas",
+        "source": "Source",
+        "security": "Security"
+      },
+      "verb": {
+        "created": "Créé",
+        "changed": "Modifié",
+        "deleted": "Supprimé",
+        "enabled": "Activé",
+        "disabled": "Désactivé"
+      }
+    },
+    "access": {
+      "needsAuthor": "Nécessite l'autorisation Créer sur Sécurité",
+      "openPreset": "Créer un rôle à partir de {preset}",
+      "askPreset": "Demandez le modèle {preset} à un administrateur.",
+      "checkFailedTitle": "Impossible de vérifier votre accès à Sécurité",
+      "checkFailedHint": "Le serveur n’a pas répondu. Votre session reste connectée."
+    },
+    "aria": {
+      "addSource": "Ajouter une source",
+      "addToCase": "Ajouter au cas",
+      "caseAssignee": "Responsable du cas",
+      "casePriority": "Priorité du cas",
+      "filterField": "Champ du filtre",
+      "filterOperator": "Opérateur du filtre",
+      "filterValue": "Valeur du filtre",
+      "huntKind": "Élément à rechercher",
+      "indicatorType": "Type d’indicateur",
+      "severityFilter": "Filtre de gravité",
+      "stream": "Flux"
     }
   },
   "promql": {

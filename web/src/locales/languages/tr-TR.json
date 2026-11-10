@@ -691,7 +691,8 @@
       "scoreConfigs": "Puan yapılandırmaları",
       "workflows": "İş akışları",
       "syntheticFolders": "Sentetik klasörleri",
-      "downtimeFolders": "Bakım penceresi klasörleri"
+      "downtimeFolders": "Bakım penceresi klasörleri",
+      "security": "Güvenlik"
     },
     "resourcesInline": {
       "dashboards": "panolar",
@@ -747,7 +748,8 @@
       "fleetManagement": "filo yönetimi",
       "incidents": "vakalar",
       "onCallResponses": "nöbet yanıtları",
-      "searchJobs": "arama işleri"
+      "searchJobs": "arama işleri",
+      "security": "Güvenlik"
     },
     "denied": {
       "view": "{resource} görüntüleyemezsiniz",
@@ -4500,6 +4502,7 @@
       "presetsSubtitle": "Bir ön ayarın yetkilerini bu role ekleyin. Hiçbir şey kaldırılmaz.",
       "presetsSectionBuiltin": "Yerleşik",
       "presetsSectionJob": "İşe Göre",
+      "presetsSectionSecurity": "Güvenlik",
       "presetAddsTooltip": "{count} İzin Ekler | {count} İzin Ekler",
       "presetInRole": "Rolde Var",
       "presetInRoleTooltip": "Bu Rolde Bu Ön Ayardaki Her Şey Zaten Var",
@@ -4575,7 +4578,16 @@
       "presetRestored": "{title}: {permissions} geri yüklendi. Kaydetmeden önce değişiklikleri gözden geçirin.",
       "presetSummaryRestores": "Kaldırılmak üzere işaretlediğiniz {count} izni korur. | Kaldırılmak üzere işaretlediğiniz {count} izni korur.",
       "presetRestoreButton": "{count} İzni Koru | {count} İzni Koru",
-      "effectStillAllowed": "Erişim değişikliği yok: daha geniş bir yetki buna hâlâ izin veriyor."
+      "effectStillAllowed": "Erişim değişikliği yok: daha geniş bir yetki buna hâlâ izin veriyor.",
+      "moduleGroupSecurity": "Güvenlik",
+      "presetSocAnalystTitle": "SOC Analisti",
+      "presetSocAnalystDescription": "Güvenlik uyarılarını ve vakalarını değerlendirin; tespitler, akışlar ve tehdit istihbaratı listeleri için okuma erişimi",
+      "presetDetectionEngineerTitle": "Tespit Mühendisi",
+      "presetDetectionEngineerDescription": "Tespit oluşturun, ayarlayın, etkinleştirin ve çalıştırın, içerik yükleyin, kaynakları işlevleri ve işlem hatlarıyla birlikte bağlayın ve tehdit istihbaratı listeleri gibi zenginleştirme tablolarını yönetin; Güvenlik, vakalar ve akışlar için okuma erişimi",
+      "presetSecurityAdminTitle": "Güvenlik Yöneticisi",
+      "presetSecurityAdminDescription": "Tespitleri ve vakaları silmek ve kaynakları hariç tutmak dahil, olaylar, işlevler, işlem hatları, zenginleştirme tabloları ve şifre anahtarlarıyla tüm Güvenliği yönetin; akışlar için okuma erişimi",
+      "presetSecurityViewerTitle": "Güvenlik Görüntüleyicisi",
+      "presetSecurityViewerDescription": "Güvenliği, vakalarını, tespitlerini ve kaynak akışlarını değiştirmeden görüntüleyin"
     },
     "rolesPage": {
       "subtitle": "Rol paketi izinleri — erişim vermek için bunları Kullanıcılara, Hizmet Hesaplarına veya Gruplara atayın.",
@@ -7711,6 +7723,28 @@
       "tlsBody": "Token, düz metin HTTP üzerinden yeniden oynatılabilen bir bearer kimlik bilgisidir; bu nedenle TLS'i {brand} üzerinde ({setting}, varsayılan olarak devre dışı) veya önünde güvenilir bir proxy'de sonlandırın."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Mevcut {product} yapılandırmasını güncelleyerek günlükleri, metrikleri ve izleri bu kuruluşa gönderin.",
+      "correlationBody": "Günlükleri izlerle ilişkilendirmek için uygulamalar tam 128 bit iz kimliğini kaydetmelidir. Java tracer yalnızca alt 64 biti kaydediyorsa uygulamada {setting} ayarlayın.",
+      "profilingBody": "Profilleme ayrı bir hedef ve Agent API anahtarını kullanır. Uygulamada zaten bir profil oluşturucu çalışıyorsa geçiş sırasında uygulama veya tracer profillemesini kapatın ya da hedefini ayrıca yapılandırın.",
+      "multiValueTagsBody": "Birden fazla farklı değeri olan etiketler sıralanmış JSON dizisi metni kullanır. [ ile başlayan tek bir değer de seri kimliğini korumak için tek öğeli JSON dizisi olarak kodlanır.",
+      "envTitle": "Agent yapılandırması",
+      "envBody": "Bu ortam değişkenlerini {product} üzerinde ayarlayın ve yeniden başlatın. {product} {version} veya üzerini gerektirir.",
+      "tokenBody": "API anahtarı {prefix} ile başlayan bir kuruluş veri alımı token'ı olmalıdır. Bu kuruluşta etkin bir veri alımı token'ı yok, bu nedenle kurulum snippet'i gösterilmiyor. Bir veri alımı token'ı oluşturun, ardından bu sayfaya dönün.",
+      "tokenLink": "Veri alımı token'larını aç",
+      "featuresOffBody": "URL'lerden sonraki satırlar, aynı anahtarla {vendor} sunucularına gönderen Agent özelliklerini kapatır. {setting} ayrıca {component} bileşenini kapalı tutar; daha yeni Agent sürümleri bunu çalıştırır ve bu URL'lerdeki yolu korumaz.",
+      "logsTitle": "Günlükler",
+      "logsBody": "{product} içinde günlük toplama varsayılan olarak kapalıdır. {setting} ayarını yapın ve günlük kaynaklarınızı yapılandırın.",
+      "dualTitle": "Mevcut hedefinizi koruyun",
+      "dualBody": "Mevcut bir hedefin yanı sıra bu kuruluşa göndermek için mevcut URL'leri ve API anahtarını koruyun ve bunun yerine {file} dosyasına bu girişleri ekleyin. Ek günlük uç noktaları aksi halde TCP kullandığından günlükler için {setting} gerekir.",
+      "metricsTitle": "Metrikleri sorgulama",
+      "metricsTypes": "Her seri, Agent'ın gönderdiği değerle birlikte {typeField} ve {intervalField} etiketleriyle bir gauge olarak saklanır.",
+      "metricsCount": "Count serileri her flush aralığı için sayıyı tutar. Bunları PromQL'de {promql} ile veya SQL'de {sql} ile toplayın.",
+      "metricsRate": "Rate serileri saniye başınadır. Aralığın sayısını geri elde etmek için değeri {intervalField} ile çarpın.",
+      "metricsCounterFns": "PromQL {rate} ve {increase} kümülatif sayaçlar bekler; bu nedenle bu serilerde anlamlı sonuçlar vermezler.",
+      "metricsSketch": "Dağılımlar histogram kovaları olarak saklanır ve yüzdelikler bu kovalardan tahmin edilir. Daha yüksek bir ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA daha ince kovalar ve daha kesin yüzdelikler sağlar, ancak daha fazla saklanan satır maliyetiyle."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU dışa aktarıcı"
   },
@@ -24327,8 +24361,9 @@
       "classMix": "Son bir saatteki sınıflar: {mix}",
       "objects": "OCSF nesneleri",
       "missingSignals": "Görülmeyen: {fields}",
-      "detections": "{n} tespit | {n} tespit",
-      "firing": "{n} tetiklenmiş | {n} tetiklenmiş",
+      "detections": "{n} eşleşen kural | {n} eşleşen kural",
+      "firing": "{n} isabetli | {n} isabetli",
+      "matchingRulesHint": "Bu kaynağa uygulanan Sigma kataloğu kuralları. İsabetler, dağıtılmış algılamalar değil, geçerli penceredeki eşleşmelerdir.",
       "rulesFor": "{source} için Sigma kuralları",
       "hits": "{n} isabet | {n} isabet",
       "viewHits": "İsabetleri görüntüle",
@@ -24357,7 +24392,44 @@
       "invertFilter": "Dahil etme ve hariç tutma arasında geçiş yap",
       "removeFilter": "Filtreyi kaldır",
       "pivotSqlUnsupported": "Bu SQL sorgusu basit bir SELECT … WHERE değildir; bu nedenle filtre sorguya eklenemedi. Sorguyu elle düzenleyin veya Oluşturucu'ya geçin.",
-      "topValuesWholeStream": "SQL modu: değerler sorgunuzda değil, tüm akışta sayılır."
+      "topValuesWholeStream": "SQL modu: değerler sorgunuzda değil, tüm akışta sayılır.",
+      "allSources": "Tüm güvenlik kaynakları",
+      "sortSqlMode": "Elle yazılmış bir sorgu kendi ORDER BY ifadesini belirler",
+      "includeFailed": "{name} Güvenlik'e eklenemedi",
+      "excludeFailed": "{name} Güvenlik'ten kaldırılamadı",
+      "hunt": {
+        "title": "Tüm güvenlik kaynaklarında aynı anda ara",
+        "hint": "Bir IP adresi, kullanıcı veya ana makine yazın. Her kaynak kendi sütunlarıyla aranır ve her satır hangi kaynaktan geldiğini gösterir.",
+        "noMatches": "Bu aralıkta eşleşme yok",
+        "noMatchesHint": "Zaman aralığını genişletin veya tek bir tür yerine herhangi bir alanda arayın.",
+        "noFields": "Alanlar kaynağa göre değişir. Alanlarına göz atmak için tek bir kaynak seçin.",
+        "search": "Ara",
+        "aliases": "{n} yazım biçimi daha eşleşiyor | {n} yazım biçimi daha eşleşiyor",
+        "clearAliases": "Yalnızca yazılan adı eşleştir",
+        "uncounted": "Sayılmadı: {streams}",
+        "kind": {
+          "any": "Herhangi bir alan",
+          "user": "Kullanıcı",
+          "ip": "IP adresi",
+          "host": "Ana makine"
+        },
+        "placeholder": {
+          "any": "IP adresi, kullanıcı, ana makine veya metin",
+          "user": "dave, ACME\\dave veya dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "Ana makine adı"
+        },
+        "column": {
+          "time": "Zaman",
+          "source": "Kaynak",
+          "user": "Kullanıcı",
+          "ip": "Kaynak IP",
+          "host": "Ana makine",
+          "action": "Eylem",
+          "outcome": "Sonuç",
+          "message": "Mesaj"
+        }
+      }
     },
     "drawer": {
       "event": "Güvenlik olayı",
@@ -24378,7 +24450,14 @@
       "classUid": "class_uid {n}",
       "eyebrow": "Güvenlik olayı",
       "source": "Kaynak",
-      "matchedRules": "{n} algılama eşleşti | {n} algılama eşleşti"
+      "matchedRules": "{n} algılama eşleşti | {n} algılama eşleşti",
+      "openCase": "Vaka aç",
+      "openCaseHint": "Bu olayın belirttiği ana bilgisayar, kullanıcı veya adres için bir vaka açın",
+      "addToCase": "Vakaya ekle",
+      "pickCase": "Açık bir vakaya ekle",
+      "caseOpened": "Vaka açıldı: {title}",
+      "caseUpdated": "Olay {title} vakasına eklendi",
+      "caseError": "Bu olaydan vaka açılamadı"
     },
     "record": {
       "prev": "Önceki kayıt",
@@ -24482,7 +24561,20 @@
       "customWindow": "Sabit bir pencere gösteriliyor: {from} → {to}",
       "backToRange": "Son {range} dilimine dön",
       "missing": "Bu bağlantının işaret ettiği uyarı yüklenen pencerede yok. Bu aralıktan daha eski olabilir veya en yeni satır sınırının ötesinde kalmış olabilir.",
-      "dismiss": "Kapat"
+      "dismiss": "Kapat",
+      "triage": {
+        "createCase": "Vaka oluştur",
+        "addToCase": "Vakaya ekle",
+        "openCase": "Vakayı aç",
+        "acknowledge": "İncelemeyi başlat",
+        "addNote": "Not ekle",
+        "notePlaceholder": "Bu tetiklenmenin vakasına not ekleyin",
+        "acknowledged": "Vaka incelemeye alındı",
+        "noted": "Vakaya not eklendi",
+        "caseOpened": "Vaka açıldı",
+        "attached": "Tetiklenme vakaya eklendi",
+        "failed": "Vaka güncellenemedi"
+      }
     },
     "cases": {
       "title": "Vakalar",
@@ -24510,7 +24602,8 @@
         "lastSeen": "Son görülme"
       },
       "fact": {
-        "duration": "Süre"
+        "duration": "Süre",
+        "timeToClose": "Kapanma süresi"
       },
       "durationMinutes": "{n} dk",
       "durationHours": "{n} sa",
@@ -24532,7 +24625,8 @@
         "service_discovery": "Hizmet keşfiyle korelasyon kuruldu",
         "primary_match": "Birincil boyutlar üzerinden korelasyon kuruldu",
         "secondary_match": "İkincil boyutlar üzerinden korelasyon kuruldu",
-        "alert_id": "Aynı tespit"
+        "alert_id": "Aynı tespit",
+        "entity": "Aynı ana bilgisayar, kullanıcı veya adres"
       },
       "commentPlaceholder": "Ekibe bir not ekleyin",
       "postComment": "Not gönder",
@@ -24554,7 +24648,16 @@
         "analysisComplete": "Kök neden analizi tamamlandı",
         "analysisFailed": "Kök neden analizi başarısız oldu: {reason}",
         "analysisCancelled": "Kök neden analizi iptal edildi",
-        "other": "{type}"
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "Karar: gerçek pozitif",
+          "false_positive": "Karar: yanlış pozitif",
+          "benign": "Karar: zararsız",
+          "duplicate": "Karar: yinelenen",
+          "stale": "Karar: eski / geçmiş"
+        },
+        "alertsAttached": "Elle eklenen tetiklenmeler: {names}",
+        "eventAttached": "{stream} akışından {at} tarihli olay eklendi"
       },
       "analysisHint": "Bu vakadaki tetiklenmeleri birbirine bağlayan şeylerin yapay zeka özeti.",
       "runAnalysis": "Analiz et",
@@ -24570,7 +24673,42 @@
         "resolved": "Vakayı kapat"
       },
       "notFound": "Vaka bulunamadı",
-      "timelinePartial": "Bu zaman çizelgesi vaka kaydından yeniden oluşturuldu; bu nedenle yeniden oluşturmadan önceki notlar, onaylar ve analiz etkinlikleri eksik olabilir."
+      "timelinePartial": "Bu zaman çizelgesi vaka kaydından yeniden oluşturuldu; bu nedenle yeniden oluşturmadan önceki notlar, onaylar ve analiz etkinlikleri eksik olabilir.",
+      "verdict": {
+        "true_positive": "Gerçek pozitif",
+        "false_positive": "Yanlış pozitif",
+        "benign": "Zararsız",
+        "duplicate": "Yinelenen",
+        "stale": "Eski / geçmiş"
+      },
+      "close": {
+        "title": "Vakayı kapat",
+        "verdict": "Karar",
+        "verdictRequired": "Bir karar seçin",
+        "reason": "Gerekçe",
+        "reasonPlaceholder": "Ne bulduğunuzu ve vakanın neden kapatılabileceğini yazın",
+        "reasonRequired": "Bir gerekçe girin",
+        "reasonTooLong": "Gerekçeyi en fazla {max} karakterle sınırlayın",
+        "cancel": "İptal"
+      },
+      "settings": {
+        "open": "Vaka ayarları",
+        "title": "Vaka ayarları",
+        "save": "Kaydet",
+        "saved": "Vaka ayarları kaydedildi",
+        "loadFailed": "Vaka ayarları yüklenemedi",
+        "saveFailed": "Vaka ayarları kaydedilemedi",
+        "autoCloseDays": "Sessiz vakaları şu süre sonra kapat (gün)",
+        "autoCloseDaysHint": "Bu kadar gün boyunca yeni tetiklenme olmayan bir vaka kendiliğinden kapanır. 0 vakaları açık tutar. En fazla {max}.",
+        "groupWindowMinutes": "Tetiklenmeleri şu süre içinde grupla (dakika)",
+        "groupWindowMinutesHint": "Aynı ana bilgisayar, kullanıcı veya adreste, bir vakanın son etkinliğinden itibaren bu kadar dakika içinde (olay zamanına göre) gerçekleşen etkinlik o vakaya katılır. 0, her algılama için ayrı bir vaka açar. En fazla {max}.",
+        "wholeNumber": "Bir tam sayı girin",
+        "range": "0 ile {max} arasında bir değer girin"
+      },
+      "assignedTo": "Atanan: {to}",
+      "unassignedToast": "Vaka ataması kaldırıldı",
+      "historical": "Geçmiş (geriye dönük)",
+      "historicalHint": "Bu vakadaki her tetiklenme geçmiş veriler üzerinde yapılan geriye dönük taramadan geldi; güncel bir etkinliği yansıtmıyor."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -24592,19 +24730,21 @@
       "legend": {
         "firing": "Pencere içinde tetiklendi (daha koyu = daha fazla)",
         "covered": "Etkin bir algılama tarafından kapsanıyor",
-        "available": "Kural kullanılabilir, etkin değil"
+        "available": "Kural kullanılabilir, etkin değil",
+        "none": "Katalogda kural yok"
       },
       "columnCount": "{covered} tanesi kapsandı ({total} içinden)",
       "cellEnabled": "{n} açık algılama | {n} açık algılama",
       "cellAvailable": "{n} kullanılabilir kural | {n} kullanılabilir kural",
       "noMatch": "Eşleşen teknik yok",
       "unmapped": "Bilinen taktiği olmayan teknikler",
-      "footnote": "Teknikler, birlikte gelen {n} Sigma kuralından ve kendi algılamalarınızdan gelir; yerleşim, her kuralın etiketlendiği taktikleri izler.",
+      "footnote": "Kapsam, MITRE ATT&CK Enterprise v{version} sürümündeki {total} tekniğe göre ölçülür; alt teknikler üst tekniklerine sayılır; ürünle birlikte {n} Sigma kuralı gelir.",
       "drawerEyebrow": "ATT&CK tekniği",
       "state": {
         "firing": "Tetiklenmiş",
         "covered": "Kapsanan",
-        "available": "Kapsanmıyor"
+        "available": "Kapsanmıyor",
+        "none": "Kural yok"
       },
       "fact": {
         "state": "Kapsam",
@@ -24629,7 +24769,9 @@
       "openTechnique": "attack.mitre.org üzerinde {id} öğesini aç",
       "viewOnAttack": "ATT&CK'te görüntüle",
       "manageDetections": "Algılamaları yönet",
-      "historyNarrowed": "Uyarı geçmişinin maksimum sorgu aralığı, tetiklenmeleri {from} tarihinden itibaren olanlarla sınırlar; bu penceredeki daha erken tetiklenmeler sayılmaz."
+      "historyNarrowed": "Uyarı geçmişinin maksimum sorgu aralığı, tetiklenmeleri {from} tarihinden itibaren olanlarla sınırlar; bu penceredeki daha erken tetiklenmeler sayılmaz.",
+      "cellNone": "Kural yok",
+      "coverageError": "ATT&CK kapsamı yüklenemedi: {reason}"
     },
     "detections": {
       "title": "Algılamalar",
@@ -24647,7 +24789,8 @@
         "erroring": "Hata veriyor",
         "enabled": "Etkin",
         "disabled": "Devre dışı",
-        "all": "Tüm tespitler"
+        "all": "Tüm tespitler",
+        "notifyFailing": "Bildirim başarısız"
       },
       "column": {
         "name": "Tespit",
@@ -24660,7 +24803,8 @@
       "state": {
         "enabled": "Etkin",
         "disabled": "Devre dışı",
-        "erroring": "Hata veriyor"
+        "erroring": "Hata veriyor",
+        "notifyFailing": "Bildirim başarısız"
       },
       "tab": {
         "overview": "Genel bakış",
@@ -24722,17 +24866,23 @@
       "libraryEmpty": "Bu filtreyle eşleşen kural yok",
       "stream": "Akış",
       "streamPlaceholder": "Çalıştırılacak akışı seçin",
-      "notify": "Bildirim",
-      "notifyPlaceholder": "Bir hedef seçin",
-      "noDestinations": "Henüz uyarı hedefi yok. Bir tespitin bildirim gönderebilmesi için bir hedef gerekir; yeni bir sekmede hedef oluşturup geri dönün. Bu liste kendiliğinden yenilenir.",
+      "notify": "Bildir (isteğe bağlı)",
+      "notifyPlaceholder": "Hiçbiri: tetiklenmeler yine de vaka açar",
+      "noDestinations": "Henüz uyarı hedefi yok. Tespitler hedef olmadan da bulgular üretir ve vakalar açar; yalnızca bildirim de almak istiyorsanız bir hedef ekleyin.",
       "createDestination": "Hedef oluştur",
       "reloadDestinations": "Yenile",
       "lookBack": "Geriye bakış (dakika)",
+      "lookBackHelp": "En az {minutes} dakikalık korelasyon penceresi; her çalıştırma bu pencereyi süre boyunca kaydırır",
+      "correlationWindowLabel": "Korelasyon penceresi (dakika)",
+      "backfill": "İlk çalıştırmada geçmiş verileri de kontrol et",
+      "backfillRange": "Kontrol edilecek geçmiş veri",
+      "backfillHours": "Son saat | Son {n} saat",
       "runEvery": "Çalıştırma sıklığı (dakika)",
       "silence": "Sessiz kalma süresi (dakika)",
       "compiles": "{stream} üzerinde derlenir",
       "compilesAs": "{stream} üzerinde derlenir, {source} olarak tanımlanır",
       "logsourceMismatch": "Bu kural {rule} için yazılmış, ancak {stream} {source} olarak tanımlanmış. Yalnızca ikisinin alan adları örtüştüğünde eşleşebilir.",
+      "unseenFields": "Bu akışta henüz görülmemiş alan: {fields}. Algılamayı oluşturmak bu sütunları ekler, böylece ilk böyle olaydan önce hazır olur.",
       "ocsfBridge": "{stream} OCSF olduğundan kuralın alanları OCSF yollarına eşlenir ve yalnızca {guard} içeren olaylarda çalışır.",
       "ocsfGuard": {
         "class": "class_uid {uid}",
@@ -24760,10 +24910,23 @@
       "validation": {
         "positive": "En az 1 dakika olmalı",
         "nonNegative": "Negatif olamaz",
-        "periodGap": "Çalıştırma aralığından daha kısa: çalıştırmalar arasındaki dakikalar hiçbir zaman kontrol edilmez"
+        "periodGap": "Çalıştırma aralığından daha kısa: çalıştırmalar arasındaki dakikalar hiçbir zaman kontrol edilmez",
+        "belowTimespan": "En az {minutes} dakikalık korelasyon penceresi olmalı"
       },
       "nameTaken": "“{name}” adlı bir algılama veya uyarı zaten var. Geçmişi bununkiyle birleşeceği için başka bir akış seçin veya önce mevcut olanı kaldırın.",
-      "loadError": "Algılama kuralları yüklenemedi"
+      "loadError": "Algılama kuralları yüklenemedi",
+      "notifyFailingHint": "Bu kural tetiklendi ancak son bildirimi iletilemedi. Hedeflerini Geçmiş sekmesinden kontrol edin.",
+      "correlationWindow": "Korelasyonun zaman aralığına göre belirlenir",
+      "createForbidden": "Algılama oluşturmak için Güvenlik izni gerekir",
+      "preview": {
+        "run": "Eşleşmeleri önizle",
+        "hint": "Sorguyu son 24 saat üzerinde çalıştırır ve eşleşen ilk 20 olayı gösterir",
+        "empty": "Son 24 saatte hiçbir şey eşleşmedi",
+        "shown": "Son 24 saatte eşleşen {total} olaydan {shown} tanesi",
+        "failed": "Sorgu başarısız oldu: {reason}",
+        "time": "Zaman"
+      },
+      "queryFailed": "Kaydedilmedi: bu algılamanın sorgusu çalışmıyor ({reason})"
     },
     "content": {
       "title": "İçerik",
@@ -24833,7 +24996,6 @@
       "noStreamsForRule": "Akışlarınızın hiçbiri bu kuralla eşleşmiyor",
       "noStreamsForRuleHint": "{logsource} için yazılmış. O kaynaktan veri alın, burada görünecektir.",
       "runnable": "Bu akışta çalışır",
-      "notRunnable": "Burada çalıştırılamaz",
       "openInEvents": "Olaylar'da aç",
       "installHere": "Bu akışa kur",
       "install": "Algılama olarak kur",
@@ -24855,7 +25017,38 @@
         "severityId": "Önem derecesi",
         "statusId": "Sonuç"
       },
-      "cannotRun": "Verilerinizde çalıştırılamaz"
+      "catalogError": "Tespit kataloğu yüklenemedi: {reason}",
+      "notRunnableYet": "Henüz çalıştırılamaz",
+      "newRulesAvailable": "{n} yeni kural artık {stream} üzerinde çalışabilir | {n} yeni kural artık {stream} üzerinde çalışabilir",
+      "reviewNewRules": "İncele",
+      "reviewingNewRules": "Artık {stream} üzerinde çalışabilen {n} kural gösteriliyor | Artık {stream} üzerinde çalışabilen {n} kural gösteriliyor",
+      "showAllRules": "Tüm kuralları göster",
+      "installSelected": "Seçilenleri kur",
+      "selectRunnable": "Çalıştırılabilirleri seç",
+      "selectRunnableHint": "Gösterilen ve verilerinizde çalışan, henüz kurulmamış tüm kuralları seçin",
+      "bulk": {
+        "title": "{n} kuralı kur | {n} kuralı kur",
+        "subtitle": "Her kural sunucuda kendi akışı için derlenir ve bu ayarlarla bir algılama olarak kaydedilir.",
+        "stream": "Akışlar",
+        "everyStream": "Her kuralın çalıştığı tüm akışlar",
+        "folder": "Uyarı klasörü",
+        "correlationWindow": "Bir korelasyon kuralı en az kendi penceresi kadar geriye bakar.",
+        "nothing": "Seçilen kuralların hiçbiri bu akışta çalışmıyor.",
+        "plan": "{n} algılama oluşturulacak: | {n} algılama oluşturulacak:",
+        "correlation": "Korelasyon",
+        "confirm": "{n} algılamayı kur | {n} algılamayı kur",
+        "close": "Kapat",
+        "summary": "{total} kuraldan {installed} kuruldu, {skipped} atlandı, {failed} başarısız",
+        "duplicate": "{name} adlı bir algılama zaten var.",
+        "correlationBlocked": "Korelasyon bu akışta çalışamaz.",
+        "status": {
+          "installed": "Kuruldu",
+          "skipped": "Atlandı",
+          "failed": "Başarısız",
+          "pending": "Bekliyor"
+        },
+        "done": "{n} algılama kuruldu | {n} algılama kuruldu"
+      }
     },
     "entities": {
       "title": "Varlıklar",
@@ -24865,18 +25058,15 @@
         "graph": "Risk grafiği"
       },
       "riskGraph": {
-        "empty": "Grafikleştirilecek varlık yok",
-        "emptyHint": "Risk grafiğini görmek için güvenlik kaynakları ekleyin veya zaman aralığını genişletin.",
-        "showingTop": "Riske göre en yüksek {total} varlıktan ilk {n} tanesi gösteriliyor",
-        "illustrative": "Örnekleyici: ilişkiler gözlemlenerek değil, risk sıralamasından çıkarılmıştır.",
-        "baseScore": "temel {n}",
-        "propagatedScore": "yayılan {n}",
-        "tier": {
-          "critical": "Kritik",
-          "high": "Yüksek",
-          "medium": "Orta",
-          "low": "Düşük"
-        }
+        "empty": "Bu pencerede bağlantılı hiçbir şey yok",
+        "emptyHint": "Grafik, aynı olayda veya aynı vakada görünen kullanıcıları, IP adreslerini ve ana bilgisayarları birbirine bağlar. Bu pencerede hiçbiri eşleşmedi; zaman aralığını genişletin.",
+        "showingTop": "Riske göre ilk {n} / {total} gösteriliyor",
+        "legend": "Düz çizgi: aynı olayda görüldü. Kesikli çizgi: aynı vaka tarafından anıldı.",
+        "edgeEvents": "{n} olay | {n} olay",
+        "edgeCases": "{n} vaka | {n} vaka",
+        "scoreHint": "Onu anan vakalar: {detection}. Başarısız olaylar: {failure}. Bir vakanın andığı bir varlığa bağlı: {neighbour}.",
+        "nodeFacts": "{events} olay · {failures} başarısız",
+        "nodeCases": "{n} vaka | {n} vaka"
       },
       "kinds": {
         "user": "Kullanıcılar",
@@ -24917,16 +25107,20 @@
           "ip": "Çok sayıda kullanıcı",
           "host": "Çok sayıda kullanıcı"
         },
-        "external": "Genel adres"
+        "external": "Genel adres",
+        "fail_then_success": "Başarısızlıklardan sonra başarı",
+        "open_case": "Açık vaka"
       },
       "signalHint": {
         "failures": "Bu varlığın olaylarının en az {rate}% kadarı başarısız oldu ve en az {n} başarısızlık var; yalnızca sonuç bildiren kaynaklar sayılır.",
         "spread": {
-          "user": "Zaman aralığında tek bir kaynakta {n} veya daha fazla kaynak IP'den görüldü.",
-          "ip": "Zaman aralığında tek bir kaynakta {n} veya daha fazla kullanıcı tarafından kullanıldı. NAT ve VPN çıkışları da böyle görünür; parola püskürtme de öyle.",
-          "host": "Zaman aralığında tek bir kaynakta {n} veya daha fazla kullanıcı tarafından erişildi."
+          "user": "Tek bir kaynakta {n} veya daha fazla kaynak IP'den görüldü; bu pencerede diğer kullanıcıların gösterdiğinin çok üzerinde.",
+          "ip": "Tek bir kaynakta {n} veya daha fazla kullanıcı tarafından kullanıldı; bu pencerede diğer adreslerin çok üzerinde. NAT ve VPN çıkışları da böyle görünür; parola püskürtme de öyle.",
+          "host": "Tek bir kaynakta {n} veya daha fazla kullanıcı tarafından erişildi; bu pencerede diğer ana bilgisayarların çok üzerinde."
         },
-        "external": "Özel, geri döngü veya bağlantı yerel aralığında değil."
+        "external": "Özel, geri döngü veya bağlantı yerel aralığında değil.",
+        "fail_then_success": "En az {n} başarısız olay, ardından ilk başarısızlıktan sonra başarılı bir olay: işe yaramış olabilecek bir tahmin.",
+        "open_case": "Açık bir SIEM vakası bu varlığı belirtiyor."
       },
       "peersChip": {
         "ips": "Bir kaynakta en fazla {n} kaynak IP | Bir kaynakta en fazla {n} kaynak IP",
@@ -24937,7 +25131,7 @@
       "capped": "Her kaynak en yoğun {n} varlığını döndürdü; daha sakin olanlar listelenmez ve bu eşiğe yakın varlıkların sayımları kısmi olabilir. + ile işaretli sekme sayımları kesilmiştir.",
       "failedStreams": "Okunamadı: {streams}",
       "noSources": "Okunacak güvenlik kaynağı yok",
-      "noSourcesHint": "Varlıklar, adı güvenlik verisi olduğunu belirten akışlarda ya da Olaylar sayfasında kaynak olarak eklediğiniz akışlarda bulunur.",
+      "noSourcesHint": "Varlıklar, adı güvenlik verisi olduğunu belirten akışlarda veya Güvenlik → Kaynaklar altında eklediğiniz akışlarda bulunur.",
       "empty": "Bu zaman aralığında varlık yok",
       "emptyHint": "Zaman aralığını genişletin veya kaynaklarınızın kullanıcı, IP ya da ana bilgisayar alanları içerdiğini kontrol edin.",
       "refresh": "Yenile",
@@ -24945,7 +25139,8 @@
       "tab": {
         "activity": "Etkinlik",
         "related": "İlgili",
-        "sources": "Kaynaklar"
+        "sources": "Kaynaklar",
+        "cases": "Vakalar"
       },
       "activity": "Zaman içinde olaylar",
       "chart": {
@@ -24954,6 +25149,9 @@
       },
       "topN": "olaylara göre ilk {n}",
       "noRelated": "Bu zaman aralığında ilgili bir şey yok.",
+      "noCases": "Bu varlığı belirten bir SIEM vakası yok.",
+      "caseOpen": "Açık",
+      "caseResolved": "Çözüldü",
       "failedCount": "{n} başarısız | {n} başarısız",
       "openEvents": "Olaylarda Aç",
       "huntInEvents": "Olaylarda Avla",
@@ -24968,7 +25166,9 @@
         "failed": "Okunamadı"
       },
       "loadError": "Güvenlik kaynakları yüklenemedi",
-      "detailFailed": "Bu varlığın bazı verileri okunamadı: {streams}."
+      "detailFailed": "Bu varlığın bazı verileri okunamadı: {streams}.",
+      "aliasCount": "+{n} yazım | +{n} yazım",
+      "aliasHint": "Bu yazımla günlüğe kaydedildi; aynı kimliktir."
     },
     "ueba": {
       "title": "Kullanıcı Davranışı Analizi",
@@ -25005,7 +25205,11 @@
         "new_ip": "Yeni kaynak IP",
         "failure_jump": "Başarısızlıklar arttı",
         "new_hours": "Olağandışı saatler",
-        "first_seen": "İlk görülme"
+        "first_seen": "İlk görülme",
+        "peer_volume": "Emsallerin çok üzerinde",
+        "peer_failures": "Başarısızlıklar emsallerin çok üzerinde",
+        "fail_then_success": "Başarısızlıklardan sonra başarı",
+        "open_case": "Açık vaka"
       },
       "reason": {
         "volume": "{n} olay, önceki {baseline} döneminde beklenen ~{expected} değerinin yaklaşık {ratio}× katı.",
@@ -25013,7 +25217,12 @@
         "newIpExternal": "Genel {ip} adresinden, önceki {baseline} döneminde hiç görülmemiş {n} olay. | Genel {ip} adresinden, önceki {baseline} döneminde hiç görülmemiş {n} olay (toplamda {count} yeni adres).",
         "failureJump": "{n} başarısızlık — olayların %{rate}'i; temel dönemdeki %{baseline} değerinden yükseldi.",
         "newHours": "{n} olay {hours} UTC'de; bu saatlerde kullanıcı önceki {baseline} döneminde hiç etkin olmamıştı.",
-        "firstSeen": "Önceki {baseline} döneminde hiç etkinliği olmayan bir kullanıcıdan {n} olay."
+        "firstSeen": "Önceki {baseline} döneminde hiç etkinliği olmayan bir kullanıcıdan {n} olay.",
+        "peerVolume": "{n} olay; tipik bir kullanıcıda yaklaşık {median} vardı. Bu kullanıcının kendi temel çizgisi hâlâ oluşturuluyor.",
+        "peerFailures": "{n} başarısızlık (olayların %{rate} kadarı); tipik bir kullanıcıda yaklaşık {median} vardı. Bu kullanıcının kendi temel çizgisi hâlâ oluşturuluyor.",
+        "newIpBuilding": "{ip} genel adresinden {n} olay. Bu kullanıcının kendi temel çizgisi hâlâ oluşturuluyor, bu nedenle her genel adres işaretleniyor. | {ip} genel adresinden {n} olay. Bu kullanıcının kendi temel çizgisi hâlâ oluşturuluyor, bu nedenle her genel adres işaretleniyor (toplam {count} genel adres).",
+        "failThenSuccess": "{ip} adresinden {n} başarısızlık, ardından aynı adresten başarılı bir olay.",
+        "openCase": "Açık \"{title}\" ({severity}) vakasında geçiyor. | {n} açık vakada geçiyor; en yenisi \"{title}\" ({severity})."
       },
       "fact": {
         "events": "Olaylar",
@@ -25055,7 +25264,10 @@
       "notEvaluated": "Temel veriler eksik olduğu için bu kullanıcı için değerlendirilmedi: {signals}.",
       "hoursNotJudged": "Olağan dışı saatler yalnızca önceki {baseline} döneminin %{share}'ini kapsayan en az {min} temel olayla değerlendirilir. Bu kullanıcının geçmişi daha kısa olduğundan hiçbir saat işaretlenmez.",
       "noHistory": "Önceki {baseline} döneminde {streams} için veri yok; bu nedenle oradaki hiç kimse ilk kez görülen olarak adlandırılmaz.",
-      "volumeNotJudged": "Bu kullanıcı için hacim değerlendirilmez: bir günden kısa pencereler temeldeki aynı gün saatleriyle karşılaştırılır; bu da en az bir günlük geçmiş gerektirir."
+      "volumeNotJudged": "Bu kullanıcı için hacim değerlendirilmez: bir günden kısa pencereler temeldeki aynı gün saatleriyle karşılaştırılır; bu da en az bir günlük geçmiş gerektirir.",
+      "baselineBuilding": "Temel çizgi oluşturuluyor",
+      "baselineBuildingHint": "Şimdiye kadar {span} geçmiş var. Bu kullanıcının kendi geçmişiyle karşılaştırma, {baseline} tam geçmiş oluştuğunda başlar; bu arada yalnızca diğer kullanıcılara göre belirgin aykırı değerler işaretlenir.",
+      "buildingNotice": "{n} kullanıcı için temel çizgi hâlâ oluşturuluyor: {baseline} tam geçmiş oluşana kadar yalnızca diğer kullanıcılara göre belirgin aykırı değerler işaretlenir. | {n} kullanıcı için temel çizgiler hâlâ oluşturuluyor: {baseline} tam geçmiş oluşana kadar yalnızca diğer kullanıcılara göre belirgin aykırı değerler işaretlenir."
     },
     "intel": {
       "title": "Tehdit İstihbaratı",
@@ -25077,12 +25289,11 @@
       "sighted": "Bir kez görüldü | {n} kez görüldü",
       "sweeping": "Tarama sürüyor… {total} sorgudan {done}",
       "sweptAcross": "{n} güvenlik kaynağı tarandı | {n} güvenlik kaynağı tarandı",
-      "partial": "Bu tarama {n} sorguluk sınırında durdu, bu nedenle bazı sütunlar aranmadı. Sorgu sayısı liste × sütun ile artar: tam bir tarama için eski listeleri veya süresi dolmuş göstergeleri kaldırın ya da listeleri türe göre bölün.",
       "failedQueries": "{n} sütun aranamadı ve atlandı. | {n} sütun aranamadı ve atlandı.",
       "truncated": "{lists} listesinin yalnızca ilk {n} satırı okundu; geri kalanı taranmadı.",
       "noIndicators": "Gösterge yok",
       "noCoverage": "Hangi sütunların arandığını görmek için bir tarama çalıştırın",
-      "coverageHint": "Bir taramanın {n} güvenlik kaynağında neleri aradığı. Eşleşme, listelenen sütunlarda tam olarak yapılır; sütunu olmayan bir tür hiçbir şekilde görülemez.",
+      "coverageHint": "Bir taramanın {n} güvenlik kaynağında neleri aradığı. Her sütun, tam değeri ve içindeki tam token'lar (diziler, günlük metni ve SHA256= karmaları gibi) üzerinden eşleştirilir; sütunu olmayan bir tür hiç görülemez.",
       "indicatorCount": "{n} gösterge | {n} gösterge",
       "columnsSearched": "{n} sütun | {n} sütun",
       "blind": "Aranamaz",
@@ -25160,7 +25371,7 @@
         "cancel": "İptal",
         "indicators": "Göstergeler",
         "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "Her satırda bir tane veya virgül ya da boşluklarla ayırın. Yinelenenler yok sayılır.",
+        "indicatorsHelp": "Her satıra bir tane ya da virgül veya boşlukla ayrılmış olarak. Yinelenenler yok sayılır. Bir liste en fazla {max} öğe tutar.",
         "indicatorsRequired": "En az bir gösterge girin",
         "invalid": "Gösterge olarak tanınmayanlar ({n}): {sample}",
         "line": "satır {n}",
@@ -25184,7 +25395,7 @@
         "importSubtitle": "Bir gösterge sütunu gerekir; tür, önem derecesi, kaynak ve son kullanma isteğe bağlıdır.",
         "importSubmit": "İçe Aktar",
         "file": "CSV dosyası",
-        "fileHelp": "Gösterge olmayan satırlar atlanır ve sayılır.",
+        "fileHelp": "Gösterge olmayan satırlar atlanır ve sayılır. Bir liste en fazla {max} gösterge, dosyalar en fazla {mb} MB tutar.",
         "fileRequired": "Bir CSV dosyası seçin",
         "defaultSeverity": "Önem derecesi bulunmayan satırlar için kullanılacak önem derecesi",
         "append": "Listeyi değiştirmek yerine listeye ekle",
@@ -25203,7 +25414,10 @@
         "noIndicatorColumnIn": "{table} içinde indicator, ioc veya value sütunu yok, bu nedenle gösterge eklenemez. Başka bir liste seçin.",
         "replaceTitle": "Listeyi değiştir",
         "replaceMessage": "Ekleme kapalıyken içe aktarma {table} tablosunu tamamen değiştirir: mevcut tüm satırlar, sütunları ve ayarları kaldırılır ve yalnızca bu dosyanın göstergeleri kalır.",
-        "replaceConfirm": "Değiştir"
+        "replaceConfirm": "Değiştir",
+        "tooMany": "{n} gösterge yapıştırıldı; bir liste en fazla {max} tutar.",
+        "listFull": "{table} {count} gösterge tutacaktı; bir liste en fazla {max} tutar. Bunları listelere bölün.",
+        "fileTooLarge": "Dosya {max} MB'tan büyük. Daha küçük dosyalara bölün."
       },
       "importCsv": "CSV içe aktar",
       "unreadTables": "{lists} okunamadı; göstergeleri gösterilmez veya taranmaz. | {lists} okunamadı; göstergeleri gösterilmez veya taranmaz.",
@@ -25213,12 +25427,15 @@
       "columnsSkipped": "{n} sütun aranmadı | {n} sütun aranmadı",
       "skippedHint": "Tamamen aranmadı — tarama sorgu sınırına ulaştı veya sorgu başarısız oldu:",
       "caveat": {
-        "capped": "Tarama sorgu sınırına ulaştı, bu nedenle bazı sütunlar aranmadı.",
         "failed": "{n} sütun aranamadı. | {n} sütun aranamadı.",
         "partial": "{n} sorgu yalnızca kısmi sonuç döndürdü, bu nedenle bu sütunlar tam olarak aranmadı. | {n} sorgu yalnızca kısmi sonuç döndürdü, bu nedenle bu sütunlar tam olarak aranmadı.",
         "unsearched": "Hiçbir akışta şunlar için sütun yok: {types}.",
-        "cidr": "{n} CIDR aralığı taranmadı. | {n} CIDR aralığı taranmadı."
-      }
+        "cidr": "{n} CIDR aralığı taranmadı. | {n} CIDR aralığı taranmadı.",
+        "checked": "{total} göstergenin yalnızca {checked} tanesi tam olarak kontrol edildi."
+      },
+      "partialChecked": "Kısmi sonuç: {total} göstergeden {checked} tanesi kontrol edildi. Kalanların sayıları düşük olabilir.",
+      "partialCapped": "Kısmi sonuç: {total} göstergeden {checked} tanesi kontrol edildi. Tarama {n} sorguda durur; en az ciddi göstergeler kontrol edilmedi.",
+      "inText": "{column} (metin içinde)"
     },
     "sources": {
       "title": "Veri kaynakları",
@@ -25238,7 +25455,6 @@
       "exclude": "Hariç tut",
       "attached": "{pack} iliştirildi.",
       "detached": "Paket ayrıldı.",
-      "detachedPipelineSkipped": "Paket ayrıldı. Kayıtlı işlem hattı artık bu akış ve paketle eşleşmiyor, bu nedenle değiştirilmedi.",
       "empty": "Henüz günlük akışı yok. Güvenlik günlüklerini herhangi bir akış olarak alın; burada görünürler.",
       "noticePackRemoved": "{stream}: paket SIEM dışında kaldırıldı. Yeniden iliştirin veya temizleyin.",
       "noticeNoRecord": "{stream}: bir paket kayıt olmadan iliştirilmiş. Kaydını oluşturun veya ayırın.",
@@ -25249,14 +25465,31 @@
       "blockGlobalFlatten": "{stream}: genel düzleştirme düzeyi ({level}) OCSF sütunlarının düz kalmasını sağlamaz.",
       "blockSchemaMissing": "{stream}: kullanıcı tanımlı şemada şu OCSF sütunları eksik: {columns}.",
       "blockPipelineDisabled": "{stream}: mevcut işlem hattı devre dışı; iliştirmeden önce etkinleştirin.",
-      "attachErrors": {
-        "functionEditedOutside": "Fonksiyon {name} SIEM dışında düzenlendi.",
-        "pipelineNoAccess": "Bu akışta erişiminiz olmayan bir işlem hattı var.",
-        "permissionDenied": "Bu akış için fonksiyonları ve işlem hatlarını düzenleme izniniz olmalı.",
-        "pipelineChanged": "Bu akışın işlem hattı değişti ve artık eklemeyi engelliyor; yenileyip tekrar kontrol edin.",
-        "packConflict": "Bu akışta zaten {pack} paketi var; önce ayırın.",
-        "noPipeline": "Bu akış için gerçek zamanlı bir işlem hattı oluşturulamadı veya bulunamadı.",
-        "failed": "Ekleme başarısız oldu."
+      "actionFailed": "Değişiklik kaydedilmedi.",
+      "stateExcluded": "Hariç tutuldu",
+      "excludedBy": "{user} tarafından {time} tarihinde hariç tutuldu",
+      "sourceTypeConfidence": "{label} (%{n})",
+      "notClassified": "Henüz sınıflandırılmadı",
+      "lastChange": "Son değişiklik: {user}, {time}: {summary}",
+      "previewTitle": "{pack}, {stream} akışına iliştirilsin mi?",
+      "previewSubtitle": "Siz onaylayana kadar hiçbir şey yazılmaz.",
+      "previewLoading": "İliştirmenin neyi değiştireceği kontrol ediliyor…",
+      "previewPack": "Paket",
+      "previewClasses": "Yazdığı OCSF sınıfı",
+      "previewFunction": "Fonksiyon",
+      "previewPipeline": "İşlem hattı",
+      "previewFunctionCreate": "{name} oluştur",
+      "previewFunctionReuse": "{name} yeniden kullanılır, zaten aynı",
+      "previewPipelineCreate": "{name} oluştur: {stream} → fonksiyon → {stream}",
+      "previewPipelineExtend": "{name} içine, kaynağın hemen ardından {feeds} hedefini besleyen bir fonksiyon düğümü ekle",
+      "previewPipelineAlready": "{name} bu paketi zaten çalıştırıyor; yalnızca kayıt yazılır",
+      "confirmAttach": "İliştir",
+      "cancel": "İptal",
+      "detachedSkipped": "Paket ayrıldı. {id} işlem hattı değiştirilmedi: {reason}.",
+      "skipReason": {
+        "pipeline_missing": "artık mevcut değil",
+        "other_stream": "artık başka bir akışı okuyor",
+        "other_pack": "artık farklı bir paket çalıştırıyor"
       }
     },
     "nav": {
@@ -25269,13 +25502,60 @@
       "intel": "Tehdit İstihbaratı",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
-      "content": "İçerik"
+      "content": "İçerik",
+      "sources": "Veri kaynakları"
     },
     "sigma": {
       "notSupported": "Desteklenmiyor: {fields}",
       "cannotMatch": "Eşleştirilemiyor: bu akışta {fields} yok",
       "compiledEmpty": "Kural boş olarak derlendi",
       "assumedAbsent": "Bu akışta {fields} hiç bulunmadığı varsayılıyor"
+    },
+    "audit": {
+      "title": "Değişiklik günlüğü",
+      "hint": "Son 7 günde algılamaları, kaynakları ve vakaları kimin değiştirdiği",
+      "when": "Zaman",
+      "who": "Değiştiren",
+      "area": "Alan",
+      "action": "İşlem",
+      "target": "Ne değişti",
+      "empty": "Kayıtlı değişiklik yok",
+      "emptyHint": "Algılamalarda, Güvenlik kaynaklarında ve vakalarda yapılan değişiklikler burada görünür.",
+      "disabled": "Denetim günlüğü kapalı",
+      "disabledHint": "Güvenlik ayarlarını kimin değiştirdiğini kaydetmek için bu dağıtımda denetim günlüğünü açın.",
+      "category": {
+        "detection": "Algılama",
+        "case": "Vaka",
+        "source": "Kaynak",
+        "security": "Güvenlik"
+      },
+      "verb": {
+        "created": "Oluşturuldu",
+        "changed": "Değiştirildi",
+        "deleted": "Silindi",
+        "enabled": "Açıldı",
+        "disabled": "Kapatıldı"
+      }
+    },
+    "access": {
+      "needsAuthor": "Güvenlik üzerinde Oluştur izni gerekir",
+      "openPreset": "{preset} ile bir rol başlatın",
+      "askPreset": "{preset} ön ayarı için bir yöneticiye başvurun.",
+      "checkFailedTitle": "Güvenlik erişiminiz kontrol edilemedi",
+      "checkFailedHint": "Sunucu yanıt vermedi. Oturumunuz hâlâ açık."
+    },
+    "aria": {
+      "addSource": "Kaynak ekle",
+      "addToCase": "Vakaya ekle",
+      "caseAssignee": "Vaka atanan kişisi",
+      "casePriority": "Vaka önceliği",
+      "filterField": "Filtre alanı",
+      "filterOperator": "Filtre operatörü",
+      "filterValue": "Filtre değeri",
+      "huntKind": "Ne aranacak",
+      "indicatorType": "Gösterge türü",
+      "severityFilter": "Önem derecesi filtresi",
+      "stream": "Akış"
     }
   },
   "promql": {

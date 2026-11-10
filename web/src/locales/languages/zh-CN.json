@@ -691,7 +691,8 @@
       "scoreConfigs": "分数配置",
       "workflows": "工作流",
       "syntheticFolders": "合成监控文件夹",
-      "downtimeFolders": "停机时间文件夹"
+      "downtimeFolders": "停机时间文件夹",
+      "security": "安全"
     },
     "resourcesInline": {
       "dashboards": "仪表盘",
@@ -747,7 +748,8 @@
       "fleetManagement": "Fleet 管理",
       "incidents": "事件",
       "onCallResponses": "值班响应",
-      "searchJobs": "搜索任务"
+      "searchJobs": "搜索任务",
+      "security": "安全"
     },
     "denied": {
       "view": "您无法查看{resource}",
@@ -4500,6 +4502,7 @@
       "presetsSubtitle": "将预设中的授权添加到此角色。不会移除任何内容。",
       "presetsSectionBuiltin": "内置",
       "presetsSectionJob": "按职责",
+      "presetsSectionSecurity": "安全",
       "presetAddsTooltip": "添加 {count} 项权限 | 添加 {count} 项权限",
       "presetInRole": "已在角色中",
       "presetInRoleTooltip": "此角色已拥有此预设中的全部内容",
@@ -4575,7 +4578,16 @@
       "presetRestored": "{title}：已恢复 {permissions}。保存前请查看更改。",
       "presetSummaryRestores": "保留您标记为移除的 {count} 项权限。 | 保留您标记为移除的 {count} 项权限。",
       "presetRestoreButton": "保留 {count} 项权限 | 保留 {count} 项权限",
-      "effectStillAllowed": "访问权限无变化：更大范围的授权仍允许此操作。"
+      "effectStillAllowed": "访问权限无变化：更大范围的授权仍允许此操作。",
+      "moduleGroupSecurity": "安全",
+      "presetSocAnalystTitle": "SOC 分析师",
+      "presetSocAnalystDescription": "分诊安全告警和案例，并可读取检测、数据流和威胁情报列表",
+      "presetDetectionEngineerTitle": "检测工程师",
+      "presetDetectionEngineerDescription": "创建、调整、启用和运行检测，安装内容，连同函数和管道一起接入数据源，并维护威胁情报列表等扩充表，可读取安全模块、案例和数据流",
+      "presetSecurityAdminTitle": "安全管理员",
+      "presetSecurityAdminDescription": "管理整个安全模块，包括删除检测和案例、排除数据源，以及事件、函数、管道、扩充表和加密密钥，并可读取数据流",
+      "presetSecurityViewerTitle": "安全查看者",
+      "presetSecurityViewerDescription": "查看安全模块及其案例、检测和源数据流，但不能更改"
     },
     "rolesPage": {
       "subtitle": "角色捆绑权限 — 将其分配给用户、服务帐号或群组以授予访问权限。",
@@ -7711,6 +7723,28 @@
       "tlsBody": "该令牌是持有者凭证，可在明文 HTTP 上重放，因此在 {brand}（{setting}，默认禁用）或在其前面的受信任代理处终止 TLS。"
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "更新现有 {product} 的配置，将日志、指标和链路发送到此组织。",
+      "correlationBody": "要关联日志和链路，应用必须记录完整的 128 位链路 ID。如果 Java tracer 仅记录低 64 位，请在应用上设置 {setting}。",
+      "profilingBody": "性能分析使用独立的目标地址和 Agent API 密钥。如果应用已启用性能分析，请在迁移期间关闭应用或 tracer 的性能分析，或单独配置其目标地址。",
+      "multiValueTagsBody": "同一标签的多个不同值会存为排序后的 JSON 数组字符串。以 [ 开头的单个值也会编码为单元素 JSON 数组，以保留序列身份。",
+      "envTitle": "Agent 配置",
+      "envBody": "在 {product} 上设置这些环境变量并重启。需要 {product} {version} 或更高版本。",
+      "tokenBody": "API 密钥必须是组织数据摄取令牌，以 {prefix} 开头。此组织没有已启用的数据摄取令牌，因此不显示设置片段。请创建数据摄取令牌，然后返回此页面。",
+      "tokenLink": "打开数据摄取令牌",
+      "featuresOffBody": "The lines after the URLs turn off Agent features that send to {vendor}'s own servers with the same key. {setting} also keeps {component} off, which newer Agent versions run and which does not keep the path in these URLs.",
+      "logsTitle": "日志",
+      "logsBody": "在 {product} 中，日志收集默认关闭。请设置 {setting} 并配置日志源。",
+      "dualTitle": "保留当前目标",
+      "dualBody": "若要在保留现有目标的同时发送到此组织，请保留当前 URL 和 API 密钥，改为将这些条目添加到 {file}。日志需要 {setting}，否则额外的日志端点会使用 TCP。",
+      "metricsTitle": "查询指标",
+      "metricsTypes": "每个序列都存储为 Gauge，取值为 Agent 发送的值，并使用 {typeField} 和 {intervalField} 作为标签。",
+      "metricsCount": "Count 序列保存每个刷新间隔的计数。可在 PromQL 中使用 {promql} 或在 SQL 中使用 {sql} 将它们相加。",
+      "metricsRate": "Rate 序列按每秒计。将值乘以 {intervalField} 可还原该间隔内的计数。",
+      "metricsCounterFns": "PromQL 的 {rate} 和 {increase} 期望累积计数器，因此在这些序列上不会给出有意义的结果。",
+      "metricsSketch": "分布存储为直方图桶，百分位数根据这些桶估算。更高的 ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA 会带来更细的桶和更精确的百分位数，代价是存储更多行。"
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU 导出器"
   },
@@ -24327,8 +24361,9 @@
       "classMix": "过去一小时内的类：{mix}",
       "objects": "OCSF 对象",
       "missingSignals": "未出现：{fields}",
-      "detections": "{n} 个检测 | {n} 个检测",
-      "firing": "{n} 个触发中 | {n} 个触发中",
+      "detections": "{n} 条匹配规则 | {n} 条匹配规则",
+      "firing": "{n} 条有命中 | {n} 条有命中",
+      "matchingRulesHint": "适用于此数据源的 Sigma 目录规则。命中是指当前时间窗口内的匹配，而非已部署的检测规则。",
       "rulesFor": "{source} 的 Sigma 规则",
       "hits": "{n} 次命中 | {n} 次命中",
       "viewHits": "查看命中",
@@ -24357,7 +24392,44 @@
       "invertFilter": "在包含与排除之间切换",
       "removeFilter": "移除过滤器",
       "pivotSqlUnsupported": "此 SQL 查询不是简单的 SELECT … WHERE，因此无法为其添加过滤器。请手动编辑查询，或切换到构建器。",
-      "topValuesWholeStream": "SQL 模式：值按整个数据流统计，而非按您的查询统计。"
+      "topValuesWholeStream": "SQL 模式：值按整个数据流统计，而非按您的查询统计。",
+      "allSources": "所有安全数据源",
+      "sortSqlMode": "手写查询会自行设置 ORDER BY",
+      "includeFailed": "无法将 {name} 添加到安全",
+      "excludeFailed": "无法从安全中移除 {name}",
+      "hunt": {
+        "title": "一次搜索所有安全数据源",
+        "hint": "输入 IP 地址、用户或主机。每个数据源按其自身的列进行搜索，每一行都会注明来自哪个数据源。",
+        "noMatches": "此时间范围内没有匹配项",
+        "noMatchesHint": "请扩大时间范围，或搜索任意字段而不限定某一类。",
+        "noFields": "字段因数据源而异。请选择一个数据源以浏览其字段。",
+        "search": "搜索",
+        "aliases": "另外匹配 {n} 种拼写 | 另外匹配 {n} 种拼写",
+        "clearAliases": "仅匹配输入的名称",
+        "uncounted": "未计入：{streams}",
+        "kind": {
+          "any": "任意字段",
+          "user": "用户",
+          "ip": "IP 地址",
+          "host": "主机"
+        },
+        "placeholder": {
+          "any": "IP 地址、用户、主机或文本",
+          "user": "dave, ACME\\dave 或 dave{'@'}acme.io",
+          "ip": "185.220.101.47",
+          "host": "主机名"
+        },
+        "column": {
+          "time": "时间",
+          "source": "数据源",
+          "user": "用户",
+          "ip": "源 IP",
+          "host": "主机",
+          "action": "操作",
+          "outcome": "结果",
+          "message": "消息"
+        }
+      }
     },
     "drawer": {
       "event": "安全事件",
@@ -24378,7 +24450,14 @@
       "classUid": "class_uid {n}",
       "eyebrow": "安全事件",
       "source": "来源",
-      "matchedRules": "匹配 {n} 条检测规则 | 匹配 {n} 条检测规则"
+      "matchedRules": "匹配 {n} 条检测规则 | 匹配 {n} 条检测规则",
+      "openCase": "创建案例",
+      "openCaseHint": "针对此事件涉及的主机、用户或地址创建案例",
+      "addToCase": "添加到案例",
+      "pickCase": "添加到未结案例",
+      "caseOpened": "已创建案例：{title}",
+      "caseUpdated": "事件已添加到 {title}",
+      "caseError": "无法从此事件创建案例"
     },
     "record": {
       "prev": "上一条记录",
@@ -24482,7 +24561,20 @@
       "customWindow": "显示固定窗口：{from} → {to}",
       "backToRange": "返回最近 {range}",
       "missing": "此链接指向的告警不在已加载的窗口内。它可能早于当前范围，或超出最新行数上限。",
-      "dismiss": "关闭"
+      "dismiss": "关闭",
+      "triage": {
+        "createCase": "创建案例",
+        "addToCase": "添加到案例",
+        "openCase": "打开案例",
+        "acknowledge": "开始调查",
+        "addNote": "添加备注",
+        "notePlaceholder": "为此触发所在的案例添加备注",
+        "acknowledged": "案例已标记为调查中",
+        "noted": "备注已添加到案例",
+        "caseOpened": "案例已打开",
+        "attached": "触发已添加到案例",
+        "failed": "无法更新案例"
+      }
     },
     "cases": {
       "title": "案例",
@@ -24510,7 +24602,8 @@
         "lastSeen": "最后出现"
       },
       "fact": {
-        "duration": "持续时间"
+        "duration": "持续时间",
+        "timeToClose": "关闭耗时"
       },
       "durationMinutes": "{n} 分钟",
       "durationHours": "{n} 小时",
@@ -24532,7 +24625,8 @@
         "service_discovery": "通过服务发现关联",
         "primary_match": "基于主要维度关联",
         "secondary_match": "基于次要维度关联",
-        "alert_id": "同一检测"
+        "alert_id": "同一检测",
+        "entity": "相同主机、用户或地址"
       },
       "commentPlaceholder": "为团队添加备注",
       "postComment": "发布备注",
@@ -24554,7 +24648,16 @@
         "analysisComplete": "根因分析已完成",
         "analysisFailed": "根因分析失败：{reason}",
         "analysisCancelled": "根因分析已取消",
-        "other": "{type}"
+        "other": "{type}",
+        "verdict": {
+          "true_positive": "结论：真阳性",
+          "false_positive": "结论：误报",
+          "benign": "结论：良性",
+          "duplicate": "结论：重复",
+          "stale": "结论：过时 / 历史"
+        },
+        "alertsAttached": "手动添加的触发：{names}",
+        "eventAttached": "已添加来自 {stream} 的事件（{at}）"
       },
       "analysisHint": "由 AI 生成的摘要，说明此案件中各次触发之间的关联。",
       "runAnalysis": "分析",
@@ -24570,7 +24673,42 @@
         "resolved": "关闭案件"
       },
       "notFound": "未找到案件",
-      "timelinePartial": "此时间线是根据案件记录重建的，因此重建前的备注、认领记录和分析活动可能缺失。"
+      "timelinePartial": "此时间线是根据案件记录重建的，因此重建前的备注、认领记录和分析活动可能缺失。",
+      "verdict": {
+        "true_positive": "真阳性",
+        "false_positive": "误报",
+        "benign": "良性",
+        "duplicate": "重复",
+        "stale": "过时 / 历史"
+      },
+      "close": {
+        "title": "关闭案例",
+        "verdict": "结论",
+        "verdictRequired": "请选择结论",
+        "reason": "原因",
+        "reasonPlaceholder": "说明你的发现以及案例可以关闭的原因",
+        "reasonRequired": "请填写原因",
+        "reasonTooLong": "原因不得超过 {max} 个字符",
+        "cancel": "取消"
+      },
+      "settings": {
+        "open": "案例设置",
+        "title": "案例设置",
+        "save": "保存",
+        "saved": "案例设置已保存",
+        "loadFailed": "无法加载案例设置",
+        "saveFailed": "无法保存案例设置",
+        "autoCloseDays": "静默案例自动关闭天数",
+        "autoCloseDaysHint": "连续这么多天没有新触发的案例会自动关闭。0 表示案例保持打开。最多 {max}。",
+        "groupWindowMinutes": "触发合并时间窗口（分钟）",
+        "groupWindowMinutesHint": "按事件时间计算，在案例最近一次活动后的这么多分钟内，同一主机、用户或地址上的活动会并入该案例。0 表示每个检测单独开一个案例。最多 {max}。",
+        "wholeNumber": "请输入整数",
+        "range": "请输入 0 到 {max} 之间的值"
+      },
+      "assignedTo": "已分配给 {to}",
+      "unassignedToast": "案例已取消分配",
+      "historical": "历史（回填）",
+      "historicalHint": "此案例中的所有触发均来自对历史数据的回填，因此不代表当前活动。"
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -24592,19 +24730,21 @@
       "legend": {
         "firing": "时间窗口内触发（颜色越深表示越多）",
         "covered": "由已启用的检测覆盖",
-        "available": "规则可用，但未启用"
+        "available": "规则可用，但未启用",
+        "none": "目录中没有规则"
       },
       "columnCount": "已覆盖 {covered} / {total}",
       "cellEnabled": "{n} 个检测已启用 | {n} 个检测已启用",
       "cellAvailable": "{n} 条规则可用 | {n} 条规则可用",
       "noMatch": "没有匹配的技术",
       "unmapped": "没有已知战术的技术",
-      "footnote": "技术来自 {n} 条随附的 Sigma 规则和你自己的检测；归类依据每条规则所标记的战术。",
+      "footnote": "覆盖率基于 MITRE ATT&CK Enterprise v{version} 的 {total} 项技术衡量，子技术计入其父技术；产品内置 {n} 条 Sigma 规则。",
       "drawerEyebrow": "ATT&CK 技术",
       "state": {
         "firing": "触发中",
         "covered": "已覆盖",
-        "available": "未覆盖"
+        "available": "未覆盖",
+        "none": "无规则"
       },
       "fact": {
         "state": "覆盖情况",
@@ -24629,7 +24769,9 @@
       "openTechnique": "在 attack.mitre.org 上打开 {id}",
       "viewOnAttack": "在 ATT&CK 中查看",
       "manageDetections": "管理检测",
-      "historyNarrowed": "告警历史的最大查询范围会将触发记录限制为 {from} 之后的记录；此窗口内更早的触发不计入。"
+      "historyNarrowed": "告警历史的最大查询范围会将触发记录限制为 {from} 之后的记录；此窗口内更早的触发不计入。",
+      "cellNone": "无规则",
+      "coverageError": "无法加载 ATT&CK 覆盖范围：{reason}"
     },
     "detections": {
       "title": "检测",
@@ -24647,7 +24789,8 @@
         "erroring": "错误中",
         "enabled": "已启用",
         "disabled": "已禁用",
-        "all": "所有检测"
+        "all": "所有检测",
+        "notifyFailing": "通知失败"
       },
       "column": {
         "name": "检测",
@@ -24660,7 +24803,8 @@
       "state": {
         "enabled": "已启用",
         "disabled": "已禁用",
-        "erroring": "错误中"
+        "erroring": "错误中",
+        "notifyFailing": "通知失败"
       },
       "tab": {
         "overview": "概览",
@@ -24722,17 +24866,23 @@
       "libraryEmpty": "没有规则与该过滤器匹配",
       "stream": "数据流",
       "streamPlaceholder": "选择要运行的数据流",
-      "notify": "通知",
-      "notifyPlaceholder": "选择目标",
-      "noDestinations": "尚无告警目标。检测需要一个目标来发送通知，请在新标签页中创建后返回；此列表会自动刷新。",
+      "notify": "通知（可选）",
+      "notifyPlaceholder": "无：触发时仍会开启案例",
+      "noDestinations": "尚无告警目标。没有目标时，检测仍会生成发现并开启案例；仅当您还希望接收通知时，才需要添加目标。",
       "createDestination": "创建目标",
       "reloadDestinations": "刷新",
       "lookBack": "回溯（分钟）",
+      "lookBackHelp": "至少为 {minutes} 分钟的关联窗口；每次运行都会在此范围内滑动该窗口",
+      "correlationWindowLabel": "关联窗口（分钟）",
+      "backfill": "首次运行时也检查历史数据",
+      "backfillRange": "要检查的历史数据",
+      "backfillHours": "最近 1 小时 | 最近 {n} 小时",
       "runEvery": "运行间隔（分钟）",
       "silence": "静默时长（分钟）",
       "compiles": "针对 {stream} 编译",
       "compilesAs": "针对 {stream} 编译，标识为 {source}",
       "logsourceMismatch": "此规则针对 {rule} 编写，但 {stream} 被标识为 {source}。只有当两者共享字段名时才能匹配。",
+      "unseenFields": "此数据流上尚未出现的字段：{fields}。创建检测规则时会添加这些列，使其在首个此类事件到来前即已就绪。",
       "ocsfBridge": "{stream} 是 OCSF，因此规则字段会映射到 OCSF 路径，并且仅对满足 {guard} 的事件运行。",
       "ocsfGuard": {
         "class": "class_uid {uid}",
@@ -24760,10 +24910,23 @@
       "validation": {
         "positive": "必须至少为 1 分钟",
         "nonNegative": "不能为负数",
-        "periodGap": "短于运行间隔：两次运行之间的分钟数将永远不会被检查"
+        "periodGap": "短于运行间隔：两次运行之间的分钟数将永远不会被检查",
+        "belowTimespan": "必须至少为 {minutes} 分钟的关联窗口"
       },
       "nameTaken": "名为“{name}”的检测规则或告警已存在。其历史记录将与当前项合并，因此请先选择另一个数据流或删除现有项。",
-      "loadError": "加载检测规则失败"
+      "loadError": "加载检测规则失败",
+      "notifyFailingHint": "此规则已触发，但其最近一次通知未能送达。请在“历史”中检查其通知目标。",
+      "correlationWindow": "由关联规则的时间跨度决定",
+      "createForbidden": "创建检测需要安全权限",
+      "preview": {
+        "run": "预览匹配项",
+        "hint": "对最近 24 小时运行查询，并显示前 20 条匹配的事件",
+        "empty": "最近 24 小时内没有匹配项",
+        "shown": "最近 24 小时内共 {total} 条匹配事件，显示 {shown} 条",
+        "failed": "查询失败：{reason}",
+        "time": "时间"
+      },
+      "queryFailed": "未保存：此检测的查询无法运行（{reason}）"
     },
     "content": {
       "title": "内容",
@@ -24833,7 +24996,6 @@
       "noStreamsForRule": "你的数据流均不匹配此规则",
       "noStreamsForRuleHint": "该规则针对 {logsource} 编写。摄取该来源后，它将显示在此处。",
       "runnable": "可在此数据流上运行",
-      "notRunnable": "无法在此运行",
       "openInEvents": "在事件中打开",
       "installHere": "安装到此数据流",
       "install": "安装为检测规则",
@@ -24855,7 +25017,38 @@
         "severityId": "严重性",
         "statusId": "结果"
       },
-      "cannotRun": "无法在你的数据上运行"
+      "catalogError": "无法加载检测目录：{reason}",
+      "notRunnableYet": "暂不可运行",
+      "newRulesAvailable": "{stream} 上现在可以运行 {n} 条新规则 | {stream} 上现在可以运行 {n} 条新规则",
+      "reviewNewRules": "查看",
+      "reviewingNewRules": "正在显示 {stream} 上现在可以运行的 {n} 条规则 | 正在显示 {stream} 上现在可以运行的 {n} 条规则",
+      "showAllRules": "显示全部规则",
+      "installSelected": "安装所选",
+      "selectRunnable": "选择可运行项",
+      "selectRunnableHint": "选择当前显示的、可在您的数据上运行且尚未安装的所有规则",
+      "bulk": {
+        "title": "安装 {n} 条规则 | 安装 {n} 条规则",
+        "subtitle": "每条规则都会在服务器上针对其数据流编译，并按这些设置保存为检测规则。",
+        "stream": "数据流",
+        "everyStream": "每条规则运行的所有数据流",
+        "folder": "告警文件夹",
+        "correlationWindow": "关联规则的回溯时长至少等于其自身的时间窗口。",
+        "nothing": "所选规则均不在此数据流上运行。",
+        "plan": "将创建 {n} 个检测规则： | 将创建 {n} 个检测规则：",
+        "correlation": "关联",
+        "confirm": "安装 {n} 个检测规则 | 安装 {n} 个检测规则",
+        "close": "关闭",
+        "summary": "共 {total} 个：已安装 {installed} 个，跳过 {skipped} 个，失败 {failed} 个",
+        "duplicate": "名为 {name} 的检测规则已存在。",
+        "correlationBlocked": "该关联规则无法在此数据流上运行。",
+        "status": {
+          "installed": "已安装",
+          "skipped": "已跳过",
+          "failed": "失败",
+          "pending": "等待中"
+        },
+        "done": "已安装 {n} 个检测规则 | 已安装 {n} 个检测规则"
+      }
     },
     "entities": {
       "title": "实体",
@@ -24865,18 +25058,15 @@
         "graph": "风险图"
       },
       "riskGraph": {
-        "empty": "无可绘制的实体",
-        "emptyHint": "添加安全来源或扩大时间范围以查看风险图。",
-        "showingTop": "按风险显示前 {n} 个，共 {total} 个",
-        "illustrative": "示意：关系由风险排名推断，并非实际观测。",
-        "baseScore": "基础 {n}",
-        "propagatedScore": "传播 {n}",
-        "tier": {
-          "critical": "严重",
-          "high": "高",
-          "medium": "中",
-          "low": "低"
-        }
+        "empty": "此窗口内没有关联项",
+        "emptyHint": "该图会关联同一事件或同一案例中出现的用户、IP 地址和主机。此窗口内没有此类关联；请扩大时间范围。",
+        "showingTop": "按风险显示前 {n} 个（共 {total} 个）",
+        "legend": "实线：出现在同一事件中。虚线：被同一案例提及。",
+        "edgeEvents": "{n} 个事件 | {n} 个事件",
+        "edgeCases": "{n} 个案例 | {n} 个案例",
+        "scoreHint": "提及它的案例：{detection}。失败事件：{failure}。与案例提及的实体关联：{neighbour}。",
+        "nodeFacts": "{events} 个事件 · {failures} 个失败",
+        "nodeCases": "{n} 个案例 | {n} 个案例"
       },
       "kinds": {
         "user": "用户",
@@ -24917,16 +25107,20 @@
           "ip": "多个用户",
           "host": "多个用户"
         },
-        "external": "公网地址"
+        "external": "公网地址",
+        "fail_then_success": "多次失败后成功",
+        "open_case": "未结案例"
       },
       "signalHint": {
         "failures": "该实体至少有 {rate}% 的事件失败，且失败次数至少为 {n}，仅统计会上报结果的来源。",
         "spread": {
-          "user": "在时间窗口内，在单个来源中从 {n} 个或更多来源 IP 观察到。",
-          "ip": "在时间窗口内，在单个来源中被 {n} 个或更多用户使用。NAT 和 VPN 出口也会呈现这种情况；密码喷洒也是如此。",
-          "host": "在时间窗口内，在单个来源中被 {n} 个或更多用户访问。"
+          "user": "在单一来源中从 {n} 个或更多源 IP 出现，明显高于此窗口内其他用户的情况。",
+          "ip": "在单一来源中被 {n} 个或更多用户使用，明显高于此窗口内的其他地址。NAT 和 VPN 出口也会呈现这种情况；密码喷洒同样如此。",
+          "host": "在单一来源中被 {n} 个或更多用户访问，明显高于此窗口内的其他主机。"
         },
-        "external": "不在私有、环回或链路本地地址范围内。"
+        "external": "不在私有、环回或链路本地地址范围内。",
+        "fail_then_success": "至少 {n} 次失败事件，之后在首次失败后出现一次成功：可能是猜测得手。",
+        "open_case": "有一个未结的 SIEM 案例涉及此实体。"
       },
       "peersChip": {
         "ips": "单个来源中最多 {n} 个来源 IP | 单个来源中最多 {n} 个来源 IP",
@@ -24937,7 +25131,7 @@
       "capped": "每个来源返回了其最活跃的 {n} 个实体；较不活跃的实体未列出，接近该截断值的实体计数可能不完整。标记有 + 的标签页计数已被截断。",
       "failedStreams": "无法读取：{streams}",
       "noSources": "没有可读取的安全来源",
-      "noSourcesHint": "实体来自名称标记为安全数据的数据流，或来自你在事件页面添加为来源的数据流。",
+      "noSourcesHint": "实体来自名称被标记为安全数据的数据流，或您在“安全 → 来源”下纳入的数据流。",
       "empty": "此时间窗口内没有实体",
       "emptyHint": "请扩大时间范围，或检查你的来源是否包含用户、IP 或主机字段。",
       "refresh": "刷新",
@@ -24945,7 +25139,8 @@
       "tab": {
         "activity": "活动",
         "related": "相关",
-        "sources": "来源"
+        "sources": "来源",
+        "cases": "案例"
       },
       "activity": "事件趋势",
       "chart": {
@@ -24954,6 +25149,9 @@
       },
       "topN": "按事件数排名前 {n}",
       "noRelated": "此时间窗口内没有相关内容。",
+      "noCases": "没有 SIEM 案例涉及此实体。",
+      "caseOpen": "未结",
+      "caseResolved": "已解决",
       "failedCount": "{n} 次失败 | {n} 次失败",
       "openEvents": "在事件中打开",
       "huntInEvents": "在事件中搜寻",
@@ -24968,7 +25166,9 @@
         "failed": "无法读取"
       },
       "loadError": "无法加载安全数据源",
-      "detailFailed": "该实体的部分数据无法读取：{streams}。"
+      "detailFailed": "该实体的部分数据无法读取：{streams}。",
+      "aliasCount": "+{n} 种拼写 | +{n} 种拼写",
+      "aliasHint": "以此拼写记录，属于同一身份。"
     },
     "ueba": {
       "title": "用户行为分析",
@@ -25005,7 +25205,11 @@
         "new_ip": "新增源 IP",
         "failure_jump": "失败激增",
         "new_hours": "异常时段",
-        "first_seen": "首次出现"
+        "first_seen": "首次出现",
+        "peer_volume": "远高于同类用户",
+        "peer_failures": "失败数远高于同类用户",
+        "fail_then_success": "多次失败后成功",
+        "open_case": "未结案例"
       },
       "reason": {
         "volume": "{n} 个事件，约为此前 {baseline} 预期值 ~{expected} 的 {ratio} 倍。",
@@ -25013,7 +25217,12 @@
         "newIpExternal": "{n} 个事件来自公网地址 {ip}，在此前 {baseline} 中从未出现过。 | {n} 个事件来自公网地址 {ip}，在此前 {baseline} 中从未出现过（共 {count} 个新地址）。",
         "failureJump": "{n} 次失败 — 占事件的 {rate}%，高于基线中的 {baseline}%。",
         "newHours": "{n} 个事件发生于 UTC {hours}，而这些时段该用户在此前 {baseline} 中从未活跃过。",
-        "firstSeen": "{n} 个事件来自一名在此前 {baseline} 中完全没有活动的用户。"
+        "firstSeen": "{n} 个事件来自一名在此前 {baseline} 中完全没有活动的用户。",
+        "peerVolume": "{n} 个事件，而典型用户约为 {median} 个。该用户自身的基线仍在建立中。",
+        "peerFailures": "{n} 次失败（占事件的 {rate}%），而典型用户约为 {median} 次。该用户自身的基线仍在建立中。",
+        "newIpBuilding": "来自公网地址 {ip} 的 {n} 个事件。此用户自身的基线仍在建立中，因此任何公网地址都会被标记。 | 来自公网地址 {ip} 的 {n} 个事件。此用户自身的基线仍在建立中，因此任何公网地址都会被标记（共 {count} 个公网地址）。",
+        "failThenSuccess": "来自 {ip} 的 {n} 次失败，随后同一地址出现一次成功事件。",
+        "openCase": "被未结案例“{title}”（{severity}）涉及。 | 被 {n} 个未结案例涉及，最新的是“{title}”（{severity}）。"
       },
       "fact": {
         "events": "事件",
@@ -25055,7 +25264,10 @@
       "notEvaluated": "由于基线数据不完整，未针对该用户评估：{signals}。",
       "hoursNotJudged": "只有基线事件至少为 {min} 个、且覆盖此前 {baseline} 的 {share}% 时，才会判断异常时段。该用户的历史较短，因此不会标记任何小时。",
       "noHistory": "先前 {baseline} 中没有 {streams} 的数据，因此不会将其中任何人标记为首次出现。",
-      "volumeNotJudged": "未针对该用户判断数据量：不足一天的时间窗会与基线中同一时段进行比较，而这至少需要一天的历史数据。"
+      "volumeNotJudged": "未针对该用户判断数据量：不足一天的时间窗会与基线中同一时段进行比较，而这至少需要一天的历史数据。",
+      "baselineBuilding": "基线建立中",
+      "baselineBuildingHint": "目前已有 {span} 的历史。待积累满 {baseline} 的完整历史后，才会开始与该用户自身的过去比较；在此期间，仅标记相对其他用户的明显异常值。",
+      "buildingNotice": "{n} 位用户的基线仍在建立中：在积累满 {baseline} 的完整历史之前，仅标记相对其他用户的明显异常值。 | {n} 位用户的基线仍在建立中：在积累满 {baseline} 的完整历史之前，仅标记相对其他用户的明显异常值。"
     },
     "intel": {
       "title": "威胁情报",
@@ -25077,12 +25289,11 @@
       "sighted": "发现 1 次 | 发现 {n} 次",
       "sweeping": "正在扫描… 已完成 {done}/{total} 个查询",
       "sweptAcross": "已扫描 {n} 个安全数据源 | 已扫描 {n} 个安全数据源",
-      "partial": "本次扫描在达到 {n} 条查询的上限时停止，因此有些列未被搜索。查询数量会随列表 × 列数增长：要完成完整扫描，请移除过时列表或已过期指标，或按类型拆分列表。",
       "failedQueries": "{n} 列无法搜索，已被跳过。 | {n} 列无法搜索，已被跳过。",
       "truncated": "仅读取了 {lists} 的前 {n} 行；其余行未被扫描。",
       "noIndicators": "暂无指标",
       "noCoverage": "运行扫描以查看哪些列会被搜索",
-      "coverageHint": "一次扫描在 {n} 个安全数据源中搜索了哪些内容。匹配仅在所列的列上进行精确匹配；没有对应列的类型根本无法被发现。",
+      "coverageHint": "一次扫描会在 {n} 个安全来源中搜索。每一列都会按完整值以及其中的完整词元进行匹配，例如数组、日志文本和 SHA256= 哈希；没有对应列的类型完全无法被发现。",
       "indicatorCount": "{n} 个指标 | {n} 个指标",
       "columnsSearched": "{n} 列 | {n} 列",
       "blind": "不可搜索",
@@ -25160,7 +25371,7 @@
         "cancel": "取消",
         "indicators": "指标",
         "indicatorsPlaceholder": "185.220.101.4\nevil[.]example\nd41d8cd98f00b204e9800998ecf8427e",
-        "indicatorsHelp": "每行一个，或用逗号、空格分隔。重复项将被忽略。",
+        "indicatorsHelp": "每行一个，或用逗号或空格分隔。重复项会被忽略。每个列表最多可容纳 {max} 个。",
         "indicatorsRequired": "请至少输入一个指标",
         "invalid": "无法识别为指标（{n}）：{sample}",
         "line": "第 {n} 行",
@@ -25184,7 +25395,7 @@
         "importSubtitle": "需要包含指标列；类型、严重程度、来源和过期时间为可选。",
         "importSubmit": "导入",
         "file": "CSV 文件",
-        "fileHelp": "非指标行将被跳过并计入统计。",
+        "fileHelp": "非指示符的行会被跳过并计数。每个列表最多可容纳 {max} 个指示符；文件最大为 {mb} MB。",
         "fileRequired": "请选择 CSV 文件",
         "defaultSeverity": "缺少严重程度的行使用的严重程度",
         "append": "添加到列表而非替换列表",
@@ -25203,7 +25414,10 @@
         "noIndicatorColumnIn": "{table} 没有 indicator、ioc 或 value 列，因此无法向其中添加指示器。请选择其他列表。",
         "replaceTitle": "替换列表",
         "replaceMessage": "关闭追加导入会完全替换 {table}：所有现有行、其列和设置都将被移除，仅保留此文件中的指示器。",
-        "replaceConfirm": "替换"
+        "replaceConfirm": "替换",
+        "tooMany": "已粘贴 {n} 个指标；一个列表最多 {max} 个。",
+        "listFull": "{table} 将包含 {count} 个指标；一个列表最多 {max} 个。请拆分到多个列表。",
+        "fileTooLarge": "文件大于 {max} MB。请拆分为较小的文件。"
       },
       "importCsv": "导入 CSV",
       "unreadTables": "无法读取 {lists}；其指示器不会显示，也不会被扫描。 | 无法读取 {lists}；其指示器不会显示，也不会被扫描。",
@@ -25213,12 +25427,15 @@
       "columnsSkipped": "{n} 列未搜索 | {n} 列未搜索",
       "skippedHint": "未完全搜索——扫描已达到查询限制或查询失败：",
       "caveat": {
-        "capped": "扫描已达到查询限制，因此部分列未搜索。",
         "failed": "无法搜索 {n} 列。 | 无法搜索 {n} 列。",
         "partial": "{n} 个查询仅返回部分结果，因此这些列未完全搜索。 | {n} 个查询仅返回部分结果，因此这些列未完全搜索。",
         "unsearched": "没有数据流包含以下类型的列：{types}。",
-        "cidr": "{n} 个 CIDR 范围未扫描。 | {n} 个 CIDR 范围未扫描。"
-      }
+        "cidr": "{n} 个 CIDR 范围未扫描。 | {n} 个 CIDR 范围未扫描。",
+        "checked": "{total} 个指标中只有 {checked} 个被完整检查。"
+      },
+      "partialChecked": "结果不完整：已检查 {total} 个指标中的 {checked} 个。其余指标的计数可能偏低。",
+      "partialCapped": "结果不完整：已检查 {total} 个指标中的 {checked} 个。扫描在 {n} 个查询处停止；严重程度最低的指标未被检查。",
+      "inText": "{column}（文本中）"
     },
     "sources": {
       "title": "数据源",
@@ -25238,8 +25455,7 @@
       "exclude": "排除",
       "attached": "已附加 {pack}。",
       "detached": "包已分离。",
-      "detachedPipelineSkipped": "包已分离。记录的流水线不再匹配此数据流和包，因此保持不变。",
-      "empty": "尚无日志数据流。将安全日志作为任意数据流摄取，它们就会显示在此处。",
+      "empty": "尚无日志数据流。将安全日志作为任意数据流摄取后，它们会显示在这里。",
       "noticePackRemoved": "{stream}：包已在 SIEM 外部移除。请重新附加或清除。",
       "noticeNoRecord": "{stream}：已附加包但缺少记录。请记录或分离。",
       "noticeNotWriting": "{stream}：流水线不再写入此数据流。",
@@ -25249,14 +25465,31 @@
       "blockGlobalFlatten": "{stream}：全局展平级别（{level}）无法让 OCSF 列保持展平。",
       "blockSchemaMissing": "{stream}：用户定义的 schema 缺少 OCSF 列：{columns}。",
       "blockPipelineDisabled": "{stream}：现有流水线已禁用；请在附加前启用它。",
-      "attachErrors": {
-        "functionEditedOutside": "函数 {name} 已在 SIEM 外部被编辑。",
-        "pipelineNoAccess": "此数据流有一个您无权访问的流水线。",
-        "permissionDenied": "您需要具备编辑此数据流的函数和流水线的权限。",
-        "pipelineChanged": "此数据流的流水线已更改，现在会阻止附加；请刷新并重新检查。",
-        "packConflict": "此数据流已存在 pack {pack}；请先将其分离。",
-        "noPipeline": "无法为此数据流创建或找到实时流水线。",
-        "failed": "附加失败。"
+      "actionFailed": "更改未保存。",
+      "stateExcluded": "已排除",
+      "excludedBy": "{user} 于 {time} 排除",
+      "sourceTypeConfidence": "{label}（{n}%）",
+      "notClassified": "尚未分类",
+      "lastChange": "{user} 于 {time} 最后更改：{summary}",
+      "previewTitle": "将 {pack} 附加到 {stream}？",
+      "previewSubtitle": "在您确认之前不会写入任何内容。",
+      "previewLoading": "正在检查附加后会发生哪些变更…",
+      "previewPack": "包",
+      "previewClasses": "写入的 OCSF 类",
+      "previewFunction": "函数",
+      "previewPipeline": "管道",
+      "previewFunctionCreate": "创建 {name}",
+      "previewFunctionReuse": "复用 {name}（已完全相同）",
+      "previewPipelineCreate": "创建 {name}：{stream} → 函数 → {stream}",
+      "previewPipelineExtend": "在 {name} 中紧接数据源之后添加一个函数节点，输出到 {feeds}",
+      "previewPipelineAlready": "{name} 已在运行此包；仅写入记录",
+      "confirmAttach": "附加",
+      "cancel": "取消",
+      "detachedSkipped": "包已分离。管道 {id} 未更改：{reason}。",
+      "skipReason": {
+        "pipeline_missing": "已不存在",
+        "other_stream": "现在读取的是另一个数据流",
+        "other_pack": "现在运行的是另一个包"
       }
     },
     "nav": {
@@ -25269,13 +25502,60 @@
       "intel": "威胁情报",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
-      "content": "内容"
+      "content": "内容",
+      "sources": "数据源"
     },
     "sigma": {
       "notSupported": "不支持：{fields}",
       "cannotMatch": "无法匹配：此数据流没有 {fields}",
       "compiledEmpty": "规则编译结果为空",
       "assumedAbsent": "假定此数据流从不会有 {fields}"
+    },
+    "audit": {
+      "title": "变更日志",
+      "hint": "过去 7 天内谁更改了检测、数据源和案例",
+      "when": "时间",
+      "who": "更改人",
+      "area": "区域",
+      "action": "操作",
+      "target": "更改内容",
+      "empty": "没有变更记录",
+      "emptyHint": "对检测、安全数据源和案例的更改会显示在这里。",
+      "disabled": "审计日志已关闭",
+      "disabledHint": "请为此部署开启审计日志，以记录谁更改了安全设置。",
+      "category": {
+        "detection": "检测",
+        "case": "案例",
+        "source": "数据源",
+        "security": "安全"
+      },
+      "verb": {
+        "created": "已创建",
+        "changed": "已更改",
+        "deleted": "已删除",
+        "enabled": "已开启",
+        "disabled": "已关闭"
+      }
+    },
+    "access": {
+      "needsAuthor": "需要安全模块的创建权限",
+      "openPreset": "基于 {preset} 创建角色",
+      "askPreset": "请向管理员申请 {preset} 预设。",
+      "checkFailedTitle": "无法检查您的安全访问权限",
+      "checkFailedHint": "服务器未响应。您的会话仍处于登录状态。"
+    },
+    "aria": {
+      "addSource": "添加数据源",
+      "addToCase": "添加到案例",
+      "caseAssignee": "案例负责人",
+      "casePriority": "案例优先级",
+      "filterField": "筛选字段",
+      "filterOperator": "筛选运算符",
+      "filterValue": "筛选值",
+      "huntKind": "狩猎目标",
+      "indicatorType": "指标类型",
+      "severityFilter": "严重性筛选",
+      "stream": "数据流"
     }
   },
   "promql": {
