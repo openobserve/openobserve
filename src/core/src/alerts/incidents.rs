@@ -1685,8 +1685,7 @@ pub fn finding_dimensions(
     ])
 }
 
-/// Narrow on purpose: one member recovering is not the incident being over; acknowledged, assigned
-/// and security cases are a human's to close.
+/// One member recovering doesn't end it; acknowledged, assigned and security cases close by hand.
 pub async fn resolve_alert_firing(
     event: &config::meta::alerts::recovery::RecoveryEvent,
     muted: bool,
