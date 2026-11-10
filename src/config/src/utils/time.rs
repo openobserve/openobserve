@@ -141,6 +141,10 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
     }
 
     let s = s.trim_matches('"');
+    if s.contains(' ') && s.len() == 19 {
+        let fmt = "%Y-%m-%d %H:%M:%S";
+        return Ok(NaiveDateTime::parse_from_str(s, fmt)?.and_utc());
+    }
     let t_separated = match s.split_once(' ') {
         Some((date, time)) if NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok() => {
             Some(format!("{date}T{time}"))
@@ -521,6 +525,15 @@ mod tests {
             let got = parse_str_to_time(input).map(|v| v.timestamp_micros()).ok();
             assert_eq!(got, Some(v_exp), "{input}");
         }
+    }
+
+    #[test]
+    fn test_parse_timestamp_micro_from_str_unpadded_double_space() {
+        let input = "2021-1-01  00:00:00";
+        assert_eq!(
+            parse_timestamp_micro_from_str(input).ok(),
+            Some((1609459200000000, false)),
+        );
     }
 
     #[test]
