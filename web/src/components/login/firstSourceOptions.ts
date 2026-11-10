@@ -125,10 +125,9 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
   {
     id: "agent",
     labelKey: "login.getStarted.sources.agent",
-    route: "recommendedMcp",
+    route: "ai-integrations",
     icon: "auto-awesome",
-    signals: [],
-    feature: "mcp",
+    signals: ["traces"],
   },
   {
     id: "sample",
@@ -166,7 +165,6 @@ const DOCS_SEGMENT_SOURCES: Record<string, FirstSourceId> = {
   rum: "rum",
   llm: "llm",
   genai: "llm",
-  mcp: "agent",
 };
 
 /** The option with this id, or undefined for an unknown id. */

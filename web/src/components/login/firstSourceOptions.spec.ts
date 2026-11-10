@@ -75,7 +75,7 @@ describe("firstSourceOptions", () => {
         "AWS, Azure or GCP",
         "Browser (RUM)",
         "LLM or AI app",
-        "Let an AI agent set it up",
+        "AI agent app",
         "Explore sample data",
         "Not sure yet",
       ]);
@@ -92,7 +92,7 @@ describe("firstSourceOptions", () => {
         cloud: "AWSConfig",
         rum: "frontendMonitoring",
         llm: "ai-integrations",
-        agent: "recommendedMcp",
+        agent: "ai-integrations",
         sample: undefined,
         unsure: undefined,
       });
@@ -172,7 +172,6 @@ describe("firstSourceOptions", () => {
       ["https://openobserve.ai/docs/integration/gcp/", "cloud"],
       ["https://openobserve.ai/docs/rum/", "rum"],
       ["https://openobserve.ai/docs/integration/llm/openai/", "llm"],
-      ["https://openobserve.ai/docs/mcp/", "agent"],
       ["https://www.openobserve.ai/docs/ingestion/logs/linux/", "linux"],
     ])("maps %s to %s", (url, id) => {
       expect(docsReferrerSource(url)).toBe(id);
@@ -276,21 +275,19 @@ describe("firstSourceOptions", () => {
   });
 
   it("firstSourceOption finds by id", () => {
-    expect(firstSourceOption("agent")?.route).toBe("recommendedMcp");
+    expect(firstSourceOption("agent")?.route).toBe("ai-integrations");
     expect(firstSourceOption("missing")).toBeUndefined();
     expect(firstSourceOption(null)).toBeUndefined();
   });
 
-  it("locks the agent and RUM options only while their feature is license-locked", () => {
-    const agent = firstSourceOption("agent")!;
+  it("locks the RUM option only while its feature is license-locked", () => {
     const rum = firstSourceOption("rum")!;
     const linux = firstSourceOption("linux")!;
+    const agent = firstSourceOption("agent")!;
     const locked = { mcp: "locked", rum: "locked" } as const;
 
-    expect(isFirstSourceLocked(agent, locked)).toBe(true);
+    expect(isFirstSourceLocked(agent, locked)).toBe(false);
     expect(isFirstSourceLocked(rum, locked)).toBe(true);
     expect(isFirstSourceLocked(linux, locked)).toBe(false);
-    expect(isFirstSourceLocked(agent, { mcp: "enabled" })).toBe(false);
-    expect(isFirstSourceLocked(agent, undefined)).toBe(false);
   });
 });

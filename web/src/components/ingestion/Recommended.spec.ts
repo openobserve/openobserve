@@ -404,16 +404,16 @@ describe("Recommended: Get started pick", () => {
       wrapper.unmount();
     });
 
-    it.each([
-      ["rum", "frontendMonitoring"],
-      ["agent", "recommendedMcp"],
-    ])("keeps the lock on a pinned %s pick", async (pick, name) => {
-      localStorage.setItem(`o2.onboarding.firstSource.${ORG}`, pick);
-      const wrapper = await mountLicensed({ [pick === "rum" ? "rum" : "mcp"]: "locked" });
-      const pinned = wrapper.find(`[data-test="ingestion-recommended-pick-tab-${name}"]`);
-      expect(pinned.find(".lock-chip").exists()).toBe(true);
-      wrapper.unmount();
-    });
+    it.each([["rum", "frontendMonitoring"]])(
+      "keeps the lock on a pinned %s pick",
+      async (pick, name) => {
+        localStorage.setItem(`o2.onboarding.firstSource.${ORG}`, pick);
+        const wrapper = await mountLicensed({ [pick === "rum" ? "rum" : "mcp"]: "locked" });
+        const pinned = wrapper.find(`[data-test="ingestion-recommended-pick-tab-${name}"]`);
+        expect(pinned.find(".lock-chip").exists()).toBe(true);
+        wrapper.unmount();
+      },
+    );
 
     it.each([
       ["frontendMonitoring", "rum"],
