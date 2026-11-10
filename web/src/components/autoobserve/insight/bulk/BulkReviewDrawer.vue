@@ -217,7 +217,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-body">{{ row.stream.name }}</span>
         </template>
         <template #cell-firesWhen="{ row }">
-          <span class="text-text-body" :data-test="`bulk-review-firesWhen-${row.key}`">
+          <span
+            class="text-text-body block py-1 whitespace-normal"
+            :data-test="`bulk-review-firesWhen-${row.key}`"
+          >
             {{ firesWhenOf(t, kind, row) }}
           </span>
         </template>
