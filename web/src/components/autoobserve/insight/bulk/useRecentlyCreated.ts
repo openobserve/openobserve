@@ -44,4 +44,13 @@ const clearOnPass = (passAt: number): void => {
   for (const [key, at] of created) if (at <= passAt) created.delete(key);
 };
 
-export const useRecentlyCreated = () => ({ has, add, remove, clearOnPass });
+/** Whether any alert was created after the pass at `passAt` (ms), so it still waits to be counted. */
+const waiting = (passAt: number = 0): boolean => {
+  for (const at of created.values()) if (at > passAt) return true;
+  return false;
+};
+
+export const useRecentlyCreated = () => ({ has, add, remove, clearOnPass, waiting });
+
+/** The just-added kind each coverage check is filled by. */
+export const KIND_OF_CHECK = { errors: "errors", latency: "latency", absence: "no_data" } as const;

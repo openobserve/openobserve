@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { queryClient } from "@/composables/query/queryClient";
+import { autoobserveKeys } from "@/services/autoobserve.querykeys";
 import { reactive, ref } from "vue";
 import type { Router } from "vue-router";
 import alertsService from "@/services/alerts";
@@ -159,6 +161,12 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
     return !s.cancelled;
   };
 
+  // Coverage and the gap suggestions are what the add changes, so the page reads them again.
+  const refreshCoverage = (org: string): void => {
+    void queryClient.invalidateQueries({ queryKey: autoobserveKeys.coverageAll(org) });
+    void queryClient.invalidateQueries({ queryKey: autoobserveKeys.suggestions(org) });
+  };
+
   const runJob = async (s: Session, job: Job): Promise<void> => {
     if (!mayWrite(s)) {
       delete results[job.key];
@@ -210,6 +218,7 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
         failed += 1;
       }
     });
+    refreshCoverage(s.org);
     const { t } = deps;
     toast(
       failed
@@ -257,6 +266,7 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
       running.value = false;
     }
     announce(s);
+    if (s.created.length) refreshCoverage(s.org);
     if (Object.values(results).every((r) => r.status === "created")) closeBulkReview();
   };
 
@@ -275,7 +285,8 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
         ? [
             {
               key: row.key,
-              kind,
+              // One service's review mixes kinds, and the just-added store is keyed by each row's own.
+              kind: row.row.kind ?? kind,
               prefill: row.prefill,
               folder: row.folder,
               destinations: row.destinations,

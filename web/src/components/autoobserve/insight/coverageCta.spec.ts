@@ -20,6 +20,7 @@ import { gt, raw } from "@/types/i18n";
 import type { CoverageCell, CoverageRow } from "../fixtures";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { cellInsight, gapInsight, tracesRoute } from "./coverageCta";
+import { serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import type { CoverageCell as Cell } from "../fixtures";
 
 const gapCell = (stateKey: "none" | "silent" = "none", monitor?: string): CoverageCell => ({
@@ -103,6 +104,43 @@ describe("Signals watched gap line (flagged surface 2)", () => {
 
   it("offers nothing without the service's streams", () => {
     expect(gapInsight(gt, "en-US", row([]))?.cta ?? null).toBeNull();
+  });
+});
+
+describe("Just added, until the next check counts it (COVERAGE-AFTER-ADD)", () => {
+  const recently = useRecentlyCreated();
+  const key = serviceKeyOf("demo-org", "svc-ingest-c", null, null);
+  afterEach(() => recently.clearOnPass(Number.MAX_SAFE_INTEGER));
+
+  it("never offers an alert this page just added again", () => {
+    recently.add(key, "errors");
+    recently.add(key, "no_data");
+    const parts = gapInsight(gt, "en-US", row([LOGS, TRACES]), [], "demo-org");
+    const target = parts?.cta?.target;
+    if (target?.type !== "bulk") throw new Error("expected bulk");
+    expect(target.request.rows.map((r) => r.kind)).toEqual(["latency"]);
+  });
+
+  it("offers nothing once every gap was just added", () => {
+    for (const kind of ["errors", "latency", "no_data"] as const) recently.add(key, kind);
+    expect(gapInsight(gt, "en-US", row([LOGS, TRACES]), [], "demo-org")?.cta ?? null).toBeNull();
+  });
+
+  it("says a just-added check is counted at the next check, with no second Add", () => {
+    recently.add(key, "no_data");
+    const r = row([LOGS, TRACES]);
+    const parts = cellInsight(gt, "en-US", r, "absence", r.checks!.absence, "demo-org");
+    expect(parts?.why).toBe(
+      "Added. AutoObserve counts it at its next check, within about 5 minutes.",
+    );
+    expect(parts?.cta).toBeNull();
+  });
+
+  it("another org's add does not hide this org's gap", () => {
+    recently.add(serviceKeyOf("other-org", "svc-ingest-c", null, null), "errors");
+    const target = gapInsight(gt, "en-US", row([LOGS, TRACES]), [], "demo-org")?.cta?.target;
+    if (target?.type !== "bulk") throw new Error("expected bulk");
+    expect(target.request.rows.map((r) => r.kind)).toEqual(["errors", "latency", "no_data"]);
   });
 });
 

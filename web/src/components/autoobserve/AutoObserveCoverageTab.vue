@@ -364,11 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.checks"
               type="button"
               class="hover:bg-surface-subtle-hover focus-visible:outline-focus-ring-accent rounded-default -ms-1.5 inline-flex h-7 cursor-pointer items-center gap-1.5 px-1.5 focus-visible:outline-2 focus-visible:outline-offset-1"
-              :class="
-                liveCellLook(row.checks[check].engine?.stateKey ?? 'none') === 'missing'
-                  ? 'text-text-secondary'
-                  : 'text-text-body'
-              "
+              :class="cellLook(row, check) === 'missing' ? 'text-text-secondary' : 'text-text-body'"
               :title="row.checks[check].state === 'gap' ? row.checks[check].reason : undefined"
               :aria-label="liveCellAria(row, check)"
               :aria-pressed="isSelected(row.service, check)"
@@ -377,9 +373,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span
                 class="size-2 shrink-0 rounded-full"
-                :class="LIVE_DOT[liveCellLook(row.checks[check].engine?.stateKey ?? 'none')]"
+                :class="LIVE_DOT[cellLook(row, check)]"
                 aria-hidden="true"
-              />{{ liveCellWord(t, row.checks[check].engine?.stateKey ?? "none") }}
+              />{{
+                liveCellWord(t, row.checks[check].engine?.stateKey ?? "none", isAdded(row, check))
+              }}
             </button>
           </template>
           <template #cell-state="{ row }">
@@ -530,7 +528,9 @@ import {
   type LiveCellLook,
   type LiveCoverageState,
 } from "./live/liveCopy";
+import { useStore } from "vuex";
 import { useLoadPhase } from "./live/liveModel";
+import { justAdded } from "./insight/coverageCta";
 import LiveNoticeState from "./live/LiveNoticeState.vue";
 import LiveRefreshFailed from "./live/LiveRefreshFailed.vue";
 
@@ -540,6 +540,7 @@ type CoverageFill = "state" | "learning" | "detectors" | "scanned";
 type ServiceState = "watched" | "learning" | "gap";
 
 const { t, locale } = useI18nTyped();
+const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -950,8 +951,13 @@ const closeDrawer = () => {
   );
 };
 
+const isAdded = (row: CoverageRow, check: LiveCheck) =>
+  !!props.source &&
+  justAdded(String(store.state.selectedOrganization?.identifier ?? ""), row, check);
+const cellLook = (row: CoverageRow, check: LiveCheck) =>
+  liveCellLook(row.checks?.[check].engine?.stateKey ?? "none", isAdded(row, check));
 const liveCellAria = (row: CoverageRow, check: LiveCheck) =>
-  liveCheckText(t, check, row.checks?.[check].engine?.stateKey ?? "none");
+  liveCheckText(t, check, row.checks?.[check].engine?.stateKey ?? "none", isAdded(row, check));
 
 const SERVICE_COLUMN: OTableColumnDef<CoverageRow> = {
   id: "service",

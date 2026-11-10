@@ -32,6 +32,7 @@ import { syntheticPrefillFor } from "@/utils/synthetics/syntheticPrefill";
 import type { CoverageCell, CoverageRow, LiveCheck } from "../fixtures";
 import type { SyntheticsLocation } from "@/types/synthetics";
 import type { BulkKind, BulkRow } from "./bulk/useBulkReview";
+import { KIND_OF_CHECK, serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import { draftTarget, type AlertDraft } from "./targets/alertDraft";
 import type { ServiceAddress } from "./targets/serviceAddress";
 import { notifyOf, teamOf, type OwnedAlert } from "./targets/ownership";
@@ -62,6 +63,7 @@ export interface SyntheticInputs {
 const NO_DATA_MINUTES = 15;
 const HOUR_US = 3_600_000_000;
 const NO_SYNTHETIC_INPUTS: SyntheticInputs = { address: null, locations: [] };
+const recently = useRecentlyCreated();
 
 const enterprise = () => config.isEnterprise === "true";
 
@@ -118,13 +120,26 @@ const DRAFT_ORDER: BulkKind[] = ["errors", "latency", "no_data"];
 const unwatched = (cell: CoverageCell | undefined) =>
   !!cell && cell.engine?.stateKey !== "covered" && cell.state !== "watched";
 
+/** Whether this page added the alert for one of the service's checks and no pass has counted it yet. */
+export const justAdded = (org: string, row: CoverageRow, check: LiveCheck): boolean =>
+  recently.has(
+    serviceKeyOf(org, nameOf(row), row.identity?.cluster ?? null, row.identity?.namespace ?? null),
+    KIND_OF_CHECK[check],
+  );
+
 /** The alerts one service still needs drafted: errors and no-data on its rows, latency on its traces. */
-const draftsOf = (row: CoverageRow, checks: Record<LiveCheck, CoverageCell>): BulkKind[] => {
+const draftsOf = (
+  row: CoverageRow,
+  checks: Record<LiveCheck, CoverageCell>,
+  org: string,
+): BulkKind[] => {
   if (!rowStream(row)) return [];
+  // An alert added here stays out of the list until a pass counts it, so it is never added twice.
+  const open = (check: LiveCheck) => unwatched(checks[check]) && !justAdded(org, row, check);
   const kinds: BulkKind[] = [
-    ...(unwatched(checks.errors) ? (["errors"] as BulkKind[]) : []),
-    ...(unwatched(checks.latency) && streamOf(row, "traces") ? (["latency"] as BulkKind[]) : []),
-    ...(unwatched(checks.absence) ? (["no_data"] as BulkKind[]) : []),
+    ...(open("errors") ? (["errors"] as BulkKind[]) : []),
+    ...(open("latency") && streamOf(row, "traces") ? (["latency"] as BulkKind[]) : []),
+    ...(open("absence") ? (["no_data"] as BulkKind[]) : []),
   ];
   return DRAFT_ORDER.filter((k) => kinds.includes(k));
 };
@@ -198,11 +213,12 @@ export const gapInsight = (
   locale: string,
   row: CoverageRow,
   owned: OwnedAlert[] = [],
+  org: string = "",
 ): InsightParts | null => {
   const checks = row.checks;
   if (!checks) return null;
   const own = ownership(nameOf(row), owned);
-  const kinds = draftsOf(row, checks);
+  const kinds = draftsOf(row, checks, org);
   const one =
     kinds.length === 1 && kinds[0] === "no_data"
       ? addAlert(t, scopeOf(row, rowStream(row)!), (s) => noDataAlert(s, own), own.team.folderId)
@@ -461,6 +477,9 @@ export const cellInsight = (
 ): InsightParts | null => {
   const state = cell.engine?.stateKey;
   if (cell.state !== "gap" || state === "covered") return null;
+  if (key in KIND_OF_CHECK && justAdded(org, row, key as LiveCheck)) {
+    return partsOf(`${row.service}-${key}`, { why: t("insight.kind.cell.justAdded"), cta: null });
+  }
   const copy =
     state === "silent" ? silentCopy(t, row, cell) : gapCopy(t, row, key, org, synthetic, owned);
   return copy ? partsOf(`${row.service}-${key}`, copy) : null;

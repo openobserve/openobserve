@@ -57,6 +57,7 @@ import {
   type LivePhase,
 } from "./liveCopy";
 import { PAGED_CAP, failedDetail } from "./incidentsCopy";
+import { useRecentlyCreated } from "../insight/bulk/useRecentlyCreated";
 
 export interface RailSource extends Required<SourceState> {
   requests: LiveRequest[];
@@ -72,6 +73,8 @@ interface QueryLike {
   isFetching: Ref<boolean>;
 }
 
+const COVERAGE_POLL_MS = 5 * 60_000;
+const ADDED_POLL_MS = 60_000;
 export const SKELETON_DELAY_MS = 300;
 
 export const SKELETON_HOLD_MS = 300;
@@ -195,8 +198,23 @@ export const useLiveAutoObserve = () => {
   const now = useNow();
   const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
   const enabled = computed(() => live.value && !!org.value);
+  const recently = useRecentlyCreated();
+  // A pass runs about every 5 minutes; while an alert added here waits for one, read every minute.
   const coverage = useQuery(() =>
-    Object.assign(autoobserveCoverageQuery(org.value, "strict"), { enabled: enabled.value }),
+    Object.assign(autoobserveCoverageQuery(org.value, "strict"), {
+      enabled: enabled.value,
+      refetchInterval: (query: { state: { data?: { pass_at?: number | null } } }) =>
+        recently.waiting((query.state.data?.pass_at ?? 0) / 1000)
+          ? ADDED_POLL_MS
+          : COVERAGE_POLL_MS,
+    }),
+  );
+  watch(
+    () => coverage.data.value?.pass_at,
+    (passAt) => {
+      if (passAt) recently.clearOnPass(passAt / 1000);
+    },
+    { immediate: true },
   );
   const suggestions = useQuery(() =>
     Object.assign(autoobserveSuggestionsPageQuery(org.value, RAIL_CAP, 0), {

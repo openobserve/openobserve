@@ -129,6 +129,26 @@ const mountDrawer = (
 const chips = (wrapper: ReturnType<typeof mountDrawer>) =>
   wrapper.findAll('[data-test^="autoobserve-coverage-drawer-chip-"]');
 
+describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", () => {
+  it("reads Added in a neutral dot until a pass counts it, and offers no second add", async () => {
+    const { serviceKeyOf, useRecentlyCreated } = await import(
+      "./insight/bulk/useRecentlyCreated"
+    );
+    const recently = useRecentlyCreated();
+    const org = String(store.state.selectedOrganization?.identifier ?? "");
+    recently.add(serviceKeyOf(org, "checkout", "prod-eu", "shop"), "errors");
+    try {
+      const row = liveRow({ errors: cell("none"), latency: cell("none"), absence: cell("none") });
+      const found = chips(mountDrawer(row, "gap"));
+      expect(found[0].text()).toBe("Errors: Added");
+      expect(found[0].find("span").classes().join(" ")).toContain(LIVE_DOT.added);
+      expect(found[1].text()).toBe("Latency: Not watched");
+    } finally {
+      recently.clearOnPass(Number.MAX_SAFE_INTEGER);
+    }
+  });
+});
+
 describe("CoverageServiceDrawer in live mode", () => {
   it("shows the table's three checks, with their cell words and dots, and nothing else", () => {
     const row = liveRow({

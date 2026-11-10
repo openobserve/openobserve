@@ -409,6 +409,7 @@ import { useInsightActions } from "./insight/useInsightActions";
 import {
   cellInsight,
   gapInsight,
+  justAdded,
   ownedAlertIds,
   probeScope,
   tracesRoute,
@@ -639,11 +640,13 @@ const chips = computed(() => {
 const liveChips = computed(() =>
   LIVE_CHECKS.map((check) => {
     const stateKey = liveChecks.value?.[check].engine?.stateKey ?? "none";
+    const org = String(store.state.selectedOrganization?.identifier ?? "");
+    const added = !!props.live && justAdded(org, props.row, check);
     return {
       check,
-      look: liveCellLook(stateKey),
+      look: liveCellLook(stateKey, added),
       open: props.expanded === check,
-      text: liveCheckText(t, check, stateKey),
+      text: liveCheckText(t, check, stateKey, added),
     };
   }),
 );
@@ -709,7 +712,9 @@ watch(
   { immediate: true },
 );
 const gapParts = computed(() =>
-  props.live && state.value === "gap" ? gapInsight(t, locale.value, props.row, owned.value) : null,
+  props.live && state.value === "gap"
+    ? gapInsight(t, locale.value, props.row, owned.value, orgId.value)
+    : null,
 );
 // The address query and the locations read run only once Synthetic check is open, not per drawer.
 const probeOpen = computed(() => !!props.live && extraOpen.value === "external_probe");

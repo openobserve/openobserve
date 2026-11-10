@@ -22,6 +22,8 @@ import store from "@/test/unit/helpers/store";
 import { isPrefillBlocked, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import type { TranslateFn } from "@/types/i18n";
 import { m12Rows } from "./bulkFixtures";
+import { queryClient } from "@/composables/query/queryClient";
+import { autoobserveKeys } from "@/services/autoobserve.querykeys";
 import { useRecentlyCreated, serviceKeyOf } from "./useRecentlyCreated";
 import {
   applyRights,
@@ -182,6 +184,34 @@ describe("useBulkCreate — create", () => {
     expect(recent.has(key, "no_data")).toBe(true);
     recent.clearOnPass(Date.now());
     expect(recent.has(key, "no_data")).toBe(false);
+  });
+});
+
+describe("useBulkCreate — coverage follows the add (COVERAGE-AFTER-ADD)", () => {
+  const invalidated = () =>
+    (spy.mock.calls as unknown as [{ queryKey: unknown[] }][]).map(([f]) => f.queryKey);
+  let spy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    spy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+  });
+  afterEach(() => spy.mockRestore());
+
+  it("refetches coverage and the gap suggestions once after Add, not once per alert", async () => {
+    api.create.mockImplementation((_org: string, body: any) => okFor(body.name));
+    await makeCreate().create("no_data", ticked());
+    expect(invalidated()).toEqual([
+      autoobserveKeys.coverageAll("demo-org"),
+      autoobserveKeys.suggestions("demo-org"),
+    ]);
+  });
+
+  it("refetches them again after Undo", async () => {
+    api.create.mockImplementation((_org: string, body: any) => okFor(`id-${body.name}`));
+    await makeCreate().create("no_data", ticked());
+    spy.mockClear();
+    lastToast().action.handler();
+    await flushPromises();
+    expect(invalidated()).toHaveLength(2);
   });
 });
 

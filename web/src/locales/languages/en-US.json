@@ -30667,7 +30667,8 @@
         "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service",
         "none": "{signal}: no alert watches this"
       },
-      "fallsShort": "Falls short"
+      "fallsShort": "Falls short",
+      "added": "Added"
     },
     "drawer": {
       "moreChecks": "Other checks",
@@ -34602,6 +34603,7 @@
         "next": "Add an alert that fires when its success line doesn't appear."
       },
       "cell": {
+        "justAdded": "Added. AutoObserve counts it at its next check, within about 5 minutes.",
         "errorsWhy": "No alert watches {service}'s errors.",
         "errorsNext": "Add an errors alert at 3 times its usual rate.",
         "latencyWhy": "No alert watches {service}'s latency.",

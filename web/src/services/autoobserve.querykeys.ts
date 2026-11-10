@@ -18,6 +18,7 @@ import type { AutoObserveCoverageView } from "./autoobserve";
 
 export const autoobserveKeys = {
   all: (org: string) => orgKey(org, "autoobserve"),
+  coverageAll: (org: string) => orgKey(org, "autoobserve", "coverage"),
   coverage: (org: string, view: AutoObserveCoverageView) =>
     orgKey(org, "autoobserve", "coverage", view),
   suggestions: (org: string) => orgKey(org, "autoobserve", "suggestions"),
