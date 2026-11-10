@@ -16,13 +16,16 @@
 use std::time::Instant;
 
 use ::search::{QueryDelta, SearchResultType, datafusion::physical_plan::streaming_aggs_exec};
-use config::meta::{
-    search::{
-        PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-        SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
+use config::{
+    meta::{
+        search::{
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
+            SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
+        },
+        sql::OrderBy,
+        stream::StreamType,
     },
-    sql::OrderBy,
-    stream::StreamType,
+    utils::sql::is_explain_query,
 };
 use log;
 use tokio::sync::mpsc;
@@ -81,6 +84,12 @@ pub async fn do_partitioned_search(
     // instead of returning the newest-first page this function otherwise builds.
     extract_patterns: bool,
 ) -> Result<(), infra::errors::Error> {
+    // EXPLAIN hits are plan rows, which the requested result size must not cap.
+    let req_size = if is_explain_query(&req.query.sql) {
+        -1
+    } else {
+        req_size
+    };
     crate::sql::histogram::pin_histogram_timezone(
         &mut req.query.sql,
         &mut req.query.timezone,
