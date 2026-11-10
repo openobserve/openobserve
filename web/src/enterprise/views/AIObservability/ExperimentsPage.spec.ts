@@ -259,7 +259,7 @@ describe("ExperimentsPage live rows", () => {
     vi.useRealTimers();
   });
 
-  // C2-X9: an SDK run whose process died stays "running" until its 24 h deadline.
+  // An SDK run whose process died stays "running" until its 24 h deadline.
   it("backs off while a live row does not move, and pauses while the tab is hidden", async () => {
     vi.useFakeTimers();
     queryClient.clear();

@@ -26,7 +26,7 @@ import { traceUsageSum } from "./llmAttribution";
 
 const HOUR = 3_600_000_000;
 
-describe("insights search filter (AIO-26)", () => {
+describe("insights search filter", () => {
   it("narrows by trace, so a model filter keeps the trace's tool spans", () => {
     expect(searchFilterSql("default", " gen_ai_response_model = 'gpt-4o' ")).toBe(
       `trace_id IN (SELECT trace_id FROM "default" WHERE (gen_ai_response_model = 'gpt-4o'))`,
@@ -98,7 +98,7 @@ describe("traceListSql", () => {
     expect(traceListSql("s", { startTime: 0, endTime: 1 }, "", true)).not.toContain("HAVING");
   });
 
-  // G2-13: the drawer costs a trace as the tiles do, top-level agents included.
+  // The drawer costs a trace as the tiles do, top-level agents included.
   it("costs each trace by the per-trace usage rule over the agent-parent join", () => {
     const sql = traceListSql("s", { startTime: 0, endTime: 1 }, "gen_ai_agent_name = 'a'", true);
     expect(sql).not.toContain("SUM(gen_ai_usage_cost)");

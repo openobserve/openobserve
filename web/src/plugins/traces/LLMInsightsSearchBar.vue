@@ -14,16 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  LLMInsightsSearchBar — the Insights filter (AIO-26): a WHERE clause over the
-  stream's spans, in the Traces search syntax with its field and value
-  completion. A trace matches when any of its spans does. Enter or Apply sets
-  it; the page keeps it in the URL.
--->
+<!-- A trace matches when any of its spans matches the WHERE clause. -->
 <template>
   <div class="px-page-edge pt-2" data-test="llm-insights-search">
-    <!-- The same box as OSearchInput (the Quality page's search), so the two
-         pages read alike; inside it, the query editor's completion. -->
     <div
       class="rounded-default bg-input-bg focus-within:border-input-border-focus focus-within:ring-focus-ring-accent flex h-[2.125rem] w-full items-center border ps-2 pe-1 transition-[color,background-color,border-color,box-shadow] duration-150 focus-within:ring-[0.125rem]"
       :class="error ? 'border-error-600' : 'border-input-border hover:border-input-border-hover'"
@@ -165,9 +158,7 @@ async function bindEnter() {
 </script>
 
 <style scoped>
-/* keep(lib-override:code-query-editor): the query editor brings its own surface
-   and focus ring for its full-size use; inside this search box the box draws
-   both, so the editor and Monaco's generated DOM go transparent. */
+/* keep(lib-override:code-query-editor): the search box draws surface and focus ring. */
 .llm-insights-search-editor :deep(.logs-query-editor) {
   background: transparent;
   box-shadow: none;

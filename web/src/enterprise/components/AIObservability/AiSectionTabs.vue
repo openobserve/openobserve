@@ -14,12 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  AiSectionTabs — the current AI Observability page's peer tabs, for a page
-  header's #header-tabs (with tabs-below), like AlertSectionTabs. The shell
-  provides which tabs there are (see aiSectionTabs.ts); a locked tab carries a
-  lock and opens the enterprise features page.
--->
+<!-- A locked tab opens the enterprise features page. -->
 <template>
   <OTabs
     v-if="ctx && hasTabs"

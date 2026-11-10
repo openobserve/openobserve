@@ -277,13 +277,7 @@ export interface UseAgentScopeReturn {
    * No-op — returns false — outside cascade mode or when no agent matches.
    */
   selectAgentByName: (name: string) => boolean;
-  /**
-   * Seed the cascade from an (env, name, version) scope — a URL deep-link or a
-   * persisted selection. Any of the three may be "" (not given). Picks the agent
-   * matching every given dimension, else drops version, else matches the name
-   * alone, so a same-named agent under a different env/version is only the
-   * fallback. A given `stream` is kept when the agent sends to it. Returns true when an agent was selected.
-   */
+  /** Seed the cascade from a scope, preferring a full match over a same-named agent elsewhere. */
   selectAgentByScope: (env: string, name: string, version: string, stream?: string) => boolean;
 }
 
@@ -524,8 +518,6 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     return agents.value.find((a) => agentOptionKey(a) === activeAgent.value) ?? null;
   });
 
-  // Hazard 3 — effectiveStream normalization: uniformly `?? ""`. In agent mode
-  // the selected agent's source_stream drives the query; Stream mode reads the page-picked stream.
   const effectiveStream = computed(() =>
     opts.filterMode.value === "agent"
       ? (selectedAgent.value?.source_stream ?? "")

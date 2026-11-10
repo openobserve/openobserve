@@ -14,14 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  AI Observability module shell — mirrors the Settings/IAM scaffold so the
-  module fits the new app-wide UX (left section rail + breadcrumb in the top
-  chrome). The rail is data-driven via SectionHubGroup[]; routing each item
-  picks the route the rail/breadcrumb highlight. A rail item that holds several
-  sections (AI_OBSERVABILITY_TABBED_ITEMS) draws them as a tab strip above the
-  page; each tab is its own route, so the page under it is unchanged.
--->
+<!-- AI Observability shell: a section rail; tabbed rail items draw a tab strip, one route per tab. -->
 <template>
   <OPageLayout bleed :sidebar-width="railCollapsed ? RAIL_COLLAPSED_WIDTH : RAIL_WIDTH">
     <template #sidebar>
@@ -33,8 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="AI_ICON"
         collapsible
       >
-        <!-- The rail's foot, apart from the groups: Playground, and a Tools
-             menu holding the Configure pages. Collapsed, the two stack. -->
+        <!-- Rail foot: Playground and a Tools menu of Configure pages; they stack when collapsed. -->
         <template v-if="footerItem || configureItems.length" #footer="{ collapsed }">
           <div class="flex gap-2" :class="collapsed ? 'flex-col items-center' : 'items-center'">
             <OButton
@@ -101,9 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <section class="flex h-full min-h-0 min-w-0 flex-col">
       <div class="min-h-0 flex-1 overflow-y-auto">
         <OnlineEvalsDisabled v-if="onlineEvalsRouteOff" />
-        <!-- Pages hand questions to the O2 AI panel (AIO-36 "Explain"); MainLayout listens here.
-             Only a page that declares the event gets the listener: on the others it is an
-             extraneous attribute, which Vue warns about on a fragment-root page. -->
+        <!-- Only pages that declare the event get the listener; elsewhere Vue warns on fragment roots. -->
         <router-view v-else v-slot="{ Component }">
           <component :is="Component" v-bind="aiChatListener(Component)" />
         </router-view>
@@ -208,19 +198,12 @@ type SectionEntry = Omit<SectionHubItem, "icon" | "dataTest"> & {
   footer?: true;
 };
 
-// Single source of truth for the rail items, their tabs AND the breadcrumb
-// switcher, derived from AI_OBSERVABILITY_SECTIONS — the SAME list the OSS
-// and enterprise routers build their /ai routes from (see
-// composables/shared/useAIObservabilityRoutes.ts), so a nav item's
-// `featureKey`/`routeName` can't drift from what actually gates/names its
-// route. Enterprise-only sections stay visible but locked in OSS.
-// Settings/IAM rail pattern.
+// Derived from AI_OBSERVABILITY_SECTIONS, the list the routers use, so nav keys can't drift from routes.
 const sectionEntries = computed<SectionEntry[]>(() => {
   const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
   // With online evaluations off the server serves no evaluation sections, so drop them.
   const hideEvalSections = hidesOnlineEvalEntries(store.state.zoConfig);
-  // Memoized per featureKey, not per section — the four Evaluations tabs
-  // share one key and would otherwise recompute the same access check 4x.
+  // Per featureKey, not per section: the four Evaluations tabs share one key.
   const accessByFeatureKey = new Map<string, ReturnType<typeof checkFeatureAccess>>();
   const sections = AI_OBSERVABILITY_SECTIONS.filter(
     (section) =>

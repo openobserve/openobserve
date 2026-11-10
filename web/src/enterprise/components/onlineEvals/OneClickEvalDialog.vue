@@ -14,14 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  OneClickEvalDialog — a first score in one screen (AIO-23). It checks the judge
-  provider on open, offers built-in library judges only (each maps to a catalog
-  scorer, so there is no prompt to write), and creates the score config, the
-  scorer and a sampled trace job, then activates it and opens the config's
-  Quality page ("Waiting for your first scores"). A custom judge goes through
-  the full job form.
--->
+<!-- Library judges only: each maps to a catalog scorer, so there is no prompt to write. -->
 <template>
   <ODialog
     :open="open"

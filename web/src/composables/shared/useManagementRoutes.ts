@@ -138,8 +138,7 @@ const useManagementRoutes = () => {
     },
   });
 
-  // Always registered so a direct URL hits the locked page (`withFeatureGate`) instead of a 404.
-  // Registered in every build; slackRouteGuard and the rail both hide it unless the org config turns Slack on.
+  // Always registered so a direct URL hits the locked page; the guard and rail hide it unless Slack is on.
   routes[0].children.push({
     path: "slack",
     name: "slack",

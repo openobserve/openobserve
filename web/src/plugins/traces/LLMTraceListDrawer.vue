@@ -14,13 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  LLMTraceListDrawer — the traces behind a clicked Insights chart point or KPI
-  tile (AIO-26), without leaving AI Observability. Same scope and filters as
-  the page, narrowed to the clicked series and time bucket. A row opens the
-  trace in the conversation drawer; "Filter Insights to this" turns a model
-  series into the page's Model filter; "Open in Traces" is the full search.
--->
 <template>
   <ODrawer
     :open="open"

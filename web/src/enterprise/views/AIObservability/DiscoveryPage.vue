@@ -279,8 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
-    <!-- Trace and span rows open in a drawer on this page (AIO-21), keeping
-         the agent, version and time range. -->
+    <!-- Rows open in a drawer here, keeping the agent, version and time range. -->
     <AiTraceDrawer v-model:open="traceDrawerOpen" :trace="drawerTrace" />
   </AiPageShell>
 </template>

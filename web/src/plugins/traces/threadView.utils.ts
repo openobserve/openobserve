@@ -179,11 +179,7 @@ function decodeAnyValue(value: unknown): unknown {
   }
 }
 
-/**
- * Map raw role strings to the canonical 5-value union we render against.
- * Common SDK aliases: "human" → user, "model"/"ai" → assistant,
- * "function" → tool, OpenAI Responses "developer" → system.
- */
+/** Map SDK role aliases (human, model, ai, function, developer) to the canonical union. */
 export function normalizeRole(raw: unknown): Role {
   const r = String(raw ?? "").toLowerCase();
   if (r === "system" || r === "developer") return "system";
@@ -193,24 +189,7 @@ export function normalizeRole(raw: unknown): Role {
   return "unknown";
 }
 
-/**
- * Pull the textual content out of an SDK-specific message body. Handles:
- *   - plain strings
- *   - OTEL/Anthropic multipart arrays of `{type:"text", text}` parts
- *   - Vertex/ADK `function_response.response.content` payloads
- *   - Vertex/ADK `parts` arrays
- *   - generic `{text}` / `{content}` objects
- *
- * OTel GenAI v5 `reasoning`/`tool_call_response`/`server_tool_call_response`
- * parts render as text, including real-world SDK field-name aliases
- * (`thinking`/`result`) that don't match the spec's own names — kept in
- * sync with genAiParts.ts; tool calls render as cards, textless parts as a `[type]` marker.
- *
- * @example extractContent("hello")                 // "hello"
- * @example extractContent([{ text: "a" },
- *                         { text: "b" }])          // "a\nb"
- * @example extractContent({ parts: [{ text: "x" }] }) // "x"
- */
+/** Text of an SDK-specific message body; keep part aliases in sync with genAiParts.ts. */
 export function extractContent(content: unknown): string {
   if (content == null) return "";
   if (typeof content === "string") return content;
@@ -256,13 +235,7 @@ export function extractContent(content: unknown): string {
   return String(content);
 }
 
-/**
- * Find the array of messages inside an SDK envelope. Supports:
- *   1. Flat OTEL array       — [{role, content}, ...]
- *   2. Wrapped messages key  — {messages: [...]}
- *   3. Vertex/ADK request    — {model, config, contents: [...]}
- *   4. Gemini candidates, Bedrock `output.message`, LangChain `[[...]]` / `{generations}`
- */
+/** Find the messages array inside any supported SDK envelope. */
 export function resolveMessageArray(parsed: unknown): unknown[] {
   if (!parsed) return [];
   if (Array.isArray(parsed)) return flattenBatches(parsed);
@@ -380,11 +353,7 @@ function messageFromAnyValue(value: unknown, defaultRole: Role): Message | null 
   return { role, content, sig: `${role}::${content}` };
 }
 
-/**
- * Convert the raw input payload into a normalised `Message[]`.
- *
- * A system prompt outside the messages array (Vertex, Gemini, Anthropic/Bedrock) becomes a synthetic system message.
- */
+/** Out-of-array system prompts (Vertex, Gemini, Anthropic/Bedrock) become a system message. */
 export function messagesFromInput(raw: unknown): Message[] {
   const parsed = decodeAnyValue(raw);
   if (parsed == null) return [];
@@ -609,24 +578,7 @@ export interface TraceGroup {
   errorCount: number;
 }
 
-/**
- * Pure helper: turn a flat span list (from one trace_id) into a
- * `TraceGroup`. Returns `null` when the trace has no LLM-turn spans
- * (we don't render an empty chat for non-LLM traces).
- *
- * Logic:
- *   1. Sort LLM turns by start_time so the chat reads top-down.
- *   2. Attach tool spans to their parent turn by `reference_parent_span_id`.
- *      If no spans match (some SDKs flatten the parent chain), fall back
- *      to a time-window match: tools whose `start_time` is between this
- *      turn and the next; an orphan tool span before the first turn goes to turn 0.
- *   3. Resolve the trace's "system prompt" + "user query" from turn 0's
- *      input. Filter agent-injection look-alikes.
- *   4. For each subsequent turn, find genuine new user messages (dedup
- *      against the canonical user query and against earlier turns' new
- *      messages by `sig`).
- *   5. Aggregate per-trace cost / duration / error count.
- */
+/** Tools fall back to a time-window match when SDKs flatten the parent chain. */
 export function buildTraceGroup(spans: any[]): TraceGroup | null {
   if (!spans.length) return null;
   const traceId = String(spans[0].trace_id || "");

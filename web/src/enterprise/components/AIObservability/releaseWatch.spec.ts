@@ -37,7 +37,7 @@ const m = (over: Partial<WindowMeasures>): WindowMeasures => ({
   ...over,
 });
 
-describe("release watch (AIO-39)", () => {
+describe("release watch", () => {
   it("compares the newest version with the one before it", () => {
     const pair = watchPair([
       { name: "omp", version: "18.8.5", first_seen: 1 } as any,
@@ -64,7 +64,7 @@ describe("release watch (AIO-39)", () => {
     const sql = versionWindowSql("s", v, true);
     expect(sql).not.toContain("SUM(gen_ai_usage_cost)");
     expect(sql).toContain(`${traceUsageSum("gen_ai_usage_cost")} AS cost`);
-    // G2-13: top-level agents come from the agent-parent join.
+    // Top-level agents come from the agent-parent join.
     expect(sql).toContain(`FROM "s"${agentParentsJoin("s", true)} WHERE`);
     expect(versionWindowSql("s", v, false)).toContain(
       `FROM "s"${agentParentsJoin("s", false)} WHERE`,

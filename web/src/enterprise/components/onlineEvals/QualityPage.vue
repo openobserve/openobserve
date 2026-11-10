@@ -17,8 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 flex-col" data-test="quality-page">
     <!-- With a config open the page header is the detail header, as on the other detail pages. -->
-    <!-- The config list carries its rail item's header (Evaluations), the same on
-         each of its tabs; a config's detail has its own. -->
     <OPageHeader
       :title="!configId && sectionHeader ? sectionHeader.title : header.title"
       :subtitle="!configId && sectionHeader ? sectionHeader.subtitle : header.subtitle"
@@ -240,7 +238,7 @@ const { listQuery, rows, visibleRows, tiles, tileFilter, listStatus } = useQuali
 const tableForbidden = computed(
   () => listStatus.value === 403 || (!!props.configsForbidden && rows.value.length === 0),
 );
-// A first score in one screen (AIO-23), from the header or the empty state.
+// Opened from the header or the empty state.
 const oneClickOpen = ref(false);
 const showOneClick = computed(
   () => !configId.value && !props.createForbidden && !tableForbidden.value,

@@ -228,7 +228,7 @@ export function attributeSteps(spans: Span[]): StepAttribution[] {
         : null,
     });
   }
-  // A lone successful model call says nothing the span bar does not (C2-06).
+  // A lone successful model call says nothing the span bar does not.
   const only = steps.length === 1 ? steps[0] : null;
   if (only && only.kind === "llm" && !only.cause && !only.failed) {
     only.slow = false;

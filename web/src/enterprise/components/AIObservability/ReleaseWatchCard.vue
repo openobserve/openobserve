@@ -14,12 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  ReleaseWatchCard — on Insights for an agent with a new version (AIO-39): the
-  new version against the previous one over each version's first 3 hours, the
-  regressions, and the failure classes it introduced. "Open compare" opens
-  Compare versions; "Mute this version" hides the card for it. Observation only.
--->
+<!-- New version vs the previous one over each version's first 3 hours. Observation only. -->
 <template>
   <div
     v-if="visible"

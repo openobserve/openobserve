@@ -40,8 +40,7 @@ const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) IN ('2','5')";
 /// Any root span is a request, whatever its kind: a trace starting at a client span entered there.
 const ROOT_ARM: &str = "OR (reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
 
-/// Tolerates reformatting, not rewrites: a condition before `service_name` stays unrecognised.
-/// The `(` opens the `||` chain `quote_sql_string` writes for some services.
+/// Tolerates reformatting, not rewrites; `(` opens the `||` chain `quote_sql_string` writes.
 static IDENTITY: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)\bFROM\s+("(?:[^"]|"")*")\s+WHERE\s+service_name\s*=\s*\(?'"#).unwrap()
 });

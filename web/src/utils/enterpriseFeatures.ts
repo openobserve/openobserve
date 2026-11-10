@@ -186,11 +186,7 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     predicate: (c) => c.isEnterprise || c.isCloud,
     labelKey: "llmProviders.tabLabel",
   },
-  // Also gates the LLM Insights/Sessions Agent-mode toggle and the LLM
-  // Insights version-compare entry — both call the same agent-mapping API
-  // this AI Observability page configures, so they share this one gate rather than
-  // each re-deriving their own edition check (see AiScopeBar.vue,
-  // LLMInsightsDashboard.vue, SessionsList.vue).
+  // Also gates Agent mode and version compare: they call the same agent-mapping API.
   genAiAgentMapping: {
     predicate: (c) => c.isEnterprise || c.isCloud,
     labelKey: "genAiAgentMapping.tabLabel",

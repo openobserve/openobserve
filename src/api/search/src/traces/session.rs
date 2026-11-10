@@ -1379,10 +1379,7 @@ fn normalize_session_search_term(raw: Option<&String>) -> Option<String> {
     Some(trimmed.chars().take(SESSION_SEARCH_MAX_LEN).collect())
 }
 
-/// Case-insensitive substring predicate on one span column.
-///
-/// `str_match_ignore_case` takes the term as literal text — unlike `LIKE` it
-/// has no wildcards, so `%` and `_` need no escaping.
+/// Case-insensitive literal substring match; `str_match_ignore_case` needs no wildcard escaping.
 fn session_search_predicate(column: &str, term: &str) -> String {
     format!(
         "str_match_ignore_case({column}, {})",
@@ -1787,7 +1784,7 @@ fn build_latest_sessions_sql(
     .collect();
     let stream_ident = traces::session::quote_identifier(stream_name);
     let agent_parents = agent_parents_join(&stream_ident, validated.layout(), None);
-    // Picks the agent's harness patterns when the session is read (AIO-22).
+    // Picks the agent's harness patterns when the session is read.
     let (agent_name_expr, session_agent_name_expr) = if validated.has_gen_ai
         && validated.has_input_messages
     {
@@ -2128,7 +2125,7 @@ mod tests {
 
     use super::*;
 
-    // AIO-22: the agent's harness text is hidden before the 400-character cut.
+    // The agent's harness text is hidden before the 400-character cut.
     #[test]
     fn session_hits_hide_the_agents_harness_text_and_take_a_title() {
         let wrapper = format!("<system-reminder>{}</system-reminder>", "x".repeat(600));
@@ -2757,7 +2754,7 @@ mod tests {
 
     #[test]
     fn session_trace_page_reports_every_turn_and_pages_newest_first() {
-        // S3-03: `total` is the session's turn count, not the page length.
+        // `total` is the session's turn count, not the page length.
         let ordering: HashMap<String, i64> = (0..5).map(|n| (format!("t{n}"), n)).collect();
         assert_eq!(
             session_trace_page(ordering.clone(), 0, 2),

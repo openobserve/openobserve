@@ -544,11 +544,7 @@ describe("LLMInsightsDashboard — onMounted", () => {
 // ===========================================================================
 
 describe("LLMInsightsDashboard — onUnmounted", () => {
-  // The dashboard wires cancellation through onUnmounted so in-flight server
-  // queries are cancelled when the user navigates away. Without this the server
-  // keeps streaming results to a component that's no longer rendered. Unmount
-  // cancels the dashboard's own queries plus the version-compare arms (armA +
-  // armB) and filter-option queries; the spy count depends on mocks, so assert only that cancelling happens.
+  // The spy count depends on mocks, so assert only that cancelling happens.
   it("calls cancelAll on unmount", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
@@ -557,10 +553,6 @@ describe("LLMInsightsDashboard — onUnmounted", () => {
     expect(mockCancelAll).toHaveBeenCalled();
   });
 });
-
-// ===========================================================================
-// onViewTrace — opens the trace drawer when user clicks a recent error
-// ===========================================================================
 
 describe("LLMInsightsDashboard — onViewTrace", () => {
   it("opens the trace drawer with the current window, without leaving the page", async () => {
@@ -617,10 +609,6 @@ describe("LLMInsightsDashboard — OSS builds (neither isEnterprise nor isCloud 
     expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(true);
   });
 });
-
-// ===========================================================================
-// Scope: mode resolution (AIO-02/03), URL scope (AIO-08), one agents fetch (AIO-18)
-// ===========================================================================
 
 const agentAt = (name: string, stream: string, env: string, version: string) => ({
   name,
@@ -679,7 +667,6 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     const wrapper = await mountAndEnter();
 
     expect((wrapper.vm as any).filterMode).toBe("agent");
-    // The auto-picked agent stays out of the URL too, so a reload with no agents ends in Stream.
     // A write that changes nothing is skipped, so the URL may still be the route's own query.
     const lastReplace = mockRouterReplace.mock.calls.at(-1) as unknown as
       [{ query: Record<string, unknown> }] | undefined;
@@ -902,7 +889,7 @@ describe("LLMInsightsDashboard — scope resolution", () => {
   });
 });
 
-describe("LLMInsightsDashboard — search filter (AIO-26)", () => {
+describe("LLMInsightsDashboard — search filter", () => {
   it("narrows the strip to the traces the search matches and keeps it in the URL", async () => {
     const wrapper = mountDashboard();
     await flushPromises();

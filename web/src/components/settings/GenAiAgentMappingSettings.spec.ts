@@ -340,7 +340,7 @@ describe("GenAiAgentMappingSettings", () => {
     });
   });
 
-  // A2-04: two rows for one agent saved two rules that the list and Session Detail read differently.
+  // Two rows for one agent saved two rules that the list and Session Detail read differently.
   it("refuses to save two rows for the same agent", async () => {
     mockGet.mockResolvedValue({
       ...config(["my.agent"]),

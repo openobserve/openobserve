@@ -14,15 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  AiAlertPackDialog — install the `ai-agents` alert pack in one screen (AIO-20).
-  The stream and the destination come first, because users name their own
-  trace streams: the dialog picks the first LLM stream and the first alert
-  destination, so install is two clicks. Rules whose data is not there yet are
-  listed with what they wait for and are not installed. A rule already
-  installed for the stream is marked and skipped: alert names are not unique,
-  so installing it again would add a second copy.
--->
+<!-- Alert names are not unique, so a rule already installed for the stream is skipped, not duplicated. -->
 <template>
   <ODialog
     :open="open"

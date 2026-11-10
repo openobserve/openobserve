@@ -142,7 +142,6 @@ impl std::fmt::Display for TargetScope {
     }
 }
 
-/// Valid state transitions. Maps from current state to allowed next states.
 /// `paused → paused` turns a budget pause into a user's, so no auto-resume at 00:00 UTC.
 pub fn is_valid_transition(from: &str, to: &str) -> bool {
     matches!(
@@ -173,7 +172,7 @@ pub enum BudgetAction {
     KeepRunning,
 }
 
-/// A job's daily judge spend limit (AIO-24). One budget covers all regions.
+/// A job's daily judge spend limit; one budget covers all regions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EvalJobBudget {

@@ -13,21 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * In-memory, selection-scoped cache for the LLM Insights data path the
- * dashboards' IndexedDB panel cache can't cover: the **KPI strip** (fetched by
- * the dashboard via `useLLMInsights`). The chart panels reuse the dashboards'
- * own IndexedDB cache instead.
- *
- * Keyed by `selectionKey`, so returning to the same selection hits.
- *
- * A module singleton on purpose: panels are recreated on every tab toggle, so a `Map` in
- * `setup()` would be reset to empty each time and never hit. Module scope means
- * one shared instance for the page's lifetime; cleared only on a full reload.
- *
- * Bounded (`MAX_ENTRIES`) so a long session that visits many windows can't grow
- * without limit — the oldest entry is evicted FIFO when full.
- */
+/** Module singleton: panels remount on every tab toggle, so a per-setup `Map` would never hit. */
 import { quantizeRange } from "@/composables/query/queryClient";
 import type { LLMKPI, LLMSparklineSeries } from "./composables/useLLMInsights";
 

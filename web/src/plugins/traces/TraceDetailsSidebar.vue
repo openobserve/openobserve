@@ -1299,7 +1299,7 @@ export default defineComponent({
       type: Number as PropType<number | null>,
       default: null,
     },
-    // AIO-33: the trace's rule issues; the Issues tab shows those this span is evidence for.
+    // The Issues tab shows the trace's rule issues this span is evidence for.
     issues: {
       type: Array as PropType<TraceIssue[]>,
       default: () => [],

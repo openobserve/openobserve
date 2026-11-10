@@ -158,10 +158,7 @@ function clientScoreSummary(summary: ExperimentClientScoreSummary): ExperimentSc
   );
 }
 
-/**
- * The row's own `includeSummary` fields already carry the type-aware
- * aggregate per scorer and per client dimension, so this only reshapes them.
- */
+/** The row's `includeSummary` fields already carry the per-scorer aggregate; this only reshapes. */
 export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidence {
   const platform = (experiment.scoreSummaries ?? []).map((summary) => {
     const name = summary.scoreConfigName || summary.name;

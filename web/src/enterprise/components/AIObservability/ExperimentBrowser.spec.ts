@@ -909,7 +909,7 @@ describe("ExperimentBrowser", () => {
     );
   });
 
-  // C2-X4: four completed re-runs of qa2-flaky on PR 108, then a cancelled fifth.
+  // Four completed re-runs of qa2-flaky on PR 108, then a cancelled fifth.
   it("keeps the newest completed re-run's verdict when a newer re-run was cancelled", async () => {
     route.query = { group: "pr", sort: "regressions" };
     const flaky = (
@@ -1003,7 +1003,7 @@ describe("ExperimentBrowser", () => {
     expect(replace).toHaveBeenLastCalledWith({ query: { group: "pr", sort: "regressions" } });
   });
 
-  // C2-X5: qa2-partial, whose tone Scorer errored on 5 of 10 rows.
+  // qa2-partial, whose tone Scorer errored on 5 of 10 rows.
   it("judges a run whose scorer failed on some rows by its other scores, and marks the failed one", async () => {
     const base = makeExperiment({
       id: "base",
@@ -1042,7 +1042,7 @@ describe("ExperimentBrowser", () => {
     );
   });
 
-  // C2-X6: unranged qa2-latency (lte), baseline 100, run 0.
+  // Unranged qa2-latency (lte), baseline 100, run 0.
   it("reads an unranged score's move as a percent of the baseline, not points", async () => {
     const latency = (mean: number) => [
       makeScoreSummary({
@@ -1078,7 +1078,7 @@ describe("ExperimentBrowser", () => {
     );
   });
 
-  // C2-X8: qa2-allerr, every task errored, then finalized.
+  // qa2-allerr: every task errored, then finalized.
   it("says how many tasks failed on a completed run and refuses it as the baseline", async () => {
     const allErr = makeExperiment({
       id: "allerr",

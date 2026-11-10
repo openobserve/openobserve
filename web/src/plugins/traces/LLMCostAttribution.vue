@@ -14,16 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  LLMCostAttribution — "Cost by model / user / tenant / feature" on Insights (AIO-27).
-  One row per value with cost, share, tokens and traces for the page's scope
-  and window; spans with no value land in an Unattributed row so the shares add
-  up. A segmented bar above the table shows each row's share of spend in the
-  row's dot colour. A row click filters the page to that value. With nothing
-  to attribute (the stream never received the attribute, or no span in the
-  window sets it) the panel says what the view shows and links to the mapping,
-  whose coverage tells whether to map an existing field or instrument.
--->
+<!-- Spans with no value land in an Unattributed row so the shares add up. -->
 <template>
   <LLMPanelCard
     :title="t('llmAttribution.title')"

@@ -53,9 +53,7 @@ export function useAiDateController(opts: { defaultRelative?: string } = {}) {
     };
   }
 
-  // URL ↔ shared date sync. URL wins over shared state on mount so deep-links
-  // reproduce the exact saved view, but shared state is the cross-page memory
-  // when no URL hint is present.
+  // URL wins on mount so deep-links reproduce the saved view; shared state covers the no-URL case.
   function readFromUrl(): boolean {
     const fromRaw = route.query.from;
     const toRaw = route.query.to;
@@ -105,8 +103,6 @@ export function useAiDateController(opts: { defaultRelative?: string } = {}) {
     });
   }
 
-  // Date-only part of the page's onDateChange: update state + write URL. The
-  // page wires the child refresh off `timeRange` separately (see useChildRefresh).
   // Returns whether the range changed, so pages skip the picker's mount replay.
   function onDateChange(value: any): boolean {
     const before = selectionKey();

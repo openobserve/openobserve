@@ -259,8 +259,7 @@ pub async fn update_job(
     store_job_update(job).await
 }
 
-/// Runs every check [`update_job`] makes, so a caller can refuse the edit before it is stored.
-/// `budget` says what the request asks of the stored budget; `job.budget` is ignored.
+/// Runs every check [`update_job`] makes; `budget` is the request's, `job.budget` is ignored.
 #[tracing::instrument(skip(job))]
 pub async fn prepare_job_update(
     org_id: &str,

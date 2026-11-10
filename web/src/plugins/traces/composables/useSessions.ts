@@ -180,7 +180,7 @@ export interface SessionRow {
   userId: string;
   /** First user message in the session (truncated server-side). */
   firstUserMessage: string;
-  /** Harness blocks the agent's patterns hid from it (AIO-22). */
+  /** Harness blocks the agent's patterns hid from it. */
   harnessHidden: number;
   /** The tag that hid a message that was only harness text. */
   harnessOnly: string;
@@ -213,14 +213,7 @@ const rowsPerPage = ref(20);
 // preserves the exact list when navigating into a session and back.
 const sortBy = ref<SessionSortField>("end_time");
 const sortOrder = ref<SessionSortOrder>("desc");
-// Active list search (the search box on the scope row) — this ref IS the
-// box's v-model directly (live, debounced), no separate draft. Module-scoped
-// like the pagination so a back-navigation from a session detail restores the
-// filtered page together with the term that produced it. Deliberately NOT
-// persisted to localStorage: the scope is remembered across visits, a search
-// is a one-time action. The backend matches it against the user id OR the
-// conversation text (whichever the stream has), so one term searches both.
-// `user` is an exact user id (the Users page's "Sessions" link, `?user=`).
+// Module-scoped so back-navigation restores the filtered page; not persisted, a search is one-time.
 export interface SessionSearch {
   keyword?: string;
   user?: string;
@@ -374,13 +367,7 @@ export function useSessions() {
     }
   }
 
-  /**
-   * Fetch one page of a session's turns and derive the session-level rollup client-side.
-   *
-   * The backend returns the same trace-summary hit shape that this mapper
-   * already consumes, but with per-turn status computed from all spans in each
-   * trace. Pages run newest first; `total` is the session's turn count.
-   */
+  /** Fetch one page of a session's turns, newest first; `total` is the session's turn count. */
   async function fetchSession(
     streamName: string,
     sessionId: string,
@@ -619,11 +606,7 @@ export function useSessions() {
     return buildTurnDetail(traceId, hits || []);
   }
 
-  /**
-   * Fetch all gen_ai spans of the given turns — the raw span rows the
-   * `ThreadView` component renders from (it groups by `trace_id` and classifies
-   * by `gen_ai_operation_name`). Filters by trace ids so tool-execution spans are included.
-   */
+  /** Fetch all gen_ai spans of the given turns, by trace id so tool-execution spans are included. */
   async function fetchSessionSpans(
     streamName: string,
     turns: Pick<SessionTraceRow, "traceId" | "spanCount">[],

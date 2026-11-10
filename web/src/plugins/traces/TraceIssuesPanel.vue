@@ -14,10 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  TraceIssuesPanel — the span sidebar's Issues tab (AIO-33): why the rule fired,
-  from counts only (no prompt text), and the evidence spans as links.
--->
 <template>
   <div class="flex flex-col gap-3 p-1" data-test="trace-issues-panel">
     <section

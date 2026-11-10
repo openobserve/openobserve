@@ -13,35 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<!--
-  AgentScopeCascade — the three inline Env → Agent → Version dropdowns that
-  replace the single grouped agent picker in the AI scope bar. It is a thin,
-  presentational shell over useAgentScope's cascade state: the parent owns the
-  derived option lists (envs / agentNames / versions) and the three selection
-  refs, and re-derives the lower lists whenever a higher dimension changes. This
-  component only renders them and forwards changes back via v-model.
-
-  Styling matches the standard OpenObserve dropdown (the single agent picker it
-  replaces): `label-position="inside"`, `w-full rounded-default` on the OSelect
-  inside a fixed-width wrapper, so it reads as native.
-
-  Dropdowns stay ENABLED even when a dimension has a single option — a disabled
-  (greyed) control reads as "broken". The user can still open it to see the one
-  value; the parent has auto-selected it. UNSET dimensions arrive with their
-  label already resolved to the unset i18n string in the option object.
-
-  When there are no agents at all (empty options), the whole cascade is hidden by
-  the parent (the page shows its own no-agents empty state), so this component
-  never renders a stuck/empty dropdown.
-
-  A fourth Stream dropdown renders only when the selected env + agent + version
-  sends to more than one stream (useAgentScope.agentStreams), so a single-stream
-  setup keeps its three-control row. It shows the stream the page reads (the
-  pick, else the default) and emits the pick via update:selectedStream. Below md
-  it takes its own row under the three-up cascade.
-
-  data-test on each: `${prefix}-cascade-{env|agent|version|stream}`.
--->
+<!-- Dropdowns stay enabled with a single option: a disabled control reads as broken. -->
 <template>
   <div
     class="flex flex-wrap items-center gap-2 max-md:basis-full"

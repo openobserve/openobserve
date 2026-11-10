@@ -374,7 +374,7 @@ describe("JobFormPage", () => {
     expect(payload.inputMapping).toEqual({
       s1: { input: "{{gen_ai_input_messages}}" },
     });
-    // Every new job starts with the default daily budget (AIO-24).
+    // Every new job starts with the default daily budget.
     expect(payload.budget).toEqual({ dailyUsd: 5, onReach: "pause" });
     // draft path → no activation
     expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
@@ -491,7 +491,7 @@ describe("JobFormPage", () => {
       expect(wrapper.emitted("saved")).toBeTruthy();
     });
 
-    it("keeps a job's own budget on edit (AIO-24)", async () => {
+    it("keeps a job's own budget on edit", async () => {
       wrapper = createWrapper({
         mode: "edit",
         row: { ...editRow, budget: { dailyUsd: 12, onReach: "keep_running", pausedAt: 1 } },

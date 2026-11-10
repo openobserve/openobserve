@@ -53,10 +53,7 @@ export interface LLMPanelQuery {
   seriesField?: string;
   /** Hit field used for the y-value (or bar length). */
   valueField?: string;
-  /**
-   * i18n KEY for the legend label used when seriesField is not set. Resolved by
-   * Resolved by `buildLLMPanelSchema` so the label follows the locale.
-   */
+  /** i18n key for the legend label when seriesField is unset, resolved per locale. */
   seriesLabelKey?: I18nKey;
   /** Series drawn one per value column; `errored` picks errored (true) or error-free (false) traces on click. */
   measures?: Array<{ field: string; labelKey: I18nKey; color?: string; errored?: boolean }>;
@@ -87,11 +84,9 @@ export interface LLMPanelDef {
   color?: string;
   /** Optional row cap for horizontal-bar panels (top N). */
   limit?: number;
-  /**
-   * A trace matches when any span has the `seriesSql` value; `errored` selects traces with an errored span.
-   */
+  /** A trace matches when any span has the `seriesSql` value; `errored` selects errored traces. */
   drill?: { seriesSql?: string; errored?: true };
-  /** "Create alert" from this panel (AIO-20): the pack template it maps to. */
+  /** "Create alert" from this panel: the pack template it maps to. */
   alert?: AiAlertKind;
 }
 
@@ -378,27 +373,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
 ];
 
-/**
- * Substitute the standard placeholders in a SQL template with concrete values.
- *
- * Replaces (globally, all occurrences):
- *   {{stream}}     → `"streamName"` (always quoted — DataFusion treats unquoted
- *                                    identifiers as case-insensitive)
- *   {{startTime}}  → numeric microseconds, unquoted
- *   {{endTime}}    → numeric microseconds, unquoted
- *   {{interval}}   → bucket width string ("5 minutes", "1 hour", etc.) — used
- *                                    only inside `histogram(_timestamp, '…')`
- *   {{scope}}      → ` AND (<agentFilter>)` or nothing; mark each WHERE of a UNION
- *   {{unattributed}} → the quoted series name for usage with no model
- *   {{agentParents}} → `agentParentsJoin`, placed after `{{stream}}`
- *
- * @example
- *   renderPanelSql(
- *     `SELECT histogram(_timestamp, '{{interval}}') FROM {{stream}}`,
- *     { stream: "default", startTime: 1700000000000000, endTime: 1700001000000000, interval: "1 minute" },
- *   )
- *   // => `SELECT histogram(_timestamp, '1 minute') FROM "default"`
- */
+/** Fills `{{…}}` placeholders; `{{stream}}` is quoted since DataFusion folds unquoted identifiers. */
 export function renderPanelSql(
   sql: string,
   ctx: {

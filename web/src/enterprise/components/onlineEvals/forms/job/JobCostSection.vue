@@ -14,11 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The job form's Cost section (AIO-24): what the job would score and spend a
-  day, and its daily budget and what happens when it is reached. The budget
-  fields are the parent form's (`dailyBudgetUsd`, `budgetAction`), bound by name.
--->
+<!-- Budget fields are the parent form's (`dailyBudgetUsd`, `budgetAction`), bound by name. -->
 <template>
   <section
     class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"

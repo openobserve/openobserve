@@ -189,11 +189,8 @@ const props = withDefaults(
     selectedAgentName: string;
     /** Selected version (two-way via update:selectedVersion). */
     selectedVersion: string;
-    /** Streams carrying the selected agent (useAgentScope.agentStreams); two
-        or more show the cascade's Stream dropdown. */
+    /** Streams carrying the selected agent; two or more show the cascade's Stream dropdown. */
     agentStreams?: SelectOption[];
-    /** The stream agent mode reads (the page's effectiveStream); a pick
-        emits update:selectedAgentStream. */
     selectedAgentStream?: string;
     /** Gate the stream select behind an OSkeleton until streams load
         (Sessions/LLM). Graph/Behavior derive the stream from the agents API

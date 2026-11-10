@@ -14,15 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  AiTraceDrawer — opens a trace inside the AI Observability page the user is on
-  (AIO-21), instead of jumping to the Traces page and dropping the agent, version
-  and time range. The trace renders through the embedded TraceDetails, so LLM
-  traces open on Thread. With an `evaluator` trace (a score's judge call), one
-  toggle switches between the scored trace and its judge. "Open in Traces" is
-  today's full page, in a new tab. The `#footer` slot carries page actions such
-  as Previous / Next score.
--->
+<!-- Opens a trace in place so the AI page keeps its agent, version and time range. -->
 <template>
   <ODrawer
     :open="open"

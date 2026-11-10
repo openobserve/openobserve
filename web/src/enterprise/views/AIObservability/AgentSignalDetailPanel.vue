@@ -53,8 +53,7 @@
             {{ explanation }}
           </p>
         </div>
-        <!-- AIO-36: the finding and the evidence below it, handed to O2 AI. Waits
-             for the evidence so the question carries it. -->
+        <!-- Waits for the evidence so the question to O2 AI carries it. -->
         <OButton
           v-if="explainable"
           variant="outline"

@@ -1,11 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
-<!--
-  One dataset's runs in time order for one score, against the baseline and a
-  noise band as wide as Compare's threshold. Points inside the band count as
-  unchanged, so a one-slot wobble does not read as a regression. A plain SVG
-  like OSparkline: one series and a band need nothing from a chart library.
--->
+<!-- Points inside the noise band count as unchanged, so a one-slot wobble is not a regression. -->
 <template>
   <div
     v-if="trend && trend.points.length"
@@ -39,8 +34,7 @@
         {{ t("experimentsAtScale.improvedCount", { count: trend.improved }) }}
       </span>
     </div>
-    <!-- The coordinate space is the measured width, so the plot spans the
-         section at 1 unit = 1 px and the text keeps its size. -->
+    <!-- Viewbox is the measured width, so 1 unit = 1 px and text keeps its size. -->
     <svg
       ref="svg"
       :viewBox="`0 0 ${W} ${H}`"

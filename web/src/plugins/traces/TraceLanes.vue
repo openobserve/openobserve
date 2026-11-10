@@ -14,14 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  Lanes under a span timeline, on its time axis (AIO-37): correlated log lines
-  of the critical-path services as ticks by severity, one metric per service
-  from a fixed list, and the state of each pod the spans ran on. Uses the same
-  correlation service as the sidebar's Logs and Metrics tabs, so it is locked
-  without that license. A lane whose data is not there is left out; when none
-  loads, one row says so (or that the load failed).
--->
+<!-- Uses the sidebar's correlation service, so it is locked without that license. -->
 <template>
   <div
     v-if="!access.allowed"

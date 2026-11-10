@@ -14,11 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The eval job drawer's Workload tab (AIO-25): score lag, throughput, judge
-  errors by kind and judge spend over the drawer's window; a plain "Scores
-  stopped" banner; and the job's two alert templates, prefilled with its id.
--->
 <template>
   <div class="flex flex-col gap-[1.125rem] pb-[1.125rem]" data-test="eval-job-workload">
     <div v-if="stopped" class="px-5">

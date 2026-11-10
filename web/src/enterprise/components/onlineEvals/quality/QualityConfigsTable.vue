@@ -37,10 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       width="100%"
       @row-click="(row: QualityRow) => emit('open', row, 'all')"
     >
-      <!-- The tiles sit in the toolbar so the column picker, which the table
-           draws only with a toolbar, shares their row. Counts from an empty
-           list would read "0 of 0 … every config gives a result" next to an
-           error or an empty org. -->
+      <!-- In the toolbar so the column picker shares their row; hidden when the list is empty. -->
       <template v-if="loading || tiles.total > 0" #toolbar>
         <div class="min-w-0 flex-1" data-test="quality-tiles">
           <OStatStrip>
@@ -372,7 +369,6 @@ function openConfig(row: QualityRow) {
     .catch(() => {});
 }
 
-// A first score in one screen (AIO-23), before the manual path.
 const emptyActions = computed<EmptyStateAction[]>(() => [
   {
     id: "one-click",

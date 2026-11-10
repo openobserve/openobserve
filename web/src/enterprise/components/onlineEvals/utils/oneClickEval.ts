@@ -18,7 +18,7 @@ import type { CompletionWindowDefaults } from "./completionWindow";
 import { DEFAULT_BUDGET_ACTION, DEFAULT_DAILY_BUDGET_USD } from "./evalSpend";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
-/** Built-in catalog judges the one-click dialog offers (AIO-23), in order. */
+/** Built-in catalog judges the one-click dialog offers, in order. */
 export const ONE_CLICK_JUDGES = ["hallucination", "answer_relevance", "helpfulness", "toxicity"];
 
 /** Trace-scope system variables: the root LLM call's input and output. */
@@ -83,7 +83,6 @@ export function buildOneClickJob(opts: {
     sessionConfig: null,
     samplingMode: "rate",
     samplingValue: opts.rate,
-    // The same default budget every new job starts with (AIO-24).
     budget: { dailyUsd: DEFAULT_DAILY_BUDGET_USD, onReach: DEFAULT_BUDGET_ACTION },
   };
 }

@@ -7,8 +7,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <template>
   <div class="flex h-full min-h-0 flex-col p-4" data-test="scorer-library">
-    <!-- Code checks ship in the bundle and need no provider, so they list even
-         while the judge catalog loads, fails, or has no provider to run on. -->
+    <!-- Code checks need no provider, so they list even while the judge catalog fails. -->
     <div class="flex min-h-0 flex-1 flex-col">
       <div class="mb-4 flex items-end gap-3">
         <div v-if="providers.length > 0" class="flex w-60 shrink-0 items-center gap-2">

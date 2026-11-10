@@ -43,7 +43,7 @@ const feature: BudgetDef = {
   stream: "default",
 };
 
-describe("budgets (AIO-38)", () => {
+describe("budgets", () => {
   // One named user, apart from the per-user cap ("Each user").
   it("budgets one user on user_id, as one key", () => {
     const vip: BudgetDef = { ...feature, scope: "oneUser", value: "u_42" };
@@ -77,7 +77,7 @@ describe("budgets (AIO-38)", () => {
     expect(perSession).not.toContain("LIMIT");
   });
 
-  // W3-01: the agent name or user is often only on the root/agent span, the cost on its children.
+  // The agent name or user is often only on the root/agent span, the cost on its children.
   it("attributes a trace's whole cost to the value any of its spans carries", () => {
     const agent = budgetSql({ ...feature, scope: "agent", value: "omp" }, true);
     expect(agent).toContain(
@@ -161,7 +161,7 @@ describe("budgets (AIO-38)", () => {
     expect(sql).not.toContain("LIMIT");
   });
 
-  // W3-04: 80% of a sub-cent limit, rounded to 4 decimals, landed on the limit and was refused.
+  // 80% of a sub-cent limit, rounded to 4 decimals, landed on the limit and was refused.
   it("keeps the warning below the limit for sub-cent limits, without float noise", () => {
     expect(warningValue(0.0001)).toBe(0.00008);
     expect(warningValue(0.0002)).toBe(0.00016);
@@ -169,7 +169,7 @@ describe("budgets (AIO-38)", () => {
     expect(warningValue(400)).toBe(320);
   });
 
-  // W3-V1: a sub-cent spend read "$0.00" next to a "$0.0003" limit.
+  // A sub-cent spend read "$0.00" next to a "$0.0003" limit.
   it("shows sub-cent amounts with their digits, cents otherwise", () => {
     expect(formatBudgetUsd(0.00044)).toBe("$0.00044");
     expect(formatBudgetUsd(0.0003)).toBe("$0.0003");
@@ -232,7 +232,7 @@ describe("budgets (AIO-38)", () => {
     expect(merged.map((d) => d.alertIds)).toEqual([["warn", "over"], ["new"]]);
   });
 
-  // G3-E1: budgets that reused a name are separate budgets, not one pair.
+  // Budgets that reused a name are separate budgets, not one pair.
   it("folds only a true warn/over pair of one budget", () => {
     const def = (id: string, alertName: string, over: Partial<typeof feature> = {}) => ({
       ...feature,

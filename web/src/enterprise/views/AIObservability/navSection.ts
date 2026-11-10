@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The shell lifts a tab's key to its rail item through the section's `tabOf`.
-//
-// Matched by PREFIX, not by an exact list: every section grows drill-down routes
-// (`aiExperimentDetail`, `aiDatasetDetail`, `aiQueueWorkbench`) and an exact list
-// silently unlights the rail the day one is added. Prefixes make a new sub-route
-// inherit its parent's highlight by default.
+// Matched by prefix so a new drill-down route inherits its parent's rail highlight.
 
 /** No entry here may be a prefix of another, or the earlier one always wins. */
 const SECTION_BY_ROUTE_PREFIX: ReadonlyArray<readonly [string, string]> = [

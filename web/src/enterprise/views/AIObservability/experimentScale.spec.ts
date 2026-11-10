@@ -514,7 +514,7 @@ describe("partly failed scoring", () => {
   });
 });
 
-// C2-X6: an unranged numeric score moves relative to its baseline.
+// An unranged numeric score moves relative to its baseline.
 describe("delta units", () => {
   it("prints an unranged numeric move as a percent of the baseline, and a ranged one as points", () => {
     const latency = (mean: number) => summary("latency", { kind: "numeric", mean });

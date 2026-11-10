@@ -233,7 +233,7 @@ describe("useLLMInsights — fetchAll fires 3 parallel queries", () => {
       expect(sql).toContain("SUM(tokens) as total_tokens");
       expect(sql).toContain("SUM(cost) as total_cost");
       expect(sql).not.toMatch(/SUM\(\s*gen_ai_usage_/i);
-      // G2-13: top-level agents come from the agent-parent join.
+      // Top-level agents come from the agent-parent join.
       expect(sql).toContain(`FROM "default"${agentParentsJoin("default", true)}`);
     }
   });
@@ -500,9 +500,6 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
 // ---------------------------------------------------------------------------
 
 describe("useLLMInsights — fetchAll error path", () => {
-  // A failure on any summary query should populate `error.value`
-  // and the dashboard renders its error state. We catch internally so
-  // callers don't need a try/catch; the server message is the error handler's second argument.
   it("captures the server error message and clears loading on rejection", async () => {
     const { fetchAll, error, loading } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
@@ -846,8 +843,6 @@ describe("useLLMInsights — cancelAll", () => {
     expect(mockCancelStreamQuery).not.toHaveBeenCalled();
   });
 
-  // After kicking off fetchAll, every trace ID is active. cancelAll
-  // should cancel them all and pass the org ID for routing.
   it("cancels every in-flight trace ID with the current org ID", async () => {
     const { fetchAll, cancelAll } = useLLMInsights();
     fetchAll("default", 100, 200);

@@ -541,7 +541,7 @@ mod tests {
         assert!(config("regex x+").normalize_and_validate().is_ok());
     }
 
-    // A2-04: an empty expression says so, not that the prefix is missing.
+    // An empty expression says so, not that the prefix is missing.
     #[test]
     fn harness_pattern_with_an_empty_expression_says_it_is_empty() {
         let save = |p: &str| {
@@ -574,7 +574,7 @@ mod tests {
         );
     }
 
-    // A2-04: two rules for one agent made the list and Session Detail hide different text.
+    // Two rules for one agent made the list and Session Detail hide different text.
     #[test]
     fn harness_rules_refuse_a_duplicate_agent() {
         let rule = |agent: &str, patterns: &[&str]| HarnessPatternRule {

@@ -14,12 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  "Behind this step" (AIO-37): on a Thread view tool call or LLM turn that
-  failed or ran slow, where its time went in one sentence, the waterfall's
-  lanes cut to the step's window, and a way back to the span in the waterfall.
-  Needs the context TraceDetails provides; renders nothing without it.
--->
+<!-- Needs the context TraceDetails provides; renders nothing without it. -->
 <template>
   <div
     v-if="timeline"

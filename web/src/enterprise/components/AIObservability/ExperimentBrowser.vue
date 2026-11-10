@@ -148,10 +148,7 @@
         :shared-cases="sharedCases"
       />
 
-      <!-- Five rows then scroll inside the group: the header row is h-9 and the
-           body rows are OTable's normal density, so one dataset with many runs
-           can't push every other group off the page. Re-runs are tree parents:
-           the newest completed run is the row, the others expand under it. -->
+      <!-- Five rows then scroll, so one dataset with many runs can't push other groups off the page. -->
       <OTable
         v-if="isGroupExpanded(group.id)"
         :data="group.rows"
@@ -321,8 +318,7 @@
         </template>
 
         <template #cell-status="{ row }">
-          <!-- Notes sit on their own line under the chip: beside it, a 200 px
-               column cut "Latest re-run: Cancelled" to "Latest re-run: Can…". -->
+          <!-- Notes sit under the chip: beside it, a 200 px column truncated them. -->
           <div class="flex min-w-0 flex-col" :data-test="`ai-experiment-status-${row.id}`">
             <div v-if="row.status === 'running'" class="flex min-w-0 items-center gap-2">
               <OProgressBar
@@ -1106,9 +1102,7 @@ function isBaseline(experiment: LlmExperiment) {
   return experiment.isBaseline;
 }
 
-// A baseline is the fixed reference every later run gets compared against, so
-// it must point at a run with final results — pending/running/failed/cancelled
-// runs have nothing stable to pin (baseline.rs refuses them); clearing a baseline is always safe.
+// Only a run with final results can be a baseline (baseline.rs refuses others); clearing is always safe.
 function canSetBaseline(experiment: LlmExperiment) {
   return experiment.isBaseline || (experiment.status === "completed" && !taskFailures(experiment));
 }

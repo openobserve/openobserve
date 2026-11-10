@@ -634,8 +634,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
 
-                        <!-- G4-08: the span fetch failed — say so, with Retry, rather
-                     than reading as a turn with nothing captured. -->
+                        <!-- The span fetch failed: show Retry, not an empty turn. -->
                         <div
                           v-else-if="spansFailed.has(trace.traceId)"
                           class="text-compact text-error-500 flex items-center gap-2"
@@ -666,7 +665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span class="text-text-heading text-xs font-bold">
                                 {{ t("traces.sessionDetail.roles.user") }}
                               </span>
-                              <!-- AIO-22: harness text hidden by the agent's patterns; Show puts it back. -->
+                              <!-- Harness text hidden by the agent's patterns; Show puts it back. -->
                               <button
                                 v-if="turnDetail(trace.traceId)?.harnessHidden"
                                 type="button"
@@ -851,7 +850,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.sessionDetail.rail.toolHotspots") }}
                   </span>
                 </div>
-                <!-- G4-08: turns whose spans failed to load are missing from the list. -->
+                <!-- Turns whose spans failed to load are missing from the list. -->
                 <div
                   v-if="!sessionSpansLoading && spansFailed.size"
                   class="border-border-default text-2xs text-error-500 flex items-center gap-2 border-b px-3 py-1.5"
@@ -1397,8 +1396,7 @@ const kpiCards = computed<
       // Red only when the majority of turns failed (> 50% error rate); below
       // that the tile stays neutral so the colour means "this session broke".
       variant: s.errRate > 50 ? "danger" : undefined,
-      // Up to 3 error turns → jump chips. More than that → a "Filter Errors"
-      // button. Errors are counted over the loaded turns only.
+      // Errors are counted over the loaded turns only.
       subLead: !s.errors
         ? partial
           ? t("traces.sessionDetail.kpiSub.errorsNoneLoaded", { total: loaded })
@@ -1584,7 +1582,7 @@ const rawTurnDetails = computed<Record<string, TurnDetail>>(() => {
   for (const tid of Object.keys(byTrace)) out[tid] = buildTurnDetail(tid, byTrace[tid]);
   return out;
 });
-// The same, with harness text hidden in the user message (AIO-22).
+// The same, with harness text hidden in the user message.
 const turnDetailsByTrace = computed<Record<string, TurnDetail & { harnessHidden?: number }>>(() => {
   const out: Record<string, TurnDetail & { harnessHidden?: number }> = {};
   for (const [tid, detail] of Object.entries(rawTurnDetails.value)) {

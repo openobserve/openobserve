@@ -1,16 +1,7 @@
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { UNSET } from "@/enterprise/composables/useAgentScope";
 
-/**
- * Pure builder for the agent-scoping predicate used by the Behavior
- * drill-down drawer (AgentSignalDetailPanel.vue). Scopes by the CLIMBED
- * agent (via `callerExpr`, e.g. COALESCE(...)) and, when present, further
- * narrows to the selected env/version variant using the raw canonical span
- * columns `c.gen_ai_agent_env` / `c.gen_ai_agent_version`.
- *
- * Backward compatible: when both env and version are absent, the output is
- * byte-identical to the pre-existing agent-only predicate. UNSET pins a dimension to "not set".
- */
+/** Without env and version the output is byte-identical to the old agent-only predicate; UNSET pins "not set". */
 export const buildAgentClimbFilter = (
   callerExpr: string,
   agent: string | undefined,

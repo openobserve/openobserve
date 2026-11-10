@@ -145,10 +145,7 @@ export function useLLMStreamQuery() {
       const accumulated: any[] = [];
       const metadataHits: any[] = [];
 
-      // Honour the SQL's own LIMIT as the request `size` so the
-      // backend doesn't scan more rows than the panel actually wants.
-      // The table panels use LIMIT 10; latency raw uses LIMIT
-      // 50000. Falls back to 1000 for queries without LIMIT.
+      // SQL's own LIMIT becomes `size` so the backend doesn't scan more rows than needed.
       const size = querySize(sql);
 
       // Match the rest of the codebase: only base64-encode when the

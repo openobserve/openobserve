@@ -50,10 +50,7 @@ defineOptions({ name: "AILLMInsightsPage" });
 
 const { t } = useI18nTyped();
 
-// Shared across LLM Insights, LLM Sessions, and Quality — picking a window
-// on any of the three lands on the other two (singleton ref + localStorage
-// persistence). See useAiDateRange.ts for the contract. LLM Insights syncs its
-// date to the URL so deep-/share-links reproduce the exact view.
+// Shared with LLM Sessions and Quality; LLM Insights also syncs it to the URL for share links.
 const {
   dateState,
   timeRange,

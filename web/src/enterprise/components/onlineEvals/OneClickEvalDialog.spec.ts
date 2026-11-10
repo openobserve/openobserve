@@ -136,7 +136,7 @@ describe("OneClickEvalDialog", () => {
     });
   });
 
-  // J2-06: after saving the provider the user comes back to the reopened dialog.
+  // After saving the provider the user comes back to the reopened dialog.
   it("sends Add provider to the LLM Providers page with a way back to the dialog", async () => {
     await mountDialog();
 

@@ -522,7 +522,7 @@ describe("DiscoveryPage add to queue", () => {
 });
 
 describe("DiscoveryPage row drill-down", () => {
-  // AIO-21: trace rows open in a drawer on this page, so the scope stays put.
+  // Trace rows open in a drawer on this page, so the scope stays put.
   it("opens a trace row in the trace drawer, around the row's time", async () => {
     const wrapper = await mountPage();
     const state = (wrapper.vm as any).$.setupState;

@@ -14,12 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  LLMTopErrorsTable — the "Top errors" panel on Insights: the 10 error
-  messages that hit the most traces in the page's scope and window, where each
-  came from, the traces it hit and when it was last seen. A row click opens
-  those traces (the panel's drill). The errors chart says when; this says what.
--->
 <template>
   <LLMPanelCard
     :title="t(panel.titleKey)"

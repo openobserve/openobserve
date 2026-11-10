@@ -1972,7 +1972,7 @@ export default defineComponent({
       () => hasLLMSpans.value && effectiveSpanList.value.some((span: any) => hasLLMPayload(span)),
     );
 
-    // AIO-37: where each LLM or tool step spent its time, shared with the Thread view.
+    // Shared with the Thread view.
     const timeSteps = computed(() => attributeSteps(effectiveSpanList.value ?? []));
     const timeHeadlines = computed(() => mergedHeadlines(headlineSteps(timeSteps.value), t));
     // The lanes follow the trace kind until the user flips the switch.

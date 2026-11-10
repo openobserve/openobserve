@@ -246,8 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </footer>
     </template>
-    <!-- Traces open in a drawer on this page (AIO-21): the scope, the score list
-         and the selected score stay put; Previous / Next step through the list. -->
+    <!-- A drawer keeps the scope and selected score in place while traces open. -->
     <AiTraceDrawer
       v-model:open="traceDrawerOpen"
       v-model:view="traceDrawerView"

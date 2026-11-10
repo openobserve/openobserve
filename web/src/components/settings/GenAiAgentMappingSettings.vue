@@ -9,8 +9,7 @@
     <template #title>
       <span data-test="gen-ai-agent-mapping-page-title">{{ t("genAiAgentMapping.title") }}</span>
     </template>
-    <!-- Page-level action on the stored registry, not the form: it stays in
-         the header, like LLM Providers' "New Provider". -->
+    <!-- Acts on the stored registry, not the form, so it lives in the header. -->
     <template #actions>
       <OButton
         data-test="gen-ai-agent-registry-clear-btn"
@@ -46,8 +45,7 @@
       <!-- Scrollable form body -->
       <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div class="grid grid-cols-1 gap-5">
-          <!-- Agent identity: the same table as cost attribution below. The
-               standard attribute is read first, then each fallback in order. -->
+          <!-- Standard attribute is read first, then each fallback in order. -->
           <section class="flex flex-col gap-3" data-test="gen-ai-identity-section">
             <div class="flex flex-col">
               <span class="text-text-heading text-sm font-semibold">
@@ -83,10 +81,7 @@
             </div>
           </section>
 
-          <!-- AIO-27: the span contract for cost attribution. The standard
-               attribute is read first; at ingest a span without it takes the
-               first fallback it carries. Coverage is the share of the past
-               24 hours' traces in the agent streams that have a value. -->
+          <!-- At ingest a span without the standard attribute takes its first fallback. -->
           <section
             id="cost-attribution"
             class="border-border-default flex scroll-mt-4 flex-col gap-3 border-t pt-4"
@@ -138,8 +133,7 @@
             }}</span>
           </section>
 
-          <!-- AIO-22: harness text each agent wraps around its user's request,
-               hidden in session titles, first messages and turn previews. -->
+          <!-- Harness text agents wrap around user requests, hidden in titles and previews. -->
           <section
             class="border-border-default flex flex-col gap-3 border-t pt-4"
             data-test="gen-ai-harness-section"
@@ -264,9 +258,7 @@
         </div>
       </div>
 
-      <!-- Sticky footer action bar (mirrors AddAlert): primary Save pinned at
-           the bottom-right while the body scrolls. The field helpers fill or
-           clear the form, so they sit with its Save, not in the page header. -->
+      <!-- Field helpers change the form, so they sit with its Save, not in the header. -->
       <div class="border-border-default flex shrink-0 items-center gap-2 border-t px-4 py-2.5">
         <OButton
           data-test="gen-ai-agent-mapping-apply-defaults-btn"

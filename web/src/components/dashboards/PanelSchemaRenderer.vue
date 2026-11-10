@@ -2404,8 +2404,7 @@ export default defineComponent({
       hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction?.({ type: "hideTip" }),
     });
 
-    // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.
-    // `chart-click` hands the raw point to hosts with their own click-through (AI Insights).
+    // A click opens the drilldown menu, so it does nothing where drilldowns are off.
     const onPanelClick = (...args: Parameters<typeof onChartClick>) => {
       emit("chart-click", args[0]);
       return allowDrilldown.value && !store.state.kioskMode ? onChartClick(...args) : undefined;

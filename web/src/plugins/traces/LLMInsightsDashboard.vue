@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        another bg-card-glass-bg would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div class="flex h-full flex-col bg-transparent">
-    <!-- Page filter (AIO-26): a WHERE clause over the spans that narrows the
-         tiles and every panel to the traces it matches; kept in the URL. -->
+    <!-- Page filter: a WHERE clause over the spans, kept in the URL. -->
     <LLMInsightsSearchBar
       v-if="availableStreams.length > 0 && scopeReady && !compareMode && !emptyOrg"
       :stream="effectiveStream"
@@ -139,8 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("aiObservability.versionCompare.bar.exit") }}
         </OButton>
-        <!-- AIO-20: install the ai-agents alert pack (loops, failures, cost).
-             A setup action, not a scope control: an icon at the bar's far end. -->
+        <!-- A setup action, not a scope control, so it sits at the bar's far end. -->
         <OButton
           v-if="!compareMode"
           variant="outline"
@@ -200,11 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="px-page-edge flex-1"
       />
 
-      <!-- Generic error state — kept separate because a failed request is a
-         different signal from "no data yet". Once we have a result we fall
-         through to the consolidated empty / dashboard branches below. A
-         filter that fails shows it too, even on the first load, rather than
-         a strip that loads forever over panels that each fail. -->
+      <!-- A failed request, even a filter on first load, is a different signal from "no data yet". -->
       <OEmptyState
         v-else-if="error && (hasLoadedOnce || hasActiveFilters)"
         size="hero"
@@ -300,8 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
       <div v-else class="px-page-edge flex-1 overflow-y-auto pb-3">
-        <!-- AI data health (AIO-17): between the scope bar and the KPI tiles;
-           hidden when every check passes. -->
+        <!-- AI data health: hidden when every check passes. -->
         <LLMDataHealthStrip
           :health="dataHealth"
           :loading="dataHealthLoading"
@@ -314,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @load-samples="fetchSamples"
           @view-trace="onViewTrace"
         />
-        <!-- A new agent version against the previous one (AIO-39). Enterprise only. -->
+        <!-- A new agent version against the previous one. Enterprise only. -->
         <ReleaseWatchCard
           v-if="
             genAiAgentMappingAccess.allowed && filterMode === 'agent' && releaseVariants.length > 1
@@ -417,8 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            remount is what lets it restore an already-fetched result instead of
            re-querying. Same selection + window → instant cache hit; a new one →
            a clean miss that fetches. -->
-        <!-- One column below xl: at 1024 px a half-width panel leaves its table too narrow
-           for its columns. -->
+        <!-- One column below xl: at 1024 px a half-width panel leaves its table too narrow. -->
         <div class="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
           <div
             v-for="panel in LLM_INSIGHTS_PANELS"
@@ -463,8 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Who drives the bill: cost by model, user, tenant or feature (AIO-27).
-           Below the trends: it breaks the cost trend down. -->
+        <!-- Below the trends: it breaks the cost trend down. -->
         <LLMCostAttribution
           :stream="effectiveStream"
           :scope="scopeClause"
@@ -482,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <AiAlertPackDialog v-model:open="alertPackOpen" :default-stream="effectiveStream" />
 
-    <!-- The traces behind a clicked chart point or tile (AIO-26). -->
+    <!-- The traces behind a clicked chart point or tile. -->
     <LLMTraceListDrawer
       v-model:open="traceListOpen"
       :stream="effectiveStream"
@@ -495,8 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @open-in-traces="openTraceListInTraces"
     />
 
-    <!-- Traces open in a drawer on this page (AIO-21): the scope and the
-         window stay as they were. Last, so it stacks over the trace list. -->
+    <!-- Last, so the trace drawer stacks over the trace list. -->
     <AiTraceDrawer v-model:open="traceDrawerOpen" :trace="drawerTrace" />
   </div>
 </template>
@@ -615,7 +605,7 @@ const {
   streamsLoaded,
 } = useLLMInsights();
 
-// AI data health (AIO-17) — also feeds the Total Cost tile's unpriced note (AIO-16).
+// AI data health also feeds the Total Cost tile's unpriced note.
 const {
   health: dataHealth,
   checkedWindow: dataHealthWindow,
@@ -721,10 +711,7 @@ const scopeReady = ref(false);
 // nothing, so the next load after it decides again; so does a window the user
 // picks, whose agents may differ (unless the user chose the mode).
 let modeSettled = false;
-// Scope to seed the cascade with once the list loads: the URL deep-link first, else the persisted selection.
-// `selectAgentByScope`, then cleared. (The URL carries readable values, not the
-// internal agent key.) Env/version come from the same source as the name, so a
-// name-only link never pairs with a stored variant of another agent.
+// URL deep-link scope first, else persisted; env/version share its source so a name-only link never pairs with another agent's variant.
 const urlHasAgentScope = !!(urlScope.agent || urlScope.env || urlScope.version);
 const pendingScope = ref<{ env: string; name: string; version: string; stream?: string } | null>(
   urlHasAgentScope
@@ -1117,7 +1104,7 @@ const traceDrawerOpen = ref(false);
 const drawerTrace = ref<AiDrawerTrace | null>(null);
 const alertPackOpen = ref(false);
 
-// --- Click-through (AIO-26) ---------------------------------------------------
+// --- Click-through -----------------------------------------------------------
 const traceListOpen = ref(false);
 const traceListSelection = ref<TraceListSelection | null>(null);
 const traceListTitle = ref<I18nText>(raw(""));
@@ -1385,12 +1372,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   const errorRate =
     kpi.value.traceCount > 0 ? (kpi.value.errorCount / kpi.value.traceCount) * 100 : 0;
 
-  // Cost is the KPI summary's gen_ai_usage_cost sum over LLM-call spans
-  // (llmCallUsageSum). Spans whose model has no price carry no cost, so when the
-  // data health check finds unpriced tokens the tile reads as a lower bound
-  // ("≥ $X"), or "cost unknown" when none of the window's tokens were priced,
-  // with the token count under it.
-  // The check reads the whole window, not the filters; only filtered tokens with no cost at all read as "cost unknown".
+  // Unpriced spans carry no cost, so the tile is a lower bound ("≥ $X") when the whole-window health check finds unpriced tokens.
   const u = unpriced.value;
   const windowOnly = hasActiveFilters.value;
   const filteredPriced = kpi.value.totalCost > 0 || kpi.value.totalTokens === 0;
@@ -1595,8 +1577,7 @@ async function loadInsights(
     }
 
     const result = await fetchAll(stream, start, end, effectiveAgent.value, filterClause.value);
-    // `loading` true→false already stamped lastRunAt via the watcher; snapshot
-    // this call's own result so returning to this selection skips the network.
+    // Snapshot this call's result so returning to this selection skips the network.
     if (result) {
       kpiCache.set(ck, { ...result, lastRunAt: lastRunAt.value });
     }

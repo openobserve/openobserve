@@ -441,7 +441,6 @@
           </OTable>
         </template>
 
-        <!-- Workload (AIO-25) -->
         <JobWorkloadTab
           v-else-if="activeTab === 'workload'"
           :row="row"
@@ -904,9 +903,6 @@ function openEvaluationRun(run: JobRunRow) {
     .catch(() => {});
 }
 
-// Global refresh — re-syncs the shared window then re-queries everything
-// (KPI strip + Runs + Failures), since one picker drives the whole view.
-// The Workload tab re-queries when this changes.
 const refreshToken = ref(0);
 
 async function refreshAll() {

@@ -20,8 +20,6 @@
     <div class="shrink-0" data-test="agent-behavior-summary">
       <OStatStrip :items="behaviorStats" :loading="tableLoading" />
     </div>
-    <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
-         panels (LLMTopErrorsTable) so the whole page reads as one surface. -->
     <div
       class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
       data-test="agent-behavior-loops-card"
@@ -32,7 +30,7 @@
         icon="restart-alt"
         tone="warning"
       >
-        <!-- AIO-20: the ai-agents alert pack, in one screen. -->
+        <!-- The ai-agents alert pack, in one screen. -->
         <template #actions>
           <OButton
             variant="outline"
@@ -63,8 +61,7 @@
         :empty-message="loopsEmptyMessage"
         @row-click="(r: any) => openDetail('loop', r)"
       >
-        <!-- An (agent, tool) seen in more than one env/version: its variants,
-             each opening the drawer on that variant alone. -->
+        <!-- An (agent, tool) in several env/versions: each variant opens the drawer alone. -->
         <template #expansion="{ row }">
           <OTable
             :data="row.variants"
@@ -80,7 +77,7 @@
             @row-click="(v: any) => openDetail('loop', v)"
           />
         </template>
-        <!-- Repeated tool calls for this agent and tool, prefilled (AIO-20). -->
+        <!-- Repeated tool calls for this agent and tool, prefilled. -->
         <template #cell-alert="{ row }">
           <span @click.stop>
             <CreateAlertAction
@@ -123,8 +120,7 @@
         :empty-message="failuresEmptyMessage"
         @row-click="(r: any) => openDetail('failure', r)"
       >
-        <!-- An (agent, class) seen in more than one env/version: its variants,
-             each opening the drawer on that variant alone. -->
+        <!-- An (agent, class) in several env/versions: each variant opens the drawer alone. -->
         <template #expansion="{ row }">
           <OTable
             :data="row.variants"
@@ -232,9 +228,7 @@ const detailScope = computed<DrillScope>(
     },
 );
 
-// Highlight the row whose drawer is currently open, so the relationship
-// "this row → this drawer" is visible at a glance (rather than a drawer that
-// seems disconnected from the table); each row variant has its own id.
+// Each row variant has its own id, so only the row whose drawer is open highlights.
 const isActiveRow = (type: "loop" | "failure", row: any): boolean => {
   const d = detailRow.value;
   return !!detailOpen.value && !!d && d.signalType === type && d.id === row.id;

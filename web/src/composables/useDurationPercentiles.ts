@@ -63,26 +63,7 @@ const UNIT_ALIASES: Record<string, string> = {
 
 export type ParseDurationResult = string | { error: string };
 
-/**
- * Converts duration comparisons in a WHERE clause that carry human-readable
- * unit suffixes back to raw microseconds.
- *
- * Only quoted duration literals are rewritten via the SQL AST; the rest of the clause is kept byte-for-byte.
- *
- * Tolerates optional whitespace between the number and unit, and accepts all
- * common unit aliases (e.g. "second", "seconds", "sec", "secs" → s).
- *
- * Returns `{ error }` when a duration value contains an unrecognised unit.
- * Falls back to the original string if the SQL parser throws (malformed input).
- *
- * Examples:
- *   `duration >= '100us'`       →  `duration >= 100`
- *   `duration >= '1.50 ms'`     →  `duration >= 1500`
- *   `duration >= '2 seconds'`   →  `duration >= 2000000`
- *   `duration >= '1.50m'`       →  `duration >= 90000000`
- *   `duration BETWEEN '1ms' AND '2s'` → `duration BETWEEN 1000 AND 2000000`
- *   `duration >= '5 lightyears'` → `{ error: 'Unknown duration unit: "lightyears"' }`
- */
+/** Rewrites quoted duration literals (e.g. '1.5 ms') in a WHERE clause to microseconds via the SQL AST. */
 export const parseDurationWhereClause = (
   whereClause: string,
   parser: any,

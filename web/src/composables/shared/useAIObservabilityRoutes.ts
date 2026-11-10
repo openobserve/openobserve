@@ -78,8 +78,7 @@ export interface AiObservabilityTabbedItem {
   dataTest: string;
 }
 
-/**
- * Routes stay flat siblings so each tab keeps its own URL and feature gate.
+/** Routes stay flat siblings so each tab keeps its own URL and feature gate. */
 export const AI_OBSERVABILITY_TABBED_ITEMS: Record<
   AiObservabilityTabbedItemKey,
   AiObservabilityTabbedItem
@@ -111,14 +110,7 @@ export const AI_OBSERVABILITY_TABBED_ITEMS: Record<
   },
 };
 
-/**
- * One list builds nav items and routes (see `Index.vue`'s `sectionEntries` and
- * `useAIObservabilityRouteChildren` below) — a typo in `featureKey` or
- * `routeName` now breaks the nav tooltip and the route guard the SAME way,
- * instead of silently drifting between independently hand-typed copies.
- *
- * `featureKey: null` marks sections OSS serves itself; always reachable.
- */
+/** One list builds nav items and routes so `featureKey`/`routeName` can't drift; `null` = OSS. */
 export interface AiObservabilitySection {
   key: string;
   featureKey: FeatureKey | null;
@@ -132,9 +124,7 @@ export interface AiObservabilitySection {
   tabOf?: AiObservabilityTabbedItemKey;
   /** Pinned to the foot of the rail, outside the groups (Playground). */
   footer?: true;
-  /** A `/config` flag that must be true for the rail to list this section.
-      Carried over from the Settings rail for the pages that moved from it,
-      which hid them in every edition, OSS included, with the flag off. */
+  /** A `/config` flag that must be true to list this section, in every edition. */
   requiresConfigFlag?: "online_evals_enabled" | "model_pricing_enabled";
   /** Omitted only for `prompts`, whose routes come from the external,
       already-shared `promptRoutes` table (also consumed directly by
@@ -145,10 +135,7 @@ export interface AiObservabilitySection {
   /** Extra route `props`. Only the first entry for a deduped `routeName`
       (here, `quality` for `aiEvaluations`) is read. */
   routeProps?: Record<string, unknown>;
-  /** Route `meta.titleKey`, when it must differ from the nav `labelKey` —
-      only `aiEvaluations` needs this: its 4 tabs each have their own label,
-      but the route itself (reachable before any tab is picked) keeps the
-      page-level `onlineEvals.title`. Defaults to `labelKey`. */
+  /** Route `meta.titleKey` when it must differ from `labelKey`; defaults to `labelKey`. */
   metaTitleKey?: I18nKey;
 }
 

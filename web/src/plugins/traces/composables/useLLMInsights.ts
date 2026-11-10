@@ -64,25 +64,6 @@ const EMPTY_KPI: LLMKPI = {
   p95DurationMicros: 0,
 };
 
-/**
- * Composable that owns the LLM Insights dashboard's state + fetch flow.
- *
- * Returns a bag of refs (whole-window KPI numbers, sparkline series,
- * loading/error flags, LLM streams) plus `fetchAll`, `restore`, `cancelAll`.
- *
- * State is per-mount: a fresh component instance gets a fresh set of
- * refs. The dashboard's `onMounted` is the single trigger for the
- * initial fetch, and `fetchAll` is also invoked on Refresh / stream
- * change. There's no caching layer — the dashboard always pulls fresh
- * numbers when asked (the parent's `Index.vue → searchData` decides
- * when to ask).
- *
- * @example
- *   const { kpi, sparklines, loading, error, fetchAll } =
- *     useLLMInsights();
- *   await fetchAll("default", 1700000000000000, 1700001000000000);
- *   console.log(kpi.value.totalCost, kpi.value.totalTokens);
- */
 export function useLLMInsights() {
   const store = useStore();
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
@@ -215,17 +196,7 @@ export function useLLMInsights() {
     return p95;
   }
 
-  /**
-   * Internal — fetch the bucketed time-series powering the sparklines
-   * under each KPI card plus the totals; totals use a whole-window per-trace query since distinct counts aren't additive across buckets.
-   *
-   * `histogram(_timestamp)` is intentionally called WITHOUT an explicit
-   * interval — the backend picks an appropriate bucket width for the
-   * query window. We consume the returned rows in `ORDER BY ts` order,
-   * so the frontend never needs to know the interval.
-   *
-   * Tokens and cost follow `traceUsageSum`, the rule Cost by, Users and Sessions share.
-   */
+  /** Totals use a whole-window query since distinct counts aren't additive across buckets. */
   async function fetchSummary(
     streamName: string,
     startTime: number,
@@ -322,27 +293,6 @@ export function useLLMInsights() {
     return { totals, series };
   }
 
-  /**
-   * Entry point; runs two independent parts: summary → `sparklines` + `kpi` but P95 (`loading`), and
-   *   - whole-window P95  → `kpi.p95DurationMicros`
-   *       drives `p95Loading` (just the P95 card's loader)
-   *
-   * Decoupled on purpose: summary cards render without waiting on the slower P95 query, so
-   * only the P95 card shows a loader while it's still in flight. A P95
-   * failure degrades that card to "0" rather than failing the whole strip.
-   *
-   * `error` (cleared on entry, populated only on a summary rejection)
-   * is caught internally so callers don't wrap in try/catch — they read
-   * `error.value` after `await fetchAll(...)` resolves.
-   *
-   * Bails out as a no-op for missing/zero arguments — the dashboard
-   * renders the streamLoaded skeleton until a real window is in props.
-   *
-   * @example
-   *   await fetchAll("default", 1700000000000000, 1700001000000000);
-   *   if (error.value) console.error(error.value);
-   *   else console.log(kpi.value.totalCost);
-   */
   // Bumped per fetchAll so a slower earlier load can't overwrite a newer selection's tiles.
   let fetchSeq = 0;
 
@@ -372,8 +322,7 @@ export function useLLMInsights() {
       p95: number;
     } = { p95: 0 };
 
-    // Summary: powers the sparklines and every KPI total but P95. Drives
-    // the main strip skeleton via `loading` — resolves independently of P95.
+    // Resolves independently of P95 so the strip never waits on the slower query.
     const summaryPromise = fetchSummary(
       streamName,
       startTime,

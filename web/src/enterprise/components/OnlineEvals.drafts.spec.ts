@@ -139,7 +139,7 @@ const mountAt = async (query: string) => {
       },
       { path: "/logs", name: "logs", component: Blank },
       { path: "/settings/llm", name: "llmProviders", component: Blank },
-      // The job form's cost section links unpriced judges here (AIO-24).
+      // The job form's cost section links unpriced judges here.
       { path: "/settings/model_pricing/gaps", name: "modelPricingGaps", component: Blank },
     ],
   });

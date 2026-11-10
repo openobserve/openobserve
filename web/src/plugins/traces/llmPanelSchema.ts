@@ -98,10 +98,7 @@ export function buildLLMPanelSchema(opts: {
           : "bar"
         : (TYPE_MAP[panel.type] ?? "line");
 
-  // Field roles differ by panel shape:
-  //  - trends (stacked-area / stacked-bar / line): time on X, series field = BREAKDOWN.
-  //  - bars (horizontal-bar): the series field (e.g. model) is the X category
-  //    and there is no breakdown (a single fixed-color series of bars).
+  // Horizontal bars use the series field as the X category, with no breakdown.
   const isHBar = panel.type === "horizontal-bar";
   const xFieldName = isHBar ? seriesField : timeField;
   const breakdownName = isHBar ? undefined : seriesField;

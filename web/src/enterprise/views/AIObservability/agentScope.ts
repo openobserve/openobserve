@@ -17,15 +17,7 @@ import type { AgentSignalRecord } from "@/services/agent_signals";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { UNSET } from "@/enterprise/composables/useAgentScope";
 
-/**
- * Predicate: does signal `s` match the selected agent scope (name + env +
- * version)? null = don't constrain, UNSET = must have no value; mirrors buildAgentClimbFilter.
- *
- * Colocated here (rather than inline in AgentBehaviorPanel.vue's
- * `<script setup>`) so it can be unit tested directly without mounting the
- * panel's heavier deps (OTable, OStatStrip, i18n, vuex, http service) —
- * `<script setup>` cannot contain module exports.
- */
+/** Does signal `s` match the agent scope? null = unconstrained, UNSET = must have no value. */
 export const matchesAgentScope = (
   s: Pick<AgentSignalRecord, "agent_name" | "gen_ai_agent_env" | "gen_ai_agent_version">,
   scope: { name: string; env?: string | null; version?: string | null },

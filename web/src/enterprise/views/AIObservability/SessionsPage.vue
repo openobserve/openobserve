@@ -58,8 +58,7 @@ const { t } = useI18nTyped();
 // edition check.
 const detailRouteName = "aiSessionDetails";
 
-// Shared with LLM Insights + Quality — see useAiDateRange.ts. Sessions syncs its
-// date to the URL so deep-links reproduce the exact view.
+// Sessions syncs its date to the URL so deep-links reproduce the exact view.
 const {
   dateState,
   timeRange,

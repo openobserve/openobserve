@@ -137,7 +137,7 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     labelKey: "alerts.prefill.sources.ai.label",
     toastKey: "alerts.prefill.sources.ai.toast",
     icon: "shield-alert-outline",
-    // The HAVING clause is the whole condition (AIO-20), so any returned row fires.
+    // The HAVING clause is the whole condition, so any returned row fires.
     defaultThreshold: "count",
     showQueryPreview: true,
   },

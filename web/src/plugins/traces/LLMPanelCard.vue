@@ -13,19 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<!--
-  LLMPanelCard — the shared chrome for every LLM Insights panel (the trend
-  charts and the tables). One card + one header bar, so the header
-  isn't hand-rolled per panel.
-
-  The header deliberately reuses the dashboards PanelContainer bar styling
-  (compact single line, `text-compact` medium title, a bottom divider, a
-  `flex-1` spacer, trailing controls) so these read-only AI panels look like
-  native dashboard panels — WITHOUT pulling in PanelContainer's editable-grid
-  machinery (drag / edit / delete / variables / alerts) or losing the inline
-  subtitle it has no slot for. `#actions` is the trailing-control spot (e.g. a
-  future overflow menu).
--->
+<!-- Reuses the PanelContainer bar styling without its editable-grid machinery. -->
 <template>
   <div
     class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"

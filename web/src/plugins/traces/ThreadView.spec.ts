@@ -198,7 +198,7 @@ describe("ThreadView", () => {
       expect(wrapper.findAll(".thread-tool-row")).toHaveLength(1);
     });
 
-    // C2-08: the chip counts the cards drawn, including calls with no tool span.
+    // The chip counts the cards drawn, including calls with no tool span.
     it("counts tool calls recorded without a tool span, as the cards do", () => {
       const llm = makeLLMSpan({
         gen_ai_output_messages: JSON.stringify([
@@ -216,7 +216,7 @@ describe("ThreadView", () => {
       expect(toolChipValue()).toBe("2");
     });
 
-    // C2-08: a tool span that wraps the only model call starts before it.
+    // A tool span that wraps the only model call starts before it.
     it("shows and counts a tool span that starts before the first model call", () => {
       const llm = makeLLMSpan({ reference_parent_span_id: "outer" });
       const outer = makeToolSpan({
@@ -517,7 +517,7 @@ describe("ThreadView", () => {
       expect(row.text()).toContain("grep");
       expect(wrapper.find(".thread-pill").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("Called grep");
-      // C2-08: no span means no result was recorded, not an empty result.
+      // No span means no result was recorded, not an empty result.
       expect(wrapper.text()).toContain("No result recorded");
       expect(wrapper.text()).not.toContain("(empty)");
     });
@@ -549,8 +549,6 @@ describe("ThreadView", () => {
       expect(wrapper.find(".thread-pill--ok").exists()).toBe(true);
     });
   });
-
-  // AIO-37: "Behind this step" on a failed or slow step, in the trace view only
 
   describe("behind this step", () => {
     const llm = makeLLMSpan({ span_id: "llm-p" });

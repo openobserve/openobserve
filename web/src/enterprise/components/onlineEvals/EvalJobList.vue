@@ -58,8 +58,7 @@
               @select="onStatSelect"
             />
           </div>
-          <!-- Jobs their budget paused (AIO-24): why, when they resume, a one-day override, and
-               Keep paused, which makes the pause the user's so 00:00 UTC does not resume it. -->
+          <!-- Keep paused makes the pause the user's, so 00:00 UTC does not resume it. -->
           <div
             v-for="row in budgetPausedRows"
             :key="row.id"

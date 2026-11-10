@@ -14,12 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  Users (AIO-27) — who uses the agents and what they cost: one row per
-  `user.id`, with its tenant, sessions, tokens, spend, error rate (traces with
-  an errored span) and last activity, most expensive first. "Sessions" opens the Sessions
-  list filtered to that user.
--->
 <template>
   <AiPageShell
     data-test="ai-users"

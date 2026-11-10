@@ -96,7 +96,6 @@ interface Props {
 const props = defineProps<Props>();
 const emit = defineEmits<{ (e: "drill", drill: LLMPanelDrill): void }>();
 
-// Built on click: the panel's pack template for the agent in scope (AIO-20).
 const buildAlert = () =>
   buildAiPrefill({ kind: props.panel.alert!, stream: props.streamName, agent: props.alertAgent });
 const store = useStore();

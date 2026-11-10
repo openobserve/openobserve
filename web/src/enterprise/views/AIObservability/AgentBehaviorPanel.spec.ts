@@ -316,7 +316,7 @@ describe("AgentBehaviorPanel", () => {
     expect(wrapper.find('[data-test="strip"]').text()).toBe("3,9,3");
   });
 
-  // U3-08: at 1024 px the counts took 150 px each and crushed Agent and Tool to "q…".
+  // At 1024 px the counts took 150 px each and crushed Agent and Tool to "q…".
   it("keeps Agent and Tool at a usable floor and the loop counts compact", async () => {
     const wrapper = await mountWith(reportSignals);
     const loops = wrapper

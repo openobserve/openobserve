@@ -14,12 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  LLMFailingToolsTable — the "Failing tools" panel on Insights: the 10 tools
-  with the most failed calls in the page's scope and window, with how many of
-  their calls failed, the traces affected and the last failure. A row click
-  opens those failed traces (the panel's drill).
--->
 <template>
   <LLMPanelCard
     :title="t(panel.titleKey)"

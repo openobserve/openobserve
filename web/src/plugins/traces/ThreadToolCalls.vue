@@ -14,21 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  ThreadToolCalls — one card per tool call of a turn, in order (AIO-21): name,
-  status, duration, arguments and result. The first call and every failed call
-  open by default; the rest show one summary line. Long results are cut at 6 lines,
-  with the full JSON one click away. Reused by the Thread view and, behind the
-  `collapsed` "Show calls" pill, by the Session Detail collapsed turn body.
-  Takes the turn's tool calls (execute_tool spans, plus `synthetic` entries for
-  tool_call parts with no span); emits the span id from "open span". In the
-  trace view a call that failed or ran slow also opens "Behind this step"
-  (AIO-37).
-
-  Self-contained: own reveal + per-tool expand state + the scoped artwork (the
-  zigzag is a tiled inline SVG Tailwind can't express, so scoped CSS is allowed
-  here per the redesign rules §5a).
--->
 <template>
   <div v-if="toolCalls.length > 0" class="thread-tools-thread">
     <!-- One-way reveal (collapsed mode): clicking shows the calls and removes the pill. -->

@@ -329,8 +329,6 @@
             </div>
           </section>
 
-          <!-- Code: the function is the scorer, so there is no provider and no
-               rule builder. Its parameters are the variables a job maps. -->
           <section
             v-else-if="formValues.scorerType === 'code'"
             class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"

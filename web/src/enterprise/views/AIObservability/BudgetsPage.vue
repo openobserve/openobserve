@@ -14,13 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  Budgets (AIO-38) — spend limits per agent, feature, user, model or session,
-  each one alert: warning at 80% and critical at 100%, both to one destination
-  whose webhook is the signal a gateway enforces on critical. Spent against
-  limit is read live from the trace cost columns. Unpriced spend is named,
-  never counted as $0.
--->
+<!-- Spend is read live from trace cost columns; unpriced spend is named, never counted as $0. -->
 <template>
   <AiPageShell
     data-test="ai-budgets"
@@ -215,8 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="ai-budgets-scope"
         />
-        <!-- The agents, features or models the stream has seen; one not seen
-             yet (a feature before it ships) can still be typed in. -->
+        <!-- A value not seen yet (a feature before it ships) can still be typed in. -->
         <OSelect
           v-if="!isEach(draft.scope) && !missingField"
           v-model="draft.value"

@@ -414,7 +414,7 @@ describe("extractContent", () => {
     expect(extractContent([{ type: "thinking", content: "let me check" }])).toBe("let me check");
   });
 
-  // C2-05: Anthropic extended thinking is the model's scratchpad, not its reply.
+  // Anthropic extended thinking is the model's scratchpad, not its reply.
   it("leaves Anthropic thinking and redacted_thinking blocks out of the text", () => {
     expect(
       extractContent([
@@ -1287,7 +1287,7 @@ describe("SDK tool-call payload shapes", () => {
       ["Cold, -3°C in Oslo."],
     ]);
   });
-  // C2-05 (T2): Anthropic content blocks with no execute_tool span.
+  // Anthropic content blocks with no execute_tool span.
   it("reads an Anthropic thinking + text + tool_use turn as a bubble and a card", () => {
     const g = buildTraceGroup([
       makeSpan({
@@ -1316,7 +1316,7 @@ describe("SDK tool-call payload shapes", () => {
     ]);
   });
 
-  // G3-T2: one call written as a tool_use block and again in tool_calls.
+  // One call written as a tool_use block and again in tool_calls.
   it("draws one card for a call listed under the same id in content and tool_calls", () => {
     const output = JSON.stringify([
       {
@@ -1372,7 +1372,7 @@ describe("SDK tool-call payload shapes", () => {
     expect(new Set(keys).size).toBe(3);
   });
 
-  // C2-08 (T9): `outer_task` wraps the only chat and starts 0.2 s before it.
+  // `outer_task` wraps the only chat and starts 0.2 s before it.
   it("attaches a tool span that starts before the first turn to that turn", () => {
     const chat = {
       gen_ai_operation_name: "chat",
@@ -1409,7 +1409,7 @@ describe("SDK tool-call payload shapes", () => {
 });
 
 describe("provider-native payloads", () => {
-  // G3-T1: a LangChain ChatGeneration keeps its own text next to the message object.
+  // A LangChain ChatGeneration keeps its own text next to the message object.
   it.each([
     ["minimal", [{ text: "visible answer", message: { id: "m1", meta: true } }], "visible answer"],
     [
@@ -1434,7 +1434,6 @@ describe("provider-native payloads", () => {
     ]);
   });
 
-  // G3-T4: OpenAI Responses API input and output items.
   it("reads an OpenAI Responses trace: developer prompt, function_call card, no raw items", () => {
     const developer = { role: "developer", content: "You are a search bot." };
     const user = { role: "user", content: [{ type: "input_text", text: "Find LCEL docs" }] };
@@ -1488,7 +1487,7 @@ describe("provider-native payloads", () => {
     ]);
   });
 
-  // G3-T5: the cheap, unambiguous provider envelopes.
+  // The cheap, unambiguous provider envelopes.
   it("surfaces an Anthropic or Bedrock top-level system prompt", () => {
     expect(
       messagesFromInput(

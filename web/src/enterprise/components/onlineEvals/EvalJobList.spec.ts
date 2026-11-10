@@ -57,7 +57,6 @@ describe("EvalJobList columns", () => {
 });
 
 describe("EvalJobList budget banner", () => {
-  // X3-06: a budget-paused job can be kept paused instead of resuming at 00:00 UTC.
   it("offers Keep paused next to Resume, and Keep paused pauses the job", async () => {
     const row = {
       id: "job-1",

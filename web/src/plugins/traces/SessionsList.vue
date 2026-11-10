@@ -36,13 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          `sessions-*` for the count/badges — so those two are passed explicitly to
          stay byte-identical. solidAgentTrigger keeps the "All Agents" empty state
          in solid text (Sessions never dimmed it). -->
-    <!-- List search, above the scope bar as on Insights and Quality — one
-         box, matched against the user id OR the conversation text server-side
-         (whichever the stream has). Live, debounced (300ms — same as the
-         Streams list's search), same pattern as LogStream.vue: no Enter /
-         run-query affordance, a settled value just re-fetches. The applied
-         term lives in useSessions' singleton next to the page/size so
-         back-navigation restores the filtered page. -->
+    <!-- Debounced 300 ms like the Streams search; the term lives in useSessions so Back restores the filtered page. -->
     <div
       v-if="!(streamsLoaded && availableStreams.length === 0)"
       class="px-page-edge shrink-0 pt-2"
@@ -222,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.firstUserMessage" class="text-text-secondary text-xs">
           {{ row.firstUserMessage }}
         </span>
-        <!-- A message that was only harness text says so and names the tag (AIO-22). -->
+        <!-- A message that was only harness text says so and names the tag. -->
         <span v-else-if="row.harnessOnly" class="text-text-muted text-xs">
           {{ t("readableSessions.onlyHarness", { tag: `<${row.harnessOnly}>` }) }}
         </span>
@@ -402,11 +396,7 @@ const urlKeyword = normalizeSearchTerm(
 // Matched server-side against the user id OR the conversation text,
 // whichever the stream has.
 const SEARCH_INPUT_ID = "sessions-list-search";
-// A term in the URL overrides whatever the singleton holds: a pasted link
-// must reproduce its filtered view. When it differs from what the cached rows
-// were fetched with, the cache guard in `loadSessions` is bypassed once so the
-// mount fetch runs with the URL's term instead of restoring the stale page.
-// A link with the same term may name another stream, so only Back (a `forward` entry) restores cached rows.
+// A URL term overrides the singleton and bypasses the cache guard once, so a pasted link reproduces its view.
 let searchChangedByUrl = false;
 if (urlKeyword && (urlKeyword !== searchKeyword.value || !window.history.state?.forward)) {
   searchKeyword.value = urlKeyword;
@@ -627,7 +617,6 @@ const tableColumns = computed(() =>
       hideable: true,
       meta: { align: "left" },
     },
-    // A Title column when the agent mapping turns session titles on (AIO-22).
     ...(sessions.value.some((s) => s.title)
       ? [
           {
@@ -668,7 +657,7 @@ const tableColumns = computed(() =>
       id: "cost",
       header: t("traces.sessionsList.columns.cost"),
       accessorKey: "cost",
-      // Fits "≥ $0.0000 partial" and "cost unknown" (unpriced tokens, AIO-16).
+      // Fits "≥ $0.0000 partial" and "cost unknown" (unpriced tokens).
       size: 150,
       sortable: true,
       hideable: true,
