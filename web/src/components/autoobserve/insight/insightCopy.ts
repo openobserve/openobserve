@@ -151,6 +151,7 @@ export interface DecisionNotice {
 }
 
 const NO_DESTINATION = "alert_no_destination";
+const NOTIFY_FAILED = "alert_notify_failed";
 
 const HOUR_US = 3_600_000_000;
 
@@ -164,6 +165,7 @@ const TONE_VARIANT: Record<InsightTone, BadgeVariant> = {
 const KIND_TONE: Record<string, InsightTone> = {
   alert_not_working: "failure",
   alert_no_destination: "gap",
+  alert_notify_failed: "failure",
   silent_coverage: "gap",
   blind_guardrail: "failure",
   coverage_gap: "gap",
@@ -364,8 +366,18 @@ const noDestinationWhy = (t: TranslateFn, zone: InsightZone, item: AutoObserveSu
     : null;
 };
 
-const alertNext = (t: TranslateFn, item: AutoObserveSuggestion): I18nText | null =>
-  item.advice && Object.hasOwn(ADVICE_LABEL, item.advice) ? t(ADVICE_LABEL[item.advice]) : null;
+const alertNext = (t: TranslateFn, item: AutoObserveSuggestion): I18nText | null => {
+  if (item.kind === NO_DESTINATION) return t("insight.alert.nextNoDestination");
+  if (item.kind === NOTIFY_FAILED) return t("insight.alert.nextNotifyFailed");
+  return item.advice && Object.hasOwn(ADVICE_LABEL, item.advice)
+    ? t(ADVICE_LABEL[item.advice])
+    : null;
+};
+
+const ALERT_CHIP: Record<string, I18nKey> = {
+  [NO_DESTINATION]: "insight.kind.chip.notifiesNoOne",
+  [NOTIFY_FAILED]: "autoobserveLive.suggestions.kinds.alert_notify_failed",
+};
 
 // Logs opens an hour before the last data so the last normal rows are on screen; else the run's own window.
 const logsWindow = (
@@ -545,14 +557,14 @@ const notWorkingParts = (
   return {
     id: item.id,
     chip: {
-      label: t(silent ? "insight.kind.chip.notifiesNoOne" : "insight.chip.notWorking"),
+      label: t(ALERT_CHIP[item.kind] ?? "insight.chip.notWorking"),
       variant: TONE_VARIANT[tone],
       tone,
     },
     headline: today.headline,
     why: silent ? noDestinationWhy(t, zone, item) : alertWhy(t, zone, item),
     whyDetail: null,
-    next: silent ? t("insight.alert.nextNoDestination") : alertNext(t, item),
+    next: alertNext(t, item),
     cta,
     secondary: [change ? review : null, logs, calibration].filter(
       (c): c is InsightCta => c !== null,

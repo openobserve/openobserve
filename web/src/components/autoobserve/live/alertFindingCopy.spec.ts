@@ -124,7 +124,7 @@ describe("alert_not_working cards (P5b test 27)", () => {
       [{}, "checkout-errors is not working"],
     ];
     for (const [evidence, expected] of cases) {
-      expect(String(alertFindingHeadline(gt, finding("f", evidence)))).toBe(expected);
+      expect(String(alertFindingHeadline(gt, "en-US", finding("f", evidence)))).toBe(expected);
     }
   });
 

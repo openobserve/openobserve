@@ -51,8 +51,37 @@ const SENTENCE: Record<string, Sentence> = {
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
-export const alertFindingHeadline = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
+const count = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+
+// Counts are said only when the server sent both, so "3 of 0" never shows.
+const notifyFailedHeadline = (
+  t: TranslateFn,
+  locale: string,
+  s: AutoObserveSuggestion,
+  monitor: I18nText,
+): I18nText => {
+  const failed = count(s.evidence.delivery_failures);
+  const tried = count(s.evidence.delivery_attempts);
+  if (failed === null || tried === null)
+    return t("autoobserveLive.suggestions.body.alertNotifyFailedNoCounts", { monitor });
+  const n = new Intl.NumberFormat(locale);
+  return t(
+    "autoobserveLive.suggestions.body.alertNotifyFailed",
+    { monitor, failed: raw(n.format(failed)), tried: raw(n.format(tried)) },
+    tried,
+  );
+};
+
+export const alertFindingHeadline = (
+  t: TranslateFn,
+  locale: string,
+  s: AutoObserveSuggestion,
+): I18nText => {
   const monitor = raw(text(s.evidence.alert_name));
+  if (s.kind === "alert_no_destination")
+    return t("autoobserveLive.suggestions.body.alertNoDestination", { monitor });
+  if (s.kind === "alert_notify_failed") return notifyFailedHeadline(t, locale, s, monitor);
   const pattern = text(s.evidence.pattern);
   const sentence = Object.hasOwn(SENTENCE, pattern) ? SENTENCE[pattern] : null;
   if (!sentence) return t(GENERIC, { monitor });

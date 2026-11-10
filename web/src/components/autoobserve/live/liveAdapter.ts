@@ -195,6 +195,11 @@ const SUGGESTION_KIND: Record<string, { label: I18nKey; look: LookKind; tag?: Ba
     look: "notify",
     tag: "error-soft",
   },
+  alert_notify_failed: {
+    label: "autoobserveLive.suggestions.kinds.alert_notify_failed",
+    look: "notify",
+    tag: "error-soft",
+  },
   source_silence: {
     label: "insight.kind.chip.stoppedSending",
     look: "watching",
@@ -650,12 +655,7 @@ const alertParts = (
 ): Parts => {
   const runAt = num(s.last_seen_at);
   return {
-    headline:
-      s.kind === "alert_no_destination"
-        ? t("autoobserveLive.suggestions.body.alertNoDestination", {
-            monitor: raw(str(s.evidence.alert_name)),
-          })
-        : alertFindingHeadline(t, s),
+    headline: alertFindingHeadline(t, locale, s),
     why:
       runAt === null || nowMs === undefined
         ? null

@@ -31,7 +31,8 @@ export type AutoObserveSuggestionKind =
   | "blind_guardrail"
   | "discovery_unusable"
   | "alert_not_working"
-  | "alert_no_destination";
+  | "alert_no_destination"
+  | "alert_notify_failed";
 
 export interface AutoObserveEvidence {
   monitor_kind: string;

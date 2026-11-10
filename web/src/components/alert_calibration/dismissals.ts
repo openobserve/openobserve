@@ -179,7 +179,7 @@ export function isDismissable(record: FindingRecord): record is DismissableFindi
 
 /** The AutoObserve kinds that are calibration findings, decided through the `alert_finding` family. */
 export const isAlertFindingKind = (kind: string): boolean =>
-  kind === "alert_not_working" || kind === "alert_no_destination";
+  kind === "alert_not_working" || kind === "alert_no_destination" || kind === "alert_notify_failed";
 
 export function dismissableOf(
   item: Pick<AutoObserveSuggestion, "kind" | "evidence" | "subject">,

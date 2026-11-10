@@ -30740,6 +30740,7 @@
         "blind_guardrail": "Not working",
         "discovery_unusable": "Data quality",
         "alert_no_destination": "Notifies no one",
+        "alert_notify_failed": "Notification failed",
         "other": "Other"
       },
       "severity": {
@@ -30777,6 +30778,8 @@
         "alertOtherError": "{monitor} keeps failing with an error",
         "alertNotWorkingGeneric": "{monitor} is not working",
         "alertNoDestination": "{monitor} fired and notifies no one",
+        "alertNotifyFailed": "{monitor} fired, and {failed} of {tried} notification failed. | {monitor} fired, and {failed} of {tried} notifications failed.",
+        "alertNotifyFailedNoCounts": "{monitor} fired, and its notifications failed.",
         "alertStreamGone": "{monitor} keeps failing because its stream doesn't exist",
         "alertFieldGone": "{monitor} keeps failing because a field it uses doesn't exist",
         "other": "I found something this page can't show yet"
@@ -34268,6 +34271,7 @@
       "whyEmptyScope": "No rows matched its filters in the last {window}, so it cannot fire.",
       "whyNoDestination": "It fired {count} time in the last calibration window, and no one was notified. | It fired {count} times in the last calibration window, and no one was notified.",
       "nextNoDestination": "Choose who gets notified.",
+      "nextNotifyFailed": "Check its destination.",
       "errorType": {
         "stream_missing": "stream-not-found errors",
         "field_missing": "field-not-found errors",
