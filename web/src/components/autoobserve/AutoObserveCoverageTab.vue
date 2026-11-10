@@ -568,6 +568,13 @@ const LIVE_FILTER_WORD: Partial<Record<CoverageFilter, LiveCoverageState>> = {
   watched: "watched",
   gaps: "gap",
 };
+// Live coverage has three checks, so a service's alerts fall in 3+, 2, 1 or none, not the fixture's 6/5.
+const LIVE_DETECTOR_LEGEND: { cls: HexClass; key: I18nKey }[] = [
+  { cls: "s1", key: "autoobserveLive.coverage.bucketThree" },
+  { cls: "s2", key: "autoobserveLive.coverage.bucketTwo" },
+  { cls: "s3", key: "autoobserveLive.coverage.bucketOne" },
+  { cls: "none", key: "autoobserve.coverage.bucketNone" },
+];
 const LIVE_STATE_LEGEND: { cls: HexClass; state: LiveCoverageState }[] = [
   { cls: "gap", state: "gap" },
   { cls: "watched", state: "watched" },
@@ -851,6 +858,7 @@ const fillClass = (row: CoverageRow): HexClass => {
   if (fill.value === "detectors") {
     const n = detectorsOf(row);
     if (n === 0) return "none";
+    if (props.source) return n >= 3 ? "s1" : n === 2 ? "s2" : "s3";
     if (n >= 6) return "s1";
     return n === 5 ? "s2" : "s3";
   }
@@ -895,7 +903,9 @@ const items = computed(() => allRows.value.map(toItem));
 const legend = computed(() =>
   (props.source && fill.value === "state"
     ? LIVE_STATE_LEGEND.map(({ cls, state }) => ({ cls, label: coverageWord(t, state) }))
-    : LEGEND[fill.value].map(({ cls, key }) => ({ cls, label: t(key) }))
+    : (props.source && fill.value === "detectors" ? LIVE_DETECTOR_LEGEND : LEGEND[fill.value]).map(
+        ({ cls, key }) => ({ cls, label: t(key) }),
+      )
   ).map((item) => ({
     ...item,
     count: searched.value.filter((r) => fillClass(r) === item.cls).length,

@@ -30658,6 +30658,9 @@
       "noCluster": "no cluster",
       "noMatch": "No service, cluster or namespace matches “{query}”",
       "showAll": "Show all",
+      "bucketThree": "3 or more",
+      "bucketTwo": "2",
+      "bucketOne": "1",
       "filterHides": "No service is {state}",
       "filterHidesSearch": "{count} service matches “{query}”, but it isn't {state} | {count} services match “{query}”, but none is {state}"
     },

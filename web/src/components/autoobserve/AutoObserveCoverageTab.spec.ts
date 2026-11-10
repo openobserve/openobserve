@@ -171,6 +171,18 @@ describe("AutoObserveCoverageTab in live mode", () => {
       );
     });
 
+    it("buckets detector counts for three live checks, not the fixture's 6 and 5 (T2-22)", async () => {
+      routeQuery.cov = "map";
+      const wrapper = mountTab(live(FEW));
+      wrapper.findComponent(OSelect).vm.$emit("update:modelValue", "detectors");
+      await flushPromises();
+      const labels = wrapper
+        .findAll('[data-test^="autoobserve-coverage-legend-"]')
+        .filter((c) => !c.attributes("data-test")!.endsWith("chips"))
+        .map((c) => c.findAll("span")[1].text());
+      expect(labels).toEqual(["3 or more", "2", "1", "None"]);
+    });
+
     it("offers no learning fill", () => {
       const options = mountTab(live(FEW)).findComponent(OSelect).props("options") as {
         value: string;

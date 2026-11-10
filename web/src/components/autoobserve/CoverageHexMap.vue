@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :width="layout.width"
       :height="layout.height"
       :viewBox="`0 0 ${layout.width} ${layout.height}`"
-      class="block overflow-visible"
+      class="block max-w-full overflow-visible"
       role="group"
       :aria-label="label"
     >
