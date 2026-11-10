@@ -112,6 +112,13 @@ describe("SlackConnectEmpty on Cloud (A1)", () => {
     expect(w.find('[data-test="slack-setup-app"]').exists()).toBe(false);
   });
 
+  it("says connecting also lets AutoObserve post its digest", () => {
+    const w = mountEmpty();
+    expect(w.find('[data-test="slack-connect-autoobserve"]').text()).toBe(
+      "Once connected, AutoObserve can post a daily digest to a channel you pick.",
+    );
+  });
+
   it("renders Add to Slack as a button carrying the Slack artwork", () => {
     const button = mountEmpty().find('[data-test="slack-add-to-slack"]');
     expect(button.element.tagName).toBe("BUTTON");

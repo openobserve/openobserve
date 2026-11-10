@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import addToSlackImage from "@/assets/images/common/add_to_slack.png";
 import addToSlackImage2x from "@/assets/images/common/add_to_slack@2x.png";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -59,6 +60,8 @@ const props = defineProps<{
 const emit = defineEmits<{ setup: []; installed: [confirmation: SlackInstallConfirmation] }>();
 
 const { t } = useI18nTyped();
+// The digest is an enterprise and Cloud feature, so only those builds mention it.
+const autoobserveEdition = props.isCloud || config.isEnterprise == "true";
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
@@ -303,6 +306,11 @@ const nextSteps = computed<I18nText[]>(() =>
         :title="t('slackApp.connect.title')"
         :backdrop="false"
       >
+        <template v-if="autoobserveEdition" #description>
+          <span data-test="slack-connect-autoobserve">{{
+            t("slackApp.connect.autoobserveHint")
+          }}</span>
+        </template>
         <template #actions>
           <OButton
             v-if="isCloud"

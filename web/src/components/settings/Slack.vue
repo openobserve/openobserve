@@ -181,6 +181,7 @@ const openDialog = (mode: DialogMode): void => {
         v-else-if="forbidden"
         size="hero"
         preset="no-access"
+        :description="t('slackApp.workspaces.noAccess')"
         data-test="slack-no-access"
       />
       <OEmptyState
@@ -251,6 +252,7 @@ const openDialog = (mode: DialogMode): void => {
             :key="current.id"
             :installation="current"
             :is-cloud="isCloud"
+            :read-only="insights.data.value?.can_edit === false"
             @disconnect="openDialog('disconnect')"
             @uninstall="openDialog('uninstall')"
           >

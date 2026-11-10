@@ -71,6 +71,8 @@ interface ConnectedOrgRow {
 const props = defineProps<{
   installation: InstallationView;
   isCloud: boolean;
+  /** The reader lacks Manage Slack, so removing the app is offered but off. */
+  readOnly?: boolean;
 }>();
 
 const emit = defineEmits<{ disconnect: []; uninstall: [] }>();
@@ -606,6 +608,14 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
         {{ t("slackApp.card.disconnectSection") }}
       </h2>
       <OCard variant="outlined" class="p-5">
+        <p
+          v-if="readOnly"
+          class="text-text-secondary mb-4 flex items-start gap-2 text-sm"
+          data-test="slack-danger-locked"
+        >
+          <OIcon name="lock" size="sm" class="mt-0.5 shrink-0" />
+          <span>{{ t("slackApp.insights.locked") }} {{ t("slackApp.insights.lockedDetail") }}</span>
+        </p>
         <div v-if="showDisconnect" class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex min-w-0 flex-col gap-0.5">
             <span class="text-text-heading text-sm font-medium">
@@ -619,6 +629,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
             variant="outline-destructive"
             size="sm-action"
             icon-left="link-off"
+            :disabled="readOnly"
             data-test="slack-disconnect-org"
             @click="emit('disconnect')"
           >
@@ -642,6 +653,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
             variant="destructive"
             size="sm-action"
             icon-left="delete"
+            :disabled="readOnly"
             data-test="slack-uninstall"
             @click="emit('uninstall')"
           >

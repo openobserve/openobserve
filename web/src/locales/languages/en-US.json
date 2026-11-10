@@ -31674,6 +31674,7 @@
     "connect": {
       "title": "Connect a Slack workspace",
       "description": "Your team asks OpenObserve questions from Slack and gets answers with their own permissions.",
+      "autoobserveHint": "Once connected, AutoObserve can post a daily digest to a channel you pick.",
       "stepCheckTitle": "Check this server",
       "stepCreateTitle": "Create the app",
       "stepInstallTitle": "Install and link people",
@@ -32039,7 +32040,8 @@
       "loadFailed": "Couldn't load your linked accounts"
     },
     "workspaces": {
-      "addAnother": "Add another workspace"
+      "addAnother": "Add another workspace",
+      "noAccess": "Slack settings need the Manage Slack permission. Ask an admin of this organization."
     },
     "sections": {
       "onThisPage": "On this page",
