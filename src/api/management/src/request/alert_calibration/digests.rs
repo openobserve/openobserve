@@ -43,7 +43,7 @@ use o2_enterprise::enterprise::{
         dismissals::{SCOPE_ALERT, Target},
     },
     autoobserve::{
-        alert_findings::{DigestRun, FAILURE_RULE, RUN_LOOKBACK_US},
+        alert_findings::{DigestRun, LISTED_RULES, RUN_LOOKBACK_US},
         marks::TableKvReader,
     },
 };
@@ -555,7 +555,11 @@ pub(crate) async fn latest_alert_findings(
 ) -> Result<Option<DigestRun>, InfraError> {
     let schema = alert_schema(org_id).await?;
     let search = |sql, from, size| search_at(org_id, sql, (since, now + 1), from, size);
-    alert_findings_with(&schema, search).await
+    let mut run = alert_findings_with(&schema, search).await?;
+    if let Some(run) = run.as_mut() {
+        drop_detection_findings(org_id, &mut run.records).await;
+    }
+    Ok(run)
 }
 
 pub(crate) async fn finding_target(
@@ -563,10 +567,41 @@ pub(crate) async fn finding_target(
     finding_id: &str,
     now: i64,
 ) -> Result<Option<Target>, InfraError> {
-    Ok(finding_hit(org_id, finding_id, now)
-        .await?
-        .as_ref()
-        .and_then(target_of))
+    let hit = finding_hit(org_id, finding_id, now).await?;
+    let listed = match &hit {
+        Some(hit) => !on_detection(org_id, hit).await,
+        None => false,
+    };
+    Ok(hit.as_ref().filter(|_| listed).and_then(target_of))
+}
+
+/// Runs leave a security detection to the Security module, so its older findings are unlisted too.
+async fn drop_detection_findings(org_id: &str, hits: &mut Vec<Value>) {
+    let mut kept = Vec::with_capacity(hits.len());
+    for hit in std::mem::take(hits) {
+        if !on_detection(org_id, &hit).await {
+            kept.push(hit);
+        }
+    }
+    *hits = kept;
+}
+
+async fn on_detection(org_id: &str, hit: &Value) -> bool {
+    match finding_alert(hit) {
+        Some(alert_id) => crate::request::security::is_siem_alert(org_id, alert_id).await,
+        None => false,
+    }
+}
+
+/// The alert a finding row is about; runs, skips and markers name none.
+fn finding_alert(hit: &Value) -> Option<&str> {
+    if hit.get("kind").and_then(Value::as_str) != Some("finding") {
+        return None;
+    }
+    hit.get("alert_id")
+        .or_else(|| hit.get("scope_key"))
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty())
 }
 
 /// The finding's stored change as the alert read offers it to this reader, destination included.
@@ -579,6 +614,9 @@ pub(crate) async fn finding_change(
     let Some(hit) = finding_hit(org_id, finding_id, now).await? else {
         return Ok(None);
     };
+    if on_detection(org_id, &hit).await {
+        return Ok(None);
+    }
     let Some(alert_id) = hit
         .get("scope_key")
         .and_then(Value::as_str)
@@ -862,11 +900,11 @@ fn alert_run_sql(held: &dyn Fn(&str) -> bool) -> String {
 fn alert_records_sql(run: &DigestRun, after: &str) -> String {
     format!(
         "SELECT * FROM \"{DIGEST_STREAM}\" WHERE window_start = {} AND window_end = {} \
-         AND kind = 'finding' AND rule_id = {} AND scope_kind = {} AND _timestamp = {} \
+         AND kind = 'finding' AND rule_id IN ({}) AND scope_kind = {} AND _timestamp = {} \
          AND finding_id > {} ORDER BY finding_id ASC",
         run.window_start,
         run.window_end,
-        quote_sql_string(FAILURE_RULE),
+        LISTED_RULES.map(quote_sql_string).join(", "),
         quote_sql_string(SCOPE_ALERT),
         run.emitted_at,
         quote_sql_string(after)
@@ -956,6 +994,7 @@ async fn with_suggestions(
     hits: Result<Vec<Value>, Response>,
 ) -> Result<Vec<Value>, Response> {
     let mut hits = hits?;
+    drop_detection_findings(org_id, &mut hits).await;
     offer_destination_suggestions(org_id, user_id, visibility, &mut hits).await;
     if let Err(e) = keep_offers(org_id, user_id, &hits).await {
         log::error!("[alert_calibration] keeping the offers for org={org_id} failed: {e}");
@@ -1377,7 +1416,7 @@ mod tests {
             alert_records_sql(&run, "ab'c"),
             format!(
                 "SELECT * FROM \"{DIGEST_STREAM}\" WHERE window_start = 10 AND window_end = 20 \
-                 AND kind = 'finding' AND rule_id = 'failure' AND scope_kind = 'alert' \
+                 AND kind = 'finding' AND rule_id IN ('failure', 'no_destination') AND scope_kind = 'alert' \
                  AND _timestamp = 30 AND finding_id > 'ab''c' ORDER BY finding_id ASC"
             )
         );
@@ -1624,5 +1663,45 @@ mod tests {
             ("noise", None, "a1")
         );
         assert!(target_of(&serde_json::json!({"rule_id": "noise"})).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_finding_on_an_alert_that_became_a_detection_is_no_longer_listed() {
+        use config::meta::{
+            alerts::alert::{Alert, SIEM_ATTRIBUTE},
+            folder::Folder,
+        };
+        use svix_ksuid::KsuidLike;
+
+        let org = format!("cal_det_{}", config::ider::uuid());
+        let (detection, plain) = (
+            svix_ksuid::Ksuid::new(None, None).to_string(),
+            svix_ksuid::Ksuid::new(None, None).to_string(),
+        );
+        for (id, siem) in [(&detection, true), (&plain, false)] {
+            let mut alert = Alert::default();
+            alert.org_id = org.clone();
+            alert.context_attributes = siem.then(|| {
+                [(SIEM_ATTRIBUTE.to_string(), "true".to_string())]
+                    .into_iter()
+                    .collect()
+            });
+            common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key(&org, id),
+                (Folder::default(), alert),
+            );
+        }
+        let finding = |id: &str| serde_json::json!({"kind": "finding", "alert_id": id});
+        let mut hits = vec![
+            finding(&detection),
+            finding(&plain),
+            serde_json::json!({"kind": "run"}),
+            serde_json::json!({"kind": "finding", "scope_key": detection}),
+        ];
+        drop_detection_findings(&org, &mut hits).await;
+        assert_eq!(
+            hits,
+            vec![finding(&plain), serde_json::json!({"kind": "run"})]
+        );
     }
 }
