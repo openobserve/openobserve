@@ -123,8 +123,8 @@ export const STATE_LOOK: Record<
   undone: { variant: "purple-soft", key: "autoobserve2.activityPage.status.undone", icon: "undo" },
 };
 
-// Read on use, since the sample ledger loads after this module.
-const factOf = (id: string): LedgerFact | undefined => LEDGER.find((f) => f.id === id);
+// Read on use, since the sample ledger loads after this module; every entry comes from it.
+const factOf = (id: string): LedgerFact => LEDGER.find((f) => f.id === id) as LedgerFact;
 
 // The investigation loop's only change is an alert-query fix, so it reads as alert tuning.
 const kindOf = (fact: LedgerFact): ChangeKind => {
