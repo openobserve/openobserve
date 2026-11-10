@@ -11605,7 +11605,12 @@
       "successTimes": "Successful evaluation time",
       "nearLimit": "Near the time limit",
       "successTimesValue": "median {p50} · 90th percentile {p90} · longest {max}",
-      "nearLimitValue": "{count} of {total} successful evaluation took {near} or more | {count} of {total} successful evaluations took {near} or more"
+      "nearLimitValue": "{count} of {total} successful evaluation took {near} or more | {count} of {total} successful evaluations took {near} or more",
+      "blipEpisodes": "Firings that ended",
+      "blipsWouldNotAlert": "Would not fire with the suggested hold",
+      "checkInterval": "Check interval",
+      "holdNow": "Hold for now",
+      "holdSuggested": "Suggested hold"
     },
     "errorClass": {
       "streamMissing": "Stream not found",
