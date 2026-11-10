@@ -48,6 +48,9 @@ const UNKNOWN_SERVICE: &str = "unknown";
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 /// How many of an alert's latest firings a Firing run after a window looks through for open pages.
 const MUTED_RESOLVES_SCANNED: u64 = 10;
+/// Pause between two attempts of one incident notification.
+#[cfg(feature = "enterprise")]
+const INCIDENT_NOTIFY_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 /// Per-entity case lock, so detections firing in one tick join one case; striped to stay bounded.
 static SIEM_CASE_LOCKS: LazyLock<Vec<tokio::sync::Mutex<()>>> =
     LazyLock::new(|| (0..64).map(|_| tokio::sync::Mutex::new(())).collect());
@@ -511,14 +514,8 @@ async fn send_incident_notifications_inner(
         );
         let explicit: Vec<_> = send.alert_template.into_iter().cloned().collect();
         for dest_name in &send.dest_names {
-            match crate::alerts::notifications::notify::notify(
-                org_id,
-                dest_name,
-                &explicit,
-                Some(&subject),
-                &mut send.ctx,
-            )
-            .await
+            match notify_incident_destination(org_id, dest_name, &explicit, &subject, &mut send.ctx)
+                .await
             {
                 Ok(sent) => success_parts.push(format!("{dest_name}: {}", sent.response)),
                 Err(e) => {
@@ -544,6 +541,52 @@ async fn send_incident_notifications_inner(
         );
         Some(error)
     }
+}
+
+/// Retries a temporary failure in place: later firings join as repeats and never re-send it.
+#[cfg(feature = "enterprise")]
+async fn notify_incident_destination(
+    org_id: &str,
+    dest_name: &str,
+    explicit: &[config::meta::destinations::Template],
+    subject: &str,
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+) -> Result<
+    crate::alerts::notifications::notify::SendOutcome,
+    crate::alerts::notifications::notify::NotifyError,
+> {
+    let attempts = infra::scheduler::get_scheduler_max_retries();
+    let mut attempt = 1;
+    loop {
+        match crate::alerts::notifications::notify::notify(
+            org_id,
+            dest_name,
+            explicit,
+            Some(subject),
+            ctx,
+        )
+        .await
+        {
+            Err(error) if retries_incident_notify(&error, attempt, attempts) => {
+                log::warn!(
+                    "[incidents] notify {dest_name} failed for {org_id}, attempt {attempt}/{attempts}: {error}"
+                );
+                attempt += 1;
+                tokio::time::sleep(INCIDENT_NOTIFY_RETRY_DELAY).await;
+            }
+            result => return result,
+        }
+    }
+}
+
+/// Whether a failed incident send is tried again; a refusal that cannot pass is not.
+#[cfg(feature = "enterprise")]
+fn retries_incident_notify(
+    error: &crate::alerts::notifications::notify::NotifyError,
+    attempt: i32,
+    attempts: i32,
+) -> bool {
+    error.is_retryable() && attempt < attempts
 }
 
 /// Point `ctx` at the incident: its link, and the `incident_*` template variables.
@@ -6076,5 +6119,25 @@ mod tests {
             escalated_severity("P1", cases::sigma_severity("low"), None),
             None
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_incident_notification_retries_only_a_temporary_failure() {
+        use crate::alerts::notifications::notify::NotifyError;
+        let rejected = |status| NotifyError::Rejected {
+            status,
+            body: String::new(),
+        };
+        assert!(retries_incident_notify(&rejected(500), 1, 3));
+        assert!(retries_incident_notify(&rejected(429), 2, 3));
+        assert!(!retries_incident_notify(&rejected(500), 3, 3));
+        assert!(!retries_incident_notify(&rejected(400), 1, 3));
+        assert!(!retries_incident_notify(
+            &NotifyError::DestinationNotFound("slack".to_string()),
+            1,
+            3
+        ));
+        assert!(!retries_incident_notify(&rejected(500), 1, 0));
     }
 }
