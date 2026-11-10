@@ -22,6 +22,8 @@ export const BASELINE_LOOKBACK_US = 7 * 24 * 3_600_000_000;
 const LOOKBACK_HOURS = 7 * 24;
 // The latency alert ignores windows with fewer requests, so a p95 over fewer says nothing usual.
 const MIN_REQUESTS = 20;
+// A week's level barely moves in minutes, and two reads of it must not draft two thresholds for one check.
+const KEEP_MS = 15 * 60_000;
 
 /** One usual-level query: the error count or the p95, scoped like the alert it sets a threshold for. */
 export interface BaselineRequest {
@@ -31,6 +33,8 @@ export interface BaselineRequest {
 }
 
 type Hit = Record<string, unknown>;
+
+const measured = new Map<string, { value: number; at: number }>();
 
 const num = (value: unknown): number => {
   const n = Number(value);
@@ -59,6 +63,23 @@ const levelOf = (kind: BaselineRequest["kind"], hits: Hit[], end: number): numbe
 
 /** The usual errors an hour (over the hours with data, up to 7 days) or p95 in ms, from one streaming query; null when there is none or it was stopped. */
 export const measureBaseline = (
+  org: string,
+  request: BaselineRequest,
+  signal?: AbortSignal,
+): Promise<number | null> => {
+  const key = `${org}\n${request.kind}\n${request.stream.type}\n${request.sql}`;
+  const kept = measured.get(key);
+  if (kept && Date.now() - kept.at < KEEP_MS) return Promise.resolve(kept.value);
+  return readBaseline(org, request, signal).then((value) => {
+    if (value !== null && !signal?.aborted) measured.set(key, { value, at: Date.now() });
+    return value;
+  });
+};
+
+/** Drops every kept level, so the next read measures again. */
+export const forgetBaselines = (): void => measured.clear();
+
+const readBaseline = (
   org: string,
   request: BaselineRequest,
   signal?: AbortSignal,
