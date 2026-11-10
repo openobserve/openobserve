@@ -19,6 +19,7 @@ import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import { m12Rows, sourceRows } from "./bulkFixtures";
 import {
+  blockLine,
   failureLine,
   firesWhenOf,
   footerOf,
@@ -121,6 +122,30 @@ describe("bulkCopy — rows and groups", () => {
       { folders: [], overrides: {}, rights: null },
     );
     expect(rows.map((r) => serviceLabel(t, r, rows))).toEqual(["svc-x", "svc-x"]);
+  });
+
+  it("names each namespace in the no-usual-level reason (ADD-ALERT-DEST 9)", () => {
+    const scope = (namespace: string) => ({
+      service: "svc-a",
+      cluster: null,
+      namespace,
+      stream: { type: "traces", name: "app_traces" },
+      schema: ["service_name", "service_k8s_namespace_name"],
+    });
+    const rows = reviewRowsOf(
+      {
+        kind: "errors",
+        rows: [
+          { key: "j", kind: "errors", scope: scope("ns-j"), usually: null },
+          { key: "s", kind: "errors", scope: scope("ns-s"), usually: null },
+        ],
+      },
+      { folders: [], overrides: {}, rights: null, baselines: { j: null, s: null } },
+    );
+    expect(rows.map((r) => blockLine(t, r, rows))).toEqual([
+      "AutoObserve found no usual error count for svc-a · ns-j over the last 7 days. Set a threshold to add this alert.",
+      "AutoObserve found no usual error count for svc-a · ns-s over the last 7 days. Set a threshold to add this alert.",
+    ]);
   });
 
   it("says rows for logs and spans for traces, and the usual rate", () => {

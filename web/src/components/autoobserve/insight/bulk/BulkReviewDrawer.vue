@@ -50,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v) => setGroupBy(v as GroupBy)"
           />
         </div>
-        <span class="text-text-secondary text-xs">{{ t("insight.bulk.groupHint") }}</span>
+        <span class="text-text-secondary text-xs" data-test="bulk-review-group-hint">{{
+          state.groupBy === "team" ? t("insight.bulk.groupHint") : t("insight.bulk.groupHintOther")
+        }}</span>
       </div>
 
       <OBanner
@@ -146,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :folders="folderChoices"
             :destinations="state.destinations"
             :disabled="locked"
+            :reach-gap="reachGap"
             @toggle="(on: boolean) => toggleGroup(groupOf(sectionKey)!, on)"
             @collapse="toggleCollapsed(sectionKey)"
             @change="(f: FolderRef, d: string[]) => changeGroup(groupOf(sectionKey)!, f, d)"
@@ -184,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               :data-test="`bulk-review-cant-${row.key}`"
             >
-              {{ blockLine(t, row) }}
+              {{ blockLine(t, row, reviewRows) }}
             </span>
             <OInput
               v-if="row.block?.code === 'noBaseline' || state.thresholds[row.key]"
@@ -226,14 +229,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #footer>
       <div class="flex flex-wrap items-center justify-between gap-3">
         <p
-          v-if="silent.length && !done"
-          class="text-status-warning-text flex min-w-0 flex-1 items-start gap-1.5 text-xs text-pretty"
+          v-if="unreachable.length && !done"
+          class="text-status-error-text flex min-w-0 flex-1 items-start gap-1.5 text-xs text-pretty"
           data-test="bulk-review-no-destination"
         >
-          <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" />
-          <span>{{
-            t("insight.bulk.noDestination", { count: silent.length }, silent.length)
-          }}</span>
+          <OIcon name="error" size="xs" class="mt-0.5 shrink-0" />
+          <span>{{ unreachableLine(t, reachGap, unreachable.length) }}</span>
         </p>
         <p
           v-else
@@ -241,7 +242,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="bulk-review-footer"
         >
           {{ footer }}
-          <template v-if="tickedRows.length && !done">
+          <span
+            v-if="silent.length && !done"
+            class="text-text-secondary"
+            data-test="bulk-review-via-incident"
+            >{{ viaIncidentLine(t, silent.length) }}</span
+          >
+          <template v-else-if="tickedRows.length && !done">
             {{ t("insight.bulk.footerOrigin") }}
           </template>
         </p>
@@ -259,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!done"
             variant="primary"
             size="sm-action"
-            :disabled="toCreate.length === 0 || checking || silent.length > 0"
+            :disabled="toCreate.length === 0 || checking || unreachable.length > 0"
             :loading="running"
             data-test="bulk-review-create"
             @click="createTicked()"
@@ -276,6 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onBeforeUnmount, provide, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { incidentReachGap, unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
 import config from "@/aws-exports";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -334,6 +342,9 @@ const enterprise = config.isEnterprise === "true";
 const { isMobile } = useBreakpoint();
 const { state, reviewRows, groups, toCreate, tickedRows, checking, silent } = useBulkReview();
 const locale = computed(() => String(i18nLocale.value));
+const reachGap = computed(() => incidentReachGap(store.state.zoConfig));
+// Every AutoObserve draft opens an incident, so a row with no destination is blocked only when that pages no one.
+const unreachable = computed(() => (reachGap.value === null ? [] : silent.value));
 const org = () => String(store.state.selectedOrganization?.identifier ?? "");
 
 const { results, running, create, retry, reset, expire, hideUndo, showUndo } = useBulkCreate({

@@ -310,7 +310,7 @@ describe("errorsAlert", () => {
       label: "Fire above",
       suffix: "errors an hour",
       reason:
-        "AutoObserve found no usual error count for svc-a over the last 7 days. Set a threshold to add this alert.",
+        "AutoObserve found no usual error count for svc-a · cluster-k / ns-b over the last 7 days. Set a threshold to add this alert.",
       value: null,
     });
     expect(isPrefillBlocked(prefill)).toBe(false);
@@ -327,6 +327,19 @@ describe("errorsAlert", () => {
     expect(prefill.sql).toMatch(/HAVING count\(\*\) > 40$/);
     expect(prefill).toMatchObject({ triggerThreshold: 1, triggerOperator: ">=" });
     expect(prefill.thresholdInput?.value).toBe(40);
+  });
+});
+
+describe("AutoObserve is the destination", () => {
+  it("every AutoObserve draft opens an incident, so one with no destination still pages on-call", () => {
+    const silent = {
+      ...options,
+      notify: { destinations: [] as string[], reason: "none" as const },
+    };
+    expect(noDataAlert(logsScope(), silent)!.createsIncident).toBe(true);
+    expect(
+      errorsAlert(tracesScope(), { ...silent, errorField: null, usualPerHour: 2 })!.createsIncident,
+    ).toBe(true);
   });
 });
 

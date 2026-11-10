@@ -184,6 +184,31 @@ describe("BulkReviewDrawer — review", () => {
   });
 });
 
+describe("BulkReviewDrawer — group editor (T2-17)", () => {
+  it("the hint names teams only while grouped by team (T2-9)", async () => {
+    await mountDrawer();
+    await openWith(m12Rows(IDS).slice(0, 1));
+    expect(text("bulk-review-group-hint")).toContain("come from each team");
+    const { setGroupBy } = await import("./useBulkReview");
+    setGroupBy("folder");
+    await flushPromises();
+    expect(text("bulk-review-group-hint")).toBe("Change the folder and destination per group.");
+  });
+
+  it("applies a picked destination at once, without Done", async () => {
+    await mountDrawer();
+    await openWith(m12Rows(IDS).slice(0, 1));
+    await click("bulk-review-group-change-team-ingest");
+    const header = wrapper!.findComponent({ name: "BulkReviewGroupHeader" });
+    const selects = header.findAllComponents({ name: "OSelect" });
+    selects[1].vm.$emit("update:modelValue", ["ops-webhook"]);
+    await flushPromises();
+    expect(review.reviewRows.value[0].destinations).toEqual(["ops-webhook"]);
+    expect(text("bulk-review-group-meta-team-ingest")).toContain("notifies ops-webhook");
+    expect(q("bulk-review-group-editor-team-ingest")).not.toBeNull();
+  });
+});
+
 describe("BulkReviewDrawer — results", () => {
   it("locks an open group editor across Create and partial failure", async () => {
     let reject!: (reason: unknown) => void;
@@ -193,12 +218,11 @@ describe("BulkReviewDrawer — results", () => {
     await click("bulk-review-group-change-team-ingest");
     const header = wrapper!.findComponent({ name: "BulkReviewGroupHeader" });
     const selects = header.findAllComponents({ name: "OSelect" });
-    selects[0].vm.$emit("update:modelValue", "f-pay");
-    selects[1].vm.$emit("update:modelValue", []);
-    await flushPromises();
     await click("bulk-review-create");
     const assertFrozen = async () => {
       for (const select of selects) expect(select.props("disabled")).toBe(true);
+      selects[0].vm.$emit("update:modelValue", "f-pay");
+      selects[1].vm.$emit("update:modelValue", []);
       const done = header.findComponent(`[data-test="bulk-review-group-apply-team-ingest"]`);
       expect(done.props("disabled")).toBe(true);
       done.vm.$emit("click");
@@ -400,33 +424,61 @@ describe("BulkReviewDrawer — focus and edition", () => {
   });
 });
 
-describe("BulkReviewDrawer: a group that notifies no one is a warning", () => {
-  it("shows notifies no one on the No team yet row in amber, not in the red of a failure", async () => {
+const reach = (incidents: boolean, oncall: boolean) => {
+  store.state.zoConfig = {
+    ...store.state.zoConfig,
+    incidents_enabled: incidents,
+    oncall_enabled: oncall,
+  };
+};
+
+describe("BulkReviewDrawer: a group with no destination says who it reaches", () => {
+  const lonely = {
+    key: "lonely",
+    scope: {
+      service: "svc-lonely",
+      cluster: null,
+      namespace: null,
+      stream: { type: "logs", name: "app_logs" },
+      schema: ["_timestamp", "service_name"],
+    },
+    usually: null,
+  };
+  const reachPart = () =>
+    [...q("bulk-review-group-meta-__no_team__")!.querySelectorAll("span")].find((span) =>
+      /on-call|no one/.test(span.textContent ?? ""),
+    )!;
+
+  it("with incidents paging on-call, the group reads as reaching on-call, in neutral text", async () => {
+    reach(true, true);
+    await mountDrawer();
+    await openWith([lonely]);
+    expect(text("bulk-review-group-meta-__no_team__")).toContain(
+      "pages on-call through an incident",
+    );
+    expect(reachPart().className).not.toMatch(/status-(warning|error)-text/);
+  });
+
+  it("with incidents off, the group notifies no one, in the red of a failure", async () => {
+    reach(false, true);
+    await mountDrawer();
+    await openWith([lonely]);
+    expect(reachPart().textContent?.trim()).toBe("notifies no one");
+    expect(reachPart().className).toContain("text-status-error-text");
+  });
+
+  it("a group where only some rows notify a destination says how many (T2-9)", async () => {
+    reach(true, true);
     await mountDrawer();
     await openWith([
-      {
-        key: "lonely",
-        scope: {
-          service: "svc-lonely",
-          cluster: null,
-          namespace: null,
-          stream: { type: "logs", name: "app_logs" },
-          schema: ["_timestamp", "service_name"],
-        },
-        usually: null,
-      },
-    ]);
-    const meta = q("bulk-review-group-meta-__no_team__");
-    expect(text("bulk-review-group-meta-__no_team__")).toContain("notifies no one");
-    const part = [...meta!.querySelectorAll("span")].find(
-      (span) => span.textContent?.trim() === "notifies no one",
-    )!;
-    expect(part.className).toContain("text-status-warning-text");
-    expect(part.className).not.toContain("text-status-error-text");
+      lonely,
+      { ...lonely, key: "lonely-2", notify: { destinations: ["legacy-pager"], reason: "none" } },
+    ] as never);
+    expect(text("bulk-review-group-meta-__no_team__")).toContain("1 of 2 notify legacy-pager");
   });
 });
 
-describe("BulkReviewDrawer — never notifies no one (W4)", () => {
+describe("BulkReviewDrawer — AutoObserve is the destination", () => {
   const orphan = (key: string, alertIds?: string[]) => ({
     key,
     scope: {
@@ -441,20 +493,63 @@ describe("BulkReviewDrawer — never notifies no one (W4)", () => {
     ...(alertIds ? { alertIds } : {}),
   });
 
-  it("a ticked row that notifies no one blocks Add with the amber reason", async () => {
+  it("with incidents paging on-call, rows with no destination can be added, with a neutral line", async () => {
+    reach(true, true);
     await mountDrawer();
     await openWith([orphan("a-1"), orphan("a-2"), ...m12Rows(IDS).slice(0, 1)]);
-    const add = q("bulk-review-create") as HTMLButtonElement;
-    expect(add.disabled).toBe(true);
-    const reason = q("bulk-review-no-destination")!;
-    expect(reason.textContent).toContain(
-      "Choose who 2 alerts notify before adding them. An alert that notifies no one leaves its service unwatched.",
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(false);
+    expect(q("bulk-review-no-destination")).toBeNull();
+    const line = q("bulk-review-via-incident")!;
+    expect(line.textContent?.trim()).toBe(
+      "No destination for 2 alerts: each opens an incident, and the incident pages on-call.",
     );
-    expect(reason.className).toContain("warning");
+    expect(line.className).not.toMatch(/status-(warning|error)-text/);
+    expect(text("bulk-review-footer")).toContain("3 alerts will be created");
+  });
+
+  it("counts only rows Add would send, not one still waiting for its stream fields", async () => {
+    reach(false, true);
+    api.schema.mockImplementation((_org: string, name: string) =>
+      name === "slow_logs"
+        ? new Promise(() => undefined)
+        : Promise.resolve({ data: { schema: [{ name: "service_name" }] } }),
+    );
+    const waiting = {
+      ...orphan("a-3"),
+      scope: {
+        ...orphan("a-3").scope,
+        stream: { type: "logs", name: "slow_logs" },
+        schema: undefined,
+      },
+    };
+    await mountDrawer();
+    await openWith([orphan("a-1"), waiting] as never);
+    expect(text("bulk-review-no-destination")).toContain("Choose a destination for this alert.");
+  });
+
+  it("with incidents off, a ticked row with no destination blocks Add with the red line naming what is off", async () => {
+    reach(false, true);
+    await mountDrawer();
+    await openWith([orphan("a-1"), orphan("a-2"), ...m12Rows(IDS).slice(0, 1)]);
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(true);
+    const reason = q("bulk-review-no-destination")!;
+    expect(reason.textContent?.trim()).toBe(
+      "Choose a destination for these 2 alerts. Incidents are off in this organization, so an alert with no destination reaches no one.",
+    );
+    expect(reason.className).toContain("text-status-error-text");
     expect(text("bulk-review-footer")).toBe("");
   });
 
+  it("with on-call off, the red line says on-call is off", async () => {
+    reach(true, false);
+    await mountDrawer();
+    await openWith([orphan("a-1")]);
+    expect(text("bulk-review-no-destination")).toContain("On-call is off in this organization");
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("choosing a destination for the group enables Add and brings back the count", async () => {
+    reach(false, false);
     await mountDrawer();
     await openWith([orphan("a-1"), orphan("a-2")]);
     const group = review.groups.value[0];
@@ -467,6 +562,7 @@ describe("BulkReviewDrawer — never notifies no one (W4)", () => {
   });
 
   it("unticking the rows that notify no one also enables Add", async () => {
+    reach(false, false);
     await mountDrawer();
     await openWith([orphan("a-1"), ...m12Rows(IDS).slice(0, 1)]);
     const { toggleRow } = await import("./useBulkReview");
@@ -504,7 +600,8 @@ describe("BulkReviewDrawer — never notifies no one (W4)", () => {
     expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("keeps the block when the service's alerts notify no one either", async () => {
+  it("keeps the block when the service's alerts notify no one either and incidents are off", async () => {
+    reach(false, false);
     api.list.mockResolvedValue({
       data: { list: [{ alert_id: "al-1", folder_id: "f-pay", destinations: [] }] },
     });

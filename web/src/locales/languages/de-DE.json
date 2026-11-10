@@ -12900,7 +12900,7 @@
       "suppressRepeatsTooltip": "Einmal benachrichtigen, wenn der Alarm ausgelöst wird oder die Stufe wechselt, nicht bei jeder Auswertung. Lassen Sie es ausgeschaltet, um nach jeder Stummschaltung weiterhin Erinnerungen zu erhalten.",
       "keepFiringForInvalid": "Geben Sie 0 oder mehr Sekunden ein",
       "keepFiringForTooLong": "Geben Sie höchstens 86400 Sekunden (24 Stunden) ein",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "Variable hinzufügen",
@@ -13578,8 +13578,7 @@
         "tracesStoredSpans": "Die Zählungen beziehen sich auf gespeicherte Spans; gesampelter Traffic erscheint daher niedriger als er tatsächlich ist.",
         "tracesPeriodCapped": "Das Alarmfenster wurde auf {minutes} Minuten begrenzt, damit jede Prüfung schnell bleibt.",
         "tracesNotRun": "Diese Suche wurde noch nicht ausgeführt, daher verwendet der Alarm den Filter im Editor."
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
     },
     "saveFailed": "Der Alarm konnte nicht gespeichert werden.",
     "loadFailed": "Der Alarm konnte nicht geladen werden.",
@@ -32610,9 +32609,7 @@
         }
       }
     },
-    "bulk": {
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
-    },
+    "bulk": {},
     "decisions": {
       "saved": {
         "applied": "Applied to {title}.",

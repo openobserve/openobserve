@@ -283,6 +283,8 @@ const assemble = (
     frequencyMinutes: FREQUENCY_MINUTES,
     silenceMinutes: SILENCE_MINUTES,
     thresholdShape: "count",
+    // AutoObserve is the destination: the incident pages on-call when no person is named.
+    createsIncident: true,
     // The condition lives in the query, so one returned row means it was met; an empty threshold leaves the form's own.
     ...(thresholded && !promql ? { triggerThreshold: 1, triggerOperator: ">=" } : {}),
     warnings: dedupe(warnings),
@@ -381,14 +383,20 @@ export const baselineSql = (s: ServiceScope, b: BaselineInputs): string | null =
 /** The field that asks for a threshold when there is no usual level to suggest one. */
 const thresholdInput = (
   kind: "errors" | "latency",
-  service: string,
+  s: ServiceScope,
   value: number | null,
 ): AlertPrefillThresholdInput => ({
   label: gt("insight.threshold.label"),
   suffix: gt(`insight.threshold.${kind}Suffix`),
-  reason: gt(`insight.threshold.${kind}Reason`, { service }),
+  reason: gt(`insight.threshold.${kind}Reason`, { service: scopeLabel(s) }),
   value,
 });
+
+/** "svc-a · cluster-k / ns-b": the scope the baseline was measured on, as the review list names it. */
+const scopeLabel = (s: ServiceScope): string => {
+  const where = [s.cluster, s.namespace].filter(Boolean).join(" / ");
+  return where ? `${s.service} · ${where}` : s.service;
+};
 
 const userThreshold = (value: number | null | undefined): number | null =>
   typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
@@ -419,7 +427,7 @@ export const errorsAlert = (
     o,
   );
   return suggested === null
-    ? { ...prefill, thresholdInput: thresholdInput("errors", s.service, typed) }
+    ? { ...prefill, thresholdInput: thresholdInput("errors", s, typed) }
     : prefill;
 };
 
@@ -455,7 +463,7 @@ export const latencyAlert = (
     o,
   );
   return suggested === null
-    ? { ...prefill, thresholdInput: thresholdInput("latency", s.service, typed) }
+    ? { ...prefill, thresholdInput: thresholdInput("latency", s, typed) }
     : prefill;
 };
 

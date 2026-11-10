@@ -275,22 +275,63 @@ describe("AddAlert with an AutoObserve prefill", () => {
     expect(bannerText()).not.toContain("Alert Calibration");
   });
 
-  describe("never saves an alert that notifies no one (W4)", () => {
+  describe("AutoObserve is the destination: saves only an alert that reaches someone", () => {
     const silent: AutoObserveAlertOptions = {
       ...options,
       notify: { destinations: [], reason: "none" },
     };
     const save = () => byTest("add-alert-submit-btn") as HTMLButtonElement;
     const reason = () => byTest("add-alert-no-destination");
+    const via = () => byTest("add-alert-via-incident");
+    const reach = (incidents: boolean, oncall: boolean) => {
+      store.state.zoConfig = {
+        ...store.state.zoConfig,
+        incidents_enabled: incidents,
+        oncall_enabled: oncall,
+      };
+    };
+    beforeEach(() => reach(false, false));
+    afterEach(() => reach(false, false));
 
-    it("an AutoObserve draft with no destination blocks Save with the amber reason", async () => {
+    it("with incidents paging on-call, a draft with no destination opens an incident and saves", async () => {
+      reach(true, true);
+      await openNoDataPrefill("enterprise", silent);
+      expect(vm().formData.creates_incident).toBe(true);
+      expect(save().disabled).toBe(false);
+      expect(reason()).toBeNull();
+      expect(via()?.textContent?.trim()).toBe(
+        "No destination: this alert opens an incident, and the incident pages on-call.",
+      );
+      expect(via()?.className).not.toMatch(/status-(warning|error)-text/);
+      expect(wrapper!.findComponent({ name: "AlertSettings" }).props("destinationRequired")).toBe(
+        false,
+      );
+    });
+
+    it("turning off Creates Incident brings the block back, saying how to lift it", async () => {
+      reach(true, true);
+      await openNoDataPrefill("enterprise", silent);
+      const form = wrapper!.findComponent({ name: "OForm" }).props("form") as {
+        setFieldValue: (name: string, value: unknown) => void;
+      };
+      form.setFieldValue("creates_incident", false);
+      await flushPromises();
+      expect(vm().formData.creates_incident).toBe(false);
+      expect(save().disabled).toBe(true);
+      expect(reason()?.textContent?.trim()).toBe(
+        "Choose a destination for this alert, or turn on Creates Incident. With neither, it reaches no one.",
+      );
+    });
+
+    it("with incidents off, a draft with no destination blocks Save with the red reason naming what is off", async () => {
+      reach(false, true);
       await openNoDataPrefill("enterprise", silent);
       expect(vm().formData.destinations).toEqual([]);
       expect(save().disabled).toBe(true);
       expect(reason()?.textContent?.trim()).toBe(
-        "Choose a destination. An alert that notifies no one leaves its service unwatched.",
+        "Choose a destination for this alert. Incidents are off in this organization, so an alert with no destination reaches no one.",
       );
-      expect(reason()?.className).toContain("warning");
+      expect(reason()?.className).toContain("text-status-error-text");
     });
 
     it("choosing a destination lifts the block", async () => {
@@ -311,13 +352,12 @@ describe("AddAlert with an AutoObserve prefill", () => {
     });
 
     const REASON =
-      "Choose a destination. An alert that notifies no one leaves its service unwatched.";
+      "Choose a destination for this alert. Incidents and on-call are off in this organization, so an alert with no destination reaches no one.";
     const blockedToast = () =>
       vi
         .mocked(toast)
         .mock.calls.find(
-          ([o]) =>
-            String(o.message) === REASON && (o as { variant?: string }).variant === "warning",
+          ([o]) => String(o.message) === REASON && (o as { variant?: string }).variant === "error",
         );
 
     it("Enter in a field (the form's own submit) saves nothing without a destination", async () => {

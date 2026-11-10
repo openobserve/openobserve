@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { IncidentReachGap } from "@/utils/alerts/deliveryTarget";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { deniedLine } from "../insightCta";
 import type { BulkKind, FolderRef, ReviewGroup, ReviewRow } from "./useBulkReview";
@@ -97,7 +98,7 @@ export const serviceLabel = (t: TranslateFn, row: ReviewRow, all: ReviewRow[]): 
 };
 
 /** Why a row cannot be ticked: its stream fields, or a builder that could not make the alert. */
-export const blockLine = (t: TranslateFn, row: ReviewRow): I18nText => {
+export const blockLine = (t: TranslateFn, row: ReviewRow, all: ReviewRow[] = [row]): I18nText => {
   const block = row.block;
   if (!block) return t("insight.bulk.cantBuild");
   if (block.code === "checking") return t("insight.bulk.block.checking");
@@ -106,7 +107,7 @@ export const blockLine = (t: TranslateFn, row: ReviewRow): I18nText => {
     return t("insight.bulk.block.schemaFailed", { stream: row.stream.name });
   }
   if (block.code === "noBaseline") {
-    return t(`insight.threshold.${block.kind}Reason`, { service: row.service });
+    return t(`insight.threshold.${block.kind}Reason`, { service: serviceLabel(t, row, all) });
   }
   return t(`insight.bulk.block.noField.${block.part}`, {
     stream: row.stream.name,
@@ -161,12 +162,30 @@ export const groupTitle = (t: TranslateFn, group: ReviewGroup): I18nText => {
   return raw(group.name ?? "");
 };
 
+/** Who a group's alerts reach: its destinations, "1 of 3 notify x" when only some rows have one, else on-call or no one. */
+export const reachPart = (
+  t: TranslateFn,
+  locale: string,
+  group: ReviewGroup,
+  gap: IncidentReachGap,
+): I18nText => {
+  const named = group.rows.filter((r) => r.destinations.length).length;
+  if (!named) {
+    return gap === null ? t("insight.bulk.notifiesViaIncident") : t("insight.bulk.notifiesNone");
+  }
+  const destinations = nameList(t, locale, group.destinations);
+  return named === group.rows.length
+    ? t("insight.bulk.notifies", { destinations })
+    : t("insight.bulk.notifiesSome", { count: named, total: group.rows.length, destinations });
+};
+
 /** "folder ingest · notifies ingest-oncall · 5", with the tick count when some are unticked. */
 export const groupMeta = (
   t: TranslateFn,
   locale: string,
   group: ReviewGroup,
   ticked: number,
+  gap: IncidentReachGap = "both",
 ): I18nText[] => {
   const parts: I18nText[] = [];
   if (group.kind !== "folder") {
@@ -177,11 +196,7 @@ export const groupMeta = (
       parts.push(t(key, { folder: group.folders[0]?.name ?? "" }));
     }
   }
-  parts.push(
-    group.destinations.length
-      ? t("insight.bulk.notifies", { destinations: nameList(t, locale, group.destinations) })
-      : t("insight.bulk.notifiesNone"),
-  );
+  parts.push(reachPart(t, locale, group, gap));
   const creatable = group.rows.filter((r) => r.prefill && !r.locked).length;
   parts.push(
     ticked === creatable || group.locked

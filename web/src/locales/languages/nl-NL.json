@@ -12900,7 +12900,7 @@
       "suppressRepeatsTooltip": "Meld één keer wanneer het alarm begint af te gaan of van niveau verandert, niet bij elke evaluatie. Laat dit uit staan om na elke stilteperiode herinneringen te blijven ontvangen.",
       "keepFiringForInvalid": "Voer 0 of meer seconden in",
       "keepFiringForTooLong": "Voer maximaal 86400 seconden in (24 uur)",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "Variabele toevoegen",
@@ -13578,8 +13578,7 @@
         "tracesStoredSpans": "De tellingen betreffen opgeslagen spans, dus gesampled verkeer komt lager uit dan het in werkelijkheid is.",
         "tracesPeriodCapped": "Het alarmvenster is beperkt tot {minutes} minuten om elke controle snel te houden.",
         "tracesNotRun": "Deze zoekopdracht is nog niet uitgevoerd, dus het alarm gebruikt het filter in de editor."
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
     },
     "saveFailed": "Kon het alarm niet opslaan.",
     "loadFailed": "Kon het alarm niet laden.",
@@ -32610,9 +32609,7 @@
         }
       }
     },
-    "bulk": {
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
-    },
+    "bulk": {},
     "decisions": {
       "saved": {
         "applied": "Applied to {title}.",

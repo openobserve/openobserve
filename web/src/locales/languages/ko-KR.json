@@ -12900,7 +12900,7 @@
       "suppressRepeatsTooltip": "알림이 발생하기 시작하거나 레벨이 변경될 때 한 번만 알림을 보내고, 매 평가마다 보내지 않습니다. 각 무음 기간 이후에도 계속 알림을 받으려면 꺼 두세요.",
       "keepFiringForInvalid": "0초 이상 입력하세요",
       "keepFiringForTooLong": "최대 86400초(24시간)까지 입력하세요",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "변수 추가",
@@ -13578,8 +13578,7 @@
         "tracesStoredSpans": "개수는 저장된 스팬 기준이므로 샘플링된 트래픽은 실제보다 낮게 집계됩니다.",
         "tracesPeriodCapped": "각 검사를 빠르게 유지하기 위해 알림 기간이 {minutes}분으로 제한되었습니다.",
         "tracesNotRun": "이 검색은 아직 실행되지 않았으므로 알림은 편집기의 필터를 사용합니다."
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
     },
     "saveFailed": "알림을 저장할 수 없습니다.",
     "loadFailed": "알림을 불러올 수 없습니다.",
@@ -32610,9 +32609,7 @@
         }
       }
     },
-    "bulk": {
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
-    },
+    "bulk": {},
     "decisions": {
       "saved": {
         "applied": "Applied to {title}.",

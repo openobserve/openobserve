@@ -749,10 +749,10 @@ export const useBulkReview = () => ({
   tickedRows: computed(() =>
     reviewRows.value.filter((r) => state.ticked.has(r.key) && isTickable(r)),
   ),
-  /** Ticked rows that would notify no one; Add waits until each has a destination or is unticked. */
+  /** Rows Add would send that name no destination; they reach on-call only through their incident. */
   silent: computed(() =>
     reviewRows.value.filter(
-      (r) => state.ticked.has(r.key) && isTickable(r) && !r.destinations.length,
+      (r) => state.ticked.has(r.key) && isCreatable(r) && !r.destinations.length,
     ),
   ),
   /** A ticked row still waits for its stream fields, so Create would leave it out. */

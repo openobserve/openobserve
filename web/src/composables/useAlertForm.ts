@@ -97,7 +97,12 @@ import {
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { isNotFoundError } from "@/utils/alerts/alertEditorDraft";
-import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
+import {
+  hasDeliveryTarget,
+  incidentReachGap,
+  reachesSomeone,
+  unreachableLine,
+} from "@/utils/alerts/deliveryTarget";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import type {
   AlertFieldPatch,
@@ -443,6 +448,7 @@ export const seedFormFromPrefill = (
   }
   if (prefill.silenceMinutes !== undefined) data.trigger_condition.silence = prefill.silenceMinutes;
   if (prefill.timezone) data.trigger_condition.timezone = prefill.timezone;
+  if (prefill.createsIncident) data.creates_incident = true;
 
   // With a threshold inside the query (HAVING / promql condition) the trigger only needs one row.
   const hasQueryThreshold =
@@ -820,21 +826,32 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
   // The surface that seeded this form, so a source can hold the form to its own rules.
   const prefillSource = ref<string | null>(null);
-  // An AutoObserve draft must notify someone, else the service it was drafted for stays unwatched.
-  const destinationRequired = computed(
+  // An AutoObserve draft must reach a person: a target of its own, or an incident that pages on-call.
+  const autoObserveDraft = computed(
     () => prefillSource.value === AUTOOBSERVE_SOURCE && !beingUpdated.value,
   );
+  const reachGap = computed(() => incidentReachGap(store.state.zoConfig));
+  const destinationRequired = computed(
+    () => autoObserveDraft.value && !(formData.value?.creates_incident && reachGap.value === null),
+  );
   const silentAutoObserveDraft = computed(
-    () => destinationRequired.value && !hasDeliveryTarget(formData.value ?? {}),
+    () => autoObserveDraft.value && !reachesSomeone(formData.value ?? {}, store.state.zoConfig),
+  );
+  /** A draft with no target of its own that still reaches on-call through its incident. */
+  const viaIncidentDraft = computed(
+    () =>
+      autoObserveDraft.value &&
+      !silentAutoObserveDraft.value &&
+      !hasDeliveryTarget(formData.value ?? {}),
   );
   /** Every save path (button, Enter, leave dialog, JSON) stops here, so the rule holds on all of them. */
   const blockSilentDraft = (values: unknown): boolean => {
     if (
-      !destinationRequired.value ||
-      hasDeliveryTarget((values ?? {}) as Parameters<typeof hasDeliveryTarget>[0])
+      !autoObserveDraft.value ||
+      reachesSomeone((values ?? {}) as Parameters<typeof reachesSomeone>[0], store.state.zoConfig)
     )
       return false;
-    toast({ variant: "warning", message: t("alerts.prefill.noDestination") });
+    toast({ variant: "error", message: unreachableLine(t, reachGap.value, 1) });
     return true;
   };
   /** Outcome of the anomaly edit fetch: "missing" when the server has no such config. */
@@ -3433,6 +3450,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     handleSave,
     destinationRequired,
     silentAutoObserveDraft,
+    viaIncidentDraft,
+    reachGap,
     queryModesWithContent,
     saveModeChoices,
     saveModeDialogOpen,

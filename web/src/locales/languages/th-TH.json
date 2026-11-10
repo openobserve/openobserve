@@ -12897,7 +12897,7 @@
       "suppressRepeatsTooltip": "แจ้งเตือนเพียงครั้งเดียวเมื่อการแจ้งเตือนเข้าสู่สถานะกำลังแจ้งเตือนหรือเปลี่ยนระดับ ไม่ใช่ทุกครั้งที่มีการประเมิน หากปิดไว้จะยังได้รับการเตือนซ้ำหลังช่วงปิดเสียงแจ้งเตือนแต่ละครั้ง",
       "keepFiringForInvalid": "Enter 0 or more seconds",
       "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -13575,8 +13575,7 @@
         "tracesStoredSpans": "การนับอ้างอิงจากสแปนที่จัดเก็บไว้ จึงทำให้ปริมาณทราฟฟิกที่ถูกสุ่มตัวอย่างดูต่ำกว่าความเป็นจริง",
         "tracesPeriodCapped": "หน้าต่างการแจ้งเตือนถูกจำกัดไว้ที่ {minutes} นาที เพื่อให้การตรวจสอบแต่ละครั้งรวดเร็ว",
         "tracesNotRun": "ยังไม่ได้รันการค้นหานี้ การแจ้งเตือนจึงใช้ตัวกรองในตัวแก้ไข"
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
     },
     "saveFailed": "Could not save the alert.",
     "loadFailed": "Could not load the alert.",
@@ -32601,9 +32600,7 @@
         }
       }
     },
-    "bulk": {
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
-    },
+    "bulk": {},
     "decisions": {
       "saved": {
         "applied": "Applied to {title}.",

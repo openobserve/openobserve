@@ -484,11 +484,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <p
               v-if="silentAutoObserveDraft"
-              class="text-status-warning-text me-auto flex min-w-0 items-start gap-1.5 text-xs"
+              class="text-status-error-text me-auto flex min-w-0 items-start gap-1.5 text-xs"
               data-test="add-alert-no-destination"
             >
-              <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" />
-              <span>{{ t("alerts.prefill.noDestination") }}</span>
+              <OIcon name="error" size="xs" class="mt-0.5 shrink-0" />
+              <span>{{ unreachableLine(t, reachGap, 1) }}</span>
+            </p>
+            <p
+              v-else-if="viaIncidentDraft"
+              class="text-text-secondary me-auto min-w-0 text-xs"
+              data-test="add-alert-via-incident"
+            >
+              {{ viaIncidentLine(t, 1) }}
             </p>
             <OButton
               data-test="add-alert-cancel-btn"
@@ -720,6 +727,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
+import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
@@ -894,7 +902,7 @@ export default defineComponent({
     // form reports a valid expression the Save button stays disabled (the schema
     // blocks a bad expression on submit too — this is the visible affordance).
     const compositeValidation = ref<{ valid: boolean }>({ valid: false });
-    const { silentAutoObserveDraft, destinationRequired } = alertForm;
+    const { silentAutoObserveDraft, destinationRequired, viaIncidentDraft, reachGap } = alertForm;
     const compositeSaveDisabled = computed(
       () =>
         (isCompositeMode.value && compositeValidation.value.valid !== true) ||
@@ -1140,6 +1148,10 @@ export default defineComponent({
       compositeSaveDisabled,
       silentAutoObserveDraft,
       destinationRequired,
+      viaIncidentDraft,
+      reachGap,
+      unreachableLine,
+      viaIncidentLine,
       onCompositeValidation,
       handleSqlSchemaUpdated,
     };

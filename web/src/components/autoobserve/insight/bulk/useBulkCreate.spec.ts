@@ -149,6 +149,7 @@ describe("useBulkCreate — create", () => {
       expect(body.query_condition.aggregation).toBeNull();
       expect(body.trigger_condition).toMatchObject({ period: 15, threshold: 1, operator: ">=" });
       expect(body.is_real_time).toBe(false);
+      expect(body.creates_incident).toBe(true);
     }
     const ingest = api.create.mock.calls.find((c) => c[1].name === "svc-ingest-b-no-data")!;
     expect(ingest[1].destinations).toEqual(["ingest-oncall"]);

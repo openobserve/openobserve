@@ -167,6 +167,8 @@ const absencePrefill = (
   frequencyMinutes: 5,
   triggerThreshold: 1,
   triggerOperator: ">=",
+  // AutoObserve is the destination: the incident pages on-call when no person is named.
+  createsIncident: true,
   warnings: [],
   meta: { description: origin(what), destinations: [] },
 });
