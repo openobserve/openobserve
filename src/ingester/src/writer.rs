@@ -30,7 +30,7 @@ use config::{
 use hashbrown::HashSet;
 use infra::runtime::WAL_RUNTIME;
 use snafu::ResultExt;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{RwLock, RwLockWriteGuard, mpsc};
 use wal::{Writer as WalWriter, build_file_path};
 
 use crate::{
@@ -250,6 +250,17 @@ pub async fn check_ttl() -> Result<()> {
     Ok(())
 }
 
+/// Rotates every registered writer without closing its queue or removing it.
+pub async fn rotate_all() -> Result<()> {
+    for w in WRITERS.iter() {
+        let w = w.read().await;
+        for r in w.values() {
+            r.rotate_locked(r.wal.write().await).await?;
+        }
+    }
+    Ok(())
+}
+
 pub async fn flush_all() -> Result<()> {
     log::info!("[INGESTER:MEM] start flush all writers");
     for w in WRITERS.iter() {
@@ -268,17 +279,16 @@ pub async fn flush_all() -> Result<()> {
     Ok(())
 }
 
-// get the max seq id of all writers
-pub async fn get_max_writer_seq_id() -> u64 {
-    let mut max_seq_id = 0;
+/// Max id of the writers' active memtables, comparable with `check_persist_done`.
+pub async fn get_max_memtable_id() -> u64 {
+    let mut max_id = 0;
     for w in WRITERS.iter() {
         let w = w.read().await;
         for r in w.values() {
-            // next_seq is the next seq id to be used, so we need to subtract 1
-            max_seq_id = max_seq_id.max(r.next_seq.load(Ordering::Relaxed) - 1);
+            max_id = max_id.max(r.memtable.read().await.id());
         }
     }
-    max_seq_id
+    max_id
 }
 
 impl Writer {
@@ -547,7 +557,7 @@ impl Writer {
 
         // rotation wal
         let start = std::time::Instant::now();
-        let mut wal = self.wal.write().await;
+        let wal = self.wal.write().await;
         let wal_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
@@ -559,6 +569,10 @@ impl Writer {
         {
             return Ok(());
         }
+        self.rotate_locked(wal).await
+    }
+
+    async fn rotate_locked(&self, mut wal: RwLockWriteGuard<'_, WalWriter>) -> Result<()> {
         let cfg = get_config();
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)

@@ -144,6 +144,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
+    <div v-if="securityAccess.canOpen.value" class="ms-3 flex shrink-0 items-center">
+      <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
+    </div>
+
     <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
     <div class="min-w-0 flex-1" />
 
@@ -511,6 +515,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
+import SolutionSwitcher from "./SolutionSwitcher.vue";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -537,6 +543,7 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
+    SolutionSwitcher,
     SampleDataHeaderChip,
     LinkedAccountsDialog,
     OButton,
@@ -632,6 +639,7 @@ export default defineComponent({
     "signout",
   ],
   setup(props, { emit }) {
+    const securityAccess = useSecurityAccess();
     const { t } = useI18nTyped();
     const { featureName } = useFeatureNames();
     const router = useRouter();
@@ -866,6 +874,7 @@ export default defineComponent({
     };
 
     return {
+      securityAccess,
       isDark,
       t,
       raw,

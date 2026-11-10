@@ -215,14 +215,21 @@ async fn persist_alert_run_state_deferred(
             rule_value,
         )
     } else {
-        apply_outcome(
+        let mut update = apply_outcome(
             alert_id,
             ROLLUP_GROUP_KEY,
             prev.as_ref(),
             state_outcome,
             level,
             now,
-        )
+        );
+        // A multi-alert rollup's `last_seen` is its last group observation, which the reaper needs.
+        if alert.query_condition.multi_alert_enabled()
+            && let Some(state) = update.state.as_mut()
+        {
+            state.last_seen = prev.as_ref().and_then(|p| p.last_seen);
+        }
+        update
     };
 
     // A Slack app send of this run already published the start it predicted for the new firing.
@@ -1604,6 +1611,7 @@ async fn handle_composite_alert_trigger(
                     Some(evaluated.level),
                     Some(i32::from(evaluated.result) as f64),
                     None,
+                    None,
                 )
                 .await
                 {
@@ -1707,6 +1715,7 @@ async fn handle_composite_alert_trigger(
                     now,
                     Some(evaluated.level),
                     downtime,
+                    None,
                 )
                 .await;
             }
@@ -1978,9 +1987,8 @@ async fn handle_anomaly_detection_triggers(
         .disabled
     {
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
-        trigger.status = db::scheduler::TriggerStatus::Completed;
-        // The row is parked and never pulled again, so without this the last
-        // real outcome stands forever on a detector the kill switch stopped.
+        // Completed is never pulled again, and nothing re-arms it when the switch comes back on.
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
         record_anomaly_outcome(&mut trigger, &RunOutcome::Skipped, now_micros());
         db::scheduler::update_trigger(trigger, true, "").await?;
         return Ok(());
@@ -3129,6 +3137,7 @@ pub(crate) async fn correlate_muted_incident(
     triggered_at: i64,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     downtime: &config::meta::downtimes::ActiveDowntime,
+    history_before: Option<i64>,
 ) {
     let Some(first_row) = rows.first() else {
         return;
@@ -3145,6 +3154,7 @@ pub(crate) async fn correlate_muted_incident(
         eval_level,
         None,
         Some(downtime),
+        history_before,
     )
     .await
     {
@@ -3165,6 +3175,7 @@ async fn correlate_repeated_incident(
     triggered_at: i64,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     actual_value: Option<f64>,
+    history_before: Option<i64>,
 ) {
     let Some(first_row) = rows.first() else {
         return;
@@ -3182,6 +3193,7 @@ async fn correlate_repeated_incident(
         eval_level,
         actual_value,
         None,
+        history_before,
     )
     .await
     {
@@ -3660,6 +3672,8 @@ async fn handle_alert_triggers(
             backfill_job: None,
             notified_destinations: vec![],
             chart_id: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
         }
     };
 
@@ -3764,6 +3778,12 @@ async fn handle_alert_triggers(
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
+    #[cfg(feature = "enterprise")]
+    let siem_run = super::siem::SiemRun::for_alert(&alert, &trigger_data);
+    #[cfg(feature = "enterprise")]
+    let start_time = siem_run
+        .as_ref()
+        .map_or(start_time, |run| run.window_start(final_end_time));
 
     let last_states = if !alert.query_condition.multi_alert_enabled()
         && (alert.pending_period_sec > 0 || alert.suppresses_repeats())
@@ -3802,11 +3822,32 @@ async fn handle_alert_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
+        #[cfg(feature = "enterprise")]
+        severity: siem_run.as_ref().and_then(|run| run.severity.clone()),
+        #[cfg(feature = "enterprise")]
+        siem: siem_run.is_some().then_some(true),
         ..Default::default()
     };
 
     let evaluation_took = Instant::now();
     // evaluate alert
+    #[cfg(feature = "enterprise")]
+    let result = match siem_run.as_ref() {
+        Some(run) => {
+            run.evaluate(&alert, start_time, final_end_time, &query_trace_id)
+                .await
+        }
+        None => {
+            alert
+                .evaluate(
+                    None,
+                    (Some(start_time), final_end_time),
+                    Some(query_trace_id.clone()),
+                )
+                .await
+        }
+    };
+    #[cfg(not(feature = "enterprise"))]
     let result = alert
         .evaluate(
             None,
@@ -3902,7 +3943,29 @@ async fn handle_alert_triggers(
         return Err(err);
     }
 
-    let trigger_results = result.unwrap();
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut trigger_results = result.unwrap();
+    #[cfg(feature = "enterprise")]
+    let mut siem_history_before = None;
+    #[cfg(feature = "enterprise")]
+    if let Some(run) = siem_run.as_ref() {
+        run.dedupe(
+            &mut trigger_results,
+            &mut trigger_data,
+            start_time,
+            final_end_time,
+        );
+        siem_history_before = run.history_before(final_end_time);
+        trigger_data_stream.historical = trigger_results
+            .data
+            .as_deref()
+            .is_some_and(|rows| run.is_historical(rows, final_end_time))
+            .then_some(true);
+        trigger_data_stream.siem_groups = trigger_results
+            .data
+            .as_deref()
+            .and_then(o2_enterprise::enterprise::security::sigma::correlation::fired_groups_json);
+    }
     // Classified severity for this evaluation (alerts_2.md Feature 1). Captured
     // once here so every downstream path — state persistence and the trigger
     // record — reports the same level.
@@ -4023,6 +4086,12 @@ async fn handle_alert_triggers(
         alert.query_condition.multi_alert_enabled(),
         multi_level,
     );
+    // An ack or a silence must never leave a security detection blind to a returning attacker.
+    #[cfg(feature = "enterprise")]
+    let evaluates_through_silence = evaluates_through_silence
+        || o2_enterprise::enterprise::security::detection::evaluates_through_silence(
+            alert.context_attributes.as_ref(),
+        );
     // ── §7.1 delivery decision ──────────────────────────────────────────────
     // Computed for multi-level alerts only; single-level alerts short-circuit
     // to `Deliver` so their behaviour is bit-for-bit unchanged (G5).
@@ -4074,6 +4143,8 @@ async fn handle_alert_triggers(
                 .get_next_trigger_time(true, alert.tz_offset, false, None)?;
         new_trigger.is_silenced = false;
         trigger_data_stream.next_run_at = new_trigger.next_run_at;
+        #[cfg(feature = "enterprise")]
+        super::siem::SiemRun::restore(siem_run.as_ref(), &mut trigger_data);
         new_trigger.data = json::to_string(&trigger_data).unwrap();
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         if let Some(alert_id) = alert.id.as_ref() {
@@ -4195,11 +4266,14 @@ async fn handle_alert_triggers(
             triggered_at,
             eval_level,
             &downtime,
+            siem_history_before,
         )
         .await;
     }
     #[cfg(feature = "enterprise")]
-    if delivery == DeliveryDecision::SuppressedAsRepeat
+    if (delivery == DeliveryDecision::SuppressedAsRepeat
+        || (siem_run.is_some()
+            && o2_enterprise::enterprise::security::detection::attaches_withheld_firing(&delivery)))
         && let Some(rows) = trigger_results.data.as_deref()
     {
         correlate_repeated_incident(
@@ -4209,6 +4283,7 @@ async fn handle_alert_triggers(
             triggered_at,
             eval_level,
             trigger_results.actual_value,
+            siem_history_before,
         )
         .await;
     }
@@ -4262,6 +4337,7 @@ async fn handle_alert_triggers(
                 eval_level,
                 trigger_results.actual_value,
                 None,
+                siem_history_before,
             )
             .await
             {
@@ -4562,6 +4638,8 @@ async fn handle_alert_triggers(
                         // reachable from the evaluation-error path, so that
                         // safety valve does NOT trip for delivery failures.
                         trigger_data_stream.status = RunOutcome::NotifyFailed;
+                        #[cfg(feature = "enterprise")]
+                        super::siem::SiemRun::restore(siem_run.as_ref(), &mut trigger_data);
                         let retry_data = json::to_string(&trigger_data).unwrap();
                         db::scheduler::update_status(
                             &new_trigger.org,
@@ -4646,6 +4724,8 @@ async fn handle_alert_triggers(
                         trigger_data_stream.next_run_at = new_trigger.next_run_at;
                         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                     } else {
+                        #[cfg(feature = "enterprise")]
+                        super::siem::SiemRun::restore(siem_run.as_ref(), &mut trigger_data);
                         let trigger_data = json::to_string(&trigger_data).unwrap();
                         // Otherwise update its status and data only
                         db::scheduler::update_status(
@@ -4672,10 +4752,11 @@ async fn handle_alert_triggers(
         }
         #[cfg(feature = "enterprise")]
         if let Some(error) = incident_notify_error {
-            durable_outcome = Some(record_incident_notify_failure(
-                &mut trigger_data_stream,
-                error,
-            ));
+            let durable = record_incident_notify_failure(&mut trigger_data_stream, error);
+            // A detection whose pages never land must not look healthy on the Security list.
+            if siem_run.is_none() {
+                durable_outcome = Some(durable);
+            }
         }
     } else {
         if condition_matched {
@@ -7765,6 +7846,51 @@ mod tests {
         assert_eq!(outcome.acked_by.as_deref(), Some("oncall@example.com"));
         assert!(!outcome.attempted, "{:?}", outcome.errors);
         assert_stays_firing_with_note(&outcome);
+    }
+
+    #[tokio::test]
+    async fn a_rollup_rewrite_after_dispatch_keeps_the_observation_clock() {
+        use config::meta::alerts::{level::AlertLevel, state::ROLLUP_GROUP_KEY};
+
+        let Some(alert) = stored_host_alert("rewrite_clock", &["dest"], 0).await else {
+            return;
+        };
+        let alert_id = alert.id.unwrap().to_string();
+        let episode = config::meta::alerts::recovery::EpisodeInput::undelivered(0);
+        persist_alert_run_state_deferred(
+            &alert,
+            &alert_id,
+            &RunOutcome::Firing,
+            Some(AlertLevel::Critical),
+            Some(&critical_hosts(&["a"])),
+            None,
+            &episode,
+        )
+        .await
+        .expect("the plan commits");
+        let rollup = || async {
+            infra::table::alert_states::get(&alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        let observed = rollup().await.last_seen;
+
+        let committed = persist_alert_run_state(
+            &alert,
+            &alert_id,
+            &RunOutcome::NotifyFailed,
+            Some(AlertLevel::Critical),
+            None,
+            None,
+            &episode,
+        )
+        .await;
+
+        assert!(committed);
+        let after = rollup().await;
+        assert_eq!(after.last_outcome, Some(RunOutcome::NotifyFailed));
+        assert_eq!(after.last_seen, observed, "a rewrite observed no groups");
     }
 
     #[tokio::test]

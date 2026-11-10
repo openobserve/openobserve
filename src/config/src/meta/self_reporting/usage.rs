@@ -341,6 +341,22 @@ pub struct TriggerData {
     /// error/skipped runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub level: Option<i32>,
+    /// SIEM detections only: the rule's Sigma level, since `level` is the threshold axis.
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
+    /// SIEM detections only: hides the row from users without Security after the rule is deleted.
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub siem: Option<bool>,
+    /// SIEM detections only: a backfill firing on evidence older than the run's own window.
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub historical: Option<bool>,
+    /// SIEM detections only: the groups this run fired on, as JSON, so evidence shows those rows.
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub siem_groups: Option<String>,
     /// Which group produced `actual_value` (worst group; D8).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_label: Option<String>,
@@ -421,6 +437,14 @@ impl Default for TriggerData {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
@@ -482,6 +506,14 @@ impl TriggerData {
             threshold_value: Some(0.0),
             threshold_operator: Some(String::new()),
             level: Some(0),
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: Some(false),
+            #[cfg(feature = "enterprise")]
+            historical: Some(false),
+            #[cfg(feature = "enterprise")]
+            siem_groups: Some(String::new()),
             group_label: Some(String::new()),
             value_is_lower_bound: Some(false),
             synthetics_error_source: Some(String::new()),
@@ -2118,6 +2150,14 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,

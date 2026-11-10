@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="telemetry"
           mobile-dropdown
           data-test="fleet-flow-overview-telemetry"
-          @update:model-value="(v) => (telemetry = v as FlowSignal)"
+          @update:model-value="(v) => onSignalChange(v as FlowSignal)"
         >
           <OToggleGroupItem
             v-for="opt in telemetryOptions"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="timeWindow"
             mobile-dropdown
             data-test="fleet-flow-overview-window"
-            @update:model-value="(v) => (timeWindow = v as FlowWindow)"
+            @update:model-value="(v) => onWindowChange(v as FlowWindow)"
           >
             <OToggleGroupItem v-for="w in windows" :key="w" :value="w" size="sm">
               {{ raw(w) }}
@@ -337,6 +337,7 @@ import { buildPipelineMap, strokeWidth, type MapEdge, type MapNode } from "./pip
 import { formatCount } from "./fleetFormat";
 import { useFleetFlow } from "./useFleetApi";
 import { typeKey } from "./editor/editorGraph";
+import analytics from "@/services/product_analytics";
 
 const emit = defineEmits<{
   navigate: [tab: FleetTab, query: Record<string, string>];
@@ -435,6 +436,16 @@ function retry() {
 function refresh() {
   retry();
   emit("refresh");
+}
+
+function onWindowChange(next: FlowWindow) {
+  timeWindow.value = next;
+  analytics.track("fleet_flow_window_changed", { window: next });
+}
+
+function onSignalChange(next: FlowSignal) {
+  telemetry.value = next;
+  analytics.track("fleet_flow_signal_changed", { signal: next });
 }
 
 defineExpose({ refresh: retry });
@@ -776,7 +787,9 @@ function clampPopover() {
 function select(next: Selection, event: MouseEvent | TouchEvent, anchorToNode: boolean) {
   const same = selection.value?.kind === next.kind && selection.value.id === next.id;
   selection.value = same ? null : next;
-  if (!same) placePopover(event, anchorToNode);
+  if (same) return;
+  placePopover(event, anchorToNode);
+  analytics.track("fleet_flow_detail_opened", { kind: next.kind });
 }
 
 function onNodeClick({ node, event }: NodeMouseEvent) {

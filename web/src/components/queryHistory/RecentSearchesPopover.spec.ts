@@ -31,6 +31,8 @@ const api = vi.hoisted(() => ({
 vi.mock("@/services/query_history", () => ({ default: api }));
 const clipboard = vi.hoisted(() => ({ copyToClipboard: vi.fn().mockResolvedValue(true) }));
 vi.mock("@/utils/clipboard", () => clipboard);
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: analytics }));
 
 import RecentSearchesPopover from "./RecentSearchesPopover.vue";
 import RecentSearchesFocusDropdown from "./RecentSearchesFocusDropdown.vue";
@@ -270,8 +272,17 @@ describe("RecentSearchesPopover", () => {
     await flushPromises();
     await wrapper.find('[data-test="recent-searches-row-e0"]').trigger("click");
     expect(wrapper.emitted("run")?.[0]).toEqual([expect.objectContaining({ id: "e0" }), "now"]);
+    expect(analytics.track).toHaveBeenLastCalledWith("search_history_entry_restored", {
+      source: "logs",
+      run: true,
+      surface: "quick_list",
+    });
     await wrapper.find('[data-test="recent-searches-row-e0"]').trigger("click", { shiftKey: true });
     expect(wrapper.emitted("load")?.[0]?.[0]).toMatchObject({ id: "e0" });
+    expect(analytics.track).toHaveBeenLastCalledWith(
+      "search_history_entry_restored",
+      expect.objectContaining({ run: false }),
+    );
   });
 
   it("runs on Enter, loads on Shift+Enter, and leaves Ctrl/Cmd+Enter to the page's run shortcut", async () => {

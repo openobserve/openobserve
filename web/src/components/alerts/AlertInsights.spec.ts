@@ -18,6 +18,9 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const mockPush = vi.fn();
 vi.mock("vue-router", () => ({
@@ -392,5 +395,37 @@ describe("AlertInsights - dashboardData loaded on mount", () => {
     const w = await mountComp();
     await flushPromises();
     expect((w.vm as any).dashboardData).not.toBeNull();
+  });
+});
+
+describe("AlertInsights - analytics", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("tracks a tab switch, a user time-range change and applied filters", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    vi.mocked(analytics.track).mockClear();
+    (w.vm as any).onTabsChange("quality");
+    (w.vm as any).updateDateTime({ startTime: 1, endTime: 2, userChangedValue: true });
+    (w.vm as any).onDataZoom({ panelId: "p", start: 1, end: 2 });
+    (w.vm as any).handleContextMenuFilter({
+      panelId: "p",
+      panelTitle: "t",
+      operator: ">=",
+      value: 3,
+    });
+    expect(vi.mocked(analytics.track).mock.calls).toEqual([
+      ["alert_insights_tab_switched", { tab: "quality" }],
+      ["alert_insights_time_range_changed", { type: "absolute" }],
+      ["alert_insights_filter_applied", { source: "zoom" }],
+      ["alert_insights_filter_applied", { source: "context_menu" }],
+    ]);
+  });
+
+  it("does not track a locked tab that opens the upgrade dialog", async () => {
+    const w = await mountComp();
+    vi.mocked(analytics.track).mockClear();
+    (w.vm as any).onTabsChange("frequency");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

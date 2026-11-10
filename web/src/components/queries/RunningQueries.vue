@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import SearchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import { onBeforeMount, ref, defineComponent, computed, toRaw, watch } from "vue";
 
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -323,6 +324,7 @@ export default defineComponent({
       schemaData.value = row;
 
       showListSchemaDialog.value = true;
+      analytics.track("query_management_query_details_opened");
     };
 
     const perPageOptions: any = [
@@ -625,6 +627,10 @@ export default defineComponent({
     const deleteQuery = () => {
       SearchService.cancel_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
         .then(() => {
+          analytics.track("query_management_queries_cancelled", {
+            count: deleteDialog.value.data.length,
+            view: selectedQueryTypeTab.value,
+          });
           selectedRow.value[selectedQueryTypeTab.value] = [];
 
           getRunningQueries();
@@ -737,6 +743,7 @@ export default defineComponent({
 
     const onChangeQueryTab = (tab: "summary" | "all") => {
       selectedQueryTypeTab.value = tab;
+      analytics.track("query_management_tab_switched", { tab });
     };
 
     const onChangeSearchType = (value: string) => {
@@ -744,6 +751,7 @@ export default defineComponent({
     };
 
     const filterUserQueries = (row: any) => {
+      analytics.track("query_management_user_drilled_down");
       selectedQueryTypeTab.value = "all";
       selectedSearchField.value = "all";
       selectedSearchType.value = row.search_type_label;

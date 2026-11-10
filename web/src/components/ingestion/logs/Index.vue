@@ -142,6 +142,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('ingestion.splunkHecTab')"
       />
       <ORouteTab
+        name="datadogAgentLogs"
+        data-test="ingestion-logs-tab-datadogagent"
+        :to="{
+          name: 'datadogAgentLogs',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/pipeline/datadog.png')"
+        :label="t('ingestion.datadogAgentTab')"
+      />
+      <ORouteTab
         name="loongcollector"
         data-test="ingestion-logs-tab-loongcollector"
         :to="{
@@ -213,6 +225,7 @@ export default defineComponent({
       "syslogNg",
       "splunkHec",
       "loongcollector",
+      "datadogAgentLogs",
     ];
 
     onBeforeMount(() => {

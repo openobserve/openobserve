@@ -336,6 +336,7 @@ import useRum from "@/composables/rum/useRum";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import NoData from "@/components/shared/grid/NoData.vue";
+import analytics from "@/services/product_analytics";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 const { t } = useI18nTyped();
@@ -510,16 +511,19 @@ const collectServiceOptions = () => {
 const onStatusFilterChange = (value: IssueStatusFilter) => {
   statusFilter.value = value;
   updateUrlQueryParams();
+  analytics.track("rum_error_filter_applied", { filter: "status", value });
 };
 
 const onTypeFilterChange = (value: IssueTypeFilter) => {
   typeFilter.value = value;
   updateUrlQueryParams();
+  analytics.track("rum_error_filter_applied", { filter: "type", value });
 };
 
 const onServiceFilterChange = (value: string) => {
   serviceFilter.value = value;
   runQuery();
+  analytics.track("rum_error_filter_applied", { filter: "service", value: value ? "set" : "all" });
 };
 
 // The sidebar shares `_rumdata` with sessions/views/actions, so without these

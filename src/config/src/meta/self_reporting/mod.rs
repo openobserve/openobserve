@@ -395,6 +395,14 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
@@ -956,6 +964,14 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
@@ -1049,6 +1065,14 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,
@@ -1126,6 +1150,14 @@ mod tests {
             threshold_value: None,
             threshold_operator: None,
             level: None,
+            #[cfg(feature = "enterprise")]
+            severity: None,
+            #[cfg(feature = "enterprise")]
+            siem: None,
+            #[cfg(feature = "enterprise")]
+            historical: None,
+            #[cfg(feature = "enterprise")]
+            siem_groups: None,
             group_label: None,
             value_is_lower_bound: None,
             synthetics_error_source: None,

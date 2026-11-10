@@ -14,7 +14,7 @@
  * here, never recomputed. These tests therefore ask the server which rule it
  * considers shadowed rather than recomputing it — but they ASSERT that it named
  * one, they do not skip. `seedOverlappingRules` writes `{service}` and
- * `{service, namespace}` deliberately, and the narrower rule shadows the
+ * `{service, k8s-namespace}` deliberately, and the narrower rule shadows the
  * broader one; verified against this build, which returns `health: "shadowed"`
  * on the broad rule. "Neither is shadowed" is a regression in the analysis, and
  * skipping on it would quietly retire every case below.
@@ -126,7 +126,7 @@ test.describe('On-call routing rules', {
     });
     const narrow = await createOwnershipRule(page, {
       teamId: narrowTeam.id,
-      dimensions: { service, namespace: `${service}_ns` },
+      dimensions: { service, 'k8s-namespace': `${service}_ns` },
     });
 
     return { service, broadTeam, narrowTeam, broad, narrow };
@@ -187,7 +187,7 @@ test.describe('On-call routing rules', {
 
     const shadowed = await findShadowedRule(page, [broad.id, narrow.id]);
     // An ASSERTION, not a skip. `seedOverlappingRules` writes `{service}` and
-    // `{service, namespace}` on purpose, and the more specific rule shadows the
+    // `{service, k8s-namespace}` on purpose, and the more specific rule shadows the
     // broader one — verified against this build, which reports the broad rule
     // `health: "shadowed"`. So "neither is shadowed" is never an environment
     // fact here, it is the shadowing analysis having regressed, and skipping on
@@ -239,7 +239,7 @@ test.describe('On-call routing rules', {
 
     const shadowed = await findShadowedRule(page, [broad.id, narrow.id]);
     // An ASSERTION, not a skip. `seedOverlappingRules` writes `{service}` and
-    // `{service, namespace}` on purpose, and the more specific rule shadows the
+    // `{service, k8s-namespace}` on purpose, and the more specific rule shadows the
     // broader one — verified against this build, which reports the broad rule
     // `health: "shadowed"`. So "neither is shadowed" is never an environment
     // fact here, it is the shadowing analysis having regressed, and skipping on
@@ -455,7 +455,7 @@ test.describe('On-call routing rules', {
     const team = await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_edit`) });
     const rule = await createOwnershipRule(page, {
       teamId: team.id,
-      dimensions: { namespace: `${service}_ns`, service },
+      dimensions: { 'k8s-namespace': `${service}_ns`, service },
     });
     // A second rule guarantees `region` is offered as a field whatever discovery has seen.
     await createOwnershipRule(page, { teamId: team.id, dimensions: { region: `${service}_eu` } });
@@ -466,7 +466,7 @@ test.describe('On-call routing rules', {
     await pm.oncallRoutingPage.openRuleEditorFor(rule.id);
     await expect(pm.oncallRoutingPage.getSaveRuleButton()).toBeEnabled();
 
-    // Rows are sorted by field, so row 0 is namespace.
+    // Rows are sorted by field, so row 0 is k8s-namespace.
     await pm.oncallRoutingPage.changeConditionField(0, 'region', 'Region');
     await pm.oncallRoutingPage.expectConditionNeedsValue(0);
 
@@ -474,7 +474,7 @@ test.describe('On-call routing rules', {
     await expect(pm.oncallRoutingPage.getSaveRuleButton()).toBeEnabled();
     await pm.oncallRoutingPage.saveRule();
 
-    // The removed row took namespace with it; the emptied region must not ride along as "".
+    // The removed row took k8s-namespace with it; the emptied region must not ride along as "".
     await expect.poll(
       async () => (await listOwnershipRules(page, team.id))
         .find((one) => (one.id ?? one.rule_id) === rule.id)?.dimensions,

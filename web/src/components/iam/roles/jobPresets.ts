@@ -31,6 +31,9 @@ export type JobPreset = {
 
 const ALL: readonly PermissionType[] = ["AllowAll"];
 const READ: readonly PermissionType[] = ["AllowList", "AllowGet"];
+const READ_TRIAGE: readonly PermissionType[] = ["AllowList", "AllowGet", "AllowPut"];
+// Security POST is detection authoring, kept apart from the analyst's PUT triage.
+const READ_AUTHOR: readonly PermissionType[] = ["AllowList", "AllowGet", "AllowPost"];
 
 /** Role starting points named after a job, with the companion grants each needs; stream reads are org-wide (the stream wildcard, like Read-Only) and the preset detail says so before Add. */
 export const JOB_PRESETS: JobPreset[] = [
@@ -73,5 +76,71 @@ export const JOB_PRESETS: JobPreset[] = [
     icon: "lan",
     tone: "pipelines",
     grants: { pipeline: ALL, function: ALL, stream: READ, enrichment_table: READ },
+  },
+  {
+    id: "soc_analyst",
+    titleKey: "iam.editRole.presetSocAnalystTitle",
+    descriptionKey: "iam.editRole.presetSocAnalystDescription",
+    icon: "manage-search",
+    tone: "security",
+    grants: {
+      security: READ_TRIAGE,
+      incidents: READ_TRIAGE,
+      afolder: READ,
+      stream: READ,
+      // The Intel page lists threat-intel enrichment tables.
+      enrichment_table: READ,
+    },
+  },
+  {
+    id: "detection_engineer",
+    titleKey: "iam.editRole.presetDetectionEngineerTitle",
+    descriptionKey: "iam.editRole.presetDetectionEngineerDescription",
+    icon: "shield-alert-outline",
+    tone: "security",
+    grants: {
+      security: READ_AUTHOR,
+      // Cases list detections' incidents; engineers read them but do not triage.
+      incidents: READ,
+      afolder: ALL,
+      // Attaching an OCSF pack writes its normalising function and pipeline.
+      function: ALL,
+      pipeline: ALL,
+      stream: READ,
+      // Threat-intel lists are enrichment tables, and detection engineers own them.
+      enrichment_table: ALL,
+    },
+  },
+  {
+    id: "security_admin",
+    titleKey: "iam.editRole.presetSecurityAdminTitle",
+    descriptionKey: "iam.editRole.presetSecurityAdminDescription",
+    icon: "admin-panel-settings",
+    tone: "security",
+    grants: {
+      security: ALL,
+      incidents: ALL,
+      afolder: ALL,
+      enrichment_table: ALL,
+      cipher_keys: ALL,
+      function: ALL,
+      pipeline: ALL,
+      // Detections, Events, Entities, UEBA and Content query the source streams.
+      stream: READ,
+    },
+  },
+  {
+    id: "security_viewer",
+    titleKey: "iam.editRole.presetSecurityViewerTitle",
+    descriptionKey: "iam.editRole.presetSecurityViewerDescription",
+    icon: "verified-user",
+    tone: "security",
+    grants: {
+      security: READ,
+      incidents: READ,
+      afolder: READ,
+      // Entities, UEBA and Events query the source streams.
+      stream: READ,
+    },
   },
 ];

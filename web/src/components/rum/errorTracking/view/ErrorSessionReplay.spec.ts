@@ -46,7 +46,10 @@ vi.mock("@/lib/core/Button/OButton.vue", () => ({
   },
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
+import analytics from "@/services/product_analytics";
 
 // ---------------------------------------------------------------------------
 // Test data
@@ -205,6 +208,12 @@ describe("ErrorSessionReplay", () => {
           event_time: EVENT_TIME_MS,
         },
       });
+    });
+
+    it("tracks the replay opened from an error", async () => {
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.find('[data-test="error-session-replay-play-btn"]').trigger("click");
+      expect(analytics.track).toHaveBeenCalledWith("rum_error_replay_opened");
     });
 
     it("includes event_time as Math.floor(_timestamp / 1000)", async () => {

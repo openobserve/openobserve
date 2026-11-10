@@ -15,11 +15,10 @@
 
 use std::{fmt::Debug, sync::Arc};
 
-use arrow::datatypes::SchemaRef;
 use datafusion::{
     common::{Result, internal_err, tree_node::TreeNodeRecursion},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, PhysicalExpr},
+    physical_expr::PhysicalExpr,
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
         PlanProperties,
@@ -51,7 +50,7 @@ impl AggregateTopkExec {
     ) -> Result<Self> {
         // Partial or no cache: cached partitions + input partitions
         let target_partitions = input.output_partitioning().partition_count();
-        let cache = Self::compute_properties(Arc::clone(&input.schema()), target_partitions);
+        let cache = Self::compute_properties(&input, target_partitions);
         let schema = input.schema();
         let Some(field) = schema.fields().iter().find(|f| {
             // State fields are `<name>[count]`; the name itself may hold `[`, e.g. an IN list.
@@ -80,8 +79,13 @@ impl AggregateTopkExec {
 
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
-    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> Arc<PlanProperties> {
-        let eq_properties = EquivalenceProperties::new(schema);
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        n_partitions: usize,
+    ) -> Arc<PlanProperties> {
+        // Each partition only drops rows and re-sorts, so a sort above may rely on its constants
+        let mut eq_properties = input.equivalence_properties().clone();
+        eq_properties.clear_orderings();
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
         Arc::new(PlanProperties::new(
             eq_properties,

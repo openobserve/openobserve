@@ -15,6 +15,7 @@
 
 import type { AxiosRequestConfig } from "axios";
 import http from "./http";
+import analytics from "./product_analytics";
 import type { SentTemplate } from "@/utils/alerts/notificationKinds";
 
 export type TargetModule = "alerts" | "anomaly_detections" | "synthetics" | "slos";
@@ -288,27 +289,67 @@ const downtimes = {
   get: (org: string, id: string, folder?: string) =>
     http().get<DowntimeDetail>(one(org, id), inFolder(folder)),
   create: (org: string, body: DowntimeRequest) =>
-    http().post<{ id: string }>(base(org), body, inFolder(body.folder_id)),
+    http()
+      .post<{ id: string }>(base(org), body, inFolder(body.folder_id))
+      .then((res) => {
+        analytics.track("downtime_created", {
+          repeat: body.schedule.repeat,
+          targets: body.targets.length,
+          group_scoped: !!body.alert_groups?.length,
+          end_on_clear: !!body.end_on_clear,
+        });
+        return res;
+      }),
   update: (org: string, id: string, body: DowntimeRequest) =>
-    http().put(one(org, id), body, inFolder(body.folder_id)),
+    http()
+      .put(one(org, id), body, inFolder(body.folder_id))
+      .then((res) => {
+        analytics.track("downtime_updated", { repeat: body.schedule.repeat });
+        return res;
+      }),
   cancel: (org: string, id: string, folder?: string) =>
-    http().post(`${one(org, id)}/cancel`, undefined, inFolder(folder)),
+    http()
+      .post(`${one(org, id)}/cancel`, undefined, inFolder(folder))
+      .then((res) => {
+        analytics.track("downtime_cancelled");
+        return res;
+      }),
   extend: (org: string, id: string, body: ExtendDowntimeRequest, folder?: string) =>
-    http().post<ExtendDowntimeResponse>(`${one(org, id)}/extend`, body, inFolder(folder)),
+    http()
+      .post<ExtendDowntimeResponse>(`${one(org, id)}/extend`, body, inFolder(folder))
+      .then((res) => {
+        analytics.track("downtime_extended", { mode: "by_secs" in body ? "by" : "until" });
+        return res;
+      }),
   test: (org: string, id: string, destinations: string[], folder?: string) =>
-    http().post<{ destination: string; ok: boolean; unsupported?: boolean; error?: string }[]>(
-      `${one(org, id)}/test`,
-      { destinations },
-      inFolder(folder),
-    ),
+    http()
+      .post<{ destination: string; ok: boolean; unsupported?: boolean; error?: string }[]>(
+        `${one(org, id)}/test`,
+        { destinations },
+        inFolder(folder),
+      )
+      .then((res) => {
+        analytics.track("downtime_notification_test_sent", { count: destinations.length });
+        return res;
+      }),
   remove: (org: string, id: string, folder?: string) =>
-    http().delete(one(org, id), inFolder(folder)),
+    http()
+      .delete(one(org, id), inFolder(folder))
+      .then((res) => {
+        analytics.track("downtime_deleted", { count: 1 });
+        return res;
+      }),
   move: (org: string, downtimeIds: string[], dstFolderId: string, folder?: string) =>
-    http().patch(
-      `${base(org)}/move`,
-      { downtime_ids: downtimeIds, dst_folder_id: dstFolderId },
-      inFolder(folder),
-    ),
+    http()
+      .patch(
+        `${base(org)}/move`,
+        { downtime_ids: downtimeIds, dst_folder_id: dstFolderId },
+        inFolder(folder),
+      )
+      .then((res) => {
+        analytics.track("downtime_moved", { count: downtimeIds.length });
+        return res;
+      }),
   preview: (org: string, body: PreviewRequest, folder?: string) =>
     http().post<PreviewResponse>(`${base(org)}/preview`, body, inFolder(folder)),
   resources: (org: string, body: ResourcesRequest, folder?: string) =>

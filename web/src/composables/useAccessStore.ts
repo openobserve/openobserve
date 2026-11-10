@@ -197,6 +197,7 @@ const ROUTE_NAME_KEYS: Record<string, I18nKey> = {
   downtime_folders: "accessBoundary.resources.downtimeFolders",
   settings: "accessBoundary.resources.settings",
   db_monitoring: "accessBoundary.resources.databaseMonitoring",
+  security: "accessBoundary.resources.security",
   oncall: "accessBoundary.resources.onCall",
   oncall_responses: "accessBoundary.resources.onCallResponses",
   synthetic_folder: "accessBoundary.resources.syntheticFolders",
@@ -507,6 +508,24 @@ const ROUTE_OVERRIDES: RouteOverride[] = [
     path: /^\/[^/]+\/org_cleanup_tasks\/[^/]+\/retry$/,
     resource: null,
     permissions: { POST: "create" },
+  },
+  {
+    path: /^\/[^/]+\/security\/(?:intel\/(?:sweep|sightings|validate)|entities(?:\/(?:graph|detail))?|ueba|events\/search|sigma\/compile|sources\/match)$/,
+    resource: "security",
+    permissions: { POST: "get" },
+  },
+  // The server checks a case write as triage (PUT) and a detach as admin (DELETE).
+  { path: /^\/[^/]+\/security\/cases$/, resource: "security", permissions: { POST: "update" } },
+  {
+    path: /^\/[^/]+\/security\/sources\/[^/]+\/detach$/,
+    resource: "security",
+    permissions: { POST: "delete" },
+  },
+  // Any other Security POST is authoring, which a different preset grants than PUT triage.
+  {
+    path: /^\/[^/]+\/security\//,
+    resource: "security",
+    permissions: { GET: "get", POST: "create", PUT: "update", DELETE: "delete" },
   },
   {
     path: new RegExp(`^/[^/]+/db_monitoring/(?:${DB_MONITORING_ENDPOINTS})$`),

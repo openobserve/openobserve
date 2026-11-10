@@ -459,6 +459,7 @@ import dbMonitoringService, {
   type DeadlockEvent,
   type DeadlockParticipant,
 } from "@/services/db_monitoring";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
@@ -1007,6 +1008,7 @@ const stepEvent = (row: DeadlockRow, direction: number) => {
 };
 
 const onRowAction = (id: string, row: DeadlockRow) => {
+  analytics.track("dbm_row_action_clicked", { page: "deadlocks", action: id });
   if (id === "copy") {
     copyToClipboard(row.queries.join("\n\n"), t);
     return;
@@ -1103,6 +1105,7 @@ const summaryLines = (row: DeadlockRow): string[] => [
 
 const copySummary = (row: DeadlockRow) => {
   copyToClipboard(summaryLines(row).join("\n"), t);
+  analytics.track("dbm_deadlock_summary_copied", { scope: "pair" });
 };
 
 /**
@@ -1117,6 +1120,7 @@ const copyStormSummary = () => {
   if (!rows.length) return;
   const header = `*${eventCount.value} deadlocks in this window, from ${rows.length} query pair(s)*`;
   copyToClipboard([header, "", ...rows.flatMap((r) => [...summaryLines(r), ""])].join("\n"), t);
+  analytics.track("dbm_deadlock_summary_copied", { scope: "storm" });
 };
 
 const onEmptyAction = (id: string) => {
@@ -1246,6 +1250,7 @@ const load = () =>
  * around it.
  */
 const askAiForFix = (row: DeadlockRow) => {
+  analytics.track("dbm_ai_fix_requested", { page: "deadlocks" });
   const participants = row.selectedEvent?.participants ?? [];
   const queries = participants.map((p) => p.query ?? "").filter(Boolean);
   emit("sendToAiChat", {

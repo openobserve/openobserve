@@ -28,9 +28,11 @@ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager
 import { b64DecodeUnicodeSafe } from "@/utils/formatters";
 import { kubernetesPage, FLEET_DRILLDOWN_EVENT } from "./packs/kubernetes.page";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
 
 const { useCuratedPageMock } = vi.hoisted(() => ({ useCuratedPageMock: vi.fn() }));
 vi.mock("./useCuratedPage", () => ({ useCuratedPage: useCuratedPageMock }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // The values query's transport, stubbed at the LAST seam before the network so
 // buildQueryContext — the code that turns a `filter` row into SQL — runs for real.
@@ -496,6 +498,9 @@ describe("CuratedPageView", () => {
       await flushPromises();
       expect(query().tab).toBe("health");
       expect(replaceSpy).not.toHaveBeenCalled();
+      expect(analytics.track).toHaveBeenCalledWith("infra_curated_drilldown_opened", {
+        workload: "kubernetes",
+      });
     });
 
     it("writes ONCE per switch — the echo must not turn into a second navigation", async () => {
@@ -621,6 +626,7 @@ describe("CuratedPageView", () => {
       vi.useFakeTimers();
       wrapper = await mountView();
       refreshSpy.mockClear();
+      vi.mocked(analytics.track).mockClear();
       wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
         startTime: NOW_US - HOUR_US,
         endTime: NOW_US,
@@ -629,6 +635,7 @@ describe("CuratedPageView", () => {
       vi.advanceTimersByTime(500);
       await flushPromises();
       expect(refreshSpy).not.toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 

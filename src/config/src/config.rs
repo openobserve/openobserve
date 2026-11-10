@@ -144,7 +144,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 144: turn a json templates column from an earlier 141 or 142 into text.
 // 145: add alerts.incident_title_template.
 // 146: rename user folders named default so the built-in default folder can be created.
-pub const DB_SCHEMA_VERSION: u64 = 146;
+// 147: index alert_incidents.last_alert_at over unresolved incidents.
+// 148: add alert_incidents.security_case, backfilled from SIEM detections and case group keys.
+// 149: add alert_incidents.historical, set on a security case only backfilled firings opened.
+pub const DB_SCHEMA_VERSION: u64 = 149;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -634,6 +637,16 @@ pub fn get_instance_id() -> String {
         Some(id) => id.clone(),
         None => "".to_string(),
     }
+}
+
+/// Keyed by the instance id, so an unauthenticated caller cannot map it to a public commit.
+pub fn build_fingerprint() -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::new()
+        .chain_update(get_instance_id())
+        .chain_update(COMMIT_HASH)
+        .finalize();
+    hex::encode(&digest[..12])
 }
 
 /// Caches the internal gRPC token stored in the meta db; empty means none is stored.

@@ -21,6 +21,9 @@ import { queryClient } from "@/composables/query/queryClient";
 import alertCalibration from "@/services/alert_calibration";
 import AlertCalibrationDashboard from "./AlertCalibrationDashboard.vue";
 import type { DigestRecord, RunRow } from "./digests";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/aws-exports")>();
@@ -229,6 +232,10 @@ describe("AlertCalibrationDashboard", () => {
       "_blank",
       "noopener,noreferrer",
     );
+    expect(analytics.track).toHaveBeenCalledWith("alert_calibration_finding_alert_opened", {
+      rule: "failure",
+      source: "dashboard",
+    });
     open.mockRestore();
 
     // The rule stays open across the route change, since the page itself was never left.

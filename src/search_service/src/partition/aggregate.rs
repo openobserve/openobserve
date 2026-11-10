@@ -58,6 +58,10 @@ pub async fn prepare_streaming_aggregate(
     ctx: &PartitionSqlContext,
     use_cache: bool,
 ) -> Result<(bool, Option<String>, Option<StreamingAggsPartitionStrategy>), Error> {
+    if ctx.sql.histogram_offset != Some(0) {
+        return Ok((false, None, None));
+    }
+
     let org_id = &ctx.sql.org_id;
     let stream_type = ctx.sql.stream_type;
     let streaming_id = if req.streaming_output && ctx.is_streaming_aggregate {
@@ -90,10 +94,7 @@ pub async fn prepare_streaming_aggregate(
         );
 
         let cache_interval_mins = cache_interval.get_duration_minutes();
-        if cache_interval_mins == 0 {
-            // this query can't use streaming_agg cache, return None
-            None
-        } else {
+        if cache_interval_mins > 0 {
             let streaming_id = ider::uuid();
             let hashed_query = get_aggregation_cache_key_from_request(req);
             let cache_file_path = create_aggregation_cache_file_path(
@@ -163,6 +164,8 @@ pub async fn prepare_streaming_aggregate(
                 "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
             );
             Some(streaming_id)
+        } else {
+            None
         }
     } else {
         None

@@ -151,10 +151,7 @@
            read the counts for what you narrowed to. Always rendered (skeleton
            while loading) so data arriving never shifts the rows below. -->
       <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="slos-slolist-stats"
-        >
+        <div data-test="slos-slolist-stats">
           <OStatStrip
             :items="stats"
             :loading="loading"
