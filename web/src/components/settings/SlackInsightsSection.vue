@@ -535,7 +535,8 @@ async function save(value: InsightsFormValues): Promise<void> {
             t("slackApp.insights.timeAndZone")
           }}</span>
           <div class="flex w-full items-start gap-2">
-            <div class="w-30 shrink-0">
+            <!-- The message line is reserved and kept to one line, so a typed-time error never grows the row. -->
+            <div class="min-h-14 w-30 shrink-0 [&_[role=alert]]:whitespace-nowrap">
               <OFormTime
                 name="digest_time"
                 format24
