@@ -1305,7 +1305,8 @@ pub async fn redirect(
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use common::meta::user::AuthTokens;
     use config::meta::user::UserRole;
-    use itertools::Itertools;
+
+    use crate::request::{LoginFailure, audit_login_failure};
 
     let code = match query.get("code") {
         Some(code) => code,
@@ -1316,7 +1317,6 @@ pub async fn redirect(
                 .unwrap();
         }
     };
-    let query_string = query.iter().map(|(k, v)| format!("{k}={v}")).join("&");
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
@@ -1326,7 +1326,7 @@ pub async fn redirect(
             http_method: "GET".to_string(),
             http_path: "/config/redirect".to_string(),
             http_body: "".to_string(),
-            http_query_params: query_string,
+            http_query_params: String::new(),
             http_response_code: 302,
             error_msg: None,
             trace_id: None,
@@ -1338,15 +1338,17 @@ pub async fn redirect(
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
     if let Err(msg) = consume_login_state(query.get("state"), state_cookie).await {
-        audit_message.response_meta.http_response_code = 400;
-        audit(audit_message).await;
+        audit_login_failure(
+            audit_message,
+            LoginFailure::InvalidLoginState,
+            StatusCode::BAD_REQUEST,
+        )
+        .await;
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body(Body::from(msg))
             .unwrap();
     }
-
-    log::info!("entering exchange_code: {code}");
 
     match exchange_code(code).await {
         Ok(login_data) => {
@@ -1362,6 +1364,7 @@ pub async fn redirect(
             let id_token;
             let login_url = match token_ver {
                 Ok(res) => {
+                    audit_message.user_email = res.0.user_email.clone();
                     // check for service accounts , do not to allow login
                     if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
                         && db_user
@@ -1384,9 +1387,12 @@ pub async fn redirect(
                     {
                         Ok(allowed) => {
                             if !allowed {
-                                audit_message.response_meta.http_response_code = 403;
-                                audit_message._timestamp = now_micros();
-                                audit(audit_message).await;
+                                audit_login_failure(
+                                    audit_message,
+                                    LoginFailure::LoginPolicyDenied,
+                                    StatusCode::UNAUTHORIZED,
+                                )
+                                .await;
                                 return Response::builder()
                                     .status(StatusCode::UNAUTHORIZED)
                                     .header(header::CONTENT_TYPE, "application/json")
@@ -1401,7 +1407,6 @@ pub async fn redirect(
                         }
                     }
 
-                    audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
                         "name": res.0.user_name,
@@ -1431,9 +1436,12 @@ pub async fn redirect(
                     )
                 }
                 Err(e) => {
-                    audit_message.response_meta.http_response_code = 400;
-                    audit_message._timestamp = now_micros();
-                    audit(audit_message).await;
+                    audit_login_failure(
+                        audit_message,
+                        LoginFailure::TokenValidationFailed,
+                        StatusCode::UNAUTHORIZED,
+                    )
+                    .await;
                     return Response::builder()
                         .status(StatusCode::UNAUTHORIZED)
                         .header(header::CONTENT_TYPE, "application/json")
@@ -1446,9 +1454,12 @@ pub async fn redirect(
             let session_id = ider::uuid();
 
             if access_token.is_empty() {
-                audit_message.response_meta.http_response_code = 400;
-                audit_message._timestamp = now_micros();
-                audit(audit_message).await;
+                audit_login_failure(
+                    audit_message,
+                    LoginFailure::TokenValidationFailed,
+                    StatusCode::UNAUTHORIZED,
+                )
+                .await;
                 return Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -1506,9 +1517,12 @@ pub async fn redirect(
                 .unwrap()
         }
         Err(e) => {
-            audit_message.response_meta.http_response_code = 400;
-            audit_message._timestamp = now_micros();
-            audit(audit_message).await;
+            audit_login_failure(
+                audit_message,
+                LoginFailure::TokenExchangeFailed,
+                StatusCode::UNAUTHORIZED,
+            )
+            .await;
             Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
                 .header(header::CONTENT_TYPE, "application/json")
