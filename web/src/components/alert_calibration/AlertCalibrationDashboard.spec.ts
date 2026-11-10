@@ -892,6 +892,34 @@ describe("AlertCalibrationDashboard dismissals", () => {
     wrapper.unmount();
   });
 
+  it("a_finding_link_opens_its_group_and_marks_the_row", async () => {
+    serve([nodest(1), nodest(2)], 2);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const wrapper = await mountPage({ finding: fid(2) });
+    await settle();
+    const row = wrapper.find('[data-test="alert-calibration-dashboard-alert-a2"]');
+    expect(row.exists()).toBe(true);
+    expect(row.attributes("data-focused")).toBe("true");
+    expect(scroll).toHaveBeenCalled();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-finding-gone"]').exists()).toBe(
+      false,
+    );
+    wrapper.unmount();
+  });
+
+  it("a_link_to_a_finding_no_longer_open_says_so_in_one_neutral_line", async () => {
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+    const wrapper = await mountPage({ finding: fid(9) });
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-finding-gone"]').text()).toBe(
+      "This finding is no longer open.",
+    );
+    wrapper.unmount();
+  });
+
   it("the_filter_lives_in_the_url", async () => {
     serve([nodest(1)], 1);
     vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(7)]));

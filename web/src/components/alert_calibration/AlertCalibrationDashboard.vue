@@ -160,6 +160,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AlertCalibrationDismissedList v-else-if="decisionRoute.transport.value !== 'pending'" />
         </template>
 
+        <OText
+          v-if="view === 'open' && focusGone"
+          variant="meta"
+          as="p"
+          data-test="alert-calibration-dashboard-finding-gone"
+        >
+          {{ t("alertCalibration.dashboard.findingGone") }}
+        </OText>
+
         <OBanner
           v-if="view === 'open' && dismissals.unknown.value"
           variant="error"
@@ -209,7 +218,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="glass"
           :data-test="`alert-calibration-dashboard-rule-${group.rule_id}`"
         >
-          <OCollapsible :icon="RULE_META[group.rule_id].icon" trigger-class="px-4 py-3">
+          <OCollapsible
+            :icon="RULE_META[group.rule_id].icon"
+            trigger-class="px-4 py-3"
+            :default-open="group.findings.some((f) => isFocused(f))"
+          >
             <template #trigger>
               <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">
                 {{ t(ruleLabelKey(group.rule_id, version)) }}
@@ -274,6 +287,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     finding.finding_id ?? finding.alert_id ?? finding.alert_name ?? finding.rule_id
                   "
                   class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2"
+                  :class="{ 'ring-accent ring-2 ring-inset': isFocused(finding) }"
+                  :data-focused="isFocused(finding) || undefined"
                   :data-test="`alert-calibration-dashboard-alert-${finding.alert_id}`"
                 >
                   <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="xs" shape="rounded">
@@ -374,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from "vue";
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
@@ -551,6 +566,27 @@ const onView = (value: unknown) => {
   else delete query.findings;
   void router.replace({ query });
 };
+
+/** A Slack link names one finding; the board opens its group and marks its row. */
+const focusId = computed(() =>
+  typeof route.query.finding === "string" ? route.query.finding : null,
+);
+const isFocused = (finding: FindingRecord) =>
+  !!focusId.value && finding.finding_id === focusId.value;
+const focusGone = computed(
+  () => !!focusId.value && !!data.data.value && !open.value.some((f) => isFocused(f)),
+);
+watch(
+  () => !loading.value && open.value.some((f) => isFocused(f)),
+  async (found) => {
+    if (!found) return;
+    await nextTick();
+    document
+      .querySelector('[data-focused="true"]')
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  },
+  { immediate: true },
+);
 
 const dismissTarget = shallowRef<DismissableFinding | null>(null);
 const dismissOpen = ref(false);

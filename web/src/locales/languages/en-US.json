@@ -11881,7 +11881,8 @@
       "notEnabledDescription": "Turn it on in the settings. The first run is due as soon as it is on.",
       "emptyTitle": "No runs in the last {days} days",
       "emptyDescription": "The dashboard fills in once alert calibration has run.",
-      "loadFailedTitle": "Findings couldn't be loaded"
+      "loadFailedTitle": "Findings couldn't be loaded",
+      "findingGone": "This finding is no longer open."
     },
     "lastRun": {
       "succeeded": "The last run succeeded {time}.",
