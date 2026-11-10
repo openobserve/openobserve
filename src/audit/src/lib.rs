@@ -90,6 +90,8 @@ pub async fn report_with_protocol(
 
     if get_config().common.audit_enabled {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: user_id,
             org_id,
             _timestamp: config::utils::time::now_micros(),

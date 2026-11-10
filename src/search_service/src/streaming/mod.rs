@@ -303,6 +303,8 @@ pub async fn process_search_stream_request(
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
+                            login_ip: None,
+                            user_agent: None,
                             user_email: user_id,
                             org_id,
                             _timestamp: config::utils::time::now_micros(),
@@ -411,6 +413,8 @@ pub async fn process_search_stream_request(
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
+                            login_ip: None,
+                            user_agent: None,
                             user_email: user_id,
                             org_id,
                             _timestamp: config::utils::time::now_micros(),
@@ -494,6 +498,8 @@ pub async fn process_search_stream_request(
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
+                            login_ip: None,
+                            user_agent: None,
                             user_email: user_id,
                             org_id,
                             _timestamp: config::utils::time::now_micros(),
@@ -568,6 +574,8 @@ pub async fn process_search_stream_request(
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
+                            login_ip: None,
+                            user_agent: None,
                             user_email: user_id,
                             org_id,
                             _timestamp: config::utils::time::now_micros(),
@@ -634,6 +642,8 @@ pub async fn process_search_stream_request(
                 if audit_enabled {
                     // Using spawn to handle the async call
                     audit(AuditMessage {
+                        login_ip: None,
+                        user_agent: None,
                         user_email: user_id,
                         org_id,
                         _timestamp: config::utils::time::now_micros(),
@@ -715,6 +725,8 @@ pub async fn process_search_stream_request(
         {
             // Using spawn to handle the async call
             audit(AuditMessage {
+                login_ip: None,
+                user_agent: None,
                 user_email: user_id,
                 org_id,
                 _timestamp: config::utils::time::now_micros(),
@@ -1142,6 +1154,8 @@ pub async fn process_search_stream_request_multi(
         && get_o2_config().common.audit_enabled
     {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: user_id,
             org_id,
             _timestamp: config::utils::time::now_micros(),

@@ -66,8 +66,9 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     audit::audit,
+    axum::{Extension, http::HeaderMap},
     common::utils::jwt::verify_decode_token,
-    config::{ider, utils::time::now_micros},
+    config::{axum::middlewares::RealIp, ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
@@ -1195,6 +1196,8 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: user_id.to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1300,6 +1303,8 @@ async fn get_stream_schema_status() -> (usize, usize) {
 #[cfg(feature = "enterprise")]
 pub async fn redirect(
     cookies: CookieJar,
+    headers: HeaderMap,
+    real_ip: Option<Extension<RealIp>>,
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
@@ -1318,6 +1323,8 @@ pub async fn redirect(
     };
     let query_string = query.iter().map(|(k, v)| format!("{k}={v}")).join("&");
     let mut audit_message = AuditMessage {
+        login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+        user_agent: super::users::login_user_agent(&headers),
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1571,6 +1578,8 @@ pub async fn refresh_token_with_dex(
         .collect::<Vec<_>>()
         .join("&");
     let mut audit_message = AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1864,6 +1873,8 @@ pub async fn logout(
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
         audit(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email,
             org_id: "".to_string(),
             _timestamp: now_micros(),
