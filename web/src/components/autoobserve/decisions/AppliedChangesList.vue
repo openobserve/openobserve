@@ -82,7 +82,7 @@ import {
   useDecisionRoute,
 } from "@/composables/autoobserve/useDecisionRoute";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { APPLY_FIELDS, applyCopy } from "@/components/alert_calibration/applySuggestion";
+import { applyCopy } from "@/components/alert_calibration/applySuggestion";
 import { decisionCopy } from "../insight/insightCopy";
 import { useAppliedChanges, type AppliedEntry } from "./appliedChanges";
 
@@ -113,13 +113,7 @@ const alertHref = (entry: AppliedEntry): string | null => {
 const copy = computed(() => applyCopy(t, locale.value));
 
 const detailOf = (entry: AppliedEntry): I18nText => {
-  const changes = entry.fields.flatMap((f) => {
-    if (!(f.field in APPLY_FIELDS)) return [];
-    const key = APPLY_FIELDS[f.field as keyof typeof APPLY_FIELDS];
-    return [
-      `${copy.value.fieldLabel(key)} ${copy.value.value(key, f.from)} → ${copy.value.value(key, f.to)}`,
-    ];
-  });
+  const changes = copy.value.appliedLines(entry.fields);
   const me = store.state.userInfo?.email;
   const by = t("insight.decisions.applied.by", {
     actor: entry.view.actor === me ? t("insight.decisions.applied.you") : raw(entry.view.actor),

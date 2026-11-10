@@ -288,9 +288,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OBadge>
                   <div class="flex min-w-0 flex-1 basis-56 flex-wrap items-baseline gap-x-2">
                     <OText variant="body-strong" as="span">{{ finding.alert_name }}</OText>
-                    <OText variant="meta" as="span" class="min-w-0">{{
-                      titleAfterName(finding)
-                    }}</OText>
+                    <OText
+                      variant="meta"
+                      as="span"
+                      class="min-w-0"
+                      data-test="alert-calibration-dashboard-alert-line"
+                      >{{ lineOf(finding) }}</OText
+                    >
                   </div>
                   <template v-if="appliedOf(finding)">
                     <OBadge
@@ -432,7 +436,7 @@ import {
 } from "@/composables/autoobserve/useDecisionRoute";
 import ReviewChangeDialog from "@/components/autoobserve/decisions/ReviewChangeDialog.vue";
 import type { ReviewChangeTarget } from "@/components/autoobserve/decisions/appliedChanges";
-import { applySuggestionsOf } from "./applySuggestion";
+import { applyCopy, applySuggestionsOf } from "./applySuggestion";
 import AlertCalibrationFindingsFilter from "./AlertCalibrationFindingsFilter.vue";
 import {
   dismissalCopy,
@@ -575,6 +579,20 @@ const appliedById = computed(
 );
 const appliedOf = (finding: FindingRecord) =>
   finding.finding_id ? (appliedById.value.get(finding.finding_id) ?? null) : null;
+const applyText = computed(() => applyCopy(t, locale.value));
+/** An applied row says what changed; the run's sentence still describes the alert before it. */
+const lineOf = (finding: FindingRecord) => {
+  const fields = appliedOf(finding)?.change?.fields;
+  const lines = fields ? applyText.value.appliedLines(fields) : [];
+  return lines.length ? raw(lines.join(" · ")) : titleAfterName(finding);
+};
+// The records read offers a destination change only while the alert has none, so an apply or its undo re-reads them.
+watch(
+  () => (appliedRead.data.value ? [...appliedById.value.keys()].sort().join() : null),
+  (now, before) => {
+    if (now !== null && before != null && now !== before) void data.load();
+  },
+);
 const undoApply = (finding: FindingRecord) => {
   const view = appliedOf(finding);
   if (view)

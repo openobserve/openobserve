@@ -1222,8 +1222,86 @@ describe("AlertCalibrationDashboard row next steps", () => {
         false,
       );
       expect(row.find('[data-test="alert-calibration-dashboard-undo-apply"]').text()).toBe("Undo");
+      // The run's sentence describes the alert before the change, so the row says what was changed instead.
+      const line = row.find('[data-test="alert-calibration-dashboard-alert-line"]').text();
+      expect(line).not.toContain("40 times");
+      expect(line).toContain("0 seconds → 2 minutes");
       wrapper.unmount();
     } finally {
+      vi.mocked(autoobserveDecisions.list).mockImplementation(() =>
+        Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } })),
+      );
+    }
+  });
+
+  it("an_undone_apply_offers_review_change_again_without_a_reload", async () => {
+    const withChange = record({
+      ...findings[1],
+      finding_id: fid(7),
+      insight_actions: JSON.stringify([
+        {
+          type: "apply_suggestion",
+          alert_id: "a2",
+          patch: [{ field: "pending_period_secs", from: 0, to: 120 }],
+        },
+      ]),
+    } as Partial<DigestRecord>);
+    // The server offers a change only while the alert still needs it, so the applied alert's record has none.
+    let alertHasChange = false;
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === ""
+        ? ([run] as never)
+        : ([
+            findings[0],
+            alertHasChange ? withChange : { ...withChange, insight_actions: "[]" },
+          ] as never),
+    );
+    const applied: DecisionView = {
+      decision_id: `alert_finding:${fid(7)}:apply`,
+      family: "alert_finding",
+      id: fid(7),
+      action: "apply",
+      state: "applied",
+      reason: null,
+      note: null,
+      has_note: false,
+      actor: "root@example.com",
+      source: "ui",
+      decided_at: NOW - 1000,
+      until: null,
+      revision: 2,
+      change: {
+        alert: { id: "a2", title: "cpu" },
+        fields: [{ field: "pending_period_secs", from: 0, to: 120 }],
+      },
+    };
+    const page = (view: DecisionView) =>
+      ({ data: { decisions: [view], total: 1, limit: 500, offset: 0 } }) as never;
+    vi.mocked(autoobserveDecisions.list).mockResolvedValue(page(applied));
+    const undo = vi.spyOn(autoobserveDecisions, "undo").mockResolvedValue({
+      data: { change: "changed", decision: { ...applied, state: "undone", revision: 3 } },
+    } as never);
+    try {
+      const wrapper = await mountPage();
+      await settle();
+      await wrapper
+        .find('[data-test="alert-calibration-dashboard-rule-noise"] button')
+        .trigger("click");
+      await settle();
+      vi.mocked(autoobserveDecisions.list).mockResolvedValue(
+        page({ ...applied, state: "undone", revision: 3 }),
+      );
+      alertHasChange = true;
+      await wrapper.find('[data-test="alert-calibration-dashboard-undo-apply"]').trigger("click");
+      await settle();
+      const row = wrapper.find('[data-test="alert-calibration-dashboard-alert-a2"]');
+      expect(row.find('[data-test="alert-calibration-dashboard-applied"]').exists()).toBe(false);
+      expect(row.find('[data-test="alert-calibration-dashboard-review-change"]').text()).toBe(
+        "Review change",
+      );
+      wrapper.unmount();
+    } finally {
+      undo.mockRestore();
       vi.mocked(autoobserveDecisions.list).mockImplementation(() =>
         Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } })),
       );

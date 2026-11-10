@@ -250,6 +250,13 @@ export function applyCopy(t: TranslateFn, locale: string) {
       t("alertCalibration.apply.editor.applied", { changes: changes(fields) }),
     notApplied: (reason: NotAppliedReason, names: string[] = []) =>
       t(NOT_APPLIED[reason], { names: list(names) }, Math.max(names.length, 1)),
+    /** One "Setting old → new" line per applied field, as What I've changed and an applied row show it. */
+    appliedLines: (fields: FieldChange[]): string[] =>
+      fields.flatMap((f) => {
+        if (!isApplyField(f.field)) return [];
+        const key = APPLY_FIELDS[f.field];
+        return [`${fieldLabel(key)} ${value(key, f.from)} → ${value(key, f.to)}`];
+      }),
   };
 }
 
