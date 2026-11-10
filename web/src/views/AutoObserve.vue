@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -145,6 +145,19 @@ const live = useLiveMode();
 const liveData = useLiveAutoObserve();
 const linkedTab = route.query.tab;
 const tab = ref<NerdTab>(NERD_TABS.find((name) => name === linkedTab) ?? "issues");
+// The tab lives in the URL, so reload and browser Back land on the tab the reader picked.
+watch(tab, (next) => {
+  const value = next === "issues" ? undefined : next;
+  if (value !== (route.query.tab ?? undefined))
+    void router.replace({ query: { ...route.query, tab: value } });
+});
+watch(
+  () => route.query.tab,
+  (next) => {
+    const named = NERD_TABS.find((name) => name === next) ?? "issues";
+    if (named !== tab.value) tab.value = named;
+  },
+);
 const liveIssues = useLiveIssues(computed<IssuesRange>(() => "30d"));
 const { overrides, ledger, updateEntry, issueByIncident } = useIssueLedger(scenario, t);
 const drawerOpen = ref(false);
