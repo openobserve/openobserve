@@ -597,6 +597,8 @@ export class DashboardsFormValidationPage {
         const item = this.page.locator('[data-test="dashboard-add-group-add-condition"]');
         await item.waitFor({ state: 'visible', timeout: 10000 });
         await item.click();
+        // Focus returns to the + trigger as the menu closes, which dismisses a chip popup opened before that.
+        await item.waitFor({ state: 'hidden', timeout: 10000 });
 
         // Adding a condition renders only a LABEL CHIP
         // (`dashboard-add-condition-label-${i}-${computedLabel}`). The column /
