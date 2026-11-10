@@ -316,7 +316,7 @@ describe("AddAlert calibration handoff", () => {
     expect(banner()?.getAttribute("data-severity")).toBe("info");
     expect(bannerText()).toContain("Hold for 1 minute → 2 minutes");
     expect(bannerText()).toContain("Cooldown period 10 minutes → 45 minutes");
-    expect(bannerText()).toContain("Destinations None → ops-pager");
+    expect(bannerText()).toContain("Destinations No destination → ops-pager");
 
     const navigation = router.push("/logs");
     await flushPromises();
