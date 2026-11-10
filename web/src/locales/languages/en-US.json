@@ -34368,7 +34368,8 @@
       "undoError": {
         "changed": "This changed since it was saved, so nothing was undone. Refresh and try again.",
         "gone": "This is no longer dismissed, so there is nothing to undo.",
-        "failed": "Nothing was undone. Try again."
+        "failed": "Nothing was undone. Try again.",
+        "already": "Already undone. Nothing changed."
       },
       "undoPartial": {
         "summary": "{done} of {total} undone. Not undone: {names}.",

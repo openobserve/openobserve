@@ -127,6 +127,32 @@ describe("useDecisionRoute", () => {
     vi.restoreAllMocks();
   });
 
+  it("an_undo_the_server_answers_unchanged_says_already_undone_not_undone", async () => {
+    vi.mocked(autoobserveDecisions.undo).mockResolvedValue({
+      data: { ...fixture.undone, change: "unchanged" },
+    } as never);
+    await mountRoute();
+    await route.undo([{ org: "default", view: view("f1"), title: "ingress-upstream-blips" }]);
+    await settle();
+    const toasts = openToasts();
+    expect(toasts).toHaveLength(1);
+    expect(String(toasts[0].message)).toBe("Already undone. Nothing changed.");
+    expect(toasts[0].variant).toBe("info");
+  });
+
+  it("a_group_undo_counts_only_what_it_changed", async () => {
+    vi.mocked(autoobserveDecisions.undo)
+      .mockResolvedValueOnce({ data: fixture.undone } as never)
+      .mockResolvedValueOnce({ data: { ...fixture.undone, change: "unchanged" } } as never);
+    await mountRoute();
+    await route.undo([
+      { org: "default", view: view("f1"), title: "a" },
+      { org: "default", view: view("f2"), title: "b" },
+    ]);
+    await settle();
+    expect(String(openToasts()[0].message)).toBe("Undone: a is shown again.");
+  });
+
   it("a_write_that_lands_after_an_org_switch_shows_no_toast_and_refreshes_its_own_org", async () => {
     await mountRoute();
     const answer = deferred<{ data: DecisionResult }>();

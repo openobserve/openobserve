@@ -193,6 +193,8 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
     setUndoing(ids, true);
     const failed: { item: Written; error: unknown }[] = [];
     const undone: Written[] = [];
+    // Another tab or Slack got there first: the server answers 200 with nothing changed.
+    const already: Written[] = [];
     try {
       await Promise.all(
         written.map(async (item) => {
@@ -204,7 +206,8 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
               }),
             );
             const revision = result?.data?.decision?.revision ?? item.view.revision;
-            undone.push({ ...item, view: { ...item.view, revision } });
+            const done = { ...item, view: { ...item.view, revision } };
+            (result?.data?.change === "unchanged" ? already : undone).push(done);
           } catch (error) {
             failed.push({ item, error });
           }
@@ -213,18 +216,22 @@ export function useDecisionRoute(options: { probe?: boolean } = {}) {
     } finally {
       setUndoing(ids, false);
       for (const org of new Set(written.map((w) => w.org))) refreshAfterWrite(org);
-      const undoneApplies = undone.filter((w) => w.view.action === "apply");
+      const undoneApplies = [...undone, ...already].filter((w) => w.view.action === "apply");
       for (const org of new Set(undoneApplies.map((w) => w.org))) dropFolderRows(org);
     }
     // Every Undo (toast, row, retry) passes here, so this session's What I've changed rows follow one source.
-    markUndone(undone);
+    markUndone([...undone, ...already]);
     if (written[0].org !== orgId.value) return !failed.length;
+    if (!failed.length && !undone.length) {
+      toast({ message: copy().alreadyUndone(), variant: "info" });
+      return true;
+    }
     if (!failed.length) {
       toast({
         message: copy().undone(
-          written.length,
-          written.length === 1 ? written[0].title : null,
-          written.every((w) => w.view.action === "apply"),
+          undone.length,
+          undone.length === 1 ? undone[0].title : null,
+          undone.every((w) => w.view.action === "apply"),
         ),
         variant: "success",
       });

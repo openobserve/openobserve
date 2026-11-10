@@ -734,6 +734,7 @@ export function decisionCopy(t: TranslateFn, locale: string) {
     undoOutcome,
     failuresShown: FAILURES_SHOWN,
     undo: () => t("insight.decisions.undo"),
+    alreadyUndone: () => t("insight.decisions.undoError.already"),
     retry: () => t("insight.decisions.retry"),
     dismissTitle: (subject: string | null | undefined) =>
       t("insight.decisions.dismiss.title", { title: title(subject) }),
