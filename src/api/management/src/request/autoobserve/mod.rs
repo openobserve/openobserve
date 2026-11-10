@@ -214,7 +214,7 @@ pub async fn entity_types(Path(_org_id): Path<String>) -> Response {
     tag = "AutoObserve",
     operation_id = "AutoObserveCoverage",
     summary = "Get the coverage matrix",
-    description = "This region's newest coverage matrix: one row per watched service with the evidence for each signal class. `pass_at`, `refreshed_at` and `quality` are null, and `rows` is empty, when the engine has written no pass in the last day.",
+    description = "This region's newest coverage matrix: one row per watched service with the evidence for each signal class. `pass_at`, `refreshed_at` and `quality` are null, and `rows` is empty, when the engine has written no pass in the last day. `learning` is present unless the learning state could not be read, in which case it and every `learning_until` are left out: how many of the org's streams the stream watches still learn and how many have the `history_days_needed` days they need, with `next_ready_at` (microseconds) the soonest a learning stream is ready, null when none learns. Each listed stream's `learning_until` is when its history will be enough, null once it is or when no stream watch applies.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), CoverageQuery),
     responses(
