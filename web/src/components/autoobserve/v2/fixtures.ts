@@ -103,7 +103,7 @@ export interface RequestCopy {
   label: I18nText;
   headline: I18nText;
   why: I18nText | null;
-  tags: { label: I18nText; variant: BadgeVariant }[];
+  tags: { label: I18nText; variant: BadgeVariant; hint?: I18nText }[];
   look: LookKind;
 }
 

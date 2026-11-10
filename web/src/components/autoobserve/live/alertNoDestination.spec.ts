@@ -116,3 +116,27 @@ describe("one label for a kind (filter chip and row)", () => {
     expect(suggestionKindLabel(gt, "alert_not_working")).toBe(row.kind);
   });
 });
+
+describe("calibration tiers say what they mean (T1-15)", () => {
+  it.each([
+    [
+      "A",
+      "Confirmed condition",
+      "The evidence confirms this condition, and any change offered is a concrete setting.",
+    ],
+    ["B", "Investigate", "The evidence shows where, when and how widely it fails, but not why."],
+    [
+      "C",
+      "Owner decision",
+      "The numbers are real, but whether to change the alert is the owner's call.",
+    ],
+  ] as const)("tier %s carries its one-line meaning", (tier, label, hint) => {
+    const [row] = toSuggestionRows(
+      gt,
+      ZONE,
+      [finding("alert_not_working", { rule_id: "failure", pattern: "syntax" }, { tier })],
+      NOW_MS,
+    );
+    expect(row.insight.facts).toEqual([{ label, variant: "default-soft", hint }]);
+  });
+});

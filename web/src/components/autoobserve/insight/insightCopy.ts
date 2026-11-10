@@ -82,6 +82,7 @@ export interface InsightCta {
 export interface InsightFact {
   label: I18nText;
   variant: BadgeVariant;
+  hint?: I18nText;
 }
 
 export interface InsightParts {

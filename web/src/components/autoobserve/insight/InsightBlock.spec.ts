@@ -18,6 +18,7 @@ import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import InsightBlock from "./InsightBlock.vue";
 import { ASK_AI_KEY } from "./insightCta";
 import type { InsightCta, InsightParts } from "./insightCopy";
@@ -214,6 +215,29 @@ describe("InsightBlock card (test 8)", () => {
       insight({ chip: { label: raw("Other"), variant: "default-soft", tone: "info" } }),
     );
     expect(neutral.find("article > span").classes()).toContain("bg-border-default");
+  });
+});
+
+describe("InsightBlock fact hints", () => {
+  it("explains a fact chip that carries a hint in a tooltip, and leaves the others plain", () => {
+    const wrapper = mountBlock(
+      insight({
+        facts: [
+          {
+            label: raw("Confirmed condition"),
+            variant: "default-soft",
+            hint: raw("What A means."),
+          },
+          { label: raw("High"), variant: "warning-soft" },
+        ],
+      }),
+      "details",
+    );
+    const tips = wrapper.findAllComponents(OTooltip);
+    expect(tips).toHaveLength(1);
+    expect(tips[0].props("content")).toBe("What A means.");
+    expect(wrapper.text()).toContain("Confirmed condition");
+    expect(wrapper.text()).toContain("High");
   });
 });
 

@@ -11726,6 +11726,11 @@
       "b": "Investigate",
       "c": "Owner decision"
     },
+    "tierHint": {
+      "a": "The evidence confirms this condition, and any change offered is a concrete setting.",
+      "b": "The evidence shows where, when and how widely it fails, but not why.",
+      "c": "The numbers are real, but whether to change the alert is the owner's call."
+    },
     "quality": {
       "partial": "Partial evidence",
       "unavailable": "Evidence unavailable"

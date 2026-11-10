@@ -237,6 +237,12 @@ export const TIER_LABEL: Record<Tier, I18nKey> = {
   C: "alertCalibration.tier.c",
 };
 
+export const TIER_HINT: Record<Tier, I18nKey> = {
+  A: "alertCalibration.tierHint.a",
+  B: "alertCalibration.tierHint.b",
+  C: "alertCalibration.tierHint.c",
+};
+
 /** Usable evidence needs no badge; the other two say the card is weaker than it looks. */
 export const QUALITY_LABEL: Record<Exclude<Quality, "usable">, I18nKey> = {
   partial: "alertCalibration.quality.partial",

@@ -160,7 +160,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="fact.variant"
           size="sm"
           :label="fact.label"
-        />
+        >
+          {{ fact.label }}
+          <OTooltip v-if="fact.hint" :content="fact.hint" />
+        </OTag>
         <OText v-if="parts.meta" variant="meta" as="span">{{ parts.meta }}</OText>
       </div>
       <div v-if="hasActions" class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -235,6 +238,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { InsightCta, InsightParts, InsightTone } from "./insightCopy";
 import { ASK_AI_KEY, aiEnabled, askAiPayload, insightCtaLabel } from "./insightCta";
 

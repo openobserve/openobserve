@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-calibration-finding-tier"
           >
             {{ t(TIER_LABEL[tier]) }}
+            <OTooltip :content="t(TIER_HINT[tier])" />
           </OBadge>
           <OBadge
             v-if="quality"
@@ -286,6 +287,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
@@ -316,6 +318,7 @@ import {
   SEVERITY_BADGE,
   SEVERITY_LABEL,
   SEVERITY_TILE,
+  TIER_HINT,
   TIER_LABEL,
   resourceOptions,
 } from "./format";

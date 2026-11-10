@@ -37,7 +37,7 @@ import {
 } from "../fixtures";
 import { say, type Msg, type Request, type RequestCopy } from "../v2/fixtures";
 import type { LookKind } from "../v2/changes";
-import { TIER_LABEL } from "@/components/alert_calibration/format";
+import { TIER_HINT, TIER_LABEL } from "@/components/alert_calibration/format";
 import { isAlertFindingKind } from "@/components/alert_calibration/dismissals";
 import {
   agoText,
@@ -745,10 +745,14 @@ const severityTag = (t: TranslateFn, s: AutoObserveSuggestion) => {
 };
 
 const tagsFor = (t: TranslateFn, s: AutoObserveSuggestion): RequestCopy["tags"] => {
-  const tags: { label: I18nText; variant: BadgeVariant }[] = [];
+  const tags: RequestCopy["tags"] = [];
   if (isAlertFindingKind(s.kind)) {
     if (s.tier && Object.hasOwn(TIER_LABEL, s.tier))
-      tags.push({ label: t(TIER_LABEL[s.tier]), variant: "default-soft" });
+      tags.push({
+        label: t(TIER_LABEL[s.tier]),
+        variant: "default-soft",
+        hint: t(TIER_HINT[s.tier]),
+      });
     return tags;
   }
   const severity = severityTag(t, s);
