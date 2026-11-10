@@ -91,6 +91,25 @@ describe("useLiveAutoObserve", () => {
   });
 });
 
+describe("useLiveAutoObserve on a page that shows none of it (T3-N7)", () => {
+  it("reads no coverage or suggestions while the page is inactive", async () => {
+    queryClient.clear();
+    vi.mocked(autoobserve.coverage).mockClear();
+    vi.mocked(autoobserve.suggestions).mockClear();
+    const Inactive = defineComponent({
+      setup() {
+        useLiveAutoObserve({ active: () => false });
+        return () => h("span");
+      },
+    });
+    const wrapper = mount(Inactive, { global: { plugins: [i18n, store] } });
+    await flushPromises();
+    expect(autoobserve.coverage).not.toHaveBeenCalled();
+    expect(autoobserve.suggestions).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+});
+
 describe("useLiveAutoObserve follows each pass (T2-4, COVERAGE-AFTER-ADD)", () => {
   const recently = useRecentlyCreated();
   afterEach(() => {

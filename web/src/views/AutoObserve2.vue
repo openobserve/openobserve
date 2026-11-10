@@ -395,7 +395,7 @@ const byId = computed(() => problemsFor(overrides.value));
 // Fix asks sit on their problem row, so only the rest are suggestions.
 const suggestions = computed(() => data.value.requests.filter((r) => r.kind !== "fixNow"));
 const live = useLiveMode();
-const liveData = useLiveAutoObserve();
+const liveData = useLiveAutoObserve({ active: () => route.query.page !== "activity" });
 const railShown = computed(() => live.value || suggestions.value.length > 0);
 const allOpen = ref(false);
 

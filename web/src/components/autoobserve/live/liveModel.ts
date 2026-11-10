@@ -192,14 +192,15 @@ export const useLiveZone = () => {
 // Gaps fold into one card, so the rail reads well past its cap to still fill it with other kinds.
 const RAIL_FETCH = 100;
 
-export const useLiveAutoObserve = () => {
+/** `active` is off on a sub-page that shows none of it, so a reader is never refused a read the page does not use. */
+export const useLiveAutoObserve = (options: { active?: () => boolean } = {}) => {
   const store = useStore();
   const live = useLiveMode();
   const { t } = useI18nTyped();
   const zone = useLiveZone();
   const now = useNow();
   const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-  const enabled = computed(() => live.value && !!org.value);
+  const enabled = computed(() => live.value && !!org.value && (options.active?.() ?? true));
   const recently = useRecentlyCreated();
   // A pass runs about every 5 minutes; while an alert added here waits for one, read every minute.
   const coverage = useQuery(() =>
