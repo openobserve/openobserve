@@ -140,7 +140,7 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
       const found = chips(mountDrawer(row, "gap"));
       expect(found[0].text()).toBe("Errors: Added");
       expect(found[0].find("span").classes().join(" ")).toContain(LIVE_DOT.added);
-      expect(found[1].text()).toBe("Latency: Not watched");
+      expect(found[1].text()).toBe("Latency: Coverage gap");
     } finally {
       recently.clearOnPass(Number.MAX_SAFE_INTEGER);
     }
@@ -263,20 +263,20 @@ describe("CoverageServiceDrawer in live mode", () => {
       "autoobserve-coverage-drawer-chip-absence",
     ]);
     expect(found.map((c) => c.text())).toEqual([
-      "Errors: Not watched",
-      "Latency: Silent",
-      "Stops sending: Covered",
+      "Errors: Coverage gap",
+      "Latency: Coverage gap",
+      "Stops sending: Watched",
     ]);
     const dot = (i: number) => found[i].find("span").classes().join(" ");
-    expect(dot(0)).toContain(LIVE_DOT.missing);
-    expect(dot(1)).toContain(LIVE_DOT.problem);
+    expect(dot(0)).toContain(LIVE_DOT.gap);
+    expect(dot(1)).toContain(LIVE_DOT.gap);
     expect(dot(2)).toContain(LIVE_DOT.covered);
     const charts = wrapper.findAllComponents(ChartStub).map((c) => c.props("def").signal);
     expect(charts).toEqual(["requests", "errors", "latency"]);
     const other = wrapper.find('[data-test="autoobserve-coverage-drawer-extra"]').text();
     expect(other).toContain("Saturation");
     expect(other).not.toContain("Stops sending");
-    expect(other).toContain("Not watched");
+    expect(other).toContain("Coverage gap");
     expect(other).not.toMatch(/\bNone\b/);
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-logs"]').exists()).toBe(false);
   });

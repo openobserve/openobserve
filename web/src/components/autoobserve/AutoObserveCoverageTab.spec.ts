@@ -69,6 +69,30 @@ const mountTab = (source: CoverageSource, skeleton = false) =>
     },
   });
 
+const mountUnderHeaderBar = (source: CoverageSource, skeleton = false) =>
+  mount(AutoObserveCoverageTab, {
+    props: { ledger: [], scenario: "steady", source, skeleton, explain: true, headerBar: true },
+    global: {
+      plugins: [i18n, store],
+      stubs: { CoverageHexMap: HexMapStub, CoverageServiceDrawer: true },
+    },
+  });
+
+describe("AutoObserveCoverageTab under the page's coverage bar", () => {
+  it("draws no second watched-and-gap bar, loaded or loading", () => {
+    const loaded = mountUnderHeaderBar(live(FEW));
+    expect(loaded.find('[data-test="autoobserve-coverage-summary"]').exists()).toBe(true);
+    expect(loaded.find('[data-test="autoobserve-coverage-split"]').exists()).toBe(false);
+    const loading = mountUnderHeaderBar(live(FEW), true);
+    expect(loading.find('[data-test="autoobserve-coverage-skeleton-split"]').exists()).toBe(false);
+  });
+
+  it("keeps the bar where the page has none", () => {
+    expect(has(mountTab(live(FEW)), "autoobserve-coverage-split")).toBe(true);
+    expect(has(mountTab(live(FEW), true), "autoobserve-coverage-skeleton-split")).toBe(true);
+  });
+});
+
 const has = (wrapper: ReturnType<typeof mountTab>, test: string) =>
   wrapper.find(`[data-test="${test}"]`).exists();
 
@@ -246,12 +270,12 @@ describe("AutoObserveCoverageTab in live mode", () => {
       ]);
     });
 
-    it("says Covered, No monitor or the engine's word in each cell, and never GAP", () => {
+    it("says Watched or Coverage gap in each cell, and never GAP", () => {
       const wrapper = mountTable();
-      expect(text(wrapper, "autoobserve-coverage-cell-api-errors")).toBe("Covered");
-      expect(text(wrapper, "autoobserve-coverage-cell-web-errors")).toBe("Not watched");
-      expect(text(wrapper, "autoobserve-coverage-cell-db-errors")).toBe("Silent");
-      expect(text(wrapper, "autoobserve-coverage-cell-cart-absence")).toBe("Covered");
+      expect(text(wrapper, "autoobserve-coverage-cell-api-errors")).toBe("Watched");
+      expect(text(wrapper, "autoobserve-coverage-cell-web-errors")).toBe("Coverage gap");
+      expect(text(wrapper, "autoobserve-coverage-cell-db-errors")).toBe("Coverage gap");
+      expect(text(wrapper, "autoobserve-coverage-cell-cart-absence")).toBe("Watched");
       const table = text(wrapper, "autoobserve-coverage-matrix");
       expect(table).not.toContain("GAP");
       expect(table).not.toMatch(/Requests|Saturation|Log patterns|Dependencies/);
@@ -267,16 +291,18 @@ describe("AutoObserveCoverageTab in live mode", () => {
 
     it("keys the cells, not the fixture marks, in the footer", () => {
       const key = text(mountTable(), "autoobserve-coverage-legend");
-      expect(key).toContain("Covered");
-      expect(key).toContain("Not watched");
-      expect(key).not.toMatch(/GAP|Anomaly|Threshold|Not applicable/);
+      expect(key).toContain("Watched");
+      expect(key).toContain("Coverage gap");
+      expect(key).not.toMatch(
+        /GAP|Anomaly|Threshold|Not applicable|Covered|Not watched|Falls short/,
+      );
     });
 
-    it("keys the filled amber dot with one word for a monitor that falls short", () => {
-      const item = mountTable().find('[data-test="autoobserve-coverage-legend-problem-key"]');
+    it("keys every gap with the one amber dot and the word Coverage gap", () => {
+      const item = mountTable().find('[data-test="autoobserve-coverage-legend-gap-key"]');
       expect(item.exists()).toBe(true);
-      expect(item.text()).toBe("Falls short");
-      expect(item.find("span").classes().join(" ")).toContain(LIVE_DOT.problem);
+      expect(item.text()).toBe("Coverage gap");
+      expect(item.find("span").classes().join(" ")).toContain(LIVE_DOT.gap);
     });
 
     it("searches the Where column it shows, not the stream it hides", async () => {

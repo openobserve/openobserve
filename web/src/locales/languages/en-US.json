@@ -30412,7 +30412,7 @@
       "rangeLabel": "Time range",
       "logPatternsValue": "{known} known · {fresh} new today",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "Not watched",
+      "badgeNotWatched": "Coverage gap",
       "signalsWatched": "Signals watched",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Up {change} since the start of the range",
@@ -30637,7 +30637,7 @@
       "node": "node health"
     },
     "states": {
-      "covered": "Covered",
+      "covered": "Watched",
       "weak": "Weak",
       "silent": "Silent",
       "blind": "Blind",
@@ -30686,7 +30686,6 @@
     "cell": {
       "noClass": "AutoObserve doesn't check this signal yet",
       "tipNoClass": "{signal}: AutoObserve doesn't check this yet",
-      "noMonitor": "Not watched",
       "gap": {
         "weak": "{signal}: only {monitor}, a broad alert, may notice a problem; it isn't scoped to this service | {signal}: only {monitor}, broad alerts, may notice a problem; they aren't scoped to this service",
         "silent": "{signal}: {monitor} matches, but it notifies no one | {signal}: {monitor} match, but they notify no one",
@@ -30694,7 +30693,6 @@
         "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service | {signal}: {monitor} may match, but their scope couldn't be tied to a service",
         "none": "{signal}: no alert watches this"
       },
-      "fallsShort": "Falls short",
       "added": "Added"
     },
     "drawer": {
@@ -30729,7 +30727,7 @@
       "serviceMeta": "{where}, about {traffic} events an hour",
       "trafficOnly": "About {traffic} events an hour",
       "kinds": {
-        "coverage_gap": "Not watched",
+        "coverage_gap": "Coverage gap",
         "no_absence_check": "Missing alert",
         "silent_coverage": "Notifies no one",
         "coverage_lost": "Coverage lost",
@@ -34615,7 +34613,7 @@
     },
     "kind": {
       "chip": {
-        "notWatched": "Not watched",
+        "notWatched": "Coverage gap",
         "missingAlert": "Missing alert",
         "notifiesNoOne": "Notifies no one",
         "stoppedSending": "Stopped sending",

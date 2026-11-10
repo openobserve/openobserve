@@ -519,7 +519,7 @@ describe("AllSuggestionsDrawer: Slack deep links (C4)", () => {
     expect(api).toHaveBeenCalledWith("org-a", expect.objectContaining({ kind: "coverage_gap" }));
     const chip = wrapper.findComponent('[data-test="autoobserve2-suggestions-drawer-kind"]');
     expect(chip.exists()).toBe(true);
-    expect(chip.text()).toContain("Not watched");
+    expect(chip.text()).toContain("Coverage gap");
     chip.vm.$emit("remove");
     expect(wrapper.emitted("update:kind")).toEqual([[null]]);
   });

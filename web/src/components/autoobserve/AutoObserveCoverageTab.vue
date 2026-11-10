@@ -40,7 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-hidden="true"
         >
           <OSkeleton animation="none" class="h-4 w-44" />
-          <OSkeleton animation="none" class="h-2 w-56 max-md:w-24" />
+          <OSkeleton
+            v-if="!headerBar"
+            animation="none"
+            class="h-2 w-56 max-md:w-24"
+            data-test="autoobserve-coverage-skeleton-split"
+          />
           <OSkeleton animation="none" class="ms-auto h-3 w-20" />
         </div>
         <div class="px-page-edge flex items-center gap-2 py-2" aria-hidden="true">
@@ -132,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </span>
         <span
+          v-if="!headerBar"
           role="img"
           :aria-label="splitLabel"
           class="bg-progress-bar-track flex h-2 w-56 overflow-hidden rounded-full max-md:w-full"
@@ -363,8 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               v-if="row.checks"
               type="button"
-              class="hover:bg-surface-subtle-hover focus-visible:outline-focus-ring-accent rounded-default -ms-1.5 inline-flex h-7 cursor-pointer items-center gap-1.5 px-1.5 focus-visible:outline-2 focus-visible:outline-offset-1"
-              :class="cellLook(row, check) === 'missing' ? 'text-text-secondary' : 'text-text-body'"
+              class="hover:bg-surface-subtle-hover focus-visible:outline-focus-ring-accent rounded-default text-text-body -ms-1.5 inline-flex h-7 cursor-pointer items-center gap-1.5 px-1.5 focus-visible:outline-2 focus-visible:outline-offset-1"
               :title="row.checks[check].state === 'gap' ? row.checks[check].reason : undefined"
               :aria-label="liveCellAria(row, check)"
               :aria-pressed="isSelected(row.service, check)"
@@ -587,7 +592,7 @@ const FILTER_LABEL: Record<CoverageFilter, I18nKey> = {
   gaps: "autoobserve.coverage.gaps",
   cantWatch: "autoobserve.coverage.cantWatch",
 };
-const LIVE_LEGEND: LiveCellLook[] = ["covered", "missing", "problem"];
+const LIVE_LEGEND: LiveCellLook[] = ["covered", "gap"];
 
 const FILL_LABEL: Record<CoverageFill, I18nKey> = {
   state: "autoobserve.coverage.fillState",
@@ -645,6 +650,8 @@ const props = defineProps<{
   source?: CoverageSource;
   skeleton?: boolean;
   explain?: boolean;
+  /** The page above already draws the watched-and-gap bar, so this tab must not draw a second one. */
+  headerBar?: boolean;
 }>();
 
 const emit = defineEmits<{ "how-it-works": [] }>();
