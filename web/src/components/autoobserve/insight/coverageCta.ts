@@ -281,7 +281,7 @@ export const gapInsight = (
       raw(
         `${t("insight.ai.coverage_gap.ask", { service: raw(nameOf(row)), classes })} ${t("insight.ai.coverage_gap.draft")}`,
       ),
-      [["Not watched", missing.join(", ")]],
+      [["Coverage gap", missing.join(", ")]],
     ),
   });
 };
