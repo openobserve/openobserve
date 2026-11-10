@@ -275,16 +275,17 @@ impl Engine {
         range: Option<Duration>,
         ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
-        let mut metric_values = match self.selector_load_data_inner(selector, range, ctxs).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!(
-                    "[trace_id: {}] [PromQL] Failed to load data for stream, error: {e:?}",
-                    self.trace_id
-                );
-                return Err(e);
-            }
-        };
+        let (mut metric_values, overlapping) =
+            match self.selector_load_data_inner(selector, range, ctxs).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id: {}] [PromQL] Failed to load data for stream, error: {e:?}",
+                        self.trace_id
+                    );
+                    return Err(e);
+                }
+            };
 
         // no data, return immediately
         if metric_values.is_empty() {
@@ -295,6 +296,9 @@ impl Engine {
         let query_exemplars = self.ctx.query_ctx.query_exemplars;
         metric_values.par_iter_mut().for_each(|metric| {
             sort_series(metric, query_exemplars);
+            if overlapping {
+                dedup_series(metric);
+            }
         });
         log::info!(
             "[trace_id: {}] [PromQL] sort samples by timestamps took: {:?}",
@@ -304,13 +308,14 @@ impl Engine {
         Ok(metric_values)
     }
 
+    /// Loads the series; the flag tells that several contexts were read, which may overlap.
     #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
     async fn selector_load_data_inner(
         &self,
         selector: &VectorSelector,
         range: Option<Duration>,
         ctxs: Option<SelectorContexts>,
-    ) -> Result<Vec<RangeValue>> {
+    ) -> Result<(Vec<RangeValue>, bool)> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         // Positive offset (e.g. `offset 10m`) looks into the past, so we shift
@@ -407,6 +412,7 @@ impl Engine {
         let lookback = range.map_or(self.ctx.lookback_delta, micros);
 
         let skip_labels = self.skip_labels;
+        let overlapping = ctxs.len() > 1;
         let mut tasks = Vec::with_capacity(ctxs.len());
         let mut abort_handles = Vec::with_capacity(ctxs.len());
         for ScanContext {
@@ -567,7 +573,7 @@ impl Engine {
             start_time.elapsed().as_millis()
         );
 
-        Ok(metrics)
+        Ok((metrics, overlapping))
     }
 }
 
@@ -626,12 +632,18 @@ fn flatten_loaded_metrics(metrics: LoadedMetrics) -> Vec<RangeValue> {
     }
 }
 
-/// Orders a series by time and drops the second copy of what two contexts both returned.
+/// Orders a series by time.
 fn sort_series(metric: &mut RangeValue, with_exemplars: bool) {
     metric.samples.sort_unstable_by_key(|k| k.timestamp);
-    metric.samples.dedup_by_key(|k| k.timestamp);
     if with_exemplars && let Some(exemplars) = &mut metric.exemplars {
         exemplars.sort_by_key(|k| k.timestamp);
+    }
+}
+
+/// Drops the second copy of what two contexts both returned; the series must be time-ordered.
+fn dedup_series(metric: &mut RangeValue) {
+    metric.samples.dedup_by_key(|k| k.timestamp);
+    if let Some(exemplars) = &mut metric.exemplars {
         dedup_exemplars(exemplars);
     }
 }
@@ -760,13 +772,14 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_series_keeps_one_copy_of_a_sample_read_from_wal_and_storage() {
+    fn test_dedup_series_keeps_one_copy_of_a_sample_read_from_wal_and_storage() {
         let mut metric = range_value(200, 2.0);
         metric.extend(range_value(100, 1.0));
         metric.extend(range_value(200, 2.0));
         metric.extend(range_value(100, 1.0));
 
         sort_series(&mut metric, false);
+        dedup_series(&mut metric);
 
         let samples: Vec<_> = metric
             .samples
@@ -777,7 +790,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_series_keeps_distinct_exemplars_that_share_a_timestamp() {
+    fn test_dedup_series_keeps_distinct_exemplars_that_share_a_timestamp() {
         let exemplar = |timestamp: i64, trace_id: &str| {
             Arc::new(Exemplar {
                 timestamp,
@@ -802,6 +815,7 @@ mod tests {
         });
 
         sort_series(&mut metric, true);
+        dedup_series(&mut metric);
 
         let exemplars: Vec<_> = metric
             .exemplars
