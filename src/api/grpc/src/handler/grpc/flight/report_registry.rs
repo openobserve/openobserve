@@ -19,7 +19,7 @@ use std::{
     time::Duration,
 };
 
-use flight::profile::{NodeReport, NodeStatus};
+use flight::profile::ProfileNode;
 use parking_lot::Mutex;
 use tokio::sync::watch;
 
@@ -29,7 +29,7 @@ const REPORT_TTL: Duration = Duration::from_secs(60);
 pub(super) static REPORTS: LazyLock<ReportRegistry> =
     LazyLock::new(|| ReportRegistry::new(REPORT_TTL));
 
-type ReportSender = Arc<watch::Sender<Option<NodeReport>>>;
+type ReportSender = Arc<watch::Sender<Option<ProfileNode>>>;
 type Entries = Arc<Mutex<HashMap<String, ReportSender>>>;
 
 /// Reports of this node's EXPLAIN ANALYZE runs, keyed by job trace id, kept until fetched.
@@ -61,7 +61,7 @@ impl ReportRegistry {
     }
 
     /// Waits for the run's report and removes it; `None` if no run with this key is held.
-    pub(super) async fn fetch(&self, key: &str) -> Option<NodeReport> {
+    pub(super) async fn fetch(&self, key: &str) -> Option<ProfileNode> {
         let mut rx = self.entries.lock().get(key)?.subscribe();
         let report = rx.wait_for(Option::is_some).await.ok()?.clone();
         self.entries.lock().remove(key);
@@ -69,7 +69,7 @@ impl ReportRegistry {
     }
 }
 
-/// Where one run delivers its report; a run that ends without one leaves it unavailable.
+/// Where one run delivers its report; a run that ends without one leaves nothing to fetch.
 pub(crate) struct ReportSlot {
     entries: Entries,
     key: String,
@@ -78,11 +78,7 @@ pub(crate) struct ReportSlot {
 }
 
 impl ReportSlot {
-    pub(crate) fn complete(mut self, report: NodeReport) {
-        self.deliver(report);
-    }
-
-    fn deliver(&mut self, report: NodeReport) {
+    pub(crate) fn complete(mut self, report: ProfileNode) {
         let Some(sender) = self.report.take() else {
             return;
         };
@@ -99,9 +95,9 @@ impl ReportSlot {
 
 impl Drop for ReportSlot {
     fn drop(&mut self) {
-        self.deliver(NodeReport {
-            status: NodeStatus::Unavailable,
-            plan: None,
-        });
+        // Dropping the sender ends the wait of a fetch already under way.
+        if self.report.take().is_some() {
+            self.entries.lock().remove(&self.key);
+        }
     }
 }

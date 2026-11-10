@@ -78,12 +78,17 @@ impl NodeProfileRecorder {
         self.update(|p| p.job_id.clear());
     }
 
+    /// The node's stream was read to its end.
+    pub fn mark_completed(&self) {
+        self.update(|p| p.status = NodeStatus::Completed);
+    }
+
     /// This caller's own deadline ended the call.
     pub fn mark_timed_out(&self) {
         self.update(|p| p.status = NodeStatus::TimedOut);
     }
 
-    /// The call failed on this side; a report fetched later keeps this status.
+    /// The call failed as this caller saw it.
     pub fn mark_failed(&self, e: &tonic::Status) {
         let status = match e.code() {
             tonic::Code::DeadlineExceeded => NodeStatus::TimedOut,
@@ -255,25 +260,12 @@ async fn fetch_report(
     let Some(profile) = profiles.get_mut(&partition) else {
         return;
     };
-    // The node sees only that its caller went away; an ending the caller recorded wins.
-    let caller_ended = matches!(profile.status, NodeStatus::Failed | NodeStatus::TimedOut);
     match fetched {
-        Ok(report) => {
-            if !caller_ended {
-                profile.status = report.status;
-            }
-            profile.plan = report.plan;
-        }
-        Err(e) => {
-            // Not found means the node never got as far as returning a stream.
-            if !caller_ended && e.code() != tonic::Code::NotFound {
-                profile.status = NodeStatus::Unavailable;
-            }
-            log::warn!(
-                "[trace_id {}] explain analyze: no profile from node {node_name}, partition {partition}: {e}",
-                identifier.trace_id
-            );
-        }
+        Ok(plan) => profile.plan = Some(plan),
+        Err(e) => log::warn!(
+            "[trace_id {}] explain analyze: no profile from node {node_name}, partition {partition}: {e}",
+            identifier.trace_id
+        ),
     }
 }
 

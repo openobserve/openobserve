@@ -18,7 +18,7 @@ use std::{sync::Arc, time::Duration};
 use arrow_flight::{Action, Ticket, flight_service_client::FlightServiceClient};
 use config::{datafusion::request::FlightSearchRequest, meta::cluster::NodeInfo};
 use datafusion::common::Result;
-use flight::{common::QUERY_PROFILE_ACTION, profile::NodeReport};
+use flight::{common::QUERY_PROFILE_ACTION, profile::ProfileNode};
 use infra::client::grpc::{GrpcChannel, MetadataMap, get_cached_channel};
 use prost::Message;
 use proto::cluster_rpc;
@@ -60,14 +60,14 @@ pub async fn make_flight_client(
     Ok((client, request))
 }
 
-/// Fetches a node's report on one run whose stream did not deliver it, waiting up to `timeout`.
+/// Fetches the profile a node holds for one finished run, waiting up to `timeout`.
 pub async fn fetch_node_report(
     trace_id: &str,
     org_id: &str,
     node: Arc<dyn NodeInfo>,
     job_trace_id: String,
     timeout: Duration,
-) -> Result<NodeReport, Status> {
+) -> Result<ProfileNode, Status> {
     // The request timeout only covers the response headers, not connecting or the body.
     let fetch = async {
         let mut client = flight_client(trace_id, org_id, node, timeout).await?;

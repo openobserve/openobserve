@@ -124,6 +124,7 @@ impl Stream for FlightDecoderStream {
                             self.query_context.req_last_time.elapsed().as_millis()
                         );
                     }
+                    self.query_context.node_profile.mark_completed();
                     poll = Poll::Ready(None);
                     break;
                 }

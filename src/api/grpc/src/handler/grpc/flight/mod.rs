@@ -201,7 +201,6 @@ impl FlightService for FlightServiceImpl {
                     }
                     _ = &mut timeout => {
                         log::info!("[trace_id {trace_id}] flight->search: timeout");
-                        stream.mark_timed_out();
                         break;
                     }
                 }

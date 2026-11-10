@@ -195,9 +195,9 @@ pub enum NodeStatus {
     Skipped,
     /// The request never reached the node: the caller finished before sending it.
     NotExecuted,
-    /// The node's report could not be fetched; also what a caller older than `status` leaves.
+    /// What a caller older than `status` leaves.
     #[default]
-    Unavailable,
+    Unknown,
 }
 
 impl NodeStatus {
@@ -209,17 +209,9 @@ impl NodeStatus {
             Self::TimedOut => "timed_out",
             Self::Skipped => "skipped",
             Self::NotExecuted => "not_executed",
-            Self::Unavailable => "unavailable",
+            Self::Unknown => "unknown",
         }
     }
-}
-
-/// A node's own account of a finished run, fetched by its caller after the stream.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct NodeReport {
-    pub status: NodeStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub plan: Option<ProfileNode>,
 }
 
 #[cfg(test)]

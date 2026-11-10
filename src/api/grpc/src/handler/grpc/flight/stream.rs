@@ -19,11 +19,7 @@ use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{FlightData, error::FlightError};
 use config::metrics;
 use datafusion::{execution::SendableRecordBatchStream, physical_plan::ExecutionPlan};
-use flight::{
-    common::NodeMessages,
-    encoder::FlightDataEncoder,
-    profile::{NodeReport, NodeStatus},
-};
+use flight::{common::NodeMessages, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 use search::datafusion::distributed::analyze::profile::{
     REMOTE_PROFILE_TIMEOUT, build_profile, complete_remote_profiles,
@@ -238,35 +234,19 @@ impl EventLog {
     }
 }
 
-/// What an EXPLAIN ANALYZE run reports once its stream ends, and how it ended.
+/// What an EXPLAIN ANALYZE run reports once its stream ends.
 pub(crate) struct RunReport {
     slot: ReportSlot,
     plan: Arc<dyn ExecutionPlan>,
-    status: NodeStatus,
 }
 
 impl RunReport {
     pub(crate) fn new(slot: ReportSlot, plan: Arc<dyn ExecutionPlan>) -> Self {
-        Self {
-            slot,
-            plan,
-            status: NodeStatus::EarlyStopped,
-        }
+        Self { slot, plan }
     }
 }
 
 impl FlightEncoderStream {
-    /// Records that the caller's deadline ended the run, not the caller.
-    pub(crate) fn mark_timed_out(&mut self) {
-        self.set_status(NodeStatus::TimedOut);
-    }
-
-    fn set_status(&mut self, status: NodeStatus) {
-        if let Some(report) = &mut self.report {
-            report.status = status;
-        }
-    }
-
     /// Queues the node's messages due now; a stream with no batch sends its first ones at the end.
     fn encode_node_messages(&mut self, at_end: bool) -> Result<(), FlightError> {
         let mut messages = Vec::new();
@@ -289,7 +269,6 @@ impl FlightEncoderStream {
         e: impl std::string::ToString,
     ) -> Poll<Option<Result<FlightData, tonic::Status>>> {
         self.done = true;
-        self.set_status(NodeStatus::Failed);
         self.queue.clear();
         Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))))
     }
@@ -371,7 +350,6 @@ impl Stream for FlightEncoderStream {
                         return this.fail(e);
                     }
                     this.done = true;
-                    this.set_status(NodeStatus::Completed);
                     continue;
                 }
                 Poll::Pending => return Poll::Pending,
@@ -436,7 +414,7 @@ async fn report_run(
     deadline: Duration,
 ) {
     drop(source);
-    let RunReport { slot, plan, status } = report;
+    let RunReport { slot, plan } = report;
     let settle = async {
         tasks.shutdown().await;
         // Partition tasks may read the session data until they have stopped.
@@ -446,10 +424,7 @@ async fn report_run(
     };
     tokio::pin!(settle);
     let settled = tokio::time::timeout(deadline, &mut settle).await.is_ok();
-    slot.complete(NodeReport {
-        status,
-        plan: Some(build_profile(plan.as_ref())),
-    });
+    slot.complete(build_profile(plan.as_ref()));
     if !settled {
         settle.await;
     }
