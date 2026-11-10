@@ -471,6 +471,20 @@ describe("LiveIssues", () => {
       expect(cells[0].attributes("data-tone")).toBe("neutral");
     });
 
+    it("cuts a long team name and a long unbroken sentence with an ellipsis, not mid-glyph (T1-N7)", async () => {
+      api.mockResolvedValue(
+        page([paged(0, "paged", "A Very Long Team Name For The Platform On Call Rotation")]),
+      );
+      const w = mountTable();
+      await loaded();
+      const chip = w.get(sel("page"));
+      expect(chip.classes()).toContain("max-w-full");
+      expect(chip.find('[data-test="autoobserve-live-issues-page-text"]').classes()).toContain(
+        "truncate",
+      );
+      expect(w.get(sel("sentence")).classes()).toContain("wrap-anywhere");
+    });
+
     it("the status filter says Open, the word the status chip uses", async () => {
       api.mockResolvedValue(page([at(4, 1)]));
       const w = mountTable();
@@ -478,14 +492,25 @@ describe("LiveIssues", () => {
       expect(w.find(sel("filter-open")).text()).toBe("Open");
     });
 
-    it("a denial shows no search, filters or zero counts around it", async () => {
+    it("a denial hides the search, filters and counts but keeps their space, so the table doesn't jump (T5-N4)", async () => {
       api.mockRejectedValue(httpError(403));
       const w = mountTable();
       await loaded();
       expect(w.find(sel("denied")).exists()).toBe(true);
-      expect(w.find(sel("search")).exists()).toBe(false);
-      expect(w.find(sel("priority")).exists()).toBe(false);
-      expect(w.find(sel("filter")).exists()).toBe(false);
+      for (const part of ["controls", "summary"]) {
+        const box = w.get(sel(part));
+        expect(box.classes(), part).toContain("invisible");
+        expect(box.attributes("inert"), part).toBeDefined();
+        expect(box.attributes("aria-hidden"), part).toBe("true");
+      }
+    });
+
+    it("loaded, the controls are visible and usable", async () => {
+      api.mockResolvedValue(page([at(4, 1)]));
+      const w = mountTable();
+      await loaded();
+      expect(w.get(sel("controls")).classes()).not.toContain("invisible");
+      expect(w.get(sel("controls")).attributes("inert")).toBeUndefined();
     });
 
     it("while loading, the priority counts are blank, not zero", async () => {
