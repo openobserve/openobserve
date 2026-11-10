@@ -12894,7 +12894,7 @@
       "suppressRepeatsTooltip": "當警示開始觸發或變更等級時通知一次，而非每次評估都通知。若保持關閉，則會在每個靜默期後繼續收到提醒。",
       "keepFiringForInvalid": "請輸入 0 秒或以上",
       "keepFiringForTooLong": "最多輸入 86400 秒 (24 小時)",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "新增變數",
@@ -13572,8 +13572,7 @@
         "tracesStoredSpans": "計數以已儲存的 Span 為準，因此取樣流量會比實際偏低。",
         "tracesPeriodCapped": "警示時間範圍已上限為 {minutes} 分鐘，以確保每次檢查快速。",
         "tracesNotRun": "此搜尋尚未執行，因此警示會使用編輯器中的篩選條件。"
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
     },
     "saveFailed": "無法儲存警示。",
     "loadFailed": "無法載入警示。",
@@ -32604,9 +32603,7 @@
         }
       }
     },
-    "bulk": {
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
-    },
+    "bulk": {},
     "decisions": {
       "saved": {
         "applied": "Applied to {title}.",

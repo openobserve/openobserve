@@ -12899,7 +12899,7 @@
       "suppressRepeatsTooltip": "アラートが発火し始めたときやレベルが変わったときに1回だけ通知し、評価ごとには通知しません。オフのままにすると、サイレンス期間の経過ごとにリマインダーを受け取り続けます。",
       "keepFiringForInvalid": "0 以上の秒数を入力してください",
       "keepFiringForTooLong": "最大 86400 秒（24 時間）を入力してください",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "変数を追加",
@@ -13577,8 +13577,7 @@
         "tracesStoredSpans": "カウントは保存されたスパンに基づくため、サンプリングされたトラフィックは実際より低く表示されます。",
         "tracesPeriodCapped": "各チェックを高速に保つため、アラートのウィンドウは{minutes}分に制限されました。",
         "tracesNotRun": "この検索はまだ実行されていないため、アラートはエディター内のフィルターを使用します。"
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
     },
     "saveFailed": "アラートを保存できませんでした。",
     "loadFailed": "アラートを読み込めませんでした。",
@@ -32609,9 +32608,7 @@
         }
       }
     },
-    "bulk": {
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
-    },
+    "bulk": {},
     "decisions": {
       "saved": {
         "applied": "Applied to {title}.",

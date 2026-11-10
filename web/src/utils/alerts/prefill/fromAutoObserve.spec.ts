@@ -310,7 +310,7 @@ describe("errorsAlert", () => {
       label: "Fire above",
       suffix: "errors an hour",
       reason:
-        "AutoObserve found no usual error count for svc-a over the last 7 days. Set a threshold to add this alert.",
+        "AutoObserve found no usual error count for svc-a · cluster-k / ns-b over the last 7 days. Set a threshold to add this alert.",
       value: null,
     });
     expect(isPrefillBlocked(prefill)).toBe(false);
@@ -330,12 +330,25 @@ describe("errorsAlert", () => {
   });
 });
 
+describe("AutoObserve is the destination", () => {
+  it("every AutoObserve draft opens an incident, so one with no destination still pages on-call", () => {
+    const silent = {
+      ...options,
+      notify: { destinations: [] as string[], reason: "none" as const },
+    };
+    expect(noDataAlert(logsScope(), silent)!.createsIncident).toBe(true);
+    expect(
+      errorsAlert(tracesScope(), { ...silent, errorField: null, usualPerHour: 2 })!.createsIncident,
+    ).toBe(true);
+  });
+});
+
 describe("baselineSql (F1)", () => {
-  it("counts the service's errors with the alert's own scope and error field", () => {
+  it("counts the service's errors over all its rows, with when its data starts (T2-1)", () => {
     expect(
       baselineSql(logsScope(), { kind: "errors", errorField: { name: "level", kind: "level" } }),
     ).toBe(
-      `SELECT count(*) AS errors FROM "app_logs" WHERE "service_name" = 'svc-a' AND "k8s_cluster" = 'cluster-k' AND "k8s_namespace_name" = 'ns-b' AND lower("level") IN ('error', 'fatal', 'critical', 'err', 'crit', 'alert', 'emerg')`,
+      `SELECT sum(CASE WHEN lower("level") IN ('error', 'fatal', 'critical', 'err', 'crit', 'alert', 'emerg', 'emergency') THEN 1 ELSE 0 END) AS errors, min("_timestamp") AS first_seen FROM "app_logs" WHERE "service_name" = 'svc-a' AND "k8s_cluster" = 'cluster-k' AND "k8s_namespace_name" = 'ns-b'`,
     );
   });
 

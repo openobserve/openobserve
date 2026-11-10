@@ -69,7 +69,17 @@ const SILENCE_MINUTES = 60;
 const MIN_LATENCY_SPANS = 20;
 const UTILIZATION_LIMIT = 0.9;
 const RESTART_REASONS = ["BackOff", "OOMKilling"];
-const ERROR_LEVELS = ["error", "fatal", "critical", "err", "crit", "alert", "emerg"];
+/** Log levels that count as errors; the service charts and every drafted alert read the same list. */
+export const ERROR_LEVELS = [
+  "error",
+  "fatal",
+  "critical",
+  "err",
+  "crit",
+  "alert",
+  "emerg",
+  "emergency",
+];
 
 /** Who owns a service's alerts: the folder most of them live in, else the org default (PD-4). */
 export interface TeamPick {
@@ -283,6 +293,8 @@ const assemble = (
     frequencyMinutes: FREQUENCY_MINUTES,
     silenceMinutes: SILENCE_MINUTES,
     thresholdShape: "count",
+    // AutoObserve is the destination: the incident pages on-call when no person is named.
+    createsIncident: true,
     // The condition lives in the query, so one returned row means it was met; an empty threshold leaves the form's own.
     ...(thresholded && !promql ? { triggerThreshold: 1, triggerOperator: ">=" } : {}),
     warnings: dedupe(warnings),
@@ -371,20 +383,30 @@ const levelSql = (s: ServiceScope, scope: Scope, b: BaselineInputs): string | nu
 export const baselineSql = (s: ServiceScope, b: BaselineInputs): string | null => {
   const scope = serviceScope(s);
   if (scope.blocked || scope.warnings.some((w) => w.level === "blocking")) return null;
-  return levelSql(s, scope, b);
+  if (b.kind === "latency") return levelSql(s, scope, b);
+  const pick = errorPick(s, b.errorField);
+  if (!pick) return null;
+  // Counted over every row so first_seen is when the service's data starts, not its first error.
+  return `SELECT sum(CASE WHEN ${errorPredicate(pick)} THEN 1 ELSE 0 END) AS errors, min("_timestamp") AS first_seen FROM ${sqlStream(s.stream?.name)}${whereOf(scope.where)}`;
 };
 
 /** The field that asks for a threshold when there is no usual level to suggest one. */
 const thresholdInput = (
   kind: "errors" | "latency",
-  service: string,
+  s: ServiceScope,
   value: number | null,
 ): AlertPrefillThresholdInput => ({
   label: gt("insight.threshold.label"),
   suffix: gt(`insight.threshold.${kind}Suffix`),
-  reason: gt(`insight.threshold.${kind}Reason`, { service }),
+  reason: gt(`insight.threshold.${kind}Reason`, { service: scopeLabel(s) }),
   value,
 });
+
+/** "svc-a · cluster-k / ns-b": the scope the baseline was measured on, as the review list names it. */
+const scopeLabel = (s: ServiceScope): string => {
+  const where = [s.cluster, s.namespace].filter(Boolean).join(" / ");
+  return where ? `${s.service} · ${where}` : s.service;
+};
 
 const userThreshold = (value: number | null | undefined): number | null =>
   typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
@@ -415,7 +437,7 @@ export const errorsAlert = (
     o,
   );
   return suggested === null
-    ? { ...prefill, thresholdInput: thresholdInput("errors", s.service, typed) }
+    ? { ...prefill, thresholdInput: thresholdInput("errors", s, typed) }
     : prefill;
 };
 
@@ -451,7 +473,7 @@ export const latencyAlert = (
     o,
   );
   return suggested === null
-    ? { ...prefill, thresholdInput: thresholdInput("latency", s.service, typed) }
+    ? { ...prefill, thresholdInput: thresholdInput("latency", s, typed) }
     : prefill;
 };
 

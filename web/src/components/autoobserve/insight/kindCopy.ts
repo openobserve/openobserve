@@ -125,18 +125,24 @@ const cellsOf = (s: AutoObserveSuggestion) =>
   (s.evidence.cells ?? {}) as Partial<Record<GapClass, AutoObserveCell>>;
 
 const rowOf = (s: AutoObserveSuggestion, ctx: CtaContext): AutoObserveCoverageRow | null => {
-  const service = serviceOf(s);
+  const rows = ctx.rows ?? [];
   const dims = s.subject.key_dims;
+  // The entity id names one coverage row; a name alone also matches its namesakes in other namespaces.
+  const byId = dims.entity_id ? rows.find((r) => r.service_id === dims.entity_id) : undefined;
+  if (byId) return byId;
+  const service = serviceOf(s);
   const cluster = dims.k8s_cluster_name ?? null;
   const namespace = dims.k8s_namespace_name ?? null;
-  return (
-    (ctx.rows ?? []).find(
-      (r) =>
-        r.service_name === service &&
-        (!cluster || r.cluster === cluster) &&
-        (!namespace || r.namespace === namespace),
-    ) ?? null
+  const matches = rows.filter(
+    (r) =>
+      r.service_name === service &&
+      (!cluster || r.cluster === cluster) &&
+      (!namespace || r.namespace === namespace),
   );
+  const exact = matches.find(
+    (r) => (r.cluster ?? null) === cluster && (r.namespace ?? null) === namespace,
+  );
+  return exact ?? matches[0] ?? null;
 };
 
 const streamOf = (row: AutoObserveCoverageRow, type: string) =>

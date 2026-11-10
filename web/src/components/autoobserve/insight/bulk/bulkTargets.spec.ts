@@ -71,7 +71,7 @@ describe("errorsAlert — the error predicate follows the field kind", () => {
   it("matches the error levels of a level field in any case", () => {
     const sql = errorsSql({ name: "severity", kind: "level" }, ["severity"]);
     expect(sql).toContain(
-      `lower("severity") IN ('error', 'fatal', 'critical', 'err', 'crit', 'alert', 'emerg')`,
+      `lower("severity") IN ('error', 'fatal', 'critical', 'err', 'crit', 'alert', 'emerg', 'emergency')`,
     );
   });
 

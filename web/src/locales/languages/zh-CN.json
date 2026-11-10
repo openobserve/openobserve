@@ -12899,7 +12899,7 @@
       "suppressRepeatsTooltip": "告警开始触发或级别发生变化时通知一次，而不是每次评估都通知。保持关闭可在每个静默期后继续收到提醒。",
       "keepFiringForInvalid": "请输入 0 或更大的秒数",
       "keepFiringForTooLong": "最多输入 86400 秒（24 小时）",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "添加变量",
@@ -13577,8 +13577,7 @@
         "tracesStoredSpans": "计数基于已存储的 Span，因此采样流量会低于实际值。",
         "tracesPeriodCapped": "为保证每次检查足够快，告警窗口已被限制为最多 {minutes} 分钟。",
         "tracesNotRun": "此搜索尚未运行，因此告警将使用编辑器中的过滤器。"
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
     },
     "saveFailed": "无法保存告警。",
     "loadFailed": "无法加载告警。",
@@ -32609,9 +32608,7 @@
         }
       }
     },
-    "bulk": {
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
-    },
+    "bulk": {},
     "decisions": {
       "saved": {
         "applied": "Applied to {title}.",

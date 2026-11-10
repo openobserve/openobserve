@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- How the alert counts what the query returns. -->
-      <div v-if="!pickQueryOnly" class="flex flex-col gap-2">
+      <div v-if="!pickQueryOnly && !conditionInQuery" class="flex flex-col gap-2">
         <span class="text-text-secondary text-xs font-medium">
           {{ t("alerts.prefill.dialog.thresholdLabel") }}
         </span>
@@ -187,7 +187,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.prefill.dialog.windowLabel") }}
         </span>
         <span class="text-text-body text-sm" data-test="create-alert-window">
-          {{ t("alerts.prefill.dialog.windowValue", { minutes: prefill.periodMinutes }) }}
+          {{
+            conditionInQuery
+              ? t("alerts.prefill.dialog.windowOwn", { minutes: prefill.periodMinutes })
+              : t("alerts.prefill.dialog.windowValue", { minutes: prefill.periodMinutes })
+          }}
         </span>
       </div>
 
@@ -270,6 +274,9 @@ const { t } = useI18nTyped();
 
 const selectedStream = ref("");
 const thresholdShape = ref<AlertPrefillThresholdShape>("matching-rows");
+const conditionInQuery = computed(
+  () => !!props.prefill && !!getAlertSource(props.prefill.source).conditionInQuery,
+);
 
 const isOpen = computed({
   get: () => props.open,

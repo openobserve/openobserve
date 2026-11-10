@@ -32,14 +32,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <polygon :points="HEX_POINTS" :class="STATE_FILL[state]" />
         </svg>
         <div class="min-w-0 flex-1">
-          <span
-            class="text-text-heading block truncate text-base font-semibold"
+          <OTruncatedText
+            class="text-text-heading block text-base font-semibold"
             data-test="autoobserve-coverage-drawer-title"
-            >{{ row.service }}</span
+            >{{ row.service }}</OTruncatedText
           >
-          <span class="text-text-secondary block truncate text-xs">{{ subTitle }}</span>
+          <OTruncatedText
+            class="text-text-secondary block text-xs"
+            data-test="autoobserve-coverage-drawer-subtitle"
+            >{{ subTitle }}</OTruncatedText
+          >
         </div>
-        <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+        <OTooltip
+          v-if="!logsOnly"
+          :content="tracesLock.lockedReason.value"
+          :disabled="!tracesLock.locked.value"
+        >
           <span class="inline-flex">
             <OButton
               variant="outline"
@@ -55,7 +63,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </span>
         </OTooltip>
-        <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+        <OButton
+          v-else
+          variant="outline"
+          size="sm-action"
+          icon-left="search"
+          :aria-label="t('autoobserve.coverage.openLogs')"
+          data-test="autoobserve-coverage-drawer-logs"
+          @click="openTraces()"
+          ><span class="max-md:sr-only">{{ t("autoobserve.coverage.openLogs") }}</span></OButton
+        >
+        <OTooltip
+          v-if="!logsOnly"
+          :content="tracesLock.lockedReason.value"
+          :disabled="!tracesLock.locked.value"
+        >
           <span class="inline-flex">
             <OButton
               variant="outline"
@@ -118,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CoverageSignalDetail
           v-if="liveChecks && absenceOpen"
           :cell="liveChecks.absence"
+          :last-fired="lastFiredOf(liveChecks.absence)"
           :service="row.service"
           signal="absence"
           :ledger="ledger"
@@ -251,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="expanded === chart.def.signal"
                 class="sm:hidden"
                 :cell="chart.cell"
+                :last-fired="lastFiredOf(chart.cell)"
                 :service="row.service"
                 :signal="chart.def.signal"
                 :ledger="ledger"
@@ -266,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <CoverageSignalDetail
                 :cell="openChart.cell"
+                :last-fired="lastFiredOf(openChart.cell)"
                 :service="row.service"
                 :signal="openChart.def.signal"
                 :ledger="ledger"
@@ -398,20 +423,23 @@ import {
   liveCellLook,
   liveCellWord,
   liveCheckText,
+  agoText,
   liveGapLines,
   streamLearning,
   userTimeZone,
 } from "./live/liveCopy";
 import { liveMetricDef, type LiveChartSignal } from "./live/serviceChartSql";
+import { chartThreshold } from "./live/alertThreshold";
 import { useServiceCharts, type ServiceChartStatus } from "./live/useServiceCharts";
 import InsightBlock from "./insight/InsightBlock.vue";
 import { useInsightActions } from "./insight/useInsightActions";
 import {
   cellInsight,
   gapInsight,
+  justAdded,
   ownedAlertIds,
   probeScope,
-  tracesRoute,
+  serviceRoute,
 } from "./insight/coverageCta";
 import { useServiceAddress } from "./insight/targets/serviceAddress";
 import { loadOwnedAlerts, type OwnedAlert } from "./insight/targets/ownership";
@@ -469,9 +497,9 @@ const STATE_VARIANT: Record<ServiceState, BadgeVariant> = {
   gap: "warning-soft",
 };
 const STATE_FILL: Record<ServiceState, string> = {
-  watched: "fill-badge-success-soft-text dark:fill-status-positive",
+  watched: "fill-badge-success-soft-text",
   learning: "fill-status-info-text",
-  gap: "fill-status-warning-text",
+  gap: "fill-icon-chip-warning-text",
 };
 const CELL_LABEL: Record<CellState, I18nKey> = {
   watched: "autoobserve.coverage.watched",
@@ -484,9 +512,9 @@ const CELL_FILL: Record<CellState, string> = {
   na: "fill-transparent stroke-border-strong",
 };
 const DOT: Record<CellState, string> = {
-  watched: "bg-badge-success-soft-text dark:bg-status-positive",
+  watched: "bg-badge-success-soft-text",
   learning: "bg-status-info-text",
-  gap: "bg-status-warning-text",
+  gap: "bg-icon-chip-warning-text",
   na: "border border-border-strong",
 };
 
@@ -579,9 +607,12 @@ const charts = computed(() =>
     .map((def) => {
       const signal = def.signal as LiveChartSignal;
       const live = props.live ? serviceCharts.charts.value[signal] : null;
+      const cell = liveChecks.value?.[LIVE_CELL[signal]] ?? props.row.cells[def.signal];
       return {
-        def: live ? liveMetricDef(signal, live.unit) : def,
-        cell: liveChecks.value?.[LIVE_CELL[signal]] ?? props.row.cells[def.signal],
+        def: live
+          ? liveMetricDef(signal, live.unit, chartThreshold(signal, live.unit, cellAlerts(cell)))
+          : def,
+        cell,
         series: live ? live.series : seriesFor(props.scenario, props.row, def, range.value),
         live,
       };
@@ -639,11 +670,13 @@ const chips = computed(() => {
 const liveChips = computed(() =>
   LIVE_CHECKS.map((check) => {
     const stateKey = liveChecks.value?.[check].engine?.stateKey ?? "none";
+    const org = String(store.state.selectedOrganization?.identifier ?? "");
+    const added = !!props.live && justAdded(org, props.row, check);
     return {
       check,
-      look: liveCellLook(stateKey),
+      look: liveCellLook(stateKey, added),
       open: props.expanded === check,
-      text: liveCheckText(t, check, stateKey),
+      text: liveCheckText(t, check, stateKey, added),
     };
   }),
 );
@@ -680,11 +713,28 @@ const openCheck = (check: LiveCheck) => {
 const extraValue = (cell: CoverageCell): I18nText =>
   cell.detector ? raw(cell.detector) : liveCellWord(t, cell.engine?.stateKey ?? "none");
 
-// Open in Traces lands on this service's spans; the catalog stays plain navigation (CTA-MAP §2).
+// A logs-only service has no spans and no catalog entry, so its one way out is Logs.
+const logsOnly = computed(
+  () =>
+    !!props.live &&
+    !!props.row.identity?.streams.length &&
+    !props.row.identity.streams.some((s) => s.type === "traces"),
+);
+
+// Open in Traces (or Logs) lands on the scope the charts read; the catalog stays plain navigation (CTA-MAP §2).
 const openTraces = (tab?: string) => {
   const org = store.state.selectedOrganization?.identifier;
-  if (!tab && props.row.identity) {
-    void router.push(tracesRoute(props.row, String(org ?? ""), Date.now() * 1000));
+  const to =
+    !tab && props.row.identity
+      ? serviceRoute(
+          props.row,
+          String(org ?? ""),
+          Date.now() * 1000,
+          props.live ? serviceCharts.scopes.value : {},
+        )
+      : null;
+  if (to) {
+    void router.push(to);
     return;
   }
   void router.push({ name: "traces", query: { org_identifier: org, ...(tab ? { tab } : {}) } });
@@ -709,7 +759,9 @@ watch(
   { immediate: true },
 );
 const gapParts = computed(() =>
-  props.live && state.value === "gap" ? gapInsight(t, locale.value, props.row, owned.value) : null,
+  props.live && state.value === "gap"
+    ? gapInsight(t, locale.value, props.row, owned.value, orgId.value)
+    : null,
 );
 // The address query and the locations read run only once Synthetic check is open, not per drawer.
 const probeOpen = computed(() => !!props.live && extraOpen.value === "external_probe");
@@ -740,6 +792,20 @@ const insightFor = (key: string, cell: CoverageCell) =>
         owned.value,
       )
     : null;
+// The cell's own alerts, from the alert list the drawer already read.
+function cellAlerts(cell: CoverageCell): OwnedAlert[] {
+  if (!props.live || !cell.engine) return [];
+  const ids = new Set(cell.engine.monitors.filter((m) => m.kindKey === "alert").map((m) => m.id));
+  return owned.value.filter((a) => a.id && ids.has(a.id));
+}
+
+const lastFiredOf = (cell: CoverageCell): I18nText | null => {
+  const mine = cellAlerts(cell);
+  if (!mine.length) return null;
+  const at = Math.max(0, ...mine.map((a) => a.last_triggered_at ?? 0));
+  if (!at) return t("autoobserve.coverage.never");
+  return agoText(t, locale.value, Math.max(0, Math.floor((Date.now() - at / 1000) / 60_000)));
+};
 const chartInsight = (signal: Signal, cell: CoverageCell) =>
   insightFor(LIVE_CELL[signal as LiveChartSignal] ?? signal, cell);
 </script>

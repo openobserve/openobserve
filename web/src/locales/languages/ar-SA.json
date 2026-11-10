@@ -12899,7 +12899,7 @@
       "suppressRepeatsTooltip": "إشعار مرة واحدة عندما يبدأ التنبيه في الإطلاق أو يتغير مستواه، وليس عند كل تقييم. اتركه معطّلًا لمواصلة تلقّي التذكيرات بعد كل فترة كتم.",
       "keepFiringForInvalid": "أدخل 0 ثانية أو أكثر",
       "keepFiringForTooLong": "أدخل 86400 ثانية (24 ساعة) كحد أقصى",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "إضافة متغير",
@@ -13577,8 +13577,7 @@
         "tracesStoredSpans": "الأعداد مأخوذة من الامتدادات المخزّنة، لذا تبدو حركة المرور المُعاينة أقل مما هي عليه فعليًا.",
         "tracesPeriodCapped": "تم تحديد نافذة التنبيه بحد أقصى {minutes} دقيقة للحفاظ على سرعة كل فحص.",
         "tracesNotRun": "لم يتم تشغيل هذا البحث بعد، لذا يستخدم التنبيه الفلتر الموجود في المحرر."
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
     },
     "saveFailed": "لم أتمكن من حفظ التنبيه.",
     "loadFailed": "لم أتمكن من تحميل التنبيه.",
@@ -32609,9 +32608,7 @@
         }
       }
     },
-    "bulk": {
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
-    },
+    "bulk": {},
     "decisions": {
       "saved": {
         "applied": "Applied to {title}.",

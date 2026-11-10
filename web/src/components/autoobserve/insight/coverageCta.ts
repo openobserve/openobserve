@@ -16,7 +16,7 @@
 import type { RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
-import { buildTracesRoute } from "@/utils/metrics/metricDrilldown";
+import { buildLogsRoute, buildTracesRoute } from "@/utils/metrics/metricDrilldown";
 import {
   baselineSql,
   errorFieldOf,
@@ -32,6 +32,7 @@ import { syntheticPrefillFor } from "@/utils/synthetics/syntheticPrefill";
 import type { CoverageCell, CoverageRow, LiveCheck } from "../fixtures";
 import type { SyntheticsLocation } from "@/types/synthetics";
 import type { BulkKind, BulkRow } from "./bulk/useBulkReview";
+import { KIND_OF_CHECK, serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import { draftTarget, type AlertDraft } from "./targets/alertDraft";
 import type { ServiceAddress } from "./targets/serviceAddress";
 import { notifyOf, teamOf, type OwnedAlert } from "./targets/ownership";
@@ -62,6 +63,7 @@ export interface SyntheticInputs {
 const NO_DATA_MINUTES = 15;
 const HOUR_US = 3_600_000_000;
 const NO_SYNTHETIC_INPUTS: SyntheticInputs = { address: null, locations: [] };
+const recently = useRecentlyCreated();
 
 const enterprise = () => config.isEnterprise === "true";
 
@@ -118,13 +120,26 @@ const DRAFT_ORDER: BulkKind[] = ["errors", "latency", "no_data"];
 const unwatched = (cell: CoverageCell | undefined) =>
   !!cell && cell.engine?.stateKey !== "covered" && cell.state !== "watched";
 
+/** Whether this page added the alert for one of the service's checks and no pass has counted it yet. */
+export const justAdded = (org: string, row: CoverageRow, check: LiveCheck): boolean =>
+  recently.has(
+    serviceKeyOf(org, nameOf(row), row.identity?.cluster ?? null, row.identity?.namespace ?? null),
+    KIND_OF_CHECK[check],
+  );
+
 /** The alerts one service still needs drafted: errors and no-data on its rows, latency on its traces. */
-const draftsOf = (row: CoverageRow, checks: Record<LiveCheck, CoverageCell>): BulkKind[] => {
+const draftsOf = (
+  row: CoverageRow,
+  checks: Record<LiveCheck, CoverageCell>,
+  org: string,
+): BulkKind[] => {
   if (!rowStream(row)) return [];
+  // An alert added here stays out of the list until a pass counts it, so it is never added twice.
+  const open = (check: LiveCheck) => unwatched(checks[check]) && !justAdded(org, row, check);
   const kinds: BulkKind[] = [
-    ...(unwatched(checks.errors) ? (["errors"] as BulkKind[]) : []),
-    ...(unwatched(checks.latency) && streamOf(row, "traces") ? (["latency"] as BulkKind[]) : []),
-    ...(unwatched(checks.absence) ? (["no_data"] as BulkKind[]) : []),
+    ...(open("errors") ? (["errors"] as BulkKind[]) : []),
+    ...(open("latency") && streamOf(row, "traces") ? (["latency"] as BulkKind[]) : []),
+    ...(open("absence") ? (["no_data"] as BulkKind[]) : []),
   ];
   return DRAFT_ORDER.filter((k) => kinds.includes(k));
 };
@@ -152,6 +167,10 @@ const bulkTarget = (
     rows: kinds.map((kind) => bulkRowOf(row, kind, owned)),
   },
 });
+
+// Only a service with a known cluster has a cluster to set Kubernetes up for.
+const kubeNote = (t: TranslateFn, row: CoverageRow): I18nText | null =>
+  row.identity?.cluster ? t("insight.note.setUpKubernetes") : null;
 
 const setUpData = (t: TranslateFn, org: string, note: I18nText | null = null) =>
   ctaOf(
@@ -198,11 +217,12 @@ export const gapInsight = (
   locale: string,
   row: CoverageRow,
   owned: OwnedAlert[] = [],
+  org: string = "",
 ): InsightParts | null => {
   const checks = row.checks;
   if (!checks) return null;
   const own = ownership(nameOf(row), owned);
-  const kinds = draftsOf(row, checks);
+  const kinds = draftsOf(row, checks, org);
   const one =
     kinds.length === 1 && kinds[0] === "no_data"
       ? addAlert(t, scopeOf(row, rowStream(row)!), (s) => noDataAlert(s, own), own.team.folderId)
@@ -239,6 +259,29 @@ export const gapInsight = (
       [["Not watched", missing.join(", ")]],
     ),
   });
+};
+
+const FALLS_STATES = new Set(["weak", "silent", "blind", "unmapped"]);
+
+/** The same alerts and the same fault the summary names, for a live check an alert matches but falls short on. */
+const fallsWhy = (
+  t: TranslateFn,
+  locale: string,
+  row: CoverageRow,
+  key: CellKey,
+  cell: CoverageCell,
+): I18nText | null => {
+  const state = cell.engine?.stateKey ?? "none";
+  if (!(key in KIND_OF_CHECK) || !FALLS_STATES.has(state)) return null;
+  const names = [
+    ...new Set(
+      (cell.engine?.monitors ?? []).filter((m) => m.stateKey === state).map((m) => m.name),
+    ),
+  ];
+  if (!names.length) return null;
+  const monitor = raw(new Intl.ListFormat(locale, { type: "conjunction" }).format(names));
+  const what = t(`insight.kind.cell.watchWhat.${key as LiveCheck}`, { service: raw(nameOf(row)) });
+  return t(`insight.kind.cell.falls.${state as "weak"}`, { monitor, what }, names.length);
 };
 
 const silentCopy = (t: TranslateFn, row: CoverageRow, cell: CoverageCell): CellCopy | null => {
@@ -365,7 +408,7 @@ const metricsCopy = (
     return {
       why: t("insight.kind.cell.noMetrics", { service }),
       next: null,
-      cta: setUpData(t, org, t("insight.note.setUpKubernetes")),
+      cta: setUpData(t, org, kubeNote(t, row)),
       ai: ai(key, row, t("insight.ai.cell.kubernetes", { service })),
     };
   const build = key === "saturation" ? memoryAlert : nodeAlert;
@@ -377,11 +420,24 @@ const metricsCopy = (
   };
 };
 
-const restartCopy = (t: TranslateFn, row: CoverageRow, owned: OwnedAlert[]): CellCopy => {
+const restartCopy = (
+  t: TranslateFn,
+  row: CoverageRow,
+  org: string,
+  owned: OwnedAlert[],
+): CellCopy => {
   const service = raw(nameOf(row));
   const own = ownership(nameOf(row), owned);
   const events = row.identity?.streams.find((s) => s.type === "logs" && /event/i.test(s.name));
-  const scope = scopeOf(row, events ?? { type: "logs", name: "" });
+  // Without restart events there is nothing to alert on, so the step is getting that data in.
+  if (!events)
+    return {
+      why: t("insight.kind.cell.noRestartEvents", { service }),
+      next: null,
+      cta: setUpData(t, org, kubeNote(t, row)),
+      ai: ai("workload_health", row, t("insight.ai.cell.kubernetes", { service })),
+    };
+  const scope = scopeOf(row, events);
   return {
     why: t("insight.kind.cell.restartsWhy", { service }),
     next: t("insight.kind.cell.restartsNext"),
@@ -440,7 +496,7 @@ const gapCopy = (
     case "node":
       return metricsCopy(t, row, key, org, owned);
     case "workload_health":
-      return restartCopy(t, row, owned);
+      return restartCopy(t, row, org, owned);
     case "external_probe":
       return syntheticCopy(t, row, synthetic, owned);
     default:
@@ -451,7 +507,7 @@ const gapCopy = (
 /** One chart's or Other checks row's why, next step and fix; null for a check that is watched. */
 export const cellInsight = (
   t: TranslateFn,
-  _locale: string,
+  locale: string,
   row: CoverageRow,
   key: CellKey,
   cell: CoverageCell,
@@ -461,9 +517,16 @@ export const cellInsight = (
 ): InsightParts | null => {
   const state = cell.engine?.stateKey;
   if (cell.state !== "gap" || state === "covered") return null;
+  if (key in KIND_OF_CHECK && justAdded(org, row, key as LiveCheck)) {
+    return partsOf(`${row.service}-${key}`, { why: t("insight.kind.cell.justAdded"), cta: null });
+  }
   const copy =
     state === "silent" ? silentCopy(t, row, cell) : gapCopy(t, row, key, org, synthetic, owned);
-  return copy ? partsOf(`${row.service}-${key}`, copy) : null;
+  if (!copy) return null;
+  return partsOf(`${row.service}-${key}`, {
+    ...copy,
+    why: fallsWhy(t, locale, row, key, cell) ?? copy.why,
+  });
 };
 
 /** The ids of the alerts coverage matched to the service, which say where its alerts live and whom they notify. */
@@ -489,3 +552,25 @@ export const tracesRoute = (row: CoverageRow, org: string, nowUs: number): Route
     timeRange: { start_time: nowUs - HOUR_US, end_time: nowUs },
     org,
   });
+
+/** The filters each stream's charts read, so the page it opens shows the same scope. */
+export type ChartScopes = Partial<Record<"traces" | "logs", Record<string, string>>>;
+
+/** The last hour of this service where its data is: Traces on its traces stream, else Logs on its logs stream. */
+export const serviceRoute = (
+  row: CoverageRow,
+  org: string,
+  nowUs: number,
+  scopes: ChartScopes = {},
+): RouteLocationRaw | null => {
+  const timeRange = { start_time: nowUs - HOUR_US, end_time: nowUs };
+  const traces = streamOf(row, "traces");
+  if (traces) {
+    const filters = scopes.traces ?? { service_name: nameOf(row) };
+    return buildTracesRoute({ stream: traces.name, filters, timeRange, org });
+  }
+  const logs = streamOf(row, "logs");
+  if (!logs) return null;
+  const filters = scopes.logs ?? { service_name: nameOf(row) };
+  return buildLogsRoute({ stream: logs.name, filters, timeRange, org });
+};

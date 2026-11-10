@@ -179,6 +179,9 @@ export interface AlertPrefill {
   /** Comparison for `triggerThreshold`; only meaningful alongside it. */
   triggerOperator?: string;
 
+  /** The alert opens an incident when it fires, so on-call is paged even with no destination. */
+  createsIncident?: boolean;
+
   /** Rolling evaluation window in minutes, already clamped. */
   periodMinutes?: number;
   frequencyMinutes?: number;

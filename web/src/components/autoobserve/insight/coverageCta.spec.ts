@@ -19,7 +19,8 @@ import config from "@/aws-exports";
 import { gt, raw } from "@/types/i18n";
 import type { CoverageCell, CoverageRow } from "../fixtures";
 import { b64DecodeUnicode } from "@/utils/zincutils";
-import { cellInsight, gapInsight, tracesRoute } from "./coverageCta";
+import { cellInsight, gapInsight, serviceRoute, tracesRoute } from "./coverageCta";
+import { serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import type { CoverageCell as Cell } from "../fixtures";
 
 const gapCell = (stateKey: "none" | "silent" = "none", monitor?: string): CoverageCell => ({
@@ -106,6 +107,43 @@ describe("Signals watched gap line (flagged surface 2)", () => {
   });
 });
 
+describe("Just added, until the next check counts it (COVERAGE-AFTER-ADD)", () => {
+  const recently = useRecentlyCreated();
+  const key = serviceKeyOf("demo-org", "svc-ingest-c", null, null);
+  afterEach(() => recently.clearOnPass(Number.MAX_SAFE_INTEGER));
+
+  it("never offers an alert this page just added again", () => {
+    recently.add(key, "errors");
+    recently.add(key, "no_data");
+    const parts = gapInsight(gt, "en-US", row([LOGS, TRACES]), [], "demo-org");
+    const target = parts?.cta?.target;
+    if (target?.type !== "bulk") throw new Error("expected bulk");
+    expect(target.request.rows.map((r) => r.kind)).toEqual(["latency"]);
+  });
+
+  it("offers nothing once every gap was just added", () => {
+    for (const kind of ["errors", "latency", "no_data"] as const) recently.add(key, kind);
+    expect(gapInsight(gt, "en-US", row([LOGS, TRACES]), [], "demo-org")?.cta ?? null).toBeNull();
+  });
+
+  it("says a just-added check is counted at the next check, with no second Add", () => {
+    recently.add(key, "no_data");
+    const r = row([LOGS, TRACES]);
+    const parts = cellInsight(gt, "en-US", r, "absence", r.checks!.absence, "demo-org");
+    expect(parts?.why).toBe(
+      "Added. AutoObserve counts it at its next check, within about 5 minutes.",
+    );
+    expect(parts?.cta).toBeNull();
+  });
+
+  it("another org's add does not hide this org's gap", () => {
+    recently.add(serviceKeyOf("other-org", "svc-ingest-c", null, null), "errors");
+    const target = gapInsight(gt, "en-US", row([LOGS, TRACES]), [], "demo-org")?.cta?.target;
+    if (target?.type !== "bulk") throw new Error("expected bulk");
+    expect(target.request.rows.map((r) => r.kind)).toEqual(["errors", "latency", "no_data"]);
+  });
+});
+
 describe("Signals chart details", () => {
   it("words the Requests chart as stopping, not 'Absence', and adds a no-data alert", () => {
     const parts = cellInsight(gt, "en-US", row([LOGS]), "absence", gapCell());
@@ -173,7 +211,7 @@ describe("Signals chart details", () => {
       gapCell("silent", "ingress-volume-detector"),
     );
     expect(parts?.why).toBe(
-      "ingress-volume-detector would notice svc-ingest-c stopping, but it notifies no one.",
+      "ingress-volume-detector watches whether svc-ingest-c stops sending, but it notifies no one.",
     );
     expect(parts?.cta?.label).toBe("Choose who gets notified");
     expect(parts?.cta?.target).toEqual({
@@ -182,6 +220,66 @@ describe("Signals chart details", () => {
       alertName: "ingress-volume-detector",
       destinations: [],
     });
+  });
+});
+
+describe("Why matches the summary for an alert that falls short (T2-5, T2-6)", () => {
+  const stated = (stateKey: "weak" | "blind" | "silent", ...names: string[]): CoverageCell => ({
+    state: "gap",
+    reason: raw(""),
+    engine: {
+      state: raw(stateKey),
+      stateKey,
+      monitors: names.map((name) => ({
+        id: name,
+        name,
+        kind: raw("Alert"),
+        kindKey: "alert",
+        state: raw(stateKey),
+        stateKey,
+        predicate: "",
+      })),
+    },
+  });
+
+  it("a blind errors alert is named, never 'No alert watches'", () => {
+    const parts = cellInsight(
+      gt,
+      "en-US",
+      row([LOGS]),
+      "errors",
+      stated("blind", "traces-route-errors"),
+    );
+    expect(parts?.why).toBe(
+      "traces-route-errors watches svc-ingest-c's errors, but it can't see this service's data.",
+    );
+  });
+
+  it("two weak latency alerts are both named", () => {
+    const parts = cellInsight(
+      gt,
+      "en-US",
+      row([LOGS, TRACES]),
+      "latency",
+      stated("weak", "ingress-slow-requests", "ingress-upstream-blips"),
+    );
+    expect(parts?.why).toBe(
+      "Only ingress-slow-requests and ingress-upstream-blips, broad alerts, watch svc-ingest-c's latency, and they aren't scoped to this service.",
+    );
+    expect(parts?.cta?.label).toBe("Add alert");
+  });
+
+  it("a silent errors alert is called an errors alert, not a stopping one", () => {
+    const parts = cellInsight(
+      gt,
+      "en-US",
+      row([LOGS]),
+      "errors",
+      stated("silent", "sec-twin-normal"),
+    );
+    expect(parts?.why).toBe(
+      "sec-twin-normal watches svc-ingest-c's errors, but it notifies no one.",
+    );
   });
 });
 
@@ -235,10 +333,29 @@ describe("Other checks (flagged surface 3)", () => {
     expect(target.prefill.locations).toEqual(["pub-1", "pub-2"]);
   });
 
-  it("adds a restarts alert", () => {
-    const parts = cellInsight(gt, "en-US", row([LOGS]), "workload_health", gapCell());
+  it("adds a restarts alert on the service's restart events", () => {
+    const events = { type: "logs", name: "k8s_events" };
+    const parts = cellInsight(gt, "en-US", row([LOGS, events]), "workload_health", gapCell());
     expect(parts?.why).toBe("No alert watches restarts of svc-ingest-c.");
     expect(parts?.cta?.label).toBe("Add alert");
+  });
+
+  it("without restart events, says so and offers to set the data up, not a pod alert (T2-23)", () => {
+    const parts = cellInsight(gt, "en-US", row([LOGS]), "workload_health", gapCell());
+    expect(parts?.why).toBe(
+      "No restart events arrive for svc-ingest-c, so its restarts can't be watched yet.",
+    );
+    expect(parts?.next).toBeNull();
+    expect(parts?.cta?.label).toBe("Set up data");
+  });
+
+  it("names a cluster to set up only for a service that has one (T2-23)", () => {
+    const none = cellInsight(gt, "en-US", row([LOGS]), "saturation", gapCell());
+    expect(none?.cta?.note).toBeNull();
+    const placed = row([LOGS]);
+    placed.identity!.cluster = "cluster-k";
+    const some = cellInsight(gt, "en-US", placed, "saturation", gapCell());
+    expect(some?.cta?.note).toBe("Opens Kubernetes setup for its cluster.");
   });
 });
 
@@ -252,5 +369,27 @@ describe("drawer header", () => {
     expect(to.query.stream).toBe("default");
     expect(b64DecodeUnicode(to.query.query)).toContain("service_name");
     expect(b64DecodeUnicode(to.query.query)).toContain("svc-ingest-c");
+  });
+});
+
+describe("Open the service where its data is (T2-7)", () => {
+  type To = { name?: string; path?: string; query: Record<string, string> };
+  it("opens Traces on the same scope the charts read, namespace included", () => {
+    const to = serviceRoute(row([TRACES]), "demo-org", 1_000_000, {
+      traces: { service_name: "svc-a", service_k8s_namespace_name: "ns-b" },
+    }) as To;
+    expect(to.name).toBe("traces");
+    const where = b64DecodeUnicode(to.query.query) ?? "";
+    expect(where).toContain("svc-a");
+    expect(where).toContain("ns-b");
+  });
+
+  it("opens Logs for a service that sends only logs", () => {
+    const to = serviceRoute(row([LOGS]), "demo-org", 1_000_000, {
+      logs: { service_name: "svc-ingest-e" },
+    }) as To;
+    expect(to.path).toBe("/logs");
+    expect(to.query.stream).toBe("ingest_c");
+    expect(b64DecodeUnicode(to.query.query)).toContain("svc-ingest-e");
   });
 });

@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -163,6 +163,8 @@ const props = defineProps<{
   ledger: LedgerEntry[];
   insight?: InsightParts | null;
   pending?: boolean;
+  /** When the live cell's alerts last fired, read from the alerts; absent until they are read. */
+  lastFired?: I18nText | null;
 }>();
 
 const emit = defineEmits<{ cta: [cta: InsightCta] }>();
@@ -180,7 +182,7 @@ const ledgerTag = (id: string) => {
 };
 
 const lastFired = computed(() => {
-  if (props.cell.engine) return t("autoobserveLive.drawer.notAvailable");
+  if (props.cell.engine) return props.lastFired ?? t("autoobserveLive.drawer.notAvailable");
   if (props.cell.state !== "watched") return t("autoobserve.coverage.never");
   const n = seed(`${props.service}:${props.signal}:fired`) % 6;
   if (n === 0) return t("autoobserve.coverage.never");

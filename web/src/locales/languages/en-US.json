@@ -13331,7 +13331,7 @@
       "suppressRepeatsTooltip": "Notify once when the alert starts firing or changes level, not on every evaluation. Leave it off to keep getting reminders after each silence period.",
       "keepFiringForInvalid": "Enter 0 or more seconds",
       "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -13910,6 +13910,7 @@
         "thresholdCount": "Count of rows",
         "windowLabel": "Window",
         "windowValue": "Last {minutes} minutes (from your time range)",
+        "windowOwn": "Last {minutes} minutes",
         "queryLabel": "Query",
         "queryCopied": "Query copied to clipboard",
         "patternsLabel": "Patterns",
@@ -14037,8 +14038,14 @@
           "schemaUnread": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Close it and try again.",
           "noDraft": "AutoObserve can't build this alert on the fields of stream {stream}. Write the query by hand."
         }
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
+    },
+    "reach": {
+      "bothOff": "Choose a destination for this alert. Incidents and on-call are off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. Incidents and on-call are off in this organization, so an alert with no destination reaches no one.",
+      "incidentsOff": "Choose a destination for this alert. Incidents are off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. Incidents are off in this organization, so an alert with no destination reaches no one.",
+      "noIncident": "Choose a destination for this alert, or turn on Creates Incident. With neither, it reaches no one. | Choose a destination for these {count} alerts, or turn on Creates Incident. With neither, they reach no one.",
+      "oncallOff": "Choose a destination for this alert. On-call is off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. On-call is off in this organization, so an alert with no destination reaches no one.",
+      "viaIncident": "No destination: this alert opens an incident, and the incident pages on-call. | No destination for {count} alerts: each opens an incident, and the incident pages on-call."
     },
     "saveFailed": "Could not save the alert.",
     "loadFailed": "Could not load the alert.",
@@ -30396,6 +30403,7 @@
       "tipNormal": "Normal {low} – {high}",
       "openTraces": "Open in Traces",
       "openCatalog": "Service Catalog",
+      "openLogs": "Open in Logs",
       "rangeLabel": "Time range",
       "logPatternsValue": "{known} known · {fresh} new today",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
@@ -30661,20 +30669,28 @@
       "labelNamespace": "{name} · {namespace}",
       "labelPlace": "{name} · {cluster} · {namespace}",
       "noNamespace": "no namespace",
-      "noCluster": "no cluster"
+      "noCluster": "no cluster",
+      "noMatch": "No service, cluster or namespace matches “{query}”",
+      "showAll": "Show all",
+      "bucketThree": "3 or more",
+      "bucketTwo": "2",
+      "bucketOne": "1",
+      "filterHides": "No service is {state}",
+      "filterHidesSearch": "{count} service matches “{query}”, but it isn't {state} | {count} services match “{query}”, but none is {state}"
     },
     "cell": {
       "noClass": "AutoObserve doesn't check this signal yet",
       "tipNoClass": "{signal}: AutoObserve doesn't check this yet",
       "noMonitor": "Not watched",
       "gap": {
-        "weak": "{signal}: only {monitor}, a broad alert, may notice a problem; it isn't scoped to this service",
-        "silent": "{signal}: {monitor} matches, but it notifies no one",
-        "blind": "{signal}: {monitor} matches, but it can't see its data",
-        "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service",
+        "weak": "{signal}: only {monitor}, a broad alert, may notice a problem; it isn't scoped to this service | {signal}: only {monitor}, broad alerts, may notice a problem; they aren't scoped to this service",
+        "silent": "{signal}: {monitor} matches, but it notifies no one | {signal}: {monitor} match, but they notify no one",
+        "blind": "{signal}: {monitor} matches, but it can't see its data | {signal}: {monitor} match, but they can't see their data",
+        "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service | {signal}: {monitor} may match, but their scope couldn't be tied to a service",
         "none": "{signal}: no alert watches this"
       },
-      "fallsShort": "Falls short"
+      "fallsShort": "Falls short",
+      "added": "Added"
     },
     "drawer": {
       "moreChecks": "Other checks",
@@ -34284,6 +34300,7 @@
         "cluster": "Cluster"
       },
       "groupHint": "Folder and destination come from each team. Change them per group.",
+      "groupHintOther": "Change the folder and destination per group.",
       "column": {
         "service": "Service",
         "stream": "Stream",
@@ -34291,11 +34308,11 @@
         "usually": "Usually"
       },
       "tickGroup": "Tick every alert in {group}",
-      "tickRow": "Tick {service}",
+      "tickRow": "Tick {service}, {alert}",
       "teamName": "{team} team",
       "noTeam": "No team yet",
       "noTeamWhy": "No owner is known for these, so they use the org default.",
-      "chooseFolder": "Choose a folder",
+      "chooseFolder": "Choose a folder and destination",
       "noCluster": "No cluster",
       "noNamespace": "no namespace",
       "folder": "folder {folder}",
@@ -34303,6 +34320,8 @@
       "folders": "{count} folders",
       "notifies": "notifies {destinations}",
       "notifiesNone": "notifies no one",
+      "notifiesSome": "{count} of {total} notify {destinations}",
+      "notifiesViaIncident": "pages on-call through an incident",
       "ticked": "{ticked} of {count} ticked",
       "change": "Change folder or destination",
       "changeFolder": "Folder",
@@ -34325,7 +34344,7 @@
       "hours": "{count} hour | {count} hours",
       "usually": "{rate} an hour",
       "unsureTail": "Unticked: check before adding.",
-      "cantBuild": "AutoObserve can't build this alert. Open the service to add it by hand.",
+      "cantBuild": "AutoObserve can't build this alert from this stream's fields. Add it by hand in Alerts.",
       "block": {
         "checking": "Checking the stream's fields…",
         "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",
@@ -34372,8 +34391,7 @@
       "undone": "{count} alert removed. | {count} alerts removed.",
       "undoFailed": "{failed} of {total} alerts couldn't be removed. Remove them from Alerts.",
       "more": "{count} more",
-      "usuallyLatency": "p95 {value} ms",
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
+      "usuallyLatency": "p95 {value} ms"
     },
     "decisions": {
       "reasons": {
@@ -34665,12 +34683,25 @@
         "next": "Add an alert that fires when its success line doesn't appear."
       },
       "cell": {
+        "falls": {
+          "weak": "Only {monitor}, a broad alert, watches {what}, and it isn't scoped to this service. | Only {monitor}, broad alerts, watch {what}, and they aren't scoped to this service.",
+          "silent": "{monitor} watches {what}, but it notifies no one. | {monitor} watch {what}, but they notify no one.",
+          "blind": "{monitor} watches {what}, but it can't see this service's data. | {monitor} watch {what}, but they can't see this service's data.",
+          "unmapped": "{monitor} may watch {what}, but its scope couldn't be tied to this service. | {monitor} may watch {what}, but their scope couldn't be tied to this service."
+        },
+        "watchWhat": {
+          "errors": "{service}'s errors",
+          "latency": "{service}'s latency",
+          "absence": "whether {service} stops sending"
+        },
+        "justAdded": "Added. AutoObserve counts it at its next check, within about 5 minutes.",
         "errorsWhy": "No alert watches {service}'s errors.",
         "errorsNext": "Add an errors alert at 3 times its usual rate.",
         "latencyWhy": "No alert watches {service}'s latency.",
         "latencyNext": "Add a latency alert at 2 times its usual p95.",
         "latencyNoTraces": "Latency is charted from traces. {service} sends none.",
         "noMetrics": "No CPU or memory data arrives for {service}, so this can't be watched yet.",
+        "noRestartEvents": "No restart events arrive for {service}, so its restarts can't be watched yet.",
         "saturationWhy": "No alert watches memory or CPU for {service}. Container memory arrives in {stream}.",
         "saturationNext": "Add a memory alert at 90% of its limit.",
         "nodeWhy": "No alert watches the nodes {service} runs on. Node data arrives in {stream}.",
@@ -34731,7 +34762,8 @@
       "latencySuffix": "ms (p95)",
       "errorsReason": "AutoObserve found no usual error count for {service} over the last 7 days. Set a threshold to add this alert.",
       "latencyReason": "AutoObserve found no usual latency for {service} over the last 7 days. Set a threshold to add this alert.",
-      "measuring": "Measuring the usual level over the last 7 days…"
+      "measuring": "Measuring the usual level over the last 7 days…",
+      "invalid": "Enter a number above 0."
     }
   }
 }

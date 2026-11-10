@@ -245,6 +245,43 @@ describe("toCoverageSource", () => {
     expect(found.rows).toHaveLength(0);
   });
 
+  it("names every alert that falls short the same way, not only the first (T2-20)", () => {
+    const ev = (name: string) => ({
+      monitor_kind: "alert",
+      monitor_id: name,
+      monitor_name: name,
+      predicate: "",
+      last_data_at: null,
+    });
+    const source = toCoverageSource(
+      gt,
+      coverage({
+        rows: [
+          {
+            service_name: "svc-y",
+            cluster: null,
+            namespace: null,
+            streams: [],
+            cells: {
+              errors: { state: "none", evidence: [], counts: {} },
+              latency: {
+                state: "weak",
+                evidence: [ev("ingress-slow-requests"), ev("ingress-upstream-blips")],
+                counts: {},
+              },
+              absence: { state: "none", evidence: [], counts: {} },
+            },
+          },
+        ] as never,
+      }),
+      { status: "ready", retry },
+      "en-US",
+    );
+    expect(source.rows[0].checks?.latency.reason).toBe(
+      "Latency: only ingress-slow-requests and ingress-upstream-blips, broad alerts, may notice a problem; they aren't scoped to this service",
+    );
+  });
+
   it("labels a service with the two live state words", () => {
     const cell = (state: string) => ({ state, evidence: [], counts: {} });
     const row = (name: string, errors: string) => ({

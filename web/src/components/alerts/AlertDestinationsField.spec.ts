@@ -135,7 +135,7 @@ describe("AlertDestinationsField status line", () => {
   it("says a target is required, not optional, when the caller requires one", () => {
     const wrapper = mountField({ notifiesNobody: true, showStatus: true, targetRequired: true });
     expect(wrapper.find(NOTE).text()).toBe(
-      "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched.",
+      "Required. With no destination, this alert reaches no one.",
     );
   });
 

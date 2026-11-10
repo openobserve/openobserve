@@ -22,7 +22,8 @@ export type MeasureText = (text: string, font: number) => number;
 
 export const LINE_HEIGHT = 1.15;
 const MIN_FONT = 9;
-const FONT_STEP = 1.5;
+// Whole sizes, so one map never mixes 12 with an off-scale 10.5.
+const FONT_STEP = 1;
 const ELLIPSIS = "…";
 // A 1-2 character line reads as a typo ("svc-" over "e", demo bug 7), so every wrapped line keeps 3.
 const MIN_PART = 3;
@@ -93,13 +94,15 @@ export const fitLabel = (
   font: number,
   measure: MeasureText,
 ): HexLabel | null => {
-  for (const size of [font, Math.max(MIN_FONT, font - FONT_STEP)]) {
+  const base = Math.max(MIN_FONT, Math.floor(font));
+  const smaller = Math.max(MIN_FONT, base - FONT_STEP);
+  for (const size of [base, smaller]) {
     const max = Math.floor(height / (size * LINE_HEIGHT));
     if (max < 1) return null;
     const fit = best(name, size, max, room, measure);
     if (fit.wide <= room) return { lines: fit.lines, font: size };
   }
-  const size = Math.max(MIN_FONT, font - FONT_STEP);
+  const size = smaller;
   const max = Math.max(1, Math.floor(height / (size * LINE_HEIGHT)));
   const lines = best(name, size, max, room, measure)
     .lines.map((l) => shorten(l, size, room, measure))

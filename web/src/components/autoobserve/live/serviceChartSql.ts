@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { ERROR_LEVELS } from "@/utils/alerts/prefill/fromAutoObserve";
 import {
   STEPS,
   type ChartRange,
@@ -43,7 +44,6 @@ export const LIVE_SIGNALS: LiveChartSignal[] = ["requests", "errors", "latency"]
 
 // The first text field present wins, so a stream with several level fields uses the most specific one.
 const LEVEL_FIELDS = ["severity_text", "level", "severity", "log_level"];
-const ERROR_LEVELS = ["error", "err", "fatal", "critical", "crit", "alert", "emerg", "emergency"];
 // lower() fails on a numeric column, and real deployments store severity or level as a number.
 const TEXT_TYPES = new Set(["Utf8", "LargeUtf8", "Utf8View"]);
 const BUCKET: Record<ChartRange, string> = {
@@ -61,9 +61,14 @@ const NO_FACTS: ServiceChartFacts = {
 
 export const quoteIdent = (name: string) => `"${name.replace(/"/g, "")}"`;
 
-export const filterSql = (filters: Record<string, string> | undefined): string =>
+/** A null value means the field must be absent, as on a service that has no namespace. */
+export const filterSql = (filters: Record<string, string | null> | undefined): string =>
   Object.entries(filters ?? {})
-    .map(([field, value]) => `${quoteIdent(field)} = '${escapeSingleQuotes(String(value))}'`)
+    .map(([field, value]) =>
+      value === null
+        ? `(${quoteIdent(field)} IS NULL OR ${quoteIdent(field)} = '')`
+        : `${quoteIdent(field)} = '${escapeSingleQuotes(String(value))}'`,
+    )
     .join(" AND ");
 
 export const pickErrorField = (fields: Map<string, string>): ErrorRule | null => {
@@ -79,7 +84,7 @@ const errorCondition = (rule: ErrorRule) =>
 
 const bucketSql = (
   stream: string,
-  filters: Record<string, string>,
+  filters: Record<string, string | null>,
   range: ChartRange,
   cols: string[],
 ) =>
@@ -88,7 +93,7 @@ const bucketSql = (
 
 export const tracesSql = (
   stream: string,
-  filters: Record<string, string>,
+  filters: Record<string, string | null>,
   range: ChartRange,
   want: { errors: boolean; latency: boolean },
 ) =>
@@ -99,7 +104,7 @@ export const tracesSql = (
 
 export const logsSql = (
   stream: string,
-  filters: Record<string, string>,
+  filters: Record<string, string | null>,
   range: ChartRange,
   rule: ErrorRule | null,
 ) =>
@@ -225,10 +230,15 @@ export const noFacts = (missingField: string | null = null): ServiceChartFacts =
   missingField,
 });
 
-export const liveMetricDef = (signal: LiveChartSignal, unit: MetricUnit): MetricDef => ({
+export const liveMetricDef = (
+  signal: LiveChartSignal,
+  unit: MetricUnit,
+  threshold: number | null = null,
+): MetricDef => ({
   signal,
   titleKey: SIGNAL_LABEL[signal],
   unit,
   base: 0,
   spread: 0,
+  ...(threshold !== null ? { threshold } : {}),
 });

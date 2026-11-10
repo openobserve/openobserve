@@ -11,6 +11,7 @@
   "frequencyMinutes": 5,
   "silenceMinutes": 60,
   "thresholdShape": "count",
+  "createsIncident": true,
   "triggerThreshold": 1,
   "triggerOperator": ">=",
   "warnings": [],

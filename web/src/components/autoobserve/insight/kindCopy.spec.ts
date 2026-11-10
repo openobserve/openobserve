@@ -542,6 +542,41 @@ describe("many coverage gaps fold into one card (0, 1, a few, many)", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  it("keeps a service with no namespace apart from the same name in a namespace (T2-2)", () => {
+    const named = (id: string, ns: string | null): AutoObserveCoverageRow => ({
+      ...row([{ type: "logs", name: `logs_${id}` }]),
+      service_id: id,
+      service_name: "svc-b",
+      namespace: ns,
+    });
+    const gapFor = (id: string, dims: Record<string, string>) =>
+      suggestion(
+        "coverage_gap",
+        { service_name: "svc-b", cells: NONE_CELLS, traffic_per_hour: 1 },
+        {
+          id: `gap-${id}`,
+          subject: { kind: "service", key_dims: { service_name: "svc-b", ...dims } },
+        },
+      );
+    const gaps = [
+      ...Array.from({ length: 5 }, (_, i) => gap(i)),
+      gapFor("b-d", { entity_id: "b-d", k8s_namespace_name: "ns-d" }),
+      gapFor("b-none", { entity_id: "b-none" }),
+    ];
+    const list = toRequests(gt, zone, [other, ...gaps], NOW_MS, {
+      rows: [
+        ...Array.from({ length: 5 }, (_, i) => gapRow(i)),
+        named("b-d", "ns-d"),
+        named("b-none", null),
+      ],
+    });
+    const target = list[1].insight.cta?.target;
+    if (target?.type !== "bulk") throw new Error("expected bulk");
+    const streams = new Set(target.request.rows.map((r) => r.scope.stream.name));
+    expect(streams.has("logs_b-d")).toBe(true);
+    expect(streams.has("logs_b-none")).toBe(true);
+  });
+
   it("keeps one card per gap while the server counts fewer than six (F8)", () => {
     const all = Array.from({ length: 5 }, (_, i) => gap(i));
     const list = toRequests(gt, zone, [other, all[0], all[1]], NOW_MS, {

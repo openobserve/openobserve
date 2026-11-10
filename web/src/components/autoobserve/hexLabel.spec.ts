@@ -138,3 +138,20 @@ describe("a crowded map's long labels", () => {
       ).toBe(true);
   });
 });
+
+describe("label sizes stay on the type scale (T5-5)", () => {
+  it("steps down one whole size, never to 10.5", () => {
+    const room = measure("checkout-v2", 11) + 1;
+    expect(fitLabel("checkout-v2", room, 60, 12, measure)?.font).toBe(11);
+  });
+
+  it("snaps a hex-sized font to a whole size", () => {
+    const out = fitLabel("api", 200, 60, 11.6, measure);
+    expect(out?.font).toBe(11);
+  });
+
+  it("shrinks a label that does not fit by one whole size only", () => {
+    const out = fitLabel("a-very-long-service-name", 30, 60, 12, measure);
+    expect(out?.font).toBe(11);
+  });
+});

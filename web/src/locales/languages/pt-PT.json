@@ -12899,7 +12899,7 @@
       "suppressRepeatsTooltip": "Notifica uma vez quando o alerta começa a disparar ou muda de nível, não a cada avaliação. Deixe-o desativado para continuar a receber lembretes após cada período de silêncio.",
       "keepFiringForInvalid": "Introduza 0 ou mais segundos",
       "keepFiringForTooLong": "Introduza no máximo 86400 segundos (24 horas)",
-      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
+      "targetRequiredNote": "Required. With no destination, this alert reaches no one."
     },
     "advanced": {
       "addVariable": "Adicionar variável",
@@ -13577,8 +13577,7 @@
         "tracesStoredSpans": "As contagens referem-se a spans armazenados, por isso o tráfego amostrado aparece inferior ao real.",
         "tracesPeriodCapped": "A janela do alerta foi limitada a {minutes} minutos para manter cada verificação rápida.",
         "tracesNotRun": "Esta pesquisa ainda não foi executada, por isso o alerta usa o filtro do editor."
-      },
-      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
+      }
     },
     "saveFailed": "Não foi possível guardar o alerta.",
     "loadFailed": "Não foi possível carregar o alerta.",
@@ -32609,9 +32608,7 @@
         }
       }
     },
-    "bulk": {
-      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
-    },
+    "bulk": {},
     "decisions": {
       "saved": {
         "applied": "Applied to {title}.",

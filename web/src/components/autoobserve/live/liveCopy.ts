@@ -417,7 +417,7 @@ const COVERAGE_WORD: Record<LiveCoverageState, I18nKey> = {
 export const coverageWord = (t: TranslateFn, state: LiveCoverageState): I18nText =>
   t(COVERAGE_WORD[state]);
 
-export type LiveCellLook = "covered" | "missing" | "problem";
+export type LiveCellLook = "covered" | "missing" | "problem" | "added";
 
 const CELL_WORD: Record<AutoObserveCellState, I18nKey> = {
   covered: "autoobserveLive.states.covered",
@@ -428,18 +428,25 @@ const CELL_WORD: Record<AutoObserveCellState, I18nKey> = {
   none: "autoobserveLive.cell.noMonitor",
 };
 
-export const liveCellLook = (state: AutoObserveCellState): LiveCellLook => {
+/** A check this page just added an alert for reads "Added" until a pass counts it. */
+export const liveCellLook = (state: AutoObserveCellState, added = false): LiveCellLook => {
+  if (added && state !== "covered") return "added";
   if (state === "covered") return "covered";
   return state === "none" ? "missing" : "problem";
 };
 
-export const liveCellWord = (t: TranslateFn, state: AutoObserveCellState): I18nText =>
-  t(CELL_WORD[state]);
+export const liveCellWord = (
+  t: TranslateFn,
+  state: AutoObserveCellState,
+  added = false,
+): I18nText =>
+  added && state !== "covered" ? t("autoobserveLive.cell.added") : t(CELL_WORD[state]);
 
 export const LIVE_DOT: Record<LiveCellLook, string> = {
-  covered: "bg-status-positive",
-  missing: "border border-status-warning-text",
-  problem: "bg-status-warning-text",
+  covered: "bg-badge-success-soft-text",
+  missing: "border border-icon-chip-warning-text",
+  problem: "bg-icon-chip-warning-text",
+  added: "bg-border-strong",
 };
 
 // Weak, Silent, Blind and Unmapped share one amber dot, so a key names that dot with one word.
@@ -447,6 +454,7 @@ const LOOK_WORD: Record<LiveCellLook, I18nKey> = {
   covered: "autoobserveLive.states.covered",
   missing: "autoobserveLive.cell.noMonitor",
   problem: "autoobserveLive.cell.fallsShort",
+  added: "autoobserveLive.cell.added",
 };
 
 export const liveLookWord = (t: TranslateFn, look: LiveCellLook): I18nText => t(LOOK_WORD[look]);
@@ -466,10 +474,11 @@ export const liveCheckText = (
   t: TranslateFn,
   check: LiveCheck,
   state: AutoObserveCellState,
+  added = false,
 ): I18nText =>
   t("autoobserve.coverage.chipAria", {
     signal: liveCheckName(t, check),
-    state: liveCellWord(t, state),
+    state: liveCellWord(t, state, added),
   });
 
 // The same words as the coverage gap card's Why, so the drawer and the card never disagree.

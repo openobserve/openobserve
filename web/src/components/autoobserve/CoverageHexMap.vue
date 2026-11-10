@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :width="layout.width"
       :height="layout.height"
       :viewBox="`0 0 ${layout.width} ${layout.height}`"
-      class="block overflow-visible"
+      class="block max-w-full overflow-visible"
       role="group"
       :aria-label="label"
     >
@@ -146,7 +146,7 @@ const emit = defineEmits<{ select: [key: string] }>();
 const FILL: Record<HexClass, string> = {
   watched: "fill-badge-success-soft-text/15 stroke-badge-success-soft-text/30",
   learning: "stroke-status-neutral-text/60",
-  gap: "fill-status-warning-text stroke-status-warning-text",
+  gap: "fill-icon-chip-warning-text stroke-icon-chip-warning-text",
   none: "fill-status-neutral-text stroke-transparent",
   s1: "fill-map-seq-1 stroke-transparent",
   s2: "fill-map-seq-2 stroke-transparent",
@@ -158,7 +158,7 @@ const FILL: Record<HexClass, string> = {
 const SWATCH: Record<HexClass, string> = {
   watched: "bg-badge-success-soft-text/15 border border-badge-success-soft-text/60",
   learning: "bg-badge-default-soft-bg border border-dashed border-status-neutral-text",
-  gap: "bg-status-warning-text",
+  gap: "bg-icon-chip-warning-text",
   none: "bg-status-neutral-text",
   s1: "bg-map-seq-1",
   s2: "bg-map-seq-2",

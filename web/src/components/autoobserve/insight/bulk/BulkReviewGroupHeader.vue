@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-secondary" :data-test="`bulk-review-group-meta-${slug}`">
         <template v-for="(part, i) in meta" :key="i">
           <span v-if="i > 0" aria-hidden="true"> · </span>
-          <span :class="isSilent(part) ? 'text-status-warning-text' : ''">{{ part }}</span>
+          <span :class="isSilent(part) ? 'text-status-error-text' : ''">{{ part }}</span>
         </template>
       </span>
       <OButton
@@ -100,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         v-model="folderId"
         :disabled="disabled"
+        @update:model-value="apply(false)"
         class="w-52"
         size="sm"
         label-position="inside"
@@ -110,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         v-model="chosen"
         :disabled="disabled"
+        @update:model-value="apply(false)"
         class="w-72"
         size="sm"
         multiple
@@ -123,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         :disabled="disabled"
         :data-test="`bulk-review-group-apply-${slug}`"
-        @click="apply"
+        @click="apply(true)"
       >
         {{ t("insight.bulk.changeDone") }}
       </OButton>
@@ -138,6 +140,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import type { IncidentReachGap } from "@/utils/alerts/deliveryTarget";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { copyRequestLabel, groupMeta, groupTitle, lockedLine, requestText } from "./bulkCopy";
 import {
@@ -158,6 +161,8 @@ const props = defineProps<{
   folders: FolderRef[];
   destinations: string[];
   disabled: boolean;
+  /** What keeps an incident from paging on-call here; null when a group with no destination still reaches on-call. */
+  reachGap: IncidentReachGap;
 }>();
 
 const emit = defineEmits<{
@@ -186,7 +191,9 @@ const tick = computed(() => groupTick(props.group, props.ticked));
 const tickedCount = computed(
   () => props.group.rows.filter((r) => isTickable(r) && props.ticked.has(r.key)).length,
 );
-const meta = computed(() => groupMeta(t, String(locale.value), props.group, tickedCount.value));
+const meta = computed(() =>
+  groupMeta(t, String(locale.value), props.group, tickedCount.value, props.reachGap),
+);
 const silent = computed(() => t("insight.bulk.notifiesNone"));
 const isSilent = (part: I18nText) => part === silent.value;
 
@@ -200,11 +207,12 @@ const destinationOptions = computed(() =>
   })),
 );
 
-const apply = () => {
+// Each pick applies at once, so the header and Add never wait on a Done nobody asked for.
+const apply = (close: boolean) => {
   if (props.disabled) return;
   const folder = props.folders.find((f) => f.id === folderId.value);
   if (folder) emit("change", folder, [...chosen.value]);
-  editing.value = false;
+  if (close) editing.value = false;
 };
 
 const copyRequest = () =>

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { gt } from "@/types/i18n";
@@ -159,6 +159,30 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(text).not.toMatch(/learning/i);
     });
 
+    it("counts the legend over the services the search matches (T2-15)", async () => {
+      routeQuery.cov = "map";
+      const wrapper = mountTab(
+        live(coverage([row("api", "covered"), row("web", "none"), row("db", "none")])),
+      );
+      await wrapper.find('[data-test="autoobserve-coverage-search"] input').setValue("web");
+      expect(wrapper.find('[data-test="autoobserve-coverage-legend-gap"]').text()).toContain("1");
+      expect(wrapper.find('[data-test="autoobserve-coverage-legend-watched"]').text()).toContain(
+        "0",
+      );
+    });
+
+    it("buckets detector counts for three live checks, not the fixture's 6 and 5 (T2-22)", async () => {
+      routeQuery.cov = "map";
+      const wrapper = mountTab(live(FEW));
+      wrapper.findComponent(OSelect).vm.$emit("update:modelValue", "detectors");
+      await flushPromises();
+      const labels = wrapper
+        .findAll('[data-test^="autoobserve-coverage-legend-"]')
+        .filter((c) => !c.attributes("data-test")!.endsWith("chips"))
+        .map((c) => c.findAll("span")[1].text());
+      expect(labels).toEqual(["3 or more", "2", "1", "None"]);
+    });
+
     it("offers no learning fill", () => {
       const options = mountTab(live(FEW)).findComponent(OSelect).props("options") as {
         value: string;
@@ -269,6 +293,33 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(shown()).toEqual(["pay"]);
       await input.setValue("ship-logs");
       expect(shown()).toEqual([]);
+    });
+
+    it("says the filter hides the matches, not that nothing matches (T2-12)", async () => {
+      const wrapper = mountTable(coverage([row("api", "none"), row("web", "none")]));
+      await wrapper.find('[data-test="autoobserve-coverage-search"] input').setValue("prod-eu");
+      const watched = wrapper.findComponent('[data-test="autoobserve-coverage-filter"]');
+      watched.vm.$emit("update:modelValue", "watched");
+      await flushPromises();
+      expect(has(wrapper, "autoobserve-coverage-no-match")).toBe(false);
+      const hidden = wrapper.find('[data-test="autoobserve-coverage-filter-hides"]');
+      expect(hidden.text()).toContain("2 services match “prod-eu”, but none is Watched");
+    });
+
+    it("names what the live search matches when nothing does", async () => {
+      const wrapper = mountTable(coverage([row("api", "none")]));
+      await wrapper.find('[data-test="autoobserve-coverage-search"] input').setValue("zzz");
+      expect(text(wrapper, "autoobserve-coverage-no-match")).toContain(
+        "No service, cluster or namespace matches “zzz”",
+      );
+    });
+
+    it("sorts by every column (T2-19)", () => {
+      const columns = mountTable().findComponent(OTable).props("columns") as {
+        id: string;
+        sortable?: boolean;
+      }[];
+      expect(columns.every((c) => c.sortable)).toBe(true);
     });
 
     it("leaves the fixture table as it was", () => {

@@ -25,6 +25,11 @@ import autoobserve, {
 } from "@/services/autoobserve";
 import fixture from "./__fixtures__/autoobserveIncidents.json";
 import { fixtureAllowed, keepLatched, useLiveAutoObserve, useLiveMode } from "./liveModel";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  serviceKeyOf,
+  useRecentlyCreated,
+} from "@/components/autoobserve/insight/bulk/useRecentlyCreated";
 
 const routeQuery: Record<string, string> = { live: "1" };
 
@@ -83,7 +88,51 @@ describe("useLiveAutoObserve", () => {
     vi.advanceTimersByTime(2 * 60 * 60_000);
     await nextTick();
     expect(wrapper.text()).toBe("2 hours ago");
+  });
+});
+
+describe("useLiveAutoObserve follows each pass (T2-4, COVERAGE-AFTER-ADD)", () => {
+  const recently = useRecentlyCreated();
+  afterEach(() => {
+    vi.useRealTimers();
+    recently.clearOnPass(Number.MAX_SAFE_INTEGER);
+    queryClient.clear();
+  });
+  const start = () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval", "setTimeout"] });
+    vi.setSystemTime(START);
+    queryClient.clear();
+    vi.mocked(autoobserve.coverage)
+      .mockReset()
+      .mockResolvedValue({ data: coverage() } as never);
+    vi.mocked(autoobserve.suggestions).mockResolvedValue({
+      data: { suggestions: [], total: 0, limit: 5, offset: 0 },
+    } as never);
+    return mount(Harness, { global: { plugins: [i18n, store] } });
+  };
+
+  it("refetches coverage on the pass cadence, so an open page never shows an old pass", async () => {
+    start();
+    await flushPromises();
     expect(autoobserve.coverage).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(autoobserve.coverage).toHaveBeenCalledTimes(2);
+  });
+
+  it("polls every minute while an alert added here waits, and stops once a newer pass counts it", async () => {
+    recently.add(serviceKeyOf("default", "api", "prod", "shop"), "errors", START + 1_000);
+    start();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(autoobserve.coverage).toHaveBeenCalledTimes(2);
+    vi.mocked(autoobserve.coverage).mockResolvedValue({
+      data: { ...coverage(), pass_at: (START + 90_000) * 1000 },
+    } as never);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(autoobserve.coverage).toHaveBeenCalledTimes(3);
+    expect(recently.has(serviceKeyOf("default", "api", "prod", "shop"), "errors")).toBe(false);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(autoobserve.coverage).toHaveBeenCalledTimes(3);
   });
 });
 

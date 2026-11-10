@@ -24,6 +24,7 @@ import {
 import type { I18nText } from "@/types/i18n";
 import { warn } from "@/utils/alerts/alertPrefill";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { ERROR_LEVELS } from "@/utils/alerts/prefill/fromAutoObserve";
 
 // The identity field names the coverage analyzer joins services on, in the contract's order.
 export const SERVICE_FIELDS = [
@@ -39,7 +40,6 @@ export const NAMESPACE_FIELDS = ["k8s_namespace_name", "namespace", "kubernetes_
 // Traces keep a span's resource attributes under a service_ prefix.
 export const SPAN_CLUSTER_FIELDS = [...CLUSTER_FIELDS, "service_k8s_cluster_name"];
 export const SPAN_NAMESPACE_FIELDS = [...NAMESPACE_FIELDS, "service_k8s_namespace_name"];
-const ERROR_LEVELS = ["error", "fatal", "critical", "err", "crit", "alert", "emerg"];
 const NO_DATA_MINUTES = 15;
 const SOURCE_MINUTES = 60;
 
@@ -167,6 +167,8 @@ const absencePrefill = (
   frequencyMinutes: 5,
   triggerThreshold: 1,
   triggerOperator: ">=",
+  // AutoObserve is the destination: the incident pages on-call when no person is named.
+  createsIncident: true,
   warnings: [],
   meta: { description: origin(what), destinations: [] },
 });

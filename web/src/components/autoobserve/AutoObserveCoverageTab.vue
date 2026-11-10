@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="term && !searched.length"
           size="block"
           illustration="no-results"
-          :title="t('autoobserve.coverage.noMatch', { query: raw(term) })"
+          :title="noMatchTitle"
           :action-label="t('autoobserve.coverage.clearSearch')"
           data-test="autoobserve-coverage-no-match"
           @action="clearSearch"
@@ -364,11 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.checks"
               type="button"
               class="hover:bg-surface-subtle-hover focus-visible:outline-focus-ring-accent rounded-default -ms-1.5 inline-flex h-7 cursor-pointer items-center gap-1.5 px-1.5 focus-visible:outline-2 focus-visible:outline-offset-1"
-              :class="
-                liveCellLook(row.checks[check].engine?.stateKey ?? 'none') === 'missing'
-                  ? 'text-text-secondary'
-                  : 'text-text-body'
-              "
+              :class="cellLook(row, check) === 'missing' ? 'text-text-secondary' : 'text-text-body'"
               :title="row.checks[check].state === 'gap' ? row.checks[check].reason : undefined"
               :aria-label="liveCellAria(row, check)"
               :aria-pressed="isSelected(row.service, check)"
@@ -377,9 +373,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span
                 class="size-2 shrink-0 rounded-full"
-                :class="LIVE_DOT[liveCellLook(row.checks[check].engine?.stateKey ?? 'none')]"
+                :class="LIVE_DOT[cellLook(row, check)]"
                 aria-hidden="true"
-              />{{ liveCellWord(t, row.checks[check].engine?.stateKey ?? "none") }}
+              />{{
+                liveCellWord(t, row.checks[check].engine?.stateKey ?? "none", isAdded(row, check))
+              }}
             </button>
           </template>
           <template #cell-state="{ row }">
@@ -396,10 +394,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <OEmptyState
-              v-if="term"
+              v-if="searched.length && filter !== 'all'"
               size="block"
               illustration="no-results"
-              :title="t('autoobserve.coverage.noMatch', { query: raw(term) })"
+              :title="filterHidesTitle"
+              :action-label="t('autoobserveLive.coverage.showAll')"
+              data-test="autoobserve-coverage-filter-hides"
+              @action="filter = 'all'"
+            />
+            <OEmptyState
+              v-else-if="term"
+              size="block"
+              illustration="no-results"
+              :title="noMatchTitle"
               :action-label="t('autoobserve.coverage.clearSearch')"
               data-test="autoobserve-coverage-no-match"
               @action="clearSearch"
@@ -530,7 +537,9 @@ import {
   type LiveCellLook,
   type LiveCoverageState,
 } from "./live/liveCopy";
+import { useStore } from "vuex";
 import { useLoadPhase } from "./live/liveModel";
+import { justAdded } from "./insight/coverageCta";
 import LiveNoticeState from "./live/LiveNoticeState.vue";
 import LiveRefreshFailed from "./live/LiveRefreshFailed.vue";
 
@@ -540,6 +549,7 @@ type CoverageFill = "state" | "learning" | "detectors" | "scanned";
 type ServiceState = "watched" | "learning" | "gap";
 
 const { t, locale } = useI18nTyped();
+const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -558,6 +568,13 @@ const LIVE_FILTER_WORD: Partial<Record<CoverageFilter, LiveCoverageState>> = {
   watched: "watched",
   gaps: "gap",
 };
+// Live coverage has three checks, so a service's alerts fall in 3+, 2, 1 or none, not the fixture's 6/5.
+const LIVE_DETECTOR_LEGEND: { cls: HexClass; key: I18nKey }[] = [
+  { cls: "s1", key: "autoobserveLive.coverage.bucketThree" },
+  { cls: "s2", key: "autoobserveLive.coverage.bucketTwo" },
+  { cls: "s3", key: "autoobserveLive.coverage.bucketOne" },
+  { cls: "none", key: "autoobserve.coverage.bucketNone" },
+];
 const LIVE_STATE_LEGEND: { cls: HexClass; state: LiveCoverageState }[] = [
   { cls: "gap", state: "gap" },
   { cls: "watched", state: "watched" },
@@ -587,7 +604,7 @@ const SEGMENT_CLASS: Record<CellState, string> = {
 const SWATCH: Record<HexClass, string> = {
   watched: "bg-badge-success-soft-text/15 border border-badge-success-soft-text/60",
   learning: "bg-badge-default-soft-bg border border-dashed border-status-neutral-text",
-  gap: "bg-status-warning-text",
+  gap: "bg-icon-chip-warning-text",
   none: "bg-status-neutral-text",
   s1: "bg-map-seq-1",
   s2: "bg-map-seq-2",
@@ -693,9 +710,9 @@ const watchedPct = computed(() =>
 );
 
 const split = computed(() => [
-  { cls: "bg-badge-success-soft-text/50", count: totals.value.fullyWatched },
+  { cls: "bg-badge-success-soft-text", count: totals.value.fullyWatched },
   { cls: "bg-status-neutral-text/60", count: totals.value.learning },
-  { cls: "bg-status-warning-text", count: totals.value.gaps },
+  { cls: "bg-icon-chip-warning-text", count: totals.value.gaps },
 ]);
 
 const summaryText = computed(() => {
@@ -804,6 +821,25 @@ const announcement = computed(() => {
   return term.value ? t("autoobserve.coverage.matchCount", { count }, count) : "";
 });
 
+// Live search matches service, cluster and namespace; the fixture table's matches service or stream.
+const noMatchTitle = computed(() =>
+  props.source
+    ? t("autoobserveLive.coverage.noMatch", { query: raw(term.value) })
+    : t("autoobserve.coverage.noMatch", { query: raw(term.value) }),
+);
+
+const filterHidesTitle = computed(() => {
+  const count = searched.value.length;
+  const state = filterLabel(filter.value);
+  return term.value
+    ? t(
+        "autoobserveLive.coverage.filterHidesSearch",
+        { count, query: raw(term.value), state },
+        count,
+      )
+    : t("autoobserveLive.coverage.filterHides", { state });
+});
+
 const clearSearch = () => {
   query.value = "";
   document.getElementById(SEARCH_ID)?.focus();
@@ -822,6 +858,7 @@ const fillClass = (row: CoverageRow): HexClass => {
   if (fill.value === "detectors") {
     const n = detectorsOf(row);
     if (n === 0) return "none";
+    if (props.source) return n >= 3 ? "s1" : n === 2 ? "s2" : "s3";
     if (n >= 6) return "s1";
     return n === 5 ? "s2" : "s3";
   }
@@ -866,10 +903,12 @@ const items = computed(() => allRows.value.map(toItem));
 const legend = computed(() =>
   (props.source && fill.value === "state"
     ? LIVE_STATE_LEGEND.map(({ cls, state }) => ({ cls, label: coverageWord(t, state) }))
-    : LEGEND[fill.value].map(({ cls, key }) => ({ cls, label: t(key) }))
+    : (props.source && fill.value === "detectors" ? LIVE_DETECTOR_LEGEND : LEGEND[fill.value]).map(
+        ({ cls, key }) => ({ cls, label: t(key) }),
+      )
   ).map((item) => ({
     ...item,
-    count: allRows.value.filter((r) => fillClass(r) === item.cls).length,
+    count: searched.value.filter((r) => fillClass(r) === item.cls).length,
   })),
 );
 
@@ -950,14 +989,30 @@ const closeDrawer = () => {
   );
 };
 
+const isAdded = (row: CoverageRow, check: LiveCheck) =>
+  !!props.source &&
+  justAdded(String(store.state.selectedOrganization?.identifier ?? ""), row, check);
+const cellLook = (row: CoverageRow, check: LiveCheck) =>
+  liveCellLook(row.checks?.[check].engine?.stateKey ?? "none", isAdded(row, check));
 const liveCellAria = (row: CoverageRow, check: LiveCheck) =>
-  liveCheckText(t, check, row.checks?.[check].engine?.stateKey ?? "none");
+  liveCheckText(t, check, row.checks?.[check].engine?.stateKey ?? "none", isAdded(row, check));
 
 const SERVICE_COLUMN: OTableColumnDef<CoverageRow> = {
   id: "service",
   header: t("autoobserve.coverage.service"),
   accessorKey: "service",
   size: 160,
+  sortable: true,
+};
+
+// Sorting a check column puts the worst first: no monitor, then the ways one falls short, then covered.
+const CHECK_RANK: Record<string, number> = {
+  none: 0,
+  blind: 1,
+  unmapped: 2,
+  silent: 3,
+  weak: 4,
+  covered: 5,
 };
 
 const liveColumns: OTableColumnDef<CoverageRow>[] = [
@@ -967,24 +1022,28 @@ const liveColumns: OTableColumnDef<CoverageRow>[] = [
     header: t("autoobserveLive.coverage.columns.where"),
     accessorFn: (row: CoverageRow) => row.where ?? "",
     size: 170,
+    sortable: true,
   },
   ...LIVE_CHECKS.map((check) => ({
     id: `check-${check}`,
     header: liveCheckName(t, check),
-    accessorFn: (row: CoverageRow) => row.checks?.[check].engine?.stateKey ?? "none",
+    accessorFn: (row: CoverageRow) => CHECK_RANK[row.checks?.[check].engine?.stateKey ?? "none"],
     size: 130,
+    sortable: true,
   })),
   {
     id: "state",
     header: t("autoobserveLive.coverage.columns.state"),
-    accessorFn: (row: CoverageRow) => row.status?.state ?? "",
+    accessorFn: (row: CoverageRow) => rank(row),
     size: 130,
+    sortable: true,
   },
   {
     id: "lastScanned",
     header: t("autoobserveLive.coverage.columns.lastChecked"),
-    accessorKey: "lastScanned",
+    accessorFn: (row: CoverageRow) => row.scannedMinutes ?? Number.MAX_SAFE_INTEGER,
     size: 130,
+    sortable: true,
   },
 ];
 
