@@ -55,7 +55,7 @@ export function placementMode(placement: AssistantPlacementName, sheet: boolean)
   return sheet ? "sheet" : "sidebar";
 }
 
-/** The Open as moves a container offers: Side panel, Full page, Pop out and its editor's dock, by viewport and placement. */
+/** The Open as moves a container offers: Side panel, Full page, Floating window and its editor's dock, by viewport and placement. */
 export function useAssistantPlaces(input: () => AssistantPlacesInput): {
   places: ComputedRef<AssistantPlace[]>;
 } {

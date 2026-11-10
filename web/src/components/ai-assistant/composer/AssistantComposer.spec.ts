@@ -1775,7 +1775,7 @@ describe("dictation (WP-48)", () => {
     expect(ctx.status()).toBe("Dictation cancelled.");
   });
 
-  it("shows listening in the bottom row beside the image button, and says the start once", async () => {
+  it("shows listening in the bottom row just left of the image button, and says the start once", async () => {
     const ctx = voiceSetup();
     await listen(ctx);
     expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("true");
@@ -1785,7 +1785,7 @@ describe("dictation (WP-48)", () => {
     expect(wave.get('[data-test="assistant-dictate-elapsed"]').text()).toBe("0:00");
     const right = ctx.wrapper.get('[data-test="assistant-composer-bar-right"]').element;
     expect(wave.element.parentElement).toBe(right);
-    expect(wave.element.previousElementSibling).toBe(
+    expect(wave.element.nextElementSibling).toBe(
       ctx.wrapper.get('[data-test="assistant-attach-image"]').element,
     );
     expect(ctx.textarea().classes()).not.toContain("pe-24!");

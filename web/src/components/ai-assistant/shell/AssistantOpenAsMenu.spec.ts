@@ -196,7 +196,7 @@ describe("Open as", () => {
     expect(store.state.shell.placement.kind).toBe("sidebar");
   });
 
-  it("names the moves Side panel, Full page and Pop out, in the board's order", async () => {
+  it("names the moves Side panel, Full page and Floating window, in the board's order", async () => {
     await setup({});
     const items = document.body.querySelectorAll('[role="menuitemradio"], [role="menuitem"]');
     expect([...items].map((el) => el.getAttribute("data-test"))).toEqual([
@@ -207,7 +207,7 @@ describe("Open as", () => {
     expect([...items].map((el) => el.textContent?.trim())).toEqual([
       "Side panel",
       "Full page",
-      "Pop out",
+      "Floating window",
     ]);
     expect(document.body.querySelector('[role="separator"]')).toBeNull();
   });
