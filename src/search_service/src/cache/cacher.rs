@@ -363,7 +363,10 @@ pub async fn check_cache(
                     *should_exec_query = false;
                 }
 
-                if cached_resp.cached_response.total == (sql.limit as usize)
+                // older rows can only rank after a full page when the newest rows come first
+                if is_descending
+                    && !is_histogram_non_ts_order
+                    && cached_resp.cached_response.total == (sql.limit as usize)
                     && cached_resp.response_end_time == req.query.end_time
                 {
                     *should_exec_query = false;
