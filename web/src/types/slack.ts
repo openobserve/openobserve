@@ -312,6 +312,9 @@ export interface SlackCredentialsRequest {
 export interface SlackAvailableInstallation {
   installation_id: string;
   team_name: string;
+  app_id?: string;
+  /** Install time, Unix microseconds. */
+  created_at?: number;
 }
 
 export interface SlackUpgradeCandidate {

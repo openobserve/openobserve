@@ -59,7 +59,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ setup: []; installed: [confirmation: SlackInstallConfirmation] }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 // The digest is an enterprise and Cloud feature, so only those builds mention it.
 const autoobserveEdition = props.isCloud || config.isEnterprise == "true";
 const store = useStore();
@@ -72,6 +72,29 @@ const instance = computed(() => installations.data.value?.instance ?? null);
 const offered = computed(() =>
   props.available.filter((item) => item.installation_id !== instance.value?.installation_id),
 );
+const addedDay = (micros: number): string =>
+  new Intl.DateTimeFormat(locale.value, { dateStyle: "medium" }).format(micros / 1000);
+// Only rows that share a name get a second line, so the usual single workspace keeps its layout.
+const offeredDetail = computed(() => {
+  const detail = new Map<string, I18nText>();
+  for (const item of offered.value) {
+    const twins = offered.value.filter((o) => o !== item && o.team_name === item.team_name);
+    if (!twins.length) continue;
+    const day = item.created_at ? addedDay(item.created_at) : null;
+    const sameDay =
+      day !== null && twins.some((o) => o.created_at && addedDay(o.created_at) === day);
+    if (day && sameDay && item.app_id)
+      detail.set(
+        item.installation_id,
+        t("slackApp.connect.addedOnApp", { date: raw(day), app: raw(item.app_id) }),
+      );
+    else if (day)
+      detail.set(item.installation_id, t("slackApp.connect.addedOn", { date: raw(day) }));
+    else if (item.app_id)
+      detail.set(item.installation_id, t("slackApp.connect.appId", { app: raw(item.app_id) }));
+  }
+  return detail;
+});
 const copyRequest = (): void => {
   const notice = instance.value;
   if (!notice) return;
@@ -286,7 +309,15 @@ const nextSteps = computed<I18nText[]>(() =>
         class="border-border-default flex items-center justify-between gap-3 border-t pt-3"
         :data-test="`slack-available-${item.installation_id}`"
       >
-        <span class="text-text-body text-sm font-medium">{{ raw(item.team_name) }}</span>
+        <div class="flex min-w-0 flex-col">
+          <span class="text-text-body text-sm font-medium">{{ raw(item.team_name) }}</span>
+          <span
+            v-if="offeredDetail.has(item.installation_id)"
+            class="text-text-secondary text-xs"
+            :data-test="`slack-available-detail-${item.installation_id}`"
+            >{{ offeredDetail.get(item.installation_id) }}</span
+          >
+        </div>
         <OButton
           variant="primary"
           size="sm-action"

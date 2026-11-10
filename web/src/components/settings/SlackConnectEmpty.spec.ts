@@ -328,6 +328,39 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
     expect(w.find('[data-test="slack-setup-app"]').classes()).not.toContain("bg-button-primary");
   });
 
+  it("tells two workspaces with one name apart by install date, and by app when the dates match (T4-22)", () => {
+    const NOV_1 = Date.UTC(2026, 10, 1, 12) * 1000;
+    const NOV_5 = Date.UTC(2026, 10, 5, 12) * 1000;
+    const w = mountEmpty({
+      isCloud: false,
+      available: [
+        { installation_id: "a", team_name: "Acme Corp", app_id: "A01", created_at: NOV_1 },
+        { installation_id: "b", team_name: "Acme Corp", app_id: "A02", created_at: NOV_5 },
+        { installation_id: "c", team_name: "Beta", app_id: "A03", created_at: NOV_1 },
+        { installation_id: "d", team_name: "Gamma", app_id: "A04", created_at: NOV_1 },
+        { installation_id: "e", team_name: "Gamma", app_id: "A05", created_at: NOV_1 + 60_000_000 },
+      ],
+    });
+    const detail = (id: string) => w.find(`[data-test="slack-available-detail-${id}"]`);
+    expect(detail("a").text()).toBe("Added Nov 1, 2026");
+    expect(detail("b").text()).toBe("Added Nov 5, 2026");
+    expect(detail("c").exists()).toBe(false);
+    expect(detail("d").text()).toBe("Added Nov 1, 2026 · app A04");
+    expect(detail("e").text()).toBe("Added Nov 1, 2026 · app A05");
+  });
+
+  it("names the app alone for a same-name workspace an older server sends without a date", () => {
+    const w = mountEmpty({
+      isCloud: false,
+      available: [
+        { installation_id: "a", team_name: "Acme Corp", app_id: "A01" },
+        { installation_id: "b", team_name: "Acme Corp" },
+      ],
+    });
+    expect(w.find('[data-test="slack-available-detail-a"]').text()).toBe("App A01");
+    expect(w.find('[data-test="slack-available-detail-b"]').exists()).toBe(false);
+  });
+
   it("keeps Set up Slack app primary when no workspace is set up yet", () => {
     const w = mountEmpty({ isCloud: false });
     expect(w.find('[data-test="slack-available"]').exists()).toBe(false);
