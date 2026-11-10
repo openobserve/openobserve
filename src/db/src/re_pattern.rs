@@ -96,9 +96,6 @@ pub async fn update(id: &str, new_pattern: &str) -> Result<(), errors::Error> {
             None,
         )
         .await?;
-    if let Ok(Some(entry)) = infra::table::re_pattern::get(id).await {
-        invalidate_public_dashboards(&entry.org).await;
-    }
     #[cfg(feature = "enterprise")]
     {
         let config = o2_enterprise::enterprise::common::config::get_config();
@@ -165,15 +162,23 @@ pub async fn remove(org_id: &str, pattern_id: &str) -> Result<(), errors::Error>
 
 /// Makes every stored public dashboard result of `org` rebuild before it is served again, so
 /// anonymous viewers never keep values that a new or changed redaction pattern now hides.
-/// Callers run it after the pattern manager holds the change; a failure is logged, never
-/// returned, so it never stops a redaction change from reaching the other nodes.
+/// Callers run it after this node's pattern manager holds the change, and every node's watcher
+/// runs it again, so the last bump follows the last node. A failure is retried, then logged,
+/// never returned, so it never stops a redaction change from reaching the other nodes.
 pub async fn invalidate_public_dashboards(org: &str) {
     let db = infra::db::get_orm_client_rw().await;
-    let now = config::utils::time::now_micros();
-    if let Err(e) =
-        infra::table::public_dashboards::bump_settings_rev(db, org, "re_pattern", now).await
-    {
-        log::error!("[re_pattern] failed to invalidate public dashboards of {org}: {e}");
+    for attempt in 1..=3 {
+        let now = config::utils::time::now_micros();
+        match infra::table::public_dashboards::bump_settings_rev(db, org, "re_pattern", now).await {
+            Ok(()) => return,
+            Err(e) if attempt < 3 => {
+                log::warn!("[re_pattern] public dashboards of {org}: bump {attempt} failed: {e}");
+                tokio::time::sleep(std::time::Duration::from_millis(200 * attempt)).await;
+            }
+            Err(e) => {
+                log::error!("[re_pattern] failed to invalidate public dashboards of {org}: {e}")
+            }
+        }
     }
 }
 

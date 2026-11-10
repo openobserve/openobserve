@@ -302,7 +302,7 @@ pub async fn read(
 }
 
 /// A file built before the org's last settings or redaction change is never served.
-pub fn withheld(header: &Header, live: &Live) -> bool {
+pub fn predates_settings(header: &Header, live: &Live) -> bool {
     header.settings_rev != live.settings_rev
 }
 
@@ -542,7 +542,7 @@ pub async fn build(
         .filter(|p| p.stored.header.published_by == live.published_by)
         .map(|mut p| {
             // Data built before a settings or redaction change is never reused or retained.
-            if withheld(&p.stored.header, &live) {
+            if predates_settings(&p.stored.header, &live) {
                 p.body = None;
             }
             p
@@ -1053,7 +1053,7 @@ async fn serve_file(
         return serve_cold(engine, flights, key, None, req, intents, live).await;
     }
     // A settings or redaction change can hide values the file still holds: rebuild before serving.
-    if withheld(&header, live) {
+    if predates_settings(&header, live) {
         return serve_cold(engine, flights, key, Some(header), req, intents, live).await;
     }
     let link = req.link;
@@ -1197,7 +1197,7 @@ fn once(
     let Some(body) = built
         .body
         .as_ref()
-        .filter(|_| !withheld(&built.header, live))
+        .filter(|_| !predates_settings(&built.header, live))
     else {
         return Served::Unavailable {
             retry_after: MIN_RETRY_SECS * 2,
@@ -2189,10 +2189,9 @@ pub(super) mod tests {
     async fn a_settings_change_never_serves_the_old_body_through_a_deadline_check() {
         let (engine, flights, link, dash, now) = after_settings_change(&[("p1", "s1")], &[]).await;
         // Past the 15-minute access re-check of an idle absolute link.
-        let served = read_at(engine, flights, &link, &dash, abs_range(), now + 20 * MIN).await;
-        if let Served::Data { response, .. } = &served {
-            assert_eq!(build_no(response, "p1"), 2, "served the pre-change body");
-        }
+        let resp = data(&read_at(engine, flights, &link, &dash, abs_range(), now + 20 * MIN).await)
+            .clone();
+        assert_eq!(build_no(&resp, "p1"), 2, "served the pre-change body");
     }
 
     #[tokio::test]
