@@ -79,7 +79,7 @@ describe("pagedFindingCopy (W2)", () => {
     const c = copy(item({ page: page("unrouted") }));
     expect(c.page).toEqual({
       tone: "warning",
-      text: "Nobody was paged: no on-call team owns this service and the org has no default team.",
+      text: "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
       routing: true,
     });
     expect(c.next).toContain("Set up on-call routing so the next stop pages someone.");

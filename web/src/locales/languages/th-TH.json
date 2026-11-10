@@ -32574,7 +32574,7 @@
         "page": {
           "paged": "Paged {team}",
           "pagedTeam": "Paged the on-call team",
-          "unrouted": "Nobody was paged: no on-call team owns this service and the org has no default team.",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
           "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand."
         },
         "nextRouting": "Set up on-call routing so the next stop pages someone.",
