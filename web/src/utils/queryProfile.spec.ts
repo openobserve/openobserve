@@ -653,6 +653,8 @@ describe("parseSearchStream / extractProfile", () => {
     expect(parseSearchStream(sse(failed))?.warning).toBe("Cast error");
     expect(parseSearchStream(sse({ hits: [], total: 0, is_partial: true }))?.warning).toBe("");
     expect(parseSearchStream(sse({ hits: [], total: 0 }))?.warning).toBeUndefined();
+    const laterPartial = sse(failed) + sse({ hits: [], total: 0, is_partial: true });
+    expect(parseSearchStream(laterPartial)?.warning).toBe("Cast error");
   });
 
   it("merges hits across events and keeps took_detail from the metadata event", () => {

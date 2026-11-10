@@ -674,7 +674,7 @@ function mergeStreamEvent(merged: SearchStreamResult, event: Record<string, unkn
     if (typeof results[key] === "number") merged[key] = results[key] as number;
   }
   const warning = partialWarning(results);
-  if (warning !== undefined) merged.warning = warning;
+  if (warning || (warning === "" && merged.warning === undefined)) merged.warning = warning;
   return found || results.total !== undefined;
 }
 
