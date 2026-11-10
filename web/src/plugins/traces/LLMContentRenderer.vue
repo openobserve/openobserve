@@ -685,9 +685,16 @@ const shouldFillFormattedContent = computed(() => {
   );
 });
 
+const markdownRenderer = new marked.Renderer();
+// LLM content can contain literal tags and placeholders that must remain visible.
+markdownRenderer.html = ({ text }) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 const renderMarkdown = (content: string): string => {
   const markdownContent = toMarkdown(content);
-  return DOMPurify.sanitize(marked.parse(markdownContent) as string);
+  return DOMPurify.sanitize(
+    marked.parse(markdownContent, { renderer: markdownRenderer }) as string,
+  );
 };
 </script>
 
