@@ -179,6 +179,8 @@ pub async fn check_cache(
 
     if sql.histogram_offset != Some(0) {
         return MultiCachedQueryResponse {
+            ts_column: result_ts_col.to_string(),
+            is_descending,
             order_by: order_by.clone(),
             ..Default::default()
         };
