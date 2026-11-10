@@ -330,10 +330,6 @@ export const funnelFor = (scenario: Scenario) => {
   };
 };
 
-export const FUNNEL: Record<Scenario, ReturnType<typeof funnelFor>> = Object.fromEntries(
-  SCENARIOS.map((s) => [s, funnelFor(s)]),
-) as Record<Scenario, ReturnType<typeof funnelFor>>;
-
 const SEVERITY_TONE: Record<Severity, UnfoldTone> = {
   p1: "danger",
   p2: "danger",

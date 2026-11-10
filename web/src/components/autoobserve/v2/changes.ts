@@ -123,7 +123,8 @@ export const STATE_LOOK: Record<
   undone: { variant: "purple-soft", key: "autoobserve2.activityPage.status.undone", icon: "undo" },
 };
 
-const FACTS: Record<string, LedgerFact> = Object.fromEntries(LEDGER.map((f) => [f.id, f]));
+// Read on use, since the sample ledger loads after this module.
+const factOf = (id: string): LedgerFact | undefined => LEDGER.find((f) => f.id === id);
 
 // The investigation loop's only change is an alert-query fix, so it reads as alert tuning.
 const kindOf = (fact: LedgerFact): ChangeKind => {
@@ -158,7 +159,7 @@ export const isChange = (entry: LedgerEntry) =>
 // An answered request happened now, so it moves to today however old the proposal is.
 export const toChanges = (ledger: LedgerEntry[], phases: Record<string, FixPhase>): Change[] =>
   ledger.filter(isChange).map((entry) => {
-    const fact = FACTS[entry.id];
+    const fact = factOf(entry.id);
     return {
       entry,
       fact,

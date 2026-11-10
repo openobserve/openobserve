@@ -17,6 +17,7 @@ import { computed, reactive, watch } from "vue";
 import {
   AUTONOMY,
   SCENARIOS,
+  factsReady,
   scenarioFacts,
   type Autonomy,
   type FixKind,
@@ -42,14 +43,9 @@ const AUTONOMY_DEFAULTS = Object.fromEntries(AUTONOMY.map((a) => [a.kind, a.mode
 >;
 
 // One entry per ledger id, though the same request can appear in several scenarios.
-const REQUESTS: RequestFact[] = [
-  ...new Map(
-    SCENARIOS.flatMap((s) => scenarioFacts(s).requests).map((r) => [r.ledgerId, r]),
-  ).values(),
-];
+let requests: RequestFact[] = [];
 // A yes on a request tied to a problem starts a fix that settles a few seconds later.
-const FIX_REQUESTS = new Set(REQUESTS.filter((r) => r.problem).map((r) => r.ledgerId));
-const STANDING = REQUESTS.filter((r) => r.autonomyKind);
+let fixRequests = new Set<string>();
 
 // Module-level so both views and every remount share one record of what the viewer decided.
 const decisions = reactive<Record<string, Decision>>({});
@@ -68,7 +64,7 @@ const decide = (ledgerId: string, decision: Decision) => {
   if (decisions[ledgerId]) return;
   decisions[ledgerId] = decision;
   record(ledgerId, decision);
-  if (decision !== "yes" || !FIX_REQUESTS.has(ledgerId)) return;
+  if (decision !== "yes" || !fixRequests.has(ledgerId)) return;
   phases[ledgerId] = "fixing";
   timers.set(
     ledgerId,
@@ -93,7 +89,7 @@ const undo = (ledgerId: string) => {
 };
 
 // A standing-permission request and its row in Settings are one setting.
-STANDING.forEach((req) => {
+const linkStanding = (req: RequestFact) => {
   const kind = req.autonomyKind as FixKind;
   watch(
     () => decisions[req.ledgerId],
@@ -112,12 +108,23 @@ STANDING.forEach((req) => {
       if (mode !== "fix" && decisions[req.ledgerId] === "yes") undo(req.ledgerId);
     },
   );
+};
+
+// The sample requests exist only once the sample facts have loaded.
+void factsReady.then(() => {
+  requests = [
+    ...new Map(
+      SCENARIOS.flatMap((s) => scenarioFacts(s).requests).map((r) => [r.ledgerId, r]),
+    ).values(),
+  ];
+  fixRequests = new Set(requests.filter((r) => r.problem).map((r) => r.ledgerId));
+  requests.filter((r) => r.autonomyKind).forEach(linkStanding);
 });
 
 // Fixes completed on the page add to their kind's track record; undoing one takes it back off.
 const completedFixes = computed(() => {
   const counts: Partial<Record<FixKind, number>> = {};
-  REQUESTS.forEach((req) => {
+  requests.forEach((req) => {
     if (!req.fixKind || phases[req.ledgerId] !== "fixed") return;
     counts[req.fixKind] = (counts[req.fixKind] ?? 0) + 1;
   });

@@ -460,7 +460,7 @@ export const DESTINATION_OPTIONS: DestinationOption[] = DESTINATIONS.map((d) => 
 
 export const LAST_CHECKED = LAST_CHECKED_MINUTES;
 
-export const ALL_SERVICES = scenarioFacts("demo").services.map((s) => s.name);
+export const allServices = () => scenarioFacts("demo").services.map((s) => s.name);
 
 export { SCENARIOS };
 
