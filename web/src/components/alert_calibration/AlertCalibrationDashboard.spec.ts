@@ -1071,4 +1071,49 @@ describe("AlertCalibrationDashboard row next steps", () => {
     expect(rowButtons(w)).toContain("Open alert");
     w.unmount();
   });
+
+  it("a finding that stores a change offers Review change on its row, opening the dialog (W5)", async () => {
+    const withChange = record({
+      ...findings[1],
+      finding_id: fid(7),
+      insight_actions: JSON.stringify([
+        {
+          type: "apply_suggestion",
+          alert_id: "a2",
+          patch: [{ field: "pending_period_secs", from: 0, to: 120 }],
+        },
+      ]),
+    } as Partial<DigestRecord>);
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([run] as never) : ([findings[0], withChange] as never),
+    );
+    const wrapper = await mountPage();
+    await wrapper
+      .find('[data-test="alert-calibration-dashboard-rule-noise"] button')
+      .trigger("click");
+    await flushPromises();
+    const row = wrapper.find('[data-test="alert-calibration-dashboard-alert-a2"]');
+    const button = row.find('[data-test="alert-calibration-dashboard-review-change"]');
+    expect(button.text()).toBe("Review change");
+    await button.trigger("click");
+    await flushPromises();
+    const dialog = wrapper.findComponent({ name: "ReviewChangeDialog" });
+    expect(dialog.props("open")).toBe(true);
+    expect(dialog.props("target")).toMatchObject({
+      findingId: fid(7),
+      alertId: "a2",
+      alertName: "cpu",
+    });
+    await wrapper
+      .find('[data-test="alert-calibration-dashboard-rule-failure"] button')
+      .trigger("click");
+    await flushPromises();
+    expect(
+      wrapper
+        .find('[data-test="alert-calibration-dashboard-alert-a1"]')
+        .find('[data-test="alert-calibration-dashboard-review-change"]')
+        .exists(),
+    ).toBe(false);
+    wrapper.unmount();
+  });
 });

@@ -48,6 +48,7 @@ import {
   GAP_PAGE_SIZE,
   RAIL_CAP,
   checkedView,
+  learningLine,
   liveErrorDetail,
   liveFailureOf,
   statusOf,
@@ -250,6 +251,7 @@ export const useLiveAutoObserve = () => {
     railSkeleton,
     today: computed(() => todayText(zone.value.locale, zone.value.timeZone, minute.value * 60_000)),
     checked: computed(() => checkedView(t, zone.value.locale, source.value)),
+    learning: computed(() => learningLine(t, zone.value, source.value.learning)),
   };
 };
 
@@ -282,6 +284,10 @@ export const useLivePaged = (cap = PAGED_CAP) => {
     Object.assign(autoobserveIncidentsPageQuery(org.value, cap, 0), {
       enabled: enabled.value,
     }),
+  );
+  // The home already loads this coverage, so the learning line shares its cache.
+  const coverage = useQuery(() =>
+    Object.assign(autoobserveCoverageQuery(org.value, "strict"), { enabled: enabled.value }),
   );
   const retry = () => void query.refetch();
   const state = useKeptFailure(
@@ -337,6 +343,7 @@ export const useLivePaged = (cap = PAGED_CAP) => {
     zone,
     now: computed(() => minute.value * 60_000),
     paging: computed(() => query.data.value?.paging ?? true),
+    learning: computed(() => coverage.data.value?.learning ?? null),
     rows: computed(() => rows.value),
     hasMore: computed(() => latch.value?.hasMore ?? false),
     newCount,

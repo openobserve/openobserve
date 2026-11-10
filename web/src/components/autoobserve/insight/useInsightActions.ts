@@ -24,6 +24,7 @@ import type { DismissTarget } from "@/components/alert_calibration/dismissals";
 import type { InsightCta, InsightParts } from "./insightCopy";
 import { resolveDraft } from "./targets/alertDraft";
 import { destinationHandoff } from "./targets/editTargets";
+import type { ReviewChangeTarget } from "../decisions/appliedChanges";
 
 export function useInsightActions() {
   const router = useRouter();
@@ -31,6 +32,8 @@ export function useInsightActions() {
   const pendingId = ref<string | null>(null);
   const dismissTarget = shallowRef<DismissTarget | null>(null);
   const dismissOpen = ref(false);
+  const reviewTarget = shallowRef<ReviewChangeTarget | null>(null);
+  const reviewOpen = ref(false);
   let live = true;
   onScopeDispose(() => {
     live = false;
@@ -53,6 +56,11 @@ export function useInsightActions() {
         name: "synthetics-add",
         query: { org_identifier: orgId.value, type: "http", prefill: "autoobserve" },
       });
+      return;
+    }
+    if (cta.target.type === "review_change") {
+      reviewTarget.value = cta.target.change;
+      reviewOpen.value = true;
       return;
     }
     if (cta.target.type === "bulk") {
@@ -101,5 +109,5 @@ export function useInsightActions() {
     dismissOpen.value = true;
   }
 
-  return { run, dismiss, pendingId, dismissTarget, dismissOpen };
+  return { run, dismiss, pendingId, dismissTarget, dismissOpen, reviewTarget, reviewOpen };
 }

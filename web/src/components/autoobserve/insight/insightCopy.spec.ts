@@ -330,3 +330,55 @@ describe("insightCopy: the open-source build", () => {
     expect(p.why).toBe("4 of 9 runs failed in the last calibration window.");
   });
 });
+
+describe("Review change on the card (W5)", () => {
+  const apply = {
+    type: "apply_suggestion",
+    alert_id: "a2",
+    patch: [{ field: "pending_period_secs", from: 0, to: 120 }],
+  };
+
+  it("a finding that stores a change leads with Review change and keeps Review alert", () => {
+    const p = parts(
+      notWorking(
+        { alert_id: "a2" },
+        { actions: [{ type: "review_alert", alert_id: "a2", focus: "query" }, apply] as never },
+      ),
+    );
+    expect(p.cta?.label).toBe("Review change");
+    expect(p.cta?.action).toBe("reviewChange");
+    expect(p.note).toBe("Shows what changes before anything is saved.");
+    const target = p.cta?.target;
+    if (target?.type !== "review_change") throw new Error("expected review_change");
+    expect(target.change).toEqual({
+      findingId: ID,
+      alertId: "a2",
+      alertName: "payments-latency",
+      action: {
+        type: "apply_suggestion",
+        alert_id: "a2",
+        patch: [{ field: "pending_period_secs", from: 0, to: 120 }],
+      },
+    });
+    expect(p.secondary.map((c) => c.action)).toContain("reviewAlert");
+  });
+
+  it("the alert id can come from the review action when evidence has none", () => {
+    const p = parts(
+      notWorking({}, { actions: [{ type: "review_alert", alert_id: "a2" }, apply] as never }),
+    );
+    expect(p.cta?.action).toBe("reviewChange");
+  });
+
+  it("a change for another alert, or a malformed one, is dropped and the card is as today", () => {
+    const other = { ...apply, alert_id: "zz" };
+    expect(
+      parts(notWorking({ alert_id: "a2" }, { actions: [other] as never })).cta?.action,
+    ).not.toBe("reviewChange");
+    const bad = { ...apply, patch: [{ field: "query", from: 1, to: 2 }] };
+    expect(parts(notWorking({ alert_id: "a2" }, { actions: [bad] as never })).cta?.action).not.toBe(
+      "reviewChange",
+    );
+    expect(parts(notWorking()).cta?.action).toBe("reviewAlert");
+  });
+});

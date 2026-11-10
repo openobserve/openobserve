@@ -97,6 +97,7 @@ import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
+import { fenceAlertWrite } from "@/services/alerts.readFence";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { setMutationNotifier } from "@/composables/query/queryClient";
 import { announcePolite } from "@/lib/feedback/RegionStatus/announcer";
@@ -1207,6 +1208,42 @@ describe("AlertList - router query behaviors", () => {
     expect(pushedQuery.page).toBe("3");
     expect(pushedQuery.action).toBeUndefined();
     expect(pushedQuery.alert_id).toBeUndefined();
+  });
+
+  it("a folder read answered after an AutoObserve Apply or Undo does not refill the rows with the old alert (F2)", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const org = store.state.selectedOrganization.identifier;
+    let answerLate: (value: any) => void = () => {};
+    (alertsSvc.listByFolderId as any)
+      .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)))
+      .mockResolvedValue({ data: { list: [{ ...alertsDB[0], name: "After apply" }] } });
+    const read = wrapper.vm.getAlertsFn(store, "default", "", true, "", true);
+    await flushPromises();
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    answerLate({ data: { list: [{ ...alertsDB[0], name: "Before apply" }] } });
+    await read;
+    await flushPromises();
+    const rows = store.state.organizationData.allAlertsListByFolderId.default;
+    expect(rows.map((r: any) => r.name)).toEqual(["After apply"]);
+  });
+
+  it("an editor opened from the list during an AutoObserve Apply gets the applied alert (F2)", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const org = store.state.selectedOrganization.identifier;
+    let answerLate: (value: any) => void = () => {};
+    (alertsSvc.get_by_alert_id as any)
+      .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)))
+      .mockResolvedValue({ data: { ...alertsDB[0], alert_id: "a9", name: "After apply" } });
+    wrapper.vm.router.currentRoute.value.query = { action: "update", alert_id: "a9" };
+    const open = wrapper.vm.handleActionQuery("update");
+    await flushPromises();
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    answerLate({ data: { ...alertsDB[0], alert_id: "a9", name: "Before apply" } });
+    await open;
+    await flushPromises();
+    expect(wrapper.vm.formData?.name).toBe("After apply");
   });
 
   // The editor opens an alert from its detail cache (getAlertById), and a save

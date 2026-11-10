@@ -1,0 +1,111 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <ul
+    v-if="entries.length"
+    class="flex flex-col gap-2"
+    :aria-label="t('insight.decisions.applied.title')"
+    data-test="autoobserve-applied-list"
+  >
+    <li
+      v-for="entry in entries"
+      :key="entry.view.decision_id"
+      class="border-border-subtle bg-surface-base rounded-default flex items-start gap-2 border px-3 py-2.5"
+      data-test="autoobserve-applied-row"
+    >
+      <OIcon name="check" size="sm" class="text-text-secondary mt-0.5 shrink-0" />
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <OTruncatedText class="text-text-heading text-sm font-medium">{{
+          entry.title
+        }}</OTruncatedText>
+        <p class="text-text-secondary text-xs" data-test="autoobserve-applied-detail">
+          {{ detailOf(entry) }}
+        </p>
+      </div>
+      <OTag
+        v-if="entry.view.state === 'undone'"
+        variant="default"
+        size="xs"
+        :label="t('insight.decisions.applied.undone')"
+        data-test="autoobserve-applied-undone"
+      />
+      <OButton
+        v-else
+        variant="ghost-primary"
+        size="xs"
+        :loading="route.isUndoing(entry.view.decision_id)"
+        data-test="autoobserve-applied-undo"
+        @click="undo(entry)"
+      >
+        {{ t("insight.decisions.undo") }}
+      </OButton>
+    </li>
+  </ul>
+  <slot v-else />
+</template>
+
+<script setup lang="ts">
+import { computed } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useOrgId } from "@/composables/query";
+import { decisionsPageQuery, useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { APPLY_FIELDS, applyCopy } from "@/components/alert_calibration/applySuggestion";
+import { decisionCopy } from "../insight/insightCopy";
+import { useAppliedChanges, type AppliedEntry } from "./appliedChanges";
+
+const LISTED = 50;
+
+const { t, locale } = useI18nTyped();
+const store = useStore();
+const orgId = useOrgId();
+const route = useDecisionRoute();
+
+const listed = useQuery(() => ({
+  ...decisionsPageQuery(orgId.value, "alert_finding", LISTED, 0),
+  enabled: route.enabled.value,
+}));
+
+const entries = useAppliedChanges(orgId, () => listed.data.value?.decisions ?? []);
+
+const copy = computed(() => applyCopy(t, locale.value));
+
+const detailOf = (entry: AppliedEntry): I18nText => {
+  const changes = entry.fields.flatMap((f) => {
+    if (!(f.field in APPLY_FIELDS)) return [];
+    const key = APPLY_FIELDS[f.field as keyof typeof APPLY_FIELDS];
+    return [
+      `${copy.value.fieldLabel(key)} ${copy.value.value(key, f.from)} → ${copy.value.value(key, f.to)}`,
+    ];
+  });
+  const me = store.state.userInfo?.email;
+  const by = t("insight.decisions.applied.by", {
+    actor: entry.view.actor === me ? t("insight.decisions.applied.you") : raw(entry.view.actor),
+    when: decisionCopy(t, locale.value).when(entry.view.decided_at),
+  });
+  return raw([...changes, String(by)].join(" · "));
+};
+
+function undo(entry: AppliedEntry) {
+  void route.undo([{ org: entry.org, view: entry.view, title: entry.title }]);
+}
+</script>

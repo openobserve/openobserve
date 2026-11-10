@@ -57,6 +57,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </p>
       <OTruncatedText
+        v-else-if="slotKind === 'learning'"
+        as="p"
+        :lines="2"
+        class="leading-relaxed"
+        data-test="autoobserve2-paged-learning"
+        >{{ learningText }}</OTruncatedText
+      >
+      <OTruncatedText
         v-else-if="slotKind === 'pagingOff'"
         as="p"
         :lines="2"
@@ -125,6 +133,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @retry="state.retry()"
       />
       <OEmptyState
+        v-else-if="settled && !rows.length && waiting"
+        size="inline"
+        variant="neutral"
+        icon="hourglass-empty"
+        :title="waiting.title"
+        :description="waiting.desc"
+        data-test="autoobserve2-paged-empty-learning"
+      />
+      <OEmptyState
         v-else-if="settled && !rows.length && !paging"
         size="inline"
         variant="neutral"
@@ -151,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               as="p"
               class="text-text-heading text-sm leading-5 font-medium"
               data-test="autoobserve2-paged-sentence"
-              >{{ row.sentence }}</OTruncatedText
+              >{{ row.copy.headline ?? row.sentence }}</OTruncatedText
             >
             <div class="flex h-5 min-w-0 items-center gap-1.5">
               <OTag
@@ -195,6 +212,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ row.analysis.detail }}</OTruncatedText
               >
             </div>
+            <p
+              v-if="row.copy.page"
+              class="flex items-start gap-1.5 text-xs leading-5"
+              :class="PAGE_TONE[row.copy.page.tone].text"
+              :data-tone="row.copy.page.tone"
+              data-test="autoobserve2-paged-page"
+            >
+              <OIcon :name="PAGE_TONE[row.copy.page.tone].icon" size="xs" class="mt-1 shrink-0" />
+              <span>{{ row.copy.page.text }}</span>
+            </p>
+            <p
+              v-if="row.copy.why"
+              class="text-text-body text-xs leading-5"
+              data-test="autoobserve2-paged-why"
+            >
+              {{ row.copy.why }}
+            </p>
+            <p
+              v-if="row.copy.next"
+              class="text-text-secondary text-xs leading-5"
+              data-test="autoobserve2-paged-next"
+            >
+              {{ row.copy.next }}
+            </p>
             <div
               class="-ms-2.5 flex flex-wrap items-center gap-1"
               data-test="autoobserve2-paged-actions"
@@ -224,6 +265,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="router.push(row.logs)"
               >
                 {{ insightCtaLabel(t, "openInLogs") }}
+              </OButton>
+              <OButton
+                v-if="row.copy.page?.routing"
+                variant="outline"
+                size="xs"
+                data-test="autoobserve2-paged-routing"
+                @click="router.push({ name: 'onCallRouting', query: { org_identifier: org } })"
+              >
+                {{ copy.routing }}
               </OButton>
               <OButton
                 v-if="canAsk && row.ai"
@@ -283,6 +333,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -295,6 +346,7 @@ import {
   insightCtaLabel,
   type AiFinding,
 } from "../insight/insightCta";
+import { pagedFindingCopy, type PageLine } from "../insight/kindCopy";
 import SectionCard from "../v2/SectionCard.vue";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveRefreshFailed from "./LiveRefreshFailed.vue";
@@ -316,7 +368,13 @@ import {
   skeletonRows,
   statusLabel,
 } from "./incidentsCopy";
-import { liveLoadText, liveNotice, type LiveFailure } from "./liveCopy";
+import {
+  learningEmpty,
+  learningLine,
+  liveLoadText,
+  liveNotice,
+  type LiveFailure,
+} from "./liveCopy";
 import { useLivePaged, useLoadPhase } from "./liveModel";
 
 const NOTICE_TEST: Record<LiveFailure, string> = {
@@ -324,6 +382,12 @@ const NOTICE_TEST: Record<LiveFailure, string> = {
   off: "autoobserve2-paged-off",
   unavailable: "autoobserve2-paged-unavailable",
   failed: "autoobserve2-paged-error",
+};
+
+const PAGE_TONE: Record<PageLine["tone"], { icon: string; text: string }> = {
+  neutral: { icon: "check", text: "text-text-secondary" },
+  warning: { icon: "warning", text: "text-status-warning-text" },
+  error: { icon: "warning", text: "text-status-error-text" },
 };
 
 const props = withDefaults(defineProps<{ cap?: number }>(), { cap: PAGED_CAP });
@@ -350,12 +414,16 @@ const notice = computed(() =>
     ? liveNotice(t, "incidents", state.value.failure)
     : null,
 );
+const learningText = computed(() => learningLine(t, paged.zone.value, paged.learning.value));
+const waiting = computed(() => learningEmpty(t, paged.zone.value, paged.learning.value));
 const newText = computed(() => newFindingsText(t, locale.value, paged.newCount.value));
 
 // One message at a time, so the slot never grows a second line of notices.
 const slotKind = computed(() => {
   if (settled.value && state.value.stale) return "stale";
   if (settled.value && paged.newCount.value > 0) return "new";
+  if (settled.value && learningText.value && !(waiting.value && !rows.value.length))
+    return "learning";
   if (settled.value && rows.value.length && !paging.value) return "pagingOff";
   if (state.value.status === "loading") return skeleton.value ? "skeleton" : "none";
   return "subtitle";
@@ -373,6 +441,7 @@ const shown = computed(() =>
     analysis: analysisLine(t, item, paged.rcaEnabled.value),
     logs: findingLogs(item, paged.now.value),
     ai: findingAi(t, item, paged.zone.value, paged.now.value),
+    copy: pagedFindingCopy(t, paged.zone.value, item, paged.now.value),
   })),
 );
 

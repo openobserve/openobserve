@@ -315,7 +315,8 @@ export const skeletonRows = (cap: number): number =>
 // The card's fixed words, so the component holds no key of its own.
 export const pagedCopy = (t: TranslateFn) => ({
   title: t("autoobserveLive.incidents.title"),
-  subtitle: t("autoobserveLive.incidents.subtitle"),
+  subtitle: t("autoobserveLive.incidents.subtitleWho"),
+  routing: t("autoobserveLive.incidents.routing"),
   openIncident: t("autoobserveLive.incidents.openIncident"),
   viewAnalysis: t("autoobserveLive.incidents.viewAnalysis"),
   showNew: t("autoobserveLive.incidents.showNew"),

@@ -314,9 +314,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update-entry="updateEntry"
     >
       <template v-if="live" #empty>
-        <div class="bg-surface-base border-border-subtle rounded-surface border py-6 shadow-xs">
-          <LiveSurfaceEmpty surface="changes" @action="allOpen = true" />
-        </div>
+        <AppliedChangesList>
+          <div class="bg-surface-base border-border-subtle rounded-surface border py-6 shadow-xs">
+            <LiveSurfaceEmpty surface="changes" @action="allOpen = true" />
+          </div>
+        </AppliedChangesList>
       </template>
     </ChangesPage>
 
@@ -338,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </HistoryDrawer>
     <SettingsDrawer v-model:open="settingsOpen">
       <template v-if="live" #empty>
-        <LiveSurfaceEmpty surface="settings" @action="settingsToHowItWorks" />
+        <LiveSettingsPanel @action="settingsToHowItWorks" />
       </template>
     </SettingsDrawer>
     <HowItWorksDrawer v-model:open="howOpen" />
@@ -375,6 +377,8 @@ import {
 import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
 import LiveSurfaceEmpty from "@/components/autoobserve/live/LiveSurfaceEmpty.vue";
+import LiveSettingsPanel from "@/components/autoobserve/live/LiveSettingsPanel.vue";
+import AppliedChangesList from "@/components/autoobserve/decisions/AppliedChangesList.vue";
 import { MAIN_PAGED_CAP } from "@/components/autoobserve/live/incidentsCopy";
 import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
@@ -522,7 +526,13 @@ const coverageSegments = computed(() => {
 });
 
 const coverageSentence = computed(() => {
-  if (live.value) return liveSentence(t, locale.value, liveData.source.value.totals) ?? raw("");
+  if (live.value) {
+    const parts = [
+      liveSentence(t, locale.value, liveData.source.value.totals),
+      liveData.learning.value,
+    ];
+    return raw(parts.filter(Boolean).join(" "));
+  }
   const head = say(t, summary.value.head);
   const clauses = summary.value.clauses.map((m) => say(t, m));
   if (!clauses.length) return head;

@@ -13317,7 +13317,8 @@
       "suppressRepeats": "Suppress repeats",
       "suppressRepeatsTooltip": "Notify once when the alert starts firing or changes level, not on every evaluation. Leave it off to keep getting reminders after each silence period.",
       "keepFiringForInvalid": "Enter 0 or more seconds",
-      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)",
+      "targetRequiredNote": "Required. An alert added from AutoObserve must notify someone, or its service stays unwatched."
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -14023,7 +14024,8 @@
           "schemaUnread": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Close it and try again.",
           "noDraft": "AutoObserve can't build this alert on the fields of stream {stream}. Write the query by hand."
         }
-      }
+      },
+      "noDestination": "Choose a destination. An alert that notifies no one leaves its service unwatched."
     },
     "saveFailed": "Could not save the alert.",
     "loadFailed": "Could not load the alert.",
@@ -30856,7 +30858,9 @@
         "desc": "AutoObserve records stream findings for this organization but opens no incidents. An administrator turns paging on."
       },
       "loading": "Loading paged findings…",
-      "loaded": "Paged findings loaded"
+      "loaded": "Paged findings loaded",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
     },
     "issues": {
       "searchPlaceholder": "Search what happened or a stream",
@@ -30907,6 +30911,26 @@
         "desc": "An administrator turns AutoObserve and its paging on for this deployment. Who it notifies and how far it acts on its own will be set here once those controls exist.",
         "action": "How it works"
       }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show here as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
     }
   },
   "autoobserve2": {
@@ -34281,7 +34305,8 @@
       "undone": "{count} alert removed. | {count} alerts removed.",
       "undoFailed": "{failed} of {total} alerts couldn't be removed. Remove them from Alerts.",
       "more": "{count} more",
-      "usuallyLatency": "p95 {value} ms"
+      "usuallyLatency": "p95 {value} ms",
+      "noDestination": "Choose who {count} alert notifies before adding it. An alert that notifies no one leaves its service unwatched. | Choose who {count} alerts notify before adding them. An alert that notifies no one leaves its service unwatched."
     },
     "decisions": {
       "reasons": {
@@ -34321,11 +34346,16 @@
         "until": "Dismissed until {when}: {title}.",
         "noEnd": "Dismissed: {title}.",
         "markedOne": "{title} marked as intended report.",
-        "marked": "{count} alert marked as intended report. | {count} alerts marked as intended reports."
+        "marked": "{count} alert marked as intended report. | {count} alerts marked as intended reports.",
+        "applied": "Applied to {title}.",
+        "appliedEditor": "Saved and recorded for {title}.",
+        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
       },
       "undone": {
         "one": "Undone: {title} is shown again.",
-        "many": "Undone: {count} item is shown again. | Undone: {count} items are shown again."
+        "many": "Undone: {count} item is shown again. | Undone: {count} items are shown again.",
+        "applyOne": "Undone: {title} is back to how it was.",
+        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       },
       "error": {
         "changed": "This changed since you opened it. Refresh and try again.",
@@ -34380,6 +34410,26 @@
         "range": "{from}–{to} of {total}",
         "previous": "Previous page",
         "next": "Next page"
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undone": "Undone",
+        "you": "you"
       }
     },
     "cta": {
@@ -34557,6 +34607,36 @@
         "restartsNext": "Add an alert that fires when its pods restart 3 times in 10 minutes.",
         "syntheticWhy": "Nothing checks {service} from outside. A synthetic check sends a request every few minutes and notices an outage even when the service sends nothing.",
         "syntheticNext": "Add a synthetic check on its health endpoint."
+      },
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: no on-call team owns this service and the org has no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying."
+        }
       }
     },
     "threshold": {

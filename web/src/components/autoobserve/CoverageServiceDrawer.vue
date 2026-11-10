@@ -157,13 +157,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
         </div>
-        <p
-          v-if="learningLine"
-          class="text-text-secondary text-xs"
+        <div
+          v-if="learning"
+          class="text-text-secondary flex flex-col gap-1 text-xs"
           data-test="autoobserve-coverage-drawer-learning"
         >
-          {{ learningLine }}
-        </p>
+          <p data-test="autoobserve-coverage-drawer-learning-summary">{{ learning.summary }}</p>
+          <ul v-if="learning.rows.length" class="flex flex-col gap-0.5">
+            <li
+              v-for="stream in learning.rows"
+              :key="stream.key"
+              class="flex min-w-0 items-baseline gap-2"
+              data-test="autoobserve-coverage-drawer-learning-stream"
+            >
+              <span class="text-text-body min-w-0 truncate" :title="stream.stream">{{
+                stream.stream
+              }}</span>
+              <span class="ms-auto shrink-0">{{ stream.until }}</span>
+            </li>
+          </ul>
+        </div>
         <div
           v-if="gapLines.length"
           class="flex flex-wrap items-center gap-x-3 gap-y-2"
@@ -386,6 +399,8 @@ import {
   liveCellWord,
   liveCheckText,
   liveGapLines,
+  streamLearning,
+  userTimeZone,
 } from "./live/liveCopy";
 import { liveMetricDef, type LiveChartSignal } from "./live/serviceChartSql";
 import { useServiceCharts, type ServiceChartStatus } from "./live/useServiceCharts";
@@ -581,7 +596,18 @@ const gapLines = computed<I18nText[]>(() => {
   return reason ? [reason] : [];
 });
 
-const learningLine = computed(() =>
+const learning = computed(() => {
+  const streams = props.row.identity?.streams;
+  if (streams)
+    return streamLearning(
+      t,
+      { locale: locale.value, timeZone: userTimeZone(store.state.timezone) },
+      streams,
+    );
+  return fixtureLearningLine.value ? { summary: fixtureLearningLine.value, rows: [] } : null;
+});
+
+const fixtureLearningLine = computed(() =>
   state.value === "learning" && progress.value
     ? t("autoobserve.coverage.bandLearning", {
         days: progress.value[0],

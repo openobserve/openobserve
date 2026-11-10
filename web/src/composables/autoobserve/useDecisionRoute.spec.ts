@@ -43,6 +43,7 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import { queryClient } from "@/composables/query/queryClient";
+import { alertKeys } from "@/services/alerts.querykeys";
 import fixture from "@/components/autoobserve/live/__fixtures__/autoobserveDecisions.json";
 import autoobserveDecisions, {
   type DecisionRequest,
@@ -243,5 +244,79 @@ describe("useDecisionRoute", () => {
         .mock.calls.map((c) => c[1])
         .sort(),
     ).toEqual(["alert_finding:f1", "alert_finding:f2"]);
+  });
+  it("an_apply_and_its_undo_drop_cached_alert_reads_and_folder_rows", async () => {
+    await mountRoute();
+    const detail = alertKeys.detail("default", "al-1");
+    const seed = () => {
+      queryClient.setQueryData(detail, { id: "al-1", pending_period_sec: 0 });
+      store.commit("setAllAlertsListByFolderId", { pay: [{ alert_id: "al-1" }] });
+    };
+    const applied = { ...view("f1"), action: "apply" as const, state: "applied" as const };
+    vi.mocked(autoobserveDecisions.decide).mockResolvedValue({
+      data: { change: "created", decision: applied },
+    } as never);
+    seed();
+    await route.decide({ family: "alert_finding", id: "f1", action: "apply" }, "disk latency");
+    expect(queryClient.getQueryState(detail)?.isInvalidated).toBe(true);
+    expect(store.state.organizationData.allAlertsListByFolderId).toEqual({});
+    seed();
+    await route.undo([{ org: "default", view: applied, title: "disk latency" }]);
+    await settle();
+    expect(queryClient.getQueryState(detail)?.isInvalidated).toBe(true);
+    expect(store.state.organizationData.allAlertsListByFolderId).toEqual({});
+  });
+
+  describe("a read sent before an Apply or Undo and answered after it (F2)", () => {
+    const detail = alertKeys.detail("default", "al-1");
+    const applied = { ...view("f1"), action: "apply" as const, state: "applied" as const };
+    // The first read answers late with the values from before the write; later reads see the write.
+    const staleThenFresh = () => {
+      const late = deferred<{ pending_period_sec: number }>();
+      let calls = 0;
+      const queryFn = () =>
+        calls++ === 0 ? late.promise : Promise.resolve({ pending_period_sec: 120 });
+      return { late, queryFn };
+    };
+
+    it("an_undo_keeps_the_late_pre_undo_answer_out_of_the_cache", async () => {
+      await mountRoute();
+      const { late, queryFn } = staleThenFresh();
+      const read = queryClient.fetchQuery({ queryKey: detail, queryFn }).catch(() => null);
+      await route.undo([{ org: "default", view: applied, title: "disk latency" }]);
+      late.resolve({ pending_period_sec: 0 });
+      await read;
+      await settle();
+      expect(queryClient.getQueryData(detail)).not.toEqual({ pending_period_sec: 0 });
+      expect(queryClient.getQueryState(detail)?.isInvalidated).toBe(true);
+    });
+
+    it("an_apply_keeps_the_late_pre_apply_answer_out_of_the_cache", async () => {
+      await mountRoute();
+      vi.mocked(autoobserveDecisions.decide).mockResolvedValue({
+        data: { change: "created", decision: applied },
+      } as never);
+      const { late, queryFn } = staleThenFresh();
+      const read = queryClient.fetchQuery({ queryKey: detail, queryFn }).catch(() => null);
+      await route.decide({ family: "alert_finding", id: "f1", action: "apply" }, "disk latency");
+      late.resolve({ pending_period_sec: 0 });
+      await read;
+      await settle();
+      expect(queryClient.getQueryData(detail)).not.toEqual({ pending_period_sec: 0 });
+      expect(queryClient.getQueryState(detail)?.isInvalidated).toBe(true);
+    });
+  });
+
+  it("a_dismissal_leaves_alert_reads_alone", async () => {
+    await mountRoute();
+    const detail = alertKeys.detail("default", "al-1");
+    queryClient.setQueryData(detail, { id: "al-1" });
+    store.commit("setAllAlertsListByFolderId", { pay: [{ alert_id: "al-1" }] });
+    vi.mocked(autoobserveDecisions.decide).mockResolvedValue(decided("f1") as never);
+    await route.decide(body("f1"), "nightly-summary");
+    expect(queryClient.getQueryState(detail)?.isInvalidated).toBe(false);
+    expect(store.state.organizationData.allAlertsListByFolderId).toEqual({
+      pay: [{ alert_id: "al-1" }],
+    });
   });
 });

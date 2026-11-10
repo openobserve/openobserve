@@ -28,6 +28,7 @@ import {
   type PatchValue,
   type PlannedField,
 } from "@/utils/alerts/alertEditHandoff";
+import type { FieldChange } from "@/services/autoobserveDecisions";
 import { arrayColumn, type DigestRecord, type InsightAction, type ReviewFocus } from "./digests";
 import { formatMinutes, formatSeconds } from "./format";
 
@@ -113,6 +114,13 @@ export const patchOf = (action: ApplySuggestion): AlertFieldPatch =>
     ]),
   );
 
+/** The inverse of patchOf: a stored patch back in the wire's field names, as the decision route lists them. */
+export const fieldsOf = (patch: AlertFieldPatch): FieldChange[] =>
+  (Object.entries(APPLY_FIELDS) as [ApplyField, PatchKey][]).flatMap(([field, key]) => {
+    const change = patch[key];
+    return change ? [{ field, from: change.from, to: change.to } as FieldChange] : [];
+  });
+
 function parseApplySuggestion(item: unknown, alertId: string | undefined): ApplySuggestion | null {
   if (!isRecord(item) || item.type !== "apply_suggestion") return null;
   // Any other key (a second target such as `alert_ids`, or a field this build cannot check) drops the action.
@@ -145,6 +153,18 @@ export function applySuggestionsOf(record: DigestRecord): ApplySuggestion[] {
     const action = parseApplySuggestion(item, record.alert_id);
     return action ? [action] : [];
   });
+}
+
+/** An insight's change for its own alert, under the same rules as a digest row's; null when there is none. */
+export function applySuggestionIn(
+  actions: unknown,
+  alertId: string | undefined,
+): ApplySuggestion | null {
+  for (const item of Array.isArray(actions) ? actions : []) {
+    const action = parseApplySuggestion(item, alertId);
+    if (action) return action;
+  }
+  return null;
 }
 
 /** The one handoff the editor reads; an apply carries its patch and focuses its first field. */

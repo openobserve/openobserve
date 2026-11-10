@@ -19,7 +19,11 @@ import type { AlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft"
 import { queryClient } from "@/composables/query/queryClient";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { alertDetailQuery } from "@/services/alerts.queries";
+import { fetchAlertRead } from "@/services/alerts.readFence";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { newRequestId, useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
+import { isItemGone, isRouteDisabled } from "@/services/autoobserveDecisions";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import type { AlertEditHandoff, AlertFieldPatch } from "@/ts/interfaces/alertPrefill";
 import { takeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
 import {
@@ -28,9 +32,15 @@ import {
   planEditHandoff,
   type EditHandoffPlan,
 } from "@/utils/alerts/alertEditHandoff";
-import { applyCopy, type ApplyCopy } from "@/components/alert_calibration/applySuggestion";
+import {
+  applyCopy,
+  fieldsOf,
+  type ApplyCopy,
+} from "@/components/alert_calibration/applySuggestion";
+import { recordApplied } from "@/components/autoobserve/decisions/appliedChanges";
 import { isAlertCalibrationEnabled } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import { handoffCopy } from "@/components/autoobserve/insight/targets/editTargets";
+import { decisionCopy } from "@/components/autoobserve/insight/insightCopy";
 
 type AlertForm = ReturnType<typeof useAlertForm>;
 
@@ -63,6 +73,9 @@ export const useCalibrationHandoff = ({
     return isEditHandoffPrefill(prefill, typeof route.value.params.alert_id === "string");
   });
   const banner = shallowRef<CalibrationBanner | null>(null);
+  const decisions = useDecisionRoute({ probe: false });
+  // The finding whose change landed in this form; a Save then records it, so Undo and What I've changed see it.
+  let appliedFinding: { id: string; patch: AlertFieldPatch; title: string } | null = null;
   let active = true;
   onBeforeUnmount(() => {
     active = false;
@@ -91,7 +104,10 @@ export const useCalibrationHandoff = ({
   // The editor's own read and the prompt's may be up to a minute old, so the from check needs the server's current values.
   const freshAlert = async (alertId: string): Promise<Record<string, unknown> | null> => {
     try {
-      return await queryClient.fetchQuery({ ...alertDetailQuery(orgId(), alertId), staleTime: 0 });
+      return await fetchAlertRead(queryClient, orgId(), {
+        ...alertDetailQuery(orgId(), alertId),
+        staleTime: 0,
+      });
     } catch {
       // A failed read plans as invalid, since an empty alert never matches the handoff's target.
       return null;
@@ -115,6 +131,12 @@ export const useCalibrationHandoff = ({
     }
     const patch = handoff.patch as AlertFieldPatch;
     await editorDraft.applyProgrammaticChange(() => form.applyFieldPatch(patch));
+    if (handoff.source === CALIBRATION_PREFILL && handoff.target.findingId)
+      appliedFinding = {
+        id: handoff.target.findingId,
+        patch,
+        title: String(form.formData.value?.name ?? ""),
+      };
     await focus(plan);
     return { variant: "info", text: copy.applied(plan.fields) };
   };
@@ -161,5 +183,38 @@ export const useCalibrationHandoff = ({
     if (active) banner.value = result;
   };
 
-  return { reserved, banner, run };
+  /** After a Save: records the applied change once; the save stands either way, and only a real failure says the record is missing. */
+  const recordSaved = async () => {
+    const applied = appliedFinding;
+    appliedFinding = null;
+    if (!applied) return;
+    const org = orgId();
+    // A save may reset the form, so the name read when the change landed stands in.
+    const title = String(form.formData.value?.name ?? "") || applied.title || null;
+    try {
+      const result = await decisions.decide(
+        {
+          family: "alert_finding",
+          id: applied.id,
+          action: "apply",
+          applied_via: "editor",
+          request_id: newRequestId(),
+        },
+        title,
+      );
+      // An older server lists no applies, so this session's list is the only place the change shows.
+      recordApplied({
+        org,
+        view: { ...result.decision, via: "editor" },
+        title: title ?? "",
+        fields: fieldsOf(applied.patch),
+      });
+    } catch (error) {
+      // A server without the route never recorded editor saves, so it stays as today.
+      if (isRouteDisabled(error) && !isItemGone(error)) return;
+      toast({ message: decisionCopy(t, locale.value).notRecorded(), variant: "warning" });
+    }
+  };
+
+  return { reserved, banner, run, recordSaved };
 };

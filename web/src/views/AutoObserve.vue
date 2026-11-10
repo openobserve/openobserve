@@ -78,22 +78,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :source="live ? liveData.source.value : undefined"
         :skeleton="live && liveData.coverageSkeleton.value"
       />
-      <LiveSurfaceEmpty
-        v-else-if="tab === 'activity' && live"
-        surface="changes"
-        @action="allOpen = true"
-      />
+      <AppliedChangesList v-else-if="tab === 'activity' && live">
+        <LiveSurfaceEmpty surface="changes" @action="allOpen = true" />
+      </AppliedChangesList>
       <AutoObserveActivityTab
         v-else-if="tab === 'activity'"
         :ledger="ledger"
         @update-entry="updateEntry"
         @open-incident="openIncident"
       />
-      <LiveSurfaceEmpty
-        v-else-if="tab === 'policy' && live"
-        surface="settings"
-        @action="howOpen = true"
-      />
+      <LiveSettingsPanel v-else-if="tab === 'policy' && live" in-page @action="howOpen = true" />
       <AutoObservePolicyTab v-else-if="tab === 'policy'" />
     </OPageLayout>
 
@@ -128,6 +122,8 @@ import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
 import { useLiveAutoObserve, useLiveMode } from "@/components/autoobserve/live/liveModel";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
 import LiveSurfaceEmpty from "@/components/autoobserve/live/LiveSurfaceEmpty.vue";
+import LiveSettingsPanel from "@/components/autoobserve/live/LiveSettingsPanel.vue";
+import AppliedChangesList from "@/components/autoobserve/decisions/AppliedChangesList.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
 import { useLiveIssues } from "@/components/autoobserve/live/useLiveIssues";
 import { openBadge } from "@/components/autoobserve/live/incidentsCopy";

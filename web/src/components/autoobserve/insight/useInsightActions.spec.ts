@@ -322,3 +322,37 @@ describe("useInsightActions: where each fix lands", () => {
     expect(push).toHaveBeenCalledWith({ path: "/logs" });
   });
 });
+
+describe("useInsightActions: Review change opens its dialog (W5)", () => {
+  it("holds the change for the dialog and opens it, writing nothing", async () => {
+    let actions!: ReturnType<typeof useInsightActions>;
+    mount(
+      defineComponent({
+        setup() {
+          actions = useInsightActions();
+          return () => h("div");
+        },
+      }),
+    );
+    const change = {
+      findingId: "f-1",
+      alertId: "a-1",
+      alertName: "disk latency",
+      action: {
+        type: "apply_suggestion" as const,
+        alert_id: "a-1",
+        patch: [{ field: "pending_period_secs" as const, from: 0, to: 120 }],
+      },
+    };
+    await actions.run("f1", {
+      key: "review-change",
+      action: "reviewChange",
+      label: raw("Review change"),
+      note: null,
+      target: { type: "review_change", change },
+    });
+    expect(actions.reviewOpen.value).toBe(true);
+    expect(actions.reviewTarget.value).toEqual(change);
+    expect(push).not.toHaveBeenCalled();
+  });
+});

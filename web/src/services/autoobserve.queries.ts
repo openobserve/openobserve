@@ -18,6 +18,7 @@ import autoobserve, {
   type AutoObserveCoverage,
   type AutoObserveCoverageView,
   type AutoObserveIncidentList,
+  type AutoObservePagingSettings,
   type AutoObserveSuggestionList,
 } from "./autoobserve";
 import { autoobserveKeys } from "./autoobserve.querykeys";
@@ -75,6 +76,22 @@ export const autoobserveGapSuggestionsQuery = (org: string, pageSize: number) =>
       return { suggestions: all, total: all.length, limit: pageSize, offset: 0 };
     },
     staleTime: LIVE_STALE_TIME,
+  });
+
+// Null when the server has no paging route, so every surface keeps what it shows today.
+export const autoobservePagingQuery = (org: string) =>
+  queryOptions({
+    queryKey: autoobserveKeys.pagingSettings(org),
+    queryFn: async (): Promise<AutoObservePagingSettings | null> => {
+      try {
+        return (await autoobserve.pagingSettings(org)).data;
+      } catch (error) {
+        if ((error as { response?: { status?: number } }).response?.status === 404) return null;
+        throw error;
+      }
+    },
+    staleTime: LIVE_STALE_TIME,
+    retry: false,
   });
 
 // Polls only while a listed analysis is live, as the incident list does; otherwise the stale time decides.

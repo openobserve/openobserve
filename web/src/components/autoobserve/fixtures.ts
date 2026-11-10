@@ -256,7 +256,7 @@ export interface LiveIdentity {
   serviceName: string;
   cluster: string | null;
   namespace: string | null;
-  streams: { type: string; name: string }[];
+  streams: { type: string; name: string; learning_until?: number | null }[];
 }
 
 export interface StreamScan {

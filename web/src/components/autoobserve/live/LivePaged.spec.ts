@@ -564,4 +564,140 @@ describe("LivePaged (D9-web)", () => {
       expect(unreadable.findAll(sel("ask-ai"))).toHaveLength(0);
     });
   });
+
+  describe("who was paged (W2)", () => {
+    const withPage = (
+      i: number,
+      outcome: string,
+      team_name: string | null,
+      extra: Partial<AutoObserveIncidentItem> = {},
+    ) =>
+      ({
+        ...FIXTURE.items[i],
+        page: { outcome, team_id: team_name ? "t-1" : null, team_name },
+        ...extra,
+      }) as AutoObserveIncidentItem;
+
+    it("the subtitle no longer claims your on-call team was paged", async () => {
+      api.mockResolvedValueOnce(page([]));
+      const w = mountCard();
+      await flushPromises();
+      expect(w.find(sel("subtitle")).text()).toBe(
+        "Findings that opened an incident, who was paged, and its analysis.",
+      );
+      expect(w.text()).not.toContain("for your on-call team");
+    });
+
+    it("each outcome draws its own line; pending and absent draw none", async () => {
+      api.mockResolvedValueOnce(
+        page([
+          withPage(0, "paged", "SRE"),
+          withPage(1, "unrouted", null),
+          withPage(2, "failed", "SRE"),
+          withPage(3, "pending", null),
+        ]),
+      );
+      const w = mountCard({ cap: 10 });
+      await flushPromises();
+      const lines = rows(w).map((r) => r.find(sel("page")));
+      expect(lines[0].text()).toBe("Paged SRE");
+      expect(lines[0].attributes("data-tone")).toBe("neutral");
+      expect(lines[1].text()).toContain("Nobody was paged");
+      expect(lines[1].attributes("data-tone")).toBe("warning");
+      expect(lines[2].text()).toContain("Paging failed");
+      expect(lines[2].attributes("data-tone")).toBe("error");
+      expect(lines[3].exists()).toBe(false);
+      expect(rows(w)[0].findAll(sel("routing"))).toHaveLength(0);
+      await rows(w)[1].find(sel("routing")).trigger("click");
+      expect(push).toHaveBeenCalledWith({
+        name: "onCallRouting",
+        query: { org_identifier: "demo-org" },
+      });
+    });
+
+    it("every readable row has a why and a next line", async () => {
+      api.mockResolvedValueOnce(page(pick(0)));
+      const w = mountCard();
+      await flushPromises();
+      expect(rows(w)[0].find(sel("why")).text()).toMatch(
+        /^No data has arrived on checkout \(logs\) since /,
+      );
+      expect(rows(w)[0].find(sel("next")).text()).toContain("Check the sender or collector");
+    });
+
+    it("a grouped incident heads with the count and names three", async () => {
+      const members = Array.from({ length: 12 }, (_, n) => ({
+        id: `m-${n}`,
+        title: "",
+        stream_type: "logs",
+        stream_name: `ingest_${n}`,
+        first_seen_at: FIXTURE.items[0].finding.first_seen_at,
+        recovered_at: null,
+      }));
+      api.mockResolvedValueOnce(page([withPage(0, "unrouted", null, { members })]));
+      const w = mountCard();
+      await flushPromises();
+      expect(sentences(w)[0]).toBe("12 streams stopped sending data");
+      expect(rows(w)[0].find(sel("why")).text()).toContain(
+        "ingest_0, ingest_1, ingest_2, and 9 more",
+      );
+    });
+  });
+
+  describe("learning (W3)", () => {
+    const coverageApi = vi.mocked(autoobserve.coverage);
+    const NOV_24_US = Date.UTC(2026, 10, 24, 12, 0) * 1000;
+    const coverage = (streams_learning: number, streams_ready: number) =>
+      ({
+        data: {
+          view: "strict",
+          pass_at: null,
+          refreshed_at: null,
+          quality: null,
+          classes: [],
+          rows: [],
+          learning: {
+            streams_learning,
+            streams_ready,
+            history_days_needed: 14,
+            next_ready_at: NOV_24_US,
+          },
+        },
+      }) as never;
+
+    afterEach(() => coverageApi.mockReset());
+
+    it("the subtitle slot carries the learning line while streams learn", async () => {
+      coverageApi.mockResolvedValue(coverage(9, 10));
+      api.mockResolvedValueOnce(page([]));
+      const w = mountCard();
+      await flushPromises();
+      expect(w.find(sel("learning")).text()).toBe(
+        "Learning 9 streams. The first is ready on Nov 24; AutoObserve needs 14 days of history to judge a stream.",
+      );
+      expect(w.find(sel("subtitle")).exists()).toBe(false);
+      expect(w.find(sel("empty")).text()).toContain("Nothing has paged anyone");
+    });
+
+    it("an org with no ready stream says what it waits for instead of looking empty", async () => {
+      coverageApi.mockResolvedValue(coverage(12, 0));
+      api.mockResolvedValueOnce(page([]));
+      const w = mountCard();
+      await flushPromises();
+      expect(w.find(sel("subtitle")).exists()).toBe(true);
+      const empty = w.find(sel("empty-learning"));
+      expect(empty.text()).toContain("Learning your streams");
+      expect(empty.text()).toContain("The first of 12 streams is ready on Nov 24.");
+    });
+
+    it("a server without the learning block keeps today's card", async () => {
+      coverageApi.mockResolvedValue({ data: { rows: [] } } as never);
+      api.mockResolvedValueOnce(page([]));
+      const w = mountCard();
+      await flushPromises();
+      expect(w.find(sel("learning")).exists()).toBe(false);
+      expect(w.find(sel("subtitle")).exists()).toBe(true);
+      expect(w.find(sel("empty")).exists()).toBe(true);
+    });
+  });
 });

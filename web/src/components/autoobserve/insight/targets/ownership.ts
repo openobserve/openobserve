@@ -21,6 +21,7 @@ export type { NotifyPick, TeamPick };
 
 /** The part of an alert list row ownership reads (`GET /api/v2/{org}/alerts`). */
 export interface OwnedAlert {
+  id?: string | null;
   folder_id?: string | null;
   folder_name?: string | null;
   destinations?: string[] | null;
@@ -107,6 +108,7 @@ export const notifyOf = (service: string, alerts: OwnedAlert[]): NotifyPick => {
 const ownedOf = (alert: any): OwnedAlert => {
   const folder = alert?.folder_name;
   return {
+    id: String(alert?.alert_id ?? alert?.id ?? "") || null,
     folder_id: alert?.folder_id ?? folder?.id ?? null,
     folder_name: typeof folder === "string" ? folder : (folder?.name ?? null),
     destinations: Array.isArray(alert?.destinations) ? alert.destinations : [],

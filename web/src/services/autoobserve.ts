@@ -57,7 +57,8 @@ export interface AutoObserveCoverageRow {
   service_name: string;
   cluster: string | null;
   namespace: string | null;
-  streams: { type: string; name: string }[];
+  // learning_until is null or absent once the stream has enough history.
+  streams: { type: string; name: string; learning_until?: number | null }[];
   traffic_per_hour: number | null;
   // The engine raises findings only for good services while discovery is partial.
   good?: boolean;
@@ -72,6 +73,14 @@ export interface AutoObserveQuality {
   stale_since: number | null;
 }
 
+// Streams still gathering history; next_ready_at is when the first one is ready, in microseconds.
+export interface AutoObserveLearning {
+  streams_learning: number;
+  streams_ready: number;
+  history_days_needed: number;
+  next_ready_at: number | null;
+}
+
 // pass_at, refreshed_at and quality are null when the engine wrote no pass in the last day.
 export interface AutoObserveCoverage {
   view: AutoObserveCoverageView;
@@ -80,6 +89,7 @@ export interface AutoObserveCoverage {
   quality: AutoObserveQuality | null;
   classes: AutoObserveClass[];
   rows: AutoObserveCoverageRow[];
+  learning?: AutoObserveLearning;
 }
 
 export type AutoObserveTier = "A" | "B" | "C";
@@ -146,6 +156,25 @@ export interface AutoObserveSuggestionList {
 
 export type AutoObserveFindingKind = "stream_silence" | "stream_drop" | "stream_rise";
 
+export type AutoObservePageOutcome = "paged" | "unrouted" | "failed" | "pending";
+
+// Who a stopped stream paged; absent on a server that does not record it.
+export interface AutoObservePage {
+  outcome: AutoObservePageOutcome;
+  team_id: string | null;
+  team_name: string | null;
+}
+
+// One stream grouped into the same incident; the list is omitted when empty.
+export interface AutoObserveIncidentMember {
+  id: string;
+  title: string;
+  stream_type: string;
+  stream_name: string;
+  first_seen_at: number;
+  recovered_at: number | null;
+}
+
 export interface AutoObserveIncidentItem {
   // kind and stream are null when the incident's group values are unreadable.
   finding: {
@@ -169,6 +198,14 @@ export interface AutoObserveIncidentItem {
     summary: RcaSummaryFields | null;
     not_run_reason: string | null;
   };
+  page?: AutoObservePage;
+  members?: AutoObserveIncidentMember[];
+}
+
+// available is false when the deployment turns paging off; the switch then cannot be turned on.
+export interface AutoObservePagingSettings {
+  page_on_stop: boolean;
+  available: boolean;
 }
 
 // Items come newest first; there is no total, only has_more.
@@ -185,6 +222,14 @@ const autoobserve = {
     http().get<AutoObserveSuggestionList>(`/api/v2/${org}/autoobserve/suggestions`, { params }),
   incidents: (org: string, params: { limit: number; offset: number }) =>
     http().get<AutoObserveIncidentList>(`/api/v2/${org}/autoobserve/incidents`, { params }),
+  pagingSettings: (org: string) =>
+    http().get<AutoObservePagingSettings>(`/api/v2/${org}/autoobserve/settings/paging`, {
+      silentForbidden: true,
+    }),
+  setPagingSettings: (org: string, body: { page_on_stop: boolean }) =>
+    http().put<AutoObservePagingSettings>(`/api/v2/${org}/autoobserve/settings/paging`, body, {
+      silentForbidden: true,
+    }),
 };
 
 export default autoobserve;

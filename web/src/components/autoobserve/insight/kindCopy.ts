@@ -18,8 +18,10 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type {
   AutoObserveCell,
   AutoObserveCoverageRow,
+  AutoObserveIncidentItem,
   AutoObserveSuggestion,
 } from "@/services/autoobserve";
+import { formatWhen } from "../live/liveCopy";
 import {
   heartbeatAlert,
   noDataAlert,
@@ -54,6 +56,21 @@ export interface KindCopy {
   cta: InsightCta | null;
   secondary: InsightCta[];
   ai: AiFinding | null;
+}
+
+/** Who a paged finding reached; `routing` asks for the on-call routing CTA. */
+export interface PageLine {
+  tone: "neutral" | "warning" | "error";
+  text: I18nText;
+  routing: boolean;
+}
+
+/** A paged finding's own lines: a grouped headline, who was paged, why and next. */
+export interface PagedFindingCopy {
+  headline: I18nText | null;
+  page: PageLine | null;
+  why: I18nText | null;
+  next: I18nText | null;
 }
 
 type GapClass = "errors" | "latency" | "absence";
@@ -134,7 +151,14 @@ const scopeOf = (row: AutoObserveCoverageRow, stream: { type: string; name: stri
   stream,
 });
 
-// No alert watches a gap service, so its drafts land in the org default folder and notify no one yet.
+/** The service's own alerts coverage matched on any check, including ones that lost to another monitor. */
+const alertIdsOf = (row: AutoObserveCoverageRow): string[] => {
+  const evidence = Object.values(row.cells).flatMap((c) => c?.all_evidence ?? c?.evidence ?? []);
+  const ids = evidence.filter((e) => e.monitor_kind === "alert").map((e) => e.monitor_id);
+  return [...new Set(ids)].sort();
+};
+
+// Drafts start in the org default folder; the review list fills team and destination from the service's own alerts.
 const ownership = (service: string) => ({
   team: teamOf(service, []),
   notify: notifyOf(service, []),
@@ -167,6 +191,7 @@ const bulkRow = (row: AutoObserveCoverageRow, kind: BulkKind): BulkRow => ({
   scope: scopeOf(row, kind === "latency" ? streamOf(row, "traces")! : rowStream(row)!),
   usually: null,
   ...ownership(row.service_name),
+  ...(alertIdsOf(row).length ? { alertIds: alertIdsOf(row) } : {}),
   ...(kind === "latency" ? { inputs: { durationField: "duration", p95Ms: null } } : {}),
 });
 
@@ -786,6 +811,76 @@ export const gapGroupCopy = (
         ["First services", shown.join(", ")],
       ],
     },
+  };
+};
+
+const PAGED_KINDS = ["stream_silence", "stream_drop", "stream_rise"] as const;
+
+type PagedKind = (typeof PAGED_KINDS)[number];
+
+const pagedKindOf = (kind: string | null): PagedKind | null =>
+  PAGED_KINDS.find((k) => k === kind) ?? null;
+
+const pageLine = (t: TranslateFn, item: AutoObserveIncidentItem): PageLine | null => {
+  switch (item.page?.outcome) {
+    case "paged":
+      return {
+        tone: "neutral",
+        text: item.page.team_name
+          ? t("insight.kind.paged.page.paged", { team: raw(item.page.team_name) })
+          : t("insight.kind.paged.page.pagedTeam"),
+        routing: false,
+      };
+    case "unrouted":
+      return { tone: "warning", text: t("insight.kind.paged.page.unrouted"), routing: true };
+    case "failed":
+      return { tone: "error", text: t("insight.kind.paged.page.failed"), routing: false };
+    default:
+      return null;
+  }
+};
+
+/** The one copy for a paged finding's card row, for one stream or a group of many. */
+export const pagedFindingCopy = (
+  t: TranslateFn,
+  zone: InsightZone,
+  item: AutoObserveIncidentItem,
+  nowMs: number,
+): PagedFindingCopy => {
+  const kind = pagedKindOf(item.finding.kind);
+  const page = pageLine(t, item);
+  const { stream_name, stream_type, first_seen_at } = item.finding;
+  if (!kind || !stream_name || !stream_type) return { headline: null, page, why: null, next: null };
+  const time = formatWhen(first_seen_at / 1000, zone.locale, zone.timeZone, nowMs);
+  const members = item.members ?? [];
+  const many = members.length > 1;
+  const shown = members.slice(0, GROUP_NAMES).map((m) => m.stream_name);
+  const rest = members.length - shown.length;
+  const streams = listOf(
+    zone.locale,
+    [
+      ...shown,
+      ...(rest > 0
+        ? [String(t("autoobserveLive.suggestions.moreNames", { count: rest }, rest))]
+        : []),
+    ],
+    "conjunction",
+  );
+  const why = many
+    ? t(`insight.kind.paged.${kind}.whyMany`, { streams, time })
+    : t(`insight.kind.paged.${kind}.why`, {
+        stream: raw(stream_name),
+        type: raw(stream_type),
+        time,
+      });
+  const next = String(t(`insight.kind.paged.${kind}.${many ? "nextMany" : "next"}`));
+  return {
+    headline: many
+      ? t(`insight.kind.paged.${kind}.headline`, { count: count(members.length, zone.locale) })
+      : null,
+    page,
+    why,
+    next: raw(page?.routing ? `${next} ${t("insight.kind.paged.nextRouting")}` : next),
   };
 };
 

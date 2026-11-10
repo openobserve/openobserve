@@ -315,3 +315,57 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 });
+
+describe("AutoObserve2 coverage page learning line (W3)", () => {
+  const data = (learning?: Record<string, unknown>) => ({
+    data: {
+      view: "strict",
+      pass_at: null,
+      refreshed_at: null,
+      quality: null,
+      classes: [],
+      rows: [
+        {
+          service_id: "s",
+          service_name: "svc-a",
+          cluster: null,
+          namespace: null,
+          streams: [],
+          traffic_per_hour: null,
+          cells: {},
+        },
+      ],
+      ...(learning ? { learning } : {}),
+    },
+  });
+
+  beforeEach(() => {
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+    Object.assign(routeQuery, { live: "1", page: "coverage" });
+  });
+
+  it("follows the coverage sentence while streams learn", async () => {
+    vi.mocked(autoobserve.coverage).mockResolvedValue(
+      data({
+        streams_learning: 9,
+        streams_ready: 3,
+        history_days_needed: 14,
+        next_ready_at: Date.UTC(2026, 10, 24, 12) * 1000,
+      }) as never,
+    );
+    const wrapper = mountView();
+    await flushPromises();
+    expect(wrapper.find('[data-test="autoobserve2-coverage-sentence"]').text()).toMatch(
+      /^.+\. Learning 9 streams\. The first is ready on Nov 24; AutoObserve needs 14 days of history to judge a stream\.$/,
+    );
+  });
+
+  it("a server without the learning block keeps today's sentence", async () => {
+    vi.mocked(autoobserve.coverage).mockResolvedValue(data() as never);
+    const wrapper = mountView();
+    await flushPromises();
+    expect(wrapper.find('[data-test="autoobserve2-coverage-sentence"]').text()).not.toContain(
+      "Learning",
+    );
+  });
+});

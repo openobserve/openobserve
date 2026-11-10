@@ -20,7 +20,11 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { AutoObserveSuggestion } from "@/services/autoobserve";
 import { buildLogsRoute } from "@/utils/metrics/metricDrilldown";
 import type { ReviewFocus } from "@/components/alert_calibration/digests";
-import type { ReviewAlertAction } from "@/components/alert_calibration/applySuggestion";
+import {
+  applySuggestionIn,
+  type ReviewAlertAction,
+} from "@/components/alert_calibration/applySuggestion";
+import type { ReviewChangeTarget } from "../decisions/appliedChanges";
 import {
   ADVICE_LABEL,
   insightActionLabel,
@@ -60,7 +64,8 @@ export type InsightTarget =
   | { type: "create_alert"; prefill: AlertPrefill; folder: string; draft?: AlertDraft }
   | { type: "bulk"; request: BulkReviewRequest }
   | { type: "synthetic"; prefill: SyntheticPrefillInput }
-  | { type: "destinations"; alertId: string; alertName: string; destinations: string[] };
+  | { type: "destinations"; alertId: string; alertName: string; destinations: string[] }
+  | { type: "review_change"; change: ReviewChangeTarget };
 
 export interface InsightCta {
   key: string;
@@ -476,6 +481,31 @@ const notWorkingAi = (
   };
 };
 
+/** Review change, when the finding stores a change for its own alert; the dialog shows old to new before any write. */
+const reviewChangeCta = (t: TranslateFn, item: AutoObserveSuggestion): InsightCta | null => {
+  const reviewed = typedActions(item).find((a) => a.type === "review_alert");
+  const alertId =
+    text(item.evidence.alert_id) || (reviewed?.type === "review_alert" ? reviewed.alert_id : "");
+  const findingId = text(item.evidence.finding_id) || item.id;
+  const action = alertId ? applySuggestionIn(item.actions, alertId) : null;
+  if (!action) return null;
+  return {
+    key: "review-change",
+    action: "reviewChange",
+    label: insightCtaLabel(t, "reviewChange"),
+    target: {
+      type: "review_change",
+      change: {
+        findingId,
+        alertId,
+        alertName: text(item.evidence.alert_name) || text(item.evidence.monitor_name),
+        action,
+      },
+    },
+    note: t("insight.decisions.apply.cardNote"),
+  };
+};
+
 const notWorkingParts = (
   t: TranslateFn,
   zone: InsightZone,
@@ -483,9 +513,11 @@ const notWorkingParts = (
   today: InsightToday,
   nowMs: number,
 ): InsightParts => {
-  const cta = ctaOf(t, item, nowMs);
+  const review = ctaOf(t, item, nowMs);
+  const change = reviewChangeCta(t, item);
+  const cta = change ?? review;
   const stream = evidenceLogsStream(item);
-  const logs = stream && cta?.key !== `logs-${stream}` ? logsCta(t, item, stream, nowMs) : null;
+  const logs = stream && review?.key !== `logs-${stream}` ? logsCta(t, item, stream, nowMs) : null;
   const calibration = calibrationCta(t, item);
   return {
     id: item.id,
@@ -495,7 +527,9 @@ const notWorkingParts = (
     whyDetail: null,
     next: alertNext(t, item),
     cta,
-    secondary: [logs, calibration].filter((c): c is InsightCta => c !== null),
+    secondary: [change ? review : null, logs, calibration].filter(
+      (c): c is InsightCta => c !== null,
+    ),
     note: cta?.note ?? null,
     facts: today.tags,
     meta: today.why,
@@ -711,7 +745,14 @@ export function decisionCopy(t: TranslateFn, locale: string) {
             org: raw(org),
             when: when(preview.effect.until, nowMs),
           }),
-    saved: (view: Pick<DecisionView, "reason" | "until">, subject: string | null | undefined) => {
+    saved: (
+      view: Pick<DecisionView, "reason" | "until"> & Partial<Pick<DecisionView, "action" | "via">>,
+      subject: string | null | undefined,
+    ) => {
+      if (view.action === "apply")
+        return view.via === "editor"
+          ? t("insight.decisions.saved.appliedEditor", { title: title(subject) })
+          : t("insight.decisions.saved.applied", { title: title(subject) });
       if (view.reason === "intended_report")
         return t("insight.decisions.saved.markedOne", { title: title(subject) });
       return view.until === null
@@ -720,10 +761,17 @@ export function decisionCopy(t: TranslateFn, locale: string) {
     },
     marked: (n: number): I18nText =>
       t("insight.decisions.saved.marked", { count: countText(n, locale) }, n),
-    undone: (n: number, subject?: string | null): I18nText =>
-      n === 1 && subject
+    notRecorded: (): I18nText => t("insight.decisions.saved.notRecorded"),
+    undone: (n: number, subject?: string | null, applied = false): I18nText => {
+      // An undone apply restores the alert; an undone dismissal shows the finding again.
+      if (applied)
+        return n === 1 && subject
+          ? t("insight.decisions.undone.applyOne", { title: raw(subject) })
+          : t("insight.decisions.undone.applyMany", { count: countText(n, locale) }, n);
+      return n === 1 && subject
         ? t("insight.decisions.undone.one", { title: raw(subject) })
-        : t("insight.decisions.undone.many", { count: countText(n, locale) }, n),
+        : t("insight.decisions.undone.many", { count: countText(n, locale) }, n);
+    },
     actor: (actor: string, me: string | undefined): I18nText =>
       me && actor === me ? t("insight.decisions.you") : raw(actor),
     count: (n: number): I18nText => countText(n, locale),

@@ -22,6 +22,7 @@ import type {
   AutoObserveClass,
   AutoObserveCoverage,
   AutoObserveCoverageRow,
+  AutoObserveLearning,
   AutoObserveStatedEvidence,
   AutoObserveSuggestion,
   AutoObserveSuggestionList,
@@ -81,6 +82,8 @@ export interface CoverageSource extends Required<SourceState> {
   planned: Set<string>;
   // Null when the engine finished no pass in the last day.
   passMinutes: number | null;
+  // Null on a server that does not report learning.
+  learning: AutoObserveLearning | null;
 }
 
 export interface Zone {
@@ -417,12 +420,26 @@ export const toCoverageSource = (
 ): CoverageSource => {
   const base = { busy: false, failure: null, detail: raw(""), stale: null, ...state };
   if (!data)
-    return { ...base, rows: [], totals: EMPTY_TOTALS, planned: new Set(), passMinutes: null };
+    return {
+      ...base,
+      rows: [],
+      totals: EMPTY_TOTALS,
+      planned: new Set(),
+      passMinutes: null,
+      learning: null,
+    };
   const names = uniqueNames(t, data.rows);
   const minutes = minutesSince(data.pass_at, now);
   const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale));
   const planned = new Set(data.rows.flatMap((row, i) => (cannotWatch(row) ? [names[i]] : [])));
-  return { ...base, rows, totals: totalsOf(data, rows), planned, passMinutes: minutes };
+  return {
+    ...base,
+    rows,
+    totals: totalsOf(data, rows),
+    planned,
+    passMinutes: minutes,
+    learning: data.learning ?? null,
+  };
 };
 
 const listOf = (locale: string, parts: I18nText[]): I18nText =>

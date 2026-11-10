@@ -35,6 +35,11 @@ import {
   type AlertFieldPatch,
 } from "@/ts/interfaces/alertPrefill";
 import { byTest, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
+import autoobserveDecisions from "@/services/autoobserveDecisions";
+import {
+  clearAppliedSession,
+  useAppliedChanges,
+} from "@/components/autoobserve/decisions/appliedChanges";
 import AddAlert from "./AddAlert.vue";
 
 vi.mock("@/composables/useStreams", () => ({
@@ -80,6 +85,17 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
       list: vi.fn(() => Promise.resolve({ data: [{ name: "ops-pager" }, { name: "ops-mail" }] })),
     },
   });
+});
+vi.mock("@/services/autoobserveDecisions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/autoobserveDecisions")>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      decide: vi.fn(() => Promise.reject({ response: { status: 404, data: {} } })),
+      list: vi.fn(),
+    },
+  };
 });
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
@@ -544,6 +560,159 @@ describe("AddAlert calibration handoff", () => {
     expect(messages).toContain("Alert updated successfully.");
     expect(messages.join(" ")).not.toMatch(/calibration|suggest|appl/i);
     expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBeNull();
+  });
+
+  it("Save after an applied handoff records it as applied in the editor, with Undo (W5)", async () => {
+    vi.mocked(autoobserveDecisions.decide).mockResolvedValueOnce({
+      data: {
+        change: "created",
+        decision: {
+          decision_id: "alert_finding:f1",
+          family: "alert_finding",
+          id: "f1",
+          action: "apply",
+          state: "applied",
+          reason: null,
+          note: null,
+          has_note: false,
+          actor: "you",
+          source: "ui",
+          decided_at: 1,
+          until: null,
+          revision: 2,
+        },
+      },
+    } as never);
+    writeAlertEditHandoff(handoff());
+    await mountEditor();
+    await vm().handleSave();
+    await flushPromises();
+    expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+    expect(autoobserveDecisions.decide).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        family: "alert_finding",
+        id: "f1",
+        action: "apply",
+        applied_via: "editor",
+      }),
+    );
+    const recorded = vi
+      .mocked(toast)
+      .mock.calls.find(([options]) => String(options.message).startsWith("Saved and recorded for"));
+    expect(recorded?.[0].action?.label).toBe("Undo");
+  });
+
+  it("a recorded editor Save lists the change in What I've changed when the server lists none (F3)", async () => {
+    clearAppliedSession();
+    vi.mocked(autoobserveDecisions.decide).mockResolvedValueOnce({
+      data: {
+        change: "created",
+        decision: {
+          decision_id: "alert_finding:f1",
+          family: "alert_finding",
+          id: "f1",
+          action: "apply",
+          state: "applied",
+          reason: null,
+          note: null,
+          has_note: false,
+          actor: "you",
+          source: "ui",
+          decided_at: 1,
+          until: null,
+          revision: 2,
+        },
+      },
+    } as never);
+    writeAlertEditHandoff(handoff());
+    await mountEditor();
+    await vm().handleSave();
+    await flushPromises();
+    const org = String(store.state.selectedOrganization.identifier);
+    const entries = useAppliedChanges(org, []).value;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].title).toBe("ops_cpu");
+    expect(entries[0].view.decision_id).toBe("alert_finding:f1");
+    expect(entries[0].fields).toEqual(
+      expect.arrayContaining([
+        { field: "pending_period_secs", from: 60, to: 120 },
+        { field: "silence_minutes", from: 10, to: 45 },
+        { field: "destinations", from: [], to: ["ops-pager"] },
+      ]),
+    );
+  });
+
+  it("a failed record lists nothing in What I've changed (F3)", async () => {
+    clearAppliedSession();
+    vi.mocked(autoobserveDecisions.decide).mockRejectedValueOnce({
+      response: { status: 500, data: {} },
+    });
+    writeAlertEditHandoff(handoff());
+    await mountEditor();
+    await vm().handleSave();
+    await flushPromises();
+    const org = String(store.state.selectedOrganization.identifier);
+    expect(useAppliedChanges(org, []).value).toHaveLength(0);
+  });
+
+  it("a failed record after Save says the change was not recorded, in amber (D7)", async () => {
+    vi.mocked(autoobserveDecisions.decide).mockRejectedValueOnce({
+      response: { status: 500, data: {} },
+    });
+    writeAlertEditHandoff(handoff());
+    await mountEditor();
+    await vm().handleSave();
+    await flushPromises();
+    expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+    const notice = vi
+      .mocked(toast)
+      .mock.calls.find(([options]) => String(options.message).includes("not recorded"));
+    expect(String(notice?.[0].message)).toBe(
+      "Saved. This change was not recorded, so it can't be undone from AutoObserve.",
+    );
+    expect(notice?.[0].variant).toBe("warning");
+    expect(notice?.[0].action).toBeUndefined();
+  });
+
+  it("a finding gone since the handoff (404 not_found) says the change was not recorded (D7)", async () => {
+    vi.mocked(autoobserveDecisions.decide).mockRejectedValueOnce({
+      response: { status: 404, data: { code: 404, error: "not_found", message: "gone" } },
+    });
+    writeAlertEditHandoff(handoff());
+    await mountEditor();
+    await vm().handleSave();
+    await flushPromises();
+    const messages = vi.mocked(toast).mock.calls.map(([options]) => String(options.message));
+    expect(messages).toContain(
+      "Saved. This change was not recorded, so it can't be undone from AutoObserve.",
+    );
+  });
+
+  it("a server without the decision route saves as today, with no notice (D7)", async () => {
+    vi.mocked(autoobserveDecisions.decide).mockRejectedValueOnce({
+      response: { status: 404, data: {} },
+    });
+    writeAlertEditHandoff(handoff());
+    await mountEditor();
+    await vm().handleSave();
+    await flushPromises();
+    expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+    const messages = vi.mocked(toast).mock.calls.map(([options]) => String(options.message));
+    expect(messages.join(" ")).not.toMatch(/not recorded/);
+  });
+
+  it("Save records nothing when the handoff did not apply", async () => {
+    vi.mocked(autoobserveDecisions.decide).mockClear();
+    writeAlertEditHandoff(handoff({ patch: { silenceMinutes: { from: 10, to: 45 } } }));
+    await mountEditor({
+      ...savedAlert,
+      trigger_condition: { ...savedAlert.trigger_condition, silence: 30 },
+    });
+    expect(bannerText()).toContain("this alert changed after the analysis");
+    await vm().handleSave();
+    await flushPromises();
+    expect(autoobserveDecisions.decide).not.toHaveBeenCalled();
   });
 
   it("the handoff is read once", async () => {

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import { keepPreviousData, queryOptions, useQuery, useQueryClient } from "@tanstack/vue-query";
 import config from "@/aws-exports";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
@@ -22,6 +23,7 @@ import { toast, toastRecords } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { autoobserveKeys } from "@/services/autoobserve.querykeys";
 import { alertCalibrationKeys } from "@/services/alert_calibration.querykeys";
+import { fenceAlertWrite } from "@/services/alerts.readFence";
 import autoobserveDecisions, {
   isRouteDisabled,
   type BatchResult,
@@ -32,6 +34,7 @@ import autoobserveDecisions, {
   type PreviewParams,
 } from "@/services/autoobserveDecisions";
 import { decisionCopy } from "@/components/autoobserve/insight/insightCopy";
+import { markUndone } from "@/components/autoobserve/decisions/appliedChanges";
 
 /** One written decision, the org it was written in, and the name its toasts use. */
 export interface Written {
@@ -106,12 +109,16 @@ export const newRequestId = (): string =>
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 
 /** The one entry to the decision route for every surface: the switch, writes, the undo toast and undo. */
-export function useDecisionRoute() {
+export function useDecisionRoute(options: { probe?: boolean } = {}) {
   const { t, locale } = useI18nTyped();
   const orgId = useOrgId();
   const queryClient = useQueryClient();
   const enterprise = isEnterprise();
-  const probe = useQuery(() => ({ ...decisionsEnabledQuery(orgId.value), enabled: enterprise }));
+  // A caller that only records a write it already made needs no probe; a 404 then tells it the route is off.
+  const probe = useQuery(() => ({
+    ...decisionsEnabledQuery(orgId.value),
+    enabled: enterprise && options.probe !== false,
+  }));
   /** A failed probe reads as off, so a surface falls back to today's routes instead of erroring. */
   const enabled = computed(() => enterprise && probe.data.value === true);
   /** Only a confirmed off switch, or a build without the route, writes through today's routes. */
@@ -123,10 +130,22 @@ export function useDecisionRoute() {
   const undoing = ref<ReadonlySet<string>>(new Set());
   const copy = () => decisionCopy(t, locale.value);
 
+  const store = useStore();
+
   const refreshAfterWrite = (org: string) => {
     void queryClient.invalidateQueries({ queryKey: autoobserveKeys.suggestions(org) });
     void queryClient.invalidateQueries({ queryKey: autoobserveKeys.decisionsPages(org) });
     void queryClient.invalidateQueries({ queryKey: alertCalibrationKeys.dismissals(org) });
+  };
+
+  // An apply or its undo rewrites the alert, so a read from before it, saved later, would put the old values back.
+  const fencedIfApply = <T>(org: string, action: string | undefined, write: () => Promise<T>) =>
+    action === "apply" ? fenceAlertWrite(queryClient, org, write) : write();
+
+  // AlertList renders folders from Vuex, which holds only the selected org's rows.
+  const dropFolderRows = (org: string) => {
+    if (store?.state.selectedOrganization?.identifier === org)
+      void store.dispatch("setAllAlertsListByFolderId", {});
   };
 
   const setUndoing = (ids: string[], on: boolean) => {
@@ -139,19 +158,24 @@ export function useDecisionRoute() {
   };
 
   /** Undoes every write in one go and says how many were undone; a retry covers only what failed. */
-  async function undo(written: Written[]) {
+  async function undo(written: Written[]): Promise<boolean> {
     const ids = written.map((w) => w.view.decision_id);
-    if (!written.length || ids.some((id) => undoing.value.has(id))) return;
+    if (!written.length || ids.some((id) => undoing.value.has(id))) return false;
     setUndoing(ids, true);
     const failed: { item: Written; error: unknown }[] = [];
+    const undone: Written[] = [];
     try {
       await Promise.all(
         written.map(async (item) => {
           try {
-            await autoobserveDecisions.undo(item.org, item.view.decision_id, {
-              expected_revision: item.view.revision,
-              request_id: newRequestId(),
-            });
+            const result = await fencedIfApply(item.org, item.view.action, () =>
+              autoobserveDecisions.undo(item.org, item.view.decision_id, {
+                expected_revision: item.view.revision,
+                request_id: newRequestId(),
+              }),
+            );
+            const revision = result?.data?.decision?.revision ?? item.view.revision;
+            undone.push({ ...item, view: { ...item.view, revision } });
           } catch (error) {
             failed.push({ item, error });
           }
@@ -160,14 +184,22 @@ export function useDecisionRoute() {
     } finally {
       setUndoing(ids, false);
       for (const org of new Set(written.map((w) => w.org))) refreshAfterWrite(org);
+      const undoneApplies = undone.filter((w) => w.view.action === "apply");
+      for (const org of new Set(undoneApplies.map((w) => w.org))) dropFolderRows(org);
     }
-    if (written[0].org !== orgId.value) return;
+    // Every Undo (toast, row, retry) passes here, so this session's What I've changed rows follow one source.
+    markUndone(undone);
+    if (written[0].org !== orgId.value) return !failed.length;
     if (!failed.length) {
       toast({
-        message: copy().undone(written.length, written.length === 1 ? written[0].title : null),
+        message: copy().undone(
+          written.length,
+          written.length === 1 ? written[0].title : null,
+          written.every((w) => w.view.action === "apply"),
+        ),
         variant: "success",
       });
-      return;
+      return true;
     }
     const retryable = failed.filter((f) => copy().undoRetryable(f.error)).map((f) => f.item);
     const notice = copy().undoOutcome(
@@ -176,6 +208,7 @@ export function useDecisionRoute() {
     );
     if (retryable.length) toastUndoing(retryable, notice.text, notice.variant, copy().retry());
     else toast({ message: notice.text, variant: notice.variant });
+    return false;
   }
 
   /** Every write ends in one toast whose Undo sends the revision the write returned; a write from an org left behind shows none. */
@@ -215,9 +248,13 @@ export function useDecisionRoute() {
 
   async function decide(body: DecisionRequest, title: string | null): Promise<DecisionResult> {
     const org = orgId.value;
-    const result = (await autoobserveDecisions.decide(org, body)).data;
+    const result = (
+      await fencedIfApply(org, body.action, () => autoobserveDecisions.decide(org, body))
+    ).data;
     refreshAfterWrite(org);
-    toastWritten([{ org, view: result.decision, title }], copy().saved(result.decision, title));
+    if (body.action === "apply") dropFolderRows(org);
+    const view = { ...result.decision, via: body.applied_via ?? result.decision.via };
+    toastWritten([{ org, view: result.decision, title }], copy().saved(view, title));
     return result;
   }
 

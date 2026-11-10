@@ -155,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="dismissOpen"
       :finding="dismissTarget"
     />
+    <ReviewChangeDialog v-if="reviewTarget" v-model:open="reviewOpen" :target="reviewTarget" />
   </ODrawer>
 </template>
 
@@ -176,6 +177,7 @@ import {
 } from "@/services/autoobserve.queries";
 import InsightBlock from "../insight/InsightBlock.vue";
 import { useInsightActions } from "../insight/useInsightActions";
+import ReviewChangeDialog from "../decisions/ReviewChangeDialog.vue";
 import AlertCalibrationDismissDialog from "@/components/alert_calibration/AlertCalibrationDismissDialog.vue";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveRefreshFailed from "./LiveRefreshFailed.vue";
@@ -197,7 +199,8 @@ const emit = defineEmits<{ "update:open": [value: boolean] }>();
 const { t, locale } = useI18nTyped();
 const store = useStore();
 const zone = useLiveZone();
-const { run, dismiss, pendingId, dismissTarget, dismissOpen } = useInsightActions();
+const { run, dismiss, pendingId, dismissTarget, dismissOpen, reviewTarget, reviewOpen } =
+  useInsightActions();
 const page = ref(1);
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");

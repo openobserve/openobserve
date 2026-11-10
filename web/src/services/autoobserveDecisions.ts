@@ -19,7 +19,7 @@ export type DecisionFamily = "suggestion" | "alert_finding";
 export type DecisionAction = "dismiss" | "accept" | "apply";
 export type DecisionReason =
   "not_needed" | "planned_work" | "false_positive" | "will_fix_later" | "intended_report" | "other";
-export type DecisionState = "active" | "expired" | "undone";
+export type DecisionState = "active" | "expired" | "undone" | "applied";
 export type DecisionChange = "created" | "updated" | "unchanged" | "undone";
 export type DecisionSource = "ui" | "slack" | "api";
 
@@ -44,6 +44,23 @@ export interface SubjectInfo {
   team: string | null;
 }
 
+/** One field an apply changes; values are as the alert stores them. */
+export type FieldChange =
+  | { field: "destinations"; from: string[]; to: string[] }
+  | {
+      field: "pending_period_secs" | "keep_firing_for_secs" | "silence_minutes";
+      from: number;
+      to: number;
+    };
+
+/** What applying a finding's suggested change would do, as the preview sends it. */
+export interface ChangePreview {
+  alert: { title: string; folder: string | null; team: string | null; destinations: string[] };
+  fields: FieldChange[];
+  /** `count` of the run's `of` acknowledged firings would no longer alert; absent when the run did not record it. */
+  acknowledged_firings_dropped?: { count: number; of: number; first_at?: number };
+}
+
 export interface DecisionView {
   /** `{family}:{id}`; the undo path, never shown. */
   decision_id: string;
@@ -63,6 +80,9 @@ export interface DecisionView {
   revision: number;
   /** Only the list sends it. */
   subject?: SubjectInfo;
+  /** An apply's alert and fields, on servers that list applies. */
+  change?: { alert: { id: string; title: string }; fields: FieldChange[] };
+  via?: "apply" | "editor";
 }
 
 export interface Preview {
@@ -83,6 +103,9 @@ export interface Preview {
   revision: number;
   current: DecisionView | null;
   locked?: Refusal;
+  /** Sent for an apply only. */
+  change?: ChangePreview;
+  summary?: string;
 }
 
 /** The server refuses unknown keys. */
@@ -96,6 +119,8 @@ export interface DecisionRequest {
   until?: number;
   duration_days?: number;
   until_reopened?: boolean;
+  /** Records an apply the editor's Save already wrote. */
+  applied_via?: "editor";
   expected_revision?: number;
   /** One per dialog, so a double click or a retry writes once. */
   request_id?: string;
@@ -162,6 +187,11 @@ const statusOf = (error: unknown): number | undefined =>
 
 /** The routes answer 404 while `O2_AUTOOBSERVE_DECISIONS_ENABLED` is off, and an OSS build has none. */
 export const isRouteDisabled = (error: unknown): boolean => statusOf(error) === 404;
+
+/** A 404 naming `not_found` comes from a running route whose item is gone, not from a switched-off one. */
+export const isItemGone = (error: unknown): boolean =>
+  statusOf(error) === 404 &&
+  (error as { response?: { data?: { error?: unknown } } }).response?.data?.error === "not_found";
 
 /** A refusal carries `decision_refused`; any other 403 is the access layer's own. */
 export function refusalOf(error: unknown): Refusal | null {

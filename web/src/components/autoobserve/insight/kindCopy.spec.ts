@@ -113,6 +113,50 @@ describe("coverage gap card (flagged surface 1)", () => {
     ]);
   });
 
+  it("carries the service's own alert ids, so the review can fill who they notify (W4)", () => {
+    const ev = (id: string, kind = "alert") => ({
+      monitor_kind: kind,
+      monitor_id: id,
+      monitor_name: id,
+      predicate: "",
+      last_data_at: null,
+    });
+    const owned = {
+      ...row([
+        { type: "logs", name: "ingest_c" },
+        { type: "traces", name: "default" },
+      ]),
+      cells: {
+        ...NONE_CELLS,
+        errors: { state: "weak", evidence: [ev("al-2")], counts: {} },
+        latency: {
+          state: "none",
+          evidence: [],
+          counts: {},
+          all_evidence: [
+            { ...ev("al-1"), state: "blind" },
+            { ...ev("syn-1", "synthetic"), state: "weak" },
+          ],
+        },
+      },
+    } as AutoObserveCoverageRow;
+    const target = gapCard([owned]).cta?.target;
+    if (target?.type !== "bulk") throw new Error("expected bulk");
+    expect(target.request.rows.map((r) => r.alertIds)).toEqual([
+      ["al-1", "al-2"],
+      ["al-1", "al-2"],
+      ["al-1", "al-2"],
+    ]);
+    const bare = gapCard([
+      row([
+        { type: "logs", name: "ingest_c" },
+        { type: "traces", name: "t" },
+      ]),
+    ]);
+    if (bare.cta?.target.type !== "bulk") throw new Error("expected bulk");
+    expect(bare.cta.target.request.rows.every((r) => r.alertIds === undefined)).toBe(true);
+  });
+
   it("says latency needs traces when the service sends none", () => {
     const parts = gapCard([row([{ type: "logs", name: "ingest_c" }])]);
     expect(parts.next).toBe("Add the 2 alerts AutoObserve drafted. Latency needs traces first.");

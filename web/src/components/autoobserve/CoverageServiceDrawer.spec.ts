@@ -77,7 +77,7 @@ const cell = (state: string, by?: string) => ({
 
 const liveRow = (
   cells: Record<string, ReturnType<typeof cell>>,
-  streams: { type: string; name: string }[] = [],
+  streams: { type: string; name: string; learning_until?: number | null }[] = [],
 ) =>
   toCoverageSource(
     gt,
@@ -193,6 +193,94 @@ describe("CoverageServiceDrawer in live mode", () => {
       "No alert watches whether it stops sending",
     ]);
     expect(wrapper.text()).not.toContain("No scoped monitor");
+  });
+
+  it("names the service's streams that are still learning, with their ready date (W3)", () => {
+    const until = (Date.now() + 5 * 86_400_000) * 1000;
+    const day = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+    const row = liveRow({ errors: cell("none"), latency: cell("none"), absence: cell("none") }, [
+      { type: "logs", name: "app_logs", learning_until: until },
+      { type: "traces", name: "app_traces", learning_until: null },
+    ]);
+    const line = mountDrawer(row, "gap").find('[data-test="autoobserve-coverage-drawer-learning"]');
+    expect(line.text()).toBe(`Learning until ${day.format(until / 1000)} · app_logs (logs)`);
+  });
+
+  describe("every learning stream shows its own date (D10)", () => {
+    const day = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+    const inDays = (d: number) => (Date.now() + d * 86_400_000) * 1000;
+    const learningRows = (count: number) =>
+      liveRow(
+        { errors: cell("none"), latency: cell("none"), absence: cell("none") },
+        Array.from({ length: count }, (_, i) => ({
+          type: "logs",
+          name: `s${String(i).padStart(2, "0")}`,
+          learning_until: inDays(count - i),
+        })),
+      );
+    const rowsOf = (row: CoverageRow) =>
+      mountDrawer(row, "gap")
+        .findAll('[data-test="autoobserve-coverage-drawer-learning-stream"]')
+        .map((r) =>
+          r
+            .findAll("span")
+            .map((s) => s.text())
+            .join(" "),
+        );
+
+    it("one stream reads as one sentence, with no list", () => {
+      const row = learningRows(1);
+      const wrapper = mountDrawer(row, "gap");
+      expect(wrapper.find('[data-test="autoobserve-coverage-drawer-learning"]').text()).toBe(
+        `Learning until ${day.format(inDays(1) / 1000)} · s00 (logs)`,
+      );
+      expect(wrapper.findAll('[data-test="autoobserve-coverage-drawer-learning-stream"]')).toEqual(
+        [],
+      );
+    });
+
+    it("three streams a day apart each list their own date, soonest first", () => {
+      const row = learningRows(3);
+      const wrapper = mountDrawer(row, "gap");
+      expect(
+        wrapper.find('[data-test="autoobserve-coverage-drawer-learning-summary"]').text(),
+      ).toBe("Learning 3 streams");
+      expect(rowsOf(row)).toEqual([
+        `s02 (logs) until ${day.format(inDays(1) / 1000)}`,
+        `s01 (logs) until ${day.format(inDays(2) / 1000)}`,
+        `s00 (logs) until ${day.format(inDays(3) / 1000)}`,
+      ]);
+    });
+
+    it("many streams are all listed, none folded into a count", () => {
+      const row = learningRows(14);
+      const rows = rowsOf(row);
+      expect(rows).toHaveLength(14);
+      for (let i = 0; i < 14; i += 1)
+        expect(rows[i]).toBe(
+          `s${String(13 - i).padStart(2, "0")} (logs) until ${day.format(inDays(i + 1) / 1000)}`,
+        );
+      expect(
+        mountDrawer(row, "gap").find('[data-test="autoobserve-coverage-drawer-learning"]').text(),
+      ).not.toMatch(/more stream/);
+    });
+  });
+
+  it("has no learning line when the server sends no learning_until (W3)", () => {
+    const row = liveRow({ errors: cell("none"), latency: cell("none"), absence: cell("none") }, [
+      { type: "logs", name: "app_logs" },
+    ]);
+    expect(
+      mountDrawer(row, "gap").find('[data-test="autoobserve-coverage-drawer-learning"]').exists(),
+    ).toBe(false);
   });
 
   it("says once that no monitor watches any check, when none has one", () => {

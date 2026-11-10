@@ -21,7 +21,7 @@ import {
   permissionLabel,
   viewDenial,
 } from "@/composables/useAccessStore";
-import type { AutoObserveCellState } from "@/services/autoobserve";
+import type { AutoObserveCellState, AutoObserveLearning } from "@/services/autoobserve";
 import type { ChartRange } from "../coverageSeries";
 import { LIVE_CHECKS, type CoverageCell, type LiveCheck } from "../fixtures";
 
@@ -487,6 +487,88 @@ export const coverageSentence = (
     }),
     gaps: t("autoobserveLive.coverage.sentence.gaps", { count: count(locale, gaps) }, gaps),
   });
+};
+
+const dayText = (micros: number, zone: { locale: string; timeZone: string }): I18nText =>
+  raw(
+    new Intl.DateTimeFormat(zone.locale, {
+      month: "short",
+      day: "numeric",
+      timeZone: zone.timeZone,
+    }).format(micros / 1000),
+  );
+
+const learningParams = (
+  learning: AutoObserveLearning,
+  zone: { locale: string; timeZone: string },
+) => ({
+  count: count(zone.locale, learning.streams_learning),
+  days: count(zone.locale, learning.history_days_needed),
+  date: learning.next_ready_at !== null ? dayText(learning.next_ready_at, zone) : raw(""),
+});
+
+/** The neutral line while streams gather history; null on an older server or when none is learning. */
+export const learningLine = (
+  t: TranslateFn,
+  zone: { locale: string; timeZone: string },
+  learning: AutoObserveLearning | null | undefined,
+): I18nText | null => {
+  if (!learning || !(learning.streams_learning > 0)) return null;
+  const n = learning.streams_learning;
+  const key = learning.next_ready_at !== null ? "line" : "lineNoDate";
+  return t(`autoobserveLive.learning.${key}`, learningParams(learning, zone), n);
+};
+
+/** What an org with no ready stream waits for, in place of an empty card. */
+export const learningEmpty = (
+  t: TranslateFn,
+  zone: { locale: string; timeZone: string },
+  learning: AutoObserveLearning | null | undefined,
+): { title: I18nText; desc: I18nText } | null => {
+  if (!learning || !(learning.streams_learning > 0) || learning.streams_ready > 0) return null;
+  const n = learning.streams_learning;
+  const key = learning.next_ready_at !== null ? "emptyDesc" : "emptyDescNoDate";
+  return {
+    title: t("autoobserveLive.learning.emptyTitle"),
+    desc: t(`autoobserveLive.learning.${key}`, learningParams(learning, zone), n),
+  };
+};
+
+/** A service's learning streams: one sentence for a single stream, else a count over every stream with its own date. */
+export const streamLearning = (
+  t: TranslateFn,
+  zone: { locale: string; timeZone: string },
+  streams: { type: string; name: string; learning_until?: number | null }[],
+  nowMs: number = Date.now(),
+): { summary: I18nText; rows: { key: string; stream: string; until: I18nText }[] } | null => {
+  const learning = streams
+    .filter(
+      (s): s is typeof s & { learning_until: number } =>
+        typeof s.learning_until === "number" && s.learning_until / 1000 > nowMs,
+    )
+    .sort((a, b) => a.learning_until - b.learning_until);
+  if (!learning.length) return null;
+  const label = (s: { type: string; name: string }) => `${s.name} (${s.type})`;
+  if (learning.length === 1)
+    return {
+      summary: t("autoobserveLive.learning.until", {
+        date: dayText(learning[0].learning_until, zone),
+        streams: raw(label(learning[0])),
+      }),
+      rows: [],
+    };
+  return {
+    summary: t(
+      "autoobserveLive.learning.streams",
+      { count: count(zone.locale, learning.length) },
+      learning.length,
+    ),
+    rows: learning.map((s) => ({
+      key: `${s.type}/${s.name}`,
+      stream: label(s),
+      until: t("autoobserveLive.learning.streamUntil", { date: dayText(s.learning_until, zone) }),
+    })),
+  };
 };
 
 export const refreshFailedText = (

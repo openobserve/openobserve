@@ -400,6 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :formattedDestinations="getFormattedDestinations"
                     :destinationObjects="destinations"
                     :workflows="formData.workflows"
+                    :destinationRequired="destinationRequired"
                     @update:trigger="updateTriggerCondition"
                     @update:aggregation="updateAggregation"
                     @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
@@ -481,6 +482,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="bg-card-glass-bg border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
           >
+            <p
+              v-if="silentAutoObserveDraft"
+              class="text-status-warning-text me-auto flex min-w-0 items-start gap-1.5 text-xs"
+              data-test="add-alert-no-destination"
+            >
+              <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" />
+              <span>{{ t("alerts.prefill.noDestination") }}</span>
+            </p>
             <OButton
               data-test="add-alert-cancel-btn"
               variant="outline"
@@ -786,12 +795,15 @@ export default defineComponent({
       modelValue: () => props.modelValue,
       onSaved: (folderId, options) => emit("update:list", folderId, options),
     });
-    onFormSaved = alertEditorDraft.handleSaved;
     const calibrationHandoff = useCalibrationHandoff({
       form: alertForm,
       editorDraft: alertEditorDraft,
       modelValue: () => props.modelValue,
     });
+    onFormSaved = (folderId) => {
+      void calibrationHandoff.recordSaved();
+      alertEditorDraft.handleSaved(folderId);
+    };
     // The handoff waits for the restore choice, so a draft decides before any patch lands.
     onMounted(async () => {
       await alertEditorDraft.start();
@@ -882,8 +894,11 @@ export default defineComponent({
     // form reports a valid expression the Save button stays disabled (the schema
     // blocks a bad expression on submit too — this is the visible affordance).
     const compositeValidation = ref<{ valid: boolean }>({ valid: false });
+    const { silentAutoObserveDraft, destinationRequired } = alertForm;
     const compositeSaveDisabled = computed(
-      () => isCompositeMode.value && compositeValidation.value.valid !== true,
+      () =>
+        (isCompositeMode.value && compositeValidation.value.valid !== true) ||
+        silentAutoObserveDraft.value,
     );
     const onCompositeValidation = (value: { valid: boolean }) => {
       compositeValidation.value = value;
@@ -1123,6 +1138,8 @@ export default defineComponent({
       availableCompositeChildren,
       updateCompositeDraft,
       compositeSaveDisabled,
+      silentAutoObserveDraft,
+      destinationRequired,
       onCompositeValidation,
       handleSqlSchemaUpdated,
     };

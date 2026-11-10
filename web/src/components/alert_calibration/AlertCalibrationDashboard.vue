@@ -278,6 +278,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</OText>
                   </div>
                   <OButton
+                    v-if="changeOf(finding)"
+                    variant="ghost-primary"
+                    size="xs"
+                    data-test="alert-calibration-dashboard-review-change"
+                    @click="reviewChange(finding)"
+                  >
+                    {{ insightCtaLabel(t, "reviewChange") }}
+                  </OButton>
+                  <OButton
                     v-if="ctasOf(finding).review"
                     variant="ghost-primary"
                     size="xs"
@@ -345,6 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
     </div>
 
+    <ReviewChangeDialog v-if="changeTarget" v-model:open="changeOpen" :target="changeTarget" />
     <AlertCalibrationDismissDialog
       v-if="dismissTarget"
       :key="dismissTarget.finding_id"
@@ -386,6 +396,9 @@ import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import AlertCalibrationDismissedList from "./AlertCalibrationDismissedList.vue";
 import DecisionsDismissedList from "@/components/autoobserve/decisions/DecisionsDismissedList.vue";
 import { useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
+import ReviewChangeDialog from "@/components/autoobserve/decisions/ReviewChangeDialog.vue";
+import type { ReviewChangeTarget } from "@/components/autoobserve/decisions/appliedChanges";
+import { applySuggestionsOf } from "./applySuggestion";
 import AlertCalibrationFindingsFilter from "./AlertCalibrationFindingsFilter.vue";
 import {
   dismissalCopy,
@@ -520,6 +533,24 @@ const onView = (value: unknown) => {
 
 const dismissTarget = shallowRef<DismissableFinding | null>(null);
 const dismissOpen = ref(false);
+const changeTarget = shallowRef<ReviewChangeTarget | null>(null);
+const changeOpen = ref(false);
+
+// Only a finding with an id can be applied through the decision route, which keys it by finding.
+const changeOf = (finding: DigestRecord) =>
+  finding.finding_id && finding.alert_id ? (applySuggestionsOf(finding)[0] ?? null) : null;
+
+const reviewChange = (finding: DigestRecord) => {
+  const action = changeOf(finding);
+  if (!action) return;
+  changeTarget.value = {
+    findingId: finding.finding_id!,
+    alertId: finding.alert_id!,
+    alertName: finding.alert_name ?? finding.alert_id!,
+    action,
+  };
+  changeOpen.value = true;
+};
 const openDismiss = (finding: DismissableFinding) => {
   dismissTarget.value = finding;
   dismissOpen.value = true;

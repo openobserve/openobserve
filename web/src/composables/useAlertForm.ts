@@ -105,6 +105,7 @@ import type {
   AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
 import { isEditHandoffPrefill } from "@/utils/alerts/alertEditHandoff";
+import { AUTOOBSERVE_SOURCE } from "@/utils/alerts/prefill/fromAutoObserve";
 import {
   forecastModeFields,
   parseForecastAlertPromql,
@@ -817,6 +818,25 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isLoadingPrefill = ref(false);
   /** Lossy transforms the source adapter performed, surfaced in the form. */
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
+  // The surface that seeded this form, so a source can hold the form to its own rules.
+  const prefillSource = ref<string | null>(null);
+  // An AutoObserve draft must notify someone, else the service it was drafted for stays unwatched.
+  const destinationRequired = computed(
+    () => prefillSource.value === AUTOOBSERVE_SOURCE && !beingUpdated.value,
+  );
+  const silentAutoObserveDraft = computed(
+    () => destinationRequired.value && !hasDeliveryTarget(formData.value ?? {}),
+  );
+  /** Every save path (button, Enter, leave dialog, JSON) stops here, so the rule holds on all of them. */
+  const blockSilentDraft = (values: unknown): boolean => {
+    if (
+      !destinationRequired.value ||
+      hasDeliveryTarget((values ?? {}) as Parameters<typeof hasDeliveryTarget>[0])
+    )
+      return false;
+    toast({ variant: "warning", message: t("alerts.prefill.noDestination") });
+    return true;
+  };
   /** Outcome of the anomaly edit fetch: "missing" when the server has no such config. */
   const anomalyLoadStatus = ref<"idle" | "loaded" | "missing" | "failed">("idle");
   // Late async seeding (timezone from the stored offset) that must land before the form counts as loaded.
@@ -1829,6 +1849,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const jsonEditorData = computed(() => stripFormExtras(cloneDeep(formData.value)));
 
   const saveAlertJson = async (json: any) => {
+    // Unparseable JSON falls through to the shared validation, which reports it.
+    const parsed = (() => {
+      try {
+        return JSON.parse(json);
+      } catch {
+        return null;
+      }
+    })();
+    if (parsed && blockSilentDraft(parsed)) return;
     const saveContext: SaveAlertContext = {
       store,
       t,
@@ -1932,6 +1961,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       resetForm(data);
 
       prefillWarnings.value = prefill.warnings ?? [];
+      prefillSource.value = prefill.source;
 
       toast({
         variant: "success",
@@ -2591,6 +2621,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // saveAnomalyDetection). The anomaly schema branch is pass-through, so this is
   // still reached in anomaly mode and delegates correctly.
   const performSave = async () => {
+    if (blockSilentDraft(formData.value)) return;
     if (isAnomalyMode.value) {
       await saveAnomalyDetection();
       return;
@@ -3298,6 +3329,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     validationErrors,
     isLoadingPrefill,
     prefillWarnings,
+    prefillSource,
     anomalyLoadStatus,
     formReady,
     activeFolderId,
@@ -3399,6 +3431,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     applyAlertPrefill,
     applyFieldPatch,
     handleSave,
+    destinationRequired,
+    silentAutoObserveDraft,
     queryModesWithContent,
     saveModeChoices,
     saveModeDialogOpen,

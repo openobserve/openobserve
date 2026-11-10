@@ -425,3 +425,92 @@ describe("BulkReviewDrawer: a group that notifies no one is a warning", () => {
     expect(part.className).not.toContain("text-status-error-text");
   });
 });
+
+describe("BulkReviewDrawer — never notifies no one (W4)", () => {
+  const orphan = (key: string, alertIds?: string[]) => ({
+    key,
+    scope: {
+      service: "svc-a",
+      cluster: null,
+      namespace: null,
+      stream: { type: "logs", name: "app_logs" },
+      schema: ["service_name", "k8s_namespace_name"],
+    },
+    usually: 40,
+    notify: { destinations: [] as [], reason: "none" as const },
+    ...(alertIds ? { alertIds } : {}),
+  });
+
+  it("a ticked row that notifies no one blocks Add with the amber reason", async () => {
+    await mountDrawer();
+    await openWith([orphan("a-1"), orphan("a-2"), ...m12Rows(IDS).slice(0, 1)]);
+    const add = q("bulk-review-create") as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    const reason = q("bulk-review-no-destination")!;
+    expect(reason.textContent).toContain(
+      "Choose who 2 alerts notify before adding them. An alert that notifies no one leaves its service unwatched.",
+    );
+    expect(reason.className).toContain("warning");
+    expect(text("bulk-review-footer")).toBe("");
+  });
+
+  it("choosing a destination for the group enables Add and brings back the count", async () => {
+    await mountDrawer();
+    await openWith([orphan("a-1"), orphan("a-2")]);
+    const group = review.groups.value[0];
+    const { changeGroup } = await import("./useBulkReview");
+    changeGroup(group, { id: "default", name: "default" }, ["ops-webhook"]);
+    await flushPromises();
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(false);
+    expect(q("bulk-review-no-destination")).toBeNull();
+    expect(text("bulk-review-footer")).toContain("2 alerts will be created");
+  });
+
+  it("unticking the rows that notify no one also enables Add", async () => {
+    await mountDrawer();
+    await openWith([orphan("a-1"), ...m12Rows(IDS).slice(0, 1)]);
+    const { toggleRow } = await import("./useBulkReview");
+    toggleRow("a-1", false);
+    await flushPromises();
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("fills folder and destination from the service's own alerts", async () => {
+    api.list.mockResolvedValue({
+      data: {
+        list: [
+          {
+            alert_id: "al-1",
+            folder_id: "f-pay",
+            folder_name: "payments",
+            destinations: ["payments-oncall"],
+          },
+          {
+            alert_id: "al-2",
+            folder_id: "f-pay",
+            folder_name: "payments",
+            destinations: ["payments-oncall"],
+          },
+          { alert_id: "other", folder_id: "f-ingest", folder_name: "ingest", destinations: ["x"] },
+        ],
+      },
+    });
+    await mountDrawer();
+    await openWith([orphan("a-1", ["al-1", "al-2"])]);
+    const row = review.reviewRows.value[0];
+    expect(row.destinations).toEqual(["payments-oncall"]);
+    expect(row.folder.id).toBe("f-pay");
+    expect(row.row.notify?.reason).toBe("svc-a's 2 alerts notify payments-oncall.");
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("keeps the block when the service's alerts notify no one either", async () => {
+    api.list.mockResolvedValue({
+      data: { list: [{ alert_id: "al-1", folder_id: "f-pay", destinations: [] }] },
+    });
+    await mountDrawer();
+    await openWith([orphan("a-1", ["al-1"])]);
+    expect(review.reviewRows.value[0].destinations).toEqual([]);
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(true);
+  });
+});

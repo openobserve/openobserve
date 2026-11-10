@@ -225,7 +225,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-text-body min-w-0 flex-1 text-xs text-pretty" data-test="bulk-review-footer">
+        <p
+          v-if="silent.length && !done"
+          class="text-status-warning-text flex min-w-0 flex-1 items-start gap-1.5 text-xs text-pretty"
+          data-test="bulk-review-no-destination"
+        >
+          <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" />
+          <span>{{
+            t("insight.bulk.noDestination", { count: silent.length }, silent.length)
+          }}</span>
+        </p>
+        <p
+          v-else
+          class="text-text-body min-w-0 flex-1 text-xs text-pretty"
+          data-test="bulk-review-footer"
+        >
           {{ footer }}
           <template v-if="tickedRows.length && !done">
             {{ t("insight.bulk.footerOrigin") }}
@@ -245,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!done"
             variant="primary"
             size="sm-action"
-            :disabled="toCreate.length === 0 || checking"
+            :disabled="toCreate.length === 0 || checking || silent.length > 0"
             :loading="running"
             data-test="bulk-review-create"
             @click="createTicked()"
@@ -269,6 +283,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import alertsService from "@/services/alerts";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -317,7 +332,7 @@ const store = useStore();
 const router = useRouter();
 const enterprise = config.isEnterprise === "true";
 const { isMobile } = useBreakpoint();
-const { state, reviewRows, groups, toCreate, tickedRows, checking } = useBulkReview();
+const { state, reviewRows, groups, toCreate, tickedRows, checking, silent } = useBulkReview();
 const locale = computed(() => String(i18nLocale.value));
 const org = () => String(store.state.selectedOrganization?.identifier ?? "");
 

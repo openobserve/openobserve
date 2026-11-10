@@ -21,6 +21,7 @@ import commonService from "@/services/common";
 import { baselineSql, errorFieldOf } from "@/utils/alerts/prefill/fromAutoObserve";
 import { measureBaseline, type BaselineRequest } from "../targets/baseline";
 import { measuredThreshold } from "../targets/thresholds";
+import { loadOwnedAlerts, notifyOf, teamOf } from "../targets/ownership";
 import destinationService from "@/services/alert_destination";
 import streamService from "@/services/stream";
 import {
@@ -82,6 +83,8 @@ export interface BulkRow {
   /** The service's team and destinations from its alerts; absent means "No team yet". */
   team?: TeamPick;
   notify?: NotifyPick;
+  /** The service's own alerts coverage matched, read when the review opens to fill a missing team and destination. */
+  alertIds?: string[];
   /** Builder inputs the errors and latency kinds need. */
   inputs?: {
     errorField?: FieldPick;
@@ -156,6 +159,8 @@ const state = reactive({
   types: {} as StreamTypes,
   baselines: {} as RowBaselines,
   thresholds: {} as Record<string, number>,
+  /** Team and destination read from each row's own alerts, keyed by row. */
+  owned: {} as Record<string, Pick<BulkRow, "team" | "notify">>,
   opener: null as HTMLElement | null,
 });
 
@@ -165,6 +170,9 @@ let contextLoad = 0;
 let measuring: AbortController | null = null;
 
 const isSource = (scope: ServiceScope | SourceScope): scope is SourceScope => "field" in scope;
+
+const serviceName = (scope: ServiceScope | SourceScope): string =>
+  isSource(scope) ? scope.value : scope.service;
 
 const builderOptions = (row: BulkRow) => ({
   team: row.team ?? {
@@ -346,9 +354,11 @@ export const reviewRowsOf = (
     types?: StreamTypes;
     baselines?: RowBaselines;
     thresholds?: Record<string, number>;
+    owned?: Record<string, Pick<BulkRow, "team" | "notify">>;
   },
 ): ReviewRow[] =>
-  request.rows.map((row) => {
+  request.rows.map((given) => {
+    const row = ctx.owned?.[given.key] ? { ...given, ...ctx.owned[given.key] } : given;
     const scope = row.scope;
     const named = row.team && row.team.source === "folder";
     const override = ctx.overrides[row.key];
@@ -483,6 +493,7 @@ const reviewRows = computed(() =>
         types: state.types,
         baselines: state.baselines,
         thresholds: state.thresholds,
+        owned: state.owned,
       })
     : [],
 );
@@ -510,6 +521,7 @@ export const openBulkReview = (request: BulkReviewRequest): void => {
   state.types = {};
   state.baselines = {};
   state.thresholds = {};
+  state.owned = {};
   state.ticked = startTicks(reviewRows.value);
   collapseDefaults();
   state.open = true;
@@ -570,6 +582,25 @@ const readSchemas = async (
   return { schemas, types };
 };
 
+/** Each row that notifies no one gets the team and destination its service's own alerts use, from one alert read. */
+const readOwnership = async (
+  org: string,
+  rows: BulkRow[],
+): Promise<Record<string, Pick<BulkRow, "team" | "notify">>> => {
+  const wanting = rows.filter((r) => r.alertIds?.length && !r.notify?.destinations.length);
+  const ids = [...new Set(wanting.flatMap((r) => r.alertIds ?? []))];
+  const alerts = await loadOwnedAlerts(org, ids);
+  const owned: Record<string, Pick<BulkRow, "team" | "notify">> = {};
+  for (const row of wanting) {
+    const mine = alerts.filter((a) => a.id && row.alertIds!.includes(a.id));
+    const notify = notifyOf(serviceName(row.scope), mine);
+    if (!notify.destinations.length) continue;
+    const team = row.team?.source === "folder" ? row.team : teamOf(serviceName(row.scope), mine);
+    owned[row.key] = { team, notify };
+  }
+  return owned;
+};
+
 /** Loads the folders, the stream fields and, when served, the folder write rights the review shows. */
 export const loadReviewContext = async (org: string): Promise<void> => {
   stopLoads();
@@ -581,12 +612,14 @@ export const loadReviewContext = async (org: string): Promise<void> => {
     state.folders = [];
     state.destinations = [];
   }
-  const [folders, rights, schemas] = await Promise.allSettled([
+  const [folders, rights, schemas, owned] = await Promise.allSettled([
     commonService.list_Folders(org, "alerts", { skipAccessToast: true }),
     rightsSource(org),
     readSchemas(org, load),
+    readOwnership(org, state.request?.rows ?? []),
   ]);
   if (load !== contextLoad) return;
+  if (owned.status === "fulfilled") applyOwnership(owned.value);
   if (schemas.status === "fulfilled") applySchemas(schemas.value);
   if (folders.status === "fulfilled") {
     state.folders = (folders.value.data?.list ?? []).map((f: any) => ({
@@ -596,6 +629,10 @@ export const loadReviewContext = async (org: string): Promise<void> => {
   }
   if (rights.status === "fulfilled") applyRights(rights.value);
   await measureRows(org, load, signal);
+};
+
+const applyOwnership = (owned: Record<string, Pick<BulkRow, "team" | "notify">>): void => {
+  state.owned = owned;
 };
 
 /** Measures each waiting row's usual level, a few at a time; a row the week gave none is unticked until a threshold is set. */
@@ -711,6 +748,12 @@ export const useBulkReview = () => ({
   /** The ticked rows the footer counts, including those still waiting for their fields. */
   tickedRows: computed(() =>
     reviewRows.value.filter((r) => state.ticked.has(r.key) && isTickable(r)),
+  ),
+  /** Ticked rows that would notify no one; Add waits until each has a destination or is unticked. */
+  silent: computed(() =>
+    reviewRows.value.filter(
+      (r) => state.ticked.has(r.key) && isTickable(r) && !r.destinations.length,
+    ),
   ),
   /** A ticked row still waits for its stream fields, so Create would leave it out. */
   checking: computed(() =>

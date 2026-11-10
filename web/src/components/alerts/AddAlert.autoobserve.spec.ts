@@ -67,6 +67,7 @@ vi.mock("@/services/alerts", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), {
     default: {
       update_by_alert_id: vi.fn(() => Promise.resolve({ data: { code: 200 } })),
+      create_by_alert_id: vi.fn(() => Promise.resolve({ data: { code: 200, id: "new" } })),
       get_by_alert_id: vi.fn(),
       listByFolderId: vi.fn(() => Promise.resolve({ data: { list: [] } })),
     },
@@ -85,6 +86,12 @@ vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn
 
 interface AddAlertVm {
   formData: Record<string, any>;
+  handleSave: () => Promise<void>;
+  saveAlertJson: (json: string) => Promise<void>;
+}
+
+interface AddAlertSetter {
+  updateDestinations: (destinations: string[]) => void;
 }
 
 // Shape of GET /api/v2/{org}/alerts/{id}, with neutral names.
@@ -184,7 +191,10 @@ const bannerText = () => byTest("add-alert-calibration-banner")?.textContent?.tr
 const toastMessages = () =>
   vi.mocked(toast).mock.calls.map(([arg]) => (arg as { message: string }).message);
 
-const openNoDataPrefill = async (build: "enterprise" | "oss" = "enterprise") => {
+const openNoDataPrefill = async (
+  build: "enterprise" | "oss" = "enterprise",
+  opts: AutoObserveAlertOptions = options,
+) => {
   const prefill = noDataAlert(
     {
       service: "svc-ingest-b",
@@ -193,7 +203,7 @@ const openNoDataPrefill = async (build: "enterprise" | "oss" = "enterprise") => 
       stream: { type: "logs", name: "ingest_b" },
       schema: ["service_name"],
     },
-    options,
+    opts,
   )!;
   writeAlertPrefill(normalizePrefill(prefill));
   // An OSS build never writes this prefill, so the OSS case seeds the enterprise one, as the Playwright case does.
@@ -263,5 +273,98 @@ describe("AddAlert with an AutoObserve prefill", () => {
     expect(bannerText()).toContain("Suggested by AutoObserve");
     expect(bannerText()).toContain("ops-webhook");
     expect(bannerText()).not.toContain("Alert Calibration");
+  });
+
+  describe("never saves an alert that notifies no one (W4)", () => {
+    const silent: AutoObserveAlertOptions = {
+      ...options,
+      notify: { destinations: [], reason: "none" },
+    };
+    const save = () => byTest("add-alert-submit-btn") as HTMLButtonElement;
+    const reason = () => byTest("add-alert-no-destination");
+
+    it("an AutoObserve draft with no destination blocks Save with the amber reason", async () => {
+      await openNoDataPrefill("enterprise", silent);
+      expect(vm().formData.destinations).toEqual([]);
+      expect(save().disabled).toBe(true);
+      expect(reason()?.textContent?.trim()).toBe(
+        "Choose a destination. An alert that notifies no one leaves its service unwatched.",
+      );
+      expect(reason()?.className).toContain("warning");
+    });
+
+    it("choosing a destination lifts the block", async () => {
+      await openNoDataPrefill("enterprise", silent);
+      (wrapper!.findComponent(AddAlert).vm as unknown as AddAlertSetter).updateDestinations([
+        "ops-webhook",
+      ]);
+      await flushPromises();
+      expect(vm().formData.destinations).toEqual(["ops-webhook"]);
+      expect(save().disabled).toBe(false);
+      expect(reason()).toBeNull();
+    });
+
+    it("an AutoObserve draft that already notifies someone saves as before", async () => {
+      await openNoDataPrefill();
+      expect(save().disabled).toBe(false);
+      expect(reason()).toBeNull();
+    });
+
+    const REASON =
+      "Choose a destination. An alert that notifies no one leaves its service unwatched.";
+    const blockedToast = () =>
+      vi
+        .mocked(toast)
+        .mock.calls.find(
+          ([o]) =>
+            String(o.message) === REASON && (o as { variant?: string }).variant === "warning",
+        );
+
+    it("Enter in a field (the form's own submit) saves nothing without a destination", async () => {
+      await openNoDataPrefill("enterprise", silent);
+      vi.mocked(toast).mockClear();
+      vi.mocked(alertsService.create_by_alert_id).mockClear();
+      await wrapper!.findComponent({ name: "OForm" }).find("form").trigger("submit");
+      await vi.waitFor(() => expect(blockedToast()).toBeDefined());
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(blockedToast()).toBeDefined();
+    });
+
+    it("the leave dialog's Save (handleSave) saves nothing without a destination", async () => {
+      await openNoDataPrefill("enterprise", silent);
+      vi.mocked(toast).mockClear();
+      vi.mocked(alertsService.create_by_alert_id).mockClear();
+      await vm().handleSave();
+      await flushPromises();
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(blockedToast()).toBeDefined();
+    });
+
+    it("JSON Save saves nothing without a destination", async () => {
+      await openNoDataPrefill("enterprise", silent);
+      vi.mocked(toast).mockClear();
+      vi.mocked(alertsService.create_by_alert_id).mockClear();
+      await vm().saveAlertJson(JSON.stringify({ ...vm().formData, destinations: [] }));
+      await flushPromises();
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(blockedToast()).toBeDefined();
+    });
+
+    it("tells the destination field it is required for an AutoObserve draft", async () => {
+      await openNoDataPrefill("enterprise", silent);
+      expect(wrapper!.findComponent({ name: "AlertSettings" }).props("destinationRequired")).toBe(
+        true,
+      );
+    });
+
+    it("a plain new alert with no destination is never blocked", async () => {
+      await mountAt("/alerts/add", { modelValue: {}, isUpdated: false, destinations: [] });
+      expect(vm().formData.destinations).toEqual([]);
+      expect(save().disabled).toBe(false);
+      expect(reason()).toBeNull();
+      expect(wrapper!.findComponent({ name: "AlertSettings" }).props("destinationRequired")).toBe(
+        false,
+      );
+    });
   });
 });

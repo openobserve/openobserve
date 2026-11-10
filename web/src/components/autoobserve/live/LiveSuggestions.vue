@@ -116,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="dismissOpen"
       :finding="dismissTarget"
     />
+    <ReviewChangeDialog v-if="reviewTarget" v-model:open="reviewOpen" :target="reviewTarget" />
     <template v-if="beyond" #footer>
       <div class="flex items-center gap-2">
         <span
@@ -148,6 +149,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import SectionCard from "../v2/SectionCard.vue";
 import InsightBlock from "../insight/InsightBlock.vue";
 import { useInsightActions } from "../insight/useInsightActions";
+import ReviewChangeDialog from "../decisions/ReviewChangeDialog.vue";
 import AlertCalibrationDismissDialog from "@/components/alert_calibration/AlertCalibrationDismissDialog.vue";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveRefreshFailed from "./LiveRefreshFailed.vue";
@@ -175,7 +177,8 @@ const props = defineProps<{ rail: RailSource; skeleton: boolean }>();
 const emit = defineEmits<{ "see-all": [] }>();
 
 const { t, locale } = useI18nTyped();
-const { run, dismiss, pendingId, dismissTarget, dismissOpen } = useInsightActions();
+const { run, dismiss, pendingId, dismissTarget, dismissOpen, reviewTarget, reviewOpen } =
+  useInsightActions();
 
 const shown = computed(() => props.rail.requests.slice(0, RAIL_CAP));
 const shownCount = computed(() => shown.value.reduce((sum, r) => sum + (r.covers ?? 1), 0));

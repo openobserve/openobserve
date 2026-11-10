@@ -138,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :notifies-nobody="notifiesNobody"
             :oncall-team="formData?.oncall_team"
             :locked-target-names="formData?._ui?.lockedTargetNames"
+            :target-required="destinationRequired"
             show-status
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
@@ -309,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :notifies-nobody="notifiesNobody"
             :oncall-team="formData?.oncall_team"
             :locked-target-names="formData?._ui?.lockedTargetNames"
+            :target-required="destinationRequired"
             show-status
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
@@ -528,6 +530,11 @@ export default defineComponent({
     workflows: {
       type: Array as PropType<any[]>,
       default: () => [],
+    },
+    // The parent refuses to save without a target (an AutoObserve draft), so the hint must not call it optional.
+    destinationRequired: {
+      type: Boolean,
+      default: false,
     },
     formattedDestinations: {
       type: Array as PropType<any[]>,
