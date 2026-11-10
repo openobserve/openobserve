@@ -104,7 +104,7 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
     <h3 class="text-text-heading text-base font-semibold">synthetics.scheduleAlert.alerts</h3>
   </div>
   <div class="flex flex-col gap-4 px-3 py-2">
-    <alert-destinations-field-stub destinations="dest-1" workflows="" destinationoptions="ops-webhook" label="synthetics.scheduleAlert.destinations" tooltip="" placeholder="alerts.summary.noDestination" notifiesnobody="false" showstatus="false" supportsworkflows="false" data-test="synthetics-check-alerts-destinations"></alert-destinations-field-stub>
+    <alert-destinations-field-stub destinations="dest-1" workflows="" destinationoptions="ops-webhook" label="synthetics.scheduleAlert.destinations" tooltip="" placeholder="alerts.summary.noDestination" notifiesnobody="false" showstatus="false" targetrequired="false" supportsworkflows="false" data-test="synthetics-check-alerts-destinations"></alert-destinations-field-stub>
     <div class="flex flex-wrap items-start gap-2" data-test="synthetics-check-alerts-template"><label class="text-text-heading flex h-9 w-47.5 items-center font-semibold">alerts.templateOverride.label</label>
       <div class="min-w-0 flex-1 basis-60">
         <template-override-picker-stub kind="synthetics" disabled="false" destinations="dest-1"></template-override-picker-stub>
