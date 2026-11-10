@@ -25,6 +25,7 @@ import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
 import { MAIN_PAGED_CAP } from "@/components/autoobserve/live/incidentsCopy";
 import ThisWeek from "@/components/autoobserve/v2/ThisWeek.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
+import TopBarStatus from "@/components/autoobserve/v2/TopBarStatus.vue";
 import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
 import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
 import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
@@ -65,9 +66,16 @@ const quiet = SCENARIOS.find(
   (s) => scenarioData(s).requests.filter((r) => r.kind !== "fixNow").length === 0,
 );
 
+// The page header is the shared layout's; its slots render so the body and actions stay reachable.
+const PageLayoutStub = {
+  props: ["title", "subtitle", "back", "icon", "titleDataTest"],
+  template:
+    "<div><h1 :data-test='titleDataTest'>{{ title }}</h1><p>{{ subtitle }}</p><slot name='subtitle' /><slot name='actions' /><slot /></div>",
+};
+
 const mountView = () =>
   shallowMount(AutoObserve2, {
-    global: { plugins: [i18n, store] },
+    global: { plugins: [i18n, store], stubs: { OPageLayout: PageLayoutStub } },
   });
 
 const DrawerStub = {
@@ -88,6 +96,7 @@ const mountOpen = () =>
         HowItWorksDrawer: true,
         AutoObserveIssueDrawer: true,
         TopBar: true,
+        OPageLayout: PageLayoutStub,
       },
     },
   });
@@ -146,14 +155,15 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     expect(wrapper.findComponent(ThisWeek).exists()).toBe(true);
     expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(true);
     expect(wrapper.findComponent(LivePaged).exists()).toBe(false);
-    expect(wrapper.findComponent(TopBar).props("live")).toBe(false);
+    expect(wrapper.findComponent(TopBarStatus).props("live")).toBe(false);
   });
 
   it("live mode hides only the scenario picker; the footer keeps See changes", () => {
     Object.assign(routeQuery, { live: "1", scenario: SCENARIOS[0] });
     const wrapper = mountView();
     expect(wrapper.find('[data-test="autoobserve2-scenario"]').exists()).toBe(false);
-    const bar = wrapper.findComponent(TopBar);
+    expect(wrapper.findComponent(TopBar).exists()).toBe(true);
+    const bar = wrapper.findComponent(TopBarStatus);
     expect(bar.props("live")).toBe(true);
     expect(bar.props("checked")).toEqual({ kind: "loading" });
     expect(wrapper.findComponent(PageFooter).exists()).toBe(true);

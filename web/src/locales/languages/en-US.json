@@ -30938,6 +30938,7 @@
     }
   },
   "autoobserve2": {
+    "backToHome": "Back to AutoObserve",
     "demoTag": "Demo",
     "scenarioLabel": "Demo scenario",
     "scenarios": {

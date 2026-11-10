@@ -15,343 +15,302 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="bg-surface-subtle [container-type:size] h-full overflow-auto"
-    data-test="autoobserve2-page"
+  <OPageLayout
+    bleed
+    :title="header.title"
+    :icon="page ? undefined : 'navigation'"
+    :back="header.back"
+    :subtitle="header.subtitle"
+    :title-data-test="header.titleTest"
   >
-    <!-- A size container, so the pinned rail can be capped to the visible panel rather than the viewport. -->
-    <div
-      v-if="!page"
-      class="mx-auto flex max-w-[47.5rem] flex-col gap-6 px-4 pt-6 pb-12 sm:pt-8"
-      :class="railShown ? '@min-[60rem]:max-w-[68rem] @min-[60rem]:px-6' : ''"
-    >
-      <TopBar
-        :live="live"
-        :date="liveData.today.value"
-        :checked="liveData.checked.value"
-        @open="openNamed"
-        @search="searchIssues"
-      />
-      <!-- Below the breakpoint both columns dissolve into one ordered list, so suggestions follow the problems. -->
-      <div
-        class="grid grid-cols-1 gap-6 @min-[60rem]:items-start @min-[60rem]:justify-center @min-[60rem]:gap-8"
-        :class="railShown ? '@min-[60rem]:grid-cols-[minmax(0,44rem)_20rem]' : ''"
-      >
-        <div
-          class="contents @min-[60rem]:flex @min-[60rem]:min-w-0 @min-[60rem]:flex-col @min-[60rem]:gap-6"
+    <template v-if="!page" #subtitle>
+      <TopBarStatus :live="live" :date="liveData.today.value" :checked="liveData.checked.value" />
+    </template>
+    <template v-if="!page" #actions>
+      <TopBar @open="openNamed" @search="searchIssues" />
+    </template>
+    <template v-else-if="page === 'issues'" #actions>
+      <ODropdown align="end">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-right="expand-more"
+            data-test="autoobserve2-issues-range"
+          >
+            {{ t(ISSUES_RANGE_LABEL[issuesRange]) }}
+          </OButton>
+        </template>
+        <ODropdownItem
+          v-for="option in ISSUES_RANGES"
+          :key="option"
+          role="menuitemradio"
+          :aria-checked="option === issuesRange"
+          :data-test="`autoobserve2-issues-range-${option}`"
+          @select="setIssuesRange(option)"
         >
-          <LivePaged v-if="live" :cap="MAIN_PAGED_CAP" class="order-1" />
-          <ThisWeek
-            v-else
-            v-model:range="range"
-            v-model:priority="priority"
-            v-model:shown="shown"
-            class="order-1"
-            :problems="problems"
-            :requests="data.requests"
-            :service-count="data.serviceCount"
-            @open-problem="openProblem"
-            @open-issues="openIssuesPage"
-          />
-          <PageFooter
-            class="order-3 pt-2"
-            @open-coverage="openCoverage()"
-            @open-activity="openActivity()"
-          />
-          <div
-            v-if="!live"
-            class="border-border-default rounded-surface order-4 mt-6 flex flex-wrap items-center justify-center gap-2 border border-dashed px-4 py-3"
-            data-test="autoobserve2-scenario"
-          >
-            <OTag variant="purple-soft" size="xs" :label="t('autoobserve2.demoTag')" />
-            <!-- OSelect drops its id on the popover trigger, so a wrapping label names it; prevent stops a second toggle. -->
-            <label class="flex items-center gap-2" @click.prevent>
-              <span class="text-text-body text-xs">{{ t("autoobserve2.scenarioLabel") }}</span>
-              <OSelect
-                :model-value="scenario"
-                :options="scenarioOptions"
-                size="sm"
-                width="sm"
-                data-test="autoobserve2-scenario-select"
-                @update:model-value="(v) => setScenario(v as Scenario)"
-              />
-            </label>
-          </div>
-          <div
-            v-else
-            class="border-border-default rounded-surface order-4 mt-6 flex flex-wrap items-center justify-center gap-2 border border-dashed px-4 py-3"
-            data-test="autoobserve2-scenario-live"
-          >
-            <OTag variant="default-soft" size="xs" :label="scenarioNote.tag" />
-            <span class="text-text-body text-xs">{{ scenarioNote.text }}</span>
-            <OButton
-              variant="ghost-primary"
-              size="xs"
-              icon-right="arrow-forward"
-              data-test="autoobserve2-scenario-live-action"
-              @click="howOpen = true"
-            >
-              {{ scenarioNote.action }}
-            </OButton>
-          </div>
-        </div>
-        <aside
-          v-if="railShown"
-          class="contents @min-[60rem]:sticky @min-[60rem]:top-6 @min-[60rem]:block"
-          data-test="autoobserve2-rail"
-        >
-          <div
-            ref="railEl"
-            class="contents [scrollbar-width:thin] @min-[60rem]:flex @min-[60rem]:max-h-[calc(100cqh-7.5rem)] @min-[60rem]:flex-col @min-[60rem]:gap-6 @min-[60rem]:overflow-y-auto @min-[60rem]:overscroll-contain @min-[60rem]:p-px"
-            data-test="autoobserve2-rail-scroll"
-            @scroll="measureRail"
-          >
-            <LiveSuggestions
-              v-if="live"
-              class="order-2 shrink-0"
-              :rail="liveData.rail.value"
-              :skeleton="liveData.railSkeleton.value"
-              @see-all="allOpen = true"
+          <span class="flex-1">{{ t(ISSUES_RANGE_LABEL[option]) }}</span>
+          <template #icon-right>
+            <OIcon
+              name="check"
+              size="sm"
+              :class="option === issuesRange ? 'text-text-heading' : 'invisible'"
             />
-            <Suggestions v-else class="order-2 shrink-0" :requests="suggestions" />
-          </div>
-          <div
-            v-if="railMore && !live"
-            class="from-surface-subtle pointer-events-none absolute inset-x-0 bottom-0 hidden h-16 bg-linear-to-t to-transparent @min-[60rem]:block"
-          />
-          <button
-            v-if="railMore && !live"
-            type="button"
-            class="bg-surface-base border-border-default text-text-secondary hover:text-text-heading focus-visible:ring-focus-ring-accent absolute bottom-2 left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-full border px-3 py-1 text-xs shadow-sm transition-colors focus-visible:ring-2 focus-visible:outline-none @min-[60rem]:flex"
-            data-test="autoobserve2-rail-more"
-            @click="scrollRail"
-          >
-            {{ t("autoobserve2.rail.more") }}
-            <OIcon name="arrow-downward" size="xs" />
-          </button>
-        </aside>
-      </div>
-    </div>
+          </template>
+        </ODropdownItem>
+      </ODropdown>
+    </template>
     <div
-      v-else-if="page === 'coverage'"
-      class="mx-auto flex h-full max-w-[100rem] flex-col gap-5 px-4 pt-6 pb-6 @min-[60rem]:px-6"
-      data-test="autoobserve2-coverage-page"
+      class="bg-surface-subtle [container-type:size] h-full overflow-auto"
+      data-test="autoobserve2-page"
     >
-      <header class="flex flex-col gap-3">
-        <OButton
-          variant="ghost"
-          size="xs"
-          icon-left="arrow-back"
-          class="self-start"
-          data-test="autoobserve2-coverage-back"
-          @click="closePage"
-        >
-          {{ t("autoobserve2.coveragePage.back") }}
-        </OButton>
+      <!-- A size container, so the pinned rail can be capped to the visible panel rather than the viewport. -->
+      <div
+        v-if="!page"
+        class="mx-auto flex max-w-[47.5rem] flex-col gap-6 px-4 pt-6 pb-12 sm:pt-8"
+        :class="railShown ? '@min-[60rem]:max-w-[68rem] @min-[60rem]:px-6' : ''"
+      >
+        <!-- Below the breakpoint both columns dissolve into one ordered list, so suggestions follow the problems. -->
         <div
-          class="flex flex-col gap-4 @min-[60rem]:flex-row @min-[60rem]:items-end @min-[60rem]:justify-between @min-[60rem]:gap-8"
+          class="grid grid-cols-1 gap-6 @min-[60rem]:items-start @min-[60rem]:justify-center @min-[60rem]:gap-8"
+          :class="railShown ? '@min-[60rem]:grid-cols-[minmax(0,44rem)_20rem]' : ''"
         >
-          <div class="flex min-w-0 flex-col gap-1.5">
-            <h1
-              class="text-text-heading text-2xl leading-tight font-semibold tracking-tight"
-              data-test="autoobserve2-coverage-title"
-            >
-              {{ t("autoobserve2.coveragePage.title") }}
-            </h1>
-            <p
-              class="text-text-body max-w-[70ch] text-sm leading-relaxed text-pretty"
-              :class="live ? 'min-h-6' : ''"
-              data-test="autoobserve2-coverage-sentence"
-            >
-              <OSkeleton
-                v-if="live && liveData.coverageSkeleton.value"
-                animation="none"
-                class="mt-1 h-4 w-80 max-w-full"
-                data-test="autoobserve2-coverage-sentence-skeleton"
-              />
-              <template v-else>{{ coverageSentence }}</template>
-            </p>
-          </div>
           <div
-            v-if="live"
-            class="flex min-h-10 w-full shrink-0 items-end @min-[60rem]:max-w-[26rem]"
+            class="contents @min-[60rem]:flex @min-[60rem]:min-w-0 @min-[60rem]:flex-col @min-[60rem]:gap-6"
+          >
+            <LivePaged v-if="live" :cap="MAIN_PAGED_CAP" class="order-1" />
+            <ThisWeek
+              v-else
+              v-model:range="range"
+              v-model:priority="priority"
+              v-model:shown="shown"
+              class="order-1"
+              :problems="problems"
+              :requests="data.requests"
+              :service-count="data.serviceCount"
+              @open-problem="openProblem"
+              @open-issues="openIssuesPage"
+            />
+            <PageFooter
+              class="order-3 pt-2"
+              @open-coverage="openCoverage()"
+              @open-activity="openActivity()"
+            />
+            <div
+              v-if="!live"
+              class="border-border-default rounded-surface order-4 mt-6 flex flex-wrap items-center justify-center gap-2 border border-dashed px-4 py-3"
+              data-test="autoobserve2-scenario"
+            >
+              <OTag variant="purple-soft" size="xs" :label="t('autoobserve2.demoTag')" />
+              <!-- OSelect drops its id on the popover trigger, so a wrapping label names it; prevent stops a second toggle. -->
+              <label class="flex items-center gap-2" @click.prevent>
+                <span class="text-text-body text-xs">{{ t("autoobserve2.scenarioLabel") }}</span>
+                <OSelect
+                  :model-value="scenario"
+                  :options="scenarioOptions"
+                  size="sm"
+                  width="sm"
+                  data-test="autoobserve2-scenario-select"
+                  @update:model-value="(v) => setScenario(v as Scenario)"
+                />
+              </label>
+            </div>
+            <div
+              v-else
+              class="border-border-default rounded-surface order-4 mt-6 flex flex-wrap items-center justify-center gap-2 border border-dashed px-4 py-3"
+              data-test="autoobserve2-scenario-live"
+            >
+              <OTag variant="default-soft" size="xs" :label="scenarioNote.tag" />
+              <span class="text-text-body text-xs">{{ scenarioNote.text }}</span>
+              <OButton
+                variant="ghost-primary"
+                size="xs"
+                icon-right="arrow-forward"
+                data-test="autoobserve2-scenario-live-action"
+                @click="howOpen = true"
+              >
+                {{ scenarioNote.action }}
+              </OButton>
+            </div>
+          </div>
+          <aside
+            v-if="railShown"
+            class="contents @min-[60rem]:sticky @min-[60rem]:top-6 @min-[60rem]:block"
+            data-test="autoobserve2-rail"
           >
             <div
-              v-if="liveData.coverageSkeleton.value"
-              class="flex w-full flex-col gap-2"
-              aria-hidden="true"
+              ref="railEl"
+              class="contents [scrollbar-width:thin] @min-[60rem]:flex @min-[60rem]:max-h-[calc(100cqh-3rem)] @min-[60rem]:flex-col @min-[60rem]:gap-6 @min-[60rem]:overflow-y-auto @min-[60rem]:overscroll-contain @min-[60rem]:p-px"
+              data-test="autoobserve2-rail-scroll"
+              @scroll="measureRail"
             >
-              <OSkeleton animation="none" class="h-2 w-full" />
-              <div class="flex gap-4">
-                <OSkeleton animation="none" class="h-3 w-20" />
-                <OSkeleton animation="none" class="h-3 w-26" />
+              <LiveSuggestions
+                v-if="live"
+                class="order-2 shrink-0"
+                :rail="liveData.rail.value"
+                :skeleton="liveData.railSkeleton.value"
+                @see-all="allOpen = true"
+              />
+              <Suggestions v-else class="order-2 shrink-0" :requests="suggestions" />
+            </div>
+            <div
+              v-if="railMore && !live"
+              class="from-surface-subtle pointer-events-none absolute inset-x-0 bottom-0 hidden h-16 bg-linear-to-t to-transparent @min-[60rem]:block"
+            />
+            <button
+              v-if="railMore && !live"
+              type="button"
+              class="bg-surface-base border-border-default text-text-secondary hover:text-text-heading focus-visible:ring-focus-ring-accent absolute bottom-2 left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-full border px-3 py-1 text-xs shadow-sm transition-colors focus-visible:ring-2 focus-visible:outline-none @min-[60rem]:flex"
+              data-test="autoobserve2-rail-more"
+              @click="scrollRail"
+            >
+              {{ t("autoobserve2.rail.more") }}
+              <OIcon name="arrow-downward" size="xs" />
+            </button>
+          </aside>
+        </div>
+      </div>
+      <div
+        v-else-if="page === 'coverage'"
+        class="mx-auto flex h-full max-w-[100rem] flex-col gap-5 px-4 pt-6 pb-6 @min-[60rem]:px-6"
+        data-test="autoobserve2-coverage-page"
+      >
+        <header class="flex flex-col gap-3">
+          <div
+            class="flex flex-col gap-4 @min-[60rem]:flex-row @min-[60rem]:items-end @min-[60rem]:justify-between @min-[60rem]:gap-8"
+          >
+            <div class="flex min-w-0 flex-col gap-1.5">
+              <p
+                class="text-text-body max-w-[70ch] text-sm leading-relaxed text-pretty"
+                :class="live ? 'min-h-6' : ''"
+                data-test="autoobserve2-coverage-sentence"
+              >
+                <OSkeleton
+                  v-if="live && liveData.coverageSkeleton.value"
+                  animation="none"
+                  class="mt-1 h-4 w-80 max-w-full"
+                  data-test="autoobserve2-coverage-sentence-skeleton"
+                />
+                <template v-else>{{ coverageSentence }}</template>
+              </p>
+            </div>
+            <div
+              v-if="live"
+              class="flex min-h-10 w-full shrink-0 items-end @min-[60rem]:max-w-[26rem]"
+            >
+              <div
+                v-if="liveData.coverageSkeleton.value"
+                class="flex w-full flex-col gap-2"
+                aria-hidden="true"
+              >
+                <OSkeleton animation="none" class="h-2 w-full" />
+                <div class="flex gap-4">
+                  <OSkeleton animation="none" class="h-3 w-20" />
+                  <OSkeleton animation="none" class="h-3 w-26" />
+                </div>
               </div>
+              <CoverageBar
+                v-else-if="coverageSegments.watching + coverageSegments.gaps > 0"
+                class="w-full"
+                :watching="coverageSegments.watching"
+                :learning="0"
+                :gaps="coverageSegments.gaps"
+                live
+                @select="(f) => openCoverage({ filter: f }, false)"
+              />
             </div>
             <CoverageBar
-              v-else-if="coverageSegments.watching + coverageSegments.gaps > 0"
-              class="w-full"
+              v-else
+              class="w-full shrink-0 @min-[60rem]:max-w-[26rem]"
               :watching="coverageSegments.watching"
-              :learning="0"
+              :learning="coverageSegments.learning"
               :gaps="coverageSegments.gaps"
-              live
               @select="(f) => openCoverage({ filter: f }, false)"
             />
           </div>
-          <CoverageBar
-            v-else
-            class="w-full shrink-0 @min-[60rem]:max-w-[26rem]"
-            :watching="coverageSegments.watching"
-            :learning="coverageSegments.learning"
-            :gaps="coverageSegments.gaps"
-            @select="(f) => openCoverage({ filter: f }, false)"
+        </header>
+        <div
+          class="bg-surface-base border-border-subtle rounded-surface flex min-h-0 flex-1 overflow-hidden border shadow-xs"
+        >
+          <AutoObserveCoverageTab
+            :key="coverageKey"
+            :ledger="ledger"
+            :scenario="scenario"
+            :initial="coverageInitial"
+            :source="live ? liveData.source.value : undefined"
+            :skeleton="live && liveData.coverageSkeleton.value"
+            explain
+            @how-it-works="howOpen = true"
           />
         </div>
-      </header>
-      <div
-        class="bg-surface-base border-border-subtle rounded-surface flex min-h-0 flex-1 overflow-hidden border shadow-xs"
-      >
-        <AutoObserveCoverageTab
-          :key="coverageKey"
-          :ledger="ledger"
-          :scenario="scenario"
-          :initial="coverageInitial"
-          :source="live ? liveData.source.value : undefined"
-          :skeleton="live && liveData.coverageSkeleton.value"
-          explain
-          @how-it-works="howOpen = true"
-        />
       </div>
-    </div>
-    <div
-      v-else-if="page === 'issues'"
-      class="mx-auto flex h-full max-w-[100rem] flex-col gap-5 px-4 pt-6 pb-6 @min-[60rem]:px-6"
-      data-test="autoobserve2-issues-page"
-    >
-      <header class="flex flex-col gap-3">
-        <OButton
-          variant="ghost"
-          size="xs"
-          icon-left="arrow-back"
-          class="self-start"
-          data-test="autoobserve2-issues-back"
-          @click="closePage"
-        >
-          {{ t("autoobserve2.issuesPage.back") }}
-        </OButton>
+      <div
+        v-else-if="page === 'issues'"
+        class="mx-auto flex h-full max-w-[100rem] flex-col gap-5 px-4 pt-6 pb-6 @min-[60rem]:px-6"
+        data-test="autoobserve2-issues-page"
+      >
         <div
-          class="flex flex-col gap-3 @min-[60rem]:flex-row @min-[60rem]:items-end @min-[60rem]:justify-between @min-[60rem]:gap-8"
+          class="bg-surface-base border-border-subtle rounded-surface flex min-h-0 overflow-hidden border shadow-xs"
+          :class="live ? 'flex-1' : ''"
         >
-          <div class="flex min-w-0 flex-col gap-1.5">
-            <h1
-              class="text-text-heading text-2xl leading-tight font-semibold tracking-tight"
-              data-test="autoobserve2-issues-title"
-            >
-              {{ t("autoobserve2.issuesPage.title") }}
-            </h1>
-            <p
-              class="text-text-body max-w-[70ch] text-sm leading-relaxed text-pretty"
-              data-test="autoobserve2-issues-sentence"
-            >
-              {{
-                t("autoobserve2.issuesPage.sentence", {
-                  within: t(ISSUES_RANGE_WITHIN[issuesRange]),
-                })
-              }}
-            </p>
-          </div>
-          <ODropdown align="end">
-            <template #trigger>
-              <button
-                type="button"
-                class="hover:bg-surface-subtle-hover focus-visible:ring-focus-ring-accent rounded-default text-text-heading inline-flex shrink-0 items-center gap-1 self-start px-2 py-1 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none @min-[60rem]:self-auto"
-                data-test="autoobserve2-issues-range"
-              >
-                {{ t(ISSUES_RANGE_LABEL[issuesRange]) }}
-                <OIcon name="expand-more" size="sm" class="text-text-secondary" />
-              </button>
-            </template>
-            <ODropdownItem
-              v-for="option in ISSUES_RANGES"
-              :key="option"
-              role="menuitemradio"
-              :aria-checked="option === issuesRange"
-              :data-test="`autoobserve2-issues-range-${option}`"
-              @select="setIssuesRange(option)"
-            >
-              <span class="flex-1">{{ t(ISSUES_RANGE_LABEL[option]) }}</span>
-              <template #icon-right>
-                <OIcon
-                  name="check"
-                  size="sm"
-                  :class="option === issuesRange ? 'text-text-heading' : 'invisible'"
-                />
-              </template>
-            </ODropdownItem>
-          </ODropdown>
+          <LiveIssues v-if="live" :range="issuesRange" initial-filter="all" />
+          <AutoObserveIssuesTab
+            v-else
+            :issues="issues"
+            :scenario="scenario"
+            initial-filter="all"
+            @open-issue="openIssue"
+          />
         </div>
-      </header>
-      <div
-        class="bg-surface-base border-border-subtle rounded-surface flex min-h-0 overflow-hidden border shadow-xs"
-        :class="live ? 'flex-1' : ''"
-      >
-        <LiveIssues v-if="live" :range="issuesRange" initial-filter="all" />
-        <AutoObserveIssuesTab
-          v-else
-          :issues="issues"
-          :scenario="scenario"
-          initial-filter="all"
-          @open-issue="openIssue"
-        />
       </div>
-    </div>
-    <ChangesPage
-      v-else
-      :key="activityKey"
-      :ledger="live ? [] : ledger"
-      :scenario="scenario"
-      :highlight-id="changeId"
-      @back="closePage"
-      @update-entry="updateEntry"
-    >
-      <template v-if="live" #empty>
-        <AppliedChangesList>
-          <div class="bg-surface-base border-border-subtle rounded-surface border py-6 shadow-xs">
-            <LiveSurfaceEmpty surface="changes" @action="allOpen = true" />
-          </div>
-        </AppliedChangesList>
-      </template>
-    </ChangesPage>
+      <ChangesPage
+        v-else
+        :key="activityKey"
+        :ledger="live ? [] : ledger"
+        :scenario="scenario"
+        :highlight-id="changeId"
+        @update-entry="updateEntry"
+      >
+        <template v-if="live" #empty>
+          <AppliedChangesList>
+            <div class="bg-surface-base border-border-subtle rounded-surface border py-6 shadow-xs">
+              <LiveSurfaceEmpty surface="changes" @action="allOpen = true" />
+            </div>
+          </AppliedChangesList>
+        </template>
+      </ChangesPage>
 
-    <AutoObserveIssueDrawer
-      v-model:open="problemOpen"
-      :issue="selectedIssue"
-      :ledger="ledger"
-      @update-entry="updateEntry"
-    />
-    <HistoryDrawer
-      v-model:open="historyOpen"
-      :entries="live ? [] : history"
-      :change-ids="changeIds"
-      @open-change="openChange"
-    >
-      <template v-if="live" #empty>
-        <LiveSurfaceEmpty surface="history" @action="historyToIssues" />
-      </template>
-    </HistoryDrawer>
-    <SettingsDrawer v-model:open="settingsOpen">
-      <template v-if="live" #empty>
-        <LiveSettingsPanel @action="settingsToHowItWorks" />
-      </template>
-    </SettingsDrawer>
-    <HowItWorksDrawer v-model:open="howOpen" />
-    <AllSuggestionsDrawer v-if="live" v-model:open="allOpen" />
-  </div>
+      <AutoObserveIssueDrawer
+        v-model:open="problemOpen"
+        :issue="selectedIssue"
+        :ledger="ledger"
+        @update-entry="updateEntry"
+      />
+      <HistoryDrawer
+        v-model:open="historyOpen"
+        :entries="live ? [] : history"
+        :change-ids="changeIds"
+        @open-change="openChange"
+      >
+        <template v-if="live" #empty>
+          <LiveSurfaceEmpty surface="history" @action="historyToIssues" />
+        </template>
+      </HistoryDrawer>
+      <SettingsDrawer v-model:open="settingsOpen">
+        <template v-if="live" #empty>
+          <LiveSettingsPanel @action="settingsToHowItWorks" />
+        </template>
+      </SettingsDrawer>
+      <HowItWorksDrawer v-model:open="howOpen" />
+      <AllSuggestionsDrawer v-if="live" v-model:open="allOpen" />
+    </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -360,6 +319,8 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
+import TopBarStatus from "@/components/autoobserve/v2/TopBarStatus.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ThisWeek from "@/components/autoobserve/v2/ThisWeek.vue";
 import Suggestions from "@/components/autoobserve/v2/Suggestions.vue";
 import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
@@ -634,6 +595,37 @@ const closePage = () => {
   if (window.history.state?.back) router.back();
   else void router.replace({ query: { ...route.query, ...PAGE_QUERY } });
 };
+
+const PAGE_TITLE: Record<(typeof PAGES)[number], { title: I18nKey; test: string }> = {
+  coverage: { title: "autoobserve2.coveragePage.title", test: "autoobserve2-coverage-title" },
+  issues: { title: "autoobserve2.issuesPage.title", test: "autoobserve2-issues-title" },
+  activity: { title: "autoobserve2.activityPage.title", test: "autoobserve2-activity-title" },
+};
+
+// Every page shares one header, so the title keeps its place from home to a sub-page.
+const header = computed<{
+  title: I18nText;
+  titleTest: string;
+  subtitle?: I18nText;
+  back?: { label: I18nText; onClick: () => void; dataTest: string };
+}>(() => {
+  if (!page.value) return { title: t("autoobserve.title"), titleTest: "autoobserve2-title" };
+  return {
+    title: t(PAGE_TITLE[page.value].title),
+    titleTest: PAGE_TITLE[page.value].test,
+    subtitle:
+      page.value === "issues"
+        ? t("autoobserve2.issuesPage.sentence", {
+            within: t(ISSUES_RANGE_WITHIN[issuesRange.value]),
+          })
+        : undefined,
+    back: {
+      label: t("autoobserve2.backToHome"),
+      onClick: closePage,
+      dataTest: `autoobserve2-${page.value}-back`,
+    },
+  };
+});
 
 const scrollToInitialCell = async () => {
   const cell = coverageInitial.value;
