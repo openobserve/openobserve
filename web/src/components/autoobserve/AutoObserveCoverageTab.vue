@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="term && !searched.length"
           size="block"
           illustration="no-results"
-          :title="t('autoobserve.coverage.noMatch', { query: raw(term) })"
+          :title="noMatchTitle"
           :action-label="t('autoobserve.coverage.clearSearch')"
           data-test="autoobserve-coverage-no-match"
           @action="clearSearch"
@@ -394,10 +394,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <OEmptyState
-              v-if="term"
+              v-if="searched.length && filter !== 'all'"
               size="block"
               illustration="no-results"
-              :title="t('autoobserve.coverage.noMatch', { query: raw(term) })"
+              :title="filterHidesTitle"
+              :action-label="t('autoobserveLive.coverage.showAll')"
+              data-test="autoobserve-coverage-filter-hides"
+              @action="filter = 'all'"
+            />
+            <OEmptyState
+              v-else-if="term"
+              size="block"
+              illustration="no-results"
+              :title="noMatchTitle"
               :action-label="t('autoobserve.coverage.clearSearch')"
               data-test="autoobserve-coverage-no-match"
               @action="clearSearch"
@@ -805,6 +814,25 @@ const announcement = computed(() => {
   return term.value ? t("autoobserve.coverage.matchCount", { count }, count) : "";
 });
 
+// Live search matches service, cluster and namespace; the fixture table's matches service or stream.
+const noMatchTitle = computed(() =>
+  props.source
+    ? t("autoobserveLive.coverage.noMatch", { query: raw(term.value) })
+    : t("autoobserve.coverage.noMatch", { query: raw(term.value) }),
+);
+
+const filterHidesTitle = computed(() => {
+  const count = searched.value.length;
+  const state = filterLabel(filter.value);
+  return term.value
+    ? t(
+        "autoobserveLive.coverage.filterHidesSearch",
+        { count, query: raw(term.value), state },
+        count,
+      )
+    : t("autoobserveLive.coverage.filterHides", { state });
+});
+
 const clearSearch = () => {
   query.value = "";
   document.getElementById(SEARCH_ID)?.focus();
@@ -870,7 +898,7 @@ const legend = computed(() =>
     : LEGEND[fill.value].map(({ cls, key }) => ({ cls, label: t(key) }))
   ).map((item) => ({
     ...item,
-    count: allRows.value.filter((r) => fillClass(r) === item.cls).length,
+    count: searched.value.filter((r) => fillClass(r) === item.cls).length,
   })),
 );
 
@@ -964,6 +992,17 @@ const SERVICE_COLUMN: OTableColumnDef<CoverageRow> = {
   header: t("autoobserve.coverage.service"),
   accessorKey: "service",
   size: 160,
+  sortable: true,
+};
+
+// Sorting a check column puts the worst first: no monitor, then the ways one falls short, then covered.
+const CHECK_RANK: Record<string, number> = {
+  none: 0,
+  blind: 1,
+  unmapped: 2,
+  silent: 3,
+  weak: 4,
+  covered: 5,
 };
 
 const liveColumns: OTableColumnDef<CoverageRow>[] = [
@@ -973,24 +1012,28 @@ const liveColumns: OTableColumnDef<CoverageRow>[] = [
     header: t("autoobserveLive.coverage.columns.where"),
     accessorFn: (row: CoverageRow) => row.where ?? "",
     size: 170,
+    sortable: true,
   },
   ...LIVE_CHECKS.map((check) => ({
     id: `check-${check}`,
     header: liveCheckName(t, check),
-    accessorFn: (row: CoverageRow) => row.checks?.[check].engine?.stateKey ?? "none",
+    accessorFn: (row: CoverageRow) => CHECK_RANK[row.checks?.[check].engine?.stateKey ?? "none"],
     size: 130,
+    sortable: true,
   })),
   {
     id: "state",
     header: t("autoobserveLive.coverage.columns.state"),
-    accessorFn: (row: CoverageRow) => row.status?.state ?? "",
+    accessorFn: (row: CoverageRow) => rank(row),
     size: 130,
+    sortable: true,
   },
   {
     id: "lastScanned",
     header: t("autoobserveLive.coverage.columns.lastChecked"),
-    accessorKey: "lastScanned",
+    accessorFn: (row: CoverageRow) => row.scannedMinutes ?? Number.MAX_SAFE_INTEGER,
     size: 130,
+    sortable: true,
   },
 ];
 

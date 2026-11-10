@@ -30655,7 +30655,11 @@
       "labelNamespace": "{name} · {namespace}",
       "labelPlace": "{name} · {cluster} · {namespace}",
       "noNamespace": "no namespace",
-      "noCluster": "no cluster"
+      "noCluster": "no cluster",
+      "noMatch": "No service, cluster or namespace matches “{query}”",
+      "showAll": "Show all",
+      "filterHides": "No service is {state}",
+      "filterHidesSearch": "{count} service matches “{query}”, but it isn't {state} | {count} services match “{query}”, but none is {state}"
     },
     "cell": {
       "noClass": "AutoObserve doesn't check this signal yet",
