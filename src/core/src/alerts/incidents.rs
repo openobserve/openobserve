@@ -7423,6 +7423,50 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn an_incident_a_security_detection_fired_into_gets_its_link_resolved_and_stays_open()
+        {
+            let _db = store().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let f = finding(&org, ONSET);
+            let id = open(&f, &pager).await.unwrap();
+            let mut detection = config::meta::alerts::alert::Alert::default();
+            detection.org_id.clone_from(&org);
+            detection.context_attributes = Some(
+                [(
+                    config::meta::alerts::alert::SIEM_ATTRIBUTE.to_string(),
+                    "true".to_string(),
+                )]
+                .into_iter()
+                .collect(),
+            );
+            common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key(&org, "siem-detection"),
+                (Default::default(), detection),
+            );
+            infra::table::alert_incidents::add_alert_to_incident(
+                &id,
+                "siem-detection",
+                "brute force",
+                AlertKind::Internal.as_str(),
+                ONSET,
+                "alert_id",
+            )
+            .await
+            .unwrap();
+            infra::table::alert_incidents::resolve_alert_firings(&id, "siem-detection", BACK)
+                .await
+                .unwrap();
+            let resolved = resolve_finding_firing(&org, &f.subject_id, ONSET, BACK).await;
+            assert!(
+                !resolved.unwrap(),
+                "a detection's incident is an analyst's to close"
+            );
+            assert_eq!(links_resolved_at(&id).await, [Some(BACK), Some(BACK)]);
+            assert_ne!(status(&org, &id).await, "resolved");
+            assert!(!resolved_by_system(&org, &id).await);
+        }
+
+        #[tokio::test]
         async fn no_incident_holding_the_firing_resolves_nothing_and_writes_nothing() {
             let _db = store().await;
             let (org, pager) = (new_org(), Pager::default());
