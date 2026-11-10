@@ -118,7 +118,6 @@ async fn buffer_record(
         unreachable!("flatten only returns an object")
     };
     let stream_name = match stream_name {
-        Some(name) if config::get_config().common.skip_formatting_stream_name => name.to_string(),
         Some(name) => format_stream_name(name.to_string()),
         None => match record
             .get(NAME_LABEL)
