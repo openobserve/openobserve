@@ -235,7 +235,7 @@ const scopeLine = computed<I18nText>(() => {
   ];
   if (lockedRows.value.length) {
     const first = previewById.value.get(lockedRows.value[0].id)?.locked;
-    if (first) parts.push(raw(first.message));
+    if (first) parts.push(copy.value.refusalText(first));
     parts.push(
       t(
         "insight.decisions.mark.locked",

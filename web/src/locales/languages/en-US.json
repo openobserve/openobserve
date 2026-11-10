@@ -34335,6 +34335,7 @@
       "undo": "Undo",
       "retry": "Retry",
       "namesMore": "{names} and {count} more",
+      "askOwners": "Ask {names}.",
       "dismiss": {
         "title": "Dismiss “{title}”?",
         "button": "Dismiss",

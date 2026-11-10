@@ -314,6 +314,30 @@ describe("ReviewChangeDialog (W5)", () => {
     expect(q("review-change-note")?.classList.contains("invisible")).toBe(true);
   });
 
+  it("a_refusal_with_owners_names_who_to_ask_and_counts_the_rest", async () => {
+    api.preview.mockResolvedValue({
+      data: preview({
+        may: false,
+        locked: {
+          code: "decision_refused",
+          reason: "security",
+          verb: "apply",
+          message:
+            "You can't apply this: it is a security detection, and changing one also needs the Security permission. Ask an admin of this organization.",
+          folder: "ops",
+          owners: ["a@x.test", "b@x.test", "c@x.test", "d@x.test", "e@x.test"],
+          owners_scope: "org",
+          can_act: [],
+          more: 0,
+        },
+      }),
+    } as never);
+    await mountDialog();
+    const text = q("review-change-notice")?.textContent ?? "";
+    expect(text).toContain("needs the Security permission");
+    expect(text).toContain("Ask a@x.test, b@x.test, c@x.test and 2 more.");
+  });
+
   it("Edit in alert editor hands the stored change to the editor in the alert's folder", async () => {
     await mountDialog();
     q("o-dialog-secondary-btn")!.click();

@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="decision-dismiss-locked"
           >
             <OIcon name="lock" size="xs" class="mt-0.5" />
-            <span>{{ locked.message }}</span>
+            <span>{{ copy.refusalText(locked) }}</span>
           </p>
           <p
             v-else-if="effectState === 'error'"

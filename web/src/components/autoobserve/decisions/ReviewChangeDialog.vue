@@ -250,20 +250,18 @@ const readNotice = computed<{ variant: Variant; text: I18nText } | null>(() => {
   if (offline.value) return { variant: "info", text: t("insight.decisions.apply.offline") };
   if (gone.value) return { variant: "warning", text: t("insight.decisions.apply.gone") };
   const locked = preview.data.value?.locked;
-  if (locked) return { variant: "error", text: raw(locked.message) };
+  if (locked) return { variant: "error", text: decisions.value.refusalText(locked) };
   if (preview.isError.value) {
     const refusal = refusalOf(preview.error.value);
     return refusal
-      ? { variant: "error", text: raw(refusal.message) }
+      ? { variant: "error", text: decisions.value.refusalText(refusal) }
       : { variant: "error", text: t("insight.decisions.apply.loadFailed") };
   }
   return null;
 });
 
 /** A refused reader is never promised an undoable apply. */
-const isLocked = computed(
-  () => !!preview.data.value?.locked || !!refusalOf(preview.error.value),
-);
+const isLocked = computed(() => !!preview.data.value?.locked || !!refusalOf(preview.error.value));
 
 const applicable = computed(
   () =>
