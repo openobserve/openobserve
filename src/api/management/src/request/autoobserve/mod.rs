@@ -17,6 +17,7 @@
 
 pub mod decisions;
 pub mod incidents;
+pub mod paging;
 pub mod review;
 pub mod slack_feed;
 

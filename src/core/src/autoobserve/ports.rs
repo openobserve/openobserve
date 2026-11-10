@@ -374,6 +374,11 @@ pub fn ports() -> Ports {
     }
 }
 
+pub(crate) async fn org_streams_now(org: &str) -> Vec<(StreamType, String)> {
+    let schemas = infra::schema::STREAM_SCHEMAS_LATEST.read().await;
+    org_streams(schemas.keys(), org)
+}
+
 async fn search(
     org: &str,
     stream_type: StreamType,
@@ -853,6 +858,7 @@ mod tests {
             group_key: String::new(),
             action: ActionKind::Investigate,
             signal_at: 1,
+            peers: Vec::new(),
         };
         let e = port.start(&request).await.unwrap_err();
         // ENT defaults incidents on; then the request passes the gate into the incident path.

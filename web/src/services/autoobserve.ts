@@ -169,8 +169,9 @@ export interface AutoObservePage {
 export interface AutoObserveIncidentMember {
   id: string;
   title: string;
-  stream_type: string;
-  stream_name: string;
+  // Null once the org no longer has the stream.
+  stream_type: string | null;
+  stream_name: string | null;
   first_seen_at: number;
   recovered_at: number | null;
 }

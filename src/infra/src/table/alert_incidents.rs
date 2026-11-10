@@ -1360,6 +1360,90 @@ pub async fn list_by_alert_kind_with<C: ConnectionTrait>(
     Ok((rows, has_more))
 }
 
+/// The org's open `alert_kind` incidents created since `since`, read on the primary.
+pub async fn open_with_alert_kind_since(
+    org_id: &str,
+    alert_kind: &str,
+    since: i64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::CreatedAt.gte(since))
+        .filter(alert_incidents::Column::Id.in_subquery(with_alert_kind(alert_kind)))
+        .order_by_desc(alert_incidents::Column::CreatedAt)
+        .order_by_desc(alert_incidents::Column::Id)
+        .all(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// The org's newest incidents with an `alert_kind` trigger, any status, on the primary.
+pub async fn newest_with_alert_kind(
+    org_id: &str,
+    alert_kind: &str,
+    limit: u64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Id.in_subquery(with_alert_kind(alert_kind)))
+        .order_by_desc(alert_incidents::Column::CreatedAt)
+        .order_by_desc(alert_incidents::Column::Id)
+        .limit(limit)
+        .all(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// When each incident's newest `alert_kind` link was written, on the primary.
+pub async fn last_linked_at(
+    incident_ids: &[String],
+    alert_kind: &str,
+) -> Result<HashMap<String, i64>, errors::Error> {
+    if incident_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let rows: Vec<(String, Option<i64>)> = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .column_as(alert_incident_alerts::Column::CreatedAt.max(), "linked_at")
+        .filter(
+            alert_incident_alerts::Column::IncidentId
+                .is_in(incident_ids.iter().map(String::as_str)),
+        )
+        .filter(alert_incident_alerts::Column::AlertKind.eq(alert_kind))
+        .group_by(alert_incident_alerts::Column::IncidentId)
+        .into_tuple()
+        .all(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(id, at)| Some((id, at?)))
+        .collect())
+}
+
+/// Every `alert_kind` link of these incidents, oldest firing first.
+pub async fn links_with_alert_kind(
+    incident_ids: &[String],
+    alert_kind: &str,
+) -> Result<Vec<alert_incident_alerts::Model>, errors::Error> {
+    if incident_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    alert_incident_alerts::Entity::find()
+        .filter(
+            alert_incident_alerts::Column::IncidentId
+                .is_in(incident_ids.iter().map(String::as_str)),
+        )
+        .filter(alert_incident_alerts::Column::AlertKind.eq(alert_kind))
+        .order_by_asc(alert_incident_alerts::Column::AlertFiredAt)
+        .order_by_asc(alert_incident_alerts::Column::AlertId)
+        .all(get_orm_client_ro().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// Mark every open firing of `alert_id` in this incident as recovered.
 ///
 /// Keyed on the alert rather than one `alert_fired_at` because the episode's
@@ -2114,6 +2198,14 @@ fn case_condition(cases: CaseFilter) -> Option<sea_orm::Condition> {
         CaseFilter::OnlyCases => Some(marked(true)),
         CaseFilter::NoCases => Some(marked(false)),
     }
+}
+
+fn with_alert_kind(alert_kind: &str) -> sea_orm::sea_query::SelectStatement {
+    Query::select()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .from(alert_incident_alerts::Entity)
+        .and_where(alert_incident_alerts::Column::AlertKind.eq(alert_kind))
+        .to_owned()
 }
 
 fn correlation_candidates_query(org_id: &str) -> sea_orm::Select<alert_incidents::Entity> {

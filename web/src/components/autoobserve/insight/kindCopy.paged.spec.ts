@@ -129,6 +129,14 @@ describe("pagedFindingCopy (W2)", () => {
     );
   });
 
+  it("a member whose stream is gone is counted, not named", () => {
+    const i = item({ members: 4 });
+    i.members![1] = { ...i.members![1], stream_type: null, stream_name: null };
+    expect(copy(i).why).toBe(
+      "ingest_1, ingest_3, ingest_4, and 1 more have sent no data since 9:12 AM.",
+    );
+  });
+
   it("a member list of one reads as a single stream", () => {
     expect(copy(item({ members: 1 })).headline).toBeNull();
   });

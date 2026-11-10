@@ -854,7 +854,7 @@ export const pagedFindingCopy = (
   const time = formatWhen(first_seen_at / 1000, zone.locale, zone.timeZone, nowMs);
   const members = item.members ?? [];
   const many = members.length > 1;
-  const shown = members.slice(0, GROUP_NAMES).map((m) => m.stream_name);
+  const shown = members.flatMap((m) => m.stream_name ?? []).slice(0, GROUP_NAMES);
   const rest = members.length - shown.length;
   const streams = listOf(
     zone.locale,

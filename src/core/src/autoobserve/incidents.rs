@@ -15,27 +15,40 @@
 
 //! AutoObserve's incident path: the port opens a finding's incident; the list reads it back.
 
+use std::collections::{BTreeMap, HashMap, HashSet};
+
 use async_trait::async_trait;
 use config::meta::alerts::{incidents::AlertKind, rca_runs::RunSummaryFields};
-use infra::table::entity::{alert_incident_alerts, alert_incidents};
+use infra::table::{
+    entity::{alert_incident_alerts, alert_incidents},
+    oncall_ownership::Landing,
+    service_streams::ServiceRecord,
+};
 use o2_enterprise::enterprise::autoobserve::{
+    INTERVAL_SECS,
     api::Page,
     contract::ActionRequest,
+    names::decision_kinds,
+    page_routing::{catalogue, cohort_dimensions, stream_service},
     paging_enabled_for,
-    plugins::stream::{PageSubject, finding_id, page_subject},
+    plugins::stream::{PageSubject, cohort_title, finding_id, page_subject},
     ports::{ActionRefused, InvestigationPort, Recovery},
 };
 use serde::{Deserialize, Serialize};
 
 use crate::alerts::incidents::{
     FINDING_KIND_DIMENSION, FINDING_STREAM_NAME_DIMENSION, FINDING_STREAM_TYPE_DIMENSION,
-    FindingIncident, finding_dimensions, incidents_enabled, open_finding_incident,
-    resolve_finding_firing,
+    FindingIncident, FindingPager, OncallPager, finding_dimensions, incidents_enabled,
+    open_finding_incident, resolve_finding_firing,
 };
 
 /// Prefixes every finding's trigger id, so it can never equal an alert's id in `alert_id`.
 pub const SUBJECT_PREFIX: &str = "autoobserve:";
 pub const REFUSED_INCIDENTS_OFF: &str = "incidents are off or not licensed";
+/// A failed route is retried the next tick, so two ticks without a record mean it failed (R8).
+pub const PAGE_PENDING_US: i64 = 2 * INTERVAL_SECS * 1_000_000;
+/// The queue keeps one row per dimension path, so this many rows hold every recent sample.
+const UNROUTED_SCANNED: u64 = 500;
 
 /// P6 over main's incident path: the incident's own automatic analysis is the investigation.
 pub struct IncidentInvestigation;
@@ -46,7 +59,8 @@ impl InvestigationPort for IncidentInvestigation {
         refuse_unless(incidents_enabled())?;
         let subject = page_subject(request)
             .ok_or_else(|| anyhow::anyhow!("the finding is not on a stream"))?;
-        let finding = finding_incident(&subject, &request.org);
+        let records = catalogue(&request.org).await;
+        let finding = finding_incident(&subject, &request.org, &records);
         // The act's timeout drops this future; spawned, the incident work still runs to its end.
         let outcome = tokio::spawn(async move { open_finding_incident(&finding).await }).await??;
         Ok(outcome.incident_id().to_string())
@@ -78,6 +92,44 @@ pub struct AutoObserveIncident {
     pub finding: FindingView,
     pub incident: IncidentView,
     pub investigation: InvestigationView,
+    /// Every stream in the incident, first seen first; left out only by bodies older than cohorts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<MemberView>,
+    /// Who was paged, or why nobody was; left out only by bodies older than R8.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<PageView>,
+}
+
+/// One stream of an incident; its type and name are null once the org no longer has the stream.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MemberView {
+    pub id: String,
+    pub title: String,
+    pub stream_type: Option<String>,
+    pub stream_name: Option<String>,
+    pub first_seen_at: i64,
+    /// Null while any of its firings is still open.
+    pub recovered_at: Option<i64>,
+}
+
+/// The incident's page as on-call recorded it; the team is null unless it paged.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PageView {
+    pub outcome: PageOutcome,
+    pub team_id: Option<String>,
+    pub team_name: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PageOutcome {
+    Paged,
+    /// No ownership rule and no default team took it, or the org has no on-call team.
+    Unrouted,
+    /// No record two ticks after it opened while routing names a team: routing or paging errored.
+    Failed,
+    /// Opened under two ticks ago and not routed yet.
+    Pending,
 }
 
 /// Kind and stream are null when the incident's group values cannot be read.
@@ -109,14 +161,31 @@ pub struct InvestigationView {
     pub not_run_reason: Option<String>,
 }
 
-/// The pure half of `start`: the subject the incident path correlates on.
-pub fn finding_incident(s: &PageSubject, org: &str) -> FindingIncident {
+/// The pure half of `start`: the subject the incident path correlates on, scoped by `records`.
+pub fn finding_incident(s: &PageSubject, org: &str, records: &[ServiceRecord]) -> FindingIncident {
+    let scope = stream_service(records, &s.stream_type, &s.stream_name);
+    let mut streams = vec![(s.stream_type.clone(), s.stream_name.clone())];
+    streams.extend(
+        s.cohort
+            .iter()
+            .filter(|(t, n)| stream_service(records, t, n) == scope)
+            .cloned(),
+    );
     FindingIncident {
         org_id: org.to_string(),
         subject_id: format!("{SUBJECT_PREFIX}{}", s.finding_id),
         title: s.title.clone(),
         dimensions: finding_dimensions(&s.decision_kind, &s.stream_type, &s.stream_name),
         triggered_at: s.signal_at,
+        page_title: cohort_title(
+            &s.decision_kind,
+            &s.stream_type,
+            &s.stream_name,
+            streams.len(),
+        ),
+        streams,
+        cohort: true,
+        scope,
     }
 }
 
@@ -128,18 +197,83 @@ pub fn recovery_subject(r: &Recovery) -> String {
 
 /// The org's AutoObserve incidents, newest first, with whether paging is on for it.
 pub async fn list(org: &str, page: Page) -> Result<AutoObserveIncidents, anyhow::Error> {
+    let oncall_on = o2_enterprise::enterprise::oncall::is_enabled();
+    list_with(org, page, oncall_on, config::utils::time::now_micros()).await
+}
+
+/// [list], told whether on-call runs and when now is, so every page outcome can be tested.
+pub async fn list_with(
+    org: &str,
+    page: Page,
+    oncall_on: bool,
+    now: i64,
+) -> Result<AutoObserveIncidents, anyhow::Error> {
+    let kind = AlertKind::AutoObserve.as_str();
     let (rows, has_more) = infra::table::alert_incidents::list_by_alert_kind(
         org,
-        AlertKind::AutoObserve.as_str(),
+        kind,
         u64::try_from(page.limit)?,
         u64::try_from(page.offset)?,
     )
     .await?;
+    let ids: Vec<String> = rows.iter().map(|(i, _)| i.id.clone()).collect();
+    let mut links: HashMap<String, Vec<alert_incident_alerts::Model>> = HashMap::new();
+    for link in infra::table::alert_incidents::links_with_alert_kind(&ids, kind).await? {
+        links
+            .entry(link.incident_id.clone())
+            .or_default()
+            .push(link);
+    }
+    let names = stream_names(org).await;
+    let mut items: Vec<AutoObserveIncident> = rows
+        .iter()
+        .map(|(i, l)| {
+            let mut item = item_of(i, l);
+            item.members = members_of(links.get(&i.id).map_or(&[], Vec::as_slice), &names);
+            item
+        })
+        .collect();
+    let unrouted = unrouted_samples(org).await?;
+    let staffed = oncall_on && infra::table::oncall_teams::has_any_cached(org).await?;
+    for item in &mut items {
+        item.page = Some(page_of(org, item, &unrouted, staffed, now).await?);
+    }
     Ok(AutoObserveIncidents {
-        paging: paging_enabled_for(org),
+        paging: paging_enabled_for(org).await,
         has_more,
-        items: rows.iter().map(|(i, l)| item_of(i, l)).collect(),
+        items,
     })
+}
+
+pub fn members_of(
+    links: &[alert_incident_alerts::Model],
+    names: &HashMap<String, (String, String)>,
+) -> Vec<MemberView> {
+    let mut by_id: BTreeMap<&str, Vec<&alert_incident_alerts::Model>> = BTreeMap::new();
+    for link in links {
+        by_id.entry(link.alert_id.as_str()).or_default().push(link);
+    }
+    let mut members: Vec<MemberView> = by_id
+        .into_iter()
+        .map(|(alert_id, firings)| {
+            let id = alert_id.strip_prefix(SUBJECT_PREFIX).unwrap_or(alert_id);
+            let first = firings.iter().min_by_key(|l| l.alert_fired_at).copied();
+            let open = firings.iter().any(|l| l.resolved_at.is_none());
+            let stream = names.get(id);
+            MemberView {
+                id: id.to_string(),
+                title: first.map(|l| l.alert_name.clone()).unwrap_or_default(),
+                stream_type: stream.map(|(t, _)| t.clone()),
+                stream_name: stream.map(|(_, n)| n.clone()),
+                first_seen_at: first.map_or(0, |l| l.alert_fired_at),
+                recovered_at: (!open)
+                    .then(|| firings.iter().filter_map(|l| l.resolved_at).max())
+                    .flatten(),
+            }
+        })
+        .collect();
+    members.sort_by(|a, b| (a.first_seen_at, &a.id).cmp(&(b.first_seen_at, &b.id)));
+    members
 }
 
 /// A refusal of the deployment or licence, which the stream hook writes as a budget row.
@@ -190,7 +324,79 @@ pub fn item_of(
                 .and_then(|s| serde_json::from_str(s).ok()),
             not_run_reason: incident.rca_off_reason.clone(),
         },
+        members: Vec::new(),
+        page: None,
     }
+}
+
+async fn unrouted_samples(org: &str) -> anyhow::Result<HashSet<String>> {
+    let rows =
+        infra::table::oncall_ownership::list_unrouted(org, true, Landing::Nobody, UNROUTED_SCANNED)
+            .await?;
+    Ok(rows.into_iter().filter_map(|r| r.last_source_id).collect())
+}
+
+async fn page_of(
+    org: &str,
+    item: &AutoObserveIncident,
+    unrouted: &HashSet<String>,
+    staffed: bool,
+    now: i64,
+) -> anyhow::Result<PageView> {
+    let id = &item.incident.id;
+    let record = OncallPager.record(org, id).await?;
+    if let Some(team) = record.as_ref().and_then(|r| r.team_id.clone()) {
+        let team_name = infra::table::oncall_teams::get_cached(org, &team)
+            .await?
+            .map(|t| t.name);
+        return Ok(PageView {
+            outcome: PageOutcome::Paged,
+            team_id: Some(team),
+            team_name,
+        });
+    }
+    // A teamless record is how on-call keeps a page nobody owns: it woke no one.
+    let outcome = if !staffed || record.is_some() || unrouted.contains(id) {
+        PageOutcome::Unrouted
+    } else if now - item.incident.created_at < PAGE_PENDING_US {
+        PageOutcome::Pending
+    } else if routes_nowhere(org, &item.members).await? {
+        PageOutcome::Unrouted
+    } else {
+        PageOutcome::Failed
+    };
+    Ok(PageView {
+        outcome,
+        team_id: None,
+        team_name: None,
+    })
+}
+
+/// Routing decided now, for an incident whose queue sample a later page of its path replaced.
+async fn routes_nowhere(org: &str, members: &[MemberView]) -> anyhow::Result<bool> {
+    let streams: Vec<(String, String)> = members
+        .iter()
+        .filter_map(|m| Some((m.stream_type.clone()?, m.stream_name.clone()?)))
+        .collect();
+    let dimensions = cohort_dimensions(org, &streams).await;
+    let routed = o2_enterprise::enterprise::oncall::routing::decide(org, None, &dimensions).await?;
+    Ok(routed.team_id().is_none())
+}
+
+/// Each paged kind's finding id for every stream the org still has, so a member reads by name.
+async fn stream_names(org: &str) -> HashMap<String, (String, String)> {
+    let streams = crate::autoobserve::ports::org_streams_now(org).await;
+    let mut names = HashMap::new();
+    for (stream_type, name) in streams {
+        let entity = format!("{stream_type}/{name}");
+        for kind in decision_kinds::PAGED {
+            names.insert(
+                finding_id(org, kind, &entity),
+                (stream_type.to_string(), name.clone()),
+            );
+        }
+    }
+    names
 }
 
 #[cfg(test)]
@@ -212,6 +418,7 @@ mod tests {
             group_key: String::new(),
             action: ActionKind::Investigate,
             signal_at: 1_762_300_000_000_000,
+            peers: Vec::new(),
         };
         page_subject(&request).unwrap()
     }
@@ -269,7 +476,7 @@ mod tests {
     #[test]
     fn a_page_subject_maps_to_an_alert_id_incident_at_the_onset() {
         let s = subject();
-        let f = finding_incident(&s, "demo-org");
+        let f = finding_incident(&s, "demo-org", &[]);
         assert_eq!(f.org_id, "demo-org");
         assert_eq!(f.subject_id, format!("autoobserve:{}", s.finding_id));
         assert_eq!(
@@ -306,6 +513,7 @@ mod tests {
             group_key: String::new(),
             action: ActionKind::Investigate,
             signal_at: 1,
+            peers: Vec::new(),
         };
         let e = IncidentInvestigation.start(&request).await.unwrap_err();
         // ENT defaults incidents on, so the switch decides which side of the gate this reaches.
@@ -400,7 +608,7 @@ mod tests {
             signal_at: 1_762_300_000_000_000,
             recovered_at: 1_762_300_900_000_000,
         };
-        let opened = finding_incident(&subject(), "demo-org");
+        let opened = finding_incident(&subject(), "demo-org", &[]);
         assert_eq!(recovery_subject(&recovery), opened.subject_id);
         let drop = Recovery {
             decision_kind: decision_kinds::STREAM_DROP.into(),

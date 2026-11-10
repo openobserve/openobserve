@@ -1313,6 +1313,7 @@ fn autoobserve_routes(router: Router) -> Router {
         .route("/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}", put(autoobserve::put_mark).delete(autoobserve::delete_mark))
         .route("/v2/{org_id}/autoobserve/review", get(autoobserve::review::get_review))
         .route("/v2/{org_id}/autoobserve/review/{decision_kind}/{cohort_id}", put(autoobserve::review::put_verdict))
+        .route("/v2/{org_id}/autoobserve/settings/paging", get(autoobserve::paging::get_paging_settings).put(autoobserve::paging::put_paging_settings))
 }
 
 #[rustfmt::skip]
