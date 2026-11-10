@@ -539,7 +539,14 @@ pub async fn build(
     // Data built under another publisher is neither reused nor retained.
     let prior = read_prior(&key)
         .await
-        .filter(|p| p.stored.header.published_by == live.published_by);
+        .filter(|p| p.stored.header.published_by == live.published_by)
+        .map(|mut p| {
+            // Data built before a settings or redaction change is never reused or retained.
+            if withheld(&p.stored.header, &live) {
+                p.body = None;
+            }
+            p
+        });
     if let Some(p) = prior.as_ref().filter(|p| p.body.is_some()) {
         // A build that finished between the miss and this task already holds the answer.
         let h = &p.stored.header;
@@ -1186,7 +1193,12 @@ fn once(
     live: &Live,
     outcome: &'static str,
 ) -> Served {
-    let Some(body) = built.body.as_ref() else {
+    // A joined build or deadline check that read an older settings rev holds unredacted data.
+    let Some(body) = built
+        .body
+        .as_ref()
+        .filter(|_| !withheld(&built.header, live))
+    else {
         return Served::Unavailable {
             retry_after: MIN_RETRY_SECS * 2,
         };
@@ -2117,23 +2129,69 @@ pub(super) mod tests {
         assert_eq!((next.stale, next.settings_rev), (false, now + 1));
     }
 
-    #[tokio::test]
-    async fn a_settings_change_never_serves_the_old_body_while_the_rebuild_fails() {
+    /// Builds once, moves the settings rev, and fails `failing` panels transiently from then on.
+    async fn after_settings_change(
+        panels: &[(&str, &str)],
+        failing: &[&str],
+    ) -> (
+        &'static Fake,
+        &'static Flights,
+        PublicDashboard,
+        Dashboard,
+        i64,
+    ) {
         let link = link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]));
-        let range = TimeRange::Absolute {
-            start: 0,
-            end: 3_600_000_000,
-        };
-        let dash = dashboard(&[("p1", "s1")]);
+        let dash = dashboard(panels);
         let engine = fake(&link, &dash);
         let flights = flights(8, 1);
         let now = now_micros();
-        data(&read_at(engine, flights, &link, &dash, range, now).await);
+        data(&read_at(engine, flights, &link, &dash, abs_range(), now).await);
         engine.settings_rev.store(now + 1, Ordering::SeqCst);
-        engine.panic.store(true, Ordering::SeqCst);
+        for id in failing {
+            engine
+                .classes
+                .lock()
+                .unwrap()
+                .insert((*id).into(), Class::Transient);
+        }
+        (engine, flights, link, dash, now)
+    }
+
+    fn abs_range() -> TimeRange {
+        TimeRange::Absolute {
+            start: 0,
+            end: 3_600_000_000,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_settings_change_never_retains_an_old_panel_when_a_rebuild_partly_fails() {
+        let (engine, flights, link, dash, now) =
+            after_settings_change(&[("p1", "s1"), ("p2", "s2")], &["p1"]).await;
+        let resp =
+            data(&read_at(engine, flights, &link, &dash, abs_range(), now + MIN).await).clone();
+        assert_eq!(reason(&resp, "p1"), Some(NotAvailableReason::BuildError));
+        assert_eq!(build_no(&resp, "p2"), 2);
+    }
+
+    #[tokio::test]
+    async fn a_settings_change_never_serves_the_old_body_when_a_rebuild_wholly_fails() {
+        let (engine, flights, link, dash, now) =
+            after_settings_change(&[("p1", "s1")], &["p1"]).await;
         for at in [now + MIN, now + 2 * MIN] {
-            let served = read_at(engine, flights, &link, &dash, range, at).await;
+            let served = read_at(engine, flights, &link, &dash, abs_range(), at).await;
             assert!(!matches!(served, Served::Data { .. }), "{served:?}");
+        }
+        assert!(!header(&link, &abs_range()).await.has_body());
+    }
+
+    #[tokio::test]
+    async fn a_settings_change_never_serves_the_old_body_through_a_deadline_check() {
+        let (engine, flights, link, dash, now) = after_settings_change(&[("p1", "s1")], &[]).await;
+        // Past the 15-minute access re-check of an idle absolute link.
+        let served = read_at(engine, flights, &link, &dash, abs_range(), now + 20 * MIN).await;
+        if let Served::Data { response, .. } = &served {
+            assert_eq!(build_no(response, "p1"), 2, "served the pre-change body");
         }
     }
 

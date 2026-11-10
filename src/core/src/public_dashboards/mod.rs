@@ -3568,6 +3568,35 @@ mod tests {
         }
     }
 
+    /// A redaction change moves only the rev: a new row reads as the defaults, an old row keeps
+    /// its switch and limit.
+    #[tokio::test]
+    async fn a_settings_rev_bump_moves_only_the_rev() {
+        let db = replication::tests::db().await;
+        pd_table::bump_settings_rev(&db, "new", "re_pattern", 5)
+            .await
+            .unwrap();
+        let row = pd_table::get_settings(&db, "new").await.unwrap().unwrap();
+        assert_eq!((row.rev, row.enabled, row.max_links), (5, true, None));
+        assert_eq!(row.max_links_set_by, None);
+
+        pd_table::upsert_settings(&db, "o", false, Some(7), "admin", 100)
+            .await
+            .unwrap();
+        // A clock behind the stored rev still moves it forward.
+        pd_table::bump_settings_rev(&db, "o", "re_pattern", 50)
+            .await
+            .unwrap();
+        let row = pd_table::get_settings(&db, "o").await.unwrap().unwrap();
+        assert_eq!((row.rev, row.enabled, row.max_links), (101, false, Some(7)));
+        assert_eq!(row.updated_by, "admin");
+        pd_table::bump_settings_rev(&db, "o", "re_pattern", 500)
+            .await
+            .unwrap();
+        let row = pd_table::get_settings(&db, "o").await.unwrap().unwrap();
+        assert_eq!(row.rev, 500);
+    }
+
     /// Downgraded from 50 to 3 with 5 links: the 5 stay live and no sixth can be created.
     #[tokio::test]
     async fn gate12_a_downgrade_stops_new_links_and_keeps_existing_ones() {
