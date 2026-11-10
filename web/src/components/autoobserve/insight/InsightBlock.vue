@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="hasActions" class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <OButton
           v-if="!card && parts.cta && !hideCta"
-          variant="primary"
+          variant="outline"
           size="sm"
           :icon-left="parts.cta.locked ? 'lock' : undefined"
           :disabled="!!parts.cta.locked"

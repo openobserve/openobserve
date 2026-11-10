@@ -251,6 +251,12 @@ describe("InsightBlock details only (drawer row)", () => {
     expect(wrapper.get(sel("details")).find(sel("cta")).text()).toBe("Review query");
   });
 
+  it("draws the CTA as a card's one outline button, the size of the rail's (T5-8)", () => {
+    const button = mountBlock(insight(), "details").findComponent(sel("cta"));
+    expect(button.props("variant")).toBe("outline");
+    expect(button.props("size")).toBe("sm");
+  });
+
   it("prefers the longer Details why when a kind has one", () => {
     const wrapper = mountBlock(
       insight({ whyDetail: raw("Errors: none, latency: none") }),
