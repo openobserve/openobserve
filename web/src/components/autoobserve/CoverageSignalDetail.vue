@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ cell.reason }}
       </ODescriptionItem>
       <ODescriptionItem
-        v-if="cell.engine"
+        v-if="cell.engine && !(added && !cell.engine.monitors.length)"
         stacked
         :label="t('autoobserveLive.drawer.monitors')"
         data-test="autoobserve-coverage-detail-monitors"
@@ -169,6 +169,8 @@ const props = defineProps<{
   pending?: boolean;
   /** When the live cell's alerts last fired, read from the alerts; absent until they are read. */
   lastFired?: I18nText | null;
+  /** An alert for this check was just added and isn't counted yet. */
+  added?: boolean;
 }>();
 
 const emit = defineEmits<{ cta: [cta: InsightCta] }>();

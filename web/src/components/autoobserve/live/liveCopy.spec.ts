@@ -426,6 +426,27 @@ describe("liveGapLines (the drawer's line for a gap)", () => {
     ]);
   });
 
+  it("says which checks were just added instead of calling them unwatched (T2-N1)", () => {
+    const lines = liveGapLines(
+      gt,
+      "en-US",
+      { errors: check("none"), latency: check("none"), absence: check("none") },
+      new Set(["errors", "absence"] as const),
+    );
+    expect(lines).toEqual([
+      "No alert watches its latency",
+      "Added alerts for its errors and whether it stops sending. AutoObserve counts them at its next check.",
+    ]);
+    expect(
+      liveGapLines(
+        gt,
+        "en-US",
+        { errors: check("none"), latency: check("covered"), absence: check("covered") },
+        new Set(["errors"] as const),
+      ),
+    ).toEqual(["Added an alert for its errors. AutoObserve counts it at its next check."]);
+  });
+
   it("names the key's dots with the page's two state words", () => {
     expect(liveLookWord(gt, "covered")).toBe("Watched");
     expect(liveLookWord(gt, "gap")).toBe("Coverage gap");

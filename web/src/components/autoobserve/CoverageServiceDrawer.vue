@@ -141,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="liveChecks && absenceOpen"
           :cell="liveChecks.absence"
           :last-fired="lastFiredOf(liveChecks.absence)"
+          :added="addedChecks.has('absence')"
           :service="row.service"
           signal="absence"
           :ledger="ledger"
@@ -266,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :detail="chart.live?.detail ?? undefined"
               :partial="chart.live?.partial"
               :wide="chart.live?.wide"
+              :added="addedChecks.has(LIVE_CELL[chart.def.signal as LiveChartSignal])"
               @toggle="toggle(chart.def.signal)"
               @retry="chart.live?.retry()"
             >
@@ -275,6 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="sm:hidden"
                 :cell="chart.cell"
                 :last-fired="lastFiredOf(chart.cell)"
+                :added="addedChecks.has(LIVE_CELL[chart.def.signal as LiveChartSignal])"
                 :service="row.service"
                 :signal="chart.def.signal"
                 :ledger="ledger"
@@ -291,6 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <CoverageSignalDetail
                 :cell="openChart.cell"
                 :last-fired="lastFiredOf(openChart.cell)"
+                :added="addedChecks.has(LIVE_CELL[openChart.def.signal as LiveChartSignal])"
                 :service="row.service"
                 :signal="openChart.def.signal"
                 :ledger="ledger"
@@ -622,7 +626,7 @@ const charts = computed(() =>
 
 const gapLines = computed<I18nText[]>(() => {
   if (state.value !== "gap") return [];
-  if (liveChecks.value) return liveGapLines(t, locale.value, liveChecks.value);
+  if (liveChecks.value) return liveGapLines(t, locale.value, liveChecks.value, addedChecks.value);
   const reason = SIGNALS.map((s) => props.row.cells[s]).find((c) => c.state === "gap")?.reason;
   return reason ? [reason] : [];
 });
@@ -667,11 +671,22 @@ const chips = computed(() => {
   });
 });
 
+// Checks this page just added alerts for; they read Added until a newer pass counts them.
+const addedChecks = computed(
+  () =>
+    new Set(
+      props.live
+        ? LIVE_CHECKS.filter((check) =>
+            justAdded(String(store.state.selectedOrganization?.identifier ?? ""), props.row, check),
+          )
+        : [],
+    ),
+);
+
 const liveChips = computed(() =>
   LIVE_CHECKS.map((check) => {
     const stateKey = liveChecks.value?.[check].engine?.stateKey ?? "none";
-    const org = String(store.state.selectedOrganization?.identifier ?? "");
-    const added = !!props.live && justAdded(org, props.row, check);
+    const added = addedChecks.value.has(check);
     return {
       check,
       look: liveCellLook(stateKey, added),

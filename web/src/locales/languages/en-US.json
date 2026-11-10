@@ -30669,6 +30669,7 @@
         "gaps": "{count} has a coverage gap. | {count} have a coverage gap.",
         "mixed": "{watching} {gaps}"
       },
+      "gapAdded": "Added an alert for {checks}. AutoObserve counts it at its next check. | Added alerts for {checks}. AutoObserve counts them at its next check.",
       "gapNone": "No alert watches {checks}",
       "searchPlaceholder": "Search service, cluster or namespace",
       "labelNamespace": "{name} · {namespace}",

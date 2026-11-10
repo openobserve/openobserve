@@ -480,17 +480,34 @@ export const liveGapLines = (
   t: TranslateFn,
   locale: string,
   checks: Record<LiveCheck, CoverageCell>,
+  added: ReadonlySet<LiveCheck> = new Set(),
 ): I18nText[] => {
   const stateOf = (check: LiveCheck) => checks[check].engine?.stateKey ?? "none";
-  const lines = LIVE_CHECKS.filter((c) => stateOf(c) !== "none" && stateOf(c) !== "covered").map(
-    (c) => checks[c].reason ?? liveCellWord(t, stateOf(c)),
-  );
-  const missing = LIVE_CHECKS.filter((c) => stateOf(c) === "none").map((c) => t(CHECK_INLINE[c]));
+  const open = LIVE_CHECKS.filter((c) => stateOf(c) !== "covered" && !added.has(c));
+  const lines = open
+    .filter((c) => stateOf(c) !== "none")
+    .map((c) => checks[c].reason ?? liveCellWord(t, stateOf(c)));
+  const missing = open.filter((c) => stateOf(c) === "none").map((c) => t(CHECK_INLINE[c]));
   if (missing.length)
     lines.push(
       t("autoobserveLive.coverage.gapNone", {
         checks: raw(new Intl.ListFormat(locale, { type: "disjunction" }).format(missing)),
       }),
+    );
+  const justAdded = LIVE_CHECKS.filter((c) => stateOf(c) !== "covered" && added.has(c));
+  if (justAdded.length)
+    lines.push(
+      t(
+        "autoobserveLive.coverage.gapAdded",
+        {
+          checks: raw(
+            new Intl.ListFormat(locale, { type: "conjunction" }).format(
+              justAdded.map((c) => t(CHECK_INLINE[c])),
+            ),
+          ),
+        },
+        justAdded.length,
+      ),
     );
   return lines;
 };

@@ -191,6 +191,8 @@ const props = defineProps<{
   detail?: I18nText;
   partial?: boolean;
   wide?: boolean;
+  /** An alert for this check was just added and waits for the next pass to count it. */
+  added?: boolean;
 }>();
 
 const emit = defineEmits<{ toggle: []; retry: [] }>();
@@ -250,6 +252,12 @@ const plain = (v: number) => formatValue({ ...props.def, max: undefined }, v);
 
 const badge = computed<{ icon: IconName; label: I18nText; tone: string }>(() => {
   const [days, total] = props.cell.progress ?? [0, 0];
+  if (props.cell.state === "gap" && props.added)
+    return {
+      icon: "hourglass-empty",
+      label: t("autoobserveLive.cell.added"),
+      tone: "text-text-secondary",
+    };
   if (props.cell.state === "gap")
     return {
       icon: "warning-amber",

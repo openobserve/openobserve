@@ -60,7 +60,11 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 }));
 
 const DrawerStub = { template: "<div><slot name='header' /><slot /></div>" };
-const ChartStub = { name: "CoverageMetricChart", props: ["def", "cell"], template: "<div />" };
+const ChartStub = {
+  name: "CoverageMetricChart",
+  props: ["def", "cell", "added"],
+  template: "<div />",
+};
 
 const monitor = (name: string) => ({
   monitor_kind: "alert",
@@ -141,6 +145,20 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
       expect(found[0].text()).toBe("Errors: Added");
       expect(found[0].find("span").classes().join(" ")).toContain(LIVE_DOT.added);
       expect(found[1].text()).toBe("Latency: Coverage gap");
+      const wrapper = mountDrawer(row, "gap");
+      const lines = wrapper
+        .findAll('[data-test="autoobserve-coverage-drawer-gap-line"]')
+        .map((l) => l.text());
+      expect(lines.join(" ")).not.toContain("its errors,");
+      expect(lines).toContain(
+        "Added an alert for its errors. AutoObserve counts it at its next check.",
+      );
+      const added = Object.fromEntries(
+        wrapper
+          .findAllComponents(ChartStub)
+          .map((c) => [c.props("def").signal, !!c.props("added")]),
+      );
+      expect(added).toEqual({ requests: false, errors: true, latency: false });
     } finally {
       recently.clearOnPass(Number.MAX_SAFE_INTEGER);
     }

@@ -83,6 +83,28 @@ describe("CoverageMetricChart gap wording", () => {
     expect(badge(mountChart(gapCell("silent"), true))).toBe("Coverage gap");
   });
 
+  it("reads Added, not Coverage gap, on a check whose alert was just added (T2-N1)", () => {
+    const wrapper = mount(CoverageMetricChart, {
+      props: {
+        def: DEF,
+        series: SERIES,
+        cell: gapCell("none"),
+        range: "24h",
+        start: 0,
+        end: 1,
+        expanded: false,
+        readyOn: null,
+        noData: false,
+        added: true,
+      },
+      global: { plugins: [i18n, store] },
+    });
+    expect(badge(wrapper)).toBe("Added");
+    expect(
+      wrapper.find('[data-test="autoobserve-coverage-chart-badge-latency"]').classes(),
+    ).toContain("text-text-secondary");
+  });
+
   it("keeps 'Coverage gap' outside live mode", () => {
     const wrapper = mountChart({ state: "gap" }, false);
     expect(badge(wrapper)).toBe("Coverage gap");
