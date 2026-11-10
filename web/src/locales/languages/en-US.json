@@ -30779,7 +30779,8 @@
       "what": {
         "coverage": "coverage",
         "suggestions": "suggestions",
-        "incidents": "paged findings"
+        "incidents": "paged findings",
+        "issues": "issues"
       },
       "coverage": {
         "deniedTitle": "You don't have permission to see coverage",
@@ -30816,6 +30817,15 @@
         "unavailableTitle": "Paged findings are temporarily unavailable",
         "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
         "failedTitle": "Couldn't load paged findings",
+        "failedDesc": "Something went wrong while loading them. Try again in a moment."
+      },
+      "issues": {
+        "deniedTitle": "You don't have permission to see issues",
+        "deniedDesc": "Issues are incidents AutoObserve opened, so seeing them needs permission to list incidents in this organization. Ask an organization admin for it.",
+        "offDesc": "Issues appear here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "Issues are temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load issues",
         "failedDesc": "Something went wrong while loading them. Try again in a moment."
       }
     },
@@ -30870,12 +30880,22 @@
         "status": "Status",
         "stream": "Stream",
         "opened": "Opened",
-        "analysis": "Analysis"
+        "analysis": "Analysis",
+        "page": "Who was paged"
       },
       "count": "No issues | {count} issue | {count} issues",
       "capNote": "Showing the newest {count} issues. Narrow the range to see older ones.",
       "emptyRange": "No issues {within}",
       "streamType": "{type} stream",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "Open",
+      "loading": "Loading issues…",
+      "loaded": "Issues loaded",
+      "page": {
+        "unrouted": "Nobody paged",
+        "failed": "Paging failed",
+        "pending": "Not confirmed yet"
+      },
       "today": "Today",
       "yesterday": "Yesterday",
       "shared": {

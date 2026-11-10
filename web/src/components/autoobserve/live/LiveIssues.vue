@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :columns="columns"
     :frame="false"
     row-key="id"
-    pagination="client"
+    :pagination="notice ? 'none' : 'client'"
     keep-page-on-data-change
     :page-size="PAGE_SIZE"
     :show-global-filter="false"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="autoobserve-live-issues"
     @row-click="(row: IssueRow) => openIncident(row)"
   >
-    <template #toolbar>
+    <template v-if="!notice" #toolbar>
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <div class="flex min-w-[12rem] flex-1 items-center sm:max-w-[22rem]">
           <label :for="SEARCH_ID" class="sr-only">{{ copy.searchLabel }}</label>
@@ -66,11 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="option"
             :value="option"
             size="xs"
-            :disabled="!counts[option] && option !== priority"
+            :disabled="!settled || (!counts[option] && option !== priority)"
             :data-test="`autoobserve-live-issues-priority-${option}`"
           >
             {{ option === "all" ? copy.allPriorities : option.toUpperCase() }}
-            <span class="ms-1 tabular-nums">{{ counts[option] }}</span>
+            <span v-if="settled" class="ms-1 tabular-nums">{{ counts[option] }}</span>
           </OToggleGroupItem>
         </OToggleGroup>
         <OToggleGroup
@@ -98,14 +98,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
       </div>
     </template>
-    <template #subheader>
+    <template v-if="!notice" #subheader>
       <div
         class="px-page-edge border-table-row-divider flex h-9 items-center gap-2 border-b"
         data-test="autoobserve-live-issues-summary"
       >
         <LiveRefreshFailed
           v-if="settled && state.stale"
-          surface="incidents"
+          surface="issues"
           dense
           :lines="1"
           class="min-w-0"
@@ -168,11 +168,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="row.stream"
         variant="default-soft"
         shape="rounded"
-        size="xs"
+        size="sm"
         :label="row.stream"
-        :title="row.streamType"
+        :title="row.streamTitle"
         data-test="autoobserve-live-issues-stream"
       />
+    </template>
+    <template #cell-page="{ row }">
+      <OTag
+        v-if="row.page"
+        :variant="PAGE_VARIANT[row.page.tone]"
+        size="sm"
+        :label="row.page.text"
+        :data-tone="row.page.tone"
+        data-test="autoobserve-live-issues-page"
+      />
+      <span v-else class="text-text-secondary">—</span>
     </template>
     <template #cell-opened="{ row }">
       <span class="text-text-secondary text-xs whitespace-nowrap" :title="row.openedAt">{{
@@ -277,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, toRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -310,8 +321,12 @@ import {
   issuesMatchText,
   issuesNoMatch,
   issuesOpenedText,
+  issuesPageCell,
+  issuesStreamLabel,
+  issuesStreamNames,
   issuesStreamType,
   sharedAnalysis,
+  type PageCell,
   statusLabel,
   type AnalysisLine,
 } from "./incidentsCopy";
@@ -329,13 +344,20 @@ interface IssueRow {
   status: Incident["status"];
   statusText: I18nText;
   stream: I18nText | null;
-  streamType: string | undefined;
+  streamTitle: string | undefined;
+  page: PageCell | null;
   opened: I18nText;
   openedAt: string;
   analysis: AnalysisLine;
   day: string;
   haystack: string;
 }
+
+const PAGE_VARIANT: Record<PageCell["tone"], "default-soft" | "warning-soft" | "error-soft"> = {
+  neutral: "default-soft",
+  warning: "warning-soft",
+  error: "error-soft",
+};
 
 const NOTICE_TEST: Record<LiveFailure, string> = {
   denied: "autoobserve-live-issues-denied",
@@ -368,11 +390,21 @@ const settled = computed(
 );
 const notice = computed(() =>
   !skeleton.value && state.value.status === "error" && state.value.failure
-    ? liveNotice(t, "incidents", state.value.failure)
+    ? liveNotice(t, "issues", state.value.failure)
     : null,
 );
 
-const filter = ref<StatusFilter>(props.initialFilter);
+const STATUS_FILTERS: StatusFilter[] = ["open", "resolved", "all"];
+const statusParam = route.query.status as StatusFilter;
+const filter = ref<StatusFilter>(
+  STATUS_FILTERS.includes(statusParam) ? statusParam : props.initialFilter,
+);
+// The status filter lives in the URL like the search, so reload and Back keep it.
+watch(filter, (next) => {
+  const status = next === props.initialFilter ? undefined : next;
+  if (status !== (route.query.status ?? undefined))
+    void router.replace({ query: { ...route.query, status } });
+});
 const priority = ref<PriorityFilter>("all");
 const urlQuery = () => (typeof route.query.q === "string" ? route.query.q : "");
 const query = ref(urlQuery());
@@ -419,13 +451,17 @@ const all = computed<IssueRow[]>(() =>
       tone: String(item.incident.severity).toLowerCase() as RowRailTone,
       status: item.incident.status,
       statusText: statusLabel(t, item.incident.status),
-      stream: item.finding.stream_name ? raw(item.finding.stream_name) : null,
-      streamType: issuesStreamType(t, item.finding.stream_type),
+      stream: issuesStreamLabel(t, item),
+      streamTitle:
+        (item.members?.length ?? 0) > 1
+          ? issuesStreamNames(item).slice(1).join(", ")
+          : issuesStreamType(t, item.finding.stream_type),
+      page: issuesPageCell(t, item),
       opened: issuesOpenedText(t, locale.value, created, issues.now.value),
       openedAt: formatWhen(created, locale.value, zone.value.timeZone, issues.now.value),
       analysis: analysisLine(t, item, issues.rcaEnabled.value),
       day: issuesDayKey(item.finding.first_seen_at, zone.value.timeZone),
-      haystack: `${sentence}\n${item.finding.stream_name ?? ""}`.toLowerCase(),
+      haystack: [sentence, ...issuesStreamNames(item)].join("\n").toLowerCase(),
     };
   }),
 );
@@ -517,6 +553,7 @@ const columns = computed<OTableColumnDef<IssueRow>[]>(() => [
   { id: "severity", header: copy.value.colSeverity, accessorKey: "severity", size: 92 },
   { id: "status", header: copy.value.colStatus, accessorKey: "status", size: 140 },
   { id: "stream", header: copy.value.colStream, accessorKey: "stream", size: 168 },
+  { id: "page", header: copy.value.colPage, accessorKey: "page", size: 168 },
   { id: "opened", header: copy.value.colOpened, accessorKey: "opened", size: 140 },
   { id: "analysis", header: copy.value.colAnalysis, accessorKey: "analysis", size: 240 },
 ]);

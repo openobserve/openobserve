@@ -73,6 +73,12 @@ const FINDING_KEY: Record<AutoObserveFindingKind, I18nKey> = {
   stream_rise: "autoobserveLive.incidents.finding.stream_rise",
 };
 
+const GROUP_KEY: Record<AutoObserveFindingKind, I18nKey> = {
+  stream_silence: "insight.kind.paged.stream_silence.headline",
+  stream_drop: "insight.kind.paged.stream_drop.headline",
+  stream_rise: "insight.kind.paged.stream_rise.headline",
+};
+
 const FINDING_AI_KEY: Record<AutoObserveFindingKind, I18nKey> = {
   stream_silence: "insight.ai.paged.stream_silence",
   stream_drop: "insight.ai.paged.stream_drop",
@@ -119,11 +125,58 @@ const sharedAs = (analysis: AnalysisLine, shared: I18nText): AnalysisLine => ({
 const isFindingKind = (kind: string | null): kind is AutoObserveFindingKind =>
   kind !== null && Object.prototype.hasOwnProperty.call(FINDING_KEY, kind);
 
-// An unknown kind or an unreadable stream falls back to the server's own English title.
+// A group reads as the home card's headline; an unknown kind or unreadable stream falls back to the server's English title.
 export const findingSentence = (t: TranslateFn, item: AutoObserveIncidentItem): I18nText => {
   const { kind, stream_name, stream_type } = item.finding;
+  const members = item.members?.length ?? 0;
+  if (members > 1 && isFindingKind(kind)) return t(GROUP_KEY[kind], { count: members });
   if (!isFindingKind(kind) || !stream_name || !stream_type) return raw(item.incident.title);
   return t(FINDING_KEY[kind], { stream: raw(stream_name), type: raw(stream_type) });
+};
+
+/** The lead stream, plus how many more streams the group holds. */
+export const issuesStreamLabel = (
+  t: TranslateFn,
+  item: AutoObserveIncidentItem,
+): I18nText | null => {
+  const lead = item.finding.stream_name;
+  if (!lead) return null;
+  const more = (item.members?.length ?? 0) - 1;
+  return more > 0
+    ? t("autoobserveLive.issues.streamMore", { stream: raw(lead), count: more })
+    : raw(lead);
+};
+
+/** Every stream name an incident holds, for search. */
+export const issuesStreamNames = (item: AutoObserveIncidentItem): string[] => [
+  ...(item.finding.stream_name ? [item.finding.stream_name] : []),
+  ...(item.members ?? []).flatMap((m) => m.stream_name ?? []),
+];
+
+export interface PageCell {
+  text: I18nText;
+  tone: "neutral" | "warning" | "error";
+}
+
+/** Who an incident paged, in the words of the home card; null when the server recorded nothing. */
+export const issuesPageCell = (t: TranslateFn, item: AutoObserveIncidentItem): PageCell | null => {
+  switch (item.page?.outcome) {
+    case "paged":
+      return {
+        tone: "neutral",
+        text: item.page.team_name
+          ? t("insight.kind.paged.page.paged", { team: raw(item.page.team_name) })
+          : t("insight.kind.paged.page.pagedTeam"),
+      };
+    case "unrouted":
+      return { tone: "warning", text: t("autoobserveLive.issues.page.unrouted") };
+    case "failed":
+      return { tone: "error", text: t("autoobserveLive.issues.page.failed") };
+    case "pending":
+      return { tone: "neutral", text: t("autoobserveLive.issues.page.pending") };
+    default:
+      return null;
+  }
 };
 
 /** What Ask AI hands the chat for a paged finding; null when the finding is unreadable. */
@@ -387,13 +440,14 @@ export const issuesCopy = (t: TranslateFn) => ({
   searchPlaceholder: t("autoobserveLive.issues.searchPlaceholder"),
   priorityLabel: t("autoobserve2.recent.priorityLabel"),
   allPriorities: t("autoobserve2.recent.all"),
-  open: t("autoobserve.issues.open"),
+  open: t("autoobserveLive.issues.filterOpen"),
   resolved: t("autoobserve.issues.recent"),
   allStatuses: t("autoobserve.issues.all"),
   colIncident: t("autoobserveLive.issues.columns.incident"),
   colSeverity: t("autoobserveLive.issues.columns.severity"),
   colStatus: t("autoobserveLive.issues.columns.status"),
   colStream: t("autoobserveLive.issues.columns.stream"),
+  colPage: t("autoobserveLive.issues.columns.page"),
   colOpened: t("autoobserveLive.issues.columns.opened"),
   colAnalysis: t("autoobserveLive.issues.columns.analysis"),
   clearSearch: t("autoobserve.issues.clearSearch"),
