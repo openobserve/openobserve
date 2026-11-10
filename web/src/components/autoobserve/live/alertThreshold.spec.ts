@@ -45,3 +45,14 @@ describe("chartThreshold (G7: the threshold line on the service charts)", () => 
     expect(chartThreshold("latency", "ms", [{ sql: at(900) }, { sql: at(300) }])).toBe(300);
   });
 });
+
+describe("the threshold label reads as a number, not 0 (G7)", () => {
+  it("keeps enough digits for a rate under 1/min", async () => {
+    const { formatValue } = await import("../coverageSeries");
+    const def = { signal: "errors", titleKey: "x", unit: "perMin", base: 0, spread: 0 } as never;
+    expect(formatValue(def, 1 / 60)).toBe("0.017/min");
+    expect(formatValue(def, 0.5)).toBe("0.5/min");
+    expect(formatValue(def, 3.7)).toBe("3.7/min");
+    expect(formatValue(def, 0)).toBe("0/min");
+  });
+});

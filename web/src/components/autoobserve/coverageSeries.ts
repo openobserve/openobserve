@@ -352,6 +352,7 @@ export const formatValue = ({ unit, max, rate }: MetricDef, value: number) => {
   if (unit === "ms") return value >= 1000 ? `${(value / 1000).toFixed(1)} s` : `${n(1)} ms`;
   if (unit === "seconds") return `${n(1)} s`;
   if (unit === "perSec") return `${n(value < 10 ? 1 : 0)} ${rate ?? "/s"}`;
-  if (unit === "perMin") return `${n(1)}/min`;
+  // A quiet service's errors or an alert's threshold sit well under 1/min, which one decimal would show as 0.
+  if (unit === "perMin") return `${n(value > 0 && value < 0.1 ? 3 : value < 1 ? 2 : 1)}/min`;
   return max ? `${n(0)} / ${max}` : n(0);
 };
