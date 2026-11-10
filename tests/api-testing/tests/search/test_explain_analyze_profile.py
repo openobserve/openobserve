@@ -220,33 +220,20 @@ def test_invalid_sql_is_a_clear_4xx(client: OpenObserveClient, streams, window, 
     assert "SELEC" in message, resp.text[:300]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="#16511 item 1: _search_stream truncates EXPLAIN ANALYZE rows to the SQL LIMIT",
-)
 def test_limit_keeps_every_explain_analyze_row_on_stream(client: OpenObserveClient, streams, window):
-    sql = f'EXPLAIN ANALYZE SELECT n FROM "{streams[0]}" WHERE n < 100 LIMIT 1'
+    sql = f'EXPLAIN ANALYZE SELECT level, count(*) AS c FROM "{streams[0]}" GROUP BY level LIMIT 1'
     expected = len(_search(client, sql, window)["hits"])
     if expected < 2:
         pytest.fail(f"precondition: /_search returned {expected} rows")
     assert len(_stream_hits(client, sql, window)) == expected
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="#16511 item 1: _search_stream drops physical_plan from EXPLAIN ... LIMIT 1",
-)
 def test_limit_keeps_both_plans_on_stream(client: OpenObserveClient, streams, window):
     sql = f'EXPLAIN SELECT n FROM "{streams[0]}" WHERE n < 100 LIMIT 1'
     plan_types = {h.get("plan_type") for h in _stream_hits(client, sql, window, profile=False)}
     assert {"logical_plan", "physical_plan"} <= plan_types, plan_types
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="#16511 item 3: peak memory never reaches a node's scan_stats"
-)
 def test_remote_node_reports_peak_memory(client: OpenObserveClient, streams, window):
     sql = f'EXPLAIN ANALYZE SELECT level, count(*) AS c FROM "{streams[0]}" GROUP BY level'
     remotes = _remotes(_profile(_search(client, sql, window)["hits"])["plan"])

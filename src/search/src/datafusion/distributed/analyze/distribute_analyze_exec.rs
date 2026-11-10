@@ -113,12 +113,12 @@ impl DistributeAnalyzeExec {
         if self.verbose {
             phase_builder.append_value(0);
             address_builder.append_value("Output Rows");
-            name_builder.append_value("");
+            name_builder.append_value("Output Rows");
             plan_builder.append_value(profile.output_rows.to_string());
 
             phase_builder.append_value(0);
             address_builder.append_value("Duration");
-            name_builder.append_value("");
+            name_builder.append_value("Duration");
             plan_builder.append_value(format!("{duration:?}"));
         }
 
@@ -325,6 +325,28 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(batches[0].num_columns(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_distribute_analyze_exec_verbose_rows_are_named() {
+        let exec = Arc::new(DistributeAnalyzeExec::new(
+            true,
+            false,
+            false,
+            empty_input(),
+        ));
+        let batches = datafusion::physical_plan::collect(exec, Arc::new(TaskContext::default()))
+            .await
+            .unwrap();
+        let names = batches[0]
+            .column(2)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let summary: Vec<_> = (names.len() - 2..names.len())
+            .map(|i| names.value(i))
+            .collect();
+        assert_eq!(summary, ["Output Rows", "Duration"]);
     }
 
     #[tokio::test]
