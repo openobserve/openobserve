@@ -618,7 +618,7 @@ const header = computed<{
           })
         : undefined,
     back: {
-      label: t("autoobserve2.backToHome"),
+      label: t("autoobserve.title"),
       onClick: closePage,
       dataTest: `autoobserve2-${page.value}-back`,
     },

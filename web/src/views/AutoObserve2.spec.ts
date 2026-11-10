@@ -228,6 +228,16 @@ describe("AutoObserve2 rail column (OSS-9)", () => {
     }
   });
 
+  it("names the sub-page back button once: the header adds its own 'Back to' (T5-N1)", () => {
+    for (const page of ["issues", "coverage", "activity"]) {
+      Object.assign(routeQuery, { page });
+      const wrapper = mountView();
+      const back = wrapper.findComponent(PageLayoutStub).props("back") as { label: string };
+      expect(back.label, page).toBe("AutoObserve");
+      wrapper.unmount();
+    }
+  });
+
   it("a Slack suggestion link opens All suggestions on that item, and closing drops the link", async () => {
     Object.assign(routeQuery, { suggestion: "sug-9" });
     const wrapper = mountView();
