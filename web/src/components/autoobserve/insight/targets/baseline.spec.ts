@@ -64,6 +64,26 @@ describe("measureBaseline (F1)", () => {
     expect(req.pageType).toBe("logs");
   });
 
+  it("spreads the errors over the hours the service has data for, not the whole week (T2-1)", async () => {
+    const now = Date.now() * 1000;
+    answer({ hits: [{ errors: 17, first_seen: now - 2.5 * 3_600_000_000 }] });
+    expect(await measureBaseline("demo-org", ERRORS)).toBeCloseTo(6.8, 1);
+  });
+
+  it("counts a service younger than an hour as one hour of data (T2-1)", async () => {
+    answer({ hits: [{ errors: 3, first_seen: Date.now() * 1000 - 60_000_000 }] });
+    expect(await measureBaseline("demo-org", ERRORS)).toBeCloseTo(3, 1);
+  });
+
+  it("takes the earliest start across streamed partitions (T2-1)", async () => {
+    const now = Date.now() * 1000;
+    answer(
+      { hits: [{ errors: 10, first_seen: now - 2 * 3_600_000_000 }] },
+      { hits: [{ errors: 10, first_seen: now - 10 * 3_600_000_000 }] },
+    );
+    expect(await measureBaseline("demo-org", ERRORS)).toBeCloseTo(2, 1);
+  });
+
   it("keeps the last running total when the server streams the aggregate", async () => {
     answer({ hits: [{ errors: 100 }], aggs: true }, { hits: [{ errors: 336 }], aggs: true });
     expect(await measureBaseline("demo-org", ERRORS)).toBe(2);

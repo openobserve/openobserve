@@ -37,9 +37,19 @@ const num = (value: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const levelOf = (kind: BaselineRequest["kind"], hits: Hit[]): number | null => {
+const HOUR_US = 3_600_000_000;
+
+// A young service has fewer hours than the lookback, so dividing by the whole week would undercount its rate.
+const hoursOfData = (hits: Hit[], end: number): number => {
+  const starts = hits.map((h) => Number(h.first_seen)).filter((n) => Number.isFinite(n) && n > 0);
+  if (!starts.length) return LOOKBACK_HOURS;
+  const hours = (end - Math.min(...starts)) / HOUR_US;
+  return Math.min(LOOKBACK_HOURS, Math.max(1, hours));
+};
+
+const levelOf = (kind: BaselineRequest["kind"], hits: Hit[], end: number): number | null => {
   if (kind === "errors") {
-    const perHour = hits.reduce((sum, h) => sum + num(h.errors), 0) / LOOKBACK_HOURS;
+    const perHour = hits.reduce((sum, h) => sum + num(h.errors), 0) / hoursOfData(hits, end);
     return perHour > 0 ? perHour : null;
   }
   const requests = hits.reduce((sum, h) => sum + num(h.requests), 0);
@@ -47,7 +57,7 @@ const levelOf = (kind: BaselineRequest["kind"], hits: Hit[]): number | null => {
   return requests >= MIN_REQUESTS && p95 > 0 ? p95 : null;
 };
 
-/** The usual errors an hour or p95 in ms over the last 7 days, from one streaming query; null when there is none or it was stopped. */
+/** The usual errors an hour (over the hours with data, up to 7 days) or p95 in ms, from one streaming query; null when there is none or it was stopped. */
 export const measureBaseline = (
   org: string,
   request: BaselineRequest,
@@ -93,7 +103,7 @@ export const measureBaseline = (
           hits = res.content?.streaming_aggs ? chunk : [...hits, ...chunk];
         },
         error: () => resolve(null),
-        complete: () => resolve(levelOf(request.kind, hits)),
+        complete: () => resolve(levelOf(request.kind, hits, end)),
       },
     );
   });

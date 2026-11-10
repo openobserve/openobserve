@@ -331,11 +331,11 @@ describe("errorsAlert", () => {
 });
 
 describe("baselineSql (F1)", () => {
-  it("counts the service's errors with the alert's own scope and error field", () => {
+  it("counts the service's errors over all its rows, with when its data starts (T2-1)", () => {
     expect(
       baselineSql(logsScope(), { kind: "errors", errorField: { name: "level", kind: "level" } }),
     ).toBe(
-      `SELECT count(*) AS errors FROM "app_logs" WHERE "service_name" = 'svc-a' AND "k8s_cluster" = 'cluster-k' AND "k8s_namespace_name" = 'ns-b' AND lower("level") IN ('error', 'fatal', 'critical', 'err', 'crit', 'alert', 'emerg')`,
+      `SELECT sum(CASE WHEN lower("level") IN ('error', 'fatal', 'critical', 'err', 'crit', 'alert', 'emerg') THEN 1 ELSE 0 END) AS errors, min("_timestamp") AS first_seen FROM "app_logs" WHERE "service_name" = 'svc-a' AND "k8s_cluster" = 'cluster-k' AND "k8s_namespace_name" = 'ns-b'`,
     );
   });
 

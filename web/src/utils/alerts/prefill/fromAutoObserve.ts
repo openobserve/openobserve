@@ -371,7 +371,11 @@ const levelSql = (s: ServiceScope, scope: Scope, b: BaselineInputs): string | nu
 export const baselineSql = (s: ServiceScope, b: BaselineInputs): string | null => {
   const scope = serviceScope(s);
   if (scope.blocked || scope.warnings.some((w) => w.level === "blocking")) return null;
-  return levelSql(s, scope, b);
+  if (b.kind === "latency") return levelSql(s, scope, b);
+  const pick = errorPick(s, b.errorField);
+  if (!pick) return null;
+  // Counted over every row so first_seen is when the service's data starts, not its first error.
+  return `SELECT sum(CASE WHEN ${errorPredicate(pick)} THEN 1 ELSE 0 END) AS errors, min("_timestamp") AS first_seen FROM ${sqlStream(s.stream?.name)}${whereOf(scope.where)}`;
 };
 
 /** The field that asks for a threshold when there is no usual level to suggest one. */
