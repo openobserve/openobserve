@@ -814,6 +814,7 @@ describe("physicalPlanToProfile", () => {
     expect(
       fetchOf(`AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]\n    ${limit}`),
     ).toBeNull();
+    expect(fetchOf(`UnnestExec\n    ${limit}`)).toBeNull();
   });
 
   it("reads sort order pushdown from a top-N plan", () => {

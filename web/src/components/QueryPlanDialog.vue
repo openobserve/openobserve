@@ -73,9 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'bg-status-warning-text'
             "
             :aria-label="
-              analyzeState === 'done' && runWarning === undefined
-                ? t('search.queryProfile.analyzeSucceeded')
-                : t('search.queryProfile.analyzeFailedShort')
+              analyzeState === 'failed'
+                ? t('search.queryProfile.analyzeFailedShort')
+                : runWarning === undefined
+                  ? t('search.queryProfile.analyzeSucceeded')
+                  : t('search.queryProfile.analyzeWarned')
             "
             :data-test="`query-plan-mode-analyze-${analyzeState}`"
           />
@@ -108,11 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @rerun="runAnalyze"
             />
             <OBanner
-              v-if="runWarning"
+              v-if="runWarning !== undefined"
               variant="warning"
               icon="warning"
               class="shrink-0"
-              :content="raw(runWarning)"
+              :content="raw(runWarning) || t('search.queryProfile.analyzePartial')"
               data-test="query-plan-analyze-warning"
             />
             <div class="relative min-h-0 flex-1">

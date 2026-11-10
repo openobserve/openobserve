@@ -1712,7 +1712,9 @@
       "rerunCancelled": "{elapsed} 後に再実行をキャンセルしました。前回の結果を表示しています。",
       "rerunCancelledNow": "再実行をキャンセルしました。前回の結果を表示しています。",
       "analyzeSucceeded": "前回の実行は成功しました",
-      "analyzeFailedShort": "前回の実行は失敗しました"
+      "analyzeFailedShort": "前回の実行は失敗しました",
+      "analyzeWarned": "前回の実行は警告付きで完了しました",
+      "analyzePartial": "実行は完了しましたが、結果が不完全な可能性があります。"
     },
     "errorDeletingSavedView": "保存されたビューを削除中にエラーが発生しました。",
     "errorCreatingSavedView": "保存済みビューの作成中にエラーが発生しました。",

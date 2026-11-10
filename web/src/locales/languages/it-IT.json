@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Nuova esecuzione annullata dopo {elapsed}. Vengono mostrati i risultati precedenti.",
       "rerunCancelledNow": "Nuova esecuzione annullata. Vengono mostrati i risultati precedenti.",
       "analyzeSucceeded": "Ultima esecuzione riuscita",
-      "analyzeFailedShort": "Ultima esecuzione non riuscita"
+      "analyzeFailedShort": "Ultima esecuzione non riuscita",
+      "analyzeWarned": "Ultima esecuzione completata con avvisi",
+      "analyzePartial": "L'esecuzione è terminata, ma i risultati potrebbero essere incompleti."
     },
     "errorDeletingSavedView": "Errore durante l'eliminazione della vista salvata.",
     "errorCreatingSavedView": "Errore durante la creazione della vista salvata.",

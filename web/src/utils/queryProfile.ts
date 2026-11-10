@@ -1312,7 +1312,9 @@ function resultFetch(model: ProfileModel): number | null {
     const fetch = planFetch(op.detail);
     if (fetch !== null) return fetch;
     const singleInput = op.childIds.length === 1 || !!op.remoteStageId;
-    if (!singleInput || !KEEPS_EVERY_ROW.includes(op.category)) return null;
+    if (!singleInput || !KEEPS_EVERY_ROW.includes(op.category) || /Unnest/i.test(op.name)) {
+      return null;
+    }
     op = model.operators[op.childIds[0]];
   }
   return null;
