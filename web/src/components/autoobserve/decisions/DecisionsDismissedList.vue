@@ -81,6 +81,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText variant="meta" as="span" data-test="decision-dismissed-summary">
             {{ summary(row) }}
           </OText>
+          <OText
+            v-if="row.note"
+            variant="meta"
+            as="span"
+            class="break-words"
+            data-test="decision-dismissed-note"
+          >
+            {{ raw(row.note) }}
+          </OText>
         </div>
         <OText
           variant="meta"
@@ -152,10 +161,13 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import type { DecisionFamily, DecisionView } from "@/services/autoobserveDecisions";
-import { decisionsPageQuery, useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
+import {
+  dismissedDecisionsQuery,
+  useDecisionRoute,
+} from "@/composables/autoobserve/useDecisionRoute";
 import { decisionCopy } from "@/components/autoobserve/insight/insightCopy";
 
-/** One screen of rows; the server pages by limit and offset. */
+/** One screen of rows. */
 const PAGE_SIZE = 20;
 
 type Kind = DecisionFamily | "all";
@@ -185,14 +197,11 @@ const offset = ref(0);
 const kind = ref<Kind>("all");
 
 const page = useQuery(() =>
-  decisionsPageQuery(
-    orgId.value,
-    kind.value === "all" ? null : kind.value,
-    PAGE_SIZE,
-    offset.value,
-  ),
+  dismissedDecisionsQuery(orgId.value, kind.value === "all" ? null : kind.value),
 );
-const rows = computed(() => page.data.value?.decisions ?? []);
+const rows = computed(() =>
+  (page.data.value?.decisions ?? []).slice(offset.value, offset.value + PAGE_SIZE),
+);
 const total = computed(() => page.data.value?.total ?? 0);
 
 function summary(row: DecisionView): I18nText {

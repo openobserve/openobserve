@@ -28,6 +28,7 @@ import AlertCalibrationDashboard from "./AlertCalibrationDashboard.vue";
 import type { DigestRecord, RunRow } from "./digests";
 import analytics from "@/services/product_analytics";
 import { openAlertReview } from "./reviewAlert";
+import autoobserveDecisions, { type DecisionView } from "@/services/autoobserveDecisions";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("./reviewAlert", () => ({ openAlertReview: vi.fn() }));
@@ -818,6 +819,56 @@ describe("AlertCalibrationDashboard dismissals", () => {
     expect(wrapper.find('[data-test="alert-calibration-dismissed-error"]').exists()).toBe(true);
     queryClient.setQueryDefaults(["org"], {});
     wrapper.unmount();
+  });
+
+  it("with_the_decision_route_on_the_dismissed_view_is_one_list_counted_without_applies", async () => {
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(7)]));
+    const base = {
+      family: "alert_finding",
+      state: "active",
+      note: null,
+      has_note: false,
+      actor: "root@example.com",
+      source: "ui",
+      decided_at: NOW - 1000,
+      revision: 1,
+    } as const;
+    const dismissed: DecisionView = {
+      ...base,
+      decision_id: `alert_finding:${fid(7)}`,
+      id: fid(7),
+      action: "dismiss",
+      reason: "will_fix_later",
+      until: NOW + 90 * DAY_MICROS,
+      subject: { title: "ops-b", folder: "ops", team: null },
+    };
+    const applied: DecisionView = {
+      ...base,
+      decision_id: `alert_finding:${fid(7)}:apply`,
+      id: fid(7),
+      action: "apply",
+      state: "applied",
+      reason: null,
+      until: NOW + 30 * DAY_MICROS,
+      subject: { title: "ops-b", folder: "ops", team: null },
+    };
+    vi.mocked(autoobserveDecisions.list).mockResolvedValue({
+      data: { decisions: [dismissed, applied], total: 2, limit: 500, offset: 0 },
+    } as never);
+    try {
+      const wrapper = await mountPage({ findings: "dismissed" });
+      await settle();
+      expect(wrapper.find('[data-test="decision-dismissed"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-calibration-dismissed"]').exists()).toBe(false);
+      expect(wrapper.findAll('[data-test="decision-dismissed-row"]')).toHaveLength(1);
+      expect(filterText()).toContain("Dismissed (1)");
+      wrapper.unmount();
+    } finally {
+      vi.mocked(autoobserveDecisions.list).mockImplementation(() =>
+        Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } })),
+      );
+    }
   });
 
   it("the_filter_lives_in_the_url", async () => {

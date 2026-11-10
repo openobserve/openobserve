@@ -103,6 +103,35 @@ export const decisionsPageQuery = (
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** The server's own cap on one list read. */
+const LIST_READ_LIMIT = 500;
+/** Stops a list that keeps growing between reads from paging forever. */
+const LIST_READ_PAGES = 20;
+
+/** Only dismissals and marks are undone from the Dismissed list; an apply's Undo would revert the alert. */
+export const isDismissedDecision = (view: DecisionView): boolean => view.action !== "apply";
+
+/** Every dismissal and mark in force: the server lists applies with them, so this reads all and pages here. */
+export const dismissedDecisionsQuery = (org: string, family: DecisionFamily | null) =>
+  queryOptions({
+    queryKey: autoobserveKeys.dismissedDecisions(org, family ?? "all"),
+    queryFn: async ({ signal }): Promise<{ decisions: DecisionView[]; total: number }> => {
+      const rows: DecisionView[] = [];
+      for (let page = 0; page < LIST_READ_PAGES; page += 1) {
+        const params = { state: "active" as const, limit: LIST_READ_LIMIT, offset: rows.length };
+        const read = (
+          await autoobserveDecisions.list(org, family ? { ...params, family } : params, signal)
+        ).data;
+        rows.push(...read.decisions);
+        if (!read.decisions.length || rows.length >= read.total) break;
+      }
+      const decisions = rows.filter(isDismissedDecision);
+      return { decisions, total: decisions.length };
+    },
+    placeholderData: keepPreviousInOrg(org),
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 export const newRequestId = (): string =>
   typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()

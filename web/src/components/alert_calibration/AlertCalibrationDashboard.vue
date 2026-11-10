@@ -65,8 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <template v-if="view === 'dismissed'">
-        <AlertCalibrationDismissedList />
-        <DecisionsDismissedList v-if="decisionRoute.enabled.value" />
+        <DecisionsDismissedList v-if="decisionRoute.transport.value === 'decision'" />
+        <AlertCalibrationDismissedList v-else-if="decisionRoute.transport.value !== 'pending'" />
       </template>
 
       <OEmptyState
@@ -148,8 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <template v-if="view === 'dismissed'">
-          <AlertCalibrationDismissedList />
-          <DecisionsDismissedList v-if="decisionRoute.enabled.value" />
+          <DecisionsDismissedList v-if="decisionRoute.transport.value === 'decision'" />
+          <AlertCalibrationDismissedList v-else-if="decisionRoute.transport.value !== 'pending'" />
         </template>
 
         <OBanner
@@ -395,7 +395,10 @@ import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import AlertCalibrationDismissedList from "./AlertCalibrationDismissedList.vue";
 import DecisionsDismissedList from "@/components/autoobserve/decisions/DecisionsDismissedList.vue";
-import { useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
+import {
+  dismissedDecisionsQuery,
+  useDecisionRoute,
+} from "@/composables/autoobserve/useDecisionRoute";
 import ReviewChangeDialog from "@/components/autoobserve/decisions/ReviewChangeDialog.vue";
 import type { ReviewChangeTarget } from "@/components/autoobserve/decisions/appliedChanges";
 import { applySuggestionsOf } from "./applySuggestion";
@@ -513,15 +516,21 @@ const hiddenTotal = computed(
 );
 const allDismissed = computed(() => openTotal.value === 0 && hiddenTotal.value > 0);
 
-/** The list's own total, kept apart from the run's counts (P5a-Q4). */
-const dismissedLabel = computed(() =>
-  copy.value.filterDismissed(
-    dismissals.unknown.value ? null : (dismissals.query.data.value?.total ?? 0),
-  ),
-);
+const decisionDismissed = useQuery(() => ({
+  ...dismissedDecisionsQuery(orgId.value, null),
+  enabled: decisionRoute.transport.value === "decision",
+}));
+/** The total of the list the Dismissed view shows, kept apart from the run's counts (P5a-Q4). */
+const dismissedTotal = computed<number | null>(() => {
+  if (decisionRoute.transport.value === "decision") {
+    return decisionDismissed.data.value?.total ?? null;
+  }
+  return dismissals.unknown.value ? null : (dismissals.query.data.value?.total ?? 0);
+});
+const dismissedLabel = computed(() => copy.value.filterDismissed(dismissedTotal.value));
 const view = computed(() => (route.query.findings === "dismissed" ? "dismissed" : "open"));
 const dismissedReachable = computed(
-  () => view.value === "dismissed" || (dismissals.query.data.value?.total ?? 0) > 0,
+  () => view.value === "dismissed" || (dismissedTotal.value ?? 0) > 0,
 );
 const onView = (value: unknown) => {
   if (!value || value === view.value) return;
@@ -678,6 +687,7 @@ function refresh() {
   void configQuery.refetch();
   void data.load();
   void dismissals.query.refetch();
+  if (decisionRoute.transport.value === "decision") void decisionDismissed.refetch();
 }
 
 onMounted(() => void data.load());
