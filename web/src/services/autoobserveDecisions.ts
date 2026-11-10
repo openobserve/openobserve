@@ -176,7 +176,8 @@ export type PreviewParams = Pick<
 >;
 
 export interface DecisionListParams {
-  state: "active";
+  /** Absent lists undone applies too; `active` lists only what is in force. */
+  state?: "active";
   family?: DecisionFamily;
   limit: number;
   offset: number;
