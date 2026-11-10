@@ -30839,6 +30839,7 @@
       "title": "Paged findings",
       "subtitle": "Findings that opened an incident for your on-call team, with its analysis.",
       "pagingNote": "Paging is off for this organization, so AutoObserve opens no incidents.",
+      "sharedFor": "{label}: {reason}",
       "finding": {
         "stream_silence": "{stream} ({type}) stopped sending data",
         "stream_drop": "{stream} ({type}) volume dropped sharply",

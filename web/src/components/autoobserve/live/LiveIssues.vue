@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :lines="1"
             class="text-text-secondary min-w-0 flex-1 text-xs"
             data-test="autoobserve-live-issues-shared-analysis"
-            >{{ shared }}</OTruncatedText
+            >{{ shared.text }}</OTruncatedText
           >
         </template>
       </div>
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ row.analysis.label }}
         </OBadge>
         <OTruncatedText
-          v-if="row.analysis.detail && !shared"
+          v-if="row.analysis.detail && !shared?.covers(row.analysis)"
           as="p"
           :lines="2"
           class="text-text-secondary text-xs leading-snug"
@@ -496,7 +496,12 @@ const countText = computed(() => issuesCountText(t, locale.value, shown.value.le
 
 // Rows drop their reason only while this line shows it, so no summary state (stale, count) may hide it.
 const shared = computed(() =>
-  loading.value ? null : sharedAnalysis(shown.value.map((row) => row.analysis)),
+  loading.value
+    ? null
+    : sharedAnalysis(
+        t,
+        shown.value.map((row) => row.analysis),
+      ),
 );
 
 const tableEl = ref<OTableExposed<IssueRow> | null>(null);

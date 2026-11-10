@@ -459,12 +459,14 @@ describe("LivePaged (D9-web)", () => {
       expect(w.find(sel("see-all")).exists()).toBe(true);
     });
 
-    it("mixed reasons stay on their rows", async () => {
+    it("mixed reasons state the common one once and keep only the exception on its row (T1-16)", async () => {
       api.mockResolvedValueOnce(page([notRun(0), notRun(1, null), notRun(2)]));
       const w = mountCard();
       await flushPromises();
-      expect(details(w)).toHaveLength(3);
-      expect(w.find(sel("shared-analysis")).exists()).toBe(false);
+      expect(details(w)).toHaveLength(1);
+      expect(details(w)[0]).not.toBe(OFF_ONE);
+      expect(w.findAll(sel("shared-analysis"))).toHaveLength(1);
+      expect(w.find(sel("shared-analysis")).text()).toBe(`Not analyzed: ${OFF_MANY}`);
     });
 
     it("a failed refresh keeps the shared reason visible", async () => {

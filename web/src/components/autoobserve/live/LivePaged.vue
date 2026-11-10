@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ row.analysis.label }}
               </OBadge>
               <OTruncatedText
-                v-if="row.analysis.detail && !shared"
+                v-if="row.analysis.detail && !shared?.covers(row.analysis)"
                 class="text-text-secondary text-xs"
                 data-test="autoobserve2-paged-analysis-detail"
                 >{{ row.analysis.detail }}</OTruncatedText
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :lines="1"
           class="text-text-secondary min-w-0 flex-1 text-xs"
           data-test="autoobserve2-paged-shared-analysis"
-          >{{ shared }}</OTruncatedText
+          >{{ shared.text }}</OTruncatedText
         >
         <OButton
           v-if="hasMore"
@@ -457,7 +457,12 @@ const ask = (finding: AiFinding) => askAi?.(askAiPayload(t, finding, org.value))
 
 // The footer sits outside the subtitle slot, so a stale or new-findings notice never hides the reason the rows dropped.
 const shared = computed(() =>
-  settled.value ? sharedAnalysis(shown.value.map((row) => row.analysis)) : null,
+  settled.value
+    ? sharedAnalysis(
+        t,
+        shown.value.map((row) => row.analysis),
+      )
+    : null,
 );
 
 const loadPhase = useLoadPhase(() => state.value.status, skeleton);

@@ -42,6 +42,11 @@ export interface AnalysisLine {
   shared: I18nText;
 }
 
+export interface SharedAnalysis {
+  text: I18nText;
+  covers: (line: AnalysisLine) => boolean;
+}
+
 export interface IncidentRoute {
   name: "incidentDetail" | "incidentList";
   params?: { id: string };
@@ -318,13 +323,28 @@ export const analysisLine = (
 };
 
 // Two or more rows with one reason state it once, so the same sentence never repeats down the table.
-export const sharedAnalysis = (lines: readonly AnalysisLine[]): I18nText | null => {
-  const [first] = lines;
-  if (lines.length < 2 || !first.shared) return null;
-  const same = lines.every(
-    (l) => l.label === first.label && l.detail === first.detail && l.shared === first.shared,
-  );
-  return same ? first.shared : null;
+export const sharedAnalysis = (
+  t: TranslateFn,
+  lines: readonly AnalysisLine[],
+): SharedAnalysis | null => {
+  const keyOf = (l: AnalysisLine) =>
+    l.shared ? `${l.label}\u0000${l.detail}\u0000${l.shared}` : "";
+  const counts = new Map<string, number>();
+  for (const l of lines) {
+    const key = keyOf(l);
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let best: { key: string; count: number } | null = null;
+  for (const [key, count] of counts) if (!best || count > best.count) best = { key, count };
+  if (!best || best.count < 2) return null;
+  const key = best.key;
+  const line = lines.find((l) => keyOf(l) === key) as AnalysisLine;
+  // When other states sit beside it, the state's chip label says which rows the sentence is about.
+  const text =
+    best.count === lines.length
+      ? line.shared
+      : t("autoobserveLive.incidents.sharedFor", { label: line.label, reason: line.shared });
+  return { text, covers: (l) => keyOf(l) === key };
 };
 
 // The server's error text can name internal hosts, so the details give only the status and the time.
