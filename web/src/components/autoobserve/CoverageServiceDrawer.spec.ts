@@ -32,6 +32,7 @@ const api = vi.hoisted(() => ({
   getLocations: vi.fn(),
   listAlerts: vi.fn(),
   schema: vi.fn(),
+  push: vi.fn(),
 }));
 
 vi.mock("@/services/stream", () => ({
@@ -40,7 +41,7 @@ vi.mock("@/services/stream", () => ({
 
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: api.push }),
 }));
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   default: { name: "ChartRenderer", template: "<div />" },
@@ -735,5 +736,27 @@ describe("CoverageServiceDrawer gap CTA counts what it can build (T2-11)", () =>
       '[data-test="autoobserve-coverage-drawer-gap-actions"] [data-test$="-cta"]',
     );
     expect(cta.text()).toBe("Add alert");
+  });
+});
+
+describe("CoverageServiceDrawer Service Catalog link (T2-7)", () => {
+  it("opens the catalog filtered to the service", async () => {
+    api.push.mockReset();
+    const row = liveRow(
+      {
+        errors: cell("covered", "e"),
+        latency: cell("covered", "l"),
+        absence: cell("covered", "a"),
+      },
+      [{ type: "traces", name: "default" }],
+    );
+    const wrapper = mountDrawer(row, "watched");
+    await wrapper.find('[data-test="autoobserve-coverage-drawer-catalog"]').trigger("click");
+    expect(api.push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "traces",
+        query: expect.objectContaining({ tab: "services-catalog", service: "checkout" }),
+      }),
+    );
   });
 });

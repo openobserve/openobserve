@@ -738,7 +738,7 @@ const logsOnly = computed(
     !props.row.identity.streams.some((s) => s.type === "traces"),
 );
 
-// Open in Traces (or Logs) lands on the scope the charts read; the catalog stays plain navigation (CTA-MAP §2).
+// Open in Traces (or Logs) lands on the scope the charts read; the catalog opens filtered to the service.
 const openTraces = (tab?: string) => {
   const org = store.state.selectedOrganization?.identifier;
   const to =
@@ -754,7 +754,15 @@ const openTraces = (tab?: string) => {
     void router.push(to);
     return;
   }
-  void router.push({ name: "traces", query: { org_identifier: org, ...(tab ? { tab } : {}) } });
+  const service = props.row.identity?.serviceName;
+  void router.push({
+    name: "traces",
+    query: {
+      org_identifier: org,
+      ...(tab ? { tab } : {}),
+      ...(tab === "services-catalog" && service ? { service } : {}),
+    },
+  });
 };
 
 const { run, pendingId } = useInsightActions();
