@@ -11475,7 +11475,7 @@
       "noteRequired": "Add a note when the reason is Other.",
       "noteTooLong": "Shorten the note to 500 characters or fewer.",
       "duration": "Hide for",
-      "untilReopened": "Until reopened",
+      "untilReopened": "Until undone",
       "endsOn": "Hidden until {date}. After that, the finding shows again only if a later run still detects it.",
       "endsNever": "Hidden until someone reopens it.",
       "saved": "Dismissed until {date}. Find it under Dismissed.",

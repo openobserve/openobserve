@@ -137,7 +137,7 @@ describe("AlertCalibrationDismissedList", () => {
     );
     expect(text()).toContain("Another reason");
     expect(text()).toContain("Another rule");
-    expect(text()).toContain("Until reopened");
+    expect(text()).toContain("Until undone");
     expect(text()).toContain("Alert not working: Stream not found");
     for (const row of odd) {
       expect(text()).not.toContain(row.scope_key);
