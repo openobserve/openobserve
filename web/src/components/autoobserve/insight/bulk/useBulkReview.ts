@@ -314,6 +314,19 @@ const checkedPrefill = (kind: BulkKind, row: BulkRow, ctx: RowContext): Checked 
   };
 };
 
+/** Whether the stream's fields rule this draft out for good; unread fields rule nothing out. */
+export const cantBuild = (row: BulkRow, fields: StreamFields | null): boolean => {
+  const scope = row.scope;
+  if (isSource(scope) || !fields) return false;
+  if (scopeBlockOf(scope, fields.names)) return true;
+  return (
+    row.kind === "errors" &&
+    !row.inputs?.errorField &&
+    scope.stream.type !== "traces" &&
+    !errorFieldOf(scope.stream.type, fields.names, fields.types)
+  );
+};
+
 /** The query that measures one waiting row's usual level on its stream's fields; null when it can't be scoped. */
 const baselineRequestOf = (
   kind: BulkKind,

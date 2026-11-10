@@ -438,6 +438,7 @@ import { useServiceCharts, type ServiceChartStatus } from "./live/useServiceChar
 import InsightBlock from "./insight/InsightBlock.vue";
 import { useInsightActions } from "./insight/useInsightActions";
 import {
+  cantBuildKinds,
   cellInsight,
   gapInsight,
   justAdded,
@@ -447,6 +448,7 @@ import {
 } from "./insight/coverageCta";
 import { useServiceAddress } from "./insight/targets/serviceAddress";
 import { loadOwnedAlerts, type OwnedAlert } from "./insight/targets/ownership";
+import type { BulkKind } from "./insight/bulk/useBulkReview";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsLocation } from "@/types/synthetics";
 
@@ -773,9 +775,24 @@ watch(
   },
   { immediate: true },
 );
+// The CTA counts only drafts the stream fields allow, so it never promises a list of alerts it can't build.
+const cant = shallowRef<Set<BulkKind>>(new Set());
+const cantKey = computed(() =>
+  props.live && state.value === "gap" ? `${orgId.value}|${props.row.service}` : "",
+);
+watch(
+  cantKey,
+  async (key) => {
+    cant.value = new Set();
+    if (!key) return;
+    const found = await cantBuildKinds(orgId.value, props.row);
+    if (key === cantKey.value) cant.value = found;
+  },
+  { immediate: true },
+);
 const gapParts = computed(() =>
   props.live && state.value === "gap"
-    ? gapInsight(t, locale.value, props.row, owned.value, orgId.value)
+    ? gapInsight(t, locale.value, props.row, owned.value, orgId.value, cant.value)
     : null,
 );
 // The address query and the locations read run only once Synthetic check is open, not per drawer.

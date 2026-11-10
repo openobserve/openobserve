@@ -31,6 +31,11 @@ const api = vi.hoisted(() => ({
   fetch: vi.fn(),
   getLocations: vi.fn(),
   listAlerts: vi.fn(),
+  schema: vi.fn(),
+}));
+
+vi.mock("@/services/stream", () => ({
+  default: { schema: (...args: unknown[]) => api.schema(...args) },
 }));
 
 vi.mock("vue-router", async (importOriginal) => ({
@@ -699,5 +704,36 @@ describe("CoverageServiceDrawer synthetic check inputs (F6)", () => {
     const prefill = detail.props("insight").cta.target.prefill;
     expect(prefill.folder).toBe("f-pay");
     expect(prefill.destinations).toEqual(["pay-slack"]);
+  });
+});
+
+describe("CoverageServiceDrawer gap CTA counts what it can build (T2-11)", () => {
+  it("offers one Add alert when the stream has no field to count errors by", async () => {
+    const enterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    onTestFinished(() => {
+      config.isEnterprise = enterprise;
+      api.schema.mockReset();
+    });
+    api.schema.mockResolvedValue({
+      data: {
+        schema: [
+          { name: "service_name" },
+          { name: "k8s_cluster" },
+          { name: "k8s_namespace_name" },
+          { name: "body" },
+        ],
+      },
+    });
+    const row = liveRow(
+      { errors: cell("none"), latency: cell("covered", "checkout-p95"), absence: cell("none") },
+      [{ type: "logs", name: "checkout_logs" }],
+    );
+    const wrapper = mountDrawer(row, "gap");
+    await flushPromises();
+    const cta = wrapper.find(
+      '[data-test="autoobserve-coverage-drawer-gap-actions"] [data-test$="-cta"]',
+    );
+    expect(cta.text()).toBe("Add alert");
   });
 });

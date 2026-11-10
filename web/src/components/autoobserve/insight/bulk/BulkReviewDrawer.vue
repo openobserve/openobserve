@@ -190,7 +190,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               :data-test="`bulk-review-cant-${row.key}`"
             >
-              {{ blockLine(t, row, reviewRows) }}
+              <i18n-t
+                v-if="!row.block"
+                keypath="insight.bulk.cantBuildIn"
+                tag="span"
+                scope="global"
+              >
+                <template #alerts>
+                  <router-link
+                    :to="{ name: 'alertList', query: { org_identifier: org() } }"
+                    class="text-text-link hover:underline"
+                    data-test="bulk-review-open-alerts"
+                    @click="closeBulkReview()"
+                    >{{ t("insight.bulk.alertsPage") }}</router-link
+                  >
+                </template>
+              </i18n-t>
+              <template v-else>{{ blockLine(t, row, reviewRows) }}</template>
             </OTruncatedText>
             <OInput
               v-if="isMobile && asksThreshold(row)"

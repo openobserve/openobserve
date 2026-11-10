@@ -34286,6 +34286,7 @@
       "setUpKubernetes": "Opens Kubernetes setup for its cluster."
     },
     "bulk": {
+      "alertsPage": "Alerts",
       "title": {
         "no_data": "Add {count} no-data alert | Add {count} no-data alerts",
         "source": "Add {count} no-data alert | Add {count} no-data alerts",
@@ -34351,6 +34352,7 @@
       "usually": "{rate} an hour",
       "unsureTail": "Unticked: check before adding.",
       "cantBuild": "AutoObserve can't build this alert from this stream's fields. Add it by hand in Alerts.",
+      "cantBuildIn": "AutoObserve can't build this alert from this stream's fields. Add it by hand in {alerts}.",
       "block": {
         "checking": "Checking the stream's fields…",
         "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",

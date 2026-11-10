@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@/locales";
 import config from "@/aws-exports";
 import { gt, raw } from "@/types/i18n";
 import type { CoverageCell, CoverageRow } from "../fixtures";
 import { b64DecodeUnicode } from "@/utils/zincutils";
-import { cellInsight, gapInsight, serviceRoute, tracesRoute } from "./coverageCta";
+import { cantBuildKinds, cellInsight, gapInsight, serviceRoute, tracesRoute } from "./coverageCta";
 import { serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import type { CoverageCell as Cell } from "../fixtures";
 
@@ -91,6 +91,24 @@ describe("Signals watched gap line (flagged surface 2)", () => {
       ["no_data", "ingest_c"],
     ]);
     expect(parts?.ai?.subject).toBe("svc-ingest-c");
+  });
+
+  it("counts only the alerts it can build once the stream's fields are read (T2-11)", async () => {
+    const svc = row([LOGS]);
+    svc.checks!.latency = covered();
+    const fields = vi.fn(async () => ({ names: ["service_name", "body"], types: {} }));
+    const cant = await cantBuildKinds("demo-org", svc, fields);
+    expect([...cant]).toEqual(["errors"]);
+    const parts = gapInsight(gt, "en-US", svc, [], "demo-org", cant);
+    expect(parts?.cta?.label).toBe("Add alert");
+    expect(parts?.cta?.note).toBe(
+      "Opens the alert form filled in. Nothing is saved until you save.",
+    );
+  });
+
+  it("keeps every draft when the fields can't be read, so the review says why", async () => {
+    const svc = row([LOGS]);
+    expect([...(await cantBuildKinds("demo-org", svc, async () => null))]).toEqual([]);
   });
 
   it("offers one Add alert when only the no-data alert is missing", () => {

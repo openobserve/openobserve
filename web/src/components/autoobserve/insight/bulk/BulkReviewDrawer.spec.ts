@@ -216,6 +216,24 @@ describe("BulkReviewDrawer — rows that can't be added (T2-11, T2-18, T2-24)", 
     expect(box.props("checked")).toBe(false);
   });
 
+  it("links Alerts in the line of a row it can't build (T2-11)", async () => {
+    await mountDrawer();
+    api.schema.mockResolvedValue({
+      data: { schema: [{ name: "service_name" }, { name: "body" }] },
+    });
+    const row = {
+      ...svc("z:errors", "errors"),
+      scope: { ...svc("z:errors", "errors").scope, namespace: null, schema: undefined },
+    };
+    await openWith([row] as never);
+    await flushPromises();
+    const line = q("bulk-review-cant-z:errors")!;
+    expect(line.textContent).toContain("Add it by hand in Alerts.");
+    const link = line.querySelector<HTMLAnchorElement>('[data-test="bulk-review-open-alerts"]')!;
+    expect(link.textContent).toBe("Alerts");
+    expect(link.getAttribute("href")).toContain("alerts");
+  });
+
   it("names the alert in each row's tick label, so two rows of one service differ", async () => {
     await mountDrawer();
     await openWith([svc("y:errors", "errors"), svc("y:no_data", "no_data")] as never);
