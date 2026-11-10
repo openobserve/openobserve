@@ -261,13 +261,7 @@ function parseTyped(val: string): { h: number; min: number; s: number } | null {
 }
 
 const typedErrorText = (): I18nText =>
-  props.withSeconds
-    ? t("components.time.invalid", {
-        format: raw("HH:MM:SS"),
-        min: raw("00:00:00"),
-        max: raw("23:59:59"),
-      })
-    : t("components.time.invalid", { format: raw("HH:MM"), min: raw("00:00"), max: raw("23:59") });
+  t("components.time.invalid", { format: raw(props.withSeconds ? "HH:MM:SS" : "HH:MM") });
 
 // On commit; an entry it can't read stays as typed with a message, and nothing is emitted.
 function handleText24Change(e: Event) {

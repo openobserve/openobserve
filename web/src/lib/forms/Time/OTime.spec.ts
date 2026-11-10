@@ -230,7 +230,7 @@ describe("OTime", () => {
         expect(wrapper.emitted("update:modelValue")).toBeUndefined();
         expect((input.element as HTMLInputElement).value).toBe(typed);
         const alert = wrapper.get('[role="alert"]');
-        expect(alert.text()).toBe("Enter a time as HH:MM, from 00:00 to 23:59.");
+        expect(alert.text()).toBe("Enter a time as HH:MM.");
         expect(input.attributes("aria-invalid")).toBe("true");
         expect(input.attributes("aria-describedby")).toBe(alert.attributes("id"));
         (input.element as HTMLInputElement).value = "10:15";
