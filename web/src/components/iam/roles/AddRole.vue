@@ -70,7 +70,8 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
+import { isStartFrom, makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
+import { JOB_PRESETS } from "./jobPresets";
 
 const { t } = useI18nTyped();
 const props = defineProps({
@@ -83,6 +84,11 @@ const props = defineProps({
     default: () => null,
   },
   org_identifier: {
+    type: String,
+    default: "",
+  },
+  /** Preset chosen when the dialog opens, from a deep link. */
+  startFrom: {
     type: String,
     default: "",
   },
@@ -100,6 +106,7 @@ const startFromOptions = computed(() => [
   { label: t("iam.role.startFrom.k8s"), value: "k8s" },
   { label: t("iam.role.startFrom.rum_viewer"), value: "rum_viewer" },
   { label: t("iam.role.startFrom.rum_editor"), value: "rum_editor" },
+  ...JOB_PRESETS.map((preset) => ({ label: t(preset.titleKey), value: preset.id })),
 ]);
 
 const addRoleSchema = makeAddRoleSchema(t);
@@ -110,7 +117,7 @@ const addRoleSchema = makeAddRoleSchema(t);
 // No local model / watch.
 const addRoleDefaults = computed((): AddRoleForm => ({
   name: props.role?.name ?? "",
-  startFrom: "custom",
+  startFrom: isStartFrom(props.startFrom) ? props.startFrom : "custom",
 }));
 
 // Plain async @submit handler — the validated `value` is the source of truth.

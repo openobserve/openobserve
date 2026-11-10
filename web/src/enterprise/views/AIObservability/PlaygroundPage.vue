@@ -857,7 +857,11 @@ async function scoreAll() {
   if (scoring.value || !draft.scorerIds.length) return;
   scoring.value = true;
   try {
-    await Promise.all(scorableVariants.value.map((variant) => scoreVariant(variant)));
+    const scored = await Promise.all(
+      scorableVariants.value.map((variant) => scoreVariant(variant)),
+    );
+    const variantCount = scored.filter(Boolean).length;
+    if (variantCount > 0) analytics.track("llm_playground_scored", { variant_count: variantCount });
   } finally {
     scoring.value = false;
   }
@@ -870,10 +874,10 @@ async function scoreAll() {
  * scorers is left alone: a judge call costs a model call, and re-running one
  * over identical text can only produce noise around the answer already shown.
  */
-async function scoreVariant(variant: PlaygroundVariant) {
+async function scoreVariant(variant: PlaygroundVariant): Promise<boolean> {
   const cell = cellAt(results, variant.id, SINGLE_ROW_KEY);
-  if (!cell || cell.status !== "done" || !cell.text.trim()) return;
-  if (!draft.scorerIds.length) return;
+  if (!cell || cell.status !== "done" || !cell.text.trim()) return false;
+  if (!draft.scorerIds.length) return false;
 
   const request = {
     scorerIds: [...draft.scorerIds].sort(),
@@ -888,15 +892,17 @@ async function scoreVariant(variant: PlaygroundVariant) {
   };
 
   const key = scoreKey(request);
-  if (cell.scoredKey === key) return;
+  if (cell.scoredKey === key) return false;
 
   setCell(variant.id, SINGLE_ROW_KEY, { scoring: true });
   try {
     const scores = await scorePlayground(orgId.value, request);
     setCell(variant.id, SINGLE_ROW_KEY, { scores, scoredKey: key, scoring: false });
+    return true;
   } catch {
     setCell(variant.id, SINGLE_ROW_KEY, { scoring: false });
     toast({ variant: "error", message: t("aiObservability.playground.scoreFailed") });
+    return false;
   }
 }
 
@@ -1052,6 +1058,7 @@ async function copyOutput(variantId: string, rowKey: string) {
   const cell = cellAt(results, variantId, rowKey);
   if (!cell?.text) return;
   await navigator.clipboard.writeText(cell.text);
+  analytics.track("llm_playground_output_copied");
   toast({ variant: "success", message: t("aiObservability.playground.copied") });
 }
 

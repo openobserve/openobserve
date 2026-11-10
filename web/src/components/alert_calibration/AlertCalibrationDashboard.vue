@@ -228,6 +228,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
@@ -316,6 +317,10 @@ const configure = () =>
 
 /** A new tab, so the board stays where it was while the alert is fixed. */
 const openAlert = (finding: FindingRecord) => {
+  analytics.track("alert_calibration_finding_alert_opened", {
+    rule: finding.rule_id,
+    source: "dashboard",
+  });
   const { href } = router.resolve({
     name: "alertDetail",
     params: { alert_id: finding.alert_id },

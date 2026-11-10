@@ -229,6 +229,7 @@ import QueryPlanView from "@/components/query-plan/QueryPlanView.vue";
 import QueryProfileView from "@/components/query-plan/QueryProfileView.vue";
 import type { AnalyzeFact, AnalyzeNotice } from "@/components/query-plan/profileStyles";
 import { timeRangeLabel } from "@/components/query-plan/profileText";
+import analytics from "@/services/product_analytics";
 
 type PlanMode = "plan" | "text" | "analyze";
 
@@ -501,6 +502,10 @@ function finishAnalyze(parsed: SearchStreamResult | null) {
   }
   const tookMs = parsed.took_detail?.total || parsed.took || elapsedMs;
   lastRun.value = { ranAt: clockTime(new Date()), tookMs };
+  analytics.track("query_plan_analyze_completed", {
+    rerun: analyzeState.value === "rerunning",
+    has_profile: !!profile.value,
+  });
   analyzeState.value = "done";
 }
 
@@ -552,6 +557,7 @@ function cancelAnalyze() {
   const afterMs = Date.now() - runStartedAt.value;
   const rerun = analyzeState.value === "rerunning";
   stopServerQuery();
+  analytics.track("query_plan_analyze_cancelled", { rerun });
   if (rerun) {
     analyzeState.value = "done";
     toast({
@@ -582,7 +588,9 @@ function isPlanMode(value: unknown): value is PlanMode {
 }
 
 function onMode(value: unknown) {
-  if (isPlanMode(value)) mode.value = value;
+  if (!isPlanMode(value) || value === mode.value) return;
+  mode.value = value;
+  analytics.track("query_plan_mode_changed", { mode: value });
 }
 
 watch(

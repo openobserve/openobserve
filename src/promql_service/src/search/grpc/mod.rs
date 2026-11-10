@@ -80,14 +80,29 @@ impl TableProvider for StorageProvider {
         if matches_nothing(org_id, stream_name, &matchers).await? {
             return Ok(vec![]);
         }
-        let mut ctxs = Vec::new();
+        // WAL before storage: a sample moved in between is then read twice, never missed.
+        let wal_ctxs = if self.need_wal {
+            let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
+            wal::create_context(
+                &trace_id,
+                org_id,
+                stream_name,
+                time_range,
+                matchers.clone(),
+                label_selector.clone(),
+            )
+            .await?
+        } else {
+            Vec::new()
+        };
+        let mut ctxs = Vec::with_capacity(wal_ctxs.len() + 1);
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx = storage::create_context(
             &trace_id,
             org_id,
             stream_name,
             time_range,
-            matchers.clone(),
+            matchers,
             filters,
             storage::SourcePreference {
                 streaming,
@@ -98,21 +113,7 @@ impl TableProvider for StorageProvider {
         if let Some(ctx) = ctx {
             ctxs.push(ctx);
         }
-        if self.need_wal {
-            let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
-            let wal_ctx_list = wal::create_context(
-                &trace_id,
-                org_id,
-                stream_name,
-                time_range,
-                matchers,
-                label_selector,
-            )
-            .await?;
-            for ctx in wal_ctx_list {
-                ctxs.push(ctx);
-            }
-        }
+        ctxs.extend(wal_ctxs);
         Ok(ctxs)
     }
 

@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.printMode !== true && !focusMode && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
+        :flat="store.state.solutionMode === 'security'"
         :loading="!menuReady"
         :mini-mode="miniMode"
         @menu-hover="handleMenuHover"
@@ -132,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ONavbar
             class="min-h-0 flex-1 overflow-y-auto"
             :links-list="navLinks"
+            :flat="store.state.solutionMode === 'security'"
             :visible="true"
             @menu-hover="handleMenuHover"
           />
@@ -188,7 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <!-- Enter-only fade; the body's slide lives in OPageLayout so the header stays put. -->
               <FeatureLockBoundary :feature="lockedFeature">
-                <router-view v-slot="{ Component }">
+                <SecurityPageGate v-if="securityGated" />
+                <router-view v-else v-slot="{ Component }">
                   <OAccessBoundary>
                     <keep-alive :include="KEPT_ALIVE_VIEWS">
                       <component
@@ -283,6 +286,7 @@ import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import { ENTER_FADE } from "@/lib/styles/motion";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
 import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
@@ -308,6 +312,7 @@ import {
   onMounted,
   onUnmounted,
   watch,
+  watchEffect,
   markRaw,
   nextTick,
   onBeforeMount,
@@ -316,7 +321,9 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter, RouterView } from "vue-router";
+import { useRoute, useRouter, RouterView } from "vue-router";
+import { solutionModeForPath } from "@/utils/security/solutionMode";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
 
 import { setLanguage } from "../utils/cookies";
@@ -355,6 +362,7 @@ import useStreams from "@/composables/useStreams";
 import { userDataStreams } from "@/utils/internalStreams";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
 import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
+import SecurityPageGate from "@/components/security/SecurityPageGate.vue";
 import { clearLicenseDenials } from "@/composables/useLicenseDenials";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import {
@@ -420,6 +428,7 @@ export default defineComponent({
     FirstDataNotice,
     EditorDraftSignOutDialog,
     FeatureLockBoundary,
+    SecurityPageGate,
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),
@@ -681,7 +690,55 @@ export default defineComponent({
         store.state.zoConfig.version != ""
       ),
     );
-    const navLinks = computed(() => (menuReady.value ? linksList.value : []));
+    const securityNavLinks = buildSecurityNavLinks(t);
+
+    // The URL decides the mode, so a shared /security link or a /logs jump shows the matching nav.
+    const route = useRoute();
+    const securityGated = ref(false);
+    // Not reactive: only the org watcher reads it, to skip a list that did not change.
+    const orgListSnapshot = markRaw({ value: "" });
+    if (config.isEnterprise == "true") {
+      const securityAccess = useSecurityAccess();
+      // Unknown until the access answer arrives, so a cold load never flips the mode early.
+      const securityAllowed = computed(
+        () => !securityAccess.loaded.value || securityAccess.canOpen.value,
+      );
+      const onSecurityPage = computed(
+        () => route.path === "/security" || route.path.startsWith("/security/"),
+      );
+      // A member without read gets a lock naming the grant, and an unanswered check a retry, instead of the page.
+      watchEffect(() => {
+        securityGated.value =
+          onSecurityPage.value &&
+          securityAccess.feature.value === "enabled" &&
+          securityAccess.loaded.value &&
+          (securityAccess.failed.value || !securityAccess.canEnter.value);
+      });
+      watch(
+        [() => route.path, securityAllowed],
+        ([path, allowed]: [string, boolean]) => {
+          const mode = solutionModeForPath(path, store.state.solutionMode, allowed);
+          if (mode !== store.state.solutionMode) store.commit("setSolutionMode", mode);
+          // Only a hidden feature leaves the page; a refused member stays on it to read the lock.
+          if (securityAccess.feature.value === "hidden" && onSecurityPage.value) {
+            router.replace({
+              name: "home",
+              query: { org_identifier: store.state.selectedOrganization?.identifier },
+            });
+          }
+        },
+        { immediate: true },
+      );
+    }
+
+    // Security links never enter linksList, so the observability list keeps its flag and license edits.
+    const navLinks = computed(() =>
+      !menuReady.value
+        ? []
+        : store.state.solutionMode === "security"
+          ? securityNavLinks
+          : linksList.value,
+    );
 
     const langList = [
       {
@@ -1897,6 +1954,8 @@ export default defineComponent({
       dashboardSaveConflict: dashboardSaveConflictState,
       firstDataNotice,
       lockedFeature,
+      securityGated,
+      orgListSnapshot,
       layoutMixin,
       router,
       store,
@@ -1972,7 +2031,11 @@ export default defineComponent({
       this.layoutMixin.getDefaultOrganization(this.store);
     },
     changeOrganization: {
-      handler() {
+      handler(orgs: unknown) {
+        // The list is often replaced with an identical copy, which would reload the org's settings for nothing.
+        const snapshot = JSON.stringify(orgs ?? null);
+        if (snapshot === this.orgListSnapshot.value) return;
+        this.orgListSnapshot.value = snapshot;
         this.setSelectedOrganization();
       },
       deep: true,

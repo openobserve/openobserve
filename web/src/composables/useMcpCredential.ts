@@ -19,6 +19,7 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import service_accounts from "@/services/service_accounts";
+import analytics from "@/services/product_analytics";
 import { createRole, getAllRolePermissions, getResources, updateRole } from "@/services/iam";
 import {
   buildReadonlyPermissions,
@@ -162,6 +163,7 @@ export function useMcpCredential() {
       void queryClient.invalidateQueries({ queryKey: iamKeys.rolesAll(org) });
       void queryClient.invalidateQueries({ queryKey: userKeys.users(org) });
       sessionCredentials.set(org, credential.value);
+      analytics.track("mcp_credential_generated", { scope: credential.value.scope });
       return credential.value;
     } catch (err: any) {
       error.value =

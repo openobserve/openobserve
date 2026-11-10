@@ -225,13 +225,16 @@ impl TreeNodeRewriter for BroadcastJoinRewriter {
             let trace_id = &self.remote_scan_nodes.req.trace_id;
             let cluster_name = config::get_cluster_name();
             let result_path = generate_result_path(trace_id);
-            let tmp_exec = Arc::new(TmpExec::new(
-                trace_id.clone(),
-                cluster_name.clone(),
-                result_path.clone(),
-                None, // set in BroadcastJoinExec during runtime
-                left.schema(),
-            ));
+            let tmp_exec = Arc::new(
+                TmpExec::new(
+                    trace_id.clone(),
+                    cluster_name.clone(),
+                    result_path.clone(),
+                    None, // set in BroadcastJoinExec during runtime
+                    left.schema(),
+                )
+                .with_properties_of(&left),
+            );
 
             // 3. add remoteScan at the top of the hash join
             let right = node.children()[1].clone();

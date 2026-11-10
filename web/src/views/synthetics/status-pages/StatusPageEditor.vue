@@ -366,6 +366,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getFoldersListByType } from "@/utils/commons";
 import statusPagesService, { type StatusPageListItem } from "@/services/status_pages";
+import analytics from "@/services/product_analytics";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import syntheticsService from "@/services/synthetics";
 import {
@@ -675,6 +676,7 @@ async function saveSettings(values: EditStatusPageForm) {
           check_ids: c.check_ids,
         })),
     );
+    analytics.track("status_page_updated");
     dismiss();
     toast({ variant: "success", message: t("statusPages.toast.saved") });
     if (leaveSave) {

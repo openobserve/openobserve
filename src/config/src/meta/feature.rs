@@ -64,6 +64,7 @@ pub enum Feature {
     QueryManagement,
     SuperCluster,
     Byob,
+    Security,
 }
 
 impl Feature {
@@ -110,6 +111,7 @@ impl Feature {
             Feature::QueryManagement => "Query Management",
             Feature::SuperCluster => "Super Cluster",
             Feature::Byob => "Bring Your Own Bucket",
+            Feature::Security => "Security (SIEM)",
         }
     }
 }
@@ -137,6 +139,7 @@ mod tests {
             ("correlation", Feature::Correlation),
             ("rbac", Feature::Rbac),
             ("byob", Feature::Byob),
+            ("security", Feature::Security),
         ] {
             assert_eq!(Feature::from_str(key).unwrap(), f);
             assert_eq!(<&str>::from(f), key);
@@ -151,6 +154,6 @@ mod tests {
     fn indices_are_unique() {
         let indices: HashSet<u64> = Feature::all().map(Feature::index).collect();
         assert_eq!(indices.len(), Feature::all().count());
-        assert_eq!(Feature::all().count(), 30);
+        assert_eq!(Feature::all().count(), 31);
     }
 }

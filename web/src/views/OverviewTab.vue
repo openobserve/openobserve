@@ -857,6 +857,7 @@ import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/tr
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import analytics from "@/services/product_analytics";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -956,6 +957,9 @@ const onDateChange = (value: any) => {
       timeRange: timeRange.value,
     }),
   );
+  if (value.userChangedValue) {
+    analytics.track("home_time_range_changed", { type: dateTimeType.value });
+  }
   loadAll();
 };
 
@@ -1760,7 +1764,11 @@ const serviceCardClass = (svc: { health: ServiceHealthStatus; latencyFlag: boole
   SERVICE_CARD_BORDER[svc.health === "healthy" && svc.latencyFlag ? "degraded" : svc.health];
 
 // ── Navigation ───────────────────────────────────────────────────────────────
+const trackDrilldown = (target: string, properties?: object) =>
+  analytics.track("home_overview_drilldown_clicked", { target, ...properties });
+
 const goToAlert = (item: any) => {
+  trackDrilldown("alert_history");
   selectedAlertForHistory.value = item.alertConfig ?? { name: item.alertName };
   selectedAlertIdForHistory.value = item.alertId ?? "";
   showAlertHistoryDrawer.value = true;
@@ -1772,6 +1780,7 @@ const goToService = (svc: any, e?: MouseEvent) => {
   e?.stopPropagation();
   // the service panel's View traces emits here too, outside this file's lock markup
   if (tracesLock.locked.value) return;
+  trackDrilldown("service_traces");
   let filter = sqlEquals("service_name", svc.label ?? svc.id);
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
@@ -1797,6 +1806,7 @@ const openServicePanel = (svc: any) => {
   // clicking the card body opens the latency/info side panel.
   selectedService.value = svc;
   servicePanelVisible.value = true;
+  trackDrilldown("service_panel");
 };
 
 const closeServicePanel = () => {
@@ -1805,6 +1815,7 @@ const closeServicePanel = () => {
 };
 
 const goToIncident = (inc: any) => {
+  trackDrilldown("incident");
   router.push({
     name: "incidentDetail",
     params: { id: inc.id },
@@ -1824,23 +1835,28 @@ const hasEventStream = (ev: { service: string }) => ev.service !== "—";
 
 const goToAlertList = () => {
   if (alertsLocked.value) return;
+  trackDrilldown("alerts");
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });
 };
 
 const goToAddAlert = () => {
   if (alertsLocked.value) return;
+  trackDrilldown("add_alert");
   router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
 };
 
 const goToPipelines = () => {
+  trackDrilldown("pipelines");
   router.push({ name: "pipelines", query: { org_identifier: orgId.value } });
 };
 
 const goToStreams = () => {
+  trackDrilldown("streams");
   router.push({ name: "logstreams", query: { org_identifier: orgId.value } });
 };
 
 const goToIngestion = () => {
+  trackDrilldown("ingestion");
   router.push({ name: "ingestion", query: { org_identifier: orgId.value } });
 };
 
@@ -1852,6 +1868,7 @@ const onHealthOpen = (destination: OverviewDestination) => {
 
 const onSignalOpen = (signal: OverviewSignal) => {
   if (signal in signalLockedReasons.value) return;
+  trackDrilldown("signal", { signal });
   router.push({ name: signal, query: { org_identifier: orgId.value } });
 };
 
@@ -1867,10 +1884,12 @@ const onHeadlineSelect = (target: OverviewTarget) => {
 };
 
 const goToIncidentList = () => {
+  trackDrilldown("incidents");
   router.push({ name: "incidentList", query: { org_identifier: orgId.value, status: "open" } });
 };
 
 const goToAnomalies = () => {
+  trackDrilldown("anomalies");
   router.push({
     name: "alertList",
     query: { org_identifier: orgId.value, tab: "anomalyDetection" },
@@ -1879,11 +1898,13 @@ const goToAnomalies = () => {
 
 const goToLogs = () => {
   if (logsLock.locked.value) return;
+  trackDrilldown("logs");
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
 };
 
 const goToServiceGraph = () => {
   if (tracesLock.locked.value) return;
+  trackDrilldown("service_graph");
   const query: Record<string, string> = {
     org_identifier: orgId.value,
     tab: "service-graph",

@@ -33,6 +33,7 @@ config.workspace = true
 db.workspace = true
 flate2.workspace = true
 hashbrown.workspace = true
+http-body-util.workspace = true
 infra.workspace = true
 ingestion-common.workspace = true
 log.workspace = true

@@ -8,6 +8,9 @@ import AppSessions from "./AppSessions.vue";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import ShareButton from "@/components/common/ShareButton.vue";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock the composables
 const mockSessionState = {
@@ -298,6 +301,18 @@ describe("AppSessions.vue", () => {
       wrapper.vm.isLoading.splice(0);
       await nextTick();
       chips.forEach((chip) => expect(chip()).toMatch(/ · \d+$/));
+    });
+
+    it("tracks segment chips and insight actions with enum values only", async () => {
+      vi.mocked(analytics.track).mockClear();
+      wrapper.vm.pickSegment("device", "mobile");
+      wrapper.vm.handleMetricSelect("bounced");
+      wrapper.vm.applyInsightFilter({ kind: "frustration", count: 3 });
+      expect(vi.mocked(analytics.track).mock.calls).toEqual([
+        ["rum_session_segment_applied", { segment: "device", value: "mobile" }],
+        ["rum_session_segment_applied", { segment: "type", value: "bounced" }],
+        ["rum_session_insight_used", { action: "segment", kind: "frustration" }],
+      ]);
     });
 
     it("should render OTable when session replay is enabled and not loading", async () => {

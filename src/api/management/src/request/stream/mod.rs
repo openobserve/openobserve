@@ -21,6 +21,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "enterprise")]
+use config::meta::stream::SecuritySourceSetting;
 use config::{
     meta::stream::{StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
@@ -43,6 +45,8 @@ use crate::common::{
     },
     utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
 };
+#[cfg(feature = "enterprise")]
+use crate::request::security;
 
 /// GetSchema
 #[utoipa::path(
@@ -184,8 +188,10 @@ pub async fn schema(
 pub async fn create(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
-    Json(stream): Json<StreamCreate>,
+    Json(mut stream): Json<StreamCreate>,
 ) -> Response {
+    // The security setting is written only through the settings API, which validates and audits it.
+    stream.settings.security = None;
     let mut stream_name = stream_name;
     if !config::get_config().common.skip_formatting_stream_name {
         stream_name = format_stream_name(stream_name);
@@ -240,7 +246,8 @@ pub async fn create(
 pub async fn update_settings(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
-    Json(stream_settings): Json<UpdateStreamSettings>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(mut stream_settings): Json<UpdateStreamSettings>,
 ) -> Response {
     let cfg = config::get_config();
     let mut stream_name = stream_name;
@@ -258,6 +265,44 @@ pub async fn update_settings(
         )
             .into_response();
     }
+    #[cfg(feature = "enterprise")]
+    let touches_security = match security::streams::guard_settings_update(
+        &org_id,
+        &user_email.user_id,
+        &stream_name,
+        stream_type,
+        &stream_settings,
+    )
+    .await
+    {
+        Ok(touches) => touches,
+        Err(resp) => return resp,
+    };
+    // Security is enterprise-only, so an OSS build never acts on the setting.
+    #[cfg(not(feature = "enterprise"))]
+    {
+        stream_settings.security = None;
+    }
+    #[cfg(feature = "enterprise")]
+    let mut security_change = None;
+    #[cfg(feature = "enterprise")]
+    if let Some(security) = stream_settings.security.take() {
+        match prepare_security_setting(
+            &org_id,
+            &stream_name,
+            stream_type,
+            &user_email.user_id,
+            security,
+        )
+        .await
+        {
+            Ok((security, change)) => {
+                stream_settings.security = Some(security);
+                security_change = change;
+            }
+            Err(resp) => return resp,
+        }
+    }
     match stream_service::update_stream_settings(
         &org_id,
         &stream_name,
@@ -266,7 +311,21 @@ pub async fn update_settings(
     )
     .await
     {
-        Ok(resp) => resp,
+        Ok(resp) => {
+            #[cfg(feature = "enterprise")]
+            if resp.status() == StatusCode::OK {
+                if security::streams::audits_settings_request(
+                    touches_security,
+                    security_change.is_some(),
+                ) {
+                    o2_enterprise::enterprise::security::audit::mark();
+                }
+                if let Some(change) = security_change {
+                    audit_security_change(&org_id, &stream_name, &user_email.user_id, change).await;
+                }
+            }
+            resp
+        }
         Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
@@ -370,6 +429,7 @@ pub async fn update_fields(
 pub async fn delete_fields(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(fields): Json<StreamDeleteFields>,
 ) -> Response {
     let mut stream_name = stream_name;
@@ -377,6 +437,17 @@ pub async fn delete_fields(
         stream_name = format_stream_name(stream_name);
     }
     let stream_type = get_stream_type_from_request(&query);
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::streams::guard_stream_delete(
+        &org_id,
+        &user_email.user_id,
+        &stream_name,
+        stream_type.unwrap_or_default(),
+    )
+    .await
+    {
+        return resp;
+    }
     match stream_service::delete_fields(&org_id, &stream_name, stream_type, &fields.fields).await {
         Ok(_) => (
             StatusCode::OK,
@@ -422,8 +493,26 @@ pub async fn delete_fields(
 pub async fn delete(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    #[cfg(feature = "enterprise")]
+    let stored_name = if config::get_config().common.skip_formatting_stream_name {
+        stream_name.clone()
+    } else {
+        format_stream_name(stream_name.clone())
+    };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::streams::guard_stream_delete(
+        &org_id,
+        &user_email.user_id,
+        &stored_name,
+        stream_type,
+    )
+    .await
+    {
+        return resp;
+    }
     let del_related_feature_resources = query
         .get("delete_all")
         .and_then(|v| v.parse::<bool>().ok())
@@ -619,6 +708,78 @@ pub async fn list(
         }),
     )
         .into_response()
+}
+
+/// Gates a direct `security` write on Security PUT, then plans it as [`plan_security_setting`].
+#[cfg(feature = "enterprise")]
+pub(crate) async fn prepare_security_setting(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    user_id: &str,
+    security: Option<SecuritySourceSetting>,
+) -> Result<(Option<SecuritySourceSetting>, Option<String>), Response> {
+    if !security::security_allowed(org_id, user_id, "PUT").await {
+        return Err(MetaHttpResponse::forbidden(
+            "Changing a security source needs the Security permission",
+        ));
+    }
+    plan_security_setting(org_id, stream_name, stream_type, user_id, security).await
+}
+
+/// Validates and stamps an already authorized `security` write: the value to store, what changed.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn plan_security_setting(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    user_id: &str,
+    security: Option<SecuritySourceSetting>,
+) -> Result<(Option<SecuritySourceSetting>, Option<String>), Response> {
+    use o2_enterprise::enterprise::security::sources;
+
+    if let Some(new) = security.as_ref()
+        && let Err(e) = sources::validate(new)
+    {
+        return Err(MetaHttpResponse::bad_request(e));
+    }
+    let current = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let old = current.as_ref().and_then(|s| s.security.as_ref());
+    let now = config::utils::time::now_micros();
+    let change = sources::describe_change(old, security.as_ref());
+    let stored = security.map(|new| sources::stamped(old, new, user_id, now));
+    Ok((stored, (!change.is_empty()).then_some(change)))
+}
+
+#[cfg(feature = "enterprise")]
+pub(crate) async fn audit_security_change(
+    org_id: &str,
+    stream_name: &str,
+    user_id: &str,
+    change: String,
+) {
+    use o2_enterprise::enterprise::common::auditor;
+
+    log::info!("[SECURITY] {org_id}/{stream_name} security source changed by {user_id}: {change}");
+    audit::audit(auditor::AuditMessage {
+        user_email: user_id.to_string(),
+        org_id: org_id.to_string(),
+        _timestamp: config::utils::time::now_micros(),
+        protocol: auditor::Protocol::Http,
+        delegated: None,
+        fleet_id: None,
+        target: None,
+        response_meta: auditor::ResponseMeta {
+            http_method: "PUT".to_string(),
+            http_path: format!("/api/{org_id}/streams/{stream_name}/settings/security"),
+            http_query_params: String::new(),
+            http_body: change,
+            http_response_code: 200,
+            error_msg: None,
+            trace_id: None,
+        },
+    })
+    .await;
 }
 
 /// Keeps only the name and stats of each stream `can_read` refuses: settings name fields too.
@@ -843,6 +1004,7 @@ pub async fn delete_stream_cache(
 pub async fn delete_stream_data_by_time_range(
     Path((org_id, stream_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let cfg = config::get_config();
     let mut stream_name = stream_name;
@@ -850,6 +1012,17 @@ pub async fn delete_stream_data_by_time_range(
         stream_name = format_stream_name(stream_name);
     }
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = security::streams::guard_stream_delete(
+        &org_id,
+        &user_email.user_id,
+        &stream_name,
+        stream_type,
+    )
+    .await
+    {
+        return resp;
+    }
     let start = match get_ts_from_request_with_key(&query, "start") {
         Ok(ts) => ts,
         Err(e) => {

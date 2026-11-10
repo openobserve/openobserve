@@ -149,9 +149,14 @@ describe("Custom Component", () => {
         "otelCollector",
         "telegraf",
         "cloudwatchMetrics",
+        "datadogAgentMetrics",
       ]);
 
-      expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP", "ingestTracesFromOtel"]);
+      expect(wrapper.vm.traceRoutes).toEqual([
+        "tracesOTLP",
+        "ingestTracesFromOtel",
+        "datadogAgentTraces",
+      ]);
       expect(wrapper.vm.profileRoutes).toEqual(["profilesOtelCollector"]);
       expect(wrapper.vm.rumRoutes).toEqual(["frontendMonitoring"]);
     });

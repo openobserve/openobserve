@@ -94,6 +94,7 @@ ent GetAlertCalibrationConfig
 ent GetAlertCalibrationRunRecords
 ent GetAlertCalibrationStatus
 all GetAlertHistory
+ent GetAlertHistorySummary
 ent GetAllAnomalyHistory
 all GetAllUsersRoles
 all GetAnnotations
@@ -212,6 +213,7 @@ all ListGroups
 all ListIncidentRcaRuns
 all ListIncidents
 all ListKVKeys
+ent ListOcsfPacks
 ent ListRemoteTaskVersions
 ent ListRemoteTasks
 all ListReports

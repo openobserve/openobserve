@@ -215,6 +215,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { announcementConfigQuery } from "@/services/announcements.queries";
+import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 import { bannerRank } from "@/utils/announcementOrder";
@@ -430,6 +431,7 @@ const removeBanner = async () => {
       if (!sameAuthored(latest.banners[index], expected)) throw new AnnouncementConflictError();
       return { ...latest, banners: latest.banners.filter((_, i) => i !== index) };
     });
+    analytics.track("announcement_deleted");
     if (removed?.draftKey) dropBannerDrafts(removed.draftKey);
     toast({ variant: "success", message: t("announcements.list.deleted") });
   } catch (error: any) {

@@ -212,6 +212,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { PromqlLabelMatcher } from "@/components/promql/types";
+import analytics from "@/services/product_analytics";
 import {
   compileLabelFilters,
   filterGroupsOf,
@@ -355,11 +356,17 @@ const emptyMatcher = (group: number): PromqlLabelMatcher => {
 
 const addLabel = (group = 0) => {
   emitWithinCap([...props.labels, emptyMatcher(group)]);
+  if (refusedCount.value === 0) {
+    analytics.track("promql_builder_label_filter_added", { new_group: false });
+  }
 };
 
 const addGroup = () => {
   const next = Math.max(0, ...props.labels.map((l) => l.group ?? 0)) + 1;
   emitWithinCap([...props.labels, emptyMatcher(next)]);
+  if (refusedCount.value === 0) {
+    analytics.track("promql_builder_label_filter_added", { new_group: true });
+  }
 };
 
 const toggleNegate = (group: number) => {

@@ -102,6 +102,11 @@ const importMonaco = async () => {
   await import("monaco-editor/esm/vs/editor/editor.all.js");
   // Monaco caches glyph widths once; a webfont swapping in later leaves carets drawn at stale offsets.
   document.fonts?.addEventListener?.("loadingdone", () => monaco?.editor?.remeasureFonts?.());
+  // The word highlighter drops a cursor-triggered delay promise, which disposing the editor rejects.
+  const { CancellationError } = await import("monaco-editor/esm/vs/base/common/errors.js");
+  window.addEventListener("unhandledrejection", (event) => {
+    if (event.reason instanceof CancellationError) event.preventDefault();
+  });
   monaco = api;
   return api;
 };

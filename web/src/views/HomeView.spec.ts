@@ -47,6 +47,7 @@ vi.mock("@/components/ingestion/FirstDataPanel.vue", async () => {
     }),
   };
 });
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/views/OverviewTab.vue", () => ({
   default: { name: "OverviewTab", template: '<div data-test="overview-tab-stub" />' },
 }));
@@ -98,6 +99,8 @@ vi.mock("@/composables/useOrgHasUserData", async () => {
 
 import config from "@/aws-exports";
 import HomeView from "./HomeView.vue";
+import analytics from "@/services/product_analytics";
+import settings from "@/services/settings";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { raw } from "@/types/i18n";
 
@@ -163,6 +166,40 @@ describe("HomeView", () => {
 
       expect(has(`home-tab-${TAB}`)).toBe(true);
       expect(has(`home-tab-lock-${TAB}`)).toBe(false);
+    });
+
+    it("tracks a tab the user picks, naming a pinned dashboard by its kind only", async () => {
+      wrapper = mountHome();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", TAB);
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "overview");
+      expect(analytics.track).toHaveBeenCalledWith("home_tab_switched", { tab: "dashboard" });
+      expect(analytics.track).toHaveBeenCalledWith("home_tab_switched", { tab: "overview" });
+    });
+
+    it("tracks an unpin from the tab's close button once the pin is cleared", async () => {
+      vi.spyOn(settings, "deleteOrgSetting").mockResolvedValue({} as never);
+      wrapper = mountHome();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.find(`[data-test="home-tab-close-${TAB}"]`).trigger("click");
+      await flushPromises();
+      expect(analytics.track).toHaveBeenCalledWith("home_dashboard_unpinned", {
+        source: "home_tab",
+      });
+    });
+
+    it("does not track an unpin the server refused", async () => {
+      vi.spyOn(settings, "deleteOrgSetting").mockRejectedValue({ response: { status: 500 } });
+      wrapper = mountHome();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      await wrapper.find(`[data-test="home-tab-close-${TAB}"]`).trigger("click");
+      await flushPromises();
+      expect(analytics.track).not.toHaveBeenCalledWith("home_dashboard_unpinned", {
+        source: "home_tab",
+      });
     });
   });
 

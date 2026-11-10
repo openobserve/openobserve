@@ -172,10 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      search/tabs and above the rows. Always rendered (skeleton
                      while loading) so data arriving never shifts the layout. -->
               <template #subheader>
-                <div
-                  class="px-page-edge border-table-row-divider border-b py-1.5"
-                  data-test="alert-list-summary"
-                >
+                <div data-test="alert-list-summary">
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
@@ -1197,7 +1194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ExportResourceDialog
       v-model:open="showExportDialog"
-      :items="alertsToExport"
+      :items="alertsJsonExport"
       :terraform="alertsTerraform"
       :title="
         t('alerts.exportDialogTitle', { count: alertsToExport.length }, alertsToExport.length)
@@ -3665,6 +3662,14 @@ export default defineComponent({
     const alertsTerraform = computed(() =>
       alertsToTerraform(alertsToExport.value, { folderId: activeFolderId.value }),
     );
+    // Destination names only exist in the source org; Terraform keeps them for re-applying to it.
+    const alertsJsonExport = computed(() =>
+      alertsToExport.value.map((alert) =>
+        alert.alert_type === "anomaly_detection"
+          ? { ...alert, alert_destinations: [] }
+          : { ...alert, destinations: [], recovery_destinations: [] },
+      ),
+    );
     const exportLoading = ref(false);
 
     // The /export endpoint strips runtime fields from anomaly configs and works
@@ -4494,6 +4499,7 @@ export default defineComponent({
       exportAlert,
       showExportDialog,
       alertsToExport,
+      alertsJsonExport,
       alertsTerraform,
       onExportDownloaded,
       triggerAlert,

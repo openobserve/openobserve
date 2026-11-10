@@ -51,6 +51,7 @@ import ErrorTag from "./ErrorTag.vue";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import analytics from "@/services/product_analytics";
 
 const { t } = useI18nTyped();
 
@@ -84,5 +85,6 @@ const playSessionReplay = () => {
       event_time: Math.floor(props.error._timestamp / 1000),
     },
   });
+  analytics.track("rum_error_replay_opened");
 };
 </script>

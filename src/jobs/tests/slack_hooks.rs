@@ -221,7 +221,7 @@ fn shorten_url_stores_a_resolvable_org_scoped_short_url() {
             openobserve_core::short_url::retrieve("acme", short_id)
                 .await
                 .as_deref(),
-            Some(long)
+            Some("/web/logs?org_identifier=acme&sql=c2VsZWN0IDE")
         );
         assert_eq!(
             openobserve_core::short_url::retrieve("other", short_id).await,

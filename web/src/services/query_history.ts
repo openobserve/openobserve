@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 import type { TimeQueryParams } from "@/utils/dashboard/urlTimeParams";
 
 export type HistorySource = "logs" | "traces" | "metrics" | "dbm" | "profiles";
@@ -93,10 +94,31 @@ const queryHistory = {
   list: (org: string, params: QueryHistoryListParams) => http().get(base(org), { params }),
   count: (org: string, params: QueryHistoryListParams) =>
     http().get<{ count: number }>(base(org), { params: { ...params, count_only: true } }),
-  star: (org: string, id: string, starred: boolean) => http().patch(entry(org, id), { starred }),
-  remove: (org: string, id: string) => http().delete(entry(org, id)),
+  star: (org: string, id: string, starred: boolean) =>
+    http()
+      .patch(entry(org, id), { starred })
+      .then((res) => {
+        analytics.track("search_history_entry_starred", { starred });
+        return res;
+      }),
+  remove: (org: string, id: string) =>
+    http()
+      .delete(entry(org, id))
+      .then((res) => {
+        analytics.track("search_history_entry_deleted");
+        return res;
+      }),
   clear: (org: string, params: QueryHistoryClearParams) =>
-    http().delete<{ deleted: number }>(base(org), { params }),
+    http()
+      .delete<{ deleted: number }>(base(org), { params })
+      .then((res) => {
+        analytics.track("search_history_cleared", {
+          count: res?.data?.deleted ?? 0,
+          include_starred: !!params.include_starred,
+          all_sources: (params.source ?? "").includes(","),
+        });
+        return res;
+      }),
 };
 
 export default queryHistory;

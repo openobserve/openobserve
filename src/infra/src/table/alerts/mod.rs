@@ -581,6 +581,23 @@ pub async fn list_alerts_by_slo<C: ConnectionTrait>(
         .collect())
 }
 
+/// Names of every alert in the org that pages `team_id` directly, enabled or not, sorted.
+pub async fn list_names_by_oncall_team<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    team_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    Ok(alerts::Entity::find()
+        .select_only()
+        .column(alerts::Column::Name)
+        .filter(alerts::Column::Org.eq(org))
+        .filter(alerts::Column::OncallTeam.eq(team_id))
+        .order_by_asc(alerts::Column::Name)
+        .into_tuple::<String>()
+        .all(conn)
+        .await?)
+}
+
 /// When this alert was last written, epoch **microseconds** — the raw stored
 /// column, not `MetaAlert::updated_at`.
 ///
@@ -796,6 +813,15 @@ async fn list_models<C: ConnectionTrait>(
             }
             query.filter(cond)
         }
+    };
+    let query = if params.excluded_alert_ids.is_empty() {
+        query
+    } else {
+        let mut cond = Condition::all();
+        for chunk in params.excluded_alert_ids.chunks(TAG_ID_PREDICATE_CHUNK) {
+            cond = cond.add(alerts::Column::Id.is_not_in(chunk.to_vec()));
+        }
+        query.filter(cond)
     };
 
     // Apply ordering (PT-3).
@@ -1334,7 +1360,9 @@ pub(super) mod tests {
         // and called from `core` (save validation and the SLO ingest pass).
         use super::make_model;
         use crate::table::{
-            alerts::{intermediate, list_models, list_slo_burn_window_pairs},
+            alerts::{
+                intermediate, list_models, list_names_by_oncall_team, list_slo_burn_window_pairs,
+            },
             entity::{alerts, folders},
             folders::folder_type_into_i16,
         };
@@ -2256,6 +2284,27 @@ pub(super) mod tests {
             );
         }
 
+        #[tokio::test]
+        async fn excluded_ids_are_dropped_and_intersect_the_tag_predicate() {
+            let db = db_with_folder().await;
+            let (a1, a2, p1) = (alert_id(), alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&a1, "a1")).await;
+            insert_alert(&db, AlertSpec::plain(&a2, "a2")).await;
+            insert_alert(&db, AlertSpec::plain(&p1, "p1")).await;
+
+            let params = ListAlertsParams::new(ORG).without_alert_ids(vec![a2.clone()]);
+            let mut kept = ids_of(&db, params).await;
+            kept.sort();
+            let mut expected = vec![a1.clone(), p1.clone()];
+            expected.sort();
+            assert_eq!(kept, expected);
+
+            let params = ListAlertsParams::new(ORG)
+                .with_tag_alert_ids(vec![a2.clone(), p1.clone()])
+                .without_alert_ids(vec![a2]);
+            assert_eq!(ids_of(&db, params).await, vec![p1]);
+        }
+
         /// An empty resolved tag set means "no alert carries these tags" and
         /// must still match nothing once a SLO filter is also present.
         #[tokio::test]
@@ -2377,6 +2426,40 @@ pub(super) mod tests {
             params.slo_id = Some(SLO_A.to_string());
 
             assert_eq!(ids_of(&db, params).await, vec![a1]);
+        }
+
+        #[tokio::test]
+        async fn names_by_oncall_team_match_only_that_team_in_that_org() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_OTHER_ORG_PK, OTHER_ORG, "default").await;
+            for (label, org, folder_pk, team, enabled) in [
+                ("zeta", ORG, FOLDER_A_PK, Some("team-a"), false),
+                ("beta", ORG, FOLDER_A_PK, Some("team-a"), true),
+                ("other-team", ORG, FOLDER_A_PK, Some("team-b"), true),
+                ("unset", ORG, FOLDER_A_PK, None, true),
+                (
+                    "other-org",
+                    OTHER_ORG,
+                    FOLDER_OTHER_ORG_PK,
+                    Some("team-a"),
+                    true,
+                ),
+            ] {
+                let mut model = make_model(&alert_id());
+                model.org = org.to_string();
+                model.folder_id = folder_pk.to_string();
+                model.name = label.to_string();
+                model.enabled = enabled;
+                model.oncall_team = team.map(str::to_string);
+                alerts::Entity::insert(alerts::ActiveModel::from(model))
+                    .exec(&db)
+                    .await
+                    .unwrap_or_else(|e| panic!("seed alert {label}: {e}"));
+            }
+
+            let names = list_names_by_oncall_team(&db, ORG, "team-a").await.unwrap();
+
+            assert_eq!(names, vec!["beta".to_string(), "zeta".to_string()]);
         }
     }
     #[test]

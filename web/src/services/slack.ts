@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 import type {
   InstallationView,
   LinkingView,
@@ -82,7 +83,12 @@ const slack = {
     http().post<SlackInstallStartResponse>(`${base(org)}/install/start`, body, options),
 
   installExchange: (org: string, body: SlackInstallExchangeRequest) =>
-    http().post<SlackInstallExchangeResponse>(`${base(org)}/install/exchange`, body),
+    http()
+      .post<SlackInstallExchangeResponse>(`${base(org)}/install/exchange`, body)
+      .then((res) => {
+        analytics.track("slack_app_installed");
+        return res;
+      }),
 
   getPrerequisites: (org: string, options?: SlackRequestOptions) =>
     http().get<SlackPrerequisitesResponse>(`${base(org)}/prerequisites`, options),
@@ -94,7 +100,15 @@ const slack = {
     http().get<SlackServerManifest>(`${base(org)}/manifest`, { params }),
 
   createInstallation: (org: string, body: SlackCreateInstallationRequest) =>
-    http().post<SlackCreateInstallationResponse>(`${base(org)}/installations`, body),
+    http()
+      .post<SlackCreateInstallationResponse>(`${base(org)}/installations`, body)
+      .then((res) => {
+        analytics.track("slack_installation_created", {
+          mode: body.mode,
+          setup: "config_refresh_token" in body ? "token" : "manual",
+        });
+        return res;
+      }),
 
   getInstallUrl: (org: string, id: string) =>
     http().post<SlackInstallUrlResponse>(`${installation(org, id)}/install-url`),
@@ -106,16 +120,31 @@ const slack = {
     http().get<SlackInstallationsResponse>(`${base(org)}/installations`, options),
 
   testInstallation: (org: string, id: string, body: SlackTestRequest) =>
-    http().post<SlackTestResponse>(`${installation(org, id)}/test`, body),
+    http()
+      .post<SlackTestResponse>(`${installation(org, id)}/test`, body)
+      .then((res) => {
+        analytics.track("slack_installation_tested", { with_channel: !!body.channel_id });
+        return res;
+      }),
 
   getLinking: (org: string, id: string) =>
     http().get<LinkingView>(`${installation(org, id)}/linking`),
 
   updateLinking: (org: string, id: string, body: SlackLinkingUpdateRequest) =>
-    http().put<LinkingView>(`${installation(org, id)}/linking`, body),
+    http()
+      .put<LinkingView>(`${installation(org, id)}/linking`, body)
+      .then((res) => {
+        analytics.track("slack_linking_updated", { enabled: body.enabled });
+        return res;
+      }),
 
   linkAll: (org: string, id: string) =>
-    http().post<SlackLinkAllResult>(`${installation(org, id)}/link-all`),
+    http()
+      .post<SlackLinkAllResult>(`${installation(org, id)}/link-all`)
+      .then((res) => {
+        analytics.track("slack_users_bulk_linked", { count: res.data?.linked ?? 0 });
+        return res;
+      }),
 
   startConnection: (org: string, id: string, body: SlackConnectionStartRequest) =>
     http().post<SlackConnectionStartResponse>(`${installation(org, id)}/connection/start`, body),
@@ -128,13 +157,28 @@ const slack = {
     ),
 
   connectInstallation: (org: string, id: string, body: SlackConnectRequest) =>
-    http().post<SlackConnectResponse>(`${installation(org, id)}/connection`, body),
+    http()
+      .post<SlackConnectResponse>(`${installation(org, id)}/connection`, body)
+      .then((res) => {
+        analytics.track("slack_installation_connected");
+        return res;
+      }),
 
   disconnectInstallation: (org: string, id: string) =>
-    http().delete<SlackDisconnectResponse>(`${installation(org, id)}/connection`),
+    http()
+      .delete<SlackDisconnectResponse>(`${installation(org, id)}/connection`)
+      .then((res) => {
+        analytics.track("slack_installation_disconnected");
+        return res;
+      }),
 
   uninstallInstallation: (org: string, id: string) =>
-    http().delete<SlackUninstallResponse>(installation(org, id)),
+    http()
+      .delete<SlackUninstallResponse>(installation(org, id))
+      .then((res) => {
+        analytics.track("slack_app_uninstalled");
+        return res;
+      }),
 
   listChannels: (org: string, id: string, params: SlackChannelsParams = {}) =>
     http().get<SlackChannelsResponse>(`${installation(org, id)}/channels`, {
@@ -151,16 +195,24 @@ const slack = {
     body: SlackChannelDefaultRequest,
   ) =>
     // The drawer shows the 403, which names the org whose admin may change the row.
-    http().put<SlackChannelDefaultRow>(
-      `${installation(org, id)}/channel-defaults/${encodeURIComponent(channelId)}`,
-      body,
-      RENDERS_FORBIDDEN,
-    ),
+    http()
+      .put<SlackChannelDefaultRow>(
+        `${installation(org, id)}/channel-defaults/${encodeURIComponent(channelId)}`,
+        body,
+        RENDERS_FORBIDDEN,
+      )
+      .then((res) => {
+        analytics.track("slack_channel_default_saved");
+        return res;
+      }),
 
   deleteChannelDefault: (org: string, id: string, channelId: string) =>
-    http().delete<void>(
-      `${installation(org, id)}/channel-defaults/${encodeURIComponent(channelId)}`,
-    ),
+    http()
+      .delete<void>(`${installation(org, id)}/channel-defaults/${encodeURIComponent(channelId)}`)
+      .then((res) => {
+        analytics.track("slack_channel_default_deleted");
+        return res;
+      }),
 
   listOncallUnlinked: (org: string, id: string) =>
     http().get<SlackOncallUnlinkedResponse>(`${installation(org, id)}/oncall-unlinked`, {
@@ -168,7 +220,12 @@ const slack = {
     }),
 
   remindOncallUnlinked: (org: string, id: string) =>
-    http().post<SlackOncallRemindResponse>(`${installation(org, id)}/oncall-unlinked/remind`),
+    http()
+      .post<SlackOncallRemindResponse>(`${installation(org, id)}/oncall-unlinked/remind`)
+      .then((res) => {
+        analytics.track("slack_oncall_reminder_sent", { count: res.data?.sent ?? 0 });
+        return res;
+      }),
 
   getHelpContact: (org: string, id: string) =>
     http().get<SlackHelpContact>(`${installation(org, id)}/help-contact`),
@@ -180,7 +237,12 @@ const slack = {
     http().get<SlackOrgAccessView>(`${installation(org, id)}/org-access`),
 
   putOrgAccess: (org: string, id: string, body: SlackOrgAccessRequest) =>
-    http().put<SlackOrgAccessView>(`${installation(org, id)}/org-access`, body),
+    http()
+      .put<SlackOrgAccessView>(`${installation(org, id)}/org-access`, body)
+      .then((res) => {
+        analytics.track("slack_org_access_updated");
+        return res;
+      }),
 
   previewOrgAccess: (org: string, id: string, body: SlackOrgAccessRequest) =>
     http().put<SlackOrgAccessView>(`${installation(org, id)}/org-access`, {
@@ -196,11 +258,16 @@ const slack = {
     ),
 
   confirmLinkRequest: (org: string, body: SlackOidcCallbackRequest) =>
-    http().post<SlackLinkRequestConfirmResponse>(
-      `${base(org)}/link-requests/confirm`,
-      body,
-      RENDERS_FORBIDDEN,
-    ),
+    http()
+      .post<SlackLinkRequestConfirmResponse>(
+        `${base(org)}/link-requests/confirm`,
+        body,
+        RENDERS_FORBIDDEN,
+      )
+      .then((res) => {
+        analytics.track("slack_user_linked");
+        return res;
+      }),
 
   resendLinkRequest: (org: string, requestId: string, body: SlackSignedRequest) =>
     http().post<void>(
@@ -212,7 +279,12 @@ const slack = {
   getMyLinks: (org: string) => http().get<SlackMyLinksResponse>(`${base(org)}/links/me`),
 
   deleteLink: (org: string, linkId: string) =>
-    http().delete<void>(`${base(org)}/links/${encodeURIComponent(linkId)}`),
+    http()
+      .delete<void>(`${base(org)}/links/${encodeURIComponent(linkId)}`)
+      .then((res) => {
+        analytics.track("slack_user_unlinked");
+        return res;
+      }),
 
   listLinks: (org: string, params: SlackLinksParams = {}) =>
     http().get<SlackLinksResponse>(`${base(org)}/links`, { params: definedParams(params) }),

@@ -1627,12 +1627,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div class="mb-1 text-left">
           {{ t("search.noOfRecords") }}:
-          <OIcon name="info-outline" size="sm" class="ms-1 cursor-pointer" />
-          <OTooltip side="right" align="center" max-width="18.75rem">
-            <template #content>
-              <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
-            </template>
-          </OTooltip>
+          <OButton
+            variant="ghost"
+            size="icon-chip"
+            icon-left="info-outline"
+            class="ms-1 align-middle"
+            :aria-label="t('search.noOfRecordsTooltip')"
+            data-test="search-scheduler-records-info"
+          >
+            <OTooltip side="right" align="center" max-width="18.75rem">
+              <template #content>
+                <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
+              </template>
+            </OTooltip>
+          </OButton>
         </div>
         <OInput
           type="number"
@@ -1809,6 +1817,7 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
+import { applyDownloadRange, downloadRangeWindow, sqlLimitOf } from "@/utils/logs/downloadRange";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
@@ -2030,9 +2039,15 @@ export default defineComponent({
         });
         return;
       }
-      // const queryReq = this.buildSearch();
-      this.searchObj.data.customDownloadQueryObj.query.from = initNumber == 0 ? 0 : initNumber - 1;
-      this.searchObj.data.customDownloadQueryObj.query.size = this.downloadCustomRange;
+      const downloadQuery = this.searchObj.data.customDownloadQueryObj.query;
+      const plainSql =
+        this.searchObj.data.customDownloadQueryObj.encoding === "base64"
+          ? b64DecodeUnicode(downloadQuery.sql)
+          : downloadQuery.sql;
+      const sqlLimit = sqlLimitOf(this.fnParsedSQL(plainSql));
+      const rangeWindow = downloadRangeWindow(initNumber, this.downloadCustomRange, sqlLimit);
+      downloadQuery.from = rangeWindow.from;
+      downloadQuery.size = rangeWindow.size;
       searchService
         .search(
           {
@@ -2044,8 +2059,14 @@ export default defineComponent({
         )
         .then((res) => {
           this.customDownloadDialog = false;
-          if (res.data.hits.length > 0) {
-            this.downloadLogs(res.data.hits, this.downloadCustomFileType);
+          const hits = applyDownloadRange(
+            res.data.hits,
+            initNumber,
+            this.downloadCustomRange,
+            sqlLimit,
+          );
+          if (hits.length > 0) {
+            this.downloadLogs(hits, this.downloadCustomFileType);
           } else {
             toast({
               message: this.t("logs.searchBar.noDataToDownload"),

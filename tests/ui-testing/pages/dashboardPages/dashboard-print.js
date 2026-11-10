@@ -2,6 +2,7 @@
 const { expect } = require("@playwright/test");
 const { gotoWithRetry } = require("../../playwright-tests/utils/navigation.js");
 const { getOrgIdentifier } = require("../../playwright-tests/utils/cloud-auth.js");
+const { SELECTORS, clickDashboardMenuItem } = require("./dashboard-selectors.js");
 
 export default class DashboardPrintPage {
   constructor(page) {
@@ -35,8 +36,10 @@ export default class DashboardPrintPage {
   }
 
   async clickPrintButton() {
-    await this.printBtn.waitFor({ state: "visible", timeout: 30000 });
-    await this.printBtn.click();
+    await this.page
+      .locator(SELECTORS.MORE_OPTIONS_BTN)
+      .waitFor({ state: "visible", timeout: 30000 });
+    await clickDashboardMenuItem(this.page, '[data-test="dashboard-print-menu-item"]');
   }
 
   // Wait for the first panel to mount (grid is laid out with a real width).
@@ -117,7 +120,8 @@ export default class DashboardPrintPage {
   }
 
   async exitPrintMode() {
-    await this.clickPrintButton();
+    await this.printBtn.waitFor({ state: "visible", timeout: 30000 });
+    await this.printBtn.click();
     await this.waitForPrintModeCleared();
   }
 

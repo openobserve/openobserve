@@ -227,6 +227,7 @@ import {
   orgDomainsQuery,
   updateOrgSettingsMutation,
 } from "@/services/organizations.queries";
+import analytics from "@/services/product_analytics";
 import OrgDomainMappingDialog from "./OrgDomainMappingDialog.vue";
 import { createSaveQueue } from "./saveQueue";
 
@@ -410,6 +411,7 @@ function onEmptyAction(id?: string) {
 async function saveMappings(next: OrgDomainMapping[], successMessage: I18nText): Promise<boolean> {
   try {
     await updateSettings.mutateAsync({ domain_org_mappings: next });
+    analytics.track("org_domain_mappings_saved", { count: next.length });
   } catch (err) {
     toast({
       variant: "error",
@@ -473,6 +475,7 @@ async function setEnforce(value: boolean) {
   savingEnforce.value = true;
   try {
     await updateSettings.mutateAsync({ enforce_allowed_orgs_only: value });
+    analytics.track("org_domain_enforcement_updated", { enabled: value });
     toast({ variant: "success", message: t("settings.orgDomainMapping.enforceSaved") });
   } catch (err) {
     toast({

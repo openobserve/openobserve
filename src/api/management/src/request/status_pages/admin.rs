@@ -591,7 +591,7 @@ pub async fn mark_false_positive(
         ("nid" = String, Path, description = "Notice id"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),

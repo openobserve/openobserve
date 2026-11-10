@@ -343,6 +343,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -626,6 +627,7 @@ export default defineComponent({
           jobId: toBeCancelled.value.id,
         })
         .then(() => {
+          analytics.track("search_job_cancelled");
           toast({
             variant: "success",
             message: t("search_scheduler_job.job_cancelled_success"),
@@ -650,6 +652,7 @@ export default defineComponent({
           jobId: row.id,
         })
         .then(() => {
+          analytics.track("search_job_retried");
           toast({
             variant: "success",
             message: t("search_scheduler_job.job_restarted_success"),
@@ -682,6 +685,7 @@ export default defineComponent({
           jobId: toBeDeletedJob.value.id,
         })
         .then(() => {
+          analytics.track("search_job_deleted");
           fetchSearchHistory();
           toast({
             variant: "success",
@@ -899,6 +903,7 @@ export default defineComponent({
     };
 
     const fetchSearchResults = (row) => {
+      analytics.track("search_job_results_opened", { stream_type: row.stream_type ?? "logs" });
       searchObj.meta.jobId = row.id;
       goToLogs(row);
     };
