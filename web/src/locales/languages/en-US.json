@@ -30849,6 +30849,7 @@
       "showNew": "Show",
       "more": "Showing the {count} newest",
       "seeAll": "See all incidents",
+      "seeAllIssues": "See all issues",
       "failedDetail": {
         "status": "The request failed with status {status} at {time}.",
         "noResponse": "The request got no response at {time}."

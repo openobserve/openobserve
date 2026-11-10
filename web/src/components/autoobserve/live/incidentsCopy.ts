@@ -374,6 +374,7 @@ export const pagedCopy = (t: TranslateFn) => ({
   viewAnalysis: t("autoobserveLive.incidents.viewAnalysis"),
   showNew: t("autoobserveLive.incidents.showNew"),
   seeAll: t("autoobserveLive.incidents.seeAll"),
+  seeAllIssues: t("autoobserveLive.incidents.seeAllIssues"),
   emptyTitle: t("autoobserveLive.incidents.empty.title"),
   emptyDesc: t("autoobserveLive.incidents.empty.desc"),
   offTitle: t("autoobserveLive.incidents.emptyOff.title"),

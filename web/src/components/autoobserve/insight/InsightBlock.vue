@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <OTag
           :variant="parts.chip.variant"
-          size="xs"
+          size="sm"
           :label="parts.chip.label"
           :data-test="`insight-block-${parts.id}-chip`"
         />
@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="parts.cta?.locked"
         variant="meta"
         as="p"
+        wrap
         class="flex items-start gap-1"
         :data-test="`insight-block-${parts.id}-locked`"
       >
@@ -118,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="parts.note"
         variant="meta"
         as="p"
+        wrap
         :data-test="`insight-block-${parts.id}-note`"
       >
         {{ parts.note }}
@@ -156,14 +158,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="fact in parts.facts"
           :key="fact.label"
           :variant="fact.variant"
-          size="xs"
+          size="sm"
           :label="fact.label"
         />
         <OText v-if="parts.meta" variant="meta" as="span">{{ parts.meta }}</OText>
       </div>
       <div v-if="hasActions" class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <OButton
-          v-if="!card && parts.cta"
+          v-if="!card && parts.cta && !hideCta"
           variant="primary"
           size="sm"
           :icon-left="parts.cta.locked ? 'lock' : undefined"
@@ -249,8 +251,10 @@ const props = withDefaults(
     pending?: boolean;
     /** Details inside a panel that already pads its content. */
     flush?: boolean;
+    /** Details under a table row that already carries the CTA, so it isn't offered twice. */
+    hideCta?: boolean;
   }>(),
-  { variant: "card", pending: false, flush: false },
+  { variant: "card", pending: false, flush: false, hideCta: false },
 );
 
 const emit = defineEmits<{

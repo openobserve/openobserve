@@ -849,9 +849,12 @@ export const pagedFindingCopy = (
   zone: InsightZone,
   item: AutoObserveIncidentItem,
   nowMs: number,
+  routingSet = false,
 ): PagedFindingCopy => {
   const kind = pagedKindOf(item.finding.kind);
-  const page = pageLine(t, item);
+  const line = pageLine(t, item);
+  // Once the org has a default team the next stop is routed, so the card stops asking for setup.
+  const page = line && routingSet ? { ...line, routing: false } : line;
   const { stream_name, stream_type, first_seen_at } = item.finding;
   if (!kind || !stream_name || !stream_type) return { headline: null, page, why: null, next: null };
   const time = formatWhen(first_seen_at / 1000, zone.locale, zone.timeZone, nowMs);

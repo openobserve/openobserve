@@ -81,30 +81,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @pagination-change="(p) => (page = p.page)"
       >
         <template #cell-headline="{ row }">
-          <span class="text-text-heading text-pretty">{{ row.headline }}</span>
-          <span
-            v-if="row.note"
-            class="text-text-secondary mt-0.5 block text-xs leading-snug text-pretty"
-            :data-test="`autoobserve2-suggestions-note-${row.id}`"
-            >{{ row.note }}</span
-          >
+          <div class="py-1.5">
+            <span class="text-text-heading block text-pretty">{{ row.headline }}</span>
+            <span
+              v-if="row.note"
+              class="text-text-secondary mt-0.5 block text-xs leading-snug text-pretty"
+              :data-test="`autoobserve2-suggestions-note-${row.id}`"
+              >{{ row.note }}</span
+            >
+          </div>
         </template>
         <template #cell-kind="{ row }">
           <OTag
             :variant="row.kindVariant"
-            size="xs"
+            size="sm"
             :label="row.kind"
             :data-test="`autoobserve2-suggestions-kind-${row.id}`"
           />
-        </template>
-        <template #cell-severity="{ row }">
-          <OTag
-            v-if="row.severity"
-            :variant="row.severity.variant"
-            size="xs"
-            :label="row.severity.label"
-          />
-          <span v-else class="text-text-muted">—</span>
         </template>
         <template #cell-next="{ row }">
           <OButton
@@ -126,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <InsightBlock
               :parts="row.insight"
               variant="details"
+              hide-cta
               :pending="pendingId === row.id"
               @cta="(cta) => run(row.id, cta)"
               @secondary="(cta) => run(row.id, cta)"
@@ -283,7 +277,6 @@ const columns = computed<OTableColumnDef<SuggestionRow>[]>(() => [
     size: 150,
   },
   { id: "kind", header: t("autoobserveLive.suggestions.columns.kind"), size: 150 },
-  { id: "severity", header: t("autoobserveLive.suggestions.columns.severity"), size: 100 },
   { id: "next", header: t("insight.labels.nextStep"), size: 190 },
 ]);
 </script>

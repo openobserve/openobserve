@@ -29,6 +29,7 @@ import { b64DecodeUnicode } from "@/utils/zincutils";
 import { ASK_AI_KEY, type InsightAskPayload } from "../insight/insightCta";
 import { analysisLink, incidentLink } from "./incidentsCopy";
 import LivePaged from "./LivePaged.vue";
+import oncall from "@/services/oncall";
 
 const routeQuery: Record<string, string> = { live: "1" };
 const push = vi.fn();
@@ -36,6 +37,10 @@ vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRoute: () => ({ query: routeQuery }),
   useRouter: () => ({ push }),
+}));
+
+vi.mock("@/services/oncall", () => ({
+  default: { getRoutingConfig: vi.fn(() => Promise.resolve({ data: { default_team_id: null } })) },
 }));
 
 vi.mock("@/services/autoobserve", () => ({
@@ -173,10 +178,10 @@ describe("LivePaged (D9-web)", () => {
     await flushPromises();
     expect(rows(many)).toHaveLength(3);
     expect(many.find(sel("more")).text()).toBe("Showing the 3 newest");
+    expect(many.find(sel("see-all")).text()).toBe("See all issues");
     await many.find(sel("see-all")).trigger("click");
     expect(push).toHaveBeenCalledWith({
-      name: "incidentList",
-      query: { org_identifier: "demo-org" },
+      query: expect.objectContaining({ org_identifier: "demo-org", page: "issues" }),
     });
   });
 
@@ -586,6 +591,19 @@ describe("LivePaged (D9-web)", () => {
         "Findings that opened an incident, who was paged, and its analysis.",
       );
       expect(w.text()).not.toContain("for your on-call team");
+    });
+
+    it("an unrouted card stops offering routing setup once the org has a default team", async () => {
+      vi.mocked(oncall.getRoutingConfig).mockResolvedValueOnce({
+        data: { default_team_id: "t-default" },
+      } as never);
+      api.mockResolvedValueOnce(page([withPage(1, "unrouted", null)]));
+      const w = mountCard({ cap: 10 });
+      await flushPromises();
+      await flushPromises();
+      expect(rows(w)[0].find(sel("page")).text()).toContain("Nobody was paged");
+      expect(rows(w)[0].find(sel("routing")).exists()).toBe(false);
+      expect(rows(w)[0].text()).not.toContain("Set up on-call routing");
     });
 
     it("each outcome draws its own line, pending included", async () => {
