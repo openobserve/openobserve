@@ -14,20 +14,40 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, ref } from "vue";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { errorMessage, httpStatus } from "@/services/alert_calibration";
-import { requestAlertCalibrationRunMutation } from "@/services/alert_calibration.queries";
+import {
+  alertCalibrationConfigQuery,
+  requestAlertCalibrationRunMutation,
+} from "@/services/alert_calibration.queries";
 
-// A refused run stays refused for the session; the server has no read that says so up front.
+// A refused run or save stays refused for the session, also on a server whose config read does not say so up front.
 const deniedOrgs = ref<ReadonlySet<string>>(new Set());
+const configDeniedOrgs = ref<ReadonlySet<string>>(new Set());
 
 /** Tests only: the memory outlives a component. */
 export const resetRunDenials = (): void => {
   deniedOrgs.value = new Set();
+  configDeniedOrgs.value = new Set();
 };
+
+export const markConfigDenied = (org: string): void => {
+  configDeniedOrgs.value = new Set([...configDeniedOrgs.value, org]);
+};
+
+/** What this reader may do here, from the config read and from any refusal this session. */
+export function useAlertCalibrationRights() {
+  const orgId = useOrgId();
+  const configRead = useQuery(() => alertCalibrationConfigQuery(orgId.value));
+  const canRun = computed(() => configRead.data.value?.can_run !== false);
+  const canEdit = computed(
+    () => configRead.data.value?.can_edit !== false && !configDeniedOrgs.value.has(orgId.value),
+  );
+  return { canRun, canEdit };
+}
 
 /** A run lands in the digest stream later, so a request only says it was queued. */
 export function useRequestAlertCalibrationRun() {

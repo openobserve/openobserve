@@ -74,6 +74,17 @@ describe("AlertCalibrationActions", () => {
     configure.unmount();
   });
 
+  it("a_reader_the_server_says_may_not_run_is_not_offered_run_now_but_can_open_the_settings", async () => {
+    const readOnly = { enabled: true, can_edit: false, can_run: false } as AlertCalibrationConfig;
+    vi.mocked(alertCalibration.getConfig).mockResolvedValue({ data: readOnly } as never);
+    const run = await mountPart("run", readOnly);
+    const configure = await mountPart("configure", readOnly);
+    expect(run.find('[data-test="alert-calibration-run-now"]').exists()).toBe(false);
+    expect(configure.find('[data-test="alert-calibration-configure"]').exists()).toBe(true);
+    run.unmount();
+    configure.unmount();
+  });
+
   it("a_refused_run_says_what_is_missing_once_and_then_stays_off", async () => {
     vi.mocked(alertCalibration.requestRun).mockRejectedValue(forbidden());
     const wrapper = await mountPart("run", config);

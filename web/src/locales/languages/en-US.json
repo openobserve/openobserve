@@ -11920,6 +11920,8 @@
       "savedCadence": "Saved. The new cadence applies from the next run, and a shorter one can bring that run forward.",
       "saveFailed": "The settings could not be saved: {message}",
       "lastSaved": "Last saved {time}",
+      "readOnly": "You can view these settings. Ask an admin for edit access to Alert calibration to change them.",
+      "saveDenied": "You don't have permission to change Alert calibration settings. Ask an admin for edit access to it.",
       "runNowHeading": "Run now",
       "findingsKept": "Findings are kept with this organization's own records for its retention period. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",

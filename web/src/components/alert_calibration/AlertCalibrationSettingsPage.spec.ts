@@ -19,6 +19,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
 import alertCalibration from "@/services/alert_calibration";
+import { resetRunDenials } from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
 import AlertCalibrationSettings from "./AlertCalibrationSettings.vue";
 
 vi.mock("@/aws-exports", async (importOriginal) => {
@@ -76,6 +77,7 @@ const mountSettings = async () => {
 describe("AlertCalibrationSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetRunDenials();
     queryClient.clear();
     queryClient.setQueryDefaults(["org"], { retry: false });
     store.state.zoConfig = {
@@ -123,6 +125,52 @@ describe("AlertCalibrationSettings", () => {
       message: "The settings could not be saved: window_minutes must be at least 60",
       variant: "error",
     });
+    wrapper.unmount();
+  });
+  const stored = {
+    id: "c1",
+    org: "default",
+    enabled: true,
+    frequency_minutes: 1440,
+    window_minutes: 43_200,
+    created_at: 1,
+    updated_at: 1,
+  };
+
+  it("a_reader_who_may_not_edit_sees_the_settings_read_only_with_no_save_or_run", async () => {
+    vi.mocked(alertCalibration.getConfig).mockResolvedValue({
+      data: { ...stored, can_edit: false, can_run: false },
+    } as never);
+    const wrapper = await mountSettings();
+    expect(
+      wrapper.find('[data-test="alert-calibration-settings-enabled-btn"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(wrapper.find('[data-test="alert-calibration-settings-save"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-calibration-settings-discard"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-calibration-settings-run"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-calibration-settings-read-only"]').text()).toBe(
+      "You can view these settings. Ask an admin for edit access to Alert calibration to change them.",
+    );
+    wrapper.unmount();
+  });
+
+  it("a_save_refused_for_rights_turns_the_form_read_only_and_says_what_is_missing", async () => {
+    vi.mocked(alertCalibration.getConfig).mockResolvedValue({ data: stored } as never);
+    vi.mocked(alertCalibration.updateConfig).mockRejectedValue(
+      serverError(403, { code: 403, message: "Unauthorized Access" }),
+    );
+    const wrapper = await mountSettings();
+    await wrapper.find('[data-test="alert-calibration-settings-enabled-btn"]').trigger("click");
+    await wrapper.find('[data-test="alert-calibration-settings-save"]').trigger("click");
+    await vi.waitFor(() => expect(mockToast).toHaveBeenCalled());
+    await flushPromises();
+    expect(mockToast).toHaveBeenCalledWith({
+      message:
+        "You don't have permission to change Alert calibration settings. Ask an admin for edit access to it.",
+      variant: "error",
+    });
+    expect(wrapper.find('[data-test="alert-calibration-settings-save"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-calibration-settings-read-only"]').exists()).toBe(true);
     wrapper.unmount();
   });
 });

@@ -32,6 +32,10 @@ export interface AlertCalibrationConfig {
   window_minutes: number;
   created_at: number;
   updated_at: number;
+  /** Whether the caller may change this config; a server that does not say leaves it out, so only `false` limits the page. */
+  can_edit?: boolean;
+  /** Whether the caller may request a run; only `false` limits the page. */
+  can_run?: boolean;
 }
 
 /** A partial update: an absent field keeps its stored value, and the server refuses any other key. */
