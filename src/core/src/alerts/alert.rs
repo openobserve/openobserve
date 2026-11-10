@@ -1690,6 +1690,21 @@ pub(crate) fn is_alert_permitted(folder: &Folder, alert: &Alert, permissions: &[
         })
 }
 
+/// Folder ids out of `afolder:` grants; `None` when one of them is the org-wide grant.
+#[cfg(any(feature = "enterprise", test))]
+fn listable_folder_ids(org_id: &str, objects: &[String]) -> Option<Vec<String>> {
+    if objects.contains(&format!("afolder:_all_{org_id}")) {
+        return None;
+    }
+    Some(
+        objects
+            .iter()
+            .filter_map(|object| object.strip_prefix("afolder:"))
+            .map(str::to_string)
+            .collect(),
+    )
+}
+
 /// Deletes an alert by its KSUID primary key, unconditionally.
 ///
 /// `pub(crate)` since S-16 PR 4, and that is the enforcement rather than a
@@ -4766,6 +4781,22 @@ pub(super) fn to_float(val: &Value) -> f64 {
         val.as_str().unwrap_or_default().parse().unwrap_or_default()
     }
 }
+
+/// Alert folders the user may list, whatever `list_only_permitted` says; `None` is every folder.
+#[cfg(feature = "enterprise")]
+pub async fn listable_alert_folders(
+    org_id: &str,
+    user_id: &str,
+) -> Result<Option<Vec<String>>, AlertError> {
+    let folder_type = o2_openfga::meta::mapping::OFGA_MODELS
+        .get("alert_folders")
+        .map_or("afolder", |model| model.key);
+    let objects = db::authz::list_permitted_objects(org_id, user_id, "LIST", folder_type)
+        .await
+        .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
+    Ok(objects.and_then(|objects| listable_folder_ids(org_id, &objects)))
+}
+
 #[cfg(not(feature = "enterprise"))]
 pub async fn permitted_alerts(
     _org_id: &str,
@@ -5613,6 +5644,34 @@ mod send_path_tests {
                 "{outcome:?} notifies, so its destinations must be skipped"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod folder_grant_tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|v| v.to_string()).collect()
+    }
+
+    #[test]
+    fn test_listable_folders_are_the_granted_folder_ids() {
+        let listable = listable_folder_ids("o", &strings(&["afolder:a", "afolder:b"]));
+        assert_eq!(listable, Some(strings(&["a", "b"])));
+    }
+
+    #[test]
+    fn test_org_wide_list_grant_leaves_folders_unrestricted() {
+        let listable = listable_folder_ids("o", &strings(&["afolder:a", "afolder:_all_o"]));
+        assert_eq!(listable, None);
+    }
+
+    #[test]
+    fn test_no_list_grant_lists_no_folder() {
+        assert_eq!(listable_folder_ids("o", &[]), Some(vec![]));
+        let other_org = listable_folder_ids("o", &strings(&["afolder:_all_other"]));
+        assert_eq!(other_org, Some(strings(&["_all_other"])));
     }
 }
 
