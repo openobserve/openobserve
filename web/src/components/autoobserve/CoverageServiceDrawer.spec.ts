@@ -148,6 +148,39 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
 });
 
 describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)", () => {
+  it("shows no 'Last fired' for an alert that has only been evaluated, never fired (T2-N2)", async () => {
+    api.listAlerts.mockResolvedValue({
+      data: {
+        list: [
+          {
+            alert_id: "checkout-errors-id",
+            folder_id: "default",
+            destinations: [],
+            last_triggered_at: (Date.now() - 3 * 60_000) * 1000,
+            last_satisfied_at: null,
+          },
+        ],
+      },
+    });
+    try {
+      const row = liveRow({
+        errors: cell("none"),
+        latency: cell("none"),
+        absence: cell("covered", "checkout-errors"),
+      });
+      const wrapper = mountDrawer(row, "watched", true, "absence");
+      await flushPromises();
+      const detail = wrapper
+        .findAllComponents({ name: "CoverageSignalDetail" })
+        .find((c) => c.props("signal") === "absence");
+      expect(detail?.props("lastFired")).toBeNull();
+      expect(detail?.find('[data-test="autoobserve-coverage-detail-last-fired"]').exists()).toBe(
+        false,
+      );
+    } finally {
+      api.listAlerts.mockReset();
+    }
+  });
   it("reads it from the service's own alerts instead of 'Not available'", async () => {
     api.listAlerts.mockResolvedValue({
       data: {
@@ -156,7 +189,8 @@ describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)
             alert_id: "checkout-errors-id",
             folder_id: "default",
             destinations: [],
-            last_triggered_at: (Date.now() - 2 * 60 * 60_000) * 1000,
+            last_triggered_at: (Date.now() - 60_000) * 1000,
+            last_satisfied_at: (Date.now() - 2 * 60 * 60_000) * 1000,
           },
         ],
       },

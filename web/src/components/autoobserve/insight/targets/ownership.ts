@@ -27,6 +27,8 @@ export interface OwnedAlert {
   destinations?: string[] | null;
   /** Microseconds; null or 0 when it has never fired. */
   last_triggered_at?: number | null;
+  /** When the alert's condition last matched (microseconds); null until it first fires. */
+  last_satisfied_at?: number | null;
   /** The alert's query, period in minutes and stream type, for drawing where it fires on a chart. */
   sql?: string | null;
   period?: number | null;
@@ -119,6 +121,7 @@ const ownedOf = (alert: any): OwnedAlert => {
     folder_name: typeof folder === "string" ? folder : (folder?.name ?? null),
     destinations: Array.isArray(alert?.destinations) ? alert.destinations : [],
     last_triggered_at: Number(alert?.last_triggered_at) || null,
+    last_satisfied_at: Number(alert?.last_satisfied_at) || null,
     sql: alert?.condition?.sql ?? alert?.query_condition?.sql ?? null,
     period: Number(alert?.trigger_condition?.period) || null,
     streamType: alert?.stream_type ?? null,

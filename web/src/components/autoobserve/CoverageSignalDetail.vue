@@ -40,7 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </span>
       </ODescriptionItem>
-      <ODescriptionItem v-if="cell.detector" stacked :label="t('autoobserve.coverage.lastFired')">
+      <ODescriptionItem
+        v-if="cell.detector && lastFired"
+        stacked
+        :label="t('autoobserve.coverage.lastFired')"
+      >
         <span data-test="autoobserve-coverage-detail-last-fired">{{ lastFired }}</span>
       </ODescriptionItem>
       <ODescriptionItem v-if="cell.library" stacked :label="t('autoobserve.coverage.libraryEntry')">
@@ -182,7 +186,7 @@ const ledgerTag = (id: string) => {
 };
 
 const lastFired = computed(() => {
-  if (props.cell.engine) return props.lastFired ?? t("autoobserveLive.drawer.notAvailable");
+  if (props.cell.engine) return props.lastFired ?? null;
   if (props.cell.state !== "watched") return t("autoobserve.coverage.never");
   const n = seed(`${props.service}:${props.signal}:fired`) % 6;
   if (n === 0) return t("autoobserve.coverage.never");

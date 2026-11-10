@@ -30698,7 +30698,6 @@
     "drawer": {
       "moreChecks": "Other checks",
       "chartNoData": "Chart not available yet",
-      "notAvailable": "Not available",
       "monitors": "Alerts",
       "monitorLine": "{kind} · {state}",
       "noMonitor": "No alert matches"

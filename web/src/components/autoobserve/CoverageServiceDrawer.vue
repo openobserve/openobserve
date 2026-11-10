@@ -799,11 +799,10 @@ function cellAlerts(cell: CoverageCell): OwnedAlert[] {
   return owned.value.filter((a) => a.id && ids.has(a.id));
 }
 
+// last_triggered_at moves on every evaluation; last_satisfied_at moves only when the alert fires.
 const lastFiredOf = (cell: CoverageCell): I18nText | null => {
-  const mine = cellAlerts(cell);
-  if (!mine.length) return null;
-  const at = Math.max(0, ...mine.map((a) => a.last_triggered_at ?? 0));
-  if (!at) return t("autoobserve.coverage.never");
+  const at = Math.max(0, ...cellAlerts(cell).map((a) => a.last_satisfied_at ?? 0));
+  if (!at) return null;
   return agoText(t, locale.value, Math.max(0, Math.floor((Date.now() - at / 1000) / 60_000)));
 };
 const chartInsight = (signal: Signal, cell: CoverageCell) =>
