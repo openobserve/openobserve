@@ -399,7 +399,9 @@ export function grantedLedger(
 export async function joinGrantedLedger(sid: Sid, ctx: HistoryCtx): Promise<void> {
   const shown = ctx.session(sid);
   if (!shown?.org) return;
-  const joined = new Set(shown.ledger.map((entry) => entry.approvalId));
+  const joined = new Set(
+    shown.ledger.flatMap((entry) => (entry.approvalId ? [entry.approvalId] : [])),
+  );
   const since = grantedSince(shown.messages, joined);
   if (since === null) return;
   try {
