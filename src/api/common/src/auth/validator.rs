@@ -326,6 +326,11 @@ fn is_org_agnostic_path(path: &str) -> bool {
     matches!(segments.as_slice(), [_org, "password_complexity"])
 }
 
+/// GHSA-29xv-5rx7-5q7v: matching only the last segment let `/{org}/kv/organizations` skip the org.
+fn is_top_level_org_route(path_columns: &[&str]) -> bool {
+    matches!(path_columns, ["organizations"])
+}
+
 /// Compare a password under the lockout policy, recording the attempt.
 ///
 /// `compare` is whatever "this credential matches" means at the call site, and it runs only once
@@ -608,7 +613,7 @@ pub async fn validate_credentials(
         }
     }
 
-    let mut user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let mut user = if is_top_level_org_route(&path_columns) {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -841,7 +846,7 @@ pub async fn validate_credentials_ext(
         path_columns.pop();
     }
 
-    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let user = if is_top_level_org_route(&path_columns) {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -2461,6 +2466,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         exercise_empty_password_rejected(org_id).await;
         exercise_saltless_sso_user_refused(org_id).await;
         exercise_path_org_is_the_routed_org().await;
+        exercise_object_named_organizations_stays_in_its_org(org_id).await;
         exercise_user_path_refusal_is_a_role_refusal(org_id).await;
 
         let static_token = users::get_user(Some(org_id), init_user)
@@ -2591,6 +2597,46 @@ CN5lTowpVXP2OIiiNTGa75Fj
             !bad.unwrap().is_valid,
             "a bad password stays a failed login"
         );
+    }
+
+    async fn exercise_object_named_organizations_stays_in_its_org(victim_org: &str) {
+        let pwd = "Complexpass#123";
+        let attacker = "other-org-member@example.com";
+        let _ = organization::check_and_create_org_without_ofga("attacker_org").await;
+        seed_user_without_password_ext("attacker_org", attacker, UserRole::Admin, pwd, "atk-tok")
+            .await;
+        assert!(
+            validate_credentials(
+                attacker,
+                pwd,
+                "attacker_org/kv/organizations",
+                None,
+                &Method::GET,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
+            "a member must still reach its own org"
+        );
+        for (path, method) in [
+            ("kv/organizations", Method::GET),
+            ("kv/organizations", Method::POST),
+            ("alerts/templates/organizations", Method::GET),
+            ("functions/organizations", Method::PUT),
+            ("enrichment_tables/organizations", Method::POST),
+            ("streams/organizations", Method::DELETE),
+            ("organizations", Method::DELETE),
+        ] {
+            let path = format!("{victim_org}/{path}");
+            assert!(
+                !validate_credentials(attacker, pwd, &path, None, &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "GHSA-29xv-5rx7-5q7v: a non-member was accepted on {method} /{path}"
+            );
+        }
     }
 
     // Each URI is what the auth layer sees once axum has stripped its mount.
@@ -3228,16 +3274,17 @@ CN5lTowpVXP2OIiiNTGa75Fj
     }
 
     #[test]
-    fn test_validate_credentials_path_handling() {
-        // Test path handling in validate_credentials
-        let path_columns = ["api", "v1", "organizations"];
-        let last_segment = path_columns.last().unwrap_or(&"");
-        assert_eq!(*last_segment, "organizations");
-
-        // Test path with trailing slash
-        let path_with_slash = ["api", "v1", "logs", ""];
-        let last_segment_with_slash = path_with_slash.last().unwrap_or(&"");
-        assert_eq!(*last_segment_with_slash, "");
+    fn only_the_top_level_org_route_skips_the_path_org() {
+        assert!(is_top_level_org_route(&["organizations"]));
+        for path in [
+            &["acme", "kv", "organizations"][..],
+            &["acme", "alerts", "templates", "organizations"],
+            &["acme", "streams", "organizations"],
+            &["acme", "organizations"],
+            &["_meta", "organizations"],
+        ] {
+            assert!(!is_top_level_org_route(path), "{path:?}");
+        }
     }
 
     #[test]
