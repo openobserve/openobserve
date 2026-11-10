@@ -15,6 +15,8 @@
 
 //! The digests calibration passes write, read back through the module's own permission.
 
+use std::future::ready;
+
 use arrow_schema::Schema;
 use axum::{
     extract::{Path, Query},
@@ -37,13 +39,17 @@ use infra::errors::{Error as InfraError, ErrorCodes};
 use o2_enterprise::enterprise::{
     alert_calibration_service::{
         self,
+        applied::{SuggestedChange, change_of, remember_offer},
         dismissals::{SCOPE_ALERT, Target},
     },
-    autoobserve::alert_findings::{DigestRun, FAILURE_RULE, RUN_LOOKBACK_US},
+    autoobserve::{
+        alert_findings::{DigestRun, FAILURE_RULE, RUN_LOOKBACK_US},
+        marks::TableKvReader,
+    },
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::alerts::{
-    alert_calibration::sink::DIGEST_STREAM,
+    alert_calibration::{dismissals::DismissalKv, sink::DIGEST_STREAM},
     scheduler::{LastRun, last_run},
 };
 use serde::{Deserialize, Serialize};
@@ -59,7 +65,7 @@ use super::{
     },
 };
 use crate::{
-    request::alert_grants::{AlertVisibility, live_visibility},
+    request::alert_grants::{AlertVisibility, Probe, live_visibility},
     service::auth::UserEmail,
 };
 
@@ -557,6 +563,44 @@ pub(crate) async fn finding_target(
     finding_id: &str,
     now: i64,
 ) -> Result<Option<Target>, InfraError> {
+    Ok(finding_hit(org_id, finding_id, now)
+        .await?
+        .as_ref()
+        .and_then(target_of))
+}
+
+/// The finding's stored change as the alert read offers it to this reader, destination included.
+pub(crate) async fn finding_change(
+    org_id: &str,
+    user_id: &str,
+    finding_id: &str,
+    now: i64,
+) -> Result<Option<SuggestedChange>, InfraError> {
+    let Some(hit) = finding_hit(org_id, finding_id, now).await? else {
+        return Ok(None);
+    };
+    let Some(alert_id) = hit
+        .get("scope_key")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+    else {
+        return Ok(None);
+    };
+    let probe = Probe {
+        ids: vec![alert_id.clone()],
+        full: false,
+    };
+    let visibility = live_visibility(org_id, user_id, || ready(Ok(probe))).await?;
+    let mut rows = [hit];
+    offer_destination_suggestions(org_id, user_id, &visibility, &mut rows).await;
+    Ok(change_of(&rows[0]))
+}
+
+async fn finding_hit(
+    org_id: &str,
+    finding_id: &str,
+    now: i64,
+) -> Result<Option<Value>, InfraError> {
     let schema = alert_schema(org_id).await?;
     if !FINDING_COLUMNS
         .iter()
@@ -566,7 +610,7 @@ pub(crate) async fn finding_target(
     }
     let range = (now.saturating_sub(RUN_LOOKBACK_US), now + 1);
     match search_at(org_id, finding_sql(finding_id), range, 0, 1).await {
-        Ok(found) => Ok(found.hits.first().and_then(target_of)),
+        Ok(found) => Ok(found.hits.into_iter().next()),
         Err(InfraError::ErrorCode(code)) if Columns::Finding.not_written_yet(&code) => Ok(None),
         Err(e) => Err(e),
     }
@@ -913,7 +957,26 @@ async fn with_suggestions(
 ) -> Result<Vec<Value>, Response> {
     let mut hits = hits?;
     offer_destination_suggestions(org_id, user_id, visibility, &mut hits).await;
+    if let Err(e) = keep_offers(org_id, user_id, &hits).await {
+        log::error!("[alert_calibration] keeping the offers for org={org_id} failed: {e}");
+        return Err(MetaHttpResponse::internal_error(e));
+    }
     Ok(hits)
+}
+
+/// What the alert page offers is kept for its reader, so their Save records exactly that change.
+async fn keep_offers(org_id: &str, user_id: &str, hits: &[Value]) -> anyhow::Result<()> {
+    for hit in hits {
+        let Some(id) = hit.get("finding_id").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(change) = change_of(hit) else {
+            continue;
+        };
+        let who = (org_id, user_id);
+        remember_offer(&DismissalKv, &TableKvReader, who, id, &change, now_micros()).await?;
+    }
+    Ok(())
 }
 
 /// The planner reads the schema again, so a run read seen without kind re-checks its rows.

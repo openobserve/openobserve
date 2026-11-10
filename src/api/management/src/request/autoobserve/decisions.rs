@@ -32,7 +32,7 @@ use config::{
 };
 use infra::db::get_orm_client_ro;
 use o2_enterprise::enterprise::{
-    alert_calibration_service::dismissals::Target,
+    alert_calibration_service::{applied::SuggestedChange, dismissals::Target},
     autoobserve::{
         api::Deps,
         contract::EntityRef,
@@ -45,19 +45,22 @@ use o2_enterprise::enterprise::{
 };
 use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
 use openobserve_core::{
-    alerts::{alert, alert_calibration::dismissals::DismissalKv},
+    alerts::{
+        alert,
+        alert_calibration::{applied::LiveAlerts, dismissals::DismissalKv},
+    },
     background_access::rbac_enforced,
     users,
 };
 use serde::Serialize;
 use svix_ksuid::Ksuid;
 
-use super::{LiveDigest, may_change_mark, readable_subjects};
+use super::{LiveDigest, alert_allows, may_change_mark, readable_subjects};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     request::{
         alert_calibration::{
-            digests::finding_target,
+            digests::{finding_change, finding_target},
             dismissals::{may_dismiss, visible_alerts},
         },
         alert_grants::org_wide_allows,
@@ -84,7 +87,7 @@ impl Access for LiveAccess<'_> {
         Ok(visible_alerts(self.org_id, self.user_id, alert_ids).await?)
     }
 
-    /// DEC-3 is open, so an alert finding keeps calibration's org-wide rule for now.
+    /// Calibration's org-wide rule; the service adds DEC-3's folder rule through `may_edit_alert`.
     async fn may_decide(&self, family: Family, subject: &EntityRef) -> bool {
         match family {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
@@ -119,6 +122,20 @@ impl Access for LiveAccess<'_> {
     async fn finding(&self, id: &str, now: i64) -> anyhow::Result<Option<Target>> {
         Ok(finding_target(self.org_id, id, now).await?)
     }
+
+    /// The check the alert PUT route makes, so a change here needs what the editor's Save does.
+    async fn may_edit_alert(&self, alert_id: &str) -> bool {
+        !rbac_enforced().await
+            || alert_allows(self.org_id, self.user_id, alert_id, "PUT").await == Some(true)
+    }
+
+    async fn suggested_change(
+        &self,
+        id: &str,
+        now: i64,
+    ) -> anyhow::Result<Option<SuggestedChange>> {
+        Ok(finding_change(self.org_id, self.user_id, id, now).await?)
+    }
 }
 
 #[utoipa::path(
@@ -128,13 +145,13 @@ impl Access for LiveAccess<'_> {
     tag = "AutoObserve",
     operation_id = "AutoObservePreviewDecision",
     summary = "Preview a decision",
-    description = "What dismissing or accepting a suggestion, or dismissing an alert calibration finding, would change: for whom, until when, and whether the caller may do it. A caller who may not gets `locked` with the folder and up to 3 people who can act. Never writes. `reason`, `duration_days`, `until` and `until_reopened` are optional and shape `effect`.",
+    description = "What dismissing or accepting a suggestion, or dismissing or applying an alert calibration finding, would change: for whom, until when, and whether the caller may do it. An apply answers `change`: the alert, each field's old and new value, and how many acknowledged firings would no longer alert. A caller who may not gets `locked` with the folder and up to 3 people who can act. Changes no alert and no decision; the change shown to someone who may apply it is kept, so an apply or an editor Save records exactly that change. `reason`, `duration_days`, `until` and `until_reopened` are optional and shape `effect`.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("family" = String, Query, description = "suggestion or alert_finding"),
         ("id" = String, Query, description = "The suggestion id, or the finding id"),
-        ("action" = String, Query, description = "dismiss or accept"),
+        ("action" = String, Query, description = "dismiss, accept or apply"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -181,17 +198,17 @@ pub async fn preview_decision(
     context_path = "/api",
     tag = "AutoObserve",
     operation_id = "AutoObserveDecide",
-    summary = "Dismiss or accept",
-    description = "Dismisses or accepts a suggestion, or dismisses an alert calibration finding, for the whole org. The body is one decision or `items` (1 to 50), each answered with its own status. The same `request_id` answers the stored outcome as `unchanged` and writes nothing; a stale `expected_revision` is a 409. Planned work takes `until`, at most 7 days ahead; other reasons take `duration_days` (30, 90 or 180) or, for a finding, `until_reopened`. A refusal is a 403 naming the folder and up to 3 people who can act.",
+    summary = "Dismiss, accept or apply",
+    description = "Dismisses or accepts a suggestion, or dismisses an alert calibration finding or applies its stored change to the alert as the caller, for the whole org. An apply writes only while the alert still holds each old value; `applied_via: editor` records a change the alert editor already saved. The body is one decision or `items` (1 to 50), each answered with its own status. The same `request_id` answers the stored outcome as `unchanged` and writes nothing; a stale `expected_revision` is a 409. Planned work takes `until`, at most 7 days ahead; other reasons take `duration_days` (30, 90 or 180) or, for a finding, `until_reopened`. A refusal is a 403 naming the folder and up to 3 people who can act.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = inline(Object), description = "family, id, action, reason, note, until, duration_days or until_reopened, expected_revision, request_id; or items of those", content_type = "application/json"),
+    request_body(content = inline(Object), description = "family, id, action, reason, note, until, duration_days or until_reopened, expected_revision, request_id, applied_via; or items of those", content_type = "application/json"),
     responses(
         (status = 200, description = "`change` is created, updated or unchanged; a batch answers `results`", content_type = "application/json", body = Object),
         (status = 400, description = "An unreadable body, or an invalid reason, note or term", content_type = "application/json", body = Object),
-        (status = 403, description = "decision_refused: the caller may not decide on this item", content_type = "application/json", body = Object),
+        (status = 403, description = "decision_refused: the caller may not decide on this item; slack_changes_off: a Slack caller's decision while the org does not allow changes from Slack", content_type = "application/json", body = Object),
         (status = 404, description = "The item is not listed or not readable, or decisions are disabled for this deployment", content_type = "application/json", body = Object),
-        (status = 409, description = "The item changed since `expected_revision`, or the suggestion is an alert calibration finding", content_type = "application/json", body = Object),
+        (status = 409, description = "The item changed since `expected_revision`, the suggestion is an alert calibration finding, or alert_changed: the alert no longer holds the old value", content_type = "application/json", body = Object),
         (status = 500, description = "The write failed, or the decision was saved without its history row", content_type = "application/json", body = Object),
         (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
     ),
@@ -237,7 +254,7 @@ pub async fn decide(
     tag = "AutoObserve",
     operation_id = "AutoObserveUndoDecision",
     summary = "Undo a decision",
-    description = "Ends a decision in force, so the item is shown again: a dismissal is reopened, and an accept also removes the mark it set. Needs the rights of the decision it undoes and the revision the caller last saw. The same `request_id` answers `unchanged`.",
+    description = "Ends a decision in force, so the item is shown again: a dismissal is reopened, an accept also removes the mark it set, and an apply puts each old value back for 30 days while the alert still holds the new ones. Needs the rights of the decision it undoes and the revision the caller last saw. The same `request_id` answers `unchanged`.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -247,9 +264,9 @@ pub async fn decide(
     responses(
         (status = 200, description = "`change` is undone or unchanged", content_type = "application/json", body = Object),
         (status = 400, description = "An unreadable body", content_type = "application/json", body = Object),
-        (status = 403, description = "decision_refused: the caller may not undo this decision", content_type = "application/json", body = Object),
-        (status = 404, description = "No such decision in force, or decisions are disabled for this deployment", content_type = "application/json", body = Object),
-        (status = 409, description = "The decision changed since `expected_revision`", content_type = "application/json", body = Object),
+        (status = 403, description = "decision_refused: the caller may not undo this decision; slack_changes_off: a Slack caller's undo while the org does not allow changes from Slack", content_type = "application/json", body = Object),
+        (status = 404, description = "No such decision in force, the changed alert was deleted, or decisions are disabled for this deployment", content_type = "application/json", body = Object),
+        (status = 409, description = "The decision changed since `expected_revision`, or alert_changed: the alert no longer holds an applied value", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
         (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
     ),
@@ -362,6 +379,7 @@ fn context<'a>(deps: &'a Deps, access: &'a LiveAccess<'a>, source: Source) -> Ct
     Ctx {
         deps,
         store: &DismissalKv,
+        alerts: &LiveAlerts,
         findings: &LiveDigest,
         access,
         org: access.org_id,
@@ -592,6 +610,7 @@ mod tests {
             until_reopened: None,
             expected_revision: None,
             request_id: Some("3f2c9a1e-dialog".into()),
+            applied_via: None,
         };
         let report = DecisionRequest {
             family: Family::AlertFinding,
@@ -626,6 +645,8 @@ mod tests {
             revision: 0,
             current: None,
             locked: None,
+            change: None,
+            summary: None,
         };
         let mut reported = view(
             Family::AlertFinding,

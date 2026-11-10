@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, sea_query::Expr};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set, sea_query::Expr,
+};
 
 use super::entity::kv_store::{ActiveModel, Column, Entity, Model};
 use crate::{
@@ -67,7 +69,17 @@ pub async fn compare_and_set(
     expected: Option<&[u8]>,
     value: &[u8],
 ) -> Result<bool, errors::Error> {
-    let client = get_orm_client_rw().await;
+    compare_and_set_in(get_orm_client_rw().await, org_id, key, expected, value).await
+}
+
+/// `compare_and_set` on `conn`, so a caller's transaction holds it with its other writes.
+pub async fn compare_and_set_in<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    key: &str,
+    expected: Option<&[u8]>,
+    value: &[u8],
+) -> Result<bool, errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
     let written = match expected {
         None => {

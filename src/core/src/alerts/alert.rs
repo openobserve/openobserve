@@ -1586,8 +1586,21 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     folder_id: Option<(&str, &str)>,
-    mut alert: Alert,
+    alert: Alert,
 ) -> Result<Alert, AlertError> {
+    update_where(conn, org_id, folder_id, alert, None)
+        .await?
+        .ok_or(AlertError::AlertNotFound)
+}
+
+/// With `guard`, saves only while it holds, as one transaction; None when it did not.
+pub async fn update_where<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<(&str, &str)>,
+    mut alert: Alert,
+    guard: Option<infra::table::alerts::WriteGuard>,
+) -> Result<Option<Alert>, AlertError> {
     let mut dst_folder_id_info = None;
     let _folder_info = if let Some((curr_folder_id, dst_folder_id)) = folder_id {
         // Ensure that the destination folder exists.
@@ -1617,8 +1630,11 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         None => None,
     };
 
+    // A guarded patch never edits workflows, and its snapshot can miss one attached since.
     #[cfg(feature = "enterprise")]
-    if let Some(ref id) = alert.id {
+    if let Some(ref id) = alert.id
+        && guard.is_none()
+    {
         let (_, old_alert) = get_by_id(conn, org_id, id.to_owned()).await?;
         let old_workflows = old_alert.workflows;
 
@@ -1677,7 +1693,10 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     {
         reset_run_state(org_id, &id.to_string(), db::scheduler::TriggerModule::Alert).await?;
     }
-    let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+    let saved = db::alerts::alert::update_where(conn, org_id, dst_folder_id_info, alert, guard);
+    let Some(alert) = saved.await? else {
+        return Ok(None);
+    };
     slo_effect.apply().await;
     clean_up_opted_out_groups(&alert).await;
     if let Some(id) = alert.id
@@ -1712,7 +1731,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         )
         .await;
     }
-    Ok(alert)
+    Ok(Some(alert))
 }
 
 /// Gets the alert by its KSUID primary key.
@@ -2481,7 +2500,7 @@ mod slo_source_guard_tests {
                 "update",
                 "pub async fn update<C: ConnectionTrait + TransactionTrait>(",
                 "\n/// Gets the alert by its KSUID primary key.",
-                "db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert)",
+                "db::alerts::alert::update_where(conn, org_id, dst_folder_id_info, alert, guard)",
             ),
         ] {
             let body = body_of(from, to);
@@ -2496,6 +2515,22 @@ mod slo_source_guard_tests {
                 "{label} applies the SLO effect before the alert is written"
             );
         }
+    }
+
+    /// A guarded patch writes over a snapshot that can predate a workflow attached since.
+    #[test]
+    fn a_guarded_save_leaves_workflow_associations_alone() {
+        let body = body_of(
+            "pub async fn update_where<C: ConnectionTrait + TransactionTrait>(",
+            "\n/// Gets the alert by its KSUID primary key.",
+        );
+        let gate = body
+            .find("&& guard.is_none()")
+            .expect("the workflow sync must skip a guarded save");
+        let sync = body
+            .find("delete_workflow_association(")
+            .expect("update_where still syncs workflow associations");
+        assert!(gate < sync, "the gate must come before the sync");
     }
 
     #[test]
