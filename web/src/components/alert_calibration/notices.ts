@@ -52,7 +52,7 @@ export const readFailedCopy = (t: TranslateFn, error: unknown): I18nText =>
     : t("alertCalibration.readError.failed");
 
 /** What the Details disclosure shows: the server's own words, kept out of the notice itself. */
-export const readFailedDetail = (error: unknown): I18nText | null => {
+export const readFailedDetail = (error: unknown): I18nText | undefined => {
   const message = error ? errorMessage(error) : "";
-  return message ? raw(message) : null;
+  return message ? raw(message) : undefined;
 };
