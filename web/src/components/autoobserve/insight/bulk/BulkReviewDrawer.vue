@@ -22,21 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="xxl"
     :close-guard="() => !running"
     :return-focus-to="() => state.opener"
-    :aria-label="String(title)"
+    :title="title"
+    :sub-title="rule"
+    title-data-test="bulk-review-title"
+    sub-title-data-test="bulk-review-rule"
     data-test="bulk-review-drawer"
     @update:open="(open: boolean) => !open && closeBulkReview()"
   >
-    <template #header>
-      <div class="flex min-w-0 flex-col gap-0.5">
-        <h2 class="text-text-heading text-base font-semibold" data-test="bulk-review-title">
-          {{ title }}
-        </h2>
-        <p class="text-text-secondary text-xs text-pretty" data-test="bulk-review-rule">
-          {{ rule }}
-        </p>
-      </div>
-    </template>
-
     <div class="flex min-h-0 flex-col gap-3">
       <div class="flex flex-wrap items-center gap-3">
         <div class="w-44 max-md:w-full">

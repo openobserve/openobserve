@@ -138,8 +138,11 @@ describe("BulkReviewDrawer — review", () => {
     await mountDrawer();
     await openWith();
     expect(text("bulk-review-title")).toBe("Add 12 no-data alerts");
-    expect(wrapper!.findComponent({ name: "ODrawer" }).props("ariaLabel")).toBe(
-      "Add 12 no-data alerts",
+    // The drawer's own title and sub-title, so it reads like every other drawer (T5-29).
+    const drawer = wrapper!.findComponent({ name: "ODrawer" });
+    expect(drawer.props("title")).toBe("Add 12 no-data alerts");
+    expect(String(drawer.props("subTitle"))).toContain(
+      "Nothing is saved until you click Add alerts.",
     );
     expect(text("bulk-review-rule")).toContain("Nothing is saved until you click Add alerts.");
     expect(text("bulk-review-footer")).toBe(
