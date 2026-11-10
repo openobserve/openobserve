@@ -705,6 +705,20 @@ async fn list_models<C: ConnectionTrait>(
     } else {
         query
     };
+    let query = match &params.listable_folder_ids {
+        None => query,
+        // `IN ()` is not portable, and no filter would list every folder.
+        Some(ids) if ids.is_empty() => {
+            query.filter(alerts::Column::Id.eq(TAG_FILTER_NO_MATCH_SENTINEL))
+        }
+        Some(ids) => {
+            let mut cond = Condition::any();
+            for chunk in ids.chunks(TAG_ID_PREDICATE_CHUNK) {
+                cond = cond.add(folders::Column::FolderId.is_in(chunk.to_vec()));
+            }
+            query.filter(cond)
+        }
+    };
 
     // Apply the optional alert name substring filter.
     let name_substring = params.name_substring.filter(|n| !n.is_empty());
@@ -2363,6 +2377,34 @@ pub(super) mod tests {
                 2,
                 "the folder filter alone still returns non-SLO alerts"
             );
+        }
+
+        #[tokio::test]
+        async fn listable_folders_scope_a_cross_folder_list() {
+            let db = db_with_folder().await;
+            seed_folder(&db, FOLDER_B_PK, ORG, "team-a").await;
+            let (in_default, in_team) = (alert_id(), alert_id());
+            insert_alert(&db, AlertSpec::plain(&in_default, "p0")).await;
+            insert_alert(
+                &db,
+                AlertSpec::plain(&in_team, "p1").in_folder(ORG, FOLDER_B_PK),
+            )
+            .await;
+
+            let unrestricted = ListAlertsParams::new(ORG);
+            assert_eq!(ids_of(&db, unrestricted).await.len(), 2);
+
+            let one = ListAlertsParams::new(ORG).within_folders(vec!["team-a".to_string()]);
+            assert_eq!(ids_of(&db, one).await, vec![in_team]);
+
+            let none = ListAlertsParams::new(ORG).within_folders(vec![]);
+            assert!(
+                ids_of(&db, none).await.is_empty(),
+                "no listable folder must list nothing, not everything"
+            );
+
+            let other = ListAlertsParams::new(ORG).within_folders(vec!["team-z".to_string()]);
+            assert!(ids_of(&db, other).await.is_empty());
         }
 
         /// Ordering must survive the new predicate — including the deliberate

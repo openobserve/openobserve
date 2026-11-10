@@ -423,7 +423,12 @@ where
 
         // Resolve permission via the declarative route table.
         // Falls back to the legacy if-else for routes not yet in the table.
-        let resolved = match rp::resolve_permission(
+        let resolve = if query.contains_key("folder") {
+            rp::resolve_permission
+        } else {
+            rp::resolve_permission_without_folder
+        };
+        let resolved = match resolve(
             &path_columns,
             &method,
             &org_id,
