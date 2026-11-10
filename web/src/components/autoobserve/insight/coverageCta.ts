@@ -257,6 +257,29 @@ export const gapInsight = (
   });
 };
 
+const FALLS_STATES = new Set(["weak", "silent", "blind", "unmapped"]);
+
+/** The same alerts and the same fault the summary names, for a live check an alert matches but falls short on. */
+const fallsWhy = (
+  t: TranslateFn,
+  locale: string,
+  row: CoverageRow,
+  key: CellKey,
+  cell: CoverageCell,
+): I18nText | null => {
+  const state = cell.engine?.stateKey ?? "none";
+  if (!(key in KIND_OF_CHECK) || !FALLS_STATES.has(state)) return null;
+  const names = [
+    ...new Set(
+      (cell.engine?.monitors ?? []).filter((m) => m.stateKey === state).map((m) => m.name),
+    ),
+  ];
+  if (!names.length) return null;
+  const monitor = raw(new Intl.ListFormat(locale, { type: "conjunction" }).format(names));
+  const what = t(`insight.kind.cell.watchWhat.${key as LiveCheck}`, { service: raw(nameOf(row)) });
+  return t(`insight.kind.cell.falls.${state as "weak"}`, { monitor, what }, names.length);
+};
+
 const silentCopy = (t: TranslateFn, row: CoverageRow, cell: CoverageCell): CellCopy | null => {
   const monitor = cell.engine?.monitors.find((m) => m.stateKey === "silent");
   if (!monitor) return null;
@@ -467,7 +490,7 @@ const gapCopy = (
 /** One chart's or Other checks row's why, next step and fix; null for a check that is watched. */
 export const cellInsight = (
   t: TranslateFn,
-  _locale: string,
+  locale: string,
   row: CoverageRow,
   key: CellKey,
   cell: CoverageCell,
@@ -482,7 +505,11 @@ export const cellInsight = (
   }
   const copy =
     state === "silent" ? silentCopy(t, row, cell) : gapCopy(t, row, key, org, synthetic, owned);
-  return copy ? partsOf(`${row.service}-${key}`, copy) : null;
+  if (!copy) return null;
+  return partsOf(`${row.service}-${key}`, {
+    ...copy,
+    why: fallsWhy(t, locale, row, key, cell) ?? copy.why,
+  });
 };
 
 /** The ids of the alerts coverage matched to the service, which say where its alerts live and whom they notify. */

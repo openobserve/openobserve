@@ -30661,10 +30661,10 @@
       "tipNoClass": "{signal}: AutoObserve doesn't check this yet",
       "noMonitor": "Not watched",
       "gap": {
-        "weak": "{signal}: only {monitor}, a broad alert, may notice a problem; it isn't scoped to this service",
-        "silent": "{signal}: {monitor} matches, but it notifies no one",
-        "blind": "{signal}: {monitor} matches, but it can't see its data",
-        "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service",
+        "weak": "{signal}: only {monitor}, a broad alert, may notice a problem; it isn't scoped to this service | {signal}: only {monitor}, broad alerts, may notice a problem; they aren't scoped to this service",
+        "silent": "{signal}: {monitor} matches, but it notifies no one | {signal}: {monitor} match, but they notify no one",
+        "blind": "{signal}: {monitor} matches, but it can't see its data | {signal}: {monitor} match, but they can't see their data",
+        "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service | {signal}: {monitor} may match, but their scope couldn't be tied to a service",
         "none": "{signal}: no alert watches this"
       },
       "fallsShort": "Falls short",
@@ -34603,6 +34603,17 @@
         "next": "Add an alert that fires when its success line doesn't appear."
       },
       "cell": {
+        "falls": {
+          "weak": "Only {monitor}, a broad alert, watches {what}, and it isn't scoped to this service. | Only {monitor}, broad alerts, watch {what}, and they aren't scoped to this service.",
+          "silent": "{monitor} watches {what}, but it notifies no one. | {monitor} watch {what}, but they notify no one.",
+          "blind": "{monitor} watches {what}, but it can't see this service's data. | {monitor} watch {what}, but they can't see this service's data.",
+          "unmapped": "{monitor} may watch {what}, but its scope couldn't be tied to this service. | {monitor} may watch {what}, but their scope couldn't be tied to this service."
+        },
+        "watchWhat": {
+          "errors": "{service}'s errors",
+          "latency": "{service}'s latency",
+          "absence": "whether {service} stops sending"
+        },
         "justAdded": "Added. AutoObserve counts it at its next check, within about 5 minutes.",
         "errorsWhy": "No alert watches {service}'s errors.",
         "errorsNext": "Add an errors alert at 3 times its usual rate.",

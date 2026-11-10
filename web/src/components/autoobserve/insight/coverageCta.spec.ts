@@ -211,7 +211,7 @@ describe("Signals chart details", () => {
       gapCell("silent", "ingress-volume-detector"),
     );
     expect(parts?.why).toBe(
-      "ingress-volume-detector would notice svc-ingest-c stopping, but it notifies no one.",
+      "ingress-volume-detector watches whether svc-ingest-c stops sending, but it notifies no one.",
     );
     expect(parts?.cta?.label).toBe("Choose who gets notified");
     expect(parts?.cta?.target).toEqual({
@@ -220,6 +220,66 @@ describe("Signals chart details", () => {
       alertName: "ingress-volume-detector",
       destinations: [],
     });
+  });
+});
+
+describe("Why matches the summary for an alert that falls short (T2-5, T2-6)", () => {
+  const stated = (stateKey: "weak" | "blind" | "silent", ...names: string[]): CoverageCell => ({
+    state: "gap",
+    reason: raw(""),
+    engine: {
+      state: raw(stateKey),
+      stateKey,
+      monitors: names.map((name) => ({
+        id: name,
+        name,
+        kind: raw("Alert"),
+        kindKey: "alert",
+        state: raw(stateKey),
+        stateKey,
+        predicate: "",
+      })),
+    },
+  });
+
+  it("a blind errors alert is named, never 'No alert watches'", () => {
+    const parts = cellInsight(
+      gt,
+      "en-US",
+      row([LOGS]),
+      "errors",
+      stated("blind", "traces-route-errors"),
+    );
+    expect(parts?.why).toBe(
+      "traces-route-errors watches svc-ingest-c's errors, but it can't see this service's data.",
+    );
+  });
+
+  it("two weak latency alerts are both named", () => {
+    const parts = cellInsight(
+      gt,
+      "en-US",
+      row([LOGS, TRACES]),
+      "latency",
+      stated("weak", "ingress-slow-requests", "ingress-upstream-blips"),
+    );
+    expect(parts?.why).toBe(
+      "Only ingress-slow-requests and ingress-upstream-blips, broad alerts, watch svc-ingest-c's latency, and they aren't scoped to this service.",
+    );
+    expect(parts?.cta?.label).toBe("Add alert");
+  });
+
+  it("a silent errors alert is called an errors alert, not a stopping one", () => {
+    const parts = cellInsight(
+      gt,
+      "en-US",
+      row([LOGS]),
+      "errors",
+      stated("silent", "sec-twin-normal"),
+    );
+    expect(parts?.why).toBe(
+      "sec-twin-normal watches svc-ingest-c's errors, but it notifies no one.",
+    );
   });
 });
 

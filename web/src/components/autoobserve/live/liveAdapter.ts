@@ -266,11 +266,15 @@ const toMonitor = (t: TranslateFn, ev: AutoObserveStatedEvidence): EngineMonitor
   predicate: ev.predicate,
 });
 
+const monitorList = (locale: string, names: string[]): string =>
+  new Intl.ListFormat(locale, { type: "conjunction" }).format([...new Set(names)]);
+
 // Covered is the only engine state the design can call watched; every other state is a gap with its cause.
 const toCell = (
   t: TranslateFn,
   found: AutoObserveCell | undefined,
   label: I18nText,
+  locale: string,
 ): CoverageCell => {
   const cell = found ?? EMPTY_CELL;
   const lead = cell.evidence[0];
@@ -292,7 +296,19 @@ const toCell = (
   const state: GapState = cell.state === "covered" ? "none" : cell.state;
   return {
     state: "gap",
-    reason: t(GAP_REASON[state], { signal: label, monitor: raw(lead?.monitor_name ?? "") }),
+    reason: t(
+      GAP_REASON[state],
+      {
+        signal: label,
+        monitor: raw(
+          monitorList(
+            locale,
+            cell.evidence.map((ev) => ev.monitor_name),
+          ),
+        ),
+      },
+      Math.max(1, cell.evidence.length),
+    ),
     engine,
   };
 };
@@ -365,14 +381,14 @@ const toRow = (
     SIGNALS.map((signal) => {
       const cls = SIGNAL_CLASS[signal];
       const cell: CoverageCell = cls
-        ? toCell(t, row.cells[cls], t(CLASS_LABEL[cls]))
+        ? toCell(t, row.cells[cls], t(CLASS_LABEL[cls]), locale)
         : { state: "na", reason: t("autoobserveLive.cell.noClass") };
       return [signal, cell];
     }),
   ) as Record<Signal, CoverageCell>;
   const watched = GAP_CLASSES.some((cls) => row.cells[cls]?.state === "covered");
   const checks = Object.fromEntries(
-    GAP_CLASSES.map((cls) => [cls, toCell(t, row.cells[cls], t(CLASS_LABEL[cls]))]),
+    GAP_CLASSES.map((cls) => [cls, toCell(t, row.cells[cls], t(CLASS_LABEL[cls]), locale)]),
   ) as Record<LiveCheck, CoverageCell>;
   return {
     service,
@@ -396,7 +412,7 @@ const toRow = (
       : { state: "gap", label: coverageWord(t, "gap") },
     extra: EXTRA_CLASSES.map((cls) => {
       const label = t(CLASS_LABEL[cls]);
-      return { key: cls, label, cell: toCell(t, row.cells[cls], label) };
+      return { key: cls, label, cell: toCell(t, row.cells[cls], label, locale) };
     }),
   };
 };
