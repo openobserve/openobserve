@@ -279,6 +279,42 @@ mod tests {
         assert!(row.get(HAS_CANDIDATE_COLUMN).is_none(), "{row}");
     }
 
+    /// Home's Review change finds the apply this reader was offered.
+    #[test]
+    fn the_offered_change_reaches_the_autoobserve_item_before_its_review() {
+        use o2_enterprise::enterprise::autoobserve::{
+            alert_findings::{DigestRun, item_of},
+            insight::{FieldPatch, InsightAction},
+        };
+        let mut row = marked_row();
+        row["finding_id"] = "f".repeat(64).into();
+        row["alert_folder"] = "ops".into();
+        let run = DigestRun::default();
+        let item = |row: &Value| item_of("o", &run, row).expect("a listed finding");
+        let offered = item(&answered(row.clone(), &pager(&["b1"])));
+        assert_eq!(offered.kind, "alert_no_destination");
+        assert_eq!(
+            offered.actions[0],
+            InsightAction::ApplySuggestion {
+                alert_id: "a1".into(),
+                patch: vec![FieldPatch::Destinations {
+                    from: vec![],
+                    to: vec!["ops-pager".into()],
+                }],
+            }
+        );
+        assert!(matches!(
+            offered.actions[1],
+            InsightAction::ReviewAlert { .. }
+        ));
+        assert_eq!(offered.evidence["folder"], "ops");
+        let plain = item(&answered(row, &HashMap::new()));
+        assert!(matches!(
+            plain.actions[..],
+            [InsightAction::ReviewAlert { .. }]
+        ));
+    }
+
     #[tokio::test]
     async fn a_reader_who_cannot_list_the_destination_gets_the_plain_finding() {
         let auth = folder_scoped(&[]);

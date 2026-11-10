@@ -712,6 +712,8 @@ mod tests {
             subject: None,
             change: None,
             via: None,
+            undone_at: None,
+            undone_by: None,
         }
     }
 

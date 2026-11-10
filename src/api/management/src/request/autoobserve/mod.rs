@@ -54,7 +54,7 @@ use utoipa::{IntoParams, ToSchema};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     request::{
-        alert_calibration::digests::latest_alert_findings,
+        alert_calibration::digests::{latest_alert_findings, offer_reader_changes},
         alert_grants::{AlertAuthority, AlertGrants, LiveAuthority, org_wide_allows},
     },
     service::auth::UserEmail,
@@ -175,6 +175,20 @@ impl AlertFindingsRead for LiveDigest {
                 log::error!("[AUTOOBSERVE] org {org}: reading calibration findings failed: {e}");
                 ApiError::Storage(STORAGE_FAILED.into())
             })
+    }
+}
+
+/// [`LiveDigest`] with each no-destination finding's change as this reader may apply it.
+struct ReaderDigest<'a>(&'a str);
+
+#[async_trait]
+impl AlertFindingsRead for ReaderDigest<'_> {
+    async fn latest(&self, org: &str, now: i64) -> Result<Option<DigestRun>, ApiError> {
+        let mut run = LiveDigest.latest(org, now).await?;
+        if let Some(run) = run.as_mut() {
+            offer_reader_changes(org, self.0, &mut run.records).await;
+        }
+        Ok(run)
     }
 }
 
@@ -342,7 +356,7 @@ pub async fn suggestions(
             page,
             now_micros(),
             readable,
-            &LiveDigest,
+            &ReaderDigest(&user.user_id),
         )
         .await
     })

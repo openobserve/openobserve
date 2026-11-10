@@ -43,7 +43,7 @@ use o2_enterprise::enterprise::{
         dismissals::{SCOPE_ALERT, Target},
     },
     autoobserve::{
-        alert_findings::{DigestRun, LISTED_RULES, RUN_LOOKBACK_US},
+        alert_findings::{DigestRun, LISTED_RULES, NO_DESTINATION_RULE, RUN_LOOKBACK_US},
         marks::TableKvReader,
     },
 };
@@ -84,6 +84,8 @@ const OWNER_COLUMNS: [&str; 3] = [
 ];
 /// Only version 2 writes these, so a stream without one holds no record the alert read names.
 const FINDING_COLUMNS: [&str; 4] = ["kind", "rule_id", "scope_kind", "finding_id"];
+/// Set on AutoObserve's read only; ENT `alert_findings::evidence` copies it as `folder`.
+const FOLDER_COLUMN: &str = "alert_folder";
 
 /// A time range in microseconds, and how many rows to return.
 #[derive(Deserialize, IntoParams)]
@@ -557,9 +559,33 @@ pub(crate) async fn latest_alert_findings(
     let search = |sql, from, size| search_at(org_id, sql, (since, now + 1), from, size);
     let mut run = alert_findings_with(&schema, search).await?;
     if let Some(run) = run.as_mut() {
-        drop_detection_findings(org_id, &mut run.records).await;
+        drop_unlisted_findings(org_id, &mut run.records).await;
+        stamp_folders(org_id, &mut run.records).await;
     }
     Ok(run)
+}
+
+/// The reader's destination change on each no-destination finding, as the dashboard offers it.
+pub(crate) async fn offer_reader_changes(org_id: &str, user_id: &str, records: &mut [Value]) {
+    let ids: Vec<String> = records
+        .iter()
+        .filter(|hit| hit.get("rule_id").and_then(Value::as_str) == Some(NO_DESTINATION_RULE))
+        .filter_map(finding_alert)
+        .map(str::to_string)
+        .collect();
+    if ids.is_empty() {
+        return;
+    }
+    let probe = Probe { ids, full: false };
+    match live_visibility(org_id, user_id, || ready(Ok(probe))).await {
+        Ok(visibility) => {
+            offer_destination_suggestions(org_id, user_id, &visibility, records).await
+        }
+        Err(e) => log::warn!(
+            "[alert_calibration] could not read alert grants for org={org_id}, so no change is \
+             offered on AutoObserve: {e}"
+        ),
+    }
 }
 
 pub(crate) async fn finding_target(
@@ -569,21 +595,60 @@ pub(crate) async fn finding_target(
 ) -> Result<Option<Target>, InfraError> {
     let hit = finding_hit(org_id, finding_id, now).await?;
     let listed = match &hit {
-        Some(hit) => !on_detection(org_id, hit).await,
+        Some(hit) => !unlisted(org_id, hit).await,
         None => false,
     };
     Ok(hit.as_ref().filter(|_| listed).and_then(target_of))
 }
 
-/// Runs leave a security detection to the Security module, so its older findings are unlisted too.
-async fn drop_detection_findings(org_id: &str, hits: &mut Vec<Value>) {
+/// Findings whose cause is gone since the run are unlisted until the next run decides again.
+async fn drop_unlisted_findings(org_id: &str, hits: &mut Vec<Value>) {
     let mut kept = Vec::with_capacity(hits.len());
     for hit in std::mem::take(hits) {
-        if !on_detection(org_id, &hit).await {
+        if !unlisted(org_id, &hit).await {
             kept.push(hit);
         }
     }
     *hits = kept;
+}
+
+/// Runs leave a detection to the Security module, and a fixed no-destination alert notifies now.
+async fn unlisted(org_id: &str, hit: &Value) -> bool {
+    on_detection(org_id, hit).await || notifies_now(org_id, hit).await
+}
+
+async fn notifies_now(org_id: &str, hit: &Value) -> bool {
+    if hit.get("rule_id").and_then(Value::as_str) != Some(NO_DESTINATION_RULE) {
+        return false;
+    }
+    let Some(alert_id) = finding_alert(hit) else {
+        return false;
+    };
+    let incidents_page = o2_enterprise::enterprise::oncall::incidents_page_oncall();
+    common::infra::config::ALERTS
+        .read()
+        .await
+        .get(&db::alerts::alert::cache_alert_key(org_id, alert_id))
+        .is_some_and(|(_, alert)| notifies(alert, incidents_page))
+}
+
+/// The calibration rule's own test: a destination, or an incident while incidents page on-call.
+fn notifies(alert: &config::meta::alerts::alert::Alert, incidents_page: bool) -> bool {
+    !alert.destinations.is_empty() || (alert.creates_incident && incidents_page)
+}
+
+/// Records store no folder, so AutoObserve's Where column reads it from the alert as it is now.
+async fn stamp_folders(org_id: &str, hits: &mut [Value]) {
+    let cache = common::infra::config::ALERTS.read().await;
+    for hit in hits.iter_mut() {
+        let folder = finding_alert(hit)
+            .and_then(|id| cache.get(&db::alerts::alert::cache_alert_key(org_id, id)))
+            .map(|(folder, _)| folder.name.clone())
+            .filter(|name| !name.is_empty());
+        if let (Some(folder), Some(row)) = (folder, hit.as_object_mut()) {
+            row.insert(FOLDER_COLUMN.to_string(), folder.into());
+        }
+    }
 }
 
 async fn on_detection(org_id: &str, hit: &Value) -> bool {
@@ -614,7 +679,7 @@ pub(crate) async fn finding_change(
     let Some(hit) = finding_hit(org_id, finding_id, now).await? else {
         return Ok(None);
     };
-    if on_detection(org_id, &hit).await {
+    if unlisted(org_id, &hit).await {
         return Ok(None);
     }
     let Some(alert_id) = hit
@@ -840,21 +905,30 @@ where
         return Ok(None);
     };
     if FINDING_COLUMNS.iter().all(|column| held(column)) {
-        run.records = alert_failure_records(&run, &search).await?;
+        let listed = |after: &str| alert_records_sql(&run, after);
+        run.records = run_pages(&run, &search, listed).await?;
+        let every = |after: &str| finding_ids_sql(&run, after);
+        run.finding_ids = run_pages(&run, &search, every)
+            .await?
+            .iter()
+            .filter_map(|hit| hit.get("finding_id").and_then(Value::as_str))
+            .map(str::to_string)
+            .collect();
     }
     Ok(Some(run))
 }
 
 /// Every page of the run's records; a partial page would hide findings, so it fails the read.
-async fn alert_failure_records<S, F>(run: &DigestRun, search: &S) -> Result<Vec<Value>, InfraError>
+async fn run_pages<S, F, Q>(run: &DigestRun, search: &S, sql: Q) -> Result<Vec<Value>, InfraError>
 where
     S: Fn(String, i64, i64) -> F,
     F: Future<Output = Result<SearchResponse, InfraError>>,
+    Q: Fn(&str) -> String,
 {
     let mut records = Vec::new();
     let mut after = String::new();
     loop {
-        let page = match search(alert_records_sql(run, &after), 0, MAX_SIZE).await {
+        let page = match search(sql(&after), 0, MAX_SIZE).await {
             Ok(page) => page,
             Err(InfraError::ErrorCode(code)) if Columns::Finding.not_written_yet(&code) => break,
             Err(e) => return Err(e),
@@ -911,6 +985,18 @@ fn alert_records_sql(run: &DigestRun, after: &str) -> String {
     )
 }
 
+/// Every rule's findings of one emission, as the calibration page counts them.
+fn finding_ids_sql(run: &DigestRun, after: &str) -> String {
+    format!(
+        "SELECT finding_id FROM \"{DIGEST_STREAM}\" WHERE window_start = {} AND window_end = {} \
+         AND kind = 'finding' AND _timestamp = {} AND finding_id > {} ORDER BY finding_id ASC",
+        run.window_start,
+        run.window_end,
+        run.emitted_at,
+        quote_sql_string(after)
+    )
+}
+
 fn finding_sql(finding_id: &str) -> String {
     format!(
         "SELECT * FROM \"{DIGEST_STREAM}\" WHERE kind = 'finding' AND scope_kind = {} \
@@ -957,6 +1043,7 @@ fn run_of(row: &Value) -> Option<DigestRun> {
             .map(str::to_string),
         definition_checks_truncated: truncated,
         records: Vec::new(),
+        finding_ids: Vec::new(),
     })
 }
 
@@ -994,7 +1081,7 @@ async fn with_suggestions(
     hits: Result<Vec<Value>, Response>,
 ) -> Result<Vec<Value>, Response> {
     let mut hits = hits?;
-    drop_detection_findings(org_id, &mut hits).await;
+    drop_unlisted_findings(org_id, &mut hits).await;
     offer_destination_suggestions(org_id, user_id, visibility, &mut hits).await;
     if let Err(e) = keep_offers(org_id, user_id, &hits).await {
         log::error!("[alert_calibration] keeping the offers for org={org_id} failed: {e}");
@@ -1416,7 +1503,8 @@ mod tests {
             alert_records_sql(&run, "ab'c"),
             format!(
                 "SELECT * FROM \"{DIGEST_STREAM}\" WHERE window_start = 10 AND window_end = 20 \
-                 AND kind = 'finding' AND rule_id IN ('failure', 'no_destination') AND scope_kind = 'alert' \
+                 AND kind = 'finding' AND rule_id IN ('failure', 'no_destination', 'notify_failed') \
+                 AND scope_kind = 'alert' \
                  AND _timestamp = 30 AND finding_id > 'ab''c' ORDER BY finding_id ASC"
             )
         );
@@ -1576,12 +1664,22 @@ mod tests {
             &ids[2 * MAX_SIZE as usize - 1],
         ];
         let reads = stream.reads.lock().unwrap().clone();
-        assert_eq!(reads.len(), 4);
+        assert_eq!(
+            reads.len(),
+            7,
+            "the run, three record pages, three id pages"
+        );
         assert_eq!((reads[0].1, reads[0].2), (0, 1));
-        for ((sql, from, size), after) in reads[1..].iter().zip(afters) {
+        for ((sql, from, size), after) in reads[1..].iter().zip(afters.iter().chain(&afters)) {
             assert_eq!((*from, *size), (0, MAX_SIZE));
             assert!(sql.contains(&format!("finding_id > '{after}'")), "{sql}");
         }
+        assert!(
+            reads[4..]
+                .iter()
+                .all(|(sql, ..)| sql.starts_with("SELECT finding_id "))
+        );
+        assert_eq!(run.finding_ids.len(), 2 * MAX_SIZE as usize + 3);
         let partial = Paged::new(3, true);
         let read =
             alert_findings_with(&every, |sql, from, size| partial.search(sql, from, size)).await;
@@ -1698,10 +1796,63 @@ mod tests {
             serde_json::json!({"kind": "run"}),
             serde_json::json!({"kind": "finding", "scope_key": detection}),
         ];
-        drop_detection_findings(&org, &mut hits).await;
+        drop_unlisted_findings(&org, &mut hits).await;
         assert_eq!(
             hits,
             vec![finding(&plain), serde_json::json!({"kind": "run"})]
         );
+    }
+
+    #[tokio::test]
+    async fn a_no_destination_finding_is_unlisted_once_its_alert_notifies() {
+        use config::meta::{alerts::alert::Alert, folder::Folder};
+        use svix_ksuid::KsuidLike;
+
+        let org = format!("cal_fixed_{}", config::ider::uuid());
+        let id = || svix_ksuid::Ksuid::new(None, None).to_string();
+        let (silent, wired, incident) = (id(), id(), id());
+        for (alert_id, destinations, creates_incident) in [
+            (&silent, vec![], false),
+            (&wired, vec!["pager".to_string()], false),
+            (&incident, vec![], true),
+        ] {
+            let mut alert = Alert::default();
+            alert.org_id = org.clone();
+            alert.destinations = destinations;
+            alert.creates_incident = creates_incident;
+            let folder = Folder {
+                name: "ops".into(),
+                ..Folder::default()
+            };
+            common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key(&org, alert_id),
+                (folder, alert),
+            );
+        }
+        let finding = |id: &str, rule: &str| serde_json::json!({"kind": "finding", "rule_id": rule, "alert_id": id});
+        let mut hits = vec![
+            finding(&silent, NO_DESTINATION_RULE),
+            finding(&wired, NO_DESTINATION_RULE),
+            finding(&wired, "failure"),
+            finding(&incident, NO_DESTINATION_RULE),
+        ];
+        let paging = o2_enterprise::enterprise::oncall::incidents_page_oncall();
+        drop_unlisted_findings(&org, &mut hits).await;
+        let mut kept = vec![
+            finding(&silent, NO_DESTINATION_RULE),
+            finding(&wired, "failure"),
+        ];
+        if !paging {
+            kept.push(finding(&incident, NO_DESTINATION_RULE));
+        }
+        assert_eq!(hits, kept);
+        stamp_folders(&org, &mut hits).await;
+        assert!(
+            hits.iter().all(|hit| hit[FOLDER_COLUMN] == "ops"),
+            "{hits:?}"
+        );
+        let mut paging = Alert::default();
+        paging.creates_incident = true;
+        assert!(notifies(&paging, true) && !notifies(&paging, false));
     }
 }

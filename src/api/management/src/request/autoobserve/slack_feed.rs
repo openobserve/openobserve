@@ -60,12 +60,16 @@ async fn read(at: ReadAs) -> anyhow::Result<FeedInput> {
         Ok((list.suggestions, list.total))
     })
     .await?;
-    let calibration_run_at = LiveDigest
-        .latest(&at.org_id, at.now)
-        .await
-        .ok()
-        .flatten()
-        .map(|run| run.emitted_at);
+    let run = LiveDigest.latest(&at.org_id, at.now).await.ok().flatten();
+    let calibration_run_at = run.as_ref().map(|run| run.emitted_at);
+    let calibration_open = match &run {
+        Some(run) => LiveDigest
+            .dismissed(&at.org_id, at.now)
+            .await
+            .ok()
+            .map(|dismissed| run.open_count(&dismissed)),
+        None => None,
+    };
     // A failed read must fail the pass: an empty list would read as every decision undone.
     let decisions = decisions::feed_decisions(&at.org_id, &at.user_id, at.now)
         .await
@@ -73,6 +77,7 @@ async fn read(at: ReadAs) -> anyhow::Result<FeedInput> {
     Ok(FeedInput {
         items,
         calibration_run_at,
+        calibration_open,
         decisions,
     })
 }
