@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="isDismissable(finding)"
-                    variant="ghost-primary"
+                    variant="ghost-muted"
                     size="xs"
                     data-test="alert-calibration-dashboard-dismiss"
                     @click="openDismiss(finding)"

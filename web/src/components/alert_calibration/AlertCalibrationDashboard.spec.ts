@@ -21,6 +21,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { alertCalibrationKeys } from "@/services/alert_calibration.querykeys";
 import alertCalibration from "@/services/alert_calibration";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -1192,6 +1193,16 @@ describe("AlertCalibrationDashboard row next steps", () => {
     expect(payload.autoSend).toBe(false);
     expect(payload.prompt).toContain("Alert payments filters on upstream_bucket");
     expect(payload.chipName).toBe("AutoObserve finding · payments");
+    w.unmount();
+  });
+
+  it("dismiss_on_a_row_is_the_quiet_xs_button_the_cards_use_not_a_link", async () => {
+    const w = await openFailures();
+    const dismiss = w
+      .findAllComponents(OButton)
+      .find((b) => b.attributes("data-test") === "alert-calibration-dashboard-dismiss");
+    expect(dismiss?.props("variant")).toBe("ghost-muted");
+    expect(dismiss?.props("size")).toBe("xs");
     w.unmount();
   });
 
