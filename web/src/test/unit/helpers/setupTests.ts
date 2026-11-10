@@ -262,12 +262,10 @@ Object.defineProperty(navigator, "clipboard", {
   writable: true,
 });
 
-// AutoObserve's sample facts load asynchronously, and its specs read them synchronously.
-beforeAll(async () => {
-  await (
-    await import("@/components/autoobserve/data/facts")
-  ).factsReady;
-});
+// Loaded before any spec module runs, since some specs stub globals such as URL at import time.
+await (
+  await import("@/components/autoobserve/data/facts")
+).factsReady;
 
 beforeAll(() => {
   server.listen();
