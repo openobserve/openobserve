@@ -9076,6 +9076,53 @@ mod tests {
         );
     }
 
+    /// AutoObserve's alerts have no destination and may name no service, yet a firing still opens
+    /// one.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_incident_alert_with_no_destination_and_no_service_still_opens_an_incident() {
+        use config::meta::alerts::{QueryCondition, QueryType};
+        use infra::table::alert_incidents::CaseFilter;
+        use svix_ksuid::{Ksuid, KsuidLike};
+
+        use crate::alerts::rca_runs::tests::db;
+
+        const HOUR: i64 = 3_600_000_000;
+        let _db = db().await;
+        let org = format!("ao_dest_{}", config::ider::uuid());
+        let mut alert = Alert::default();
+        alert.id = Some(Ksuid::new(None, None));
+        alert.org_id = org.clone();
+        alert.name = "autoobserve_errors".to_string();
+        alert.creates_incident = true;
+        alert.destinations.clear();
+        alert.query_condition = QueryCondition {
+            query_type: QueryType::SQL,
+            sql: Some(
+                "SELECT count(*) AS errors FROM \"app_traces\" HAVING count(*) > 3".to_string(),
+            ),
+            ..Default::default()
+        };
+        let rows: Vec<Map<String, Value>> = vec![
+            serde_json::json!({"errors": 5})
+                .as_object()
+                .unwrap()
+                .clone(),
+        ];
+
+        let correlated =
+            correlate_alert_to_incident(&alert, &rows[0], &rows, 2 * HOUR, None, None, None, None)
+                .await
+                .unwrap();
+
+        assert!(correlated.is_some(), "no service still opens an incident");
+        let (incidents, total) = list_incidents_filtered(&org, None, CaseFilter::All, 10, 0)
+            .await
+            .unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(incidents[0].alert_count, 1);
+    }
+
     /// Hosts past the partition cap join the detection's entity-less case, not the first of them.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
