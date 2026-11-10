@@ -25,6 +25,8 @@ export interface OwnedAlert {
   folder_id?: string | null;
   folder_name?: string | null;
   destinations?: string[] | null;
+  /** Microseconds; null or 0 when it has never fired. */
+  last_triggered_at?: number | null;
 }
 
 export interface FolderRef {
@@ -112,6 +114,7 @@ const ownedOf = (alert: any): OwnedAlert => {
     folder_id: alert?.folder_id ?? folder?.id ?? null,
     folder_name: typeof folder === "string" ? folder : (folder?.name ?? null),
     destinations: Array.isArray(alert?.destinations) ? alert.destinations : [],
+    last_triggered_at: Number(alert?.last_triggered_at) || null,
   };
 };
 

@@ -131,9 +131,7 @@ const chips = (wrapper: ReturnType<typeof mountDrawer>) =>
 
 describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", () => {
   it("reads Added in a neutral dot until a pass counts it, and offers no second add", async () => {
-    const { serviceKeyOf, useRecentlyCreated } = await import(
-      "./insight/bulk/useRecentlyCreated"
-    );
+    const { serviceKeyOf, useRecentlyCreated } = await import("./insight/bulk/useRecentlyCreated");
     const recently = useRecentlyCreated();
     const org = String(store.state.selectedOrganization?.identifier ?? "");
     recently.add(serviceKeyOf(org, "checkout", "prod-eu", "shop"), "errors");
@@ -149,12 +147,43 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
   });
 });
 
+describe("CoverageServiceDrawer: when a covered check's alert last fired (T2-13)", () => {
+  it("reads it from the service's own alerts instead of 'Not available'", async () => {
+    api.listAlerts.mockResolvedValue({
+      data: {
+        list: [
+          {
+            alert_id: "checkout-errors-id",
+            folder_id: "default",
+            destinations: [],
+            last_triggered_at: (Date.now() - 2 * 60 * 60_000) * 1000,
+          },
+        ],
+      },
+    });
+    try {
+      const row = liveRow({
+        errors: cell("none"),
+        latency: cell("none"),
+        absence: cell("covered", "checkout-errors"),
+      });
+      const wrapper = mountDrawer(row, "watched", true, "absence");
+      await flushPromises();
+      const detail = wrapper
+        .findAllComponents({ name: "CoverageSignalDetail" })
+        .find((c) => c.props("signal") === "absence");
+      expect(String(detail?.props("lastFired"))).toBe("2 hours ago");
+    } finally {
+      api.listAlerts.mockReset();
+    }
+  });
+});
+
 describe("CoverageServiceDrawer header for a logs-only service (T2-7)", () => {
   it("offers Open in Logs instead of Traces and the Service Catalog", () => {
-    const row = liveRow(
-      { errors: cell("none"), latency: cell("none"), absence: cell("none") },
-      [{ type: "logs", name: "ingest_e" }],
-    );
+    const row = liveRow({ errors: cell("none"), latency: cell("none"), absence: cell("none") }, [
+      { type: "logs", name: "ingest_e" },
+    ]);
     const wrapper = mountDrawer(row, "gap");
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-logs"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-traces"]').exists()).toBe(false);

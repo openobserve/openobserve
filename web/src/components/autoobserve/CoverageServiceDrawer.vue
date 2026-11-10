@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CoverageSignalDetail
           v-if="liveChecks && absenceOpen"
           :cell="liveChecks.absence"
+          :last-fired="lastFiredOf(liveChecks.absence)"
           :service="row.service"
           signal="absence"
           :ledger="ledger"
@@ -269,6 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="expanded === chart.def.signal"
                 class="sm:hidden"
                 :cell="chart.cell"
+                :last-fired="lastFiredOf(chart.cell)"
                 :service="row.service"
                 :signal="chart.def.signal"
                 :ledger="ledger"
@@ -284,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <CoverageSignalDetail
                 :cell="openChart.cell"
+                :last-fired="lastFiredOf(openChart.cell)"
                 :service="row.service"
                 :signal="openChart.def.signal"
                 :ledger="ledger"
@@ -416,6 +419,7 @@ import {
   liveCellLook,
   liveCellWord,
   liveCheckText,
+  agoText,
   liveGapLines,
   streamLearning,
   userTimeZone,
@@ -780,6 +784,16 @@ const insightFor = (key: string, cell: CoverageCell) =>
         owned.value,
       )
     : null;
+// The latest firing of the cell's own alerts, from the alert list the drawer already read.
+const lastFiredOf = (cell: CoverageCell): I18nText | null => {
+  if (!props.live || !cell.engine) return null;
+  const ids = new Set(cell.engine.monitors.filter((m) => m.kindKey === "alert").map((m) => m.id));
+  const mine = owned.value.filter((a) => a.id && ids.has(a.id));
+  if (!mine.length) return null;
+  const at = Math.max(0, ...mine.map((a) => a.last_triggered_at ?? 0));
+  if (!at) return t("autoobserve.coverage.never");
+  return agoText(t, locale.value, Math.max(0, Math.floor((Date.now() - at / 1000) / 60_000)));
+};
 const chartInsight = (signal: Signal, cell: CoverageCell) =>
   insightFor(LIVE_CELL[signal as LiveChartSignal] ?? signal, cell);
 </script>
