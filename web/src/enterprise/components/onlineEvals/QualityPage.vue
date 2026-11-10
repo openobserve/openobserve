@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :forbidden="tableForbidden"
           :load-error="!!listQuery.error.value && listStatus !== 403"
           @open="openConfig"
-          :agent="agent"
+          :agent="agent ?? null"
           @one-click="oneClickOpen = true"
           @retry="retryList"
         />
