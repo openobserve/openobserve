@@ -34,6 +34,12 @@ export function setRuntimeHandle(runtime: AssistantRuntime | null): void {
   current.value = runtime;
 }
 
+/** The host's name for its selected org once the runtime is built; any other id reads as itself. */
+export function hostOrgName(id: string): string {
+  const org = current.value?.context.value?.getOrg();
+  return org?.identifier === id && org.name ? org.name : id;
+}
+
 /** Builds the runtime on demand; the dynamic import keeps it out of the caller's chunk. */
 export function ensureRuntime(): Promise<AssistantRuntime> {
   if (current.value) return Promise.resolve(current.value);

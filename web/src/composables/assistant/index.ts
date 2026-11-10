@@ -71,11 +71,7 @@ export {
   useAssistantOpenChord,
   useAssistantShortcuts,
 } from "./shortcuts";
-export {
-  hostOrgName,
-  refreshPageContext,
-  useAssistantContext,
-} from "./context/useAssistantContext";
+export { refreshPageContext, useAssistantContext } from "./context/useAssistantContext";
 export {
   INTERNAL_FIELDS,
   MAX_ATTACHED_BYTES,
@@ -185,6 +181,7 @@ export {
   useLifecycleQuestion,
 } from "./lifecycle";
 export {
+  hostOrgName,
   markSignedIn,
   useOtherAccountSignedIn,
   useSignedOutElsewhere,

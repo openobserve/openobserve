@@ -32,6 +32,7 @@ import { gt, raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { isRunning, useAssistantStore, type AssistantStoreInternal } from "../assistantStore";
 import type { Sid } from "../assistantStore.types";
 import { getAssistantRuntime } from "../runtime";
+import { hostOrgName } from "../runtimeHandle";
 import {
   serializedNameOf,
   attachmentSummary,
@@ -223,12 +224,6 @@ export function resetAssistantContextForTests(): void {
   stopWatchers?.();
   stopWatchers = null;
   reader = () => contextRegistry.getActiveContext();
-}
-
-/** The host's name for its selected org; any other id reads as itself. */
-export function hostOrgName(id: string): string {
-  const org = getAssistantRuntime().context.value?.getOrg();
-  return org?.identifier === id && org.name ? org.name : id;
 }
 
 function subscribe(store: AssistantStoreInternal, read: () => Promise<PageContext | null>): void {

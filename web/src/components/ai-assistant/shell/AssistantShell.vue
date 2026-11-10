@@ -1033,6 +1033,7 @@ const transcriptHost: AssistantTranscriptHost = {
   online: () => online.value,
   canRetry: (sid) => store.canRetry(sid),
   focusComposer: focusAfterAction,
+  stageFollowUp: (sid, text) => store.stage(sid, { text, mode: "replace" }),
 };
 provide(assistantTranscriptHostKey, transcriptHost);
 

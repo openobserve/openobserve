@@ -14,26 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { assistantTranscriptHostKey } from "@/composables/assistant/pure";
 
 import AssistantFollowUps from "./AssistantFollowUps.vue";
 
-const { stage } = vi.hoisted(() => ({ stage: vi.fn() }));
-vi.mock("@/composables/assistant", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/composables/assistant")>()),
-  useAssistantStore: () => ({ stage }),
-}));
-
 describe("AssistantFollowUps", () => {
-  beforeEach(() => stage.mockClear());
-
   it("stages a follow-up and focuses the composer, never sends", async () => {
     const focusComposer = vi.fn();
+    const stageFollowUp = vi.fn();
     const wrapper = mount(AssistantFollowUps, {
       props: { sid: "s1", items: ["Show Redis errors by minute", "Which endpoints?"] },
-      global: { provide: { [assistantTranscriptHostKey as symbol]: { focusComposer } } },
+      global: {
+        provide: { [assistantTranscriptHostKey as symbol]: { focusComposer, stageFollowUp } },
+      },
     });
     const rows = wrapper.findAll('[data-test="assistant-follow-up"]');
     expect(rows.map((row) => row.text())).toEqual([
@@ -41,10 +36,7 @@ describe("AssistantFollowUps", () => {
       "Which endpoints?",
     ]);
     await rows[0].trigger("click");
-    expect(stage).toHaveBeenCalledWith("s1", {
-      text: "Show Redis errors by minute",
-      mode: "replace",
-    });
+    expect(stageFollowUp).toHaveBeenCalledWith("s1", "Show Redis errors by minute");
     expect(focusComposer).toHaveBeenCalled();
   });
 });

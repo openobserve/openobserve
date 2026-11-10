@@ -175,7 +175,7 @@ describe("AssistantMessage", () => {
     expect(bubble.classes()).toEqual(
       expect.arrayContaining([
         "bg-assistant-user-bg",
-        "rounded-[1.125rem]",
+        "rounded-chat-bubble",
         "rounded-ee-default",
         "max-w-[80%]",
         "text-text-body",

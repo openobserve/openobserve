@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { inject } from "vue";
 
-import { useAssistantStore } from "@/composables/assistant";
 import { assistantTranscriptHostKey } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -43,12 +42,11 @@ const ROW_CLASS =
 
 const props = defineProps<{ sid: string; items: string[] }>();
 
-const store = useAssistantStore();
+// Through the host, so the public shared page never pulls in the assistant store.
 const host = inject(assistantTranscriptHostKey, null);
 
-// A follow-up stages, so the reader can edit it before Send (A28).
 function stage(text: string): void {
-  store.stage(props.sid, { text, mode: "replace" });
+  host?.stageFollowUp(props.sid, text);
   host?.focusComposer();
 }
 </script>

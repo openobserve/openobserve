@@ -257,8 +257,8 @@ import AssistantErrorRow from "@/components/ai-assistant/common/AssistantErrorRo
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
-import { isRunning } from "@/composables/assistant";
 import {
+  isRunning,
   approvalCoversTargets,
   approvalEditor,
   approvalEntity,

@@ -158,7 +158,7 @@ import { useRouter } from "vue-router";
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { hostOrgName, useAssistantName } from "@/composables/assistant";
+import { hostOrgName, useAssistantName } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";

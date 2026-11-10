@@ -27,6 +27,7 @@ import { formatOrgRange, uiIntlLocale } from "@/utils/formatters";
 import { isUserDataStream, type StreamOwnership } from "@/utils/internalStreams";
 
 import type { AssistantHostAdapter, ObjectKind, Sid, Tri } from "./assistantStore.types";
+import { periodText } from "./context/contextChips";
 import type { ContextChip, PageContext } from "./context/types";
 import { useAssistantContext } from "./context/useAssistantContext";
 import { getAssistantRuntime } from "./runtime";
@@ -35,16 +36,6 @@ export const STARTER_COUNT = 3;
 
 /** How far down the history the "Continue" starter looks for a chat other than the open one. */
 const RECENT_LOOKUP = 5;
-
-// SI symbols for clock units, as `formatElapsed` writes them; calendar units take the locale's short form.
-const PERIOD_SYMBOLS: Record<string, string> = { s: "s", m: "min", h: "h" };
-
-const PERIOD_UNITS: Record<string, Intl.NumberFormatOptions["unit"]> = {
-  d: "day",
-  w: "week",
-  M: "month",
-  y: "year",
-};
 
 const STREAM_TYPES = ["logs", "metrics", "traces"] as const;
 
@@ -562,19 +553,4 @@ function rangeOf(context: PageContext | null): StarterFacts["range"] {
   if (from !== undefined && to !== undefined)
     return { label: formatOrgRange(from, to), period: null, periodEn: null, from, to };
   return null;
-}
-
-/** "15 min", "1 h", "7 days" for a relative period such as `15m`; `null` for anything else. */
-export function periodText(period: string, locale: string): string | null {
-  const match = /^(\d+)([smhdwMy])$/.exec(period);
-  if (!match) return null;
-  const count = Number(match[1]);
-  const symbol = PERIOD_SYMBOLS[match[2]];
-  const number = new Intl.NumberFormat(locale);
-  if (symbol) return `${number.format(count)} ${symbol}`;
-  return new Intl.NumberFormat(locale, {
-    style: "unit",
-    unit: PERIOD_UNITS[match[2]],
-    unitDisplay: "long",
-  }).format(count);
 }

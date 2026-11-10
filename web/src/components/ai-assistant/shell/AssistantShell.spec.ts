@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computed, defineComponent, inject, ref } from "vue";
+import { computed, defineComponent, inject, ref, shallowRef } from "vue";
 
 import type { AssistantCapability, GateCode, Starter } from "@/composables/assistant";
 import { assistantSessionSourceKey } from "@/composables/assistant/pure";
@@ -310,6 +310,7 @@ describe("AssistantShell states", () => {
 
   it("holds Try again under another tab's approval lock and says why when pressed", async () => {
     setRuntimeHandle({
+      context: shallowRef(null),
       lifecycle: {
         signedOutElsewhere: computed(() => false),
         otherAccountSignedIn: computed(() => false),
@@ -734,6 +735,7 @@ describe("WP-06 conversation wiring", () => {
   it("opens the running chats from a member's run-limit refusal", async () => {
     const { runs } = fakeRuns();
     setRuntimeHandle({
+      context: shallowRef(null),
       runs,
       lifecycle: {
         signedOutElsewhere: computed(() => false),
@@ -947,6 +949,7 @@ describe("AssistantShell after a sign-out in another tab", () => {
   it("shows the signed-out notice with Sign in, unannounced, and keeps Send off", async () => {
     const signedOut = ref(true);
     setRuntimeHandle({
+      context: shallowRef(null),
       lifecycle: {
         signedOutElsewhere: computed(() => signedOut.value),
         otherAccountSignedIn: computed(() => false),
@@ -966,6 +969,7 @@ describe("AssistantShell after a sign-out in another tab", () => {
 
   it("asks for a reload when another account signed in, keeping this tab's chats locked", async () => {
     setRuntimeHandle({
+      context: shallowRef(null),
       lifecycle: {
         signedOutElsewhere: computed(() => true),
         otherAccountSignedIn: computed(() => true),
@@ -983,6 +987,7 @@ describe("AssistantShell after a sign-out in another tab", () => {
 
   it("leaves the stopped turn's own outcome to say it, without a second notice", async () => {
     setRuntimeHandle({
+      context: shallowRef(null),
       lifecycle: {
         signedOutElsewhere: computed(() => true),
         otherAccountSignedIn: computed(() => false),
@@ -1175,6 +1180,7 @@ describe("AssistantShell decision cards", () => {
   it("shows the waiting line with Stop where another tab holds the card", async () => {
     const stopElsewhere = vi.fn(async () => undefined);
     setRuntimeHandle({
+      context: shallowRef(null),
       lifecycle: {
         signedOutElsewhere: computed(() => false),
         otherAccountSignedIn: computed(() => false),
@@ -1190,6 +1196,7 @@ describe("AssistantShell decision cards", () => {
 
   it("says so when Stop on another tab's turn could not cancel it (R3)", async () => {
     setRuntimeHandle({
+      context: shallowRef(null),
       lifecycle: {
         signedOutElsewhere: computed(() => false),
         otherAccountSignedIn: computed(() => false),

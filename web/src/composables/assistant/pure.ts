@@ -90,7 +90,8 @@ export {
   STALL_MS,
   type TurnProgress,
 } from "./turnStateMachine";
-export { isTerminal } from "./turnStates";
+export { isRunning, isTerminal } from "./turnStates";
+export { widerPeriodText } from "./starterPayload";
 export { diffCounts, diffLines, type DiffLine } from "./lineDiff";
 export {
   assistantObjectNameKey,
@@ -111,6 +112,7 @@ export {
 } from "./useAssistantPanelWidth";
 export { useAssistantLeaveGuard, type LeaveGuard } from "./lifecycleQuestions";
 export {
+  hostOrgName,
   markSignedIn,
   runtimeHandle,
   useAssistantGate,
@@ -246,6 +248,8 @@ export interface AssistantTranscriptHost {
   canRetry(sid: Sid): boolean;
   /** After a turn action whose control unmounts (`95` §3, HT-04 AC 10). */
   focusComposer(): void;
+  /** Puts a suggested follow-up in the composer for the reader to edit before Send (A28). */
+  stageFollowUp(sid: Sid, text: string): void;
 }
 
 /** What evidence blocks ask of the live store; every action still goes through `dispatch`. */

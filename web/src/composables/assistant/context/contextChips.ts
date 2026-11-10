@@ -18,7 +18,6 @@ import { gt, raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/
 import { formatBytes, formatOrgRange, uiIntlLocale } from "@/utils/formatters";
 
 import type { ComposerState, DataLevel } from "../assistantStore.types";
-import { periodText } from "../useAssistantStarters";
 import type { ChipKind, ContextChip } from "./types";
 
 /** The agent's whitelist (`ai:src/server/context/o2ai_context.py:37-87`); every other field is not read. */
@@ -56,6 +55,16 @@ export const MAX_ATTACHED_BYTES = 32 * 1024;
 
 /** The page time the tray assumes when a page has no picker (CT-01 AC 2). */
 export const DEFAULT_PERIOD = "15m";
+
+// SI symbols for clock units, as `formatElapsed` writes them; calendar units take the locale's short form.
+const PERIOD_SYMBOLS: Record<string, string> = { s: "s", m: "min", h: "h" };
+
+const PERIOD_UNITS: Record<string, Intl.NumberFormatOptions["unit"]> = {
+  d: "day",
+  w: "week",
+  M: "month",
+  y: "year",
+};
 
 /** A paste longer than this many lines or characters becomes a Pasted text chip (D4 §3.9). */
 export const PASTE_CHIP_LINES = 20;
@@ -397,6 +406,21 @@ export function timeWindowOf(
     period: DEFAULT_PERIOD,
     source: "default",
   };
+}
+
+/** "15 min", "1 h", "7 days" for a relative period such as `15m`; `null` for anything else. */
+export function periodText(period: string, locale: string): string | null {
+  const match = /^(\d+)([smhdwMy])$/.exec(period);
+  if (!match) return null;
+  const count = Number(match[1]);
+  const symbol = PERIOD_SYMBOLS[match[2]];
+  const number = new Intl.NumberFormat(locale);
+  if (symbol) return `${number.format(count)} ${symbol}`;
+  return new Intl.NumberFormat(locale, {
+    style: "unit",
+    unit: PERIOD_UNITS[match[2]],
+    unitDisplay: "long",
+  }).format(count);
 }
 
 /** "last 15 min" for a relative window, "13:43–13:58 IST" (org zone, minute precision) otherwise (CT-01 AC 3). */

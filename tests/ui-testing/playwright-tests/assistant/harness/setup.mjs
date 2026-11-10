@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 // Shared Playwright setup: AI endpoint mocks, config gating patch, backend rewrite, login.
+import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -698,9 +699,9 @@ async function rootApi(method, path, body) {
 
 /** A new admin of the test org with a random password, for flows that switch users in one browser. */
 export async function createUser(prefix = "second") {
-  const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const stamp = `${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
   const user = `${prefix}-${stamp}@example.com`;
-  const pass = `Pw#${Math.random().toString(36).slice(2)}${stamp}`;
+  const pass = `Pw#${randomBytes(12).toString("base64url")}${stamp}`;
   await rootApi("POST", `/api/${ENV.org}/users`, { email: user, password: pass, role: "admin", first_name: "Second", last_name: "User" });
   return { user, pass };
 }
