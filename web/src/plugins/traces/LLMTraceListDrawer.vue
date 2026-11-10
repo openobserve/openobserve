@@ -102,6 +102,7 @@ import {
   traceRowTimeFormat,
   type TraceListSelection,
 } from "./llmInsightsDrill";
+import { streamHasParentSpan } from "./llmStreamColumns";
 
 const props = defineProps<{
   open: boolean;
@@ -163,8 +164,11 @@ async function load() {
   loading.value = true;
   failed.value = false;
   try {
+    const org = store.state.selectedOrganization.identifier;
+    const hasParentSpan = await streamHasParentSpan(org, props.stream);
+    if (mine !== seq) return;
     const hits = (await executeQuery(
-      traceListSql(props.stream, sel, props.scope),
+      traceListSql(props.stream, sel, props.scope, hasParentSpan),
       sel.startTime,
       sel.endTime,
     )) as any[];

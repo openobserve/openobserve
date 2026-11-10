@@ -24,6 +24,7 @@ import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service
 import { TRACE_ERRORED_SQL } from "@/plugins/traces/llmTraceOutcome";
 import { buildAgentTraceFilter } from "@/plugins/traces/llmAgentFilter";
 import { traceUsageSum } from "@/plugins/traces/llmAttribution";
+import { agentParentsJoin } from "@/plugins/traces/config/llmInsightsPanels";
 
 export const WATCH_WINDOW_US = 3 * 3_600_000_000;
 /** The card starts once the new version has this many sessions in its window. */
@@ -41,14 +42,22 @@ export function watchPair(
   return versions.length >= 2 ? { next: versions[0], prev: versions[1] } : null;
 }
 
-/** Window measures for one version: traces, traces with errors, sessions, cost, p95. */
-export function versionWindowSql(stream: string, v: GenAiAgentListItem): string {
+/**
+ * Window measures for one version: traces, traces with errors, sessions, cost, p95.
+ * `hasParentSpan`: the stream stores span parents (`agentParentsJoin`).
+ */
+export function versionWindowSql(
+  stream: string,
+  v: GenAiAgentListItem,
+  hasParentSpan: boolean,
+): string {
   return (
     `SELECT COUNT(*) AS traces, SUM(failed) AS failed, COUNT(DISTINCT session) AS sessions, ` +
     `SUM(cost) AS cost, approx_percentile_cont(duration_us, 0.95) AS p95_us FROM (` +
     `SELECT trace_id, ${TRACE_ERRORED_SQL} AS failed, MAX(gen_ai_conversation_id) AS session, ` +
     `${traceUsageSum("gen_ai_usage_cost")} AS cost, (MAX(end_time) - MIN(start_time)) / 1000 AS duration_us ` +
-    `FROM "${stream}" WHERE ${buildAgentTraceFilter(v, stream)} GROUP BY trace_id)`
+    `FROM "${stream}"${agentParentsJoin(stream, hasParentSpan)} ` +
+    `WHERE ${buildAgentTraceFilter(v, stream)} GROUP BY trace_id)`
   );
 }
 

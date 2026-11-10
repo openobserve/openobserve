@@ -22,32 +22,123 @@ import {
   traceUsageSum,
   usersSql,
 } from "./llmAttribution";
-import { llmCallUsageSum } from "./config/llmInsightsPanels";
+import { agentParentsJoin, llmCallUsageSum } from "./config/llmInsightsPanels";
+
+const withParents = { hasParentSpan: true };
+
+type Span = {
+  span_id: string;
+  parent?: string;
+  op: string | null;
+  usage: number;
+};
+
+/**
+ * One trace's usage as the generated SQL computes it, over in-memory spans:
+ * the FROM's agent-parent join gives each span `agent_parent_span` (its parent
+ * when that parent is a span of the join's agent operation), then `rule` is
+ * read back: the LLM-call sum's operations, and the fallback's operation and
+ * whether it keeps only spans with no agent parent. A fallback in any other
+ * shape (a MAX, a sum over every agent) does not parse and fails the test.
+ */
+function traceUsageOver(from: string, rule: string, column: string, spans: Span[]): number {
+  const join =
+    /AS agent_parents ON trace_id = agent_parent_trace AND (\w+) = agent_parent_span$/.exec(from);
+  const joinAgentOp = /WHERE gen_ai_operation_name = '(\w+)'\) AS agent_parents/.exec(from)?.[1];
+  if (join) expect(join[1]).toBe("reference_parent_span_id");
+  else expect(from).toMatch(/WHERE false\) AS agent_parents ON trace_id = agent_parent_trace$/);
+  const agentParent = (s: Span) => {
+    const parent = spans.find((p) => p.span_id === s.parent);
+    return join && parent && parent.op === joinAgentOp ? parent.span_id : null;
+  };
+  const llmOps = [
+    ...(rule.match(/gen_ai_operation_name IN \(([^)]*)\)/)?.[1] ?? "").matchAll(/'([^']+)'/g),
+  ].map((m) => m[1]);
+  const llm = spans
+    .filter((s) => (s.op == null ? rule.includes("IS NULL OR") : llmOps.includes(s.op)))
+    .reduce((acc, s) => acc + s.usage, 0);
+  const fallback = new RegExp(
+    `SUM\\(CASE WHEN gen_ai_operation_name = '(\\w+)'( AND agent_parent_span IS NULL)? THEN ${column} END\\)`,
+  ).exec(rule);
+  expect(fallback, rule).not.toBeNull();
+  const [, agentOp, topLevelOnly] = fallback!;
+  const agents = spans
+    .filter((s) => s.op === agentOp && (!topLevelOnly || agentParent(s) === null))
+    .reduce((acc, s) => acc + s.usage, 0);
+  return llm || agents;
+}
 
 describe("cost attribution (AIO-27)", () => {
   it("attributes a trace's whole cost to the value set on any of its spans", () => {
-    const sql = costByDimensionSql("s", "tenant_id", "gen_ai_agent_name = 'a'").rows;
+    const sql = costByDimensionSql("s", "tenant_id", "gen_ai_agent_name = 'a'", withParents).rows;
     expect(sql).toContain("COALESCE(MAX(tenant_id), '') AS v");
-    expect(sql).toContain("FROM \"s\" WHERE gen_ai_agent_name = 'a' GROUP BY trace_id");
+    expect(sql).toContain(
+      `FROM "s"${agentParentsJoin("s", true)} WHERE gen_ai_agent_name = 'a' GROUP BY trace_id`,
+    );
   });
 
-  // The one per-trace rule: LLM-call usage, else the agent span's. An agent
-  // span repeating its chat child's usage counts once; usage only on the
-  // invoke_agent span still counts. The fallback reads agent spans only, not
-  // every span (workflow/tool rollups would double count).
-  it("defines a trace's usage as its LLM calls', else its agent span's", () => {
-    const rule = traceUsageSum("gen_ai_usage_cost");
-    expect(rule).toContain(`NULLIF(${llmCallUsageSum("gen_ai_usage_cost")}, 0)`);
-    expect(rule).toContain(
-      "MAX(CASE WHEN gen_ai_operation_name = 'invoke_agent' THEN gen_ai_usage_cost END)",
-    );
-    expect(rule).not.toContain("SUM(gen_ai_usage_cost)");
+  // G2-13: the one per-trace rule is LLM-call usage, else the usage of the
+  // top-level agent spans (parent not an agent span). Sibling agents add up; a
+  // nested agent repeats part of its parent's usage and is not counted again.
+  describe("a trace's usage (traceUsageSum)", () => {
+    const usage = (spans: Span[], hasParentSpan = true) =>
+      traceUsageOver(
+        agentParentsJoin("s", hasParentSpan),
+        traceUsageSum("gen_ai_usage_cost"),
+        "gen_ai_usage_cost",
+        spans,
+      );
+    const workflow: Span = { span_id: "w", op: "invoke_workflow", usage: 0 };
+    const siblings: Span[] = [
+      workflow,
+      { span_id: "a1", parent: "w", op: "invoke_agent", usage: 0.1 },
+      { span_id: "n", parent: "a1", op: "invoke_agent", usage: 0.04 },
+      { span_id: "a2", parent: "w", op: "invoke_agent", usage: 0.2 },
+    ];
+
+    it("sums sibling agents and skips the agent nested under one of them", () => {
+      expect(usage(siblings)).toBeCloseTo(0.3);
+    });
+
+    it("counts a root agent and its own repeating child agent once", () => {
+      expect(
+        usage([
+          { span_id: "a", op: "invoke_agent", usage: 0.3 },
+          { span_id: "b", parent: "a", op: "invoke_agent", usage: 0.3 },
+        ]),
+      ).toBeCloseTo(0.3);
+    });
+
+    it("keeps LLM-call usage over any agent span", () => {
+      expect(
+        usage([
+          { span_id: "a", op: "invoke_agent", usage: 0.15 },
+          { span_id: "c", parent: "a", op: "chat", usage: 0.01 },
+          { span_id: "x", op: "invoke_agent", usage: 0.5 },
+        ]),
+      ).toBeCloseTo(0.01);
+    });
+
+    it("sums every agent span of a stream that stores no parents (all roots)", () => {
+      const roots = siblings.map((s) => ({ ...s, parent: undefined }));
+      expect(usage(roots, false)).toBeCloseTo(0.34);
+    });
+
+    it("reads LLM calls first and agent spans only, never every span", () => {
+      const rule = traceUsageSum("gen_ai_usage_cost");
+      expect(rule).toContain(`NULLIF(${llmCallUsageSum("gen_ai_usage_cost")}, 0)`);
+      expect(rule).not.toContain("SUM(gen_ai_usage_cost)");
+    });
   });
 
   it("sums each trace's usage with the shared rule in Cost by dims and Users", () => {
     for (const sql of [
-      costByDimensionSql("s", "tenant_id", "gen_ai_agent_name = 'a'").rows,
-      usersSql("s", { scope: "gen_ai_agent_name = 'a'", tenantColumn: "tenant_id" }),
+      costByDimensionSql("s", "tenant_id", "gen_ai_agent_name = 'a'", withParents).rows,
+      usersSql("s", {
+        scope: "gen_ai_agent_name = 'a'",
+        tenantColumn: "tenant_id",
+        ...withParents,
+      }),
     ]) {
       for (const [column, alias] of [
         ["gen_ai_usage_cost", "cost"],
@@ -55,15 +146,20 @@ describe("cost attribution (AIO-27)", () => {
       ]) {
         expect(sql).toContain(`${traceUsageSum(column)} AS ${alias}`);
       }
+      expect(sql).toContain(`FROM "s"${agentParentsJoin("s", true)} WHERE`);
       expect(sql).toContain("GROUP BY trace_id");
     }
+    // A stream without the parent column joins no parents and names no missing column.
+    const flat = usersSql("s", { scope: "", tenantColumn: null, hasParentSpan: false });
+    expect(flat).toContain(`FROM "s"${agentParentsJoin("s", false)} GROUP BY trace_id`);
+    expect(flat).not.toContain("reference_parent_span_id");
   });
 
   // One trace can call several models, so a model's cost is its own calls'.
   // A trace with usage only on its agent span has no model to take, so that
   // usage lands in the unattributed '' row instead of vanishing.
   it("attributes cost per model and trace, agent-only usage unattributed", () => {
-    const sql = costByModelSql("s", "gen_ai_agent_name = 'a'").rows;
+    const sql = costByModelSql("s", "gen_ai_agent_name = 'a'", withParents).rows;
     const [models, agentOnly] = sql.split(" UNION ALL ");
     expect(agentOnly).toBeDefined();
     expect(models).toContain("SELECT trace_id, gen_ai_response_model AS v");
@@ -74,8 +170,14 @@ describe("cost attribution (AIO-27)", () => {
     );
     expect(agentOnly).toContain("SELECT trace_id, '' AS v");
     expect(agentOnly).toContain(`COALESCE(${llmCallUsageSum("gen_ai_usage_cost")}, 0) = 0`);
-    expect(agentOnly).toContain("gen_ai_operation_name = 'invoke_agent'");
-    expect(agentOnly).toContain("WHERE gen_ai_agent_name = 'a' GROUP BY trace_id HAVING");
+    expect(agentOnly).toContain(
+      "gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL",
+    );
+    expect(agentOnly).toContain(
+      `FROM "s"${agentParentsJoin("s", true)} WHERE gen_ai_agent_name = 'a' GROUP BY trace_id HAVING`,
+    );
+    // The per-model LLM-call arm reads no agent span, so it needs no join.
+    expect(models).not.toContain("agent_parents");
     expect(sql).toContain("COUNT(DISTINCT trace_id) AS traces");
   });
 
@@ -83,7 +185,10 @@ describe("cost attribution (AIO-27)", () => {
   // query aggregates the same grouping with no limit. The search layer ignores
   // an ORDER BY on an expression (S3V-01), so the sort key is a projected alias.
   it("fetches the top values plus unattributed, and totals over every value", () => {
-    for (const sql of [costByDimensionSql("s", "user_id", ""), costByModelSql("s", "")]) {
+    for (const sql of [
+      costByDimensionSql("s", "user_id", "", withParents),
+      costByModelSql("s", "", withParents),
+    ]) {
       expect(sql.rows).toMatch(
         /^SELECT v, cost, tokens, traces, unpriced, CASE WHEN v = '' THEN 0 ELSE 1 END AS unattributed_last FROM \(/,
       );
@@ -135,25 +240,33 @@ describe("cost attribution (AIO-27)", () => {
   });
 
   it("lists users without a tenant column and escapes the search, ignoring case", () => {
-    const sql = usersSql("s", { scope: "", tenantColumn: null, search: "U_1%" });
+    const sql = usersSql("s", { scope: "", tenantColumn: null, search: "U_1%", ...withParents });
     expect(sql).toContain("'' AS tenant");
     expect(sql).toContain("LOWER(user_id) LIKE '%u\\_1\\%%'");
   });
 
   it("matches a backslash in the search literally instead of escaping the next character", () => {
-    const sql = usersSql("s", { scope: "", tenantColumn: null, search: "a\\" });
+    const sql = usersSql("s", { scope: "", tenantColumn: null, search: "a\\", ...withParents });
     // `a\` must become the LIKE pattern `%a\\%`, not `%a\%` (which matches a literal `%`).
     expect(sql).toContain("LOWER(user_id) LIKE '%a\\\\%'");
   });
 
   it("counts unpriced LLM-call tokens per row only when the stream has the status column", () => {
-    const withStatus = usersSql("s", { scope: "", tenantColumn: null, hasCostStatus: true });
+    const withStatus = usersSql("s", {
+      scope: "",
+      tenantColumn: null,
+      hasCostStatus: true,
+      ...withParents,
+    });
     expect(withStatus).toContain("gen_ai_usage_cost_status = 'unpriced'");
     expect(withStatus).toContain("SUM(unpriced) AS unpriced");
-    expect(usersSql("s", { scope: "", tenantColumn: null })).not.toContain("cost_status");
+    expect(usersSql("s", { scope: "", tenantColumn: null, ...withParents })).not.toContain(
+      "cost_status",
+    );
+    const cols = { hasCostStatus: true, ...withParents };
     for (const sql of [
-      costByDimensionSql("s", "user_id", "", true),
-      costByModelSql("s", "", true),
+      costByDimensionSql("s", "user_id", "", cols),
+      costByModelSql("s", "", cols),
     ]) {
       expect(sql.rows).toContain("gen_ai_usage_cost_status = 'unpriced'");
       expect(sql.totals).toContain("SUM(unpriced) AS unpriced");

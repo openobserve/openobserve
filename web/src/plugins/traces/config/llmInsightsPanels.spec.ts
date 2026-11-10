@@ -14,6 +14,7 @@ import {
   compactSql,
   pickInterval,
   llmCallUsageSum,
+  agentParentsJoin,
   ERROR_MESSAGE_SQL,
   type LLMPanelDef,
 } from "./llmInsightsPanels";
@@ -190,7 +191,7 @@ describe("renderPanelSql", () => {
 });
 
 describe("cost and token trends add up to the tiles", () => {
-  const render = (id: string) =>
+  const render = (id: string, hasParentSpan = true) =>
     renderPanelSql(LLM_INSIGHTS_PANELS.find((p) => p.id === id)!.query.sql, {
       stream: "s",
       startTime: 0,
@@ -198,9 +199,10 @@ describe("cost and token trends add up to the tiles", () => {
       interval: "1 hour",
       agentFilter: "gen_ai_agent_name = 'a'",
       unattributedLabel: "Unattributed",
+      hasParentSpan,
     });
 
-  it("adds the traces whose cost is only on their agent span as an Unattributed series", () => {
+  it("adds the traces whose cost is only on their agent spans as an Unattributed series", () => {
     const sql = render("cost-trend");
     expect(sql).toContain("UNION ALL");
     expect(sql).toContain("'Unattributed' as model");
@@ -211,11 +213,47 @@ describe("cost and token trends add up to the tiles", () => {
     expect(sql.match(/AND \(gen_ai_agent_name = 'a'\)/g)).toHaveLength(2);
   });
 
+  // G2-13: the agent-only half sums the top-level agents, found by joining each
+  // span to its agent parent; a stream that stores no parents joins none.
+  it("sums the top-level agents of an agent-only trace in both trends", () => {
+    for (const id of ["cost-trend", "token-trend"]) {
+      const sql = render(id);
+      expect(sql).toContain(
+        `FROM "s"${agentParentsJoin("s", true)} WHERE trace_id IS NOT NULL AND (gen_ai_agent_name = 'a')`,
+      );
+      expect(sql).toContain("gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL");
+      expect(sql).not.toContain("MAX(CASE WHEN gen_ai_operation_name = 'invoke_agent'");
+      expect(sql).not.toContain("{{agentParents}}");
+      const flat = render(id, false);
+      expect(flat).toContain(`FROM "s"${agentParentsJoin("s", false)} WHERE trace_id IS NOT NULL`);
+      expect(flat).not.toContain("reference_parent_span_id");
+    }
+  });
+
   it("adds agent-span-only tokens to the token trend", () => {
     const sql = render("token-trend");
     expect(sql).toContain("UNION ALL");
-    expect(sql).toContain("gen_ai_operation_name = 'invoke_agent' THEN gen_ai_usage_input_tokens");
+    expect(sql).toContain(
+      "gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL THEN gen_ai_usage_input_tokens",
+    );
     expect(sql.match(/AND \(gen_ai_agent_name = 'a'\)/g)).toHaveLength(2);
+  });
+});
+
+describe("agentParentsJoin", () => {
+  it("joins each span to its parent when the parent is an agent span of the same trace", () => {
+    expect(agentParentsJoin("s", true)).toBe(
+      ` LEFT JOIN (SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span ` +
+        `FROM "s" WHERE gen_ai_operation_name = 'invoke_agent') AS agent_parents ` +
+        `ON trace_id = agent_parent_trace AND reference_parent_span_id = agent_parent_span`,
+    );
+  });
+
+  it("joins no rows on a stream without the parent column, so every agent is top-level", () => {
+    expect(agentParentsJoin("s", false)).toBe(
+      ` LEFT JOIN (SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span ` +
+        `FROM "s" WHERE false) AS agent_parents ON trace_id = agent_parent_trace`,
+    );
   });
 });
 

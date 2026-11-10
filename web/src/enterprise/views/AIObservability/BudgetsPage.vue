@@ -291,6 +291,7 @@ import { useAiDateController } from "@/enterprise/composables/useAiDateControlle
 import { useLlmPageScope } from "@/enterprise/composables/useLlmPageScope";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import { pricingGapsRoute, type TimeWindow } from "@/plugins/traces/llmDataTrust.utils";
+import { streamHasParentSpan } from "@/plugins/traces/llmStreamColumns";
 import {
   BUDGET_COLUMNS,
   PERIOD_MINUTES,
@@ -557,8 +558,9 @@ async function reload() {
     // A failed read is an unknown spend, never $0 "under".
     rows.value = await Promise.all(
       defs.map(async (b) => {
+        const hasParentSpan = await streamHasParentSpan(org(), b.stream);
         const result = await executeQuery(
-          isEach(b.scope) ? budgetSummarySql(b) : budgetSql(b),
+          isEach(b.scope) ? budgetSummarySql(b, hasParentSpan) : budgetSql(b, hasParentSpan),
           now - PERIOD_MINUTES[b.period] * 60_000_000,
           now,
         ).then((hits) => hits as BudgetRow[], spendError);
@@ -646,6 +648,8 @@ async function submit() {
       value: draft.value.trim(),
       period: draft.scope === "session" ? "hour" : draft.period,
     };
+    // The budget's SQL reads the stream's top-level agents through span parents.
+    const hasParentSpan = await streamHasParentSpan(org(), b.stream);
     if (editing.value) {
       const folder = budgetFolder.value ?? undefined;
       const stored = (await alertsService.get_by_alert_id(org(), editing.value.alertId, folder))
@@ -655,6 +659,7 @@ async function submit() {
         budgetAlertUpdate({ ...stored, id: editing.value.alertId }, b, {
           destination: destination.value ?? "",
           editor: store.state.userInfo?.email ?? "",
+          hasParentSpan,
         }),
         folder,
       );
@@ -668,6 +673,7 @@ async function submit() {
           destination: destination.value ?? "",
           owner: store.state.userInfo?.email ?? "",
           timezone: store.state.timezone || "UTC",
+          hasParentSpan,
         }),
         id,
       );

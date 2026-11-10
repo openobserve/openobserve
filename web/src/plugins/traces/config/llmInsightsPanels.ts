@@ -163,22 +163,48 @@ export function llmCallUsageSum(column: string): string {
   return `SUM(CASE WHEN ${predicate} THEN ${column} ELSE 0 END)`;
 }
 
-/** The largest `invoke_agent` span's usage: the outermost agent's rollup. */
-export const agentSpanUsage = (column: string) =>
-  `MAX(CASE WHEN ${OBSERVATION_TYPE_FIELD} = 'invoke_agent' THEN ${column} END)`;
+const AGENT_SPAN = `${OBSERVATION_TYPE_FIELD} = 'invoke_agent'`;
+
+/** Stored column holding a span's parent span id; a stream whose spans never had a parent lacks it. */
+export const PARENT_SPAN_FIELD = "reference_parent_span_id";
 
 /**
- * Inside `GROUP BY trace_id`: the agent-span usage a trace's total falls back
- * to when none of its LLM calls carries any (`traceUsageSum`), else 0. That
- * usage has no LLM call to take a model from, so per-model views show it as
- * unattributed.
+ * What `topLevelAgentUsage` finds top-level agents through, placed right after
+ * the stream in FROM: each span joins its parent when that parent is an
+ * `invoke_agent` span of the same trace (`agent_parent_span`, else NULL), one
+ * row per span since the agent ids are distinct. A stream without the parent
+ * column holds only root spans, so every agent span is top-level and the join
+ * is to no rows. Mirrors `agent_parents_join` in
+ * src/api/search/src/traces/session.rs.
+ */
+export function agentParentsJoin(stream: string, hasParentSpan: boolean): string {
+  const agents = `SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span FROM "${stream}"`;
+  return hasParentSpan
+    ? ` LEFT JOIN (${agents} WHERE ${AGENT_SPAN}) AS agent_parents ` +
+        `ON trace_id = agent_parent_trace AND ${PARENT_SPAN_FIELD} = agent_parent_span`
+    : ` LEFT JOIN (${agents} WHERE false) AS agent_parents ON trace_id = agent_parent_trace`;
+}
+
+/**
+ * The usage of a trace's top-level agent spans, those whose parent is not an
+ * agent span: sibling agents add up, and a nested agent, whose usage its
+ * parent's already holds, is not counted again. Needs `agentParentsJoin` in FROM.
+ */
+export const topLevelAgentUsage = (column: string) =>
+  `SUM(CASE WHEN ${AGENT_SPAN} AND agent_parent_span IS NULL THEN ${column} END)`;
+
+/**
+ * Inside `GROUP BY trace_id`: the top-level agents' usage a trace's total falls
+ * back to when none of its LLM calls carries any (`traceUsageSum`), else 0.
+ * That usage has no LLM call to take a model from, so per-model views show it
+ * as unattributed.
  */
 export const agentFallbackUsage = (column: string) =>
   `CASE WHEN COALESCE(${llmCallUsageSum(column)}, 0) = 0 ` +
-  `THEN COALESCE(${agentSpanUsage(column)}, 0) ELSE 0 END`;
+  `THEN COALESCE(${topLevelAgentUsage(column)}, 0) ELSE 0 END`;
 
 /**
- * The traces whose usage is only on their agent span, one row each, placed in
+ * The traces whose usage is only on their agent spans, one row each, placed in
  * the bucket of their first span. A trace is judged whole, not per bucket, so a
  * trace whose agent span and LLM calls fall in different buckets never counts
  * twice. Its first span's time is projected as `first_ts` (the search layer
@@ -188,7 +214,7 @@ function agentOnlyTracesSql(columns: Array<[string, string]>, havingColumn: stri
   const projected = columns.map(([col, alias]) => `${agentFallbackUsage(col)} as ${alias}`);
   return `
     SELECT trace_id, MIN(_timestamp) as first_ts, ${projected.join(", ")}
-    FROM {{stream}}
+    FROM {{stream}}{{agentParents}}
     WHERE trace_id IS NOT NULL{{scope}}
     GROUP BY trace_id
     HAVING ${agentFallbackUsage(havingColumn)} > 0`;
@@ -426,6 +452,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
  *   {{scope}}      → ` AND (<agentFilter>)`, or nothing: a template with several
  *                                    WHEREs (a UNION) marks each one to scope
  *   {{unattributed}} → the quoted series name for usage with no model
+ *   {{agentParents}} → `agentParentsJoin` for the stream, after `{{stream}}` in a
+ *                                    FROM whose usage falls back to top-level agents
  *
  * @example
  *   renderPanelSql(
@@ -446,6 +474,8 @@ export function renderPanelSql(
     agentFilter?: string;
     /** Translated name of the series for usage with no model ({{unattributed}}). */
     unattributedLabel?: string;
+    /** The stream stores span parents ({{agentParents}}); false or absent when it has none. */
+    hasParentSpan?: boolean;
   },
 ): string {
   const marked = sql.includes("{{scope}}");
@@ -459,7 +489,8 @@ export function renderPanelSql(
     .replace(
       /\{\{unattributed\}\}/g,
       () => `'${(ctx.unattributedLabel ?? "Unattributed").replace(/'/g, "''")}'`,
-    );
+    )
+    .replace(/\{\{agentParents\}\}/g, () => agentParentsJoin(ctx.stream, !!ctx.hasParentSpan));
 
   if (!ctx.agentFilter || marked) return compactSql(rendered);
 

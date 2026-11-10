@@ -25,6 +25,8 @@ import {
   type WindowMeasures,
 } from "./releaseWatch";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import { agentParentsJoin } from "@/plugins/traces/config/llmInsightsPanels";
+import { traceUsageSum } from "@/plugins/traces/llmAttribution";
 
 const m = (over: Partial<WindowMeasures>): WindowMeasures => ({
   traces: 1000,
@@ -51,16 +53,22 @@ describe("release watch (AIO-39)", () => {
     const noEnv = { name: "qa", version: "2.0", env: null } as unknown as GenAiAgentListItem;
     const prod = { name: "qa", version: "2.0", env: "production" } as GenAiAgentListItem;
     const envNull = /gen_ai_agent_env\s+IS\s+NULL/i;
-    expect(versionWindowSql("s", noEnv)).toMatch(envNull);
+    expect(versionWindowSql("s", noEnv, true)).toMatch(envNull);
     expect(versionFailuresSql("s", noEnv, true)).toMatch(envNull);
-    expect(versionWindowSql("s", prod)).not.toMatch(envNull);
+    expect(versionWindowSql("s", prod, true)).not.toMatch(envNull);
     expect(versionFailuresSql("s", prod, true)).toContain("'production'");
   });
 
   it("counts a trace's cost once, by the per-trace usage rule, not every span", () => {
-    const sql = versionWindowSql("s", { name: "qa", version: "2.0" } as GenAiAgentListItem);
+    const v = { name: "qa", version: "2.0" } as GenAiAgentListItem;
+    const sql = versionWindowSql("s", v, true);
     expect(sql).not.toContain("SUM(gen_ai_usage_cost)");
-    expect(sql).toContain("gen_ai_operation_name = 'invoke_agent'");
+    expect(sql).toContain(`${traceUsageSum("gen_ai_usage_cost")} AS cost`);
+    // G2-13: top-level agents come from the agent-parent join.
+    expect(sql).toContain(`FROM "s"${agentParentsJoin("s", true)} WHERE`);
+    expect(versionWindowSql("s", v, false)).toContain(
+      `FROM "s"${agentParentsJoin("s", false)} WHERE`,
+    );
   });
 
   it("mutes a release only in its own org, stream and env", () => {

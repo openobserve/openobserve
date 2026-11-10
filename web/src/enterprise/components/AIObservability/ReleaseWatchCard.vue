@@ -134,6 +134,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useStreams from "@/composables/useStreams";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
+import { PARENT_SPAN_FIELD } from "@/plugins/traces/config/llmInsightsPanels";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
 import { formatCost } from "@/utils/llmUtils";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -229,14 +230,16 @@ async function load() {
   const wp = windowOf(p.prev);
   const wn = windowOf(p.next);
   const schema = await getStream(props.stream, "traces", true).catch(() => null);
-  const hasMsg = (schema?.schema ?? []).some((f: any) => f.name === "status_message");
+  const fields: string[] = (schema?.schema ?? []).map((f: any) => f.name);
+  const hasMsg = fields.includes("status_message");
+  const hasParent = fields.includes(PARENT_SPAN_FIELD);
   const run = (sql: string, w: { start: number; end: number }) =>
     sql
       ? (executeQuery(sql, w.start, w.end).catch(() => []) as Promise<any[]>)
       : Promise.resolve([]);
   const [prevRow, nextRow, prevMsgs, nextMsgs] = await Promise.all([
-    run(versionWindowSql(props.stream, p.prev), wp),
-    run(versionWindowSql(props.stream, p.next), wn),
+    run(versionWindowSql(props.stream, p.prev, hasParent), wp),
+    run(versionWindowSql(props.stream, p.next, hasParent), wn),
     run(versionFailuresSql(props.stream, p.prev, hasMsg), wp),
     run(versionFailuresSql(props.stream, p.next, hasMsg), wn),
   ]);

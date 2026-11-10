@@ -29,7 +29,7 @@
 
 import { SEVERITY_TO_PRIORITY } from "@/constants/alertLibrary";
 import { traceUsageSum } from "@/plugins/traces/llmAttribution";
-import { llmCallUsageSum } from "@/plugins/traces/config/llmInsightsPanels";
+import { agentParentsJoin, llmCallUsageSum } from "@/plugins/traces/config/llmInsightsPanels";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
 export const BUDGET_PACK = "ai-budgets";
@@ -79,16 +79,17 @@ export const WARN_RATIO = 0.8;
  * children still counts: a trace counts its whole usage (`traceUsageSum`). A one-value budget
  * counts every trace with a span carrying the value; an "each" budget gives a trace to the value
  * its spans carry (`MAX`), as Users does. A model is set on each LLM call, so model budgets stay
- * per span.
+ * per span. `hasParentSpan`: the stream stores span parents (`agentParentsJoin`).
  */
-export function budgetSql(b: BudgetDef): string {
+export function budgetSql(b: BudgetDef, hasParentSpan: boolean): string {
   const col = BUDGET_COLUMNS[b.scope];
   const tail = `GROUP BY ${col} ORDER BY spent DESC`;
   const cost = `${traceUsageSum("gen_ai_usage_cost")} AS cost`;
+  const spans = `"${b.stream}"${agentParentsJoin(b.stream, hasParentSpan)}`;
   if (isEach(b.scope)) {
     return (
       `SELECT ${col}, SUM(cost) AS spent FROM (` +
-      `SELECT trace_id, MAX(${col}) AS ${col}, ${cost} FROM "${b.stream}" GROUP BY trace_id) ` +
+      `SELECT trace_id, MAX(${col}) AS ${col}, ${cost} FROM ${spans} GROUP BY trace_id) ` +
       `WHERE ${col} IS NOT NULL AND ${col} != '' ${tail}`
     );
   }
@@ -102,7 +103,7 @@ export function budgetSql(b: BudgetDef): string {
   return (
     `SELECT ${col}, SUM(cost) AS spent FROM (` +
     `SELECT trace_id, MAX(CASE WHEN ${match} THEN ${col} END) AS ${col}, ${cost} ` +
-    `FROM "${b.stream}" WHERE trace_id IN (SELECT trace_id FROM "${b.stream}" WHERE ${match}) ` +
+    `FROM ${spans} WHERE trace_id IN (SELECT trace_id FROM "${b.stream}" WHERE ${match}) ` +
     `GROUP BY trace_id) WHERE ${match} ${tail}`
   );
 }
@@ -145,6 +146,8 @@ export function budgetAlertPayload(
     destination: string;
     owner: string;
     timezone: string;
+    /** The stream stores span parents (`budgetSql`). */
+    hasParentSpan: boolean;
   },
 ) {
   return {
@@ -156,7 +159,7 @@ export function budgetAlertPayload(
     destinations: opts.destination ? [opts.destination] : [],
     query_condition: {
       type: "sql",
-      sql: budgetSql(b),
+      sql: budgetSql(b, opts.hasParentSpan),
       conditions: null,
       // SQL multi-alert: the backend derives group_by from the SQL; function is fixed.
       aggregation: {
@@ -206,13 +209,14 @@ export function budgetAlertPayload(
 export function budgetAlertUpdate(
   stored: Record<string, any>,
   b: BudgetDef,
-  opts: { destination: string; editor: string },
+  opts: { destination: string; editor: string; hasParentSpan: boolean },
 ) {
   const next = budgetAlertPayload(b, {
     folderId: stored.folder_id,
     destination: opts.destination,
     owner: stored.owner,
     timezone: stored.trigger_condition?.timezone ?? "UTC",
+    hasParentSpan: opts.hasParentSpan,
   });
   const trigger = stored.trigger_condition ?? {};
   return {
@@ -349,11 +353,11 @@ export function formatBudgetUsd(value: number): string {
  * The spend of a per-key budget over every key, not one page of them: how many
  * keys spent, how many are at or over the limit, their total and the largest.
  */
-export function budgetSummarySql(b: BudgetDef): string {
+export function budgetSummarySql(b: BudgetDef, hasParentSpan: boolean): string {
   return (
     `SELECT COUNT(*) AS key_count, ` +
     `SUM(CASE WHEN spent >= ${b.limitUsd} THEN 1 ELSE 0 END) AS over_count, ` +
-    `SUM(spent) AS spent, MAX(spent) AS largest FROM (${budgetSql(b)})`
+    `SUM(spent) AS spent, MAX(spent) AS largest FROM (${budgetSql(b, hasParentSpan)})`
   );
 }
 

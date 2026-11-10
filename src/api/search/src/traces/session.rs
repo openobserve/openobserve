@@ -1065,6 +1065,8 @@ fn build_session_trace_details_sql(
             "gen_ai_usage_cost_net_cache_impact",
         );
         let unpriced_selects = validated.unpriced_selects();
+        let agent_parents =
+            agent_parents_join(&stream_ident, validated.layout(), Some(trace_id_predicate));
         format!(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
@@ -1085,7 +1087,7 @@ fn build_session_trace_details_sql(
             {first_msg_clause} as gen_ai_input_messages, \
             {agent_clause}\
             {trace_selects} \
-            FROM {stream_ident} \
+            FROM {stream_ident}{agent_parents} \
             WHERE {trace_id_predicate} \
             GROUP BY trace_id"
         )
@@ -1292,20 +1294,58 @@ fn optional_usage_expr(has_field: bool, sum_expr: &str, alias: &str) -> String {
     }
 }
 
-/// One trace's usage: its LLM-call spans' sum, else the largest `invoke_agent`
-/// span's usage when no LLM call carries any. SDKs that report usage only on
-/// the agent span still count, and an agent span repeating its children's
-/// usage (or an outer agent repeating an inner one) counts once. Only valid
-/// inside a `GROUP BY trace_id`: a session's usage is the sum of its traces'.
-/// Mirrors `traceUsageSum` in `web/src/plugins/traces/llmAttribution.ts`.
+/// One trace's usage: its LLM-call spans' sum, else, when no LLM call carries any, the sum over
+/// its top-level `invoke_agent` spans (agent spans whose parent is not an agent span). SDKs that
+/// report usage only on the agent span still count, sibling agents add up, and an agent span
+/// repeating its children's usage (or an outer agent repeating a nested one) counts once. Reads
+/// the column [`agent_parents_join`] adds, and is only valid inside a `GROUP BY trace_id`: a
+/// session's usage is the sum of its traces'. Mirrors `traceUsageSum` in
+/// `web/src/plugins/traces/llmAttribution.ts`.
 pub(super) fn usage_rule(column: &str, has_operation_name: bool) -> String {
     let llm_sum = super::schema_compat::usage_sum_expr(column, has_operation_name);
     if !has_operation_name {
         return llm_sum;
     }
     format!(
-        "COALESCE(NULLIF({llm_sum}, 0), max(CASE WHEN gen_ai_operation_name = 'invoke_agent' \
+        "COALESCE(NULLIF({llm_sum}, 0), sum(CASE WHEN {AGENT_SPAN} AND {AGENT_PARENT_SPAN} IS NULL \
          THEN {column} END), 0)"
+    )
+}
+
+/// The spans the usage rule falls back to.
+const AGENT_SPAN: &str = "gen_ai_operation_name = 'invoke_agent'";
+
+/// Added to every span by [`agent_parents_join`]: its parent's id when that parent is an agent
+/// span of the same trace, else NULL.
+const AGENT_PARENT_SPAN: &str = "agent_parent_span";
+
+/// What [`usage_rule`] finds top-level agents through, placed right after the stream in `FROM`:
+/// each span joins its parent when that parent is an `invoke_agent` span of the same trace, one
+/// row per span since the agent ids are distinct. `scope` narrows the agent lookup to the traces
+/// the outer query reads. A stream without the parent column holds only root spans, so every
+/// agent span is top-level and the join is to no rows. Empty when the rule reads no agent spans.
+pub(super) fn agent_parents_join(
+    stream_ident: &str,
+    layout: super::schema_compat::StreamLlmLayout,
+    scope: Option<&str>,
+) -> String {
+    if !layout.has_operation_name {
+        return String::new();
+    }
+    let agents = format!(
+        "SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS {AGENT_PARENT_SPAN} \
+         FROM {stream_ident}"
+    );
+    if !layout.has_parent_span {
+        return format!(
+            " LEFT JOIN ({agents} WHERE false) AS agent_parents ON trace_id = agent_parent_trace"
+        );
+    }
+    let scope = scope.map(|p| format!(" AND ({p})")).unwrap_or_default();
+    format!(
+        " LEFT JOIN ({agents} WHERE {AGENT_SPAN}{scope}) AS agent_parents \
+         ON trace_id = agent_parent_trace AND {} = {AGENT_PARENT_SPAN}",
+        super::schema_compat::PARENT_SPAN_ID_COLUMN
     )
 }
 
@@ -1590,6 +1630,12 @@ fn build_latest_session_page_sql(
         ),
     };
     let stream_ident = traces::session::quote_identifier(stream_name);
+    // Only a Tokens/Cost sort applies the usage rule here.
+    let agent_parents = if latest_session_usage_sort_column(sort.field, validated).is_some() {
+        agent_parents_join(&stream_ident, validated.layout(), None)
+    } else {
+        String::new()
+    };
 
     // Per trace, over all of its spans: its session (the id its spans carry;
     // SDKs often set it on the agent span only, while the chat children carry
@@ -1601,7 +1647,7 @@ fn build_latest_session_page_sql(
         "SELECT session_id, max(trace_last_activity) as session_last_activity{sort_projection} \
          FROM (SELECT max({session_id_col}) as session_id, trace_id, \
          max(end_time) as trace_last_activity{trace_sort_projection}{match_columns} \
-         FROM {stream_ident} \
+         FROM {stream_ident}{agent_parents} \
          GROUP BY trace_id) \
          WHERE session_id IS NOT NULL AND session_id != '' \
          GROUP BY session_id{membership_filter} \
@@ -1784,6 +1830,7 @@ fn build_latest_sessions_sql(
     .map(|alias| format!("sum({alias}) as {alias}, "))
     .collect();
     let stream_ident = traces::session::quote_identifier(stream_name);
+    let agent_parents = agent_parents_join(&stream_ident, validated.layout(), None);
     // Picks the agent's harness patterns when the session is read (AIO-22).
     let (agent_name_expr, session_agent_name_expr) = if validated.has_gen_ai
         && validated.has_input_messages
@@ -1836,7 +1883,7 @@ fn build_latest_sessions_sql(
          array_agg(DISTINCT {user_id_col}) \
              FILTER (WHERE {user_id_col} IS NOT NULL AND {user_id_col} != '') as user_ids, \
          {first_message_expr} \
-         FROM {stream_ident} \
+         FROM {stream_ident}{agent_parents} \
          GROUP BY trace_id) \
          WHERE session_id IN ({session_ids_sql}) \
          GROUP BY session_id"
@@ -2668,6 +2715,7 @@ mod tests {
         let mut validated = gen_ai_with_messages();
         validated.has_total_tokens = true;
         validated.has_operation_name = true;
+        validated.has_parent_span = true;
         for field in [
             LatestSessionSortField::TotalTokens,
             LatestSessionSortField::Cost,
@@ -2685,7 +2733,13 @@ mod tests {
                 "SELECT session_id, max(trace_last_activity) as session_last_activity, \
                  sum(trace_sort_value) as session_sort_value"
             );
-            assert!(per_trace.contains("max(CASE WHEN gen_ai_operation_name = 'invoke_agent'"));
+            assert!(per_trace.contains(
+                "sum(CASE WHEN gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL"
+            ));
+            assert!(per_trace.contains(&format!(
+                "FROM \"bench_traces\"{}",
+                agent_parents_join("\"bench_traces\"", validated.layout(), None)
+            )));
             assert!(per_trace.contains(&format!(
                 "max(CASE WHEN {filter} THEN 1 ELSE 0 END) as session_match_0"
             )));
@@ -2710,6 +2764,7 @@ mod tests {
         let mut validated = gen_ai_with_messages();
         validated.has_total_tokens = true;
         validated.has_operation_name = true;
+        validated.has_parent_span = true;
         let any_session = "WHERE session_id IS NOT NULL AND session_id != '' GROUP BY session_id";
         let page_sorts = [
             LatestSessionSortField::EndTime,
@@ -2755,7 +2810,10 @@ mod tests {
                 per_trace.starts_with("max(gen_ai_conversation_id) as session_id, trace_id, "),
                 "{sql}"
             );
-            assert!(per_trace.ends_with(" FROM \"bench_traces\""), "{sql}");
+            // The usage rule's agent-parent join narrows no span either.
+            let agent_parents = agent_parents_join("\"bench_traces\"", validated.layout(), None);
+            let spans = per_trace.trim_end_matches(agent_parents.as_str());
+            assert!(spans.ends_with(" FROM \"bench_traces\""), "{sql}");
             assert!(tail.starts_with(sessions), "{sql}");
             assert!(!tail.contains("gen_ai_conversation_id"), "{sql}");
             // Conditions are per-trace flags, so the keyword and the user may
@@ -2791,7 +2849,114 @@ mod tests {
         validated.has_total_tokens = true;
         validated.has_cache_read_input_tokens = true;
         validated.has_operation_name = true;
+        validated.has_parent_span = true;
         validated
+    }
+
+    /// G2-13: with no LLM-call usage, a trace sums its top-level agent spans
+    /// (parent not an agent span), so two sibling agents add up and an agent
+    /// nested under one of them is not counted again. The parent join marks
+    /// the nested ones; the largest agent span alone is no longer the answer.
+    #[test]
+    fn usage_rule_sums_top_level_agents_found_through_their_parents() {
+        assert_eq!(
+            usage_rule("gen_ai_usage_cost", true),
+            format!(
+                "COALESCE(NULLIF(sum(CASE WHEN {LLM_CALL} THEN gen_ai_usage_cost ELSE 0 END), 0), \
+                 sum(CASE WHEN gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL \
+                 THEN gen_ai_usage_cost END), 0)"
+            )
+        );
+        let layout = with_operation_name().layout();
+        // Each span meets its parent when the parent is an agent span of the same
+        // trace; the agent ids are distinct, so no span is duplicated.
+        let agents = "SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span \
+                      FROM \"s\" WHERE gen_ai_operation_name = 'invoke_agent'";
+        let on =
+            "ON trace_id = agent_parent_trace AND reference_parent_span_id = agent_parent_span";
+        assert_eq!(
+            agent_parents_join("\"s\"", layout, None),
+            format!(" LEFT JOIN ({agents}) AS agent_parents {on}")
+        );
+        // Bounded to the traces the outer query reads.
+        assert_eq!(
+            agent_parents_join("\"s\"", layout, Some("trace_id IN ('t1')")),
+            format!(" LEFT JOIN ({agents} AND (trace_id IN ('t1'))) AS agent_parents {on}")
+        );
+        // No parent column: only root spans, so every agent is top-level and the
+        // join adds no parent (and names no missing column).
+        let flat = super::super::schema_compat::StreamLlmLayout {
+            has_parent_span: false,
+            ..layout
+        };
+        let no_parents = agent_parents_join("\"s\"", flat, Some("trace_id IN ('t1')"));
+        assert_eq!(
+            no_parents,
+            " LEFT JOIN (SELECT DISTINCT trace_id AS agent_parent_trace, span_id AS agent_parent_span \
+             FROM \"s\" WHERE false) AS agent_parents ON trace_id = agent_parent_trace"
+        );
+        assert!(!no_parents.contains("reference_parent_span_id"));
+        // Without the operation name the rule is a plain sum and reads no agent span.
+        let legacy = super::super::schema_compat::StreamLlmLayout {
+            has_operation_name: false,
+            ..layout
+        };
+        assert_eq!(agent_parents_join("\"s\"", legacy, None), "");
+        assert_eq!(
+            usage_rule("gen_ai_usage_cost", false),
+            "sum(gen_ai_usage_cost)"
+        );
+    }
+
+    #[test]
+    fn session_queries_join_agent_parents_wherever_they_apply_the_usage_rule() {
+        let validated = with_operation_name();
+        let join = |scope: Option<&str>| agent_parents_join("\"s\"", validated.layout(), scope);
+        let details = build_session_trace_details_sql(
+            "s",
+            &validated,
+            true,
+            "service_name",
+            "trace_id IN ('t1')",
+        );
+        assert!(
+            details.contains(&format!(
+                "FROM \"s\"{} WHERE trace_id IN ('t1') GROUP BY trace_id",
+                join(Some("trace_id IN ('t1')"))
+            )),
+            "{details}"
+        );
+        let sessions = build_latest_sessions_sql("s", &["s1".to_string()], &validated);
+        assert!(
+            sessions.contains(&format!("FROM \"s\"{} GROUP BY trace_id)", join(None))),
+            "{sessions}"
+        );
+        let page = |field| {
+            build_latest_session_page_sql(
+                "s",
+                "",
+                &LatestSessionSearch::default(),
+                &sort(field, LatestSessionSortOrder::Desc),
+                &validated,
+            )
+        };
+        for field in [
+            LatestSessionSortField::TotalTokens,
+            LatestSessionSortField::Cost,
+        ] {
+            let sql = page(field);
+            assert!(
+                sql.contains(&format!("FROM \"s\"{} GROUP BY trace_id)", join(None))),
+                "{sql}"
+            );
+        }
+        // Sorts that read no usage scan the stream alone.
+        for field in [
+            LatestSessionSortField::EndTime,
+            LatestSessionSortField::TraceCount,
+        ] {
+            assert!(!page(field).contains("agent_parents"));
+        }
     }
 
     #[test]
@@ -2800,7 +2965,8 @@ mod tests {
         let llm_sum = |column: &str| {
             format!(
                 "COALESCE(NULLIF(sum(CASE WHEN {LLM_CALL} THEN {column} ELSE 0 END), 0), \
-                 max(CASE WHEN gen_ai_operation_name = 'invoke_agent' THEN {column} END), 0)"
+                 sum(CASE WHEN gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL \
+                 THEN {column} END), 0)"
             )
         };
         let details = build_session_trace_details_sql(
@@ -2878,6 +3044,7 @@ mod tests {
         );
         for sql in [&sessions, &details, &page] {
             assert!(!sql.contains("gen_ai_operation_name"), "{sql}");
+            assert!(!sql.contains("agent_parents"), "{sql}");
         }
         assert!(sessions.contains("sum(gen_ai_usage_input_tokens) as gen_ai_usage_input_tokens"));
         assert!(sessions.contains("WHERE session_id IN ('session-1')"));

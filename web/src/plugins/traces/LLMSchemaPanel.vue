@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
@@ -71,6 +71,7 @@ import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUti
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildAiPrefill } from "@/utils/alerts/prefill/fromAi";
 import type { LLMPanelDrill } from "./llmInsightsDrill";
+import { streamHasParentSpan } from "./llmStreamColumns";
 
 interface Props {
   panel: LLMPanelDef;
@@ -99,6 +100,22 @@ const emit = defineEmits<{ (e: "drill", drill: LLMPanelDrill): void }>();
 const buildAlert = () =>
   buildAiPrefill({ kind: props.panel.alert!, stream: props.streamName, agent: props.alertAgent });
 const store = useStore();
+
+// The usage trends fall back to a trace's top-level agents, a lookup that
+// depends on whether the stream stores span parents. Those panels wait for
+// that answer before they query; the others render at once.
+const needsParents = computed(() => props.panel.query.sql.includes("{{agentParents}}"));
+const hasParentSpan = ref<boolean | null>(null);
+watch(
+  () => [props.streamName, needsParents.value] as const,
+  async ([stream, needs]) => {
+    hasParentSpan.value = null;
+    if (!needs || !stream) return;
+    const resolved = await streamHasParentSpan(store.state.selectedOrganization.identifier, stream);
+    if (props.streamName === stream) hasParentSpan.value = resolved;
+  },
+  { immediate: true },
+);
 
 // Horizontal bars select their category (the model); trends select the series
 // (breakdown value, or the value column for multi-series panels) at the
@@ -144,6 +161,7 @@ const sql = computed(() => {
     interval: "",
     agentFilter: props.agentFilter,
     unattributedLabel: t("llmAttribution.unattributed"),
+    hasParentSpan: !!hasParentSpan.value,
   });
 
   // Bar panels declare a top-N cap (the legacy renderer sliced client-side).
@@ -156,7 +174,7 @@ const sql = computed(() => {
 });
 
 const chartData = computed(() =>
-  props.streamName
+  props.streamName && (!needsParents.value || hasParentSpan.value !== null)
     ? buildLLMPanelSchema({
         panel: props.panel,
         sql: sql.value,

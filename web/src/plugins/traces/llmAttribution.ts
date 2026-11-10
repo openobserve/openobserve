@@ -28,9 +28,10 @@
 import { TRACE_ERRORED_SQL } from "./llmTraceOutcome";
 import {
   agentFallbackUsage,
-  agentSpanUsage,
+  agentParentsJoin,
   llmCallUsageSum,
   MODEL_SERIES_SQL,
+  topLevelAgentUsage,
 } from "./config/llmInsightsPanels";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 
@@ -54,17 +55,27 @@ const where = (scope: string) => (scope ? ` WHERE ${scope}` : "");
 /**
  * One trace's usage, the rule every Insights, Users and Sessions total uses
  * (the backend's session totals mirror it): the sum over its LLM-call spans,
- * else, when no LLM-call span carries any, its agent span's usage. SDKs that
- * report usage only on the agent span still count, and an agent span
- * repeating its children's usage (or an outer agent repeating an inner one)
- * counts once. Use inside `GROUP BY trace_id`.
+ * else, when no LLM-call span carries any, the sum over its top-level agent
+ * spans (agent spans whose parent is not an agent span). SDKs that report usage
+ * only on agent spans still count, sibling agents add up, and an agent span
+ * repeating its children's usage (or an outer agent repeating a nested one)
+ * counts once. Use inside `GROUP BY trace_id`, over a FROM that carries
+ * `agentParentsJoin`.
  */
 export const traceUsageSum = (column: string) =>
-  `COALESCE(NULLIF(${llmCallUsageSum(column)}, 0), ${agentSpanUsage(column)}, 0)`;
+  `COALESCE(NULLIF(${llmCallUsageSum(column)}, 0), ${topLevelAgentUsage(column)}, 0)`;
 
 const traceUsage =
   `${traceUsageSum("gen_ai_usage_cost")} AS cost, ` +
   `${traceUsageSum("gen_ai_usage_total_tokens")} AS tokens`;
+
+/** The stream's optional columns the usage queries depend on. */
+export interface UsageColumns {
+  /** Spans record their parent, so the usage rule can find top-level agents (`agentParentsJoin`). */
+  hasParentSpan: boolean;
+  /** Ingest marks unpriced calls (`unpricedTokensSum`). */
+  hasCostStatus?: boolean;
+}
 
 /**
  * Tokens on LLM calls that had no price (ingest marks them
@@ -110,30 +121,26 @@ export function costByDimensionSql(
   stream: string,
   column: string,
   scope: string,
-  hasCostStatus = false,
+  cols: UsageColumns,
 ): AttributionSql {
   return attributionSql(
     `SELECT v, SUM(cost) AS cost, SUM(tokens) AS tokens, COUNT(*) AS traces, ` +
       `SUM(unpriced) AS unpriced FROM (` +
       `SELECT trace_id, COALESCE(MAX(${column}), '') AS v, ${traceUsage}, ` +
-      `${unpricedTokensSum(hasCostStatus)} AS unpriced ` +
-      `FROM "${stream}"${where(scope)} GROUP BY trace_id) ` +
-      `GROUP BY v`,
+      `${unpricedTokensSum(!!cols.hasCostStatus)} AS unpriced ` +
+      `FROM "${stream}"${agentParentsJoin(stream, cols.hasParentSpan)}${where(scope)} ` +
+      `GROUP BY trace_id) GROUP BY v`,
   );
 }
 
 /**
  * Cost, tokens and traces per model. Per (trace, model), not per trace: one
  * trace can call several models, and each LLM call carries its own model and
- * usage. A trace whose usage is only on its agent span (see `traceUsageSum`)
+ * usage. A trace whose usage is only on its agent spans (see `traceUsageSum`)
  * has no LLM call to take a model from, so that usage lands in the '' row,
  * shown as unattributed like the other dimensions' spans with no value.
  */
-export function costByModelSql(
-  stream: string,
-  scope: string,
-  hasCostStatus = false,
-): AttributionSql {
+export function costByModelSql(stream: string, scope: string, cols: UsageColumns): AttributionSql {
   const scoped = scope ? ` AND (${scope})` : "";
   const cost = "gen_ai_usage_cost";
   const tokens = "gen_ai_usage_total_tokens";
@@ -143,13 +150,14 @@ export function costByModelSql(
       `SELECT trace_id, ${MODEL_SERIES_SQL} AS v, ` +
       `COALESCE(${llmCallUsageSum(cost)}, 0) AS cost, ` +
       `COALESCE(${llmCallUsageSum(tokens)}, 0) AS tokens, ` +
-      `${unpricedTokensSum(hasCostStatus)} AS unpriced ` +
+      `${unpricedTokensSum(!!cols.hasCostStatus)} AS unpriced ` +
       `FROM "${stream}" WHERE ${MODEL_SERIES_SQL} IS NOT NULL${scoped} ` +
       `GROUP BY trace_id, ${MODEL_SERIES_SQL} ` +
       `UNION ALL ` +
       `SELECT trace_id, '' AS v, ${agentFallbackUsage(cost)} AS cost, ` +
       `${agentFallbackUsage(tokens)} AS tokens, 0 AS unpriced ` +
-      `FROM "${stream}"${where(scope)} GROUP BY trace_id ` +
+      `FROM "${stream}"${agentParentsJoin(stream, cols.hasParentSpan)}${where(scope)} ` +
+      `GROUP BY trace_id ` +
       `HAVING ${agentFallbackUsage(cost)} > 0 OR ${agentFallbackUsage(tokens)} > 0) ` +
       `GROUP BY v`,
   );
@@ -237,8 +245,7 @@ export function usersSql(
     tenantColumn: string | null;
     tenant?: string;
     search?: string;
-    hasCostStatus?: boolean;
-  },
+  } & UsageColumns,
 ): string {
   const tenantExpr = opts.tenantColumn ? `MAX(${opts.tenantColumn})` : "''";
   const filters = ["user_id IS NOT NULL", "user_id != ''"];
@@ -258,7 +265,8 @@ export function usersSql(
     `MAX(gen_ai_conversation_id) AS session, ${traceUsage}, ` +
     `${unpricedTokensSum(!!opts.hasCostStatus)} AS unpriced, ` +
     `${TRACE_ERRORED_SQL} AS failed, MAX(_timestamp) AS last_ts ` +
-    `FROM "${stream}"${where(opts.scope)} GROUP BY trace_id) ` +
+    `FROM "${stream}"${agentParentsJoin(stream, opts.hasParentSpan)}${where(opts.scope)} ` +
+    `GROUP BY trace_id) ` +
     `WHERE ${filters.join(" AND ")} GROUP BY user_id ORDER BY cost DESC LIMIT ${USERS_LIMIT}`
   );
 }

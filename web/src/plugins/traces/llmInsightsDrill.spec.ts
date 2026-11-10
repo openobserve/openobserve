@@ -21,7 +21,8 @@ import {
   traceListSql,
   traceRowTimeFormat,
 } from "./llmInsightsDrill";
-import { autoHistogramBucketMicros } from "./config/llmInsightsPanels";
+import { agentParentsJoin, autoHistogramBucketMicros } from "./config/llmInsightsPanels";
+import { traceUsageSum } from "./llmAttribution";
 
 const HOUR = 3_600_000_000;
 
@@ -54,6 +55,7 @@ describe("traceListSql", () => {
       "s",
       { startTime: 0, endTime: 1, seriesSql: "gen_ai_response_model", seriesValue: "m" },
       "gen_ai_agent_name = 'a'",
+      true,
     );
     expect(sql).toContain("WHERE gen_ai_agent_name = 'a' GROUP BY trace_id HAVING");
     expect(sql).toContain(
@@ -75,6 +77,7 @@ describe("traceListSql", () => {
         errored: true,
       },
       "",
+      true,
     );
     expect(sql).toContain(
       "HAVING max(CASE WHEN gen_ai_tool_name = 'grep' AND span_status = 'ERROR' THEN 1 ELSE 0 END) = 1",
@@ -83,28 +86,35 @@ describe("traceListSql", () => {
   });
 
   it("selects the errored traces when there is no series", () => {
-    const sql = traceListSql("s", { startTime: 0, endTime: 1, errored: true }, "");
+    const sql = traceListSql("s", { startTime: 0, endTime: 1, errored: true }, "", true);
     expect(sql).toContain("HAVING max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) = 1");
   });
 
   it("selects the traces without an errored span (the OK part of a bar)", () => {
-    const sql = traceListSql("s", { startTime: 0, endTime: 1, errored: false }, "");
+    const sql = traceListSql("s", { startTime: 0, endTime: 1, errored: false }, "", true);
     expect(sql).toContain("HAVING max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) = 0");
   });
 
   it("has no HAVING for a whole-window list", () => {
-    expect(traceListSql("s", { startTime: 0, endTime: 1 }, "")).not.toContain("HAVING");
+    expect(traceListSql("s", { startTime: 0, endTime: 1 }, "", true)).not.toContain("HAVING");
   });
 
-  it("costs each trace by the per-trace usage rule, not the sum over every span", () => {
-    const sql = traceListSql("s", { startTime: 0, endTime: 1 }, "");
+  // G2-13: the drawer costs a trace as the tiles do, top-level agents included.
+  it("costs each trace by the per-trace usage rule over the agent-parent join", () => {
+    const sql = traceListSql("s", { startTime: 0, endTime: 1 }, "gen_ai_agent_name = 'a'", true);
     expect(sql).not.toContain("SUM(gen_ai_usage_cost)");
-    expect(sql).toContain("gen_ai_operation_name = 'invoke_agent'");
+    expect(sql).toContain(`${traceUsageSum("gen_ai_usage_cost")} AS cost`);
+    expect(sql).toContain(
+      `FROM "s"${agentParentsJoin("s", true)} WHERE gen_ai_agent_name = 'a' GROUP BY trace_id`,
+    );
+    const flat = traceListSql("s", { startTime: 0, endTime: 1 }, "", false);
+    expect(flat).toContain(`FROM "s"${agentParentsJoin("s", false)} GROUP BY trace_id`);
   });
 
   it("lists only agent-span-only traces for the cost trend's unattributed series", () => {
-    const sql = traceListSql("s", { startTime: 0, endTime: 1, agentOnly: true }, "");
+    const sql = traceListSql("s", { startTime: 0, endTime: 1, agentOnly: true }, "", true);
     expect(sql).toMatch(/HAVING CASE WHEN COALESCE\(SUM\(.*\), 0\) = 0 THEN .* > 0/);
+    expect(sql).toContain("AND agent_parent_span IS NULL");
   });
 });
 

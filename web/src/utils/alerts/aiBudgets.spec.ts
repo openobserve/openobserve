@@ -32,6 +32,7 @@ import {
   warningValue,
   type BudgetDef,
 } from "./aiBudgets";
+import { agentParentsJoin } from "@/plugins/traces/config/llmInsightsPanels";
 
 const feature: BudgetDef = {
   name: "deep-research-daily",
@@ -46,8 +47,8 @@ describe("budgets (AIO-38)", () => {
   // One named user, apart from the per-user cap ("Each user").
   it("budgets one user on user_id, as one key", () => {
     const vip: BudgetDef = { ...feature, scope: "oneUser", value: "u_42" };
-    expect(budgetSql(vip)).toContain("WHERE user_id = 'u_42' GROUP BY user_id");
-    expect(budgetSql(vip)).toContain("THEN user_id END) AS user_id");
+    expect(budgetSql(vip, true)).toContain("WHERE user_id = 'u_42' GROUP BY user_id");
+    expect(budgetSql(vip, true)).toContain("THEN user_id END) AS user_id");
     expect(budgetSpend(vip, [{ spent: 12 }])).toMatchObject({ spent: 12, keys: 1 });
     expect(
       budgetFromAlert({
@@ -64,12 +65,12 @@ describe("budgets (AIO-38)", () => {
   });
 
   it("groups spend by the scope's column, unaliased, so the SQL multi-alert accepts it", () => {
-    const sql = budgetSql(feature);
+    const sql = budgetSql(feature, true);
     expect(sql).toMatch(/^SELECT feature_name, SUM\(cost\) AS spent FROM \(/);
     expect(sql).toContain(
       "WHERE feature_name = 'deep-research' GROUP BY feature_name ORDER BY spent DESC",
     );
-    const perSession = budgetSql({ ...feature, scope: "session", value: "", period: "hour" });
+    const perSession = budgetSql({ ...feature, scope: "session", value: "", period: "hour" }, true);
     expect(perSession).toContain(
       "WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' GROUP BY gen_ai_conversation_id ORDER BY spent DESC",
     );
@@ -78,23 +79,45 @@ describe("budgets (AIO-38)", () => {
 
   // W3-01: the agent name or user is often only on the root/agent span, the cost on its children.
   it("attributes a trace's whole cost to the value any of its spans carries", () => {
-    const agent = budgetSql({ ...feature, scope: "agent", value: "omp" });
+    const agent = budgetSql({ ...feature, scope: "agent", value: "omp" }, true);
     expect(agent).toContain(
       "SELECT trace_id, MAX(CASE WHEN gen_ai_agent_name = 'omp' THEN gen_ai_agent_name END) AS gen_ai_agent_name, COALESCE(",
     );
     expect(agent).toContain(
-      "FROM \"default\" WHERE trace_id IN (SELECT trace_id FROM \"default\" WHERE gen_ai_agent_name = 'omp') GROUP BY trace_id) WHERE gen_ai_agent_name = 'omp'",
+      `FROM "default"${agentParentsJoin("default", true)} WHERE trace_id IN (SELECT trace_id FROM "default" WHERE gen_ai_agent_name = 'omp') GROUP BY trace_id) WHERE gen_ai_agent_name = 'omp'`,
     );
     // "Each user": a trace goes to the user its spans carry.
-    expect(budgetSql({ ...feature, scope: "user", value: "" })).toContain(
+    expect(budgetSql({ ...feature, scope: "user", value: "" }, true)).toContain(
       "SELECT trace_id, MAX(user_id) AS user_id, COALESCE(",
     );
     // A model is on each LLM call: spend stays per span, over LLM calls only, so an agent
     // span carrying the model does not count its children's cost again.
-    const model = budgetSql({ ...feature, scope: "model", value: "gpt-4o" });
+    const model = budgetSql({ ...feature, scope: "model", value: "gpt-4o" }, true);
     expect(model).not.toContain("SUM(gen_ai_usage_cost)");
     expect(model).toContain("THEN gen_ai_usage_cost ELSE 0 END) AS spent");
     expect(model).toContain("WHERE gen_ai_response_model = 'gpt-4o'");
+    expect(model).not.toContain("agent_parents");
+  });
+
+  // G2-13: a trace's spend falls back to its top-level agents, read through the
+  // agent-parent join; a stream that stores no parents joins none.
+  it("spends a trace's top-level agents when it has no LLM-call cost", () => {
+    for (const scope of ["agent", "user", "session", "feature", "oneUser"] as const) {
+      const b = { ...feature, scope, value: scope === "user" || scope === "session" ? "" : "v" };
+      const sql = budgetSql(b, true);
+      expect(sql).toContain("gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL");
+      expect(sql).toContain(`FROM "default"${agentParentsJoin("default", true)}`);
+      const flat = budgetSql(b, false);
+      expect(flat).toContain(`FROM "default"${agentParentsJoin("default", false)}`);
+      expect(flat).not.toContain("reference_parent_span_id");
+    }
+    const alert = budgetAlertPayload(
+      { ...feature, scope: "agent", value: "omp" },
+      { folderId: "f", destination: "", owner: "me", timezone: "UTC", hasParentSpan: true },
+    );
+    expect(alert.query_condition.sql).toBe(
+      budgetSql({ ...feature, scope: "agent", value: "omp" }, true),
+    );
   });
 
   it("is one alert, warning at 80% and critical at 100% of each key's spend, readable back", () => {
@@ -103,6 +126,7 @@ describe("budgets (AIO-38)", () => {
       destination: "litellm-hook",
       owner: "me",
       timezone: "UTC",
+      hasParentSpan: true,
     });
     expect(alert.name).toBe("deep-research-daily");
     expect(alert.destinations).toEqual(["litellm-hook"]);
@@ -132,7 +156,7 @@ describe("budgets (AIO-38)", () => {
 
   // B-10: a per-key budget counts every key, not the first page of them.
   it("summarises a per-key budget over all its keys", () => {
-    const sql = budgetSummarySql({ ...feature, scope: "user", value: "", limitUsd: 25 });
+    const sql = budgetSummarySql({ ...feature, scope: "user", value: "", limitUsd: 25 }, true);
     expect(sql).toMatch(
       /^SELECT COUNT\(\*\) AS key_count, SUM\(CASE WHEN spent >= 25 THEN 1 ELSE 0 END\) AS over_count, SUM\(spent\) AS spent, MAX\(spent\) AS largest FROM \(SELECT user_id, SUM\(cost\) AS spent FROM \(/,
     );
@@ -190,6 +214,7 @@ describe("budgets (AIO-38)", () => {
       destination: "",
       owner: "me",
       timezone: "UTC",
+      hasParentSpan: true,
     });
     expect(isLegacyBudgetAlert(current)).toBe(false);
     expect(isLegacyBudgetAlert({ ...current, query_condition: { aggregation: null } })).toBe(true);
@@ -258,6 +283,7 @@ describe("budgets (AIO-38)", () => {
         destination: "old-hook",
         owner: "first@example.com",
         timezone: "Asia/Kolkata",
+        hasParentSpan: true,
       }),
       id: "a1",
       enabled: false,
@@ -270,6 +296,7 @@ describe("budgets (AIO-38)", () => {
       {
         destination: "litellm-hook",
         editor: "me@example.com",
+        hasParentSpan: true,
       },
     );
     expect(next.query_condition.aggregation.having.value).toBe(50);
@@ -292,6 +319,7 @@ describe("budgets (AIO-38)", () => {
       {
         destination: "",
         editor: "me",
+        hasParentSpan: true,
       },
     );
     expect(monthly.trigger_condition.period).toBe(43200);

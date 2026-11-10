@@ -22,7 +22,12 @@
  */
 
 import { TRACE_ERROR_SPANS_SQL, TRACE_ERRORED_SQL } from "./llmTraceOutcome";
-import { agentFallbackUsage, MODEL_SERIES_SQL, type LLMPanelDef } from "./config/llmInsightsPanels";
+import {
+  agentFallbackUsage,
+  agentParentsJoin,
+  MODEL_SERIES_SQL,
+  type LLMPanelDef,
+} from "./config/llmInsightsPanels";
 import { ATTRIBUTION_COLUMNS, traceUsageSum } from "./llmAttribution";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -95,8 +100,14 @@ export function traceRowTimeFormat(sel: TraceListSelection | null, timezone: str
  * The newest matching traces, one row each, with their errored span count.
  * A series that is also errored (a failing tool) needs one span that is both:
  * a trace whose grep call worked but whose LLM call failed is not a grep failure.
+ * `hasParentSpan`: the stream stores span parents (`agentParentsJoin`).
  */
-export function traceListSql(stream: string, sel: TraceListSelection, scope: string): string {
+export function traceListSql(
+  stream: string,
+  sel: TraceListSelection,
+  scope: string,
+  hasParentSpan: boolean,
+): string {
   const having: string[] = [];
   const series =
     sel.seriesSql && sel.seriesValue !== undefined
@@ -116,7 +127,7 @@ export function traceListSql(stream: string, sel: TraceListSelection, scope: str
     "FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') AS input,",
     `MAX(gen_ai_response_model) AS model, ${traceUsageSum("gen_ai_usage_cost")} AS cost,`,
     `${TRACE_ERROR_SPANS_SQL} AS error_spans`,
-    `FROM "${stream}"`,
+    `FROM "${stream}"${agentParentsJoin(stream, hasParentSpan)}`,
     scope ? `WHERE ${scope}` : "",
     "GROUP BY trace_id",
     having.length ? `HAVING ${having.join(" AND ")}` : "",

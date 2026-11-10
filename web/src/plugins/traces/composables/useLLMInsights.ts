@@ -18,8 +18,9 @@ import { gt } from "@/types/i18n";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentTraceFilter } from "../llmAgentFilter";
-import { compactSql } from "../config/llmInsightsPanels";
+import { agentParentsJoin, compactSql } from "../config/llmInsightsPanels";
 import { traceUsageSum } from "../llmAttribution";
+import { streamHasParentSpan } from "../llmStreamColumns";
 import { TRACE_ERRORED_SQL } from "../llmTraceOutcome";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { streamQueryError } from "./useLLMStreamQuery";
@@ -232,8 +233,8 @@ export function useLLMInsights() {
    * so the frontend never needs to know the interval.
    *
    * Each trace's tokens and cost follow `traceUsageSum` (its LLM calls'
-   * usage, else its agent span's), the rule Cost by, Users and Sessions use.
-   * The sparklines apply it per bucket, so they only trace the shape. The
+   * usage, else its top-level agents'), the rule Cost by, Users and Sessions
+   * use. The sparklines apply it per bucket, so they only trace the shape. The
    * per-bucket error-rate SERIES divides each bucket's error count by its
    * trace count.
    */
@@ -243,12 +244,14 @@ export function useLLMInsights() {
     endTime: number,
     agent?: GenAiAgentListItem | null,
     extraFilter = "",
+    hasParentSpan = false,
   ): Promise<{ totals: Omit<LLMKPI, "p95DurationMicros">; series: LLMSparklineSeries }> {
     // One size must cover every bucket — there's no pagination here. 10_000
     // is a wide margin (even a 1-year window at a coarse interval stays under).
     const size = 10_000;
 
     const where = scopeWhere(agent, streamName, extraFilter);
+    const from = `"${streamName}"${agentParentsJoin(streamName, hasParentSpan)}`;
     const mainSql = compactSql(`
       SELECT
         histogram(_timestamp) as ts,
@@ -258,7 +261,7 @@ export function useLLMInsights() {
         ${traceUsageSum("gen_ai_usage_total_tokens")} as total_tokens,
         ${traceUsageSum("gen_ai_usage_cost")} as total_cost,
         COALESCE(approx_percentile_cont(duration, 0.95) FILTER (WHERE gen_ai_operation_name IS NOT NULL), 0) as p95_duration
-      FROM "${streamName}"
+      FROM ${from}
       ${where}
       GROUP BY ts
       ORDER BY ts
@@ -274,7 +277,7 @@ export function useLLMInsights() {
           ${TRACE_ERRORED_SQL} as errored,
           ${traceUsageSum("gen_ai_usage_total_tokens")} as tokens,
           ${traceUsageSum("gen_ai_usage_cost")} as cost
-        FROM "${streamName}"
+        FROM ${from}
         ${where}
         GROUP BY trace_id
       )
@@ -373,6 +376,13 @@ export function useLLMInsights() {
     p95Loading.value = true;
     error.value = null;
 
+    // Usage falls back to the trace's top-level agents, found through span
+    // parents when the stream stores them.
+    const hasParentSpan = await streamHasParentSpan(
+      store.state.selectedOrganization.identifier,
+      streamName,
+    );
+
     // This call's own results; the snapshot returned to the caller (KPI cache)
     // is built from these, never from the shared refs.
     const own: {
@@ -382,7 +392,14 @@ export function useLLMInsights() {
 
     // Summary: powers the sparklines and every KPI total but P95. Drives
     // the main strip skeleton via `loading` — resolves independently of P95.
-    const summaryPromise = fetchSummary(streamName, startTime, endTime, agent, extraFilter)
+    const summaryPromise = fetchSummary(
+      streamName,
+      startTime,
+      endTime,
+      agent,
+      extraFilter,
+      hasParentSpan,
+    )
       .then((summary) => {
         own.summary = summary;
         if (!isLatest()) return;

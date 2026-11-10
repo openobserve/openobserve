@@ -160,6 +160,7 @@ import { useLlmPageScope } from "@/enterprise/composables/useLlmPageScope";
 import useStreams from "@/composables/useStreams";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import { ATTRIBUTION_COLUMNS, USERS_LIMIT, usersSql } from "@/plugins/traces/llmAttribution";
+import { PARENT_SPAN_FIELD } from "@/plugins/traces/config/llmInsightsPanels";
 import LLMCostCell from "@/plugins/traces/LLMCostCell.vue";
 import { formatCost, formatTokens } from "@/utils/llmUtils";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -305,6 +306,7 @@ async function reload() {
         tenant: tenant.value ?? undefined,
         search: search.value.trim() || undefined,
         hasCostStatus: names.has("gen_ai_usage_cost_status"),
+        hasParentSpan: names.has(PARENT_SPAN_FIELD),
       }),
       startTime,
       endTime,

@@ -519,14 +519,17 @@ fn build_user_trace_usage_sql(
         let usage = |column: &str| super::session::usage_rule(column, layout.has_operation_name);
         let total_tokens_expr = usage("gen_ai_usage_total_tokens");
         let cost_expr = usage("gen_ai_usage_cost");
+        let trace_filter = format!("trace_id IN ('{trace_ids_sql}')");
+        let agent_parents =
+            super::session::agent_parents_join(&stream_ident, layout, Some(&trace_filter));
         format!(
             "SELECT trace_id, \
             min(start_time) as trace_start_time, \
             max(end_time) as trace_end_time, \
             {total_tokens_expr} as gen_ai_usage_details_total, \
             {cost_expr} as gen_ai_usage_cost_details \
-            FROM {stream_ident} \
-            WHERE trace_id IN ('{trace_ids_sql}') \
+            FROM {stream_ident}{agent_parents} \
+            WHERE {trace_filter} \
             GROUP BY trace_id"
         )
     } else {
@@ -809,6 +812,7 @@ mod tests {
             StreamLlmLayout {
                 has_gen_ai: true,
                 has_operation_name: false,
+                has_parent_span: true,
             },
         );
         let legacy = build_user_trace_usage_sql("a\"b", "abc-1", StreamLlmLayout::default());
@@ -820,6 +824,7 @@ mod tests {
         assert!(current.contains("sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"));
         assert!(current.contains("sum(gen_ai_usage_cost) as gen_ai_usage_cost_details"));
         assert!(!current.contains("gen_ai_operation_name"));
+        assert!(!current.contains("agent_parents"));
         assert!(legacy.contains("sum(llm_usage_tokens_total) as gen_ai_usage_details_total"));
         assert!(legacy.contains("sum(llm_usage_cost_total) as gen_ai_usage_cost_details"));
     }
@@ -832,21 +837,31 @@ mod tests {
             super::super::schema_compat::StreamLlmLayout {
                 has_gen_ai: true,
                 has_operation_name: true,
+                has_parent_span: true,
             },
         );
         let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
                         ('chat', 'text_completion', 'generate_content', 'embeddings'))";
-        // LLM-call usage, else the agent span's: a trace with usage only on its
-        // invoke_agent span counts, a rollup repeating its chat child counts once.
+        // LLM-call usage, else the top-level agents': sibling agents with usage
+        // only on their invoke_agent spans add up, a nested agent or a rollup
+        // repeating its chat child counts once.
         for (column, alias) in [
             ("gen_ai_usage_total_tokens", "gen_ai_usage_details_total"),
             ("gen_ai_usage_cost", "gen_ai_usage_cost_details"),
         ] {
             assert!(sql.contains(&format!(
                 "COALESCE(NULLIF(sum(CASE WHEN {llm_call} THEN {column} ELSE 0 END), 0), \
-                 max(CASE WHEN gen_ai_operation_name = 'invoke_agent' THEN {column} END), 0) \
-                 as {alias}"
+                 sum(CASE WHEN gen_ai_operation_name = 'invoke_agent' AND agent_parent_span IS NULL \
+                 THEN {column} END), 0) as {alias}"
             )));
         }
+        // The agent lookup reads only this page's traces.
+        assert!(sql.contains(
+            "FROM \"default\" LEFT JOIN (SELECT DISTINCT trace_id AS agent_parent_trace, \
+             span_id AS agent_parent_span FROM \"default\" WHERE gen_ai_operation_name = 'invoke_agent' \
+             AND (trace_id IN ('abc-1'))) AS agent_parents \
+             ON trace_id = agent_parent_trace AND reference_parent_span_id = agent_parent_span \
+             WHERE trace_id IN ('abc-1') GROUP BY trace_id"
+        ));
     }
 }

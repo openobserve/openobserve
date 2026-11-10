@@ -159,6 +159,7 @@ import {
   type AttributionTotals,
 } from "./llmAttribution";
 import { FILTER_COLUMNS, type FilterDim } from "./llmInsightsDrill";
+import { PARENT_SPAN_FIELD } from "./config/llmInsightsPanels";
 
 const props = defineProps<{
   stream: string;
@@ -340,7 +341,10 @@ async function loadSchema() {
 
 async function load() {
   const column = FILTER_COLUMNS[dim.value];
-  const hasCostStatus = schemaColumns.value.has("gen_ai_usage_cost_status");
+  const cols = {
+    hasCostStatus: schemaColumns.value.has("gen_ai_usage_cost_status"),
+    hasParentSpan: schemaColumns.value.has(PARENT_SPAN_FIELD),
+  };
   // Bump first, so a query still in flight for the previous dimension cannot land.
   const mine = ++seq;
   if (!props.stream || !schemaColumns.value.has(column)) {
@@ -354,8 +358,8 @@ async function load() {
   try {
     const sql =
       dim.value === "model"
-        ? costByModelSql(props.stream, props.scope, hasCostStatus)
-        : costByDimensionSql(props.stream, column, props.scope, hasCostStatus);
+        ? costByModelSql(props.stream, props.scope, cols)
+        : costByDimensionSql(props.stream, column, props.scope, cols);
     const [rows, sums] = (await Promise.all([
       executeQuery(sql.rows, props.startTime, props.endTime),
       executeQuery(sql.totals, props.startTime, props.endTime),
