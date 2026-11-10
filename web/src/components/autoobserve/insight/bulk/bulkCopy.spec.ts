@@ -104,6 +104,30 @@ describe("bulkCopy — rows and groups", () => {
     expect(label("e-b")).toBe("svc-e · cluster-k / ns-b");
   });
 
+  it("names a service the way the coverage page does, even with no twin in the list (T2-N4)", () => {
+    const scope = {
+      service: "svc-b",
+      label: "svc-b · no namespace",
+      cluster: null,
+      namespace: null,
+      stream: { type: "logs", name: "b" },
+    };
+    const rows = reviewRowsOf(
+      {
+        kind: "errors",
+        rows: [
+          { key: "b:errors", kind: "errors", scope, usually: 10 },
+          { key: "b:no_data", kind: "no_data", scope, usually: null },
+        ],
+      },
+      { folders: [], overrides: {}, rights: null },
+    );
+    expect(rows.map((r) => serviceLabel(t, r, rows))).toEqual([
+      "svc-b · no namespace",
+      "svc-b · no namespace",
+    ]);
+  });
+
   it("names a service plainly when its rows are only its own drafts of different kinds", () => {
     const scope = {
       service: "svc-x",

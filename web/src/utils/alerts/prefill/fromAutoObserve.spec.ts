@@ -143,6 +143,15 @@ describe("noDataAlert", () => {
     );
   });
 
+  it("names the service in the subtitle the way the coverage page does (T2-N4)", () => {
+    const prefill = noDataAlert(
+      { ...logsScope({ cluster: null, namespace: "ns-d" }), label: "svc-a · ns-d" },
+      options,
+    )!;
+    expect(prefill.sourceLabel).toBe("Suggested by AutoObserve for svc-a · ns-d");
+    expect(prefill.sql).toContain(`"service_name" = 'svc-a'`);
+  });
+
   it("with no namespace field in the stream it filters on the service alone, with no null text", () => {
     const prefill = noDataAlert(
       logsScope({ cluster: null, namespace: null, schema: ["_timestamp", "service_name"] }),

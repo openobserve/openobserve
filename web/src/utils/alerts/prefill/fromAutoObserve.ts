@@ -99,6 +99,8 @@ export type NotifyPick =
 
 export interface ServiceScope {
   service: string;
+  /** How the coverage page names this service, such as "svc-b · no namespace"; the bare name when absent. */
+  label?: string;
   cluster: string | null;
   namespace: string | null;
   stream: { type: string; name: string };
@@ -266,7 +268,7 @@ const nameOf = (
   );
 
 const assemble = (
-  label: { service: string; cluster?: string | null; namespace?: string | null },
+  label: { service: string; label?: string; cluster?: string | null; namespace?: string | null },
   stream: { type: string; name: string },
   shape: Shape,
   o: AutoObserveAlertOptions,
@@ -278,7 +280,9 @@ const assemble = (
   return {
     version: ALERT_PREFILL_VERSION,
     source: AUTOOBSERVE_SOURCE,
-    sourceLabel: gt("alerts.prefill.sources.autoobserve.sourceLabel", { service: label.service }),
+    sourceLabel: gt("alerts.prefill.sources.autoobserve.sourceLabel", {
+      service: label.label || label.service,
+    }),
     name: nameOf(label, shape.kind),
     streamType: stream?.type || "logs",
     streamName: stream?.name?.trim() ?? "",

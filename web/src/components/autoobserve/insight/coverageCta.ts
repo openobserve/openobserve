@@ -77,6 +77,7 @@ const nameOf = (row: CoverageRow) => row.identity?.serviceName ?? row.service;
 
 const scopeOf = (row: CoverageRow, stream: Stream): ServiceScope => ({
   service: nameOf(row),
+  label: row.service,
   cluster: row.identity?.cluster ?? null,
   namespace: row.identity?.namespace ?? null,
   stream,
