@@ -21,6 +21,7 @@ import autoobserve, { type AutoObservePagingSettings } from "@/services/autoobse
 import { autoobservePagingQuery } from "@/services/autoobserve.queries";
 import { autoobserveKeys } from "@/services/autoobserve.querykeys";
 import type { I18nText, TranslateFn } from "@/types/i18n";
+import { liveFailureOf, type LiveFailure } from "./liveCopy";
 
 export type PagingWriteError = "denied" | "failed";
 
@@ -57,9 +58,16 @@ export function usePagingSetting() {
   const missing = computed(() => !enterprise || query.data.value === null);
   const loading = computed(() => enterprise && query.isPending.value);
   const loadFailed = computed(() => enterprise && query.isError.value);
-  // The switch shows the value being written, so a refused write flips it back.
-  const checked = computed(() => (saving.value ? pending.value : !!settings.value?.page_on_stop));
+  const loadFailure = computed<LiveFailure | null>(() =>
+    loadFailed.value ? liveFailureOf(query.error.value) : null,
+  );
   const available = computed(() => settings.value?.available !== false);
+  // The switch shows the value being written, so a refused write flips it back; a deployment that cannot page reads off.
+  const checked = computed(() =>
+    saving.value ? pending.value : available.value && !!settings.value?.page_on_stop,
+  );
+  const retrying = computed(() => query.isFetching.value);
+  const retry = () => query.refetch();
 
   async function set(next: boolean) {
     const org = orgId.value;
@@ -95,6 +103,9 @@ export function usePagingSetting() {
     missing,
     loading,
     loadFailed,
+    loadFailure,
+    retry,
+    retrying,
     checked,
     available,
     saving,

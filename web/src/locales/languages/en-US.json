@@ -30920,6 +30920,10 @@
       "unavailable": "Paging is turned off for this deployment.",
       "denied": "{denied} {askAdmin}",
       "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "You don't have permission to see the paging setting",
+      "deniedDesc": "Paging is set once for the whole organization. Ask an organization admin for access.",
+      "failedTitle": "Couldn't load the paging setting",
+      "failedDesc": "Something went wrong while loading it. Try again in a moment.",
       "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
     },
     "learning": {

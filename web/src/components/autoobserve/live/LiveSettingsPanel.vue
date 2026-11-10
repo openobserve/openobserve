@@ -16,6 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <LiveSurfaceEmpty v-if="paging.missing.value" surface="settings" @action="emit('action')" />
+  <LiveNoticeState
+    v-else-if="loadNotice"
+    :notice="loadNotice"
+    size="block"
+    :busy="paging.retrying.value"
+    :class="inPage && 'max-w-2xl p-4'"
+    data-test="autoobserve-live-settings-paging-notice"
+    retry-test="autoobserve-live-settings-paging-retry"
+    @retry="paging.retry()"
+  />
   <div
     v-else-if="!paging.loading.value"
     class="flex flex-col gap-6 pb-8"
@@ -39,10 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DrawerSection from "../v2/DrawerSection.vue";
+import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveSurfaceEmpty from "./LiveSurfaceEmpty.vue";
+import { pagingLoadNotice } from "./liveCopy";
 import PagingSetting from "./PagingSetting.vue";
 import { usePagingSetting } from "./usePagingSetting";
 
@@ -52,4 +65,8 @@ const emit = defineEmits<{ action: [] }>();
 
 const { t } = useI18nTyped();
 const paging = usePagingSetting();
+
+const loadNotice = computed(() =>
+  paging.loadFailure.value ? pagingLoadNotice(t, paging.loadFailure.value) : null,
+);
 </script>

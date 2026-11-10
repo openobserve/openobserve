@@ -201,6 +201,20 @@ export const liveNotice = (
   return { failure, title: t(keys.title), description: t(keys.desc), ...NOTICE_LOOK[failure] };
 };
 
+/** The notice a failed paging read shows; a denial cannot change on a retry, anything else can. */
+export const pagingLoadNotice = (t: TranslateFn, failure: LiveFailure): LiveNoticeView =>
+  failure === "denied"
+    ? {
+        title: t("autoobserveLive.paging.deniedTitle"),
+        description: t("autoobserveLive.paging.deniedDesc"),
+        ...NOTICE_LOOK.denied,
+      }
+    : {
+        title: t("autoobserveLive.paging.failedTitle"),
+        description: t("autoobserveLive.paging.failedDesc"),
+        ...NOTICE_LOOK.failed,
+      };
+
 // A surface with no backend yet says what will appear and what to do now, never sample data.
 export const liveSurfaceEmpty = (t: TranslateFn, surface: LiveEmptySurface): LiveSurfaceEmpty => {
   const keys = EMPTY_KEY[surface];

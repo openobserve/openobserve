@@ -92,6 +92,8 @@ export const autoobservePagingQuery = (org: string) =>
     },
     staleTime: LIVE_STALE_TIME,
     retry: false,
+    // Surfaces mount the switch only once the read settles, so a failed read refetched on mount would loop.
+    retryOnMount: false,
   });
 
 // Polls only while a listed analysis is live, as the incident list does; otherwise the stale time decides.

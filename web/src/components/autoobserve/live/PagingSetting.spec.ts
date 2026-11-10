@@ -111,6 +111,14 @@ describe("PagingSetting (W1)", () => {
     expect(w.find('[role="alert"]').exists()).toBe(false);
   });
 
+  it("unavailable while the org's value is on: the switch is drawn off, since nothing pages", async () => {
+    get.mockResolvedValue(ok(true, false));
+    const w = mountIt(PagingSetting);
+    await flushPromises();
+    expect(switchOf(w).attributes("aria-checked")).toBe("false");
+    expect(switchOf(w).attributes("disabled")).toBeDefined();
+  });
+
   it("turning it on PUTs the value, is busy meanwhile, then holds the server's value", async () => {
     get.mockResolvedValue(ok(false));
     let resolve: (v: unknown) => void = () => {};
@@ -204,6 +212,48 @@ describe("PagingSetting (W1)", () => {
       await flushPromises();
       expect(w.find(sel("")).exists()).toBe(false);
       expect(w.find('[data-test="autoobserve-live-empty-settings"]').exists()).toBe(true);
+    });
+
+    const settle = async () => {
+      for (let i = 0; i < 20; i++) {
+        await flushPromises();
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    };
+
+    // After the cap the mock never settles, so a refetch loop ends with a count instead of hanging the run.
+    const failFor = (status: number, cap = 40) => {
+      let calls = 0;
+      get.mockImplementation(() =>
+        calls++ < cap ? Promise.reject(httpError(status)) : (new Promise(() => {}) as never),
+      );
+    };
+
+    it("GET 403: one request, then a red denial instead of a blank panel", async () => {
+      failFor(403);
+      const w = mountIt(LiveSettingsPanel);
+      await settle();
+      expect(get).toHaveBeenCalledTimes(1);
+      const notice = w.find('[data-test="autoobserve-live-settings-paging-notice"]');
+      expect(notice.exists()).toBe(true);
+      expect(notice.text()).toContain("You don't have permission to see the paging setting");
+      expect(notice.attributes("role")).toBe("alert");
+      expect(w.text()).not.toContain("Retry");
+      expect(w.find(sel("")).exists()).toBe(false);
+    });
+
+    it("GET 500: one request, a red failure with Retry, and Retry reads once more", async () => {
+      failFor(500);
+      const w = mountIt(LiveSettingsPanel);
+      await settle();
+      expect(get).toHaveBeenCalledTimes(1);
+      const notice = w.find('[data-test="autoobserve-live-settings-paging-notice"]');
+      expect(notice.text()).toContain("Couldn't load the paging setting");
+      get.mockResolvedValue(ok(true));
+      await w.find('[data-test="autoobserve-live-settings-paging-retry"]').trigger("click");
+      await settle();
+      expect(get).toHaveBeenCalledTimes(2);
+      expect(switchOf(w).attributes("aria-checked")).toBe("true");
     });
 
     it("an OSS build never asks for the route and keeps today's empty state", async () => {
