@@ -215,6 +215,10 @@ const serviceScope = (s: ServiceScope, serviceFields = SERVICE_FIELDS): Scope =>
     [s.cluster, scopeFieldsOf(s.stream?.type).cluster, "autoobserve.noClusterField"],
     [s.namespace, scopeFieldsOf(s.stream?.type).namespace, "autoobserve.noNamespaceField"],
   ];
+  const emptyNs =
+    !s.namespace && s.schema ? pickField(scopeFieldsOf(s.stream?.type).namespace, s.schema) : null;
+  // Same pair as the charts; without it the no-namespace entity's alert watches every namespace's rows.
+  if (emptyNs) where.push(`(${sqlField(emptyNs)} IS NULL OR ${sqlField(emptyNs)} = '')`);
   for (const [value, candidates, missing] of extra) {
     if (!value) continue;
     // Without the schema a guessed cluster field could match nothing, which a no-data alert reads as an outage.
