@@ -348,6 +348,8 @@ impl Pipeline {
     /// 8. EnrichmentTables can only be used in Scheduled pipelines
     ///
     /// If all satisfies, populates the [Pipeline::source] with the first node in nodes list
+    ///
+    /// Unless `ZO_SKIP_FORMATTING_STREAM_NAME` is set, also formats fixed stream-node names.
     pub fn validate(&mut self) -> Result<()> {
         if self.name.is_empty() {
             return Err(anyhow!("Please provide non-empty name for the pipeline"));
@@ -368,8 +370,7 @@ impl Pipeline {
             _ => {}
         };
 
-        // format fixed names before any guard reads them or ck 3 copies the source; `{...}` resolve
-        // per record
+        // must run before the internal-stream guards and the ck 3 source copy
         if !crate::get_config().common.skip_formatting_stream_name {
             for node in self.nodes.iter_mut() {
                 if let NodeData::Stream(stream_params) = &mut node.data
