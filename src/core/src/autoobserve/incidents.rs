@@ -124,7 +124,7 @@ pub struct PageView {
 #[serde(rename_all = "snake_case")]
 pub enum PageOutcome {
     Paged,
-    /// No ownership rule and no default team took it, or the org has no on-call team.
+    /// No rule and no default team took it, or the org had no on-call team when it opened.
     Unrouted,
     /// No record two ticks after it opened while routing names a team: routing or paging errored.
     Failed,
@@ -234,9 +234,13 @@ pub async fn list_with(
         })
         .collect();
     let unrouted = unrouted_samples(org).await?;
-    let staffed = oncall_on && infra::table::oncall_teams::has_any_cached(org).await?;
+    let staffed_since = if oncall_on {
+        first_team_at(org).await?
+    } else {
+        None
+    };
     for item in &mut items {
-        item.page = Some(page_of(org, item, &unrouted, staffed, now).await?);
+        item.page = Some(page_of(org, item, &unrouted, staffed_since, now).await?);
     }
     Ok(AutoObserveIncidents {
         paging: paging_enabled_for(org).await,
@@ -336,11 +340,17 @@ async fn unrouted_samples(org: &str) -> anyhow::Result<HashSet<String>> {
     Ok(rows.into_iter().filter_map(|r| r.last_source_id).collect())
 }
 
+/// When the org's oldest on-call team was made; on-call pages nobody in an org without one.
+async fn first_team_at(org: &str) -> anyhow::Result<Option<i64>> {
+    let teams = infra::table::oncall_teams::list(org).await?;
+    Ok(teams.iter().map(|t| t.created_at).min())
+}
+
 async fn page_of(
     org: &str,
     item: &AutoObserveIncident,
     unrouted: &HashSet<String>,
-    staffed: bool,
+    staffed_since: Option<i64>,
     now: i64,
 ) -> anyhow::Result<PageView> {
     let id = &item.incident.id;
@@ -355,6 +365,8 @@ async fn page_of(
             team_name,
         });
     }
+    // Paging ran when it opened, so a team added later never makes it pending or failed.
+    let staffed = staffed_since.is_some_and(|at| at <= item.incident.created_at);
     // A teamless record is how on-call keeps a page nobody owns: it woke no one.
     let outcome = if !staffed || record.is_some() || unrouted.contains(id) {
         PageOutcome::Unrouted

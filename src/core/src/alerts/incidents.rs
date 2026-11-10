@@ -6009,6 +6009,7 @@ mod tests {
             infra::table::oncall_routing_config::set_default_team(&org, Some(&team.id))
                 .await
                 .unwrap();
+            age_teams(&org, 2 * PAGE_PENDING_US).await;
             let mut ids = Vec::new();
             for i in 0..4 {
                 let mut own = stop(&org, i);
@@ -6076,6 +6077,7 @@ mod tests {
             let _team = infra::table::oncall_teams::create(&ruleless, "core", "UTC", None)
                 .await
                 .unwrap();
+            age_teams(&ruleless, 2 * PAGE_PENDING_US).await;
             let old = open(&stop(&ruleless, 0), &pager).await.unwrap();
             age(&old, 0, PAGE_PENDING_US + 60_000_000).await;
             let fresh = open(&stop(&teamless, 0), &pager).await.unwrap();
@@ -6119,6 +6121,101 @@ mod tests {
             assert_eq!(pages[&id].team_name, None);
         }
 
+        #[tokio::test]
+        async fn a_stop_that_opened_with_no_team_stays_unrouted_after_a_default_team_is_added() {
+            use crate::autoobserve::incidents::{PAGE_PENDING_US, PageOutcome};
+
+            let _db = store().await;
+            let org = new_org();
+            let id = open_finding_incident_with(&stop(&org, 0), &OncallPager, &ClusterTurns)
+                .await
+                .unwrap()
+                .incident_id()
+                .to_string();
+            let record = OncallPager.record(&org, &id).await.unwrap();
+            assert!(record.is_none(), "an org with no team pages nobody");
+            assert_eq!(
+                pages_of(&org, true).await[&id].outcome,
+                PageOutcome::Unrouted
+            );
+            let team = infra::table::oncall_teams::create(&org, "shop", "UTC", None)
+                .await
+                .unwrap();
+            infra::table::oncall_routing_config::set_default_team(&org, Some(&team.id))
+                .await
+                .unwrap();
+            assert_eq!(
+                pages_of(&org, true).await[&id].outcome,
+                PageOutcome::Unrouted,
+                "no page is queued, so not pending"
+            );
+            age(&id, 0, PAGE_PENDING_US + 60_000_000).await;
+            assert_eq!(
+                pages_of(&org, true).await[&id].outcome,
+                PageOutcome::Unrouted,
+                "no page was attempted, so not failed"
+            );
+        }
+
+        #[tokio::test]
+        async fn a_page_the_on_call_service_refused_reads_pending_then_failed() {
+            use crate::autoobserve::incidents::{PAGE_PENDING_US, PageOutcome};
+
+            let _db = store().await;
+            let org = new_org();
+            let team = infra::table::oncall_teams::create(&org, "shop", "UTC", None)
+                .await
+                .unwrap();
+            infra::table::oncall_routing_config::set_default_team(&org, Some(&team.id))
+                .await
+                .unwrap();
+            age_teams(&org, 2 * PAGE_PENDING_US).await;
+            let refused = open(&stop(&org, 0), &Pager::refusing(true, false)).await;
+            assert!(refused.is_err(), "the route errored");
+            let id = incidents_of(&org).await.remove(0).id;
+            assert_eq!(
+                pages_of(&org, true).await[&id].outcome,
+                PageOutcome::Pending
+            );
+            age(&id, 0, PAGE_PENDING_US + 60_000_000).await;
+            assert_eq!(pages_of(&org, true).await[&id].outcome, PageOutcome::Failed);
+        }
+
+        #[tokio::test]
+        async fn a_fresh_stop_routed_to_the_default_team_reads_paged() {
+            use config::meta::oncall::{ResponderRole, SubjectRef, SubjectType};
+
+            use crate::autoobserve::incidents::PageOutcome;
+
+            let _db = store().await;
+            let org = new_org();
+            let team = infra::table::oncall_teams::create(&org, "shop", "UTC", None)
+                .await
+                .unwrap();
+            infra::table::oncall_routing_config::set_default_team(&org, Some(&team.id))
+                .await
+                .unwrap();
+            let id = open(&stop(&org, 0), &Pager::for_team(&team.id))
+                .await
+                .unwrap();
+            let paged = SubjectRef::new(SubjectType::Incident, id.clone(), 1);
+            infra::table::oncall_responses::open(
+                &org,
+                &paged,
+                Some(&team.id),
+                2,
+                Some(TITLE),
+                ResponderRole::Owner,
+                None,
+            )
+            .await
+            .unwrap();
+            let page = &pages_of(&org, true).await[&id];
+            assert_eq!(page.outcome, PageOutcome::Paged);
+            assert_eq!(page.team_id.as_deref(), Some(team.id.as_str()));
+            assert_eq!(page.team_name.as_deref(), Some("shop"));
+        }
+
         async fn pages_of(
             org: &str,
             oncall_on: bool,
@@ -6135,6 +6232,21 @@ mod tests {
                 .into_iter()
                 .map(|i| (i.incident.id, i.page.expect("every item says its page")))
                 .collect()
+        }
+
+        /// Moves the org's teams back, so an incident aged into the past still opened after them.
+        async fn age_teams(org: &str, by: i64) {
+            use infra::table::entity::oncall_teams as teams;
+
+            teams::Entity::update_many()
+                .col_expr(
+                    teams::Column::CreatedAt,
+                    Expr::col(teams::Column::CreatedAt).sub(by),
+                )
+                .filter(teams::Column::OrgId.eq(org))
+                .exec(infra::db::get_orm_client_rw().await)
+                .await
+                .unwrap();
         }
 
         #[tokio::test]
