@@ -1376,7 +1376,7 @@ mod tests {
             ("POST", "/kv/kv/_search", "kv"),
             ("POST", "/api/kv/_search", "api"),
             ("POST", "/v2/kv/_search", "v2"),
-            ("GET", "/v2/acme/alerts", "acme"),
+            ("GET", "/v2/acme/alerts?folder=default", "acme"),
         ] {
             let (mut parts, ()) = http::Request::builder()
                 .method(method)
