@@ -25,7 +25,10 @@ import type {
   TurnState,
   TurnTerminal,
 } from "@/composables/assistant";
+import { queuedDraftSid } from "@/composables/assistant";
 import { raw } from "@/types/i18n";
+
+import { fakeAssistant } from "../__tests__/fakeAssistant";
 
 import {
   queuedOf,
@@ -388,6 +391,41 @@ describe("useComposerQueue: Enter while answering queues one message", () => {
     expect(sentText(store)).toEqual(["queued"]);
     expect(composer(store).text).toBe("typed later");
   });
+});
+
+describe("useComposerQueue: a queued message leaves with its chat (S2-5)", () => {
+  it.each(["dropSession", "reset"] as const)(
+    "drops the queued message, in memory and in storage, on %s",
+    async (how) => {
+      const { store } = fakeAssistant();
+      const sid = store.createSession({
+        origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      });
+      const session = store.state.sessions[sid];
+      session.turn = { state: "responding.writing" };
+      let queue!: ComposerQueue;
+      mount(
+        defineComponent({
+          setup() {
+            queue = useComposerQueue({ sid: () => sid, store });
+            return () => null;
+          },
+        }),
+      );
+      session.composer.text = "and the one before?";
+      expect(queue.enqueue()).toBe(true);
+      store.drafts.flush();
+      expect(store.drafts.read(session.userOrgKey, queuedDraftSid(sid))).toMatchObject({
+        text: "and the one before?",
+      });
+      const key = session.userOrgKey;
+      if (how === "dropSession") store.dropSession(sid);
+      else store.reset();
+      await flushPromises();
+      expect(queuedOf(sid)).toBeNull();
+      if (how === "dropSession") expect(store.drafts.read(key, queuedDraftSid(sid))).toBeNull();
+    },
+  );
 });
 
 describe("useComposerQueue: a queued message survives a reload (Q2)", () => {

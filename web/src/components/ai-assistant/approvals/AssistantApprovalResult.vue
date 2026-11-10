@@ -271,6 +271,7 @@ import {
   approvalVerb,
   assistantEvidenceHostKey,
   assistantTranscriptHostKey,
+  type ActionLedgerEntry,
   type ApprovalBlockData,
   type ApprovalResult,
   type ApprovalResultItem,
@@ -648,7 +649,7 @@ const madeGrantLine = computed<"listed" | "revoked" | "not_stored" | null>(() =>
   if (!alwaysAllowed.value || standingAllowed.value) return null;
   if (revokedHere.value) return "revoked";
   const outcome = view.value?.outcome;
-  if (outcome?.grant?.stored === false) return "not_stored";
+  if (outcome?.grant?.stored === false || resolved.value?.grantNotStored) return "not_stored";
   if (!live.value || grantsFailed.value) return "listed";
   if (madeGrant.value === undefined) return null;
   if (madeGrant.value) return "listed";
@@ -754,6 +755,17 @@ const glyph = computed<IconName>(() => {
   return assistantGlyph.interrupted;
 });
 
+// Gathered targets can share a name with no id, so the server's ledger id binds a row to its own entry first.
+function undoEntryOf(item: ApprovalResultItem): ActionLedgerEntry | null {
+  const entries = undoEntries.value;
+  if (item.ledgerId) return entries.find((entry) => entry.id === item.ledgerId) ?? null;
+  return (
+    entries.find((entry) =>
+      item.id ? entry.resource.id === item.id : entry.resource.name === item.name,
+    ) ?? null
+  );
+}
+
 // One item is the line itself; a batch lists its rows.
 const rows = computed(() => {
   const items = view.value?.result?.items ?? [];
@@ -763,12 +775,7 @@ const rows = computed(() => {
     return {
       key: item.id ?? `${index}`,
       failed: item.status !== "done",
-      undo:
-        item.status === "done"
-          ? (undoEntries.value.find((entry) =>
-              item.id ? entry.resource.id === item.id : entry.resource.name === item.name,
-            ) ?? null)
-          : null,
+      undo: item.status === "done" ? undoEntryOf(item) : null,
       text:
         item.status === "done"
           ? raw(item.name)

@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 import { shownTurns } from "@/composables/assistant/historyRecords";
 import { projectRecord, type StoredTurn } from "@/composables/assistant/record";
@@ -61,6 +62,27 @@ const answer = (
   contentBlocks: blocks,
   ...over,
 });
+
+// The app's entity routes as the real router nests them, under the `/web` base.
+function entityRouter() {
+  const blank = { render: () => null };
+  return createRouter({
+    history: createMemoryHistory("/web"),
+    routes: [
+      {
+        path: "/",
+        component: blank,
+        children: [
+          { path: "logs", name: "logs", component: blank },
+          { path: "traces", name: "traces", component: blank },
+          { path: "alerts/detail/:alert_id", name: "alertDetail", component: blank },
+          { path: "/dashboards/view", name: "viewDashboard", component: blank },
+          { path: "settings", name: "settings", component: blank },
+        ],
+      },
+    ],
+  });
+}
 
 const mountMessage = (message: ChatMessage, props: Record<string, unknown> = {}) =>
   mount(AssistantMessage, { props: { message, turnId: "t1", ...props }, attachTo: document.body });
@@ -364,8 +386,14 @@ describe("AssistantMessage", () => {
       `[checkout_5xx](/web/alerts/detail/a1?org_identifier=default). [checkout](${o}/web/traces?org_identifier=default&tab=services-catalog&service=checkout) again; `,
       `[settings](/web/settings) is no entity.`,
     ].join("");
-    const wrapper = mountMessage(answer([{ type: "text", text }]), {
-      turn: { prompt: user(), org: "chat-org" } as never,
+    const wrapper = mount(AssistantMessage, {
+      props: {
+        message: answer([{ type: "text", text }]),
+        turnId: "t1",
+        turn: { prompt: user(), org: "chat-org" } as never,
+      },
+      global: { plugins: [entityRouter()] },
+      attachTo: document.body,
     });
     const links = wrapper.findAll("a[data-entity]");
     expect(links.map((a) => [a.text(), a.attributes("data-entity")])).toEqual([
@@ -380,6 +408,36 @@ describe("AssistantMessage", () => {
     expect(links[0].attributes("target")).toBeUndefined();
     for (const link of links) expect(link.find("span").classes()).toContain("bg-current");
     expect(wrapper.findAll("a").map((a) => a.text())).not.toContain("settings");
+  });
+
+  it.each([
+    ["a chat of another org", { org: "other-org" }],
+    ["a page whose evidence cannot open", { openable: false }],
+  ])("SR-03: renders entity links as text in %s", (_, patch) => {
+    const evidence = fakeEvidence();
+    const text = `Errors start in [ta_logs](/web/logs?stream=ta_logs&stream_type=logs).`;
+    const wrapper = mount(AssistantMessage, {
+      props: {
+        message: answer([{ type: "text", text }]),
+        turnId: "t1",
+        turn: evidence.turn(patch),
+      },
+      global: { plugins: [entityRouter()], provide: evidence.provide },
+      attachTo: document.body,
+    });
+    expect(wrapper.findAll("a")).toHaveLength(0);
+    expect(wrapper.text()).toContain("Errors start in ta_logs.");
+  });
+
+  it("SR-03: keeps entity links in a chat of the current org", () => {
+    const evidence = fakeEvidence();
+    const text = `Errors start in [ta_logs](/web/logs?stream=ta_logs&stream_type=logs).`;
+    const wrapper = mount(AssistantMessage, {
+      props: { message: answer([{ type: "text", text }]), turnId: "t1", turn: evidence.turn() },
+      global: { plugins: [entityRouter()], provide: evidence.provide },
+      attachTo: document.body,
+    });
+    expect(wrapper.get("a[data-entity]").attributes("href")).toContain("org_identifier=default");
   });
 
   it("drops the navigation link line for a query the answer already shows as a card", () => {

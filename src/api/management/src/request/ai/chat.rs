@@ -102,6 +102,9 @@ const CONFIRM_RELAY_TIMEOUT: std::time::Duration = std::time::Duration::from_sec
 const APPROVAL_RESOLVED: &str = "approval_resolved";
 /// The 409 reason while another `/confirm` of the same card is being decided.
 const APPROVAL_DECIDING: &str = "approval_deciding";
+/// Claim key of an id-less decision; card ids start `apr_`, so the two never collide.
+#[cfg(any(feature = "enterprise", test))]
+const SESSION_CLAIM_PREFIX: &str = "session:";
 #[cfg(any(feature = "enterprise", test))]
 const CONFIRM_REFUSAL_KEYS: [&str; 10] = [
     "id",
@@ -1227,12 +1230,17 @@ fn declines(body: &[u8]) -> bool {
 
 /// The body o2-ai gets: `org_id` is the authorized path org, `approved` true only for JSON `true`.
 #[cfg(any(feature = "enterprise", test))]
-fn bind_confirm_body_to_org(body: &[u8], org_id: &str) -> Option<Value> {
+fn bind_confirm_body_to_org(body: &[u8], org_id: &str, caller: &str) -> Option<Value> {
     let mut value: serde_json::Value = serde_json::from_slice(body).ok()?;
     let object = value.as_object_mut()?;
     let approved = object.get("approved") == Some(&Value::Bool(true));
     object.insert("approved".to_string(), Value::Bool(approved));
     object.insert("org_id".to_string(), serde_json::Value::from(org_id));
+    // o2-ai signs this email, which must equal the one the MCP check compares.
+    object.remove("user_email");
+    if !caller.is_empty() {
+        object.insert("user_email".to_string(), Value::from(caller));
+    }
     // The card the browser answers is relayed as `approval_record`, never taken from the body.
     object.remove("approval_record");
     object.remove("policy");
@@ -1311,13 +1319,34 @@ fn extends_only(body: &[u8]) -> bool {
         .is_ok_and(|body| body.get("extend") == Some(&Value::Bool(true)))
 }
 
-/// The card a `/confirm` decides, to claim before forwarding; questions and extensions decide none.
+/// Puts the grant outcome on the answer and on its stored resolution, so a reload reads it too.
 #[cfg(any(feature = "enterprise", test))]
-fn deciding_card(body: &[u8]) -> Option<String> {
+fn with_grant(answer: &mut Value, grant: Option<Value>) {
+    let Some(grant) = grant else {
+        return;
+    };
+    if let Some(resolved) = answer.get_mut("resolved").and_then(Value::as_object_mut) {
+        resolved.insert("grant".to_string(), grant.clone());
+    }
+    answer["grant"] = grant;
+}
+
+/// What a `/confirm` claims before forwarding: its card, or the whole chat when it names none.
+#[cfg(any(feature = "enterprise", test))]
+fn deciding_card(body: &[u8], session_id: &str) -> Option<String> {
     if answers_question(body) || extends_only(body) {
         return None;
     }
-    confirm_id(&serde_json::from_slice::<Value>(body).ok()?)
+    let body = serde_json::from_slice::<Value>(body).ok()?;
+    Some(confirm_id(&body).unwrap_or_else(|| format!("{SESSION_CLAIM_PREFIX}{session_id}")))
+}
+
+/// Whether o2-ai's 409 says the card was decided; any other conflict left it undecided.
+#[cfg(any(feature = "enterprise", test))]
+fn conflict_decided(body: &str) -> bool {
+    let upstream: Value = serde_json::from_str(body).unwrap_or_default();
+    let upstream = upstream.get("detail").unwrap_or(&upstream);
+    upstream["code"] == APPROVAL_RESOLVED
 }
 
 /// o2-ai's refusal of a decision keeps its status (404 unknown or expired, 409 decided, 410).
@@ -1835,12 +1864,13 @@ async fn relay_confirm_answer(answered: &Answered<'_>, response_body: &str) -> R
         let tool = resolved["tool"]
             .as_str()
             .or_else(|| stored.and_then(|row| row.tool.as_deref()));
-        record_decision(org_id, resolved, true).await;
         let grant =
             super::grants::record_from_confirm(org_id, session_id, caller, resolved, tool).await;
-        if let Some(grant) = grant.and_then(|grant| serde_json::to_value(grant).ok()) {
-            answer["grant"] = grant;
-        }
+        with_grant(
+            &mut answer,
+            grant.and_then(|grant| serde_json::to_value(grant).ok()),
+        );
+        record_decision(org_id, &answer["resolved"], true).await;
         // The chat index stops reporting the confirmation as pending.
         super::turn_marks::mark_answered(org_id, session_id, caller).await;
         record_turn_decision(org_id, session_id, caller, request).await;
@@ -1884,7 +1914,7 @@ async fn prepare_confirm(
         return Err(error::invalid_request(problem));
     }
     // o2-ai refuses a card recorded for another org, so it gets the authorized path org.
-    let Some(mut forward) = bind_confirm_body_to_org(body, org_id) else {
+    let Some(mut forward) = bind_confirm_body_to_org(body, org_id, caller) else {
         return Err(error::invalid_request(
             "Confirmation body must be a JSON object",
         ));
@@ -2145,7 +2175,11 @@ async fn cancel_turn(
     let mut chat_turns: Option<Vec<String>> = None;
     let target = if persisted {
         let running = super::chats::running_turn_id(&org_id, &session_id).await;
-        match stop_target(turn_id.as_deref(), running.as_deref()) {
+        let starting = match (&running, turn_id.as_deref()) {
+            (None, Some(named)) => turn_unrecorded(&org_id, &session_id, named).await,
+            _ => false,
+        };
+        match stop_target(turn_id.as_deref(), running.as_deref(), starting) {
             Some(turn) => StopTarget::Turn(turn),
             None => StopTarget::Nothing,
         }
@@ -2247,13 +2281,27 @@ async fn upstream_cancel(
     (Some(active), None)
 }
 
-/// The persisted turn to stop: the running one, and only if it is the one the caller named.
+/// The persisted turn to stop: the running one if it is the one named, else a named one starting.
 #[cfg(feature = "enterprise")]
-fn stop_target(named: Option<&str>, running: Option<&str>) -> Option<String> {
-    let running = running?;
+fn stop_target(named: Option<&str>, running: Option<&str>, starting: bool) -> Option<String> {
+    let Some(running) = running else {
+        return named.filter(|_| starting).map(str::to_string);
+    };
     named
         .is_none_or(|named| named == running)
         .then(|| running.to_string())
+}
+
+/// Whether the chat has no record of `turn_id` yet: a turn holding the lease before its record.
+#[cfg(feature = "enterprise")]
+async fn turn_unrecorded(org_id: &str, session_id: &str, turn_id: &str) -> bool {
+    match infra::table::ai_chat_turns::get(org_id, session_id, turn_id).await {
+        Ok(found) => found.is_none(),
+        Err(e) => {
+            log::warn!("[AI-CHAT] cannot read turn {turn_id} of {org_id}/{session_id}: {e}");
+            false
+        }
+    }
 }
 
 /// The turn without persistence a Stop goes to, from the turns `(turn, user)` running here.
@@ -2936,7 +2984,7 @@ pub async fn confirm_action(
             .get("user_id")
             .and_then(|v| v.to_str().ok())
             .unwrap_or_default();
-        let deciding = deciding_card(&body_bytes);
+        let deciding = deciding_card(&body_bytes, &session_id);
         if let Some(id) = &deciding
             && !super::grants::claim_decision(&org_id, id).await
         {
@@ -2966,7 +3014,7 @@ pub async fn confirm_action(
                 let response_body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
                 if !status.is_success() {
                     log::warn!("Agent confirm endpoint returned {status}");
-                    if status == StatusCode::CONFLICT {
+                    if status == StatusCode::CONFLICT && conflict_decided(&response_body) {
                         record_known_decision(&org_id, &response_body).await;
                     } else {
                         release_claim(&org_id, deciding.as_deref()).await;
@@ -2980,7 +3028,15 @@ pub async fn confirm_action(
                     request: &body_bytes,
                     stored: stored.as_ref(),
                 };
-                relay_confirm_answer(&answered, &response_body).await
+                let answer = relay_confirm_answer(&answered, &response_body).await;
+                // A chat-wide claim must not block the chat's next card once this one is decided.
+                if deciding
+                    .as_deref()
+                    .is_some_and(|key| key.starts_with(SESSION_CLAIM_PREFIX))
+                {
+                    release_claim(&org_id, deciding.as_deref()).await;
+                }
+                answer
             }
             Ok(Err(e)) if is_timeout(&e) => confirm_timed_out(),
             Ok(Err(e)) => {
@@ -5083,7 +5139,7 @@ mod tests {
 
     #[test]
     fn test_confirm_body_carries_the_path_org() {
-        let value = bind_confirm_body_to_org(br#"{"approved":true}"#, "acme").unwrap();
+        let value = bind_confirm_body_to_org(br#"{"approved":true}"#, "acme", "").unwrap();
         assert_eq!(
             value,
             serde_json::json!({"approved": true, "org_id": "acme"})
@@ -5091,9 +5147,18 @@ mod tests {
     }
 
     #[test]
+    fn the_relay_names_the_authenticated_caller_as_the_signer() {
+        let body = br#"{"approved":true,"user_email":"mallory@evil.io"}"#;
+        let value = bind_confirm_body_to_org(body, "acme", "Alice@acme.io").unwrap();
+        assert_eq!(value["user_email"], "Alice@acme.io");
+        let anonymous = bind_confirm_body_to_org(body, "acme", "").unwrap();
+        assert!(anonymous.get("user_email").is_none());
+    }
+
+    #[test]
     fn test_confirm_body_org_cannot_be_chosen_by_the_client() {
-        let value =
-            bind_confirm_body_to_org(br#"{"approved":true,"org_id":"victim"}"#, "acme").unwrap();
+        let value = bind_confirm_body_to_org(br#"{"approved":true,"org_id":"victim"}"#, "acme", "")
+            .unwrap();
         assert_eq!(value["org_id"], "acme");
     }
 
@@ -5102,7 +5167,7 @@ mod tests {
         let body =
             br#"{"approval_id":"apr_9","approved":true,"approval_record":{"id":"x"},"policy":{}}"#;
         assert_eq!(confirm_body_problem(body), None);
-        let value = bind_confirm_body_to_org(body, "acme").unwrap();
+        let value = bind_confirm_body_to_org(body, "acme", "").unwrap();
         assert_eq!(value["id"], "apr_9");
         assert!(value.get("approval_record").is_none() && value.get("policy").is_none());
         assert!(confirm_body_problem(br#"{"call_id":3}"#).is_some());
@@ -5134,7 +5199,7 @@ mod tests {
     fn an_ask_user_answer_reaches_o2_ai_on_its_request_id_and_touches_no_card() {
         let body = br#"{"request_id":"ask_1","answer":"opt_2"}"#;
         assert_eq!(confirm_body_problem(body), None);
-        let bound = bind_confirm_body_to_org(body, "acme").unwrap();
+        let bound = bind_confirm_body_to_org(body, "acme", "").unwrap();
         assert_eq!(bound["id"], "ask_1");
         assert_eq!(bound["answer"], "opt_2");
         assert!(answers_question(body));
@@ -5144,16 +5209,16 @@ mod tests {
 
     #[test]
     fn test_confirm_body_must_be_a_json_object() {
-        assert!(bind_confirm_body_to_org(b"", "acme").is_none());
-        assert!(bind_confirm_body_to_org(b"not json", "acme").is_none());
-        assert!(bind_confirm_body_to_org(b"[true]", "acme").is_none());
+        assert!(bind_confirm_body_to_org(b"", "acme", "").is_none());
+        assert!(bind_confirm_body_to_org(b"not json", "acme", "").is_none());
+        assert!(bind_confirm_body_to_org(b"[true]", "acme", "").is_none());
     }
 
     #[test]
     fn the_confirm_relay_passes_scope_items_reply_and_id_through() {
         let body = br#"{"id":"apr_1","approved":true,"scope":"chat","items":["a1"],"reply":"no"}"#;
         assert_eq!(confirm_body_problem(body), None);
-        let bound = bind_confirm_body_to_org(body, "acme").unwrap();
+        let bound = bind_confirm_body_to_org(body, "acme", "").unwrap();
         assert_eq!(bound["scope"], "chat");
         assert_eq!(bound["items"], serde_json::json!(["a1"]));
         assert_eq!(bound["reply"], "no");
@@ -5168,19 +5233,61 @@ mod tests {
     #[test]
     fn only_a_decision_claims_its_card_before_the_relay() {
         assert_eq!(
-            deciding_card(br#"{"id":"apr_1","approved":true}"#).as_deref(),
+            deciding_card(br#"{"id":"apr_1","approved":true}"#, "s1").as_deref(),
             Some("apr_1")
         );
         assert_eq!(
-            deciding_card(br#"{"approval_id":"apr_2","approved":false}"#).as_deref(),
+            deciding_card(br#"{"approval_id":"apr_2","approved":false}"#, "s1").as_deref(),
             Some("apr_2")
         );
-        assert_eq!(deciding_card(br#"{"id":"apr_1","extend":true}"#), None);
         assert_eq!(
-            deciding_card(br#"{"request_id":"q1","answer":"yes"}"#),
+            deciding_card(br#"{"id":"apr_1","extend":true}"#, "s1"),
             None
         );
-        assert_eq!(deciding_card(b"not json"), None);
+        assert_eq!(
+            deciding_card(br#"{"request_id":"q1","answer":"yes"}"#, "s1"),
+            None
+        );
+        assert_eq!(deciding_card(b"not json", "s1"), None);
+    }
+
+    #[test]
+    fn a_refused_grant_is_kept_in_the_stored_resolution() {
+        let mut answer = serde_json::json!({
+            "id": "apr_1",
+            "resolved": {"type": "confirmation_resolved", "id": "apr_1", "approved": true},
+        });
+        let refused =
+            serde_json::json!({"stored": false, "scope": "always", "reason": "store_failed"});
+        with_grant(&mut answer, Some(refused.clone()));
+        assert_eq!(answer["grant"], refused);
+        assert_eq!(answer["resolved"]["grant"], refused);
+        let mut once = serde_json::json!({"resolved": {"id": "apr_2"}});
+        with_grant(&mut once, None);
+        assert!(once.get("grant").is_none() && once["resolved"].get("grant").is_none());
+    }
+
+    #[test]
+    fn a_decision_without_an_id_claims_its_whole_chat() {
+        assert_eq!(
+            deciding_card(br#"{"approved":true}"#, "s1").as_deref(),
+            Some("session:s1")
+        );
+        assert_eq!(
+            deciding_card(br#"{"approved":false,"id":""}"#, "s1").as_deref(),
+            Some("session:s1")
+        );
+    }
+
+    #[test]
+    fn only_an_already_decided_conflict_keeps_the_claim() {
+        let decided = r#"{"detail":{"code":"approval_resolved","id":"apr_1","approved":true}}"#;
+        assert!(conflict_decided(decided));
+        let owner_gone = r#"{"detail":{"code":"session_owner_unavailable","message":"x"}}"#;
+        assert!(!conflict_decided(owner_gone));
+        let mismatch = r#"{"detail":{"code":"approval_mismatch","pending_id":"apr_2"}}"#;
+        assert!(!conflict_decided(mismatch));
+        assert!(!conflict_decided("not json"));
     }
 
     #[test]
@@ -5947,12 +6054,22 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn a_stop_reaches_only_the_running_turn_it_names() {
-        assert_eq!(stop_target(None, Some("t2")).as_deref(), Some("t2"));
-        assert_eq!(stop_target(Some("t2"), Some("t2")).as_deref(), Some("t2"));
+        assert_eq!(stop_target(None, Some("t2"), false).as_deref(), Some("t2"));
+        assert_eq!(
+            stop_target(Some("t2"), Some("t2"), false).as_deref(),
+            Some("t2")
+        );
         // A stale Stop for t1 must not cut t2, which now runs in the same chat.
-        assert_eq!(stop_target(Some("t1"), Some("t2")), None);
-        assert_eq!(stop_target(Some("t1"), None), None);
-        assert_eq!(stop_target(None, None), None);
+        assert_eq!(stop_target(Some("t1"), Some("t2"), false), None);
+        assert_eq!(stop_target(Some("t1"), None, false), None);
+        assert_eq!(stop_target(None, None, false), None);
+        assert_eq!(
+            stop_target(Some("t1"), None, true).as_deref(),
+            Some("t1"),
+            "a Stop during the turn's start still targets it"
+        );
+        assert_eq!(stop_target(None, None, true), None);
+        assert_eq!(stop_target(Some("t1"), Some("t2"), true), None);
     }
 
     #[cfg(feature = "enterprise")]
@@ -6171,7 +6288,7 @@ mod tests {
             (br#"{"approved": "true"}"#, false),
             (br#"{}"#, false),
         ] {
-            let value = bind_confirm_body_to_org(body, "acme").unwrap();
+            let value = bind_confirm_body_to_org(body, "acme", "").unwrap();
             assert_eq!(
                 value["approved"],
                 approved,

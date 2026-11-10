@@ -528,6 +528,25 @@ describe("opening and Follow in thread", () => {
     expect(followedRcaRun().value).toBeNull();
   });
 
+  it("ends a followed run on an org switch and on sign-out, so the panel never acts on the old org's incident (R2-01)", async () => {
+    const { store } = await setup();
+    const door = useRcaFollowOutside();
+    door.follow({ org: "default", incidentId: "inc-482", runId: "run-1" });
+    await vi.dynamicImportSettled();
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="assistant-rca-thread"]')).not.toBeNull();
+    store.setIdentity({ userOrgKey: "k2", org: "other" });
+    await flushPromises();
+    expect(followedRcaRun().value).toBeNull();
+    expect(document.body.querySelector('[data-test="assistant-rca-thread"]')).toBeNull();
+    door.follow({ org: "other", incidentId: "inc-9", runId: "run-9" });
+    await flushPromises();
+    expect(followedRcaRun().value).toMatchObject({ runId: "run-9" });
+    store.setIdentity(null);
+    await flushPromises();
+    expect(followedRcaRun().value).toBeNull();
+  });
+
   it("switches to the new run when the followed thread re-analyzes, instead of snapping back", async () => {
     const { wrapper } = await setup();
     const door = useRcaFollowOutside();

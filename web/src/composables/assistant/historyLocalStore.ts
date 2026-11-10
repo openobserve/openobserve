@@ -26,7 +26,13 @@ import {
   sessionHints,
   type HistoryCtx,
 } from "./historyContext";
-import { LOCAL_CAP, SERVER_CACHE_CAP, type LocalRecord, type LocalTurn } from "./historyDb";
+import {
+  LIVE_SAVE_GRACE_MS,
+  LOCAL_CAP,
+  SERVER_CACHE_CAP,
+  type LocalRecord,
+  type LocalTurn,
+} from "./historyDb";
 import type { StoredTurn } from "./record";
 import { isTerminal } from "./turnStates";
 
@@ -120,10 +126,13 @@ async function keepWritten(written: LocalRecord, ctx: HistoryCtx): Promise<void>
   const rows = [...ctx.local.value.filter((row) => row.id !== written.id), written];
   const cached = rows.filter((row) => row.serverBacked);
   const excess = cached.length - SERVER_CACHE_CAP;
+  const now = ctx.deps.now();
   const victims =
     excess > 0
       ? cached
-          .filter((row) => !row.liveTurnId && !(row.sessionId && ctx.session(row.sessionId)))
+          .filter(
+            (row) => !liveSaveHeld(row, now) && !(row.sessionId && ctx.session(row.sessionId)),
+          )
           .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
           .slice(0, excess)
       : [];
@@ -131,6 +140,13 @@ async function keepWritten(written: LocalRecord, ctx: HistoryCtx): Promise<void>
   ctx.local.value = rows.filter((row) => !gone.has(row.id));
   if (!victims.length || !written.userOrgKey) return;
   await ctx.deps.db.remove([...gone], written.userOrgKey).catch(() => ctx.noteStorageFailure());
+}
+
+// Only the grace window needs this browser's copy; after it the server's copy wins, so the row may go.
+function liveSaveHeld(row: LocalRecord, now: number): boolean {
+  return (
+    !!row.liveTurnId && row.liveSavedAt !== undefined && now - row.liveSavedAt <= LIVE_SAVE_GRACE_MS
+  );
 }
 
 // Prune-on-save: the oldest unpinned chat goes and Undo keeps it for 10 s; nothing is pruned on read.

@@ -738,7 +738,7 @@ describe("useAssistantHistory reload", () => {
     const old = Array.from({ length: SERVER_CACHE_CAP + 1 }, (_, i) =>
       record(100 + i, { serverBacked: true }),
     );
-    const live = record(99, { serverBacked: true, liveTurnId: "t-live" });
+    const live = record(99, { serverBacked: true, liveTurnId: "t-live", liveSavedAt: Date.now() });
     const local = record(98);
     const fake = setup({ persistence: true }, [
       record(1, { serverBacked: true }),
@@ -756,6 +756,35 @@ describe("useAssistantHistory reload", () => {
     expect(kept).not.toContain(100);
     expect(kept).not.toContain(101);
     expect(kept.filter((id) => fake.db.rows.get(id)?.serverBacked)).toHaveLength(SERVER_CACHE_CAP);
+  });
+
+  it("lets a chat saved after a completed turn leave the cache once its grace window is over (S2-1)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+      const fake = setup({ persistence: true });
+      await flushPromises();
+      // The fake's ids share one v7 time prefix, so each chat carries its own row id as a real one would.
+      const saveNew = (text: string) => {
+        const sid = chat(fake, text);
+        fake.store.state.sessions[sid].chatId = Date.now();
+        return fake.history.save(sid).then(() => sid);
+      };
+      const first = await saveNew("oldest");
+      const firstId = [...fake.db.rows.values()].find((row) => row.sessionId === first)!.id;
+      expect(fake.db.rows.get(firstId)).toMatchObject({ liveTurnId: "t1" });
+      fake.store.dropSession(first);
+      vi.setSystemTime(Date.now() + LIVE_SAVE_GRACE_MS + 1);
+      for (let i = 0; i < SERVER_CACHE_CAP; i++) {
+        vi.setSystemTime(Date.now() + 1);
+        await saveNew(`newer ${i}`);
+      }
+      await flushPromises();
+      expect(fake.db.rows.has(firstId)).toBe(false);
+      expect(fake.db.rows.size).toBe(SERVER_CACHE_CAP);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps this browser's live save inside the grace window and the server's after it", async () => {

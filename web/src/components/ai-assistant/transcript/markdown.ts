@@ -27,15 +27,15 @@ import {
   type PropType,
   type ShallowRef,
 } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, type RouteLocationRaw, type Router } from "vue-router";
 
 import { gt } from "@/types/i18n";
 
 import {
   CLASSES,
   contentHash,
-  entityHref,
   entityKindOf,
+  entityQuery,
   EXTERNAL_REL,
   PART_CHARS,
   PART_LINES,
@@ -45,6 +45,7 @@ import {
   PROSE_CLASSES,
   SAFE_DATA_IMAGE,
   SYNTAX_CLASSES,
+  type EntityKind,
   type MarkdownPart,
   type ParseRequest,
   type ParseResult,
@@ -142,6 +143,14 @@ const PURIFY = {
   ADD_URI_SAFE_ATTR: ["data-claim"],
   ALLOW_ARIA_ATTR: false,
   ALLOWED_URI_REGEXP: /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i,
+};
+
+// The named route each entity kind opens; an entity href that resolves to any other route is not a link (SR-01).
+const ENTITY_ROUTES: Readonly<Record<EntityKind, string>> = {
+  stream: "logs",
+  service: "traces",
+  dashboard: "viewDashboard",
+  alert: "alertDetail",
 };
 
 /** The worker's parse run in place, for specs; app code never parses on the main thread. */
@@ -404,11 +413,14 @@ export const AssistantMarkdownPart = defineComponent({
     lead: { type: Boolean, default: false },
     /** The part belongs to the streaming answer, which fills before anything else. */
     live: { type: Boolean, default: false },
-    /** The chat's org, pinned on every entity link so a link never switches org. */
+    /** The chat's org, pinned on every entity link so a link never switches org; with none, entity links are text. */
     org: { type: String, default: "" },
+    /** False when the chat's entities cannot open here (another org, or a page with no app behind it): entity links are text. */
+    openable: { type: Boolean, default: true },
   },
   setup(props) {
     const el = ref<HTMLElement | null>(null);
+    const router = useRouter();
     useSlicedFill(el, {
       live: () => props.live,
       source: () => props.part,
@@ -424,7 +436,10 @@ export const AssistantMarkdownPart = defineComponent({
         } else {
           node.className = props.htmlClass;
           delete node.dataset.test;
-          const html = sanitize(part.html, props.org);
+          const html = sanitize(
+            part.html,
+            router && props.org && props.openable ? { router, org: props.org } : null,
+          );
           const first = [...html.childNodes].find((child) => !blankText(child));
           if (props.lead && first instanceof HTMLParagraphElement) markLead(first);
           node.replaceChildren(html);
@@ -432,7 +447,6 @@ export const AssistantMarkdownPart = defineComponent({
         if (announce) announceFill(node);
       },
     });
-    const router = useRouter();
     // An entity link opens in the app without a reload; a modified click keeps the browser's new-tab behaviour.
     const onClick = (event: MouseEvent) => {
       if (event.defaultPrevented || event.button !== 0) return;
@@ -440,12 +454,10 @@ export const AssistantMarkdownPart = defineComponent({
       const href = (event.target as Element | null)
         ?.closest?.("a[data-entity]")
         ?.getAttribute("href");
-      if (!href || !router) return;
+      const target = href && router ? entityRoute(router, href, props.org) : null;
+      if (!target) return;
       event.preventDefault();
-      const base = router.options.history.base;
-      void router
-        .push(base && href.startsWith(base) ? href.slice(base.length) || "/" : href)
-        .catch(() => undefined);
+      void router.push(target.route).catch(() => undefined);
     };
     return () => h("div", { ref: el, onClick });
   },
@@ -889,19 +901,53 @@ function samePart(a: MarkdownPart, b: MarkdownPart): boolean {
   );
 }
 
+// An in-app href as the named entity route it opens, rebuilt by the router from the identifying params only; null for any other path.
+function entityRoute(
+  router: Router,
+  href: string,
+  org = "",
+): { kind: EntityKind; route: RouteLocationRaw; href: string } | null {
+  const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  const url = parseUrl(href, origin);
+  if (!url || url.origin !== origin) return null;
+  const base = (router.options.history.base ?? "").replace(/\/$/, "");
+  if (!url.pathname.startsWith(`${base}/`) || url.pathname.startsWith(`${base}//`)) return null;
+  const kind = entityKindOf(url);
+  if (!kind) return null;
+  try {
+    const found = router.resolve(url.pathname.slice(base.length));
+    if (found.name !== ENTITY_ROUTES[kind]) return null;
+    const query = Object.fromEntries(entityQuery(url, kind, org));
+    const route = { name: ENTITY_ROUTES[kind], params: found.params, query };
+    return { kind, route, href: router.resolve(route).href };
+  } catch {
+    return null;
+  }
+}
+
 // The renderer's own rules again, on whatever came back: http(s) to other origins only, and only the renderer's classes (X8).
-function sanitize(html: string, org: string): DocumentFragment {
+function sanitize(
+  html: string,
+  entities: { router: Router; org: string } | null,
+): DocumentFragment {
   const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost";
   const fragment = DOMPurify.sanitize(html, { ...PURIFY, RETURN_DOM_FRAGMENT: true });
   fragment.querySelectorAll("a").forEach((link) => {
     const url = parseUrl(link.getAttribute("href"), origin);
     // Only the renderer's entity link stays in app; it opens in place, so it takes no target.
-    const kind = url?.origin === origin ? entityKindOf(url) : null;
-    if (url && kind && link.getAttribute("class") === CLASSES.entityLink) {
+    if (link.getAttribute("class") === CLASSES.entityLink) {
+      const target = entities
+        ? entityRoute(entities.router, link.getAttribute("href") ?? "", entities.org)
+        : null;
+      if (!target) {
+        link.querySelector(":scope > span:empty")?.remove();
+        link.replaceWith(...Array.from(link.childNodes));
+        return;
+      }
       link.removeAttribute("target");
       link.removeAttribute("rel");
-      link.setAttribute("href", entityHref(url, kind, org));
-      link.setAttribute("data-entity", kind);
+      link.setAttribute("href", target.href);
+      link.setAttribute("data-entity", target.kind);
       return;
     }
     if (!url || (url.protocol !== "http:" && url.protocol !== "https:") || url.origin === origin) {

@@ -722,6 +722,36 @@ describe("the request", () => {
     expect(request.attachments).toEqual([{ kind: "log_row", data: { level: "error" } }]);
   });
 
+  it("attaches no row, cell or span below the raw data level, in blocks or typed (PSO-05)", () => {
+    const chips = [
+      chip("log_row", { user_email: "ada@example.com" }),
+      chip("cell", { status: 503 }),
+      chip("span", { span_id: "span-77" }),
+      chip("query_error", { message: "bad field" }),
+    ];
+    for (const attachments of [false, true])
+      for (const dataLevel of ["schema", "aggregates"] as const) {
+        const request = serialize(
+          session(),
+          snapshot({ chips }),
+          CLIENT,
+          turn(PAGE_CONTEXTS.logs, { attachments, dataLevel }),
+        );
+        const sent = JSON.stringify([request.message.text, request.attachments ?? []]);
+        expect(sent).not.toContain("ada@example.com");
+        expect(sent).not.toContain("503");
+        expect(sent).not.toContain("span-77");
+        expect(sent).toContain("bad field");
+      }
+    const raw = serialize(
+      session(),
+      snapshot({ chips }),
+      CLIENT,
+      turn(PAGE_CONTEXTS.logs, { attachments: true, dataLevel: "raw" }),
+    );
+    expect(raw.attachments?.map((a) => a.kind)).toEqual(["log_row", "cell", "span", "query_error"]);
+  });
+
   it("keeps a pasted text in the message body even when typed attachments are on (D4 §3.9)", () => {
     const row = chip("log_row", { level: "error" });
     const pasted = pastedTextChip("line 1\nline 2", "p1");

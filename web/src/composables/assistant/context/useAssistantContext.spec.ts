@@ -193,6 +193,57 @@ describe("useAssistantContext", () => {
     expect(view.chips.value.some((c) => c.kind === "incident")).toBe(false);
   });
 
+  it("marks a row chip not read and leaves it out of the attachments below the raw data level (PSO-05)", async () => {
+    const view = mountContext(async () => PAGE_CONTEXTS.logs);
+    await flushPromises();
+    store.addChip(sid, {
+      id: "r1",
+      kind: "log_row",
+      label: raw("Log row"),
+      data: { a: 1 },
+      sizeBytes: 7,
+      provenance: "door",
+      sent: "serialized",
+    });
+    const row = () => view.chips.value.find((chip) => chip.id === "r1")!;
+    expect(chipStateOf(row())).toBe("sent");
+    store.syncCapability({ ...store.state.capability, dataLevel: "aggregates" });
+    await flushPromises();
+    expect(chipStateOf(row())).toBe("not_read");
+    expect(view.sees.value.some((r) => r.id === "attachments")).toBe(false);
+  });
+
+  it.each([
+    ["a field chip", { kind: "field" as const, label: raw("status = 503") }],
+    [
+      "the DBM finding chip",
+      {
+        kind: "report" as const,
+        label: raw("Database · db1"),
+        ref: { type: "dbm_finding", org: "org1" },
+      },
+    ],
+  ])(
+    "marks %s not read below the raw data level, as o2-ai withholds it (PSO-05)",
+    async (_, extra) => {
+      const view = mountContext(async () => PAGE_CONTEXTS.logs);
+      await flushPromises();
+      store.addChip(sid, {
+        id: "x1",
+        data: { a: 1 },
+        sizeBytes: 7,
+        provenance: "door",
+        sent: "serialized",
+        ...extra,
+      });
+      const chip = () => view.chips.value.find((c) => c.id === "x1")!;
+      expect(chipStateOf(chip())).toBe("sent");
+      store.syncCapability({ ...store.state.capability, dataLevel: "schema" });
+      await flushPromises();
+      expect(chipStateOf(chip())).toBe("not_read");
+    },
+  );
+
   it("adds an attachments row and the shared disclosure", async () => {
     const view = mountContext(async () => PAGE_CONTEXTS.logs);
     await flushPromises();

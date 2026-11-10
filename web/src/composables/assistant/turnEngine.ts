@@ -39,6 +39,7 @@ import type {
   AssistantState,
   CapabilityAgent,
   ComposerSnapshot,
+  DataLevel,
   HistoryService,
   RequestBuilder,
   RequestTurn,
@@ -144,6 +145,8 @@ export interface EngineCapability {
   attachments?(): boolean;
   /** The server routes an explicit `mode: "chat"` past an incident's RCA default. */
   rcaChatMode?(): boolean;
+  /** The org's data-sharing level, when the server reports it. */
+  dataLevel?(): DataLevel | undefined;
   /** `capability.agents`; a spec's fake without it has no roster. */
   agents?(): CapabilityAgent[] | undefined;
 }
@@ -961,6 +964,9 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       if (saved === "server" && current?.turn.state === "done")
         current.turn = { state: "done", saved };
     },
+    forget(sid) {
+      last.delete(sid);
+    },
     turnFrames(sid) {
       const rec = runtime.get(sid)?.turn;
       return rec ? { turnId: rec.turnId, frames: [...rec.throughSeq, ...rec.sinceSeq] } : null;
@@ -1030,6 +1036,7 @@ function defaultRequestBuilder(
 
 function requestTurnOf(rec: TurnRecord, deps: TurnEngineDeps): RequestTurn {
   const capability = deps.capability();
+  const dataLevel = capability.dataLevel?.();
   return {
     pageContext: rec.rawContext as PageContext | null,
     turnId: rec.turnId,
@@ -1039,6 +1046,7 @@ function requestTurnOf(rec: TurnRecord, deps: TurnEngineDeps): RequestTurn {
     persisted: capability.persistence(),
     attachments: capability.attachments?.() ?? false,
     ...(capability.rcaChatMode?.() && { rcaChatMode: true }),
+    ...(dataLevel && { dataLevel }),
     now: deps.now(),
     ...(rec.replyToApproval && { replyToApproval: rec.replyToApproval }),
     ...(rec.replacesTurnId && { replacesTurnId: rec.replacesTurnId }),

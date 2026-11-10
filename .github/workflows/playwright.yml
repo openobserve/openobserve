@@ -910,7 +910,7 @@ jobs:
           } > tests/ui-testing/.env
           cd tests/ui-testing && npm ci
           npx playwright install --with-deps chromium
-          npx playwright test playwright-tests/assistant --grep @edition --pass-with-no-tests
+          npx playwright test playwright-tests/assistant --grep @edition
 
       - name: Check OpenObserve and Vite logs
         if: always()

@@ -1666,22 +1666,23 @@ fn last_content_line(lines: &[&str], from: Option<usize>) -> Option<usize> {
     }
 }
 
-/// Streams a step's input names: explicit name keys, else the tables of its SQL.
+/// Streams a step's input names: its name keys and its SQL's tables; none when the SQL is
+/// unreadable.
 fn context_streams(context: &Map<String, Value>) -> Vec<String> {
-    let named: Vec<String> = STREAM_NAME_KEYS
+    let mut streams: Vec<String> = STREAM_NAME_KEYS
         .iter()
         .filter_map(|k| context.get(*k).and_then(Value::as_str))
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(str::to_string)
         .collect();
-    if !named.is_empty() {
-        return named;
+    if let Some(sql) = context.get("sql").and_then(Value::as_str) {
+        // A named stream does not vouch for the SQL, which may read another one.
+        match config::meta::sql::resolve_stream_names(sql) {
+            Ok(tables) if !tables.is_empty() => streams.extend(tables),
+            _ => return Vec::new(),
+        }
     }
-    let Some(sql) = context.get("sql").and_then(Value::as_str) else {
-        return Vec::new();
-    };
-    let mut streams = config::meta::sql::resolve_stream_names(sql).unwrap_or_default();
     streams.sort();
     streams.dedup();
     streams
@@ -3391,6 +3392,23 @@ mod tests {
         assert!(
             !hidden.contains("secret") && hidden.starts_with("See"),
             "{hidden}"
+        );
+    }
+
+    #[test]
+    fn a_named_stream_does_not_hide_the_tables_its_sql_reads() {
+        let turns = vec![json!({"frames": [
+            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c1", "context": {"stream_name": "public", "sql": "SELECT * FROM secret"}},
+            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c2", "context": {"stream_name": "public", "sql": "SELEC nonsense ((("}},
+        ]})];
+        let place = |s: &str| Some(("logs".to_string(), s.to_string()));
+        assert_eq!(
+            step_streams(&turns),
+            [
+                ("c1".to_string(), place("public")),
+                ("c1".to_string(), place("secret")),
+                ("c2".to_string(), None),
+            ]
         );
     }
 

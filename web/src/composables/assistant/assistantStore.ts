@@ -63,7 +63,7 @@ import type {
   WindowGeometry,
 } from "./assistantStore.types";
 import type { ContextChip } from "./context/types";
-import { createDraftStore, type DraftPayload, type DraftStore } from "./drafts";
+import { createDraftStore, queuedDraftSid, type DraftPayload, type DraftStore } from "./drafts";
 import {
   forgetTabs,
   markedUserOrgKeys,
@@ -668,8 +668,12 @@ function createCore(
         return session && session.messages.length > 0 && isIdle(core, session);
       });
       for (const sid of holding.slice(IDLE_SESSION_LIMIT)) {
-        state.sessions[sid].messages = [];
+        const session = state.sessions[sid];
+        session.messages = [];
         core.released.add(sid);
+        // Retry resends only a failed or refused turn, so any other snapshot is dead weight.
+        if (session.turn.state !== "failed" && session.turn.state !== "refused")
+          deps.engine.forget?.(sid);
       }
     },
   };
@@ -765,6 +769,8 @@ function createSessionSlice(core: StoreCore) {
       const session = core.session(sid);
       if (!session) return;
       core.drafts.remove(session.userOrgKey, sid);
+      core.drafts.remove(session.userOrgKey, queuedDraftSid(sid));
+      deps.engine.forget?.(sid);
       delete state.sessions[sid];
       delete core.notices[sid];
       state.recent = state.recent.filter((id) => id !== sid);
@@ -1398,21 +1404,24 @@ function createTurnSlice(core: StoreCore) {
     continueTurn: (sid) => deps.engine.continueTurn(sid),
     retrySave: (sid, turnId) => deps.engine.retrySave(sid, turnId),
     regenerate(sid) {
-      if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      const session = core.session(sid);
+      if (!session || !core.writable(session)) return Promise.resolve(refusedUnknown());
       const locked = refusedByLock(core.turnLock(sid));
       if (locked) return Promise.resolve(locked);
       return track(sid, null, () => deps.engine.send(sid, { input: "regenerate" }));
     },
     editResend(sid, edit) {
-      if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      const session = core.session(sid);
+      if (!session || !core.writable(session)) return Promise.resolve(refusedUnknown());
       const locked = refusedByLock(core.turnLock(sid));
       if (locked) return Promise.resolve(locked);
+      const range = toRaw(session.composer.timeOverride);
       const snapshot: ComposerSnapshot = {
         text: edit.text,
         chips: edit.chips,
         images: edit.images,
         mentions: [],
-        timeOverride: null,
+        timeOverride: range ? { ...range } : null,
       };
       return track(sid, null, () =>
         deps.engine.send(sid, { input: "edit_resend", snapshot, editedFrom: edit.editedFrom }),
@@ -1570,7 +1579,10 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
       return "proceed";
     },
     reset() {
-      for (const sid of Object.keys(state.sessions)) delete state.sessions[sid];
+      for (const sid of Object.keys(state.sessions)) {
+        deps.engine.forget?.(sid);
+        delete state.sessions[sid];
+      }
       for (const sid of Object.keys(core.notices)) delete core.notices[sid];
       state.recent = [];
       Object.assign(state.shell, {

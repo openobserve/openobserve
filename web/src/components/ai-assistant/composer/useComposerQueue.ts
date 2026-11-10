@@ -26,6 +26,7 @@ import {
 
 import {
   isRunning,
+  queuedDraftSid,
   useAssistantStore,
   type ComposerSnapshot,
   type ComposerState,
@@ -180,13 +181,19 @@ export function installQueueDrain(store: QueueStore): void {
   drain?.scope.stop();
   const scope = effectScope(true);
   drain = { store, scope };
-  scope.run(() =>
+  scope.run(() => {
     watch(
       () => [...queues.keys()].filter((sid) => endedTurn(store, sid)),
       (ended) => ended.forEach((sid) => drainOne(store, sid)),
       { flush: "post", immediate: true },
-    ),
-  );
+    );
+    // A deleted chat or a sign-out's reset takes the session away, so its queued message goes with it.
+    watch(
+      () => [...queues.keys()].filter((sid) => !store.state.sessions[sid]),
+      (gone) => gone.forEach((sid) => queues.delete(sid)),
+      { flush: "post", immediate: true },
+    );
+  });
 }
 
 /** Lets a spec start with no queued messages; never called by app code. */
@@ -197,7 +204,6 @@ export function resetComposerQueueForTests(): void {
   drain = null;
 }
 
-// A chat this store no longer holds keeps its message until it is opened again.
 function endedTurn(store: QueueStore, sid: string): boolean {
   const session = store.state.sessions[sid];
   return !!session && !isRunning(session.turn);
@@ -254,9 +260,9 @@ function writeStored(sid: Sid, item: QueuedMessage | null): void {
   const store = drain?.store;
   const session = store?.state.sessions[sid];
   if (!store || !session?.userOrgKey || session.record?.ephemeral) return;
-  if (!item) return store.drafts.remove(session.userOrgKey, storedSid(sid));
+  if (!item) return store.drafts.remove(session.userOrgKey, queuedDraftSid(sid));
   const { text, chips, timeOverride, removedPageKeys, homeStarter } = item.snapshot;
-  store.drafts.schedule(session.userOrgKey, storedSid(sid), {
+  store.drafts.schedule(session.userOrgKey, queuedDraftSid(sid), {
     text,
     chips,
     timeOverride,
@@ -269,7 +275,7 @@ function writeStored(sid: Sid, item: QueuedMessage | null): void {
 function restoreStored(store: QueueStore, sid: Sid): void {
   const session = store.state.sessions[sid];
   if (queues.has(sid) || !session?.userOrgKey || session.record?.ephemeral) return;
-  const stored = store.drafts.read(session.userOrgKey, storedSid(sid));
+  const stored = store.drafts.read(session.userOrgKey, queuedDraftSid(sid));
   if (!stored || !holdsDraft({ ...stored, images: [] })) return;
   const snapshot: ComposerSnapshot = {
     text: stored.text,
@@ -281,10 +287,6 @@ function restoreStored(store: QueueStore, sid: Sid): void {
     ...(stored.homeStarter && { homeStarter: true }),
   };
   queues.set(sid, { text: stored.text, at: Date.now(), snapshot, held: true });
-}
-
-function storedSid(sid: Sid): Sid {
-  return `${sid}:queued`;
 }
 
 // Page chips come with the page, so they alone are not a draft.

@@ -201,6 +201,8 @@ export interface ResolvedBlockData {
   items?: ApprovalResultItem[];
   /** A write the user's standing grant let run with no card before it (`by === "grant"`). */
   grant?: ResolvedGrant;
+  /** The server refused or failed to store the grant this approve asked for. */
+  grantNotStored?: { reason?: string };
 }
 
 /** The grant a `by: "grant"` resolution ran under; no `id` once it was revoked. */
@@ -1162,6 +1164,7 @@ function typedResolved(state: StreamState, data: any, phase: StreamPhase): Strea
     ...(RESOLVED_SCOPES.has(data.scope) && { scope: data.scope }),
     ...resolvedItemsOf(data.items),
     ...grantOf(data),
+    ...grantNotStoredOf(data.grant),
   };
   appendBlock(state, { type: "approval_result", resolved });
   if (resolved.grant && resolved.approved) settleGrantedWrite(state, resolved.grant);
@@ -1203,6 +1206,16 @@ function grantOf(data: any): { grant?: ResolvedGrant } {
       ...(id && { id }),
       ...(typeof data.operation === "string" &&
         data.operation && { operation: data.operation.slice(0, MAX_TOOL_CHARS) }),
+    },
+  };
+}
+
+// The stored resolution keeps `/confirm`'s grant outcome, so a reopened chat still says the grant was never saved.
+function grantNotStoredOf(raw: unknown): { grantNotStored?: { reason?: string } } {
+  if (!isRecord(raw) || raw.stored !== false) return {};
+  return {
+    grantNotStored: {
+      ...(typeof raw.reason === "string" && { reason: raw.reason.slice(0, MAX_LINE_CHARS) }),
     },
   };
 }

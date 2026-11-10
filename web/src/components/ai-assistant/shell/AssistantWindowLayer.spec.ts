@@ -186,20 +186,20 @@ describe("AssistantWindowLayer", () => {
     ).toBe(true);
   });
 
-  it("reserves the tray's band for page content while a bar shows", async () => {
+  it("leaves the sheet's bottom inset alone when its tray comes and goes (R2-02)", async () => {
     const { store } = fake.current;
     const sid = newChat();
     store.floatChat(sid, { focus: "none" });
     await setup();
-    const band = () =>
-      document.documentElement.style.getPropertyValue("--o-assistant-inset-bottom");
-    expect(band()).toBe("");
+    const style = document.documentElement.style;
+    style.setProperty("--o-assistant-inset-bottom", "320");
     store.minimiseWindow(sid, "button");
     await flushPromises();
-    expect(band()).toBe("56");
+    expect(style.getPropertyValue("--o-assistant-inset-bottom")).toBe("320");
     store.closeWindow(sid);
     await flushPromises();
-    expect(band()).toBe("");
+    expect(style.getPropertyValue("--o-assistant-inset-bottom")).toBe("320");
+    style.removeProperty("--o-assistant-inset-bottom");
   });
 
   it("collapses a window that fully covers a keyboard-focused page control, and undoes it (SC 2.4.11)", async () => {

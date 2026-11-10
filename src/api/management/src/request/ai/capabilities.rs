@@ -32,6 +32,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
+use common::meta::organization::AiDataSharingLevel;
 use config::meta::user::UserRole;
 use db::user::is_root_user;
 use o2_enterprise::enterprise::{
@@ -122,6 +123,9 @@ pub struct Capabilities {
     /// Set only when the org turned the assistant off; `can_chat` is then false.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gate: Option<Gate>,
+    /// The org's data-sharing level; the client leaves row, cell and span chips out below `raw`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_sharing_level: Option<String>,
 }
 
 impl Capabilities {
@@ -161,7 +165,14 @@ impl Capabilities {
             rca_chat_mode: settings.rca && facts.rca_chat_mode,
             approval_extend_budgets: facts.approval_extend_budgets,
             gate: None,
+            data_sharing_level: None,
         }
+    }
+
+    /// Every member reads the level, since only admins can read the org's settings.
+    fn with_data_level(mut self, level: AiDataSharingLevel) -> Self {
+        self.data_sharing_level = Some(level.as_str().to_string());
+        self
     }
 
     /// Without `agents` the client sends none, which is what a closed v2 gate needs.
@@ -585,7 +596,8 @@ pub async fn get_capabilities(
     } else {
         None
     };
-    let enabled = super::settings::org_ai(&org_id).await.enabled;
+    let org_ai = super::settings::org_ai(&org_id).await;
+    let enabled = org_ai.enabled;
     let health = if enabled {
         current_health(&org_id, discover_auth).await
     } else {
@@ -596,7 +608,8 @@ pub async fn get_capabilities(
     } else {
         Vec::new()
     };
-    let capabilities = Capabilities::new(health, permissions, Settings::from_config(), toolsets);
+    let capabilities = Capabilities::new(health, permissions, Settings::from_config(), toolsets)
+        .with_data_level(org_ai.data_sharing_level);
     let capabilities = if openobserve_core::ai_chat::admission::v2_gate_open().await {
         capabilities
     } else {
@@ -1153,7 +1166,8 @@ mod tests {
         } else {
             Vec::new()
         };
-        let probe = Capabilities::new(sample_health(), permissions, sample_settings(), toolsets);
+        let probe = Capabilities::new(sample_health(), permissions, sample_settings(), toolsets)
+            .with_data_level(AiDataSharingLevel::default());
         serde_json::to_value(probe).unwrap()
     }
 
@@ -1305,6 +1319,20 @@ mod tests {
         assert_eq!(off["gate"], "off_for_org");
         assert_eq!(off["can_chat"], false);
         assert_eq!(off["can_write"], json["can_write"]);
+    }
+
+    #[tokio::test]
+    async fn every_member_reads_the_org_data_level_even_when_off_or_gated() {
+        for (role, name) in Role::ALL {
+            let permissions = permissions(role).await;
+            let caps =
+                Capabilities::new(sample_health(), permissions, sample_settings(), Vec::new())
+                    .with_data_level(AiDataSharingLevel::Aggregates);
+            let off = serde_json::to_value(caps.clone().without_agents().off_for_org()).unwrap();
+            assert_eq!(off["data_sharing_level"], "aggregates", "{name}");
+            let on = serde_json::to_value(caps).unwrap();
+            assert_eq!(on["data_sharing_level"], "aggregates", "{name}");
+        }
     }
 
     #[test]

@@ -204,7 +204,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { alertsListQuery } from "@/services/alerts.queries";
-import { dashboardsByFolderQuery, dashboardsSearchQuery } from "@/services/dashboards.queries";
+import { dashboardsSearchQuery } from "@/services/dashboards.queries";
 import { pipelinesQuery } from "@/services/pipelines.queries";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -244,7 +244,7 @@ const enabled = computed(() => props.open && !!props.org);
 const streams = STREAM_TYPES.map((type) =>
   useQuery(computed(() => ({ ...streamNameListQuery(props.org, type), enabled: enabled.value }))),
 );
-// The API lists only the default folder unless given a title, so a typed mention searches every folder by its longest term.
+// A typed mention searches every folder by its longest term; a bare one lists every folder's first dashboards.
 const titleTerm = computed(() =>
   props.query
     .trim()
@@ -253,9 +253,7 @@ const titleTerm = computed(() =>
 );
 const dashboards = useQuery(
   computed(() => ({
-    ...(titleTerm.value
-      ? dashboardsSearchQuery(props.org, titleTerm.value)
-      : dashboardsByFolderQuery(props.org, "default")),
+    ...dashboardsSearchQuery(props.org, titleTerm.value),
     enabled: enabled.value,
   })),
 );

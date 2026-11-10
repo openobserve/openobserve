@@ -40,6 +40,7 @@ import { aiCreditsNotice } from "@/utils/aiCredits";
 import type { TranslateFn } from "@/types/i18n";
 import IncidentAiAnalysisCell from "./IncidentAiAnalysisCell.vue";
 import { rcaSummary } from "@/test/unit/fixtures/rcaThread";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 const triggerRca = vi.mocked(incidentsService.triggerRca);
 
@@ -274,6 +275,13 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
   });
 
   describe("v7: Follow in thread", () => {
+    const setAssistantFlag = (on: boolean | undefined) => {
+      window.__O2_ASSISTANT_V2__ = on;
+      resetAssistantV2ForTests();
+    };
+    beforeEach(() => setAssistantFlag(true));
+    afterEach(() => setAssistantFlag(undefined));
+
     const mountWith = (rca: Incident["rca"]) =>
       mount(IncidentAiAnalysisCell, {
         props: { incident: { ...incident, rca }, rcaEnabled: true, now: Date.now() },
@@ -306,6 +314,17 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
       const detail = wrapper.find('[data-test="incident-ai-analysis-detail"]');
       if (detail.exists()) expect(detail.attributes("title")).toMatch(/\S( · \S|$)/);
     });
+
+    it.each(["running", "completed"] as const)(
+      "with the assistant flag off, a %s run has no Follow in thread, since no assistant host is mounted to follow it",
+      (state) => {
+        setAssistantFlag(false);
+        const wrapper = mountWith(rcaSummary({ run_id: "run-7", state }));
+
+        expect(wrapper.find('[data-test="incident-ai-analysis-follow-btn"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="incident-ai-analysis-label"]').exists()).toBe(true);
+      },
+    );
 
     it("an incident with no run keeps Analyze and has no Follow in thread", () => {
       const wrapper = mountWith(null);

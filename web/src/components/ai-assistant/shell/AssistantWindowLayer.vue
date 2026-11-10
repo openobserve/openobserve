@@ -70,8 +70,6 @@ const MAIN_SELECTOR = "main[data-test='main-content']";
 
 const UNMOUNTED_GATES: ReadonlySet<string> = new Set(["loading", "not_entitled", "not_configured"]);
 
-const BAND_VAR = "--o-assistant-inset-bottom";
-
 // Only the assistant's own surfaces stay out of the focus-not-obscured check.
 const OWN_SURFACES = `${ASSISTANT_SURFACES_SELECTOR}, [data-test='assistant-tray']`;
 
@@ -311,16 +309,6 @@ watch(
   },
 );
 
-watch(
-  bandRem,
-  (rem) => {
-    const el = document.documentElement;
-    if (rem > 0) el.style.setProperty(BAND_VAR, String((rem + 0.5) * 16));
-    else el.style.removeProperty(BAND_VAR);
-  },
-  { flush: "post" },
-);
-
 watch(openWindows, (windows) => {
   for (const sid of Object.keys(obscured))
     if (!windows.some((w) => w.sid === sid)) delete obscured[sid];
@@ -346,6 +334,5 @@ onBeforeUnmount(() => {
   document.removeEventListener("focusin", onFocusIn);
   mainSizes?.disconnect();
   modalWatch?.disconnect();
-  document.documentElement.style.removeProperty(BAND_VAR);
 });
 </script>

@@ -1183,6 +1183,25 @@ describe("reduce: typed phases (live)", () => {
     expect(odd.resolved?.outcome).toBeUndefined();
   });
 
+  it("keeps a replayed resolution's unstored grant as not saved (AE-06)", () => {
+    const state = makeState({ messages: [assistant()] });
+    const replay = makeCtx({ phase: "replay", isActive: false });
+    const base = { type: "confirmation_resolved", approved: true, scope: "always" };
+    reduce(
+      state,
+      { ...base, id: "c9", grant: { stored: false, scope: "always", reason: "read-only" } },
+      replay,
+    );
+    reduce(
+      state,
+      { ...base, id: "c8", grant: { stored: true, scope: "always", id: "g1" } },
+      replay,
+    );
+    const [refused, stored] = blocksOf(state).filter((b) => b.type === "approval_result");
+    expect(refused.resolved?.grantNotStored).toEqual({ reason: "read-only" });
+    expect(stored.resolved?.grantNotStored).toBeUndefined();
+  });
+
   it("reads every field of a recorded o2-ai confirmation_resolved frame (WC-3)", () => {
     const recorded = JSON.parse(
       readFileSync(join(__dirname, "__fixtures__", "frames", "confirmation_resolved.json"), "utf8"),

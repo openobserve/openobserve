@@ -48,7 +48,7 @@ function seedMenu(): void {
   queryClient.setQueryData(streamKeys.nameList("default", "traces"), []);
   queryClient.setQueryData(alertKeys.list("default", "default", undefined, undefined), []);
   queryClient.setQueryData(pipelineKeys.list("default"), []);
-  queryClient.setQueryData(dashboardKeys.byFolder("default", "default"), []);
+  queryClient.setQueryData(dashboardKeys.search("default", ""), []);
 }
 
 function setup(messages = false) {

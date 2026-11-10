@@ -525,6 +525,7 @@ function engineDeps(
         persistence: () => handle.capability.value.persistence,
         attachments: () => handle.capability.value.attachments === true,
         rcaChatMode: () => handle.capability.value.rcaChatMode === true,
+        dataLevel: () => handle.capability.value.dataLevel,
         agents: () => handle.capability.value.agents,
       };
     },

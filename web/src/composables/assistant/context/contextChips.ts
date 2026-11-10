@@ -17,7 +17,7 @@ import type { PageContext, PageTimeRange } from "@/composables/contextProviders/
 import { gt, raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { formatBytes, formatOrgRange, uiIntlLocale } from "@/utils/formatters";
 
-import type { ComposerState } from "../assistantStore.types";
+import type { ComposerState, DataLevel } from "../assistantStore.types";
 import { periodText } from "../useAssistantStarters";
 import type { ChipKind, ContextChip } from "./types";
 
@@ -93,6 +93,16 @@ export function serializedNameOf(chip: ContextChip): string | undefined {
 
 /** Kinds that count as rows against the 20-row cap. */
 export const ROW_KINDS: ReadonlySet<ChipKind> = new Set(["log_row", "cell", "span"]);
+
+/** Below raw the org shares no individual rows, so chips that carry one row's values are not attached. */
+export function withheldAtLevel(chip: ContextChip, level: DataLevel | undefined): boolean {
+  return !!level && level !== "raw" && carriesRowData(chip);
+}
+
+// A field chip holds one row's value and the DBM finding chip holds the server's statements; o2-ai withholds the same set.
+function carriesRowData(chip: ContextChip): boolean {
+  return ROW_KINDS.has(chip.kind) || chip.kind === "field" || chip.ref?.type === "dbm_finding";
+}
 
 /** Kinds whose label reads "Kind · {name}": below md the icon shows the kind, so only the name is shown (CT-01 AC 9). */
 export const NAMED_KINDS: ReadonlySet<ChipKind> = new Set([
