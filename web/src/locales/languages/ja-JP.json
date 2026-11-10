@@ -7723,6 +7723,28 @@
       "tlsBody": "トークンは平文 HTTP 上で再利用可能なベアラー認証情報であるため、{brand} で ({setting}、デフォルトでは無効) またはその前段の信頼できるプロキシで TLS を終端してください。"
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "既存の {product} の設定を更新し、ログ、メトリクス、トレースをこの組織に送信します。",
+      "correlationBody": "ログとトレースを関連付けるには、アプリケーションで完全な 128 ビットのトレース ID を記録する必要があります。Java tracer が下位 64 ビットのみを記録する場合は、アプリケーションで {setting} を設定してください。",
+      "profilingBody": "プロファイリングは独自の送信先と Agent API キーを使用します。既にプロファイラーを実行している場合は、移行中にアプリケーションまたは tracer のプロファイリングを無効にするか、送信先を個別に設定してください。",
+      "multiValueTagsBody": "複数の異なる値を持つタグは、並べ替えた JSON 配列文字列を使用します。[ で始まる単一の値も、系列の識別を保つために要素が 1 つの JSON 配列としてエンコードされます。",
+      "envTitle": "エージェント設定",
+      "envBody": "これらの環境変数を {product} に設定して再起動します。{product} {version} 以降が必要です。",
+      "tokenBody": "API キーは組織の取り込みトークンである必要があり、{prefix} で始まります。この組織には有効な取り込みトークンがないため、セットアップスニペットは表示されません。取り込みトークンを作成してから、このページに戻ってください。",
+      "tokenLink": "取り込みトークンを開く",
+      "featuresOffBody": "The lines after the URLs turn off Agent features that send to {vendor}'s own servers with the same key. {setting} also keeps {component} off, which newer Agent versions run and which does not keep the path in these URLs.",
+      "logsTitle": "ログ",
+      "logsBody": "ログ収集は {product} ではデフォルトで無効です。{setting} を設定し、ログソースを構成してください。",
+      "dualTitle": "現在の宛先を維持",
+      "dualBody": "既存の宛先と併用してこの組織に送信するには、現在の URL と API キーをそのままにし、代わりにこれらのエントリを {file} に追加します。追加のログエンドポイントはそうしないと TCP を使用するため、ログには {setting} が必要です。",
+      "metricsTitle": "メトリクスのクエリ",
+      "metricsTypes": "すべての系列は、エージェントが送信した値を持つゲージとして保存され、{typeField} と {intervalField} でラベル付けされます。",
+      "metricsCount": "Count 系列は各フラッシュ間隔のカウントを保持します。PromQL では {promql}、SQL では {sql} で合計してください。",
+      "metricsRate": "Rate 系列は 1 秒あたりの値です。間隔のカウントを復元するには、値に {intervalField} を掛けます。",
+      "metricsCounterFns": "PromQL の {rate} と {increase} は累積カウンターを想定しているため、これらの系列では意味のある結果は得られません。",
+      "metricsSketch": "ディストリビューションはヒストグラムのバケットとして保存され、パーセンタイルはそれらのバケットから推定されます。ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA を大きくすると、保存される行数が増える代わりに、より細かいバケットとより正確なパーセンタイルが得られます。"
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU エクスポーター"
   },

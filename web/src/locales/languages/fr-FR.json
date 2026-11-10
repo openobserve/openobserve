@@ -7723,6 +7723,28 @@
       "tlsBody": "Le jeton est un identifiant bearer rejouable en HTTP en clair, donc terminez TLS au niveau de {brand} ({setting}, désactivé par défaut) ou d'un proxy de confiance placé devant."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Modifiez la configuration de votre {product} existant pour envoyer les journaux, métriques et traces à cette organisation.",
+      "correlationBody": "Pour corréler journaux et traces, les applications doivent journaliser un ID de trace complet de 128 bits. Si votre tracer Java ne journalise que les 64 bits de poids faible, définissez {setting} sur l’application.",
+      "profilingBody": "Le profilage utilise une destination distincte et la clé API de l’Agent. Si une application utilise déjà un profileur, désactivez le profilage de l’application ou du tracer pendant la migration, ou configurez sa destination séparément.",
+      "multiValueTagsBody": "Les tags comportant plusieurs valeurs distinctes utilisent une chaîne de tableau JSON trié. Une valeur unique commençant par [ est aussi encodée dans un tableau JSON à un élément pour préserver l’identité de la série.",
+      "envTitle": "Configuration de l’Agent",
+      "envBody": "Définissez ces variables d’environnement sur le {product} et redémarrez-le. Nécessite {product} {version} ou une version ultérieure.",
+      "tokenBody": "La clé API doit être un jeton d'ingestion d'organisation, qui commence par {prefix}. Cette organisation n'a aucun jeton d'ingestion activé, aucun extrait de configuration n'est donc affiché. Créez un jeton d'ingestion, puis revenez à cette page.",
+      "tokenLink": "Ouvrir les jetons d’ingestion",
+      "featuresOffBody": "Les lignes après les URL désactivent les fonctionnalités de l’Agent qui envoient vers les serveurs propres de {vendor} avec la même clé. {setting} maintient également {component} désactivé, que les versions plus récentes de l’Agent exécutent et qui ne conserve pas le chemin dans ces URL.",
+      "logsTitle": "Logs",
+      "logsBody": "La collecte de logs est désactivée par défaut dans le {product}. Définissez {setting} et configurez vos sources de logs.",
+      "dualTitle": "Conserver votre destination actuelle",
+      "dualBody": "Pour envoyer vers cette organisation en parallèle d’une destination existante, conservez les URL et la clé API actuelles et ajoutez plutôt ces entrées à {file}. Les logs nécessitent {setting}, car sinon les points de terminaison de logs supplémentaires utilisent TCP.",
+      "metricsTitle": "Interrogation des métriques",
+      "metricsTypes": "Chaque série est stockée sous forme de gauge avec la valeur envoyée par l’Agent, étiquetée avec {typeField} et {intervalField}.",
+      "metricsCount": "Les séries de type count contiennent le décompte pour chaque intervalle de vidage. Additionnez-les avec {promql} en PromQL ou {sql} en SQL.",
+      "metricsRate": "Les séries de type rate sont exprimées par seconde. Multipliez la valeur par {intervalField} pour retrouver le décompte de l’intervalle.",
+      "metricsCounterFns": "Les fonctions PromQL {rate} et {increase} attendent des compteurs cumulatifs ; elles ne donnent donc pas de résultats significatifs sur ces séries.",
+      "metricsSketch": "Les distributions sont stockées sous forme de buckets d’histogramme, et les centiles sont estimés à partir de ces buckets. Une valeur plus élevée de ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA donne des buckets plus fins et des centiles plus précis, au prix d’un plus grand nombre de lignes stockées."
+    },
     "gpu": "GPU",
     "gpuExporter": "Exportateur GPU"
   },

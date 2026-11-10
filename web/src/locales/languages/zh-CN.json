@@ -7723,6 +7723,28 @@
       "tlsBody": "该令牌是持有者凭证，可在明文 HTTP 上重放，因此在 {brand}（{setting}，默认禁用）或在其前面的受信任代理处终止 TLS。"
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "更新现有 {product} 的配置，将日志、指标和链路发送到此组织。",
+      "correlationBody": "要关联日志和链路，应用必须记录完整的 128 位链路 ID。如果 Java tracer 仅记录低 64 位，请在应用上设置 {setting}。",
+      "profilingBody": "性能分析使用独立的目标地址和 Agent API 密钥。如果应用已启用性能分析，请在迁移期间关闭应用或 tracer 的性能分析，或单独配置其目标地址。",
+      "multiValueTagsBody": "同一标签的多个不同值会存为排序后的 JSON 数组字符串。以 [ 开头的单个值也会编码为单元素 JSON 数组，以保留序列身份。",
+      "envTitle": "Agent 配置",
+      "envBody": "在 {product} 上设置这些环境变量并重启。需要 {product} {version} 或更高版本。",
+      "tokenBody": "API 密钥必须是组织数据摄取令牌，以 {prefix} 开头。此组织没有已启用的数据摄取令牌，因此不显示设置片段。请创建数据摄取令牌，然后返回此页面。",
+      "tokenLink": "打开数据摄取令牌",
+      "featuresOffBody": "The lines after the URLs turn off Agent features that send to {vendor}'s own servers with the same key. {setting} also keeps {component} off, which newer Agent versions run and which does not keep the path in these URLs.",
+      "logsTitle": "日志",
+      "logsBody": "在 {product} 中，日志收集默认关闭。请设置 {setting} 并配置日志源。",
+      "dualTitle": "保留当前目标",
+      "dualBody": "若要在保留现有目标的同时发送到此组织，请保留当前 URL 和 API 密钥，改为将这些条目添加到 {file}。日志需要 {setting}，否则额外的日志端点会使用 TCP。",
+      "metricsTitle": "查询指标",
+      "metricsTypes": "每个序列都存储为 Gauge，取值为 Agent 发送的值，并使用 {typeField} 和 {intervalField} 作为标签。",
+      "metricsCount": "Count 序列保存每个刷新间隔的计数。可在 PromQL 中使用 {promql} 或在 SQL 中使用 {sql} 将它们相加。",
+      "metricsRate": "Rate 序列按每秒计。将值乘以 {intervalField} 可还原该间隔内的计数。",
+      "metricsCounterFns": "PromQL 的 {rate} 和 {increase} 期望累积计数器，因此在这些序列上不会给出有意义的结果。",
+      "metricsSketch": "分布存储为直方图桶，百分位数根据这些桶估算。更高的 ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA 会带来更细的桶和更精确的百分位数，代价是存储更多行。"
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU 导出器"
   },

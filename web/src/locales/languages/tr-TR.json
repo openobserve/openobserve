@@ -7723,6 +7723,28 @@
       "tlsBody": "Token, düz metin HTTP üzerinden yeniden oynatılabilen bir bearer kimlik bilgisidir; bu nedenle TLS'i {brand} üzerinde ({setting}, varsayılan olarak devre dışı) veya önünde güvenilir bir proxy'de sonlandırın."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Mevcut {product} yapılandırmasını güncelleyerek günlükleri, metrikleri ve izleri bu kuruluşa gönderin.",
+      "correlationBody": "Günlükleri izlerle ilişkilendirmek için uygulamalar tam 128 bit iz kimliğini kaydetmelidir. Java tracer yalnızca alt 64 biti kaydediyorsa uygulamada {setting} ayarlayın.",
+      "profilingBody": "Profilleme ayrı bir hedef ve Agent API anahtarını kullanır. Uygulamada zaten bir profil oluşturucu çalışıyorsa geçiş sırasında uygulama veya tracer profillemesini kapatın ya da hedefini ayrıca yapılandırın.",
+      "multiValueTagsBody": "Birden fazla farklı değeri olan etiketler sıralanmış JSON dizisi metni kullanır. [ ile başlayan tek bir değer de seri kimliğini korumak için tek öğeli JSON dizisi olarak kodlanır.",
+      "envTitle": "Agent yapılandırması",
+      "envBody": "Bu ortam değişkenlerini {product} üzerinde ayarlayın ve yeniden başlatın. {product} {version} veya üzerini gerektirir.",
+      "tokenBody": "API anahtarı {prefix} ile başlayan bir kuruluş veri alımı token'ı olmalıdır. Bu kuruluşta etkin bir veri alımı token'ı yok, bu nedenle kurulum snippet'i gösterilmiyor. Bir veri alımı token'ı oluşturun, ardından bu sayfaya dönün.",
+      "tokenLink": "Veri alımı token'larını aç",
+      "featuresOffBody": "URL'lerden sonraki satırlar, aynı anahtarla {vendor} sunucularına gönderen Agent özelliklerini kapatır. {setting} ayrıca {component} bileşenini kapalı tutar; daha yeni Agent sürümleri bunu çalıştırır ve bu URL'lerdeki yolu korumaz.",
+      "logsTitle": "Günlükler",
+      "logsBody": "{product} içinde günlük toplama varsayılan olarak kapalıdır. {setting} ayarını yapın ve günlük kaynaklarınızı yapılandırın.",
+      "dualTitle": "Mevcut hedefinizi koruyun",
+      "dualBody": "Mevcut bir hedefin yanı sıra bu kuruluşa göndermek için mevcut URL'leri ve API anahtarını koruyun ve bunun yerine {file} dosyasına bu girişleri ekleyin. Ek günlük uç noktaları aksi halde TCP kullandığından günlükler için {setting} gerekir.",
+      "metricsTitle": "Metrikleri sorgulama",
+      "metricsTypes": "Her seri, Agent'ın gönderdiği değerle birlikte {typeField} ve {intervalField} etiketleriyle bir gauge olarak saklanır.",
+      "metricsCount": "Count serileri her flush aralığı için sayıyı tutar. Bunları PromQL'de {promql} ile veya SQL'de {sql} ile toplayın.",
+      "metricsRate": "Rate serileri saniye başınadır. Aralığın sayısını geri elde etmek için değeri {intervalField} ile çarpın.",
+      "metricsCounterFns": "PromQL {rate} ve {increase} kümülatif sayaçlar bekler; bu nedenle bu serilerde anlamlı sonuçlar vermezler.",
+      "metricsSketch": "Dağılımlar histogram kovaları olarak saklanır ve yüzdelikler bu kovalardan tahmin edilir. Daha yüksek bir ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA daha ince kovalar ve daha kesin yüzdelikler sağlar, ancak daha fazla saklanan satır maliyetiyle."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU dışa aktarıcı"
   },

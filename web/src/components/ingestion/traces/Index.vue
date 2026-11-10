@@ -40,6 +40,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
         :label="t('ingestion.otelCollectorTabLabel')"
       />
+      <ORouteTab
+        name="datadogAgentTraces"
+        data-test="ingestion-traces-tab-datadogagent"
+        :to="{
+          name: 'datadogAgentTraces',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/pipeline/datadog.png')"
+        :label="t('ingestion.datadogAgentTab')"
+      />
     </template>
 
     <div class="h-full w-full">
@@ -93,13 +105,14 @@ export default defineComponent({
     const routeToTracesTab: Record<string, string> = {
       tracesOTLP: "openTelemetry",
       ingestTracesFromOtel: "ingestTracesFromOtel",
+      datadogAgentTraces: "datadogAgentTraces",
     };
     const ingestiontabs = ref(
       routeToTracesTab[router.currentRoute.value.name as string] ?? "openTelemetry",
     );
 
     onMounted(() => {
-      const ingestRoutes = ["tracesOTLP"];
+      const ingestRoutes = ["tracesOTLP", "datadogAgentTraces"];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
           name: router.currentRoute.value.name,

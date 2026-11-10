@@ -7723,6 +7723,28 @@
       "tlsBody": "El token es una credencial de portador que se puede reutilizar sobre HTTP en texto plano, así que termina TLS en {brand} ({setting}, deshabilitado de forma predeterminada) o en un proxy de confianza delante de él."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Actualice la configuración de su {product} existente para enviar registros, métricas y trazas a esta organización.",
+      "correlationBody": "Para correlacionar registros y trazas, las aplicaciones deben registrar el ID de traza completo de 128 bits. Si su tracer Java solo registra los 64 bits inferiores, configure {setting} en la aplicación.",
+      "profilingBody": "El perfilado utiliza un destino independiente y la clave API del Agent. Si una aplicación ya ejecuta un perfilador, desactive el perfilado de la aplicación o del tracer durante la migración, o configure su destino por separado.",
+      "multiValueTagsBody": "Las etiquetas con varios valores distintos usan una cadena de matriz JSON ordenada. Un valor único que empiece por [ también se codifica como una matriz JSON de un elemento para preservar la identidad de la serie.",
+      "envTitle": "Configuración del Agent",
+      "envBody": "Configura estas variables de entorno en el {product} y reinícialo. Requiere {product} {version} o una versión posterior.",
+      "tokenBody": "La clave de API debe ser un token de ingesta de la organización, que empieza por {prefix}. Esta organización no tiene ningún token de ingesta habilitado, por lo que no se muestra ningún fragmento de configuración. Cree un token de ingesta y vuelva a esta página.",
+      "tokenLink": "Abrir tokens de ingesta",
+      "featuresOffBody": "Las líneas posteriores a las URL desactivan funciones del Agent que envían a los servidores propios de {vendor} con la misma clave. {setting} también mantiene desactivado {component}, que ejecutan las versiones más recientes del Agent y que no conserva la ruta en estas URL.",
+      "logsTitle": "Logs",
+      "logsBody": "La recopilación de logs está desactivada de forma predeterminada en el {product}. Configura {setting} y tus fuentes de logs.",
+      "dualTitle": "Conservar tu destino actual",
+      "dualBody": "Para enviar a esta organización junto con un destino existente, conserva las URL y la clave de API actuales y añade estas entradas a {file} en su lugar. Los logs necesitan {setting}, porque, de lo contrario, los endpoints de logs adicionales usan TCP.",
+      "metricsTitle": "Consultar métricas",
+      "metricsTypes": "Cada serie se almacena como un gauge con el valor que envió el Agent, etiquetado con {typeField} y {intervalField}.",
+      "metricsCount": "Las series de tipo count contienen el recuento de cada intervalo de envío. Súmalas con {promql} en PromQL o {sql} en SQL.",
+      "metricsRate": "Las series de tipo rate son por segundo. Multiplica el valor por {intervalField} para recuperar el recuento del intervalo.",
+      "metricsCounterFns": "Las funciones {rate} e {increase} de PromQL esperan contadores acumulativos, por lo que no dan resultados significativos en estas series.",
+      "metricsSketch": "Las distribuciones se almacenan como buckets de histograma y los percentiles se estiman a partir de esos buckets. Un valor mayor de ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA proporciona buckets más finos y percentiles más precisos, a costa de almacenar más filas."
+    },
     "gpu": "GPU",
     "gpuExporter": "Exportador de GPU"
   },

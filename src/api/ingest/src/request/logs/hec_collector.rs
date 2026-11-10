@@ -271,7 +271,7 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
     // §6 step 2: the GUID converts to its `o2oi_` token, which is what actually
     // authorizes ingestion, and is validated through the existing org-scoped path.
     match validate_o2oi_token(&org_id, &o2oi_token).await {
-        O2oiCheck::Valid => {}
+        O2oiCheck::Valid(_) => {}
         O2oiCheck::NotFound => {
             return reject(
                 HecCollectorStatus::TokenDisabled,
@@ -404,9 +404,9 @@ fn canonical_guid(token: &str) -> Option<String> {
     groups.next().is_none().then(|| token.to_ascii_lowercase())
 }
 
-/// Outcome of re-validating the `o2oi_` token a GUID converts to (design §6).
-enum O2oiCheck {
-    Valid,
+/// Outcome of validating an `o2oi_` token; `Valid` carries the token's name.
+pub(crate) enum O2oiCheck {
+    Valid(String),
     NotFound,
     StoreError(String),
 }
@@ -461,14 +461,14 @@ fn resolve_guid(guid: &str, loaded: bool) -> TokenLookup {
 /// what the Basic-auth `o2oi_` path already does — §6.2's "a miss never reaches
 /// the database" is about the GUID map, whose miss is already answered with code
 /// 4 above, so only a holder of a live GUID can get this far.
-async fn validate_o2oi_token(org_id: &str, o2oi_token: &str) -> O2oiCheck {
-    if ORG_INGESTION_TOKENS.contains_key(&format!("{org_id}/{o2oi_token}")) {
-        return O2oiCheck::Valid;
+pub(crate) async fn validate_o2oi_token(org_id: &str, o2oi_token: &str) -> O2oiCheck {
+    if let Some(name) = ORG_INGESTION_TOKENS.get(&format!("{org_id}/{o2oi_token}")) {
+        return O2oiCheck::Valid(name.value().clone());
     }
     match db::org_ingestion_tokens::find_enabled_token(org_id, o2oi_token).await {
         Ok(Some(record)) => {
-            ORG_INGESTION_TOKENS.insert(format!("{org_id}/{o2oi_token}"), record.name);
-            O2oiCheck::Valid
+            ORG_INGESTION_TOKENS.insert(format!("{org_id}/{o2oi_token}"), record.name.clone());
+            O2oiCheck::Valid(record.name)
         }
         Ok(None) => O2oiCheck::NotFound,
         Err(e) => O2oiCheck::StoreError(e.to_string()),
@@ -619,7 +619,7 @@ fn admission_status(e: &infra::errors::Error) -> HecCollectorStatus {
 /// `check_ingestion_allowed` flattens these into one stringly-typed variant, so
 /// the message is the only thing separating "retry later" from "your index is
 /// wrong"; matched on the literals it builds.
-fn is_retryable_admission(msg: &str) -> bool {
+pub(crate) fn is_retryable_admission(msg: &str) -> bool {
     msg == "not an ingester" || msg.starts_with("Quota exceeded for this organization")
 }
 
@@ -869,7 +869,7 @@ mod tests {
         ORG_INGESTION_TOKENS.insert(format!("orgstep2/{O2OI}"), "step2".to_string());
         assert!(matches!(
             validate_o2oi_token("orgstep2", O2OI).await,
-            O2oiCheck::Valid
+            O2oiCheck::Valid(_)
         ));
         ORG_INGESTION_TOKENS.remove(&format!("orgstep2/{O2OI}"));
     }

@@ -7723,6 +7723,28 @@
       "tlsBody": "Token to poświadczenie typu bearer, które można powtórnie użyć przez nieszyfrowany HTTP, więc zakończ TLS w {brand} ({setting}, domyślnie wyłączone) lub w zaufanym serwerze proxy przed nim."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Agent Datadog",
+    "datadogAgent": {
+      "intro": "Zaktualizuj konfigurację istniejącego {product}, aby wysyłać logi, metryki i ślady do tej organizacji.",
+      "correlationBody": "Aby powiązać logi ze śladami, aplikacje muszą zapisywać pełny 128-bitowy identyfikator śladu. Jeśli tracer Java zapisuje tylko dolne 64 bity, ustaw {setting} w aplikacji.",
+      "profilingBody": "Profilowanie korzysta z osobnego miejsca docelowego i klucza API Agenta. Jeśli aplikacja już używa profilera, wyłącz profilowanie aplikacji lub tracera na czas migracji albo skonfiguruj osobno jego miejsce docelowe.",
+      "multiValueTagsBody": "Tagi z kilkoma różnymi wartościami używają ciągu posortowanej tablicy JSON. Pojedyncza wartość zaczynająca się od [ jest również kodowana jako jednoelementowa tablica JSON, aby zachować tożsamość serii.",
+      "envTitle": "Konfiguracja agenta",
+      "envBody": "Ustaw te zmienne środowiskowe dla {product} i uruchom go ponownie. Wymaga {product} w wersji {version} lub nowszej.",
+      "tokenBody": "Klucz API musi być tokenem pozyskiwania danych organizacji, który zaczyna się od {prefix}. Ta organizacja nie ma włączonego tokenu pozyskiwania danych, więc fragment konfiguracji nie jest wyświetlany. Utwórz token pozyskiwania danych, a następnie wróć na tę stronę.",
+      "tokenLink": "Otwórz tokeny pozyskiwania danych",
+      "featuresOffBody": "Wiersze po adresach URL wyłączają funkcje Agenta, które wysyłają na własne serwery {vendor} przy użyciu tego samego klucza. {setting} także wyłącza {component}, który jest uruchamiany w nowszych wersjach Agenta i który nie zachowuje ścieżki w tych adresach URL.",
+      "logsTitle": "Logi",
+      "logsBody": "Zbieranie logów jest domyślnie wyłączone w {product}. Ustaw {setting} i skonfiguruj źródła logów.",
+      "dualTitle": "Zachowaj obecne miejsce docelowe",
+      "dualBody": "Aby wysyłać do tej organizacji równolegle z istniejącym miejscem docelowym, zachowaj bieżące adresy URL i klucz API, a zamiast tego dodaj te wpisy do {file}. Logi wymagają {setting}, ponieważ w przeciwnym razie dodatkowe punkty końcowe logów korzystają z TCP.",
+      "metricsTitle": "Odpytywanie metryk",
+      "metricsTypes": "Każda seria jest przechowywana jako gauge z wartością wysłaną przez Agenta, oznaczona etykietami {typeField} i {intervalField}.",
+      "metricsCount": "Serie Count przechowują liczbę dla każdego interwału opróżniania. Zsumuj je za pomocą {promql} w PromQL lub {sql} w SQL.",
+      "metricsRate": "Serie Rate są na sekundę. Pomnóż wartość przez {intervalField}, aby odzyskać liczbę dla danego interwału.",
+      "metricsCounterFns": "PromQL {rate} i {increase} oczekują liczników skumulowanych, więc nie dają sensownych wyników na tych seriach.",
+      "metricsSketch": "Rozkłady są przechowywane jako przedziały histogramu, a percentyle są szacowane na podstawie tych przedziałów. Wyższa wartość ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA daje drobniejsze przedziały i dokładniejsze percentyle, kosztem większej liczby przechowywanych wierszy."
+    },
     "gpu": "GPU",
     "gpuExporter": "Eksporter GPU"
   },

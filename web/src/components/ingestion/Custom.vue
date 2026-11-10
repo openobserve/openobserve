@@ -118,8 +118,9 @@ export default defineComponent({
       "otelCollector",
       "telegraf",
       "cloudwatchMetrics",
+      "datadogAgentMetrics",
     ];
-    const traceRoutes = ["tracesOTLP", "ingestTracesFromOtel"];
+    const traceRoutes = ["tracesOTLP", "ingestTracesFromOtel", "datadogAgentTraces"];
     const profileRoutes = ["profilesOtelCollector"];
     const rumRoutes = ["frontendMonitoring"];
     const logRoutes = [

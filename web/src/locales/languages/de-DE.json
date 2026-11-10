@@ -7723,6 +7723,28 @@
       "tlsBody": "Der Token ist ein Bearer-Anmeldedatenwert, der über unverschlüsseltes HTTP wiederverwendet werden kann. Beenden Sie daher TLS bei {brand} ({setting}, standardmäßig deaktiviert) oder bei einem vertrauenswürdigen Proxy davor."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Aktualisieren Sie die Konfiguration Ihres vorhandenen {product}, um Logs, Metriken und Traces an diese Organisation zu senden.",
+      "correlationBody": "Zur Verknüpfung von Logs und Traces müssen Anwendungen die vollständige 128-Bit-Trace-ID protokollieren. Protokolliert Ihr Java-Tracer nur die unteren 64 Bit, setzen Sie {setting} in der Anwendung.",
+      "profilingBody": "Profiling verwendet ein separates Ziel und den API-Schlüssel des Agents. Läuft bereits ein Profiler, deaktivieren Sie das Profiling der Anwendung oder des Tracers während der Migration oder konfigurieren Sie dessen Ziel separat.",
+      "multiValueTagsBody": "Tags mit mehreren unterschiedlichen Werten verwenden eine sortierte JSON-Array-Zeichenfolge. Ein einzelner Wert, der mit [ beginnt, wird ebenfalls als JSON-Array mit einem Element kodiert, um die Serienidentität zu erhalten.",
+      "envTitle": "Agent-Konfiguration",
+      "envBody": "Legen Sie diese Umgebungsvariablen auf dem {product} fest und starten Sie ihn neu. Erfordert {product} {version} oder höher.",
+      "tokenBody": "Der API-Schlüssel muss ein Datenerfassungs-Token der Organisation sein, das mit {prefix} beginnt. Diese Organisation hat kein aktiviertes Datenerfassungs-Token, daher wird kein Einrichtungssnippet angezeigt. Erstellen Sie ein Datenerfassungs-Token und kehren Sie dann zu dieser Seite zurück.",
+      "tokenLink": "Datenerfassungs-Token öffnen",
+      "featuresOffBody": "Die Zeilen nach den URLs deaktivieren Agent-Funktionen, die mit demselben Schlüssel an die eigenen Server von {vendor} senden. {setting} hält außerdem {component} deaktiviert, das neuere Agent-Versionen ausführen und das den Pfad in diesen URLs nicht beibehält.",
+      "logsTitle": "Logs",
+      "logsBody": "Die Log-Erfassung ist im {product} standardmäßig deaktiviert. Legen Sie {setting} fest und konfigurieren Sie Ihre Log-Quellen.",
+      "dualTitle": "Behalten Sie Ihr aktuelles Ziel bei",
+      "dualBody": "Um zusätzlich zu einem vorhandenen Ziel an diese Organisation zu senden, behalten Sie die aktuellen URLs und den API-Schlüssel bei und fügen Sie diese Einträge stattdessen zu {file} hinzu. Logs benötigen {setting}, da zusätzliche Log-Endpunkte sonst TCP verwenden.",
+      "metricsTitle": "Metriken abfragen",
+      "metricsTypes": "Jede Serie wird als Gauge mit dem vom Agent gesendeten Wert gespeichert und mit {typeField} und {intervalField} gekennzeichnet.",
+      "metricsCount": "Count-Serien enthalten die Anzahl für jedes Flush-Intervall. Summieren Sie sie mit {promql} in PromQL oder {sql} in SQL.",
+      "metricsRate": "Rate-Serien sind pro Sekunde. Multiplizieren Sie den Wert mit {intervalField}, um die Anzahl für das Intervall zu erhalten.",
+      "metricsCounterFns": "PromQL {rate} und {increase} erwarten kumulative Zähler und liefern daher auf diesen Serien keine aussagekräftigen Ergebnisse.",
+      "metricsSketch": "Verteilungen werden als Histogramm-Buckets gespeichert, und Perzentile werden aus diesen Buckets geschätzt. Ein höherer ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA liefert feinere Buckets und präzisere Perzentile – auf Kosten von mehr gespeicherten Zeilen."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU-Exporter"
   },

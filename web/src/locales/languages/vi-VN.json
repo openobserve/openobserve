@@ -7723,6 +7723,28 @@
       "tlsBody": "Token là thông tin xác thực bearer có thể bị phát lại qua HTTP dạng văn bản thuần, nên hãy kết thúc TLS tại {brand} ({setting}, mặc định bị tắt) hoặc tại một proxy tin cậy đứng trước nó."
     },
     "splunkHecTab": "Splunk HEC",
+    "datadogAgentTab": "Datadog Agent",
+    "datadogAgent": {
+      "intro": "Cập nhật cấu hình {product} hiện có để gửi nhật ký, chỉ số và dấu vết tới tổ chức này.",
+      "correlationBody": "Để liên kết nhật ký với dấu vết, ứng dụng phải ghi ID dấu vết 128 bit đầy đủ. Nếu Java tracer chỉ ghi 64 bit thấp, hãy đặt {setting} trên ứng dụng.",
+      "profilingBody": "Việc lập hồ sơ dùng đích riêng và khóa API của Agent. Nếu ứng dụng đã chạy trình lập hồ sơ, hãy tắt tính năng lập hồ sơ của ứng dụng hoặc tracer khi di chuyển, hoặc cấu hình đích riêng.",
+      "multiValueTagsBody": "Thẻ có nhiều giá trị khác nhau dùng chuỗi mảng JSON được sắp xếp. Một giá trị đơn bắt đầu bằng [ cũng được mã hóa thành mảng JSON một phần tử để giữ nguyên danh tính chuỗi.",
+      "envTitle": "Cấu hình Agent",
+      "envBody": "Đặt các biến môi trường này trên {product} và khởi động lại nó. Yêu cầu {product} {version} trở lên.",
+      "tokenBody": "Khóa API phải là token tiếp nhận dữ liệu của tổ chức, bắt đầu bằng {prefix}. Tổ chức này không có token tiếp nhận dữ liệu nào được bật, vì vậy không có đoạn mã thiết lập nào được hiển thị. Hãy tạo token tiếp nhận dữ liệu, sau đó quay lại trang này.",
+      "tokenLink": "Mở token tiếp nhận dữ liệu",
+      "featuresOffBody": "Các dòng sau URL tắt những tính năng của Agent gửi đến máy chủ riêng của {vendor} bằng cùng khóa đó. {setting} cũng giữ {component} ở trạng thái tắt, thành phần mà các phiên bản Agent mới hơn chạy và không giữ đường dẫn trong các URL này.",
+      "logsTitle": "Nhật ký",
+      "logsBody": "Thu thập nhật ký mặc định bị tắt trong {product}. Đặt {setting} và cấu hình các nguồn nhật ký của bạn.",
+      "dualTitle": "Giữ đích hiện tại của bạn",
+      "dualBody": "Để gửi đến tổ chức này song song với một đích hiện có, hãy giữ nguyên các URL và khóa API hiện tại và thêm các mục này vào {file} thay vào đó. Nhật ký cần {setting}, vì nếu không các endpoint nhật ký bổ sung sẽ dùng TCP.",
+      "metricsTitle": "Truy vấn chỉ số",
+      "metricsTypes": "Mỗi chuỗi được lưu dưới dạng gauge với giá trị mà Agent đã gửi, được gắn nhãn bằng {typeField} và {intervalField}.",
+      "metricsCount": "Chuỗi Count chứa số đếm cho mỗi khoảng flush. Hãy cộng chúng bằng {promql} trong PromQL hoặc {sql} trong SQL.",
+      "metricsRate": "Chuỗi Rate tính theo giây. Nhân giá trị với {intervalField} để khôi phục số đếm cho khoảng đó.",
+      "metricsCounterFns": "PromQL {rate} và {increase} mong đợi bộ đếm tích lũy, nên chúng không cho kết quả có ý nghĩa trên các chuỗi này.",
+      "metricsSketch": "Phân phối được lưu dưới dạng các bucket histogram, và phân vị được ước tính từ các bucket đó. ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA cao hơn cho các bucket mịn hơn và phân vị chính xác hơn, đổi lại là nhiều dòng được lưu hơn."
+    },
     "gpu": "GPU",
     "gpuExporter": "GPU exporter"
   },

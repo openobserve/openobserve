@@ -2970,6 +2970,20 @@ pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static DATADOG_DROPPED_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "datadog_dropped_requests_total",
+            "Datadog Agent requests to an unsupported route, answered 202 and dropped".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
 /// Count of records dropped by an ingestion policy on the write path, which still answers success.
 ///
 /// Not labelled by stream: streams are auto-created from client-supplied names, and this fires on
@@ -3135,6 +3149,9 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(HEC_REQUESTS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(DATADOG_DROPPED_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_RECORDS_DROPPED.clone()))
@@ -3816,6 +3833,7 @@ mod tests {
     fn test_statics_hec() {
         let _ = HEC_AUTH_TOTAL.clone();
         let _ = HEC_REQUESTS_TOTAL.clone();
+        let _ = DATADOG_DROPPED_REQUESTS_TOTAL.clone();
     }
 
     #[test]
