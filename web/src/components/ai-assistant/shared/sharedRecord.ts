@@ -30,8 +30,13 @@ export interface SharedRecordOptions {
 
 const MAX_DEPTH = 12;
 
-const MODEL_NAME =
-  /\b(?:[a-z][\w-]*\/)?(?:claude|gpt|gemini|llama|mistral|mixtral|deepseek|qwen|o[134])(?:[-_.: ]?(?:\d[\w.]*|sonnet|opus|haiku|pro|flash|mini|turbo|nano|preview|instruct|latest))+\b/gi;
+const MODEL_PART = String.raw`(?:\d[a-z\d]*|sonnet|opus|haiku|pro|flash|mini|turbo|nano|preview|instruct|latest)`;
+
+// Only the first part may follow the family with no separator, so no input can be split two ways (ReDoS).
+const MODEL_NAME = new RegExp(
+  String.raw`\b(?:[a-z][\w-]*\/)?(?:claude|gpt|gemini|llama|mistral|mixtral|deepseek|qwen|o[134])[-_.: ]?${MODEL_PART}(?:[-_.: ]${MODEL_PART})*\b`,
+  "gi",
+);
 
 // Inputs and outputs go; the tool's name and whether it worked stay.
 const REDACTED_KEYS = ["context", "confirmationArgs", "details", "resultMessage", "summary"];

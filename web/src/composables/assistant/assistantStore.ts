@@ -89,10 +89,11 @@ import {
 import type { TurnLockReason } from "./lifecycle";
 import { getAssistantRuntime } from "./runtime";
 import { SIDEBAR_MIN_REM } from "./sidebarWidth";
-import { isTerminal, type TurnState, type TurnTerminal } from "./turnStates";
+import { isRunning, isTerminal, type TurnState, type TurnTerminal } from "./turnStates";
 import { MAX_FLOATING_CHATS, cascadeGeometry, openWindowCap } from "./windows";
 
 export { MAIN_MIN_REM, NAV_RAIL_REM, SIDEBAR_MIN_REM } from "./sidebarWidth";
+export { isRunning } from "./turnStates";
 
 export const MAX_CHIP_ROWS = 20;
 
@@ -579,10 +580,6 @@ export function containerOf(placement: Placement, lgUp: boolean): Container | nu
   if (placement.kind === "full") return "full_view";
   if (!lgUp) return "sheet";
   return placement.kind === "sidebar" ? "sidebar" : `docked.${placement.hostId}`;
-}
-
-export function isRunning(turn: TurnState): boolean {
-  return turn.state !== "idle" && !isTerminal(turn);
 }
 
 function createCore(

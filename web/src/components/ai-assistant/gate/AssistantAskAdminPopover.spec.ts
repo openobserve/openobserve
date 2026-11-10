@@ -35,8 +35,8 @@ const { copyToClipboard, toast, phone, orgNames } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard }));
-vi.mock("@/composables/assistant", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/composables/assistant")>()),
+vi.mock("@/composables/assistant/pure", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/assistant/pure")>()),
   hostOrgName: (id: string) => orgNames.get(id) ?? id,
 }));
 vi.mock("@/composables/useBreakpoint", async () => {

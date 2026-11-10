@@ -16,9 +16,9 @@
 import { gt, raw, type I18nText } from "@/types/i18n";
 import { uiIntlLocale } from "@/utils/formatters";
 
-import { periodMs } from "./context/contextChips";
+import { periodMs, periodText } from "./context/contextChips";
 import type { ContextChip } from "./context/types";
-import { periodText, type Starter } from "./useAssistantStarters";
+import type { Starter } from "./useAssistantStarters";
 
 /** The window an empty default-window answer offers instead (PO A26). */
 export const WIDER_PERIOD = "1h";

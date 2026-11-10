@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <p
       v-if="userText"
-      class="bg-assistant-user-bg rounded-ee-default text-text-body max-w-[80%] min-w-0 rounded-[1.125rem] px-3.5 py-2 text-sm break-words whitespace-pre-wrap"
+      class="bg-assistant-user-bg rounded-ee-default text-text-body rounded-chat-bubble max-w-[80%] min-w-0 px-3.5 py-2 text-sm break-words whitespace-pre-wrap"
       data-test="assistant-message-text"
     >
       {{ userText }}

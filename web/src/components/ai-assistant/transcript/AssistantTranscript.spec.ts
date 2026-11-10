@@ -100,6 +100,7 @@ function mountLive(session: AssistantSession, over: Partial<AssistantTranscriptH
     persistence: () => true,
     online: () => true,
     focusComposer: vi.fn(),
+    stageFollowUp: vi.fn(),
     canRetry: () => true,
     ...over,
   };

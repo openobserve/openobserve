@@ -1290,10 +1290,16 @@ function slots(html: string): string {
 
 // The text of a raw HTML block: tags, comments and script or style bodies go, the words stay.
 function htmlText(html: string): string {
-  const stripped = html
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, "")
-    .replace(/<[^>]*>/g, "");
+  let stripped = html;
+  let previous: string;
+  // Repeat until stable: one removal can join the pieces around it into a new tag.
+  do {
+    previous = stripped;
+    stripped = stripped
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, "")
+      .replace(/<[^>]*>/g, "");
+  } while (stripped !== previous);
   return decodeEntities(stripped).trim();
 }
 

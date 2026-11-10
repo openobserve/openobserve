@@ -89,6 +89,9 @@ const htmlOf = (parts: MarkdownPart[]) =>
     .map((part) => (part.kind === "html" ? part.html : part.kind === "text" ? part.text : ""))
     .join("");
 
+const visible = (markup: string) =>
+  (new DOMParser().parseFromString(markup, "text/html").body.textContent ?? "").replace(/\s/g, "");
+
 const render = (text: string, state: "open" | "closed" = "closed") =>
   renderMarkdown(`b${Math.random()}`, text, state);
 
@@ -777,7 +780,6 @@ describe("markdown.ts strict profile", () => {
     const { parts } = parse(text);
     expect(performance.now() - started).toBeLessThan(500);
     expect(parts.length).toBeLessThan(10);
-    const visible = (markup: string) => markup.replace(/<[^>]*>/g, "").replace(/\s/g, "");
     expect(visible(htmlOf(parts))).toContain(visible(label));
     expect(htmlOf(parts).match(/<a /g)).toHaveLength(1);
   });
@@ -1208,7 +1210,6 @@ describe("markdown.ts strict profile", () => {
         const open = piece.match(/<(?!\/|br|wbr|hr|img)[a-z0-9]+/g)?.length ?? 0;
         expect(piece.match(/<\/[a-z0-9]+>/g)?.length ?? 0).toBe(open);
       }
-      const visible = (markup: string) => markup.replace(/<[^>]*>/g, "").replace(/\s/g, "");
       const unsplit = new Marked({ gfm: true, breaks: true }).parse(text) as string;
       expect(visible(html.join(""))).toBe(visible(unsplit));
     },

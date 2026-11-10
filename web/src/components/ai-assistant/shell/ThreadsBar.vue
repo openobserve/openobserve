@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="root"
     :aria-label="t('assistant.threadsBar.label')"
     data-test="threads-bar"
-    class="fixed end-[calc((var(--o-tray-end,0)+0.75)*1rem)] bottom-3 z-5000 flex max-w-(--o-threads-bar-max) flex-col items-end gap-2"
+    class="fixed end-[calc((var(--o-tray-end,0)+0.75)*1rem)] bottom-3 z-5000 flex max-w-[var(--o-threads-bar-max,none)] flex-col items-end gap-2"
   >
     <div
       v-if="expanded"

@@ -238,7 +238,7 @@ describe("ThreadsBar", () => {
     expect(wrapper.get('[data-test="threads-bar-toggle"]').classes()).toContain("shrink-0");
     expect(wrapper.get('[data-test="threads-bar-pill-thread-s1"]').classes()).toContain("min-w-0");
     expect(wrapper.get('[data-test="threads-bar"]').classes()).toContain(
-      "max-w-(--o-threads-bar-max)",
+      "max-w-[var(--o-threads-bar-max,none)]",
     );
   });
 

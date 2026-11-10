@@ -70,6 +70,10 @@ export function isTerminal(turn: TurnState): turn is TurnTerminal {
   return TERMINAL_STATES.has(turn.state);
 }
 
+export function isRunning(turn: TurnState): boolean {
+  return turn.state !== "idle" && !isTerminal(turn);
+}
+
 /** True when this tab saw the turn a list summary calls running end, so that summary is stale. */
 export function endedHere(
   session: {
