@@ -1172,6 +1172,64 @@ describe("AlertCalibrationDashboard row next steps", () => {
     w.unmount();
   });
 
+  it("an_applied_finding_says_so_on_its_row_with_undo_instead_of_review_change", async () => {
+    const withChange = record({
+      ...findings[1],
+      finding_id: fid(7),
+      insight_actions: JSON.stringify([
+        {
+          type: "apply_suggestion",
+          alert_id: "a2",
+          patch: [{ field: "pending_period_secs", from: 0, to: 120 }],
+        },
+      ]),
+    } as Partial<DigestRecord>);
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([run] as never) : ([findings[0], withChange] as never),
+    );
+    const applied: DecisionView = {
+      decision_id: `alert_finding:${fid(7)}:apply`,
+      family: "alert_finding",
+      id: fid(7),
+      action: "apply",
+      state: "applied",
+      reason: null,
+      note: null,
+      has_note: false,
+      actor: "root@example.com",
+      source: "ui",
+      decided_at: NOW - 1000,
+      until: null,
+      revision: 2,
+      change: {
+        alert: { id: "a2", title: "cpu" },
+        fields: [{ field: "pending_period_secs", from: 0, to: 120 }],
+      },
+    };
+    vi.mocked(autoobserveDecisions.list).mockResolvedValue({
+      data: { decisions: [applied], total: 1, limit: 500, offset: 0 },
+    } as never);
+    try {
+      const wrapper = await mountPage();
+      await settle();
+      await wrapper
+        .find('[data-test="alert-calibration-dashboard-rule-noise"] button')
+        .trigger("click");
+      await settle();
+      const row = wrapper.find('[data-test="alert-calibration-dashboard-alert-a2"]');
+      expect(row.find('[data-test="alert-calibration-dashboard-applied"]').text()).toBe("Applied");
+      expect(row.find('[data-test="alert-calibration-dashboard-review-change"]').exists()).toBe(
+        false,
+      );
+      expect(row.find('[data-test="alert-calibration-dashboard-undo-apply"]').text()).toBe("Undo");
+      wrapper.unmount();
+    } finally {
+      vi.mocked(autoobserveDecisions.list).mockImplementation(() =>
+        Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } })),
+      );
+    }
+  });
+
   it("a finding that stores a change offers Review change on its row, opening the dialog (W5)", async () => {
     const withChange = record({
       ...findings[1],

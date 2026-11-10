@@ -300,8 +300,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       titleAfterName(finding)
                     }}</OText>
                   </div>
+                  <template v-if="appliedOf(finding)">
+                    <OBadge
+                      variant="default-soft"
+                      size="xs"
+                      shape="rounded"
+                      data-test="alert-calibration-dashboard-applied"
+                    >
+                      {{ t("alertCalibration.dashboard.applied") }}
+                    </OBadge>
+                    <OButton
+                      variant="outline"
+                      size="xs"
+                      :loading="decisionRoute.isUndoing(appliedOf(finding)!.decision_id)"
+                      data-test="alert-calibration-dashboard-undo-apply"
+                      @click="undoApply(finding)"
+                    >
+                      {{ insightCtaLabel(t, "undo") }}
+                    </OButton>
+                  </template>
                   <OButton
-                    v-if="changeOf(finding)"
+                    v-else-if="changeOf(finding)"
                     variant="ghost-primary"
                     size="xs"
                     data-test="alert-calibration-dashboard-review-change"
@@ -419,6 +438,7 @@ import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import AlertCalibrationDismissedList from "./AlertCalibrationDismissedList.vue";
 import DecisionsDismissedList from "@/components/autoobserve/decisions/DecisionsDismissedList.vue";
 import {
+  appliedDecisionsQuery,
   dismissedDecisionsQuery,
   useDecisionRoute,
 } from "@/composables/autoobserve/useDecisionRoute";
@@ -542,6 +562,27 @@ const hiddenTotal = computed(
     (latest.value ? hiddenByRun(latest.value, dismissals.query.data.value) : 0),
 );
 const allDismissed = computed(() => openTotal.value === 0 && hiddenTotal.value > 0);
+
+const appliedRead = useQuery(() => ({
+  ...appliedDecisionsQuery(orgId.value),
+  enabled: decisionRoute.transport.value === "decision",
+}));
+/** The applies still in force, by finding: the run's words describe the alert before the change. */
+const appliedById = computed(
+  () =>
+    new Map(
+      (appliedRead.data.value ?? [])
+        .filter((view) => view.state === "applied")
+        .map((view) => [view.id, view] as const),
+    ),
+);
+const appliedOf = (finding: FindingRecord) =>
+  finding.finding_id ? (appliedById.value.get(finding.finding_id) ?? null) : null;
+const undoApply = (finding: FindingRecord) => {
+  const view = appliedOf(finding);
+  if (view)
+    void decisionRoute.undo([{ org: orgId.value, view, title: finding.alert_name ?? null }]);
+};
 
 const decisionDismissed = useQuery(() => ({
   ...dismissedDecisionsQuery(orgId.value, null),
@@ -735,7 +776,10 @@ function refresh() {
   void configQuery.refetch();
   void data.load();
   void dismissals.query.refetch();
-  if (decisionRoute.transport.value === "decision") void decisionDismissed.refetch();
+  if (decisionRoute.transport.value === "decision") {
+    void decisionDismissed.refetch();
+    void appliedRead.refetch();
+  }
 }
 
 onMounted(() => void data.load());

@@ -11882,7 +11882,8 @@
       "emptyTitle": "No runs in the last {days} days",
       "emptyDescription": "The dashboard fills in once alert calibration has run.",
       "loadFailedTitle": "Findings couldn't be loaded",
-      "findingGone": "This finding is no longer open."
+      "findingGone": "This finding is no longer open.",
+      "applied": "Applied"
     },
     "lastRun": {
       "succeeded": "The last run succeeded {time}.",
