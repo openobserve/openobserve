@@ -41,6 +41,9 @@ pub struct Model {
     pub false_alarm_by: Option<String>,
     pub false_alarm_at: Option<i64>,
     pub false_alarm_reason: Option<String>,
+    /// `status_recovered_at` of the check at the mark. Set only while the check was failing, so
+    /// only then does the mark hold the failure. None = the mark holds nothing.
+    pub false_alarm_recovered_at: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
 }

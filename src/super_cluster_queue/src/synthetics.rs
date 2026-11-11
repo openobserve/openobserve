@@ -348,6 +348,7 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
             run_class,
             run_class_at,
             tested_at,
+            recovered_at,
         } => {
             let streaks = table::synthetics_checks::StatusStreaks {
                 last_check_status: status,
@@ -357,6 +358,7 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
                 run_class,
                 run_class_at,
                 tested_at,
+                recovered_at,
             };
             apply_last_check_status(conn, &org_id, &id, &streaks).await?;
         }
@@ -662,6 +664,7 @@ mod tests {
             last_run_class: 0,
             last_run_class_at: 0,
             last_tested_at: 0,
+            status_recovered_at: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
@@ -905,6 +908,7 @@ mod tests {
                 last_run_class INTEGER NOT NULL DEFAULT 0,
                 last_run_class_at BIGINT NOT NULL DEFAULT 0,
                 last_tested_at BIGINT NOT NULL DEFAULT 0,
+                status_recovered_at BIGINT NOT NULL DEFAULT 0,
                 gap_since BIGINT NOT NULL DEFAULT 0,
                 gap_runs INTEGER NOT NULL DEFAULT 0,
                 gap_notified_at BIGINT NOT NULL DEFAULT 0,

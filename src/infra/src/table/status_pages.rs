@@ -59,6 +59,8 @@ pub struct CheckStateRow {
     pub last_run_class_at: i64,
     /// `scheduled_ts` of the newest finalized run that tested the site. 0 = none.
     pub last_tested_at: i64,
+    /// Finish time of the run that started the current Up streak. A false alarm hold matches it.
+    pub recovered_at: i64,
     /// Seconds between scheduled runs; 0 for cron.
     pub interval_secs: i64,
     pub created_at: i64,
@@ -143,6 +145,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
         .column(synthetics_checks::Column::LastRunClass)
         .column(synthetics_checks::Column::LastRunClassAt)
         .column(synthetics_checks::Column::LastTestedAt)
+        .column(synthetics_checks::Column::StatusRecoveredAt)
         .column(synthetics_checks::Column::Frequency)
         .column(synthetics_checks::Column::CreatedAt)
         .filter(synthetics_checks::Column::Id.is_in(check_ids.iter().cloned()));
@@ -163,6 +166,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
         last_run_class: i32,
         last_run_class_at: i64,
         last_tested_at: i64,
+        status_recovered_at: i64,
         frequency: serde_json::Value,
         created_at: i64,
     }
@@ -189,6 +193,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
                 last_run_class: r.last_run_class,
                 last_run_class_at: r.last_run_class_at,
                 last_tested_at: r.last_tested_at,
+                recovered_at: r.status_recovered_at,
                 interval_secs,
                 created_at: r.created_at,
             }
@@ -432,6 +437,78 @@ pub async fn update_notice_runtime<C: ConnectionTrait>(
         )
         .col_expr(status_page_notices::Column::UpdatedAt, Expr::value(now))
         .filter(status_page_notices::Column::Id.eq(id))
+        // A tick that read the notice before a false alarm mark must not write its old open
+        // state over the mark.
+        .filter(status_page_notices::Column::FalseAlarmAt.is_null())
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+/// Writes a false alarm mark only if the notice still holds the `state`, `resolved_at` and empty
+/// mark that the caller read, and only the columns the mark owns. Returns false when another
+/// write came first, so the caller can read again.
+pub async fn mark_notice_false_alarm(
+    before: &status_page_notices::Model,
+    after: &status_page_notices::Model,
+) -> Result<bool, errors::Error> {
+    let conn = get_orm_client_rw().await;
+    let resolved_was = match before.resolved_at {
+        Some(at) => status_page_notices::Column::ResolvedAt.eq(at),
+        None => status_page_notices::Column::ResolvedAt.is_null(),
+    };
+    let res = status_page_notices::Entity::update_many()
+        .col_expr(status_page_notices::Column::State, Expr::value(after.state))
+        .col_expr(
+            status_page_notices::Column::ResolvedAt,
+            Expr::value(after.resolved_at),
+        )
+        .col_expr(
+            status_page_notices::Column::Segments,
+            Expr::value(after.segments.clone()),
+        )
+        .col_expr(
+            status_page_notices::Column::ExcludedFromUptime,
+            Expr::value(after.excluded_from_uptime),
+        )
+        .col_expr(
+            status_page_notices::Column::FalseAlarmBy,
+            Expr::value(after.false_alarm_by.clone()),
+        )
+        .col_expr(
+            status_page_notices::Column::FalseAlarmAt,
+            Expr::value(after.false_alarm_at),
+        )
+        .col_expr(
+            status_page_notices::Column::FalseAlarmReason,
+            Expr::value(after.false_alarm_reason.clone()),
+        )
+        .col_expr(
+            status_page_notices::Column::FalseAlarmRecoveredAt,
+            Expr::value(after.false_alarm_recovered_at),
+        )
+        .col_expr(
+            status_page_notices::Column::UpdatedAt,
+            Expr::value(after.updated_at),
+        )
+        .filter(status_page_notices::Column::Id.eq(before.id.as_str()))
+        .filter(status_page_notices::Column::OrgId.eq(before.org_id.as_str()))
+        .filter(status_page_notices::Column::FalseAlarmAt.is_null())
+        .filter(status_page_notices::Column::State.eq(before.state))
+        .filter(resolved_was)
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Disarms every false alarm hold. Part of [`super::synthetics_checks::reset_false_alarm_holds`].
+pub async fn disarm_false_alarm_holds<C: ConnectionTrait>(conn: &C) -> Result<(), errors::Error> {
+    status_page_notices::Entity::update_many()
+        .col_expr(
+            status_page_notices::Column::FalseAlarmRecoveredAt,
+            Expr::value(Option::<i64>::None),
+        )
+        .filter(status_page_notices::Column::FalseAlarmRecoveredAt.is_not_null())
         .exec(conn)
         .await?;
     Ok(())

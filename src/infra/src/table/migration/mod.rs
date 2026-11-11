@@ -257,6 +257,7 @@ mod m20261103_000001_add_status_streaks_to_synthetics;
 mod m20261103_000002_add_run_class_to_synthetics;
 mod m20261103_000003_add_gap_state_to_synthetics;
 mod m20261103_000003_status_page_notice_false_alarm;
+mod m20261111_000001_add_false_alarm_recovery_stamp;
 mod m20261120_000001_add_template_applies_to;
 mod m20261120_000002_rename_reserved_template_collisions;
 mod m20261120_000003_add_anomaly_template;
@@ -864,6 +865,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261103_000002_add_run_class_to_synthetics::Migration),
             Box::new(m20261103_000003_status_page_notice_false_alarm::Migration),
             Box::new(m20261103_000003_add_gap_state_to_synthetics::Migration),
+            Box::new(m20261111_000001_add_false_alarm_recovery_stamp::Migration),
         ]
     }
 }
@@ -990,6 +992,7 @@ mod tests {
         (150, "m20261103_000002_add_run_class_to_synthetics"),
         (151, "m20261103_000003_status_page_notice_false_alarm"),
         (152, "m20261103_000003_add_gap_state_to_synthetics"),
+        (153, "m20261111_000001_add_false_alarm_recovery_stamp"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

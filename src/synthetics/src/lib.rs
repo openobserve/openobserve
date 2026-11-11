@@ -287,6 +287,7 @@ async fn ownership_supervisor() {
                     generation,
                     "[synthetics] ownership acquired — starting workers"
                 );
+                reset_holds_if_owner_changed(generation).await;
                 let (tx, token) = StopToken::new();
                 running = Some((tx, spawn_workers(token)));
             }
@@ -312,6 +313,54 @@ async fn ownership_supervisor() {
             SupervisorAction::Hold => {}
         }
         tokio::time::sleep(JOB_CLUSTER_POLL).await;
+    }
+}
+
+/// Whether a start must reset the false alarm holds. `marker` is the cluster that last started the
+/// workers, or an error when the KV read failed. A restart of the same owner, or the first good
+/// claim read after a failed one, keeps the holds. Any doubt resets them, which only fails open.
+#[cfg(feature = "enterprise")]
+fn hold_reset_needed(marker: Result<&str, ()>, local_cluster: &str) -> bool {
+    !matches!(marker, Ok(owner) if owner == local_cluster)
+}
+
+/// Run before the workers start. After a real handoff, this cluster's copy of the check rows can
+/// miss a recovery that the old owner saw, so a false alarm hold could hide a new outage. The
+/// reset disarms every hold and moves every recovery stamp; then the marker names this cluster.
+#[cfg(feature = "enterprise")]
+async fn reset_holds_if_owner_changed(generation: u64) {
+    use o2_enterprise::enterprise::super_cluster::kv;
+
+    let local = config::get_cluster_name();
+    let marker = kv::scheduler::get_synthetics_hold_owner().await;
+    if let Err(e) = &marker {
+        tracing::warn!(
+            generation,
+            "[synthetics] could not read the hold owner: {e}"
+        );
+    }
+    if !hold_reset_needed(marker.as_deref().map_err(|_| ()), &local) {
+        return;
+    }
+    let conn = infra::db::get_orm_client_rw().await;
+    let now = config::utils::time::now_micros();
+    if let Err(e) = infra::table::synthetics_checks::reset_false_alarm_holds(conn, now).await {
+        // Start anyway: the next start retries, because the marker still names another cluster.
+        tracing::error!(
+            generation,
+            "[synthetics] false alarm hold reset failed: {e}"
+        );
+        return;
+    }
+    tracing::info!(
+        generation,
+        "[synthetics] new owner — false alarm holds reset"
+    );
+    if let Err(e) = kv::scheduler::set_synthetics_hold_owner(&local).await {
+        tracing::warn!(
+            generation,
+            "[synthetics] could not write the hold owner: {e}"
+        );
     }
 }
 
@@ -454,6 +503,26 @@ mod job_cluster_gate_tests {
     /// structural — [`init`] returns before the poll task is ever spawned, so
     /// no KV client is constructed on this path — and this pins the arm that
     /// makes that safe to rely on.
+    #[test]
+    fn holds_reset_only_when_another_cluster_or_nobody_started_last() {
+        assert!(
+            !super::hold_reset_needed(Ok("us-west"), "us-west"),
+            "restart of the same owner"
+        );
+        assert!(
+            super::hold_reset_needed(Ok("eu-central"), "us-west"),
+            "real handoff"
+        );
+        assert!(
+            super::hold_reset_needed(Ok(""), "us-west"),
+            "first start after the upgrade"
+        );
+        assert!(
+            super::hold_reset_needed(Err(()), "us-west"),
+            "KV read failed"
+        );
+    }
+
     #[test]
     fn super_cluster_disabled_starts_whatever_the_claim_says() {
         assert!(should_start(false, "us-west", LOCAL, &both()));

@@ -522,6 +522,17 @@ pub async fn get_cached_online_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| node.status == NodeStatus::Online).await
 }
 
+/// True when every online node of this cluster runs this build. A synthetics false alarm hold
+/// is armed and applied only then: during a rolling deploy an old node can finish a recovery
+/// without moving the recovery stamp, which would let a hold hide the next outage. Unknown
+/// counts as false.
+pub async fn all_online_nodes_run_this_build() -> bool {
+    match get_cached_online_nodes().await {
+        Some(nodes) if !nodes.is_empty() => nodes.iter().all(|n| n.version == config::VERSION),
+        _ => false,
+    }
+}
+
 #[inline]
 pub async fn get_cached_online_router_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_router()).await

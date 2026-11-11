@@ -27,7 +27,7 @@ use std::collections::{HashMap, HashSet};
 use config::meta::status_pages as engine;
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
-    table::{entity::status_page_notices, status_pages as table, synthetics_runs},
+    table::{entity::status_page_notices, status_pages as table},
 };
 
 const RESOLVED_LOOKBACK_MICROS: i64 = 90 * 86_400 * 1_000_000;
@@ -43,6 +43,9 @@ struct TickData {
     states: Vec<table::CheckStateRow>,
     snoozed: HashSet<String>,
     notices: Vec<status_page_notices::Model>,
+    /// False alarm holds apply only while every node runs this build. See
+    /// [`infra::cluster::all_online_nodes_run_this_build`].
+    holds_allowed: bool,
 }
 
 /// Renders one page's snapshot on demand, through the exact same serializer
@@ -107,6 +110,8 @@ pub async fn preview_snapshot(
         states,
         snoozed: HashSet::new(),
         notices: notices.clone(),
+        // A preview renders the snapshot only. It runs no engine actions, so it holds nothing.
+        holds_allowed: false,
     };
     let (current, history, page_notice_ids) =
         build_page_snapshot(&page, &data, &notices_by_component, now);
@@ -296,6 +301,11 @@ async fn load(
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
+    // Notices before check state: a false alarm mark that lands between the two reads must not
+    // meet an older recovery stamp, which would open a new incident for the marked failure. A
+    // mark after this read is not seen this tick, and `update_notice_runtime` skips a marked
+    // notice.
+    let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
 
     // Delta by default; full sweep on the Nth tick. The sweep replaces the
     // cache wholesale (so deleted/unmapped checks drop out); the delta merges
@@ -330,7 +340,7 @@ async fn load(
         .map(|s| s.synthetics_id)
         .collect();
     snoozed.extend(muted_checks(conn, &mappings).await);
-    let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
+    let holds_allowed = infra::cluster::all_online_nodes_run_this_build().await;
     Ok(TickData {
         pages,
         components,
@@ -338,6 +348,7 @@ async fn load(
         states,
         snoozed,
         notices,
+        holds_allowed,
     })
 }
 
@@ -425,21 +436,11 @@ async fn apply_engine_actions(
     }
 
     let th_by_check = thresholds_by_check(data);
-    // Only a failing check can open an incident, so only a failing check needs the query.
-    let failing: HashSet<&str> = data
-        .states
-        .iter()
-        .filter(|s| s.down_runs > 0)
-        .map(|s| s.id.as_str())
-        .collect();
-    let mut held = HashSet::new();
-    for (check_id, starts_at) in false_alarm_marks(&data.notices) {
-        if failing.contains(check_id.as_str())
-            && !synthetics_runs::passed_since(conn, &check_id, starts_at).await?
-        {
-            held.insert(check_id);
-        }
-    }
+    let mut held = if data.holds_allowed {
+        false_alarm_holds(&data.notices, &data.states)
+    } else {
+        HashSet::new()
+    };
     held.extend(data.snoozed.iter().cloned());
     let actions = engine::incident_actions_with(
         &checks,
@@ -455,29 +456,42 @@ async fn apply_engine_actions(
     Ok(())
 }
 
-/// Checks whose newest auto-incident was closed by a false alarm mark, with the start of that
-/// incident. The caller holds a check until a run scheduled after that start passes in every
-/// job, so the hold ends at a recovery and never at a change of run class. A partial run or a
-/// Not measured run during the same failure keeps the hold, and a new failure after a recovery
-/// opens a new incident. Marking an incident that was already over holds nothing. This replaces
-/// the old six-hour snooze.
-fn false_alarm_marks(notices: &[status_page_notices::Model]) -> HashMap<String, i64> {
-    let mut marked: HashMap<String, (i64, i64)> = HashMap::new();
+/// The recovery stamps that armed false alarm marks saved, per check. A mark is armed when it
+/// closed the incident (`resolved_at == false_alarm_at`) while the check was failing, so it saved
+/// the check's stamp.
+fn false_alarm_marks(notices: &[status_page_notices::Model]) -> HashMap<&str, HashSet<i64>> {
+    let mut marked: HashMap<&str, HashSet<i64>> = HashMap::new();
     for n in notices {
-        if let (Some(check_id), Some(at)) = (n.auto_check_id.as_deref(), n.false_alarm_at)
-            && n.resolved_at == Some(at)
+        if let (Some(check_id), Some(at), Some(stamp)) = (
+            n.auto_check_id.as_deref(),
+            n.false_alarm_at,
+            n.false_alarm_recovered_at,
+        ) && n.resolved_at == Some(at)
         {
-            let e = marked
-                .entry(check_id.to_owned())
-                .or_insert((at, n.starts_at));
-            if at > e.0 {
-                *e = (at, n.starts_at);
-            }
+            marked.entry(check_id).or_default().insert(stamp);
         }
     }
     marked
-        .into_iter()
-        .map(|(id, (_, starts_at))| (id, starts_at))
+}
+
+/// Checks held by a false alarm mark: the check is failing and an armed mark saved its current
+/// recovery stamp. Each recovery moves the stamp, so only a mark of the failure that is still
+/// going on matches, and a new failure after a recovery opens a new incident. The rule does not
+/// compare mark times, so it does not depend on wall clocks.
+fn false_alarm_holds(
+    notices: &[status_page_notices::Model],
+    states: &[table::CheckStateRow],
+) -> HashSet<String> {
+    let marks = false_alarm_marks(notices);
+    states
+        .iter()
+        .filter(|s| {
+            s.down_runs > 0
+                && marks
+                    .get(s.id.as_str())
+                    .is_some_and(|stamps| stamps.contains(&s.recovered_at))
+        })
+        .map(|s| s.id.clone())
         .collect()
 }
 
@@ -583,6 +597,7 @@ async fn open_notice(
             false_alarm_by: None,
             false_alarm_at: None,
             false_alarm_reason: None,
+            false_alarm_recovered_at: None,
             created_at: now,
             updated_at: now,
         },
@@ -924,16 +939,17 @@ mod fast_pass_tests {
             last_run_class: 0,
             last_run_class_at: 0,
             last_tested_at: 0,
+            recovered_at: 0,
             interval_secs: 60,
             created_at: 0,
         }
     }
 
     #[test]
-    fn a_false_alarm_mark_gives_the_start_of_the_marked_incident() {
-        let notice = |check: &str, starts_at: i64, resolved: Option<i64>, mark: Option<i64>| {
+    fn a_false_alarm_holds_only_the_failure_whose_stamp_it_saved() {
+        let notice = |check: &str, resolved: Option<i64>, mark: Option<i64>, stamp: Option<i64>| {
             status_page_notices::Model {
-                id: format!("{check}-{starts_at}"),
+                id: format!("{check}-{mark:?}-{stamp:?}"),
                 org_id: "org".into(),
                 kind: 0,
                 impact: 0,
@@ -941,7 +957,7 @@ mod fast_pass_tests {
                 title: String::new(),
                 body: String::new(),
                 state: 2,
-                starts_at,
+                starts_at: 0,
                 resolved_at: resolved,
                 segments: "[]".into(),
                 excluded_from_uptime: mark.is_some(),
@@ -952,26 +968,47 @@ mod fast_pass_tests {
                 false_alarm_by: None,
                 false_alarm_at: mark,
                 false_alarm_reason: None,
+                false_alarm_recovered_at: stamp,
                 created_at: 0,
                 updated_at: 0,
             }
         };
+        let failing = |id: &str, recovered_at: i64| {
+            let mut r = row(id, 3);
+            r.down_runs = 2;
+            r.recovered_at = recovered_at;
+            r
+        };
         let notices = vec![
-            // Marked while open: the mark closed it.
-            notice("same", 400, Some(500), Some(500)),
-            // Two marks on one check: the newest mark wins.
-            notice("two", 100, Some(200), Some(200)),
-            notice("two", 700, Some(800), Some(800)),
+            // Marked while failing at stamp 7, and no recovery since: held.
+            notice("same", Some(500), Some(500), Some(7)),
+            // Marked at stamp 7, then a recovery moved the stamp to 9: a new failure.
+            notice("recovered", Some(500), Some(500), Some(7)),
+            // Marked while the check was not failing: the mark saved nothing.
+            notice("unarmed", Some(500), Some(500), None),
+            // Resolved at 300 and marked at 500: the mark did not close it.
+            notice("old", Some(300), Some(500), Some(7)),
+            // Two marks. The newer mark time has the older stamp, as after a clock step back.
+            notice("two", Some(900), Some(900), Some(3)),
+            notice("two", Some(400), Some(400), Some(7)),
             // Not a false alarm.
-            notice("real", 400, Some(500), None),
-            // Resolved at 300 and marked at 500: the incident was already over.
-            notice("old", 100, Some(300), Some(500)),
+            notice("real", Some(500), None, None),
         ];
-        let marks = false_alarm_marks(&notices);
-        assert_eq!(
-            marks,
-            HashMap::from([("same".to_string(), 400), ("two".to_string(), 700)])
-        );
+        let mut up = failing("up", 7);
+        up.down_runs = 0;
+        let notices = [notices, vec![notice("up", Some(500), Some(500), Some(7))]].concat();
+        let states = [
+            failing("same", 7),
+            failing("recovered", 9),
+            failing("unarmed", 7),
+            failing("old", 7),
+            failing("two", 7),
+            failing("real", 7),
+            // Armed stamp matches, but the check is not failing: nothing to hold.
+            up,
+        ];
+        let held = false_alarm_holds(&notices, &states);
+        assert_eq!(held, HashSet::from(["same".to_string(), "two".to_string()]));
     }
 
     #[test]

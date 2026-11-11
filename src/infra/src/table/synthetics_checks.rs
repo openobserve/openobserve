@@ -983,6 +983,9 @@ pub struct StatusStreaks {
     pub run_class_at: i64,
     /// `scheduled_ts` of the newest run that tested the site, in microseconds. 0 = none.
     pub tested_at: i64,
+    /// Finish time of the run that started the current Up streak, in microseconds. It never goes
+    /// down, so a false alarm hold that saved an older value ends. 0 = no recovery yet.
+    pub recovered_at: i64,
 }
 
 /// Reads the badge and run streaks of one check. `None` when the check is not in this region.
@@ -999,20 +1002,29 @@ pub async fn get_status_streaks<C: ConnectionTrait>(
         .column(Column::LastRunClass)
         .column(Column::LastRunClassAt)
         .column(Column::LastTestedAt)
-        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64)>()
+        .column(Column::StatusRecoveredAt)
+        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(last_check_status, down_runs, up_runs, run_ts, run_class, run_class_at, tested_at)| {
-            StatusStreaks {
-                last_check_status,
-                down_runs,
-                up_runs,
-                run_ts,
-                run_class,
-                run_class_at,
-                tested_at,
-            }
+        |(
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
+            recovered_at,
+        )| StatusStreaks {
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
+            recovered_at,
         },
     ))
 }
@@ -1032,21 +1044,30 @@ pub async fn lock_status_streaks<C: ConnectionTrait>(
         .column(Column::LastRunClass)
         .column(Column::LastRunClassAt)
         .column(Column::LastTestedAt)
+        .column(Column::StatusRecoveredAt)
         .lock_exclusive()
-        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64)>()
+        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(last_check_status, down_runs, up_runs, run_ts, run_class, run_class_at, tested_at)| {
-            StatusStreaks {
-                last_check_status,
-                down_runs,
-                up_runs,
-                run_ts,
-                run_class,
-                run_class_at,
-                tested_at,
-            }
+        |(
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
+            recovered_at,
+        )| StatusStreaks {
+            last_check_status,
+            down_runs,
+            up_runs,
+            run_ts,
+            run_class,
+            run_class_at,
+            tested_at,
+            recovered_at,
         },
     ))
 }
@@ -1066,7 +1087,8 @@ pub async fn swap_status_streaks<C: ConnectionTrait>(
         .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
         .col_expr(Column::LastRunClass, Expr::value(next.run_class))
         .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at))
-        .col_expr(Column::LastTestedAt, Expr::value(next.tested_at));
+        .col_expr(Column::LastTestedAt, Expr::value(next.tested_at))
+        .col_expr(Column::StatusRecoveredAt, Expr::value(next.recovered_at));
     if streaks_differ(expected, next) {
         q = q.col_expr(
             Column::UpdatedAt,
@@ -1081,6 +1103,7 @@ pub async fn swap_status_streaks<C: ConnectionTrait>(
         .filter(Column::StatusRunTs.eq(expected.run_ts))
         .filter(Column::LastRunClass.eq(expected.run_class))
         .filter(Column::LastRunClassAt.eq(expected.run_class_at))
+        .filter(Column::StatusRecoveredAt.eq(expected.recovered_at))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
@@ -1113,7 +1136,58 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
         .filter(Column::StatusRunTs.lte(next.run_ts))
         .exec(conn)
         .await?;
+    let stamp_moved = apply_replicated_recovery(conn, id, next.recovered_at).await?;
+    Ok(res.rows_affected > 0 || stamp_moved)
+}
+
+/// Moves the recovery stamp forward, whatever `run_ts` the local row holds. A late recovery
+/// message must still end a false alarm hold after the local row took a newer run.
+async fn apply_replicated_recovery<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    recovered_at: i64,
+) -> Result<bool, errors::Error> {
+    if recovered_at <= 0 {
+        return Ok(false);
+    }
+    let res = Entity::update_many()
+        .col_expr(Column::StatusRecoveredAt, Expr::value(recovered_at))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::Id.eq(id))
+        .filter(Column::StatusRecoveredAt.lt(recovered_at))
+        .exec(conn)
+        .await?;
     Ok(res.rows_affected > 0)
+}
+
+/// After the job cluster claim moves to this cluster: moves every recovery stamp past `now` and
+/// disarms every false alarm hold, so no hold from the old owner can match a new stamp. Safe to
+/// run twice. A marked failure that still goes on then opens a new incident.
+pub async fn reset_false_alarm_holds<C: ConnectionTrait>(
+    conn: &C,
+    now: i64,
+) -> Result<(), errors::Error> {
+    // Two updates, so no SQL dialect needs GREATEST. The order matters: the second one sets
+    // values that the first one would move again.
+    Entity::update_many()
+        .col_expr(
+            Column::StatusRecoveredAt,
+            Expr::col(Column::StatusRecoveredAt).add(1),
+        )
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::StatusRecoveredAt.gt(now))
+        .exec(conn)
+        .await?;
+    Entity::update_many()
+        .col_expr(Column::StatusRecoveredAt, Expr::value(now + 1))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::StatusRecoveredAt.lte(now))
+        .exec(conn)
+        .await?;
+    super::status_pages::disarm_false_alarm_holds(conn).await
 }
 
 /// The alert bookkeeping a completed run needs in order to decide whether to
@@ -1509,6 +1583,7 @@ fn streaks_differ(a: &StatusStreaks, b: &StatusStreaks) -> bool {
         || a.down_runs != b.down_runs
         || a.up_runs != b.up_runs
         || a.run_class != b.run_class
+        || a.recovered_at != b.recovered_at
 }
 
 fn check_type_to_str(t: &SyntheticType) -> &'static str {
@@ -1585,6 +1660,7 @@ pub(crate) mod tests {
             last_run_class: 0,
             last_run_class_at: 0,
             last_tested_at: 0,
+            status_recovered_at: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,

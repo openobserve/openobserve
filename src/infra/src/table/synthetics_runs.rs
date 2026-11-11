@@ -445,30 +445,6 @@ pub async fn get_run<C: ConnectionTrait>(
         .map_err(errors::Error::from)
 }
 
-/// True when a finished run of the check, scheduled after `since`, passed in every job
-/// (`run_result` 1 = Passed or 2 = Warning). A false alarm hold ends at such a run. A partial
-/// run or a Not measured run does not end it.
-pub async fn passed_since<C: ConnectionTrait>(
-    conn: &C,
-    synthetics_id: &str,
-    since: i64,
-) -> Result<bool, errors::Error> {
-    let sql = r#"
-        SELECT id FROM synthetics_runs
-        WHERE synthetics_id = $1 AND scheduled_ts > $2
-          AND completed_at IS NOT NULL AND run_result IN (1, 2)
-        LIMIT 1
-    "#;
-    let rows = conn
-        .query_all(Statement::from_sql_and_values(
-            conn.get_database_backend(),
-            sql,
-            [Value::from(synthetics_id.to_owned()), Value::from(since)],
-        ))
-        .await?;
-    Ok(!rows.is_empty())
-}
-
 /// Counts the job and, for the caller that completes the run, writes the run result to the check
 /// row in the same transaction.
 pub async fn finalize_run<C: ConnectionTrait + TransactionTrait>(
@@ -567,7 +543,19 @@ pub fn next_streaks(
         run_class,
         run_class_at,
         tested_at,
+        recovered_at: cur.recovered_at,
     })
+}
+
+/// The recovery stamp after a run: the run's finish time when it starts an Up streak, and the old
+/// stamp otherwise. A late Up run (`late`) always counts, because replay cannot tell if it started
+/// the streak. The stamp only rises, also when two runs finish in the same microsecond.
+pub fn recovery_stamp(cur: &StatusStreaks, verdict: Verdict, late: bool, finished_at: i64) -> i64 {
+    if verdict == Verdict::Up && (late || cur.up_runs == 0) {
+        (cur.recovered_at + 1).max(finished_at)
+    } else {
+        cur.recovered_at
+    }
 }
 
 async fn finalize<C: ConnectionTrait + TransactionTrait>(
@@ -609,6 +597,7 @@ async fn finalize<C: ConnectionTrait + TransactionTrait>(
         t.verdict,
         t.class,
         run.scheduled_ts,
+        now_us,
     )
     .await?;
     txn.commit().await?;
@@ -765,17 +754,22 @@ async fn write_check_row<C: ConnectionTrait>(
     verdict: Verdict,
     run_class: RunClass,
     run_ts: i64,
+    finished_at: i64,
 ) -> Result<Option<StatusStreaks>, errors::Error> {
     // Retried because a concurrent run of the same check can win the swap between read and write.
     for _ in 0..SWAP_ATTEMPTS {
         let Some(cur) = synthetics_checks::lock_status_streaks(conn, synthetics_id).await? else {
             return Ok(None);
         };
-        let next = match next_streaks(&cur, run_result, verdict, run_class, run_ts) {
-            Some(next) => next,
+        let (mut next, late) = match next_streaks(&cur, run_result, verdict, run_class, run_ts) {
+            Some(next) => (next, false),
             // A run that finishes after a newer one rebuilds the streaks in run order.
-            None => replay_streaks(conn, synthetics_id, &cur).await?,
+            None => (
+                replay_streaks(conn, synthetics_id, &cur, verdict == Verdict::Up).await?,
+                true,
+            ),
         };
+        next.recovered_at = recovery_stamp(&cur, verdict, late, finished_at);
         if next == cur {
             return Ok(None);
         }
@@ -784,6 +778,7 @@ async fn write_check_row<C: ConnectionTrait>(
                 || cur.down_runs != next.down_runs
                 || cur.up_runs != next.up_runs
                 || cur.run_class != next.run_class
+                || cur.recovered_at != next.recovered_at
                 || cur.tested_at / TESTED_AT_PUBLISH_US != next.tested_at / TESTED_AT_PUBLISH_US;
             return Ok(changed.then_some(next));
         }
@@ -799,6 +794,7 @@ async fn replay_streaks<C: ConnectionTrait>(
     conn: &C,
     synthetics_id: &str,
     cur: &StatusStreaks,
+    late_up: bool,
 ) -> Result<StatusStreaks, errors::Error> {
     let backend = conn.get_database_backend();
     let runs = conn
@@ -818,24 +814,36 @@ async fn replay_streaks<C: ConnectionTrait>(
         ))
         .await?;
     let mut replayed = StatusStreaks::default();
+    let mut saw_up = false;
     for row in runs.iter().rev() {
         let id: String = row.try_get("", "id")?;
         let scheduled_ts: i64 = row.try_get("", "scheduled_ts")?;
         let job_count: i32 = row.try_get("", "job_count")?;
         let t = tally(job_count, &job_outcomes(conn, &id).await?);
+        saw_up |= t.verdict == Verdict::Up;
         if let Some(next) = next_streaks(&replayed, 0, t.verdict, t.class, scheduled_ts) {
             replayed = next;
         }
     }
+    // The window starts from an empty state. With no Up verdict in it, and no late Up that can be
+    // older than the window, the failure goes on from before the window: keep the Down streak that
+    // the row already had.
+    let (down_runs, up_runs) = if saw_up || late_up {
+        (replayed.down_runs, replayed.up_runs)
+    } else {
+        (cur.down_runs.max(replayed.down_runs), 0)
+    };
     Ok(StatusStreaks {
         last_check_status: cur.last_check_status,
-        down_runs: replayed.down_runs,
-        up_runs: replayed.up_runs,
+        down_runs,
+        up_runs,
         run_ts: cur.run_ts,
         run_class: cur.run_class,
         run_class_at: cur.run_class_at,
         // A late run can be the newest one that tested the site.
         tested_at: cur.tested_at.max(replayed.tested_at),
+        // `write_check_row` sets the stamp from the late run itself.
+        recovered_at: cur.recovered_at,
     })
 }
 
@@ -1120,6 +1128,7 @@ mod tests {
             last_run_class: 0,
             last_run_class_at: 0,
             last_tested_at: 0,
+            status_recovered_at: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
@@ -1232,6 +1241,7 @@ mod tests {
                 run_class: m.last_run_class,
                 run_class_at: m.last_run_class_at,
                 tested_at: m.last_tested_at,
+                recovered_at: m.status_recovered_at,
             },
             m.updated_at,
         )
@@ -1333,6 +1343,7 @@ mod tests {
                 run_class: RunClass::Partial.to_db(),
                 run_class_at: 100,
                 tested_at: 100,
+                recovered_at: 0,
             }
         );
         assert_eq!(done.check_update, Some(row));
@@ -1423,6 +1434,181 @@ mod tests {
         assert_eq!(row.run_ts, 200);
     }
 
+    #[test]
+    fn the_recovery_stamp_moves_only_when_an_up_streak_starts() {
+        let cur = |up_runs, recovered_at| StatusStreaks {
+            up_runs,
+            recovered_at,
+            ..StatusStreaks::default()
+        };
+        assert_eq!(recovery_stamp(&cur(0, 0), Verdict::Up, false, 500), 500);
+        assert_eq!(
+            recovery_stamp(&cur(2, 300), Verdict::Up, false, 500),
+            300,
+            "steady Up"
+        );
+        assert_eq!(
+            recovery_stamp(&cur(2, 300), Verdict::Up, true, 500),
+            500,
+            "late Up"
+        );
+        assert_eq!(recovery_stamp(&cur(0, 300), Verdict::Down, false, 500), 300);
+        assert_eq!(
+            recovery_stamp(&cur(0, 300), Verdict::NoVerdict, false, 500),
+            300
+        );
+        // The clock moved back: the stamp still rises.
+        assert_eq!(recovery_stamp(&cur(0, 900), Verdict::Up, false, 500), 901);
+    }
+
+    #[tokio::test]
+    async fn a_recovery_moves_the_stamp_once_per_up_streak() {
+        let db = db().await;
+        let stamp = |db| async move { check_row(db).await.0.recovered_at };
+        run_with_jobs(&db, "down", 100, 1).await;
+        ack(&db, "down", 0, 3, 110).await;
+        assert_eq!(stamp(&db).await, 0);
+        run_with_jobs(&db, "up1", 200, 1).await;
+        ack(&db, "up1", 0, 1, 210).await;
+        assert_eq!(stamp(&db).await, 210, "the first Up after a failure");
+        run_with_jobs(&db, "up2", 300, 1).await;
+        ack(&db, "up2", 0, 1, 310).await;
+        assert_eq!(stamp(&db).await, 210, "a steady check keeps its stamp");
+        run_with_jobs(&db, "down2", 400, 1).await;
+        ack(&db, "down2", 0, 3, 410).await;
+        run_with_jobs(&db, "gap", 500, 1).await;
+        ack(&db, "gap", 0, 4, 510).await;
+        assert_eq!(stamp(&db).await, 210, "Down and no verdict keep the stamp");
+        run_with_jobs(&db, "up3", 600, 1).await;
+        ack(&db, "up3", 0, 1, 605).await;
+        assert_eq!(stamp(&db).await, 605);
+    }
+
+    #[tokio::test]
+    async fn a_no_verdict_replay_keeps_the_failure_and_a_late_up_moves_the_stamp() {
+        let db = db().await;
+        run_with_jobs(&db, "d1", 100, 1).await;
+        ack(&db, "d1", 0, 3, 110).await;
+        run_with_jobs(&db, "d2", 200, 1).await;
+        ack(&db, "d2", 0, 3, 210).await;
+        // More no-verdict runs than the replay window holds.
+        for i in 0..(REPLAY_RUNS + 1) {
+            let id = format!("gap-{i}");
+            let ts = 1_000 + i * 100;
+            run_with_jobs(&db, &id, ts, 1).await;
+            ack(&db, &id, 0, 4, ts + 10).await;
+        }
+        assert_eq!(check_row(&db).await.0.down_runs, 2);
+        // A late no-verdict run replays a window with no Up verdict: the failure goes on.
+        run_with_jobs(&db, "late-gap", 300, 1).await;
+        ack(&db, "late-gap", 0, 4, 9_000).await;
+        let (row, _) = check_row(&db).await;
+        assert_eq!((row.down_runs, row.up_runs), (2, 0));
+        assert_eq!(row.recovered_at, 0);
+        // A late Up outside the window still moves the stamp, and it ends the failure.
+        run_with_jobs(&db, "late-up", 400, 1).await;
+        ack(&db, "late-up", 0, 1, 9_500).await;
+        let (row, _) = check_row(&db).await;
+        assert_eq!(row.recovered_at, 9_500);
+        assert_eq!(row.down_runs, 0);
+    }
+
+    #[tokio::test]
+    async fn a_late_recovery_message_moves_the_stamp_past_a_newer_local_run() {
+        let db = db().await;
+        run_with_jobs(&db, "d1", 500, 1).await;
+        ack(&db, "d1", 0, 3, 510).await;
+        let older = StatusStreaks {
+            last_check_status: 1,
+            up_runs: 1,
+            run_ts: 300,
+            run_class: RunClass::Up.to_db(),
+            recovered_at: 320,
+            ..StatusStreaks::default()
+        };
+        assert!(
+            synthetics_checks::apply_replicated_streaks(&db, "mon-1", &older)
+                .await
+                .unwrap()
+        );
+        let (row, _) = check_row(&db).await;
+        assert_eq!(row.run_ts, 500, "the streaks keep the newer local run");
+        assert_eq!(row.recovered_at, 320, "the stamp moves anyway");
+        let stale = StatusStreaks {
+            recovered_at: 100,
+            ..older
+        };
+        assert!(
+            !synthetics_checks::apply_replicated_streaks(&db, "mon-1", &stale)
+                .await
+                .unwrap()
+        );
+        assert_eq!(check_row(&db).await.0.recovered_at, 320, "never goes down");
+    }
+
+    #[tokio::test]
+    async fn a_handoff_reset_moves_every_stamp_and_disarms_every_hold() {
+        use crate::table::entity::status_page_notices as notices;
+        let db = db().await;
+        let backend = db.get_database_backend();
+        db.execute(backend.build(&Schema::new(backend).create_table_from_entity(notices::Entity)))
+            .await
+            .unwrap();
+        let marked = notices::Model {
+            id: "n1".into(),
+            org_id: "org1".into(),
+            kind: 0,
+            impact: 0,
+            source: 0,
+            title: String::new(),
+            body: String::new(),
+            state: 2,
+            starts_at: 0,
+            resolved_at: Some(50),
+            segments: "[]".into(),
+            excluded_from_uptime: true,
+            deleted_at: None,
+            auto_check_id: Some("mon-1".into()),
+            auto_recovery_streak: 0,
+            owner: None,
+            false_alarm_by: Some("a@b.c".into()),
+            false_alarm_at: Some(50),
+            false_alarm_reason: Some("probe".into()),
+            false_alarm_recovered_at: Some(0),
+            created_at: 0,
+            updated_at: 0,
+        };
+        let am: notices::ActiveModel = marked.into();
+        am.reset_all().insert(&db).await.unwrap();
+
+        synthetics_checks::reset_false_alarm_holds(&db, 1_000)
+            .await
+            .unwrap();
+        assert_eq!(check_row(&db).await.0.recovered_at, 1_001);
+        // Twice, with a clock behind the stamp: it still moves and never repeats a value.
+        synthetics_checks::reset_false_alarm_holds(&db, 900)
+            .await
+            .unwrap();
+        assert_eq!(check_row(&db).await.0.recovered_at, 1_002);
+        let n = notices::Entity::find_by_id("n1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(n.false_alarm_recovered_at, None);
+
+        // The rebuilder never writes its old open state over a marked notice.
+        crate::table::status_pages::update_notice_runtime(&db, "n1", 1, None, "[]", 0, 2_000)
+            .await
+            .unwrap();
+        let n = notices::Entity::find_by_id("n1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!((n.state, n.resolved_at), (2, Some(50)));
+    }
+
     #[tokio::test]
     async fn late_up_between_two_downs_rebuilds_the_streak() {
         let db = db().await;
@@ -1445,27 +1631,6 @@ mod tests {
             "badge stays the newest run's"
         );
         assert_eq!(late.check_update, Some(row));
-    }
-
-    #[tokio::test]
-    async fn only_a_run_that_passed_everywhere_ends_a_false_alarm_hold() {
-        let db = db().await;
-        // Incident opened at 150. A partial run and a Not measured run keep the hold.
-        run_with_jobs(&db, "partial", 200, 2).await;
-        ack(&db, "partial", 0, 1, 210).await;
-        ack(&db, "partial", 1, 3, 220).await;
-        run_with_jobs(&db, "gap", 300, 1).await;
-        ack(&db, "gap", 0, 4, 310).await;
-        assert!(!passed_since(&db, "mon-1", 150).await.unwrap());
-        // A passing run that finalizes after a newer Down run still ends the hold.
-        run_with_jobs(&db, "late_up", 400, 1).await;
-        run_with_jobs(&db, "down", 500, 1).await;
-        ack(&db, "down", 0, 3, 510).await;
-        assert!(!passed_since(&db, "mon-1", 150).await.unwrap());
-        ack(&db, "late_up", 0, 1, 600).await;
-        assert!(passed_since(&db, "mon-1", 150).await.unwrap());
-        // A pass before the incident start does not count.
-        assert!(!passed_since(&db, "mon-1", 400).await.unwrap());
     }
 
     #[tokio::test]
@@ -1521,6 +1686,7 @@ mod tests {
                 run_class: RunClass::Down.to_db(),
                 run_class_at: 100,
                 tested_at: 100,
+                recovered_at: 0,
             }
         );
         let run = get_run(&db, "r1").await.unwrap().unwrap();

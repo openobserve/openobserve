@@ -2925,6 +2925,7 @@ mod tests {
             "last_run_class",
             "last_run_class_at",
             "last_tested_at",
+            "status_recovered_at",
             "gap_since",
             "gap_runs",
             "gap_notified_at",
