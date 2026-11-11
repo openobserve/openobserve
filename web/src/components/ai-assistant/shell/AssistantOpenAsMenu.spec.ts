@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import { historyStubs } from "../__tests__/historyStubs";
@@ -183,6 +184,33 @@ describe("Open as", () => {
     expect(store.windowOf(sid)).toBeNull();
     expect(store.state.shell.activeSid).toBe(sid);
     expect(router.currentRoute.value.name).toBe("assistant");
+  });
+
+  it("starts an empty full-page chat from a chat with messages, leaving that chat as it was", async () => {
+    const { store } = fake.current;
+    const sid = store.state.shell.activeSid;
+    store.state.sessions[sid].messages.push({
+      role: "user",
+      content: raw("why 5xx?"),
+      turnId: "t1",
+    });
+    const { router } = await setup({});
+    expect(item("full-new")!.textContent).toContain("New chat in full page");
+    item("full-new")!.click();
+    await flushPromises();
+    const fresh = store.state.shell.activeSid;
+    expect(fresh).not.toBe(sid);
+    expect(store.state.sessions[fresh].messages).toHaveLength(0);
+    expect(store.state.sessions[sid].messages).toHaveLength(1);
+    expect(store.state.shell.placement.kind).toBe("full");
+    expect(router.currentRoute.value.name).toBe("assistant");
+    expect(router.currentRoute.value.params.chatId).toBeFalsy();
+  });
+
+  it("offers no separate new full-page chat when the chat is already empty", async () => {
+    await setup({});
+    expect(item("full")).not.toBeNull();
+    expect(item("full-new")).toBeNull();
   });
 
   it("pins a window's chat from Side panel", async () => {
