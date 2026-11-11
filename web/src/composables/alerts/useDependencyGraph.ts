@@ -94,10 +94,7 @@ export interface DepNode {
   usageCount: number;
   /** Destination-only: per-kind breakdown behind `usageCount`, from its `uses`. */
   consumerCounts?: Partial<Record<DepConsumerKind, number>>;
-  /**
-   * Template-only: server references with no edge in this graph, such as a default-org
-   * template used in other orgs. Kept through pruning, because no local row owns them.
-   */
+  /** Template-only: server references with no edge here (e.g. other orgs); kept through pruning. */
   externalCounts?: { destinations: number; alerts: number };
   /** Destination-only: the rows behind `consumerCounts`, for the dialog's per-kind sections. */
   consumerUses?: Partial<Record<DepConsumerKind, UsageRow[]>>;
@@ -583,9 +580,8 @@ export function useDependencyGraph() {
       }
     }
 
-    // Server usage counts: consumers with no list of their own here become badges, and
-    // references the local lists do not hold (other orgs, rows the user cannot list)
-    // become external counts. A reference with a local edge is counted only once.
+    // Consumers with no list here become badges; references with no local edge become external
+    // counts, so a reference with a local edge is counted only once.
     const localRefs = new Map<string, { destinations: number; alerts: number }>();
     for (const e of edges) {
       if (e.relation === "usage") continue;
@@ -664,10 +660,8 @@ export function useDependencyGraph() {
     loading.value = true;
     error.value = null;
     try {
-      // All three reads go through the query cache. `includeUsage: true` keys the
-      // destinations read separately from a plain picker fetch (see destinationKeys.list),
-      // so the two never collide even though both cover the same org + module. The
-      // templates read asks for `used_by` counts under its own key for the same reason.
+      // `includeUsage: true` keys the destinations and templates reads apart from the plain
+      // picker fetches (see destinationKeys.list), so the cache entries never collide.
       const inputs = {
         alerts: alertDependenciesQuery(org),
         destinations: destinationsQuery(org, "alert", true),

@@ -263,7 +263,8 @@ impl ListTemplatesQuery {
     description = "Retrieves a list of all alert notification templates configured for an organization. Returns template \
                    names, types, and basic metadata to help administrators manage notification formatting options. \
                    Templates provide reusable formatting configurations that ensure consistent alert notifications across \
-                   different channels and destinations.",
+                   different channels and destinations. With `include_usage=true`, each template also carries \
+                   `used_by` counts; `binding_names` is empty in the list.",
     security(
         ("Authorization"= [])
     ),
@@ -272,7 +273,7 @@ impl ListTemplatesQuery {
         ListTemplatesQuery,
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Template>)),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<TemplateWithUsage>)),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(

@@ -24,9 +24,8 @@ export const templatesQuery = (org: string, includeUsage = false) =>
     queryFn: async (): Promise<any[]> =>
       (await template.list({ org_identifier: org, ...(includeUsage && { include_usage: true }) }))
         .data ?? [],
-    // A catalogue read by every alert form, not alert state — so the normal tier, not the live one.
-    // Usage counts change with every alert, check, or detector save, and no write there
-    // invalidates this key, so the graph re-reads them on each rebuild (its own TTL bounds that).
+    // Usage counts change on saves that never invalidate this key, so the graph re-reads them;
+    // the plain catalogue keeps the normal tier.
     staleTime: includeUsage ? 0 : NORMAL_STALE_TIME,
   });
 
