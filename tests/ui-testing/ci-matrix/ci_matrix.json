@@ -700,7 +700,7 @@
   },
   {
     "testfolder": "Assistant",
-    "_comment": "O2 Assistant mocked harness on the production bundle the binary embeds. Every assistant WP appends its spec files here in the PR that creates them; @edition flows skip here and run in the assistant_editions job.",
+    "_comment": "O2 Assistant mocked harness on the production bundle the binary embeds. Every assistant WP appends its spec files here in the PR that creates them; @edition flows skip here and run in the assistant_editions job. OSS CI sets O2_BUNDLE_EDITION=oss, so on its OSS bundle only @stack-oss flows run; ENT CI runs the full set on its enterprise bundle.",
     "actual_folder": "assistant",
     "browser": "chrome",
     "run_files": [

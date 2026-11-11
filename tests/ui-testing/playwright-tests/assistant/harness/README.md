@@ -57,6 +57,7 @@ without the wrapper config the design folder used.
 | `ZO_BASE_URL` | Same-origin UI (`/web`) and API, as in CI. Wins unless `O2_VITE_DEV` is set; no backend rewrite |
 | `ZO_ROOT_USER_EMAIL`, `ZO_ROOT_USER_PASSWORD` | Login (fallback `O2_USER`, `O2_PASS`); there are no built-in credentials |
 | `ORGNAME` | Org (fallback `O2_ORG`, then `default`) |
+| `O2_BUNDLE_EDITION` | `oss`, `enterprise` or `cloud`: the edition the served bundle was built as. `oss` (set by OSS CI, whose bundle locks the assistant) skips every flow not tagged `@stack-oss` and makes `forceOssBuild` a no-op |
 | `O2_VITE_DEV` | Set when the app is served by the Vite dev server; enables the edition rewrite |
 | `O2_APP_URL` | Where Vite serves the app (default `http://localhost:8093/web`) |
 | `O2_API_ORIGIN` | API origin baked into the bundle (default `http://localhost:5080`); every request to it is routed |

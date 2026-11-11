@@ -642,6 +642,9 @@ jobs:
           path: tests/ui-testing/last-run-prev
 
       - name: Install dependencies and run ui-tests
+        env:
+          # build_binary never sets VITE_OPENOBSERVE_ENTERPRISE; the assistant harness runs only its @stack-oss flows on it.
+          O2_BUNDLE_EDITION: oss
         run: |
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
@@ -860,13 +863,24 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ needs.resolve_binary.outputs.run_id }}
 
+      # The release-ci binary reads the UI from /tmp/dist at runtime instead of embedding it.
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.resolve_binary.outputs.frontend_artifact_name }}
+          path: /tmp/dist
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_binary.outputs.run_id }}
+
       - name: Start OpenObserve
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
 
+      # This job serves the UI from Vite, so readiness is the API's health, not the embedded /web/login.
       - name: Wait for start
         run: |
           for i in $(seq 1 120); do
-            if curl -sf http://localhost:5080/web/login > /dev/null 2>&1; then
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
               echo "Server ready after ${i}s"
               exit 0
             fi

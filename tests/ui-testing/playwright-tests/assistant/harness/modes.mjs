@@ -25,6 +25,18 @@ export function currentMode(env = process.env) {
 
 export const MODE = currentMode();
 
+/** Editions a served bundle can be built as, keyed to the stack mode that serves the same build. */
+export const BUNDLE_MODES = { oss: "stack-oss", enterprise: "stack-ee", cloud: "stack-cloud" };
+
+/** The edition the served bundle was built as (`O2_BUNDLE_EDITION`); empty means unknown and every flow runs. */
+export function bundleEdition(env = process.env) {
+  const edition = env.O2_BUNDLE_EDITION || "";
+  if (edition && !BUNDLE_MODES[edition]) throw new Error(`O2_BUNDLE_EDITION must be one of ${Object.keys(BUNDLE_MODES).join(", ")}; got "${edition}"`);
+  return edition;
+}
+
+export const BUNDLE_EDITION = bundleEdition();
+
 export const isStack = (mode = MODE) => mode !== "mock";
 
 export const modeTag = (mode = MODE) => `@${mode}`;
@@ -50,6 +62,7 @@ export async function enforceMode() {
     return;
   }
   test.skip(!runsIn(tags), `not declared for ${MODE}`);
+  test.skip(BUNDLE_EDITION === "oss" && !tags.includes(TAGS.O), "the served bundle is the OSS edition, which locks the assistant");
 }
 
 /** Skips the running flow in a stack mode because it needs a mock the real server cannot provide. */

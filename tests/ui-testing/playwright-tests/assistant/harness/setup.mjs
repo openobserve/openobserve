@@ -20,7 +20,7 @@ import {
   overageStatus,
   sharedChat,
 } from "./mocks.mjs";
-import { MODE, enforceMode, isStack, mockOnly } from "./modes.mjs";
+import { BUNDLE_EDITION, BUNDLE_MODES, MODE, TAGS, enforceMode, isStack, mockOnly } from "./modes.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -603,7 +603,7 @@ async function requireViteDev() {
 
 async function rewriteEdition(context, replacements, servedBy) {
   // A stack run of the matching edition is already that build; any other stack cannot fake it.
-  if (MODE === servedBy) return;
+  if (MODE === servedBy || BUNDLE_MODES[BUNDLE_EDITION] === servedBy) return;
   await mockOnly("the edition rewrite");
   await requireViteDev();
   await context.route(/\/web\/src\/aws-exports\.ts/, async (route) => {
@@ -683,6 +683,30 @@ export async function login(page, as = { user: ENV.user, pass: ENV.pass }) {
   await page.locator('[data-test="login-sign-in"]').click();
   await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 30000 });
   await page.waitForLoadState("networkidle").catch(() => {});
+  await failOnOssBundle(page);
+}
+
+/** Fails at once when the bundle locks the assistant as an Enterprise feature but the flow is not declared for OSS. */
+async function failOnOssBundle(page) {
+  // The dev server's edition is rewritten after login, so its login-time edition says nothing.
+  if (ENV.viteDev) return;
+  const { test } = await import("@playwright/test");
+  let tags;
+  try {
+    tags = test.info().tags;
+  } catch {
+    return;
+  }
+  if (tags.includes(TAGS.O)) return;
+  const door = await page.evaluate(() => {
+    const el = document.querySelector('[data-test="menu-link-ai-item"]');
+    return el ? { state: el.getAttribute("data-state"), label: el.getAttribute("aria-label") || "" } : null;
+  });
+  if (door?.state !== "locked" || !/Enterprise/.test(door.label)) return;
+  throw new Error(
+    `The served bundle is the OSS edition (header door "${door.label}"), but this flow needs the enterprise assistant. ` +
+      "Run it against an enterprise build, or set O2_BUNDLE_EDITION=oss to run only the flows tagged @stack-oss.",
+  );
 }
 
 /** A real (unmocked) API call as the root user, for fixtures the mocks do not cover. */
