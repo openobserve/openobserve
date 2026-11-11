@@ -160,6 +160,7 @@ pub async fn extend(
 pub async fn unmute(
     target: &AckTarget,
     downtime_id: &str,
+    version: Option<i64>,
     actor: &str,
 ) -> Result<Downtime, MuteError> {
     downtimes::ensure_enabled()?;
@@ -167,6 +168,8 @@ pub async fn unmute(
         .await
         .map_err(MuteError::from)?;
     let row = quick_mute_of(target, downtime_id).await?;
+    // The shape check ignores the groups, so a mute widened since the list loaded needs this.
+    check_seen_version(version, &row)?;
     let after = downtimes::cancel_quick_mute(&target.org_id, actor, row).await?;
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&after)).await;
     Ok(after)
@@ -414,6 +417,14 @@ fn version_changed(row: &Downtime) -> MuteError {
     })
 }
 
+/// No `seen` version keeps the old route behaviour; another one is a 409 with the current row.
+fn check_seen_version(seen: Option<i64>, row: &Downtime) -> Result<(), MuteError> {
+    match seen {
+        Some(version) if version != row.version => Err(version_changed(row)),
+        _ => Ok(()),
+    }
+}
+
 async fn quick_mute_of(target: &AckTarget, downtime_id: &str) -> Result<Downtime, MuteError> {
     let row = downtimes::get_row(&target.org_id, downtime_id).await?;
     if !is_quick_mute(&row, &target.alert_id) {
@@ -606,6 +617,29 @@ mod tests {
         assert!(requested_end(true, Some(30), None, NOW).is_err());
         assert!(requested_end(false, None, Some(NOW), NOW).is_err());
         assert!(requested_end(false, None, None, NOW).is_err());
+    }
+
+    #[test]
+    fn an_unmute_at_a_stale_version_is_a_409_before_anything_is_cancelled() {
+        let mut r = row(Some(vec![group("k1")]), None);
+        r.version = 3;
+        assert!(check_seen_version(None, &r).is_ok());
+        assert!(check_seen_version(Some(3), &r).is_ok());
+        assert!(matches!(
+            check_seen_version(Some(2), &r),
+            Err(MuteError::Conflict(AlertMuteConflict::VersionChanged {
+                version: 3,
+                ..
+            }))
+        ));
+        let src = include_str!("mute.rs");
+        let body = &src[src.find("pub async fn unmute(").unwrap()..];
+        let body = &body[..body.find("\n}\n").unwrap()];
+        let check = body
+            .find("check_seen_version(version, &row)?")
+            .expect("checked");
+        let cancel = body.find("cancel_quick_mute(").expect("cancelled");
+        assert!(check < cancel, "the check uses the row the cancel writes");
     }
 
     #[test]

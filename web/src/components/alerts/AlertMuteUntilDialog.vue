@@ -84,6 +84,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   "update:open": [value: boolean];
   done: [];
+  /** A refused or unanswered extend: the dialog stays open and its screen refreshes. */
+  settled: [];
 }>();
 
 const { t } = useI18nTyped();
@@ -101,7 +103,10 @@ const form = useOForm<ExtendForm>({
     const until = extendUntil(values, timezone);
     const target = props.target;
     if (!target || !props.downtime || until === null) return;
-    if (!(await actions.extend(target, props.downtime, { endsAt: until }))) return;
+    if ((await actions.extend(target, props.downtime, { endsAt: until })) !== "ok") {
+      emit("settled");
+      return;
+    }
     emit("done");
     emit("update:open", false);
   },

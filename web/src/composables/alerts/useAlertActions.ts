@@ -15,6 +15,7 @@
 
 import { computed } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
@@ -38,6 +39,8 @@ import type {
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { refusalToast, teamsOf, unchangedAckToast, type AckVerb } from "@/utils/alerts/ackState";
 import { buildAlertMuteRequest, endTimeText, type AlertMuteEnd } from "@/utils/downtimes/quickMute";
+import { downtimeLink } from "@/utils/downtimes/link";
+import { failureResult, failureStatus, type MuteActionResult } from "@/utils/downtimes/muteResult";
 
 /** The alert an action is for; `folderId` is the alert's own folder, which the route check reads. */
 export interface AlertActionTarget {
@@ -51,6 +54,8 @@ export interface AlertMuteRef {
   id: string;
   ends_at: number;
   version?: number;
+  /** The downtime's own folder, for the link a refused End offers. */
+  folder_id?: string;
 }
 
 export interface AlertMuteScope {
@@ -76,6 +81,8 @@ export function useAlertActions() {
   const orgId = useOrgId();
   const queryClient = useQueryClient();
   const zone = useViewerTimezone();
+  // Undefined in a leaf mount without a router, where the refused-End toast carries no link.
+  const router = useRouter();
 
   const ackWrite = useMutation(() => ackAlertMutation(orgId.value));
   const unackWrite = useMutation(() => unackAlertMutation(orgId.value));
@@ -319,11 +326,11 @@ export function useAlertActions() {
     target: AlertActionTarget,
     downtime: AlertMuteRef,
     end: AlertMuteEnd,
-  ): Promise<boolean> => {
+  ): Promise<MuteActionResult> => {
     const version = await versionOf(downtime);
     if (version === null) {
       toast({ variant: "error", message: t("toastMessages.downtimes.extendFailed") });
-      return false;
+      return "failed";
     }
     try {
       const result = await extendWrite.mutateAsync({
@@ -336,32 +343,63 @@ export function useAlertActions() {
         variant: "success",
         message: t("toastMessages.downtimes.extended", { time: timeOf(result.ends_at) }),
       });
-      return true;
+      return "ok";
     } catch (err: unknown) {
       const error = alertActionErrorOf(err);
-      if (sharedErrorToast(error, "mute")) return false;
-      const message =
-        error?.code === "version_changed"
-          ? t("toastMessages.downtimes.muteChanged", { time: timeOf(error.ends_at) })
-          : t("toastMessages.downtimes.extendFailed");
-      toast({ variant: "error", message });
-      return false;
+      if (!sharedErrorToast(error, "mute")) {
+        const message =
+          error?.code === "version_changed"
+            ? t("toastMessages.downtimes.muteChanged", { time: timeOf(error.ends_at) })
+            : t("toastMessages.downtimes.extendFailed");
+        toast({ variant: "error", message });
+      }
+      return failureResult(err);
     }
   };
 
-  const endMute = async (target: AlertActionTarget, downtimeId: string): Promise<boolean> => {
+  const openDowntime = (downtime: AlertMuteRef) =>
+    router
+      ? {
+          action: {
+            label: t("toastMessages.downtimes.viewDowntime"),
+            handler: () => void router.push(downtimeLink(downtime, orgId.value)),
+          },
+        }
+      : {};
+
+  const endFailureToast = (err: unknown, downtime: AlertMuteRef) => {
+    if (alertActionErrorOf(err)?.code === "version_changed") {
+      toast({
+        variant: "error",
+        message: t("toastMessages.downtimes.muteChangedOpen"),
+        ...openDowntime(downtime),
+      });
+      return;
+    }
+    const message =
+      failureStatus(err) === 403
+        ? t("toastMessages.downtimes.noPermissionToEnd")
+        : t("toastMessages.downtimes.cancelFailed");
+    toast({ variant: "error", message });
+  };
+
+  /** Ends the mute at the version the screen showed, so a mute widened since is refused. */
+  const endMute = async (
+    target: AlertActionTarget,
+    downtime: AlertMuteRef,
+  ): Promise<MuteActionResult> => {
     try {
       await cancelWrite.mutateAsync({
         alertId: target.alertId,
-        downtimeId,
+        downtimeId: downtime.id,
         folderId: target.folderId,
+        version: downtime.version,
       });
       toast({ variant: "success", message: t("toastMessages.downtimes.muteEnded") });
-      return true;
+      return "ok";
     } catch (err: unknown) {
-      if (sharedErrorToast(alertActionErrorOf(err), "mute")) return false;
-      toast({ variant: "error", message: t("toastMessages.downtimes.cancelFailed") });
-      return false;
+      if (!sharedErrorToast(alertActionErrorOf(err), "mute")) endFailureToast(err, downtime);
+      return failureResult(err);
     }
   };
 

@@ -15,12 +15,17 @@
 
 //! The alert-scoped mute routes (§6, Q1): enterprise only, 403 "Not Supported" in the OSS build.
 
-use axum::{Extension, Json, extract::Path, http::HeaderMap, response::Response};
+use axum::{
+    Extension, Json,
+    extract::{Path, Query},
+    http::HeaderMap,
+    response::Response,
+};
 use config::meta::{
     alerts::ack::ActRefusal,
     downtimes::{
         AlertMuteConflict, AlertMuteExtendRequest, AlertMuteExtendResponse, AlertMuteRequest,
-        AlertMuteResponse, Downtime,
+        AlertMuteResponse, CancelDowntimeQuery, Downtime,
     },
 };
 use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
@@ -153,7 +158,7 @@ pub async fn extend_alert_mute(
     tag = "Alerts",
     operation_id = "CancelAlertMute",
     summary = "End an alert's quick mute now",
-    description = "Cancels a quick mute of this alert; the row stays for history. Same rule as mute.",
+    description = "Cancels a quick mute of this alert; the row stays for history. A `version` other than the stored one cancels nothing and answers 409 `version_changed`. Same rule as mute.",
     security(
         ("Authorization"= [])
     ),
@@ -162,12 +167,13 @@ pub async fn extend_alert_mute(
         ("alert_id" = String, Path, description = "Alert ID"),
         ("downtime_id" = String, Path, description = "Downtime ID of the quick mute"),
         ("folder" = Option<String>, Query, description = "Folder ID of the alert, for the permission check"),
+        CancelDowntimeQuery,
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Downtime),
         (status = 403, description = "Refused, with who is on call and who can act; or not supported", content_type = "application/json", body = ActRefusal),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
-        (status = 409, description = "Not a quick mute of this alert", content_type = "application/json", body = AlertMuteConflict),
+        (status = 409, description = "Not a quick mute of this alert, or the version changed", content_type = "application/json", body = AlertMuteConflict),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -176,6 +182,7 @@ pub async fn extend_alert_mute(
 )]
 pub async fn cancel_alert_mute(
     Path((org_id, alert_id, downtime_id)): Path<(String, String, String)>,
+    Query(query): Query<CancelDowntimeQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -184,8 +191,13 @@ pub async fn cancel_alert_mute(
             Ok(t) => t,
             Err(resp) => return resp,
         };
-        match openobserve_core::alerts::mute::unmute(&target, &downtime_id, &user_email.user_id)
-            .await
+        match openobserve_core::alerts::mute::unmute(
+            &target,
+            &downtime_id,
+            query.version,
+            &user_email.user_id,
+        )
+        .await
         {
             Ok(body) => crate::common::meta::http::HttpResponse::json(body),
             Err(e) => error_response(e),
@@ -193,7 +205,7 @@ pub async fn cancel_alert_mute(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, alert_id, downtime_id, user_email);
+        let _ = (org_id, alert_id, downtime_id, query, user_email);
         crate::request::downtimes::not_supported()
     }
 }
@@ -252,7 +264,7 @@ mod tests {
             )
             .await,
             extend_alert_mute(two(), user(), Json(AlertMuteExtendRequest::default())).await,
-            cancel_alert_mute(two(), user()).await,
+            cancel_alert_mute(two(), Query(CancelDowntimeQuery::default()), user()).await,
         ];
         for response in responses {
             assert_eq!(response.status(), StatusCode::FORBIDDEN);

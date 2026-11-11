@@ -281,10 +281,17 @@ pub async fn update(
 }
 
 /// Ends an active window now or calls off a scheduled one; the row stays for history.
-pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, DowntimeError> {
+pub async fn cancel(
+    org: &str,
+    user_id: &str,
+    id: &str,
+    version: Option<i64>,
+) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
+    // The same row goes to the guarded write, so an edit after this check also fails.
+    check_version(version, &before)?;
     cancel_row(org, user_id, before).await
 }
 
@@ -3228,6 +3235,74 @@ mod tests {
             .unwrap();
         assert_eq!(stored.schedule.ends_at, Some(window.end + HOUR));
         assert!(body_of("pub async fn extend(").contains("extend_follow_up(org, user_id, &before"));
+    }
+
+    #[tokio::test]
+    async fn a_cancel_at_a_stale_version_or_after_a_later_edit_leaves_the_downtime_live() {
+        use infra::table::{
+            downtimes::{self as table, Guard},
+            entity::{downtimes as entity, folders},
+        };
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(entity::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        let default = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create_with(&db, "acme", default, FolderType::Downtimes)
+            .await
+            .unwrap();
+        let mut mute = row(vec![TargetModule::AnomalyDetections], 0, 10 * HOUR);
+        mute.version = 1;
+        mute.updated_at = 1;
+        table::put_with(&db, &mute).await.unwrap();
+
+        let read = table::get_with(&db, "acme", "d1").await.unwrap().unwrap();
+        assert!(matches!(
+            check_version(Some(0), &read),
+            Err(DowntimeError::Conflict(_))
+        ));
+        check_version(Some(1), &read).unwrap();
+        // A teammate widens the mute after the check: the cancel's guarded write must lose.
+        let widened = Downtime {
+            version: 2,
+            updated_at: 2,
+            ..read.clone()
+        };
+        assert!(
+            table::write_with(&db, &widened, Guard::Unchanged(1), &[], 2)
+                .await
+                .unwrap()
+        );
+        let after = cancelled(&read, "ops", 3);
+        assert!(
+            !table::write_with(&db, &after, Guard::Unchanged(read.updated_at), &[], 3)
+                .await
+                .unwrap()
+        );
+        let stored = table::get_with(&db, "acme", "d1").await.unwrap().unwrap();
+        assert_eq!(stored.version, 2);
+        assert!(stored.cancelled_at.is_none(), "the downtime stays live");
+
+        let cancel = body_of("pub async fn cancel(");
+        let check = cancel
+            .find("check_version(version, &before)?")
+            .expect("checked");
+        assert!(check < cancel.find("cancel_row(org, user_id, before)").unwrap());
+        assert!(
+            body_of("async fn cancel_row(").contains("set_if_unchanged(&after, before.updated_at")
+        );
     }
 
     fn body_of(head: &str) -> &'static str {

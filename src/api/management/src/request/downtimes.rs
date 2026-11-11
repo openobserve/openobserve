@@ -21,10 +21,10 @@ use axum::{
     response::Response,
 };
 use config::meta::downtimes::{
-    CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest, DowntimeTestRequest,
-    DowntimeTestResult, ExtendDowntimeRequest, ExtendDowntimeResponse, ListDowntimesQuery,
-    ListDowntimesResponse, MoveDowntimesRequest, PreviewRequest, PreviewResponse, ResourcesRequest,
-    ResourcesResponse, ValuesRequest, ValuesResponse,
+    CancelDowntimeQuery, CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest,
+    DowntimeTestRequest, DowntimeTestResult, ExtendDowntimeRequest, ExtendDowntimeResponse,
+    ListDowntimesQuery, ListDowntimesResponse, MoveDowntimesRequest, PreviewRequest,
+    PreviewResponse, ResourcesRequest, ResourcesResponse, ValuesRequest, ValuesResponse,
 };
 use openobserve_api_common::extractors::Headers;
 use serde::Deserialize;
@@ -338,16 +338,18 @@ pub async fn update_downtime(
     tag = "Downtimes",
     operation_id = "CancelDowntime",
     summary = "End or cancel a downtime",
-    description = "Ends an active window now, or calls off a scheduled one. The row stays for history.",
+    description = "Ends an active window now, or calls off a scheduled one. The row stays for history. A `version` other than the stored one cancels nothing and answers 409.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("downtime_id" = String, Path, description = "Downtime id"),
+        CancelDowntimeQuery,
     ),
     responses(
         (status = 200, description = "Cancelled", content_type = "application/json", body = Downtime),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 409, description = "The downtime changed since the given version", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": true})),
@@ -356,17 +358,24 @@ pub async fn update_downtime(
 )]
 pub async fn cancel_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
+    Query(query): Query<CancelDowntimeQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         respond(
-            openobserve_core::downtimes::cancel(&org_id, &user_email.user_id, &downtime_id).await,
+            openobserve_core::downtimes::cancel(
+                &org_id,
+                &user_email.user_id,
+                &downtime_id,
+                query.version,
+            )
+            .await,
         )
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, downtime_id, user_email);
+        let _ = (org_id, downtime_id, query, user_email);
         not_supported()
     }
 }
@@ -642,7 +651,7 @@ mod tests {
             .await,
             get_downtime(one(), user()).await,
             update_downtime(one(), user(), Json(body)).await,
-            cancel_downtime(one(), user()).await,
+            cancel_downtime(one(), Query(CancelDowntimeQuery::default()), user()).await,
             extend_downtime(one(), user(), Json(ExtendDowntimeRequest::default())).await,
             delete_downtime(one(), user()).await,
         ];

@@ -1,0 +1,137 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mount } from "@vue/test-utils";
+import { defineComponent } from "vue";
+import { createStore } from "vuex";
+import i18n from "@/locales";
+import downtimes from "@/services/downtimes";
+import { queryClient } from "@/composables/query/queryClient";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useDowntimeRowActions } from "./useDowntimeRowActions";
+
+vi.mock("@/services/downtimes", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+const push = vi.fn();
+vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+
+const store = createStore({
+  state: { selectedOrganization: { identifier: "acme" }, timezone: "UTC" },
+});
+
+const mountActions = () => {
+  let api: ReturnType<typeof useDowntimeRowActions> | undefined;
+  mount(
+    defineComponent({
+      setup() {
+        api = useDowntimeRowActions();
+        return {};
+      },
+      template: "<div />",
+    }),
+    { global: { plugins: [store, i18n] } },
+  );
+  return api!;
+};
+
+const mute = {
+  id: "d1",
+  name: "Quick mute · ut-demo-anomaly",
+  ends_at: 4_102_444_800_000_000,
+  version: 3,
+  folder_id: "ops",
+  end_here: true,
+};
+const httpError = (status: number, data: unknown = {}) => ({ response: { status, data } });
+const lastToast = () => vi.mocked(toast).mock.calls.at(-1)?.[0];
+
+describe("useDowntimeRowActions", () => {
+  beforeEach(() => {
+    queryClient.clear();
+    vi.mocked(toast).mockReset();
+    push.mockReset();
+    for (const fn of Object.values(downtimes)) if (vi.isMockFunction(fn)) fn.mockReset();
+  });
+
+  it("ends a mute at the version and in the folder the row showed", async () => {
+    vi.mocked(downtimes.cancel).mockResolvedValue({ data: {} } as any);
+    expect(await mountActions().end(mute)).toBe("ok");
+    expect(downtimes.cancel).toHaveBeenCalledWith("acme", "d1", "ops", 3);
+    expect(lastToast()?.message).toBe("Mute ended. Notifications resume.");
+  });
+
+  it("says the mute changed on a 409, refetches, and links to the downtime", async () => {
+    const refetch = vi.spyOn(queryClient, "invalidateQueries");
+    vi.mocked(downtimes.cancel).mockRejectedValue(httpError(409));
+    expect(await mountActions().end(mute)).toBe("conflict");
+    expect(lastToast()?.message).toBe("This mute changed. Open the downtime.");
+    expect(refetch).toHaveBeenCalled();
+    lastToast()?.action?.handler();
+    expect(push).toHaveBeenCalledWith({
+      name: "downtimeDetail",
+      params: { id: "d1" },
+      query: { org_identifier: "acme", folder: "ops" },
+    });
+    refetch.mockRestore();
+  });
+
+  it("says a 403 is a missing permission, and still refetches", async () => {
+    const refetch = vi.spyOn(queryClient, "invalidateQueries");
+    vi.mocked(downtimes.cancel).mockRejectedValue(httpError(403));
+    expect(await mountActions().end(mute)).toBe("conflict");
+    expect(lastToast()?.message).toBe("You do not have permission to end this mute.");
+    expect(refetch).toHaveBeenCalled();
+    refetch.mockRestore();
+  });
+
+  it("refetches nothing when no answer came", async () => {
+    const refetch = vi.spyOn(queryClient, "invalidateQueries");
+    vi.mocked(downtimes.cancel).mockRejectedValue(new Error("Network Error"));
+    expect(await mountActions().end(mute)).toBe("failed");
+    expect(refetch).not.toHaveBeenCalled();
+    refetch.mockRestore();
+  });
+
+  it("extends by a preset at the version the row showed", async () => {
+    vi.mocked(downtimes.extend).mockResolvedValue({
+      data: { id: "d1", schedule: { ends_at: 4_102_448_400_000_000 } },
+    } as any);
+    expect(await mountActions().extendBy(mute, 3600)).toBe("ok");
+    expect(downtimes.extend).toHaveBeenCalledWith(
+      "acme",
+      "d1",
+      { by_secs: 3600, version: 3 },
+      "ops",
+    );
+    vi.mocked(downtimes.extend).mockRejectedValue(httpError(409));
+    expect(await mountActions().extendBy(mute, 3600)).toBe("conflict");
+    expect(lastToast()?.message).toBe("This mute changed. Open the downtime.");
+  });
+
+  it("opens Extend until on the stored row, kept at the version the row showed", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: { id: "d1", folder_id: "ops", version: 5, current_window: { start: 1, end: 2 } },
+    } as any);
+    const api = mountActions();
+    await api.openExtendUntil(mute);
+    expect(downtimes.get).toHaveBeenCalledWith("acme", "d1", "ops");
+    expect(api.extendUntilOpen.value).toBe(true);
+    expect(api.extendUntilRow.value).toMatchObject({ id: "d1", version: 3 });
+  });
+});
