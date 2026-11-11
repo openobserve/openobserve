@@ -32,6 +32,7 @@ use config::{
 };
 use db::org_ingestion_tokens::SPLUNK_HEC_TOKENS_LOADED;
 use ingestion_common::IngestUser;
+use openobserve_api_common::RequestOrg;
 use serde::{Deserialize, Serialize};
 
 use crate::service::{
@@ -316,6 +317,7 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
         org_id: org_id.clone(),
         token_id,
     });
+    req.extensions_mut().insert(RequestOrg(org_id.clone()));
     let mut response = next.run(req).await;
     response.extensions_mut().insert(RejectionOrg(org_id));
     response
@@ -872,6 +874,47 @@ mod tests {
             O2oiCheck::Valid
         ));
         ORG_INGESTION_TOKENS.remove(&format!("orgstep2/{O2OI}"));
+    }
+
+    #[tokio::test]
+    async fn splunk_auth_names_the_token_org_for_the_feature_gate() {
+        use tower::ServiceExt;
+
+        const GATE_GUID: &str = "22222222-2222-4222-8222-222222222222";
+        const O2OI: &str = "o2oi_gatetoken";
+        SPLUNK_HEC_TOKENS.insert(
+            GATE_GUID.to_string(),
+            infra::table::org_ingestion_tokens::SplunkHecTokenEntry {
+                org_id: "orggate".to_string(),
+                token_id: "tok-gate".to_string(),
+                o2oi_token: O2OI.to_string(),
+                enabled: true,
+            },
+        );
+        ORG_INGESTION_TOKENS.insert(format!("orggate/{O2OI}"), "gate".to_string());
+        let app = axum::Router::new().route(
+            "/services/collector",
+            axum::routing::post(|Extension(org): Extension<RequestOrg>| async move { org.0 })
+                .route_layer(axum::middleware::from_fn(splunk_auth_middleware)),
+        );
+
+        let response = app
+            .oneshot(
+                Request::post("/services/collector")
+                    .header(header::AUTHORIZATION, format!("Splunk {GATE_GUID}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&body[..], b"orggate");
+        SPLUNK_HEC_TOKENS.remove(GATE_GUID);
+        ORG_INGESTION_TOKENS.remove(&format!("orggate/{O2OI}"));
     }
 
     #[test]
