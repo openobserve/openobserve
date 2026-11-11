@@ -862,6 +862,15 @@ mod tests {
         job.filter_condition = future_operator(end_signal());
         assert!(job.validate().is_err());
         assert_eq!(job.unreadable_condition(), Some("filter condition"));
+
+        job.filter_condition = serde_json::json!({"filterType": "group", "logicalOperator": "AND",
+            "conditions": [{"filterType": "condition", "column": "span_id",
+                            "operator": "is_not_null", "value": "", "logicalOperator": "AND"}]});
+        assert!(job.validate().is_ok());
+        // The scheduler cannot parse this field/operator shape, so it would match every span.
+        job.filter_condition =
+            serde_json::json!({"type": "condition", "field": "span_id", "operator": "exists"});
+        assert!(job.validate().is_err());
     }
 
     #[test]
