@@ -479,6 +479,21 @@ describe("SecurityEvents severity, SQL results and default stream", () => {
     expect(w.findComponent({ name: "SecurityEventsTimeline" }).props("severity")).toEqual([5, 6]);
   });
 
+  it("ORs two picked severity tiles into one IN list", async () => {
+    serverSeverity.sql = "SEV_EXPR";
+    const w = await mountView("?stream=okta_auth&period=1h&severity=5,6");
+    await w.get(sel("security-events-severity-high")).trigger("click");
+    await settle();
+    await settle();
+    const timeline = w.findComponent({ name: "SecurityEventsTimeline" });
+    expect(timeline.props("severity")).toEqual([5, 6, 4]);
+    const rowSql = search.mock.calls
+      .map(sqlOf)
+      .filter((q) => q.includes("zo_severity_id"))
+      .at(-1);
+    expect(rowSql).toContain("IN (5, 6, 4)");
+  });
+
   it("shows GROUP BY results as returned, with no drawer and pivots only on stored columns", async () => {
     const sql = `SELECT actor_alternateid, COUNT(*) AS n FROM "okta_auth" GROUP BY actor_alternateid`;
     search.mockImplementation((req: { query: { query: { sql: string } } }) =>

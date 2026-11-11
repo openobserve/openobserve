@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import type { Router } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import securityInvestigate, {
@@ -212,9 +212,32 @@ describe("SecurityEntities", () => {
 
   it("shows the server's signals and counts them in the strip", async () => {
     const w = await mountView();
-    expect(w.find('[data-test="security-entities-stat-spread"]').text()).toMatch(/^0/);
-    expect(w.find('[data-test="security-entities-stat-failures"]').text()).toMatch(/^1/);
+    const spread = w.find(
+      '[data-test="security-entities-stat-spread"] [data-test="o-stat-card-value"]',
+    );
+    expect(spread.text()).toBe("0");
+    const failures = w.find(
+      '[data-test="security-entities-stat-failures"] [data-test="o-stat-card-value"]',
+    );
+    expect(failures.text()).toBe("1");
     expect(w.find('[data-test="security-entities-table"]').text()).toContain("High failure rate");
+  });
+
+  it("ORs two picked signal chips", async () => {
+    const w = await mountView();
+    const vm = w.vm as any;
+    const all = vm.filteredRows.length;
+    vm.signalFilters = ["failures"];
+    await flushPromises();
+    const failing = vm.filteredRows.length;
+    expect(failing).toBeGreaterThan(0);
+    expect(failing).toBeLessThan(all);
+    vm.signalFilters = ["failures", "spread"];
+    await flushPromises();
+    const either = vm.allRows.filter((r: any) =>
+      r.signals.some((sig: string) => sig === "failures" || sig === "spread"),
+    );
+    expect(vm.filteredRows.length).toBe(either.length);
   });
 
   it("hunts across every source with all of the user's spellings", async () => {

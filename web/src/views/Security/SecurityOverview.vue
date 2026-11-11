@@ -627,6 +627,7 @@ function nav(path: string, query: Record<string, string> = {}) {
         :items="stats"
         :loading="!summaryLanded"
         selectable
+        :row="false"
         :selected-key="null"
         data-test="security-overview-stats"
         @select="onStat"

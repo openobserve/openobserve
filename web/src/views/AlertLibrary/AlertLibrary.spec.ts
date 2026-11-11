@@ -162,6 +162,9 @@ const pressedTiles = (wrapper: ReturnType<typeof mount>) =>
       wrapper.find(`[data-test="alert-library-stat-${key}"]`).attributes("aria-pressed") === "true",
   );
 
+const stat = (wrapper: ReturnType<typeof mount>, key: "ready" | "missing" | "all") =>
+  wrapper.find(`[data-test="alert-library-stat-${key}"]`);
+
 /** Rail rows are checkboxes; the click target is the box, not the label. */
 const tickRail = async (wrapper: ReturnType<typeof mount>, test: string) => {
   await wrapper.find(`[data-test="${test}"]`).find('[role="checkbox"]').trigger("click");
@@ -316,18 +319,18 @@ describe("AlertLibrary", () => {
     ).not.toContain("Not ingested");
   });
 
-  it("counts ready, needs-data and total over what is in view, with All last", async () => {
+  it("counts ready, needs-data and total over what is in view, with All first", async () => {
     const wrapper = await mountView();
     const tiles = wrapper.findAll('[data-test^="alert-library-stat-"]');
     expect(tiles.map((tile) => tile.attributes("data-test"))).toEqual([
+      "alert-library-stat-all",
       "alert-library-stat-ready",
       "alert-library-stat-missing",
-      "alert-library-stat-all",
     ]);
     // All four alerts are in view; only cert-expiring's stream is missing.
-    expect(tiles[0].text()).toContain("3");
-    expect(tiles[1].text()).toContain("1");
-    expect(tiles[2].text()).toContain("4");
+    expect(stat(wrapper, "ready").text()).toContain("3");
+    expect(stat(wrapper, "missing").text()).toContain("1");
+    expect(stat(wrapper, "all").text()).toContain("4");
   });
 
   it("recounts the strip when the rail narrows", async () => {
@@ -335,8 +338,7 @@ describe("AlertLibrary", () => {
     // they would contradict the grid under them.
     const wrapper = await mountView();
     await tickRail(wrapper, "alert-library-rail-category-self-monitoring");
-    const tiles = wrapper.findAll('[data-test^="alert-library-stat-"]');
-    expect(tiles[2].text()).toContain("1");
+    expect(stat(wrapper, "all").text()).toContain("1");
   });
 
   it("recounts the strip when the search narrows, since search is not a facet", async () => {
@@ -345,8 +347,7 @@ describe("AlertLibrary", () => {
     const wrapper = await mountView();
     wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", "disk pressure");
     await flushPromises();
-    const tiles = wrapper.findAll('[data-test^="alert-library-stat-"]');
-    expect(tiles[2].text()).toContain("1");
+    expect(stat(wrapper, "all").text()).toContain("1");
   });
 
   it("counts each severity before its own filter, so the others do not read as empty", async () => {
@@ -518,16 +519,15 @@ describe("AlertLibrary", () => {
       // nothing about.
       getStreams.mockRejectedValue(new Error("boom"));
       const wrapper = await mountView();
-      const tiles = wrapper.findAll('[data-test^="alert-library-stat-"]');
-      expect(tiles[0].text()).toContain("—");
-      expect(tiles[1].text()).toContain("—");
+      expect(stat(wrapper, "ready").text()).toContain("—");
+      expect(stat(wrapper, "missing").text()).toContain("—");
       // The total is a fact about the catalog, not about the org.
-      expect(tiles[2].text()).toContain("4");
+      expect(stat(wrapper, "all").text()).toContain("4");
     });
 
     it("keeps a known verdict when a REFRESH fails, instead of discarding it", async () => {
       const wrapper = await mountView();
-      expect(wrapper.findAll('[data-test^="alert-library-stat-"]')[1].text()).toContain("1");
+      expect(stat(wrapper, "missing").text()).toContain("1");
 
       getStreams.mockRejectedValueOnce(new Error("timeout"));
       const callsBefore = getStreams.mock.calls.length;
@@ -537,7 +537,7 @@ describe("AlertLibrary", () => {
       expect(getStreams.mock.calls.length).toBe(callsBefore + 1);
 
       // Still 1 missing: a transient failure must not rewrite what we knew.
-      expect(wrapper.findAll('[data-test^="alert-library-stat-"]')[1].text()).toContain("1");
+      expect(stat(wrapper, "missing").text()).toContain("1");
       expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').text()).toContain(
         "Not ingested",
       );

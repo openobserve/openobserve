@@ -106,6 +106,19 @@ describe("SecurityContent", () => {
     expect(row?.text()).toContain("1 stream");
   });
 
+  it("ORs two picked rule chips", async () => {
+    const w = await mountView();
+    const count = (key: string) =>
+      Number(w.find(`[data-test="security-content-stat-${key}"]`).text().match(/\d+/)?.[0]);
+    await w.get('[data-test="security-content-stat-installed"]').trigger("click");
+    await w.get('[data-test="security-content-stat-ready"]').trigger("click");
+    await flushPromises();
+    const rules = (w.vm as any).filteredRules;
+    expect(rules.length).toBe(count("installed") + count("ready"));
+    expect(rules.some((r: any) => r.installed)).toBe(true);
+    expect(rules.some((r: any) => !r.installed)).toBe(true);
+  });
+
   it("offers a not-yet-installed CloudTrail rule as ready to install", async () => {
     const w = await mountView();
     await search(w, "Root Account");

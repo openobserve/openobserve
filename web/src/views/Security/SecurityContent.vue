@@ -79,6 +79,7 @@ import {
   toneOfSigmaLevel,
   type SeverityTone,
 } from "@/utils/security/severity";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
 const { t, te } = useI18nTyped();
 const translatedOr = (key: string, fallback: string) => (te(key) ? t(key) : raw(fallback));
@@ -359,7 +360,9 @@ const ruleRows = computed<RuleRow[]>(() =>
 const isReady = (r: RuleRow) => r.runnable.length > 0 && !r.installed && !installPending.value;
 
 type RuleFacet = "ready" | "installed" | "applies";
-const ruleFacet = ref<RuleFacet | null>(null);
+const ruleFacets = ref<RuleFacet[]>([]);
+const matchesRuleFacet = (r: RuleRow, key: RuleFacet) =>
+  key === "ready" ? isReady(r) : key === "installed" ? r.installed : r.streams.length > 0;
 const ruleSearch = ref("");
 const ruleLevel = ref<string | null>(null);
 const logsourceFilter = ref<string | null>(null);
@@ -375,9 +378,7 @@ const filteredRules = computed(() => {
   const reviewKeys = reviewing.value ? new Set(reviewing.value.keys) : null;
   return ruleRows.value.filter((r) => {
     if (reviewKeys && !reviewKeys.has(r.id)) return false;
-    if (ruleFacet.value === "ready" && !isReady(r)) return false;
-    if (ruleFacet.value === "installed" && !r.installed) return false;
-    if (ruleFacet.value === "applies" && !r.streams.length) return false;
+    if (!matchesAnyKey(ruleFacets.value, r, matchesRuleFacet)) return false;
     if (ruleLevel.value && r.tone !== ruleLevel.value) return false;
     if (logsourceFilter.value && r.logsource !== logsourceFilter.value) return false;
     if (!needle) return true;
@@ -393,7 +394,7 @@ const ruleFiltersActive = computed(
   () =>
     !!ruleSearch.value ||
     !!ruleLevel.value ||
-    !!ruleFacet.value ||
+    ruleFacets.value.length > 0 ||
     !!logsourceFilter.value ||
     !!reviewing.value,
 );
@@ -401,7 +402,7 @@ function clearRuleFilters() {
   reviewing.value = null;
   ruleSearch.value = "";
   ruleLevel.value = null;
-  ruleFacet.value = null;
+  ruleFacets.value = [];
   logsourceFilter.value = null;
 }
 
@@ -473,10 +474,6 @@ function onBulkDone(n: number) {
   selectedRuleIds.value = [];
   if (n) toast({ variant: "success", message: t("siem.content.bulk.done", { n }, n) });
   void loadDetections(orgId.value);
-}
-
-function onRuleStat(key: string) {
-  ruleFacet.value = key === "all" || ruleFacet.value === key ? null : (key as RuleFacet);
 }
 
 const logsourceGroups = computed(() => groupByLogsource(catalog.value));
@@ -1017,20 +1014,8 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         @sort-change="() => nextTick(syncIndexes)"
         @row-click="(row: RuleRow) => showRule(row.id)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
-            <OStatStrip
-              compact-values
-              :items="ruleStats"
-              selectable
-              :selected-key="ruleFacet"
-              data-test="security-content-rule-stats"
-              @select="onRuleStat"
-            />
-          </div>
-        </template>
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="contents">
             <div class="w-40 shrink-0">
               <OSelect
                 :aria-label="t('siem.aria.severityFilter')"
@@ -1044,9 +1029,21 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             </div>
             <OSearchInput
               v-model="ruleSearch"
-              class="flex-1"
+              class="min-w-0 flex-1 md:min-w-48"
               :placeholder="t('siem.content.searchRules')"
               data-test="security-content-search-rules"
+            />
+            <OStatStrip
+              compact-values
+              :items="ruleStats"
+              selectable
+              :row="false"
+              class="max-md:order-last"
+              multiple
+              :selected-keys="ruleFacets"
+              default-key="all"
+              data-test="security-content-rule-stats"
+              @update:selected-keys="ruleFacets = $event as RuleFacet[]"
             />
             <OButton
               v-if="canAuthor"
@@ -1170,27 +1167,25 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         @sort-change="() => nextTick(syncIndexes)"
         @row-click="(row: SourceRow) => showSource(row.id)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
-            <OStatStrip
-              compact-values
-              :items="sourceStats"
-              selectable
-              :selected-key="sourceFacet"
-              data-test="security-content-source-stats"
-              @select="
-                (key: string) =>
-                  (sourceFacet = key === 'all' || sourceFacet === key ? null : 'detected')
-              "
-            />
-          </div>
-        </template>
         <template #toolbar>
           <OSearchInput
             v-model="sourceSearch"
-            class="w-full"
+            class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('siem.content.searchSources')"
             data-test="security-content-search-sources"
+          />
+          <OStatStrip
+            compact-values
+            :items="sourceStats"
+            selectable
+            :row="false"
+            class="max-md:order-last"
+            :selected-key="sourceFacet"
+            data-test="security-content-source-stats"
+            @select="
+              (key: string) =>
+                (sourceFacet = key === 'all' || sourceFacet === key ? null : 'detected')
+            "
           />
         </template>
         <template #cell-label="{ row }">

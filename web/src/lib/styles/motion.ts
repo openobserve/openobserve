@@ -36,3 +36,11 @@ export const STILL_LOADING_REPEAT_MS = 30_000;
 export const STALE_DIM_DELAY_MS = 150;
 
 export const STALE_DIM = "opacity-60";
+
+// A CSS wait, not a timer, so every re-display restarts it; o2-motion-keep stops reduced motion zeroing the wait.
+export const LOADER_REVEAL =
+  "o2-motion-keep animate-in fade-in-0 fill-mode-backwards delay-300 duration-(--duration-overlay-in)";
+
+// The first tooltip waits; a neighbour opened inside the skip window opens at once.
+export const TOOLTIP_DELAY_MS = 300;
+export const TOOLTIP_SKIP_DELAY_MS = 300;

@@ -337,11 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
                   >
                     {{ t("alerts.groupBy") }}
-                    <OTooltip
-                      :content="t('alerts.queryConfig.groupByTooltip')"
-                      :delay="300"
-                      side="top"
-                    />
+                    <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" side="top" />
                   </span>
                   <div class="flex flex-wrap items-center gap-2">
                     <template v-for="(group, index) in logGroupByRows" :key="index">
@@ -398,11 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                   >
                     {{ t("alerts.queryConfig.havingGroups") }}
-                    <OTooltip
-                      :content="t('alerts.queryConfig.havingGroupsTooltip')"
-                      :delay="300"
-                      side="top"
-                    />
+                    <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" side="top" />
                   </span>
                   <div class="flex flex-nowrap items-start gap-2">
                     <OFormSelect
@@ -507,7 +499,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                             :content="t('alerts.metricsValueFieldTooltip')"
-                            :delay="300"
                             side="bottom"
                           />
                         </div>
@@ -713,11 +704,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
                   >
                     {{ t("alerts.groupBy") }}
-                    <OTooltip
-                      :content="t('alerts.queryConfig.groupByTooltip')"
-                      :delay="300"
-                      side="top"
-                    />
+                    <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" side="top" />
                   </span>
                   <div class="flex flex-wrap items-center gap-2">
                     <template v-for="(group, index) in metricGroupByRows" :key="index">
@@ -772,11 +759,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                   >
                     {{ t("alerts.queryConfig.havingGroups") }}
-                    <OTooltip
-                      :content="t('alerts.queryConfig.havingGroupsTooltip')"
-                      :delay="300"
-                      side="top"
-                    />
+                    <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" side="top" />
                   </span>
                   <div class="flex flex-nowrap items-start gap-2">
                     <OFormSelect
@@ -821,7 +804,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
                 >
                   {{ t("alerts.queryConfig.checkEvery") }} *
-                  <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
+                  <OTooltip :content="t('alerts.howOftenCheckTooltip')" side="top" />
                 </span>
                 <div class="flex flex-col gap-1">
                   <div class="flex items-center gap-2 max-md:flex-wrap">
@@ -878,12 +861,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="max-w-37.5 min-w-37.5"
                           @update:model-value="onCronTimezoneChange"
                         />
-                        <OTooltip
-                          v-if="cronTimezone"
-                          :content="raw(cronTimezone)"
-                          :delay="300"
-                          side="bottom"
-                        />
+                        <OTooltip v-if="cronTimezone" :content="raw(cronTimezone)" side="bottom" />
                       </span>
                     </template>
 
@@ -1084,7 +1062,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="showVrl"
                       :aria-label="t('alerts.queryConfig.showVrlEditor')"
                     >
-                      <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" :delay="300" />
+                      <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" />
                     </OSwitch>
                     <OToggleGroup
                       v-if="localTab === 'promql'"
@@ -1167,7 +1145,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? raw(sample.query)
                             : t('alerts.promqlSampleDisabled')
                         "
-                        :delay="300"
                       />
                     </button>
                   </div>
@@ -1215,7 +1192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="showVrl"
                         :aria-label="t('alerts.queryConfig.hideVrlEditor')"
                       >
-                        <OTooltip :content="t('alerts.queryConfig.hideVrlEditor')" :delay="300" />
+                        <OTooltip :content="t('alerts.queryConfig.hideVrlEditor')" />
                       </OSwitch>
                     </div>
                   </div>
@@ -1293,7 +1270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-7 font-bold whitespace-nowrap"
                 >
                   {{ t("alerts.queryConfig.checkEvery") }} *
-                  <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
+                  <OTooltip :content="t('alerts.howOftenCheckTooltip')" side="top" />
                 </span>
                 <div class="flex flex-col gap-1">
                   <div class="flex items-center gap-2">
@@ -1343,12 +1320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="max-w-37.5 min-w-37.5"
                           @update:model-value="onCronTimezoneChange"
                         />
-                        <OTooltip
-                          v-if="cronTimezone"
-                          :content="raw(cronTimezone)"
-                          :delay="300"
-                          side="bottom"
-                        />
+                        <OTooltip v-if="cronTimezone" :content="raw(cronTimezone)" side="bottom" />
                       </span>
                     </template>
                   </div>
@@ -1647,11 +1619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                     >{{ t("alerts.alertIfValueIs") }} *
-                    <OTooltip
-                      :content="t('alerts.queryConfig.alertIfValueIsTooltip')"
-                      :delay="300"
-                      side="top"
-                    />
+                    <OTooltip :content="t('alerts.queryConfig.alertIfValueIsTooltip')" side="top" />
                   </span>
                   <div class="flex flex-col gap-1.5">
                     <div class="flex items-start gap-2">
@@ -1769,11 +1737,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                     >{{ t("alerts.havingSeries") }} *
-                    <OTooltip
-                      :content="t('alerts.queryConfig.havingSeriesTooltip')"
-                      :delay="300"
-                      side="top"
-                    />
+                    <OTooltip :content="t('alerts.queryConfig.havingSeriesTooltip')" side="top" />
                   </span>
                   <div class="flex items-start gap-2">
                     <OFormSelect

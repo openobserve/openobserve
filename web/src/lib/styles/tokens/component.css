@@ -52,6 +52,7 @@
 
   /* Button — ghost-primary (flat + primary color text) */
   --color-button-ghost-primary-text: var(--color-primary-600);
+  --color-button-ghost-primary-hover-text: var(--color-accent-on-tint);
   --color-button-ghost-primary-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-primary-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-primary-focus-ring: var(--color-focus-ring-accent);
@@ -75,7 +76,7 @@
 
   /* Button — ghost-muted (secondary text at rest → primary text + bg on hover) */
   --color-button-ghost-muted-text: var(--color-text-secondary);
-  --color-button-ghost-muted-hover-text: var(--color-primary-600);
+  --color-button-ghost-muted-hover-text: var(--color-accent-on-tint);
   --color-button-ghost-muted-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-muted-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-muted-focus-ring: var(--color-focus-ring-accent);
@@ -197,7 +198,8 @@
   /* Tabs */
   --color-tabs-indicator: var(--color-primary-600);
   --color-tabs-active-text: var(--color-primary-700);
-  --color-tabs-active-bg: var(--color-surface-accent-active);
+  /* Not surface-accent-active: that tint is darkened for buttons, and tabs keep main's fill. */
+  --color-tabs-active-bg: var(--color-primary-100);
   --color-tabs-inactive-text: var(--color-text-heading);
   --color-tabs-hover-text: var(--color-text-heading);
   --color-tabs-hover-bg: color-mix(in srgb, var(--color-primary-100) 50%, var(--color-primary-50));
@@ -623,8 +625,13 @@
   --color-select-content-border: var(--color-border-default);
   --color-select-item-text: var(--color-text-heading);
   --color-select-item-hover-bg: var(--color-surface-accent-hover);
-  --color-select-item-selected-bg: var(--color-surface-accent-active);
-  --color-select-item-selected-text: var(--color-primary-700);
+  /* Darker than surface-accent-active so a selected option stays 1.13:1 apart from a hovered one under every preset. */
+  --color-select-item-selected-bg: color-mix(
+    in srgb,
+    var(--color-primary-200) 65%,
+    var(--color-primary-100)
+  );
+  --color-select-item-selected-text: var(--color-accent-on-tint);
   --color-select-item-disabled: var(--color-text-disabled);
   --color-select-header-bg: color-mix(
     in srgb,
@@ -645,11 +652,7 @@
   /* Switch (OSwitch) */
   --color-switch-label: var(--color-text-heading);
   --color-switch-label-disabled: var(--color-text-secondary);
-  /* Switch palette — single solid color (primary-500) for both border AND
-     fill on ON state so the track reads as one color, not two-tone.
-       ON       → primary-500 fill + primary-500 border + white thumb
-       OFF      → primary-500 outline + primary-500 thumb on left
-       DISABLED → grey-300 dashed outline */
+  /* Off keeps the brand outline and thumb; a grey off state reads as disabled. */
   --color-switch-border: var(--color-primary-500);
   --color-switch-border-off: var(--color-primary-500);
   --color-switch-thumb-off: var(--color-primary-500);
@@ -673,10 +676,9 @@
   --color-checkbox-label: var(--color-text-heading);
   --color-checkbox-label-disabled: var(--color-text-disabled);
 
-  /* Radio (ORadio) — primary outline by default (interactive signal),
-     grey only when disabled. */
+  /* Radio (ORadio) */
   --color-radio-bg: var(--color-surface-base);
-  --color-radio-border: var(--color-primary-600);
+  --color-radio-border: var(--color-border-control);
   --color-radio-hover-border: var(--color-primary-700);
   --color-radio-checked-border: var(--color-primary-600);
   --color-radio-checked-dot: var(--color-primary-600);
@@ -742,6 +744,8 @@
   --color-datepicker-day-hover-bg: var(--color-surface-accent-hover);
   --color-datepicker-day-selected-bg: var(--color-primary-600);
   --color-datepicker-day-selected-text: var(--color-white);
+  /* Picker labels on the popup itself; primary-600 falls to 3.6:1 there under the lighter presets. */
+  --color-datepicker-accent-text: var(--color-primary-700);
   --color-datepicker-day-today-border: var(--color-primary-400);
   --color-datepicker-day-outside-text: var(--color-text-disabled);
   --color-datepicker-day-disabled-text: var(--color-text-disabled);
@@ -782,16 +786,14 @@
   --color-table-header-text: var(--color-text-secondary);
   --color-table-header-border: var(--color-border-default);
   /* Hover clears ~1.19:1 on white and selected sits ~1.08:1 above it, so both read without sinking secondary text. */
-  --color-table-row-hover-bg: color-mix(
-    in srgb,
-    var(--color-primary-100) 85%,
-    var(--color-primary-50)
-  );
+  --color-table-row-hover-bg: var(--color-surface-accent-hover);
   --color-table-row-selected-bg: color-mix(
     in srgb,
     var(--color-primary-200) 30%,
     var(--color-primary-100)
   );
+  /* A ghost hover on a hovered row would match the row fill, so it steps up to the active tier. */
+  --color-table-row-action-hover-bg: var(--color-surface-accent-active);
   /* Rows re-point text-secondary to this on the hover/selected fills, where plain grey-500 falls below 4.5:1. */
   --color-table-row-text-secondary-tinted: var(--color-grey-600);
   --color-table-row-striped-bg: var(--color-surface-subtle);
@@ -1012,6 +1014,9 @@
   --color-menu-badge-ring: var(--color-grey-900);
   /* Active and hover rail labels need a darker step than --color-accent to clear 4.5:1 on the light tile. */
   --color-nav-label-accent: var(--color-primary-700);
+  /* Nav flyout rows keep their own fills so the item-1 menu hover does not reach the nav. */
+  --color-nav-flyout-item-hover-bg: var(--color-primary-50);
+  --color-nav-flyout-item-selected-bg: var(--color-primary-100);
 
   /* Inline progress/duration bar fill (synthetics run timings). */
   --color-progress-track-fill: var(--color-primary-400);
@@ -1356,6 +1361,8 @@
   --color-thread-accent-strong: var(--color-thread-accent-strong);
   --color-menu-badge-ring: var(--color-menu-badge-ring);
   --color-nav-label-accent: var(--color-nav-label-accent);
+  --color-nav-flyout-item-hover-bg: var(--color-nav-flyout-item-hover-bg);
+  --color-nav-flyout-item-selected-bg: var(--color-nav-flyout-item-selected-bg);
   --color-progress-track-fill: var(--color-progress-track-fill);
 
   /* Ingestion empty-state card icon accents */
@@ -1409,6 +1416,7 @@
 
   /* Button — ghost-primary */
   --color-button-ghost-primary-text: var(--color-button-ghost-primary-text);
+  --color-button-ghost-primary-hover-text: var(--color-button-ghost-primary-hover-text);
   --color-button-ghost-primary-hover-bg: var(--color-button-ghost-primary-hover-bg);
   --color-button-ghost-primary-active-bg: var(--color-button-ghost-primary-active-bg);
   --color-button-ghost-primary-focus-ring: var(--color-button-ghost-primary-focus-ring);
@@ -1689,6 +1697,7 @@
   --color-datepicker-day-hover-bg: var(--color-datepicker-day-hover-bg);
   --color-datepicker-day-selected-bg: var(--color-datepicker-day-selected-bg);
   --color-datepicker-day-selected-text: var(--color-datepicker-day-selected-text);
+  --color-datepicker-accent-text: var(--color-datepicker-accent-text);
   --color-datepicker-day-today-border: var(--color-datepicker-day-today-border);
   --color-datepicker-day-outside-text: var(--color-datepicker-day-outside-text);
   --color-datepicker-day-disabled-text: var(--color-datepicker-day-disabled-text);
@@ -2034,6 +2043,7 @@
   --color-table-header-text: var(--color-table-header-text);
   --color-table-header-border: var(--color-table-header-border);
   --color-table-row-hover-bg: var(--color-table-row-hover-bg);
+  --color-table-row-action-hover-bg: var(--color-table-row-action-hover-bg);
   --color-table-row-selected-bg: var(--color-table-row-selected-bg);
   --color-table-row-text-secondary-tinted: var(--color-table-row-text-secondary-tinted);
   --color-table-row-striped-bg: var(--color-table-row-striped-bg);

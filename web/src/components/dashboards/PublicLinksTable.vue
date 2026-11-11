@@ -41,23 +41,9 @@
       table-id="public-links"
       data-test="dashboards-public-links-table"
     >
-      <template #subheader>
-        <div data-test="dashboards-public-links-summary">
-          <OStatStrip
-            :items="summaryStats"
-            :loading="loading"
-            selectable
-            compact
-            :selected-key="statusFilter"
-            default-key="all"
-            @select="onStatSelect"
-          />
-        </div>
-      </template>
-
       <template #toolbar>
-        <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
-          <div class="min-w-0 flex-1 max-md:min-w-40">
+        <div class="contents">
+          <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
             <OInput
               v-model="searchQuery"
               :placeholder="t('dashboard.publicLinks.search')"
@@ -70,6 +56,19 @@
               </template>
             </OInput>
           </div>
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            compact
+            :row="false"
+            multiple
+            :selected-keys="statusFilters"
+            default-key="all"
+            class="max-md:order-last"
+            data-test="dashboards-public-links-summary"
+            @update:selected-keys="statusFilters = $event as StatusFilter[]"
+          />
         </div>
       </template>
       <template #toolbar-trailing>
@@ -457,12 +456,13 @@ import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { foldersQuery } from "@/services/common.queries";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
-type StatusFilter = "live" | "notViewed" | "paused" | "attention" | "expired" | "all";
+type StatusFilter = "live" | "notViewed" | "paused" | "attention" | "expired";
 /** Where a row action was clicked, so the spinner shows on that control. */
 type RowActionSource = "inline" | "menu";
 
-const FILTER_STATUSES: Record<Exclude<StatusFilter, "all">, PublicLinkStatus[]> = {
+const FILTER_STATUSES: Record<StatusFilter, PublicLinkStatus[]> = {
   live: ["live"],
   notViewed: ["not_viewed"],
   paused: ["paused"],
@@ -540,19 +540,19 @@ const revokeMutation = useMutation(() => revokePublicLinkMutation(orgId.value));
 const refreshMutation = useMutation(() => refreshPublicLinkMutation(orgId.value));
 const takeOverMutation = useMutation(() => takeOverPublicLinkMutation(orgId.value));
 
-const statusFilter = ref<StatusFilter>("all");
+const statusFilters = ref<StatusFilter[]>([]);
 const searchQuery = ref("");
 const editing = ref<PublicLink | null>(null);
 const panelOpen = ref(false);
 // Rows with a pause, resume, refresh or revoke in flight, so a second click can't send it again.
 const busyRows = reactive(new Map<string, RowActionSource>());
 
-const countOf = (filter: Exclude<StatusFilter, "all">) =>
+const countOf = (filter: StatusFilter) =>
   links.value.filter((l) => FILTER_STATUSES[filter].includes(statusOf(l))).length;
 
 // The tile goes with the batch call, so a filter on it can't outlive a failed call.
 watch(attentionKnown, (known) => {
-  if (!known && statusFilter.value === "attention") statusFilter.value = "all";
+  if (!known) statusFilters.value = statusFilters.value.filter((key) => key !== "attention");
 });
 
 const summaryStats = computed<StatItem[]>(() => {
@@ -615,9 +615,10 @@ const summaryStats = computed<StatItem[]>(() => {
 
 const visibleLinks = computed(() => {
   const q = publicLinkSearchTerm(searchQuery.value);
-  const filter = statusFilter.value;
   return links.value.filter((link) => {
-    if (filter !== "all" && !FILTER_STATUSES[filter].includes(statusOf(link))) return false;
+    const matches = (row: PublicLink, key: StatusFilter) =>
+      FILTER_STATUSES[key].includes(statusOf(row));
+    if (!matchesAnyKey(statusFilters.value, link, matches)) return false;
     if (!q) return true;
     return [link.name, link.slug, link.dashboard_title, link.folder_name, link.published_by].some(
       (v) => (v ?? "").toLowerCase().includes(q),
@@ -626,7 +627,7 @@ const visibleLinks = computed(() => {
 });
 
 const filtered = computed(
-  () => links.value.length > 0 && (!!searchQuery.value.trim() || statusFilter.value !== "all"),
+  () => links.value.length > 0 && (!!searchQuery.value.trim() || statusFilters.value.length > 0),
 );
 
 const columns = publicLinkColumns(t, { withDashboard: true });
@@ -672,14 +673,10 @@ async function runRowAction(
   }
 }
 
-function onStatSelect(key: string) {
-  statusFilter.value = key === "all" || key === statusFilter.value ? "all" : (key as StatusFilter);
-}
-
 function onEmptyAction(id?: string) {
   if (id !== "clear-filters") return;
   searchQuery.value = "";
-  statusFilter.value = "all";
+  statusFilters.value = [];
 }
 
 function copyLink(link: PublicLink) {

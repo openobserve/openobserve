@@ -846,6 +846,21 @@ describe("PipelinesList", () => {
     });
   });
 
+  it("ORs two picked state chips", async () => {
+    await flushPromises();
+    const state = (p: any) => (!p.enabled ? "paused" : p.last_error ? "errored" : "active");
+    const expected = (keys: string[]) =>
+      wrapper.vm.filteredPipelines
+        .filter((p: any) => keys.includes(state(p)))
+        .map((p: any) => p.name);
+    for (const keys of [["active"], ["paused"], ["active", "paused"]]) {
+      wrapper.vm.stateFilters = keys;
+      await nextTick();
+      expect(wrapper.vm.displayedPipelines.map((p: any) => p.name)).toEqual(expected(keys));
+    }
+    expect(expected(["active", "paused"])).toHaveLength(2);
+  });
+
   describe("state link from the Overview", () => {
     const mountWithQuery = (query: Record<string, string>) => {
       mockRouter.currentRoute.value.query = query as any;
@@ -859,11 +874,11 @@ describe("PipelinesList", () => {
       useListViewState("pipelines", {
         filterQuery: "etl",
         tab: "scheduled",
-        stateFilter: "paused",
+        stateFilter: ["paused"],
       });
       const linked = mountWithQuery({ state: "errored" });
       const vm = linked.vm as any;
-      expect(vm.stateFilter).toBe("errored");
+      expect(vm.stateFilters).toEqual(["errored"]);
       expect(vm.activeTab).toBe("all");
       expect(vm.filterQuery).toBe("");
       linked.unmount();
@@ -883,13 +898,13 @@ describe("PipelinesList", () => {
       useListViewState("pipelines", {
         filterQuery: "etl",
         tab: "scheduled",
-        stateFilter: "paused",
+        stateFilter: ["paused"],
       });
       mountWithQuery({ state: "errored" }).unmount();
       const again = createWrapper();
       const vm = again.vm as any;
       expect(vm.filterQuery).toBe("etl");
-      expect(vm.stateFilter).toBe("paused");
+      expect(vm.stateFilters).toEqual(["paused"]);
       again.unmount();
     });
 
@@ -905,10 +920,10 @@ describe("PipelinesList", () => {
 
     it("ignores an unknown state and keeps the saved view", () => {
       resetListViewState();
-      useListViewState("pipelines", { tab: "scheduled", stateFilter: "paused" });
+      useListViewState("pipelines", { tab: "scheduled", stateFilter: ["paused"] });
       const linked = mountWithQuery({ state: "bogus" });
       const vm = linked.vm as any;
-      expect(vm.stateFilter).toBe("paused");
+      expect(vm.stateFilters).toEqual(["paused"]);
       expect(vm.activeTab).toBe("scheduled");
       linked.unmount();
     });
@@ -929,7 +944,7 @@ describe("PipelinesList", () => {
       const vm = restored.vm as any;
       expect(vm.filterQuery).toBe("etl");
       expect(vm.activeTab).toBe("scheduled");
-      expect(vm.stateFilter).toBe("paused");
+      expect(vm.stateFilters).toEqual(["paused"]);
       expect(vm.pageSize).toBe(50);
       expect(vm.sortBy).toBe("name");
       expect(vm.sortOrder).toBe("desc");

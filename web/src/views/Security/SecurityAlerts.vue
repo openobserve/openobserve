@@ -79,6 +79,7 @@ import type { EvidenceGroup } from "@/services/securitySigma";
 import { useQueryClient } from "@tanstack/vue-query";
 import { normalizeEvents } from "@/utils/security/normalize";
 import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
+import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -118,7 +119,8 @@ const customWindow = ref<{ startMs: number; endMs: number } | null>(
     : null,
 );
 const showEvaluations = ref(q.evals === "1");
-const facet = ref<Facet | null>(FACETS.includes(q.facet as Facet) ? (q.facet as Facet) : null);
+const isFacet = (key: string): key is Facet => FACETS.includes(key as Facet);
+const facets = ref<Facet[]>(readFilterKeys(q.facet, isFacet));
 const search = ref(q.q ?? "");
 const selectedKey = ref<string | null>(q.firing ?? null);
 
@@ -131,12 +133,12 @@ function syncUrl() {
     query.period = range.value;
   }
   if (showEvaluations.value) query.evals = "1";
-  if (facet.value) query.facet = facet.value;
+  if (facets.value.length) query.facet = facets.value.join(",");
   if (search.value.trim()) query.q = search.value.trim();
   if (selectedKey.value) query.firing = selectedKey.value;
   router.replace({ query });
 }
-watch([showEvaluations, facet, search, selectedKey], syncUrl);
+watch([showEvaluations, facets, search, selectedKey], syncUrl);
 
 const windowEndMs = ref(customWindow.value?.endMs ?? Date.now());
 const windowMs = computed(() =>
@@ -191,7 +193,7 @@ const summaryAt = ref<number | null>(null);
 // Silenced runs are mostly "normal", so the Silenced facet needs every outcome.
 const SIGNAL_OUTCOMES = ["firing", "notify_failed", "error"];
 const outcomeFilter = computed(() =>
-  showEvaluations.value || facet.value === "silenced" ? undefined : SIGNAL_OUTCOMES,
+  showEvaluations.value || facets.value.includes("silenced") ? undefined : SIGNAL_OUTCOMES,
 );
 const siemIds = computed(() => siemRows.value.map((d) => String(d.alert.id ?? "")).filter(Boolean));
 
@@ -275,7 +277,9 @@ const siemScoped = computed(() => joined.value.filter((f) => f.detection));
 const base = computed(() =>
   siemScoped.value.filter(
     (f) =>
-      showEvaluations.value || isSignal(f) || (facet.value === "silenced" && f.row.is_silenced),
+      showEvaluations.value ||
+      isSignal(f) ||
+      (facets.value.includes("silenced") && f.row.is_silenced),
   ),
 );
 const emptyCounts = (): Record<Facet, number> => ({
@@ -313,18 +317,17 @@ const counts = computed(() => ({
 }));
 const statsLoading = computed(() => summaryAt.value === null);
 
+function matchesFacet(f: Firing, key: Facet): boolean {
+  if (key === "error") return f.status === "error";
+  if (key === "silenced") return !!f.row.is_silenced;
+  const tones = FACET_TONES[key] ?? [];
+  return tones.includes(f.tone) && (f.status === "firing" || f.status === "notify_failed");
+}
+
 const filtered = computed(() => {
   const needle = search.value.trim().toLowerCase();
   return base.value.filter((f) => {
-    if (facet.value === "error" && f.status !== "error") return false;
-    if (facet.value === "silenced" && !f.row.is_silenced) return false;
-    const tones = facet.value ? FACET_TONES[facet.value] : undefined;
-    if (
-      tones &&
-      !(tones.includes(f.tone) && (f.status === "firing" || f.status === "notify_failed"))
-    ) {
-      return false;
-    }
+    if (!matchesAnyKey(facets.value, f, matchesFacet)) return false;
     if (!needle) return true;
     return (
       f.name.toLowerCase().includes(needle) ||
@@ -355,9 +358,11 @@ const stats = computed<StatItem[]>(() =>
     dataTest: `security-alerts-stat-${tile.key}`,
   })),
 );
-function onFacet(key: string) {
-  facet.value = facet.value === key ? null : (key as Facet);
-}
+// The chart can point at one severity band only.
+const chartHighlight = computed(() => {
+  const tones = facets.value.filter((key) => key !== "error" && key !== "silenced");
+  return facets.value.length === 1 && tones.length === 1 ? tones[0] : null;
+});
 
 const chartSeries = computed(() =>
   [...SEVERITY_TONES].reverse().map((tone) => ({
@@ -457,10 +462,10 @@ const columns = computed<OTableColumnDef<Firing>[]>(() => [
 const rowRail = (f: Firing) => severityRailColor(f.tone);
 const rowClass = (f: Firing) => (f.id === selectedKey.value ? "!bg-table-row-selected-bg" : "");
 
-const filtersActive = computed(() => !!facet.value || !!search.value.trim());
+const filtersActive = computed(() => facets.value.length > 0 || !!search.value.trim());
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
-    facet.value = null;
+    facets.value = [];
     search.value = "";
   }
 }
@@ -1030,16 +1035,7 @@ onUnmounted(() => {
         data-test="security-alerts-notices"
       />
 
-      <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
-        <OStatStrip
-          compact-values
-          :items="stats"
-          :loading="statsLoading"
-          selectable
-          :selected-key="facet"
-          data-test="security-alerts-stats"
-          @select="onFacet"
-        />
+      <div class="border-border-default px-page-edge shrink-0 border-b py-3">
         <div class="h-28">
           <SecuritySeverityChart
             :buckets="chartBuckets"
@@ -1047,7 +1043,7 @@ onUnmounted(() => {
             :loading="chartLoading"
             :min="windowStartMs"
             :max="windowEndMs"
-            :highlight="facet && facet !== 'error' && facet !== 'silenced' ? facet : null"
+            :highlight="chartHighlight"
             data-test="security-alerts-chart"
           />
         </div>
@@ -1088,8 +1084,8 @@ onUnmounted(() => {
           </OButton>
         </template>
         <template #toolbar>
-          <div class="flex w-full flex-wrap items-center gap-3">
-            <div class="w-72">
+          <div class="contents">
+            <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
               <OSearchInput
                 v-model="search"
                 :placeholder="t('siem.alerts.search')"
@@ -1103,7 +1099,18 @@ onUnmounted(() => {
               size="sm"
               data-test="security-alerts-evaluations"
             />
-            <div class="flex-1" />
+            <OStatStrip
+              compact-values
+              :items="stats"
+              :loading="statsLoading"
+              selectable
+              :row="false"
+              class="max-md:order-last"
+              multiple
+              :selected-keys="facets"
+              data-test="security-alerts-stats"
+              @update:selected-keys="facets = $event as Facet[]"
+            />
             <span class="text-text-secondary text-xs" data-test="security-alerts-count">
               {{
                 t("siem.alerts.count", { n: formatEventCount(filtered.length) }, filtered.length)

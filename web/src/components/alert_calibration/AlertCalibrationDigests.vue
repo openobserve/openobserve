@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
-      <div class="px-page-edge flex shrink-0 flex-col gap-3 py-3">
+      <!-- The failure banner renders nothing on success; `empty:hidden` drops its padding then. -->
+      <div class="px-page-edge flex shrink-0 flex-col py-3 empty:hidden">
         <AlertCalibrationLastRun v-if="config" only-failure />
-        <OStatStrip :items="stats" data-test="alert-calibration-digests-stats" />
       </div>
 
       <div class="min-h-0 flex-1 overflow-hidden">
@@ -83,6 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-calibration-digests-search"
               />
             </div>
+          </template>
+
+          <template #subheader>
+            <OStatStrip :items="stats" row data-test="alert-calibration-digests-stats" />
           </template>
 
           <template #toolbar-trailing>

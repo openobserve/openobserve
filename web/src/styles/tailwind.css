@@ -159,6 +159,18 @@ html.theme-switching *::after {
     transition-duration: 0.01ms !important;
     transition-delay: 0s !important;
   }
+
+  /* Loaders stay still (a static skeleton, still dots); the spinner keeps turning. */
+  .animate-pulse,
+  .animate-bounce,
+  [class*="o2-skel-shimmer"] {
+    animation: none !important;
+  }
+
+  .skeleton-wave::after {
+    animation: none !important;
+    content: none !important;
+  }
 }
 
 /*

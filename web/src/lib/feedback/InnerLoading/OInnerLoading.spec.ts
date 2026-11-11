@@ -1,6 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import OInnerLoading from "./OInnerLoading.vue";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
+
+// Hidden while any element from it up to the overlay root carries opacity-0.
+function isHidden(el: Element, root: Element): boolean {
+  for (let node: Element | null = el; node; node = node.parentElement) {
+    if (node.classList.contains("opacity-0")) return true;
+    if (node === root) return false;
+  }
+  return false;
+}
 
 describe("OInnerLoading", () => {
   it("does not render when showing=false", () => {
@@ -64,5 +75,37 @@ describe("OInnerLoading", () => {
     const overlay = wrapper.find("[role='status']");
     expect(overlay.classes()).toContain("absolute");
     expect(overlay.classes()).toContain("inset-0");
+  });
+
+  it("keeps the scrim and spinner invisible until the delay passes, with the real Transition", async () => {
+    vi.useFakeTimers();
+    const wrapper = mount(OInnerLoading, {
+      props: { showing: false },
+      global: { stubs: { transition: false } },
+    });
+    try {
+      await wrapper.setProps({ showing: true });
+      const root = wrapper.get("[role='status']").element;
+      const scrim = wrapper.get(".bg-inner-loading-overlay").element;
+      const spinner = wrapper.getComponent({ name: "OSpinner" }).element as Element;
+
+      await vi.advanceTimersByTimeAsync(100);
+      await nextTick();
+      expect(isHidden(scrim, root)).toBe(true);
+      expect(isHidden(spinner, root)).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(LOADER_DELAY_MS - 101);
+      await nextTick();
+      expect(isHidden(scrim, root)).toBe(true);
+      expect(isHidden(spinner, root)).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await nextTick();
+      expect(isHidden(scrim, root)).toBe(false);
+      expect(isHidden(spinner, root)).toBe(false);
+    } finally {
+      wrapper.unmount();
+      vi.useRealTimers();
+    }
   });
 });

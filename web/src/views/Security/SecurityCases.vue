@@ -743,18 +743,11 @@ onMounted(() => {
       </OButton>
     </template>
     <div class="flex min-h-0 flex-1 flex-col">
-      <div class="border-border-default px-page-edge flex shrink-0 flex-col gap-2 border-b py-3">
-        <SecurityNotices :notices="notices" data-test="security-cases-notices" />
-        <OStatStrip
-          compact-values
-          :items="stats"
-          :loading="totals.open === null && loading"
-          selectable
-          :selected-key="statusFilter"
-          data-test="security-cases-stats"
-          @select="onStatusTile"
-        />
-      </div>
+      <SecurityNotices
+        :notices="notices"
+        class="mx-page-edge my-3 shrink-0"
+        data-test="security-cases-notices"
+      />
 
       <OTable
         :data="shown"
@@ -778,8 +771,8 @@ onMounted(() => {
         @row-click="open"
       >
         <template #toolbar>
-          <div class="flex w-full items-center gap-3">
-            <div class="w-80">
+          <div class="contents">
+            <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
               <OSearchInput
                 v-model="search"
                 :placeholder="t('siem.cases.search')"
@@ -787,6 +780,17 @@ onMounted(() => {
                 data-test="security-cases-search"
               />
             </div>
+            <OStatStrip
+              compact-values
+              :items="stats"
+              :loading="totals.open === null && loading"
+              selectable
+              :row="false"
+              class="max-md:order-last"
+              :selected-key="statusFilter"
+              data-test="security-cases-stats"
+              @select="onStatusTile"
+            />
           </div>
         </template>
         <template #toolbar-trailing>

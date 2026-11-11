@@ -492,6 +492,7 @@ function openDetections() {
         :items="stats"
         :loading="(rulesLoading && !siemRows.length) || lastRunAt === null"
         selectable
+        :row="false"
         :selected-key="selectedStat"
         data-test="security-mitre-stats"
         @select="onStat"

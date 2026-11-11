@@ -16,11 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ConfigProvider :dir="layoutDirection">
-    <router-view></router-view>
-    <OToastProvider />
-    <ConfirmDialogProvider />
-    <CreateAlertDialogProvider />
-    <UpdatePasswordDialog />
+    <TooltipProvider
+      :delay-duration="TOOLTIP_DELAY_MS"
+      :skip-delay-duration="TOOLTIP_SKIP_DELAY_MS"
+    >
+      <router-view></router-view>
+      <OToastProvider />
+      <ConfirmDialogProvider />
+      <CreateAlertDialogProvider />
+      <UpdatePasswordDialog />
+    </TooltipProvider>
   </ConfigProvider>
 </template>
 
@@ -30,7 +35,8 @@ import { useRouter } from "vue-router";
 import { onMounted, watch } from "vue";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import { getLocale, isRtlLocale } from "@/locales";
-import { ConfigProvider } from "reka-ui";
+import { ConfigProvider, TooltipProvider } from "reka-ui";
+import { TOOLTIP_DELAY_MS, TOOLTIP_SKIP_DELAY_MS } from "@/lib/styles/motion";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
@@ -39,6 +45,7 @@ import UpdatePasswordDialog from "@/components/common/UpdatePasswordDialog.vue";
 export default {
   components: {
     ConfigProvider,
+    TooltipProvider,
     OToastProvider,
     ConfirmDialogProvider,
     CreateAlertDialogProvider,
@@ -88,6 +95,8 @@ export default {
     return {
       store,
       layoutDirection,
+      TOOLTIP_DELAY_MS,
+      TOOLTIP_SKIP_DELAY_MS,
     };
   },
 };

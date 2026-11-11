@@ -137,6 +137,18 @@ describe("SecurityDetections", () => {
     expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeUndefined();
   });
 
+  it("ORs two picked stat chips", async () => {
+    const w = await mountView();
+    await w.get('[data-test="security-detections-stat-fired"]').trigger("click");
+    await flushPromises();
+    expect(rowOf(w, RULE_STOP_LOGGING.title)).toBeDefined();
+    expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeUndefined();
+    await w.get('[data-test="security-detections-stat-enabled"]').trigger("click");
+    await flushPromises();
+    expect(rowOf(w, RULE_STOP_LOGGING.title)).toBeDefined();
+    expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeDefined();
+  });
+
   it("marks a detection whose notifications fail instead of showing it healthy", async () => {
     const listed = alertListResponse() as { data: { list: Record<string, unknown>[] } };
     listed.data.list[0].last_outcome = "notify_failed";
