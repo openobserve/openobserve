@@ -45,3 +45,9 @@ export const CUSTOM_SQL_PANEL_TYPES: readonly string[] = ["flame-graph", "logs"]
 
 export const isCustomSqlPanel = (type: unknown): boolean =>
   typeof type === "string" && CUSTOM_SQL_PANEL_TYPES.includes(type);
+
+/** Panel types with no stream or fields to pick, so the editor shows no Fields column for them. */
+export const FIELDLESS_PANEL_TYPES: readonly string[] = ["html", "markdown", "alert-list"];
+
+export const isFieldlessPanel = (type: unknown): boolean =>
+  typeof type === "string" && FIELDLESS_PANEL_TYPES.includes(type);
