@@ -252,8 +252,9 @@ test.describe("assistant doors", () => {
   });
 
   test("DOOR-05 the empty-state door names SQL mode and the absolute range", { tag: ["@mock"] }, async ({ page }) => {
+    // Logs opens the filter builder by default, which hides the SQL editor this door needs.
+    await page.addInitScript(() => localStorage.setItem("o2.logs.queryInput", "query"));
     await gotoLogs(page);
-    await page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]').click().catch(() => undefined);
     const editor = page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor').first();
     await editor.click();
     await page.keyboard.press("ControlOrMeta+a");
