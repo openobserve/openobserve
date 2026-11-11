@@ -91,11 +91,15 @@ pub fn generate_select_star_schema(
                             .fields()
                             .iter()
                             .filter(|field| {
-                                uds_present.contains(field.name())
-                                    || field.name() == TIMESTAMP_COL_NAME
-                                    || field.name() == ID_COL_NAME
-                                    || (need_all_column
-                                        && field.name() == cfg.common.column_all.as_str())
+                                let name = field.name();
+                                uds_present.contains(name)
+                                    || name == TIMESTAMP_COL_NAME
+                                    || name == ID_COL_NAME
+                                    || ((need_all_column
+                                        || !cfg.search.feature_query_exclude_all)
+                                        && name == cfg.common.column_all.as_str())
+                                    // post-truncation steps re-add FTS columns from this base
+                                    || (need_fst_fields && fts_fields.iter().any(|f| f == name))
                             })
                             .cloned()
                             .collect::<Vec<_>>(),
@@ -218,6 +222,14 @@ pub fn generate_quick_mode_fields(
     {
         fields.push(Arc::new(field.clone()));
         fields_name.insert(TIMESTAMP_COL_NAME.to_string());
+    }
+    // truncation must not drop _all when the query config keeps it, as in the UDS projection
+    if !cfg.search.feature_query_exclude_all
+        && !fields_name.contains(&cfg.common.column_all)
+        && let Ok(field) = schema.field_with_name(&cfg.common.column_all)
+    {
+        fields.push(Arc::new(field.clone()));
+        fields_name.insert(cfg.common.column_all.clone());
     }
     // add the selected columns
     if let Some(columns) = columns {
@@ -875,5 +887,119 @@ mod tests {
             .collect();
         assert!(names.contains("trace_id"));
         assert!(names.contains("service_name"));
+    }
+
+    #[test]
+    fn test_quick_mode_keeps_fts_columns_for_uds_streams() {
+        let cutoff = config::get_config().limit.quick_mode_num_fields;
+        let mut fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new("packed_col", DataType::Utf8, true)),
+        ];
+        let mut defined = Vec::new();
+        for i in 0..cutoff + 1 {
+            let name = format!("user_field_{i}");
+            fields.push(Arc::new(Field::new(&name, DataType::Utf8, true)));
+            defined.push(name);
+        }
+        fields.push(Arc::new(Field::new(
+            ORIGINAL_DATA_COL_NAME,
+            DataType::Utf8,
+            true,
+        )));
+        let settings = config::meta::stream::StreamSettings {
+            defined_schema_fields: defined,
+            index_original_data: true,
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            config::utils::json::to_string(&settings).unwrap(),
+        )]);
+        let name = TableReference::bare("logs_stream");
+        let mut schemas = HashMap::new();
+        schemas.insert(
+            name.clone(),
+            Arc::new(SchemaCache::new(Schema::new_with_metadata(
+                fields, metadata,
+            ))),
+        );
+
+        let result = generate_select_star_schema(
+            schemas,
+            &HashMap::new(),
+            HashMap::new(),
+            true,
+            StreamType::Logs,
+            &None,
+            true,
+        );
+
+        let names: HashSet<_> = result[&name]
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+        assert!(names.contains(ORIGINAL_DATA_COL_NAME));
+        assert!(!names.contains("packed_col"));
+    }
+
+    #[test]
+    fn test_quick_mode_keeps_all_when_query_exclude_all_disabled() {
+        let saved_cfg = config::CONFIG.load_full();
+        let mut cfg = config::Config::init().unwrap();
+        cfg.search.feature_query_exclude_all = false;
+        config::CONFIG.store(Arc::new(cfg));
+
+        let cutoff = config::get_config().limit.quick_mode_num_fields;
+        let column_all = config::get_config().common.column_all.clone();
+        let mut fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new("packed_col", DataType::Utf8, true)),
+        ];
+        let mut defined = Vec::new();
+        for i in 0..cutoff + 1 {
+            let name = format!("user_field_{i}");
+            fields.push(Arc::new(Field::new(&name, DataType::Utf8, true)));
+            defined.push(name);
+        }
+        fields.push(Arc::new(Field::new(&column_all, DataType::Utf8, true)));
+        let settings = config::meta::stream::StreamSettings {
+            defined_schema_fields: defined,
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            config::utils::json::to_string(&settings).unwrap(),
+        )]);
+        let name = TableReference::bare("logs_stream");
+        let mut schemas = HashMap::new();
+        schemas.insert(
+            name.clone(),
+            Arc::new(SchemaCache::new(Schema::new_with_metadata(
+                fields, metadata,
+            ))),
+        );
+
+        let result = generate_select_star_schema(
+            schemas,
+            &HashMap::new(),
+            HashMap::new(),
+            true,
+            StreamType::Logs,
+            &None,
+            false,
+        );
+
+        config::CONFIG.store(saved_cfg);
+        let names: HashSet<_> = result[&name]
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+        assert!(names.contains(&column_all));
+        assert!(!names.contains("packed_col"));
     }
 }
