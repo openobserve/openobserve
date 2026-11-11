@@ -215,6 +215,14 @@ describe("AddTemplate - rendering (create mode)", () => {
     expect(titleEl.text()).toContain("New template");
   });
 
+  it("limits the name input to the 256-character server limit", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    const field = w.find('[data-test="add-template-name-input"]');
+    const input = field.element.tagName === "INPUT" ? field : field.find("input");
+    expect(input.attributes("maxlength")).toBe("256");
+  });
+
   it("preserves the core data-tests", async () => {
     const w = await mountComp();
     await selectCustomMode(w);
