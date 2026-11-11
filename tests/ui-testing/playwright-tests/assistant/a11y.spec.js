@@ -581,7 +581,7 @@ test.describe("assistant accessibility", () => {
     expect([...found.nameless]).toEqual([]);
   });
 
-  test("A11Y-08 again in dark: a docked editor's approval keeps focus in the buffer, Ctrl+I reaches Deny and the dock is clean", { tag: ["@mock"] }, async ({
+  test("A11Y-08 again in dark: a docked editor's approval keeps focus in the buffer, Ctrl+I reaches the card and the dock is clean", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -611,7 +611,8 @@ test.describe("assistant accessibility", () => {
     expect.soft(blocking).toEqual([]);
     await buffer.click();
     await page.keyboard.press("ControlOrMeta+i");
-    await expect(pending.locator('[data-test="assistant-approval-deny"]')).toBeFocused();
+    // The chord lands on the card's heading, as APPR-01 asserts.
+    await expect(pending.locator('[data-test="assistant-approval-heading"]')).toBeFocused();
   });
 
   /** Tabs through the page and returns every focused page control whose rect meets `cover`'s rect. */

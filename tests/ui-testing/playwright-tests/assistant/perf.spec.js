@@ -185,7 +185,8 @@ test.describe("assistant transcript performance", () => {
       const setInterval = window.setInterval;
       const raf = window.requestAnimationFrame;
       window.setInterval = (...args) => {
-        counts.interval += 1;
+        // The active-chats read polls every 15 s by design, and the query library re-arms that interval on each fetch.
+        if (args[1] !== 15_000) counts.interval += 1;
         return setInterval(...args);
       };
       window.requestAnimationFrame = (cb) => {
