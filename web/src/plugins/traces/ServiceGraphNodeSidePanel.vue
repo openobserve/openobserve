@@ -31,6 +31,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }
     "
   >
+    <template v-if="versionsEnabled && headerIdentity" #header-left>
+      <div class="flex min-w-0 flex-wrap items-center gap-2" data-test="svcver-panel-identity">
+        <ServiceEnvChip
+          :identity="headerIdentity"
+          :service="headerIdentity.service_name"
+        /><ServiceScopeChip
+          facet="where"
+          :where-key="headerIdentity.where_key"
+          :place="headerIdentity.where"
+        /><ServiceScopeChip facet="version" :value="headerVersion" />
+      </div>
+    </template>
     <template #header-right>
       <div class="flex items-center gap-2">
         <!-- Agent nodes: show which env/version variant this node represents. -->
@@ -40,9 +52,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :version="agentEnvVersion.version"
           data-test="service-graph-node-agent-badges"
         />
-        <OTag type="serviceStatus" :value="serviceHealth.status" data-test="service-health-badge">{{
-          serviceHealth.text
-        }}</OTag>
+        <span class="text-text-secondary text-xs">{{ t("serviceVersions.panel.health") }}</span>
+        <span
+          v-if="selectedNode?.health_withheld"
+          class="text-text-muted"
+          data-test="service-health-none"
+          >{{ raw("—") }}<OTooltip :content="t('serviceVersions.catalog.healthNoTraffic')"
+        /></span>
+        <OTag
+          v-else
+          type="serviceStatus"
+          :value="serviceHealth.status"
+          data-test="service-health-badge"
+          >{{ serviceHealth.text }}</OTag
+        >
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -179,13 +202,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("traces.serviceGraphNodeSidePanel.viewTraces") }}
           </OButton>
         </div>
+        <OBanner
+          v-if="whereUnscopedNotice"
+          variant="warning"
+          dense
+          class="mx-page-edge"
+          data-test="svcver-panel-where-unscoped"
+          >{{ whereUnscopedNotice }}</OBanner
+        >
         <div class="charts-wrapper min-h-[10.875rem] w-full py-0!">
           <div class="charts-container w-full">
             <RenderDashboardCharts
               ref="dashboardChartsRef"
               :viewOnly="true"
               :frame="false"
-              :dashboardData="dashboardData || {}"
+              :dashboardData="markedDashboardData || {}"
               :currentTimeObj="currentTimeObj"
               :allowAlertCreation="false"
               searchType="dashboards"
@@ -195,6 +226,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <div
+        v-if="versionsEnabled && !markerQuery.isError.value"
+        class="px-page-edge flex flex-wrap gap-2"
+        data-test="svcver-marker-legend"
+      >
+        <OButton
+          v-for="marker in markerQuery.data.value?.deploys || []"
+          :key="marker.deploy_key"
+          variant="ghost"
+          size="chip"
+          :data-test="`svcver-marker-${marker.deploy_key}`"
+          @click="
+            compareDrawer.open({
+              service: selectedNode?.name || selectedNode?.label || selectedNode?.id,
+              where: marker.where_key,
+              a: marker.version,
+              deployKey: marker.deploy_key,
+              fromPanel: true,
+            })
+          "
+          >{{ marker.kind === "rollback" ? "↶ " : "" }}{{ deployBuildLabel(marker, t) }}</OButton
+        >
+      </div>
       <!-- Full-bleed divider: panel has no horizontal padding, so w-full reaches both edges -->
       <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="my-1.5!" />
       <!-- Tabs: Operations / Nodes / Pods -->
@@ -218,6 +272,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="capitalize"
               data-test="service-graph-node-panel-tab-operations"
             />
+            <OTab
+              v-if="!isInferred"
+              name="versions"
+              :suffix-icon="!versionsEnabled ? 'lock' : undefined"
+              data-test="svcver-versions-tab"
+              ><span>{{ t("serviceVersions.panel.versions") }}</span
+              ><OTag
+                v-if="versionsEnabled && versionCount"
+                type="countChip"
+                :value="activeTab === 'versions' ? 'primary' : 'neutral'"
+                data-test="svcver-versions-count"
+                >{{ versionCount }}</OTag
+              ></OTab
+            >
             <!-- Agent behavior (loops/failures) — only for agent nodes;
                    locked without an Enterprise/Cloud edition. See Agent
                    Signals design §4b. -->
@@ -302,6 +370,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdown>
         </div>
         <OTabPanels v-model="activeTab" animated>
+          <OTabPanel name="versions"
+            ><ServiceVersionsTab
+              :service="selectedNode?.name || selectedNode?.label || selectedNode?.id || ''"
+          /></OTabPanel>
           <!-- Operations Tab -->
           <OTabPanel
             name="operations"
@@ -672,11 +744,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { versionImageLabel, whereSentence } from "@/utils/serviceVersionsCopy";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -689,6 +763,18 @@ import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { defineComponent, computed, ref, watch, defineAsyncComponent, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import ServiceVersionsTab from "@/enterprise/components/ServiceVersions/ServiceVersionsTab.vue";
+import ServiceEnvChip from "@/components/shared/ServiceEnvChip.vue";
+import ServiceScopeChip from "@/components/shared/ServiceScopeChip.vue";
+import config from "@/aws-exports";
+import { useQuery } from "@tanstack/vue-query";
+import { deploysQuery, versionsQuery } from "@/services/service_versions.queries";
+import {
+  deployBuildLabel,
+  deployMarkers,
+} from "@/enterprise/components/ServiceVersions/deployMarkers";
+import { useVersionCompareDrawer } from "@/enterprise/composables/useVersionCompareDrawer";
+import { useServicePanelRoute } from "./composables/useServicePanelRoute";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import {
@@ -926,6 +1012,7 @@ export interface ResourceRow {
 // Keyed on the actual stream field, not on the internal group_id, so this stays
 // in sync with OTEL semantic conventions regardless of backend group_id naming.
 const DEFAULT_GROUP_FIELDS = new Set([
+  "o2_service_version",
   // Kubernetes
   "service_k8s_pod_name",
   "service_k8s_node_name",
@@ -944,11 +1031,15 @@ const DEFAULT_GROUP_FIELDS = new Set([
   "service_process_runtime_name",
   "service_process_runtime_version",
   // Service identity
-  "service_namespace",
-  "service_version",
+  "service_service_namespace",
+  "service_service_version",
 ]);
 
 // Generic environment display labels for non-primary-platform segments.
+const DURATION_P95_PANEL_ID = "Panel_ServiceDurationP95";
+// Dashboard grids are 192 columns wide, so three RED charts take a third each.
+const RED_CHART_WIDTH = 64;
+
 // Primary platform labels (k8s/aws/azure/gcp) come from the shared ENV_SEGMENTS.
 const GENERIC_ENV_LABELS: Record<string, string> = {
   get host() {
@@ -974,9 +1065,31 @@ const envLabel = (envKey: string): string =>
   GENERIC_ENV_LABELS[envKey] ??
   envKey;
 
+/** Builds the Duration p95 RED chart from the Rate panel, so it shares its style and trace search. */
+const durationP95Panel = (ratePanel: any, title: string) => {
+  const panel = deepCopy(ratePanel);
+  panel.id = DURATION_P95_PANEL_ID;
+  panel.title = title;
+  panel.config.unit = "milliseconds";
+  panel.config.unit_custom = "";
+  panel.config.decimals = 0;
+  // p95 comes from the same authorized trace search as Rate and Errors, never from a rollup.
+  panel.queries[0].query =
+    "SELECT histogram(_timestamp, '[INTERVAL]') AS time_bucket, approx_percentile_cont(duration, 0.95) / 1000.0 AS p95_duration FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC";
+  panel.queries[0].fields.y = panel.queries[0].fields.y.map((field: any) => ({
+    ...field,
+    alias: "p95_duration",
+    column: "p95_duration",
+  }));
+  return panel;
+};
+
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
+    ServiceVersionsTab,
+    ServiceEnvChip,
+    ServiceScopeChip,
     OTag,
     OSeparator,
     OSkeleton,
@@ -986,6 +1099,7 @@ export default defineComponent({
     OTabPanels,
     OTabPanel,
     OButton,
+    OBanner,
     ODropdown,
     ODropdownItem,
     ODrawer,
@@ -1039,10 +1153,123 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
+    const versionPanel = useServicePanelRoute();
+    const versionsEnabled = config.isEnterprise === "true" || config.isCloud === "true";
+    const compareDrawer = useVersionCompareDrawer();
+    const markerQuery = useQuery(
+      computed(() => ({
+        ...deploysQuery(
+          store.state.selectedOrganization?.identifier || "",
+          store.state.userInfo?.email || "",
+          {
+            service:
+              props.selectedNode?.name || props.selectedNode?.label || props.selectedNode?.id || "",
+            where: versionPanel.state.value.where || undefined,
+            start_time: props.timeRange.startTime,
+            end_time: props.timeRange.endTime,
+          },
+        ),
+        enabled:
+          versionsEnabled &&
+          props.visible &&
+          Boolean(props.selectedNode) &&
+          !props.selectedNode?.service_type,
+      })),
+    );
+
+    const panelVersions = useQuery(
+      computed(() => ({
+        ...versionsQuery(
+          store.state.selectedOrganization?.identifier || "",
+          store.state.userInfo?.email || "",
+          {
+            service:
+              props.selectedNode?.name || props.selectedNode?.label || props.selectedNode?.id || "",
+            where: versionPanel.state.value.where || undefined,
+            include_inactive: true,
+            limit: 10000,
+          },
+        ),
+        enabled:
+          versionsEnabled &&
+          props.visible &&
+          Boolean(store.state.selectedOrganization?.identifier) &&
+          Boolean(props.selectedNode) &&
+          !props.selectedNode?.service_type,
+      })),
+    );
+    const scopedVersions = computed(() =>
+      (panelVersions.data.value?.versions || []).filter(
+        (row) => row.where_key === versionPanel.state.value.where,
+      ),
+    );
+    const versionCount = computed(() => scopedVersions.value.length);
+    const headerIdentity = computed(
+      () =>
+        [...scopedVersions.value]
+          .filter((row) => row.version && !row.restricted)
+          .sort(
+            (a, b) =>
+              Number(b.active) - Number(a.active) ||
+              (b.deploys?.[0]?.at || b.first_seen) - (a.deploys?.[0]?.at || a.first_seen),
+          )[0],
+    );
+    const headerVersion = computed(() =>
+      headerIdentity.value
+        ? versionImageLabel(
+            headerIdentity.value.version,
+            headerIdentity.value.image,
+            headerIdentity.value.version_images,
+            t,
+          )
+        : "",
+    );
+
     const { getStream } = useStreams(t);
 
     // RED Charts State
     const dashboardData = ref<any>({});
+    const markedDashboardData = computed(() => {
+      if (!dashboardData.value?.tabs) return dashboardData.value;
+      return {
+        ...dashboardData.value,
+        tabs: dashboardData.value.tabs.map((tab: any) => ({
+          ...tab,
+          panels: tab.panels.map((panel: any) => ({
+            ...panel,
+            config: {
+              ...panel.config,
+              chart_mark_lines: deployMarkers(
+                markerQuery.isError.value ? [] : markerQuery.data.value?.deploys || [],
+                panel.title === "Errors"
+                  ? "error_rate"
+                  : panel.title === "Rate"
+                    ? "requests"
+                    : "p95",
+                store.state.timezone || "UTC",
+                t,
+              ),
+              chart_mark_line_click: (marker: {
+                version: string;
+                where: string;
+                deployKey?: string;
+              }) =>
+                compareDrawer.open({
+                  service:
+                    props.selectedNode?.name ||
+                    props.selectedNode?.label ||
+                    props.selectedNode?.id ||
+                    "",
+                  where: marker.where,
+                  a: marker.version,
+                  deployKey: marker.deployKey,
+                  fromPanel: true,
+                }),
+            },
+          })),
+        })),
+      };
+    });
 
     // Local datazoom filter map (keyed by panelId)
     const localRangeFilters = ref<
@@ -1083,6 +1310,10 @@ export default defineComponent({
     // and inferredTabConfigs. Declared here (ahead of serviceNameField) so the
     // computed can read it without a temporal-dead-zone error at mount.
     const streamFieldSet = ref<Set<string>>(new Set());
+    const schemaResolved = ref(false);
+    const schemaFailed = ref(false);
+    // Bumped on every schema reset so a read that settles after a stream, node or org change is dropped.
+    let schemaGeneration = 0;
 
     /**
      * Returns the SQL expression for the node's identity column, used in WHERE
@@ -1167,9 +1398,36 @@ export default defineComponent({
         Object.prototype.hasOwnProperty.call(props.selectedNode ?? {}, "service_system"),
     );
 
+    const selectedPanelWhere = computed(() =>
+      props.selectedNode?.service_type ? "" : versionPanel.state.value.where,
+    );
+    // null holds source queries until the schema settles; an unread schema drops the where, since an absent column 400s.
+    const panelWhereKey = computed<string | null>(() => {
+      const where = selectedPanelWhere.value;
+      if (!where) return "";
+      if (schemaResolved.value) return streamFieldSet.value.has("o2_service_where") ? where : "";
+      return schemaFailed.value ? "" : null;
+    });
+    const whereUnscopedNotice = computed(() =>
+      schemaFailed.value && selectedPanelWhere.value
+        ? whereSentence(
+            {
+              in: "serviceVersions.panel.whereUnscoped",
+              outside: "serviceVersions.panel.whereUnscopedOutside",
+            },
+            selectedPanelWhere.value,
+            null,
+            {},
+            t,
+          )
+        : "",
+    );
+
     const serviceFilter = (alias = ""): string => {
       const serviceName = buildServiceName();
       let filter = `${identityField(alias)} = '${serviceName}'`;
+      if (panelWhereKey.value)
+        filter += ` AND ${alias}o2_service_where = '${escapeSingleQuotes(panelWhereKey.value)}'`;
       if (!hasCatalogServiceIdentity.value) return filter;
 
       filter += ` AND ${alias}infer_service_type = '${escapeSingleQuotes(props.selectedNode.service_type)}'`;
@@ -1203,6 +1461,8 @@ export default defineComponent({
       const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
       const catalogServiceFilter = serviceFilter();
       const interval = chartInterval(props.timeRange.startTime, props.timeRange.endTime);
+      const redPanels = convertedDashboard.tabs[0].panels;
+      redPanels.push(durationP95Panel(redPanels[0], t("serviceVersions.panel.durationP95")));
 
       convertedDashboard.tabs[0].panels.forEach((panel: any, index: number) => {
         let whereClause: string;
@@ -1214,6 +1474,9 @@ export default defineComponent({
         }
 
         panel.layout.h = 10;
+        panel.layout.w = RED_CHART_WIDTH;
+        panel.layout.x = index * RED_CHART_WIDTH;
+        panel.layout.i = index + 1;
 
         let query = panel.queries[0].query
           .replace("[STREAM_NAME]", () => `"${streamName}"`)
@@ -1586,10 +1849,12 @@ export default defineComponent({
           props.streamFilter,
           props.visible,
           serviceNameField.value,
+          panelWhereKey.value,
         ] as const,
-      ([, , , visible]) => {
+      ([, , , visible, , whereKey]) => {
         if (visible && props.selectedNode) {
-          loadDashboard();
+          if (whereKey === null) dashboardData.value = {};
+          else loadDashboard();
         } else if (!visible) {
           dashboardData.value = {};
         }
@@ -1598,7 +1863,15 @@ export default defineComponent({
     );
 
     // Active tab state
-    const activeTab = ref<string>("operations");
+    const activeTab = ref<string>(
+      versionPanel.state.value.open ? versionPanel.state.value.tab : "operations",
+    );
+    watch(
+      () => versionPanel.state.value.tab,
+      (tab) => {
+        if (versionPanel.state.value.open) activeTab.value = tab;
+      },
+    );
 
     // Recent Operations State
     const operationsViewMode = ref<"aggregated" | "spans">("aggregated");
@@ -1618,8 +1891,6 @@ export default defineComponent({
     // IDs of alias entries the user has checked in the dropdown
     const selectedWorkloadFields = ref<string[]>([]);
 
-    const schemaResolved = ref(false);
-
     /** Fetch the trace stream schema and populate streamFieldSet.
      *  Idempotent — skips if already resolved for the current stream.
      *  Uses useStreams(t).getStream() which caches the schema in the Vuex store
@@ -1633,15 +1904,21 @@ export default defineComponent({
       )
         return;
 
+      const generation = schemaGeneration;
+      const isCurrent = () => generation === schemaGeneration;
       try {
         const stream = await getStream(props.streamFilter, "traces", true);
+        if (!isCurrent()) return false;
         const schemaFields: { name: string; type: string }[] = stream?.schema || [];
         streamFieldSet.value = new Set(schemaFields.map((f) => f.name));
         schemaResolved.value = true;
       } catch (err) {
+        if (!isCurrent()) return false;
         console.error("[ServiceGraphNodeSidePanel] Failed to resolve stream schema:", err);
         streamFieldSet.value = new Set();
+        schemaFailed.value = true;
       }
+      return true;
     };
 
     // Inferred service tabs — built from INFERRED_SERVICE_TABS registry when
@@ -1718,6 +1995,8 @@ export default defineComponent({
         return;
       }
       activeTab.value = String(name);
+      if (versionPanel.state.value.open)
+        void versionPanel.update(versionPanel.state.value.where, String(name));
     }
 
     // env/version for the clicked agent node. The graph topology doesn't carry
@@ -1770,9 +2049,13 @@ export default defineComponent({
     const activeResourceTabConfigs = computed(() =>
       isInferred.value
         ? inferredTabConfigs.value
-        : availableResourceTabConfigs.value.filter((c) =>
-            selectedWorkloadFields.value.includes(c.id),
-          ),
+        : availableResourceTabConfigs.value
+            .filter((c) => selectedWorkloadFields.value.includes(c.id))
+            .sort(
+              (a, b) =>
+                Number(b.fields?.includes("o2_service_version")) -
+                Number(a.fields?.includes("o2_service_version")),
+            ),
     );
     // Deduped list of environments detected from visible resource groups
     const detectedEnvironments = computed<{ key: string; label: string }[]>(() => {
@@ -1886,7 +2169,13 @@ export default defineComponent({
         };
       }
 
-      const status = serviceHealthFromErrorRate(serviceNodeErrorRate(props.selectedNode));
+      const node = props.selectedNode;
+      if (node.health_status)
+        return {
+          status: node.health_status,
+          text: t(`traces.servicesCatalog.status.${node.health_status}`),
+        };
+      const status = serviceHealthFromErrorRate(serviceNodeErrorRate(node));
       return { status, text: t(`traces.servicesCatalog.status.${status}`) };
     });
 
@@ -2098,6 +2387,7 @@ export default defineComponent({
 
       loadingOperations.value = true;
       recentOperations.value = [];
+      const scope = serviceFilter();
 
       try {
         const streamName = props.streamFilter || "default";
@@ -2138,6 +2428,7 @@ export default defineComponent({
           page_type: "traces",
         });
 
+        if (scope !== serviceFilter()) return;
         if (response.data && response.data.hits) {
           recentOperations.value = response.data.hits.map((op: any) => ({
             name: op.operation_name || "unknown",
@@ -2152,9 +2443,9 @@ export default defineComponent({
         }
       } catch (error) {
         console.error("Failed to fetch aggregated operations:", error);
-        recentOperations.value = [];
+        if (scope === serviceFilter()) recentOperations.value = [];
       } finally {
-        loadingOperations.value = false;
+        if (scope === serviceFilter()) loadingOperations.value = false;
       }
     };
 
@@ -2164,6 +2455,7 @@ export default defineComponent({
 
       loadingOperations.value = true;
       recentSpanData.value = { errorSpans: [], slowSpans: [] };
+      const scope = serviceFilter();
 
       try {
         const streamName = props.streamFilter || "default";
@@ -2199,6 +2491,7 @@ export default defineComponent({
           }),
         ]);
 
+        if (scope !== serviceFilter()) return;
         recentSpanData.value = {
           errorSpans: (errorRes.data?.hits || []).map((s: any) => ({
             name: s.operation_name || "unknown",
@@ -2212,9 +2505,9 @@ export default defineComponent({
         };
       } catch (error) {
         console.error("Failed to fetch recent spans:", error);
-        recentSpanData.value = { errorSpans: [], slowSpans: [] };
+        if (scope === serviceFilter()) recentSpanData.value = { errorSpans: [], slowSpans: [] };
       } finally {
-        loadingOperations.value = false;
+        if (scope === serviceFilter()) loadingOperations.value = false;
       }
     };
 
@@ -2238,9 +2531,15 @@ export default defineComponent({
         // response) — otherwise a model node's operations query fires with the
         // wrong column and returns "No operations found".
         serviceNameField.value,
+        panelWhereKey.value,
       ],
       () => {
-        if (props.visible && props.selectedNode && props.streamFilter !== "all") {
+        if (
+          props.visible &&
+          props.selectedNode &&
+          props.streamFilter !== "all" &&
+          panelWhereKey.value !== null
+        ) {
           fetchOperations();
         }
       },
@@ -2257,6 +2556,7 @@ export default defineComponent({
         [config.id]: true,
       };
       resourceTabData.value = { ...resourceTabData.value, [config.id]: [] };
+      const scope = serviceFilter();
 
       try {
         const streamName = props.streamFilter || "default";
@@ -2285,6 +2585,7 @@ export default defineComponent({
           page_type: "traces",
         });
 
+        if (scope !== serviceFilter()) return;
         if (response.data?.hits) {
           resourceTabData.value = {
             ...resourceTabData.value,
@@ -2301,12 +2602,14 @@ export default defineComponent({
         }
       } catch (error) {
         console.error(`Failed to fetch ${config.label} data:`, error);
-        resourceTabData.value = { ...resourceTabData.value, [config.id]: [] };
+        if (scope === serviceFilter())
+          resourceTabData.value = { ...resourceTabData.value, [config.id]: [] };
       } finally {
-        resourceTabLoading.value = {
-          ...resourceTabLoading.value,
-          [config.id]: false,
-        };
+        if (scope === serviceFilter())
+          resourceTabLoading.value = {
+            ...resourceTabLoading.value,
+            [config.id]: false,
+          };
       }
     };
 
@@ -2318,7 +2621,7 @@ export default defineComponent({
       if (!props.visible || props.streamFilter === "all" || !props.streamFilter) return;
 
       // Ensure the stream schema is resolved (shared with inferred tab resolution)
-      await resolveStreamSchema();
+      if ((await resolveStreamSchema()) === false) return;
       if (streamFieldSet.value.size === 0 || correlationLocked.value) return;
 
       try {
@@ -2377,6 +2680,21 @@ export default defineComponent({
           };
         });
 
+        if (streamFieldSet.value.has("o2_service_version")) {
+          availableResourceTabConfigs.value = availableResourceTabConfigs.value.filter(
+            (c) => c.groupField !== "o2_service_version",
+          );
+          availableResourceTabConfigs.value.unshift({
+            id: "service-version",
+            label: t("serviceVersions.panel.byVersion"),
+            groupField: "o2_service_version",
+            colLabel: t("serviceVersions.panel.version"),
+            colId: "service_version",
+            environment: "",
+            isDefault: true,
+          });
+        }
+
         // Smart defaults — pre-select only the important groups
         selectedWorkloadFields.value = availableResourceTabConfigs.value
           .filter((c) => c.isDefault)
@@ -2403,9 +2721,27 @@ export default defineComponent({
 
     // Lazy-fetch resource tab data / metrics when their tab is activated
     watch(
-      () => [props.visible, props.selectedNode?.id, props.streamFilter, activeTab.value],
-      () => {
-        if (!props.visible || !props.selectedNode || props.streamFilter === "all") return;
+      () =>
+        [
+          props.visible,
+          props.selectedNode?.id,
+          props.streamFilter,
+          activeTab.value,
+          panelWhereKey.value,
+        ] as const,
+      (next, prev) => {
+        if (prev && next[4] !== prev[4]) {
+          resourceTabData.value = {};
+          resourceTabLoading.value = {};
+          metricsCorrelationLoaded.value = false;
+        }
+        if (
+          !props.visible ||
+          !props.selectedNode ||
+          props.streamFilter === "all" ||
+          panelWhereKey.value === null
+        )
+          return;
         const config = activeResourceTabConfigs.value.find((c) => c.id === activeTab.value);
         if (config && !resourceTabData.value[config.id]?.length) {
           fetchResourceData(config);
@@ -2414,11 +2750,42 @@ export default defineComponent({
       },
     );
 
+    // Declared before discovery so the reset runs first; one source per value, so a refreshed row of the same node keeps its tab.
+    watch(
+      [
+        () => props.selectedNode?.id,
+        () => props.streamFilter,
+        () => store.state.selectedOrganization?.identifier,
+      ],
+      () => {
+        resourceTabData.value = {};
+        resourceTabLoading.value = {};
+        availableResourceTabConfigs.value = [];
+        resolvedWorkloadFields.value = [];
+        selectedWorkloadFields.value = [];
+        schemaGeneration++;
+        schemaResolved.value = false;
+        schemaFailed.value = false;
+        streamFieldSet.value = new Set();
+        metricsCorrelationData.value = null;
+        metricsCorrelationError.value = null;
+        metricsCorrelationLoaded.value = false;
+        activeTab.value = "operations";
+        localRangeFilters.value.clear();
+        rangeFiltersVersion.value++;
+      },
+    );
+
     // Trigger workload field discovery when the panel becomes visible with a valid stream.
     // For inferred services, resolve the stream schema so inferredTabConfigs can filter
     // fallback field chains to only those present in the schema.
     watch(
-      () => [props.visible, props.selectedNode?.id, props.streamFilter],
+      () => [
+        props.visible,
+        props.selectedNode?.id,
+        props.streamFilter,
+        store.state.selectedOrganization?.identifier,
+      ],
       ([visible]) => {
         if (visible && props.selectedNode && props.streamFilter !== "all") {
           if (isInferred.value) {
@@ -2429,26 +2796,6 @@ export default defineComponent({
         }
       },
       { immediate: true },
-    );
-
-    // Reset resource tab data, local filters, and go back to operations tab when node or stream changes
-    watch(
-      () => [props.selectedNode?.id, props.streamFilter],
-      () => {
-        resourceTabData.value = {};
-        resourceTabLoading.value = {};
-        availableResourceTabConfigs.value = [];
-        resolvedWorkloadFields.value = [];
-        selectedWorkloadFields.value = [];
-        schemaResolved.value = false;
-        streamFieldSet.value = new Set();
-        metricsCorrelationData.value = null;
-        metricsCorrelationError.value = null;
-        metricsCorrelationLoaded.value = false;
-        activeTab.value = "operations";
-        localRangeFilters.value.clear();
-        rangeFiltersVersion.value++;
-      },
     );
 
     // Navigate to traces explore page with contextual filters
@@ -2653,6 +3000,7 @@ export default defineComponent({
     return {
       raw,
       t,
+      whereUnscopedNotice,
       serviceMetrics,
       serviceHealth,
       isAllStreamsSelected,
@@ -2686,6 +3034,14 @@ export default defineComponent({
       handleShowTelemetry,
       // RED Charts
       dashboardData,
+      markedDashboardData,
+      markerQuery,
+      deployBuildLabel,
+      versionCount,
+      headerIdentity,
+      headerVersion,
+      compareDrawer,
+      versionsEnabled,
       selectedTimeObj,
       currentTimeObj,
       loadDashboard,
@@ -2704,6 +3060,7 @@ export default defineComponent({
       // Recent Operations
       loadingOperations,
       recentOperations,
+      operationsViewMode,
       operationsTableColumns,
       operationsTableRows,
       navigateToTraces,

@@ -32,6 +32,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
 import { buildChipDimensionsFromFilters } from "@/services/service_streams";
+import { correlationDisplayProps } from "@/types/serviceRef";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
@@ -524,6 +525,7 @@ async function openCorrelationFromLog(logData: any) {
       Object.keys(logFilters).length > 0 ? logFilters : result.correlationData.matched_dimensions;
     correlationDashboardProps.value = {
       serviceName: result.correlationData.service_name,
+      ...correlationDisplayProps(result.correlationData),
       matchedDimensions: actualMatchedDimensions,
       additionalDimensions: {},
       matchedSetId: result.correlationData.matched_set_id,

@@ -852,7 +852,7 @@ import { overviewKeys } from "@/services/overview.querykeys";
 import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
-import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
@@ -1786,6 +1786,9 @@ const goToAlert = (item: any) => {
   showAlertHistoryDrawer.value = true;
 };
 
+// Gen-AI node names live in gen_ai_* fields, and their streams may lack infer_service_name (a 400).
+const INFER_NAME_SERVICE_TYPES = new Set(["database", "queue", "rpc", "external"]);
+
 const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card
   // click (which opens the latency/info side panel).
@@ -1793,7 +1796,10 @@ const goToService = (svc: any, e?: MouseEvent) => {
   // the service panel's View traces emits here too, outside this file's lock markup
   if (tracesLock.locked.value) return;
   trackDrilldown("service_traces");
-  let filter = sqlEquals("service_name", svc.label ?? svc.id);
+  let filter = buildViewTracesFilter({
+    serviceName: svc.label ?? svc.id,
+    serviceType: INFER_NAME_SERVICE_TYPES.has(svc.service_type) ? svc.service_type : undefined,
+  });
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
   const query: Record<string, string> = {

@@ -25,6 +25,7 @@ import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -37,6 +38,7 @@ vi.mock("@/services/downtimes", () => ({
     move: vi.fn(),
     preview: vi.fn(),
     resources: vi.fn(),
+    values: vi.fn(),
   },
 }));
 
@@ -127,6 +129,21 @@ describe("DowntimeDetail", () => {
 
   afterEach(() => {
     document.body.innerHTML = "";
+  });
+
+  it("names the service in the condition chip by its display name and keeps the key on hover", async () => {
+    vi.mocked(downtimes.values).mockResolvedValue({ data: stage8.downtime_values } as never);
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: {
+        ...detail,
+        condition: { type: "pair", key: "service", operator: "=", value: "checkoutservice" },
+      },
+    } as never);
+    const { wrapper } = await mountDetail();
+    const chip = wrapper.get('[data-test="downtime-detail-condition"]');
+    expect(chip.text()).toContain("service=CheckoutService");
+    expect(chip.attributes("title")).toBe("service=checkoutservice");
+    wrapper.unmount();
   });
 
   it("renders the Suppressed tab from a 200 with two hits", async () => {

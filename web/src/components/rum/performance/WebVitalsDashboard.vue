@@ -96,6 +96,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter, useRoute } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import useRumPerformanceTab from "@/composables/rum/useRumPerformanceTab";
+import { useDeployMarkerClicks } from "@/composables/dashboard/deployMarkerScope";
 import {
   parseDuration,
   generateDurationLabel,
@@ -135,6 +136,7 @@ export default defineComponent({
     // before. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
     const { dashboardData, schemaResolved, showEmptyState, ensureRumSchema } =
       useRumPerformanceTab(webVitalsDashboard);
+    useDeployMarkerClicks(() => dashboardData.value);
 
     const showDashboardSettingsDialog = ref(false);
     const viewOnly = ref(true);

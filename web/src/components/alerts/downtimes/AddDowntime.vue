@@ -335,6 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :request="request"
                 :folder-label="folderLabel"
                 :folder-name="targetFolderName"
+                :value-label="valueLabel"
                 :large-modules="largeModules"
               />
             </div>
@@ -385,6 +386,7 @@ import { useOrgId } from "@/composables/query";
 import { useAutoName } from "@/composables/useAutoName";
 import { useDowntimeItems, useTargetModuleLocks } from "@/composables/downtimes/useDowntimeItems";
 import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
+import { useDowntimeValueLabels } from "@/composables/downtimes/useDowntimeValueLabels";
 import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import {
   downtimeDetailQuery,
@@ -743,8 +745,16 @@ const targetFolderName: FolderNameFn = (module, id) =>
     id,
   );
 
+const valueLabel = useDowntimeValueLabels(
+  orgId,
+  computed(() => values.value.folder_id || undefined),
+  () => buildCondition(values.value),
+);
+
 const autoName = useAutoName({
-  suggestion: computed(() => buildDowntimeAutoName(values.value, t, itemName, targetFolderName)),
+  suggestion: computed(() =>
+    buildDowntimeAutoName(values.value, t, itemName, targetFolderName, undefined, valueLabel.value),
+  ),
   currentValue: () => String(values.value.name ?? ""),
   apply: (name: string) => form.setFieldValue("name", name),
   enabled: () => !isEdit.value && !duplicateId.value,

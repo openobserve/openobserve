@@ -82,6 +82,7 @@ import { useI18nTyped } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import errorDashboard from "@/utils/rum/errors.json";
 import useRumPerformanceTab from "@/composables/rum/useRumPerformanceTab";
+import { useDeployMarkerClicks } from "@/composables/dashboard/deployMarkerScope";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
@@ -111,6 +112,7 @@ export default defineComponent({
     // See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
     const { dashboardData, schemaResolved, showEmptyState, ensureRumSchema } =
       useRumPerformanceTab(errorDashboard);
+    useDeployMarkerClicks(() => dashboardData.value);
 
     const showDashboardSettingsDialog = ref(false);
     const viewOnly = ref(true);

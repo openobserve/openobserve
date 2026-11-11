@@ -4,6 +4,8 @@ import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import type { DowntimeRequest } from "@/services/downtimes";
 import { completePairs, incidentsLine, notifySentence, summarySentence } from "./summary";
+import type { ValueLabelFn } from "./targetSummary";
+import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
 
 const flow1: DowntimeRequest = {
   folder_id: "planned-maintenance",
@@ -147,5 +149,24 @@ describe("incidentsLine", () => {
       target.module === "alerts" ? { ...target, incident_mode: "none" as const } : target,
     );
     expect(incidentsLine(none, gt)).toBe("No incidents open during the window.");
+  });
+});
+
+// Display names as the real values endpoint returns them for `service` (stage 8 golden).
+const goldenLabel: ValueLabelFn = (key, value) =>
+  key === "service"
+    ? stage8.downtime_values.values.find((v) => v.value === value)?.label
+    : undefined;
+
+describe("summarySentence with display names", () => {
+  it("says which service stops notifying by its display name", () => {
+    const request: Pick<DowntimeRequest, "condition" | "targets" | "schedule"> = {
+      ...flow1,
+      condition: { type: "pair", key: "service", operator: "=", value: "checkoutservice" },
+      targets: [{ module: "alerts", folders: { kind: "all" } }],
+    };
+    const sentence = summarySentence(request, gt, undefined, "en-US", goldenLabel);
+    expect(sentence).toContain("alerts with service=CheckoutService stop notifying.");
+    expect(sentence).not.toContain("checkoutservice");
   });
 });

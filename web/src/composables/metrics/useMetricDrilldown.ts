@@ -21,6 +21,7 @@ import serviceStreamsApi, {
   type StreamInfo,
 } from "@/services/service_streams";
 import metricsService from "@/services/metrics";
+import { displayFieldsOf, type ServiceDisplayFields } from "@/types/serviceRef";
 import {
   availability as availabilityOf,
   buildLogsRoute,
@@ -52,12 +53,13 @@ export type DrilldownMenu =
   | { kind: "error"; message: string | null }
   | { kind: "notice"; notice: DrilldownNotice }
   | { kind: "pickService"; label: string; values: string[] }
-  | {
+  | ({
       kind: "streams";
+      /** The service key; requests and stream filters use it, never the display name. */
       service: string;
       logs: DrilldownStream[];
       traces: DrilldownStream[];
-    };
+    } & ServiceDisplayFields);
 
 interface LabelFilterLike {
   label: string;
@@ -192,6 +194,7 @@ export function useMetricDrilldown(deps: UseMetricDrilldownDeps) {
       menu.value = {
         kind: "streams",
         service: data.service_name,
+        ...displayFieldsOf(data),
         logs: listed(data.related_streams?.logs),
         traces: listed(data.related_streams?.traces),
       };

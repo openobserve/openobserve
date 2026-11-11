@@ -25,6 +25,7 @@ import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectio
 import { PreviewCancelledError } from "@/composables/metrics/useMetricsPreviewQueue";
 import config from "@/aws-exports";
 import { clearAnnouncements } from "@/lib/feedback/RegionStatus/announcer";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 const drilldownApi = vi.hoisted(() => ({
   getIdentityConfig: vi.fn(),
@@ -870,6 +871,53 @@ describe("MetricDetailView", () => {
             .findAllComponents({ name: "ODropdown" })
             .some((d) => d.find('[data-test="metrics-detail-drilldown"]').exists()),
         ).toBe(true);
+      });
+
+      it("heads the streams menu with the service by its trace name", async () => {
+        const row = labelRows.differs;
+        drilldownApi.getSemanticGroups.mockResolvedValue({
+          data: [{ id: "service", display: "Service", fields: ["service_name"] }],
+        });
+        drilldownApi.correlate.mockResolvedValue({
+          data: {
+            ...row,
+            matched_dimensions: {},
+            additional_dimensions: {},
+            related_streams: { logs: [], traces: [], metrics: [], profiles: [] },
+          },
+        });
+        wrapper = mountView(
+          {
+            filters: [{ label: "service_name", value: row.service_name }],
+            ensureSchemas: () => Promise.resolve(true),
+          },
+          {
+            stubs: {
+              ODropdown: {
+                name: "ODropdown",
+                template: "<div><slot name='trigger' /><slot /></div>",
+              },
+              ODropdownGroup: {
+                name: "ODropdownGroup",
+                props: ["label"],
+                template: "<div><span>{{ label }}</span><slot /></div>",
+              },
+              ODropdownItem: { name: "ODropdownItem", template: "<div><slot /></div>" },
+            },
+          },
+        );
+        await flushPromises();
+        wrapper.findComponent({ name: "ODropdown" }).vm.$emit("update:open", true);
+        await flushPromises();
+
+        const header = wrapper.get('[data-test="metrics-detail-drilldown-service"]');
+        expect(header.text()).toContain(row.display_name);
+        expect(header.get('[data-test="svcver-service-name-detected"]').text()).toContain(
+          row.service_name,
+        );
+        const menu = wrapper.get('[data-test="metrics-detail-drilldown-menu"]').text();
+        expect(menu).toContain("Service");
+        expect(menu).toContain(`No logs stream for service ${row.display_name}`);
       });
 
       it("stays disabled, saying it is checking access, until both reads answer", async () => {

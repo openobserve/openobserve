@@ -580,6 +580,53 @@ pub async fn list(org_id: &str) -> Result<Vec<ServiceRecord>, errors::Error> {
     Ok(records.into_iter().map(model_to_record).collect())
 }
 
+/// The org's registry rows through `conn`, so a writer's checks read the database it writes.
+pub async fn list_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<ServiceRecord>, errors::Error> {
+    let records = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(records.into_iter().map(model_to_record).collect())
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_table_for_tests<C: ConnectionTrait>(conn: &C) -> Result<(), sea_orm::DbErr> {
+    let backend = conn.get_database_backend();
+    let mut table = sea_orm::Schema::new(backend).create_table_from_entity(Entity);
+    conn.execute(backend.build(table.if_not_exists())).await?;
+    Ok(())
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn insert_for_tests<C: ConnectionTrait>(
+    conn: &C,
+    records: &[ServiceRecord],
+) -> Result<(), sea_orm::DbErr> {
+    for record in records {
+        ActiveModel {
+            id: Set(record.id.clone()),
+            org_id: Set(record.org_id.clone()),
+            service_name: Set(record.service_name.clone()),
+            set_id: Set(record.set_id.clone()),
+            disambiguation: Set(record.disambiguation.clone()),
+            all_dimensions: Set(record.all_dimensions.clone()),
+            logs_streams: Set(record.logs_streams.clone()),
+            traces_streams: Set(record.traces_streams.clone()),
+            metrics_streams: Set(record.metrics_streams.clone()),
+            profiles_streams: Set(record.profiles_streams.clone()),
+            field_name_mapping: Set(record.field_name_mapping.clone()),
+            last_seen: Set(record.last_seen),
+        }
+        .insert(conn)
+        .await?;
+    }
+    Ok(())
+}
+
 /// List services by service name
 pub async fn list_by_name(
     org_id: &str,
