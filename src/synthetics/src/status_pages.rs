@@ -198,6 +198,8 @@ struct RebuilderState {
     holds_build_checked: bool,
     /// When the build gate was first seen open in a row, for the drain grace of [`holds_ready`].
     gate_open_since: Option<i64>,
+    /// The stored build key was already removed during the current closed-gate period.
+    gate_closed_cleared: bool,
 }
 
 /// Metadata key with the git commit that last checked the false alarm holds.
@@ -217,14 +219,22 @@ async fn holds_ready(
     now: i64,
     rt: &mut RebuilderState,
 ) -> Result<bool, infra::errors::Error> {
+    let db = infra::db::get_db().await;
     if !infra::cluster::all_online_nodes_run_this_build().await {
+        // Another build writes now, for example a rollback. Its recoveries may not move the stamp,
+        // so the next opening must wait for the grace and reset again, also after a restart.
         rt.gate_open_since = None;
+        if rt.holds_build_checked || !rt.gate_closed_cleared {
+            let _ = db.delete(HOLDS_BUILD_KEY, false, false, None).await;
+            rt.holds_build_checked = false;
+            rt.gate_closed_cleared = true;
+        }
         return Ok(false);
     }
+    rt.gate_closed_cleared = false;
     if rt.holds_build_checked {
         return Ok(true);
     }
-    let db = infra::db::get_db().await;
     if db.get(HOLDS_BUILD_KEY).await.ok().as_deref() == Some(config::COMMIT_HASH.as_bytes()) {
         rt.holds_build_checked = true;
         return Ok(true);
@@ -246,11 +256,12 @@ async fn holds_ready(
     Ok(true)
 }
 
-/// Twice the HTTP drain timeout plus a minute, so an old node that went offline has stopped
-/// finishing runs before a new build resets the holds.
+/// Twice the HTTP drain timeout plus a minute, and at least ten minutes, so an old node that went
+/// offline has stopped finishing runs before a new build resets the holds. The floor covers an old
+/// node with a longer drain timeout than this one, and its background workers.
 fn holds_drain_grace_micros() -> i64 {
     let drain = config::get_config().limit.http_shutdown_timeout.max(1) as i64;
-    (2 * drain + 60) * 1_000_000
+    (2 * drain + 60).max(600) * 1_000_000
 }
 
 /// Per-check thresholds from the pages the check is mapped to. A check on
@@ -358,6 +369,14 @@ async fn load(
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
+    // Before the notice and state reads, so a reset in this call is in the data this tick uses.
+    let holds_allowed = match holds_ready(conn, now, rt).await {
+        Ok(ready) => ready,
+        Err(e) => {
+            tracing::error!("[status_pages] false alarm hold check failed: {e}");
+            false
+        }
+    };
     // Notices before check state: a false alarm mark that lands between the two reads must not
     // meet an older recovery stamp, which would open a new incident for the marked failure. A
     // mark after this read is not seen this tick, and `update_notice_runtime` skips a marked
@@ -397,13 +416,6 @@ async fn load(
         .map(|s| s.synthetics_id)
         .collect();
     snoozed.extend(muted_checks(conn, &mappings).await);
-    let holds_allowed = match holds_ready(conn, now, rt).await {
-        Ok(ready) => ready,
-        Err(e) => {
-            tracing::error!("[status_pages] false alarm hold check failed: {e}");
-            false
-        }
-    };
     Ok(TickData {
         pages,
         components,
