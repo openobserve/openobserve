@@ -13,7 +13,7 @@ import { raw, type I18nText } from "@/types/i18n";
 //   <OTimeCell :value="row.timestamp" unit="ms" :timezone="store.state.timezone" />
 
 import { computed } from "vue";
-import { getIntlLocale } from "@/locales";
+import { relativeTimeText } from "./relativeTime";
 import { formatInTimeZone } from "date-fns-tz";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -48,16 +48,6 @@ const props = withDefaults(
   }>(),
   { unit: "auto", mode: "relative", emptyLabel: raw("—"), relativeCutoffDays: 30 },
 );
-
-// Largest unit first, so a span reads in the largest unit it reaches.
-const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
-  ["year", 365 * 86_400_000],
-  ["month", 30 * 86_400_000],
-  ["day", 86_400_000],
-  ["hour", 3_600_000],
-  ["minute", 60_000],
-  ["second", 1000],
-];
 
 /** Normalise any supported input to epoch milliseconds, or null if invalid. */
 const epochMs = computed<number | null>(() => {
@@ -130,9 +120,7 @@ const relative = computed(() => {
   const now = props.now ?? Date.now();
   const ageMs = Math.abs(now - epochMs.value);
   if (ageMs <= props.relativeCutoffDays * 86_400_000) {
-    const diff = epochMs.value - now;
-    const [unit, size] = RELATIVE_UNITS.find(([, ms]) => ageMs >= ms) ?? RELATIVE_UNITS[5];
-    return new Intl.RelativeTimeFormat(getIntlLocale()).format(Math.round(diff / size), unit);
+    return relativeTimeText(epochMs.value, now);
   }
   return prettyDate.value;
 });

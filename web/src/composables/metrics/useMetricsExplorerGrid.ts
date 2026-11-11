@@ -33,6 +33,7 @@ import StreamService from "@/services/stream";
 import metricsService, { type MetricUsageCounts } from "@/services/metrics";
 import {
   buildMetricCards,
+  labelsOf,
   operandStreamsOf,
   type MetricCard,
   type MetricStream,
@@ -194,6 +195,10 @@ export interface CardPreview {
   cachedTimeRange?: { start_time: number; end_time: number } | null;
   /** The function actually in effect — reflects a ⚙ override, not the default. */
   footerLabel: string;
+  /** The results describe the window before a range change; dims while the new window loads. */
+  windowStale?: boolean;
+  /** Epoch ms of the refresh that failed while `stale` keeps the previous result. */
+  failedAt?: number | null;
 }
 
 export interface FnOverride {
@@ -332,6 +337,11 @@ function passesAbsent(op: LabelMatchOp, value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** A kept chart with nothing in flight behind it is settled; with no chart there is nothing to keep. */
+function settledSnapshot(preview: CardPreview): CardPreview | null {
+  return preview.results.length ? { ...preview, status: "done" } : null;
 }
 
 export function useMetricsExplorerGrid(t: TranslateFn) {
@@ -595,6 +605,36 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     }
   };
 
+  const streamSchemaInFlight = new Map<string, Promise<void>>();
+
+  /** One stream's labels from its own schema; a failure leaves it unknown, so readers fail open. */
+  const loadStreamSchema = (name: string): Promise<void> => {
+    const generation = orgGeneration;
+    // Keyed by org generation: a request still pending for the previous org must not stand in for this one.
+    const key = `${generation}:${name}`;
+    const pending = streamSchemaInFlight.get(key);
+    if (pending) return pending;
+    const request = StreamService.schema(org.value, name, "metrics")
+      .then((response: any) => {
+        if (generation !== orgGeneration) return;
+        const labels = labelsOf({ ...(response?.data ?? {}), name } as MetricStream);
+        if (labels) labelsByStream.value = { ...labelsByStream.value, [name]: labels };
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (streamSchemaInFlight.get(key) === request) streamSchemaInFlight.delete(key);
+      });
+    streamSchemaInFlight.set(key, request);
+    return request;
+  };
+
+  /** Labels for just these streams, without the org-wide schema sweep `ensureSchemas` runs. */
+  const ensureStreamSchemas = async (names: string[]): Promise<void> => {
+    if (schemaLoaded.value) return;
+    const missing = [...new Set(names)].filter((name) => !labelsByStream.value[name]);
+    await Promise.all(missing.map(loadStreamSchema));
+  };
+
   /* ------------------------------------------------------------ filtering */
 
   /**
@@ -704,6 +744,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * times over.
    */
   const emptyMetrics = ref<Set<string>>(new Set());
+  /** Slice cards whose sweep request has settled in this window, preview or not. */
+  const sweptNames = ref<Set<string>>(new Set());
 
   /**
    * Metrics whose settled-empty preview has already spent its one bounded
@@ -971,6 +1013,82 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   /** The slice actually rendered. Colour index is position in this same order. */
   const pagedCards = computed(() => pageSlice.value.filter((card) => !isHiddenAsEmpty(card)));
+
+  /** Emptiness is known: the card has an answer for this window, or its sweep ended without one. */
+  const isResolved = (card: MetricCard): boolean => {
+    if (card.unsupported) return true;
+    const preview = previews.value[card.name];
+    if (!preview) return sweptNames.value.has(card.name);
+    if (preview.status === "loading") return false;
+    // A kept chart whose new-window request was cancelled waits for its next visit, not the grid.
+    return !preview.windowStale || sweptNames.value.has(card.name);
+  };
+
+  /** The slice's emptiness sweep has not settled, so the count waits and unknown slots stay placeholders (M-1). */
+  const holding = computed(
+    () => hideEmptyPanels.value && pageSlice.value.some((card) => !isResolved(card)),
+  );
+
+  const namesOf = (list: MetricCard[]) => list.map((card) => card.name);
+  const startsWith = (list: string[], head: string[]) =>
+    head.length <= list.length && head.every((name, i) => list[i] === name);
+
+  /** The slice's cards with data, in order, up to the first card whose emptiness is still unknown. */
+  const knownPrefix = computed(() => {
+    const names: string[] = [];
+    for (const card of pageSlice.value) {
+      if (!isResolved(card)) break;
+      if (!isHiddenAsEmpty(card)) names.push(card.name);
+    }
+    return names;
+  });
+
+  const gridView = shallowRef<{
+    slice: string[];
+    filtered: boolean;
+    shown: string[];
+    placeholders: number;
+  }>({ slice: [], filtered: false, shown: [], placeholders: 0 });
+  // Pre-flush, not sync: a preview write and its emptiness mark land in the same tick and must be read together.
+  watch(
+    [holding, pagedCards, knownPrefix, hideEmptyPanels],
+    () => {
+      const slice = namesOf(pageSlice.value);
+      const filtered = hideEmptyPanels.value;
+      if (!holding.value) {
+        gridView.value = { slice, filtered, shown: namesOf(pagedCards.value), placeholders: 0 };
+        return;
+      }
+      const previous = gridView.value;
+      const sameSearch =
+        previous.filtered && previous.slice.length > 0 && startsWith(slice, previous.slice);
+      const prefix = knownPrefix.value;
+      // Within a search the grid only appends, so a drawn card never moves or leaves (M-1).
+      const shown = !sameSearch || startsWith(prefix, previous.shown) ? prefix : previous.shown;
+      const placeholders = Math.max(0, pagedCards.value.length - shown.length);
+      gridView.value = { slice, filtered, shown, placeholders };
+    },
+    { immediate: true },
+  );
+
+  /** What the grid draws: the cards known in order, then same-size placeholders for the slots still unknown. */
+  const displayed = computed<{
+    cards: MetricCard[];
+    placeholders: number;
+    /** Drawn cards whose new answer is empty: each keeps its slot as a placeholder until the slice settles. */
+    emptyHeld: Set<string>;
+  }>(() => {
+    if (!holding.value) return { cards: pagedCards.value, placeholders: 0, emptyHeld: new Set() };
+    const byName = new Map(pageSlice.value.map((card) => [card.name, card]));
+    const view = gridView.value;
+    const cards = view.shown.map((name) => byName.get(name)).filter((c): c is MetricCard => !!c);
+    return {
+      cards,
+      placeholders: view.placeholders,
+      // Empty cards are never shown with "With data" on, and a drawn slot never closes up mid-search (M-1).
+      emptyHeld: new Set(namesOf(cards.filter(isHiddenAsEmpty))),
+    };
+  });
 
   const hasMore = computed(() => sortedCandidates.value.length > pageSize.value);
   const remainingCount = computed(() =>
@@ -1818,6 +1936,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       !opts?.skipCache &&
       !opts?.realign &&
       !pendingRefresh &&
+      !settled?.windowStale &&
       settled &&
       settled.status !== "loading" &&
       settled.status !== "error"
@@ -1852,7 +1971,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // the recheck must reach the backend, not just get past the guards above —
     // `queue.run`'s own `cache: true, refresh: false` default would otherwise
     // hand back the very cached empty answer this recheck exists to get past.
-    const queryOpts = forcedRecheck || pendingRefresh ? { ...opts, skipCache: true } : opts;
+    // The queue caches by query and step, so an answer for the previous window must not be served back.
+    const queryOpts =
+      forcedRecheck || pendingRefresh || settled?.windowStale ? { ...opts, skipCache: true } : opts;
     // The MISS path of the await above: a restore that painted checks the epoch
     // itself, but a cache miss fell through to the loading write below — and if
     // the map was cleared while IndexedDB was answering, that write resurrects
@@ -1870,7 +1991,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       bucketUnit: defaults.bucketUnit,
       stale: false,
       nanGuardApplied: false,
-      sparse: false,
+      // Describes the kept `results`, so a sparse answer stays "too few samples" while it reloads.
+      sparse: !!existing?.sparse && !!existing.results.length,
       // Carried like `results`: the old (possibly widened) chart stays on
       // screen while the re-query runs, so a drill-in during that window must
       // still hand the editor the window that chart is true of.
@@ -1882,6 +2004,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       // new data lands.
       cachedTimeRange: existing?.cachedTimeRange ?? null,
       footerLabel: resolved.footerLabel,
+      windowStale: !!existing?.windowStale && !!existing.results.length,
     };
 
     try {
@@ -2016,10 +2139,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         // A recheck that never answered has not been spent, or the stale empty answer it restores sticks for good.
         if (forcedRecheck) markRechecked(card.name, false);
         // A card remounted by a grid reflow (a sibling hidden as no-data) cancels its own refresh; the remount must re-ask, not reuse this.
-        if (existing) {
+        // A loading snapshot restored here has no request left behind it, so it would read as loading forever.
+        const restored = existing?.status === "loading" ? settledSnapshot(existing) : existing;
+        if (restored) {
           previews.value[card.name] = queryOpts?.skipCache
-            ? { ...existing, pendingRefresh: true }
-            : existing;
+            ? { ...restored, pendingRefresh: true }
+            : restored;
         } else delete previews.value[card.name];
         return;
       }
@@ -2048,6 +2173,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         // A failed auto-refresh leaves the previous chart up, flagged stale,
         // rather than blanking a chart the user was reading.
         stale: previous.length > 0,
+        failedAt: previous.length > 0 ? Date.now() : null,
         nanGuardApplied: existing?.nanGuardApplied ?? false,
         sparse: existing?.sparse ?? false,
         widenedRateWindow: existing?.widenedRateWindow ?? null,
@@ -2142,6 +2268,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     emptyMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();
     pageGeneration++;
+    sweptNames.value = new Set();
   };
 
   /**
@@ -2495,6 +2622,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     invalidateAll();
   };
 
+  /** Swaps one filter in place, so an edited chip keeps its position. */
+  const replaceLabelFilter = async (previous: LabelFilter, next: LabelFilter) => {
+    await ensureSchemas();
+    const key = labelFilterKey(previous);
+    const nextKey = labelFilterKey(next);
+    labelFilters.value = labelFilters.value
+      .filter((f) => labelFilterKey(f) === key || labelFilterKey(f) !== nextKey)
+      .map((f) => (labelFilterKey(f) === key ? next : f));
+    invalidateAll();
+  };
+
   /** By identity, not by label — several filters can share a label. */
   const removeLabelFilter = (filter: LabelFilter) => {
     const key = labelFilterKey(filter);
@@ -2588,8 +2726,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
     }
 
+    const epoch = previewsEpoch;
     for (const card of slice) {
-      const resolved = !!previews.value[card.name];
+      const known = previews.value[card.name];
+      const resolved = !!known && !known.windowStale;
       const recheck = !!opts?.skipCache && emptyMetrics.value.has(card.name);
       if (resolved && !recheck) continue;
 
@@ -2600,6 +2740,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }).finally(() => {
         // Settled: there is nothing left to cancel.
         prefetching.delete(card.name);
+        if (epoch === previewsEpoch) sweptNames.value = new Set(sweptNames.value).add(card.name);
       });
     }
   };
@@ -2615,7 +2756,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * re-applied) and the grid answers by re-querying every card — ~40 requests for
    * a view the user just left.
    */
-  watch([pageSlice, hideEmptyPanels], () => {
+  // Also on un-pause: a placeholder is not a card, so nothing else asks for a slot left unresolved while paused.
+  watch([pageSlice, hideEmptyPanels, paused], () => {
     if (paused.value) return;
     if (sweepTimer) clearTimeout(sweepTimer);
     sweepTimer = setTimeout(() => {
@@ -2629,17 +2771,50 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     if (sweepTimer) clearTimeout(sweepTimer);
   });
 
+  /** Keeps each drawn chart, pinned to the window it describes, until its new window lands. */
+  const keepPreviewsAsStale = (previous: { start_time: number; end_time: number }) => {
+    previewsEpoch++;
+    const slice = new Set(pageSlice.value.map((card) => card.name));
+    const kept: Record<string, CardPreview> = {};
+    for (const [name, preview] of Object.entries(previews.value)) {
+      if (!preview.results.length) continue;
+      kept[name] = {
+        ...preview,
+        // The request that wrote "loading" is cancelled below, so the kept chart is settled until its next visit.
+        status: "done",
+        windowStale: true,
+        stale: false,
+        failedAt: null,
+        cachedTimeRange: preview.cachedTimeRange ?? previous,
+      };
+    }
+    previews.value = kept;
+    previewOrder = previewOrder.filter((name) => name in kept);
+    sweptNames.value = new Set();
+    // The slice's answers hold the grid still until its sweep settles; off-slice answers cannot be rechecked.
+    emptyMetrics.value = new Set([...emptyMetrics.value].filter((name) => slice.has(name)));
+  };
+
+  /** `windowChanged` with `keepPreviews`: a new window, drawn over the previous charts (ruling 10). */
   const setTimeRange = (
     range: { start_time: number; end_time: number },
-    opts?: { keepPreviews?: boolean; keepPage?: boolean },
+    opts?: { keepPreviews?: boolean; keepPage?: boolean; windowChanged?: boolean },
   ) => {
+    const previous = timeRange.value;
     timeRange.value = range;
     queue.cancelAll();
-    if (opts?.keepPreviews) return;
+    if (opts?.keepPreviews && !opts.windowChanged) return;
+
+    if (opts?.keepPreviews) {
+      keepPreviewsAsStale(previous);
+      resetWindowCaches(opts.keepPage);
+      return;
+    }
 
     previewsEpoch++;
     previews.value = {};
     previewOrder = [];
+    sweptNames.value = new Set();
     // Emptiness is a property of the WINDOW, not of the metric, and this set is
     // self-sealing: a card in it is filtered out of the grid, so it never
     // renders, never re-queries, and can never clear itself. Carried across a
@@ -2652,12 +2827,16 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // window, so its answers still hold; clearing there would un-hide every
     // no-data card on each auto-refresh tick just to re-hide it a moment later.
     emptyMetrics.value = new Set();
+    resetWindowCaches(opts?.keepPage);
+  };
+
+  const resetWindowCaches = (keepPage?: boolean) => {
     // A new window deserves its own bounded recheck, not one already spent by
     // the window just left.
     emptyRecheckedCards.value = new Set();
     // Cards empty in the old window may have data in this one; a zoom keeps its page so the dragged card stays.
     pageGeneration++;
-    if (!opts?.keepPage) pageSize.value = INITIAL_PAGE_SIZE;
+    if (!keepPage) pageSize.value = INITIAL_PAGE_SIZE;
 
     // Label VALUES are a property of the window too — `job` has the values it had
     // in the last 15 minutes, which is not what it had over 30 days. Their cache
@@ -2695,6 +2874,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     emptyMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();
     pageGeneration++;
+    sweptNames.value = new Set();
     pageSize.value = INITIAL_PAGE_SIZE;
     schemaLoaded.value = false;
     // The in-flight guards, not just the loaded flags.
@@ -2730,6 +2910,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     sortedCards,
     filteredCards,
     pagedCards,
+    displayed,
+    holding,
     /** The page's query budget — exposed so the cap can be asserted directly. */
     pageSlice,
     hasMore,
@@ -2774,9 +2956,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     loadLabelValues,
     labelValueScope,
     addLabelFilter,
+    replaceLabelFilter,
     removeLabelFilter,
     setLabelGroupNegated,
     ensureSchemas,
+    ensureStreamSchemas,
     isLabelEligible,
     inapplicableLabelFilters,
 

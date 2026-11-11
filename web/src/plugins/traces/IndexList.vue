@@ -21,7 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
-        :label="searchObj.data.stream.selectedStream?.label ? raw('') : t('search.selectIndex')"
+        :label="
+          searchObj.loadingStream || searchObj.data.stream.selectedStream?.label
+            ? raw('')
+            : t('search.selectIndex')
+        "
         :options="streamOptions"
         data-cy="index-dropdown"
         @search="onStreamSearch"
@@ -40,7 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="fieldListRef"
         :fields="normalizedFieldList"
         :search="searchObj.data.stream.filterField"
-        :loading="searchObj.loadingStream"
+        :loading="
+          searchObj.loadingStream ||
+          (searchObj.meta.loadingFields && !searchObj.data.stream.selectedStreamFields.length)
+        "
         :theme="store.state.theme"
         :show-pagination="true"
         :page-size="pagination.rowsPerPage"
@@ -172,11 +179,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #loading>
-          <div class="flex w-full items-center justify-center pt-8">
-            <div class="mx-auto my-0 flex w-fit items-center gap-1.5 text-sm font-medium">
-              <OSpinner size="sm" />
-              {{ t("traces.loadingStream") }}
-            </div>
+          <div
+            class="px-page-edge flex w-full flex-col gap-3 pt-3"
+            aria-busy="true"
+            data-test="traces-field-list-skeleton"
+          >
+            <span class="sr-only">{{ t("common.loading") }}</span>
+            <OSkeleton
+              v-for="(width, index) in RAIL_SKELETON_WIDTHS"
+              :key="index"
+              type="text"
+              animation="none"
+              :class="width"
+              aria-hidden="true"
+            />
           </div>
         </template>
       </GroupedFieldList>
@@ -202,6 +218,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
@@ -210,9 +227,23 @@ import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
 
+const RAIL_SKELETON_WIDTHS = [
+  "w-16",
+  "w-24",
+  "w-28",
+  "w-20",
+  "w-14",
+  "w-32",
+  "w-24",
+  "w-28",
+  "w-20",
+  "w-24",
+];
+
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: {
+    OSkeleton,
     FieldRow,
     OButton,
     OSelect,
@@ -247,6 +278,13 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { searchObj, tracesParser } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
+    // The rail is no longer remounted per load, so a refreshed list reaches the picker here.
+    watch(
+      () => searchObj.data.stream.streamLists,
+      (list) => {
+        streamOptions.value = list;
+      },
+    );
 
     const pagination = ref({
       page: 1,
@@ -597,6 +635,7 @@ export default defineComponent({
       router,
       searchObj,
       streamOptions,
+      RAIL_SKELETON_WIDTHS,
       addToFilter,
       getImageURL,
       filterStreamFn,

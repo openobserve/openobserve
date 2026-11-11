@@ -25,46 +25,80 @@
     <OCard v-for="section in sections" :key="section.key">
       <OCardSection role="body">
         <h3 class="text-text-heading mb-3 text-lg">{{ section.title }}</h3>
-        <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <div
             v-for="field in section.fields"
             :key="field.key"
-            class="flex flex-col gap-1"
+            class="flex min-w-0 flex-col gap-1"
+            :class="fieldSpan(field)"
             :data-test="`alerts-alertconfigsummary-${field.key}`"
           >
-            <dt class="text-text-secondary text-xs">
-              {{ field.label }}
-            </dt>
-            <dd class="text-text-heading text-sm" :class="field.mono ? 'font-mono break-all' : ''">
-              <OTag v-if="field.badge" :type="field.badge" :value="field.value" size="sm" />
-              <!-- Unstyled on purpose: base-elements.css already gives every
-                   `a` the link colour AND the darker hover shade. Re-declaring
-                   `text-text-link` here would pin hover to the resting colour,
-                   making this the one link in the app that does not respond. -->
-              <router-link
-                v-else-if="field.link"
-                :to="field.link"
-                :data-test="`alerts-alertconfigsummary-${field.key}-link`"
-                >{{ field.value }}</router-link
+            <template v-if="field.code || field.badge">
+              <span
+                :id="labelId(field.key)"
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+                >{{ field.label }}</span
               >
-              <template v-else>{{ field.value }}</template>
-            </dd>
+              <OCodeBlock
+                v-if="field.code"
+                :code="field.value"
+                :lang="field.code"
+                :max-lines="12"
+                inset
+                role="group"
+                :aria-labelledby="labelId(field.key)"
+                class="my-0!"
+                :data-test="`alerts-alertconfigsummary-${field.key}-code`"
+              />
+              <div v-else class="flex h-7 items-center">
+                <OTag :type="field.badge" :value="field.value" size="sm" />
+              </div>
+            </template>
+            <OInput
+              v-else
+              :model-value="shownValue(field.value)"
+              :label="field.label"
+              :placeholder="t('alerts.configNotSet')"
+              readonly
+              size="xs"
+              :data-test="`alerts-alertconfigsummary-${field.key}-input`"
+            >
+              <template v-if="field.link" #icon-right>
+                <!-- Unstyled: base-elements.css owns the link colour and its hover shade. -->
+                <router-link
+                  :to="field.link"
+                  :aria-label="t('alerts.openSlo')"
+                  :title="t('alerts.openSlo')"
+                  class="flex items-center"
+                  :data-test="`alerts-alertconfigsummary-${field.key}-link`"
+                >
+                  <OIcon name="open-in-new" size="sm" />
+                </router-link>
+              </template>
+            </OInput>
           </div>
-        </dl>
+        </div>
       </OCardSection>
     </OCard>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useId } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { alertConditionText, alertWarningConditionText } from "@/utils/alerts/alertCondition";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import {
+  alertConditionIsQuery,
+  alertConditionText,
+  alertWarningConditionText,
+} from "@/utils/alerts/alertCondition";
 import {
   buildAnomalyFilterExpression,
   operatorNeedsValue,
@@ -80,17 +114,19 @@ import {
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { formatTimestampInTimezone } from "@/utils/date";
 
-/** A field row. Loose by construction: the optional render hints (`mono`,
- *  `badge`, `link`) are set on some rows and not others, and inferring per-row
- *  literal types splits the list into a union the template cannot read. */
+/** Loose on purpose: per-row literal inference would split the list into a union the template cannot read. */
 interface SummaryField {
   key: string;
   label: I18nText;
   value: any;
-  mono?: boolean;
+  /** Highlighting language; set only on a whole query, which renders as a code block. */
+  code?: QueryLang;
+  wide?: boolean;
   badge?: string;
   link?: Record<string, any>;
 }
+
+type QueryLang = "sql" | "promql";
 
 interface SummarySection {
   key: string;
@@ -118,6 +154,18 @@ const aggregation = computed(() => queryCondition.value?.aggregation);
 
 const isBlank = (v: any) => v === undefined || v === null || v === "";
 
+// An unset field stays empty so the input's placeholder, not a dash, says so.
+const shownValue = (v: any): string => (isBlank(v) || v === EMPTY ? "" : String(v));
+
+const LONG_VALUE_CHARS = 32;
+const fieldSpan = (field: SummaryField): string => {
+  if (field.code || field.wide) return "col-span-full";
+  return shownValue(field.value).length > LONG_VALUE_CHARS ? "sm:col-span-2" : "";
+};
+
+const idPrefix = useId();
+const labelId = (key: string) => `${idPrefix}-${key}-label`;
+
 /** Renders a minutes-granularity duration with its unit — minutes normally,
  *  hours when the value is a whole multiple of 60. `period` / `frequency` /
  *  `silence` / the pending-period-in-minutes are all whole minutes on the
@@ -138,6 +186,11 @@ const formatMinutesDuration = (minutes: number | null | undefined): string => {
 // question of the same alert.
 const conditionText = computed(() => alertConditionText(props.alert));
 const warningText = computed(() => alertWarningConditionText(props.alert));
+const conditionIsQuery = computed(() => alertConditionIsQuery(props.alert));
+const conditionLang = computed<QueryLang | undefined>(() => {
+  if (!conditionIsQuery.value || conditionText.value === EMPTY) return undefined;
+  return queryCondition.value?.type === "promql" ? "promql" : "sql";
+});
 
 // ── SLO alerts (Feature 5, Phase 3.3) ───────────────────────────────────────
 // This family has no stream, no SQL and no aggregation, so the generic source
@@ -189,13 +242,11 @@ const sloFields = computed(() => {
       key: "condition",
       label: t("alerts.groups.criticalCondition"),
       value: sloThreshold("critical"),
-      mono: true,
     },
     {
       key: "warning",
       label: t("alerts.groups.warningCondition"),
       value: sloThreshold("warning"),
-      mono: true,
     },
   ];
   // An error-budget condition carries no windows at all — the backend rejects
@@ -260,8 +311,8 @@ const anomalySourceFields = computed(() => {
   const a = props.alert;
   const customSql = a?.query_mode === "custom_sql";
   const fields: SummaryField[] = [
-    { key: "stream", label: t("alerts.streamName"), value: a?.stream_name || EMPTY },
     { key: "stream-type", label: t("alerts.streamType"), value: a?.stream_type || EMPTY },
+    { key: "stream", label: t("alerts.streamName"), value: a?.stream_name || EMPTY },
     {
       key: "query-mode",
       label: t("alerts.anomaly.queryMode"),
@@ -274,7 +325,7 @@ const anomalySourceFields = computed(() => {
       key: "custom-sql",
       label: t("alerts.customSql"),
       value: a?.custom_sql || EMPTY,
-      mono: true,
+      code: a?.custom_sql ? "sql" : undefined,
     });
   } else {
     fields.push(
@@ -282,13 +333,12 @@ const anomalySourceFields = computed(() => {
         key: "detection-function",
         label: t("alerts.detectionFunction"),
         value: a?.detection_function || EMPTY,
-        mono: true,
       },
       {
         key: "filters",
         label: t("alerts.anomaly.filters"),
         value: anomalyFiltersText.value,
-        mono: true,
+        code: anomalyFiltersText.value === EMPTY ? undefined : "sql",
       },
     );
   }
@@ -421,7 +471,7 @@ const anomalyModelFields = computed(() => {
     const label = isAnomalyDataReadinessStatus(a.status)
       ? t("alerts.anomaly.dataReadinessReason")
       : t("alerts.anomaly.lastError");
-    fields.push({ key: "last-error", label, value: a.last_error });
+    fields.push({ key: "last-error", label, value: a.last_error, wide: true });
   }
   return fields;
 });
@@ -440,34 +490,37 @@ const genericSections = computed<SummarySection[]>(() => [
       ? sloFields.value
       : [
           {
-            key: "stream",
-            label: t("alerts.streamName"),
-            value: props.alert?.stream_name || EMPTY,
-          },
-          {
             key: "stream-type",
             label: t("alerts.streamType"),
             value: props.alert?.stream_type || EMPTY,
           },
           {
+            key: "stream",
+            label: t("alerts.streamName"),
+            value: props.alert?.stream_name || EMPTY,
+          },
+          {
             key: "condition",
             label: t("alerts.groups.criticalCondition"),
             value: conditionText.value,
-            mono: true,
+            code: conditionLang.value,
           },
-          {
-            key: "warning",
-            label: t("alerts.groups.warningCondition"),
-            value: warningText.value,
-            mono: true,
-          },
+          // Beside a query, a dash Warning reads as a missing setting.
+          ...(conditionIsQuery.value && warningText.value === EMPTY
+            ? []
+            : [
+                {
+                  key: "warning",
+                  label: t("alerts.groups.warningCondition"),
+                  value: warningText.value,
+                },
+              ]),
           {
             key: "group-by",
             label: t("alerts.groups.groupBy"),
             value: aggregation.value?.group_by?.length
               ? aggregation.value.group_by.join(", ")
               : EMPTY,
-            mono: true,
           },
           {
             key: "evaluation-mode",
@@ -511,7 +564,7 @@ const genericSections = computed<SummarySection[]>(() => [
       },
       {
         key: "silence",
-        label: t("alerts.silence"),
+        label: t("alerts.silenceNotification"),
         value: formatMinutesDuration(props.alert?.trigger_condition?.silence),
       },
       {
@@ -531,7 +584,12 @@ const genericSections = computed<SummarySection[]>(() => [
   },
 ]);
 
+const queriesLast = (section: SummarySection): SummarySection => ({
+  ...section,
+  fields: [...section.fields.filter((f) => !f.code), ...section.fields.filter((f) => f.code)],
+});
+
 const sections = computed(() =>
-  isAnomalyConfig.value ? anomalySections.value : genericSections.value,
+  (isAnomalyConfig.value ? anomalySections.value : genericSections.value).map(queriesLast),
 );
 </script>

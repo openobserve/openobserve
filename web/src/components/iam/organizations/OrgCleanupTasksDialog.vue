@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="overallStatus === 'in_progress'"
               name="autorenew"
               size="xs"
-              class="me-1 animate-spin"
+              class="o2-motion-keep me-1 animate-spin"
             />
             {{
               overallStatus === "completed"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 :class="{
                   'text-success': row.status === 'done',
-                  'text-primary animate-spin': row.status === 'running',
+                  'text-primary o2-motion-keep animate-spin': row.status === 'running',
                   'text-error': row.status === 'failed',
                   'text-text-secondary': row.status === 'pending',
                 }"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     :class="{
                       'text-success': child.status === 'done',
-                      'text-primary animate-spin': child.status === 'running',
+                      'text-primary o2-motion-keep animate-spin': child.status === 'running',
                       'text-error': child.status === 'failed',
                       'text-text-secondary': child.status === 'pending',
                     }"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 :class="{
                   'text-success': row.task.status === 'done',
-                  'text-primary animate-spin': row.task.status === 'running',
+                  'text-primary o2-motion-keep animate-spin': row.task.status === 'running',
                   'text-error': row.task.status === 'failed',
                   'text-text-secondary': row.task.status === 'pending',
                 }"
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="tasks.length && overallStatus === 'in_progress'"
         class="text-text-secondary mt-3 flex items-center gap-1.5 text-xs"
       >
-        <OIcon name="autorenew" size="xs" class="animate-spin" />
+        <OIcon name="autorenew" size="xs" class="o2-motion-keep animate-spin" />
         <span>{{ t("iam.orgCleanupTasksDialog.refreshingEvery5s") }}</span>
       </div>
       <div v-else-if="tasks.length && overallStatus === 'failed'" class="text-error mt-3 text-xs">

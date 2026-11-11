@@ -210,7 +210,9 @@ async fn usage_for(
 /// Reads the database directly; the `ALERTS` cache cannot answer "used" while cold.
 async fn alert_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
     let conn = get_orm_client_ro().await;
-    let alerts = db::alerts::alert::list_with_folders(conn, ListAlertsParams::new(org_id)).await?;
+    let alerts =
+        db::alerts::alert::list_with_folders_fully_decoded(conn, ListAlertsParams::new(org_id))
+            .await?;
     let mut uses = Vec::new();
     for (folder, alert) in alerts {
         let id = alert.id.map(|id| id.to_string()).unwrap_or_default();
@@ -257,7 +259,7 @@ async fn composite_alert_usage(org_id: &str) -> Result<Vec<DestinationUse>, Dest
 }
 
 async fn pipeline_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
-    let pipelines = infra::pipeline::list_by_org(org_id).await?;
+    let pipelines = infra::pipeline::list_by_org_fully_decoded(org_id).await?;
     let mut uses = Vec::new();
     for pl in pipelines {
         let names = pl.nodes.iter().filter_map(|node| {
@@ -338,7 +340,7 @@ async fn oncall_team_channel_usage(org_id: &str) -> Result<Vec<DestinationUse>, 
 /// Folder-blind like the alerts arm: a workflow node can name a destination in any folder.
 #[cfg(feature = "enterprise")]
 async fn workflow_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
-    let workflows = crate::workflows::list_workflows(org_id, None, None, None)
+    let workflows = infra::table::workflows::list_by_org_fully_decoded(org_id)
         .await
         .map_err(|e| DestinationError::InfraError(infra::errors::Error::Message(e.to_string())))?;
     let mut uses = Vec::new();

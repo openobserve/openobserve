@@ -15,13 +15,17 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { reactive } from "vue";
+import { defineComponent, h, reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import { convertToUtcTimestamp } from "@/utils/timezone";
 import { formatAxisTickValue } from "@/utils/dashboard/axisTickFormat";
 import { createSeriesOverrideLookup } from "@/utils/dashboard/seriesOverrides";
 import { convertMultiSQLData } from "@/utils/dashboard/convertSQLData";
+import {
+  useFailedRefreshHold,
+  type FailedRefreshHoldHooks,
+} from "@/composables/dashboard/panelFailedRefreshHold";
 
 // ---------------------------------------------------------------------------
 // Heavy async component stubs — must be declared before the component import
@@ -44,6 +48,7 @@ vi.mock("./TracesLatencyHeatmap.vue", () => ({
       "ask-ai",
       "create-alert",
       "add-to-dashboard",
+      "refresh-failed",
     ],
   },
 }));
@@ -183,6 +188,35 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
           emits: ["close", "apply-filter"],
         },
       },
+    },
+  });
+}
+
+// The Rate panel's loader hooks and result, mounted where RenderDashboardCharts would load it.
+let redPanel: { state: any; hooks: FailedRefreshHoldHooks } | null = null;
+const RedPanelProbe = defineComponent({
+  props: ["dashboardData"],
+  setup(props: any) {
+    const state = reactive({
+      data: [] as any,
+      loading: false,
+      errorDetail: { message: "", code: "" as string | number },
+      metadata: { queries: [] as any[] },
+      resultMetaData: [] as any,
+      annotations: [] as any,
+    });
+    const hooks = useFailedRefreshHold(state, () => props.dashboardData?.tabs?.[0]?.panels?.[0]);
+    redPanel = { state, hooks };
+    return () => h("div", { "data-test": "render-dashboard-charts" });
+  },
+});
+
+function mountWithRedPanel(): VueWrapper<any> {
+  return mount(TracesMetricsDashboard, {
+    props: defaultProps,
+    global: {
+      plugins: [mockStore, i18n],
+      stubs: { teleport: true, RenderDashboardCharts: RedPanelProbe },
     },
   });
 }
@@ -564,12 +598,84 @@ describe("TracesMetricsDashboard", () => {
       });
     });
 
+    it("marks the page's refresh failed when the heatmap keeps its grid after a failed refresh", async () => {
+      const meta = mockSearchObj.meta as any;
+      meta.refreshFailedAt = null;
+      meta.lastRunAt = 100;
+      await wrapper.vm.loadDashboard();
+      meta.lastRunAt = 200;
+
+      wrapper.findComponent({ name: "TracesLatencyHeatmap" }).vm.$emit("refresh-failed");
+
+      expect(meta.refreshFailedAt).toEqual(expect.any(Number));
+      expect(meta.chartRefreshFailed).toBe(true);
+      expect(meta.lastRunAt).toBe(100);
+      meta.refreshFailedAt = null;
+      meta.chartRefreshFailed = false;
+    });
+
     it("builds a fresh request object on every loadDashboard", async () => {
       await wrapper.vm.loadDashboard();
       const first = wrapper.vm.heatmapRequest;
       await wrapper.vm.loadDashboard();
       expect(wrapper.vm.heatmapRequest).not.toBe(first);
       expect(wrapper.vm.heatmapRequest).toEqual(first);
+    });
+  });
+
+  describe("a RED panel's failed refresh after the next query was staged with auto-run off", () => {
+    // Runs the probe's load the way usePanelDataLoader does, with the editor changed while it waits.
+    const runRedPanel = (outcome: { hits?: any[]; fail?: boolean }, stageWhileWaiting = "") => {
+      const { state, hooks } = redPanel!;
+      hooks.loadScheduled();
+      if (stageWhileWaiting) mockSearchObj.data.editorValue = stageWhileWaiting;
+      hooks.loadStarted();
+      state.loading = true;
+      state.errorDetail = { message: "", code: "" };
+      if (outcome.hits) state.data = [outcome.hits];
+      if (outcome.fail) state.errorDetail = { message: "Search failed", code: 500 };
+      state.loading = false;
+    };
+    let probed: VueWrapper<any>;
+    const meta = mockSearchObj.meta as any;
+
+    beforeEach(async () => {
+      meta.refreshFailedAt = null;
+      meta.chartRefreshFailed = false;
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      probed = mountWithRedPanel();
+      await flushPromises();
+      await probed.vm.loadDashboard();
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      probed.unmount();
+      redPanel = null;
+      meta.refreshFailedAt = null;
+      meta.chartRefreshFailed = false;
+      meta.lastRunAt = undefined;
+    });
+
+    it("shows the error, not query A's chart, when query B's run fails", async () => {
+      runRedPanel({ hits: [{ service: "a" }] }, "service_name = 'b'");
+
+      await probed.vm.loadDashboard();
+      await flushPromises();
+      runRedPanel({ fail: true });
+
+      expect(redPanel!.state.errorDetail.message).toBe("Search failed");
+      expect(meta.refreshFailedAt).toBeNull();
+    });
+
+    it("keeps query A's chart when A's own request is refreshed again and fails", () => {
+      runRedPanel({ hits: [{ service: "a" }] }, "service_name = 'b'");
+
+      runRedPanel({ fail: true });
+
+      expect(redPanel!.state.errorDetail.message).toBe("");
+      expect(redPanel!.state.data).toEqual([[{ service: "a" }]]);
+      expect(meta.refreshFailedAt).toEqual(expect.any(Number));
     });
   });
 

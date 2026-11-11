@@ -3355,7 +3355,8 @@
         "edit": "Düzenle",
         "identityRowForm": "Bu kartta, kimlik kuralları ilk tanımlanan olaydan itibaren geçerlidir.",
         "newUsersOnly": "Yalnızca yeni kullanıcılar",
-        "newUsersSessionsTip": "Yalnızca yeni kullanıcılar, Kullanıcılar modunda çalışır"
+        "newUsersSessionsTip": "Yalnızca yeni kullanıcılar, Kullanıcılar modunda çalışır",
+        "fieldMissingOn": "{field}: bu akışta olmayan alan"
       },
       "appFilters": {
         "hiddenLabel": "Uygulama filtreleri tarafından gizlendi:",
@@ -13587,6 +13588,8 @@
     "sloColumn": "SLO",
     "sloKind": "Koşul türü",
     "sloLongWindow": "Uzun pencere",
+    "configNotSet": "Ayarlanmadı",
+    "openSlo": "SLO'yu aç",
     "sloShortWindow": "Kısa pencere",
     "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
     "seconds": "Saniye",
@@ -16551,7 +16554,6 @@
     "errorSpans": "Hata Spanları",
     "filterByErrors": "Hatalara göre filtrele",
     "clearErrorFilter": "Hata filtresini temizle",
-    "updatingResults": "Sonuçlar güncelleniyor",
     "error": "HATA",
     "errorCount": "{n} HATA | {n} HATA",
     "success": "BAŞARI",
@@ -32542,5 +32544,11 @@
     "recentRow": "Son arama",
     "deletedQuery": "{query} silindi",
     "undo": "Geri al"
+  },
+  "filterBar": {
+    "validation": {
+      "regexLength": "Deseni en fazla {max} karakterle sınırlayın.",
+      "regexInvalid": "Bu desen geçersiz veya desteklenmiyor. İleriye bakma, geriye bakma ve geri başvurular kullanılamaz."
+    }
   }
 }

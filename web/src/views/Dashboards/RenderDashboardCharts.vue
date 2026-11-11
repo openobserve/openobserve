@@ -201,16 +201,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    Mounting everything up front froze large dashboards. -->
               <div
                 v-else-if="!shouldMountPanel(item.id)"
-                class="drag-cancel flex h-full flex-col p-2"
+                class="drag-cancel h-full"
+                :class="$slots['panel-placeholder'] ? undefined : 'flex flex-col p-2'"
                 :data-test="`dashboard-panel-placeholder-${item.id}`"
               >
-                <OTruncatedText
-                  class="text-text-secondary text-sm"
-                  :data-test="`dashboard-placeholder-title-${item.id}`"
-                >
-                  {{ getPanelTitle(item) }}
-                </OTruncatedText>
-                <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
+                <!-- Opt-in: a host whose page placeholder already drew the panels keeps that look until they mount. -->
+                <slot name="panel-placeholder" :panel="item" :title="getPanelTitle(item)">
+                  <OTruncatedText
+                    class="text-text-secondary text-sm"
+                    :data-test="`dashboard-placeholder-title-${item.id}`"
+                  >
+                    {{ getPanelTitle(item) }}
+                  </OTruncatedText>
+                  <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
+                </slot>
               </div>
               <!-- Panel with Panel-Level Variables -->
               <div v-else class="panel-with-variables flex h-full flex-col">
