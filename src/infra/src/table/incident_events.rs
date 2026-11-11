@@ -384,26 +384,7 @@ pub async fn record_alert(
     match row {
         Some(model) => {
             let mut events = decode_events(org_id, incident_id, &model.events);
-
-            // Scan backwards through the trailing block of Alert events.
-            // If a matching alert_id is found within that block, increment it.
-            // Stop (and append) as soon as a non-Alert event is encountered.
-            let compacted = 'scan: {
-                for event in events.iter_mut().rev() {
-                    if !event.is_alert() {
-                        break 'scan false;
-                    }
-                    if event.is_alert_for(alert_id) {
-                        event.increment_alert(alert_id, triggered_at);
-                        break 'scan true;
-                    }
-                }
-                false
-            };
-
-            if !compacted {
-                events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
-            }
+            push_alert(&mut events, alert_id, alert_name, triggered_at);
             let events_json = encode_events(&events)?;
 
             let mut active: incident_events::ActiveModel = model.into();
@@ -424,6 +405,27 @@ pub async fn record_alert(
 
     txn.commit().await?;
     Ok(())
+}
+
+/// The compaction [record_alert] applies, on the decoded timeline.
+/// Scans backwards through the trailing block of Alert events. If a matching alert_id is
+/// found within that block, its count is incremented. Otherwise a new Alert event is appended.
+pub fn push_alert(
+    events: &mut Vec<IncidentEvent>,
+    alert_id: &str,
+    alert_name: &str,
+    triggered_at: i64,
+) {
+    for event in events.iter_mut().rev() {
+        if !event.is_alert() {
+            break;
+        }
+        if event.is_alert_for(alert_id) {
+            event.increment_alert(alert_id, triggered_at);
+            return;
+        }
+    }
+    events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
 }
 
 /// Deletes all incident event entries belonging to the given org.

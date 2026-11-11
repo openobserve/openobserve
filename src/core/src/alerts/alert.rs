@@ -2615,7 +2615,8 @@ fn incident_path_notified(
     match outcome {
         Outcome::NewIncidentCreated { .. }
         | Outcome::NewAlertTypeJoined { .. }
-        | Outcome::SeverityEscalated { .. } => true,
+        | Outcome::SeverityEscalated { .. }
+        | Outcome::FiredAfterReopen { .. } => true,
         Outcome::ExistingAlertRepeated { .. } => false,
     }
 }

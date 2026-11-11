@@ -449,6 +449,13 @@ pub enum IncidentCorrelationOutcome {
         incident_id: String,
         service_name: String,
     },
+    /// The first firing after a person manually reopened the incident. The alert is
+    /// already a member, but the reopen asked for attention again, so a notification
+    /// is sent. Later firings are `ExistingAlertRepeated` again.
+    FiredAfterReopen {
+        incident_id: String,
+        service_name: String,
+    },
 }
 
 impl IncidentCorrelationOutcome {
@@ -457,7 +464,8 @@ impl IncidentCorrelationOutcome {
             Self::NewIncidentCreated { incident_id, .. }
             | Self::NewAlertTypeJoined { incident_id, .. }
             | Self::ExistingAlertRepeated { incident_id, .. }
-            | Self::SeverityEscalated { incident_id, .. } => incident_id,
+            | Self::SeverityEscalated { incident_id, .. }
+            | Self::FiredAfterReopen { incident_id, .. } => incident_id,
         }
     }
 
@@ -466,7 +474,8 @@ impl IncidentCorrelationOutcome {
             Self::NewIncidentCreated { service_name, .. }
             | Self::NewAlertTypeJoined { service_name, .. }
             | Self::ExistingAlertRepeated { service_name, .. }
-            | Self::SeverityEscalated { service_name, .. } => service_name,
+            | Self::SeverityEscalated { service_name, .. }
+            | Self::FiredAfterReopen { service_name, .. } => service_name,
         }
     }
 
@@ -476,7 +485,8 @@ impl IncidentCorrelationOutcome {
             Self::NewAlertTypeJoined { incident_id, .. } => Some(incident_id),
             Self::NewIncidentCreated { .. }
             | Self::ExistingAlertRepeated { .. }
-            | Self::SeverityEscalated { .. } => None,
+            | Self::SeverityEscalated { .. }
+            | Self::FiredAfterReopen { .. } => None,
         }
     }
 }
@@ -623,6 +633,10 @@ pub struct IncidentEvent {
     #[serde(flatten)]
     pub event_type: IncidentEventType,
 }
+
+/// The `Reopened` reason a manual status change writes. An unacknowledge writes a
+/// different reason, so a firing after it stays suppressed.
+pub const MANUAL_REOPEN_REASON: &str = "Manually reopened";
 
 /// Tagged enum of all possible incident event types
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -905,6 +919,11 @@ impl IncidentEvent {
         })
     }
 
+    /// A person reopened the incident from its status control.
+    pub fn manually_reopened(user_id: impl Into<String>) -> Self {
+        Self::reopened(user_id, MANUAL_REOPEN_REASON)
+    }
+
     pub fn reopened(user_id: impl Into<String>, reason: impl Into<String>) -> Self {
         Self::now(IncidentEventType::Reopened {
             user_id: user_id.into(),
@@ -1060,6 +1079,14 @@ impl IncidentEvent {
         false
     }
 
+    /// Whether a person reopened the incident from its status control (not an unacknowledge).
+    pub fn is_manual_reopen(&self) -> bool {
+        matches!(
+            &self.event_type,
+            IncidentEventType::Reopened { reason, .. } if reason == MANUAL_REOPEN_REASON
+        )
+    }
+
     /// Check if this event is any Alert event (regardless of alert_id)
     pub fn is_alert(&self) -> bool {
         matches!(&self.event_type, IncidentEventType::Alert { .. })
@@ -1106,6 +1133,13 @@ mod tests {
             ),
             (
                 IncidentCorrelationOutcome::NewIncidentCreated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+            (
+                IncidentCorrelationOutcome::FiredAfterReopen {
                     incident_id: id(),
                     service_name: svc(),
                 },
