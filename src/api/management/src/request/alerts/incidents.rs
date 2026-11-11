@@ -170,8 +170,16 @@ pub async fn list_incidents(
         ("x-o2-mcp" = json!({"description": "Get an incident's details", "category": "alerts", "pinned": true}))
     )
 )]
-pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
-    match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id).await
+pub async fn get_incident(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    match openobserve_core::alerts::incidents::get_incident_with_alerts(
+        &org_id,
+        &incident_id,
+        &user_email.user_id,
+    )
+    .await
     {
         Ok(Some(incident)) => MetaHttpResponse::json(incident),
         Ok(None) => MetaHttpResponse::not_found("Incident not found"),
@@ -477,12 +485,12 @@ pub struct TriggerRcaQuery {
     request_body(content = TriggerRcaBody, description = "Optional guidance for the new run", content_type = "application/json"),
     responses(
         (status = 202, description = "Analysis started", content_type = "application/json", body = RcaStartedResponse),
-        (status = 400, description = "RCA not enabled, an analysis is already in progress, an invalid body (`error_code: invalid_body`, also for unknown fields) or invalid guidance (`error_code: invalid_guidance`)", content_type = "application/json", body = ()),
+        (status = 400, description = "RCA not enabled, no RCA agent is configured (`error_code: agent_not_configured`), an analysis is already in progress, an invalid body (`error_code: invalid_body`, also for unknown fields) or invalid guidance (`error_code: invalid_guidance`)", content_type = "application/json", body = ()),
         (status = 402, description = "AI credits exhausted", content_type = "application/json", body = ()),
         (status = 412, description = "Paid usage requires organization consent", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal error", content_type = "application/json", body = Object),
-        (status = 503, description = "RCA agent or billing state unavailable", content_type = "application/json", body = ()),
+        (status = 503, description = "Billing state unavailable", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -531,13 +539,12 @@ pub async fn trigger_incident_rca(
     }
 
     if !openobserve_core::alerts::incidents::rca_agent_available() {
-        return axum::response::Response::builder()
-            .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
-            .header(axum::http::header::CONTENT_TYPE, "application/json")
-            .body(axum::body::Body::from(
-                serde_json::json!({"error": "RCA agent is not available"}).to_string(),
-            ))
-            .unwrap();
+        return rca_error_response(
+            axum::http::StatusCode::BAD_REQUEST,
+            "RCA agent is not available",
+            Some("agent_not_configured"),
+            None,
+        );
     }
 
     // Validate existence before quota; the context builder hydrates the incident later.
@@ -1263,14 +1270,14 @@ async fn incident_run(
     ),
     responses(
         (status = 202, description = "Resumed run started", content_type = "application/json", body = RcaResumedResponse),
-        (status = 400, description = "RCA not enabled", content_type = "application/json", body = ()),
+        (status = 400, description = "RCA not enabled, or no RCA agent is configured (`error_code: agent_not_configured`)", content_type = "application/json", body = ()),
         (status = 402, description = "AI credits exhausted", content_type = "application/json", body = ()),
         (status = 404, description = "Unknown incident or run", content_type = "application/json", body = Object),
         (status = 409, description = "`error_code`: `not_resumable`, `nothing_to_resume` or `run_in_flight`", content_type = "application/json", body = Object),
         (status = 410, description = "`error_code: transcript_expired`: the earlier run's transcript is gone", content_type = "application/json", body = Object),
         (status = 412, description = "Paid usage requires organization consent", content_type = "application/json", body = ()),
         (status = 500, description = "Internal error", content_type = "application/json", body = Object),
-        (status = 503, description = "RCA agent or billing state unavailable, or the earlier run's transcript could not be read in full (`error_code: history_unavailable`)", content_type = "application/json", body = Object),
+        (status = 503, description = "Billing state unavailable, or the earlier run's transcript could not be read in full (`error_code: history_unavailable`)", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -1316,7 +1323,7 @@ async fn resume_run(
     }
     if !openobserve_core::alerts::incidents::rca_agent_available() {
         return rca_error_response(
-            StatusCode::SERVICE_UNAVAILABLE,
+            StatusCode::BAD_REQUEST,
             "RCA agent is not available",
             Some("agent_not_configured"),
             None,

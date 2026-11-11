@@ -660,6 +660,58 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
     }
 }
 
+/// Whether this save turns a disabled alert back on.
+pub(crate) fn re_enables(was_enabled: Option<bool>, enabled: bool) -> bool {
+    was_enabled == Some(false) && enabled
+}
+
+/// Drops an alert's run-state rows and its scheduler delivery memory, so it starts like a new
+/// alert.
+pub(crate) async fn reset_run_state(
+    org_id: &str,
+    alert_id: &str,
+    module: db::scheduler::TriggerModule,
+) -> Result<(), infra::errors::Error> {
+    use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+
+    let firing = crate::alerts::lifecycle::firing_rows(alert_id).await;
+    let mut rows = infra::table::alert_states::list_groups(alert_id).await?;
+    rows.extend(infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await?);
+    db::alerts::alert_states::delete_states(alert_id).await?;
+    forget_trigger_delivery(org_id, module, alert_id).await?;
+    crate::alerts::recovery::log_orphaned_episodes(alert_id, &rows, "dropped on re-enable");
+    let cleared = crate::alerts::lifecycle::deleted_clears(
+        &firing,
+        config::utils::time::now_micros(),
+        crate::alerts::lifecycle::ClearKind::AlertReEnabled,
+    );
+    crate::alerts::lifecycle::on_all_cleared(org_id, alert_id, &cleared).await;
+    Ok(())
+}
+
+/// Clears the silence window and notified level the scheduler keeps in the trigger's data.
+async fn forget_trigger_delivery(
+    org_id: &str,
+    module: db::scheduler::TriggerModule,
+    key: &str,
+) -> Result<(), infra::errors::Error> {
+    use config::meta::triggers::ScheduledTriggerData;
+    use infra::errors::{DbError, Error};
+
+    let mut trigger = match db::scheduler::get(org_id, module, key).await {
+        Ok(trigger) => trigger,
+        Err(Error::DbError(DbError::KeyNotExists(_))) => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    // Unparsable data is read as the default by the scheduler, so it remembers no delivery.
+    let Ok(mut data) = ScheduledTriggerData::from_json_string(&trigger.data) else {
+        return Ok(());
+    };
+    data.clear_delivery();
+    trigger.data = data.to_json_string();
+    db::scheduler::update_trigger(trigger, false, "").await
+}
+
 /// What saving this alert does to the SLOs measuring from it: decided before
 /// the write by [`prepare_alert`], applied after it by the caller.
 ///
@@ -1488,6 +1540,12 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         }
     }
 
+    // Before the write: once enabled, the scheduler may evaluate against the old state.
+    if let Some(id) = alert.id
+        && re_enables(was_enabled, alert.enabled)
+    {
+        reset_run_state(org_id, &id.to_string(), db::scheduler::TriggerModule::Alert).await?;
+    }
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     slo_effect.apply().await;
     clean_up_opted_out_groups(&alert).await;
@@ -2332,9 +2390,13 @@ pub async fn enable_by_name(
             }
         };
     let changed = alert.enabled != value;
+    let reset = re_enables(Some(alert.enabled), value);
     alert.enabled = value;
     let alert_id = alert.id.map(|id| id.to_string());
     let by = alert.last_edited_by.clone().unwrap_or_default();
+    if reset && let Some(alert_id) = alert_id.as_deref() {
+        reset_run_state(org_id, alert_id, db::scheduler::TriggerModule::Alert).await?;
+    }
     db::alerts::alert::set(org_id, alert, false).await?;
     if changed && let Some(alert_id) = alert_id {
         crate::alerts::lifecycle::on_alert_enabled_changed(org_id, &alert_id, &by, value).await;
@@ -5586,6 +5648,92 @@ mod tests {
         alert.query_condition.query_type = QueryType::PromQL;
         alert.query_condition.promql_multi_alert = true;
         assert!(validate_recovery_templates("default", &alert).await.is_ok());
+    }
+
+    #[test]
+    fn only_turning_an_alert_back_on_resets_it() {
+        assert!(re_enables(Some(false), true));
+        assert!(!re_enables(Some(true), false));
+        assert!(!re_enables(Some(true), true));
+        assert!(!re_enables(Some(false), false));
+        assert!(!re_enables(None, true), "a new alert has nothing to reset");
+    }
+
+    #[tokio::test]
+    async fn re_enabling_drops_every_state_row_and_keeps_the_history() {
+        use config::meta::{
+            alerts::{level::AlertLevel, state::ROLLUP_GROUP_KEY},
+            self_reporting::usage::RunOutcome,
+        };
+        use svix_ksuid::KsuidLike;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("re_enable_reset_{}", config::utils::time::now_micros());
+        let folder = Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(&org, folder, FolderType::Alerts)
+            .await
+            .unwrap();
+        let mut alert = Alert::default();
+        alert.org_id = org.clone();
+        alert.name = "re_enable_reset".to_string();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        let alert = infra::table::alerts::create(
+            infra::db::get_orm_client_rw().await,
+            &org,
+            "default",
+            alert,
+            false,
+        )
+        .await
+        .unwrap();
+        let alert_id = alert.id.unwrap().to_string();
+        for key in [ROLLUP_GROUP_KEY, "host=a"] {
+            let mut update = config::meta::alerts::state::apply_outcome(
+                &alert_id,
+                key,
+                None,
+                RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                1_000,
+            );
+            if let Some(state) = update.state.as_mut() {
+                state.episode_id = Some(format!("ep-{key}"));
+            }
+            db::alerts::alert_states::persist(&update, None)
+                .await
+                .unwrap();
+        }
+
+        reset_run_state(&org, &alert_id, db::scheduler::TriggerModule::Alert)
+            .await
+            .unwrap();
+
+        assert!(
+            infra::table::alert_states::get(&alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            infra::table::alert_states::list_groups(&alert_id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let history = infra::table::alert_states::list_transitions(&alert_id, 10)
+            .await
+            .unwrap();
+        assert_eq!(history.len(), 2, "the transition log outlives the reset");
     }
 
     #[test]

@@ -215,14 +215,21 @@ async fn persist_alert_run_state_deferred(
             rule_value,
         )
     } else {
-        apply_outcome(
+        let mut update = apply_outcome(
             alert_id,
             ROLLUP_GROUP_KEY,
             prev.as_ref(),
             state_outcome,
             level,
             now,
-        )
+        );
+        // A multi-alert rollup's `last_seen` is its last group observation, which the reaper needs.
+        if alert.query_condition.multi_alert_enabled()
+            && let Some(state) = update.state.as_mut()
+        {
+            state.last_seen = prev.as_ref().and_then(|p| p.last_seen);
+        }
+        update
     };
 
     // A Slack app send of this run already published the start it predicted for the new firing.
@@ -7488,6 +7495,132 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
+
+    /// A stored multi-alert grouped by host; `None` without the meta store CI configures.
+    async fn stored_host_alert(
+        name: &str,
+        destinations: &[&str],
+        pending_period_sec: i64,
+    ) -> Option<config::meta::alerts::alert::Alert> {
+        use config::meta::alerts::Aggregation;
+        use svix_ksuid::KsuidLike;
+
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return None;
+        }
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+
+        let org = format!("{name}_{}", now_micros());
+        let folder = config::meta::folder::Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        infra::table::folders::get_or_create(
+            &org,
+            folder,
+            config::meta::folder::FolderType::Alerts,
+        )
+        .await
+        .unwrap();
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.org_id = org.clone();
+        alert.name = name.to_string();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.destinations = destinations.iter().map(ToString::to_string).collect();
+        alert.pending_period_sec = pending_period_sec;
+        alert.query_condition.aggregation = Some(
+            serde_json::from_value::<Aggregation>(serde_json::json!({
+                "group_by": ["host"],
+                "function": "count",
+                "having": {"column": "value", "operator": ">", "value": 1},
+                "multi_alert": true,
+            }))
+            .unwrap(),
+        );
+        // Group rows are written only for a stored alert that still has multi_alert on.
+        Some(
+            infra::table::alerts::create(
+                infra::db::get_orm_client_rw().await,
+                &org,
+                "default",
+                alert,
+                false,
+            )
+            .await
+            .unwrap(),
+        )
+    }
+
+    fn host_labels(host: &str) -> std::collections::BTreeMap<String, String> {
+        std::collections::BTreeMap::from([("host".into(), host.into())])
+    }
+
+    fn critical_hosts(hosts: &[&str]) -> config::meta::alerts::grouping::GroupClassification {
+        use config::meta::alerts::grouping::{GroupObservation, classify_groups_by};
+
+        let observations = hosts
+            .iter()
+            .map(|host| GroupObservation::new(host_labels(host), 5.0))
+            .collect();
+        classify_groups_by(
+            observations,
+            |_| Some(config::meta::alerts::level::AlertLevel::Critical),
+            100,
+        )
+    }
+
+    #[tokio::test]
+    async fn a_rollup_rewrite_after_dispatch_keeps_the_observation_clock() {
+        use config::meta::alerts::{level::AlertLevel, state::ROLLUP_GROUP_KEY};
+
+        let Some(alert) = stored_host_alert("rewrite_clock", &["dest"], 0).await else {
+            return;
+        };
+        let alert_id = alert.id.unwrap().to_string();
+        let episode = config::meta::alerts::recovery::EpisodeInput::undelivered(0);
+        persist_alert_run_state_deferred(
+            &alert,
+            &alert_id,
+            &RunOutcome::Firing,
+            Some(AlertLevel::Critical),
+            Some(&critical_hosts(&["a"])),
+            None,
+            &episode,
+        )
+        .await
+        .expect("the plan commits");
+        let rollup = || async {
+            infra::table::alert_states::get(&alert_id, ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        let observed = rollup().await.last_seen;
+
+        let committed = persist_alert_run_state(
+            &alert,
+            &alert_id,
+            &RunOutcome::NotifyFailed,
+            Some(AlertLevel::Critical),
+            None,
+            None,
+            &episode,
+        )
+        .await;
+
+        assert!(committed);
+        let after = rollup().await;
+        assert_eq!(after.last_outcome, Some(RunOutcome::NotifyFailed));
+        assert_eq!(after.last_seen, observed, "a rewrite observed no groups");
+    }
 
     #[test]
     fn a_scheduled_run_refuses_a_pipeline_bound_to_another_org() {

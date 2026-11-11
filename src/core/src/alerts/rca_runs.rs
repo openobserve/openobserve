@@ -634,6 +634,12 @@ pub(crate) mod tests {
         LOCK.lock().await
     }
 
+    /// Turn RCA off for a test of the RCA-off guard; RCA is on by default.
+    pub(crate) fn rca_off() {
+        unsafe { std::env::set_var("O2_INCIDENTS_RCA_ENABLED", "false") };
+        o2_enterprise::enterprise::common::config::refresh_config().unwrap();
+    }
+
     /// A fresh org with one open incident that was never analyzed.
     pub(crate) async fn new_incident(topology: Option<serde_json::Value>) -> (String, String) {
         let org_id = format!("rca_{}", runs_table::new_run_id().to_lowercase());
