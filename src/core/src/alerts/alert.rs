@@ -135,6 +135,9 @@ pub enum AlertError {
     #[error("Alerts cannot be defined on the internal stream '{0}'")]
     ProtectedStream(String),
 
+    #[error("Invalid alert condition: {0}")]
+    InvalidCondition(String),
+
     /// The warning/critical pair is invalid for the chosen operator.
     /// "Less severe" is direction-dependent — see `level::validate_thresholds`.
     #[error("Invalid warning threshold: {0}")]
@@ -957,6 +960,16 @@ async fn prepare_alert(
     if alert.name.contains('/') {
         return Err(AlertError::AlertNameContainsForwardSlash);
     }
+    if let Some(conditions) = alert.query_condition.conditions.as_ref() {
+        conditions
+            .validate_operator_values()
+            .map_err(AlertError::InvalidCondition)?;
+    }
+    alert
+        .trigger_condition
+        .validate_threshold_operator()
+        .and_then(|_| alert.query_condition.validate_threshold_operators())
+        .map_err(AlertError::InvalidCondition)?;
     // A realtime alert sees every ingested row, so one on chat history would exfiltrate it.
     // Case-insensitive, so no spelling of the chat stream slips through.
     if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
@@ -2602,9 +2615,19 @@ fn incident_path_notified(
     match outcome {
         Outcome::NewIncidentCreated { .. }
         | Outcome::NewAlertTypeJoined { .. }
-        | Outcome::SeverityEscalated { .. } => true,
+        | Outcome::SeverityEscalated { .. }
+        | Outcome::FiredAfterReopen { .. } => true,
         Outcome::ExistingAlertRepeated { .. } => false,
     }
+}
+
+/// `FiredAfterReopen` notifies destinations but pages nobody, so the manual trigger still pages.
+#[cfg(feature = "enterprise")]
+fn incident_path_paged(
+    outcome: &config::meta::alerts::incidents::IncidentCorrelationOutcome,
+) -> bool {
+    use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+    !matches!(outcome, Outcome::FiredAfterReopen { .. }) && incident_path_notified(outcome)
 }
 
 pub async fn trigger_by_id<C: ConnectionTrait>(
@@ -2624,7 +2647,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let (incident_notified, incident_notify_error) = if alert.creates_incident
+    let (incident_notified, incident_paged, incident_notify_error) = if alert.creates_incident
         && crate::alerts::incidents::incidents_enabled()
     {
         let synthetic_row = manual_trigger_row(&alert);
@@ -2652,6 +2675,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                 );
                 (
                     incident_path_notified(&correlated.outcome),
+                    incident_path_paged(&correlated.outcome),
                     correlated.notify_error,
                 )
             }
@@ -2660,17 +2684,17 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                (false, None)
+                (false, false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                (false, None)
+                (false, false, None)
             }
         }
     } else {
-        (false, None)
+        (false, false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
@@ -2691,7 +2715,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // somebody checks a new on-call alert pages before trusting it, and it only
     // answers that question if it pages.
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
+    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_paged {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
     #[cfg(feature = "enterprise")]
@@ -4939,6 +4963,7 @@ mod threshold_validation_tests {
                 operator: config::meta::alerts::Operator::GreaterThan,
                 value: json!(90),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: true,
@@ -4958,6 +4983,7 @@ mod threshold_validation_tests {
             operator: config::meta::alerts::Operator::GreaterThan,
             value: json!(10),
             ignore_case: false,
+            case_insensitive: None,
         });
         alert.query_condition.promql_multi_alert = true;
         alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
@@ -5176,6 +5202,7 @@ mod group_by_validation_tests {
                 operator: Operator::GreaterThan,
                 value: json!(100),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: false,
@@ -5220,8 +5247,6 @@ mod send_path_tests {
     use config::meta::destinations::{Endpoint, HTTPType, Template, TemplateKind};
 
     #[cfg(feature = "enterprise")]
-    use super::incident_path_notified;
-    #[cfg(feature = "enterprise")]
     use super::is_license_denial;
     use super::{
         Alert, AlertError, AlertExt, NotificationOutcome, WORKFLOWS_UNLICENSED_REASON,
@@ -5229,6 +5254,8 @@ mod send_path_tests {
         send_attempted, send_discord_with_attachment, send_error_message, send_failure_message,
         send_http_notification, workflows_denial_as_warning,
     };
+    #[cfg(feature = "enterprise")]
+    use super::{incident_path_notified, incident_path_paged};
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
         ssrf_test_support::{hanging_server, isolated, secret_server, truncated_server},
@@ -5661,6 +5688,23 @@ mod send_path_tests {
         // the incident path sends NOTHING for this outcome, so skipping the alert's
         // destinations here would mean nobody is notified at all
         assert!(!incident_path_notified(&Outcome::ExistingAlertRepeated {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        }));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_firing_after_reopen_skips_destinations_but_still_pages() {
+        use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+
+        let outcome = Outcome::FiredAfterReopen {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        };
+        assert!(incident_path_notified(&outcome));
+        assert!(!incident_path_paged(&outcome));
+        assert!(!incident_path_paged(&Outcome::ExistingAlertRepeated {
             incident_id: "i1".to_string(),
             service_name: "svc".to_string(),
         }));
@@ -6174,6 +6218,7 @@ mod tests {
             operator: Operator::Contains,
             value: json!("enrique"),
             ignore_case: false,
+            case_insensitive: None,
         };
         let sql = build_expr(&condition, "", &DataType::Utf8).unwrap();
         assert_eq!(sql, "str_match(\"auth_username\", 'enrique')");
@@ -8224,6 +8269,7 @@ mod tests {
                 operator: config::meta::alerts::Operator::GreaterThanEquals,
                 value: json!(85.5),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: Some(70.0),
             multi_alert: false,
@@ -8602,6 +8648,7 @@ mod tests {
             operator: config::meta::alerts::Operator::LessThanEquals,
             value: json!(7),
             ignore_case: false,
+            case_insensitive: None,
         });
         alert.query_condition.promql = Some(
             "((disk_used) >= 0.9) * 0 or clamp_min(ceil((0.9 - (disk_used)) / (deriv((disk_used)[2d:15m]) > 0) / 8640 - 1e-6) / 10, 0) or ((disk_used) * 0 + 36500)".into(),
@@ -9195,6 +9242,7 @@ mod tests {
                 operator: config::meta::alerts::Operator::GreaterThanEquals,
                 value: json!(85.5),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: false,
@@ -9297,6 +9345,92 @@ mod tests {
             ),
             "{res:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_an_extended_operator_outside_the_condition_tree() {
+        use config::meta::alerts::{AggFunction, Aggregation, Condition};
+
+        let cond = |operator| Condition {
+            column: "v".to_string(),
+            operator,
+            value: serde_json::json!(1),
+            ignore_case: false,
+            case_insensitive: None,
+        };
+        let err = prepare_schedule(|a| a.trigger_condition.operator = Operator::In).await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m) if m.contains("trigger condition")),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.query_condition.promql_condition = Some(cond(Operator::ReMatch));
+        })
+        .await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m) if m.contains("PromQL condition")),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.query_condition.aggregation = Some(Aggregation {
+                group_by: None,
+                function: AggFunction::Count,
+                having: cond(Operator::StartsWith),
+                warning_value: None,
+                multi_alert: false,
+            });
+        })
+        .await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m) if m.contains("aggregation having")),
+            "{err:?}"
+        );
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            a.query_condition.promql_condition = Some(cond(Operator::GreaterThan));
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    fn with_condition_operator(alert: &mut Alert, operator: &str) {
+        alert.query_condition.conditions = Some(
+            serde_json::from_value(serde_json::json!({"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": operator,
+                     "value": ["error"], "logicalOperator": "AND"}]}}))
+            .unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_accepts_an_in_condition() {
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            with_condition_operator(a, "in");
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    fn with_case_insensitive_contains(alert: &mut Alert) {
+        alert.query_condition.conditions = Some(
+            serde_json::from_value(serde_json::json!({"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "contains",
+                     "value": "err", "case_insensitive": true, "logicalOperator": "AND"}]}}))
+            .unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_accepts_a_case_insensitive_condition() {
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            with_case_insensitive_contains(a);
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
     }
 
     #[tokio::test]

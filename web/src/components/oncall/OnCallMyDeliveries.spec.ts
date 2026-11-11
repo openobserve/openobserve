@@ -25,6 +25,7 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { MyDelivery } from "@/ts/interfaces/oncall";
 import { axiosReply } from "@/test/unit/helpers/mockService";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 
 vi.mock("@/services/oncall", () => ({
   default: { myDeliveries: vi.fn(), markDeliveriesRead: vi.fn(), acknowledgeResponse: vi.fn() },
@@ -921,6 +922,8 @@ describe("OnCallMyDeliveries", () => {
     it("holds the same fixed body while loading", async () => {
       service.myDeliveries.mockReturnValue(new Promise<never>(() => {}));
       const wrapper = await mountReal();
+      // The skeleton shows only once a load outlasts the loader delay.
+      await new Promise((r) => setTimeout(r, LOADER_DELAY_MS + 20));
 
       expect(table(wrapper).classes()).toContain("[&_[data-test=o2-table-scroll-container]]:h-104");
       const skeleton = card(wrapper).find('[data-test="o2-table-skeleton-body"]');

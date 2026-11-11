@@ -348,15 +348,27 @@ pub async fn list(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
 ) -> Result<Vec<Alert>, infra::errors::Error> {
-    let params = ListAlertsParams::new(org_id).in_folder("default");
-    let params = if let Some(stream_name) = stream_name {
-        params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
-    } else {
-        params
-    };
-
     let client = get_orm_client_ro().await;
-    let alerts = table::list(client, params)
+    let alerts = table::list(
+        client,
+        default_folder_params(org_id, stream_type, stream_name),
+    )
+    .await?
+    .into_iter()
+    .map(|(_f, a)| a)
+    .collect();
+    Ok(alerts)
+}
+
+/// Like `list` but fails on an unreadable row, so a stream delete cannot leave its alert behind.
+pub async fn list_fully_decoded(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> Result<Vec<Alert>, infra::errors::Error> {
+    let client = get_orm_client_ro().await;
+    let params = default_folder_params(org_id, stream_type, stream_name);
+    let alerts = table::list_fully_decoded(client, params)
         .await?
         .into_iter()
         .map(|(_f, a)| a)
@@ -364,10 +376,10 @@ pub async fn list(
     Ok(alerts)
 }
 
-/// Every alert of the org in every folder; `list` reads only the default folder.
+/// Every alert of the org in every folder, failing on an unreadable row so teardown misses none.
 pub async fn list_all_for_cleanup(org_id: &str) -> Result<Vec<Alert>, infra::errors::Error> {
     let client = get_orm_client_ro().await;
-    let alerts = table::list(client, ListAlertsParams::new(org_id))
+    let alerts = table::list_fully_decoded(client, ListAlertsParams::new(org_id))
         .await?
         .into_iter()
         .map(|(_f, a)| a)
@@ -382,25 +394,44 @@ pub async fn list_with_folders<C: ConnectionTrait>(
     table::list(conn, params).await
 }
 
+/// Like `list_with_folders` but fails on an unreadable row; unreadable must not mean "unused".
+pub async fn list_with_folders_fully_decoded<C: ConnectionTrait>(
+    conn: &C,
+    params: ListAlertsParams,
+) -> Result<Vec<(Folder, Alert)>, infra::errors::Error> {
+    table::list_fully_decoded(conn, params).await
+}
+
 pub async fn watch() -> Result<(), anyhow::Error> {
     infra::coordinator::alerts::watch_events(put_into_cache, delete_from_cache).await
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let client = get_orm_client_rw().await;
+    let orgs: HashSet<String> = infra::schema::STREAM_SCHEMAS
+        .read()
+        .await
+        .keys()
+        .filter(|key| key.contains('/'))
+        .filter_map(|key| key.split('/').next().map(str::to_string))
+        .collect();
+    cache_orgs(client, orgs).await
+}
+
+pub async fn reset() -> Result<(), anyhow::Error> {
+    let key = "/alerts/";
+    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
+}
+
+/// Loads the alerts of `orgs` into the caches; an alert row this version cannot read is skipped
+/// by the table layer, so it cannot stop the node from starting.
+async fn cache_orgs<C: ConnectionTrait>(
+    conn: &C,
+    orgs: HashSet<String>,
+) -> Result<(), anyhow::Error> {
     let mut alerts: Vec<(Folder, Alert)> = Vec::new();
-    let r = infra::schema::STREAM_SCHEMAS.read().await;
-    let mut orgs = HashSet::new();
-    for key in r.keys() {
-        if !key.contains('/') {
-            continue;
-        }
-        let split_key = key.split('/').collect::<Vec<&str>>();
-        let org_name = split_key[0];
-        orgs.insert(org_name);
-    }
     for org_name in orgs {
-        let alerts_in_orgs = table::list(client, ListAlertsParams::new(org_name)).await?;
+        let alerts_in_orgs = table::list(conn, ListAlertsParams::new(&org_name)).await?;
         alerts.extend(alerts_in_orgs);
     }
 
@@ -420,11 +451,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     log::info!("Alerts Cached");
     Ok(())
-}
-
-pub async fn reset() -> Result<(), anyhow::Error> {
-    let key = "/alerts/";
-    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
 }
 
 async fn put_into_cache(
@@ -495,6 +521,19 @@ async fn delete_from_cache(org: String, alert_id: String) -> Result<(), anyhow::
     }
 
     Ok(())
+}
+
+fn default_folder_params(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> ListAlertsParams {
+    let params = ListAlertsParams::new(org_id).in_folder("default");
+    if let Some(stream_name) = stream_name {
+        params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
+    } else {
+        params
+    }
 }
 
 pub async fn get_alert_from_cache(org_id: &str, alert_id: &str) -> Option<(Folder, Alert)> {
@@ -650,6 +689,123 @@ mod tests {
         let expected = ksuid.to_string();
         let key = scheduler_key(Some(ksuid));
         assert_eq!(key, expected);
+    }
+
+    fn alert_row(
+        org: &str,
+        id: &str,
+        query_conditions: Option<serde_json::Value>,
+    ) -> infra::table::entity::alerts::Model {
+        infra::table::entity::alerts::Model {
+            id: id.to_string(),
+            org: org.to_string(),
+            folder_id: "folder_pk".to_string(),
+            name: format!("alert-{id}"),
+            stream_type: "logs".to_string(),
+            stream_name: "s".to_string(),
+            is_real_time: false,
+            destinations: serde_json::json!([]),
+            template: None,
+            context_attributes: None,
+            row_template: None,
+            row_template_type: 0,
+            description: None,
+            enabled: true,
+            tz_offset: 0,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            query_type: 0,
+            query_conditions,
+            query_sql: None,
+            query_promql: None,
+            query_promql_condition: None,
+            query_aggregation: None,
+            query_promql_multi_alert: None,
+            query_promql_rule_mode: None,
+            query_vrl_function: None,
+            query_search_event_type: None,
+            query_multi_time_range: None,
+            trigger_threshold_operator: ">".to_string(),
+            trigger_period_seconds: 900,
+            trigger_threshold_count: 1,
+            trigger_thresholds: None,
+            priority: None,
+            tags: None,
+            slo_id: None,
+            oncall_team: None,
+            runbook_url: None,
+            incident_title_template: None,
+            query_slo_condition: None,
+            trigger_frequency_type: 1,
+            trigger_frequency_seconds: 300,
+            trigger_frequency_cron: None,
+            trigger_frequency_cron_timezone: None,
+            trigger_silence_seconds: 0,
+            trigger_tolerance_seconds: None,
+            owner: None,
+            last_edited_by: None,
+            updated_at: None,
+            align_time: false,
+            dedup_enabled: false,
+            dedup_time_window_minutes: None,
+            dedup_config: None,
+            creates_incident: false,
+            workflows: serde_json::json!([]),
+            pending_period_sec: 0,
+            notify_on_recovery: None,
+            recovery_destinations: None,
+            keep_firing_for_seconds: None,
+            suppress_repeats: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cache_orgs_skips_an_alert_this_version_cannot_read() {
+        use infra::table::entity::{alerts, folders};
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, Schema};
+        use svix_ksuid::KsuidLike;
+
+        const ORG: &str = "cache_skips_unreadable";
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for create in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(alerts::Entity),
+        ] {
+            db.execute(backend.build(&create)).await.unwrap();
+        }
+        folders::ActiveModel {
+            id: Set("folder_pk".to_string()),
+            org: Set(ORG.to_string()),
+            folder_id: Set(DEFAULT_FOLDER.to_string()),
+            name: Set("default".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(1),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        let future_rule = serde_json::json!({"version": 2, "conditions": {
+            "filterType": "group", "logicalOperator": "AND", "conditions": [
+                {"filterType": "condition", "column": "level", "operator": "future_op",
+                 "value": ["error"], "logicalOperator": "AND"}]}});
+        let ids = [Ksuid::new(None, None), Ksuid::new(None, None)].map(|id| id.to_string());
+        for (id, conditions) in ids.iter().zip([None, Some(future_rule)]) {
+            alerts::ActiveModel::from(alert_row(ORG, id, conditions))
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        cache_orgs(&db, HashSet::from([ORG.to_string()]))
+            .await
+            .unwrap();
+
+        let cached = ALERTS.read().await;
+        assert!(cached.contains_key(&cache_alert_key(ORG, &ids[0])));
+        assert!(!cached.contains_key(&cache_alert_key(ORG, &ids[1])));
     }
 }
 

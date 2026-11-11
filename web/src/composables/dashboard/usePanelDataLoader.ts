@@ -32,6 +32,7 @@ import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
 import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import { useFailedRefreshHold } from "./panelFailedRefreshHold";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
@@ -208,6 +209,7 @@ export const usePanelDataLoader = (
   const isVisible: any = ref(false);
 
   const refreshAfterRestore = usePanelRefreshAfterRestore({ state, panelSchema, dashboardId });
+  const failedRefreshHold = useFailedRefreshHold(state, () => panelSchema.value);
 
   // Until the first load settles the panel has no answer yet, so "No Data" would flash over a cached result.
   const isFirstLoadSettled = ref(false);
@@ -416,6 +418,7 @@ export const usePanelDataLoader = (
 
   const loadData = async () => {
     const loadCall = ++latestLoadCall;
+    failedRefreshHold.loadScheduled();
     log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
 
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
@@ -504,6 +507,7 @@ export const usePanelDataLoader = (
           state.loading = false;
           state.isOperationCancelled = false;
           log("loadData: panelcache: restored from cache");
+          failedRefreshHold.loadRestored();
           runCount++;
           if (!refreshAfterRestore.queueRefresh()) return;
         }
@@ -551,6 +555,7 @@ export const usePanelDataLoader = (
       runCount++;
 
       refreshAfterRestore.holdIfQueued();
+      failedRefreshHold.loadStarted();
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 

@@ -652,6 +652,7 @@ mod tests {
                     operator: Operator::GreaterThan,
                     value: 0.into(),
                     ignore_case: false,
+                    case_insensitive: None,
                 },
                 warning_value: None,
                 multi_alert: true,

@@ -29,8 +29,9 @@ use config::{
     },
 };
 use infra::{
-    coordinator::pipelines::PIPELINES_WATCH_PREFIX, pipeline as db_pipeline,
+    coordinator::pipelines::PIPELINES_WATCH_PREFIX,
     pipeline as infra_pipeline,
+    pipeline::{self as db_pipeline, UnreadablePipeline},
 };
 
 use crate::{
@@ -317,7 +318,10 @@ where
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_scheduler() {
         return Ok(());
     }
-    let pipelines = list().await?;
+    let db_pipeline::DecodedPipelines {
+        pipelines,
+        unreadable,
+    } = db_pipeline::list_decoded().await?;
     if pipelines
         .iter()
         .any(|pl| pl.enabled && pl.num_of_func() > 0)
@@ -335,6 +339,9 @@ where
     stream_exec_pl.clear();
     scheduled_pipelines_cache.clear();
     BROKEN_REALTIME_PIPELINES.write().await.clear();
+    for row in &unreadable {
+        record_unreadable_pipeline(row).await;
+    }
 
     for pipeline in pipelines.into_iter() {
         if pipeline.enabled {
@@ -402,6 +409,35 @@ async fn compile_realtime_pipeline(
         }
     }
     compiled
+}
+
+/// Marks an enabled realtime pipeline this version cannot read as broken, like a compile failure.
+async fn record_unreadable_pipeline(row: &UnreadablePipeline) {
+    let mut broken = BROKEN_REALTIME_PIPELINES.write().await;
+    match &row.realtime_stream {
+        Some(stream)
+            if row.enabled && (stream.org_id.is_empty() || stream.org_id.as_str() == row.org) =>
+        {
+            broken.insert(
+                row.id.clone(),
+                BrokenPipeline {
+                    name: row.name.clone(),
+                    stream: stream.clone(),
+                    error: format!("this version cannot read it: {}", row.error),
+                },
+            );
+        }
+        _ => {
+            broken.remove(&row.id);
+        }
+    }
+}
+
+/// Drops a pipeline the watch could not read from every cache, as `cache` would on a restart.
+async fn forget_unreadable_pipeline(row: &UnreadablePipeline) {
+    remove_realtime_pipeline_cache(&row.id).await;
+    SCHEDULED_PIPELINES.write().await.remove(&row.id);
+    record_unreadable_pipeline(row).await;
 }
 
 fn broken_pipeline_error(pipeline_id: &str, broken: &BrokenPipeline) -> ErrorData {
@@ -600,9 +636,18 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra::db::Event::Put(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
-                let Ok(pipeline) = get_by_id(pipeline_id).await else {
-                    log::error!("[Pipeline::watch] error getting pipeline by id from db");
-                    continue;
+                let pipeline = match db_pipeline::get_decoded_by_id(pipeline_id).await {
+                    Ok(Ok(pipeline)) => pipeline,
+                    Ok(Err(row)) => {
+                        forget_unreadable_pipeline(&row).await;
+                        continue;
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[Pipeline::watch] error getting pipeline {pipeline_id} from db: {e}"
+                        );
+                        continue;
+                    }
                 };
                 PIPELINE_ID_TO_ORG
                     .write()
@@ -1043,6 +1088,79 @@ mod tests {
             .await
             .remove("broken_pl_2");
         transform::QUERY_FUNCTIONS.remove("broken_org_2/tag_host");
+    }
+
+    fn unreadable(id: &str, org: &str, stream: Option<&StreamParams>) -> UnreadablePipeline {
+        UnreadablePipeline {
+            id: id.to_string(),
+            org: org.to_string(),
+            name: format!("{id}_name"),
+            enabled: true,
+            realtime_stream: stream.cloned(),
+            error: "unknown variant `future_op`".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_enabled_realtime_pipeline_is_marked_broken() {
+        let stream = StreamParams::new("unreadable_org", "unreadable_stream", StreamType::Logs);
+        record_unreadable_pipeline(&unreadable("unread_pl_1", "unreadable_org", Some(&stream)))
+            .await;
+        let broken = broken_on_node("unreadable_org").await;
+        let error = broken.get("unread_pl_1").expect("marked broken");
+        assert!(error.contains("future_op"), "{error}");
+
+        let mut disabled = unreadable("unread_pl_1", "unreadable_org", Some(&stream));
+        disabled.enabled = false;
+        record_unreadable_pipeline(&disabled).await;
+        assert!(
+            !broken_on_node("unreadable_org")
+                .await
+                .contains_key("unread_pl_1")
+        );
+
+        record_unreadable_pipeline(&unreadable("unread_pl_2", "unreadable_org", None)).await;
+        let other_org = StreamParams::new("someone_else", "s", StreamType::Logs);
+        record_unreadable_pipeline(&unreadable(
+            "unread_pl_3",
+            "unreadable_org",
+            Some(&other_org),
+        ))
+        .await;
+        assert!(broken_on_node("unreadable_org").await.is_empty());
+        assert!(broken_on_node("someone_else").await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_watch_drops_a_pipeline_it_cannot_read_from_the_caches() {
+        let stream = StreamParams::new("unread_watch_org", "unread_watch_s", StreamType::Logs);
+        let pipeline = realtime_pipeline("unread_watch_pl", &stream);
+        let exec_pl = ExecutablePipeline::new(&pipeline).await.unwrap();
+        upsert_realtime_pipeline_cache(&pipeline.id, &stream, exec_pl).await;
+
+        forget_unreadable_pipeline(&unreadable(
+            "unread_watch_pl",
+            "unread_watch_org",
+            Some(&stream),
+        ))
+        .await;
+
+        assert!(get_executable_pipelines(&stream).await.is_empty());
+        assert!(
+            !PIPELINE_STREAM_MAPPING
+                .read()
+                .await
+                .contains_key("unread_watch_pl")
+        );
+        assert!(
+            broken_on_node("unread_watch_org")
+                .await
+                .contains_key("unread_watch_pl")
+        );
+        BROKEN_REALTIME_PIPELINES
+            .write()
+            .await
+            .remove("unread_watch_pl");
     }
 
     async fn broken_on_node(org: &str) -> HashMap<String, String> {

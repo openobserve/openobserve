@@ -128,6 +128,8 @@ const options = (wrapper: any) =>
 const cellWithCount = (wrapper: any, count: number) =>
   options(wrapper).series[0].data.find((c: number[]) => c[3] === count);
 
+const panelLine = (wrapper: any) => wrapper.findComponent({ name: "LoadingProgress" });
+
 let wrapper: any = null;
 
 beforeAll(async () => {
@@ -157,6 +159,188 @@ describe("TracesLatencyHeatmap", () => {
       wrapper = await mountHeatmap();
       expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
       expect(wrapper.findComponent({ name: "ChartRenderer" }).exists()).toBe(false);
+    });
+
+    it("keeps the drawn grid at full opacity through a re-run, under its panel line", async () => {
+      wrapper = await mountHeatmap();
+      let answer!: (v: any) => void;
+      search.mockReturnValueOnce(new Promise((r) => (answer = r)) as any);
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+
+      const body = wrapper.find('[data-test="traces-latency-heatmap-body"]');
+      expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+      expect(body.attributes("aria-busy")).toBe("true");
+      expect(panelLine(wrapper).props("loading")).toBe(true);
+      await new Promise((r) => setTimeout(r, 160));
+      expect(body.classes()).not.toContain("opacity-60");
+
+      answer({ data: { hits: HITS, histogram_interval: 10 } });
+      await settle();
+      expect(body.attributes("aria-busy")).toBeUndefined();
+      expect(panelLine(wrapper).props("loading")).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+    });
+
+    it("draws the dashboard panel line on its header edge through the first load and each re-run, and none once drawn", async () => {
+      let first!: (v: any) => void;
+      search.mockReturnValueOnce(new Promise((r) => (first = r)) as any);
+      wrapper = await mountHeatmap();
+      const line = panelLine(wrapper);
+      expect(line.element.parentElement?.getAttribute("data-test")).toBe(
+        "traces-latency-heatmap-body",
+      );
+      expect(line.element.parentElement?.firstElementChild).toBe(line.element);
+      expect(line.props()).toMatchObject({
+        loading: true,
+        loadingProgressPercentage: 0,
+        indeterminate: false,
+      });
+      expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
+
+      first({ data: { hits: HITS, histogram_interval: 10 } });
+      await settle();
+      expect(panelLine(wrapper).props("loading")).toBe(false);
+
+      let again!: (v: any) => void;
+      search.mockReturnValueOnce(new Promise((r) => (again = r)) as any);
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      expect(panelLine(wrapper).props("loading")).toBe(true);
+
+      again({ data: { hits: HITS, histogram_interval: 10 } });
+      await settle();
+      expect(panelLine(wrapper).props("loading")).toBe(false);
+    });
+
+    it("never keeps another stream's grid while the new stream's loads", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a" });
+      search.mockReturnValueOnce(new Promise(() => {}) as any);
+      await wrapper.setProps({ request: request("SELECT 2"), stream: "b" });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
+    });
+
+    it("keeps the drawn grid at full opacity when the re-run fails", async () => {
+      wrapper = await mountHeatmap();
+      const drawn = options(wrapper);
+      let fail!: (e: unknown) => void;
+      search.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)) as any);
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      await new Promise((r) => setTimeout(r, 160));
+      const body = wrapper.find('[data-test="traces-latency-heatmap-body"]');
+      expect(body.classes()).not.toContain("opacity-60");
+
+      fail(new Error("boom"));
+      await settle();
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+      expect(options(wrapper)).toEqual(drawn);
+      expect(body.attributes("aria-busy")).toBeUndefined();
+      expect(body.classes()).not.toContain("opacity-60");
+      expect(panelLine(wrapper).props("loading")).toBe(false);
+      expect(wrapper.emitted("refresh-failed")).toHaveLength(1);
+    });
+
+    it("reports a refused re-run (4xx) to the page and keeps the grid", async () => {
+      wrapper = await mountHeatmap();
+      const drawn = options(wrapper);
+      search.mockRejectedValueOnce({
+        response: { status: 400, data: { code: 400, message: "Bad Request" } },
+      });
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+
+      expect(wrapper.emitted("refresh-failed")).toHaveLength(1);
+      expect(options(wrapper)).toEqual(drawn);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(false);
+    });
+
+    it("shows the error state, not the previous query's grid, when a same-stream re-run of a new query fails", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a", source: "a|spans|q1" });
+      search.mockRejectedValueOnce(new Error("boom"));
+      await wrapper.setProps({ request: request("SELECT 2"), source: "a|spans|q2" });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(false);
+      expect(wrapper.emitted("refresh-failed")).toBeUndefined();
+    });
+
+    it("keeps the grid when a re-run of the same query fails", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a", source: "a|spans|q1" });
+      search.mockRejectedValueOnce(new Error("boom"));
+      await wrapper.setProps({ request: request("SELECT 2"), source: "a|spans|q1" });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+      expect(wrapper.emitted("refresh-failed")).toHaveLength(1);
+    });
+
+    it("keeps the empty state when a re-run over no data fails", async () => {
+      respond({ hits: [], histogram_interval: 10 });
+      wrapper = await mountHeatmap();
+      search.mockRejectedValueOnce(new Error("boom"));
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-no-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(false);
+      expect(wrapper.emitted("refresh-failed")).toHaveLength(1);
+    });
+
+    it("shows the error state when another stream's first load fails", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a" });
+      search.mockRejectedValueOnce(new Error("boom"));
+      await wrapper.setProps({ request: request("SELECT 2"), stream: "b" });
+      await settle();
+
+      expect(wrapper.find('[data-test="traces-latency-heatmap-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(false);
+      expect(wrapper.emitted("refresh-failed")).toBeUndefined();
+    });
+
+    it("keeps the static block over the mounted chart until its first frame is drawn, and not again on a re-run", async () => {
+      wrapper = await mountHeatmap();
+      const cover = () => wrapper!.find('[data-test="traces-latency-heatmap-first-frame"]');
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+      expect(cover().exists()).toBe(true);
+      expect(cover().attributes("role")).toBe("img");
+      expect(cover().attributes("aria-label")).toBe("Loading chart");
+      expect(cover().classes()).toEqual(expect.arrayContaining(["absolute", "inset-0"]));
+      expect(cover().element.childElementCount).toBe(0);
+
+      wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("painted");
+      await settle();
+      expect(cover().exists()).toBe(false);
+
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      expect(cover().exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
+    });
+
+    it("waits for the first frame again after the chart was replaced by another stream's load", async () => {
+      wrapper = await mountHeatmap({ request: request(), stream: "a" });
+      wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("painted");
+      await settle();
+      await wrapper.setProps({ request: request("SELECT 2"), stream: "b" });
+      await settle();
+      expect(wrapper.find('[data-test="traces-latency-heatmap-first-frame"]').exists()).toBe(true);
+    });
+
+    it("draws a blank Loading chart box, not a spinner or skeleton, before its first grid", async () => {
+      search.mockReturnValue(new Promise(() => {}) as any);
+      wrapper = await mountHeatmap();
+      const loading = wrapper.find('[data-test="traces-latency-heatmap-loading"]');
+      expect(loading.attributes("role")).toBe("img");
+      expect(loading.attributes("aria-label")).toBe("Loading chart");
+      expect(wrapper.findComponent({ name: "OSpinner" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OSkeleton" }).exists()).toBe(false);
     });
 
     it("renders the empty state component for no hits", async () => {

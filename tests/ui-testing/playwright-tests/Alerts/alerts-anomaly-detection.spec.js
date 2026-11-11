@@ -408,7 +408,10 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.addFilter('kubernetes_namespace_name', '=', 'ziox');
       await expect(rows).toHaveCount(initial + 1);
 
-      await pm.anomalyDetectionPage.removeFilter(initial);
+      await expect(pm.anomalyDetectionPage.filterBuilder().chip('kubernetes_namespace_name'))
+        .toContainText('ziox');
+
+      await pm.anomalyDetectionPage.removeFilter('kubernetes_namespace_name');
       await expect(rows).toHaveCount(initial);
     });
 
@@ -690,8 +693,7 @@ test.describe('Anomaly Detection', () => {
         await expect(pauseBtn).toHaveAttribute('data-row-action', 'pause');
 
         await pm.anomalyDetectionPage.togglePause(name);
-        await expect(pm.anomalyDetectionPage.getToastLocator(/success/i)).toBeVisible();
-        // Pause must actually flip the state: the control now offers "resume".
+        // No success toast: the row's control reports the result. Pause must flip it to offer "resume".
         await expect(pauseBtn).toHaveAttribute('data-row-action', 'resume');
 
         await pm.anomalyDetectionPage.togglePause(name);

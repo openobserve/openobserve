@@ -401,6 +401,17 @@ describe("useDragAndDrop", () => {
       expect(useDnD.pipelineObj.dirtyFlag).toBe(false);
     });
 
+    it("keeps an opened pipeline clean when selecting a node only deselects edges", () => {
+      useDnD.pipelineObj.isEditPipeline = true;
+      useDnD.pipelineObj.dirtyFlag = false;
+      useDnD.pipelineObj.edgesChange = false;
+
+      useDnD.onEdgesChange([{ type: "select", id: "edge1", selected: false }]);
+
+      expect(useDnD.pipelineObj.dirtyFlag).toBe(false);
+      expect(useDnD.pipelineObj.edgesChange).toBe(false);
+    });
+
     it("should not set edgesChange for empty changes array", () => {
       useDnD.pipelineObj.edgesChange = false;
 
