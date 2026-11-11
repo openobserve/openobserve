@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createMemoryHistory, createRouter } from "vue-router";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
+import config from "@/aws-exports";
 
 const router = createRouter({
   history: createMemoryHistory(),
@@ -58,6 +59,27 @@ describe("SearchBar — Ask AI while the filter builder shows", () => {
     await flushPromises();
     await wrapper.find(dt("logs-search-bar-filter-builder-ai-btn")).trigger("click");
     expect(openAiMode).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens AI mode when the builder's AI button is clicked before the query editor has loaded", async () => {
+    const originalIsEnterprise = config.isEnterprise;
+    const originalAiEnabled = store.state.zoConfig.ai_enabled;
+    (config as any).isEnterprise = "true";
+    store.state.zoConfig.ai_enabled = true;
+    onTestFinished(() => {
+      (config as any).isEnterprise = originalIsEnterprise;
+      store.state.zoConfig.ai_enabled = originalAiEnabled;
+    });
+    wrapper = mountSearchBar();
+    await flushPromises();
+    wrapper.vm.queryEditorRef = null;
+    wrapper.vm.searchObj.data.stream.selectedStream = ["app_logs"];
+    await flushPromises();
+    await wrapper.find(dt("logs-search-bar-filter-builder-ai-btn")).trigger("click");
+    expect(wrapper.vm.searchObj.meta.nlpMode).toBe(true);
+    await flushPromises();
+    expect(wrapper.find(dt("logs-search-bar-filter-builder")).exists()).toBe(false);
+    wrapper.vm.searchObj.meta.nlpMode = false;
   });
 
   it("gives AI mode the query editor and brings the builder back when it closes", async () => {
