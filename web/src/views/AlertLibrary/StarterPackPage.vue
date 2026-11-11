@@ -88,7 +88,20 @@ const installedOn = computed(() => {
 });
 const perDay = computed(() => queriesPerDay(onRows.value.map(({ alert }) => alert)));
 const streams = computed(() => [...new Set(rows.value.map((row) => row.alert.stream_name))]);
-const kindCount = (kind: string) => flow.items.value.filter((item) => item.kind === kind).length;
+const ITEM_KINDS = ["dashboard", "alert", "savedView"] as const;
+const itemGroups = computed(() =>
+  ITEM_KINDS.map((kind) => ({
+    kind,
+    items: flow.items.value.filter((item) => item.kind === kind),
+  })).filter(({ items }) => items.length),
+);
+const silentFired = computed(() =>
+  onRows.value.filter(({ id, alert }) => (fired.value[id] ?? 0) > 0 && !alert.destinations?.length),
+);
+const silentFiredTimes = computed(() =>
+  silentFired.value.reduce((sum, { id }) => sum + (fired.value[id] ?? 0), 0),
+);
+const packVersion = computed(() => flow.record.value?.version ?? pack.version);
 const showAsk = computed(() => flow.forbidden.value || turn.forbidden.value);
 const pageState = computed(() => {
   if (!flow.loaded.value) return "loading";
@@ -138,7 +151,12 @@ const refresh = async () => {
     return;
   }
   await turn.load({ count: false });
-  await Promise.all([readFired(), health.check(streams.value), matcher.check()]);
+  await Promise.all([
+    flow.loadPreview(),
+    readFired(),
+    health.check(streams.value),
+    matcher.check(),
+  ]);
 };
 
 onMounted(refresh);
@@ -194,7 +212,9 @@ const muteContext = computed(() =>
     bleed
     :title="t('starterPacks.page.title', { title: t(pack.titleKey) })"
     icon="hub"
-    :subtitle="t('starterPacks.page.breadcrumb')"
+    :subtitle="
+      t('starterPacks.page.breadcrumb', { pack: t(pack.titleKey), version: raw(packVersion) })
+    "
     title-data-test="starter-pack-page-title"
   >
     <template #actions>
@@ -286,7 +306,101 @@ const muteContext = computed(() =>
         </OButton>
       </div>
       <template v-else>
+        <OBanner
+          v-if="silentFired.length"
+          variant="error-soft"
+          dense
+          data-test="starter-pack-page-silent-banner"
+        >
+          {{
+            t(
+              "starterPacks.page.silentFired",
+              { count: silentFired.length, times: silentFiredTimes },
+              silentFired.length,
+            )
+          }}
+        </OBanner>
         <StarterPackHealthLine :org="org" />
+        <div class="grid grid-cols-3 gap-3 max-md:grid-cols-1" data-test="starter-pack-page-tiles">
+          <div
+            class="border-border-default rounded-default flex flex-col gap-1 border p-3"
+            data-test="starter-pack-page-tile-installed"
+          >
+            <OText variant="meta">{{ t("starterPacks.page.tileInstalled") }}</OText>
+            <strong class="text-lg">{{
+              t("starterPacks.page.installedOf", {
+                made: flow.made.value.length,
+                total: flow.items.value.length,
+              })
+            }}</strong>
+          </div>
+          <div
+            class="border-border-default rounded-default flex flex-col gap-1 border p-3"
+            data-test="starter-pack-page-tile-data"
+          >
+            <OText variant="meta">{{ t("starterPacks.page.tileData") }}</OText>
+            <strong class="text-lg">{{
+              t("starterPacks.page.streamCount", { count: streams.length }, streams.length)
+            }}</strong>
+          </div>
+          <div
+            class="border-border-default rounded-default flex flex-col gap-1 border p-3"
+            data-test="starter-pack-page-tile-version"
+          >
+            <OText variant="meta">{{ t("starterPacks.page.tileVersion") }}</OText>
+            <strong class="text-lg">{{ packVersion }}</strong>
+          </div>
+        </div>
+        <div
+          class="border-border-default rounded-default flex flex-col border"
+          data-test="starter-pack-page-items"
+        >
+          <div class="flex items-center justify-between px-3 py-2">
+            <strong>{{ t("starterPacks.page.items") }}</strong>
+            <OButton
+              variant="ghost-primary"
+              size="sm-action"
+              data-test="starter-pack-page-open-btn"
+              @click="openView"
+            >
+              {{ t("starterPacks.page.open") }}
+            </OButton>
+          </div>
+          <template v-for="group in itemGroups" :key="group.kind">
+            <OText
+              variant="meta"
+              class="bg-surface-subtle px-3 py-1"
+              :data-test="`starter-pack-page-group-${group.kind}`"
+              >{{
+                t(`starterPacks.page.group.${group.kind}`, { count: group.items.length })
+              }}</OText
+            >
+            <div
+              v-for="item in group.items"
+              :key="item.itemId"
+              class="border-border-default flex items-center justify-between gap-2 border-t px-3 py-1.5"
+              :class="{ 'bg-banner-error-bg': item.status === 'failed' }"
+              :data-test="`starter-pack-page-item-${item.status}`"
+            >
+              <span class="min-w-0 truncate">{{ flow.nameOf(item.itemId) }}</span>
+              <OBadge
+                v-if="item.status === 'failed' || item.status === 'skipped'"
+                :variant="item.status === 'failed' ? 'error-outline' : 'default-outline'"
+              >
+                {{ t(`starterPacks.page.status.${item.status}`) }}
+              </OBadge>
+            </div>
+          </template>
+          <OText
+            v-for="repair in flow.record.value?.repairs ?? []"
+            :key="repair.from"
+            variant="meta"
+            class="border-border-default border-t px-3 py-1.5"
+            data-test="starter-pack-page-repair"
+          >
+            {{ t("starterPacks.page.repair", { from: raw(repair.from), to: raw(repair.to) }) }}
+          </OText>
+        </div>
         <OBanner
           v-if="!onRows.length && offCount"
           variant="info"
@@ -380,51 +494,8 @@ const muteContext = computed(() =>
                 t("starterPacks.page.setUpBy", { who: raw(flow.record.value?.installedBy ?? "") })
               }}</span>
               <span>{{ t("starterPacks.page.date", { date: raw(installedOn) }) }}</span>
-              <span>{{
-                t("starterPacks.page.version", {
-                  version: raw(flow.record.value?.version ?? pack.version),
-                })
-              }}</span>
               <span>{{ t("starterPacks.page.queries", { count: perDay.toLocaleString() }) }}</span>
               <OText variant="meta">{{ t("starterPacks.page.scanNote") }}</OText>
-            </div>
-            <div
-              class="border-border-default rounded-default flex flex-col gap-1 border p-3"
-              data-test="starter-pack-page-items"
-            >
-              <strong>{{ t("starterPacks.page.items") }}</strong>
-              <span class="flex items-center justify-between">
-                {{
-                  t(
-                    flow.licensed.value
-                      ? "starterPacks.drawer.view"
-                      : "starterPacks.page.dashboards",
-                  )
-                }}
-                <OButton variant="ghost-primary" size="sm-action" @click="openView">
-                  {{ t("starterPacks.page.open") }}
-                </OButton>
-              </span>
-              <span>{{
-                t("starterPacks.countAlerts", { count: kindCount("alert") }, kindCount("alert"))
-              }}</span>
-              <span>{{
-                t(
-                  "starterPacks.countViews",
-                  { count: kindCount("savedView") },
-                  kindCount("savedView"),
-                )
-              }}</span>
-              <span
-                v-for="repair in flow.record.value?.repairs ?? []"
-                :key="repair.from"
-                data-test="starter-pack-page-repair"
-              >
-                {{ t("starterPacks.page.repair", { from: raw(repair.from), to: raw(repair.to) }) }}
-              </span>
-              <span v-for="item in flow.skipped.value" :key="item.itemId">
-                {{ t("starterPacks.page.skipped", { name: raw(flow.nameOf(item.itemId)) }) }}
-              </span>
             </div>
             <div
               class="border-border-default rounded-default flex flex-col gap-1 border p-3"

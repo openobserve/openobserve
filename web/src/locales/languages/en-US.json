@@ -15221,7 +15221,7 @@
     },
     "page": {
       "title": "{title} pack",
-      "breadcrumb": "Alert Library › Packs",
+      "breadcrumb": "Library / Packs / {pack} · version {version}",
       "turnOffAll": "Turn off all pack alerts",
       "askAdmin": "Ask an admin for access to the {folder} folder",
       "loadFailed": "Couldn't load this pack",
@@ -15238,13 +15238,10 @@
       "about": "About this setup",
       "setUpBy": "Set up by {who}",
       "date": "Date: {date}",
-      "version": "Version: {version}",
       "queries": "Background queries: about {count} a day",
       "scanNote": "Scan size isn't shown yet. It can be estimated only where the data exists.",
-      "items": "What it set up",
-      "dashboards": "Kubernetes dashboard",
+      "items": "Items in this pack",
       "repair": "Reads {to} instead of {from}",
-      "skipped": "{name}: couldn't fit this to your data, skipped",
       "reads": "Reads",
       "streams": "Streams: {count}",
       "whoCanSee": "Who can see it",
@@ -15252,7 +15249,22 @@
       "manageAccess": "Manage access",
       "threshold": "Threshold",
       "open": "Open",
-      "thresholdFailed": "Couldn't save the threshold. Nothing changed."
+      "thresholdFailed": "Couldn't save the threshold. Nothing changed.",
+      "silentFired": "{count} alert has fired {times} times this week and notified nobody. It notifies in-app only. | {count} alerts have fired {times} times this week and notified nobody. They notify in-app only.",
+      "tileInstalled": "Installed",
+      "tileData": "Data",
+      "tileVersion": "Version",
+      "installedOf": "{made} of {total}",
+      "streamCount": "{count} stream | {count} streams",
+      "group": {
+        "dashboard": "Dashboards · {count}",
+        "alert": "Alerts · {count}",
+        "savedView": "Saved searches · {count}"
+      },
+      "status": {
+        "failed": "Could not create",
+        "skipped": "Left out"
+      }
     }
   },
   "alert_library": {
