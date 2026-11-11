@@ -21,6 +21,8 @@ import { fakeFlow } from "@/components/starterPacks/starterPackTestFlow";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
+import { readQuery } from "@/composables/query/readQuery";
+
 import StarterPackPage from "./StarterPackPage.vue";
 
 const fake = vi.hoisted(() => ({
@@ -129,5 +131,32 @@ describe("StarterPackPage", () => {
   it("shows Copy link for an admin when a write is refused", async () => {
     fake.turn.forbidden.value = true;
     expect(has(await render(), "starter-pack-page-copy-link-btn")).toBe(true);
+  });
+
+  it("groups items by type and marks the ones that failed", async () => {
+    const items = [
+      { kind: "dashboard", itemId: "d1", status: "created" },
+      { kind: "alert", itemId: "a1", status: "failed" },
+    ];
+    fake.flow = fakeFlow({
+      record: shallowRef({ items, installedBy: "a@example.com" }),
+      items: ref(items),
+      made: ref(items.slice(0, 1)),
+    });
+    const wrapper = await render();
+    expect(has(wrapper, "starter-pack-page-group-dashboard")).toBe(true);
+    expect(has(wrapper, "starter-pack-page-group-alert")).toBe(true);
+    expect(has(wrapper, "starter-pack-page-item-failed")).toBe(true);
+    expect(wrapper.find('[data-test="starter-pack-page-tile-installed"]').text()).toContain(
+      "1 of 2",
+    );
+  });
+
+  it("warns only when a pack alert fired and notifies nobody", async () => {
+    expect(has(await render(), "starter-pack-page-silent-banner")).toBe(false);
+    fake.turn.rows.value = [{ ...row(true), alert: { stream_name: "s", destinations: [] } }];
+    vi.mocked(readQuery).mockResolvedValue({ total: 4 } as never);
+    const banner = (await render()).find('[data-test="starter-pack-page-silent-banner"]');
+    expect(banner.text()).toContain("fired 4 times");
   });
 });
