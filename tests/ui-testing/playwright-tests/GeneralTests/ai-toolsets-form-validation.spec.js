@@ -180,6 +180,10 @@ test.describe('CrossLink dialog form validation', () => {
             test.skip(true, 'AI Toolsets is an enterprise-only feature — absent in the OSS build');
             return;
         }
+        if (featureAvailable['cross-linking'] === undefined) {
+            featureAvailable['cross-linking'] = await pm.crossLinkPage.isCrossLinkingEnabledOnServer();
+        }
+        test.skip(!featureAvailable['cross-linking'], 'ZO_ENABLE_CROSS_LINKING is off on this server, so the stream schema has no cross-linking tab');
         // Open the stream schema cross-linking tab so the dialog can be opened
         await pm.crossLinkPage.navigateToStreamCrossLinkTab(testStream);
         testLogger.info('Navigated to cross-link tab', { stream: testStream });

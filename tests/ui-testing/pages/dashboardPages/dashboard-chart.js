@@ -220,7 +220,7 @@ export default class ChartTypeSelector {
     await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 10000 });
   }
 
-  // Stream select with retry mechanism (no page reload to preserve context)
+  // Stream select with retry mechanism; reloads the panel editor at most once, only when the stream is missing from the list
   async selectStream(streamName, maxRetries = 3) {
     const streamInput = this.page.locator(
       '[data-test="index-dropdown-stream"]'
@@ -228,11 +228,21 @@ export default class ChartTypeSelector {
 
     // An already-selected stream can be missing from the open option list (seen on alpha1), so there is nothing to click.
     const trigger = this.page.locator('[data-test="index-dropdown-stream-trigger"]').first();
-    await streamInput.waitFor({ state: "visible", timeout: 10000 });
-    if ((await trigger.getAttribute("data-test-selected-value", { timeout: 5000 })) === streamName) {
+    const isAlreadySelected = async () => {
+      await streamInput.waitFor({ state: "visible", timeout: 10000 });
+      return (await trigger.getAttribute("data-test-selected-value", { timeout: 5000 })) === streamName;
+    };
+    if (await isAlreadySelected()) {
       testLogger.info(`selectStream: "${streamName}" is already the selected stream`);
       return;
     }
+
+    const popover = this.page.locator('[data-test="index-dropdown-stream-popover"]');
+    // Exact value match: hasText is a substring match, so "e2e_automate" also hit "e2e_automate1_w0".
+    const streamOption = this.page
+      .locator(`[data-test="index-dropdown-stream-option"][data-test-value="${streamName}"]`)
+      .first();
+    let reloaded = false;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -243,7 +253,6 @@ export default class ChartTypeSelector {
         await streamInput.click();
 
         // Wait for popover to open, then type via keyboard (OSelect wrapper div doesn't accept fill directly)
-        const popover = this.page.locator('[data-test="index-dropdown-stream-popover"]');
         await popover.waitFor({ state: "visible", timeout: 10000 });
         await this.page.keyboard.press("Control+a");
         await this.page.keyboard.type(streamName);
@@ -254,15 +263,18 @@ export default class ChartTypeSelector {
           .allTextContents();
         testLogger.debug(`Attempt ${attempt}: Looking for "${streamName}". Available options (${allOptions.length}): ${allOptions.slice(0, 10).join(', ')}`);
 
-        // Exact value match: hasText is a substring match, so "e2e_automate" also hit "e2e_automate1_w0".
-        const streamOption = this.page
-          .locator(`[data-test="index-dropdown-stream-option"][data-test-value="${streamName}"]`)
-          .first();
-
         await streamOption.waitFor({ state: "visible", timeout: 15000 });
         await streamOption.click();
         return; // Success
       } catch (error) {
+        // The stream list is cached for minutes from page load (and fetched at boot when restricted routes are on), so a stream ingested after navigation only shows after a reload.
+        const missingFromList = (await popover.isVisible()) && (await streamOption.count()) === 0;
+        if (!reloaded && missingFromList && (await this.reloadPanelEditorKeepingSelections())) {
+          reloaded = true;
+          if (await isAlreadySelected()) return;
+          attempt--;
+          continue;
+        }
         if (attempt === maxRetries) {
           // Final attempt: log full diagnostic info
           const finalOptions = await this.page
@@ -272,11 +284,33 @@ export default class ChartTypeSelector {
           testLogger.error(`FAILED after ${maxRetries} attempts. Final options: ${finalOptions.join(', ')}`);
           throw error;
         }
-        // Close dropdown and wait for network before retry (don't reload - loses context!)
+        // Close dropdown and wait for network before retry
         await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
         await this.page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
       }
     }
+  }
+
+  // Returns false where a reload would lose unsaved editor state the test built (outside the dashboard editor, or with extra query tabs).
+  async reloadPanelEditorKeepingSelections() {
+    if (!/\/dashboards\/add_panel/.test(this.page.url())) return false;
+    if ((await this.page.locator('[data-test="dashboard-panel-query-tab-1"]').count()) > 0) return false;
+    const chartType = await this.page
+      .locator('[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected]')
+      .first()
+      .getAttribute("data-test-selected", { timeout: 2000 })
+      .catch(() => null);
+    const streamType = await this.page
+      .locator('[data-test="index-dropdown-stream_type-trigger"]')
+      .first()
+      .getAttribute("data-test-selected-value", { timeout: 2000 })
+      .catch(() => null);
+    testLogger.info(`selectStream: stream missing from the cached list, reloading the panel editor (chart=${chartType}, streamType=${streamType})`);
+    await this.page.reload({ waitUntil: "domcontentloaded" });
+    await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 30000 });
+    if (chartType) await this.selectChartType(chartType);
+    if (streamType) await this.selectStreamType(streamType);
+    return true;
   }
 
   // Search field and added for X, Y,Breakdown etc.

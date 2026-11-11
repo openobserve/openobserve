@@ -10527,6 +10527,10 @@ export class LogsPage {
         await this.expectNoToastContaining(this.multiStreamPatternsToastText);
     }
 
+    async isAutoQueryEnabledOnInstance() {
+        return await this.logsQueryPage._isAutoQueryEnabled();
+    }
+
     /**
      * Read `quick_mode_enabled` from the instance /config endpoint.
      * isSelectStarForTable() short-circuits to false when this is off, so the

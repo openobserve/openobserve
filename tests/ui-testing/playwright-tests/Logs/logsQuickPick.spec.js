@@ -175,6 +175,8 @@ test.describe("Logs No-Stream Quick Pick testcases", () => {
     tag: ['@logs-stream-quick-pick', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing hero recent chip stream selection');
+    // With auto-query on, the seeded recent stream is restored as the selected stream, so the no-stream hero never renders.
+    test.skip(await pm.logsPage.isAutoQueryEnabledOnInstance(), 'auto_query_enabled is on, so the persisted stream is reopened instead of the hero');
 
     const orgId = getOrgIdentifier();
 

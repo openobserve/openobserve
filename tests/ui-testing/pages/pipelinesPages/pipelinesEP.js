@@ -34,6 +34,9 @@ export class PipelinesEP {
         this.sourceStreamNameInput = '[data-test="pipeline-import-source-stream-name-input"]';
         this.destinationFunctionNameInput = '[data-test="pipeline-import-destination-function-name-input"]';
         this.destinationStreamTypeInput = '[data-test="pipeline-import-destination-stream-type-input"]';
+        this.importOrgIdTrigger = page.locator('[data-test="pipeline-import-org-id-input-trigger"]');
+        this.importOrgIdSearch = page.locator('[data-test="pipeline-import-org-id-input-search"]');
+        this.importOrgIdOption = (org) => page.locator(`[data-test="pipeline-import-org-id-input-option"][data-test-value="${org}"]`);
         // Stream picker is OSelect (Reka Listbox) post-migration.
         this.menuScroll = '[data-test$="-popover"], [role="listbox"]';
         this.menuItem = '[data-test$="-option"]';
@@ -187,6 +190,7 @@ export class PipelinesEP {
         const nameField = this.page.locator(this.pipelineImportNameInput);
         await nameField.waitFor({ state: 'attached', timeout: 10000 });
         await nameField.fill(name, { force: true });
+        await this.selectImportOrgIdIfAsked();
 
         // Check if stream dropdown exists using specific data-test attribute (more reliable than positional indexes)
         const streamDropdownExists = await this.page.locator(this.sourceStreamNameInput)
@@ -282,6 +286,16 @@ export class PipelinesEP {
     }
 
 
+    // The import fixtures carry org "default"; in any other org the form asks for the Organization Id, which must be the current org.
+    async selectImportOrgIdIfAsked() {
+        if (!(await this.importOrgIdTrigger.isVisible())) return;
+        const org = process.env.ORGNAME || 'default';
+        await this.importOrgIdTrigger.click();
+        await this.importOrgIdSearch.fill(org);
+        await this.importOrgIdOption(org).click();
+        await expect(this.importOrgIdTrigger).toHaveAttribute('data-test-selected-value', org);
+    }
+
     async importJsonButtonPipeline() {
         await this.page.locator(this.importJsonButton).waitFor({ state: 'visible' });
         await this.page.locator(this.importJsonButton).click();
@@ -322,6 +336,7 @@ export class PipelinesEP {
         const nameField = this.page.locator(this.pipelineImportNameInput);
         await nameField.waitFor({ state: 'attached', timeout: 10000 });
         await nameField.fill(name, { force: true });
+        await this.selectImportOrgIdIfAsked();
         await this.page.locator(this.destinationFunctionNameInput).click();
 
         // Wait for dropdown to open
