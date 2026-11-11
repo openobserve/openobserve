@@ -454,7 +454,17 @@ pub async fn handle_request(
     // batch process records through pipeline
     if !executable_pipelines.is_empty() {
         let records_count = pipeline_inputs.len();
-        for exec_pl in &executable_pipelines {
+        let evaluation_tasks = crate::ingestion::spawn_llm_evaluations(
+            org_id,
+            &stream_name,
+            &executable_pipelines,
+            &pipeline_inputs,
+            Some(&stream_name),
+        );
+        for exec_pl in executable_pipelines
+            .iter()
+            .filter(|p| !crate::ingestion::is_llm_evaluation(p))
+        {
             match exec_pl
                 .process_batch(org_id, pipeline_inputs.clone(), Some(stream_name.clone()))
                 .await
@@ -565,6 +575,8 @@ pub async fn handle_request(
                 }
             }
         } // for each pipeline
+
+        crate::ingestion::join_llm_evaluations(evaluation_tasks, org_id, &stream_name).await;
 
         // Evaluation-only pipelines emit no downstream records. Preserve the
         // original log stream while evaluator work runs asynchronously.
