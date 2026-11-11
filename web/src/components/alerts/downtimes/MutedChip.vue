@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <a
       v-if="link"
       :href="link.href"
-      class="focus-visible:outline-focus-ring-accent inline-flex max-w-full min-w-0 rounded-sm no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+      class="focus-visible:outline-focus-ring-accent rounded-default inline-flex max-w-full min-w-0 no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
       @click.stop.prevent="openDowntime"
     >
       <OTag type="downtimeStatus" value="active" class="max-w-full min-w-0">

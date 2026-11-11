@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <router-link
             v-if="stateTag(row, state) === 'muted' && row.active_downtime"
             :to="downtimeLink(row.active_downtime, orgId)"
-            class="focus-visible:outline-focus-ring-accent inline-flex rounded-sm no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+            class="focus-visible:outline-focus-ring-accent rounded-default inline-flex no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
             :data-test="`alerts-firing-row-muted-${row.alert_id}`"
             @click.stop
           >
