@@ -2444,6 +2444,8 @@
   --color-assistant-signal-attention: var(--color-status-warning-text);
   --color-assistant-signal-failed: var(--color-status-negative);
   --color-assistant-signal-unread: var(--color-text-secondary);
+  /* A refused turn's title sits on the warning wash, where the shared warning text misses 4.5:1. */
+  --color-assistant-refused-text: color-mix(in srgb, var(--color-status-warning-text) 85%, black);
   --color-assistant-user-bg: color-mix(
     in srgb,
     var(--color-primary-600) 9%,
@@ -2517,6 +2519,7 @@
   --color-assistant-signal-attention: var(--color-assistant-signal-attention);
   --color-assistant-signal-failed: var(--color-assistant-signal-failed);
   --color-assistant-signal-unread: var(--color-assistant-signal-unread);
+  --color-assistant-refused-text: var(--color-assistant-refused-text);
   --color-assistant-user-bg: var(--color-assistant-user-bg);
   --color-assistant-mark-bg: var(--color-assistant-mark-bg);
   --color-assistant-mark-fg: var(--color-assistant-mark-fg);
