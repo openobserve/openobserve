@@ -95,6 +95,11 @@ pub enum DowntimeError {
     Forbidden(String),
     Conflict(String),
     Internal(String),
+    /// Too many test sends by one user; retry after the given seconds.
+    RateLimited {
+        message: String,
+        retry_after_secs: i64,
+    },
 }
 
 impl std::fmt::Display for DowntimeError {
@@ -105,6 +110,7 @@ impl std::fmt::Display for DowntimeError {
             Self::BadRequest(m) | Self::Forbidden(m) | Self::Conflict(m) | Self::Internal(m) => {
                 f.write_str(m)
             }
+            Self::RateLimited { message, .. } => f.write_str(message),
         }
     }
 }
@@ -375,7 +381,17 @@ pub async fn send_test(
             start: row.schedule.starts_at,
             end: row.schedule.ends_at.unwrap_or(row.schedule.starts_at),
         });
-    Ok(notify::send_test(&row, window, &req.destinations, now).await)
+    notify::send_test(&row, user_id, window, &req.destinations, now)
+        .await
+        .map_err(|e| match e {
+            crate::alerts::notifications::TestSendError::RateLimited { retry_after_secs } => {
+                DowntimeError::RateLimited {
+                    message: e.to_string(),
+                    retry_after_secs,
+                }
+            }
+            e => DowntimeError::Internal(e.to_string()),
+        })
 }
 
 /// Lengthens the active window; a recurring row gets a one-time follow-up instead.

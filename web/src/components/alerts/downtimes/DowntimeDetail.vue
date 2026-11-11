@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="testDestinations.length === 0"
               :loading="testMutation.isPending.value"
               data-test="downtime-detail-send-test"
-              @click="sendTest"
+              @click="testConfirmOpen = true"
             >
               {{ t("alerts.downtimes.notify.test.send") }}
             </OButton>
@@ -353,6 +353,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :cancel-label="t('alerts.downtimes.confirmCancel.keep', { count: 1 }, 1)"
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
+    />
+
+    <ConfirmDialog
+      v-model="testConfirmOpen"
+      :title="t('alerts.downtimes.notify.test.confirmTitle')"
+      :message="
+        t('alerts.downtimes.notify.test.confirmMessage', {
+          names: testDestinations.map((d) => d.name).join(', '),
+        })
+      "
+      :ok-label="t('alerts.downtimes.notify.test.send')"
+      :cancel-label="t('common.cancel')"
+      data-test="downtime-detail-send-test-confirm"
+      @update:ok="sendTest"
+      @update:cancel="testConfirmOpen = false"
     />
 
     <ExtendDowntimeDialog
@@ -716,7 +731,14 @@ const testDestinations = computed<TestDestination[]>(() => {
   return names.flatMap((name) => known.filter((d) => d.name === name));
 });
 
+const testConfirmOpen = ref(false);
+// One reason per destination; a platform skip reads in words, not as the server's key.
+const failureText = (r: { destination: string; error?: string; unsupported?: boolean }) => {
+  if (r.unsupported) return `${r.destination} (${t("alerts.downtimes.notify.test.skipped")})`;
+  return r.error ? `${r.destination} (${r.error})` : r.destination;
+};
 const sendTest = async () => {
+  testConfirmOpen.value = false;
   const d = downtime.value;
   if (!d) return;
   const href = router.resolve({ name: "downtimes", query: orgQuery() }).href;
@@ -725,7 +747,7 @@ const sendTest = async () => {
     destinations: testDestinations.value,
     url: `${window.location.origin}${href}`,
   });
-  const failed = results.filter((r) => !r.ok).map((r) => r.destination);
+  const failed = results.filter((r) => !r.ok);
   if (failed.length === 0) {
     toast({
       variant: "success",
@@ -735,7 +757,9 @@ const sendTest = async () => {
   }
   toast({
     variant: "error",
-    message: t("alerts.downtimes.notify.test.failed", { names: failed.join(", ") }),
+    message: t("alerts.downtimes.notify.test.failed", {
+      names: failed.map(failureText).join(", "),
+    }),
   });
 };
 

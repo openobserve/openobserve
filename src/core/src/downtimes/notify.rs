@@ -210,17 +210,27 @@ async fn send(
     (summarize(&results), templates)
 }
 
-/// The started message to `requested` (or every destination of the row), one result each.
+/// The `[TEST] `-marked started message to `requested` (or every destination of the row), one
+/// result each. A request that reaches a destination counts against `user_id`'s test-send limit.
 pub async fn send_test(
     row: &Downtime,
+    user_id: &str,
     window: DowntimeWindow,
     requested: &[String],
     now: i64,
-) -> Vec<config::meta::downtimes::DowntimeTestResult> {
+) -> Result<
+    Vec<config::meta::downtimes::DowntimeTestResult>,
+    crate::alerts::notifications::TestSendError,
+> {
     use config::meta::downtimes::DowntimeTestResult;
 
     use crate::alerts::notifications::notify::{NotifyError, notify};
 
+    let names = test_destinations(row, requested);
+    if names.is_empty() {
+        return Ok(Vec::new());
+    }
+    crate::alerts::notifications::check_rate_limit(user_id)?;
     let due = DueEvent::of_window(NotificationEvent::Started, window);
     let counts = super::match_counts(row).await.ok();
     let vars = variables(
@@ -230,9 +240,9 @@ pub async fn send_test(
         counts.as_ref(),
         &get_config().common.web_url,
     );
-    let ctx = downtime_context(row, &due, now, vars);
+    let ctx = mark_test(downtime_context(row, &due, now, vars));
     let mut results = Vec::new();
-    for name in test_destinations(row, requested) {
+    for name in names {
         let mut ctx = ctx.clone();
         let sent = notify(&row.org, &name, &[], None, &mut ctx).await;
         results.push(match sent {
@@ -263,7 +273,27 @@ pub async fn send_test(
             }
         });
     }
-    results
+    Ok(results)
+}
+
+/// Marks a test send: Content titles and Custom subjects through the render hint, and the legacy
+/// webhook body's `text` here, since that body bypasses rendering.
+fn mark_test(
+    mut ctx: crate::alerts::notifications::NotificationContext,
+) -> crate::alerts::notifications::NotificationContext {
+    use crate::alerts::notifications::{LegacyPayload, TEST_MARKER};
+
+    ctx.render_hints.test_marker = true;
+    if let Some(legacy) = ctx.legacy_payload.take() {
+        ctx.legacy_payload = Some(LegacyPayload::new(move || {
+            let mut body = legacy.build();
+            if let Some(serde_json::Value::String(text)) = body.get_mut("text") {
+                text.insert_str(0, TEST_MARKER);
+            }
+            body
+        }));
+    }
+    ctx
 }
 
 /// Only the row's own destinations take a test, so the endpoint cannot post anywhere else.
@@ -386,6 +416,7 @@ fn downtime_context(
         render_hints: RenderHints {
             fallback_subject: Some(subject),
             escape_email_attributes: true,
+            ..Default::default()
         },
         ..Default::default()
     }
@@ -775,6 +806,65 @@ mod tests {
             "Downtime Nightly \"deploy\" <db>: ends soon. 1970-01-01 10:00 UTC to 1970-01-01 12:00 UTC, muting 2 alerts, 1 synthetics check. https://o2.example.com/web/downtimes/2f9KQe4b7Nq1vH3sT0mLzXpRcWd?org_identifier=acme"
         );
         assert_eq!(route(&resolved_for("slack"), &ctx).unwrap(), Route::Render);
+    }
+
+    #[test]
+    fn a_test_send_marks_the_content_title_and_the_legacy_text_but_a_live_send_does_not() {
+        use crate::alerts::notifications::{
+            default_template::compiled_default_content,
+            notify::{Route, route},
+            resolve_content,
+        };
+
+        let vars = || {
+            variables(
+                &row(None),
+                NotificationEvent::Started,
+                &window(),
+                None,
+                "https://o2.example.com",
+            )
+        };
+        let live = downtime_context(&row(None), &due(NotificationEvent::Started), 7, vars());
+        let test = mark_test(downtime_context(
+            &row(None),
+            &due(NotificationEvent::Started),
+            7,
+            vars(),
+        ));
+
+        let title = |ctx| resolve_content(&compiled_default_content(), ctx, "slack").title;
+        assert_eq!(title(&live), "🔵 Nightly \"deploy\" <db> started");
+        assert_eq!(title(&test), "[TEST] 🔵 Nightly \"deploy\" <db> started");
+
+        let text = |ctx| {
+            let Route::Legacy(json) = route(&resolved_for(""), ctx).unwrap() else {
+                panic!("a generic webhook gets the legacy body");
+            };
+            json["text"].as_str().unwrap().to_string()
+        };
+        assert!(
+            text(&live).starts_with("Downtime Nightly"),
+            "{}",
+            text(&live)
+        );
+        assert!(
+            text(&test).starts_with("[TEST] Downtime Nightly"),
+            "{}",
+            text(&test)
+        );
+        assert!(!live.render_hints.test_marker);
+    }
+
+    #[tokio::test]
+    async fn a_test_naming_no_destination_of_the_row_sends_nothing() {
+        let mut r = row(None);
+        r.notifications =
+            Some(serde_json::from_value(serde_json::json!({"destinations": ["hook"]})).unwrap());
+        let results = send_test(&r, "u@example.com", window(), &["nope".into()], 7)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
     }
 
     #[test]
