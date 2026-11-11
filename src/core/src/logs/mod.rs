@@ -44,6 +44,7 @@ use infra::{
     schema::{SchemaCache, get_partition_time_level},
 };
 use ingestion_common::IngestionStatus;
+use itertools::Itertools;
 use schema::{get_future_discard_error, get_upto_discard_error, stream_schema_exists};
 
 use crate::{
@@ -89,7 +90,6 @@ struct DestinationSettings<'a> {
 }
 
 impl DestinationSettings<'_> {
-    /// Canonicalizes DBM fields, trims to the UDS, then adds `_original`/`_id` and `_all_values`.
     fn apply(
         &self,
         mut record: Map<String, Value>,
@@ -172,22 +172,20 @@ pub fn refresh_derived_columns(before: &[String], records: &mut [(i64, Map<Strin
 
 /// The `_all_values` concatenation: every field but the derived ones, space-joined.
 fn all_values_of(record: &Map<String, Value>, max_len: usize) -> String {
-    let mut values = Vec::with_capacity(record.len());
-    for (k, value) in record.iter() {
-        if [
-            TIMESTAMP_COL_NAME,
-            config::ID_COL_NAME,
-            config::ORIGINAL_DATA_COL_NAME,
-            config::ALL_VALUES_COL_NAME,
-        ]
-        .contains(&k.as_str())
-            || (max_len != 0 && value.as_str().is_some_and(|s| s.len() > max_len))
-        {
-            continue;
-        }
-        values.push(value.to_string());
-    }
-    values.join(" ")
+    const DERIVED: [&str; 4] = [
+        TIMESTAMP_COL_NAME,
+        config::ID_COL_NAME,
+        config::ORIGINAL_DATA_COL_NAME,
+        config::ALL_VALUES_COL_NAME,
+    ];
+    record
+        .iter()
+        .filter(|(k, v)| {
+            !DERIVED.contains(&k.as_str())
+                && (max_len == 0 || v.as_str().is_none_or(|s| s.len() <= max_len))
+        })
+        .map(|(_, v)| v)
+        .join(" ")
 }
 
 fn parse_bulk_index(v: &Value) -> Option<BulkAction<'_>> {
