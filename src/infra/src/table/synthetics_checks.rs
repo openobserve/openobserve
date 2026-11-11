@@ -1176,11 +1176,7 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
         // Only an older producer sends a badge-only message. It can stand for a recovery that did
         // not move the stamp, so the row stops being signed.
         let badge = update_last_check_status(conn, id, next.last_check_status).await?;
-        Entity::update_many()
-            .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
-            .filter(Column::Id.eq(id))
-            .exec(conn)
-            .await?;
+        void_recovery_stamp(conn, id, config::utils::time::now_micros()).await?;
         return Ok(badge);
     }
     let res = Entity::update_many()
@@ -1206,7 +1202,42 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     let stamp_moved = apply_replicated_recovery(conn, id, next.recovered_at).await?;
-    Ok(res.rows_affected > 0 || stamp_moved)
+    if !next.signed {
+        // The `run_ts` filter can drop this message, and a later signed snapshot can overwrite it.
+        // Either way it can stand for a recovery that this row never saw, so no hold may survive.
+        void_recovery_stamp(conn, id, config::utils::time::now_micros()).await?;
+    }
+    Ok(res.rows_affected > 0 || stamp_moved || !next.signed)
+}
+
+/// For a message from an older producer: marks the row unsigned and moves its recovery stamp past
+/// `now`, whatever `run_ts` the row holds. The stamp never goes down, so no mark armed before this
+/// can match again. Safe to run twice.
+async fn void_recovery_stamp<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    // Two updates, so no SQL dialect needs GREATEST. The second one sets values that the first one
+    // would move again, so it runs last.
+    Entity::update_many()
+        .col_expr(
+            Column::StatusRecoveredAt,
+            Expr::col(Column::StatusRecoveredAt).add(1),
+        )
+        .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
+        .filter(Column::Id.eq(id))
+        .filter(Column::StatusRecoveredAt.gt(now))
+        .exec(conn)
+        .await?;
+    Entity::update_many()
+        .col_expr(Column::StatusRecoveredAt, Expr::value(now + 1))
+        .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
+        .filter(Column::Id.eq(id))
+        .filter(Column::StatusRecoveredAt.lte(now))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 /// Moves the recovery stamp forward, whatever `run_ts` the local row holds. A late recovery

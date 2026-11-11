@@ -1507,6 +1507,43 @@ mod tests {
         assert_eq!(down_notified_at(&db).await, 200);
         assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
+
+    #[test]
+    fn a_gap_that_closed_during_delivery_owes_its_resumed_notice() {
+        assert!(gap_closed_during_delivery(0, 100));
+        assert!(gap_closed_during_delivery(200, 100));
+        assert!(!gap_closed_during_delivery(100, 100));
+    }
+
+    #[test]
+    fn a_gap_notice_is_informational_and_carries_its_own_words() {
+        use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationEvent};
+        use openobserve_synthetics::alerting::GapNotice;
+
+        let gap = GapNotification {
+            org_id: "org1".into(),
+            synthetics_id: "c1".into(),
+            synthetics_name: "Checkout".into(),
+            target: "example.com".into(),
+            destinations: vec!["d1".into()],
+            notice: GapNotice::Opened { since: 1 },
+        };
+        let ctx = gap_notification_context(&gap);
+        assert_eq!(ctx.event, NotificationEvent::Informational);
+        assert_eq!(ctx.episode_id, None);
+        assert_eq!(ctx.level, Some(AlertLevel::Warning));
+        let subject = "[OpenObserve Synthetics] Monitoring gap: Checkout";
+        assert_eq!(ctx.render_hints.fallback_subject.as_deref(), Some(subject));
+        assert!(ctx.alert_description.contains("could not test example.com"));
+        let attr = |k: &str| {
+            ctx.context_attributes
+                .iter()
+                .find(|(key, _)| key == k)
+                .map(|(_, v)| v.as_str())
+        };
+        assert_eq!(attr("check_title"), Some(subject));
+        assert_eq!(attr("check_status_label"), Some("Not measured"));
+    }
 }
 
 /// Sends the "location down" notification through the shared path.
@@ -1613,41 +1650,5 @@ fn locations_url(org_id: &str) -> String {
 async fn clear_down(location_id: &str) {
     if let Err(e) = infra::table::synthetics_locations::clear_down_notification(location_id).await {
         log::error!("[synthetics] staleness watcher: clear down flag for {location_id}: {e}");
-    }
-    #[test]
-    fn a_gap_that_closed_during_delivery_owes_its_resumed_notice() {
-        assert!(gap_closed_during_delivery(0, 100));
-        assert!(gap_closed_during_delivery(200, 100));
-        assert!(!gap_closed_during_delivery(100, 100));
-    }
-
-    #[test]
-    fn a_gap_notice_is_informational_and_carries_its_own_words() {
-        use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationEvent};
-        use openobserve_synthetics::alerting::GapNotice;
-
-        let gap = GapNotification {
-            org_id: "org1".into(),
-            synthetics_id: "c1".into(),
-            synthetics_name: "Checkout".into(),
-            target: "example.com".into(),
-            destinations: vec!["d1".into()],
-            notice: GapNotice::Opened { since: 1 },
-        };
-        let ctx = gap_notification_context(&gap);
-        assert_eq!(ctx.event, NotificationEvent::Informational);
-        assert_eq!(ctx.episode_id, None);
-        assert_eq!(ctx.level, Some(AlertLevel::Warning));
-        let subject = "[OpenObserve Synthetics] Monitoring gap: Checkout";
-        assert_eq!(ctx.render_hints.fallback_subject.as_deref(), Some(subject));
-        assert!(ctx.alert_description.contains("could not test example.com"));
-        let attr = |k: &str| {
-            ctx.context_attributes
-                .iter()
-                .find(|(key, _)| key == k)
-                .map(|(_, v)| v.as_str())
-        };
-        assert_eq!(attr("check_title"), Some(subject));
-        assert_eq!(attr("check_status_label"), Some("Not measured"));
     }
 }

@@ -511,12 +511,7 @@ async fn apply_engine_actions(
     }
 
     let th_by_check = thresholds_by_check(data);
-    let mut held = if data.holds_allowed {
-        false_alarm_holds(&data.notices, &data.states)
-    } else {
-        HashSet::new()
-    };
-    held.extend(data.snoozed.iter().cloned());
+    let held = held_checks(data);
     let actions = engine::incident_actions_with(
         &checks,
         &open_by_check,
@@ -529,6 +524,18 @@ async fn apply_engine_actions(
         apply_one(conn, data, action, now).await?;
     }
     Ok(())
+}
+
+/// Checks the engine must not open an incident for this tick: snoozed checks, and checks held by
+/// a false alarm mark while [`holds_ready`] allows holds.
+fn held_checks(data: &TickData) -> HashSet<String> {
+    let mut held = if data.holds_allowed {
+        false_alarm_holds(&data.notices, &data.states)
+    } else {
+        HashSet::new()
+    };
+    held.extend(data.snoozed.iter().cloned());
+    held
 }
 
 /// The recovery stamps that armed false alarm marks saved, per check. A mark is armed when it
@@ -1099,6 +1106,23 @@ mod fast_pass_tests {
         ];
         let held = false_alarm_holds(&notices, &states);
         assert_eq!(held, HashSet::from(["same".to_string(), "two".to_string()]));
+
+        // A closed gate holds nothing, so a matching armed mark still opens an incident.
+        let mut data = TickData {
+            pages: vec![],
+            components: vec![],
+            mappings: vec![],
+            states: states.to_vec(),
+            snoozed: HashSet::from(["snoozed".to_string()]),
+            notices,
+            holds_allowed: false,
+        };
+        assert_eq!(held_checks(&data), HashSet::from(["snoozed".to_string()]));
+        data.holds_allowed = true;
+        assert_eq!(
+            held_checks(&data),
+            HashSet::from(["same".to_string(), "two".to_string(), "snoozed".to_string()])
+        );
     }
 
     #[test]

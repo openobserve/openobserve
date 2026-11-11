@@ -765,6 +765,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_late_unsigned_message_ends_any_hold_even_when_its_run_is_older() {
+        let db = db_with_a_check(0).await;
+        let down = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 3,
+            down_runs: 2,
+            run_ts: 500,
+            run_class: 3,
+            recovered_at: 1_000,
+            signed: true,
+            ..Default::default()
+        };
+        apply_last_check_status(&db, "org1", "check-1", &down)
+            .await
+            .unwrap();
+        assert_eq!(stored_streaks(&db).await.recovered_at, 1_000);
+        // An older producer's Up from before the newest run: the run_ts filter drops its streaks.
+        let late_up = infra::table::synthetics_checks::StatusStreaks {
+            last_check_status: 1,
+            down_runs: 0,
+            up_runs: 1,
+            run_ts: 400,
+            run_class: 1,
+            recovered_at: 0,
+            signed: false,
+            ..Default::default()
+        };
+        apply_last_check_status(&db, "org1", "check-1", &late_up)
+            .await
+            .unwrap();
+        let after = stored_streaks(&db).await;
+        assert_eq!(
+            after.run_ts, 500,
+            "the older run does not replace the newer one"
+        );
+        assert!(
+            after.recovered_at > 1_000,
+            "a mark armed on 1000 must not match"
+        );
+        assert!(!after.signed);
+        // A delayed signed copy of the Down row cannot bring the old stamp back.
+        apply_last_check_status(&db, "org1", "check-1", &down)
+            .await
+            .unwrap();
+        assert_eq!(stored_streaks(&db).await.recovered_at, after.recovered_at);
+    }
+
+    #[tokio::test]
     async fn a_late_or_repeated_streak_message_is_a_no_op() {
         let db = db_with_a_check(0).await;
         let newer = infra::table::synthetics_checks::StatusStreaks {
