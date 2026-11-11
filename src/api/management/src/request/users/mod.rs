@@ -40,7 +40,8 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     audit::audit,
-    config::utils::time::now_micros,
+    axum::Extension,
+    config::{axum::middlewares::RealIp, utils::time::now_micros},
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
     o2_enterprise::enterprise::password_policy::lockout::{self, LockoutState},
@@ -65,6 +66,9 @@ use crate::{
 };
 
 pub mod service_accounts;
+
+#[cfg(feature = "enterprise")]
+const MAX_LOGIN_USER_AGENT_BYTES: usize = 1024;
 
 /// One organization member, as the list endpoint reports them, plus their lockout state.
 ///
@@ -678,7 +682,8 @@ context_path = "/auth",
 )]
 pub async fn authentication(
     #[cfg(feature = "enterprise")] headers: HeaderMap,
-    #[cfg(feature = "enterprise")] Query(_query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] real_ip: Option<Extension<RealIp>>,
+    #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
     auth: Option<axum::Json<SignInUser>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -697,6 +702,8 @@ pub async fn authentication(
     // Until decoding the token or body, we can not know the the user_email
     #[cfg(feature = "enterprise")]
     let mut audit_message = AuditMessage {
+        login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+        user_agent: login_user_agent(&headers),
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -724,8 +731,12 @@ pub async fn authentication(
             {
                 let auth_header = headers.get(header::AUTHORIZATION);
                 if let Some(auth_header) = auth_header {
+                    let Ok(auth_header) = auth_header.to_str() else {
+                        audit_unauthorized_error(audit_message).await;
+                        return unauthorized_error(resp);
+                    };
                     if let Some((name, password)) =
-                        o2_dex::service::auth::get_user_from_token(auth_header.to_str().unwrap())
+                        o2_dex::service::auth::get_user_from_token(auth_header)
                     {
                         SignInUser { name, password }
                     } else {
@@ -919,6 +930,8 @@ pub async fn get_presigned_url(
             .collect::<Vec<_>>()
             .join("&");
         let audit_message = AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: user_id,
             org_id: "".to_string(),
             _timestamp: now_micros(),
@@ -947,6 +960,7 @@ pub async fn get_presigned_url(
 
 pub async fn get_auth(
     headers: http::HeaderMap,
+    #[cfg(feature = "enterprise")] real_ip: Option<Extension<RealIp>>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -962,6 +976,8 @@ pub async fn get_auth(
         let mut req_ts = 0;
 
         let mut audit_message = AuditMessage {
+            login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+            user_agent: login_user_agent(&headers),
             user_email: "".to_string(),
             org_id: "".to_string(),
             _timestamp: now_micros(),
@@ -1228,6 +1244,18 @@ pub async fn list_roles(Path(_org_id): Path<String>) -> impl IntoResponse {
     axum::Json(roles)
 }
 
+#[cfg(feature = "enterprise")]
+pub(super) fn login_user_agent(headers: &HeaderMap) -> Option<String> {
+    let header = headers.get(header::USER_AGENT)?;
+    let Ok(agent) = header.to_str() else {
+        return None;
+    };
+    if agent.len() > MAX_LOGIN_USER_AGENT_BYTES || agent.chars().any(char::is_control) {
+        return None;
+    }
+    Some(agent.to_string())
+}
+
 fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
     if role.eq(&UserRole::Root)
         || role.eq(&UserRole::ServiceAccount)
@@ -1484,7 +1512,7 @@ mod tests {
             ),
             ("exp_in".to_string(), "abc".to_string()),
         ]);
-        let resp = get_auth(http::HeaderMap::new(), Query(query)).await;
+        let resp = get_auth(http::HeaderMap::new(), None, Query(query)).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 

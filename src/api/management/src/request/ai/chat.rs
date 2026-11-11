@@ -142,6 +142,8 @@ impl ChatAudit {
     /// Built here, not by `report_with_protocol`, which has no `delegated` parameter (request 20).
     fn message(&self, code: u16, error_message: Option<String>) -> AuditMessage {
         AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: self.user_id.clone(),
             org_id: self.org_id.clone(),
             _timestamp: config::utils::time::now_micros(),
