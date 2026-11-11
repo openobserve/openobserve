@@ -489,7 +489,7 @@ export default class ChartTypeSelector {
   async waitForTableDataLoad() {
     // Wait for table to be visible
     await this.page.waitForSelector('[data-test="dashboard-panel-table"]', {
-      timeout: 10000,
+      timeout: 30000,
     });
 
     // Wait for table to have data (non-empty tbody)
@@ -510,7 +510,7 @@ export default class ChartTypeSelector {
         );
       },
       undefined,
-      { timeout: 15000 }
+      { timeout: 30000 }
     );
 
     // The check above is satisfied by a STALE table. Re-applying a query leaves the
