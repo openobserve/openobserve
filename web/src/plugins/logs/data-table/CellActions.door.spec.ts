@@ -64,7 +64,7 @@ describe("CellActions field doors", () => {
 });
 
 describe("CellActions copy with the assistant on", () => {
-  it("confirms an in-place copy on the button", async () => {
+  it("copies in place through the shared Copied bubble, leaving the button as it was", async () => {
     const wrapper = mount(CellActions, {
       global: { plugins: [i18n] },
       props: {
@@ -81,8 +81,8 @@ describe("CellActions copy with the assistant on", () => {
     await button.trigger("click");
     await flushPromises();
     expect(wrapper.emitted("copy")).toBeUndefined();
-    expect(button.attributes("aria-label")).toBe(i18n.global.t("common.copied"));
-    expect(icon.props("name")).toBe("check");
+    expect(button.attributes("aria-label")).toBe(i18n.global.t("logs.cellActions.copy"));
+    expect(icon.props("name")).toBe("content-copy");
     wrapper.unmount();
   });
 });
