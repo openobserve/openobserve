@@ -98,6 +98,11 @@ describe("SqlFilterBuilder", () => {
     expect(wrapper!.find('[data-test="b-bar-input"]').exists()).toBe(true);
   });
 
+  it("shows the query it cannot draw, so the running filter stays visible", () => {
+    mountBuilder("NOT (level = 'error')");
+    expect(wrapper!.find('[data-test="b-unparsable-query"]').text()).toBe("NOT (level = 'error')");
+  });
+
   it("draws an OR query with its connector", () => {
     mountBuilder("level = 'a' OR level = 'b'");
     expect(wrapper!.find('[data-test="b-bar-connector-1"]').exists()).toBe(true);

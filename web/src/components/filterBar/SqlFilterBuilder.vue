@@ -77,9 +77,17 @@ function clearAndBuild() {
       icon="warning"
       dense
       inline-actions
-      :content="t('filterBar.queryNotParsable')"
       :data-test="`${dataTest}-unparsable`"
     >
+      <div class="flex min-w-0 items-baseline gap-1.5">
+        <span class="shrink-0">{{ t("filterBar.queryNotParsableShort") }}</span>
+        <code
+          class="min-w-0 truncate font-mono"
+          :title="query"
+          :data-test="`${dataTest}-unparsable-query`"
+          >{{ query }}</code
+        >
+      </div>
       <template #actions>
         <OButton
           variant="outline"

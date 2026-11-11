@@ -1269,7 +1269,7 @@
     "query": "Query",
     "builderTooltip": "Build filters by picking fields, conditions and values",
     "queryTooltip": "Write the query yourself",
-    "queryNotParsable": "This query uses syntax the builder can't show. Clear it to start building, or keep editing it as a query",
+    "queryNotParsableShort": "The builder can't show this query:",
     "clearAndBuild": "Clear and build",
     "where": "Where",
     "addCondition": "Add condition",
