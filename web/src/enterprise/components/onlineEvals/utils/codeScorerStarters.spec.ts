@@ -1,7 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Runs each starter's JavaScript the way the backend sandbox does: the source
-// declares `function score(...)`, which is called with the mapped variables.
+// Calls each starter's score(...) with the mapped variables, as the backend sandbox does.
 
 import { describe, expect, it } from "vitest";
 import { CODE_SCORER_STARTERS, scoreFunctionParams } from "./codeScorerStarters";

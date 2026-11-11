@@ -1,8 +1,5 @@
 // @vitest-environment jsdom
 // Copyright 2026 OpenObserve Inc.
-//
-// The Code checks group: it lists without a provider or the catalog, and each
-// check imports as a Code scorer with its own Boolean score config.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";

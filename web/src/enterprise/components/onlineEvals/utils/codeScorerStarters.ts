@@ -1,9 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Starter checks for Code scorers. They ship in the web bundle (no catalog
-// fetch, no provider) and import as editable Code scorers with a Boolean score
-// config. Each source declares `function score(...)`; its parameter names are
-// the scorer's variables, which an eval job maps to span fields.
+// Starters ship in the web bundle so they import without a catalog fetch or provider; score()'s parameter names are the variables a job maps.
 
 export interface CodeScorerStarter {
   /** Scorer and score-config name on import; also the i18n key under codeScorer.starters. */

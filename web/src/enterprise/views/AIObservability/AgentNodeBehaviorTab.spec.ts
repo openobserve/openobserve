@@ -1,9 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-//
 // @vitest-environment jsdom
-//
-// The node Behavior tab's cost headline totals every cost row of the agent in
-// the range (one row per hourly window × env × version), not just the first.
 
 import { describe, it, expect, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
