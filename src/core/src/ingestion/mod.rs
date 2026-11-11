@@ -777,15 +777,9 @@ pub async fn write_entries_synced(
     write_entries_inner(writer, stream_name, entries, true, true).await
 }
 
-async fn write_entries_inner(
-    writer: &Arc<ingester::Writer>,
-    stream_name: &str,
-    entries: Vec<ingester::Entry>,
-    fsync: bool,
-    synced: bool,
-) -> Result<RequestStats> {
-    let mut req_stats = RequestStats::default();
-    let (entries_records, entries_size) = entries
+/// Computes usage statistics from entries, including Arrow batch row counts.
+pub fn entries_request_stats(entries: &[ingester::Entry]) -> RequestStats {
+    let (records, size) = entries
         .iter()
         .map(|entry| {
             let rows = entry
@@ -797,6 +791,21 @@ async fn write_entries_inner(
         .fold((0, 0), |(acc_records, acc_size), (records, size)| {
             (acc_records + records, acc_size + size)
         });
+    RequestStats {
+        size: size as f64 / SIZE_IN_MB,
+        records: records as i64,
+        ..Default::default()
+    }
+}
+
+async fn write_entries_inner(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    entries: Vec<ingester::Entry>,
+    fsync: bool,
+    synced: bool,
+) -> Result<RequestStats> {
+    let req_stats = entries_request_stats(&entries);
     let written = if synced {
         writer.write_batch_synced(entries).await
     } else {
@@ -816,8 +825,6 @@ async fn write_entries_inner(
         });
     }
 
-    req_stats.size += entries_size as f64 / SIZE_IN_MB;
-    req_stats.records += entries_records as i64;
     Ok(req_stats)
 }
 
@@ -1207,12 +1214,44 @@ fn record_realtime_delivery(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use arrow::{array::Int64Array, record_batch::RecordBatch};
     use arrow_schema::Field;
     use config::get_config;
     use infra::schema::unwrap_stream_settings;
     use transform::compile_vrl_function;
 
     use super::*;
+
+    #[test]
+    fn test_entries_request_stats_counts_json_and_arrow_rows() {
+        let json_entry = ingester::Entry {
+            data: vec![Arc::new(json::json!({})), Arc::new(json::json!({}))],
+            data_size: 10,
+            ..ingester::Entry::new()
+        };
+        let batch = RecordBatch::try_new(
+            Arc::new(arrow_schema::Schema::new(vec![Field::new(
+                "value",
+                arrow_schema::DataType::Int64,
+                true,
+            )])),
+            vec![Arc::new(Int64Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
+        let arrow_entry = ingester::Entry {
+            data: vec![Arc::new(json::json!({}))],
+            data_size: 20,
+            batch: Some(batch),
+            ..ingester::Entry::new()
+        };
+
+        let stats = entries_request_stats(&[json_entry, arrow_entry]);
+
+        assert_eq!(stats.records, 5);
+        assert_eq!(stats.size, 30.0 / SIZE_IN_MB);
+    }
 
     #[test]
     fn test_newly_enabled_uds_fields_only_when_the_check_turned_the_uds_on() {

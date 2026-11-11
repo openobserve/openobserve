@@ -26,7 +26,7 @@ use config::{
     meta::{
         alerts::alert,
         promql::VALUE_LABEL,
-        self_reporting::usage::UsageType,
+        self_reporting::usage::{RequestStats, UsageType},
         stream::{StreamPartition, StreamType},
     },
     metrics,
@@ -46,9 +46,9 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{
-        PartitionMemo, TriggerAlertData, evaluate_trigger, get_stream_partition_keys,
-        get_thread_id, inferred_column_type, newly_enabled_uds_fields, refactor_map,
-        repack_records, schema_records_to_entries, write_entries,
+        PartitionMemo, TriggerAlertData, entries_request_stats, evaluate_trigger,
+        get_stream_partition_keys, get_thread_id, inferred_column_type, newly_enabled_uds_fields,
+        refactor_map, repack_records, schema_records_to_entries, write_entries,
     },
     pipeline::batch_execution::ExecutablePipeline,
 };
@@ -125,6 +125,12 @@ impl StreamKeyChecks {
 pub(super) struct StreamTriggers {
     triggers: TriggerAlertData,
     mute_split: Option<crate::ingestion::realtime_mute::RealtimeMuteSplit>,
+}
+
+struct WriterBatch {
+    writer_idx: usize,
+    streams: Vec<(String, RequestStats)>,
+    entries: Vec<ingester::Entry>,
 }
 
 /// Runs each stream's pipelines over its buffered records, grouping the output by destination.
@@ -418,6 +424,8 @@ pub(super) async fn write_streams(
     started_at: i64,
 ) -> Result<WriteTimings> {
     let mut timings = WriteTimings::default();
+    let mut writers = HashMap::new();
+    let mut streams = Vec::with_capacity(entries_by_stream.len());
     for (stream_name, entries) in entries_by_stream {
         // a stream buffers nothing when every sample of it was NaN
         if entries.is_empty() {
@@ -447,34 +455,39 @@ pub(super) async fn write_streams(
         .await;
         timings.get_writer_micros += t.elapsed().as_micros();
 
+        streams.push((writer.idx(), stream_name, entries));
+        writers.insert(writer.idx(), writer);
+    }
+
+    let email = user.to_email();
+    let user_email = (!email.is_empty()).then_some(email);
+    for batch in batch_by_writer(streams) {
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let t = Instant::now();
-        let mut req_stats = write_entries(&writer, &stream_name, entries, fsync).await?;
+        let label = format!("{} streams", batch.streams.len());
+        write_entries(&writers[&batch.writer_idx], &label, batch.entries, fsync).await?;
         timings.write_micros += t.elapsed().as_micros();
 
-        let fns_length: usize = stream_pipelines.get(&stream_name).map_or(0, |pipelines| {
-            pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
-        });
-        req_stats.response_time = start.elapsed().as_secs_f64();
-        let email_str = user.to_email();
-        req_stats.user_email = if email_str.is_empty() {
-            None
-        } else {
-            Some(email_str)
-        };
-        let t = Instant::now();
-        usage_reporting::report_request_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            usage_type,
-            fns_length as u16,
-            started_at,
-        )
-        .await;
-        timings.report_stats_micros += t.elapsed().as_micros();
+        for (stream_name, mut req_stats) in batch.streams {
+            let fns_length: usize = stream_pipelines.get(&stream_name).map_or(0, |pipelines| {
+                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
+            });
+            req_stats.response_time = start.elapsed().as_secs_f64();
+            req_stats.user_email = user_email.clone();
+            let t = Instant::now();
+            usage_reporting::report_request_usage_stats(
+                req_stats,
+                org_id,
+                &stream_name,
+                StreamType::Metrics,
+                usage_type,
+                fns_length as u16,
+                started_at,
+            )
+            .await;
+            timings.report_stats_micros += t.elapsed().as_micros();
+        }
     }
     Ok(timings)
 }
@@ -597,6 +610,27 @@ fn record_evolves_schema(
             .get(key.as_str())
             .is_none_or(|existing| **existing != inferred)
     })
+}
+
+fn batch_by_writer(streams: Vec<(usize, String, Vec<ingester::Entry>)>) -> Vec<WriterBatch> {
+    let mut batches = Vec::new();
+    let mut positions = HashMap::new();
+    for (writer_idx, stream_name, entries) in streams {
+        let position = *positions.entry(writer_idx).or_insert_with(|| {
+            batches.push(WriterBatch {
+                writer_idx,
+                streams: Vec::new(),
+                entries: Vec::new(),
+            });
+            batches.len() - 1
+        });
+        let batch = &mut batches[position];
+        batch
+            .streams
+            .push((stream_name, entries_request_stats(&entries)));
+        batch.entries.extend(entries);
+    }
+    batches
 }
 
 /// Whether the stream already stores `value` as `Float64`, the column a stale marker's NULL needs.
@@ -854,5 +888,48 @@ mod tests {
         let written: usize = partitions.values().map(|p| p.records.len()).sum();
         assert_eq!(partitions.len(), 4);
         assert_eq!(written, timestamps.len());
+    }
+
+    #[test]
+    fn test_batch_by_writer_merges_streams_sharing_a_writer() {
+        let entry = |stream: &str, rows: usize| ingester::Entry {
+            stream: Arc::from(stream),
+            data: (0..rows).map(|_| Arc::new(json::json!({}))).collect(),
+            data_size: rows * 10,
+            ..ingester::Entry::new()
+        };
+        let streams = vec![
+            (1, "a".to_string(), vec![entry("a", 1), entry("a", 2)]),
+            (0, "b".to_string(), vec![entry("b", 4)]),
+            (1, "c".to_string(), vec![entry("c", 8)]),
+        ];
+
+        let batches = batch_by_writer(streams);
+
+        let summary: Vec<String> = batches
+            .iter()
+            .map(|batch| {
+                let streams: Vec<String> = batch
+                    .streams
+                    .iter()
+                    .map(|(stream, stats)| format!("{stream}:{}", stats.records))
+                    .collect();
+                format!(
+                    "{} {} {}",
+                    batch.writer_idx,
+                    streams.join(","),
+                    batch.entries.len()
+                )
+            })
+            .collect();
+        assert_eq!(summary, vec!["1 a:3,c:8 3", "0 b:4 1"]);
+        let entries: Vec<&str> = batches[0]
+            .entries
+            .iter()
+            .map(|entry| entry.stream.as_ref())
+            .collect();
+        assert_eq!(entries, vec!["a", "a", "c"]);
+        let a_size = batches[0].streams[0].1.size;
+        assert!((a_size - 30.0 / config::SIZE_IN_MB).abs() < f64::EPSILON);
     }
 }

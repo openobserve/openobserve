@@ -382,6 +382,10 @@ impl Writer {
         format!("{}/{}", self.key.org_id, self.key.stream_type)
     }
 
+    pub fn idx(&self) -> usize {
+        self.idx
+    }
+
     pub fn is_channel_closed(&self) -> bool {
         self.write_queue.is_closed()
     }
