@@ -28,8 +28,34 @@ const PROBES_AT_ONCE = 4;
 
 const known = reactive(new Map<string, { value: ScopeMatch; at: number }>());
 const running = new Map<string, Promise<ScopeMatch | null>>();
+// Whether a stream had any row, and its fields, are the same for every service on it.
+const streamRows = new Map<string, { value: boolean; at: number }>();
+const streamFields = new Map<string, { value: NonNullable<Fields>; at: number }>();
+
+// One page-level pool: every probe of every run waits for one of these slots.
+let freeSlots = PROBES_AT_ONCE;
+const waiting: (() => void)[] = [];
+let currentRun: AbortController | null = null;
 
 const quoteStream = (name: string): string => `"${name.replace(/"/g, '""')}"`;
+
+const fresh = <T>(kept: { value: T; at: number } | undefined): T | undefined =>
+  kept && Date.now() - kept.at < KEEP_MS ? kept.value : undefined;
+
+const streamKeyOf = (org: string, s: ServiceScope): string =>
+  [org, s.stream.type, s.stream.name].join("\n");
+
+const inSlot = async <T>(signal: AbortSignal, work: () => Promise<T>): Promise<T | null> => {
+  if (freeSlots > 0) freeSlots -= 1;
+  else await new Promise<void>((resolve) => waiting.push(resolve));
+  try {
+    return signal.aborted ? null : await work();
+  } finally {
+    const next = waiting.shift();
+    if (next) next();
+    else freeSlots += 1;
+  }
+};
 
 /** The stream and service a draft is scoped to, the same before and after its fields are read. */
 export const scopeIdOf = (s: ServiceScope): string =>
@@ -50,7 +76,17 @@ export const knownMatch = (org: string, s: ServiceScope): ScopeMatch | undefined
 };
 
 /** Drops every kept answer, so the next read asks again. */
-export const forgetMatches = (): void => known.clear();
+export const forgetMatches = (): void => {
+  known.clear();
+  streamRows.clear();
+  streamFields.clear();
+};
+
+/** Stops the page's running probes, queued and in flight; for unmount, leaving the page and an org switch. */
+export const cancelProbes = (): void => {
+  currentRun?.abort();
+  currentRun = null;
+};
 
 /** Whether the scope's filter keeps any of the stream's rows over 7 days, on fields already read; null when the read failed. */
 export const checkScopeMatch = (
@@ -75,8 +111,11 @@ export const checkScopeMatch = (
       const matched = await exists(sql.filtered);
       if (matched === null) return null;
       if (matched) return "match";
-      const any = await exists(sql.any);
-      return any === null ? null : any ? "none" : "quiet";
+      const streamKey = streamKeyOf(org, s);
+      const any = fresh(streamRows.get(streamKey)) ?? (await exists(sql.any));
+      if (any === null) return null;
+      streamRows.set(streamKey, { value: any, at: Date.now() });
+      return any ? "none" : "quiet";
     })
     .then((value) => {
       if (value) known.set(key, { value, at: Date.now() });
@@ -90,22 +129,53 @@ export const checkScopeMatch = (
   return read;
 };
 
-/** Reads each scope's stream fields and asks whether its filter keeps any rows, a few at a time. */
+const fieldsOf = async (
+  org: string,
+  s: ServiceScope,
+  readFields: (org: string, stream: ServiceScope["stream"]) => Promise<Fields>,
+  signal: AbortSignal,
+): Promise<Fields> => {
+  const key = streamKeyOf(org, s);
+  const kept = fresh(streamFields.get(key));
+  if (kept) return kept;
+  const fields = await inSlot(signal, () => readFields(org, s.stream));
+  if (fields) streamFields.set(key, { value: fields, at: Date.now() });
+  return fields ?? null;
+};
+
+/** Reads each stream's fields once and asks whether each scope's filter keeps any rows, 4 at a time page-wide; a new run cancels the last. */
 export const probeScopes = async (
   org: string,
   scopes: ServiceScope[],
   readFields: (org: string, stream: ServiceScope["stream"]) => Promise<Fields>,
 ): Promise<void> => {
+  cancelProbes();
+  const run = new AbortController();
+  currentRun = run;
   const due = [...new Map(scopes.map((s) => [scopeIdOf(s), s])).values()].filter(
     (s) => !knownMatch(org, s),
   );
-  for (let i = 0; i < due.length; i += PROBES_AT_ONCE) {
-    await Promise.all(
-      due.slice(i, i + PROBES_AT_ONCE).map(async (s) => {
-        const fields = s.schema ? null : await readFields(org, s.stream);
-        const schema = s.schema ?? fields?.names;
-        if (schema) await checkScopeMatch(org, { ...s, schema });
-      }),
-    );
+  const byStream = new Map<string, ServiceScope[]>();
+  for (const s of due) {
+    const key = streamKeyOf(org, s);
+    const group = byStream.get(key);
+    if (group) group.push(s);
+    else byStream.set(key, [s]);
   }
+  await Promise.all(
+    [...byStream.values()].map(async (group) => {
+      const fields = group.some((s) => !s.schema)
+        ? await fieldsOf(org, group[0], readFields, run.signal)
+        : null;
+      await Promise.all(
+        group.map(async (s) => {
+          const schema = s.schema ?? fields?.names;
+          if (schema && !run.signal.aborted) {
+            await inSlot(run.signal, () => checkScopeMatch(org, { ...s, schema }, run.signal));
+          }
+        }),
+      );
+    }),
+  );
+  if (currentRun === run) currentRun = null;
 };

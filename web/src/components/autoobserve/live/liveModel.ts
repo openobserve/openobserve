@@ -60,7 +60,7 @@ import { PAGED_CAP, failedDetail } from "./incidentsCopy";
 import { useRecentlyCreated } from "../insight/bulk/useRecentlyCreated";
 import { gapDraftScopes } from "../insight/kindCopy";
 import { readStreamFields } from "../insight/bulk/useBulkReview";
-import { probeScopes } from "../insight/targets/scopeMatch";
+import { cancelProbes, probeScopes } from "../insight/targets/scopeMatch";
 
 export interface RailSource extends Required<SourceState> {
   requests: LiveRequest[];
@@ -236,9 +236,17 @@ export const useLiveAutoObserve = (options: { active?: () => boolean } = {}) => 
   const retry = () => void Promise.all([coverage.refetch(), suggestions.refetch(), gaps.refetch()]);
   // A draft whose filter keeps none of its stream's rows could never fire, so the cards stop counting it once checked.
   watch(
-    () => [org.value, coverage.data.value?.rows, suggestions.data.value, gaps.data.value] as const,
-    ([orgId, rows, page, all]) => {
-      if (config.isEnterprise !== "true" || !orgId || !rows) return;
+    () =>
+      [
+        org.value,
+        enabled.value,
+        coverage.data.value?.rows,
+        suggestions.data.value,
+        gaps.data.value,
+      ] as const,
+    ([orgId, on, rows, page, all]) => {
+      // An org switch or a hidden page leaves nothing of the last run asking.
+      if (config.isEnterprise !== "true" || !orgId || !on || !rows) return cancelProbes();
       const listed = [...(page?.suggestions ?? []), ...(all?.suggestions ?? [])].filter(
         (s) => s.kind === "coverage_gap" && s.status === "proposed",
       );
@@ -246,6 +254,7 @@ export const useLiveAutoObserve = (options: { active?: () => boolean } = {}) => 
     },
     { immediate: true },
   );
+  onScopeDispose(cancelProbes);
   const coverageState = useKeptFailure(
     () => stateOf(coverage, retry),
     () => org.value,

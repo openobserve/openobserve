@@ -25,7 +25,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
-const { checkScopeMatch, forgetMatches, knownMatch, probeScopes, scopeMatchSql } =
+const { cancelProbes, checkScopeMatch, forgetMatches, knownMatch, probeScopes, scopeMatchSql } =
   await import("./scopeMatch");
 const { resolveDraft } = await import("./alertDraft");
 const { noDataAlert } = await import("../bulk/bulkTargets");
@@ -61,6 +61,8 @@ beforeEach(() => {
   enterprise = config.isEnterprise;
   config.isEnterprise = "true";
   api.fetch.mockReset();
+  api.cancel.mockReset();
+  cancelProbes();
   forgetMatches();
 });
 
@@ -126,6 +128,105 @@ describe("checkScopeMatch: a draft must match rows of its own stream", () => {
     await probeScopes(ORG, [BATCH], fields);
     expect(fields).toHaveBeenCalledTimes(1);
     expect(api.fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Holds every probe open until the test finishes it, counting the ones still running.
+const holdProbes = () => {
+  const open = new Map<string, { sql: string; finish: () => void }>();
+  let peak = 0;
+  api.fetch.mockImplementation((req: any, handlers: any) => {
+    const sql = b64DecodeUnicode(req.queryReq.query.sql) ?? "";
+    open.set(req.traceId, {
+      sql,
+      finish: () => {
+        open.delete(req.traceId);
+        handlers.data(null, { type: "search_response_hits", content: { results: { hits: ROW } } });
+        handlers.complete();
+      },
+    });
+    peak = Math.max(peak, open.size);
+  });
+  api.cancel.mockImplementation((req: { trace_id: string }) => open.delete(req.trace_id));
+  return {
+    open,
+    peak: () => peak,
+    finishAll: async () => {
+      while (open.size) {
+        for (const probe of [...open.values()]) probe.finish();
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    },
+  };
+};
+
+const settle = () => new Promise((r) => setTimeout(r, 0));
+const onStream = (name: string, service = "svc") => ({
+  ...BATCH,
+  service,
+  stream: { type: "logs", name },
+});
+
+describe("probeScopes: one page-level pool for the home page's gap drafts", () => {
+  it("500 gap services on one stream make 1 schema read and at most 2 probes per distinct scope", async () => {
+    answer([], ROW);
+    const scopes = Array.from({ length: 500 }, (_, i) => ({ ...BATCH, service: `svc-${i}` }));
+    const fields = vi.fn(async () => ({ names: SCHEMA, types: {} }));
+    await probeScopes(ORG, [...scopes, ...scopes], fields);
+    expect(fields).toHaveBeenCalledTimes(1);
+    expect(api.fetch.mock.calls.length).toBeLessThanOrEqual(2 * 500);
+    const unfiltered = api.fetch.mock.calls.filter((_, i) => !sentSql(i).includes(" WHERE "));
+    expect(unfiltered.length).toBeLessThanOrEqual(4);
+    expect(knownMatch(ORG, scopes[499])).toBe("none");
+    await probeScopes(ORG, [{ ...BATCH, service: "svc-new" }], fields);
+    expect(fields).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs at most 4 probes at once across every caller", async () => {
+    const probes = holdProbes();
+    const fields = vi.fn(async () => ({ names: SCHEMA, types: {} }));
+    const first = Array.from({ length: 6 }, (_, i) => onStream(`a_${i}`));
+    const second = Array.from({ length: 6 }, (_, i) => onStream(`b_${i}`));
+    void probeScopes(ORG, first, fields);
+    await settle();
+    void probeScopes(ORG, second, fields);
+    await settle();
+    await probes.finishAll();
+    expect(probes.peak()).toBeLessThanOrEqual(4);
+  });
+
+  it("a refresh cancels the previous run's pending probes", async () => {
+    const probes = holdProbes();
+    const fields = vi.fn(async () => ({ names: SCHEMA, types: {} }));
+    const first = Array.from({ length: 8 }, (_, i) => onStream(`a_${i}`));
+    void probeScopes(ORG, first, fields);
+    await settle();
+    expect(probes.open.size).toBe(4);
+    void probeScopes(ORG, [onStream("b_0")], fields);
+    await settle();
+    expect(api.cancel).toHaveBeenCalledTimes(4);
+    await probes.finishAll();
+    const asked = api.fetch.mock.calls.map((_, i) => sentSql(i));
+    for (const s of first.slice(4))
+      expect(asked.some((q) => q.includes(`"${s.stream.name}"`))).toBe(false);
+    expect(asked.some((q) => q.includes(`"b_0"`))).toBe(true);
+  });
+
+  it("cancelProbes stops the run: in-flight probes are cancelled and nothing more is sent", async () => {
+    const probes = holdProbes();
+    const fields = vi.fn(async () => ({ names: SCHEMA, types: {} }));
+    const run = probeScopes(
+      ORG,
+      Array.from({ length: 8 }, (_, i) => onStream(`a_${i}`)),
+      fields,
+    );
+    await settle();
+    const sent = api.fetch.mock.calls.length;
+    cancelProbes();
+    await run;
+    await probes.finishAll();
+    expect(api.cancel).toHaveBeenCalledTimes(sent);
+    expect(api.fetch.mock.calls.length).toBe(sent);
   });
 });
 
