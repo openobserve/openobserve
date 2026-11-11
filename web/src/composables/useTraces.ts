@@ -26,6 +26,7 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { isLeavingRoute } from "@/utils/pendingNavigation";
 import {
   DEFAULT_TRACE_SEARCH_MODE,
   type MetricsRangeFilter,
@@ -430,7 +431,7 @@ const useTraces = () => {
   /** Keeps the list view and the staged editor text in the URL without adding a history entry. */
   const patchUrlViewState = () => {
     const route = router.currentRoute.value;
-    if (route.name !== "traces") return;
+    if (route.name !== "traces" || isLeavingRoute("traces")) return;
     const query: Record<string, unknown> = { ...route.query };
     // run-query is one-shot; kept in the entry, Back to it would run whatever edit was staged there.
     delete query["run-query"];
