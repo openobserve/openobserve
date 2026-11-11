@@ -873,7 +873,15 @@ describe("OnCallPolicyEditor", () => {
         expect((await saveWith(wrapper)).template).toBe("ops-card");
       });
 
-      it("keeps the override while the room is emptied by an unsaved channel change", async () => {
+      const emptyTheRoom = async (wrapper: any) => {
+        const channelSelect = wrapper
+          .findAllComponents({ name: "OSelect" })
+          .find((c: any) => c.attributes("data-test") === "oncall-team-channel-select");
+        await channelSelect!.vm.$emit("update:modelValue", []);
+        await flushPromises();
+      };
+
+      it("releases the override once the saved channel empties the room", async () => {
         service.getTeamChannel.mockResolvedValue({
           data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
         } as any);
@@ -882,13 +890,25 @@ describe("OnCallPolicyEditor", () => {
         } as any);
         const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
         await flushPromises();
-        const channelSelect = wrapper
-          .findAllComponents({ name: "OSelect" })
-          .find((c) => c.attributes("data-test") === "oncall-team-channel-select");
-        await channelSelect!.vm.$emit("update:modelValue", []);
-        await flushPromises();
+        await emptyTheRoom(wrapper);
         expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(false);
+        expect((await saveWith(wrapper)).template).toBeNull();
+        const sent = service.setPolicy.mock.calls.map((c: any) => c[0].data.template);
+        expect(sent).toEqual(["ops-card", null]);
+        expect(wrapper.emitted("saved")).toHaveLength(1);
+      });
+
+      it("keeps the override when the channel write that empties the room fails", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+        } as any);
+        service.setTeamChannel.mockRejectedValue({ response: { status: 500 } });
+        const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
+        await flushPromises();
+        await emptyTheRoom(wrapper);
         expect((await saveWith(wrapper)).template).toBe("ops-card");
+        expect(service.setPolicy).toHaveBeenCalledTimes(1);
+        expect(wrapper.emitted("saved")).toBeUndefined();
       });
 
       it("ignores an older team channel read that lands after a newer one", async () => {

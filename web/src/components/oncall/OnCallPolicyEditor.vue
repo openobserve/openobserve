@@ -850,8 +850,7 @@ function usePolicyChannel() {
   channelBackToPolicy.value = true;
 }
 
-// Uncached read-modify-write: a stale entry would seed the draft and be saved back.
-// Each read gets a number, so a slower earlier read cannot overwrite a newer one.
+// Uncached read-modify-write; each read is numbered so a slower earlier read cannot win.
 let teamChannelReadId = 0;
 async function fetchTeamChannel() {
   const readId = ++teamChannelReadId;
@@ -1308,22 +1307,31 @@ async function save(): Promise<boolean> {
   saving.value = true;
   // A refusal names the template sent; a pick made during the request is not the one refused.
   const submittedTemplate = templateOverride.value;
+  const policyPayload = {
+    rungs: draft.value,
+    destinations: destinations.value,
+    template: templateConfirmedOff.value ? null : templateOverride.value,
+    ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
+  };
+  let channelWritten = false;
   try {
-    await savePolicyWrite.mutateAsync({
-      rungs: draft.value,
-      destinations: destinations.value,
-      template: templateConfirmedOff.value ? null : templateOverride.value,
-      ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
-    });
+    await savePolicyWrite.mutateAsync(policyPayload);
     if (!(await saveChannelAfterPolicy())) {
       emit("policy-written");
       return false;
+    }
+    // The saved channel emptied the room, so the kept override is released now, not on the next Save.
+    if (policyPayload.template !== null && templateConfirmedOff.value) {
+      channelWritten = true;
+      await savePolicyWrite.mutateAsync({ ...policyPayload, template: null });
+      if (templateOverride.value === submittedTemplate) templateOverride.value = null;
     }
     toast({ variant: "success", message: t("oncall.policySaved") });
     policyDraft.markSaved();
     emit("saved");
     return true;
   } catch (err: unknown) {
+    if (channelWritten) emit("policy-written");
     noteConfigurationDenied(err);
     if (templateOverride.value === submittedTemplate)
       templateError.value = templateBindingError(err);
