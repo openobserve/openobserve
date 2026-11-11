@@ -15021,7 +15021,17 @@
       "emptyTitle": "Nothing here yet",
       "emptyInstalled": "No pack has been installed in this organization.",
       "emptyFilter": "No items match this filter.",
-      "loadFailed": "Couldn't load the packs"
+      "loadFailed": "Couldn't load the packs",
+      "search": "Search packs",
+      "chipFits": "Fits your data · {count}",
+      "chipInstalled": "Installed · {count}",
+      "chipAll": "All · {count}",
+      "sectionFits": "Fits your data",
+      "sectionMissing": "Nothing matching yet",
+      "itemsInstalled": "{made} of {total} items installed",
+      "itemsFailed": "{count} item could not be created | {count} items could not be created",
+      "manage": "Manage",
+      "openDashboard": "Open dashboard"
     },
     "kubernetes": {
       "title": "Kubernetes",

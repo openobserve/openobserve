@@ -53,6 +53,11 @@ vi.mock("@/composables/starterPacks/packMatchData", () => ({
     dashboards: new Map([["overview", fake.dashboard]]),
   }),
 }));
+vi.mock("@/composables/starterPacks/useStarterPackFlow", async () => {
+  const { fakeFlow } = await import("./starterPackTestFlow");
+  const flow = fakeFlow();
+  return { useStarterPackFlow: () => flow };
+});
 vi.mock("@/composables/starterPacks/useInstallRecords", () => ({
   useInstallRecords: () => ({ list: async () => fake.records }),
 }));
@@ -62,7 +67,7 @@ import StarterPackLibraryTab from "./StarterPackLibraryTab.vue";
 const render = async (view: "packs" | "dashboards" = "packs") => {
   const wrapper = mount(StarterPackLibraryTab, {
     props: { org: "org", view },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n], stubs: { StarterPackDrawer: true } },
   });
   await flushPromises();
   return wrapper;
@@ -86,19 +91,47 @@ describe("StarterPackLibraryTab", () => {
     fake.push.mockClear();
   });
 
-  it("uses the existing filter words", async () => {
+  it("puts a pack that fits under Fits your data with its counts in the chips", async () => {
     const wrapper = await render();
-    expect(wrapper.get('[data-test="library-tab-state-kubernetes"]').text()).toBe("Ready to use");
-    expect(wrapper.get('[data-test="library-tab-stat-ready"]').text()).toContain("Ready to use");
-    expect(wrapper.get('[data-test="library-tab-stat-missing"]').text()).toContain("Not ingested");
+    expect(wrapper.find('[data-test="library-tab-section-fits"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="library-tab-chip-ready"]').text()).toBe("Fits your data · 1");
+    expect(wrapper.get('[data-test="library-tab-chip-all"]').text()).toBe("All · 1");
+    expect(wrapper.get('[data-test="library-tab-install-kubernetes"]').text()).toBe(
+      "Install 4 items",
+    );
+    expect(wrapper.find('[data-test="library-tab-see-kubernetes"]').exists()).toBe(true);
   });
 
-  it("shows Not ingested and filters to it", async () => {
+  it("puts a pack without data under Nothing matching yet and filters it out", async () => {
     fake.ready = false;
     const wrapper = await render();
-    expect(wrapper.get('[data-test="library-tab-state-kubernetes"]').text()).toBe("Not ingested");
-    await wrapper.get('[data-test="library-tab-stat-ready"]').trigger("click");
+    expect(wrapper.find('[data-test="library-tab-section-missing"]').exists()).toBe(true);
+    await wrapper.get('[data-test="library-tab-chip-ready"]').trigger("click");
     expect(wrapper.find('[data-test="library-tab-empty"]').exists()).toBe(true);
+  });
+
+  it("searches by name", async () => {
+    const wrapper = await render();
+    await wrapper.get('[data-test="library-tab-search"] input').setValue("nothing-like-this");
+    await flushPromises();
+    expect(wrapper.find('[data-test="library-tab-empty"]').exists()).toBe(true);
+  });
+
+  it("shows how many items an installed pack has and offers Manage", async () => {
+    fake.records = [
+      record({
+        items: [
+          { kind: "dashboard", itemId: "overview", status: "created" },
+          { kind: "alert", itemId: "a", status: "failed" },
+        ],
+      }),
+    ];
+    const wrapper = await render();
+    const items = wrapper.get('[data-test="library-tab-items-one"]').text();
+    expect(items).toContain("1 of 2 items installed");
+    expect(items).toContain("1 item could not be created");
+    expect(wrapper.get('[data-test="library-tab-state-one"]').text()).toBe("Installed");
+    expect(wrapper.find('[data-test="library-tab-open-dashboard-one"]').exists()).toBe(true);
   });
 
   it("lists every install with its installer and date under Installed", async () => {
@@ -108,7 +141,7 @@ describe("StarterPackLibraryTab", () => {
       record({ installId: "gone", status: "removed" }),
     ];
     const wrapper = await render();
-    await wrapper.get('[data-test="library-tab-stat-installed"]').trigger("click");
+    await wrapper.get('[data-test="library-tab-chip-installed"]').trigger("click");
     const one = wrapper.get('[data-test="library-tab-installed-one"]').text();
     expect(one).toContain("a@example.com");
     expect(one).toContain(new Date(1_700_000_000_000).toLocaleString());
@@ -118,7 +151,7 @@ describe("StarterPackLibraryTab", () => {
 
   it("explains an empty Installed filter", async () => {
     const wrapper = await render();
-    await wrapper.get('[data-test="library-tab-stat-installed"]').trigger("click");
+    await wrapper.get('[data-test="library-tab-chip-installed"]').trigger("click");
     expect(wrapper.get('[data-test="library-tab-empty"]').text()).toContain(
       "No pack has been installed",
     );
@@ -129,7 +162,7 @@ describe("StarterPackLibraryTab", () => {
     fake.records = [record({})];
     const wrapper = await render("dashboards");
     const id = "kubernetes/overview/one";
-    expect(wrapper.get(`[data-test="library-tab-state-${id}"]`).text()).toBe("Not ingested");
+    expect(wrapper.find('[data-test="library-tab-section-missing"]').exists()).toBe(true);
     expect(wrapper.get(`[data-test="library-tab-installed-${id}"]`).text()).toContain(
       "a@example.com",
     );
@@ -145,7 +178,8 @@ describe("StarterPackLibraryTab", () => {
     ).toBe(true);
   });
 
-  it("opens the pack page", async () => {
+  it("opens the pack page from Manage", async () => {
+    fake.records = [record({ installId: "kubernetes" })];
     const wrapper = await render();
     await wrapper.get('[data-test="library-tab-open-kubernetes"]').trigger("click");
     expect(fake.push).toHaveBeenCalledWith(
@@ -160,6 +194,6 @@ describe("StarterPackLibraryTab", () => {
     fake.fail = false;
     await error.get("button").trigger("click");
     await flushPromises();
-    expect(wrapper.find('[data-test="library-tab-state-kubernetes"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="library-tab-row-kubernetes"]').exists()).toBe(true);
   });
 });
