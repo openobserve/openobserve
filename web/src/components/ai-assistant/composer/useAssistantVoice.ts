@@ -175,7 +175,7 @@ export interface VoiceController {
   setComposing(composing: boolean, caret: number): void;
   attach(target: VoiceTarget): () => void;
   /** Learns whether this language can run on the device; asked once per language. */
-  probeOnDevice(lang: string): void;
+  probeOnDevice(lang: string): Promise<void>;
 }
 
 export interface VoiceStatusReader {
@@ -187,6 +187,8 @@ export interface VoiceStatusReader {
 export interface VoiceAvailability extends VoiceStatusReader {
   /** The sentence that says where the audio goes, or null with no engine. */
   sentence: ComputedRef<I18nText | null>;
+  /** Asks whether the sentence can say "on this device"; call only when the user looks at it. */
+  probe(): void;
 }
 
 export interface VoiceComposerOptions {
@@ -286,7 +288,7 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
     onDevice: false,
   });
   const targets = new Set<VoiceTarget>();
-  const probed = new Set<string>();
+  const probed = new Map<string, Promise<void>>();
   let run: VoiceRun | null = null;
   let composing = false;
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
@@ -436,6 +438,7 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
     run = current;
     const anchor = target.read().caret;
     Object.assign(state, { phase: "waiting", owner: target.id, via, tail: "", anchor });
+    const onDevice = probeOnDevice(lang);
     try {
       const meter = await engine.openMeter();
       if (run !== current) return meter?.close();
@@ -445,7 +448,8 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
       const code = MIC_ERRORS[(error as { name?: string })?.name ?? ""];
       if (code) return fail(current, code);
     }
-    listen(current);
+    await onDevice;
+    if (run === current) listen(current);
   }
 
   function stop(reason: VoiceStopReason): void {
@@ -549,10 +553,15 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
     };
   }
 
-  function probeOnDevice(lang: string): void {
-    if (probed.has(lang)) return;
-    probed.add(lang);
-    void engine.canRunOnDevice(lang).then((onDevice) => (state.onDevice = onDevice));
+  function probeOnDevice(lang: string): Promise<void> {
+    let pending = probed.get(lang);
+    if (!pending) {
+      pending = engine.canRunOnDevice(lang).then((onDevice) => {
+        state.onDevice = onDevice;
+      });
+      probed.set(lang, pending);
+    }
+    return pending;
   }
 
   return {
@@ -593,13 +602,6 @@ export function useVoiceStatus(): VoiceStatusReader {
     },
     { immediate: true },
   );
-  watch(
-    [status, lang],
-    ([current, tag]) => {
-      if (current === "ready") controller.probeOnDevice(tag);
-    },
-    { immediate: true },
-  );
   return { mode, status, lang };
 }
 
@@ -614,7 +616,14 @@ export function useVoiceAvailability(): VoiceAvailability {
     const brand = controller.engine.brand();
     return t(brand ? SENTENCE_KEYS[brand] : "assistant.voice.engine.vendor");
   });
-  return { ...reader, sentence };
+  return {
+    ...reader,
+    sentence,
+    // Never on mount: Chromium builds without the on-device speech service kill the tab on this call.
+    probe() {
+      if (reader.status.value === "ready") void controller.probeOnDevice(reader.lang.value);
+    },
+  };
 }
 
 /** Saves the self-hosted browser opt-in and updates every reader in this tab. */

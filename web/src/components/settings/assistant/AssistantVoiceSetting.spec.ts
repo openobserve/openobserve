@@ -95,4 +95,18 @@ describe("AssistantVoiceSetting", () => {
       "Server speech-to-text needs a newer server version.",
     );
   });
+
+  it("never asks the browser about on-device speech when it mounts on Cloud", async () => {
+    const available = vi.fn(async () => "available");
+    (window as any).SpeechRecognition = Object.assign(class {}, { available });
+    resetVoiceForTests();
+    try {
+      const wrapper = render({ edition: "cloud" });
+      await flushPromises();
+      expect(pressed(wrapper, "browser")).toBe("on");
+      expect(available).not.toHaveBeenCalled();
+    } finally {
+      delete (window as any).SpeechRecognition;
+    }
+  });
 });
