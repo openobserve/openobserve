@@ -351,7 +351,13 @@ import {
   updatePanel,
   updateDashboard,
 } from "../../../utils/commons";
-import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import {
+  onBeforeRouteLeave,
+  stringifyQuery,
+  useRoute,
+  useRouter,
+  type LocationQueryRaw,
+} from "vue-router";
 import { useStore } from "vuex";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
@@ -648,6 +654,13 @@ export default defineComponent({
     // this is used to again assign query params on discard or save
     let routeQueryParamsOnMount: any = {};
 
+    // Any replace, even a duplicate one, supersedes a pending leave, which then ends cancelled with no URL rollback.
+    let leaveInProgress = false;
+    const syncRouteQuery = (query: LocationQueryRaw) => {
+      if (leaveInProgress || stringifyQuery(query) === stringifyQuery(route.query)) return;
+      router.replace({ query });
+    };
+
     const { focusInEditor } = usePanelEditorFocus();
     // A notice's "Use Top N" / "Edit function" link lands here; the param is dropped once used.
     let focusParamUsed = false;
@@ -743,12 +756,10 @@ export default defineComponent({
         });
       }
 
-      router.replace({
-        query: {
-          ...route.query,
-          ...variableObj,
-          ...getQueryParamsForDuration(selectedDate.value),
-        },
+      syncRouteQuery({
+        ...route.query,
+        ...variableObj,
+        ...getQueryParamsForDuration(selectedDate.value),
       });
 
       // Note: updatedVariablesData is now a computed property that reads from variablesManager
@@ -1406,7 +1417,7 @@ export default defineComponent({
           delete query[`pt-period.${panelId}`];
           delete query[`pt-from.${panelId}`];
           delete query[`pt-to.${panelId}`];
-          router.replace({ query });
+          syncRouteQuery(query);
           return;
         }
 
@@ -1431,7 +1442,7 @@ export default defineComponent({
           delete query[`pt-period.${panelId}`];
         }
 
-        router.replace({ query });
+        syncRouteQuery(query);
       },
       { deep: true },
     );
@@ -1546,11 +1557,9 @@ export default defineComponent({
           start_time: effectiveTime.start_time,
           end_time: effectiveTime.end_time,
         };
-        router.replace({
-          query: {
-            ...route.query,
-            ...getQueryParamsForDuration(selectedDate.value),
-          },
+        syncRouteQuery({
+          ...route.query,
+          ...getQueryParamsForDuration(selectedDate.value),
         });
       }
     };
@@ -1659,7 +1668,11 @@ export default defineComponent({
         return;
       }
 
-      if (await resolveLeave(await askLeave())) next();
+      leaveInProgress = true;
+      const leave = await resolveLeave(await askLeave());
+      // Stays set on a confirmed leave: the navigation is still pending while the next view's chunk loads.
+      leaveInProgress = leave;
+      if (leave) next();
       else next(false);
     });
     const panelTitle = computed(() => {
