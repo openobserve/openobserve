@@ -216,10 +216,25 @@ pub async fn test_send(
     kind: NotificationKind,
 ) -> Result<String, TestSendError> {
     let (title, rendered) = build_test_message_with_title(dest_type, spec, kind)?;
+    email_reaches_a_member(org_id, dest_type)
+        .await
+        .map_err(|e| TestSendError::DispatchFailed(dispatch_error_text(&e)))?;
     check_rate_limit(user_id)?;
     dispatch_test_message(org_id, dest_type, &title, rendered)
         .await
         .map_err(|e| TestSendError::DispatchFailed(dispatch_error_text(&e)))
+}
+
+/// Fails when an email destination has no org-member recipient left, so a test that would
+/// send nothing is refused before it is charged.
+pub(crate) async fn email_reaches_a_member(
+    org_id: &str,
+    dest_type: &DestinationType,
+) -> Result<(), anyhow::Error> {
+    if let DestinationType::Email(email) = dest_type {
+        super::send::org_member_email(org_id, email).await?;
+    }
+    Ok(())
 }
 
 /// Longest receiver body a test-send error shows.

@@ -225,7 +225,10 @@ pub async fn send_test(
 > {
     use config::meta::downtimes::DowntimeTestResult;
 
-    use crate::alerts::notifications::notify::{NotifyError, resolve, route, send};
+    use crate::alerts::notifications::{
+        notify::{NotifyError, resolve, route, send},
+        test_send,
+    };
 
     let names = test_destinations(row, requested);
     if names.is_empty() {
@@ -248,11 +251,18 @@ pub async fn send_test(
         let sent = match resolve(&row.org, &name, &[], ctx.kind).await {
             Ok(resolved) => match route(&resolved, &ctx) {
                 Ok(_) => {
-                    if !charged {
-                        crate::alerts::notifications::check_rate_limit(user_id)?;
-                        charged = true;
+                    match test_send::email_reaches_a_member(&row.org, &resolved.destination_type)
+                        .await
+                    {
+                        Ok(()) => {
+                            if !charged {
+                                crate::alerts::notifications::check_rate_limit(user_id)?;
+                                charged = true;
+                            }
+                            send(&row.org, &resolved, None, &mut ctx).await
+                        }
+                        Err(e) => Err(NotifyError::from_send(e)),
                     }
-                    send(&row.org, &resolved, None, &mut ctx).await
                 }
                 Err(e) => Err(e),
             },
