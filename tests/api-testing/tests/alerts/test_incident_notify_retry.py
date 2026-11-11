@@ -76,15 +76,18 @@ def incident_alerts(client: OpenObserveClient) -> Generator[dict[str, Any], None
             created["alerts"].append(ids[case])
         yield {"alerts": alerts, "sink": sink, "ids": ids}
     finally:
-        _resolve_incidents(alerts, set(services.values()))
-        alerts.delete_alerts(created["alerts"])
-        for dest in created["destinations"]:
-            alerts._v1("DELETE", f"alerts/destinations/{dest}")
-        if template_created:
-            alerts._v1("DELETE", f"alerts/templates/{template}")
-        for stream in created["streams"]:
-            client.streams.delete(stream)
-        sink.close()
+        # A failed resolve still fails teardown, but must not skip the deletes below.
+        try:
+            _resolve_incidents(alerts, set(services.values()))
+        finally:
+            alerts.delete_alerts(created["alerts"])
+            for dest in created["destinations"]:
+                alerts._v1("DELETE", f"alerts/destinations/{dest}")
+            if template_created:
+                alerts._v1("DELETE", f"alerts/templates/{template}")
+            for stream in created["streams"]:
+                client.streams.delete(stream)
+            sink.close()
 
 
 def _resolve_incidents(alerts: AlertsClient, services: set[str]) -> None:
