@@ -515,19 +515,6 @@ import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { resolveNoDataText } from "@/utils/dashboard/noDataText";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
-// Panel types drawn by something other than ChartRenderer, which therefore never report a painted frame.
-const NON_ECHARTS_PANEL_TYPES = [
-  "maps",
-  "geomap",
-  "table",
-  "html",
-  "markdown",
-  "alert-list",
-  "flame-graph",
-  "logs",
-  "custom_chart",
-];
-
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
@@ -985,9 +972,14 @@ export default defineComponent({
     const onChartPainted = () => {
       if (chartDataConverted) chartPainted.value = true;
     };
-    const drawsWithECharts = computed(
-      () => !NON_ECHARTS_PANEL_TYPES.includes(panelSchema.value?.type),
+    // Only a mounted ChartRenderer reports painted frames; until the renderer branch has rendered, assume it will.
+    const rendererRendered = ref(false);
+    watch(
+      () => !errorDetail.value?.message && !isAwaitingFirstLoad.value,
+      (shown) => (rendererRendered.value = shown),
+      { flush: "post", immediate: true },
     );
+    const drawsWithECharts = computed(() => !rendererRendered.value || !!chartRendererRef.value);
 
     // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
     const {
