@@ -471,6 +471,105 @@ describe("AddAlert with an AutoObserve prefill", () => {
         const org = store.state.selectedOrganization.identifier;
         expect(recently.has(serviceKeyOf(org, "svc-ingest-b", null, null), "no_data")).toBe(true);
       });
+
+      it("a draft saved from the JSON editor is remembered too", async () => {
+        reach(true, true);
+        await openNoDataPrefill();
+        vi.mocked(alertsService.listByFolderId).mockResolvedValue({ data: { list: [] } } as any);
+        vi.mocked(alertsService.create_by_alert_id).mockClear();
+        // The JSON check only accepts destinations the form was handed; this draft pages on-call through its incident.
+        await vm().saveAlertJson(JSON.stringify({ ...vm().formData, destinations: [] }));
+        await flushPromises();
+        await vi.waitFor(() => expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1));
+        await flushPromises();
+        const org = store.state.selectedOrganization.identifier;
+        expect(recently.has(serviceKeyOf(org, "svc-ingest-b", null, null), "no_data")).toBe(true);
+      });
+
+      it("JSON Save checks the org's alerts first and saves nothing when the same name is in the folder", async () => {
+        reach(true, true);
+        await openNoDataPrefill();
+        vi.mocked(alertsService.listByFolderId).mockResolvedValue(
+          listed(vm().formData.name) as any,
+        );
+        vi.mocked(alertsService.create_by_alert_id).mockClear();
+        await vm().saveAlertJson(JSON.stringify(vm().formData));
+        await flushPromises();
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+        expect(toastMessages().some((m) => String(m).startsWith("Already added as"))).toBe(true);
+      });
+
+      describe("an org or folder switch during Save", () => {
+        const org = () => store.state.selectedOrganization.identifier;
+        let home = "";
+        beforeEach(() => {
+          home = org();
+        });
+        afterEach(() => {
+          store.state.selectedOrganization.identifier = home;
+          recently.clearOnPass("elsewhere-org", Number.MAX_SAFE_INTEGER);
+        });
+
+        // The check awaits the alerts list; the switch lands while it is in flight.
+        const switchDuringCheck = (move: () => void) =>
+          vi.mocked(alertsService.listByFolderId).mockImplementation((async () => {
+            move();
+            return { data: { list: [] } };
+          }) as any);
+
+        it("saves nothing in either org and says it couldn't save when the org changes", async () => {
+          reach(true, true);
+          await openNoDataPrefill();
+          vi.mocked(alertsService.create_by_alert_id).mockClear();
+          vi.mocked(toast).mockClear();
+          switchDuringCheck(() => {
+            store.state.selectedOrganization.identifier = "elsewhere-org";
+          });
+          await submit();
+          await flushPromises();
+          expect(alertsService.listByFolderId).toHaveBeenCalled();
+          expect(vi.mocked(alertsService.listByFolderId).mock.calls[0][5]).toBe(home);
+          expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+          const shown = vi
+            .mocked(toast)
+            .mock.calls.map(([o]) => o as { message: string; variant?: string })
+            .find((o) => String(o.message) === "Could not save the alert.");
+          expect(shown?.variant).toBe("error");
+          for (const id of [home, "elsewhere-org"]) {
+            expect(recently.has(serviceKeyOf(id, "svc-ingest-b", null, null), "no_data")).toBe(
+              false,
+            );
+          }
+        });
+
+        it("saves nothing when the folder changes", async () => {
+          reach(true, true);
+          await openNoDataPrefill();
+          vi.mocked(alertsService.create_by_alert_id).mockClear();
+          vi.mocked(toast).mockClear();
+          switchDuringCheck(() => {
+            (vm() as unknown as { activeFolderId: string }).activeFolderId = "pay";
+          });
+          await submit();
+          await flushPromises();
+          expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+          expect(toastMessages()).toContain("Could not save the alert.");
+        });
+
+        it("JSON Save saves nothing when the org changes", async () => {
+          reach(true, true);
+          await openNoDataPrefill();
+          vi.mocked(alertsService.create_by_alert_id).mockClear();
+          vi.mocked(toast).mockClear();
+          switchDuringCheck(() => {
+            store.state.selectedOrganization.identifier = "elsewhere-org";
+          });
+          await vm().saveAlertJson(JSON.stringify({ ...vm().formData, destinations: [] }));
+          await flushPromises();
+          expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+          expect(toastMessages()).toContain("Could not save the alert.");
+        });
+      });
     });
 
     it("tells the destination field it is required for an AutoObserve draft", async () => {

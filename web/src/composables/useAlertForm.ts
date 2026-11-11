@@ -487,6 +487,11 @@ export interface AlertFormEmit {
   (e: "refresh:templates"): void;
 }
 
+interface SaveTarget {
+  org: string;
+  folder: string;
+}
+
 // The full value set held by the ONE OForm: the alert payload shape plus the
 // form-only extras seeded by withFormExtras (logGroupBy / _ui / _meta). Typing
 // the form generic with this makes `form.state.values.*` reads (the synchronous
@@ -851,14 +856,31 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       !silentAutoObserveDraft.value &&
       !hasDeliveryTarget(formData.value ?? {}),
   );
+  const currentFolder = (): string =>
+    String(
+      (Array.isArray(activeFolderId.value) ? activeFolderId.value[0] : activeFolderId.value) ||
+        "default",
+    );
+  /** The org and folder a save writes to, read once when the save starts. */
+  const saveTargetNow = (): SaveTarget => ({
+    org: store.state.selectedOrganization.identifier,
+    folder: currentFolder(),
+  });
+  /** A save whose org or folder changed while it awaited writes nothing, rather than into the other org or folder. */
+  const blockMovedSave = (target: SaveTarget): boolean => {
+    if (
+      target.org === store.state.selectedOrganization.identifier &&
+      target.folder === currentFolder()
+    )
+      return false;
+    toast({ variant: "error", message: t("alerts.saveFailed") });
+    return true;
+  };
   /** An AutoObserve draft whose alert the org already has, from any tab or user, is not saved twice. */
-  const blockAddedDraft = async (values: any): Promise<boolean> => {
+  const blockAddedDraft = async (values: any, target: SaveTarget): Promise<boolean> => {
     if (!autoObserveDraft.value) return false;
-    const org = store.state.selectedOrganization.identifier;
-    const folder = Array.isArray(activeFolderId.value)
-      ? activeFolderId.value[0]
-      : activeFolderId.value;
-    const found = await existingForSave(org, values ?? {}, String(folder || "default"));
+    const { org } = target;
+    const found = await existingForSave(org, values ?? {}, target.folder);
     if (!found) return false;
     if (found === "unread") {
       toast({ variant: "error", message: t("alerts.prefill.addedUnread") });
@@ -1905,8 +1927,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         return null;
       }
     })();
+    const target = saveTargetNow();
+    const savedDraft = autoObserveDraft.value ? prefillMeta.value : null;
     if (parsed && blockSilentDraft(parsed)) return;
-    if (parsed && (await blockAddedDraft(parsed))) return;
+    if (parsed && (await blockAddedDraft(parsed, target))) return;
+    if (!props.isUpdated && blockMovedSave(target)) return;
     const saveContext: SaveAlertContext = {
       store,
       t,
@@ -1920,7 +1945,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       handleAlertError,
     };
 
-    const prepareAndSaveAlertFunction = (data: any) => prepareAndSaveAlertUtil(data, saveContext);
+    // The JSON check awaits the streams list too, so the org and folder are checked again right before the write.
+    const prepareAndSaveAlertFunction = async (data: any): Promise<void> => {
+      if (!props.isUpdated && blockMovedSave(target)) return;
+      if (await prepareAndSaveAlertUtil(data, saveContext)) noteSavedDraft(target.org, savedDraft);
+    };
 
     const jsonValidationContext: JsonValidationContext = {
       store,
@@ -2466,6 +2495,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // `form.state.values` — the synchronous source of truth (formData is its
   // reactive read-view and can lag by a tick after a just-written setF).
   const onSubmit = async () => {
+    const target = saveTargetNow();
     if (!runImperativeQueryChecks()) return false;
 
     if (
@@ -2624,17 +2654,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       });
       return request;
     } else {
-      if (await blockAddedDraft(payload)) {
+      const savedDraft = autoObserveDraft.value ? prefillMeta.value : null;
+      if ((await blockAddedDraft(payload, target)) || blockMovedSave(target)) {
         dismiss();
         return false;
       }
-      const savedDraft = autoObserveDraft.value ? prefillMeta.value : null;
-      payload.folder_id = activeFolderId.value;
-      callAlert = alertsService.create_by_alert_id(
-        store.state.selectedOrganization.identifier,
-        payload,
-        activeFolderId.value,
-      );
+      payload.folder_id = target.folder;
+      callAlert = alertsService.create_by_alert_id(target.org, payload, target.folder);
 
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
@@ -2650,7 +2676,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ? t("alerts.messages.alertSavedNoDestination")
               : t("alerts.messages.alertSaved"),
           });
-          noteSavedDraft(store.state.selectedOrganization.identifier, savedDraft);
+          noteSavedDraft(target.org, savedDraft);
           showSaveWarnings(res);
         })
         .catch((err: any) => {
