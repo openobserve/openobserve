@@ -149,9 +149,17 @@ async function ackAs(page, user, alertId, body) {
 }
 
 async function endMutes(page, names) {
-  const items = await listAlerts(page);
-  for (const item of items.filter((a) => names.includes(a.name) && a.active_downtime)) {
+  const items = (await listAlerts(page)).filter((a) => names.includes(a.name));
+  for (const item of items.filter((a) => a.active_downtime)) {
     await api(page, 'post', v2(`/alerts/${item.alert_id}/mute/${item.active_downtime.id}/cancel?folder=default`)).catch(() => {});
+  }
+  const ids = items.map((a) => a.alert_id);
+  if (!ids.length) return;
+  const r = await api(page, 'get', v2('/downtimes?page_size=500')).catch(() => null);
+  const rows = r?.ok() ? ((await r.json()).items ?? []) : [];
+  // Ended quick mutes are kept, and enough of them push a new row off the Downtimes list's first page.
+  for (const d of rows.filter((x) => (x.targets ?? []).some((t) => (t.ids ?? []).some((i) => ids.includes(i))))) {
+    await api(page, 'delete', v2(`/downtimes/${d.id}?folder=${encodeURIComponent(d.folder_id || 'default')}`)).catch(() => {});
   }
 }
 
