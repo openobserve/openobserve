@@ -697,8 +697,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
     // Complete workflow methods
     async uploadAndExploreEnrichmentTable(filePath, fileName) {
         await this.uploadEnrichmentFile(filePath, fileName);
-        await this.searchForEnrichmentTable(fileName);
-        await this.exploreEnrichmentTable();
+        await this.searchEnrichmentTableInList(fileName);
+        await this.clickExploreButton(fileName);
+        await expect(this.page).toHaveURL(/\/web\/logs/, { timeout: 30000 });
         await this.clickTimestampColumn();
         await this.closeLogDialog();
     }
