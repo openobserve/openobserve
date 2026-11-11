@@ -614,6 +614,18 @@
     "disabled": []
   },
   {
+    "testfolder": "Onboarding",
+    "actual_folder": "Onboarding",
+    "browser": "chrome",
+    "run_files": [
+      "empty-pages-flag-off.spec.js",
+      "first-data-notice.spec.js",
+      "legacy-pages.spec.js",
+      "token-picker.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "SLO",
     "_comment": "SLO lifecycle, form validation and the alert SLI type. No backfill dependency, so these run in parallel \u2014 but pinned to 3 workers: at 5 the concurrent SLO/alert/destination writes trip SQLite's 'database is locked' on the single-node meta store. The REST contract is covered by pytest in tests/api-testing/tests/slos/.",
     "actual_folder": "SLO",
