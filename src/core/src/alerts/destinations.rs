@@ -352,17 +352,22 @@ pub async fn save_in(
         }
     }
 
-    // The write resolves the name the same way and stores null when it finds no row.
+    // The write stores null for a name it finds no row for, so refuse it here. The lookup falls
+    // back to the default org and follows renames; the canonical name is what the write resolves.
     if let Module::Alert {
         template: Some(template_name),
         ..
-    } = &destination.module
+    } = &mut destination.module
         && !template_name.is_empty()
-        && infra::table::templates::get(&destination.org_id, template_name)
-            .await?
-            .is_none()
     {
-        return Err(DestinationError::UnknownTemplate(template_name.clone()));
+        match db::alerts::templates::get(&destination.org_id, template_name).await {
+            Ok(found) => *template_name = found.name,
+            Err(TemplateError::NotFound) => {
+                return Err(DestinationError::UnknownTemplate(template_name.clone()));
+            }
+            Err(TemplateError::InfraError(e)) => return Err(DestinationError::InfraError(e)),
+            Err(e) => return Err(DestinationError::TemplateRetrievalFailed(e.to_string())),
+        }
     }
 
     let saved = db::alerts::destinations::set(destination).await?;
@@ -1054,6 +1059,15 @@ mod tests {
         assert!(
             matches!(&saved.module, Module::Alert { template: Some(t), .. } if t == shared),
             "{saved:?}"
+        );
+        // Read the row back: the write stored the default org template's id, not null.
+        let stored = infra::table::destinations::get(org_id, "b22_shared")
+            .await
+            .expect("read back")
+            .expect("row");
+        assert!(
+            matches!(&stored.module, Module::Alert { template: Some(t), .. } if t == shared),
+            "{stored:?}"
         );
 
         let _ = db::alerts::destinations::delete(org_id, "b22_shared").await;
