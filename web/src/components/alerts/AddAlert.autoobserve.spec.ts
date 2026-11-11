@@ -283,11 +283,13 @@ describe("AddAlert with an AutoObserve prefill", () => {
     const save = () => byTest("add-alert-submit-btn") as HTMLButtonElement;
     const reason = () => byTest("add-alert-no-destination");
     const via = () => byTest("add-alert-via-incident");
-    const reach = (incidents: boolean, oncall: boolean) => {
+    const reach = (incidents: boolean, oncall: boolean, pagesOncall?: boolean) => {
+      const { incidents_page_oncall: _drop, ...rest } = store.state.zoConfig ?? {};
       store.state.zoConfig = {
-        ...store.state.zoConfig,
+        ...rest,
         incidents_enabled: incidents,
         oncall_enabled: oncall,
+        ...(pagesOncall === undefined ? {} : { incidents_page_oncall: pagesOncall }),
       };
     };
     beforeEach(() => reach(false, false));
@@ -305,6 +307,22 @@ describe("AddAlert with an AutoObserve prefill", () => {
       expect(via()?.className).not.toMatch(/status-(warning|error)-text/);
       expect(wrapper!.findComponent({ name: "AlertSettings" }).props("destinationRequired")).toBe(
         false,
+      );
+    });
+
+    it("in an org with no on-call team, the incident pages no one: Save is blocked in red with a way to set up on-call (F1)", async () => {
+      reach(true, true, false);
+      await openNoDataPrefill("enterprise", silent);
+      expect(vm().formData.creates_incident).toBe(true);
+      expect(save().disabled).toBe(true);
+      expect(via()).toBeNull();
+      expect(reason()?.className).toContain("text-status-error-text");
+      expect(reason()?.textContent).toContain(
+        "Choose a destination for this alert, or set up on-call. This organization has no on-call team, so its incident pages no one.",
+      );
+      expect(byTest("add-alert-setup-oncall")?.textContent?.trim()).toBe("Set up on-call");
+      expect(wrapper!.findComponent({ name: "AlertSettings" }).props("destinationRequired")).toBe(
+        true,
       );
     });
 

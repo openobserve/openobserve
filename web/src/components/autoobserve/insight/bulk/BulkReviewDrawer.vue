@@ -283,7 +283,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="bulk-review-no-destination"
         >
           <OIcon name="error" size="xs" class="mt-0.5 shrink-0" />
-          <span>{{ unreachableLine(t, reachGap, unreachable.length) }}</span>
+          <span
+            >{{ unreachableLine(t, reachGap, unreachable.length) }}
+            <OButton
+              v-if="reachGap === 'noTeam'"
+              variant="ghost-primary"
+              size="xs"
+              icon-right="arrow-forward"
+              data-test="bulk-review-setup-oncall"
+              @click="openOncallSetup()"
+              >{{ t("alerts.reach.setUpOncall") }}</OButton
+            ></span
+          >
         </p>
         <p
           v-else
@@ -545,6 +556,11 @@ watch(
 );
 
 const createTicked = () => create(kind.value, toCreate.value);
+
+const openOncallSetup = () => {
+  closeBulkReview();
+  router.push({ name: "onCallTeams", query: { org_identifier: org() } });
+};
 
 const openExisting = async (row: ReviewRow) => {
   const name = row.prefill?.name ?? "";

@@ -569,11 +569,13 @@ describe("BulkReviewDrawer — focus and edition", () => {
   });
 });
 
-const reach = (incidents: boolean, oncall: boolean) => {
+const reach = (incidents: boolean, oncall: boolean, pagesOncall?: boolean) => {
+  const { incidents_page_oncall: _drop, ...rest } = store.state.zoConfig ?? {};
   store.state.zoConfig = {
-    ...store.state.zoConfig,
+    ...rest,
     incidents_enabled: incidents,
     oncall_enabled: oncall,
+    ...(pagesOncall === undefined ? {} : { incidents_page_oncall: pagesOncall }),
   };
 };
 
@@ -683,6 +685,22 @@ describe("BulkReviewDrawer — AutoObserve is the destination", () => {
     );
     expect(reason.className).toContain("text-status-error-text");
     expect(text("bulk-review-footer")).toBe("");
+  });
+
+  it("in an org with no on-call team, Add is blocked in red with a way to set up on-call (F1)", async () => {
+    reach(true, true, false);
+    await mountDrawer();
+    await openWith([orphan("a-1"), orphan("a-2"), ...m12Rows(IDS).slice(0, 1)]);
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(true);
+    expect(q("bulk-review-via-incident")).toBeNull();
+    const reason = q("bulk-review-no-destination")!;
+    expect(reason.className).toContain("text-status-error-text");
+    expect(reason.textContent).toContain(
+      "Choose a destination for these 2 alerts, or set up on-call. This organization has no on-call team, so their incidents page no one.",
+    );
+    expect(text("bulk-review-setup-oncall")).toBe("Set up on-call");
+    expect(text("bulk-review-group-meta-__no_team__")).toContain("notifies no one");
+    reach(true, true);
   });
 
   it("with on-call off, the red line says on-call is off", async () => {

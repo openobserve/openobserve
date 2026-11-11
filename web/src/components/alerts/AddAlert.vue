@@ -488,7 +488,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-alert-no-destination"
             >
               <OIcon name="error" size="xs" class="mt-0.5 shrink-0" />
-              <span>{{ unreachableLine(t, reachGap, 1) }}</span>
+              <span
+                >{{ unreachableLine(t, reachGap, 1) }}
+                <OButton
+                  v-if="reachGap === 'noTeam'"
+                  variant="ghost-primary"
+                  size="xs"
+                  icon-right="arrow-forward"
+                  data-test="add-alert-setup-oncall"
+                  @click="openOncallSetup()"
+                  >{{ t("alerts.reach.setUpOncall") }}</OButton
+                ></span
+              >
             </p>
             <p
               v-else-if="viaIncidentDraft"
@@ -1024,6 +1035,12 @@ export default defineComponent({
       });
     };
 
+    const openOncallSetup = () =>
+      alertForm.router.push({
+        name: "onCallTeams",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+
     // Stream-type change: write the value into the ONE form explicitly (so the
     // synchronous form store is current before updateStreams reads it — not
     // relying on the OFormSelect field-change flush order), then refresh streams
@@ -1150,6 +1167,7 @@ export default defineComponent({
       destinationRequired,
       viaIncidentDraft,
       reachGap,
+      openOncallSetup,
       unreachableLine,
       viaIncidentLine,
       onCompositeValidation,
