@@ -16,8 +16,16 @@
 import { reactive } from "vue";
 import type { BulkKind } from "./useBulkReview";
 
+/** How long a just-added alert waits for a pass to count it before the page stops polling for one. */
+export const ADDED_KEEP_MS = 30 * 60_000;
+
+interface Added {
+  org: string;
+  at: number;
+}
+
 /** Alerts this session created, keyed by service and class, until the analysis pass after them sees them. */
-const created = reactive(new Map<string, number>());
+const created = reactive(new Map<string, Added>());
 
 const keyOf = (serviceKey: string, cls: BulkKind): string => `${cls}\u0000${serviceKey}`;
 
@@ -29,24 +37,33 @@ export const serviceKeyOf = (
   namespace: string | null,
 ): string => [org, service, cluster ?? "", namespace ?? ""].join("\u0000");
 
-const has = (serviceKey: string, cls: BulkKind): boolean => created.has(keyOf(serviceKey, cls));
+const orgOf = (serviceKey: string): string => serviceKey.split("\u0000")[0];
+
+const fresh = (entry: Added, now: number): boolean => now - entry.at <= ADDED_KEEP_MS;
+
+const has = (serviceKey: string, cls: BulkKind, now: number = Date.now()): boolean => {
+  const entry = created.get(keyOf(serviceKey, cls));
+  return !!entry && fresh(entry, now);
+};
 
 const add = (serviceKey: string, cls: BulkKind, at: number = Date.now()): void => {
-  created.set(keyOf(serviceKey, cls), at);
+  created.set(keyOf(serviceKey, cls), { org: orgOf(serviceKey), at });
 };
 
 const remove = (serviceKey: string, cls: BulkKind): void => {
   created.delete(keyOf(serviceKey, cls));
 };
 
-/** Forgets every alert created before the pass at `passAt` (ms), which already counts them. */
-const clearOnPass = (passAt: number): void => {
-  for (const [key, at] of created) if (at <= passAt) created.delete(key);
+/** Forgets every alert of `org` created before its pass at `passAt` (ms), which already counts them. */
+const clearOnPass = (org: string, passAt: number): void => {
+  for (const [key, entry] of created)
+    if (entry.org === org && entry.at <= passAt) created.delete(key);
 };
 
-/** Whether any alert was created after the pass at `passAt` (ms), so it still waits to be counted. */
-const waiting = (passAt: number = 0): boolean => {
-  for (const at of created.values()) if (at > passAt) return true;
+/** Whether an alert of `org` created after its pass at `passAt` (ms) still waits to be counted. */
+const waiting = (org: string, passAt: number = 0, now: number = Date.now()): boolean => {
+  for (const entry of created.values())
+    if (entry.org === org && entry.at > passAt && fresh(entry, now)) return true;
   return false;
 };
 

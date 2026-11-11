@@ -98,6 +98,21 @@ describe("incidentReachGap / reachesSomeone (AutoObserve is the destination)", (
     expect(reachesSomeone({ destinations: ["ops"], creates_incident: false }, {})).toBe(true);
   });
 
+  it("an org with no on-call team pages no one, even with both switches on (F1)", () => {
+    build("true", "false");
+    const noTeam = { ...on, incidents_page_oncall: false };
+    expect(incidentReachGap(noTeam)).toBe("noTeam");
+    expect(incidentReachGap({ ...on, incidents_page_oncall: true })).toBeNull();
+    expect(reachesSomeone({ destinations: [], creates_incident: true }, noTeam)).toBe(false);
+    expect(reachesSomeone({ destinations: ["ops"], creates_incident: true }, noTeam)).toBe(true);
+    expect(unreachableLine(t, "noTeam", 1)).toBe(
+      "Choose a destination for this alert, or set up on-call. This organization has no on-call team, so its incident pages no one.",
+    );
+    expect(unreachableLine(t, "noTeam", 3)).toBe(
+      "Choose a destination for these 3 alerts, or set up on-call. This organization has no on-call team, so their incidents page no one.",
+    );
+  });
+
   it("says what is missing, in one sentence per situation, for one and for many", () => {
     expect(unreachableLine(t, "incidents", 1)).toBe(
       "Choose a destination for this alert. Incidents are off in this organization, so an alert with no destination reaches no one.",

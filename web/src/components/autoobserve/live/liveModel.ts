@@ -207,7 +207,7 @@ export const useLiveAutoObserve = (options: { active?: () => boolean } = {}) => 
     Object.assign(autoobserveCoverageQuery(org.value, "strict"), {
       enabled: enabled.value,
       refetchInterval: (query: { state: { data?: { pass_at?: number | null } } }) =>
-        recently.waiting((query.state.data?.pass_at ?? 0) / 1000)
+        recently.waiting(org.value, (query.state.data?.pass_at ?? 0) / 1000)
           ? ADDED_POLL_MS
           : COVERAGE_POLL_MS,
     }),
@@ -215,7 +215,7 @@ export const useLiveAutoObserve = (options: { active?: () => boolean } = {}) => 
   watch(
     () => coverage.data.value?.pass_at,
     (passAt) => {
-      if (passAt) recently.clearOnPass(passAt / 1000);
+      if (passAt) recently.clearOnPass(org.value, passAt / 1000);
     },
     { immediate: true },
   );

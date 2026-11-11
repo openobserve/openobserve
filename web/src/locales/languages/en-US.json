@@ -14054,7 +14054,9 @@
       "bothOff": "Choose a destination for this alert. Incidents and on-call are off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. Incidents and on-call are off in this organization, so an alert with no destination reaches no one.",
       "incidentsOff": "Choose a destination for this alert. Incidents are off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. Incidents are off in this organization, so an alert with no destination reaches no one.",
       "noIncident": "Choose a destination for this alert, or turn on Creates Incident. With neither, it reaches no one. | Choose a destination for these {count} alerts, or turn on Creates Incident. With neither, they reach no one.",
+      "noTeam": "Choose a destination for this alert, or set up on-call. This organization has no on-call team, so its incident pages no one. | Choose a destination for these {count} alerts, or set up on-call. This organization has no on-call team, so their incidents page no one.",
       "oncallOff": "Choose a destination for this alert. On-call is off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. On-call is off in this organization, so an alert with no destination reaches no one.",
+      "setUpOncall": "Set up on-call",
       "viaIncident": "No destination: this alert opens an incident, and the incident pages on-call. | No destination for {count} alerts: each opens an incident, and the incident pages on-call."
     },
     "saveFailed": "Could not save the alert.",
@@ -34341,7 +34343,6 @@
       "noTeamWhy": "No owner is known for these, so they use the org default.",
       "chooseFolder": "Choose a folder and destination",
       "noCluster": "No cluster",
-      "noNamespace": "no namespace",
       "folder": "folder {folder}",
       "folderDefault": "folder {folder} (org default)",
       "folders": "{count} folders",
@@ -34372,7 +34373,7 @@
       "usually": "{rate} an hour",
       "unsureTail": "Unticked: check before adding.",
       "cantBuild": "AutoObserve can't build this alert from this stream's fields. Add it by hand in Alerts.",
-      "cantBuildIn": "AutoObserve can't build this alert from this stream's fields. Add it by hand in {alerts}.",
+      "cantBuildIn": "AutoObserve can't build this from the stream's fields. Add it by hand in {alerts}.",
       "block": {
         "checking": "Checking the stream's fields…",
         "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",
@@ -34793,6 +34794,8 @@
       "errorsReason": "AutoObserve found no usual error count for {service} over the last 7 days. Set a threshold to add this alert.",
       "latencyReason": "AutoObserve found no usual latency for {service} over the last 7 days. Set a threshold to add this alert.",
       "measuring": "Measuring the usual level over the last 7 days…",
+      "noUsual": "None in 7 days",
+      "placeholder": "Required",
       "invalid": "Enter a number above 0."
     }
   }

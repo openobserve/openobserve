@@ -101,7 +101,7 @@ describe("bulkCopy — rows and groups", () => {
     expect(label("j")).toBe("svc-j");
     expect(label("a-none")).toBe("svc-a · no namespace");
     expect(label("a-b")).toBe("svc-a · ns-b");
-    expect(label("e-b")).toBe("svc-e · cluster-k / ns-b");
+    expect(label("e-b")).toBe("svc-e · ns-b");
   });
 
   it("names a service the way the coverage page does, even with no twin in the list (T2-N4)", () => {
@@ -125,6 +125,29 @@ describe("bulkCopy — rows and groups", () => {
     expect(rows.map((r) => serviceLabel(t, r, rows))).toEqual([
       "svc-b · no namespace",
       "svc-b · no namespace",
+    ]);
+  });
+
+  it("names twins as the coverage map does, adding the cluster only where it tells them apart (F-N4)", () => {
+    const scope = (cluster: string) => ({
+      service: "svc-y",
+      cluster,
+      namespace: "ns-g",
+      stream: { type: "logs", name: "y" },
+    });
+    const rows = reviewRowsOf(
+      {
+        kind: "errors",
+        rows: [
+          { key: "y-e", kind: "errors", scope: scope("cluster-e"), usually: 10 },
+          { key: "y-f", kind: "errors", scope: scope("cluster-f"), usually: 10 },
+        ],
+      },
+      { folders: [], overrides: {}, rights: null },
+    );
+    expect(rows.map((r) => serviceLabel(t, r, rows))).toEqual([
+      "svc-y · cluster-e · ns-g",
+      "svc-y · cluster-f · ns-g",
     ]);
   });
 
@@ -216,7 +239,7 @@ describe("bulkCopy — rows and groups", () => {
     expect(rightsBanner(t, "en-US", rowsOf())).toBeNull();
     const pay = groupRows(rows, "team").at(-1)!;
     expect(requestText(t, "en-US", pay, rows)).toBe(
-      "Please add 3 no-data alerts in folder payments: svc-j, svc-e · cluster-k / ns-b, and svc-e · cluster-k / ns-c. AutoObserve found that nothing alerts if they stop sending.",
+      "Please add 3 no-data alerts in folder payments: svc-j, svc-e · ns-b, and svc-e · ns-c. AutoObserve found that nothing alerts if they stop sending.",
     );
   });
 });

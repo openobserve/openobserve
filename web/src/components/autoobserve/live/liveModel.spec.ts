@@ -114,7 +114,7 @@ describe("useLiveAutoObserve follows each pass (T2-4, COVERAGE-AFTER-ADD)", () =
   const recently = useRecentlyCreated();
   afterEach(() => {
     vi.useRealTimers();
-    recently.clearOnPass(Number.MAX_SAFE_INTEGER);
+    recently.clearOnPass("default", Number.MAX_SAFE_INTEGER);
     queryClient.clear();
   });
   const start = () => {
@@ -136,6 +136,15 @@ describe("useLiveAutoObserve follows each pass (T2-4, COVERAGE-AFTER-ADD)", () =
     expect(autoobserve.coverage).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(5 * 60_000);
     expect(autoobserve.coverage).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not poll every minute for an alert added in another org (F4)", async () => {
+    recently.add(serviceKeyOf("other-org", "api", "prod", "shop"), "errors", START + 1_000);
+    start();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(autoobserve.coverage).toHaveBeenCalledTimes(1);
+    recently.clearOnPass("other-org", Number.MAX_SAFE_INTEGER);
   });
 
   it("polls every minute while an alert added here waits, and stops once a newer pass counts it", async () => {

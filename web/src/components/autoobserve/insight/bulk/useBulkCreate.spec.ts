@@ -180,9 +180,9 @@ describe("useBulkCreate — create", () => {
     const key = serviceKeyOf("demo-org", "svc-ingest-b", null, null);
     expect(recent.has(key, "no_data")).toBe(true);
     expect(recent.has(key, "errors")).toBe(false);
-    recent.clearOnPass(before - 1);
+    recent.clearOnPass("demo-org", before - 1);
     expect(recent.has(key, "no_data")).toBe(true);
-    recent.clearOnPass(Date.now());
+    recent.clearOnPass("demo-org", Date.now());
     expect(recent.has(key, "no_data")).toBe(false);
   });
 });

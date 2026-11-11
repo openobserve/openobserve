@@ -43,7 +43,8 @@ import {
   agoText,
   coverageWord,
   formatDay,
-  serviceLabel,
+  placeLabels,
+  placeOf,
   whereText,
   type LiveFailure,
   type LiveStale,
@@ -332,47 +333,6 @@ const streamText = (row: AutoObserveCoverageRow) => {
   return streams.length > 1 ? `${streams[0].name} +${streams.length - 1}` : streams[0].name;
 };
 
-const NAME_TIERS = [
-  (_t: TranslateFn, r: AutoObserveCoverageRow): string => r.service_name,
-  (t: TranslateFn, r: AutoObserveCoverageRow): string => serviceLabel(t, r.service_name, r, false),
-  (t: TranslateFn, r: AutoObserveCoverageRow): string => serviceLabel(t, r.service_name, r, true),
-];
-
-const groupBy = (labels: string[]) =>
-  labels.reduce<Map<string, number[]>>(
-    (m, label, i) => m.set(label, [...(m.get(label) ?? []), i]),
-    new Map(),
-  );
-
-// The design keys rows by name, so every label must be unique, even against a real name that reads like a generated one.
-const uniqueNames = (t: TranslateFn, rows: AutoObserveCoverageRow[]) => {
-  const tier = rows.map(() => 0);
-  const labelOf = (i: number) => NAME_TIERS[Math.min(tier[i], NAME_TIERS.length - 1)](t, rows[i]);
-  for (let round = 0; round < NAME_TIERS.length; round++) {
-    const clashes = [...groupBy(rows.map((_, i) => labelOf(i))).values()].filter(
-      (g) => g.length > 1,
-    );
-    if (!clashes.length) return rows.map((_, i) => labelOf(i));
-    for (const group of clashes) {
-      const top = Math.max(...group.map((i) => tier[i]));
-      group.filter((i) => tier[i] === top).forEach((i) => (tier[i] += 1));
-    }
-  }
-  const labels = rows.map((_, i) => labelOf(i));
-  const groups = groupBy(labels);
-  const taken = new Set(labels);
-  const lastNumber = new Map<string, number>();
-  return labels.map((label) => {
-    if ((groups.get(label)?.length ?? 1) < 2) return label;
-    let n = (lastNumber.get(label) ?? 0) + 1;
-    while (taken.has(`${label} #${n}`)) n += 1;
-    const numbered = `${label} #${n}`;
-    lastNumber.set(label, n);
-    taken.add(numbered);
-    return numbered;
-  });
-};
-
 const coveringMonitors = (row: AutoObserveCoverageRow) =>
   GAP_CLASSES.map((cls) => row.cells[cls])
     .filter((c) => c?.state === "covered")
@@ -455,7 +415,7 @@ export const toCoverageSource = (
       passMinutes: null,
       learning: null,
     };
-  const names = uniqueNames(t, data.rows);
+  const names = placeLabels(t, data.rows.map(placeOf));
   const minutes = minutesSince(data.pass_at, now);
   const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale));
   const planned = new Set(data.rows.flatMap((row, i) => (cannotWatch(row) ? [names[i]] : [])));

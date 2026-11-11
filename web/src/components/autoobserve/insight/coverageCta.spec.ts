@@ -128,7 +128,10 @@ describe("Signals watched gap line (flagged surface 2)", () => {
 describe("Just added, until the next check counts it (COVERAGE-AFTER-ADD)", () => {
   const recently = useRecentlyCreated();
   const key = serviceKeyOf("demo-org", "svc-ingest-c", null, null);
-  afterEach(() => recently.clearOnPass(Number.MAX_SAFE_INTEGER));
+  afterEach(() => {
+    recently.clearOnPass("demo-org", Number.MAX_SAFE_INTEGER);
+    recently.clearOnPass("other-org", Number.MAX_SAFE_INTEGER);
+  });
 
   it("never offers an alert this page just added again", () => {
     recently.add(key, "errors");

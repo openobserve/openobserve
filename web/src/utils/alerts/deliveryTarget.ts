@@ -29,20 +29,22 @@ export const hasDeliveryTarget = (alert: DeliveryTargets): boolean =>
   ((config.isEnterprise === "true" || config.isCloud === "true") &&
     ((alert.workflows?.length ?? 0) > 0 || !!alert.oncall_team?.trim()));
 
-/** The /config flags that decide whether an incident pages anyone. */
+/** The org config fields that decide whether an incident pages anyone. */
 export interface IncidentReachConfig {
   incidents_enabled?: boolean;
   oncall_enabled?: boolean;
+  /** Both switches on and the org has an on-call team; absent on a server that predates it. */
+  incidents_page_oncall?: boolean;
 }
 
 /** What keeps a new incident from paging on-call in this org, or null when it does. */
-export type IncidentReachGap = "incidents" | "oncall" | "both" | null;
+export type IncidentReachGap = "incidents" | "oncall" | "both" | "noTeam" | null;
 
 export const incidentReachGap = (zo: IncidentReachConfig | null | undefined): IncidentReachGap => {
   const enterprise = config.isEnterprise === "true" || config.isCloud === "true";
   const incidents = enterprise && zo?.incidents_enabled === true;
   const oncall = enterprise && zo?.oncall_enabled === true;
-  if (incidents && oncall) return null;
+  if (incidents && oncall) return zo?.incidents_page_oncall === false ? "noTeam" : null;
   if (!incidents && !oncall) return "both";
   return incidents ? "oncall" : "incidents";
 };
@@ -58,6 +60,7 @@ const UNREACHABLE_KEYS = {
   incidents: "alerts.reach.incidentsOff",
   oncall: "alerts.reach.oncallOff",
   both: "alerts.reach.bothOff",
+  noTeam: "alerts.reach.noTeam",
 } as const;
 
 /** The one red line for alerts that would reach no one: what is off, or (gap null) that the alert opens no incident. */
