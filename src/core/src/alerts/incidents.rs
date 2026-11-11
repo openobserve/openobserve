@@ -7277,6 +7277,43 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn a_findings_first_onset_after_a_manual_reopen_takes_the_reopen_once() {
+            use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+
+            let _db = store().await;
+            let (org, pager) = (new_org(), Pager::default());
+            let own = |at| FindingIncident {
+                cohort: false,
+                ..finding(&org, at)
+            };
+            let id = open(&own(ONSET), &pager).await.unwrap();
+            infra::table::alert_incidents::update_status(&org, &id, "resolved")
+                .await
+                .unwrap();
+            update_status(&org, &id, "open", PERSON).await.unwrap();
+            let mut taken = Vec::new();
+            for at in [ONSET + QUARTER_HOUR, ONSET + 2 * QUARTER_HOUR] {
+                let outcome = open_finding_incident_with(&own(at), &pager, &ClusterTurns).await;
+                taken.push(outcome.unwrap());
+            }
+            let service_name = UNKNOWN_SERVICE.to_string();
+            assert_eq!(
+                taken,
+                [
+                    Outcome::FiredAfterReopen {
+                        incident_id: id.clone(),
+                        service_name: service_name.clone(),
+                    },
+                    Outcome::ExistingAlertRepeated {
+                        incident_id: id,
+                        service_name,
+                    },
+                ],
+                "the fenced manual reopen waits for one firing, as an alert's does"
+            );
+        }
+
+        #[tokio::test]
         async fn a_recovery_waits_for_a_status_change_in_progress_but_on_calls_close_does_not() {
             let _db = store().await;
             let (org, pager) = (new_org(), Pager::default());
