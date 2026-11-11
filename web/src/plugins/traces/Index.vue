@@ -372,6 +372,7 @@ import {
 import { buildTracesRecord, tracesRestore } from "@/utils/queryHistory/traces";
 import { isBareTracesQuery, tracesQueryKey } from "@/plugins/traces/tracesPageReturn";
 import { openRecentOnItsPage, takeRecentLanding } from "@/utils/queryHistory/routes";
+import { isLeavingRoute, trackPendingNavigation } from "@/utils/pendingNavigation";
 import type { HistoryTime, QueryHistoryEntry } from "@/services/query_history";
 
 interface TracesSavedView {
@@ -404,6 +405,7 @@ const activeTab = computed(() => {
   return "search";
 });
 const router = useRouter();
+trackPendingNavigation(router);
 const { t } = useI18nTyped();
 // Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
 const emit = defineEmits(["sendToAiChat"]);
@@ -703,6 +705,10 @@ function resolveSearchWindow(reuseLastWindow: boolean) {
   return timestamps;
 }
 
+// A query-only write lands on whichever route is current and supersedes a pending navigation.
+const canWriteTracesUrl = () =>
+  router.currentRoute.value.name === "traces" && !isLeavingRoute("traces");
+
 function buildSearch(reuseLastWindow = false) {
   try {
     let query = searchObj.data.editorValue.trim();
@@ -758,7 +764,7 @@ function buildSearch(reuseLastWindow = false) {
 
     const queryParams = getUrlQueryParams();
 
-    router.push({ query: queryParams });
+    if (canWriteTracesUrl()) router.push({ query: queryParams });
     return req;
   } catch (e) {
     console.error("Error while constructing the search query", e);
@@ -1658,7 +1664,7 @@ const consumeRunQueryFlag = async () => {
   if (!("run-query" in query)) return false;
   const forced = query["run-query"] === "true";
   delete query["run-query"];
-  await router.replace({ query });
+  if (canWriteTracesUrl()) await router.replace({ query });
   return forced;
 };
 
@@ -2439,7 +2445,7 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   const query = { ...router.currentRoute.value.query, tab: view.searchMode };
   delete query.trace_id;
   delete query.span_id;
-  await router.replace({ query });
+  if (canWriteTracesUrl()) await router.replace({ query });
   if (seq !== savedViewApplySeq) return;
 
   if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
@@ -2651,6 +2657,7 @@ const applyHandoffFilter = (): boolean => {
 watch(
   () => searchObj.meta.searchMode,
   (mode) => {
+    if (!canWriteTracesUrl()) return;
     if (
       router.currentRoute.value.query.tab === mode &&
       router.currentRoute.value.query.search_mode === undefined
