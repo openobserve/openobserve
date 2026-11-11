@@ -180,7 +180,7 @@ export const usuallyOf = (
     : t("insight.bulk.usually", { rate: number(locale, row.row.usually) });
 };
 
-/** "ingest team", "No team yet", a folder name or a cluster. */
+/** "Owner: ingest", "No owner yet", a folder name or a cluster. */
 export const groupTitle = (t: TranslateFn, group: ReviewGroup): I18nText => {
   if (group.kind === "team") {
     return group.name ? t("insight.bulk.teamName", { team: group.name }) : t("insight.bulk.noTeam");
@@ -351,6 +351,10 @@ export const existsLine = (t: TranslateFn, row: ReviewRow): I18nText | null => {
   }
   return block?.code === "existsFailed" ? t("insight.bulk.block.existsFailed") : null;
 };
+
+/** The footer's first line while some rows can't be added until the user sets their threshold. */
+export const needsThresholdLine = (t: TranslateFn, count: number): I18nText =>
+  t("insight.bulk.needsThreshold", { count }, count);
 
 /** The footer's reason when rows were left out because their alerts already exist. */
 export const existingFooter = (t: TranslateFn, rows: ReviewRow[]): I18nText | null => {

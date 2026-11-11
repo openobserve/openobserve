@@ -175,7 +175,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="max-w-60"
           :label="raw(prefill.thresholdInput.label)"
           :suffix="prefill.thresholdInput.suffix"
-          :help-text="needsThreshold(prefill) ? raw(prefill.thresholdInput.reason) : undefined"
+          :help-text="
+            needsThreshold(prefill)
+              ? raw(prefill.thresholdInput.reason)
+              : raw(prefill.thresholdInput.note) || undefined
+          "
           data-test="create-alert-threshold-value"
           @update:model-value="onThresholdInput"
         />
@@ -251,6 +255,7 @@ import type {
   AlertPrefillWarningLevel,
 } from "@/ts/interfaces/alertPrefill";
 import { isPrefillBlocked, needsThreshold } from "@/utils/alerts/alertPrefill";
+import { typedThreshold } from "@/components/autoobserve/insight/targets/thresholds";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { formatSqlForDisplay } from "@/utils/query/formatSql";
 
@@ -292,8 +297,7 @@ const thresholdDraft = ref<string | number>(props.prefill?.thresholdInput?.value
 
 const onThresholdInput = (value: string | number) => {
   thresholdDraft.value = value;
-  const typed = Number(value);
-  emit("rebuild", { threshold: Number.isFinite(typed) && typed > 0 ? typed : 0 });
+  emit("rebuild", { threshold: typedThreshold(value) });
 };
 
 const hasStreamChoice = computed(() => (props.prefill?.streamCandidates?.length ?? 0) > 1);

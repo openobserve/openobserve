@@ -35,6 +35,36 @@ export const measuredThreshold = (
     : twoSignificant(usual * LATENCY_FACTOR);
 };
 
+/** With no usual error count a draft fires on any error, so a quiet service still gets an alert that can be added. */
+export const ANY_ERROR = 0;
+
+/** A typed threshold the alert can use: an error count of 0 or more, a latency above 0; else null. */
+export const usableThreshold = (
+  kind: "errors" | "latency",
+  value: number | null | undefined,
+): number | null =>
+  typeof value === "number" &&
+  Number.isFinite(value) &&
+  (kind === "errors" ? value >= 0 : value > 0)
+    ? value
+    : null;
+
+/** The threshold a draft starts with, in the review list and the Add alert dialog alike: the measured one, else what was typed (NaN when cleared), else any error. */
+export const draftThreshold = (
+  kind: "errors" | "latency",
+  usual: number | null | undefined,
+  typed?: number | null,
+): number | null => {
+  const measured = measuredThreshold(kind, usual);
+  if (measured !== null) return measured;
+  if (typed !== null && typed !== undefined) return usableThreshold(kind, typed);
+  return kind === "errors" ? ANY_ERROR : null;
+};
+
+/** A threshold field's text as a number; an empty field is NaN, so cleared never reads as 0. */
+export const typedThreshold = (value: string | number | null | undefined): number =>
+  String(value ?? "").trim() === "" ? Number.NaN : Number(value);
+
 /** Null when there is no usual rate, since a number made up from nothing would read as a measured one. */
 export const suggestErrors = (usualPerHour: number | null | undefined): number | null =>
   measuredThreshold("errors", usualPerHour);

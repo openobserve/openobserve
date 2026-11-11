@@ -25,6 +25,7 @@ import {
   footerOf,
   groupMeta,
   groupTitle,
+  needsThresholdLine,
   partialBanner,
   requestText,
   rightsBanner,
@@ -187,7 +188,13 @@ describe("bulkCopy — rows and groups", () => {
           { key: "s", kind: "errors", scope: scope("ns-s"), usually: null },
         ],
       },
-      { folders: [], overrides: {}, rights: null, baselines: { j: null, s: null } },
+      {
+        folders: [],
+        overrides: {},
+        rights: null,
+        baselines: { j: null, s: null },
+        thresholds: { j: Number.NaN, s: Number.NaN },
+      },
     );
     expect(rows.map((r) => blockLine(t, r, rows))).toEqual([
       "AutoObserve found no usual error count for svc-a · ns-j over the last 7 days. Set a threshold to add this alert.",
@@ -214,16 +221,21 @@ describe("bulkCopy — rows and groups", () => {
     expect(firesWhenOf(t, "source", rows[0])).toBe("no rows for 1 hour");
   });
 
+  it("names how many alerts still need a threshold, one sentence for one or many", () => {
+    expect(needsThresholdLine(t, 1)).toBe("1 alert needs a threshold before it can be added.");
+    expect(needsThresholdLine(t, 12)).toBe("12 alerts need a threshold before they can be added.");
+  });
+
   it("heads each group with its folder, destinations and tick count", () => {
     const groups = groupRows(rowsOf(), "team");
     const [ingestGroup, none] = groups;
-    expect(groupTitle(t, ingestGroup)).toBe("ingest team");
+    expect(groupTitle(t, ingestGroup)).toBe("Owner: ingest");
     expect(groupMeta(t, "en-US", ingestGroup, 5)).toEqual([
       "folder ingest",
       "notifies ingest-oncall",
       "5",
     ]);
-    expect(groupTitle(t, none)).toBe("No team yet");
+    expect(groupTitle(t, none)).toBe("No owner yet");
     expect(groupMeta(t, "en-US", none, 3)).toEqual([
       "folder default (org default)",
       "notifies ops-webhook",

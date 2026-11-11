@@ -240,8 +240,8 @@ export const errorsAlert = (
   const pick =
     o.errorField ??
     (s.stream?.type === "traces" ? { name: "span_status", kind: "span_status" as const } : null);
-  const threshold = o.threshold || (o.usualPerHour ? o.usualPerHour * 3 : null);
-  if (!enterprise() || !threshold || !pick) return null;
+  const threshold = o.threshold ?? (o.usualPerHour ? o.usualPerHour * 3 : null);
+  if (!enterprise() || threshold === null || !(threshold >= 0) || !pick) return null;
   return scopedPrefill(serviceScope(s), (where) => {
     const filter = `${where} AND ${errorPredicate(pick)}`;
     return {

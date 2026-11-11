@@ -36,6 +36,7 @@ const api = vi.hoisted(() => ({
   destinations: vi.fn(),
   copy: vi.fn(),
   schema: vi.fn(),
+  configFull: vi.fn(),
 }));
 
 vi.mock("@/services/alerts", () => ({
@@ -49,6 +50,7 @@ vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }))
 vi.mock("@/services/alert_destination", () => ({ default: { list: api.destinations } }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: api.copy }));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
+vi.mock("@/services/config", () => ({ default: { get_config_full: api.configFull } }));
 const measureBaseline = vi.hoisted(() => vi.fn());
 vi.mock("../targets/baseline", () => ({
   measureBaseline: (...a: unknown[]) => measureBaseline(...a),
@@ -246,7 +248,7 @@ describe("BulkReviewDrawer — rows that can't be added (T2-11, T2-18, T2-24)", 
     expect(labels).toEqual(["Tick svc-y, Errors", "Tick svc-y, Stops sending"]);
   });
 
-  it("says why a threshold of 0 or below can't be used, and keeps what was typed", async () => {
+  it("says why a negative threshold can't be used, and keeps what was typed", async () => {
     measureBaseline.mockResolvedValue(null);
     await mountDrawer();
     await openWith([
@@ -254,14 +256,37 @@ describe("BulkReviewDrawer — rows that can't be added (T2-11, T2-18, T2-24)", 
     ] as never);
     await flushPromises();
     const input = wrapper!.findComponent('[data-test="bulk-review-threshold-y:errors"]');
+    expect(input.props("modelValue")).toBe("0");
     input.vm.$emit("update:modelValue", "-5");
     await flushPromises();
     expect(input.props("modelValue")).toBe("-5");
-    expect(input.props("errorMessage")).toBe("Enter a number above 0.");
+    expect(input.props("errorMessage")).toBe("Enter 0 or more.");
     input.vm.$emit("update:modelValue", "5");
     await flushPromises();
     expect(input.props("errorMessage")).toBeUndefined();
     expect(review.toCreate.value.map((r) => r.key)).toEqual(["y:errors"]);
+  });
+
+  it("a cleared threshold reads as an instruction, and the footer and Add say what is missing", async () => {
+    measureBaseline.mockResolvedValue(null);
+    await mountDrawer();
+    await openWith([
+      { ...svc("y:errors", "errors"), inputs: { errorField: { name: "level", kind: "level" } } },
+    ] as never);
+    await flushPromises();
+    const input = wrapper!.findComponent('[data-test="bulk-review-threshold-y:errors"]');
+    input.vm.$emit("update:modelValue", "");
+    await flushPromises();
+    expect(input.props("errorMessage")).toBe("Set a threshold");
+    expect(
+      q("bulk-review-threshold-y:errors")!.querySelector("input")!.getAttribute("aria-invalid"),
+    ).toBe("true");
+    const add = q("bulk-review-create") as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    expect(text("bulk-review-footer")).toBe(
+      "1 alert needs a threshold before it can be added. Nothing is ticked, so nothing will be created.",
+    );
+    expect(add.getAttribute("aria-describedby")).toBe(q("bulk-review-footer")!.id);
   });
 });
 
@@ -269,7 +294,9 @@ describe("BulkReviewDrawer — group editor (T2-17)", () => {
   it("the hint names teams only while grouped by team (T2-9)", async () => {
     await mountDrawer();
     await openWith(m12Rows(IDS).slice(0, 1));
-    expect(text("bulk-review-group-hint")).toContain("come from each team");
+    expect(text("bulk-review-group-hint")).toContain(
+      "come from where each service's alerts already are",
+    );
     const { setGroupBy } = await import("./useBulkReview");
     setGroupBy("folder");
     await flushPromises();
@@ -396,7 +423,7 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     expect(text("bulk-review-create")).toBe("Add alerts");
   });
 
-  it("measures an errors draft's usual level, and asks for a threshold when the week has none (F1)", async () => {
+  it("measures an errors draft's usual level, and drafts any error when the week has none (F1)", async () => {
     api.schema.mockResolvedValue({
       data: {
         schema: [
@@ -413,7 +440,7 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     await flushPromises();
     expect(measureBaseline).toHaveBeenCalledTimes(1);
     expect(text("bulk-review-no-usual-errs")).toBe("None in 7 days");
-    expect(createButton().disabled).toBe(true);
+    expect(createButton().disabled).toBe(false);
     const input = document.querySelector<HTMLInputElement>(
       '[data-test="bulk-review-firesWhen-errs"] [data-test="bulk-review-threshold-errs"] input',
     )!;
@@ -469,7 +496,8 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     expect(field.querySelector("label")).toBeNull();
     const input = field.querySelector("input")!;
     expect(input.getAttribute("aria-label")).toBe("Fire above");
-    expect(input.getAttribute("placeholder")).toBe("Required");
+    expect(input.getAttribute("placeholder")).toBe("Set value");
+    expect(input.value).toBe("0");
     expect(wrapper!.findComponent('[data-test="bulk-review-threshold-errs"]').props("size")).toBe(
       "xs",
     );
@@ -703,6 +731,30 @@ describe("BulkReviewDrawer — AutoObserve is the destination", () => {
     reach(true, true);
   });
 
+  it("sets up on-call in a new tab and checks again without losing the review", async () => {
+    reach(true, true, false);
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await mountDrawer();
+    await openWith([orphan("a-1"), orphan("a-2")]);
+    await click("bulk-review-setup-oncall");
+    expect(open).toHaveBeenCalledWith(
+      expect.stringContaining("oncall/teams"),
+      "_blank",
+      "noopener",
+    );
+    expect(review.state.open).toBe(true);
+    api.configFull.mockResolvedValue({
+      data: { ...store.state.zoConfig, incidents_page_oncall: true },
+    });
+    expect(text("bulk-review-check-oncall")).toBe("Check again");
+    await click("bulk-review-check-oncall");
+    expect(api.configFull).toHaveBeenCalledWith("demo-org");
+    expect(q("bulk-review-no-destination")).toBeNull();
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(false);
+    open.mockRestore();
+    reach(true, true);
+  });
+
   it("with on-call off, the red line says on-call is off", async () => {
     reach(true, false);
     await mountDrawer();
@@ -850,7 +902,7 @@ describe("BulkReviewDrawer — drafts the org already has", () => {
     expect(review.toCreate.value.map((r) => r.key)).toEqual(["ingest-c"]);
   });
 
-  it("counts a row that only needs a threshold as addable, in the header and the footer alike", async () => {
+  it("the user's screen: a quiet service's errors row is ticked at any error beside an added one, and Add works", async () => {
     api.list.mockResolvedValue({
       data: { list: [existing("svc-ingest-b-no-data", "f-ingest", "ingest", "al-b")] },
     });
@@ -865,21 +917,27 @@ describe("BulkReviewDrawer — drafts the org already has", () => {
     await flushPromises();
     const meta = () => text("bulk-review-group-meta-team-ingest").split(" · ").at(-1);
     expect(text("bulk-review-no-usual-errs")).toBe("None in 7 days");
-    expect(meta()).toBe("0 of 1 ticked");
-    expect(q("bulk-review-group-tick-team-ingest")!.querySelector("button")!.disabled).toBe(false);
-    expect(text("bulk-review-footer")).toBe(
-      "Nothing is ticked, so nothing will be created. 1 was already added and is left out.",
-    );
-    const input = document.querySelector<HTMLInputElement>(
-      '[data-test="bulk-review-firesWhen-errs"] [data-test="bulk-review-threshold-errs"] input',
-    )!;
-    input.value = "40";
-    input.dispatchEvent(new Event("input"));
-    await flushPromises();
+    expect(text("bulk-review-group-team-ingest")).toContain("Owner: ingest");
     expect(meta()).toBe("1");
     expect(text("bulk-review-footer")).toContain(
       "1 alert will be created in folder ingest. 1 was already added and is left out.",
     );
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(false);
+    const input = document.querySelector<HTMLInputElement>(
+      '[data-test="bulk-review-firesWhen-errs"] [data-test="bulk-review-threshold-errs"] input',
+    )!;
+    expect(input.value).toBe("0");
+    input.value = "";
+    input.dispatchEvent(new Event("input"));
+    await flushPromises();
+    expect(meta()).toBe("0 of 1 ticked");
+    expect(text("bulk-review-footer")).toBe(
+      "1 alert needs a threshold before it can be added. Nothing is ticked, so nothing will be created. 1 was already added and is left out.",
+    );
+    input.value = "40";
+    input.dispatchEvent(new Event("input"));
+    await flushPromises();
+    expect(meta()).toBe("1");
   });
 
   it("says a group has nothing to add and disables its tick when every row was already added", async () => {

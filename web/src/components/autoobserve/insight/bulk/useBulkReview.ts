@@ -20,7 +20,7 @@ import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import commonService from "@/services/common";
 import { baselineSql, errorFieldOf } from "@/utils/alerts/prefill/fromAutoObserve";
 import { measureBaseline, type BaselineRequest } from "../targets/baseline";
-import { measuredThreshold } from "../targets/thresholds";
+import { draftThreshold, measuredThreshold, usableThreshold } from "../targets/thresholds";
 import { loadOwnedAlerts, notifyOf, teamOf } from "../targets/ownership";
 import { checkScopeMatch, scopeIdOf, type ScopeMatch } from "../targets/scopeMatch";
 import destinationService from "@/services/alert_destination";
@@ -267,7 +267,7 @@ const waiting = (block: RowBlock | null): boolean =>
 const positive = (value: number | null | undefined): number | null =>
   typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 
-/** The threshold in the order the finding's evidence, the 7-day measurement, then the user sets it. */
+/** The threshold in the order the finding's evidence, the 7-day measurement, what the user typed, then any error. */
 const levelOf = (
   kind: "errors" | "latency",
   row: BulkRow,
@@ -277,10 +277,13 @@ const levelOf = (
     positive(kind === "errors" ? row.usually : row.inputs?.p95Ms) ??
     positive(ctx.baselines[row.key]);
   if (usual) return { usual, threshold: measuredThreshold(kind, usual), measured: true };
+  const measured = row.key in ctx.baselines;
+  const typed = ctx.thresholds[row.key];
+  // The any-error default waits for the week's measurement, which may still find a usual level.
   return {
     usual: null,
-    threshold: positive(ctx.thresholds[row.key]),
-    measured: row.key in ctx.baselines,
+    threshold: measured ? draftThreshold(kind, null, typed) : usableThreshold(kind, typed),
+    measured,
   };
 };
 
@@ -516,6 +519,10 @@ export const groupRows = (rows: ReviewRow[], by: GroupBy): ReviewGroup[] => {
 export const isTickable = (row: ReviewRow): boolean =>
   !row.locked && (waiting(row.block) || (!!row.prefill && !row.block));
 
+/** A row whose threshold is the user's to set, since no usual level was found: it fires on any error, or waits for one. */
+export const asksThreshold = (row: ReviewRow): boolean =>
+  row.block?.code === "noBaseline" || (!row.block && row.usual === null && row.threshold !== null);
+
 /** A row the user can add: tickable now, or waiting only for the threshold they type. */
 export const isAddable = (row: ReviewRow): boolean =>
   isTickable(row) || (!row.locked && row.block?.code === "noBaseline");
@@ -750,7 +757,7 @@ const matchRows = async (org: string, load: number, signal: AbortSignal): Promis
   }
 };
 
-/** Measures each waiting row's usual level, a few at a time; a row the week gave none is unticked until a threshold is set. */
+/** Measures each waiting row's usual level, a few at a time; a row left with no threshold is unticked until one is set. */
 const measureRows = async (org: string, load: number, signal: AbortSignal): Promise<void> => {
   const request = state.request;
   if (!request) return;
@@ -768,17 +775,18 @@ const measureRows = async (org: string, load: number, signal: AbortSignal): Prom
         const value = query ? await measureBaseline(org, query, signal) : null;
         if (load !== contextLoad) return;
         state.baselines[row.key] = value;
-        if (!positive(value)) state.ticked.delete(row.key);
+        const now = reviewRows.value.find((r) => r.key === row.key);
+        if (!now || !isTickable(now)) state.ticked.delete(row.key);
       }),
     );
     if (load !== contextLoad) return;
   }
 };
 
-/** Sets or clears the threshold the user typed for a row the week gave no usual level; a creatable row is ticked. */
+/** Sets what the user typed for a row the week gave no usual level (NaN when cleared), or null to go back to the default; a creatable row is ticked. */
 export const setRowThreshold = (key: string, value: number | null): void => {
-  if (positive(value)) state.thresholds[key] = value!;
-  else delete state.thresholds[key];
+  if (value === null) delete state.thresholds[key];
+  else state.thresholds[key] = value;
   const row = reviewRows.value.find((r) => r.key === key);
   if (row && isCreatable(row)) state.ticked.add(key);
   else state.ticked.delete(key);

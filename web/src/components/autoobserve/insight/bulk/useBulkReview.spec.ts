@@ -31,6 +31,7 @@ import {
   useBulkReview,
   NO_TEAM,
   reviewRowsOf,
+  asksThreshold,
   isCreatable,
   isTickable,
   type BulkRow,
@@ -246,13 +247,29 @@ describe("useBulkReview — thresholds and error fields (F1, F3)", () => {
     }
   });
 
-  it("asks for a threshold when the week shows no usual level, and never creates it as it is", () => {
+  it("drafts an errors row the week gave no usual count to fire on any error, so it can be added", () => {
     const errors = level({}, "errors", { baselines: { k: null } });
-    expect(errors.block).toEqual({ code: "noBaseline", kind: "errors" });
-    expect(isTickable(errors)).toBe(false);
+    expect(errors.block).toBeNull();
+    expect(errors.threshold).toBe(0);
+    expect(errors.usual).toBeNull();
+    expect(errors.prefill?.sql).toMatch(/HAVING count\(\*\) > 0$/);
+    expect(isCreatable(errors)).toBe(true);
+    expect(asksThreshold(errors)).toBe(true);
+  });
+
+  it("asks for a threshold when an errors field is cleared, and never creates it as it is", () => {
+    const cleared = level({}, "errors", { baselines: { k: null }, thresholds: { k: Number.NaN } });
+    expect(cleared.block).toEqual({ code: "noBaseline", kind: "errors" });
+    expect(isTickable(cleared)).toBe(false);
+    expect(asksThreshold(cleared)).toBe(true);
+  });
+
+  it("asks for a latency threshold when the week shows no usual p95", () => {
     const latency = level(latencyRow, "latency", { baselines: { k: null } });
     expect(latency.block).toEqual({ code: "noBaseline", kind: "latency" });
     expect(isCreatable(latency)).toBe(false);
+    expect(asksThreshold(latency)).toBe(true);
+    expect(asksThreshold(level({}, "errors", { baselines: { k: 10 } }))).toBe(false);
   });
 
   it("thresholds on the measured usual level", () => {

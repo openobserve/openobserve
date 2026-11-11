@@ -14,7 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { firedTimes, measuredThreshold, suggestErrors, suggestLatency } from "./thresholds";
+import {
+  draftThreshold,
+  firedTimes,
+  measuredThreshold,
+  suggestErrors,
+  suggestLatency,
+  typedThreshold,
+} from "./thresholds";
 
 describe("suggestErrors", () => {
   it("is three times the usual hourly count", () => {
@@ -82,5 +89,40 @@ describe("firedTimes", () => {
   it("treats a missing point as not firing", () => {
     expect(firedTimes([60, null, 60], 50)).toBe(2);
     expect(firedTimes([], 50)).toBe(0);
+  });
+});
+
+describe("draftThreshold — one rule for the review list and the Add alert dialog", () => {
+  it("drafts on the usual level, over anything typed", () => {
+    expect(draftThreshold("errors", 10)).toBe(30);
+    expect(draftThreshold("latency", 1263)).toBe(2500);
+  });
+
+  it("with no usual error count, fires on any error until the user sets a threshold", () => {
+    expect(draftThreshold("errors", null)).toBe(0);
+    expect(draftThreshold("errors", null, null)).toBe(0);
+    expect(draftThreshold("errors", null, 5)).toBe(5);
+    expect(draftThreshold("errors", null, 0)).toBe(0);
+  });
+
+  it("a cleared or unusable error count asks for a threshold", () => {
+    expect(draftThreshold("errors", null, Number.NaN)).toBeNull();
+    expect(draftThreshold("errors", null, -1)).toBeNull();
+  });
+
+  it("with no usual latency, asks for a threshold above 0", () => {
+    expect(draftThreshold("latency", null)).toBeNull();
+    expect(draftThreshold("latency", null, 0)).toBeNull();
+    expect(draftThreshold("latency", null, 300)).toBe(300);
+  });
+});
+
+describe("typedThreshold", () => {
+  it("reads an empty field as cleared, not as 0", () => {
+    expect(typedThreshold("")).toBeNaN();
+    expect(typedThreshold("  ")).toBeNaN();
+    expect(typedThreshold("abc")).toBeNaN();
+    expect(typedThreshold("0")).toBe(0);
+    expect(typedThreshold(12)).toBe(12);
   });
 });

@@ -498,6 +498,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-setup-oncall"
                   @click="openOncallSetup()"
                   >{{ t("alerts.reach.setUpOncall") }}</OButton
+                >
+                <OButton
+                  v-if="reachGap === 'noTeam'"
+                  variant="ghost-primary"
+                  size="xs"
+                  :loading="checkingReach"
+                  data-test="add-alert-check-oncall"
+                  @click="checkOncallAgain()"
+                  >{{ t("alerts.reach.checkAgain") }}</OButton
                 ></span
               >
             </p>
@@ -739,6 +748,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
 import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
+import { useOnCallSetup } from "@/composables/useOnCallSetup";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
@@ -1035,11 +1045,11 @@ export default defineComponent({
       });
     };
 
-    const openOncallSetup = () =>
-      alertForm.router.push({
-        name: "onCallTeams",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
-      });
+    const {
+      openSetup: openOncallSetup,
+      checkAgain: checkOncallAgain,
+      checking: checkingReach,
+    } = useOnCallSetup();
 
     // Stream-type change: write the value into the ONE form explicitly (so the
     // synchronous form store is current before updateStreams reads it — not
@@ -1168,6 +1178,8 @@ export default defineComponent({
       viaIncidentDraft,
       reachGap,
       openOncallSetup,
+      checkOncallAgain,
+      checkingReach,
       unreachableLine,
       viaIncidentLine,
       onCompositeValidation,

@@ -218,21 +218,35 @@ describe("useBulkReview — a threshold is measured over 7 days, else asked for 
     expect(review.toCreate.value.map((r) => r.key).sort()).toEqual(["a", "b"]);
   });
 
-  it("unticks a row the week gave no usual level, and ticks it once the user sets a threshold", async () => {
+  it("keeps an errors row the week gave no usual level ticked, firing on any error", async () => {
     api.schema.mockResolvedValue(fields("service_name", "level"));
     measureBaseline.mockResolvedValue(null);
     openBulkReview({ kind: "errors", rows: [errorsRow("a", null)] });
     await loadReviewContext("org-a");
     await flushPromises();
+    expect(rowOf("a").block).toBeNull();
+    expect(rowOf("a").threshold).toBe(0);
+    expect(review.state.ticked.has("a")).toBe(true);
+    expect(review.toCreate.value.map((r) => r.key)).toEqual(["a"]);
+  });
+
+  it("a cleared threshold unticks the row until one is set; clearing the reset goes back to any error", async () => {
+    api.schema.mockResolvedValue(fields("service_name", "level"));
+    measureBaseline.mockResolvedValue(null);
+    openBulkReview({ kind: "errors", rows: [errorsRow("a", null)] });
+    await loadReviewContext("org-a");
+    await flushPromises();
+    setRowThreshold("a", Number.NaN);
     expect(rowOf("a").block).toEqual({ code: "noBaseline", kind: "errors" });
     expect(review.state.ticked.has("a")).toBe(false);
+    expect(review.toCreate.value).toEqual([]);
     setRowThreshold("a", 40);
     expect(rowOf("a").block).toBeNull();
     expect(review.state.ticked.has("a")).toBe(true);
-    expect(review.toCreate.value.map((r) => r.key)).toEqual(["a"]);
+    expect(rowOf("a").prefill?.sql).toMatch(/HAVING count\(\*\) > 40$/);
     setRowThreshold("a", null);
-    expect(rowOf("a").block).toEqual({ code: "noBaseline", kind: "errors" });
-    expect(review.toCreate.value).toEqual([]);
+    expect(rowOf("a").threshold).toBe(0);
+    expect(review.state.ticked.has("a")).toBe(true);
   });
 
   it("drops a measurement that lands after the review moved to another org", async () => {
@@ -248,7 +262,8 @@ describe("useBulkReview — a threshold is measured over 7 days, else asked for 
     late.resolve(5);
     await first;
     await flushPromises();
-    expect(rowOf("a").block).toEqual({ code: "noBaseline", kind: "errors" });
+    expect(rowOf("a").usual).toBeNull();
+    expect(rowOf("a").threshold).toBe(0);
   });
 });
 

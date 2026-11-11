@@ -211,6 +211,37 @@ describe("CreateAlertFromSourceDialog", () => {
       expect(wrapper.emitted("rebuild")?.at(-1)).toEqual([{ threshold: 40 }]);
     });
 
+    it("lets Continue through on a drafted 0 and shows why it fires on any error", () => {
+      wrapper = mountDialog(
+        prefill({
+          source: "autoobserve",
+          sql: 'SELECT count(*) AS errors FROM "app_traces" HAVING count(*) > 0',
+          thresholdInput: {
+            label: "Fire above",
+            suffix: "errors an hour",
+            reason: "AutoObserve found no usual error count for svc-a over the last 7 days.",
+            note: "This alert fires on any error.",
+            value: 0,
+          },
+        }),
+      );
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(false);
+      expect(wrapper.text()).toContain("This alert fires on any error.");
+      expect(
+        (
+          wrapper.find('[data-test="create-alert-threshold-value"] input')
+            .element as HTMLInputElement
+        ).value,
+      ).toBe("0");
+    });
+
+    it("asks the source to rebuild with a cleared field as cleared, not as 0", async () => {
+      wrapper = mountDialog(asking(0));
+      await wrapper.find('[data-test="create-alert-threshold-value"] input').setValue("");
+      const [options] = wrapper.emitted("rebuild")!.at(-1) as [{ threshold: number }];
+      expect(options.threshold).toBeNaN();
+    });
+
     it("lets Continue through once the rebuilt prefill carries the threshold", () => {
       wrapper = mountDialog(asking(40));
       expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(false);

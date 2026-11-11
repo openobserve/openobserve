@@ -558,6 +558,12 @@ const reloadOrgConfig = (org: string) =>
     })
     .catch(() => undefined);
 
+/** Reads the org's teams and config afresh, for a page waiting on a team set up in another tab. */
+export const recheckOncallReach = async (org: string) => {
+  await queryClient.invalidateQueries({ queryKey: oncallKeys.teamsAll(org) });
+  return queryClient.fetchQuery({ ...configFullQuery(org), staleTime: 0 });
+};
+
 export const createTeamMutation = (org: string) =>
   mutationOptions({
     mutationFn: (data: { name: string; timezone: string; description?: string | null }) =>

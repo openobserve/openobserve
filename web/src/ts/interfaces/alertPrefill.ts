@@ -130,11 +130,13 @@ export interface AlertBuildOptions {
   threshold?: number;
 }
 
-/** A threshold the source could not measure: the dialog asks for it and keeps Continue off until it is set. */
+/** A threshold the source could not measure: a drafted value, or the dialog asks for one and keeps Continue off until it is set. */
 export interface AlertPrefillThresholdInput {
   label: string;
   suffix: string;
   reason: string;
+  /** Shown while the drafted value stands, to say what it does. */
+  note?: string;
   value: number | null;
 }
 

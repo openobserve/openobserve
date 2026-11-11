@@ -222,15 +222,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTruncatedText>
             <OInput
               v-if="isMobile && asksThreshold(row)"
-              :model-value="typed[row.key] ?? state.thresholds[row.key] ?? ''"
+              :model-value="thresholdText(row)"
               type="number"
               size="sm"
               class="mt-1 max-w-52"
               :label="t('insight.threshold.label')"
+              :placeholder="t('insight.threshold.placeholder')"
               :suffix="String(t(`insight.threshold.${thresholdKind(row)}Suffix`))"
               :disabled="locked"
-              :error="badThreshold(row.key)"
-              :error-message="badThreshold(row.key) ? t('insight.threshold.invalid') : undefined"
+              :error="!!thresholdError(row)"
+              :error-message="thresholdError(row)"
               :data-test="`bulk-review-threshold-${row.key}`"
               @update:model-value="(v: string | number) => typeThreshold(row.key, v)"
             />
@@ -253,15 +254,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OInput
               v-if="asksThreshold(row)"
-              :model-value="typed[row.key] ?? state.thresholds[row.key] ?? ''"
+              :model-value="thresholdText(row)"
               type="number"
               size="xs"
               :aria-label="t('insight.threshold.label')"
-              :placeholder="t('insight.threshold.placeholder')"
+              :placeholder="t('insight.threshold.placeholderShort')"
               :suffix="String(t(`insight.threshold.${thresholdKind(row)}Suffix`))"
               :disabled="locked"
-              :error="badThreshold(row.key)"
-              :error-message="badThreshold(row.key) ? t('insight.threshold.invalid') : undefined"
+              :error="!!thresholdError(row)"
+              :error-message="thresholdError(row)"
               :data-test="`bulk-review-threshold-${row.key}`"
               @update:model-value="(v: string | number) => typeThreshold(row.key, v)"
             />
@@ -281,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-usually="{ row }">
           <OSkeleton v-if="waits(row)" animation="pulse" class="h-4 w-20" aria-hidden="true" />
           <span
-            v-else-if="row.block?.code === 'noBaseline'"
+            v-else-if="asksThreshold(row)"
             class="text-text-secondary"
             :data-test="`bulk-review-no-usual-${row.key}`"
             >{{ t("insight.threshold.noUsual") }}</span
@@ -297,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-wrap items-center justify-between gap-3">
         <p
           v-if="unreachable.length && !done"
+          :id="FOOTER_ID"
           class="text-status-error-text flex min-w-0 flex-1 items-start gap-1.5 text-xs text-pretty"
           data-test="bulk-review-no-destination"
         >
@@ -309,13 +311,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="xs"
               icon-right="arrow-forward"
               data-test="bulk-review-setup-oncall"
-              @click="openOncallSetup()"
+              @click="openSetup()"
               >{{ t("alerts.reach.setUpOncall") }}</OButton
+            >
+            <OButton
+              v-if="reachGap === 'noTeam'"
+              variant="ghost-primary"
+              size="xs"
+              :loading="checkingReach"
+              data-test="bulk-review-check-oncall"
+              @click="checkAgain()"
+              >{{ t("alerts.reach.checkAgain") }}</OButton
             ></span
           >
         </p>
         <p
           v-else
+          :id="FOOTER_ID"
           class="text-text-body min-w-0 flex-1 text-xs text-pretty"
           data-test="bulk-review-footer"
         >
@@ -346,6 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="toCreate.length === 0 || checking || unreachable.length > 0"
             :loading="running"
+            :aria-describedby="FOOTER_ID"
             data-test="bulk-review-create"
             @click="createTicked()"
           >
@@ -362,6 +375,8 @@ import { computed, nextTick, onBeforeUnmount, provide, reactive, ref, watch } fr
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { incidentReachGap, unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
+import { useOnCallSetup } from "@/composables/useOnCallSetup";
+import { typedThreshold, usableThreshold } from "../targets/thresholds";
 import config from "@/aws-exports";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -385,6 +400,7 @@ import {
   failureLine,
   firesWhenOf,
   footerOf,
+  needsThresholdLine,
   partialBanner,
   rightsBanner,
   ruleOf,
@@ -397,6 +413,7 @@ import { useBulkCreate } from "./useBulkCreate";
 import { existingAlertRoute, type ExistingAlert } from "./existingAlerts";
 import {
   DEFAULT_FOLDER,
+  asksThreshold,
   changeGroup,
   closeBulkReview,
   countByFolder,
@@ -428,16 +445,20 @@ const locale = computed(() => String(i18nLocale.value));
 const typed = reactive<Record<string, string>>({});
 const typeThreshold = (key: string, value: string | number) => {
   typed[key] = String(value ?? "");
-  const n = Number(value);
-  setRowThreshold(key, typed[key].trim() !== "" && Number.isFinite(n) && n > 0 ? n : null);
+  setRowThreshold(key, typedThreshold(value));
 };
 watch(
   () => state.request,
   () => Object.keys(typed).forEach((key) => delete typed[key]),
 );
-const badThreshold = (key: string) => {
-  const value = typed[key]?.trim();
-  return !!value && !(Number(value) > 0);
+const thresholdText = (row: ReviewRow) =>
+  typed[row.key] ?? (row.threshold === null ? "" : String(row.threshold));
+const thresholdError = (row: ReviewRow) => {
+  if (!(row.key in typed)) return undefined;
+  if (typed[row.key].trim() === "") return t("insight.threshold.required");
+  const kind = thresholdKind(row);
+  if (usableThreshold(kind, typedThreshold(typed[row.key])) !== null) return undefined;
+  return kind === "errors" ? t("insight.threshold.invalidErrors") : t("insight.threshold.invalid");
 };
 const ALERT_NAME: Record<string, "errors" | "latency" | "absence"> = {
   errors: "errors",
@@ -450,6 +471,8 @@ const alertName = (row: ReviewRow) =>
 const reachGap = computed(() => incidentReachGap(store.state.zoConfig));
 // Every AutoObserve draft opens an incident, so a row with no destination is blocked only when that pages no one.
 const unreachable = computed(() => (reachGap.value === null ? [] : silent.value));
+const { openSetup, checkAgain, checking: checkingReach } = useOnCallSetup();
+const FOOTER_ID = "bulk-review-footer-reason";
 const org = () => String(store.state.selectedOrganization?.identifier ?? "");
 
 const { results, running, create, retry, reset, expire, hideUndo, showUndo } = useBulkCreate({
@@ -476,8 +499,13 @@ const footer = computed(() => {
   const existing = existingFooter(t, reviewRows.value);
   // When every draft already exists, that is the reason nothing can be added.
   if (existing && reviewRows.value.every((r) => r.block?.code === "exists")) return existing;
-  const counts = footerOf(t, locale.value, countByFolder(tickedRows.value));
-  return existing ? raw(`${counts} ${existing}`) : counts;
+  const needs = reviewRows.value.filter((r) => !r.locked && r.block?.code === "noBaseline").length;
+  const parts = [
+    needs ? needsThresholdLine(t, needs) : null,
+    footerOf(t, locale.value, countByFolder(tickedRows.value)),
+    existing,
+  ];
+  return raw(parts.filter(Boolean).join(" "));
 });
 
 const groupByOptions = computed(() =>
@@ -521,9 +549,6 @@ const compactLine = (row: ReviewRow) =>
 const measuring = (row: ReviewRow) => row.block?.code === "measuring";
 
 const waits = (row: ReviewRow) => measuring(row) || row.block?.code === "checking";
-
-const asksThreshold = (row: ReviewRow) =>
-  row.block?.code === "noBaseline" || !!state.thresholds[row.key];
 
 const columns = computed<OTableColumnDef<ReviewRow>[]>(() => [
   { id: "tick", header: raw(""), size: 44 },
@@ -581,11 +606,6 @@ watch(
 );
 
 const createTicked = () => create(kind.value, toCreate.value);
-
-const openOncallSetup = () => {
-  closeBulkReview();
-  router.push({ name: "onCallTeams", query: { org_identifier: org() } });
-};
 
 const openAdded = (alert: ExistingAlert) => {
   closeBulkReview();

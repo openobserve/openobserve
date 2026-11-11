@@ -24,7 +24,12 @@ import {
 import { gt, type I18nText } from "@/types/i18n";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { sanitizeAlertNamePart, warn } from "../alertPrefill";
-import { suggestErrors, suggestLatency } from "@/components/autoobserve/insight/targets/thresholds";
+import {
+  ANY_ERROR,
+  draftThreshold,
+  suggestErrors,
+  suggestLatency,
+} from "@/components/autoobserve/insight/targets/thresholds";
 
 export const AUTOOBSERVE_SOURCE = "autoobserve";
 
@@ -407,6 +412,9 @@ const thresholdInput = (
   label: gt("insight.threshold.label"),
   suffix: gt(`insight.threshold.${kind}Suffix`),
   reason: gt(`insight.threshold.${kind}Reason`, { service: scopeLabel(s) }),
+  ...(kind === "errors" && value === ANY_ERROR
+    ? { note: gt("insight.threshold.anyErrorNote", { service: scopeLabel(s) }) }
+    : {}),
   value,
 });
 
@@ -416,10 +424,7 @@ const scopeLabel = (s: ServiceScope): string => {
   return where ? `${s.service} · ${where}` : s.service;
 };
 
-const userThreshold = (value: number | null | undefined): number | null =>
-  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
-
-/** PD-11: fires above three times the usual hourly error count; with no usual count the user sets the threshold. */
+/** PD-11: fires above three times the usual hourly error count; with no usual count it fires on any error until the user sets one. */
 export const errorsAlert = (
   s: ServiceScope,
   o: AutoObserveAlertOptions & {
@@ -432,8 +437,7 @@ export const errorsAlert = (
   if (!errorPick(s, o.errorField)) return null;
   const scope = serviceScope(s);
   const suggested = suggestErrors(o.usualPerHour);
-  const typed = suggested === null ? userThreshold(o.threshold) : null;
-  const threshold = suggested ?? typed;
+  const threshold = draftThreshold("errors", o.usualPerHour, o.threshold);
   const having = threshold === null ? "" : ` HAVING count(*) > ${threshold}`;
   const sql = scope.blocked
     ? ""
@@ -445,7 +449,7 @@ export const errorsAlert = (
     o,
   );
   return suggested === null
-    ? { ...prefill, thresholdInput: thresholdInput("errors", s, typed) }
+    ? { ...prefill, thresholdInput: thresholdInput("errors", s, threshold) }
     : prefill;
 };
 
@@ -461,8 +465,7 @@ export const latencyAlert = (
   if (!isAutoObserveBuild()) return null;
   const scope = serviceScope(s);
   const suggested = suggestLatency(o.p95Ms);
-  const typed = suggested === null ? userThreshold(o.threshold) : null;
-  const threshold = suggested ?? typed;
+  const threshold = draftThreshold("latency", o.p95Ms, o.threshold);
   const warnings = [...scope.warnings];
   const field = o.durationField || "duration";
   if (s.stream?.type !== "traces")
@@ -481,7 +484,7 @@ export const latencyAlert = (
     o,
   );
   return suggested === null
-    ? { ...prefill, thresholdInput: thresholdInput("latency", s, typed) }
+    ? { ...prefill, thresholdInput: thresholdInput("latency", s, threshold) }
     : prefill;
 };
 

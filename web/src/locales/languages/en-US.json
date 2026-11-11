@@ -14060,6 +14060,7 @@
       "noTeam": "Choose a destination for this alert, or set up on-call. This organization has no on-call team, so its incident pages no one. | Choose a destination for these {count} alerts, or set up on-call. This organization has no on-call team, so their incidents page no one.",
       "oncallOff": "Choose a destination for this alert. On-call is off in this organization, so an alert with no destination reaches no one. | Choose a destination for these {count} alerts. On-call is off in this organization, so an alert with no destination reaches no one.",
       "setUpOncall": "Set up on-call",
+      "checkAgain": "Check again",
       "viaIncident": "No destination: this alert opens an incident, and the incident pages on-call. | No destination for {count} alerts: each opens an incident, and the incident pages on-call."
     },
     "saveFailed": "Could not save the alert.",
@@ -34327,11 +34328,11 @@
       "ruleTail": "Untick any you don't want. Nothing is saved until you click Add alerts.",
       "groupBy": "Group by",
       "groupByOption": {
-        "team": "Team",
+        "team": "Owner",
         "folder": "Folder",
         "cluster": "Cluster"
       },
-      "groupHint": "Folder and destination come from each team. Change them per group.",
+      "groupHint": "Owner, folder and destination come from where each service's alerts already are. Change them per group.",
       "groupHintOther": "Change the folder and destination per group.",
       "column": {
         "service": "Service",
@@ -34341,8 +34342,8 @@
       },
       "tickGroup": "Tick every alert in {group}",
       "tickRow": "Tick {service}, {alert}",
-      "teamName": "{team} team",
-      "noTeam": "No team yet",
+      "teamName": "Owner: {team}",
+      "noTeam": "No owner yet",
       "noTeamWhy": "No owner is known for these, so they use the org default.",
       "chooseFolder": "Choose a folder and destination",
       "noCluster": "No cluster",
@@ -34355,6 +34356,7 @@
       "notifiesViaIncident": "pages on-call through an incident",
       "ticked": "{ticked} of {count} ticked",
       "nothingToAdd": "nothing to add",
+      "needsThreshold": "{count} alert needs a threshold before it can be added. | {count} alerts need a threshold before they can be added.",
       "change": "Change folder or destination",
       "changeFolder": "Folder",
       "changeDestinations": "Destinations",
@@ -34807,8 +34809,12 @@
       "latencyReason": "AutoObserve found no usual latency for {service} over the last 7 days. Set a threshold to add this alert.",
       "measuring": "Measuring the usual level over the last 7 days…",
       "noUsual": "None in 7 days",
-      "placeholder": "Required",
-      "invalid": "Enter a number above 0."
+      "placeholder": "Set a threshold",
+      "placeholderShort": "Set value",
+      "required": "Set a threshold",
+      "invalid": "Enter a number above 0.",
+      "invalidErrors": "Enter 0 or more.",
+      "anyErrorNote": "AutoObserve found no errors for {service} in the last 7 days, so this alert fires on any error. Raise the threshold if some errors are normal."
     }
   }
 }

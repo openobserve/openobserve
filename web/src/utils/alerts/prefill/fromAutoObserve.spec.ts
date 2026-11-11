@@ -22,7 +22,7 @@ vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "fal
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import config from "@/aws-exports";
 import i18n from "@/locales";
-import { isPrefillBlocked, normalizePrefill } from "../alertPrefill";
+import { isPrefillBlocked, needsThreshold, normalizePrefill } from "../alertPrefill";
 import { raw } from "@/types/i18n";
 import {
   LEVEL0_COLUMNS,
@@ -335,22 +335,40 @@ describe("errorsAlert", () => {
     expect(prefill.sql).toMatch(/HAVING count\(\*\) > 51$/);
   });
 
-  it("with no usual count, asks for a threshold and leaves Save off until one is set (F1)", () => {
+  it("with no usual count, fires on any error and says so, so the draft can be added at once", () => {
     const prefill = errorsAlert(tracesScope(), {
       ...options,
       errorField: null,
       usualPerHour: null,
     })!;
 
-    expect(prefill.sql).not.toContain("HAVING");
-    expect(prefill.meta?.threshold).toBeNull();
-    expect(prefill.thresholdInput).toEqual({
+    expect(prefill.sql).toMatch(/HAVING count\(\*\) > 0$/);
+    expect(prefill.meta?.threshold).toBe(0);
+    expect(prefill.thresholdInput).toMatchObject({
       label: "Fire above",
       suffix: "errors an hour",
+      value: 0,
+      note: "AutoObserve found no errors for svc-a · cluster-k / ns-b in the last 7 days, so this alert fires on any error. Raise the threshold if some errors are normal.",
+    });
+    expect(needsThreshold(prefill)).toBe(false);
+  });
+
+  it("with no usual count and the field cleared, asks for a threshold and leaves Save off (F1)", () => {
+    const prefill = errorsAlert(tracesScope(), {
+      ...options,
+      errorField: null,
+      usualPerHour: null,
+      threshold: Number.NaN,
+    })!;
+
+    expect(prefill.sql).not.toContain("HAVING");
+    expect(prefill.meta?.threshold).toBeNull();
+    expect(prefill.thresholdInput).toMatchObject({
       reason:
         "AutoObserve found no usual error count for svc-a · cluster-k / ns-b over the last 7 days. Set a threshold to add this alert.",
       value: null,
     });
+    expect(needsThreshold(prefill)).toBe(true);
     expect(isPrefillBlocked(prefill)).toBe(false);
   });
 

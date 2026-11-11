@@ -40,6 +40,8 @@ vi.mock("@/aws-exports", async (importOriginal) => {
   const actual = (await importOriginal<{ default: Record<string, unknown> }>()).default;
   return { default: { ...actual, isEnterprise: "true" } };
 });
+const configFull = vi.hoisted(() => vi.fn());
+vi.mock("@/services/config", () => ({ default: { get_config_full: configFull } }));
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStream: vi.fn(() => Promise.resolve({ schema: [{ name: "service_name", type: "Utf8" }] })),
@@ -328,6 +330,28 @@ describe("AddAlert with an AutoObserve prefill", () => {
       expect(wrapper!.findComponent({ name: "AlertSettings" }).props("destinationRequired")).toBe(
         true,
       );
+    });
+
+    it("sets up on-call in a new tab, and Check again lifts the block without leaving the form", async () => {
+      reach(true, true, false);
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      await openNoDataPrefill("enterprise", silent);
+      byTest("add-alert-setup-oncall")!.click();
+      await flushPromises();
+      expect(open).toHaveBeenCalledWith(
+        expect.stringContaining("oncall/teams"),
+        "_blank",
+        "noopener",
+      );
+      configFull.mockResolvedValue({
+        data: { ...store.state.zoConfig, incidents_page_oncall: true },
+      });
+      expect(byTest("add-alert-check-oncall")?.textContent?.trim()).toBe("Check again");
+      byTest("add-alert-check-oncall")!.click();
+      await flushPromises();
+      expect(reason()).toBeNull();
+      expect(save().disabled).toBe(false);
+      open.mockRestore();
     });
 
     it("turning off Creates Incident brings the block back, saying how to lift it", async () => {
