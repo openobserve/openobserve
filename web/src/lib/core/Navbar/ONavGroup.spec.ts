@@ -6,7 +6,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ONavGroup from "./ONavGroup.vue";
-import type { SubnavChild } from "./ONavbar.types";
+import type { NestedCategory, SubnavChild } from "./ONavbar.types";
 import { NAV_GROUPS } from "./navGroups";
 import { AIM_IDLE, aim } from "./hoverIntent";
 
@@ -82,6 +82,8 @@ const i18n = createI18n({
     en: {
       menu: {
         alerts: "Alerts",
+        onCall: "On-Call",
+        streams: "Streams",
         pipeline: "Pipelines",
         trialFlyoutNote: "Your trial has ended. Pages with a lock need a plan.",
         trialPageNeedsPlan: "{page} needs a plan",
@@ -1977,6 +1979,549 @@ describe("ONavGroup", () => {
       wrapper.unmount();
       await mountReliability("/");
       expect(wrapper.findComponent(menuLinkStub).props("active")).toBe(false);
+    });
+  });
+
+  // Real Teleport: the flyout and its side panel are separate teleported roots, as in the app.
+  describe("nested categories (side panel)", () => {
+    const NESTED: NestedCategory[] = [
+      { categoryKey: "menu.alerts", icon: "shield-alert-outline" },
+      { categoryKey: "menu.onCall", icon: "call" },
+    ];
+    const ALL_CHILDREN: SubnavChild[] = [
+      { titleKey: "menu.alerts", icon: "a", name: "alertList", categoryKey: "menu.alerts" },
+      {
+        titleKey: "menu.pipeline",
+        icon: "b",
+        name: "alertDestinations",
+        categoryKey: "menu.alerts",
+      },
+      { titleKey: "menu.streams", icon: "c", name: "sloList" },
+      {
+        titleKey: "menu.alerts",
+        icon: "d",
+        name: "onCallTeams",
+        categoryKey: "menu.onCall",
+        beta: true,
+      },
+      {
+        titleKey: "menu.pipeline",
+        icon: "e",
+        name: "onCallMine",
+        categoryKey: "menu.onCall",
+        beta: true,
+      },
+      { titleKey: "menu.alerts", icon: "f", name: "alertSources", categoryKey: "menu.streams" },
+      { titleKey: "menu.pipeline", icon: "g", name: "downtimes", categoryKey: "menu.streams" },
+    ];
+    const ALL_ROUTES = ALL_CHILDREN.map((c) => c.name);
+
+    let now = 0;
+    const tick = (ms: number) => {
+      now += ms;
+      vi.advanceTimersByTime(ms);
+    };
+    const rect = (left: number, top: number, right: number, bottom: number) =>
+      ({ left, top, right, bottom, width: right - left, height: bottom - top }) as DOMRect;
+    const q = (sel: string) => document.querySelector<HTMLElement>(sel);
+    const alertsRow = () => q('[data-test="nav-group-nested-menu-alerts"]');
+    const onCallRow = () => q('[data-test="nav-group-nested-menu-onCall"]');
+    const alertsPanel = () => q('[data-test="nav-group-subpanel-menu-alerts"]');
+    const onCallPanel = () => q('[data-test="nav-group-subpanel-menu-onCall"]');
+    const reliabilityFlyout = () => q('[data-test="nav-group-flyout-reliability"]');
+
+    async function settle() {
+      await flushPromises();
+      await flushPromises();
+    }
+
+    async function mountNested(
+      opts: { path?: string; routes?: string[]; nested?: NestedCategory[] } = {},
+    ) {
+      const { path = "/", routes = ALL_ROUTES, nested = NESTED } = opts;
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          ...routes.map((name) => ({ path: `/${name}`, name, component: { template: "<div />" } })),
+        ],
+      });
+      router.push(path);
+      await router.isReady();
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "reliability",
+          title: "Reliability",
+          icon: "shield",
+          children: ALL_CHILDREN,
+          nested,
+          parentItem: {
+            link: "/alertList",
+            title: "Reliability",
+            icon: "shield",
+            name: "alertList",
+          },
+        },
+        attachTo: document.body,
+        global: {
+          plugins: [router, store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub },
+        },
+      });
+      await wrapper.trigger("mouseenter");
+      tick(OPEN_DELAY);
+      await settle();
+    }
+
+    function hover(el: HTMLElement | null, x = 0, y = 0) {
+      el!.dispatchEvent(new MouseEvent("mouseenter", { clientX: x, clientY: y }));
+    }
+
+    function key(el: HTMLElement | null, k: string) {
+      el!.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+    }
+
+    async function hoverOpenPanel(row: HTMLElement | null) {
+      hover(row);
+      tick(OPEN_DELAY);
+      await settle();
+    }
+
+    beforeEach(() => {
+      now = 0;
+      vi.spyOn(performance, "now").mockImplementation(() => now);
+      vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1440);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("renders each nested category as one row, keeps standalone items and leaves other categories headed", async () => {
+      await mountNested();
+      const rows = Array.from(
+        reliabilityFlyout()!.querySelectorAll(
+          '[data-test^="nav-group-nested-"], [data-test^="nav-group-section-label-"], [data-test^="nav-group-item-"]',
+        ),
+      ).map((el) => el.getAttribute("data-test"));
+      expect(rows).toEqual([
+        "nav-group-nested-menu-alerts",
+        "nav-group-item-sloList",
+        "nav-group-nested-menu-onCall",
+        "nav-group-section-label-h-menu.streams-3",
+        "nav-group-item-alertSources",
+        "nav-group-item-downtimes",
+      ]);
+      expect(alertsRow()!.textContent).toContain("Alerts");
+      expect(alertsRow()!.getAttribute("role")).toBe("menuitem");
+      expect(alertsRow()!.getAttribute("aria-haspopup")).toBe("menu");
+      expect(alertsRow()!.getAttribute("aria-expanded")).toBe("false");
+      expect(alertsRow()!.hasAttribute("aria-controls")).toBe(false);
+      expect(q('[data-test="nav-group-item-alertList"]')).toBeNull();
+      expect(alertsPanel()).toBeNull();
+    });
+
+    it("adds no row and no panel without the opt-in, so every category keeps its heading", async () => {
+      await mountNested({ nested: [] });
+      expect(q('[data-test^="nav-group-nested-"]')).toBeNull();
+      expect(
+        reliabilityFlyout()!.querySelectorAll('[data-test^="nav-group-section-label-"]'),
+      ).toHaveLength(3);
+      expect(q('[data-test="nav-group-item-alertList"]')).not.toBeNull();
+    });
+
+    it("keeps headings in the phone drawer, which has no room for a side panel", async () => {
+      mobile.set(true);
+      await mountNested();
+      click(wrapper.find('[data-test="tile"]').element, 1);
+      await settle();
+      const inline = q('[data-test="nav-group-inline-reliability"]')!;
+      expect(inline.querySelector('[data-test^="nav-group-nested-"]')).toBeNull();
+      expect(inline.querySelector('[data-test="nav-group-item-onCallMine"]')).not.toBeNull();
+    });
+
+    it("opens the panel after the hover delay, with every child, its Beta badge and the ARIA links", async () => {
+      await mountNested();
+      hover(onCallRow());
+      tick(OPEN_DELAY - 1);
+      await settle();
+      expect(onCallPanel()).toBeNull();
+      tick(1);
+      await settle();
+
+      const panel = onCallPanel()!;
+      expect(panel.getAttribute("role")).toBe("menu");
+      expect(panel.getAttribute("aria-labelledby")).toBe(onCallRow()!.id);
+      expect(onCallRow()!.getAttribute("aria-expanded")).toBe("true");
+      expect(onCallRow()!.getAttribute("aria-controls")).toBe(panel.id);
+      const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
+      expect(items.map((el) => el.getAttribute("data-test"))).toEqual([
+        "nav-group-item-onCallTeams",
+        "nav-group-item-onCallMine",
+      ]);
+      expect(panel.querySelectorAll('[data-test="beta-badge"]')).toHaveLength(2);
+      expect(items[0].getAttribute("href")).toBe("/onCallTeams?org_identifier=default");
+    });
+
+    it("puts a paywalled child's lock and description inside the panel", async () => {
+      paywalled.add("onCallMine");
+      await mountNested();
+      await hoverOpenPanel(onCallRow());
+      const item = onCallPanel()!.querySelector<HTMLElement>(
+        '[data-test="nav-group-item-onCallMine"]',
+      )!;
+      expect(item.getAttribute("data-paywalled")).toBe("true");
+      expect(
+        onCallPanel()!.querySelector('[data-test="nav-group-item-onCallMine-lock"]'),
+      ).not.toBeNull();
+      expect(document.getElementById(item.getAttribute("aria-describedby")!)?.textContent).toBe(
+        "Pipelines needs a plan",
+      );
+      expect(q('[data-test="nav-group-flyout-reliability-trial-note"]')).not.toBeNull();
+    });
+
+    it("switches to another nested row and closes on a plain row, each after the delay", async () => {
+      await mountNested();
+      await hoverOpenPanel(alertsRow());
+      expect(alertsPanel()).not.toBeNull();
+
+      await hoverOpenPanel(onCallRow());
+      expect(alertsPanel()).toBeNull();
+      expect(onCallPanel()).not.toBeNull();
+
+      hover(q('[data-test="nav-group-item-sloList"]'));
+      tick(OPEN_DELAY - 1);
+      await settle();
+      expect(onCallPanel()).not.toBeNull();
+      tick(1);
+      await settle();
+      expect(onCallPanel()).toBeNull();
+      expect(reliabilityFlyout()).not.toBeNull();
+    });
+
+    describe("safe zone towards the open panel", () => {
+      async function openAndLeave() {
+        await mountNested();
+        reliabilityFlyout()!.getBoundingClientRect = () => rect(102, 40, 310, 400);
+        alertsRow()!.getBoundingClientRect = () => rect(106, 100, 306, 120);
+        await hoverOpenPanel(alertsRow());
+        alertsPanel()!.getBoundingClientRect = () => rect(314, 100, 520, 240);
+        alertsRow()!.dispatchEvent(new MouseEvent("mouseleave", { clientX: 300, clientY: 110 }));
+      }
+
+      function sample(x: number, y: number) {
+        document.dispatchEvent(new MouseEvent("pointermove", { clientX: x, clientY: y }));
+      }
+
+      it("keeps the panel while the pointer travels towards it across another row, then yields once it rests", async () => {
+        await openAndLeave();
+        sample(305, 150);
+        hover(q('[data-test="nav-group-item-sloList"]'), 305, 150);
+        tick(OPEN_DELAY);
+        await settle();
+        expect(alertsPanel()).not.toBeNull();
+
+        tick(AIM_IDLE);
+        await settle();
+        expect(alertsPanel()).toBeNull();
+      });
+
+      it("switches after the normal delay when the pointer heads away from the panel", async () => {
+        await openAndLeave();
+        sample(200, 150);
+        hover(onCallRow(), 200, 150);
+        tick(OPEN_DELAY);
+        await settle();
+        expect(alertsPanel()).toBeNull();
+        expect(onCallPanel()).not.toBeNull();
+      });
+
+      it("cancels a pending switch once the pointer reaches the panel", async () => {
+        await openAndLeave();
+        sample(200, 150);
+        hover(onCallRow(), 200, 150);
+        alertsPanel()!.dispatchEvent(new MouseEvent("mouseenter"));
+        tick(OPEN_DELAY + AIM_IDLE);
+        await settle();
+        expect(alertsPanel()).not.toBeNull();
+        expect(onCallPanel()).toBeNull();
+      });
+    });
+
+    it("toggles on click for touch, but a click after a hover-open keeps the panel", async () => {
+      await mountNested();
+      alertsRow()!.click();
+      await settle();
+      expect(alertsPanel()).not.toBeNull();
+      alertsRow()!.click();
+      await settle();
+      expect(alertsPanel()).toBeNull();
+
+      await hoverOpenPanel(alertsRow());
+      alertsRow()!.click();
+      await settle();
+      expect(alertsPanel()).not.toBeNull();
+      alertsRow()!.click();
+      await settle();
+      expect(alertsPanel()).toBeNull();
+    });
+
+    it("keeps everything open while the pointer moves from the flyout into the panel, and closes after it leaves both", async () => {
+      await mountNested();
+      await hoverOpenPanel(alertsRow());
+      reliabilityFlyout()!.dispatchEvent(new MouseEvent("mouseleave"));
+      tick(CLOSE_DELAY - 1);
+      alertsPanel()!.dispatchEvent(new MouseEvent("mouseenter"));
+      tick(CLOSE_DELAY);
+      await settle();
+      expect(reliabilityFlyout()).not.toBeNull();
+      expect(alertsPanel()).not.toBeNull();
+
+      alertsPanel()!.dispatchEvent(new MouseEvent("mouseleave"));
+      tick(CLOSE_DELAY);
+      await settle();
+      expect(reliabilityFlyout()).toBeNull();
+      expect(alertsPanel()).toBeNull();
+    });
+
+    it("treats a press inside the panel as inside the menu, and closes everything when a child is chosen", async () => {
+      await mountNested();
+      await hoverOpenPanel(alertsRow());
+      const item = alertsPanel()!.querySelector<HTMLElement>(
+        '[data-test="nav-group-item-alertDestinations"]',
+      )!;
+      item.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      await settle();
+      expect(alertsPanel()).not.toBeNull();
+
+      click(item, 1);
+      await settle();
+      expect(reliabilityFlyout()).toBeNull();
+      expect(alertsPanel()).toBeNull();
+    });
+
+    it("lights the parent row, not a sibling, when the current page is inside its panel", async () => {
+      await mountNested({ path: "/alertDestinations" });
+      expect(alertsRow()!.getAttribute("data-active")).toBe("true");
+      expect(alertsRow()!.className).toContain("bg-select-item-selected-bg");
+      expect(onCallRow()!.hasAttribute("data-active")).toBe(false);
+      expect(reliabilityFlyout()!.querySelector('[aria-current="page"]')).toBeNull();
+
+      await hoverOpenPanel(alertsRow());
+      const current = alertsPanel()!.querySelectorAll('[aria-current="page"]');
+      expect(Array.from(current).map((el) => el.getAttribute("data-test"))).toEqual([
+        "nav-group-item-alertDestinations",
+      ]);
+    });
+
+    describe("gating", () => {
+      it("shows a category with one surviving child under its heading instead of behind a row", async () => {
+        await mountNested({ routes: ALL_ROUTES.filter((n) => n !== "onCallTeams") });
+        expect(onCallRow()).toBeNull();
+        expect(q('[data-test="nav-group-section-label-h-menu.onCall-2"]')).not.toBeNull();
+        expect(
+          reliabilityFlyout()!.querySelector('[data-test="nav-group-item-onCallMine"]'),
+        ).not.toBeNull();
+        expect(alertsRow()).not.toBeNull();
+      });
+
+      it("renders neither a row nor a heading when every child of the category is gated off", async () => {
+        await mountNested({ routes: ["sloList", "onCallTeams", "onCallMine"] });
+        expect(alertsRow()).toBeNull();
+        expect(q('[data-test^="nav-group-section-label-h-menu.alerts"]')).toBeNull();
+        expect(onCallRow()).not.toBeNull();
+      });
+    });
+
+    describe("placement", () => {
+      async function openAt(flyout: DOMRect, row: DOMRect, viewport: { w: number; h: number }) {
+        vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(viewport.w);
+        vi.spyOn(window, "innerHeight", "get").mockReturnValue(viewport.h);
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(200);
+        vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(120);
+        await mountNested();
+        reliabilityFlyout()!.getBoundingClientRect = () => flyout;
+        alertsRow()!.getBoundingClientRect = () => row;
+        await hoverOpenPanel(alertsRow());
+        return alertsPanel()!.getAttribute("style") ?? "";
+      }
+
+      it("opens beside the flyout's end edge, level with its row, capped to the viewport", async () => {
+        const style = await openAt(rect(102, 40, 310, 400), rect(106, 80, 306, 112), {
+          w: 1440,
+          h: 800,
+        });
+        expect(style).toContain("position: fixed");
+        expect(style).toContain("left: 314px");
+        expect(style).toContain("top: 80px");
+        expect(style).toContain("max-height: 784px");
+      });
+
+      it("flips to the start edge when the end edge has no room", async () => {
+        const style = await openAt(rect(900, 40, 1108, 400), rect(904, 80, 1104, 112), {
+          w: 1200,
+          h: 800,
+        });
+        expect(style).toContain("left: 696px");
+      });
+
+      it("shifts inside the viewport when neither side has room, and lifts off the bottom edge", async () => {
+        const style = await openAt(rect(102, 40, 310, 790), rect(106, 750, 306, 782), {
+          w: 500,
+          h: 800,
+        });
+        expect(style).toContain("left: 292px");
+        expect(style).toContain("top: 672px");
+      });
+
+      it("opens towards the start edge in RTL", async () => {
+        document.documentElement.dir = "rtl";
+        const style = await openAt(rect(1130, 40, 1338, 400), rect(1134, 80, 1334, 112), {
+          w: 1440,
+          h: 800,
+        });
+        expect(style).toContain("left: 926px");
+      });
+
+      it("caps a panel taller than the viewport and pins it to the top margin, as the flyout does", async () => {
+        vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(484);
+        vi.spyOn(window, "innerHeight", "get").mockReturnValue(500);
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(200);
+        await mountNested();
+        reliabilityFlyout()!.getBoundingClientRect = () => rect(102, 8, 310, 492);
+        alertsRow()!.getBoundingClientRect = () => rect(106, 300, 306, 332);
+        await hoverOpenPanel(alertsRow());
+        const style = alertsPanel()!.getAttribute("style") ?? "";
+        expect(style).toContain("max-height: 484px");
+        expect(style).toContain("top: 8px");
+        expect(Array.from(alertsPanel()!.classList)).toEqual(
+          expect.arrayContaining(["overflow-y-auto", "overscroll-contain"]),
+        );
+      });
+
+      it("scrolls the current page's row into view when the panel opens", async () => {
+        const scrollIntoView = vi.fn();
+        Element.prototype.scrollIntoView = scrollIntoView;
+        try {
+          await mountNested({ path: "/onCallMine" });
+          scrollIntoView.mockClear();
+          await hoverOpenPanel(onCallRow());
+          expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+          expect(scrollIntoView.mock.contexts[0]).toBe(
+            onCallPanel()!.querySelector('[data-test="nav-group-item-onCallMine"]'),
+          );
+        } finally {
+          Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+        }
+      });
+
+      it("closes when the flyout itself scrolls the row away from it", async () => {
+        await openAt(rect(102, 40, 310, 400), rect(106, 80, 306, 112), { w: 1440, h: 800 });
+        reliabilityFlyout()!.dispatchEvent(new Event("scroll"));
+        await settle();
+        expect(alertsPanel()).toBeNull();
+        expect(reliabilityFlyout()).not.toBeNull();
+      });
+    });
+
+    describe("keyboard", () => {
+      it("focuses the nested row first when the tile opens the flyout with ArrowRight", async () => {
+        await mountNested();
+        wrapper
+          .find('[data-test="tile"]')
+          .element.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+          );
+        await settle();
+        expect(document.activeElement).toBe(alertsRow());
+        key(alertsRow(), "ArrowDown");
+        expect(document.activeElement?.getAttribute("data-test")).toBe("nav-group-item-sloList");
+        key(document.activeElement as HTMLElement, "ArrowDown");
+        expect(document.activeElement).toBe(onCallRow());
+      });
+
+      for (const k of ["ArrowRight", "Enter", " "]) {
+        it(`opens the panel and focuses its first item on ${JSON.stringify(k)}`, async () => {
+          await mountNested();
+          alertsRow()!.focus();
+          key(alertsRow(), k);
+          await settle();
+          expect(alertsPanel()).not.toBeNull();
+          expect(document.activeElement?.getAttribute("data-test")).toBe(
+            "nav-group-item-alertList",
+          );
+        });
+      }
+
+      it("cycles within the panel, and ArrowLeft returns to the parent row with the panel closed", async () => {
+        await mountNested();
+        alertsRow()!.focus();
+        key(alertsRow(), "ArrowRight");
+        await settle();
+        key(document.activeElement as HTMLElement, "ArrowDown");
+        expect(document.activeElement?.getAttribute("data-test")).toBe(
+          "nav-group-item-alertDestinations",
+        );
+        key(document.activeElement as HTMLElement, "ArrowDown");
+        expect(document.activeElement?.getAttribute("data-test")).toBe("nav-group-item-alertList");
+
+        key(document.activeElement as HTMLElement, "ArrowLeft");
+        await settle();
+        expect(alertsPanel()).toBeNull();
+        expect(reliabilityFlyout()).not.toBeNull();
+        expect(document.activeElement).toBe(alertsRow());
+      });
+
+      it("in RTL, ArrowLeft opens the panel and ArrowRight returns to the row", async () => {
+        document.documentElement.dir = "rtl";
+        await mountNested();
+        alertsRow()!.focus();
+        key(alertsRow(), "ArrowLeft");
+        await settle();
+        expect(document.activeElement?.getAttribute("data-test")).toBe("nav-group-item-alertList");
+        key(document.activeElement as HTMLElement, "ArrowRight");
+        await settle();
+        expect(alertsPanel()).toBeNull();
+        expect(document.activeElement).toBe(alertsRow());
+      });
+
+      it("Escape closes the panel first, then the flyout", async () => {
+        await mountNested();
+        alertsRow()!.focus();
+        key(alertsRow(), "Enter");
+        await settle();
+        key(document.activeElement as HTMLElement, "Escape");
+        await settle();
+        expect(alertsPanel()).toBeNull();
+        expect(reliabilityFlyout()).not.toBeNull();
+        expect(document.activeElement).toBe(alertsRow());
+
+        key(alertsRow(), "Escape");
+        await settle();
+        expect(reliabilityFlyout()).toBeNull();
+        expect(document.activeElement).toBe(wrapper.find('[data-test="tile"]').element);
+      });
+
+      it("Escape on a row closes a hover-opened panel and leaves the flyout open", async () => {
+        await mountNested();
+        await hoverOpenPanel(alertsRow());
+        key(alertsRow(), "Escape");
+        await settle();
+        expect(alertsPanel()).toBeNull();
+        expect(reliabilityFlyout()).not.toBeNull();
+      });
+
+      it("Enter on a panel item navigates, closes both menus and returns focus to the tile", async () => {
+        await mountNested();
+        alertsRow()!.focus();
+        key(alertsRow(), "Enter");
+        await settle();
+        click(document.activeElement as HTMLElement, 0);
+        await settle();
+        expect(alertsPanel()).toBeNull();
+        expect(reliabilityFlyout()).toBeNull();
+        expect(document.activeElement).toBe(wrapper.find('[data-test="tile"]').element);
+      });
     });
   });
 

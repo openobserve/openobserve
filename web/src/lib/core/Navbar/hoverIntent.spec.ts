@@ -6,6 +6,7 @@ import {
   AIM_SLACK,
   aim,
   aimTriangle,
+  isAimingAt,
   isAimingAtOpenFlyout,
   isPointInTriangle,
   releasePointerTracking,
@@ -143,6 +144,34 @@ describe("hoverIntent", () => {
       aim.movedAt = 5000 - AIM_IDLE - 1;
       aim.flyout = fakeFlyout(ltrFlyout);
       expect(isAimingAtOpenFlyout()).toBe(false);
+    });
+  });
+
+  describe("isAimingAt", () => {
+    // A side panel beside the flyout, aimed at from a row that ends at x 310.
+    const panel = fakeFlyout(rect(314, 120, 520, 260));
+    const flippedPanel = fakeFlyout(rect(0, 120, 88, 260));
+
+    it("aims at the target the caller names, independent of the open flyout", () => {
+      aim.last = { x: 306, y: 200 };
+      aim.movedAt = 1000;
+      expect(isAimingAt({ x: 300, y: 130 }, panel, false, 1010)).toBe(true);
+      expect(aim.flyout).toBeNull();
+    });
+
+    it("takes the side from the caller, so a panel flipped to the start edge still aims", () => {
+      document.documentElement.dir = "ltr";
+      aim.last = { x: 94, y: 200 };
+      aim.movedAt = 1000;
+      expect(isAimingAt({ x: 100, y: 130 }, flippedPanel, true, 1010)).toBe(true);
+      expect(isAimingAt({ x: 100, y: 130 }, flippedPanel, false, 1010)).toBe(false);
+    });
+
+    it("is false without an exit point or a target", () => {
+      aim.last = { x: 306, y: 200 };
+      aim.movedAt = 1000;
+      expect(isAimingAt(null, panel, false, 1010)).toBe(false);
+      expect(isAimingAt({ x: 300, y: 130 }, null, false, 1010)).toBe(false);
     });
   });
 });

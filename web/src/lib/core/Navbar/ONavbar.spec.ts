@@ -70,8 +70,8 @@ const menuLinkStub = {
 // wires entries correctly without a vuex store or the real flyout machinery.
 const navGroupStub = {
   template:
-    "<div :data-test=\"'nav-group-' + groupKey\" :data-children=\"children.map(c => c.name).join(',')\" :data-filtered=\"(filteredChildren || []).map(c => c.name).join(',')\" :data-mode=\"parentItem ? 'link' : 'group'\" />",
-  props: ["groupKey", "title", "icon", "children", "filteredChildren", "parentItem"],
+    "<div :data-test=\"'nav-group-' + groupKey\" :data-children=\"children.map(c => c.name).join(',')\" :data-filtered=\"(filteredChildren || []).map(c => c.name).join(',')\" :data-nested=\"(nested || []).map(n => n.categoryKey).join(',')\" :data-mode=\"parentItem ? 'link' : 'group'\" />",
+  props: ["groupKey", "title", "icon", "children", "filteredChildren", "nested", "parentItem"],
 };
 
 describe("ONavbar", () => {
@@ -224,6 +224,7 @@ describe("ONavbar", () => {
       expect(reliability.attributes("data-filtered")).toBe(
         "sloList,incidentList,downtimes,alertSources",
       );
+      expect(reliability.attributes("data-nested")).toBe("menu.alerts,menu.onCall");
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
     });
 

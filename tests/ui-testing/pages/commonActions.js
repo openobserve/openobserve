@@ -37,8 +37,9 @@ export const NAV_FLYOUT_CHILD = {
     // Notification Destinations and Templates left Settings for the Reliability
     // group — they are alerting configuration. Their pages are unchanged; only
     // the way you reach them is.
-    destinations: { group: 'reliability', name: 'alertDestinations' },
-    templates: { group: 'reliability', name: 'alertTemplates' },
+    // `nested`: the flyout row whose side panel holds the child (ONavGroup `nav-group-nested-<categoryKey>`).
+    destinations: { group: 'reliability', name: 'alertDestinations', nested: 'menu-alerts' },
+    templates: { group: 'reliability', name: 'alertTemplates', nested: 'menu-alerts' },
     // Synthetics is feature-gated, so the Experience tile itself lands on RUM.
     synthetics: { group: 'experience', name: 'synthetics' },
     // IAM has no rail tile of its own; it is the second row of the Settings flyout.
@@ -56,6 +57,7 @@ export async function openNavFlyoutChild(page, child) {
     const tile = page.locator(NAV_GROUP_TILE[entry.group]);
     await tile.waitFor({ state: 'visible', timeout: 30000 });
     const item = page.locator(`[data-test="nav-group-item-${entry.name}"]`);
+    const nestedRow = entry.nested ? page.locator(`[data-test="nav-group-nested-${entry.nested}"]`) : null;
     // Opening is hover-driven with a short open delay, and the flyout self-closes
     // on scroll/resize — so while the page is still settling a single hover can
     // open it only for it to be closed again before we click. Retry the
@@ -65,6 +67,11 @@ export async function openNavFlyoutChild(page, child) {
     await expect(async () => {
         await page.mouse.move(0, 0);
         await tile.hover();
+        // A click opens the side panel without waiting on the hover delay; a second click would close it again.
+        if (nestedRow && !(await item.isVisible())) {
+            await expect(nestedRow).toBeVisible({ timeout: 2000 });
+            await nestedRow.click();
+        }
         await expect(item).toBeVisible({ timeout: 2000 });
     }).toPass({ timeout: 30000 });
     // The pointer is still over the tile (last hover above), so the flyout stays

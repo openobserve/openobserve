@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
+import type {
+  NavItem,
+  RailEntry,
+  SubnavChild,
+  NavGateContext,
+  NestedCategory,
+} from "./ONavbar.types";
 import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import { featureState } from "@/utils/featureGate";
@@ -140,6 +146,8 @@ export interface NavGroupDef {
    * rail never shows a tile with an empty flyout.
    */
   standalone?: boolean;
+  /** Categories that open as a side panel from one row; any other category keeps its heading. */
+  nested?: NestedCategory[];
 }
 
 export const NAV_GROUPS: NavGroupDef[] = [
@@ -149,6 +157,10 @@ export const NAV_GROUPS: NavGroupDef[] = [
     icon: "shield",
     parentLink: "/alerts",
     absorbs: ["alertList", "sloList", "incidentList", "downtimes", "onCallResponses"],
+    nested: [
+      { categoryKey: "menu.alerts", icon: "shield-alert-outline" },
+      { categoryKey: "menu.onCall", icon: "call" },
+    ],
     children: [
       // ── Alerts ──────────────────────────────────────────────────────────
       // These four are the alerting cluster, and they carry a peer tab strip
@@ -665,6 +677,7 @@ export function groupNavLinks(
       children,
       // The removed children still light the tile and retarget its link.
       filtered: def.children.filter((c) => !children.includes(c)),
+      nested: def.nested,
     });
     // Groups anchored after THIS group (e.g. Data follows Reliability).
     emitAnchored(def.key);

@@ -325,6 +325,31 @@ describe("groupNavLinks", () => {
     expect(alerting?.every((c) => c.categoryKey === "menu.alerts")).toBe(true);
   });
 
+  it("nests only Reliability's Alerts and On-Call categories, and every other group none", () => {
+    const entries = groupNavLinks(
+      [link("home"), link("alertList"), link("streams"), link("pipeline"), link("dashboards")],
+      undefined,
+      oncallOn,
+    );
+    const linkGroups = entries.filter(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> => e.type === "linkGroup",
+    );
+    const nestedByGroup = Object.fromEntries(
+      linkGroups.map((g) => [g.item.name, (g.nested ?? []).map((n) => n.categoryKey)]),
+    );
+    expect(nestedByGroup.reliability).toEqual(["menu.alerts", "menu.onCall"]);
+    expect(
+      Object.entries(nestedByGroup).filter(([k, v]) => k !== "reliability" && v.length > 0),
+    ).toEqual([]);
+    // Each nested category is one Reliability really heads, and holds the 3+ links nesting is for.
+    const reliability = linkGroups.find((g) => g.item.name === "reliability")!;
+    for (const { categoryKey } of reliability.nested ?? []) {
+      expect(
+        reliability.children.filter((c) => c.categoryKey === categoryKey).length,
+      ).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it("leaves SLOs, Incidents and Sources outside the Alerts header", () => {
     // They are Reliability's other concerns, not alerting configuration —
     // filing them under an "Alerts" heading would misfile them.

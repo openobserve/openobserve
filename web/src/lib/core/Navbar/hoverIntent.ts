@@ -70,10 +70,18 @@ export function isPointInTriangle(p: Point, tri: [Point, Point, Point]): boolean
 }
 
 // True only while the pointer is still travelling: a rest of AIM_IDLE ends the aim.
-export function isAimingAtOpenFlyout(now: number = performance.now()): boolean {
-  const { exit, last, flyout } = aim;
-  if (!exit || !last || !flyout) return false;
+export function isAimingAt(
+  exit: Point | null,
+  target: HTMLElement | null,
+  leftward: boolean,
+  now: number = performance.now(),
+): boolean {
+  const { last } = aim;
+  if (!exit || !last || !target) return false;
   if (now - aim.movedAt > AIM_IDLE) return false;
-  const rtl = document.documentElement.dir === "rtl";
-  return isPointInTriangle(last, aimTriangle(exit, flyout.getBoundingClientRect(), rtl));
+  return isPointInTriangle(last, aimTriangle(exit, target.getBoundingClientRect(), leftward));
+}
+
+export function isAimingAtOpenFlyout(now: number = performance.now()): boolean {
+  return isAimingAt(aim.exit, aim.flyout, document.documentElement.dir === "rtl", now);
 }

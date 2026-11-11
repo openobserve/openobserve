@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :icon="entry.item.icon"
           :children="entry.children"
           :filtered-children="entry.filtered"
+          :nested="entry.nested"
           :parent-item="entry.item"
           @mouseenter="emit('menu-hover', entry.item.link)"
         />
