@@ -629,7 +629,7 @@ function onFlyoutKeydown(event: KeyboardEvent) {
     onFlyoutTab(event);
     return;
   }
-  // Links do not activate on Space natively; route it through click so detail stays 0.
+  // Links do not activate on Space natively, so route it through click like Enter.
   if (event.key === " ") {
     event.preventDefault();
     (event.target as HTMLElement | null)
@@ -886,7 +886,6 @@ function onChildMouseenter(event: MouseEvent) {
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
         @keydown="onFlyoutKeydown"
-        @pointerdown="clearActivationKey"
       >
         <!-- Three levels, and the type says so: group (sm/semibold) → section
              (xs/semibold, secondary) → item (sm/normal). It used to run 11px →

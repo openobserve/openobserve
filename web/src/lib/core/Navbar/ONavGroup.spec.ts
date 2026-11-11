@@ -113,7 +113,7 @@ const menuLinkStub = {
 
 const oIconStub = { template: "<span />", props: ["name", "size"] };
 
-// VTU's trigger cannot set the read-only `detail`; detail 0 is a keyboard activation, 1 a pointer click.
+// VTU's trigger cannot set the read-only `detail`; Chromium sends 0 for a keyboard click, Firefox sends 1.
 function click(el: Element, detail: number) {
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail }));
 }
@@ -1959,6 +1959,20 @@ describe("ONavGroup", () => {
       firstItem()!.dispatchEvent(
         new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
       );
+      await settle();
+      expect(docFlyout()).toBeNull();
+      expect(document.activeElement).toBe(tile().element);
+    });
+
+    it("Enter on a teleported item returns focus to the tile when the click has detail 1 (Firefox)", async () => {
+      document.documentElement.dir = "ltr";
+      wrapper = mountTeleported();
+      await tile().trigger("keydown", { key: "ArrowRight" });
+      await settle();
+      const item = firstItem()!;
+      expect(document.activeElement).toBe(item);
+      item.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      click(item, 1);
       await settle();
       expect(docFlyout()).toBeNull();
       expect(document.activeElement).toBe(tile().element);
