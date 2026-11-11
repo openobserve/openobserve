@@ -3538,11 +3538,11 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
     #[env_config(
-        name = "ZO_COMPACT_METRICS_MERGE_MAX_GROUPS",
+        name = "ZO_COMPACT_METRICS_MAX_GROUPS",
         default = 100,
         help = "Max sorted file chains one metrics merge opens at once; a wider hour is first narrowed into hash-merged files. 0 disables the cap"
     )]
-    pub metrics_merge_max_groups: usize,
+    pub metrics_max_groups: usize,
     #[env_config(
         name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
         default = "",

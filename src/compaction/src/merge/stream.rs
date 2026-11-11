@@ -213,7 +213,7 @@ pub async fn merge_by_stream(
                 max_group_files: cfg.compact.max_group_files,
                 is_incremental,
                 merge_max_original_size: infra_file_list::merge_max_original_size(),
-                max_merge_groups: cfg.compact.metrics_merge_max_groups,
+                max_merge_groups: cfg.compact.metrics_max_groups,
             };
             let stream = format!("{org_id}/{stream_type}/{stream_name}");
             let planned = plan_batches(files_with_size, &mode, &limits, &stream);
