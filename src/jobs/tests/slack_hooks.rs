@@ -268,6 +268,8 @@ fn audit_publishes_a_slack_record_to_the_meta_audit_stream() {
     run(async {
         PUBLISHED.lock().unwrap().clear();
         (hooks().audit)(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: "alice@acme.com".to_string(),
             org_id: "acme".to_string(),
             _timestamp: 1_760_000_000_000_000,

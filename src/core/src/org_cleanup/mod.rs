@@ -1711,6 +1711,8 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     {
         use o2_enterprise::enterprise::common::auditor;
         audit::audit(auditor::AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: actor.to_string(),
             org_id: org_id.to_string(),
             _timestamp: config::utils::time::now_micros(),

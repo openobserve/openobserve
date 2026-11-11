@@ -88,6 +88,8 @@ pub fn hook_audit_message(
 ) -> AuditMessage {
     let path = path.split_once('?').map_or(path, |(path, _)| path);
     AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: format!("hook:{trigger_id}"),
         org_id: org_id.to_string(),
         _timestamp: now_micros(),
@@ -116,6 +118,8 @@ pub fn reveal_audit_message(
 ) -> AuditMessage {
     let path = path.split_once('?').map_or(path, |(path, _)| path);
     AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: user_email.to_string(),
         org_id: org_id.to_string(),
         _timestamp: now_micros(),

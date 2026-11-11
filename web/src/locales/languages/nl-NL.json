@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Heruitvoering geannuleerd na {elapsed}. De vorige resultaten worden getoond.",
       "rerunCancelledNow": "Heruitvoering geannuleerd. De vorige resultaten worden getoond.",
       "analyzeSucceeded": "Laatste uitvoering geslaagd",
-      "analyzeFailedShort": "Laatste uitvoering mislukt"
+      "analyzeFailedShort": "Laatste uitvoering mislukt",
+      "analyzeWarned": "Laatste run voltooid met waarschuwingen",
+      "analyzePartial": "De run is voltooid, maar de resultaten zijn mogelijk onvolledig."
     },
     "errorDeletingSavedView": "Fout bij het verwijderen van de opgeslagen weergave.",
     "errorCreatingSavedView": "Fout bij het aanmaken van een opgeslagen weergave.",

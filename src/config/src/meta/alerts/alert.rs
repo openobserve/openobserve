@@ -401,6 +401,9 @@ pub struct ListAlertsParams {
     /// The optional folder ID surrogate key with which to filter alerts.
     pub folder_id: Option<String>,
 
+    /// Folders the caller may list; `None` is unrestricted and `Some(empty)` matches nothing.
+    pub listable_folder_ids: Option<Vec<String>>,
+
     /// The optional case-insensitive alert name substring with which to filter alerts.
     pub name_substring: Option<String>,
 
@@ -479,6 +482,7 @@ impl ListAlertsParams {
         Self {
             org_id: org_id.to_owned(),
             folder_id: None,
+            listable_folder_ids: None,
             name_substring: None,
             stream_type_and_name: None,
             enabled: None,
@@ -523,6 +527,12 @@ impl ListAlertsParams {
     /// Filter alerts by the given folder ID surrogate key.
     pub fn in_folder(mut self, folder_id: &str) -> Self {
         self.folder_id = Some(folder_id.to_string());
+        self
+    }
+
+    /// Restrict the list to these folders; an empty set matches nothing.
+    pub fn within_folders(mut self, folder_ids: Vec<String>) -> Self {
+        self.listable_folder_ids = Some(folder_ids);
         self
     }
 

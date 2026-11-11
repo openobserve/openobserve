@@ -1712,7 +1712,9 @@
       "rerunCancelled": "重新執行已於 {elapsed} 後取消。正在顯示先前的結果。",
       "rerunCancelledNow": "重新執行已取消。正在顯示先前的結果。",
       "analyzeSucceeded": "上次執行成功",
-      "analyzeFailedShort": "上次執行失敗"
+      "analyzeFailedShort": "上次執行失敗",
+      "analyzeWarned": "上次執行已完成，但有警告",
+      "analyzePartial": "執行已完成，但結果可能不完整。"
     },
     "errorDeletingSavedView": "刪除已儲存的檢視時發生錯誤。",
     "errorCreatingSavedView": "建立已儲存的檢視時發生錯誤。",
