@@ -1192,7 +1192,17 @@ mod tests {
     #[test]
     fn test_generate_schema_for_defined_schema_fields_keeps_infer_columns_for_traces() {
         let mut fields = vec![Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true)];
-        for name in ALL_INFER_FIELDS {
+        let query_columns = [
+            "gen_ai_usage_cost",
+            "gen_ai_usage_cost_usd",
+            "gen_ai_tool_input",
+            "gen_ai_tool_output",
+            "gen_ai_usage_prompt_tokens",
+            "gen_ai_usage_completion_tokens",
+            "llm_request_type",
+            "llm_agent_id",
+        ];
+        for name in ALL_INFER_FIELDS.iter().copied().chain(query_columns) {
             fields.push(Field::new(name, DataType::Utf8, true));
         }
         for i in 0..15 {
@@ -1218,7 +1228,7 @@ mod tests {
         };
 
         let traces = names(StreamType::Traces);
-        for name in ALL_INFER_FIELDS {
+        for name in ALL_INFER_FIELDS.iter().copied().chain(query_columns) {
             assert!(
                 traces.contains(name),
                 "{name} dropped from the traces UDS schema"
@@ -1228,7 +1238,13 @@ mod tests {
         assert!(!traces.contains("field1"));
 
         let logs = names(StreamType::Logs);
-        assert!(ALL_INFER_FIELDS.iter().all(|name| !logs.contains(*name)));
+        assert!(
+            ALL_INFER_FIELDS
+                .iter()
+                .copied()
+                .chain(query_columns)
+                .all(|name| !logs.contains(name))
+        );
     }
 
     #[test]
