@@ -526,7 +526,7 @@ describe("AddAlert with an AutoObserve prefill", () => {
             store.state.selectedOrganization.identifier = "elsewhere-org";
           });
           await submit();
-          await flushPromises();
+          await vi.waitFor(() => expect(toastMessages()).toContain("Could not save the alert."));
           expect(alertsService.listByFolderId).toHaveBeenCalled();
           expect(vi.mocked(alertsService.listByFolderId).mock.calls[0][5]).toBe(home);
           expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
@@ -551,9 +551,8 @@ describe("AddAlert with an AutoObserve prefill", () => {
             (vm() as unknown as { activeFolderId: string }).activeFolderId = "pay";
           });
           await submit();
-          await flushPromises();
+          await vi.waitFor(() => expect(toastMessages()).toContain("Could not save the alert."));
           expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-          expect(toastMessages()).toContain("Could not save the alert.");
         });
 
         it("JSON Save saves nothing when the org changes", async () => {
