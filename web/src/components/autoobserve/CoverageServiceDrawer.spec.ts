@@ -166,7 +166,7 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
       );
       expect(added).toEqual({ requests: false, errors: true, latency: false });
     } finally {
-      recently.clearOnPass(Number.MAX_SAFE_INTEGER);
+      recently.clearOnPass(org, Number.MAX_SAFE_INTEGER);
     }
   });
 });
