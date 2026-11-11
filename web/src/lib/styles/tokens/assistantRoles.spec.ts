@@ -98,6 +98,7 @@ function failures(scope: Map<string, string>): string[] {
   check("--color-assistant-primary-foreground", "--color-assistant-primary", TEXT_MIN);
   check("--color-assistant-primary-foreground", "--color-assistant-primary-hover", TEXT_MIN);
   for (const bg of RING_SURFACES) check("--color-assistant-focus-ring", bg, NON_TEXT_MIN);
+  check("--color-assistant-refused-text", "--color-status-warning-bg", TEXT_MIN);
   return out;
 }
 

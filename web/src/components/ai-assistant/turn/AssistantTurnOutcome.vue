@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :id="titleId"
         :class="[
           'block min-w-0 font-semibold break-words',
-          kind === 'refused' ? 'text-status-warning-text' : 'text-status-error-text',
+          kind === 'refused' ? 'text-assistant-refused-text' : 'text-status-error-text',
         ]"
         data-test="assistant-turn-outcome-title"
       >
