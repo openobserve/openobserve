@@ -864,22 +864,24 @@ mod tests {
 
         let now = chrono::Utc::now().timestamp_micros();
         let over_a_week = get_services_trend(
-            Path("default".to_string()),
-            Query(ServicesTrendQuery {
+            "default",
+            "root@example.com",
+            ServicesTrendQuery {
                 start_time: Some(now - 8 * DAY_MICROS),
                 end_time: Some(now),
                 ..Default::default()
-            }),
+            },
         )
         .await;
         assert_eq!(over_a_week.status(), axum::http::StatusCode::BAD_REQUEST);
 
         let bad_baseline = get_services_trend(
-            Path("default".to_string()),
-            Query(ServicesTrendQuery {
+            "default",
+            "root@example.com",
+            ServicesTrendQuery {
                 baseline_hours: Some(169),
                 ..Default::default()
-            }),
+            },
         )
         .await;
         assert_eq!(bad_baseline.status(), axum::http::StatusCode::BAD_REQUEST);
