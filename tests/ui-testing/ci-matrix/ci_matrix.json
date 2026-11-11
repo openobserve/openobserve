@@ -23,7 +23,8 @@
       "alerts-no-destination.spec.js",
       "alerts-from-panel.spec.js",
       "alertCalibration.spec.js",
-      "alerts-content-templates.spec.js"
+      "alerts-content-templates.spec.js",
+      "alerts-firing-tab.spec.js"
     ],
     "disabled": [
       {
@@ -619,6 +620,7 @@
     "browser": "chrome",
     "run_files": [
       "first-data-notice.spec.js",
+      "diagnosis.spec.js",
       "first-event.spec.js",
       "legacy-pages.spec.js",
       "token-picker.spec.js"
