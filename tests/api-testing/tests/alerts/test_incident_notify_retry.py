@@ -124,7 +124,9 @@ def _incident_opened(incident_alerts: dict[str, Any], case: str) -> None:
                 if any(g.get("alert_id") == alert_id for g in i.get("alert_groups") or [])]
 
     incidents = wait_until(ours, timeout=120, interval=5, msg=f"{case}: no incident was opened for alert {alert_id}")
-    assert [i["status"] for i in incidents] == ["open"], incidents
+    # The one-shot seed recovers after a period, which auto-resolves the incident on a slow run.
+    assert len(incidents) == 1, incidents
+    assert incidents[0]["status"] in ("open", "resolved"), incidents
 
 
 def test_incident_notification_failing_once_is_delivered_on_the_second_attempt(incident_alerts):
