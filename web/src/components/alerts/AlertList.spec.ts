@@ -1738,6 +1738,38 @@ describe("AlertList - row actions keep the view", () => {
     expect(names(wrapper)).not.toContain("Alert 6");
   });
 
+  it("keeps a row paused when an AutoObserve Apply makes a refresh in flight read again and the re-read lags", async () => {
+    const wrapper = await mountOnPageTwo();
+    const org = store.state.selectedOrganization.identifier;
+    const read = deferred<any>();
+    const stale = alertsDB.map((a) => ({ ...a }));
+    alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
+    const refresh = wrapper.vm.refreshAlerts();
+    await flushPromises();
+
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const lagging = stale.map((a) =>
+      a.name === "Alert 8" ? { ...a, name: "Alert 8 applied" } : a,
+    );
+    alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: lagging } }));
+    await fenceAlertWrite(queryClient, org, async () => "applied");
+    read.resolve({ data: { list: stale } });
+    await refresh;
+    await flushPromises();
+
+    expect(names(wrapper)).toContain("Alert 8 applied");
+    expect(names(wrapper)).toContain("Alert 6");
+    expect(wrapper.find('[data-test="alert-list-Alert 6-left-filter"]').exists()).toBe(true);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(errorToasts()).toEqual([]);
+
+    alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: alertsDB } }));
+    await wrapper.vm.refreshAlerts();
+    await flushPromises();
+    expect(names(wrapper)).not.toContain("Alert 6");
+  });
+
   it("tags the current row when a refresh replaced the row objects while the write ran", async () => {
     const wrapper = await mountOnPageTwo();
     const write = deferred<any>();
