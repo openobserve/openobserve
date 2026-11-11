@@ -27,8 +27,6 @@ import {
   muteAlertMutation,
   extendAlertMuteMutation,
   cancelAlertMuteMutation,
-  toggleAlertStateMutation,
-  toggleAnomalyAlertStateMutation,
   retrainAnomalyMutation,
 } from "./alerts.queries";
 import { alertKeys } from "./alerts.querykeys";
