@@ -1240,6 +1240,12 @@ mod tests {
             status(DestinationError::JiraTokenChanged),
             StatusCode::BAD_REQUEST
         );
+        assert_eq!(
+            status(DestinationError::JiraAlertsUnsupported(
+                "'x' cannot become a Jira destination".to_string()
+            )),
+            StatusCode::BAD_REQUEST
+        );
     }
 
     #[test]
