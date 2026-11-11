@@ -442,39 +442,54 @@ fn empty_statement_yields_no_fingerprint() {
 /// new logs ingest path must either call the helper or consciously update this list.
 #[test]
 fn every_logs_ingest_path_applies_canonicalization() {
-    // (file, record-assembly sites, gates the `canonicalize_dbm_record` calls may use)
+    // (file, inline call gates, `DestinationSettings` gates of the sites that share `apply`)
     let paths = [
         (
             include_str!("../logs/ingest.rs"),
-            2usize,
-            &["ctx.dbm_enabled", "dest_dbm_gate"][..],
+            &[][..],
+            &["dest_dbm_gate", "ctx.dbm_enabled"][..],
         ),
         (
             include_str!("../logs/otlp.rs"),
-            3usize,
-            &["dbm_gate", "dest_dbm_gate"][..],
+            &["dbm_gate"][..],
+            &["dest_dbm_gate", "dbm_gate"][..],
         ),
+        (include_str!("../logs/mod.rs"), &["self.dbm"][..], &[][..]),
     ];
-    for (src, expected, gates) in paths {
-        let direct: Vec<usize> = src
+    for (src, inline_gates, shared_gates) in paths {
+        // An ungated call puts the DBM scan on every record of every stream.
+        let inline: Vec<&str> = src
             .match_indices("server_vantage::canonicalize_dbm_record")
-            .map(|(i, _)| i)
+            .map(|(site, _)| enclosing_if_condition(src, site))
             .collect();
         assert_eq!(
-            direct.len(),
-            expected,
-            "logs ingest path must canonicalize at every record-assembly site; a path that \
-             assembles records without it silently drops all o2_dbm_* columns"
+            inline, inline_gates,
+            "logs ingest path must canonicalize at every record-assembly site behind a \
+             per-stream DBM gate; a site without it silently drops all o2_dbm_* columns"
         );
-        // An ungated call puts the DBM scan on every record of every stream.
-        for site in direct {
-            let cond = enclosing_if_condition(src, site);
-            assert!(
-                gates.contains(&cond),
-                "canonicalize_dbm_record must sit behind a per-stream DBM gate, found `if {cond}`"
-            );
-        }
+        assert_eq!(
+            destination_settings_gates(src),
+            shared_gates,
+            "every `DestinationSettings` a record is assembled with must carry a per-stream \
+             DBM gate"
+        );
+        assert_eq!(
+            src.matches("settings.apply(").count(),
+            shared_gates.len(),
+            "every `DestinationSettings` must be applied to the records it was built for"
+        );
     }
+}
+
+/// The `dbm:` gate of every `DestinationSettings` literal in `src`, in source order.
+fn destination_settings_gates(src: &str) -> Vec<&str> {
+    src.match_indices("DestinationSettings {")
+        .map(|(site, _)| {
+            let gate = site + src[site..].find(" dbm: ").expect("a dbm gate") + " dbm: ".len();
+            let end = gate + src[gate..].find(',').expect("the gate's field end");
+            &src[gate..end]
+        })
+        .collect()
 }
 
 /// The condition of the `if` whose block directly contains `site`.
@@ -1465,16 +1480,40 @@ fn resolution_is_none_when_neither_source_identifies_an_event() {
 fn every_apply_site_restores_the_event_name() {
     let src = include_str!("../logs/otlp.rs");
 
+    // the producer loop canonicalizes inline; the two pipeline sites go through the shared apply
+    let shared = include_str!("../logs/mod.rs");
+    let sources = [(src, 1usize), (shared, 1usize)];
     let sites: Vec<usize> = src
         .match_indices("server_vantage::canonicalize_dbm_record")
         .map(|(i, _)| i)
         .collect();
+    for (source, expected) in sources {
+        assert_eq!(
+            source
+                .matches("server_vantage::canonicalize_dbm_record")
+                .count(),
+            expected,
+            "the canonicalize sites moved; re-check which of them can carry an event name \
+             across the strip"
+        );
+    }
+    let applies: Vec<usize> = src
+        .match_indices("settings.apply(")
+        .map(|(i, _)| i)
+        .collect();
     assert_eq!(
-        sites.len(),
-        3,
-        "otlp.rs is expected to canonicalize at 3 sites; if that changed, re-check \
-         which of them can carry an event name across the strip"
+        applies.len(),
+        2,
+        "otlp.rs is expected to assemble pipeline records at 2 shared-apply sites"
     );
+    for (nth, site) in applies.iter().copied().enumerate() {
+        let end = site + src[site..].find(';').expect("the apply call's end");
+        assert!(
+            src[site..end].contains("trusted_event_name"),
+            "shared-apply site #{nth} does not hand over the trusted event name, so the strip \
+             inside `DestinationSettings::apply` loses it"
+        );
+    }
 
     // At the FIRST site the re-insertion must be guarded on non-empty, so an
     // ordinary log line does not acquire the column (the brace-balance check in
@@ -1491,7 +1530,13 @@ fn every_apply_site_restores_the_event_name() {
          without one stay byte-identical"
     );
 
-    for (nth, site) in sites.iter().copied().enumerate() {
+    let shared_site = shared
+        .find("server_vantage::canonicalize_dbm_record")
+        .expect("the shared apply canonicalizes");
+    for (nth, (src, site)) in [(src, sites[0]), (shared, shared_site)]
+        .into_iter()
+        .enumerate()
+    {
         // The restore must come before this record is handed onward — bounded by the
         // next `refactor_map` call, which is the first thing that consumes `local_val`
         // after canonicalization at every one of the three sites.
