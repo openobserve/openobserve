@@ -66,6 +66,13 @@ describe("StarterPackDrawer", () => {
     );
   });
 
+  it("shows one Adapted to your data section holding the adapted rows", () => {
+    const wrapper = render(fakeFlow({ preview: shallowRef(PREVIEW) }));
+    expect(wrapper.text().split("Adapted to your data")).toHaveLength(2);
+    const reach = wrapper.get('[data-test="starter-pack-drawer-reach"]');
+    expect(reach.findComponent({ name: "StarterPackAdaptedRows" }).exists()).toBe(true);
+  });
+
   it("lists the view under items left out on a lower plan", () => {
     const wrapper = render(fakeFlow({ preview: shallowRef(PREVIEW), licensed: ref(false) }));
     expect(wrapper.get('[data-test="starter-pack-drawer-panels"]').text()).toContain(

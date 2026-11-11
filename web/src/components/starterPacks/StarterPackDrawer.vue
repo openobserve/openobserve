@@ -351,10 +351,9 @@ const askConfirm = (mode: "undo" | "remove") => {
         </div>
       </section>
 
-      <StarterPackAdaptedRows :flow="flow" />
-
       <section class="flex flex-col" data-test="starter-pack-drawer-reach">
         <OText variant="section" class="pb-1">{{ t("starterPacks.manifest.adapted") }}</OText>
+        <StarterPackAdaptedRows :flow="flow" />
         <div class="border-border-default flex justify-between gap-3 border-b py-2">
           <div class="flex flex-col">
             <span>{{ t("starterPacks.drawer.scope") }}</span>
