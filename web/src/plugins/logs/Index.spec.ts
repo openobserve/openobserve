@@ -890,6 +890,19 @@ describe("Logs Index", async () => {
     expect(wrapper.vm.splitterModel).toBe(300);
   });
 
+  it("Should still grow the query pane for a long VRL function while the filter builder shows", async () => {
+    wrapper.vm.filterBuilderGrowth = 0;
+    wrapper.vm.searchObj.data.tempFunctionContent = "";
+    await flushPromises();
+    wrapper.vm.splitterModel = 83;
+    wrapper.vm.searchObj.data.tempFunctionContent = ".a = 1\n.b = 2\n.c = 3\n.d = 4";
+    await flushPromises();
+    expect(wrapper.vm.splitterModel).toBe(130);
+    wrapper.vm.filterBuilderGrowth = 72;
+    await flushPromises();
+    expect(wrapper.vm.splitterModel).toBe(83 + 72);
+  });
+
   it("Should navigate to the Search History route on showSearchHistoryfn", async () => {
     // Search History is now a standalone route (was an `action=history` overlay).
     const pushSpy = vi.spyOn(wrapper.vm.router, "push");

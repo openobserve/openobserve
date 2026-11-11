@@ -1322,7 +1322,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 />
               </OButton>
-              <div v-if="showFilterBuilder" class="h-full overflow-y-auto py-0.75 ps-1.5 pe-18">
+              <div
+                v-if="showFilterBuilder"
+                class="h-full overflow-y-auto py-0.75 ps-1.5"
+                :class="aiButtonShown ? 'pe-26.5' : 'pe-18'"
+              >
                 <SqlFilterBuilder
                   ref="filterBuilderRef"
                   :query="searchObj.data.query"
@@ -1338,6 +1342,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @extra-select="pickRecentFilterRow"
                 />
               </div>
+              <OButton
+                v-if="showFilterBuilder && aiButtonShown"
+                data-test="logs-search-bar-filter-builder-ai-btn"
+                variant="ghost"
+                size="icon-toolbar"
+                :disabled="!searchObj.data.stream.selectedStream.length"
+                @click="openAiFromBuilder"
+                class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+                :style="{ right: aiButtonRight }"
+              >
+                <img
+                  :src="aiIcon"
+                  :alt="t('search.aiModeIconAlt')"
+                  class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
+                />
+                <span
+                  v-if="!aiAccess.allowed"
+                  aria-hidden="true"
+                  class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+                >
+                  <OIcon name="lock" size="xs" class="text-icon-locked size-2.5!" />
+                </span>
+                <OTooltip
+                  v-if="aiAccess.allowed"
+                  :content="
+                    searchObj.data.stream.selectedStream.length
+                      ? t('nlMode.toggle')
+                      : t('search.selectStreamForAI')
+                  "
+                />
+              </OButton>
               <!-- Unified Query Editor (with built-in AI bar) -->
               <UnifiedQueryEditor
                 v-if="router.currentRoute.value.name === 'logs'"
@@ -2317,21 +2352,30 @@ export default defineComponent({
       () =>
         filterBuilderOn.value &&
         !searchObj.meta.sqlMode &&
+        !searchObj.meta.nlpMode &&
         searchObj.meta.logsVisualizeToggle === "logs",
     );
-    // Mirrors QueryEditor's floating AI button, which takes the corner slot while the editor is shown.
-    const aiButtonShown = computed(() => {
-      const access = checkFeatureAccess(
-        "aiAssistant",
-        buildFeatureGateContext(store.state.zoConfig),
-      );
-      return !access.allowed || Boolean(store.state.zoConfig.ai_enabled);
-    });
+    const aiAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    // Mirrors QueryEditor's floating AI button; the builder shows its own copy in the same corner slot.
+    const aiButtonShown = computed(
+      () => !aiAccess.value.allowed || Boolean(store.state.zoConfig.ai_enabled),
+    );
+    const aiButtonRight = computed(() =>
+      searchObj.meta.showTransformEditor ? "0.25rem" : "2.375rem",
+    );
     const filterBuilderToggleRight = computed(() => {
       const corner = searchObj.meta.showTransformEditor ? 0.25 : 2.375;
-      const besideAi = !showFilterBuilder.value && aiButtonShown.value;
-      return `${besideAi ? corner + 2.125 : corner}rem`;
+      return `${aiButtonShown.value ? corner + 2.125 : corner}rem`;
     });
+    const aiIcon = computed(() =>
+      getImageURL(
+        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
+      ),
+    );
+    const openAiFromBuilder = () =>
+      (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
     const filterBuilderFields = computed(() =>
       toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
     );
@@ -5295,6 +5339,11 @@ export default defineComponent({
       filterBuilderOn,
       toggleFilterBuilder,
       showFilterBuilder,
+      aiAccess,
+      aiButtonShown,
+      aiButtonRight,
+      aiIcon,
+      openAiFromBuilder,
       filterBuilderToggleRight,
       filterBuilderFields,
       filterBuilderRef,

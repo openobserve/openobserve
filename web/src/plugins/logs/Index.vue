@@ -3153,7 +3153,7 @@ export default defineComponent({
             ? hasMoreThanTwoLines
               ? expandedHeight
               : baseHeight
-            : baseHeight + growth;
+            : Math.max(baseHeight + growth, fnLines > 2 ? expandedHeight : baseHeight);
 
         if (
           splitterModel.value < target ||
