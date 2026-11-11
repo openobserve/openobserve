@@ -206,7 +206,8 @@ import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { useShortcuts } from "@/lib/vue-shortcut-manager";
+// Not the barrel: it re-exports the cheatsheet, whose assistant imports would ride into the entry chunk via Login.
+import { useShortcuts } from "@/lib/vue-shortcut-manager/composables";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 // Pending invitation row shape returned by GET /api/invites, enriched locally

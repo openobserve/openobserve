@@ -40,11 +40,21 @@ describe("AssistantContextChip", () => {
     const root = wrapper.get('[data-test="assistant-context-chip-log_row"]');
     expect(root.attributes("data-state")).toBe("sent");
     const button = wrapper.get('[data-test="assistant-context-chip-button"]');
-    expect(button.element.tagName).toBe("SPAN");
-    expect(button.attributes("role")).toBe("button");
-    expect(button.attributes("tabindex")).toBe("0");
+    expect(button.element.tagName).toBe("BUTTON");
+    expect(button.attributes("role")).toBeUndefined();
     expect(button.attributes("aria-label")).toBe("Log row · cart · 13:57, default");
-    expect(button.classes()).toContain("rounded-default");
+    expect(button.attributes("aria-haspopup")).toBe("dialog");
+    expect(button.element.parentElement!.classList).toContain("rounded-default");
+  });
+
+  it("keeps the remove button beside the chip's button, never inside it (axe nested-interactive)", () => {
+    const wrapper = mountChip();
+    const button = wrapper.get('[data-test="assistant-context-chip-button"]').element;
+    const remove = wrapper.get('[data-test="assistant-context-chip-remove"]').element;
+    expect(button.contains(remove)).toBe(false);
+    expect(remove.parentElement).toBe(button.parentElement);
+    expect(button.parentElement!.getAttribute("role")).toBeNull();
+    expect(button.parentElement!.hasAttribute("tabindex")).toBe(false);
   });
 
   it("has a named remove button inside the pill (CT-02 AC 12)", async () => {
@@ -52,7 +62,9 @@ describe("AssistantContextChip", () => {
     const remove = wrapper.get('[data-test="assistant-context-chip-remove"]');
     expect(remove.attributes("aria-label")).toBe("Remove Log row · cart · 13:57 from context");
     expect(
-      wrapper.get('[data-test="assistant-context-chip-button"]').element.contains(remove.element),
+      wrapper
+        .get('[data-test="assistant-context-chip-button"]')
+        .element.parentElement!.contains(remove.element),
     ).toBe(true);
     await remove.trigger("click");
     expect(wrapper.emitted("remove")).toHaveLength(1);
@@ -123,9 +135,9 @@ describe("AssistantContextChip", () => {
       "not_read",
     );
     expect(wrapper.text()).toContain("not read yet");
-    expect(wrapper.get('[data-test="assistant-context-chip-button"]').classes()).toContain(
-      "border-dotted",
-    );
+    expect(
+      wrapper.get('[data-test="assistant-context-chip-button"]').element.parentElement!.classList,
+    ).toContain("border-dotted");
   });
 
   it("is an Add back chip with no remove as a ghost (CT-01 AC 7)", () => {
@@ -145,7 +157,7 @@ describe("AssistantContextChip", () => {
   });
 
   it("stays a compact pill on touch, with a 2.75 rem hit area that never grows its box (B-composer-11)", () => {
-    const button = mountChip().get('[data-test="assistant-context-chip-button"]');
+    const button = mountChip().get("[data-assistant-chip] > *");
     expect(button.classes()).not.toContain("max-md:min-h-11");
     expect(button.classes()).not.toContain("pointer-coarse:min-h-11");
     expect(button.classes()).toEqual(

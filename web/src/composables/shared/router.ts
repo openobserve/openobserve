@@ -15,7 +15,8 @@
 
 import { routeGuard, getPath } from "@/utils/zincutils";
 import { isAssistantV2 } from "@/composables/assistant/flags";
-import { fullThreadLocation } from "@/composables/assistant/pure";
+// eslint-disable-next-line no-restricted-imports -- the pure barrel's side-effect imports would land in the entry chunk
+import { fullThreadLocation } from "@/composables/assistant/fullThreadRoute";
 import type {
   LocationQuery,
   LocationQueryRaw,

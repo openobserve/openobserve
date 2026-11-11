@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :listbox-id="GO_TO_LISTBOX_ID"
           data-test="assistant-launcher-go-to-results"
           @select="onGoToSelect"
-          @close="text = ''"
+          @close="dismissGoTo"
         />
       </div>
       <slot v-if="goToOnly" name="note" />
@@ -587,8 +587,13 @@ const { matches: goToMatches } = useGoToIndex(text, {
   canAsk: () => state.value === "ready" && !goToOnly.value,
   enabled: () => props.layout === "overview" && shown.value,
 });
+const goToDismissed = ref(false);
 const goToShown = computed(
-  () => props.layout === "overview" && text.value.trim() !== "" && mentionAt.value === null,
+  () =>
+    props.layout === "overview" &&
+    text.value.trim() !== "" &&
+    mentionAt.value === null &&
+    !goToDismissed.value,
 );
 const mentionsOn = computed(() => fieldReady.value && !goToOnly.value);
 const placeholder = computed(() =>
@@ -610,6 +615,7 @@ const shownText = computed(() => voice.shown(text.value));
 
 function onInput(value: string): void {
   text.value = value;
+  goToDismissed.value = false;
   voice.noteEdit(input.value?.textarea?.selectionStart ?? value.length);
   void nextTick(detectMention);
 }
@@ -835,6 +841,12 @@ function onKeydown(event: KeyboardEvent): void {
     // Escape never clears what was typed; only the clear button does (round 1 X-20).
     (event.target as HTMLElement | null)?.blur();
   }
+}
+
+// Escape on the results closes them and leaves the field; it never clears what was typed (X-20).
+function dismissGoTo(): void {
+  goToDismissed.value = true;
+  input.value?.textarea?.blur();
 }
 
 // With no agent to ask, Enter opens the best match, as the palette does.

@@ -66,6 +66,13 @@ describe("AssistantQueryText", () => {
     expect(wrapper.get('[data-test="q-foot"] [data-test="open"]').exists()).toBe(true);
   });
 
+  it("draws the header strip in body text, which keeps AA on the syntax fill", () => {
+    const wrapper = mountText({ chrome: true, meta: raw("last 5 min") });
+    const strip = wrapper.get('[data-test="q-lang"]').element.parentElement!;
+    expect(strip.classList).toContain("text-text-body");
+    expect(strip.classList).not.toContain("text-text-secondary");
+  });
+
   it("copies the query and says Copied in place for two seconds", async () => {
     vi.useFakeTimers();
     const wrapper = mountText({ chrome: true });

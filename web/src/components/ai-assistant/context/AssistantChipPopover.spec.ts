@@ -120,6 +120,12 @@ describe("AssistantChipPopover", () => {
     expect(popover()!.getAttribute("data-dd-privacy")).toBe("mask");
   });
 
+  it("draws the provenance line in body text, which keeps AA on the popover surface", async () => {
+    const { popover } = await open();
+    const line = popover()!.querySelector('[data-test="assistant-chip-provenance"]')!;
+    expect(line.classList).toContain("text-text-body!");
+  });
+
   it("toggles Hide internal fields to send them too (CT-03 AC 2)", async () => {
     const { wrapper, popover } = await open();
     const toggle = popover()!.querySelector<HTMLElement>(

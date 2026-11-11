@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :icon="chip.withheldAt ? assistantGlyph.withheld : chipGlyph[chip.kind]"
       :clickable="!inert"
       :removable="removable"
+      label-button
       :remove-label="t('assistant.context.remove', { label })"
       remove-data-test="assistant-context-chip-remove"
-      :role="removable ? 'button' : undefined"
       :aria-label="name"
       :aria-haspopup="popup && !inert ? 'dialog' : undefined"
       :aria-expanded="popup && !inert ? expanded : undefined"
       :class="[
-        'max-w-full min-w-0 motion-safe:transition-colors [&>button]:-my-0.5',
+        'max-w-full min-w-0 motion-safe:transition-colors [&>button:last-child]:-my-0.5',
         inert ? '' : CHIP_HIT_AREA_CLASS,
       ]"
       data-test="assistant-context-chip-button"

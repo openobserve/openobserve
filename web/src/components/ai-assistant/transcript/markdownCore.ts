@@ -1290,17 +1290,44 @@ function slots(html: string): string {
 
 // The text of a raw HTML block: tags, comments and script or style bodies go, the words stay.
 function htmlText(html: string): string {
-  let stripped = html;
-  let previous: string;
-  // Repeat until stable: one removal can join the pieces around it into a new tag.
-  do {
-    previous = stripped;
-    stripped = stripped
-      .replace(/<!--[\s\S]*?-->/g, "")
-      .replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, "")
-      .replace(/<[^>]*>/g, "");
-  } while (stripped !== previous);
-  return decodeEntities(stripped).trim();
+  let kept = "";
+  let i = 0;
+  while (i < html.length) {
+    const open = html.indexOf("<", i);
+    if (open === -1) {
+      kept += html.slice(i);
+      break;
+    }
+    kept += html.slice(i, open);
+    const end = markupEnd(html, open);
+    // A `<` that opens no tag is text; the caller escapes it.
+    if (end === -1) {
+      kept += "<";
+      i = open + 1;
+    } else {
+      i = end;
+    }
+  }
+  return decodeEntities(kept).trim();
+}
+
+// One forward scan, so a removal can never join its neighbours into a new tag.
+function markupEnd(html: string, open: number): number {
+  if (html.startsWith("<!--", open)) {
+    const close = html.indexOf("-->", open + 4);
+    return close === -1 ? html.length : close + 3;
+  }
+  const tagEnd = html.indexOf(">", open + 1);
+  if (tagEnd === -1) return -1;
+  const raw = /^<(script|style)\b/i.exec(html.slice(open, tagEnd + 1));
+  if (raw) {
+    const close = html.toLowerCase().indexOf(`</${raw[1].toLowerCase()}`, tagEnd + 1);
+    if (close !== -1) {
+      const closeEnd = html.indexOf(">", close);
+      return closeEnd === -1 ? html.length : closeEnd + 1;
+    }
+  }
+  return tagEnd + 1;
 }
 
 function decodeEntities(text: string): string {

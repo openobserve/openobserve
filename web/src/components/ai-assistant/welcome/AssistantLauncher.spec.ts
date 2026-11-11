@@ -252,6 +252,21 @@ describe("AssistantLauncher", () => {
     expect(router.currentRoute.value.name).toBe("assistant");
   });
 
+  it("keeps the text on Escape while Home's Go to results are open (HOME-03)", async () => {
+    const { wrapper } = setupOn({ layout: "overview" });
+    await flushPromises();
+    await input(wrapper).setValue("keep this");
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(true);
+    (input(wrapper).element as HTMLTextAreaElement).focus();
+    await input(wrapper).trigger("keydown", { key: "Escape" });
+    expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("keep this");
+    expect(document.activeElement).not.toBe(input(wrapper).element);
+    expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(false);
+    await input(wrapper).setValue("keep this too");
+    expect(wrapper.find('[data-test="assistant-launcher-go-to"]').exists()).toBe(true);
+  });
+
   it("keeps the text on Escape and clears it only with the clear button (HOME-03, round 1 X-20)", async () => {
     const { wrapper } = setup();
     await input(wrapper).setValue("keep me");

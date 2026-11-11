@@ -1117,6 +1117,17 @@ describe("markdown.ts strict profile", () => {
     expect(html).not.toContain("<div");
   });
 
+  it.each([
+    ["<div>\n<scr<script>ipt>alert(1)</script>\n</div>", "<script"],
+    ["<div>\n<!-<!---->->x\n</div>", "<!--"],
+  ])("never rebuilds a tag from the pieces around a stripped one: %s", (input, rebuilt) => {
+    const html = htmlOf(render(input).parts);
+    mountHtml(html);
+    expect(html).not.toContain(rebuilt);
+    expect(document.body.innerHTML).not.toContain(rebuilt);
+    expect(markdownToPlainText(input)).not.toContain(rebuilt);
+  });
+
   it("never puts raw HTML in a table cell or in Copy answer (V3)", () => {
     const html = htmlOf(
       render('| a |\n|---|\n| <img src=x onerror="window.__pwned=1"> ok |').parts,
