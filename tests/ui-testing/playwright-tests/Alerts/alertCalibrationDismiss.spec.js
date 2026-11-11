@@ -111,7 +111,7 @@ test.describe("Alert Calibration dismiss and reopen", () => {
       await pm.alertCalibrationPage.showDismissed();
       const table = page.locator(pm.alertCalibrationPage.dismiss.dismissedTable);
       await expect(table).toContainText(alertName);
-      await expect(table).toContainText("Known issue, handled elsewhere");
+      await expect(table).toContainText("Will fix later");
 
       const stored = await dismissals(page, alertId);
       expect(stored.items).toHaveLength(1);
@@ -290,7 +290,7 @@ test.describe("Alert Calibration dismiss and reopen", () => {
       await pm.alertCalibrationPage.expectDialogClosed();
 
       await expect(fold).toContainText("Dismissed by", { timeout: 15000 });
-      await expect(fold).toContainText("Known issue, handled elsewhere");
+      await expect(fold).toContainText("Will fix later");
       await expect(fold).toContainText("Hidden until");
       await expect(card.locator(dismiss.cardBadge)).toHaveText("Dismissed");
       await expect(card.locator(dismiss.cardDismiss)).toHaveCount(0);
