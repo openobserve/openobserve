@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex shrink-0 items-center gap-1">
         <AssistantIconButton
-          v-if="newShown && !newInMenu"
+          v-if="newShown && newInBar"
           :label="newLabel"
           :icon="assistantGlyph.newChat"
           data-test="assistant-thread-new"
@@ -390,10 +390,10 @@ const chatActions = computed(() => hasMessages.value && !readonly.value && !!pro
 // Nothing to leave in an empty chat, and a read-only role cannot start one.
 const newShown = computed(() => !readonly.value && (hasMessages.value || chatsOpen.value));
 const { mdUp } = useBreakpoint();
-// A window, and the Full page on a phone, keep the bar's room for the title: New chat sits in the title menu.
-const newInMenu = computed(
-  () => props.placement === "window" || (props.placement === "full" && !mdUp.value),
-);
+const phoneFull = computed(() => props.placement === "full" && !mdUp.value);
+// The Full page on a phone keeps the bar's room for the title; a window offers New chat in both places.
+const newInMenu = computed(() => props.placement === "window" || phoneFull.value);
+const newInBar = computed(() => !phoneFull.value);
 const newLabel = computed<I18nText>(() =>
   object.value ? raw(object.value.newLabel) : t("assistant.thread.newChat"),
 );

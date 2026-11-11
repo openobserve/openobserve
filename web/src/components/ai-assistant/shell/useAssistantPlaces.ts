@@ -58,6 +58,7 @@ export function placementMode(placement: AssistantPlacementName, sheet: boolean)
 /** The Open as moves a container offers: Side panel, Full page, Floating window and its editor's dock, by viewport and placement. */
 export function useAssistantPlaces(input: () => AssistantPlacesInput): {
   places: ComputedRef<AssistantPlace[]>;
+  freshFull: ComputedRef<AssistantPlace | null>;
 } {
   const { t } = useI18nTyped();
   const store = useAssistantStore();
@@ -118,6 +119,20 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
     if (!lgUp.value) return [sidebar, full];
     if (placement === "docked") return [dock, full, window];
     return [sidebar, full, window, ...(chatDock.value ? [dock] : [])];
+  });
+
+  // Full page carries the chat; from a chat with messages this starts an empty one there instead.
+  const freshFull = computed<AssistantPlace | null>(() => {
+    const { placement, sid } = input();
+    if (placement === "full" || modalDock.value) return null;
+    if (!(sid && store.state.sessions[sid]?.messages.length)) return null;
+    return {
+      id: "full",
+      label: t("assistant.shell.newChatFullPage"),
+      checked: false,
+      disabled: false,
+      run: toFreshFull,
+    };
   });
 
   function running(): boolean {
@@ -182,6 +197,15 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
     void router.push({ name: "assistant", params: sid ? { chatId: sid } : {} });
   }
 
+  function toFreshFull(): void {
+    trackMove("full");
+    const sid = store.startNewChat({
+      origin: { entryKind: "thread_new", objectKind: "none", container: "full_view" },
+    });
+    store.open({ kind: "full" }, { sid, focus: "composer" });
+    void router.push({ name: "assistant" });
+  }
+
   function toDock(): void {
     const hostId = chatDock.value;
     if (!hostId) return;
@@ -190,5 +214,5 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
     store.open({ kind: "docked", hostId }, { ...(sid && { sid }), focus: "composer" });
   }
 
-  return { places };
+  return { places, freshFull };
 }

@@ -245,11 +245,12 @@ describe("AssistantThreadHeader", () => {
     off();
   });
 
-  it("leads a window's menu with New chat and draws no + on its bar", async () => {
-    const { wrapper, newChat } = await setup({ placement: "window" });
-    expect(wrapper.find('[data-test="assistant-thread-new"]').exists()).toBe(false);
-    await wrapper.get('[data-test="assistant-title-menu-new"]').trigger("click");
+  it("draws + on a window's bar and keeps New chat at the head of its menu", async () => {
+    const { wrapper, newChat } = await setup({ placement: "window", narrow: true });
+    await wrapper.get('[data-test="assistant-thread-new"]').trigger("click");
     expect(newChat).toHaveBeenCalledTimes(1);
+    await wrapper.get('[data-test="assistant-title-menu-new"]').trigger("click");
+    expect(newChat).toHaveBeenCalledTimes(2);
   });
 
   it("moves New chat into the title menu on a phone's Full page, so the title keeps the bar (B-shell3-7)", async () => {

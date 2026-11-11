@@ -32,6 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon :name="assistantGlyph.done" size="sm" class="text-assistant-link ms-auto" />
       </template>
     </ODropdownItem>
+    <ODropdownItem
+      v-if="freshFull"
+      :icon-left="assistantGlyph.newChat"
+      data-test="assistant-shell-place-full-new"
+      @select="freshFull.run"
+    >
+      {{ freshFull.label }}
+    </ODropdownItem>
   </template>
   <ODropdown v-else-if="places.length" align="end">
     <template #trigger>
@@ -73,6 +81,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </ODropdownItem>
     </ODropdownGroup>
+    <template v-if="freshFull">
+      <ODropdownSeparator />
+      <ODropdownItem
+        :icon-left="assistantGlyph.newChat"
+        data-test="assistant-shell-place-full-new"
+        @select="freshFull.run"
+      >
+        {{ freshFull.label }}
+      </ODropdownItem>
+    </template>
   </ODropdown>
 </template>
 
@@ -114,6 +132,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -128,7 +147,7 @@ const props = withDefaults(defineProps<AssistantOpenAsMenuProps>(), {
 
 const { t } = useI18nTyped();
 const { mdUp } = useBreakpoint();
-const { places } = useAssistantPlaces(() => ({
+const { places, freshFull } = useAssistantPlaces(() => ({
   placement: props.placement,
   sid: props.sid,
   sheet: props.sheet,
