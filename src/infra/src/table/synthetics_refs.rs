@@ -298,6 +298,7 @@ mod tests {
                 last_run_class_at BIGINT NOT NULL DEFAULT 0,
                 last_tested_at BIGINT NOT NULL DEFAULT 0,
                 status_recovered_at BIGINT NOT NULL DEFAULT 0,
+                status_streak_sig BIGINT NOT NULL DEFAULT 0,
                 gap_since BIGINT NOT NULL DEFAULT 0,
                 gap_runs INTEGER NOT NULL DEFAULT 0,
                 gap_notified_at BIGINT NOT NULL DEFAULT 0,

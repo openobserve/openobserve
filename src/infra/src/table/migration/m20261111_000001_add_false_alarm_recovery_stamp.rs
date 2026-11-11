@@ -26,20 +26,17 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // `has_column` keeps this idempotent. SQLite takes one ADD COLUMN per ALTER TABLE.
-        if !manager.has_column(CHECKS, "status_recovered_at").await? {
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(Synthetics::Table)
-                        .add_column(
-                            ColumnDef::new(Synthetics::StatusRecoveredAt)
-                                .big_integer()
-                                .not_null()
-                                .default(0),
-                        )
-                        .to_owned(),
-                )
-                .await?;
+        for (name, column) in check_columns() {
+            if !manager.has_column(CHECKS, name).await? {
+                manager
+                    .alter_table(
+                        Table::alter()
+                            .table(Synthetics::Table)
+                            .add_column(ColumnDef::new(column).big_integer().not_null().default(0))
+                            .to_owned(),
+                    )
+                    .await?;
+            }
         }
         if !manager
             .has_column(NOTICES, "false_alarm_recovered_at")
@@ -62,15 +59,17 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        if manager.has_column(CHECKS, "status_recovered_at").await? {
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(Synthetics::Table)
-                        .drop_column(Synthetics::StatusRecoveredAt)
-                        .to_owned(),
-                )
-                .await?;
+        for (name, column) in check_columns() {
+            if manager.has_column(CHECKS, name).await? {
+                manager
+                    .alter_table(
+                        Table::alter()
+                            .table(Synthetics::Table)
+                            .drop_column(column)
+                            .to_owned(),
+                    )
+                    .await?;
+            }
         }
         if manager
             .has_column(NOTICES, "false_alarm_recovered_at")
@@ -96,6 +95,14 @@ const NOTICES: &str = "status_page_notices";
 enum Synthetics {
     Table,
     StatusRecoveredAt,
+    StatusStreakSig,
+}
+
+fn check_columns() -> [(&'static str, Synthetics); 2] {
+    [
+        ("status_recovered_at", Synthetics::StatusRecoveredAt),
+        ("status_streak_sig", Synthetics::StatusStreakSig),
+    ]
 }
 
 #[derive(DeriveIden)]
@@ -129,12 +136,13 @@ mod tests {
         let check = db
             .query_one(Statement::from_string(
                 backend,
-                "SELECT status_recovered_at FROM synthetics",
+                "SELECT status_recovered_at, status_streak_sig FROM synthetics",
             ))
             .await
             .unwrap()
             .unwrap();
         assert_eq!(check.try_get::<i64>("", "status_recovered_at").unwrap(), 0);
+        assert_eq!(check.try_get::<i64>("", "status_streak_sig").unwrap(), 0);
         let notice = db
             .query_one(Statement::from_string(
                 backend,
@@ -150,6 +158,12 @@ mod tests {
             None
         );
         Migration.down(&manager).await.unwrap();
+        assert!(
+            !manager
+                .has_column(CHECKS, "status_streak_sig")
+                .await
+                .unwrap()
+        );
         assert!(
             !manager
                 .has_column(CHECKS, "status_recovered_at")

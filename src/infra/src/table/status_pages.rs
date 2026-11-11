@@ -61,6 +61,9 @@ pub struct CheckStateRow {
     pub last_tested_at: i64,
     /// Finish time of the run that started the current Up streak. A false alarm hold matches it.
     pub recovered_at: i64,
+    /// A writer of this build wrote the streaks. When false, no false alarm hold may apply,
+    /// because an older build can have missed a recovery. See `StatusStreaks::signed`.
+    pub signed: bool,
     /// Seconds between scheduled runs; 0 for cron.
     pub interval_secs: i64,
     pub created_at: i64,
@@ -146,6 +149,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
         .column(synthetics_checks::Column::LastRunClassAt)
         .column(synthetics_checks::Column::LastTestedAt)
         .column(synthetics_checks::Column::StatusRecoveredAt)
+        .column(synthetics_checks::Column::StatusStreakSig)
         .column(synthetics_checks::Column::Frequency)
         .column(synthetics_checks::Column::CreatedAt)
         .filter(synthetics_checks::Column::Id.is_in(check_ids.iter().cloned()));
@@ -167,6 +171,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
         last_run_class_at: i64,
         last_tested_at: i64,
         status_recovered_at: i64,
+        status_streak_sig: i64,
         frequency: serde_json::Value,
         created_at: i64,
     }
@@ -194,6 +199,13 @@ pub async fn get_check_states<C: ConnectionTrait>(
                 last_run_class_at: r.last_run_class_at,
                 last_tested_at: r.last_tested_at,
                 recovered_at: r.status_recovered_at,
+                signed: r.status_streak_sig
+                    == super::synthetics_checks::streak_sig(
+                        r.status_down_runs,
+                        r.status_up_runs,
+                        r.status_run_ts,
+                        r.last_run_class,
+                    ),
                 interval_secs,
                 created_at: r.created_at,
             }

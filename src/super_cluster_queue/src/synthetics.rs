@@ -359,6 +359,8 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
                 run_class_at,
                 tested_at,
                 recovered_at,
+                // Written by this build, which signs it.
+                signed: true,
             };
             apply_last_check_status(conn, &org_id, &id, &streaks).await?;
         }
@@ -665,6 +667,7 @@ mod tests {
             last_run_class_at: 0,
             last_tested_at: 0,
             status_recovered_at: 0,
+            status_streak_sig: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
@@ -740,6 +743,7 @@ mod tests {
             run_class_at: 200,
             tested_at: 200,
             recovered_at: 0,
+            signed: true,
         };
         apply_last_check_status(&db, "org1", "check-1", &newer)
             .await
@@ -755,6 +759,7 @@ mod tests {
             run_class_at: 100,
             tested_at: 100,
             recovered_at: 0,
+            signed: true,
         };
         apply_last_check_status(&db, "org1", "check-1", &older)
             .await
@@ -912,6 +917,7 @@ mod tests {
                 last_run_class_at BIGINT NOT NULL DEFAULT 0,
                 last_tested_at BIGINT NOT NULL DEFAULT 0,
                 status_recovered_at BIGINT NOT NULL DEFAULT 0,
+                status_streak_sig BIGINT NOT NULL DEFAULT 0,
                 gap_since BIGINT NOT NULL DEFAULT 0,
                 gap_runs INTEGER NOT NULL DEFAULT 0,
                 gap_notified_at BIGINT NOT NULL DEFAULT 0,

@@ -150,7 +150,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 150: add last_run_class, last_run_class_at and last_tested_at to synthetics.
 // 151: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
 // 152: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
-// 153: add synthetics.status_recovered_at and status_page_notices.false_alarm_recovered_at.
+// 153: add synthetics.status_recovered_at and status_streak_sig, and
+//      status_page_notices.false_alarm_recovered_at.
 pub const DB_SCHEMA_VERSION: u64 = 153;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 

@@ -562,6 +562,7 @@ fn false_alarm_holds(
         .iter()
         .filter(|s| {
             s.down_runs > 0
+                && s.signed
                 && marks
                     .get(s.id.as_str())
                     .is_some_and(|stamps| stamps.contains(&s.recovered_at))
@@ -1015,6 +1016,7 @@ mod fast_pass_tests {
             last_run_class_at: 0,
             last_tested_at: 0,
             recovered_at: 0,
+            signed: true,
             interval_secs: 60,
             created_at: 0,
         }
@@ -1071,7 +1073,14 @@ mod fast_pass_tests {
         ];
         let mut up = failing("up", 7);
         up.down_runs = 0;
-        let notices = [notices, vec![notice("up", Some(500), Some(500), Some(7))]].concat();
+        let notices = [
+            notices,
+            vec![
+                notice("up", Some(500), Some(500), Some(7)),
+                notice("unsigned", Some(500), Some(500), Some(7)),
+            ],
+        ]
+        .concat();
         let states = [
             failing("same", 7),
             failing("recovered", 9),
@@ -1081,6 +1090,12 @@ mod fast_pass_tests {
             failing("real", 7),
             // Armed stamp matches, but the check is not failing: nothing to hold.
             up,
+            // Armed stamp matches, but an older build wrote the streaks.
+            {
+                let mut r = failing("unsigned", 7);
+                r.signed = false;
+                r
+            },
         ];
         let held = false_alarm_holds(&notices, &states);
         assert_eq!(held, HashSet::from(["same".to_string(), "two".to_string()]));

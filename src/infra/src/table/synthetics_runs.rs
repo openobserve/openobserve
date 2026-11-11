@@ -544,6 +544,7 @@ pub fn next_streaks(
         run_class_at,
         tested_at,
         recovered_at: cur.recovered_at,
+        signed: true,
     })
 }
 
@@ -769,7 +770,13 @@ async fn write_check_row<C: ConnectionTrait>(
                 true,
             ),
         };
-        next.recovered_at = recovery_stamp(&cur, verdict, late, finished_at);
+        next.recovered_at = if cur.signed {
+            recovery_stamp(&cur, verdict, late, finished_at)
+        } else {
+            // An older build wrote the streaks and may have missed a recovery: assume one, so no
+            // false alarm hold saved before it can match. This only fails open.
+            (cur.recovered_at + 1).max(finished_at)
+        };
         if next == cur {
             return Ok(None);
         }
@@ -844,6 +851,7 @@ async fn replay_streaks<C: ConnectionTrait>(
         tested_at: cur.tested_at.max(replayed.tested_at),
         // `write_check_row` sets the stamp from the late run itself.
         recovered_at: cur.recovered_at,
+        signed: true,
     })
 }
 
@@ -1129,6 +1137,7 @@ mod tests {
             last_run_class_at: 0,
             last_tested_at: 0,
             status_recovered_at: 0,
+            status_streak_sig: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
@@ -1242,6 +1251,13 @@ mod tests {
                 run_class_at: m.last_run_class_at,
                 tested_at: m.last_tested_at,
                 recovered_at: m.status_recovered_at,
+                signed: m.status_streak_sig
+                    == synthetics_checks::streak_sig(
+                        m.status_down_runs,
+                        m.status_up_runs,
+                        m.status_run_ts,
+                        m.last_run_class,
+                    ),
             },
             m.updated_at,
         )
@@ -1344,6 +1360,7 @@ mod tests {
                 run_class_at: 100,
                 tested_at: 100,
                 recovered_at: 0,
+                signed: true,
             }
         );
         assert_eq!(done.check_update, Some(row));
@@ -1511,6 +1528,33 @@ mod tests {
         let (row, _) = check_row(&db).await;
         assert_eq!(row.recovered_at, 9_500);
         assert_eq!(row.down_runs, 0);
+    }
+
+    #[tokio::test]
+    async fn a_row_that_an_older_build_wrote_moves_the_stamp_at_the_next_run() {
+        let db = db().await;
+        run_with_jobs(&db, "d1", 100, 1).await;
+        ack(&db, "d1", 0, 3, 110).await;
+        assert!(check_row(&db).await.0.signed, "this build signs its writes");
+        // An older build finishes a recovery: it writes the streaks, not the signature or stamp.
+        db.execute_unprepared(
+            "UPDATE synthetics SET status_down_runs = 0, status_up_runs = 1, status_run_ts = 200, \
+             last_run_class = 1 WHERE id = 'mon-1'",
+        )
+        .await
+        .unwrap();
+        let (row, _) = check_row(&db).await;
+        assert!(!row.signed);
+        assert_eq!(
+            row.recovered_at, 0,
+            "the older build did not move the stamp"
+        );
+        // The next run of this build assumes a recovery that it cannot see.
+        run_with_jobs(&db, "d2", 300, 1).await;
+        ack(&db, "d2", 0, 3, 310).await;
+        let (row, _) = check_row(&db).await;
+        assert_eq!(row.recovered_at, 310);
+        assert!(row.signed);
     }
 
     #[tokio::test]
@@ -1687,6 +1731,7 @@ mod tests {
                 run_class_at: 100,
                 tested_at: 100,
                 recovered_at: 0,
+                signed: true,
             }
         );
         let run = get_run(&db, "r1").await.unwrap().unwrap();

@@ -970,7 +970,7 @@ pub async fn names_using_template<C: ConnectionTrait>(
 }
 
 /// The status badge and the status page run streaks, as one completed run leaves them.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StatusStreaks {
     pub last_check_status: i32,
     pub down_runs: i32,
@@ -986,6 +986,52 @@ pub struct StatusStreaks {
     /// Finish time of the run that started the current Up streak, in microseconds. It never goes
     /// down, so a false alarm hold that saved an older value ends. 0 = no recovery yet.
     pub recovered_at: i64,
+    /// The row's streaks match `status_streak_sig`, so a writer of this build wrote them. An older
+    /// build does not move the recovery stamp; when it wrote the row, a recovery may be missing
+    /// from the stamp. Always true on a value that this build computes.
+    pub signed: bool,
+}
+
+/// Signature of the streak columns. Every writer of this build stores it with them, and an
+/// older build changes the streaks without it, which [`StatusStreaks::signed`] detects. All zeros,
+/// as on a new check, signs to 0, which is the column default.
+pub fn streak_sig(down_runs: i32, up_runs: i32, run_ts: i64, run_class: i32) -> i64 {
+    if down_runs == 0 && up_runs == 0 && run_ts == 0 && run_class == 0 {
+        return 0;
+    }
+    // FNV-1a over the four values: stable across builds and platforms.
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for v in [down_runs as i64, up_runs as i64, run_ts, run_class as i64] {
+        for b in v.to_le_bytes() {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    // Never 0, so a changed row cannot match the default by chance.
+    ((h >> 1) as i64).max(1)
+}
+
+/// A new check: all zeros, which signs to the column default, so it is signed.
+impl Default for StatusStreaks {
+    fn default() -> Self {
+        Self {
+            last_check_status: 0,
+            down_runs: 0,
+            up_runs: 0,
+            run_ts: 0,
+            run_class: 0,
+            run_class_at: 0,
+            tested_at: 0,
+            recovered_at: 0,
+            signed: true,
+        }
+    }
+}
+
+impl StatusStreaks {
+    fn sig(&self) -> i64 {
+        streak_sig(self.down_runs, self.up_runs, self.run_ts, self.run_class)
+    }
 }
 
 /// Reads the badge and run streaks of one check. `None` when the check is not in this region.
@@ -1003,7 +1049,8 @@ pub async fn get_status_streaks<C: ConnectionTrait>(
         .column(Column::LastRunClassAt)
         .column(Column::LastTestedAt)
         .column(Column::StatusRecoveredAt)
-        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64, i64)>()
+        .column(Column::StatusStreakSig)
+        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
@@ -1016,6 +1063,7 @@ pub async fn get_status_streaks<C: ConnectionTrait>(
             run_class_at,
             tested_at,
             recovered_at,
+            sig,
         )| StatusStreaks {
             last_check_status,
             down_runs,
@@ -1025,6 +1073,7 @@ pub async fn get_status_streaks<C: ConnectionTrait>(
             run_class_at,
             tested_at,
             recovered_at,
+            signed: sig == streak_sig(down_runs, up_runs, run_ts, run_class),
         },
     ))
 }
@@ -1045,8 +1094,9 @@ pub async fn lock_status_streaks<C: ConnectionTrait>(
         .column(Column::LastRunClassAt)
         .column(Column::LastTestedAt)
         .column(Column::StatusRecoveredAt)
+        .column(Column::StatusStreakSig)
         .lock_exclusive()
-        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64, i64)>()
+        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
@@ -1059,6 +1109,7 @@ pub async fn lock_status_streaks<C: ConnectionTrait>(
             run_class_at,
             tested_at,
             recovered_at,
+            sig,
         )| StatusStreaks {
             last_check_status,
             down_runs,
@@ -1068,6 +1119,7 @@ pub async fn lock_status_streaks<C: ConnectionTrait>(
             run_class_at,
             tested_at,
             recovered_at,
+            signed: sig == streak_sig(down_runs, up_runs, run_ts, run_class),
         },
     ))
 }
@@ -1088,7 +1140,8 @@ pub async fn swap_status_streaks<C: ConnectionTrait>(
         .col_expr(Column::LastRunClass, Expr::value(next.run_class))
         .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at))
         .col_expr(Column::LastTestedAt, Expr::value(next.tested_at))
-        .col_expr(Column::StatusRecoveredAt, Expr::value(next.recovered_at));
+        .col_expr(Column::StatusRecoveredAt, Expr::value(next.recovered_at))
+        .col_expr(Column::StatusStreakSig, Expr::value(next.sig()));
     if streaks_differ(expected, next) {
         q = q.col_expr(
             Column::UpdatedAt,
@@ -1127,6 +1180,7 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
         .col_expr(Column::LastRunClass, Expr::value(next.run_class))
         .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at))
         .col_expr(Column::LastTestedAt, Expr::value(next.tested_at))
+        .col_expr(Column::StatusStreakSig, Expr::value(next.sig()))
         .col_expr(
             Column::UpdatedAt,
             Expr::value(config::utils::time::now_micros()),
@@ -1584,6 +1638,7 @@ fn streaks_differ(a: &StatusStreaks, b: &StatusStreaks) -> bool {
         || a.up_runs != b.up_runs
         || a.run_class != b.run_class
         || a.recovered_at != b.recovered_at
+        || a.signed != b.signed
 }
 
 fn check_type_to_str(t: &SyntheticType) -> &'static str {
@@ -1661,6 +1716,7 @@ pub(crate) mod tests {
             last_run_class_at: 0,
             last_tested_at: 0,
             status_recovered_at: 0,
+            status_streak_sig: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
