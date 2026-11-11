@@ -416,28 +416,12 @@ pub fn get_parsed_content(template: &Template) -> Result<Arc<ContentSpec>, serde
 }
 
 async fn check_not_in_use(org_id: &str, name: &str, is_root: bool) -> Result<(), TemplateError> {
-    for dest in DESTINATIONS.iter() {
-        if references_from(org_id, dest.key())
-            && matches!(&dest.module, Module::Alert { template: Some(t), .. } if t == name)
-        {
-            return Err(TemplateError::DeleteWithDestination(visible_name(
-                org_id,
-                dest.key(),
-                &dest.name,
-                is_root,
-            )));
-        }
+    let (destinations, alerts) = cached_references(org_id, name).await;
+    if let Some(by) = visible_reference(&destinations, org_id, is_root) {
+        return Err(TemplateError::DeleteWithDestination(by));
     }
-    let alerts_cache = ALERTS.read().await;
-    for (key, (_folder, alert)) in alerts_cache.iter() {
-        if references_from(org_id, key) && alert.template.as_deref() == Some(name) {
-            return Err(TemplateError::DeleteWithAlert(visible_name(
-                org_id,
-                key,
-                &alert.name,
-                is_root,
-            )));
-        }
+    if let Some(by) = visible_reference(&alerts, org_id, is_root) {
+        return Err(TemplateError::DeleteWithAlert(by));
     }
     Ok(())
 }
@@ -447,14 +431,14 @@ fn cache_key_org(cache_key: &str) -> &str {
     cache_key.split('/').next().unwrap_or_default()
 }
 
-/// A reference's name, or "in another organization" when a non-root caller of `org_id` must
-/// not see it.
-fn visible_name(org_id: &str, cache_key: &str, name: &str, is_root: bool) -> String {
-    if is_root || cache_key_org(cache_key) == org_id {
-        name.to_string()
-    } else {
-        "in another organization".to_string()
+/// How the delete guard names `refs` to the caller: the first name root or a caller of the same
+/// org may see, else a count of the references held by other orgs.
+fn visible_reference(refs: &[(String, String)], org_id: &str, is_root: bool) -> Option<String> {
+    let visible = |org: &str| is_root || org == org_id;
+    if let Some((_, name)) = refs.iter().find(|(org, _)| visible(org)) {
+        return Some(name.clone());
     }
+    (!refs.is_empty()).then(|| format!("{} in another organization", refs.len()))
 }
 
 /// `(org, name)` of cached destinations and alerts that name the template, scoped like the
@@ -704,7 +688,7 @@ mod tests {
         seed_destination("tpl_redact_other", "secret_dest", "tpl_redact_dest");
         assert!(matches!(
             check_not_in_use(DEFAULT_ORG, "tpl_redact_dest", false).await,
-            Err(TemplateError::DeleteWithDestination(d)) if d == "in another organization"
+            Err(TemplateError::DeleteWithDestination(d)) if d == "1 in another organization"
         ));
         assert!(matches!(
             check_not_in_use(DEFAULT_ORG, "tpl_redact_dest", true).await,
@@ -725,11 +709,23 @@ mod tests {
         );
         assert!(matches!(
             check_not_in_use(DEFAULT_ORG, "tpl_redact_alert", false).await,
-            Err(TemplateError::DeleteWithAlert(a)) if a == "in another organization"
+            Err(TemplateError::DeleteWithAlert(a)) if a == "1 in another organization"
         ));
         assert!(matches!(
             check_not_in_use(DEFAULT_ORG, "tpl_redact_alert", true).await,
             Err(TemplateError::DeleteWithAlert(a)) if a == "secret_alert"
+        ));
+        // A same-org reference is named even when another org's is also cached.
+        seed_destination("tpl_redact_other", "secret_mixed", "tpl_redact_mixed");
+        seed_destination(DEFAULT_ORG, "own_mixed", "tpl_redact_mixed");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_mixed", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "own_mixed"
+        ));
+        seed_destination("tpl_redact_other2", "secret_two", "tpl_redact_dest");
+        assert!(matches!(
+            check_not_in_use(DEFAULT_ORG, "tpl_redact_dest", false).await,
+            Err(TemplateError::DeleteWithDestination(d)) if d == "2 in another organization"
         ));
         let (dests, alerts) = cached_references(DEFAULT_ORG, "tpl_redact_alert").await;
         assert!(dests.is_empty());
