@@ -426,6 +426,41 @@ pub async fn all_used_by(org_id: &str) -> Result<HashMap<String, UsedBy>, Templa
     Ok(by_name)
 }
 
+/// The org whose references count for a listed template: its owner, as GET template uses.
+/// A default-org template listed in another org counts references in every org.
+fn usage_owner<'a>(request_org: &'a str, template_org: &'a str) -> &'a str {
+    if template_org.is_empty() {
+        request_org
+    } else {
+        template_org
+    }
+}
+
+/// `used_by` for each listed template, in order. One aggregate per owner org, usually one or two.
+pub async fn list_used_by(
+    request_org: &str,
+    templates: &[Template],
+) -> Result<Vec<UsedBy>, TemplateError> {
+    let mut by_owner: HashMap<String, HashMap<String, UsedBy>> = HashMap::new();
+    for t in templates {
+        let owner = usage_owner(request_org, &t.org_id);
+        if !by_owner.contains_key(owner) {
+            let usage = all_used_by(owner).await?;
+            by_owner.insert(owner.to_string(), usage);
+        }
+    }
+    Ok(templates
+        .iter()
+        .map(|t| {
+            by_owner
+                .get(usage_owner(request_org, &t.org_id))
+                .and_then(|by_name| by_name.get(&t.name))
+                .cloned()
+                .unwrap_or_default()
+        })
+        .collect())
+}
+
 /// A level 1 or level 3 binding must name a user template that applies to `kind`.
 pub async fn check_binding(org_id: &str, name: &str, kind: NotificationKind) -> Result<(), String> {
     let template = db::alerts::templates::get(org_id, name)
@@ -713,6 +748,17 @@ async fn owners_to_disown(org_id: &str, name: &str) -> Result<Vec<String>, Templ
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn usage_owner_is_the_template_org_as_get_template_uses() {
+        // A default-org template listed in org1 counts references in every org, as GET does.
+        assert_eq!(usage_owner("org1", DEFAULT_ORG), DEFAULT_ORG);
+        assert_eq!(usage_owner("org1", "org1"), "org1");
+        // A row with no stored org falls back to the org of the request.
+        assert_eq!(usage_owner("org1", ""), "org1");
+        assert_eq!(binding_scope(DEFAULT_ORG), None);
+        assert_eq!(binding_scope("org1"), Some("org1"));
+    }
 
     fn user(name: &str, kind: TemplateKind, applies_to: Vec<NotificationKind>) -> Template {
         Template {

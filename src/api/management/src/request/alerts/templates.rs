@@ -320,16 +320,15 @@ pub async fn list_templates(
     if !query.include_usage.unwrap_or(false) {
         return MetaHttpResponse::json(data.into_iter().map(Template::from).collect::<Vec<_>>());
     }
-    // The same counts GET template returns, with one query per consumer table for the list.
-    match templates::all_used_by(&org_id).await {
-        Ok(mut by_name) => MetaHttpResponse::json(
+    // The same counts GET template returns, scoped by each template's owner org, with one
+    // query per consumer table and owner for the whole list.
+    match templates::list_used_by(&org_id, &data).await {
+        Ok(used) => MetaHttpResponse::json(
             data.into_iter()
-                .map(|t| {
-                    let used_by = by_name.remove(&t.name).unwrap_or_default();
-                    TemplateWithUsage {
-                        template: Template::from(t),
-                        used_by,
-                    }
+                .zip(used)
+                .map(|(t, used_by)| TemplateWithUsage {
+                    template: Template::from(t),
+                    used_by,
                 })
                 .collect::<Vec<_>>(),
         ),
