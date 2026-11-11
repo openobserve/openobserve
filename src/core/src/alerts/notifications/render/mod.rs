@@ -1389,7 +1389,14 @@ mod tests {
         let linked = card(Some("{op} {v}"), &ctx);
         assert_eq!(
             linked["body"].as_array().unwrap().last().unwrap()["text"],
-            r"\[View\](https://evil.example) 80"
+            r"[View]\(https://evil.example) 80"
+        );
+
+        ctx.rows = vec![serde_json::from_str(r#"{"op":"[prod] CPU high","v":"80"}"#).unwrap()];
+        let plain = card(Some("{op} {v}"), &ctx);
+        assert_eq!(
+            plain["body"].as_array().unwrap().last().unwrap()["text"],
+            "[prod] CPU high 80"
         );
     }
 

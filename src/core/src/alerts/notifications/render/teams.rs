@@ -29,9 +29,10 @@ fn card_text(s: &str) -> String {
     markdown_to_plaintext(s)
 }
 
-/// A raw value in markdown-capable card text, with link brackets escaped so it cannot hide a URL.
+/// A raw value in markdown-capable card text: `](` is broken so it cannot form a link, plain
+/// brackets stay.
 fn card_raw(s: &str) -> String {
-    s.replace('[', "\\[").replace(']', "\\]")
+    s.replace("](", "]\\(")
 }
 
 pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext) -> Value {
