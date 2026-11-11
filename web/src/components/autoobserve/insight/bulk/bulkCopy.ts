@@ -116,6 +116,7 @@ export const serviceLabel = (t: TranslateFn, row: ReviewRow, all: ReviewRow[]): 
 export const blockLine = (t: TranslateFn, row: ReviewRow, all: ReviewRow[] = [row]): I18nText => {
   const block = row.block;
   if (!block) return t("insight.bulk.cantBuild");
+  if (block.code === "exists" || block.code === "existsFailed") return existsLine(t, row)!;
   if (block.code === "checking") return t("insight.bulk.block.checking");
   if (block.code === "measuring") return t("insight.threshold.measuring");
   if (block.code === "schemaFailed") {
@@ -320,6 +321,31 @@ export const partialBanner = (t: TranslateFn, failed: number, total: number): I1
 
 export const createdLine = (t: TranslateFn, locale: string, folders: FolderRef[], count: number) =>
   t("insight.bulk.createdIn", { count, where: whereFolders(t, locale, folders) }, count);
+
+/** How many rows Add left out because their alert already existed when it re-checked. */
+export const skippedLine = (t: TranslateFn, count: number): I18nText =>
+  t("insight.bulk.skipped", { count }, count);
+
+/** Why a row can't be added: its alert already exists, or the org's alerts couldn't be read to tell. */
+export const existsLine = (t: TranslateFn, row: ReviewRow): I18nText | null => {
+  const block = row.block;
+  if (block?.code === "exists") {
+    return t("insight.bulk.block.exists", {
+      name: block.alert.name,
+      folder: block.alert.folderName,
+    });
+  }
+  return block?.code === "existsFailed" ? t("insight.bulk.block.existsFailed") : null;
+};
+
+/** The footer's reason when rows were left out because their alerts already exist. */
+export const existingFooter = (t: TranslateFn, rows: ReviewRow[]): I18nText | null => {
+  const count = rows.filter((r) => r.block?.code === "exists").length;
+  if (!count) return null;
+  return count === rows.length
+    ? t("insight.bulk.existsAll", { count }, count)
+    : t("insight.bulk.existsSome", { count }, count);
+};
 
 /** The success toast, saying until when Undo works. */
 export const toastOf = (t: TranslateFn, locale: string, folders: FolderRef[], count: number) =>

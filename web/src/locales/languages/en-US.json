@@ -13908,6 +13908,8 @@
       "rowTemplateHint": "Each series’ row reads like “reaches 90 in 3 days”. Rows show only in a destination template that includes {'{'}rows{'}'}."
     },
     "prefill": {
+      "addedUnread": "Couldn't read your alerts, so AutoObserve can't tell whether this one was already added. Nothing was saved; save again to retry.",
+      "alreadyAdded": "Already added as {name} in folder {folder}, so this alert wasn't saved again.",
       "dialog": {
         "title": "Add alert",
         "continue": "Continue to alert",
@@ -34377,6 +34379,8 @@
       "block": {
         "checking": "Checking the stream's fields…",
         "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",
+        "exists": "Already added as {name} in folder {folder}.",
+        "existsFailed": "Couldn't read your alerts, so AutoObserve can't tell whether this one was already added. Reopen the review to try again.",
         "noField": {
           "service": "Stream {stream} has no service field, so this alert can't be limited to {value}.",
           "cluster": "Stream {stream} has no cluster field, so this alert can't be limited to cluster {value}.",
@@ -34391,6 +34395,9 @@
       "footerRest": "{count} in {folders} more folders",
       "footerOrigin": "Each description says it came from an AutoObserve suggestion.",
       "footerNone": "Nothing is ticked, so nothing will be created.",
+      "existsAll": "This alert was already added, so there's nothing to add. | All {count} alerts in this list were already added, so there's nothing to add.",
+      "existsSome": "{count} was already added and is left out. | {count} were already added and are left out.",
+      "skipped": "{count} already existed and was skipped. | {count} already existed and were skipped.",
       "create": "Add alerts",
       "cancel": "Cancel",
       "close": "Close",
@@ -34398,7 +34405,8 @@
         "queued": "Waiting",
         "creating": "Creating",
         "created": "Created",
-        "failed": "Not created"
+        "failed": "Not created",
+        "exists": "Already added"
       },
       "partial": "{failed} of {total} alerts wasn't created. | {failed} of {total} alerts weren't created.",
       "createdIn": "{count} was created in {where}. | {count} were created in {where}.",
@@ -34674,6 +34682,7 @@
         "why": "No alert watches {classes}.",
         "next": "Add the alert AutoObserve drafted. | Add the {count} alerts AutoObserve drafted.",
         "needsTraces": "Latency needs traces first.",
+        "groupAdded": "Added alerts for {count} service | Added alerts for {count} services",
         "groupHeadline": "Nothing watches {count} services",
         "groupTraffic": "They handle about {count} events an hour together.",
         "groupNext": "Add the alert AutoObserve drafted. | Add the {count} alerts AutoObserve drafted, in one list grouped by team."
@@ -34725,7 +34734,7 @@
           "latency": "{service}'s latency",
           "absence": "whether {service} stops sending"
         },
-        "justAdded": "Added. AutoObserve counts it at its next check, within about 5 minutes.",
+        "justAdded": "Added. AutoObserve counts it at its next check, within about 5 minutes. | Added. AutoObserve counts them at its next check, within about 5 minutes.",
         "errorsWhy": "No alert watches {service}'s errors.",
         "errorsNext": "Add an errors alert at 3 times its usual rate.",
         "latencyWhy": "No alert watches {service}'s latency.",

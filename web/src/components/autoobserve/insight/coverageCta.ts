@@ -38,7 +38,12 @@ import {
   type BulkRow,
   type StreamFields,
 } from "./bulk/useBulkReview";
-import { KIND_OF_CHECK, serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
+import {
+  KIND_OF_CHECK,
+  addedNote,
+  serviceKeyOf,
+  useRecentlyCreated,
+} from "./bulk/useRecentlyCreated";
 import { draftTarget, type AlertDraft } from "./targets/alertDraft";
 import type { ServiceAddress } from "./targets/serviceAddress";
 import { notifyOf, teamOf, type OwnedAlert } from "./targets/ownership";
@@ -543,7 +548,7 @@ export const cellInsight = (
   const state = cell.engine?.stateKey;
   if (cell.state !== "gap" || state === "covered") return null;
   if (key in KIND_OF_CHECK && justAdded(org, row, key as LiveCheck)) {
-    return partsOf(`${row.service}-${key}`, { why: t("insight.kind.cell.justAdded"), cta: null });
+    return partsOf(`${row.service}-${key}`, { why: addedNote(t), cta: null });
   }
   const copy =
     state === "silent" ? silentCopy(t, row, cell) : gapCopy(t, row, key, org, synthetic, owned);

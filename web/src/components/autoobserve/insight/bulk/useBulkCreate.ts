@@ -13,17 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryClient } from "@/composables/query/queryClient";
-import { autoobserveKeys } from "@/services/autoobserve.querykeys";
 import { reactive, ref } from "vue";
 import type { Router } from "vue-router";
 import alertsService from "@/services/alerts";
 import { toast, type DismissFn } from "@/lib/feedback/Toast/useToast";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
-import type { TranslateFn } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 import { alertBodyFromPrefill } from "./bulkPayload";
-import { toastOf, type FailureReason } from "./bulkCopy";
-import { serviceKeyOf, useRecentlyCreated } from "./useRecentlyCreated";
+import { skippedLine, toastOf, type FailureReason } from "./bulkCopy";
+import { findExisting, loadExistingAlerts, type ExistingAlert } from "./existingAlerts";
+import { refreshAfterAdd, serviceKeyOf, useRecentlyCreated } from "./useRecentlyCreated";
 import { closeBulkReview, type BulkKind, type FolderRef, type ReviewRow } from "./useBulkReview";
 
 // At most this many creates in flight, so a 400-row review never floods the alert API.
@@ -32,7 +31,7 @@ export const CREATE_TIMEOUT_MS = 30_000;
 const DUPLICATE_RX = /already exists|duplicate|unique/i;
 const RETRYABLE_STATUS = new Set([408, 500, 502, 503, 504]);
 
-export type RowStatus = "queued" | "creating" | "created" | "failed";
+export type RowStatus = "queued" | "creating" | "created" | "failed" | "exists";
 
 export interface RowResult {
   status: RowStatus;
@@ -69,6 +68,8 @@ interface Session {
   cancelled: boolean;
   inflight: Promise<void>;
   announced: number;
+  /** Rows Add left out because the org already had their alert when it re-checked. */
+  skipped: number;
 }
 
 export interface BulkCreateDeps {
@@ -137,6 +138,7 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
     cancelled: false,
     inflight: Promise.resolve(),
     announced: 0,
+    skipped: 0,
   });
 
   /** Takes Undo away; the alerts stay. */
@@ -159,12 +161,6 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
   const mayWrite = (s: Session): boolean => {
     if (deps.org() !== s.org) s.cancelled = true;
     return !s.cancelled;
-  };
-
-  // Coverage and the gap suggestions are what the add changes, so the page reads them again.
-  const refreshCoverage = (org: string): void => {
-    void queryClient.invalidateQueries({ queryKey: autoobserveKeys.coverageAll(org) });
-    void queryClient.invalidateQueries({ queryKey: autoobserveKeys.suggestions(org) });
   };
 
   const runJob = async (s: Session, job: Job): Promise<void> => {
@@ -218,7 +214,7 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
         failed += 1;
       }
     });
-    refreshCoverage(s.org);
+    refreshAfterAdd(s.org);
     const { t } = deps;
     toast(
       failed
@@ -235,15 +231,20 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
 
   // One toast holds every batch of the session, since equal toasts collapse and keep the first handler.
   const announce = (s: Session): void => {
+    if (!s.created.length && s.skipped) {
+      toast({ variant: "default", message: skippedLine(deps.t, s.skipped) });
+      return;
+    }
     if (!s.undoable || s.created.length === s.announced) return;
     s.announced = s.created.length;
     const folders = [...new Map(s.created.map((c) => [c.folder.id, c.folder])).values()];
     const previous = s.toast;
     s.toast = null;
     previous?.();
+    const created = toastOf(deps.t, deps.locale(), folders, s.created.length);
     const shown = toast({
       variant: "default",
-      message: toastOf(deps.t, deps.locale(), folders, s.created.length),
+      message: s.skipped ? raw(`${created} ${skippedLine(deps.t, s.skipped)}`) : created,
       timeout: 0,
       action: { label: deps.t("insight.bulk.undo"), handler: () => void undo(s) },
       // A closed toast takes Undo with it, so its ids are never deleted later.
@@ -266,8 +267,30 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
       running.value = false;
     }
     announce(s);
-    if (s.created.length) refreshCoverage(s.org);
-    if (Object.values(results).every((r) => r.status === "created")) closeBulkReview();
+    if (s.created.length || s.skipped) refreshAfterAdd(s.org);
+    if (Object.values(results).every((r) => r.status === "created" || r.status === "exists")) {
+      closeBulkReview();
+    }
+  };
+
+  // Another tab or user may have added some of these since the review opened; an unread list skips nothing.
+  const skipExisting = async (s: Session, list: Job[]): Promise<Job[]> => {
+    const known: ExistingAlert[] | null = await loadExistingAlerts(s.org).catch(() => null);
+    if (!known) return list;
+    return list.filter((job) => {
+      const found = findExisting(known, {
+        name: job.prefill.name ?? "",
+        folderId: job.folder.id,
+        streamType: job.prefill.streamType,
+        streamName: job.prefill.streamName,
+        sql: job.prefill.sql ?? null,
+      });
+      if (!found) return true;
+      results[job.key] = { status: "exists", id: found.id };
+      recently.add(job.serviceKey, job.kind);
+      s.skipped += 1;
+      return false;
+    });
   };
 
   /** Creates exactly the given rows, one POST each, in the org the review shows. */
@@ -296,7 +319,21 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
         : [],
     );
     for (const job of list) jobs.set(job.key, job);
-    await run(session, list);
+    const s = session;
+    s.skipped = 0;
+    running.value = true;
+    for (const job of list) results[job.key] = { status: "queued" };
+    let fresh: Job[];
+    try {
+      fresh = await skipExisting(s, list);
+    } finally {
+      running.value = false;
+    }
+    if (!mayWrite(s)) {
+      for (const job of fresh) delete results[job.key];
+      return;
+    }
+    await run(s, fresh);
   };
 
   /** Re-sends only failed rows a retry can help, in the batch's org; a created row is never sent twice. */

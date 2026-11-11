@@ -18,6 +18,7 @@ import config from "@/aws-exports";
 import { manyRows, m12Rows, sourceRows } from "./bulkFixtures";
 import { suggestErrors, suggestLatency } from "../targets/thresholds";
 import {
+  applyExisting,
   applyRights,
   changeGroup,
   closeBulkReview,
@@ -53,6 +54,7 @@ afterEach(() => {
 describe("useBulkReview — grouping", () => {
   it("groups 12 rows from 3 teams into 3 groups, each with its folder and destinations", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     const groups = review.groups.value;
     expect(groups.map((g) => g.name)).toEqual(["ingest", null, "payments"]);
     expect(groupNamed("ingest").folders).toEqual([{ id: "f-ingest", name: "ingest" }]);
@@ -63,6 +65,7 @@ describe("useBulkReview — grouping", () => {
 
   it("puts services with no team in the org default folder and says so", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     const none = review.groups.value.find((g) => g.key === NO_TEAM)!;
     expect(none.rows).toHaveLength(4);
     expect(none.usesDefault).toBe(true);
@@ -71,6 +74,7 @@ describe("useBulkReview — grouping", () => {
 
   it("regroups by folder and by cluster without losing ticks", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     toggleRow("ingest-c", false);
     const before = [...review.state.ticked].sort();
     setGroupBy("folder");
@@ -82,6 +86,7 @@ describe("useBulkReview — grouping", () => {
 
   it("resolves the folder of every row, not of the first row in its group", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     setGroupBy("cluster");
     const unclustered = review.groups.value.find((g) => g.name === null)!;
     const folders = new Set(unclustered.rows.map((r) => r.folder.id));
@@ -91,6 +96,7 @@ describe("useBulkReview — grouping", () => {
 
   it("keeps a 400-row review open on its first two groups and every total intact", () => {
     openBulkReview({ kind: "no_data", rows: manyRows(IDS) });
+    applyExisting([]);
     const groups = review.groups.value;
     expect(groups).toHaveLength(12);
     expect(groups.filter((g) => review.state.collapsed.has(g.key))).toHaveLength(10);
@@ -100,6 +106,7 @@ describe("useBulkReview — grouping", () => {
 
   it("builds source rows with the source builder, firing after 60 minutes", () => {
     openBulkReview({ kind: "source", rows: sourceRows(3) });
+    applyExisting([]);
     const rows = review.reviewRows.value;
     expect(rows.map((r) => r.service)).toEqual(["cluster-d", "host-c", "host-d"]);
     expect(rows.every((r) => r.prefill?.periodMinutes === 60)).toBe(true);
@@ -110,6 +117,7 @@ describe("useBulkReview — grouping", () => {
 describe("useBulkReview — ticks", () => {
   it("unticking a group unticks its rows, and a mixed group is indeterminate", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     const ingest = groupNamed("ingest");
     expect(groupTick(ingest, review.state.ticked)).toBe(true);
     toggleRow("ingest-b", false);
@@ -121,6 +129,7 @@ describe("useBulkReview — ticks", () => {
 
   it("starts a row the product is unsure about unticked, with its reason", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     const bursty = review.reviewRows.value.find((r) => r.key === "a-none")!;
     expect(bursty.row.unsure?.reason).toMatch(/Sends in bursts/);
     expect(review.state.ticked.has("a-none")).toBe(false);
@@ -129,6 +138,7 @@ describe("useBulkReview — ticks", () => {
 
   it("creates exactly the ticked rows, and none the user unticked", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     toggleRow("ingest-c", false);
     toggleRow("a-none", true);
     const keys = review.toCreate.value.map((r) => r.key);
@@ -139,6 +149,7 @@ describe("useBulkReview — ticks", () => {
 
   it("counts the footer exactly by folder", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     applyRights({ "f-pay": false });
     expect(countByFolder(review.toCreate.value).map((c) => [c.folder.name, c.count])).toEqual([
       ["ingest", 5],
@@ -150,6 +161,7 @@ describe("useBulkReview — ticks", () => {
 describe("useBulkReview — folder rights", () => {
   it("locks and unticks every row in a folder the user can't write to", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     applyRights({ "f-pay": false });
     const pay = groupNamed("payments");
     expect(pay.locked).toBe(true);
@@ -161,6 +173,7 @@ describe("useBulkReview — folder rights", () => {
 
   it("locks nothing while the server serves no rights", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     applyRights(null);
     expect(review.reviewRows.value.some((r) => r.locked)).toBe(false);
     expect(review.toCreate.value).toHaveLength(11);
@@ -168,6 +181,7 @@ describe("useBulkReview — folder rights", () => {
 
   it("moving a locked group to a writable folder unlocks and ticks its rows", () => {
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     applyRights({ "f-pay": false });
     changeGroup(groupNamed("payments"), { id: "f-ops", name: "ops" }, ["ops-webhook"]);
     const moved = review.reviewRows.value.filter((r) => ["j", "e-b", "e-c"].includes(r.key));
@@ -181,6 +195,7 @@ describe("useBulkReview — enterprise gate", () => {
   it("opens nothing on a build without enterprise", () => {
     config.isEnterprise = "false";
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+    applyExisting([]);
     expect(review.state.open).toBe(false);
   });
 });

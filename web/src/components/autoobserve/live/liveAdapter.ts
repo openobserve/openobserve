@@ -684,6 +684,8 @@ const whyAndNext = (t: TranslateFn, parts: Parts): I18nText | null => {
 
 // The drawer's Next step column: the kind's own next step when it has one, else the list's why-and-next.
 const nextLine = (t: TranslateFn, insight: InsightParts, parts: Parts): I18nText | null => {
+  // A card with nothing left to do keeps its one line, such as the just-added note, in the list too.
+  if (!insight.cta && insight.note) return insight.note;
   if (insight.next)
     return insight.why
       ? t("autoobserveLive.suggestions.whyNext", { why: insight.why, next: insight.next })

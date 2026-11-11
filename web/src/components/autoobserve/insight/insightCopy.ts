@@ -598,7 +598,7 @@ const todayParts = (
     next: kind?.next ?? null,
     cta,
     secondary: kind?.secondary ?? [],
-    note: cta?.note ?? null,
+    note: cta?.note ?? kind?.note ?? null,
     facts: today.tags,
     // The list's own line (place and volume) moves to Details when the kind words its why itself.
     meta: kind && "why" in kind ? today.why : null,
@@ -632,7 +632,7 @@ export const gapGroupInsight = (
     next: kind.next,
     cta: kind.cta,
     secondary: kind.secondary,
-    note: kind.cta?.note ?? null,
+    note: kind.cta?.note ?? kind.note ?? null,
     facts: [],
     meta: null,
     dismissable: null,

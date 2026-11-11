@@ -30,6 +30,10 @@ import { writeAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { noDataAlert, type AutoObserveAlertOptions } from "@/utils/alerts/prefill/fromAutoObserve";
 import { destinationHandoff } from "@/components/autoobserve/insight/targets/editTargets";
 import { byTest } from "@/test/unit/helpers/draftDom";
+import {
+  serviceKeyOf,
+  useRecentlyCreated,
+} from "@/components/autoobserve/insight/bulk/useRecentlyCreated";
 import AddAlert from "./AddAlert.vue";
 
 vi.mock("@/aws-exports", async (importOriginal) => {
@@ -406,6 +410,67 @@ describe("AddAlert with an AutoObserve prefill", () => {
       await flushPromises();
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       expect(blockedToast()).toBeDefined();
+    });
+
+    describe("a draft the org already has is not saved twice", () => {
+      const recently = useRecentlyCreated();
+      const submit = async () => {
+        await wrapper!.findComponent({ name: "OForm" }).find("form").trigger("submit");
+        await flushPromises();
+        await flushPromises();
+      };
+      const listed = (name: string) => ({
+        data: {
+          list: [
+            {
+              alert_id: "3Lwzv5LmG19lvOBHqrZ0n5TxzRR",
+              name,
+              folder_id: "ops",
+              folder_name: "ops",
+              stream_type: "logs",
+              stream_name: "elsewhere",
+              condition: { sql: "SELECT 1" },
+            },
+          ],
+        },
+      });
+      afterEach(() => recently.clearOnPass("default", Number.MAX_SAFE_INTEGER));
+
+      it("Save checks the org's alerts first and saves nothing when the same name is in the folder", async () => {
+        reach(true, true);
+        await openNoDataPrefill();
+        vi.mocked(alertsService.listByFolderId).mockResolvedValue(
+          listed(vm().formData.name) as any,
+        );
+        vi.mocked(alertsService.create_by_alert_id).mockClear();
+        vi.mocked(toast).mockClear();
+        await submit();
+        await vi.waitFor(() =>
+          expect(toastMessages().some((m) => String(m).startsWith("Already added as"))).toBe(true),
+        );
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+        const shown = vi
+          .mocked(toast)
+          .mock.calls.map(([o]) => o as { message: string; variant?: string; action?: unknown })
+          .find((o) => String(o.message).startsWith("Already added as"));
+        expect(shown?.variant).toBe("warning");
+        expect(String(shown?.message)).toBe(
+          `Already added as ${vm().formData.name} in folder ops, so this alert wasn't saved again.`,
+        );
+        expect(shown?.action).toBeDefined();
+      });
+
+      it("a saved draft is remembered, so AutoObserve stops offering it before the next check", async () => {
+        reach(true, true);
+        await openNoDataPrefill();
+        vi.mocked(alertsService.listByFolderId).mockResolvedValue({ data: { list: [] } } as any);
+        vi.mocked(alertsService.create_by_alert_id).mockClear();
+        await submit();
+        await vi.waitFor(() => expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1));
+        await flushPromises();
+        const org = store.state.selectedOrganization.identifier;
+        expect(recently.has(serviceKeyOf(org, "svc-ingest-b", null, null), "no_data")).toBe(true);
+      });
     });
 
     it("tells the destination field it is required for an AutoObserve draft", async () => {

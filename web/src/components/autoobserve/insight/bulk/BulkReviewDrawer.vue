@@ -170,15 +170,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ compactLine(row) }}
             </span>
+            <div
+              v-if="row.block?.code === 'exists'"
+              class="flex min-w-0 items-center gap-2"
+              :data-test="`bulk-review-exists-${row.key}`"
+            >
+              <OTruncatedText :lines="1" class="text-text-secondary min-w-0 text-xs">
+                {{ blockLine(t, row, reviewRows) }}
+              </OTruncatedText>
+              <OButton
+                variant="ghost-primary"
+                size="xs"
+                class="shrink-0"
+                :data-test="`bulk-review-open-added-${row.key}`"
+                @click="openAdded(row.block.alert)"
+              >
+                {{ t("insight.bulk.openExisting") }}
+              </OButton>
+            </div>
             <!-- On a wide screen a waiting or threshold row stays one line; Fires when and Usually say why. -->
             <OTruncatedText
-              v-if="
+              v-else-if="
                 (!row.prefill || row.block) && (isMobile || !(waits(row) || asksThreshold(row)))
               "
               :lines="isMobile ? 2 : 1"
               :class="[
                 'text-xs',
-                row.block?.code === 'schemaFailed'
+                row.block?.code === 'schemaFailed' || row.block?.code === 'existsFailed'
                   ? 'text-status-error-text'
                   : 'text-text-secondary',
               ]"
@@ -363,6 +381,7 @@ import BulkRowMark from "./BulkRowMark.vue";
 import {
   blockLine,
   createdLine,
+  existingFooter,
   failureLine,
   firesWhenOf,
   footerOf,
@@ -375,6 +394,7 @@ import {
   type FailureReason,
 } from "./bulkCopy";
 import { useBulkCreate } from "./useBulkCreate";
+import { existingAlertRoute, type ExistingAlert } from "./existingAlerts";
 import {
   DEFAULT_FOLDER,
   changeGroup,
@@ -451,9 +471,14 @@ const title = computed(() =>
 );
 const rule = computed(() => ruleOf(t, kind.value, reviewRows.value));
 const rights = computed(() => rightsBanner(t, locale.value, reviewRows.value));
-const footer = computed(() =>
-  done.value ? raw("") : footerOf(t, locale.value, countByFolder(tickedRows.value)),
-);
+const footer = computed(() => {
+  if (done.value) return raw("");
+  const existing = existingFooter(t, reviewRows.value);
+  // When every draft already exists, that is the reason nothing can be added.
+  if (existing && reviewRows.value.every((r) => r.block?.code === "exists")) return existing;
+  const counts = footerOf(t, locale.value, countByFolder(tickedRows.value));
+  return existing ? raw(`${counts} ${existing}`) : counts;
+});
 
 const groupByOptions = computed(() =>
   (["team", "folder", "cluster"] as GroupBy[]).map((value) => ({
@@ -560,6 +585,11 @@ const createTicked = () => create(kind.value, toCreate.value);
 const openOncallSetup = () => {
   closeBulkReview();
   router.push({ name: "onCallTeams", query: { org_identifier: org() } });
+};
+
+const openAdded = (alert: ExistingAlert) => {
+  closeBulkReview();
+  router.push(existingAlertRoute(org(), alert));
 };
 
 const openExisting = async (row: ReviewRow) => {

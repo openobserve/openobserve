@@ -24,8 +24,10 @@ import { measuredThreshold } from "../targets/thresholds";
 import { loadOwnedAlerts, notifyOf, teamOf } from "../targets/ownership";
 import destinationService from "@/services/alert_destination";
 import streamService from "@/services/stream";
+import { findExisting, loadExistingAlerts, type ExistingAlert } from "./existingAlerts";
 import {
   SERVICE_FIELDS,
+  draftNameOf,
   errorsAlert,
   latencyAlert,
   noDataAlert,
@@ -55,7 +57,12 @@ export type RowBlock =
   | { code: "measuring" }
   | { code: "schemaFailed" }
   | { code: "noBaseline"; kind: "errors" | "latency" }
-  | { code: "noField"; part: "service" | "cluster" | "namespace"; value: string };
+  | { code: "noField"; part: "service" | "cluster" | "namespace"; value: string }
+  | { code: "exists"; alert: ExistingAlert }
+  | { code: "existsFailed" };
+
+/** The org's alerts a review checks its drafts against: null while they load, "failed" when they can't be read. */
+export type ExistingCheck = ExistingAlert[] | null | "failed";
 
 /** Stream fields by `type/name`; null when they could not be read. */
 export type StreamSchemas = Record<string, string[] | null>;
@@ -161,6 +168,7 @@ const state = reactive({
   thresholds: {} as Record<string, number>,
   /** Team and destination read from each row's own alerts, keyed by row. */
   owned: {} as Record<string, Pick<BulkRow, "team" | "notify">>,
+  existing: null as ExistingCheck,
   opener: null as HTMLElement | null,
 });
 
@@ -350,6 +358,18 @@ const baselineRequestOf = (
   return sql ? { kind, stream: scope.stream, sql } : null;
 };
 
+/** An alert the org already has wins over every other reason; until the list is read a buildable row waits for it. */
+const existingBlock = (
+  existing: ExistingCheck,
+  checked: Checked,
+  draft: Parameters<typeof findExisting>[1],
+): RowBlock | null => {
+  if (existing === null) return checked.block ?? { code: "checking" };
+  if (existing === "failed") return checked.block ?? { code: "existsFailed" };
+  const alert = findExisting(existing, draft);
+  return alert ? { code: "exists", alert } : checked.block;
+};
+
 const folderName = (id: string, team: TeamPick | undefined, folders: FolderRef[]): string =>
   folders.find((f) => f.id === id)?.name ??
   (id === DEFAULT_FOLDER.id
@@ -368,6 +388,8 @@ export const reviewRowsOf = (
     baselines?: RowBaselines;
     thresholds?: Record<string, number>;
     owned?: Record<string, Pick<BulkRow, "team" | "notify">>;
+    /** Left out, nothing is checked; the review always passes it. */
+    existing?: ExistingCheck;
   },
 ): ReviewRow[] =>
   request.rows.map((given) => {
@@ -380,12 +402,25 @@ export const reviewRowsOf = (
       id: folderId,
       name: folderName(folderId, row.team, ctx.folders),
     };
-    const { prefill, block, usual, threshold } = checkedPrefill(row.kind ?? request.kind, row, {
+    const kind = row.kind ?? request.kind;
+    const checked = checkedPrefill(kind, row, {
       schemas: ctx.schemas ?? {},
       types: ctx.types ?? {},
       baselines: ctx.baselines ?? {},
       thresholds: ctx.thresholds ?? {},
     });
+    const { prefill, usual, threshold } = checked;
+    const block =
+      ctx.existing === undefined
+        ? checked.block
+        : existingBlock(ctx.existing, checked, {
+            name: prefill?.name || draftNameOf(scope, kind),
+            folderId: folder.id,
+            streamType: scope.stream.type,
+            streamName: scope.stream.name,
+            // A row still waiting for its fields has a provisional query, which may match the wrong alert.
+            sql: waiting(checked.block) ? null : (prefill?.sql ?? null),
+          });
     return {
       key: row.key,
       row,
@@ -507,6 +542,7 @@ const reviewRows = computed(() =>
         baselines: state.baselines,
         thresholds: state.thresholds,
         owned: state.owned,
+        existing: state.existing,
       })
     : [],
 );
@@ -535,6 +571,7 @@ export const openBulkReview = (request: BulkReviewRequest): void => {
   state.baselines = {};
   state.thresholds = {};
   state.owned = {};
+  state.existing = null;
   state.ticked = startTicks(reviewRows.value);
   collapseDefaults();
   state.open = true;
@@ -629,11 +666,18 @@ export const loadReviewContext = async (org: string): Promise<void> => {
     state.folders = [];
     state.destinations = [];
   }
+  // Applied on arrival, so a slow stream read never holds back the rows the org already has.
+  const existing = loadExistingAlerts(org).then(
+    (list): ExistingCheck => list,
+    (): ExistingCheck => "failed",
+  );
+  void existing.then((found) => load === contextLoad && applyExisting(found));
   const [folders, rights, schemas, owned] = await Promise.allSettled([
     commonService.list_Folders(org, "alerts", { skipAccessToast: true }),
     rightsSource(org),
     readSchemas(org, load),
     readOwnership(org, state.request?.rows ?? []),
+    existing,
   ]);
   if (load !== contextLoad) return;
   if (owned.status === "fulfilled") applyOwnership(owned.value);
@@ -700,6 +744,16 @@ export const loadDestinations = async (org: string): Promise<void> => {
   if (org !== state.org) return;
   const list = res.data?.list ?? res.data ?? [];
   state.destinations = (Array.isArray(list) ? list : []).map((d: any) => d.name);
+};
+
+/** Sets the org's alerts the drafts were checked against and unticks every row that already exists or can't be checked. */
+export const applyExisting = (existing: ExistingCheck): void => {
+  state.existing = existing;
+  for (const row of reviewRows.value) {
+    if (row.block?.code === "exists" || row.block?.code === "existsFailed") {
+      state.ticked.delete(row.key);
+    }
+  }
 };
 
 /** Sets the folder write rights and unticks every row they lock. */

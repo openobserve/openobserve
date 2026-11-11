@@ -32,6 +32,7 @@ import { draftTarget } from "./targets/alertDraft";
 import { logsForSources } from "./targets/logsTargets";
 import { notifyOf, teamOf } from "./targets/ownership";
 import type { BulkKind, BulkRow } from "./bulk/useBulkReview";
+import { addedNote, serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import { insightCtaLabel, type AiFinding, type CtaAction } from "./insightCta";
 import {
   destinationsTarget,
@@ -57,6 +58,8 @@ export interface KindCopy {
   cta: InsightCta | null;
   secondary: InsightCta[];
   ai: AiFinding | null;
+  /** The card's one line under its actions when it has no CTA to carry one. */
+  note?: I18nText | null;
 }
 
 /** Who a paged finding reached; `routing` asks for the on-call routing CTA. */
@@ -87,6 +90,8 @@ export const GAP_GROUP_AT = 6;
 const GROUP_NAMES = 3;
 
 const NO_DATA_MINUTES = 15;
+
+const recently = useRecentlyCreated();
 
 const str = (value: unknown) => (typeof value === "string" ? value : "");
 const num = (value: unknown) =>
@@ -197,8 +202,8 @@ const serviceRoute = (s: AutoObserveSuggestion): InsightTarget => ({
 
 const DRAFT_ORDER: BulkKind[] = ["errors", "latency", "no_data"];
 
-/** The alerts a gap service still needs drafted: errors and no-data on its rows, latency on its traces. */
-const draftsOf = (row: AutoObserveCoverageRow, missing: GapClass[]): BulkKind[] => {
+/** The alerts a gap service needs drafted: errors and no-data on its rows, latency on its traces. */
+const allDraftsOf = (row: AutoObserveCoverageRow, missing: GapClass[]): BulkKind[] => {
   if (!rowStream(row)) return [];
   const kinds: BulkKind[] = [];
   if (missing.includes("errors")) kinds.push("errors");
@@ -206,6 +211,23 @@ const draftsOf = (row: AutoObserveCoverageRow, missing: GapClass[]): BulkKind[] 
   if (missing.includes("absence")) kinds.push("no_data");
   return DRAFT_ORDER.filter((k) => kinds.includes(k));
 };
+
+/** A service's drafts split into those still to add and those added here that no pass has counted yet. */
+const draftsOf = (
+  org: string,
+  row: AutoObserveCoverageRow,
+  missing: GapClass[],
+): { open: BulkKind[]; added: BulkKind[] } => {
+  const key = serviceKeyOf(org, row.service_name, row.cluster, row.namespace);
+  const all = allDraftsOf(row, missing);
+  const added = all.filter((kind) => recently.has(key, kind));
+  return { open: all.filter((kind) => !added.includes(kind)), added };
+};
+
+const addedChip = (t: TranslateFn): NonNullable<KindCopy["chip"]> => ({
+  label: t("autoobserveLive.cell.added"),
+  tone: "info",
+});
 
 // Errors and latency rows carry no usual level: the review list measures it over 7 days when it opens.
 const bulkRow = (row: AutoObserveCoverageRow, kind: BulkKind): BulkRow => ({
@@ -272,7 +294,10 @@ const gapCopy = (
   const cells = cellsOf(s);
   const missing = GAP_CLASSES.filter((c) => cells[c]?.state !== "covered");
   const row = rowOf(t, s, ctx);
-  const drafts = row ? draftsOf(row, missing) : [];
+  const split = row ? draftsOf(s.org, row, missing) : { open: [], added: [] };
+  const drafts = split.open;
+  // Every draft was just added, so the card says so instead of offering them again.
+  const added = !drafts.length && split.added.length > 0;
   const traces = row ? !!streamOf(row, "traces") : true;
   const latencyBlocked = missing.includes("latency") && !traces;
   const stream = row ? rowStream(row) : null;
@@ -285,20 +310,24 @@ const gapCopy = (
       : "",
     latencyBlocked ? String(t("insight.kind.coverage_gap.needsTraces")) : "",
   ].filter(Boolean);
-  const cta =
-    row && drafts.length ? draftCta(t, row, drafts) : ctaOf(t, "openService", serviceRoute(s));
+  const cta = added
+    ? null
+    : row && drafts.length
+      ? draftCta(t, row, drafts)
+      : ctaOf(t, "openService", serviceRoute(s));
   const secondary = [
     ...(cta?.action === "openService" ? [] : [ctaOf(t, "openService", serviceRoute(s))]),
     ...(latencyBlocked ? [setUpTraces(t, s)] : []),
   ];
   const traffic = num(s.evidence.traffic_per_hour);
   return {
-    chip: { label: t("insight.kind.chip.notWatched"), tone: "gap" },
+    chip: added ? addedChip(t) : { label: t("insight.kind.chip.notWatched"), tone: "gap" },
     headline: t("insight.kind.coverage_gap.headline", { service: raw(service) }),
     why,
     whyDetail: gapDetail(t, missing, latencyBlocked, service),
-    next: nextParts.length ? raw(nextParts.join(" ")) : null,
+    next: !added && nextParts.length ? raw(nextParts.join(" ")) : null,
     cta,
+    note: added ? addedNote(t, split.added.length) : null,
     secondary,
     ai: {
       kind: s.kind,
@@ -750,6 +779,24 @@ const heartbeatCopy = (
   };
 };
 
+/** The first few gap services by name, then "and N more" up to `count`. */
+const groupNames = (
+  t: TranslateFn,
+  zone: InsightZone,
+  gaps: { s: AutoObserveSuggestion }[],
+  count: number,
+): { shown: string[]; named: I18nText } => {
+  const names = gaps.map(({ s }) => {
+    const namespace = s.subject.key_dims.k8s_namespace_name;
+    return namespace ? `${serviceOf(s)} (${namespace})` : serviceOf(s);
+  });
+  const shown = names.slice(0, GROUP_NAMES);
+  const rest = count - shown.length;
+  const more =
+    rest > 0 ? [String(t("autoobserveLive.suggestions.moreNames", { count: rest }, rest))] : [];
+  return { shown, named: listOf(zone.locale, [...shown, ...more], "conjunction") };
+};
+
 /** The one card for many coverage gaps: three names and a count, one review list, Review services and Ask AI. */
 export const gapGroupCopy = (
   t: TranslateFn,
@@ -758,28 +805,24 @@ export const gapGroupCopy = (
   ctx: CtaContext,
   total: number = gaps.length,
 ): KindCopy => {
-  const names = gaps.map((s) => {
-    const namespace = s.subject.key_dims.k8s_namespace_name;
-    return namespace ? `${serviceOf(s)} (${namespace})` : serviceOf(s);
-  });
-  const shown = names.slice(0, GROUP_NAMES);
-  const rest = Math.max(total, names.length) - shown.length;
-  const named = listOf(
-    zone.locale,
-    [
-      ...shown,
-      ...(rest > 0
-        ? [String(t("autoobserveLive.suggestions.moreNames", { count: rest }, rest))]
-        : []),
-    ],
-    "conjunction",
-  );
-  const traffic = gaps.reduce((sum, s) => sum + (num(s.evidence.traffic_per_hour) ?? 0), 0);
-  const rows = gaps.flatMap((s) => {
+  const drafted = gaps.map((s) => {
     const row = rowOf(t, s, ctx);
     const missing = GAP_CLASSES.filter((c) => cellsOf(s)[c]?.state !== "covered");
-    return row ? draftsOf(row, missing).map((kind) => bulkRow(row, kind)) : [];
+    return { s, row, ...(row ? draftsOf(s.org, row, missing) : { open: [], added: [] }) };
   });
+  // A service with a just-added alert reads as watched on the coverage page, so the card stops counting it.
+  const pending = drafted.filter((d) => !d.added.length);
+  const addedAlerts = drafted.reduce((sum, d) => sum + d.added.length, 0);
+  const left = Math.max(total, gaps.length) - (drafted.length - pending.length);
+  if (left <= 0 && addedAlerts > 0) {
+    const all = groupNames(t, zone, drafted, drafted.length);
+    return groupAddedCopy(t, drafted.length, addedAlerts, all.named);
+  }
+  const { shown, named } = groupNames(t, zone, pending, left);
+  const traffic = pending.reduce((sum, { s }) => sum + (num(s.evidence.traffic_per_hour) ?? 0), 0);
+  const rows = drafted.flatMap(({ row, open }) =>
+    row ? open.map((kind) => bulkRow(row, kind)) : [],
+  );
   // Two suggestions can resolve to one coverage row, and a review row's key must stay unique.
   const unique = [...new Map(rows.map((r) => [r.key, r])).values()];
   const review = ctaOf(t, "reviewServices", {
@@ -803,7 +846,7 @@ export const gapGroupCopy = (
     : null;
   return {
     chip: { label: t("insight.kind.chip.notWatched"), tone: "gap" },
-    headline: t("insight.kind.coverage_gap.groupHeadline", { count: total }),
+    headline: t("insight.kind.coverage_gap.groupHeadline", { count: left }),
     why: raw(
       [
         `${named}.`,
@@ -826,16 +869,34 @@ export const gapGroupCopy = (
       kind: "coverage_gap",
       subject: String(named),
       request: t("insight.ai.coverage_gap.groupAsk", {
-        count: total,
+        count: left,
         names: listOf(zone.locale, shown, "conjunction"),
       }),
       facts: [
-        ["Services not watched", String(total)],
+        ["Services not watched", String(left)],
         ["First services", shown.join(", ")],
       ],
     },
   };
 };
+
+/** The group card once every gap service has a just-added alert: no Review button until a pass counts them. */
+const groupAddedCopy = (
+  t: TranslateFn,
+  services: number,
+  alerts: number,
+  named: I18nText,
+): KindCopy => ({
+  chip: addedChip(t),
+  headline: t("insight.kind.coverage_gap.groupAdded", { count: services }, services),
+  why: raw(`${named}.`),
+  whyDetail: null,
+  next: null,
+  cta: null,
+  note: addedNote(t, alerts),
+  secondary: [],
+  ai: null,
+});
 
 const PAGED_KINDS = ["stream_silence", "stream_drop", "stream_rise"] as const;
 

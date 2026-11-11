@@ -112,6 +112,11 @@ import type {
 import { isEditHandoffPrefill } from "@/utils/alerts/alertEditHandoff";
 import { AUTOOBSERVE_SOURCE } from "@/utils/alerts/prefill/fromAutoObserve";
 import {
+  existingAlertRoute,
+  existingForSave,
+} from "@/components/autoobserve/insight/bulk/existingAlerts";
+import { noteSavedDraft } from "@/components/autoobserve/insight/bulk/useRecentlyCreated";
+import {
   forecastModeFields,
   parseForecastAlertPromql,
   type ForecastAlert,
@@ -826,6 +831,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
   // The surface that seeded this form, so a source can hold the form to its own rules.
   const prefillSource = ref<string | null>(null);
+  // The service and check an AutoObserve draft was built for, remembered once it is saved.
+  const prefillMeta = ref<Record<string, unknown> | null>(null);
   // An AutoObserve draft must reach a person: a target of its own, or an incident that pages on-call.
   const autoObserveDraft = computed(
     () => prefillSource.value === AUTOOBSERVE_SOURCE && !beingUpdated.value,
@@ -844,6 +851,30 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       !silentAutoObserveDraft.value &&
       !hasDeliveryTarget(formData.value ?? {}),
   );
+  /** An AutoObserve draft whose alert the org already has, from any tab or user, is not saved twice. */
+  const blockAddedDraft = async (values: any): Promise<boolean> => {
+    if (!autoObserveDraft.value) return false;
+    const org = store.state.selectedOrganization.identifier;
+    const folder = Array.isArray(activeFolderId.value)
+      ? activeFolderId.value[0]
+      : activeFolderId.value;
+    const found = await existingForSave(org, values ?? {}, String(folder || "default"));
+    if (!found) return false;
+    if (found === "unread") {
+      toast({ variant: "error", message: t("alerts.prefill.addedUnread") });
+      return true;
+    }
+    toast({
+      variant: "warning",
+      message: t("alerts.prefill.alreadyAdded", { name: found.name, folder: found.folderName }),
+      action: {
+        label: t("insight.bulk.openExisting"),
+        handler: () => void router.push(existingAlertRoute(org, found)),
+      },
+    });
+    return true;
+  };
+
   /** Every save path (button, Enter, leave dialog, JSON) stops here, so the rule holds on all of them. */
   const blockSilentDraft = (values: unknown): boolean => {
     if (
@@ -1875,6 +1906,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
     })();
     if (parsed && blockSilentDraft(parsed)) return;
+    if (parsed && (await blockAddedDraft(parsed))) return;
     const saveContext: SaveAlertContext = {
       store,
       t,
@@ -1979,6 +2011,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       prefillWarnings.value = prefill.warnings ?? [];
       prefillSource.value = prefill.source;
+      prefillMeta.value = prefill.meta ?? null;
 
       toast({
         variant: "success",
@@ -2591,6 +2624,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       });
       return request;
     } else {
+      if (await blockAddedDraft(payload)) {
+        dismiss();
+        return false;
+      }
+      const savedDraft = autoObserveDraft.value ? prefillMeta.value : null;
       payload.folder_id = activeFolderId.value;
       callAlert = alertsService.create_by_alert_id(
         store.state.selectedOrganization.identifier,
@@ -2612,6 +2650,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ? t("alerts.messages.alertSavedNoDestination")
               : t("alerts.messages.alertSaved"),
           });
+          noteSavedDraft(store.state.selectedOrganization.identifier, savedDraft);
           showSaveWarnings(res);
         })
         .catch((err: any) => {

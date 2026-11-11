@@ -18,11 +18,17 @@ import { flushPromises } from "@vue/test-utils";
 import config from "@/aws-exports";
 import type { BulkRow } from "./useBulkReview";
 
-const api = vi.hoisted(() => ({ folders: vi.fn(), destinations: vi.fn(), schema: vi.fn() }));
+const api = vi.hoisted(() => ({
+  folders: vi.fn(),
+  destinations: vi.fn(),
+  schema: vi.fn(),
+  alerts: vi.fn(),
+}));
 
 vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }));
 vi.mock("@/services/alert_destination", () => ({ default: { list: api.destinations } }));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
+vi.mock("@/services/alerts", () => ({ default: { listByFolderId: api.alerts } }));
 const measureBaseline = vi.hoisted(() => vi.fn());
 vi.mock("../targets/baseline", () => ({
   measureBaseline: (...a: unknown[]) => measureBaseline(...a),
@@ -70,6 +76,7 @@ beforeEach(() => {
   api.folders.mockReset().mockResolvedValue(folderList());
   api.destinations.mockReset().mockResolvedValue({ data: { list: [] } });
   api.schema.mockReset().mockResolvedValue(fields("service_name"));
+  api.alerts.mockReset().mockResolvedValue({ data: { list: [] } });
   setFolderRightsSource(null);
   measureBaseline.mockReset();
 });

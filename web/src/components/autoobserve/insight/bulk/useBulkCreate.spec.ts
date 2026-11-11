@@ -26,6 +26,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { autoobserveKeys } from "@/services/autoobserve.querykeys";
 import { useRecentlyCreated, serviceKeyOf } from "./useRecentlyCreated";
 import {
+  applyExisting,
   applyRights,
   closeBulkReview,
   openBulkReview,
@@ -95,6 +96,7 @@ beforeEach(async () => {
   });
   await router.push("/a");
   openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+  applyExisting([]);
 });
 
 afterEach(() => {

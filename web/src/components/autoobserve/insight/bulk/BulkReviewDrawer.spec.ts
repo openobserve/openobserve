@@ -788,3 +788,70 @@ describe("BulkReviewDrawer — AutoObserve is the destination", () => {
     expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe("BulkReviewDrawer — drafts the org already has", () => {
+  const existing = (name: string, folder: string, folderName: string, id: string) => ({
+    alert_id: id,
+    name,
+    folder_id: folder,
+    folder_name: folderName,
+    stream_type: "logs",
+    stream_name: "other",
+    condition: { sql: "SELECT 1" },
+  });
+
+  it("shows an added draft as Already added with a link, unticked and left out of Add", async () => {
+    api.list.mockResolvedValue({
+      data: { list: [existing("svc-ingest-b-no-data", "f-ingest", "ingest", "al-b")] },
+    });
+    await mountDrawer();
+    await openWith(m12Rows(IDS).slice(0, 2));
+    expect(text("bulk-review-exists-ingest-b")).toContain(
+      "Already added as svc-ingest-b-no-data in folder ingest.",
+    );
+    expect((q("bulk-review-tick-ingest-b") as HTMLElement).querySelector("button")?.disabled).toBe(
+      true,
+    );
+    expect(review.toCreate.value.map((r) => r.key)).toEqual(["ingest-c"]);
+    expect(text("bulk-review-footer")).toBe(
+      "1 alert will be created in folder ingest. 1 was already added and is left out. Each description says it came from an AutoObserve suggestion.",
+    );
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    await click("bulk-review-open-added-ingest-b");
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ alert_id: "al-b", folder: "f-ingest", action: "update" }),
+      }),
+    );
+    push.mockRestore();
+    expect(review.state.open).toBe(false);
+  });
+
+  it("disables Add with the reason when every draft was already added", async () => {
+    api.list.mockResolvedValue({
+      data: {
+        list: [
+          existing("svc-ingest-b-no-data", "f-ingest", "ingest", "al-b"),
+          existing("svc-ingest-c-no-data", "f-ingest", "ingest", "al-c"),
+        ],
+      },
+    });
+    await mountDrawer();
+    await openWith(m12Rows(IDS).slice(0, 2));
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(true);
+    expect(text("bulk-review-footer")).toBe(
+      "All 2 alerts in this list were already added, so there's nothing to add.",
+    );
+  });
+
+  it("says in red that nothing can be checked when the alerts list fails", async () => {
+    api.list.mockRejectedValue(httpError(500));
+    await mountDrawer();
+    await openWith(m12Rows(IDS).slice(0, 1));
+    expect((q("bulk-review-create") as HTMLButtonElement).disabled).toBe(true);
+    const line = q("bulk-review-cant-ingest-b")!;
+    expect(line.className).toContain("text-status-error-text");
+    expect(line.textContent).toContain("Couldn't read your alerts");
+  });
+});

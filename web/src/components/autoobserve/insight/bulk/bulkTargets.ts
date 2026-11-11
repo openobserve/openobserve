@@ -145,6 +145,17 @@ const errorPredicate = (pick: FieldPick): string => {
 const scopeName = (s: ServiceScope): string =>
   [s.service, s.cluster, s.namespace].filter(Boolean).join("-");
 
+const NAME_SUFFIX = { no_data: "no-data", errors: "errors", latency: "latency" } as const;
+
+/** The name a review row's alert is created under, known before its threshold is measured. */
+export const draftNameOf = (
+  scope: ServiceScope | SourceScope,
+  kind: "no_data" | "errors" | "latency" | "source",
+): string =>
+  "field" in scope
+    ? `${scope.value}-no-data`
+    : `${scopeName(scope)}-${NAME_SUFFIX[kind === "source" ? "no_data" : kind]}`;
+
 const today = (): string => new Date().toISOString().slice(0, 10);
 
 const origin = (what: string): string =>
@@ -192,7 +203,7 @@ export const noDataAlert = (s: ServiceScope, o: BuilderOptions): AlertPrefill | 
         absencePrefill(
           s.stream,
           where,
-          `${scopeName(s)}-no-data`,
+          draftNameOf(s, "no_data"),
           s.service,
           o.minutes ?? NO_DATA_MINUTES,
         ),
@@ -205,7 +216,7 @@ export const sourceNoDataAlert = (m: SourceScope, o: BuilderOptions): AlertPrefi
     ? absencePrefill(
         m.stream,
         `${quoteField(m.field)} = ${literal(m.value)}`,
-        `${m.value}-no-data`,
+        draftNameOf(m, "source"),
         m.value,
         o.minutes ?? SOURCE_MINUTES,
       )
@@ -229,7 +240,7 @@ export const errorsAlert = (
     const filter = `${where} AND ${errorPredicate(pick)}`;
     return {
       ...absencePrefill(s.stream, filter, "", s.service, 60),
-      name: `${scopeName(s)}-errors`,
+      name: draftNameOf(s, "errors"),
       sql: `SELECT count(*) AS errors FROM ${quoteStream(s.stream.name)} WHERE ${filter} HAVING count(*) > ${threshold}`,
     };
   });
@@ -245,7 +256,7 @@ export const latencyAlert = (
   const field = quoteField(o.durationField);
   return scopedPrefill(serviceScope(s), (where) => ({
     ...absencePrefill(s.stream, where, "", s.service, NO_DATA_MINUTES),
-    name: `${scopeName(s)}-latency`,
+    name: draftNameOf(s, "latency"),
     sql: `SELECT approx_percentile_cont(${field}, 0.95) AS p95 FROM ${quoteStream(s.stream.name)} WHERE ${where} HAVING approx_percentile_cont(${field}, 0.95) > ${thresholdMs * 1000}`,
   }));
 };

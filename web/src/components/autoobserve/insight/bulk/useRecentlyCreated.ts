@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive } from "vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { autoobserveKeys } from "@/services/autoobserve.querykeys";
+import type { I18nText, TranslateFn } from "@/types/i18n";
 import type { BulkKind } from "./useBulkReview";
 
 /** How long a just-added alert waits for a pass to count it before the page stops polling for one. */
@@ -71,3 +74,29 @@ export const useRecentlyCreated = () => ({ has, add, remove, clearOnPass, waitin
 
 /** The just-added kind each coverage check is filled by. */
 export const KIND_OF_CHECK = { errors: "errors", latency: "latency", absence: "no_data" } as const;
+
+// Coverage and the gap suggestions are what an add changes, so every page reads them again.
+export const refreshAfterAdd = (org: string): void => {
+  void queryClient.invalidateQueries({ queryKey: autoobserveKeys.coverageAll(org) });
+  void queryClient.invalidateQueries({ queryKey: autoobserveKeys.suggestions(org) });
+};
+
+const SAVED_KIND: Record<string, BulkKind> = {
+  errors: "errors",
+  latency: "latency",
+  no_data: "no_data",
+};
+
+/** Remembers an alert the alert form saved from an AutoObserve draft, as the review list does for its own. */
+export const noteSavedDraft = (org: string, meta: Record<string, unknown> | null | undefined) => {
+  const service = meta?.service as
+    { name?: string; cluster?: string | null; namespace?: string | null } | undefined;
+  const kind = SAVED_KIND[String(meta?.check ?? "")];
+  if (!org || !service?.name || !kind) return;
+  add(serviceKeyOf(org, service.name, service.cluster ?? null, service.namespace ?? null), kind);
+  refreshAfterAdd(org);
+};
+
+/** The one line every surface shows for alerts it just added, in place of their Add button. */
+export const addedNote = (t: TranslateFn, count: number = 1): I18nText =>
+  t("insight.kind.cell.justAdded", { count }, count);

@@ -47,6 +47,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-label="t('insight.bulk.status.failed')"
       :data-test="`${dataTest}-failed`"
     />
+    <OIcon
+      v-else-if="result.status === 'exists'"
+      name="check-circle"
+      size="sm"
+      class="text-text-secondary"
+      role="img"
+      :aria-label="t('insight.bulk.status.exists')"
+      :data-test="`${dataTest}-exists`"
+    />
     <span
       v-else
       class="bg-border-default size-2 rounded-full"

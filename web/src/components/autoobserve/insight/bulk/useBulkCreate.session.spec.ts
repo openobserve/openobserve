@@ -23,7 +23,13 @@ import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn } from "@/types/i18n";
 import { m12Rows } from "./bulkFixtures";
 import { serviceKeyOf, useRecentlyCreated } from "./useRecentlyCreated";
-import { closeBulkReview, openBulkReview, useBulkReview, type ReviewRow } from "./useBulkReview";
+import {
+  applyExisting,
+  closeBulkReview,
+  openBulkReview,
+  useBulkReview,
+  type ReviewRow,
+} from "./useBulkReview";
 
 const api = vi.hoisted(() => ({ create: vi.fn(), remove: vi.fn() }));
 
@@ -94,6 +100,7 @@ beforeEach(async () => {
   api.remove.mockReset().mockResolvedValue({ data: {} });
   await router.push("/a");
   openBulkReview({ kind: "no_data", rows: m12Rows(IDS) });
+  applyExisting([]);
 });
 
 afterEach(() => {
@@ -211,9 +218,11 @@ describe("useBulkCreate — one Undo per page (real toasts)", () => {
     api.create.mockImplementation((_o: string, body: any) => ok(`id-${body.name}`));
     const creator = makeCreate();
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS).slice(0, 1) });
+    applyExisting([]);
     await creator.create("no_data", ticked());
     creator.reset();
     openBulkReview({ kind: "no_data", rows: m12Rows(IDS).slice(1, 2) });
+    applyExisting([]);
     await creator.create("no_data", ticked());
     expect(undoToasts()).toHaveLength(1);
     expect(undoToasts()[0].message).toBe(
