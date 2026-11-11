@@ -6,14 +6,14 @@ const {
 } = require("../../utils/enhanced-baseFixtures.js");
 const testLogger = require("../../utils/test-logger.js");
 const PageManager = require("../../../pages/page-manager.js");
+const { generateSingleSpanTrace } = require("../../utils/service-graph-ingestion.js");
 const {
-  generateHexId,
-  buildSpan,
-  buildResourceSpans,
-  buildTracePayload,
-} = require("../../utils/service-graph-ingestion.js");
-const { ingestOtlpTraces, deleteStream } = require("../../utils/traces-api.js");
-const { getAuthHeaders } = require("../../utils/cloud-auth.js");
+  orgId,
+  ingestOtlpTraces,
+  waitForStreamRows,
+  deleteStream,
+} = require("../../utils/traces-api.js");
+const { ingestLogs } = require("../../utils/correlation-api-helpers.js");
 
 const NAMESPACE = "prod";
 
@@ -31,25 +31,10 @@ test.describe("Span View Logs (#12013, #15028)", { tag: "@enterprise" }, () => {
     pm = new PageManager(page);
     suffix = generateUUID().slice(0, 8);
     traceStream = `e2e_viewlogs_${suffix}`;
-    traceId = generateHexId(16);
-    spanId = generateHexId(8);
-    const nowNs = BigInt(Date.now() - 60000) * 1000000n;
-    await ingestOtlpTraces(
-      page.request,
-      traceStream,
-      buildTracePayload([
-        buildResourceSpans(`e2e-viewlogs-${suffix}`, [
-          buildSpan({
-            traceId,
-            spanId,
-            name: "checkout",
-            kind: 2,
-            startTimeNs: nowNs,
-            endTimeNs: nowNs + 5000000n,
-          }),
-        ]),
-      ]),
-    );
+    const trace = generateSingleSpanTrace({ serviceName: `e2e-viewlogs-${suffix}` });
+    ({ traceId, spanId } = trace.metadata);
+    await ingestOtlpTraces(page.request, traceStream, trace.payload);
+    await waitForStreamRows(page.request, traceStream, 1, { traceId });
     const nowUs = Date.now() * 1000;
     await pm.tracesPage.navigateToTraceDetailsUrl({
       traceId,
@@ -96,40 +81,35 @@ test.describe("Span View Logs (#12013, #15028)", { tag: "@enterprise" }, () => {
       tag: ["@bug-15028", "@P1", "@regression", "@tracesRegression"],
     },
     async ({ page }) => {
-      const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/+$/, "");
-      const org = process.env.ORGNAME || "default";
       const k8sStream = `e2e_viewlogs_k8s_${suffix}`;
       const plainStream = `e2e_viewlogs_plain_${suffix}`;
       createdLogStreams.push(k8sStream, plainStream);
-      const seed = async (stream, record) => {
-        const response = await page.request.post(`${baseUrl}/api/${org}/${stream}/_json`, {
-          headers: getAuthHeaders(),
-          data: [{ trace_id: traceId, span_id: spanId, message: `from ${stream}`, ...record }],
-        });
-        expect(response.status(), "Precondition: logs must ingest").toBe(200);
-      };
-      await seed(k8sStream, { k8s_namespace_name: NAMESPACE });
-      await seed(plainStream, { namespace: NAMESPACE });
+      await ingestLogs(page, orgId(), k8sStream, [
+        {
+          trace_id: traceId,
+          span_id: spanId,
+          message: `from ${k8sStream}`,
+          k8s_namespace_name: NAMESPACE,
+        },
+      ]);
+      await ingestLogs(page, orgId(), plainStream, [
+        {
+          trace_id: traceId,
+          span_id: spanId,
+          message: `from ${plainStream}`,
+          namespace: NAMESPACE,
+        },
+      ]);
+      for (const stream of [k8sStream, plainStream])
+        await waitForStreamRows(page.request, stream, 1, { type: "logs", traceId });
 
-      // Discovery takes minutes, so the correlate answer is fixed here; this proves how the UI uses it, not what the endpoint returns.
-      await page.route("**/service_streams/_correlate", (route) =>
-        route.fulfill({
-          json: {
-            service_name: `e2e-viewlogs-${suffix}`,
-            matched_dimensions: { service: `e2e-viewlogs-${suffix}` },
-            additional_dimensions: {},
-            related_streams: {
-              logs: [
-                { stream_name: k8sStream, filters: { k8s_namespace_name: NAMESPACE } },
-                { stream_name: plainStream, filters: { namespace: NAMESPACE } },
-              ],
-              traces: [],
-              metrics: [],
-              profiles: [],
-            },
-          },
-        }),
-      );
+      await pm.tracesPage.stubSpanCorrelation({
+        serviceName: `e2e-viewlogs-${suffix}`,
+        logStreams: [
+          { stream_name: k8sStream, filters: { k8s_namespace_name: NAMESPACE } },
+          { stream_name: plainStream, filters: { namespace: NAMESPACE } },
+        ],
+      });
 
       await pm.tracesPage.clickSpanViewLogs(spanId);
 
@@ -148,10 +128,9 @@ test.describe("Span View Logs (#12013, #15028)", { tag: "@enterprise" }, () => {
         `span_id = '${spanId}' and trace_id = '${traceId}'`,
       );
       await pm.logsPage.expectLogsTableRowCount(2);
-      await expect(
-        page.locator(pm.logsPage.errorMessage),
+      await pm.logsPage.expectNoQueryError(
         "Bug #15028: the logs query must not fail on a missing field",
-      ).toHaveCount(0);
+      );
     },
   );
 });

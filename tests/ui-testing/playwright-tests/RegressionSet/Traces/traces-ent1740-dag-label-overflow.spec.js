@@ -6,21 +6,12 @@ const {
 } = require("../../utils/enhanced-baseFixtures.js");
 const testLogger = require("../../utils/test-logger.js");
 const PageManager = require("../../../pages/page-manager.js");
-const {
-  generateHexId,
-  buildSpan,
-  buildResourceSpans,
-  buildTracePayload,
-} = require("../../utils/service-graph-ingestion.js");
-const { ingestOtlpTraces, deleteStream, stringAttr } = require("../../utils/traces-api.js");
+const { generateLlmAgentTrace } = require("../../utils/service-graph-ingestion.js");
+const { ingestOtlpTraces, waitForStreamRows, deleteStream } = require("../../utils/traces-api.js");
 
 const UNBROKEN_NAME = `tool_${"unbroken_value_".repeat(4)}end`;
 const SPACED_NAME =
   "a long operation name with many short words that needs far more room than one node box gives it";
-const GEN_AI_ATTRS = [
-  stringAttr("gen_ai.operation.name", "chat"),
-  stringAttr("gen_ai.request.model", "e2e-model"),
-];
 
 test.describe("Trace DAG node labels stay in their boxes (o2-enterprise#1740)", () => {
   let pm;
@@ -44,31 +35,13 @@ test.describe("Trace DAG node labels stay in their boxes (o2-enterprise#1740)", 
       tag: ["@bug-ent1740", "@P2", "@regression", "@tracesRegression"],
     },
     async ({ page }) => {
-      const traceId = generateHexId(16);
-      const root = generateHexId(8);
-      const nowNs = BigInt(Date.now() - 60000) * 1000000n;
-      const span = (name, spanId, parentSpanId, startMs) =>
-        buildSpan({
-          traceId,
-          spanId,
-          parentSpanId,
-          name,
-          kind: 1,
-          startTimeNs: nowNs + BigInt(startMs) * 1000000n,
-          endTimeNs: nowNs + BigInt(startMs + 5) * 1000000n,
-          attributes: GEN_AI_ATTRS,
-        });
-      await ingestOtlpTraces(
-        page.request,
-        stream,
-        buildTracePayload([
-          buildResourceSpans("e2e-1740", [
-            span("agent", root, undefined, 0),
-            span(UNBROKEN_NAME, generateHexId(8), root, 1),
-            span(SPACED_NAME, generateHexId(8), root, 2),
-          ]),
-        ]),
-      );
+      const trace = generateLlmAgentTrace({
+        serviceName: "e2e-1740",
+        childNames: [UNBROKEN_NAME, SPACED_NAME],
+      });
+      const { traceId } = trace.metadata;
+      await ingestOtlpTraces(page.request, stream, trace.payload);
+      await waitForStreamRows(page.request, stream, trace.metadata.spanCount, { traceId });
 
       const nowUs = Date.now() * 1000;
       await pm.tracesPage.navigateToTraceDetailsUrl({

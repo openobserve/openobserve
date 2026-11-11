@@ -2,34 +2,18 @@ const { test, navigateToBase } = require("../../utils/enhanced-baseFixtures.js")
 const testLogger = require("../../utils/test-logger.js");
 const PageManager = require("../../../pages/page-manager.js");
 
+const { buildTopologyResponse } = require("../../utils/service-graph-ingestion.js");
+
 const STREAM = "default";
-const node = (name) => ({
-  id: name,
-  label: name,
-  requests: 10,
-  errors: 0,
-  error_rate: 0,
-  kind: "service",
-});
-const edge = (from, to) => ({
-  from,
-  to,
-  total_requests: 10,
-  failed_requests: 0,
-  error_rate: 0,
-  p50_latency_ns: 1000000,
-  p95_latency_ns: 2000000,
-  p99_latency_ns: 3000000,
-});
-const TOPOLOGY = {
-  nodes: ["gateway", "orders", "stock", "database"].map(node),
-  edges: [
-    edge("gateway", "orders"),
-    edge("gateway", "stock"),
-    edge("orders", "database"),
-    edge("stock", "database"),
+const TOPOLOGY = buildTopologyResponse(
+  ["gateway", "orders", "stock", "database"],
+  [
+    ["gateway", "orders"],
+    ["gateway", "stock"],
+    ["orders", "database"],
+    ["stock", "database"],
   ],
-};
+);
 
 test.describe("Service Graph zoom buttons (#11289)", { tag: "@enterprise" }, () => {
   let pm;
@@ -37,10 +21,7 @@ test.describe("Service Graph zoom buttons (#11289)", { tag: "@enterprise" }, () 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     pm = new PageManager(page);
-    // The rollup takes minutes and only the chart's controls are under test, so the topology answer is fixed here.
-    await page.route("**/traces/service_graph/topology/current**", (route) =>
-      route.fulfill({ json: TOPOLOGY }),
-    );
+    await pm.serviceGraphPage.stubTopology(TOPOLOGY);
     await navigateToBase(page);
     await pm.serviceGraphPage.navigateToServiceGraphTab(STREAM);
   });

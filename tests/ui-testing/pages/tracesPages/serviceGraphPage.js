@@ -435,6 +435,11 @@ export class ServiceGraphPage {
     await expect(this.page.locator(this.chartContainer)).toBeVisible({ timeout: 30000 });
   }
 
+  /** The rollup takes minutes, so specs that test only the chart's controls fix the topology answer; call before the page loads. */
+  async stubTopology(topology) {
+    await this.page.route('**/traces/service_graph/topology/current**', (route) => route.fulfill({ json: topology }));
+  }
+
   /** Page coordinates of a Graph View node, from the chart's own layout; null until the node is laid out. */
   async getGraphViewNodePoint(nodeName) {
     return await this.page.evaluate((name) => {

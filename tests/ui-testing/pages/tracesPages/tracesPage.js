@@ -3766,6 +3766,11 @@ export class TracesPage {
     return await this.page.locator(this.flameGraphRulerLabel).allInnerTexts();
   }
 
+  async getFlameVisibleRange() {
+    const chart = await this.readRenderedChart(this.flameGraphChartScroll);
+    return chart.xMax - chart.xMin;
+  }
+
   async openTraceGraphView(view) {
     expect(await this.openTraceDetailsTab('map'), 'the Trace Graph tab must exist').toBe(true);
     const toggle = this.page.locator(`[data-test="trace-graph-${view}-view-btn"]`);
@@ -3782,6 +3787,20 @@ export class TracesPage {
     const fieldCell = this.page.locator(this.sidebarAttributeFieldCell, { hasText: new RegExp(`^\\s*${field}\\s*$`) });
     const row = this.page.locator(`${this.sidebarAttributesTable} ${this.sidebarAttributeRow}`).filter({ has: fieldCell }).first();
     await expect(row).toContainText(value, { timeout: 15000 });
+  }
+
+  /** The ingest window is only 5 hours, so the user's timezone is what puts midnight between two recent spans; call before the page loads. */
+  async pinTimezoneWithMidnightBefore(ms) {
+    const utcHour = new Date(ms).getUTCHours();
+    const offsetHours = utcHour <= 12 ? -utcHour : 24 - utcHour;
+    const zone = offsetHours === 0 ? 'Etc/UTC' : `Etc/GMT${offsetHours > 0 ? '-' : '+'}${Math.abs(offsetHours)}`;
+    await this.page.addInitScript((tz) => localStorage.setItem('timezone', tz), zone);
+    return { zone, offsetHours };
+  }
+
+  /** `ms` as the list prints it, to the second, in a whole-hour zone `offsetHours` from UTC. */
+  formatInZoneOffset(ms, offsetHours) {
+    return new Date(ms + offsetHours * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
   }
 
   async getResultTimestamps() {
@@ -3817,6 +3836,20 @@ export class TracesPage {
         boxBottom: box.bottom,
       };
     }));
+  }
+
+  /** Discovery takes minutes, so the `_correlate` answer is fixed; callers prove how the UI uses it, not what the endpoint returns. */
+  async stubSpanCorrelation({ serviceName, logStreams }) {
+    await this.page.route('**/service_streams/_correlate', (route) =>
+      route.fulfill({
+        json: {
+          service_name: serviceName,
+          matched_dimensions: { service: serviceName },
+          additional_dimensions: {},
+          related_streams: { logs: logStreams, traces: [], metrics: [], profiles: [] },
+        },
+      }),
+    );
   }
 
   async clickSpanViewLogs(spanId) {

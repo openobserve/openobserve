@@ -6,79 +6,29 @@ const {
 } = require("../../utils/enhanced-baseFixtures.js");
 const testLogger = require("../../utils/test-logger.js");
 const PageManager = require("../../../pages/page-manager.js");
-const { ingestOtlpTraces, deleteStream } = require("../../utils/traces-api.js");
-const {
-  generateHexId,
-  buildSpan,
-  buildResourceSpans,
-  buildTracePayload,
-} = require("../../utils/service-graph-ingestion.js");
+const { ingestOtlpTraces, waitForStreamRows, deleteStream } = require("../../utils/traces-api.js");
+const { generateDiamondTrace } = require("../../utils/service-graph-ingestion.js");
 
-const SERVER_KIND = 2;
-const CLIENT_KIND = 3;
 const SERVICES = ["database", "frontend-app", "inventory-service", "order-service"];
-
-// frontend-app calls order-service and inventory-service, and both call database: the shape that repeated a service per caller.
-function diamondTrace() {
-  const traceId = generateHexId(16);
-  const nowNs = BigInt(Date.now() - 60000) * 1000000n;
-  const span = (name, kind, spanId, parentSpanId, startMs, endMs) =>
-    buildSpan({
-      traceId,
-      spanId,
-      parentSpanId,
-      name,
-      kind,
-      startTimeNs: nowNs + BigInt(startMs) * 1000000n,
-      endTimeNs: nowNs + BigInt(endMs) * 1000000n,
-    });
-  const root = generateHexId(8);
-  const callOrder = generateHexId(8);
-  const callInventory = generateHexId(8);
-  const order = generateHexId(8);
-  const inventory = generateHexId(8);
-  const orderDb = generateHexId(8);
-  const inventoryDb = generateHexId(8);
-  const dbFromOrder = generateHexId(8);
-  const dbFromInventory = generateHexId(8);
-  return {
-    traceId,
-    payload: buildTracePayload([
-      buildResourceSpans("frontend-app", [
-        span("GET /checkout", SERVER_KIND, root, undefined, 0, 400),
-        span("POST /orders", CLIENT_KIND, callOrder, root, 10, 190),
-        span("POST /stock", CLIENT_KIND, callInventory, root, 200, 390),
-      ]),
-      buildResourceSpans("order-service", [
-        span("create order", SERVER_KIND, order, callOrder, 20, 180),
-        span("INSERT orders", CLIENT_KIND, orderDb, order, 30, 170),
-      ]),
-      buildResourceSpans("inventory-service", [
-        span("reserve stock", SERVER_KIND, inventory, callInventory, 210, 380),
-        span("UPDATE stock", CLIENT_KIND, inventoryDb, inventory, 220, 370),
-      ]),
-      buildResourceSpans("database", [
-        span("orders write", SERVER_KIND, dbFromOrder, orderDb, 40, 160),
-        span("stock write", SERVER_KIND, dbFromInventory, inventoryDb, 230, 360),
-      ]),
-    ]),
-  };
-}
 
 test.describe("Trace details graphs (#12463, #15973)", () => {
   let pm;
   let stream;
+  let trace;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
     stream = `e2e_15973_${generateUUID().slice(0, 8)}`;
-    const trace = diamondTrace();
+    trace = generateDiamondTrace();
     await ingestOtlpTraces(page.request, stream, trace.payload);
+    await waitForStreamRows(page.request, stream, trace.metadata.spanCount, {
+      traceId: trace.metadata.traceId,
+    });
     const nowUs = Date.now() * 1000;
     await pm.tracesPage.navigateToTraceDetailsUrl({
-      traceId: trace.traceId,
+      traceId: trace.metadata.traceId,
       stream,
       fromUs: nowUs - 15 * 60 * 1000 * 1000,
       toUs: nowUs + 5 * 60 * 1000 * 1000,
@@ -133,21 +83,19 @@ test.describe("Trace details graphs (#12463, #15973)", () => {
         await pm.tracesPage.openTraceDetailsTab("flame-graph"),
         "the flame graph tab must exist",
       ).toBe(true);
-      const root = pm.tracesPage.flameGraphChartScroll;
-      const baseline = await pm.tracesPage.waitForSettledChart(root);
+      const baseline = await pm.tracesPage.waitForSettledChart(pm.tracesPage.flameGraphChartScroll);
       const baselineLabels = await pm.tracesPage.getFlameRulerLabels();
       expect(baseline.xMax - baseline.xMin, "the flame graph opens on the whole trace").toBe(100);
-      const visibleRange = async () => {
-        const chart = await pm.tracesPage.readRenderedChart(root);
-        return chart.xMax - chart.xMin;
-      };
 
       await pm.tracesPage.clickChartZoomControl("flame-graph", "zoom-in");
       await pm.tracesPage.clickChartZoomControl("flame-graph", "zoom-in");
       await expect
-        .poll(visibleRange, { timeout: 10000, message: "zoom in must narrow the x range" })
+        .poll(() => pm.tracesPage.getFlameVisibleRange(), {
+          timeout: 10000,
+          message: "zoom in must narrow the x range",
+        })
         .toBeLessThan(70);
-      const zoomedRange = await visibleRange();
+      const zoomedRange = await pm.tracesPage.getFlameVisibleRange();
       expect(
         await pm.tracesPage.getFlameRulerLabels(),
         "the time ruler must follow the zoom",
@@ -155,12 +103,18 @@ test.describe("Trace details graphs (#12463, #15973)", () => {
 
       await pm.tracesPage.clickChartZoomControl("flame-graph", "zoom-out");
       await expect
-        .poll(visibleRange, { timeout: 10000, message: "zoom out must widen the x range" })
+        .poll(() => pm.tracesPage.getFlameVisibleRange(), {
+          timeout: 10000,
+          message: "zoom out must widen the x range",
+        })
         .toBeGreaterThan(zoomedRange);
 
       await pm.tracesPage.clickChartZoomControl("flame-graph", "fit-screen");
       await expect
-        .poll(visibleRange, { timeout: 10000, message: "fit must restore the whole trace" })
+        .poll(() => pm.tracesPage.getFlameVisibleRange(), {
+          timeout: 10000,
+          message: "fit must restore the whole trace",
+        })
         .toBe(100);
       expect(await pm.tracesPage.getFlameRulerLabels()).toEqual(baselineLabels);
     },

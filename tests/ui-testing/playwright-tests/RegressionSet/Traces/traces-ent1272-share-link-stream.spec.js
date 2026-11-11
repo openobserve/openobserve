@@ -7,7 +7,7 @@ const {
 const testLogger = require("../../utils/test-logger.js");
 const PageManager = require("../../../pages/page-manager.js");
 const { generateMultiHopTrace } = require("../../utils/service-graph-ingestion.js");
-const { ingestOtlpTraces, deleteStream } = require("../../utils/traces-api.js");
+const { ingestOtlpTraces, waitForStreamRows, deleteStream } = require("../../utils/traces-api.js");
 
 test.describe("Share Link from a trace opened outside the explorer (o2-enterprise#1272)", () => {
   let pm;
@@ -33,6 +33,9 @@ test.describe("Share Link from a trace opened outside the explorer (o2-enterpris
     async ({ page, context }) => {
       const trace = generateMultiHopTrace({ latencyMs: 60 });
       await ingestOtlpTraces(page.request, stream, trace.payload);
+      await waitForStreamRows(page.request, stream, trace.metadata.hopCount * 2, {
+        traceId: trace.metadata.traceId,
+      });
       const nowUs = Date.now() * 1000;
 
       // Opened directly so the explorer's selected stream is never set, the state the short link must not depend on.
