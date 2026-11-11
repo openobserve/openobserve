@@ -47,9 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="copy.reasonLabel(option)"
                 :data-test="`decision-dismiss-reason-${option}`"
               />
+              <!-- One message line under the fields is reserved, so a refused date or time never grows the dialog. -->
               <div
                 v-if="option === 'planned_work'"
-                class="flex flex-wrap items-start gap-2 ps-6"
+                class="flex min-h-16.25 flex-wrap items-start gap-2 ps-6"
                 data-test="decision-dismiss-until"
               >
                 <OFormDate
