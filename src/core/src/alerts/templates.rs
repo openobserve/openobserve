@@ -403,7 +403,20 @@ pub async fn all_used_by(org_id: &str) -> Result<HashMap<String, UsedBy>, Templa
     let synthetics = infra::table::synthetics_checks::templates_in_use(db_conn, scope).await?;
     let on_call = infra::table::oncall_policies::templates_in_use(scope).await?;
     let composites = infra::table::alert_composites::templates_in_use(db_conn, scope).await?;
+    Ok(fold_used_by(
+        destinations,
+        alerts,
+        [anomaly, synthetics, on_call, composites],
+    ))
+}
 
+/// Folds cache counts and one template name per consumer row into `UsedBy` per name.
+/// `rows` is anomaly, synthetics, on_call, composites, in that order.
+fn fold_used_by(
+    destinations: HashMap<String, usize>,
+    alerts: HashMap<String, usize>,
+    rows: [Vec<String>; 4],
+) -> HashMap<String, UsedBy> {
     let mut by_name: HashMap<String, UsedBy> = HashMap::new();
     for (name, n) in destinations {
         by_name.entry(name).or_default().destinations += n;
@@ -411,6 +424,7 @@ pub async fn all_used_by(org_id: &str) -> Result<HashMap<String, UsedBy>, Templa
     for (name, n) in alerts {
         by_name.entry(name).or_default().alerts += n;
     }
+    let [anomaly, synthetics, on_call, composites] = rows;
     for name in anomaly {
         by_name.entry(name).or_default().anomaly += 1;
     }
@@ -423,7 +437,7 @@ pub async fn all_used_by(org_id: &str) -> Result<HashMap<String, UsedBy>, Templa
     for name in composites {
         by_name.entry(name).or_default().composites += 1;
     }
-    Ok(by_name)
+    by_name
 }
 
 /// The org whose references count for a listed template: its owner, as GET template uses.
@@ -449,7 +463,16 @@ pub async fn list_used_by(
             by_owner.insert(owner.to_string(), usage);
         }
     }
-    Ok(templates
+    Ok(pick_used_by(request_org, templates, &by_owner))
+}
+
+/// Each template's counts from its owner org's aggregate; a name with no references is zero.
+fn pick_used_by(
+    request_org: &str,
+    templates: &[Template],
+    by_owner: &HashMap<String, HashMap<String, UsedBy>>,
+) -> Vec<UsedBy> {
+    templates
         .iter()
         .map(|t| {
             by_owner
@@ -458,7 +481,7 @@ pub async fn list_used_by(
                 .cloned()
                 .unwrap_or_default()
         })
-        .collect())
+        .collect()
 }
 
 /// A level 1 or level 3 binding must name a user template that applies to `kind`.
@@ -748,6 +771,80 @@ async fn owners_to_disown(org_id: &str, name: &str) -> Result<Vec<String>, Templ
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fold_used_by_counts_every_reference_kind_per_name() {
+        let names = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let by_name = fold_used_by(
+            HashMap::from([("a".to_string(), 2)]),
+            HashMap::from([("a".to_string(), 1), ("b".to_string(), 3)]),
+            [
+                names(&["a", "c"]),
+                names(&["c", "c"]),
+                names(&["a"]),
+                names(&["b"]),
+            ],
+        );
+        let get = |n: &str| {
+            let u = &by_name[n];
+            (
+                u.destinations,
+                u.alerts,
+                u.anomaly,
+                u.synthetics,
+                u.on_call,
+                u.composites,
+            )
+        };
+        assert_eq!(get("a"), (2, 1, 1, 0, 1, 0));
+        assert_eq!(get("b"), (0, 3, 0, 0, 0, 1));
+        // A template bound only to a detector and checks is in use (B3).
+        assert_eq!(get("c"), (0, 0, 1, 2, 0, 0));
+        assert_eq!(by_name.len(), 3);
+        assert!(fold_used_by(HashMap::new(), HashMap::new(), Default::default()).is_empty());
+    }
+
+    #[test]
+    fn pick_used_by_reads_each_template_from_its_owner_org() {
+        let tpl = |org: &str, name: &str| Template {
+            org_id: org.to_string(),
+            name: name.to_string(),
+            ..Default::default()
+        };
+        let used = |anomaly: usize| UsedBy {
+            anomaly,
+            ..Default::default()
+        };
+        let by_owner = HashMap::from([
+            (
+                "org1".to_string(),
+                HashMap::from([
+                    ("shared".to_string(), used(1)),
+                    ("own".to_string(), used(2)),
+                ]),
+            ),
+            (
+                DEFAULT_ORG.to_string(),
+                HashMap::from([("shared".to_string(), used(7))]),
+            ),
+        ]);
+        let picked = pick_used_by(
+            "org1",
+            &[
+                tpl(DEFAULT_ORG, "shared"),
+                tpl("org1", "own"),
+                tpl("org1", "unused"),
+                tpl("", "own"),
+            ],
+            &by_owner,
+        );
+        // The default-org template takes the every-org count, not org1's.
+        assert_eq!(
+            picked.iter().map(|u| u.anomaly).collect::<Vec<_>>(),
+            vec![7, 2, 0, 2]
+        );
+        assert!(pick_used_by("org1", &[], &by_owner).is_empty());
+    }
 
     #[test]
     fn usage_owner_is_the_template_org_as_get_template_uses() {

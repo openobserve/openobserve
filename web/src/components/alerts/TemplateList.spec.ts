@@ -184,6 +184,9 @@ describe("Alert List", async () => {
     const deleteAlert = vi.spyOn(templateService, "delete");
     const listTemplates = vi.spyOn(templateService, "list");
     let listCallsBeforeDelete = 0;
+    // The page's own list reads; the dependency graph's usage read is a separate request.
+    const plainListCalls = () =>
+      listTemplates.mock.calls.filter((args: any[]) => !args[0]?.include_usage).length;
     beforeEach(async () => {
       const templatesUrl = `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`;
       global.server.use(
@@ -197,7 +200,7 @@ describe("Alert List", async () => {
           ),
         ),
       );
-      listCallsBeforeDelete = listTemplates.mock.calls.length;
+      listCallsBeforeDelete = plainListCalls();
 
       // Click the delete button — only visible once skeleton is cleared (done in outer beforeEach).
       await wrapper
@@ -217,7 +220,7 @@ describe("Alert List", async () => {
 
     it("drops the deleted row in place, leaving the rest of the list alone", () => {
       // The mutation's invalidation refetches the mounted list in the background; the splice keeps the row gone meanwhile.
-      expect(listTemplates.mock.calls.length).toBe(listCallsBeforeDelete + 1);
+      expect(plainListCalls()).toBe(listCallsBeforeDelete + 1);
       const body = wrapper
         .find('[data-test="alert-templates-list-table"]')
         .find('[data-test="o2-table-body"]');
