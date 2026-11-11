@@ -30,7 +30,7 @@ import {
 const HOUR_US = 3_600_000_000;
 const MIN_US = 60_000_000;
 
-describe("workload series (AIO-25)", () => {
+describe("workload series", () => {
   it("keeps the window to about 60 buckets", () => {
     expect(workloadBucket(0, 6 * HOUR_US).interval).toBe("10 minute");
     expect(workloadBucket(0, HOUR_US).interval).toBe("1 minute");
@@ -94,7 +94,7 @@ describe("workload series (AIO-25)", () => {
   });
 });
 
-describe("scores stopped (AIO-25)", () => {
+describe("scores stopped", () => {
   const now = 100 * HOUR_US;
 
   it("fires when the filter kept matching for 30 minutes and nothing was scored", () => {

@@ -156,7 +156,7 @@ export interface EvalJob {
   updated_at?: number;
   /** Persisted health state; absent until the backend first evaluates the job. */
   health?: EvalJobHealth | null;
-  /** Daily judge spend limit (AIO-24); absent on jobs saved before budgets. */
+  /** Daily judge spend limit; absent on jobs saved before budgets. */
   budget?: EvalJobBudget | null;
 }
 

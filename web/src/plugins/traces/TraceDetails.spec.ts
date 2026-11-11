@@ -793,7 +793,7 @@ describe("TraceDetails", () => {
     });
   });
 
-  describe("Request timeline (AIO-37)", () => {
+  describe("Request timeline", () => {
     const lanesToggle = () => wrapper.find('[data-test="trace-details-lanes-toggle-btn"]');
     const template = tracesMockData.tracesDetails.traceSpans.hits[0];
     const S = 1_000_000_000;

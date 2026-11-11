@@ -859,7 +859,7 @@ describe("ExperimentBrowser", () => {
     );
   });
 
-  // B-14: an SDK run with `scorers: []` whose code reports its own Scores.
+  // An SDK run with `scorers: []` whose code reports its own Scores.
   it("gives client-reported scores their own column and judges them against the baseline", async () => {
     const clientLeak = (trueCount: number) => [
       {
@@ -1101,7 +1101,7 @@ describe("ExperimentBrowser", () => {
     ).toBeDefined();
   });
 
-  // B-16: the row numbers follow the data, so the data must be in section order.
+  // The row numbers follow the data, so the data must be in section order.
   it("hands the table its rows in the order the sections show them", async () => {
     route.query = { group: "pr" };
     const wrapper = mount(ExperimentBrowser, {
@@ -1128,7 +1128,7 @@ describe("ExperimentBrowser", () => {
     ]);
   });
 
-  // B-17: CI re-runs minutes apart read "Nov 6 … Nov 6" without the time.
+  // CI re-runs minutes apart read "Nov 6 … Nov 6" without the time.
   it("adds the time to the trend axis when its first and last runs share a day", async () => {
     const day = new Date(2026, 10, 6, 10, 0).getTime();
     const base = makeExperiment({

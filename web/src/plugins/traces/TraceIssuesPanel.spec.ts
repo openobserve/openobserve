@@ -29,7 +29,7 @@ const issue: TraceIssue = {
   lastSpanId: "s12",
 };
 
-describe("TraceIssuesPanel (AIO-33)", () => {
+describe("TraceIssuesPanel", () => {
   it("says why the rule fired from counts, and links the evidence", async () => {
     const w = mount(TraceIssuesPanel, { props: { issues: [issue] }, global: { plugins: [i18n] } });
     expect(w.text()).toContain("web_search ran 12 times in this trace. The rule fires at 10.");

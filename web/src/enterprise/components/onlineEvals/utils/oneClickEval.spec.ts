@@ -18,7 +18,7 @@ import { buildOneClickJob, oneClickWhere } from "./oneClickEval";
 
 const completion = { idleWindowSecs: 30, maxAgeSecs: 1800 };
 
-describe("buildOneClickJob (AIO-23)", () => {
+describe("buildOneClickJob", () => {
   it("samples the agent's traces and maps the root LLM input and output", () => {
     const job: any = buildOneClickJob({
       agent: "research-agent",
@@ -39,7 +39,7 @@ describe("buildOneClickJob (AIO-23)", () => {
     expect(job.budget).toEqual({ dailyUsd: 5, onReach: "pause" });
   });
 
-  // E19: toxicity reads only {{output}}; an input mapping showed it as "2 variables".
+  // Toxicity reads only {{output}}; an input mapping showed it as "2 variables".
   it("maps only the variables each scorer's template uses", () => {
     const job: any = buildOneClickJob({
       agent: null,

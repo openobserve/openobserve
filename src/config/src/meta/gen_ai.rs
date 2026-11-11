@@ -508,7 +508,7 @@ mod tests {
         assert!(err.contains("invalid regex in 'regex (?<'"), "{err}");
     }
 
-    // TS-14: a regex that can match empty text would count blocks it never hid.
+    // A regex that can match empty text would count blocks it never hid.
     #[test]
     fn harness_patterns_that_match_empty_text_hide_and_count_nothing() {
         let patterns = compile_harness_patterns(&["regex x*".to_string()]);

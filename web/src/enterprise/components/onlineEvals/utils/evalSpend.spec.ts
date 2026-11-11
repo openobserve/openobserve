@@ -39,7 +39,7 @@ const judge = (scorerId: string, priced: number, cost: number): JudgeHistory => 
   model: "gpt-4o-mini",
 });
 
-describe("eval spend estimate (AIO-24)", () => {
+describe("eval spend estimate", () => {
   it("is matched targets a day × sample rate × judge cost per target", () => {
     // 2,410 traces a day on the days with traffic; the empty days are not averaged in.
     const e = estimateJobSpend({
@@ -75,7 +75,7 @@ describe("eval spend estimate (AIO-24)", () => {
     }
   });
 
-  // E16: "Set a price" is the fix only for a judge whose calls were unpriced.
+  // "Set a price" is the fix only for a judge whose calls were unpriced.
   it("tells a judge with unpriced calls from one that has not run yet", () => {
     const gap = (history: JudgeHistory[]) =>
       estimateJobSpend({ dailyCounts: [10], rate: 1, judgeIds: ["a"], history }).judgeGap;
@@ -111,8 +111,8 @@ describe("eval spend estimate (AIO-24)", () => {
   });
 });
 
-describe("spend SQL and budget state (AIO-24)", () => {
-  // E14: UTC day buckets cut the first and the current day short, undercounting a day.
+describe("spend SQL and budget state", () => {
+  // UTC day buckets cut the first and the current day short, undercounting a day.
   it("counts matched targets per rolling 24 h from the window start, at the job's scope", () => {
     const sql = matchedPerDaySql("default", "", "trace", [], 1_700_000_000_000_000);
     expect(sql).toContain(

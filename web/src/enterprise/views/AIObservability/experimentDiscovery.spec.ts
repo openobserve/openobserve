@@ -175,7 +175,7 @@ describe("experiment discovery", () => {
     });
   });
 
-  // B-14: an SDK run that scores in its own process pins no Scorer.
+  // An SDK run that scores in its own process pins no Scorer.
   it("gives each client-reported dimension its own column, keyed by Score Config and client key", () => {
     const client = (clientScorerKey: string, mean: number) => ({
       scoreConfigId: "cfg-quality",

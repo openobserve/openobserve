@@ -2600,7 +2600,7 @@ mod tests {
             "sum(gen_ai_unpriced_tokens) as gen_ai_unpriced_tokens",
             "array_distinct(flatten(array_agg(gen_ai_unpriced_models))) as gen_ai_unpriced_models",
             "array_distinct(flatten(array_agg(user_ids))) as user_ids",
-            // TS-13: the agent of the trace the first message came from.
+            // The agent of the trace the first message came from.
             "FIRST_VALUE(agent_name ORDER BY first_message_time ASC) \
              FILTER (WHERE gen_ai_input_messages IS NOT NULL) as agent_name",
             "FIRST_VALUE(gen_ai_input_messages ORDER BY first_message_time ASC)",

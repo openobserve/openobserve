@@ -30,7 +30,7 @@ import { buildAiPrefill } from "./prefill/fromAi";
 
 const rule = (id: string) => AI_AGENTS_PACK.find((r) => r.id === id)!;
 
-describe("ai-agents pack (AIO-20)", () => {
+describe("ai-agents pack", () => {
   it("has the 7 reliability rules and 6 templates", () => {
     expect(AI_AGENTS_PACK.filter((r) => r.kind === "rule")).toHaveLength(7);
     expect(AI_AGENTS_PACK.filter((r) => r.kind === "template")).toHaveLength(6);
@@ -61,7 +61,7 @@ describe("ai-agents pack (AIO-20)", () => {
     expect(sql).toContain("HAVING count(*) >= 3");
   });
 
-  it("counts failures with the AIO-06 rule, per agent", () => {
+  it("counts failures with the failure-rate rule, per agent", () => {
     const sql = failureRateSql("s", { scope: "gen_ai_agent_name = 'a'" });
     expect(sql).toContain("FROM \"s\" WHERE gen_ai_agent_name = 'a' GROUP BY trace_id");
     expect(sql).toContain("HAVING count(*) >= 50 AND 100.0 * sum(failed) / count(*) > 5");
@@ -122,7 +122,7 @@ describe("ai-agents pack (AIO-20)", () => {
   });
 });
 
-describe("ai-agents pack: eval job templates (AIO-25)", () => {
+describe("ai-agents pack: eval job templates", () => {
   it("reads evaluator lag as p95 lag over 10 minutes, from evaluator scores only", () => {
     const sql = evaluatorLagSql();
     expect(sql).toContain(

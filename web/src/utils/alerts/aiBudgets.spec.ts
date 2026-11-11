@@ -152,7 +152,7 @@ describe("budgets", () => {
     expect(budgetSpend(eachUser, [])).toEqual({ spent: 0, over: 0, largest: 0, keys: 0 });
   });
 
-  // B-10: a per-key budget counts every key, not the first page of them.
+  // A per-key budget counts every key, not the first page of them.
   it("summarises a per-key budget over all its keys", () => {
     const sql = budgetSummarySql({ ...feature, scope: "user", value: "", limitUsd: 25 }, true);
     expect(sql).toMatch(

@@ -96,7 +96,7 @@ describe("list()", () => {
     });
   });
 
-  // B-14: the list summary carries the dimensions the customer's code reported.
+  // The list summary carries the dimensions the customer's code reported.
   it("normalizes client-reported score summaries, and leaves them absent without a summary", async () => {
     const clientSummary = {
       score_config_id: "cfg-quality",

@@ -3,11 +3,7 @@
 // Page Object Model for the AI Observability > LLM Providers surface (online evals).
 // Covers the ProviderFormPage (create/edit) and the LlmProvidersSettings list.
 //
-// Enterprise/cloud-only: the `llmProviders` route (/ai/llm-providers) is gated by
-// `withFeatureGate` (useAIObservabilityRoutes.ts), and the rail item by
-// `(isEnt || isCloud) && online_evals_enabled`. navigateToLlmProviders() probes
-// positively for the page mount and returns a boolean so callers can gate to a
-// clean SKIP on the OSS binary (mirrors navigateToModelPricing).
+// The route is enterprise/cloud-only, so navigateToLlmProviders() returns false on OSS builds for a clean skip.
 
 export class LlmProvidersPage {
     /**

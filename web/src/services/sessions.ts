@@ -56,7 +56,7 @@ export interface SessionApiHit {
   error_count: number;
   user_ids?: string[];
   first_user_message?: string | null;
-  /** AIO-22: harness blocks hidden from the first message by the agent's patterns. */
+  /** Harness blocks hidden from the first message by the agent's patterns. */
   harness_hidden?: number;
   /** Set when the first message was only harness text: the tag that hid it. */
   harness_only?: string;

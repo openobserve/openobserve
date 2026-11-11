@@ -627,7 +627,7 @@ describe("SessionDetails — turn rows", () => {
     );
   });
 
-  it("keeps each turn's session number when older turns load (S3V-02)", async () => {
+  it("keeps each turn's session number when older turns load", async () => {
     const t1 = makeTrace({ traceId: "t1", startTimeMicros: 1700000001000000000 });
     const t2 = makeTrace({ traceId: "t2", startTimeMicros: 1700000002000000000 });
     const t3 = makeTrace({ traceId: "t3", startTimeMicros: 1700000003000000000 });
@@ -662,7 +662,7 @@ describe("SessionDetails — turn rows", () => {
   });
 
   // The server applies the Rust regex, so a pattern browser RegExp rejects like `(?s)` still works.
-  it("hides the agent's harness text in the turn title and body (AIO-22)", async () => {
+  it("hides the agent's harness text in the turn title and body", async () => {
     const message = "<env>\nos: linux\n</env>\nFix the login bug";
     const patterns = ["regex (?s)<env>.*?</env>"];
     mockMappingGet.mockResolvedValue({ harness_patterns: [{ agent: "omp", patterns }] });
@@ -921,7 +921,7 @@ describe("SessionDetails — session span derived counts", () => {
     expect(body.text()).not.toContain("traces.sessionDetail.stats.toolCalls");
   });
 
-  it("counts tool calls found only in the LLM output, with no tool span (G3-T6)", async () => {
+  it("counts tool calls found only in the LLM output, with no tool span", async () => {
     const toolCallOutput = (id: string) =>
       JSON.stringify([
         {
@@ -975,7 +975,7 @@ describe("SessionDetails — session span derived counts", () => {
   });
 });
 
-describe("SessionDetails — span fetch failure (G4-08)", () => {
+describe("SessionDetails — span fetch failure", () => {
   it("shows an error with Retry on the turn and in Tool Hotspots, not 'not captured'", async () => {
     mockFetchSessionSpans.mockRejectedValue(new Error("500"));
 

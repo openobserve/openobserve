@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="t('traces.traceTree.errorSpan')"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
-                      <!-- AIO-33: the chip on a rule issue's last evidence span. -->
+                      <!-- The chip on a rule issue's last evidence span. -->
                       <OIcon
                         v-if="issueSpans[(spans as any[])[virtualRow.index].spanId]"
                         name="report-problem"
@@ -470,7 +470,7 @@ export default defineComponent({
       // DOM Element ref from parent — no runtime type check needed
       default: null,
     },
-    /** AIO-33: span id → rule label, for spans that carry an issue chip. */
+    /** Span id → rule label, for spans that carry an issue chip. */
     issueSpans: {
       type: Object as PropType<Record<string, I18nText>>,
       default: () => ({}),

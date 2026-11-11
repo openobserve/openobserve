@@ -159,7 +159,7 @@ describe("compare to baseline", () => {
     expect(compareToBaseline(run("x", 2, [bool(23, 33)]), null, policies)).toBeNull();
   });
 
-  // B-14: a CI job that scores in its own process reports client Scores only.
+  // A CI job that scores in its own process reports client Scores only.
   it("judges client-reported dimensions by their Score Config's policy, pairing on config and client key", () => {
     const client = (clientScorerKey: string, mean: number) => ({
       scoreConfigId: "cfg-quality",
@@ -316,7 +316,7 @@ describe("re-runs and CI groups", () => {
       count: 2,
       range: "27–32%",
     });
-    // B-15: runs that agree read as one value, not "0.800–0.800".
+    // Runs that agree read as one value, not "0.800–0.800".
     expect(scoreSpread([rerun("c", 3, 16), rerun("b", 2, 16)], "disclosure")).toEqual({
       count: 2,
       range: "29%",

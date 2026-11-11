@@ -26,7 +26,7 @@ import {
   scoresStoppedSql,
 } from "../aiAgentsPack";
 
-/** Eval job templates read the evaluator's streams and are scoped by job id (AIO-25). */
+/** Eval job templates read the evaluator's streams and are scoped by job id. */
 export type AiJobAlertKind = "eval_scores_stopped" | "eval_judge_error_rate";
 export type AiAlertKind = "failure_rate" | "cost" | "repeated_tool_calls" | AiJobAlertKind;
 

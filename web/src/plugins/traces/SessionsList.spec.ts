@@ -853,7 +853,7 @@ describe("SessionsList — org round trip through an org without trace streams",
     await flushPromises();
   }
 
-  it("loads the first org's sessions again after visiting an org with no streams (G2-12)", async () => {
+  it("loads the first org's sessions again after visiting an org with no streams", async () => {
     // The list was filled for org-a.
     mockHasLoadedOnce.value = true;
     mockLoadedOrg.value = "org-a";

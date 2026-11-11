@@ -33,7 +33,7 @@
           {{ t(`onlineEvals.job.preview.scopes.${targetScope}.matchedSuffix`) }}
         </span>
       </div>
-      <!-- The Cost section's figure, repeated so it stays in view while editing (AIO-24). -->
+      <!-- The Cost section's figure, repeated so it stays in view while editing. -->
       <div
         v-if="stream"
         class="border-dialog-header-border mt-2.5 flex flex-col gap-0.5 border-t pt-2.5"

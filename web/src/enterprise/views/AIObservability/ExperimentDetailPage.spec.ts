@@ -342,7 +342,7 @@ describe("ExperimentDetailPage", () => {
     expect(scores.text()).toContain("25 scored · 0 failed · 1 pending · 0 skipped · 4 unscored");
   });
 
-  // B-14: an SDK run with no pinned Scorer whose code reports its own Scores.
+  // An SDK run with no pinned Scorer whose code reports its own Scores.
   it("shows client-reported score summaries, and keeps the scoring card when they are all there is", async () => {
     const experiment = makeExperiment({ id: "exp-1", name: "sdk run", datasetId: "ds-1" });
     get.mockResolvedValue(

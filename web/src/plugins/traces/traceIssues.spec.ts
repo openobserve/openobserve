@@ -24,7 +24,7 @@ const call = (i: number, tool: string, error = false) => ({
   span_status: error ? "ERROR" : "UNSET",
 });
 
-describe("issues on one trace (AIO-33)", () => {
+describe("issues on one trace", () => {
   it("raises one issue per tool, with the chip on the last call", () => {
     // 12 web_search calls, 9 failing: both rules match, one issue.
     const spans = [

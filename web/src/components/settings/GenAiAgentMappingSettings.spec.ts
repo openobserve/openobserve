@@ -256,7 +256,7 @@ describe("GenAiAgentMappingSettings", () => {
       return result.exists() ? result.text() : null;
     };
 
-    // TS-11: results were keyed by row index, so the next row inherited a removed row's result.
+    // Results were keyed by row index, so the next row inherited a removed row's result.
     it("keeps a result with its row when another row is removed", async () => {
       const wrapper = await mountTwoRows();
       await runTest(wrapper, 0);
@@ -291,7 +291,7 @@ describe("GenAiAgentMappingSettings", () => {
       expect(resultText(wrapper, 1)).toBeNull();
     });
 
-    // TS-11: the query hard-coded gen_ai_conversation_id and took any 15 sessions.
+    // The query hard-coded gen_ai_conversation_id and took any 15 sessions.
     it("groups by the stream's session column and takes the newest sessions", async () => {
       mockGet.mockResolvedValue({
         ...config(["my.agent"]),

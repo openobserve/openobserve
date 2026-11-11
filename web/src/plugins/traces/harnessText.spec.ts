@@ -16,7 +16,7 @@
 import { describe, it, expect } from "vitest";
 import { patternsForAgent } from "./harnessText";
 
-describe("patternsForAgent (AIO-22)", () => {
+describe("patternsForAgent", () => {
   const patterns = ["tag system-reminder", "tag job"];
 
   it("keeps one agent's patterns off another agent", () => {

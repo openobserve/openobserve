@@ -24,7 +24,7 @@ export const AI_PACK_ID = "ai-agents";
 export const AI_PACK_FOLDER = "AI agents";
 /** Score streams the evaluator writes; evaluator lag reads them. */
 export const LLM_SCORES_STREAM = "_llm_scores";
-/** One span per judge call, with the job, status and error kind (AIO-25). */
+/** One span per judge call, with the job, status and error kind. */
 export const EVALUATOR_STREAM = "_evaluator";
 
 const and = (scope: string) => (scope ? ` AND ${scope}` : "");
@@ -132,7 +132,7 @@ export function scoresStoppedSql(opts: { jobId?: string | null; minScores?: numb
   );
 }
 
-/** Eval jobs whose judge calls fail more than `maxErrorPct` of the time, per job (AIO-25). */
+/** Eval jobs whose judge calls fail more than `maxErrorPct` of the time, per job. */
 export function judgeErrorRateSql(
   opts: { jobId?: string | null; maxErrorPct?: number; minCalls?: number } = {},
 ): string {

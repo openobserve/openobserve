@@ -61,7 +61,7 @@ function traceUsageOver(from: string, rule: string, column: string, spans: Span[
   return llm || agents;
 }
 
-describe("cost attribution (AIO-27)", () => {
+describe("cost attribution", () => {
   it("attributes a trace's whole cost to the value set on any of its spans", () => {
     const sql = costByDimensionSql("s", "tenant_id", "gen_ai_agent_name = 'a'", withParents).rows;
     expect(sql).toContain("COALESCE(MAX(tenant_id), '') AS v");
@@ -170,7 +170,7 @@ describe("cost attribution (AIO-27)", () => {
     expect(sql).toContain("COUNT(DISTINCT trace_id) AS traces");
   });
 
-  // The search layer ignores ORDER BY on an expression (S3V-01), so the '' row sorts first via a projected alias.
+  // The search layer ignores ORDER BY on an expression, so the '' row sorts first via a projected alias.
   it("fetches the top values plus unattributed, and totals over every value", () => {
     for (const sql of [
       costByDimensionSql("s", "user_id", "", withParents),

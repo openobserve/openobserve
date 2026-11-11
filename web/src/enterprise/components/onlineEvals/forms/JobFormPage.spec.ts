@@ -505,7 +505,7 @@ describe("JobFormPage", () => {
       expect(payload.budget).toEqual({ dailyUsd: 12, onReach: "keep_running" });
     });
 
-    it("removes the budget when the limit is switched off, and keeps a budgetless job so (E13)", async () => {
+    it("removes the budget when the limit is switched off, and keeps a budgetless job so", async () => {
       wrapper = createWrapper({
         mode: "edit",
         row: { ...editRow, budget: { dailyUsd: 12, onReach: "keep_running" } },

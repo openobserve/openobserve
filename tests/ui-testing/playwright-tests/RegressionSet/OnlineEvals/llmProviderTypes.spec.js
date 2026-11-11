@@ -11,9 +11,7 @@
 //   - No API-key "required" marker in edit mode
 //   - Cancel returns to the provider list without persisting
 //
-// Enterprise gating: the `llmProviders` route (/ai/llm-providers) is feature-gated
-// to enterprise/cloud builds (useAIObservabilityRoutes.ts). Each test
-// probes navigateToLlmProviders() and skips cleanly on the OSS binary.
+// The route is enterprise/cloud-only, so each test skips cleanly on OSS builds via navigateToLlmProviders().
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');

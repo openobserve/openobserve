@@ -36,7 +36,7 @@ export interface BudgetDef {
   stream: string;
 }
 
-/** Column each scope groups or filters on (attribution keys from AIO-27). */
+/** Column each scope groups or filters on (the cost attribution keys). */
 export const BUDGET_COLUMNS: Record<BudgetScope, string> = {
   agent: "gen_ai_agent_name",
   feature: "feature_name",

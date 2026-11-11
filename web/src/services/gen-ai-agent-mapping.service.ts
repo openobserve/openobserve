@@ -97,10 +97,10 @@ export interface GenAiAgentMappingConfig {
   agent_id_fields: string[];
   env_fields: string[];
   version_fields: string[];
-  /** Per-agent harness text hidden when sessions are read (AIO-22). */
+  /** Per-agent harness text hidden when sessions are read. */
   harness_patterns: HarnessPatternRule[];
   session_title: "off" | "first_request";
-  /** Cost attribution fallbacks copied to user.id / feature.name / tenant.id at ingest (AIO-27). */
+  /** Cost attribution fallbacks copied to user.id / feature.name / tenant.id at ingest. */
   attribution_fields: AttributionFields;
 }
 
