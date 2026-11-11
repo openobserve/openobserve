@@ -193,6 +193,12 @@
       "web/src/services/rumProductAnalytics.*",
       "tests/ui-testing/pages/rumPages/**"
     ],
+    "Onboarding": [
+      "web/src/components/onboarding/**",
+      "web/src/components/ingestion/**",
+      "web/src/views/Onboarding*",
+      "tests/ui-testing/pages/generalPages/**"
+    ],
     "Streams": [
       "web/src/components/logstream/**",
       "web/src/components/ingestion/**",
