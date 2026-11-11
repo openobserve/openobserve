@@ -612,13 +612,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
           />
         </OButton>
-        <div v-if="showFilterBuilder" class="h-full overflow-y-auto py-0.75 ps-1.5 pe-10">
+        <div
+          v-if="showFilterBuilder"
+          class="h-full overflow-y-auto py-0.75 ps-1.5"
+          :class="isAiEnabled ? 'pe-18' : 'pe-10'"
+        >
           <SqlFilterBuilder
             ref="filterBuilderRef"
             :query="searchObj.data.editorValue"
             :fields="filterBuilderFields"
             :load-values="loadFilterBuilderValues"
-            :fields-loading="searchObj.loading"
+            :fields-loading="searchObj.loadingStream"
             :extra-suggestions="recentFilterSection"
             data-test="traces-search-bar-filter-builder"
             @update:query="(sql: string) => onFilterBuilderQuery(sql) && searchData()"
@@ -628,6 +632,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @extra-select="pickRecentFilterRow"
           />
         </div>
+        <OButton
+          v-if="showFilterBuilder && isAiEnabled"
+          data-test="traces-search-bar-filter-builder-ai-btn"
+          variant="ghost"
+          size="icon-toolbar"
+          class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 right-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+          @click="openAiFromBuilder"
+        >
+          <img
+            :src="aiIcon"
+            :alt="t('search.aiModeIconAlt')"
+            class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
+          />
+          <OTooltip :content="t('nlMode.toggle')" />
+        </OButton>
         <UnifiedQueryEditor
           v-show="!showFilterBuilder"
           ref="queryEditorRef"
@@ -797,6 +816,8 @@ import {
 } from "@/utils/queryHistory/recentSearches";
 import { TRACES_EXAMPLE_QUERIES } from "@/utils/queryHistory/traces";
 import type { HistoryStatus } from "@/services/query_history";
+import { useTheme } from "@/composables/useTheme";
+import { getImageURL } from "@/utils/zincutils";
 import {
   savedViewsQuery,
   createSavedViewMutation,
@@ -1016,11 +1037,19 @@ export default defineComponent({
     watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
       immediate: true,
     });
-    const showFilterBuilder = computed(() => filterBuilderOn.value && !searchObj.meta.sqlMode);
-    // QueryEditor's floating AI button takes the corner slot while the editor is shown.
-    const filterBuilderToggleRight = computed(() =>
-      !showFilterBuilder.value && isAiEnabled.value ? "2.375rem" : "0.25rem",
+    const showFilterBuilder = computed(
+      () => filterBuilderOn.value && !searchObj.meta.sqlMode && !nlpMode.value,
     );
+    // The AI button holds the corner slot in both modes: QueryEditor's own, or the builder's copy.
+    const filterBuilderToggleRight = computed(() => (isAiEnabled.value ? "2.375rem" : "0.25rem"));
+    const { isDark } = useTheme();
+    const aiIcon = computed(() =>
+      getImageURL(
+        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
+      ),
+    );
+    const openAiFromBuilder = () =>
+      (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
     const filterBuilderFields = computed(() =>
       toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
     );
@@ -1725,6 +1754,8 @@ export default defineComponent({
       toggleFilterBuilder,
       showFilterBuilder,
       filterBuilderToggleRight,
+      aiIcon,
+      openAiFromBuilder,
       filterBuilderFields,
       filterBuilderRef,
       loadFilterBuilderValues,

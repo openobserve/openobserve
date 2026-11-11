@@ -1792,7 +1792,7 @@ describe("SearchBar", () => {
       });
     });
 
-    it("moves the builder toggle beside the AI button while the code editor shows, and hides it in AI mode", async () => {
+    it("keeps the builder toggle beside the AI button in both modes, and hides it in AI mode", async () => {
       store.state.zoConfig.ai_enabled = true;
       searchObjInstance.meta.showQuery = true;
       searchObjInstance.meta.sqlMode = false;
@@ -1805,9 +1805,14 @@ describe("SearchBar", () => {
 
         await toggle().trigger("click");
         await flushPromises();
-        expect(toggle().attributes("style")).toContain("right: 0.25rem");
+        expect(toggle().attributes("style")).toContain("right: 2.375rem");
+        expect(wrapper.find('[data-test="traces-search-bar-filter-builder-ai-btn"]').exists()).toBe(
+          true,
+        );
 
-        await toggle().trigger("click");
+        await wrapper
+          .find('[data-test="traces-search-bar-filter-builder-ai-btn"]')
+          .trigger("click");
         await flushPromises();
         editor().vm.$emit("update:nlpMode", true);
         await flushPromises();
