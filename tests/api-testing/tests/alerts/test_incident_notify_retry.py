@@ -114,19 +114,35 @@ def _history_has(incident_alerts: dict[str, Any], case: str, status: str) -> Non
                timeout=120, interval=5, msg=f"{case}: history never recorded {status}")
 
 
+def _incident_opened(incident_alerts: dict[str, Any], case: str) -> None:
+    alert_id = incident_alerts["ids"][case]
+
+    def ours() -> list[dict]:
+        resp = incident_alerts["alerts"]._v2("GET", "alerts/incidents?limit=1000")
+        assert resp.status_code == 200, resp.text
+        return [i for i in resp.json()["incidents"]
+                if any(g.get("alert_id") == alert_id for g in i.get("alert_groups") or [])]
+
+    incidents = wait_until(ours, timeout=120, interval=5, msg=f"{case}: no incident was opened for alert {alert_id}")
+    assert [i["status"] for i in incidents] == ["open"], incidents
+
+
 def test_incident_notification_failing_once_is_delivered_on_the_second_attempt(incident_alerts):
     call = _first_notify_call(incident_alerts, "flip")
     assert [d.status for d in call] == [500, 200], call
     _history_has(incident_alerts, "flip", "firing")
+    _incident_opened(incident_alerts, "flip")
 
 
 def test_incident_notification_failing_every_attempt_stops_after_the_retry_limit(incident_alerts):
     call = _first_notify_call(incident_alerts, "always500")
     assert [d.status for d in call] == [500] * MAX_ATTEMPTS, call
     _history_has(incident_alerts, "always500", "notify_failed")
+    _incident_opened(incident_alerts, "always500")
 
 
 def test_incident_notification_refused_with_4xx_is_not_retried(incident_alerts):
     call = _first_notify_call(incident_alerts, "refused400")
     assert [d.status for d in call] == [400], call
     _history_has(incident_alerts, "refused400", "notify_failed")
+    _incident_opened(incident_alerts, "refused400")
