@@ -175,6 +175,35 @@ describe("Retry re-checks the org's alerts first", () => {
     );
   });
 
+  it("says the skipped count once, not again when the review closes", async () => {
+    const rows = review.toCreate.value.slice(0, 1);
+    api.create.mockRejectedValueOnce({ code: "ECONNABORTED" });
+    const { create, retry, showUndo } = makeCreate();
+    await create("no_data", rows);
+    api.list.mockResolvedValue({
+      data: {
+        list: [
+          {
+            alert_id: "landed-2",
+            name: rows[0].prefill!.name,
+            folder_id: rows[0].folder.id,
+            folder_name: rows[0].folder.name,
+            stream_type: rows[0].stream.type,
+            stream_name: rows[0].stream.name,
+            condition: { sql: rows[0].prefill!.sql },
+          },
+        ],
+      },
+    });
+    api.toast.mockClear();
+    await retry([rows[0].key]);
+    showUndo();
+    const skipped = api.toast.mock.calls.filter(([o]) =>
+      String(o.message).includes("already existed"),
+    );
+    expect(skipped).toHaveLength(1);
+  });
+
   it("re-sends a draft the org still doesn't have", async () => {
     const rows = review.toCreate.value.slice(0, 1);
     api.create.mockRejectedValueOnce({ code: "ECONNABORTED" });

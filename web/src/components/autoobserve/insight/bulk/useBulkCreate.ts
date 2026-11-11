@@ -233,6 +233,8 @@ export const useBulkCreate = (deps: BulkCreateDeps) => {
   const announce = (s: Session): void => {
     if (s.skipped && s.created.length === s.announced) {
       toast({ variant: "default", message: skippedLine(deps.t, s.skipped) });
+      // Said once: closing the review re-announces, and this toast carries no Undo to bring back.
+      s.skipped = 0;
       return;
     }
     if (!s.undoable || s.created.length === s.announced) return;
