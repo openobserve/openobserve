@@ -2078,15 +2078,15 @@ export default defineComponent({
       }
       logsNotice.value = null;
       viewLogsRuns.value++;
-      let withdraw: (() => void) | null = null;
+      const announced: { withdraw?: () => void } = {};
       const speak = setTimeout(() => {
-        withdraw = announcePolite(t("traces.findingLogsForTrace"));
+        announced.withdraw = announcePolite(t("traces.findingLogsForTrace"));
       }, FINDING_LOGS_ANNOUNCE_MS);
       try {
         await findCorrelatedLogs();
       } finally {
         clearTimeout(speak);
-        withdraw?.();
+        announced.withdraw?.();
         viewLogsRuns.value--;
       }
     };

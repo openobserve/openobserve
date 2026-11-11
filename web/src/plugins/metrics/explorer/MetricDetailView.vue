@@ -686,7 +686,7 @@ import {
   watch,
   type PropType,
 } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import MetricCardChart, { type ChartForecast, type ShiftedResult } from "./MetricCardChart.vue";
 import MetricBreakdown, { type BreakdownFailures } from "./MetricBreakdown.vue";
 import MetricChartTile, {
@@ -803,7 +803,7 @@ export interface DetailStatus {
   /** Something on the page failed in its last run, so it must not be called updated. */
   failed: boolean;
   /** The page's one failed-refresh sentence, when its kept charts failed. */
-  failure: string | null;
+  failure: I18nText | null;
 }
 
 export default defineComponent({

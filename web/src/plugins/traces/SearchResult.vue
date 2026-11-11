@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @time-range-selected="onMetricsTimeRangeSelected"
           @editor-filter-set="onMetricsEditorFilterSet"
           @editor-filter-run="onMetricsEditorFilterRun"
-          @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
+          @send-to-ai-chat="$emit('send-to-ai-chat', $event)"
         />
         <TracesMetricsPlaceholder v-else-if="pending && searchObj.meta.showHistogram" />
 

@@ -18,7 +18,7 @@ import { computed } from "vue";
 import OIcon from "../Icon/OIcon.vue";
 import OTooltip from "../../overlay/Tooltip/OTooltip.vue";
 import OFailedPill from "../../feedback/FailedPill/OFailedPill.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDataAge, formatRefreshFailed } from "@/utils/formatters";
 import { DATA_AGE_MARKER_CLASS } from "./dataAgeMarker";
 
@@ -90,7 +90,7 @@ const failedText = computed(() =>
   >
     <!-- First child, so the tooltip binds to this button, not to its hidden text. -->
     <OTooltip
-      :content="`${failedText}\n\n${detail}`"
+      :content="raw(`${failedText}\n\n${detail}`)"
       content-class="whitespace-pre-line"
       max-width="22.5rem"
     />

@@ -19,7 +19,7 @@ import { DEFAULT_TRACE_SEARCH_MODE } from "@/ts/interfaces/traces/trace.types";
 // The org rides along on every app link, so it alone does not name a view.
 const CARRIER_KEYS = new Set(["org_identifier"]);
 
-const present = (value: LocationQuery[string]) =>
+const present = (value: LocationQuery[string] | undefined) =>
   value !== undefined && value !== null && value !== "" && !(Array.isArray(value) && !value.length);
 
 /** The URL query reduced to what names the view: sorted keys, empty values dropped, so equal views compare equal. */

@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               titleParts.head
             }}</OTruncatedText>
             <template v-else>
-              <OTooltip :content="card.name" :disabled="!titleCut" />
+              <OTooltip :content="raw(card.name)" :disabled="!titleCut" />
               <span
                 ref="titleHead"
                 class="min-w-0 overflow-hidden whitespace-nowrap"
@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <MetricCardChart
-        v-else-if="showsChart"
+        v-else-if="showsChart && preview"
         :class="{ [STALE_DIM]: windowDimmed }"
         :aria-busy="windowStale ? 'true' : undefined"
         :data-state="windowDimmed ? 'stale' : undefined"
