@@ -1539,7 +1539,7 @@ fn every_apply_site_restores_the_event_name() {
     {
         // The restore must come before this record is handed onward — bounded by the
         // next `refactor_map` call, which is the first thing that consumes `local_val`
-        // after canonicalization at every one of the three sites.
+        // after canonicalization at both sites.
         //
         // NOT a window stretching to the next `apply_to_record`: that swallows the
         // NEXT site's restore and reports every site as covered even when one is
@@ -1553,7 +1553,7 @@ fn every_apply_site_restores_the_event_name() {
         let window = &src[site..end];
         assert!(
             window.contains("O2_EVENT_NAME"),
-            "apply_to_record call site #{nth} strips o2_event_name and does not restore \
+            "canonicalize site #{nth} strips o2_event_name and does not restore \
              it immediately after; every site can recover the value (the pipeline sites \
              via `pipeline_inputs[idx]`), so the event name is lost for no reason"
         );
@@ -1608,7 +1608,7 @@ fn event_name_insertion_offset(src: &str) -> usize {
 /// reaches `apply_to_record` with no event name anywhere on it.
 ///
 /// Spec D-A correction 1: the insertion MUST be in the producer loop, where
-/// `log_record` is in scope, NOT at the three `apply_to_record` call sites — the
+/// `log_record` is in scope, NOT at the destination apply sites — the
 /// pipeline-results site iterates results where `log_record` does not exist. One
 /// insertion in the loop covers both the pipeline and non-pipeline branches.
 ///
@@ -1669,7 +1669,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
 
     // It must be written where `log_record` is still in scope — i.e. after `rec`
     // is created in the producer loop. This is what makes it the PRODUCER loop
-    // rather than one of the three apply_to_record call sites.
+    // rather than one of the destination apply sites.
     let rec_created = src
         .find("let mut rec = json::Value::Object(base.clone());")
         .expect("the producer loop must still build `rec`");

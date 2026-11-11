@@ -578,8 +578,7 @@ pub async fn handle_request(
 
         crate::ingestion::join_llm_evaluations(evaluation_tasks, org_id, &stream_name).await;
 
-        // Evaluation-only pipelines emit no downstream records. Preserve the
-        // original log stream while evaluator work runs asynchronously.
+        // Evaluation-only pipelines emit no downstream records, so the source keeps its originals.
         let has_user_pipeline = crate::ingestion::has_user_pipeline(&executable_pipelines);
         if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
             let settings = DestinationSettings {
