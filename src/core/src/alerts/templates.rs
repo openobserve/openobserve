@@ -18,6 +18,8 @@
 // service-layer guards below, and any future caller all derive the same
 // answer from one place. Re-exported here as a thin wrapper so existing
 // callers in this module keep working without a long path.
+use std::collections::HashMap;
+
 use config::{
     DEFAULT_ORG,
     meta::{
@@ -389,6 +391,39 @@ pub async fn used_by(org_id: &str, name: &str) -> Result<UsedBy, TemplateError> 
             .chain(composite_names)
             .collect(),
     })
+}
+
+/// `used_by` for every template name of the org, aggregated once for the list (no query per row).
+/// Names without references are absent. `binding_names` stays empty: the list carries counts only.
+pub async fn all_used_by(org_id: &str) -> Result<HashMap<String, UsedBy>, TemplateError> {
+    let scope = binding_scope(org_id);
+    let (destinations, alerts) = db::alerts::templates::cached_reference_counts(org_id).await;
+    let db_conn = infra::db::get_orm_client_ro().await;
+    let anomaly = infra::table::anomaly_detection::config::templates_in_use(db_conn, scope).await?;
+    let synthetics = infra::table::synthetics_checks::templates_in_use(db_conn, scope).await?;
+    let on_call = infra::table::oncall_policies::templates_in_use(scope).await?;
+    let composites = infra::table::alert_composites::templates_in_use(db_conn, scope).await?;
+
+    let mut by_name: HashMap<String, UsedBy> = HashMap::new();
+    for (name, n) in destinations {
+        by_name.entry(name).or_default().destinations += n;
+    }
+    for (name, n) in alerts {
+        by_name.entry(name).or_default().alerts += n;
+    }
+    for name in anomaly {
+        by_name.entry(name).or_default().anomaly += 1;
+    }
+    for name in synthetics {
+        by_name.entry(name).or_default().synthetics += 1;
+    }
+    for name in on_call {
+        by_name.entry(name).or_default().on_call += 1;
+    }
+    for name in composites {
+        by_name.entry(name).or_default().composites += 1;
+    }
+    Ok(by_name)
 }
 
 /// A level 1 or level 3 binding must name a user template that applies to `kind`.

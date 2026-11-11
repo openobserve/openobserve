@@ -220,6 +220,8 @@ pub struct ListTemplatesQuery {
     pub applies_to: Option<String>,
     #[serde(rename = "type")]
     pub template_type: Option<String>,
+    /// When true, each template carries `used_by` counts, aggregated once for the whole list.
+    pub include_usage: Option<bool>,
 }
 
 impl ListTemplatesQuery {
@@ -311,10 +313,26 @@ pub async fn list_templates(
         // Get List of allowed objects ends
     }
 
-    match templates::list(&org_id, _permitted, filter).await {
-        Ok(data) => {
-            MetaHttpResponse::json(data.into_iter().map(Template::from).collect::<Vec<_>>())
-        }
+    let data = match templates::list(&org_id, _permitted, filter).await {
+        Ok(data) => data,
+        Err(e) => return template_error_response(e),
+    };
+    if !query.include_usage.unwrap_or(false) {
+        return MetaHttpResponse::json(data.into_iter().map(Template::from).collect::<Vec<_>>());
+    }
+    // The same counts GET template returns, with one query per consumer table for the list.
+    match templates::all_used_by(&org_id).await {
+        Ok(mut by_name) => MetaHttpResponse::json(
+            data.into_iter()
+                .map(|t| {
+                    let used_by = by_name.remove(&t.name).unwrap_or_default();
+                    TemplateWithUsage {
+                        template: Template::from(t),
+                        used_by,
+                    }
+                })
+                .collect::<Vec<_>>(),
+        ),
         Err(e) => template_error_response(e),
     }
 }
@@ -549,6 +567,20 @@ mod tests {
 
     fn status(err: TemplateError) -> StatusCode {
         template_error_response(err).status()
+    }
+
+    #[test]
+    fn test_list_query_reads_include_usage() {
+        use axum::extract::Query;
+        let parse = |uri: &str| {
+            Query::<super::ListTemplatesQuery>::try_from_uri(&uri.parse().unwrap())
+                .unwrap()
+                .0
+        };
+        let q = parse("/t?include_usage=true&applies_to=alert");
+        assert_eq!(q.include_usage, Some(true));
+        assert_eq!(q.applies_to.as_deref(), Some("alert"));
+        assert_eq!(parse("/t").include_usage, None);
     }
 
     // 404 Not Found

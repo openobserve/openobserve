@@ -392,6 +392,39 @@ describe("TemplateList pagination persistence", () => {
     expect(pushedQuery.action).toBeUndefined();
     expect(pushedQuery.name).toBeUndefined();
   });
+
+  it("toggleTemplateEditor drops applies_to when closing, so the next new template starts on Inferred", async () => {
+    (router as any).currentRoute.value.query = {};
+    wrapper = mountComponent();
+    await flushPromises();
+    (wrapper.vm as any).showTemplateEditor = true;
+    (router as any).currentRoute.value.query = {
+      action: "add",
+      applies_to: "anomaly",
+      page: "2",
+      org_identifier: "test-org",
+    };
+    const pushSpy = vi.spyOn(router, "push");
+
+    (wrapper.vm as any).toggleTemplateEditor();
+
+    const pushedQuery = pushSpy.mock.calls[0][0].query;
+    expect(pushedQuery.applies_to).toBeUndefined();
+    expect(pushedQuery.page).toBe("2");
+  });
+
+  it("editTemplate(null) keeps applies_to, which the picker's create link passes", async () => {
+    (router as any).currentRoute.value.query = { applies_to: "anomaly" };
+    wrapper = mountComponent();
+    await flushPromises();
+    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
+
+    (wrapper.vm as any).editTemplate(null);
+
+    expect(pushSpy.mock.calls[0][0].query.applies_to).toBe("anomaly");
+    pushSpy.mockRestore();
+    (router as any).currentRoute.value.query = {};
+  });
 });
 
 describe("alertTemplates view state restore", () => {
@@ -405,6 +438,63 @@ describe("alertTemplates view state restore", () => {
   beforeEach(() => resetListViewState());
 
   afterEach(() => viewWrapper?.unmount());
+
+  it("restores the Applies to filter after navigation", async () => {
+    (router as any).currentRoute.value.query = {};
+    viewWrapper = mountComponent();
+    (viewWrapper.vm as any).appliesToFilter = "downtime";
+    await flushPromises();
+    viewWrapper.unmount();
+
+    viewWrapper = mountComponent();
+    expect((viewWrapper.vm as any).appliesToFilter).toBe("downtime");
+  });
+
+  it("prefers a valid applies_to in the address over the kept filter, and ignores an invalid one", () => {
+    useListViewState("alertTemplates", { appliesTo: "downtime" });
+    (router as any).currentRoute.value.query = { applies_to: "anomaly" };
+    viewWrapper = mountComponent();
+    expect((viewWrapper.vm as any).appliesToFilter).toBe("anomaly");
+    viewWrapper.unmount();
+
+    (router as any).currentRoute.value.query = { applies_to: "nonsense" };
+    viewWrapper = mountComponent();
+    expect((viewWrapper.vm as any).appliesToFilter).toBe("downtime");
+    (router as any).currentRoute.value.query = {};
+  });
+
+  it("says no template matches the filter, and its clear action resets the filter too", async () => {
+    const org = store.state.selectedOrganization.identifier;
+    global.server.use(
+      http.get(`${store.state.API_ENDPOINT}/api/${org}/alerts/templates`, () =>
+        HttpResponse.json([{ name: "alert_only", type: "http", body: "", applies_to: ["alert"] }]),
+      ),
+    );
+    queryClient.removeQueries({ queryKey: templateKeys.list(org), exact: true });
+    useListViewState("alertTemplates", { appliesTo: "downtime" });
+    (router as any).currentRoute.value.query = {};
+    try {
+      viewWrapper = mountComponent();
+      await vi.waitFor(() => expect((viewWrapper.vm as any).templates.length).toBe(1));
+      await flushPromises();
+      const vm = viewWrapper.vm as any;
+      expect(vm.visibleRows).toEqual([]);
+      await vi.waitFor(() =>
+        expect(viewWrapper.findComponent({ name: "OEmptyState" }).exists()).toBe(true),
+      );
+      const empty = viewWrapper.findComponent({ name: "OEmptyState" });
+      expect(empty.props("filtered")).toBe(true);
+
+      vm.filterQuery = "x";
+      empty.vm.$emit("action", "clear-filters");
+      await flushPromises();
+      expect(vm.appliesToFilter).toBe("any");
+      expect(vm.filterQuery).toBe("");
+    } finally {
+      global.server.resetHandlers();
+      queryClient.removeQueries({ queryKey: templateKeys.list(org), exact: true });
+    }
+  });
 
   it("restores search, tab, page size and sort", () => {
     useListViewState("alertTemplates", {
