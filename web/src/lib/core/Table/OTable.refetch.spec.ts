@@ -6,7 +6,7 @@ import { createI18n } from "vue-i18n";
 import { nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
 import type { OTableColumnDef } from "./OTable.types";
-import { ENTER_FADE } from "@/lib/styles/motion";
+import { ENTER_FADE, LOADER_DELAY_MS } from "@/lib/styles/motion";
 
 const i18n = createI18n({
   legacy: false,
@@ -48,6 +48,13 @@ function mountTable(props: Record<string, unknown> = {}, slots: Record<string, s
   return wrapper;
 }
 
+// The skeleton appears only once a cold load outlasts LOADER_DELAY_MS; needs fake timers.
+async function passLoaderDelay(): Promise<void> {
+  await nextTick();
+  vi.advanceTimersByTime(LOADER_DELAY_MS);
+  await nextTick();
+}
+
 function bodyText(): string {
   return wrapper.find(BODY).text();
 }
@@ -84,6 +91,26 @@ describe("OTable refetch keeps settled rows", () => {
     expect(wrapper.emitted("row-click")).toHaveLength(1);
   });
 
+  it("blocks the actions column of the kept rows once the refetch is slow, and only that column", async () => {
+    vi.useFakeTimers();
+    mountTable(
+      { columns: [...columns, { id: "actions", header: "Actions", isAction: true }] },
+      { "cell-actions": '<button data-test="row-pause">Pause</button>' },
+    );
+    const actionsCell = () =>
+      wrapper.find('[data-test="o2-table-row-0"] [data-test="o2-table-cell-actions"]');
+    const nameCell = () =>
+      wrapper.find('[data-test="o2-table-row-0"] [data-test="o2-table-cell-name"]');
+    expect(actionsCell().attributes("inert")).toBeUndefined();
+    await wrapper.setProps({ loading: true });
+    vi.runAllTimers();
+    await nextTick();
+    expect(actionsCell().attributes("inert")).toBeDefined();
+    expect(nameCell().attributes("inert")).toBeUndefined();
+    await wrapper.setProps({ loading: false });
+    expect(actionsCell().attributes("inert")).toBeUndefined();
+  });
+
   it("never shows the stale cue for a refetch that settles quickly", async () => {
     vi.useFakeTimers();
     mountTable();
@@ -96,32 +123,42 @@ describe("OTable refetch keeps settled rows", () => {
     expect(wrapper.find(BAR).exists()).toBe(false);
   });
 
-  it("blocks clicks, marks the table busy and shows the bar once the refetch is slow", async () => {
+  it("keeps reading and opening live but blocks selection once the refetch is slow", async () => {
     vi.useFakeTimers();
     mountTable({ selection: "multiple" });
     await wrapper.setProps({ loading: true });
     vi.runAllTimers();
     await nextTick();
-    expect(wrapper.find(BODY).attributes("inert")).toBeDefined();
+    expect(wrapper.find(BODY).attributes("inert")).toBeUndefined();
     expect(wrapper.find(TABLE).attributes("aria-busy")).toBe("true");
     expect(wrapper.find(BAR).exists()).toBe(true);
 
     await wrapper.find('[data-test="o2-table-row-0"]').trigger("click");
+    expect(wrapper.emitted("row-click")).toHaveLength(1);
     await wrapper.find('[data-test="o2-table-row-0"]').trigger("dblclick");
+    expect(wrapper.emitted("row-dblclick")).toHaveLength(1);
     await wrapper.find('[data-test="o2-table-cell-id"]').trigger("click");
+    expect(wrapper.emitted("cell-click")).toHaveLength(1);
     await wrapper.find('[data-test="o2-table-select-0"] [role="checkbox"]').trigger("click");
     await wrapper.find('[data-test="o2-table-select-all"] [role="checkbox"]').trigger("click");
-    expect(wrapper.emitted("row-click")).toBeUndefined();
-    expect(wrapper.emitted("row-dblclick")).toBeUndefined();
-    expect(wrapper.emitted("cell-click")).toBeUndefined();
     expect(wrapper.emitted("update:selectedIds")).toBeUndefined();
 
     await wrapper.setProps({ loading: false });
-    expect(wrapper.find(BODY).attributes("inert")).toBeUndefined();
     expect(wrapper.find(TABLE).attributes("aria-busy")).toBeUndefined();
     expect(wrapper.find(BAR).exists()).toBe(false);
-    await wrapper.find('[data-test="o2-table-row-0"]').trigger("click");
-    expect(wrapper.emitted("row-click")).toHaveLength(1);
+    await wrapper.find('[data-test="o2-table-select-0"] [role="checkbox"]').trigger("click");
+    expect(wrapper.emitted("update:selectedIds")).toHaveLength(1);
+  });
+
+  it("leaves the progress line to the page with progressLine off, and still dims", async () => {
+    vi.useFakeTimers();
+    mountTable({ progressLine: false });
+    await wrapper.setProps({ loading: true });
+    vi.runAllTimers();
+    await nextTick();
+    expect(wrapper.find(BAR).exists()).toBe(false);
+    expect(wrapper.find(TABLE).attributes("aria-busy")).toBe("true");
+    expect(wrapper.find(BODY).classes()).toContain("opacity-60");
   });
 
   it("dims kept rows on the body whose enter fade already ran and holds no opacity", async () => {
@@ -135,14 +172,16 @@ describe("OTable refetch keeps settled rows", () => {
     // Same element, so the fade does not replay; no fill mode, so the dim class owns opacity after it.
     expect(stale.element).toBe(mounted);
     expect(stale.classes()).toEqual(
-      expect.arrayContaining([...ENTER_FADE.split(" "), "opacity-60", "dark:opacity-40"]),
+      expect.arrayContaining([...ENTER_FADE.split(" "), "opacity-60"]),
     );
+    expect(stale.classes()).not.toContain("dark:opacity-40");
     expect(stale.classes().some((c) => /fill-mode-(forwards|both)/.test(c))).toBe(false);
   });
 
   it("draws the custom loading overlay on a first load but not over kept rows", async () => {
     vi.useFakeTimers();
     mountTable({ loading: true }, { loading: "<div>Custom loader</div>" });
+    await passLoaderDelay();
     expect(wrapper.find(LOADING_SLOT).exists()).toBe(true);
     await wrapper.setProps({ loading: false });
     vi.runAllTimers();
@@ -152,36 +191,47 @@ describe("OTable refetch keeps settled rows", () => {
     expect(wrapper.find(LOADING_SLOT).exists()).toBe(false);
   });
 
-  it("shows the skeleton on a first load, even with rows already passed in", () => {
+  it("shows the skeleton on a slow first load, even with rows already passed in", async () => {
+    vi.useFakeTimers();
     mountTable({ loading: true });
+    await passLoaderDelay();
     expect(wrapper.find(SKELETON).exists()).toBe(true);
   });
 
   it("shows the skeleton when the last settled answer was empty", async () => {
+    vi.useFakeTimers();
     mountTable({ data: [] });
     await wrapper.setProps({ loading: true });
+    await passLoaderDelay();
     expect(wrapper.find(SKELETON).exists()).toBe(true);
   });
 
   it("shows the skeleton for the load after an error", async () => {
+    vi.useFakeTimers();
     mountTable();
     await wrapper.setProps({ error: "boom" });
     await wrapper.setProps({ error: null, loading: true });
+    await passLoaderDelay();
     expect(wrapper.find(SKELETON).exists()).toBe(true);
   });
 
   it("shows the skeleton after loadingResetKey changes", async () => {
+    vi.useFakeTimers();
     mountTable({ loadingResetKey: "folder-a" });
     await wrapper.setProps({ loadingResetKey: "folder-b" });
     await wrapper.setProps({ loading: true });
+    await passLoaderDelay();
     expect(wrapper.find(SKELETON).exists()).toBe(true);
   });
 
   it("swaps kept rows for the skeleton when loadingResetKey changes mid-load", async () => {
+    vi.useFakeTimers();
     mountTable({ loadingResetKey: "folder-a" });
     await wrapper.setProps({ loading: true });
     expect(wrapper.find(SKELETON).exists()).toBe(false);
     await wrapper.setProps({ loadingResetKey: "folder-b" });
+    expect(wrapper.find(BODY).exists()).toBe(false);
+    await passLoaderDelay();
     expect(wrapper.find(SKELETON).exists()).toBe(true);
   });
 
@@ -193,9 +243,11 @@ describe("OTable refetch keeps settled rows", () => {
     expect(bodyText()).toContain("B 1");
   });
 
-  it("shows the skeleton on every load with skeletonOnRefetch", async () => {
+  it("shows the skeleton on every slow load with skeletonOnRefetch", async () => {
+    vi.useFakeTimers();
     mountTable({ skeletonOnRefetch: true });
     await wrapper.setProps({ loading: true });
+    await passLoaderDelay();
     expect(wrapper.find(SKELETON).exists()).toBe(true);
   });
 

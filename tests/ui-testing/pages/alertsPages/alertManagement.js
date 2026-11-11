@@ -212,9 +212,8 @@ export class AlertManagement {
         await expect(pauseButton).toBeVisible({ timeout: 5000 });
         await pauseButton.click();
 
-        await expect(
-            this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Alert Paused Successfully' }).first()
-        ).toBeVisible({ timeout: 10000 });
+        // A confirmed pause has no toast: the same button turns into Resume.
+        await expect(pauseButton).toHaveAttribute('data-row-action', 'resume', { timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Successfully paused alert', { alertName });
@@ -257,9 +256,7 @@ export class AlertManagement {
         await resumeButton.click();
         testLogger.info('Clicked resume button', { alertName });
 
-        await expect(
-            this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Alert Resumed Successfully' }).first()
-        ).toBeVisible({ timeout: 15000 });
+        await expect(resumeButton).toHaveAttribute('data-row-action', 'pause', { timeout: 15000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Successfully resumed alert', { alertName });

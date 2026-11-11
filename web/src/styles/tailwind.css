@@ -138,25 +138,24 @@ html.theme-switching *::after {
   }
 }
 
-/*
- * Reduced-motion: users who ask for less motion get a plain, near-instant
- * fade instead of the slide/zoom enter-exit animations (tw-animate-css
- * `animate-in` / `animate-out`). Keeps overlays usable without the movement.
- */
+/* Reduced motion: everything stops except an element marked o2-motion-keep (not its children); kept motion scales by --motion-slowdown. */
+:root {
+  --motion-slowdown: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  [data-reka-popper-content-wrapper] *,
-  [data-o2-dialog],
-  [data-o2-drawer],
-  [data-test="o-dialog-overlay"],
-  [data-test="o-drawer-overlay"] {
-    animation-duration: 0.01ms !important;
-    animation-timing-function: linear !important;
+  :root {
+    --motion-slowdown: 4;
   }
 
-  /* 0.01ms, not none: transitionend still fires for code that waits on it. */
-  *,
-  *::before,
-  *::after {
+  /* 0.01ms, not none: animationend and transitionend still fire for code that waits on them. */
+  :not(.o2-motion-keep),
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    animation-timing-function: linear !important;
     transition-duration: 0.01ms !important;
     transition-delay: 0s !important;
   }

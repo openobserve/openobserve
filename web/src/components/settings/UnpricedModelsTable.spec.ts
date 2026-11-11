@@ -195,7 +195,9 @@ describe("UnpricedModelsTable", () => {
   it("holds the skeleton, not the all-priced state, while the stream list loads", async () => {
     wrapper = mountTab([], { streams: [], streamsLoaded: false, stream: "", loaded: false });
     await flushPromises();
-    expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true),
+    );
     expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="model-pricing-unpriced-no-streams"]').exists()).toBe(false);
   });
@@ -203,7 +205,9 @@ describe("UnpricedModelsTable", () => {
   it("holds the skeleton, not the all-priced state, until the first read succeeds", async () => {
     wrapper = mountTab([], { loading: true, loaded: false });
     await flushPromises();
-    expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true),
+    );
     expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
   });
 

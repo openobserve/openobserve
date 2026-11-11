@@ -123,6 +123,7 @@ import {
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
+import { withoutEntrance } from "@/utils/dashboard/chartMotion";
 import {
   heatmapHoverTime,
   heatmapSyncPointer,
@@ -227,6 +228,7 @@ export default defineComponent({
     "contextmenu",
     "domcontextmenu",
     "finished",
+    "painted",
   ],
   props: {
     data: {
@@ -449,10 +451,14 @@ export default defineComponent({
     // Registered before setOption, so it runs ahead of the tooltip's own zr handler and the tooltip reads this move's time.
     const trackPointer = () => chart?.getZr().on("mousemove", reportPointerTime);
 
+    // Every setOption rebuilds the chart, so a non-zero duration replays the grow-in on each refresh, time change and return.
     const chartOptions = (options: Record<string, unknown>) =>
       withChartFont(
         withLineStrokeEvents(
-          { aria: { enabled: !props.label }, ...keepRowWindow(options) },
+          {
+            aria: { enabled: !props.label },
+            ...withoutEntrance(keepRowWindow(options)),
+          },
           props.findLineOnContextMenu,
         ),
       );
@@ -702,7 +708,19 @@ export default defineComponent({
       }
     };
 
+    // The data each full setOption drew, so `painted` reports a frame of the current data, never an older one.
+    let paintPending: unknown = null;
+    const awaitPaint = () => {
+      paintPending = props.data;
+    };
+    const onRendered = () => {
+      if (!paintPending || paintPending !== props.data) return;
+      paintPending = null;
+      emit("painted");
+    };
+
     const chartInitialSetUp = () => {
+      chart?.on("rendered", onRendered);
       chart?.on("mousemove", (params: any) => {
         if (isLineStrokeEvent(params)) return;
         emit("mousemove", params);
@@ -955,6 +973,7 @@ export default defineComponent({
         const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
         const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
         chart?.setOption(chartOptions(options), { lazyUpdate, notMerge });
+        awaitPaint();
         chart?.setOption({ animation: true }, { lazyUpdate: true });
       } catch (e: any) {
         emit("error", {
@@ -1005,6 +1024,7 @@ export default defineComponent({
             lazyUpdate: true,
             notMerge: true,
           });
+          awaitPaint();
           chartInitialSetUp();
         }
       });
@@ -1067,6 +1087,7 @@ export default defineComponent({
           lazyUpdate: true,
           notMerge: true,
         });
+        awaitPaint();
         chartInitialSetUp();
       } catch (e: any) {
         emit("error", {
@@ -1161,6 +1182,7 @@ export default defineComponent({
           lazyUpdate: true,
           notMerge: true,
         });
+        awaitPaint();
         chartInitialSetUp();
         windowResizeEventCallback();
 
@@ -1221,6 +1243,7 @@ export default defineComponent({
               lazyUpdate: true,
               notMerge: true,
             });
+            awaitPaint();
           } catch (error) {
             console.error("Error during setOption", error);
           }

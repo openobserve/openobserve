@@ -170,6 +170,10 @@
   --color-tooltip-text: var(--color-text-heading);
   --color-tooltip-border: var(--color-border-subtle);
   --color-tooltip-arrow: var(--color-surface-overlay);
+  /* Copy confirmation bubble: inverse of the page so it reads on any surface; failure in the error tint. */
+  --color-copy-confirm-bg: var(--color-grey-800);
+  --color-copy-confirm-text: var(--color-grey-50);
+  --color-copy-confirm-error-bg: var(--color-status-error-bg);
 
   /* Icon sizes */
   --text-icon-xs: var(--spacing-3);
@@ -1500,6 +1504,9 @@
   --color-tooltip-text: var(--color-tooltip-text);
   --color-tooltip-border: var(--color-tooltip-border);
   --color-tooltip-arrow: var(--color-tooltip-arrow);
+  --color-copy-confirm-bg: var(--color-copy-confirm-bg);
+  --color-copy-confirm-text: var(--color-copy-confirm-text);
+  --color-copy-confirm-error-bg: var(--color-copy-confirm-error-bg);
 
   /* Icon sizes */
   --text-icon-xs: var(--text-icon-xs);

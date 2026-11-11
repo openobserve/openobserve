@@ -17,44 +17,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard w-full overflow-hidden">
     <!-- Charts Section -->
-    <transition name="slide-fade">
-      <div
-        v-if="show"
-        class="charts-wrapper dashboard-strip flex h-auto min-h-[8.5rem] flex-col overflow-hidden py-0! will-change-[transform,opacity] md:h-40 md:flex-row"
-      >
-        <div class="h-40 min-w-0 md:h-auto md:flex-2 dark:hover:shadow-sm">
-          <RenderDashboardCharts
-            v-if="show"
-            ref="dashboardChartsRef"
-            :viewOnly="true"
-            :frame="false"
-            :dashboardData="dashboardData || {}"
-            :currentTimeObj="currentTimeObj"
-            :allowAlertCreation="false"
-            :exploreActions="true"
-            searchType="dashboards"
-            @updated:dataZoom="onDataZoom"
-            @exploreCreateAlert="onExploreCreateAlert"
-            @exploreAddToDashboard="onExploreAddToDashboard"
-          />
-        </div>
-        <!-- Tied to the Rate/Errors panels: metrics.json h (9 rows after migration) × 17px cellHeight, 4px GridStack margin -->
-        <div class="h-40 min-w-0 px-1 py-0.5 md:h-[9.5625rem] md:flex-1 md:py-1">
-          <TracesLatencyHeatmap
-            :request="heatmapRequest"
-            :selection="heatmapSelection"
-            :ai-enabled="aiEnabled"
-            @select="onHeatmapSelect"
-            @filter="heatmapSelection && onHeatmapFilter(heatmapSelection)"
-            @drill-down="onHeatmapDrillDown"
-            @clear="onHeatmapClear"
-            @ask-ai="onHeatmapAskAi"
-            @create-alert="createAlert('duration')"
-            @add-to-dashboard="openAddToDashboard('duration')"
-          />
-        </div>
+    <div
+      v-if="show"
+      class="charts-wrapper dashboard-strip relative flex h-auto min-h-[8.5rem] flex-col overflow-hidden py-0! will-change-[transform,opacity] md:h-40 md:flex-row"
+    >
+      <div class="h-40 min-w-0 md:h-auto md:flex-2 dark:hover:shadow-sm">
+        <RenderDashboardCharts
+          v-if="show"
+          ref="dashboardChartsRef"
+          :viewOnly="true"
+          :frame="false"
+          :dashboardData="dashboardData || {}"
+          :currentTimeObj="currentTimeObj"
+          :allowAlertCreation="false"
+          :exploreActions="true"
+          searchType="dashboards"
+          @updated:dataZoom="onDataZoom"
+          @exploreCreateAlert="onExploreCreateAlert"
+          @exploreAddToDashboard="onExploreAddToDashboard"
+        >
+          <!-- Until a panel mounts it keeps the page placeholder's cell, so one placeholder lasts to first draw. -->
+          <template #panel-placeholder="{ panel, title }">
+            <TracesRedPanelPlaceholder :title="title" :meta="panel.config?.title_meta" />
+          </template>
+        </RenderDashboardCharts>
       </div>
-    </transition>
+      <!-- Tied to the Rate/Errors panels: metrics.json h (9 rows after migration) × 17px cellHeight, 4px GridStack margin -->
+      <div class="h-40 min-w-0 px-1 py-0.5 md:h-[9.5625rem] md:flex-1 md:py-1">
+        <TracesLatencyHeatmap
+          :request="heatmapRequest"
+          :stream="streamName"
+          :source="heatmapSource"
+          :selection="heatmapSelection"
+          :ai-enabled="aiEnabled"
+          @select="onHeatmapSelect"
+          @filter="heatmapSelection && onHeatmapFilter(heatmapSelection)"
+          @drill-down="onHeatmapDrillDown"
+          @clear="onHeatmapClear"
+          @ask-ai="onHeatmapAskAi"
+          @create-alert="createAlert('duration')"
+          @add-to-dashboard="openAddToDashboard('duration')"
+          @refresh-failed="reportTracesChartRefreshFailed(searchObj)"
+        />
+      </div>
+    </div>
 
     <AddToDashboard
       v-if="addToDashboardPanel"
@@ -77,7 +83,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, shallowRef, onMounted, computed, defineAsyncComponent, nextTick, watch } from "vue";
+import {
+  ref,
+  shallowRef,
+  onMounted,
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  provide,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -90,6 +105,8 @@ import TracesLatencyHeatmap, {
   type LatencyHeatmapAskAi,
   type LatencyHeatmapRequest,
 } from "./TracesLatencyHeatmap.vue";
+import TracesRedPlaceholder from "./TracesRedPlaceholder.vue";
+import TracesRedPanelPlaceholder from "./TracesRedPanelPlaceholder.vue";
 import type { ComparisonSelection, PresetContext } from "./traceComparison";
 import {
   buildLatencyHeatmapSql,
@@ -105,10 +122,20 @@ import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { buildTracesRedPanel, tracesBucketNotice, type TracesRedChart } from "./tracesRedPanels";
 import type { I18nText } from "@/types/i18n";
+import { PANEL_FAILED_REFRESH_HOLD } from "@/composables/dashboard/panelFailedRefreshHold";
+import {
+  createTracesFailedRefreshHold,
+  reportTracesChartRefreshFailed,
+  startTracesChartLoad,
+  tracesChartSource,
+} from "./tracesFailedRefreshHold";
 
-const RenderDashboardCharts = defineAsyncComponent(
-  () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
-);
+// Even with its chunk loaded it resolves a tick late; delay 0 keeps the RED placeholder up for that frame.
+const RenderDashboardCharts = defineAsyncComponent({
+  loader: () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
+  loadingComponent: TracesRedPlaceholder,
+  delay: 0,
+});
 
 const TracesComparison = defineAsyncComponent(() => import("./TracesComparison.vue"));
 
@@ -148,6 +175,9 @@ const store = useStore();
 const { searchObj, tracesParser } = useTraces();
 const { t } = useI18nTyped();
 
+const failedRefreshHold = createTracesFailedRefreshHold(searchObj);
+provide(PANEL_FAILED_REFRESH_HOLD, failedRefreshHold);
+
 // Read filter and timeRange directly from the shared composable rather than via props.
 // The props go stale during synchronous call chains (e.g., auto_query_enabled
 // triggers searchData → getQueryData → getDashboardData → loadDashboard before
@@ -177,6 +207,7 @@ const dashboardData = ref(null);
 const heatmapRequest = ref<LatencyHeatmapRequest | null>(null);
 // The box drawn on the heatmap; it is applied only from its popover.
 const heatmapSelection = shallowRef<LatencyHeatmapSelection | null>(null);
+const heatmapSource = ref<string | undefined>();
 
 const showComparison = ref(false);
 // The comparison is a snapshot of the search that opened it, so a new search closes it.
@@ -230,6 +261,7 @@ const getBaseFilters = () => {
 const loadDashboard = async () => {
   try {
     error.value = null;
+    startTracesChartLoad(searchObj);
 
     currentTimeObj.value = {
       __global: {
@@ -249,6 +281,8 @@ const loadDashboard = async () => {
       effectiveTimeRange.value.endTime,
     );
 
+    const source = tracesChartSource(searchObj);
+    heatmapSource.value = source;
     heatmapRequest.value = {
       sql: buildLatencyHeatmapSql(streamName, baseFilters, interval.sql),
       startTime: effectiveTimeRange.value.startTime,
@@ -320,6 +354,7 @@ const loadDashboard = async () => {
       },
     );
 
+    failedRefreshHold.generated(convertedDashboard.tabs[0].panels, source);
     dashboardData.value = convertedDashboard;
 
     updateLayout();
@@ -662,36 +697,5 @@ defineExpose({
 
 .charts-wrapper :deep(.displayDiv) {
   margin-top: 0;
-}
-
-/* keep(complex-state): slide-fade-* drive the <transition name="slide-fade">
-   reveal (enter/leave phases) — Tailwind can't express transition-group state. */
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.slide-fade-enter-from {
-  opacity: 0;
-  transform: translateY(-0.625rem);
-  max-height: 0;
-}
-
-.slide-fade-enter-to {
-  opacity: 1;
-  transform: translateY(0);
-  max-height: 31.25rem;
-}
-
-.slide-fade-leave-from {
-  opacity: 1;
-  transform: translateY(0);
-  max-height: 31.25rem;
-}
-
-.slide-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-0.625rem);
-  max-height: 0;
 }
 </style>

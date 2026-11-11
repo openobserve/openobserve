@@ -188,15 +188,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @open="firstDataNotice.open"
                 @dismiss="firstDataNotice.dismiss"
               />
-              <!-- Enter-only fade; the body's slide lives in OPageLayout so the header stays put. -->
+              <!-- Enter-only fade, skipped on a return; the body's slide lives in OPageLayout so the header stays put. -->
               <FeatureLockBoundary :feature="lockedFeature">
                 <SecurityPageGate v-if="securityGated" />
                 <router-view v-else v-slot="{ Component }">
                   <OAccessBoundary>
-                    <keep-alive :include="KEPT_ALIVE_VIEWS">
+                    <keep-alive :include="KEPT_ALIVE_VIEWS" @vue:unmounted="forgetKeptViews">
                       <component
                         :is="Component"
-                        :class="[ENTER_FADE, 'h-full']"
+                        :class="[routeEnterClass(Component), 'h-full']"
                         @sendToAiChat="sendToAiChat"
                       />
                     </keep-alive>
@@ -284,7 +284,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
-import { ENTER_FADE } from "@/lib/styles/motion";
+import { useRouteEnterFade } from "@/layouts/useRouteEnterFade";
+import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
 import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
@@ -486,6 +487,12 @@ export default defineComponent({
     const { t } = useI18nTyped();
     // Once, here: the mixin calls inject() and onMounted(), which outside setup() warn and do nothing.
     const layoutMixin = mainLayoutMixin.setup();
+    const {
+      enterClass: routeEnterClass,
+      forgetKeptViews,
+      entering: routeEntering,
+    } = useRouteEnterFade(router, KEPT_ALIVE_VIEWS);
+    provide(PAGE_ENTRANCE_KEY, routeEntering);
     const miniMode = ref(false);
     const signOutDraftsOpen = ref(false);
     const signOutDraftCount = ref(0);
@@ -1979,7 +1986,8 @@ export default defineComponent({
       isLoading,
       fullConfigSettled,
       KEPT_ALIVE_VIEWS,
-      ENTER_FADE,
+      routeEnterClass,
+      forgetKeptViews,
       getImageURL,
       updateOrganization,
       setSelectedOrganization,

@@ -24,6 +24,7 @@ import { MISC_GROUP_ID } from "@/utils/metrics/prefixGrouping";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { PreviewCancelledError } from "@/composables/metrics/useMetricsPreviewQueue";
 import config from "@/aws-exports";
+import { clearAnnouncements } from "@/lib/feedback/RegionStatus/announcer";
 
 const drilldownApi = vi.hoisted(() => ({
   getIdentityConfig: vi.fn(),
@@ -103,9 +104,14 @@ const chartOf = (c: any) => ({
 
 const mountView = (
   props: Record<string, any> = {},
-  { realHeader = false, stubs = {} as Record<string, any> } = {},
+  {
+    realHeader = false,
+    stubs = {} as Record<string, any>,
+    attachTo,
+  }: { realHeader?: boolean; stubs?: Record<string, any>; attachTo?: HTMLElement } = {},
 ) =>
   mount(MetricDetailView, {
+    attachTo,
     props: {
       card: SELECTED,
       metricName: SELECTED.name,
@@ -141,7 +147,16 @@ const mountView = (
         ...stubs,
         MetricBreakdown: {
           name: "MetricBreakdown",
-          props: ["variant", "panelQueries", "runQuery", "compare", "stepSeconds", "forecast"],
+          props: [
+            "variant",
+            "panelQueries",
+            "runQuery",
+            "compare",
+            "stepSeconds",
+            "forecast",
+            "retryToken",
+            "announces",
+          ],
           template: "<div data-test='breakdown-stub' />",
         },
         MetricCardChart: {
@@ -197,6 +212,37 @@ describe("MetricDetailView", () => {
       expect(runQuery).toHaveBeenCalledWith("sum by (le) (rate(x[4m]))", expect.any(AbortSignal));
       const chart = wrapper.findComponent({ name: "MetricCardChart" });
       expect(chart.props("results")).toEqual([SERIES]);
+    });
+
+    it("draws the dashboard panel line on the chart's top edge, not a corner spinner, on first load and refresh", async () => {
+      let first!: (value: any) => void;
+      runQuery.mockImplementationOnce(() => new Promise((resolve) => (first = resolve)));
+      wrapper = mountView();
+      await flushPromises();
+      const overview = wrapper.find('[data-test="metrics-detail-overview"]');
+      const line = () => overview.findComponent({ name: "LoadingProgress" });
+      expect(line().element).toBe(overview.element.firstElementChild);
+      expect(line().props()).toMatchObject({
+        loading: true,
+        loadingProgressPercentage: 0,
+        indeterminate: false,
+      });
+
+      first(SERIES);
+      await flushPromises();
+      expect(line().props("loading")).toBe(false);
+
+      let answer!: (value: any) => void;
+      runQuery.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+      await wrapper.setProps({ timeRange: { start_time: 2, end_time: 3 } });
+      await flushPromises();
+      expect(line().props("loading")).toBe(true);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([SERIES]);
+      expect(wrapper.find('[data-test="metrics-detail-overview-refreshing"]').exists()).toBe(false);
+
+      answer(SERIES);
+      await flushPromises();
+      expect(line().props("loading")).toBe(false);
     });
 
     it("queries once per window, not again when the card is rebuilt unchanged", async () => {
@@ -1340,6 +1386,410 @@ describe("MetricDetailView", () => {
 
       await wrapper.setProps({ exemplarsOn: false });
       expect(chart().props("injectedExemplars")).toBeUndefined();
+    });
+  });
+
+  describe("open a metric: header, seeded chart and focus at once (M-5)", () => {
+    const seed = {
+      results: [SERIES],
+      timeRange: { start_time: 1, end_time: 2 },
+      lastTriggeredAt: Date.now(),
+    };
+    const mainChart = (w: VueWrapper<any>) =>
+      w.findAllComponents({ name: "MetricCardChart" }).filter((c) => !c.attributes("data-test"));
+
+    it("draws the card's series dimmed with the preview status until the detail query lands", async () => {
+      let land!: (value: any) => void;
+      runQuery.mockImplementation(() => new Promise((resolve) => (land = resolve)));
+      wrapper = mountView({ seed });
+
+      const preview = wrapper.find('[data-test="metrics-detail-preview-chart"]');
+      expect(preview.exists()).toBe(true);
+      expect(preview.classes()).toContain("opacity-60");
+      expect(preview.attributes("aria-busy")).toBe("true");
+      const status = wrapper.find('[data-test="metrics-detail-preview-status"]');
+      expect(status.attributes("role")).toBe("status");
+      expect(status.text()).toBe("Showing list preview · loading full chart");
+      expect(wrapper.find('[data-test="metrics-detail-loading"]').exists()).toBe(false);
+
+      land(SERIES);
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-preview-chart"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-detail-preview-status"]').exists()).toBe(false);
+      expect(mainChart(wrapper)).toHaveLength(1);
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').text()).toMatch(
+        /Updated \d{2}:\d{2}/,
+      );
+    });
+
+    it("keeps the seeded chart at full opacity with the failed marker and Retry when the detail query fails", async () => {
+      let fail!: (error: any) => void;
+      runQuery.mockImplementation(() => new Promise((_, reject) => (fail = reject)));
+      wrapper = mountView({ seed });
+      expect(wrapper.find('[data-test="metrics-detail-preview-chart"]').exists()).toBe(true);
+
+      fail({ response: { status: 403, data: { message: "Forbidden" } } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-preview-chart"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-detail-preview-status"]').exists()).toBe(false);
+      expect(wrapper.find(".opacity-60").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Query failed");
+      const kept = mainChart(wrapper);
+      expect(kept).toHaveLength(1);
+      expect(kept[0].props("results")).toEqual(seed.results);
+      expect(kept[0].props("timeRange")).toEqual(seed.timeRange);
+      const marker = wrapper.find('[data-test="metrics-detail-refresh-failed"]');
+      expect(marker.attributes("data-state")).toBe("failed");
+
+      let land!: (value: any) => void;
+      runQuery.mockImplementation(() => new Promise((resolve) => (land = resolve)));
+      await wrapper.find('[data-test="metrics-detail-refresh-failed-retry"]').trigger("click");
+      await flushPromises();
+      // Retry refreshes over the kept seed rather than blanking it.
+      expect(mainChart(wrapper)).toHaveLength(1);
+      land(SERIES);
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(true);
+    });
+
+    it("reserves the header marker's slot before any failure, so the marker moves no badge when it lands (CR2-2)", async () => {
+      runQuery.mockResolvedValue(SERIES);
+      wrapper = mountView();
+      await flushPromises();
+      const pageHeader = wrapper.findComponent({ name: "OPageHeader" });
+      const slot = () => pageHeader.get('[data-test="metrics-detail-header-failed-slot"]');
+      const before = slot().classes();
+      expect(before).toEqual(expect.arrayContaining(["inline-grid", "shrink-0"]));
+      expect(slot().find('[data-test="data-age-failed-reserve"]').classes()).toContain("invisible");
+      expect(slot().element.children).toHaveLength(1);
+
+      wrapper.findComponent({ name: "MetricBreakdown" }).vm.$emit("failures", {
+        total: 9,
+        kept: { count: 2, failedAt: Date.now(), dataFrom: Date.now() - 300_000 },
+        lost: 0,
+      });
+      await flushPromises();
+      expect(slot().classes()).toEqual(before);
+      expect(slot().element.children).toHaveLength(2);
+      expect(slot().find('[data-test="data-age-failed-reserve"]').exists()).toBe(true);
+      const marker = slot().get('[data-test="metrics-detail-header-refresh-failed"]');
+      expect(marker.classes()).toContain("[grid-area:1/1]");
+      expect(slot().find('[data-test="data-age-failed-reserve"]').classes()).toContain(
+        "[grid-area:1/1]",
+      );
+    });
+
+    it("keeps a short failed marker in the header, which stays in view when the page sentence scrolls away (K1)", async () => {
+      runQuery.mockResolvedValue(SERIES);
+      wrapper = mountView();
+      await flushPromises();
+      const header = () => wrapper.find('[data-test="metrics-detail-header-refresh-failed"]');
+      expect(header().exists()).toBe(false);
+
+      const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
+      breakdown.vm.$emit("failures", {
+        total: 9,
+        kept: { count: 2, failedAt: Date.now(), dataFrom: Date.now() - 300_000 },
+        lost: 0,
+      });
+      await flushPromises();
+      const pageHeader = wrapper.findComponent({ name: "OPageHeader" });
+      expect(pageHeader.find('[data-test="metrics-detail-header-refresh-failed"]').exists()).toBe(
+        true,
+      );
+      expect(header().attributes("data-state")).toBe("failed");
+      expect(header().attributes("tabindex")).toBe("0");
+      const words = header()
+        .findAll('[aria-hidden="true"]')
+        .map((w) => w.text());
+      expect(words).toContain("Refresh failed");
+      expect(header().find(".sr-only").text()).toMatch(
+        /^Refresh failed at .* for 2 of 10 charts · showing data from/,
+      );
+      expect(header().find('[data-test$="-retry"]').exists()).toBe(false);
+
+      breakdown.vm.$emit("failures", { total: 9, kept: null, lost: 0 });
+      await flushPromises();
+      expect(header().exists()).toBe(false);
+    });
+
+    it("labels a seed kept after a failure as the list preview, beside the red marker (CS7)", async () => {
+      let fail!: (error: any) => void;
+      runQuery.mockImplementation(() => new Promise((_, reject) => (fail = reject)));
+      wrapper = mountView({ seed });
+      fail({ response: { status: 403, data: { message: "Forbidden" } } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-preview-kept"]').text()).toBe(
+        "Showing list preview",
+      );
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(true);
+
+      runQuery.mockResolvedValue(SERIES);
+      await wrapper.find('[data-test="metrics-detail-refresh-failed-retry"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-preview-kept"]').exists()).toBe(false);
+    });
+
+    it("never says Updated while a breakdown chart is still failed, and its Retry retries them too (CS8)", async () => {
+      runQuery.mockResolvedValue(SERIES);
+      wrapper = mountView();
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(true);
+      const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
+      breakdown.vm.$emit("failures", { total: 9, kept: null, lost: 9 });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Updated");
+
+      // Kept breakdown charts whose refresh failed join the page's one sentence (j3 "for N of M charts").
+      const keptFrom = Date.now() - 300_000;
+      breakdown.vm.$emit("failures", {
+        total: 9,
+        kept: { count: 2, failedAt: Date.now(), dataFrom: keptFrom },
+        lost: 0,
+      });
+      await flushPromises();
+      const sentence = wrapper.find('[data-test="metrics-detail-refresh-failed"]');
+      expect(sentence.text()).toMatch(/for 2 of 10 charts · showing data from/);
+      expect(wrapper.text()).not.toContain("Updated");
+
+      breakdown.vm.$emit("failures", { total: 9, kept: null, lost: 0 });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(true);
+    });
+
+    it("holds the page's range status while the breakdown still loads, and silences the breakdown during it", async () => {
+      runQuery.mockResolvedValue(SERIES);
+      wrapper = mountView({ rangeChanging: true });
+      await flushPromises();
+      const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
+      expect(breakdown.props("announces")).toBe(false);
+      breakdown.vm.$emit("busy", true);
+      await flushPromises();
+      expect(wrapper.emitted("overview-status")!.at(-1)![0]).toMatchObject({ loading: true });
+      breakdown.vm.$emit("busy", false);
+      await flushPromises();
+      expect(wrapper.emitted("overview-status")!.at(-1)![0]).toMatchObject({ loading: false });
+    });
+
+    it("stops counting the breakdown's work and failures once another tab unmounts it (CS2)", async () => {
+      runQuery.mockResolvedValue(SERIES);
+      wrapper = mountView({ rangeChanging: true });
+      await flushPromises();
+      const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
+      breakdown.vm.$emit("busy", true);
+      breakdown.vm.$emit("failures", { total: 9, kept: null, lost: 2 });
+      await flushPromises();
+      expect(wrapper.emitted("overview-status")!.at(-1)![0]).toMatchObject({ loading: true });
+
+      await wrapper.setProps({ tab: "related" });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "MetricBreakdown" }).exists()).toBe(false);
+      expect(wrapper.emitted("overview-status")!.at(-1)![0]).toMatchObject({
+        loading: false,
+        failed: false,
+      });
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(true);
+    });
+
+    it("hands a failed range change's outcome to the page's region and does not alert it itself (F14)", async () => {
+      clearAnnouncements();
+      runQuery.mockResolvedValue(SERIES);
+      wrapper = mountView({ rangeChanging: true });
+      await flushPromises();
+      const alert = () =>
+        document.body.querySelector('[data-test="region-announcer-alert"]')?.textContent ?? "";
+      const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
+      breakdown.vm.$emit("busy", true);
+      await flushPromises();
+      breakdown.vm.$emit("failures", {
+        total: 9,
+        kept: { count: 1, failedAt: Date.now(), dataFrom: Date.now() - 60_000 },
+        lost: 0,
+      });
+      breakdown.vm.$emit("busy", false);
+      await flushPromises();
+      const status = wrapper.emitted("overview-status")!.at(-1)![0] as any;
+      expect(status.loading).toBe(false);
+      expect(status.failed).toBe(true);
+      expect(status.failure).toMatch(/^Refresh failed at .* for 1 of 10 chart · showing data from/);
+      expect(alert()).toBe("");
+    });
+
+    it("reports a failure with nothing kept as failed, with no sentence of its own (F14)", async () => {
+      runQuery.mockResolvedValue(SERIES);
+      wrapper = mountView({ rangeChanging: true });
+      await flushPromises();
+      const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
+      breakdown.vm.$emit("failures", { total: 9, kept: null, lost: 3 });
+      await flushPromises();
+      expect(wrapper.emitted("overview-status")!.at(-1)![0]).toMatchObject({
+        failed: true,
+        failure: null,
+      });
+    });
+
+    it("alerts the page's failed-refresh sentence once per failed run, not once per chart", async () => {
+      clearAnnouncements();
+      runQuery.mockResolvedValue(SERIES);
+      wrapper = mountView();
+      await flushPromises();
+      const alert = () =>
+        document.body.querySelector('[data-test="region-announcer-alert"]')?.textContent ?? "";
+      const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
+      const kept = (count: number) => ({
+        total: 9,
+        kept: { count, failedAt: Date.now(), dataFrom: Date.now() - 60_000 },
+        lost: 0,
+      });
+      breakdown.vm.$emit("busy", true);
+      await flushPromises();
+      breakdown.vm.$emit("failures", kept(1));
+      await flushPromises();
+      expect(alert()).toBe("");
+      breakdown.vm.$emit("busy", false);
+      await flushPromises();
+      expect(alert()).toMatch(/^Refresh failed at .* for 1 of 10 chart · showing data from/);
+      const node = document.body.querySelector('[data-test="region-announcer-alert"]');
+      if (node) node.textContent = "";
+      breakdown.vm.$emit("failures", kept(3));
+      await flushPromises();
+      expect(alert()).toBe("");
+    });
+
+    it("the page's Retry after a failed refresh also bumps the breakdown's retry", async () => {
+      let fail!: (error: any) => void;
+      runQuery.mockImplementation(() => new Promise((_, reject) => (fail = reject)));
+      wrapper = mountView({ seed });
+      fail({ response: { status: 500, data: { message: "boom" } } });
+      await flushPromises();
+      const breakdown = wrapper.findComponent({ name: "MetricBreakdown" });
+      const before = breakdown.props("retryToken");
+      runQuery.mockResolvedValue(SERIES);
+      await wrapper.find('[data-test="metrics-detail-refresh-failed-retry"]').trigger("click");
+      expect(breakdown.props("retryToken")).toBe(before + 1);
+    });
+
+    it("without a seed, a failed first load has nothing to keep and says the query failed", async () => {
+      let fail!: (error: any) => void;
+      runQuery.mockImplementation(() => new Promise((_, reject) => (fail = reject)));
+      wrapper = mountView();
+
+      fail({ response: { status: 403, data: { message: "Forbidden" } } });
+      await flushPromises();
+      expect(wrapper.text()).toContain("Query failed");
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(false);
+    });
+
+    it("without a seed, shows the static chart placeholder rather than a shimmer", () => {
+      runQuery.mockImplementation(() => new Promise(() => {}));
+      wrapper = mountView();
+      const body = wrapper.find('[data-test="metrics-detail-overview-loading"]');
+      expect(body.attributes("aria-label")).toBe("Loading chart");
+      expect(body.find(".skeleton-wave").exists()).toBe(false);
+    });
+
+    it("moves focus to the detail heading on arrival", async () => {
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      wrapper = mountView({}, { realHeader: true, attachTo: host });
+      await flushPromises();
+      expect(document.activeElement?.getAttribute("data-test")).toBe("metrics-detail-title");
+      wrapper.unmount();
+      host.remove();
+    });
+
+    it("asks for the usage once, even when a refresh rebuilds the card object", async () => {
+      wrapper = mountView();
+      await flushPromises();
+      await wrapper.setProps({ card: { ...SELECTED } });
+      await flushPromises();
+      expect(getMetricUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks for the org-wide schemas only when Related is opened", async () => {
+      const ensureSchemas = vi.fn().mockResolvedValue(true);
+      wrapper = mountView({ ensureSchemas });
+      await flushPromises();
+      expect(ensureSchemas).not.toHaveBeenCalled();
+
+      await wrapper.setProps({ tab: "related" });
+      expect(ensureSchemas).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("a failed refresh keeps the chart and says so in place (ruling 18)", () => {
+    it("keeps the drawn chart, shows the red sentence with Retry, and never advances the age", async () => {
+      wrapper = mountView({ timeRange: { start_time: 1, end_time: 2 } });
+      await flushPromises();
+      const age = wrapper.find('[data-test="metrics-detail-data-age"]').text();
+
+      runQuery.mockRejectedValue({ response: { status: 403, data: { message: "Forbidden" } } });
+      await wrapper.setProps({ timeRange: { start_time: 2, end_time: 3 } });
+      await flushPromises();
+
+      expect(wrapper.findAllComponents({ name: "MetricCardChart" })).toHaveLength(1);
+      const failed = wrapper.find('[data-test="metrics-detail-refresh-failed"]');
+      expect(failed.attributes("data-state")).toBe("failed");
+      expect(failed.text()).toMatch(
+        /Refresh failed at \d{2}:\d{2} · showing data from \d{2}:\d{2}/,
+      );
+      expect(age).toMatch(/Updated \d{2}:\d{2}/);
+
+      runQuery.mockResolvedValue(SERIES);
+      await wrapper.find('[data-test="metrics-detail-refresh-failed-retry"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(true);
+    });
+
+    it("drops the old query's failed-refresh sentence when a changed query fails with nothing to keep", async () => {
+      wrapper = mountView({ timeRange: { start_time: 1, end_time: 2 } });
+      await flushPromises();
+      runQuery.mockRejectedValue({ response: { status: 500, data: { message: "boom" } } });
+      await wrapper.setProps({ timeRange: { start_time: 2, end_time: 3 } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(true);
+
+      await wrapper.setProps({
+        overview: {
+          queries: [{ expr: "sum(rate(y[4m]))", legendTemplate: "" }],
+          chartType: "line",
+          unit: "count-per-sec",
+          bucketUnit: null,
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("Query failed");
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(false);
+    });
+
+    it("drops the old chart's failed-refresh sentence when the new view has no query to chart", async () => {
+      wrapper = mountView({ timeRange: { start_time: 1, end_time: 2 } });
+      await flushPromises();
+      runQuery.mockRejectedValue({ response: { status: 500, data: { message: "boom" } } });
+      await wrapper.setProps({ timeRange: { start_time: 2, end_time: 3 } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(true);
+
+      await wrapper.setProps({
+        overview: { queries: [], chartType: "line", unit: null, bucketUnit: null },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(false);
+    });
+
+    it("a first load that fails (400) still shows the error state, with nothing to keep", async () => {
+      runQuery.mockRejectedValue({ response: { status: 400, data: { message: "bad query" } } });
+      wrapper = mountView();
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("Query failed");
     });
   });
 });
