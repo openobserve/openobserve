@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * The server's message when a save names a template it refuses to bind
- * (missing, reserved, or not applying to the kind), or null for any other error.
- * The picker shows it under the field.
- */
+// The server's refusal of a template binding, shown under the picker; null for other errors.
 export function templateBindingError(err: any): string | null {
   if (err?.response?.status !== 400) return null;
   const message: string = err.response.data?.message ?? err.response.data?.error ?? "";

@@ -821,9 +821,7 @@ const roomDestinations = computed(() =>
 // Room posts render with the policy's template too, so the picker shows without a webhook rung.
 const templateEnabled = computed(() => webhookEnabled.value || roomDestinations.value.length > 0);
 
-// A hidden picker clears the override on save, but only once the room is known to be empty:
-// a pending or failed team channel read must not drop a template the user cannot see.
-// An unsaved channel change also keeps it: the channel is written after the policy and can fail.
+// Cleared only for a confirmed empty room: a pending, failed or unsaved channel can still use it.
 const templateConfirmedOff = computed(
   () => !templateEnabled.value && teamChannelRead.value === "loaded" && !teamChannelDirty.value,
 );

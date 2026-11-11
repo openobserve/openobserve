@@ -564,8 +564,7 @@ const shownVariableGroups = computed(() => {
     (g) => g.name === "common" || (kinds.includes(g.name) && g.variables.length > 0),
   );
 });
-// The chips use the guide's groups, the kind's own groups first so they are not behind "+N more".
-// `group.<label>` is a pattern, not a variable a chip can insert.
+// Kind groups lead so they are not behind "+N more"; `group.<label>` is a pattern, not a variable.
 const guideVariables = computed(() => [
   ...new Set(
     [

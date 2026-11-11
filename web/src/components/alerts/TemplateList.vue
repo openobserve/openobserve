@@ -925,8 +925,7 @@ const appliesToFilterOptions = computed(() => [
   ...NOTIFICATION_KINDS.map((kind) => ({ label: t(kindLabelKey(kind)), value: kind })),
 ]);
 const isAllKinds = (row: Template) => !row.applies_to?.length;
-// A prebuilt channel template serves alerts only: other kinds skip it from a destination.
-// prebuilt_default is the fallback for every kind.
+// Other kinds skip a prebuilt channel template; only prebuilt_default serves every kind.
 const appliesToText = (row: Template) =>
   row.isPrebuilt && row.name !== "prebuilt_default"
     ? t(kindLabelKey("alert"))

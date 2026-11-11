@@ -2104,8 +2104,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...anomalySensitivityPayload(budgetPerDay, c.threshold),
           ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
-          // Always sent so clearing the picker clears the stored override. With
-          // notifications off the picker is hidden, so the override is cleared too.
+          // Always sent so a clear sticks; with notifications off the hidden picker clears it.
           template: c.alert_enabled ? c.template || null : null,
         },
       };

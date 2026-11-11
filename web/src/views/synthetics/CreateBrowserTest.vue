@@ -1095,6 +1095,8 @@ async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean>
   });
   // A refusal names the template sent; a pick made during the request is not the one refused.
   const submittedTemplate = check.value.template ?? null;
+  // The payload drops the template without a destination; read now, the user can edit during the save.
+  const sentNullTemplate = !check.value.notifications?.destinations?.length;
   try {
     if (props.editId) {
       await saveMonitor.mutateAsync({
@@ -1114,7 +1116,7 @@ async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean>
     }
     isDirty.value = false;
     // With no destination the payload sent a null template, so the hidden name must not come back.
-    if (!check.value.notifications.destinations.length && check.value.template) {
+    if (sentNullTemplate && submittedTemplate && check.value.template === submittedTemplate) {
       check.value = { ...check.value, template: null };
     }
     savedCheck.value = cloneDeep(check.value);
