@@ -40,7 +40,7 @@ use tokio::{
 
 use super::{
     job::{job_range_end, job_time_level, scheduling_level},
-    plan::{BatchLimits, PlannedBatch, plan_batches, pre_merge_batches},
+    plan::{BatchLimits, plan_batches},
 };
 use crate::{
     bloom::compact::OrphanBlooms,
@@ -54,8 +54,8 @@ const HOUR_SEGMENT: usize = 7;
 #[derive(Default)]
 struct PartitionOutcome {
     orphan_blooms: OrphanBlooms,
-    /// A closed hour was only narrowed into hash-merged files: the indexed merge is still due.
-    narrowed: bool,
+    /// A closed hour only pre-merged into hash-merged files: the indexed merge is still due.
+    pre_merged: bool,
 }
 
 /// compactor run steps on a stream:
@@ -180,7 +180,6 @@ pub async fn merge_by_stream(
             .push(file);
     }
 
-    let scan_schema = Arc::new(schema.clone().with_metadata(Default::default()));
     // use multiple threads to merge
     let semaphore = Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
@@ -188,7 +187,6 @@ pub async fn merge_by_stream(
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
         let mode = mode.clone();
-        let scan_schema = scan_schema.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
         let task: JoinHandle<anyhow::Result<PartitionOutcome>> = tokio::task::spawn(async move {
@@ -217,11 +215,8 @@ pub async fn merge_by_stream(
             };
             let stream = format!("{org_id}/{stream_type}/{stream_name}");
             let planned = plan_batches(files_with_size, &mode, &limits, &stream);
-            let planned =
-                limit_indexed_merge_groups(planned, &scan_schema, limits.max_merge_groups, &stream)
-                    .await;
-            // a closed hour plans hash-merged output only to narrow itself for a later round
-            let narrowed = !is_incremental
+            // a closed hour plans hash-merged output only as a pre-merge for a later round
+            let pre_merged = !is_incremental
                 && planned
                     .iter()
                     .any(|(_, mode)| matches!(mode, MergeMode::MetricsHashMerged));
@@ -314,7 +309,7 @@ pub async fn merge_by_stream(
             }
             Ok(PartitionOutcome {
                 orphan_blooms,
-                narrowed,
+                pre_merged,
             })
         });
         tasks.push(task);
@@ -322,10 +317,10 @@ pub async fn merge_by_stream(
 
     // collect bloom files which need to be clean
     let mut orphan_blooms = OrphanBlooms::default();
-    let mut narrowed = false;
+    let mut pre_merged = false;
     for task in tasks {
         let outcome = task.await??;
-        narrowed |= outcome.narrowed;
+        pre_merged |= outcome.pre_merged;
         for (date, bloom_vers) in outcome.orphan_blooms {
             orphan_blooms.entry(date).or_default().extend(bloom_vers);
         }
@@ -339,7 +334,8 @@ pub async fn merge_by_stream(
         stream_type,
         stream_name,
         &date_start,
-        is_incremental,
+        // a pre-merged hour is rewritten by the re-armed round: blooms built now would be orphans
+        is_incremental || pre_merged,
         orphan_blooms,
     )
     .await
@@ -363,9 +359,9 @@ pub async fn merge_by_stream(
         log::warn!(
             "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] range of {date_start} settled during the incremental round, job {job_id} is left for the retry"
         );
-    } else if narrowed {
+    } else if pre_merged {
         log::info!(
-            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] {date_start} was narrowed into hash-merged files, job {job_id} is re-armed for the indexed merge"
+            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] {date_start} was pre-merged into hash-merged files, job {job_id} is re-armed for the indexed merge"
         );
         if let Err(e) = infra_file_list::set_job_pending(&[job_id], 0, None).await {
             log::error!("[COMPACTOR] set_job_pending failed: {e}");
@@ -387,51 +383,6 @@ pub async fn merge_by_stream(
         .inc_by(time);
 
     Ok(())
-}
-
-/// Swaps a closed metrics hour too wide to merge at once for the batches that narrow it.
-async fn limit_indexed_merge_groups(
-    batches: Vec<PlannedBatch>,
-    schema: &Arc<Schema>,
-    max_groups: usize,
-    stream: &str,
-) -> Vec<PlannedBatch> {
-    let mut capped = Vec::with_capacity(batches.len());
-    for (files, mode) in batches {
-        // fewer files than the cap cannot form more chains than it
-        if max_groups < 2 || files.len() <= max_groups || !matches!(mode, MergeMode::MetricsIndexed)
-        {
-            capped.push((files, mode));
-            continue;
-        }
-        let chains = match search::merge::hash_ordered_chains(schema.clone(), files.clone()).await {
-            Ok(chains) => chains,
-            Err(e) => {
-                log::warn!(
-                    "[COMPACTOR] merge_by_stream [{stream}] chaining {} files by statistics failed: {e}, counting every file as a chain",
-                    files.len()
-                );
-                files.iter().map(|f| vec![f.clone()]).collect()
-            }
-        };
-        let chain_num = chains.len();
-        let narrowing = pre_merge_batches(chains, max_groups);
-        if narrowing.is_empty() {
-            capped.push((files, mode));
-            continue;
-        }
-        log::info!(
-            "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed merge of {} files is {chain_num} chains wide, cap {max_groups}: narrowing in {} hash-merged batches first",
-            files.len(),
-            narrowing.len()
-        );
-        capped.extend(
-            narrowing
-                .into_iter()
-                .map(|files| (files, MergeMode::MetricsHashMerged)),
-        );
-    }
-    capped
 }
 
 fn has_downsampling_rule(_stream_name: &str, _max_ts: i64) -> bool {

@@ -24,20 +24,12 @@ mod single_file;
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
-use config::{
-    get_config, ider,
-    meta::{
-        search::{Session, StorageType},
-        stream::{FileKey, FileMeta},
-    },
-};
+use config::{get_config, meta::stream::FileMeta};
 use datafusion::{
     arrow::datatypes::Schema,
     catalog::TableProvider,
-    datasource::{physical_plan::FileScanConfig, source::DataSourceExec},
     error::{DataFusionError, Result},
-    physical_plan::{ExecutionPlan, execute_stream},
-    prelude::SessionContext,
+    physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
 pub use mode::{MergeMode, MergeOutput};
@@ -48,10 +40,8 @@ use parquet::{
 pub use result::{MergeResult, MergedFile};
 
 use crate::datafusion::{
-    datasource::uniontable::NewUnionTable,
-    exec::{DataFusionContextBuilder, TableBuilder},
+    datasource::uniontable::NewUnionTable, exec::DataFusionContextBuilder,
     sort_order::FileSortOrder,
-    storage::{file_list, format_location},
 };
 
 /// Merge `tables` (the union of the input files) into one or more files
@@ -126,44 +116,6 @@ pub async fn merge_parquet_files(
     Ok(MergeResult { files, file_format })
 }
 
-/// The sorted chains a hash-ordered merge of `files` reads: each chain is one input it keeps open.
-pub async fn hash_ordered_chains(
-    schema: Arc<Schema>,
-    files: Vec<FileKey>,
-) -> Result<Vec<Vec<FileKey>>> {
-    let sort_order = FileSortOrder::HashTimestampAsc;
-    let session = Session {
-        id: ider::generate(),
-        storage_type: StorageType::Memory,
-        work_group: None,
-        target_partitions: 2,
-    };
-    let trace_id = session.id.clone();
-    let planned = async {
-        let tables = TableBuilder::new()
-            .sort_order(sort_order)
-            .build(session, files.clone(), schema.clone())
-            .await?;
-        let sql = MergeMode::MetricsIndexed.sql(&schema);
-        plan_merge_query(&sql, sort_order, schema, tables).await
-    }
-    .await;
-    file_list::clear(&trace_id);
-    let (_, plan) = planned?;
-
-    let mut by_key: hashbrown::HashMap<String, FileKey> =
-        files.into_iter().map(|f| (f.key.clone(), f)).collect();
-    let mut chains = Vec::new();
-    collect_scan_chains(&plan, &mut by_key, &mut chains);
-    if !by_key.is_empty() {
-        return Err(DataFusionError::Plan(format!(
-            "hash_ordered_chains: {} file(s) missing from the merge plan",
-            by_key.len()
-        )));
-    }
-    Ok(chains)
-}
-
 /// Plan and start `sql` over the union of `tables`; the record batches arrive
 /// on the returned channel, the task reports the stream's completion / error.
 /// `sort_order` only enables `split_file_groups_by_statistics` for that
@@ -178,8 +130,27 @@ async fn run_merge_query(
     tokio::sync::mpsc::Receiver<RecordBatch>,
     tokio::task::JoinHandle<Result<()>>,
 )> {
-    let (ctx, physical_plan) = plan_merge_query(sql, sort_order, schema, tables).await?;
+    let cfg = get_config();
+    let ctx = DataFusionContextBuilder::new()
+        .trace_id("merge_parquet_files")
+        .sort_order(sort_order)
+        .build(cfg.limit.datafusion_min_partition_num)
+        .await?;
+    // register union table
+    let union_table = Arc::new(NewUnionTable::new(schema, tables));
+    ctx.register_table("tbl", union_table)?;
+
+    let plan = ctx.state().create_logical_plan(sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     let schema = physical_plan.schema();
+
+    // print the physical plan
+    if cfg.common.print_key_sql {
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string("merge_parquet_files", physical_plan.as_ref())
+        );
+    }
 
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
@@ -204,64 +175,6 @@ async fn run_merge_query(
         Ok(())
     });
     Ok((schema, rx, read_task))
-}
-
-/// The physical plan of `sql` over the union of `tables`, with the session it runs in.
-async fn plan_merge_query(
-    sql: &str,
-    sort_order: FileSortOrder,
-    schema: Arc<Schema>,
-    tables: Vec<Arc<dyn TableProvider>>,
-) -> Result<(SessionContext, Arc<dyn ExecutionPlan>)> {
-    let cfg = get_config();
-    let ctx = DataFusionContextBuilder::new()
-        .trace_id("merge_parquet_files")
-        .sort_order(sort_order)
-        .build(cfg.limit.datafusion_min_partition_num)
-        .await?;
-    // register union table
-    let union_table = Arc::new(NewUnionTable::new(schema, tables));
-    ctx.register_table("tbl", union_table)?;
-
-    let plan = ctx.state().create_logical_plan(sql).await?;
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-
-    // print the physical plan
-    if cfg.common.print_key_sql {
-        log::info!(
-            "{}",
-            config::meta::plan::generate_plan_string("merge_parquet_files", physical_plan.as_ref())
-        );
-    }
-    Ok((ctx, physical_plan))
-}
-
-/// Moves every file group of the scans under `plan` out of `by_key` into `chains`.
-fn collect_scan_chains(
-    plan: &Arc<dyn ExecutionPlan>,
-    by_key: &mut hashbrown::HashMap<String, FileKey>,
-    chains: &mut Vec<Vec<FileKey>>,
-) {
-    let scan = plan
-        .downcast_ref::<DataSourceExec>()
-        .and_then(|exec| exec.data_source().downcast_ref::<FileScanConfig>());
-    if let Some(scan) = scan {
-        for group in &scan.file_groups {
-            let chain: Vec<FileKey> = group
-                .iter()
-                .filter_map(|file| {
-                    let (_, key) = format_location(&file.object_meta.location);
-                    by_key.remove(key.as_ref())
-                })
-                .collect();
-            if !chain.is_empty() {
-                chains.push(chain);
-            }
-        }
-    }
-    for child in plan.children() {
-        collect_scan_chains(child, by_key, chains);
-    }
 }
 
 /// A temp file under `data_tmp_dir`, never the OS temp dir (often a RAM-backed tmpfs).

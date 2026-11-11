@@ -3540,7 +3540,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_METRICS_MAX_GROUPS",
         default = 100,
-        help = "Max sorted file chains one metrics merge opens at once; a wider hour is first narrowed into hash-merged files. 0 disables the cap"
+        help = "Max ingester files one metrics merge opens at once; an hour holding more is first pre-merged into hash-merged files. 0 disables the cap, 1 is raised to 2"
     )]
     pub metrics_max_groups: usize,
     #[env_config(
@@ -5201,6 +5201,10 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
+    }
+    // a merge needs two inputs: 1 would plan no batch at all
+    if cfg.compact.metrics_max_groups == 1 {
+        cfg.compact.metrics_max_groups = 2;
     }
     if cfg.compact.file_list_deleted_batch_size == 0 {
         cfg.compact.file_list_deleted_batch_size = 1000;
