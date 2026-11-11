@@ -321,6 +321,7 @@ export class LogsPage {
         // Chart selection
         this.chartSelectionContainer = '[data-test="dashboard-addpanel-chart-selection-item"]';
         this.chartTypeSelect = '[data-test="dashboard-addpanel-chart-type-select"]';
+        this.collapsedChartType = '[data-test="panel-editor-collapsed-chart-type"]';
         this.chartTypeItem = (chartId) => `[data-test="selected-chart-${chartId}-item"]`;
 
         // Panel editor
@@ -10815,8 +10816,8 @@ export class LogsPage {
     async expectChartTypeVisible(chartId) {
         const chartItem = await this.openChartTypeList(chartId);
         await expect(chartItem).toBeVisible({ timeout: 15000 });
-        // Close the list again so the fields it covers are back for the next step.
-        await this.page.keyboard.press('Escape');
+        // Escape only reaches the picker while focus is inside it, so close by toggling the select.
+        await this.page.locator(`${this.chartTypeSelect}:visible`).first().click();
         testLogger.info(`Chart type "${chartId}" is visible`);
     }
 
@@ -10824,7 +10825,7 @@ export class LogsPage {
     async openChartTypeList(chartId) {
         const chartItem = this.page.locator(`${this.chartTypeItem(chartId)}:visible`).first();
         if (!(await chartItem.isVisible().catch(() => false))) {
-            const select = this.page.locator(`${this.chartTypeSelect}:visible`).first();
+            const select = this.page.locator(`${this.chartTypeSelect}:visible, ${this.collapsedChartType}:visible`).first();
             await select.waitFor({ state: 'visible', timeout: 15000 });
             await select.click();
         }
@@ -10839,7 +10840,7 @@ export class LogsPage {
             await this.page.waitForFunction(
                 ({ chartId, shouldBeSelected }) => {
                     const selects = document.querySelectorAll(
-                        `[data-test="dashboard-addpanel-chart-type-select"][data-test-selected-value="${chartId}"]`
+                        `[data-test="dashboard-addpanel-chart-type-select"][data-test-selected-value="${chartId}"], [data-test="panel-editor-collapsed-chart-type"][data-test-selected-value="${chartId}"]`
                     );
                     let visibleFound = false;
                     for (const select of selects) {
@@ -11052,7 +11053,7 @@ export class LogsPage {
                     }
                     // A Chart type select naming a type → chart type assigned
                     return !!document.querySelector(
-                        '[data-test="dashboard-addpanel-chart-type-select"]:not([data-test-selected-value=""])[data-test-selected-value]'
+                        '[data-test="dashboard-addpanel-chart-type-select"]:not([data-test-selected-value=""])[data-test-selected-value], [data-test="panel-editor-collapsed-chart-type"]:not([data-test-selected-value=""])[data-test-selected-value]'
                     );
                 },
                 undefined,
@@ -11172,7 +11173,7 @@ export class LogsPage {
     async getCurrentChartType() {
         // Both tabs mount a PanelEditor; offsetParent skips the hidden one.
         const chartType = await this.page.evaluate(() => {
-            const selects = document.querySelectorAll('[data-test="dashboard-addpanel-chart-type-select"]');
+            const selects = document.querySelectorAll('[data-test="dashboard-addpanel-chart-type-select"], [data-test="panel-editor-collapsed-chart-type"]');
             for (const select of selects) {
                 if (select.offsetParent !== null) {
                     return select.getAttribute('data-test-selected-value') || null;
@@ -11200,7 +11201,7 @@ export class LogsPage {
             // waitForFunction rather than locator polling: the panel re-renders
             // reactively across tab switches and URL restoration.
             const result = await this.page.waitForFunction(() => {
-                const selects = document.querySelectorAll('[data-test="dashboard-addpanel-chart-type-select"]');
+                const selects = document.querySelectorAll('[data-test="dashboard-addpanel-chart-type-select"], [data-test="panel-editor-collapsed-chart-type"]');
                 for (const select of selects) {
                     // PanelEditor is mounted in both Build and Visualize tabs via
                     // v-show, so skip the hidden copy.

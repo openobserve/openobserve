@@ -148,9 +148,9 @@ export default class ChartTypeSelector {
     return this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
   }
 
-  // The Chart type select; its data-test-selected-value is the panel's chart type
+  // The Chart type select, or the collapsed Fields bar chart button; both carry the panel type in data-test-selected-value
   getChartTypeSelect() {
-    return this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible').first();
+    return this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible, [data-test="panel-editor-collapsed-chart-type"]:visible').first();
   }
 
   // Opens the chart-type list from the Chart type select unless the row is already showing

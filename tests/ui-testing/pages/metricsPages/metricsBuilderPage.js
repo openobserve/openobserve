@@ -1296,7 +1296,7 @@ export class MetricsBuilderPage {
 
     // The Chart type select; its data-test-selected-value is the panel's chart type
     getChartTypeSelect() {
-        return this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible').first();
+        return this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible, [data-test="panel-editor-collapsed-chart-type"]:visible').first();
     }
 
     // Opens the chart-type list from the Chart type select unless the row is already showing

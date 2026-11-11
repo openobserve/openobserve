@@ -765,7 +765,7 @@ export class MetricsPage {
     async openChartTypeList(chartType) {
         const chartButton = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
         if (await chartButton.isVisible().catch(() => false)) return chartButton;
-        const select = this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible').first();
+        const select = this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible, [data-test="panel-editor-collapsed-chart-type"]:visible').first();
         if (await select.isVisible({ timeout: 2000 }).catch(() => false)) {
             await select.click();
             await chartButton.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
@@ -794,7 +794,7 @@ export class MetricsPage {
             // A disabled type never flips the select's value, so a timeout reports false instead of a masked success.
             await chartButton.click();
             const activeItem = this.page.locator(
-                `[data-test="dashboard-addpanel-chart-type-select"][data-test-selected-value="${chartType}"]:visible`
+                `[data-test="dashboard-addpanel-chart-type-select"][data-test-selected-value="${chartType}"]:visible, [data-test="panel-editor-collapsed-chart-type"][data-test-selected-value="${chartType}"]:visible`
             ).first();
             return await activeItem
                 .waitFor({ state: 'visible', timeout: 5000 })
@@ -812,7 +812,7 @@ export class MetricsPage {
     }
 
     async getCurrentChartType() {
-        const chartTypeSelect = this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible').first();
+        const chartTypeSelect = this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible, [data-test="panel-editor-collapsed-chart-type"]:visible').first();
         const selectedValue = await chartTypeSelect.getAttribute('data-test-selected-value', { timeout: 2000 }).catch(() => null);
         if (selectedValue) {
             return selectedValue;
