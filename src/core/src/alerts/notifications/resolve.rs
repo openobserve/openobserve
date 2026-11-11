@@ -27,10 +27,11 @@
 //! The ONE exception is the markdown BODY, which is escaped at substitution
 //! time by [`escape_markdown`]. That is not format escaping — it is source
 //! escaping, and it cannot be deferred to the renderers: the body is parsed
-//! as markdown by every one of them, so by the time a renderer sees it, a
+//! as markdown by every markdown renderer, so by the time a renderer sees it, a
 //! value's `>` has already become a blockquote and is indistinguishable from
-//! structure the author wrote. Title, fields, links and rows are not
-//! markdown-parsed and stay raw.
+//! structure the author wrote. Opsgenie, PagerDuty and ServiceNow bodies are
+//! plain text and stay raw. Title, fields, links and rows stay raw here too;
+//! Teams parses them as markdown and guards them in its own renderer.
 
 use config::meta::alerts::{
     content_spec::ContentSpec,
@@ -51,7 +52,7 @@ const PLAIN_TEXT_BODY_FAMILIES: [&str; 3] = ["opsgenie", "pagerduty", "serviceno
 pub struct RenderedContent {
     /// Per-channel override already applied.
     pub title: String,
-    /// Substituted, still markdown, raw values.
+    /// Substituted body: values markdown-escaped, raw for Opsgenie/PagerDuty/ServiceNow.
     pub body_markdown: String,
     /// `show_when`-filtered, substituted.
     pub fields: Vec<(String, String)>,
@@ -84,11 +85,8 @@ pub fn resolve_content(
     let (title, mut unk) = substitute_raw(title_tpl, ctx);
     unknown_variables.append(&mut unk);
 
-    // The BODY is the only markdown-parsed surface (§ `escape_markdown`).
-    // Values are escaped as they are substituted so a value can never inject
-    // markdown STRUCTURE into the author's document. Title, fields, links and
-    // rows are NOT markdown-parsed and are deliberately left raw — escaping
-    // them would surface literal backslashes to users.
+    // Body values are markdown-escaped, except plain-text families, which get raw values.
+    // Title, fields, links and rows stay raw; Teams guards them in its renderer.
     let (body_markdown, mut unk) = if PLAIN_TEXT_BODY_FAMILIES.contains(&channel_family) {
         substitute_raw(&spec.body, ctx)
     } else {
@@ -242,10 +240,8 @@ pub(crate) fn substitute_raw_row(
 /// Raw substitution: `{var}` and `{var:N}` over the context, NO escaping.
 /// Unmatched tokens render [`UNMATCHED_MARKER`] and are reported.
 ///
-/// For the markdown body use [`substitute_markdown_body`] instead — values
-/// substituted into a markdown-parsed surface must be escaped or they inject
-/// structure. This function is for the NON-markdown surfaces (title, fields,
-/// links), where escaping would show users literal backslashes.
+/// For a markdown body use [`substitute_markdown_body`]. This serves title, fields, links, rows and
+/// plain-text bodies (Opsgenie/PagerDuty/ServiceNow), where escaping shows literal backslashes.
 ///
 /// Lookup order (design §5.1): scalar context fields → `row_columns`
 /// (dedup + `", "` join) → `context_attributes` → `metadata` → `group_labels`
