@@ -20,6 +20,9 @@ use utoipa::ToSchema;
 
 use super::rca_steering::SteerKind;
 
+/// The `Reopened` reason of a manual status change; an unacknowledge writes another one.
+pub const MANUAL_REOPEN_REASON: &str = "Manually reopened";
+
 /// Incident status lifecycle: Open → Acknowledged → Resolved
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -449,9 +452,7 @@ pub enum IncidentCorrelationOutcome {
         incident_id: String,
         service_name: String,
     },
-    /// The first firing after a person manually reopened the incident. The alert is
-    /// already a member, but the reopen asked for attention again, so a notification
-    /// is sent. Later firings are `ExistingAlertRepeated` again.
+    /// A member alert's first firing after a manual reopen; notification should be sent.
     FiredAfterReopen {
         incident_id: String,
         service_name: String,
@@ -459,8 +460,7 @@ pub enum IncidentCorrelationOutcome {
 }
 
 impl IncidentCorrelationOutcome {
-    /// The outcome of a member alert firing again: suppressed, unless a manual reopen
-    /// still waits for its first firing (see [manual_reopen_awaits_firing]).
+    /// A member alert firing again sends only when a manual reopen still waited for it.
     pub fn repeated(incident_id: String, service_name: String, after_reopen: bool) -> Self {
         if after_reopen {
             Self::FiredAfterReopen {
@@ -649,10 +649,6 @@ pub struct IncidentEvent {
     #[serde(flatten)]
     pub event_type: IncidentEventType,
 }
-
-/// The `Reopened` reason a manual status change writes. An unacknowledge writes a
-/// different reason, so a firing after it stays suppressed.
-pub const MANUAL_REOPEN_REASON: &str = "Manually reopened";
 
 /// Tagged enum of all possible incident event types
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -935,7 +931,6 @@ impl IncidentEvent {
         })
     }
 
-    /// A person reopened the incident from its status control.
     pub fn manually_reopened(user_id: impl Into<String>) -> Self {
         Self::reopened(user_id, MANUAL_REOPEN_REASON)
     }
@@ -1095,7 +1090,6 @@ impl IncidentEvent {
         false
     }
 
-    /// Whether a person reopened the incident from its status control (not an unacknowledge).
     pub fn is_manual_reopen(&self) -> bool {
         matches!(
             &self.event_type,
@@ -1117,9 +1111,7 @@ impl IncidentEvent {
     }
 }
 
-/// Record one firing on a decoded timeline, with compaction.
-/// Scans backwards through the trailing block of Alert events. If a matching alert_id is
-/// found within that block, its count is incremented. Otherwise a new Alert event is appended.
+/// Counts a firing into the trailing block of Alert events, or appends a new Alert event.
 pub fn push_alert_event(
     events: &mut Vec<IncidentEvent>,
     alert_id: &str,
@@ -1138,9 +1130,7 @@ pub fn push_alert_event(
     events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
 }
 
-/// Whether a manual reopen still waits for its first firing. Only a firing after the
-/// reopen ends the wait. Other events, such as a title change, do not count. An
-/// unacknowledge writes a different reason, so it never starts a wait.
+/// Whether no firing followed the latest manual reopen; metadata edits do not end the wait.
 pub fn manual_reopen_awaits_firing(events: &[IncidentEvent]) -> bool {
     for event in events.iter().rev() {
         if event.is_manual_reopen() {
@@ -1157,8 +1147,7 @@ pub fn manual_reopen_awaits_firing(events: &[IncidentEvent]) -> bool {
 mod tests {
     use super::*;
 
-    /// One repeat firing as both correlation paths of `find_or_create_incident` decide it
-    /// (exact alert-id match and dimension match): read the timeline, then record the firing.
+    // Mirrors record_alert: decide on the timeline, then record the firing into it.
     fn fire_repeat(events: &mut Vec<IncidentEvent>, alert_id: &str) -> bool {
         let after_reopen = manual_reopen_awaits_firing(events);
         push_alert_event(events, alert_id, alert_id, 1);
@@ -1168,7 +1157,6 @@ mod tests {
         )
     }
 
-    /// B2: the first repeat after a manual reopen sends once, and the next is suppressed.
     #[test]
     fn a_manual_reopen_sends_the_next_firing_once() {
         let title = || IncidentEvent::title_changed("old", "new", "u@x.io");
@@ -1209,7 +1197,7 @@ mod tests {
             ("no reopen", vec![], vec![false, false]),
         ];
         for (name, after_reopen, want) in cases {
-            // The alert fired before the reopen, so its old Alert event is in the timeline.
+            // The alert's pre-reopen Alert event must not end the wait.
             let mut events = vec![
                 IncidentEvent::created(),
                 IncidentEvent::alert("a1", "a1", 0),
@@ -1224,7 +1212,6 @@ mod tests {
         }
     }
 
-    /// One notification per reopen: a firing of another member alert used it up.
     #[test]
     fn another_member_firing_first_uses_up_the_reopen() {
         let mut events = vec![
@@ -1236,7 +1223,6 @@ mod tests {
         assert!(!fire_repeat(&mut events, "a1"));
     }
 
-    /// A second reopen waits for its own first firing.
     #[test]
     fn each_manual_reopen_sends_its_first_firing() {
         let mut events = vec![IncidentEvent::manually_reopened("u@x.io")];
@@ -1248,8 +1234,6 @@ mod tests {
         assert!(!fire_repeat(&mut events, "a1"));
     }
 
-    /// Compaction counts a repeat inside the trailing Alert block, and appends after any
-    /// other event, so a firing after a reopen is visible as a new Alert event.
     #[test]
     fn push_alert_event_compacts_only_the_trailing_alert_block() {
         let mut events = vec![IncidentEvent::alert("a1", "a1", 0)];

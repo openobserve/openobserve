@@ -44,6 +44,8 @@ use config::{
 /// alert nobody can identify belongs in the unrouted queue, not on the pager of
 /// whichever team happens to own this string.
 const UNKNOWN_SERVICE: &str = "unknown";
+/// The `incident_event` of the first notification after a manual reopen.
+const FIRED_AFTER_REOPEN_EVENT: &str = "alert_fired_after_reopen";
 /// Window behind the alert in which a service-graph edge counts as a dependency.
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 /// How many of an alert's latest firings a Firing run after a window looks through for open pages.
@@ -2232,37 +2234,14 @@ async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
     Ok(None)
 }
 
-/// The `incident_event` of the first notification after a manual reopen.
-const FIRED_AFTER_REOPEN_EVENT: &str = "alert_fired_after_reopen";
-
-/// [config::meta::alerts::incidents::manual_reopen_awaits_firing] on the stored timeline. A muted
-/// firing never sends, and an acknowledged incident has a person on it, so both skip the read. The
-/// read goes to the primary: a lagging replica would show the reopen again after a firing consumed
-/// it. A failed read keeps today's behavior: the repeat stays suppressed.
-/// Only this node's timeline is read: a reopen replicated from another super-cluster
-/// member carries no event, so a firing here after it stays suppressed.
-async fn reopen_awaits_firing_for(
-    org_id: &str,
+/// A muted firing never sends, and an acknowledged incident already has a person on it.
+fn reopen_can_send(
     incident: &infra::table::entity::alert_incidents::Model,
     muted_by: Option<&str>,
 ) -> bool {
-    if muted_by.is_some()
-        || incident.muted_by_downtime_id.is_some()
-        || incident.status == "acknowledged"
-    {
-        return false;
-    }
-    let db = infra::db::get_orm_client_rw().await;
-    match infra::table::incident_events::get_with(db, org_id, &incident.id).await {
-        Ok(events) => config::meta::alerts::incidents::manual_reopen_awaits_firing(&events),
-        Err(e) => {
-            log::error!(
-                "[incidents] could not read events of {org_id}/{}, repeat stays suppressed: {e}",
-                incident.id
-            );
-            false
-        }
-    }
+    muted_by.is_none()
+        && incident.muted_by_downtime_id.is_none()
+        && incident.status != "acknowledged"
 }
 
 /// Find an existing open incident or create a new one
@@ -2300,8 +2279,6 @@ async fn find_or_create_incident(
     {
         if let Some(incident) = exact {
             let alert_id = subject.id.clone();
-            // Read before this firing lands in the timeline, or it hides the reopen.
-            let after_reopen = reopen_awaits_firing_for(org_id, &incident, muted_by).await;
             let (is_new_alert_type, reopened) = join_then_unmute(
                 link_firing(&incident.id, subject, triggered_at, correlation_reason),
                 async || unmute_for_firing(org_id, &incident, muted_by).await,
@@ -2311,10 +2288,8 @@ async fn find_or_create_incident(
                 retitle_growing_case(org_id, &incident, entity).await;
             }
 
-            // Without the recorded firing the reopen stays unconsumed, so only a recorded
-            // firing may send for it, or every later firing would send again.
-            let mut after_reopen = after_reopen;
-            if let Err(e) = infra::table::incident_events::record_alert(
+            // The write decides under its row lock, so two firings cannot both take the reopen.
+            let after_reopen = match infra::table::incident_events::record_alert(
                 org_id,
                 &incident.id,
                 &alert_id,
@@ -2323,12 +2298,15 @@ async fn find_or_create_incident(
             )
             .await
             {
-                after_reopen = false;
-                log::error!(
-                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
-                    incident.id
-                );
-            }
+                Ok(waited) => waited && reopen_can_send(&incident, muted_by),
+                Err(e) => {
+                    log::error!(
+                        "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
+                        incident.id
+                    );
+                    false
+                }
+            };
 
             if muted_by.is_none()
                 && !reopened
@@ -2418,8 +2396,6 @@ async fn find_or_create_incident(
             let mut merged_dims = existing_dims.clone();
             let dimensions_changed = merge_dimensions(&mut merged_dims, group_values, &existing.id);
 
-            // Read before this firing lands in the timeline, or it hides the reopen.
-            let after_reopen = reopen_awaits_firing_for(org_id, &existing, muted_by).await;
             let (is_new_alert_type, reopened) = join_then_unmute(
                 infra::table::alert_incidents::add_alert_to_incident(
                     &existing.id,
@@ -2433,10 +2409,8 @@ async fn find_or_create_incident(
             )
             .await?;
 
-            // Without the recorded firing the reopen stays unconsumed, so only a recorded
-            // firing may send for it, or every later firing would send again.
-            let mut after_reopen = after_reopen;
-            if let Err(e) = infra::table::incident_events::record_alert(
+            // The write decides under its row lock, so two firings cannot both take the reopen.
+            let after_reopen = match infra::table::incident_events::record_alert(
                 org_id,
                 &existing.id,
                 &subject.id,
@@ -2445,12 +2419,15 @@ async fn find_or_create_incident(
             )
             .await
             {
-                after_reopen = false;
-                log::error!(
-                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
-                    existing.id
-                );
-            }
+                Ok(waited) => waited && reopen_can_send(&existing, muted_by),
+                Err(e) => {
+                    log::error!(
+                        "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
+                        existing.id
+                    );
+                    false
+                }
+            };
 
             if !is_new_alert_type
                 && muted_by.is_none()

@@ -2621,8 +2621,7 @@ fn incident_path_notified(
     }
 }
 
-/// Whether the incident path paged on-call for this outcome, so the manual trigger must not.
-/// `FiredAfterReopen` notifies destinations but pages nobody, so the trigger still pages.
+/// `FiredAfterReopen` notifies destinations but pages nobody, so the manual trigger still pages.
 #[cfg(feature = "enterprise")]
 fn incident_path_paged(
     outcome: &config::meta::alerts::incidents::IncidentCorrelationOutcome,
@@ -5694,7 +5693,6 @@ mod send_path_tests {
         }));
     }
 
-    /// B2: the first firing after a reopen notifies destinations but pages nobody.
     #[cfg(feature = "enterprise")]
     #[test]
     fn a_firing_after_reopen_skips_destinations_but_still_pages() {

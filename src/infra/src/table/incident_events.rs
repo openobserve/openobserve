@@ -129,15 +129,7 @@ pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr>
 
 /// Get all events for an incident
 pub async fn get(org_id: &str, incident_id: &str) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
-    get_with(get_orm_client_ro().await, org_id, incident_id).await
-}
-
-/// [get] on a given connection. A decision that a later write consumes reads the primary.
-pub async fn get_with<C: ConnectionTrait>(
-    db: &C,
-    org_id: &str,
-    incident_id: &str,
-) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
+    let db = get_orm_client_ro().await;
     let row = incident_events::Entity::find()
         .filter(incident_events::Column::OrgId.eq(org_id))
         .filter(incident_events::Column::IncidentId.eq(incident_id))
@@ -376,22 +368,24 @@ fn locked_row(
 /// Scans backwards through the trailing block of consecutive Alert events; if a matching
 /// alert_id is found within that block, its count is incremented. If a non-Alert event is
 /// encountered first (or the list is empty), a new Alert event is appended.
+/// Returns whether a manual reopen waited for this firing, decided under the row lock.
 pub async fn record_alert(
     org_id: &str,
     incident_id: &str,
     alert_id: &str,
     alert_name: &str,
     triggered_at: i64,
-) -> Result<(), sea_orm::DbErr> {
+) -> Result<bool, sea_orm::DbErr> {
     let db = get_orm_client_rw().await;
 
     let txn = db.begin().await?;
 
     let row = locked_row(&txn, org_id, incident_id).one(&txn).await?;
 
-    match row {
+    let waited = match row {
         Some(model) => {
             let mut events = decode_events(org_id, incident_id, &model.events);
+            let waited = config::meta::alerts::incidents::manual_reopen_awaits_firing(&events);
             config::meta::alerts::incidents::push_alert_event(
                 &mut events,
                 alert_id,
@@ -403,6 +397,7 @@ pub async fn record_alert(
             let mut active: incident_events::ActiveModel = model.into();
             active.events = Set(events_json);
             active.update(&txn).await?;
+            waited
         }
         None => {
             // Row doesn't exist yet
@@ -413,11 +408,12 @@ pub async fn record_alert(
                 events: Set(encode_events(&events)?),
             };
             model.insert(&txn).await?;
+            false
         }
-    }
+    };
 
     txn.commit().await?;
-    Ok(())
+    Ok(waited)
 }
 
 /// Deletes all incident event entries belonging to the given org.
