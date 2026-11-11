@@ -11,6 +11,7 @@ from collections.abc import Generator
 
 import pytest
 
+from helpers.webhook_sink import WebhookSink
 from support.client import OpenObserveClient
 
 from .multialert_helpers import AlertsClient
@@ -64,3 +65,12 @@ def failing_destination(alerts: AlertsClient) -> str:
     alerts._v1("POST", "alerts/destinations", json=destination)
     alerts._v1("PUT", f"alerts/destinations/{FAILING_DEST}", json=destination)
     return FAILING_DEST
+
+
+@pytest.fixture
+def webhook_sink() -> Generator[WebhookSink, None, None]:
+    sink = WebhookSink()
+    try:
+        yield sink
+    finally:
+        sink.close()
