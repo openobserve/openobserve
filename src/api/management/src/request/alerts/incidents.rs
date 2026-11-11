@@ -3212,6 +3212,7 @@ mod tests {
             signal: signal_class("SearchSQL", &input),
             target: evidence_target("SearchSQL", &input),
             observed: None,
+            change_rows: None,
             result_summary,
         }];
         let submit = parse_submit(&json!({

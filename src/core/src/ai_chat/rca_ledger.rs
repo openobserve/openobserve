@@ -21,10 +21,10 @@ use config::{
             MAX_AGENT_NOTE_CHARS, STEER_NOTICE, SteerHeader, SteerStatus, parse_steer_header,
         },
         oncall::{
-            confidence::{ToolCallRecord, signal_class, stream_type},
+            confidence::{SignalClass, ToolCallRecord, signal_class, stream_type},
             rca_run::{
-                LedgerCall, LedgerTool, RcaSubmit, evidence_target, exit_code, observed_window,
-                parse_submit, summarize_result,
+                LedgerCall, LedgerTool, RcaSubmit, change_rows, evidence_target, exit_code,
+                observed_window, parse_submit, summarize_result,
             },
         },
     },
@@ -357,6 +357,16 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         .as_ref()
         .and_then(|body| completed_call_failure(call.tool, state, body));
     let success = completed && failure.is_none();
+    let change_rows = body
+        .as_ref()
+        .filter(|_| success)
+        .and_then(|body| change_rows(call.tool, body));
+    // A SQL read of a change record is as much a read of the change as a diff is.
+    let signal = if change_rows.is_some() {
+        SignalClass::Change
+    } else {
+        signal_class(call.tool, &input)
+    };
     let (result_summary, result_count, error_type, observed) = match (body, failure) {
         (Some(body), None) => {
             let (summary, count) = summarize_result(call.tool, &body);
@@ -388,9 +398,10 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         started_at_us: started_at.unwrap_or_default(),
         duration_ms,
         error_type,
-        signal: signal_class(call.tool, &input),
+        signal,
         target,
         observed,
+        change_rows,
         result_summary,
     })
 }
@@ -408,7 +419,7 @@ fn completed_call_failure(tool: &str, state: &Map<String, Value>, body: &Value) 
 #[cfg(test)]
 pub(crate) mod tests {
     use config::{
-        meta::{alerts::rca_steering::SteerKind, oncall::confidence::SignalClass},
+        meta::alerts::rca_steering::SteerKind,
         utils::json::{Value, json},
     };
 
@@ -826,6 +837,46 @@ pub(crate) mod tests {
             })
         );
         assert_eq!(run.tool_log[1].observed, None);
+    }
+
+    /// A SearchSQL that returned a deploy row with old and new values is a change read.
+    #[test]
+    fn a_searched_change_record_is_a_change_read() {
+        let deploys = "SELECT version, previous_version, config_diff FROM ta_persona_deploy_events";
+        let rows = json!({"took": 5, "total": 1, "hits": [{"_timestamp": 1_792_140_000_000_000_i64,
+            "service": "inventory-svc", "version": "v3.8.1", "previous_version": "v3.8.0",
+            "config_diff": "DB_POOL_MAX_SIZE: 50 -> 5"}]});
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        s.tool(
+            "msg_a1",
+            "prt_t1",
+            "o2_SearchSQL",
+            "completed",
+            search_sql(deploys),
+            json!({"output": rows.to_string()}),
+            1_100,
+            1_142,
+        );
+        s.tool(
+            "msg_a1",
+            "prt_t2",
+            "o2_SearchSQL",
+            "completed",
+            search_sql(SQL_ERRORS),
+            hits(3),
+            1_200,
+            1_210,
+        );
+        let run = decode_run(&s.events);
+
+        let deploy = &run.tool_log[0];
+        assert_eq!(deploy.signal, SignalClass::Change);
+        assert!(deploy.reads_change("v3.8.1"), "{:?}", deploy.change_rows);
+        assert!(!deploy.reads_change("v3.9.0"));
+        assert_eq!(run.tool_log[1].signal, SignalClass::Logs);
+        assert_eq!(run.tool_log[1].change_rows, None);
     }
 
     /// An org AI Toolset call keeps opencode's `<server>_<tool>` name in the tool log.
