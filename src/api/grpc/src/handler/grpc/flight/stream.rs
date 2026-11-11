@@ -30,7 +30,7 @@ use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::grpc::flight::{
-    SessionGuard, partition_encoder::PartitionEncoderStream, report_registry::ReportSlot,
+    SessionGuard, partition_encoder::PartitionEncoderStream, profile_registry::ProfileSlot,
 };
 
 /// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
@@ -45,7 +45,7 @@ pub struct FlightEncoderStreamBuilder {
     defer_lock: Option<DeferredLock>,
     session_guard: Option<SessionGuard>,
     start: std::time::Instant,
-    report: Option<RunReport>,
+    held_profile: Option<HeldProfile>,
 }
 
 impl FlightEncoderStreamBuilder {
@@ -57,7 +57,7 @@ impl FlightEncoderStreamBuilder {
             defer_lock: None,
             session_guard: Some(session_guard),
             start: std::time::Instant::now(),
-            report: None,
+            held_profile: None,
         }
     }
 
@@ -81,8 +81,8 @@ impl FlightEncoderStreamBuilder {
         self
     }
 
-    pub(crate) fn with_report(mut self, report: Option<RunReport>) -> Self {
-        self.report = report;
+    pub(crate) fn with_held_profile(mut self, held_profile: Option<HeldProfile>) -> Self {
+        self.held_profile = held_profile;
         self
     }
 
@@ -134,7 +134,7 @@ impl FlightEncoderStreamBuilder {
             node_messages: self.node_messages,
             first_data: true,
             done: false,
-            report: self.report,
+            held_profile: self.held_profile,
             ctx: StreamContext {
                 trace_id: self.trace_id,
                 is_super: self.is_super,
@@ -155,7 +155,7 @@ impl FlightEncoderStreamBuilder {
 enum FlightSource {
     Channel(mpsc::Receiver<Result<Vec<FlightData>, FlightError>>),
     Inline(Box<PartitionEncoderStream>),
-    /// Left behind when the run's report takes the source, to drop it before reading metrics.
+    /// The source was dropped early, so that the plan's metrics are final when read.
     Closed,
 }
 
@@ -169,7 +169,7 @@ pub struct FlightEncoderStream {
     first_data: bool,
     done: bool,
     /// Set only for EXPLAIN ANALYZE.
-    report: Option<RunReport>,
+    held_profile: Option<HeldProfile>,
     /// query context + resources consumed by the stream's `Drop` teardown.
     ctx: StreamContext,
     /// per-message logging.
@@ -231,16 +231,10 @@ impl EventLog {
     }
 }
 
-/// What an EXPLAIN ANALYZE run reports once its stream ends.
-pub(crate) struct RunReport {
-    slot: ReportSlot,
-    plan: Arc<dyn ExecutionPlan>,
-}
-
-impl RunReport {
-    pub(crate) fn new(slot: ReportSlot, plan: Arc<dyn ExecutionPlan>) -> Self {
-        Self { slot, plan }
-    }
+/// The plan of an EXPLAIN ANALYZE run and where its profile goes once the stream has ended.
+pub(crate) struct HeldProfile {
+    pub(crate) slot: ProfileSlot,
+    pub(crate) plan: Arc<dyn ExecutionPlan>,
 }
 
 impl FlightEncoderStream {
@@ -357,11 +351,6 @@ impl Stream for FlightEncoderStream {
 
 impl Drop for FlightEncoderStream {
     fn drop(&mut self) {
-        let report = self.report.take();
-        if report.is_none() {
-            // Stop partition tasks before clearing session data they may still read.
-            self.ctx.tasks.abort_all();
-        }
         let ctx = &mut self.ctx;
 
         let trace_id = &ctx.trace_id;
@@ -387,12 +376,16 @@ impl Drop for FlightEncoderStream {
 
         // the defer only covers the work group slot, so it never gates the session release
         let guards = (ctx.defer_lock.take(), ctx.session_guard.take());
-        match report {
-            None => drop(guards),
-            Some(report) => {
-                let source = std::mem::replace(&mut self.source, FlightSource::Closed);
-                let tasks = std::mem::take(&mut self.ctx.tasks);
-                tokio::spawn(report_run(source, tasks, guards, report));
+        let mut tasks = std::mem::take(&mut ctx.tasks);
+        match self.held_profile.take() {
+            None => {
+                // Stop partition tasks before clearing session data they may still read.
+                tasks.abort_all();
+                drop(guards);
+            }
+            Some(held) => {
+                self.source = FlightSource::Closed;
+                tokio::spawn(hold_profile(tasks, guards, held));
             }
         }
         log::info!(
@@ -402,20 +395,18 @@ impl Drop for FlightEncoderStream {
     }
 }
 
-/// Reports the run's profile once its partitions have stopped and can no longer change it.
-async fn report_run(
-    source: FlightSource,
+/// Builds the run's profile once its partitions have stopped and can no longer change it.
+async fn hold_profile(
     mut tasks: JoinSet<()>,
     guards: (Option<DeferredLock>, Option<SessionGuard>),
-    report: RunReport,
+    held: HeldProfile,
 ) {
-    drop(source);
     tasks.shutdown().await;
     // Partition tasks may read the session data until they have stopped.
     drop(guards);
     // A cluster leader must finish its own fetches within its caller's wait.
-    complete_remote_profiles(report.plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
-    report.slot.complete(build_profile(report.plan.as_ref()));
+    complete_remote_profiles(held.plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
+    held.slot.fill(build_profile(held.plan.as_ref()));
 }
 
 fn write_options() -> IpcWriteOptions {

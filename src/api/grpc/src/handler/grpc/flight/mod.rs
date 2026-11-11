@@ -47,14 +47,14 @@ use {
 use crate::handler::grpc::{
     MetadataMap,
     flight::{
-        report_registry::REPORTS,
-        stream::{FlightEncoderStreamBuilder, RunReport},
+        profile_registry::{ProfileSlot, take_profile},
+        stream::{FlightEncoderStreamBuilder, HeldProfile},
         visitor::{get_peak_memory_from_ctx, node_role},
     },
 };
 
 mod partition_encoder;
-mod report_registry;
+mod profile_registry;
 mod stream;
 pub mod visitor;
 
@@ -163,7 +163,7 @@ impl FlightService for FlightServiceImpl {
 
         let start = std::time::Instant::now();
         let role = node_role(&plan);
-        // A cluster leader's own nodes may be cut short, so its caller always fetches its report.
+        // A cluster leader's own nodes may be cut short, so its caller always fetches its profile.
         let send_profile = req.search_info.is_analyze && matches!(role, NodeRole::Follower);
         let node_messages = NodeMessages {
             scan_stats,
@@ -174,19 +174,18 @@ impl FlightService for FlightServiceImpl {
             }),
             role,
         };
-        let report_plan = plan.clone();
 
         // One stream per output partition so they encode in parallel
-        let streams = execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
+        let streams = execute_stream_partitioned(plan.clone(), ctx.task_ctx()).map_err(|e| {
             log::error!(
                 "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
             );
             Status::internal(e.to_string())
         })?;
-        // Opened only once the call returns a stream, which is when its caller expects a report.
-        let report = req.search_info.is_analyze.then(|| {
-            let slot = REPORTS.open_for(&trace_id, std::time::Duration::from_secs(timeout));
-            RunReport::new(slot, report_plan)
+        // Opened only once the call returns a stream, which is when its caller may fetch.
+        let held_profile = req.search_info.is_analyze.then(|| HeldProfile {
+            slot: ProfileSlot::open(&trace_id, std::time::Duration::from_secs(timeout)),
+            plan,
         });
 
         let mut stream = FlightEncoderStreamBuilder::new(session_guard, node_messages)
@@ -194,7 +193,7 @@ impl FlightService for FlightServiceImpl {
             .with_is_super(is_super_cluster)
             .with_defer_lock(lock)
             .with_start(start)
-            .with_report(report)
+            .with_held_profile(held_profile)
             .build(streams, span);
 
         let stream = async_stream::stream! {
@@ -275,11 +274,10 @@ impl FlightService for FlightServiceImpl {
         }
         let key = std::str::from_utf8(&action.body)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
-        let report = REPORTS
-            .fetch(key)
+        let profile = take_profile(key)
             .await
             .ok_or_else(|| Status::not_found(format!("no profile for {key}")))?;
-        let body = serde_json::to_vec(&report).map_err(|e| Status::internal(e.to_string()))?;
+        let body = serde_json::to_vec(&profile).map_err(|e| Status::internal(e.to_string()))?;
         let reply = arrow_flight::Result { body: body.into() };
         Ok(Response::new(
             futures::stream::once(async { Ok(reply) }).boxed(),

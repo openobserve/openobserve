@@ -61,7 +61,7 @@ pub async fn make_flight_client(
 }
 
 /// Fetches a node's profile of one run whose stream did not deliver it, waiting up to `timeout`.
-pub async fn fetch_node_report(
+pub async fn fetch_node_profile(
     trace_id: &str,
     org_id: &str,
     node: Arc<dyn NodeInfo>,

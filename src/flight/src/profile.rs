@@ -167,7 +167,7 @@ pub struct RemoteNodeProfile {
     pub output_bytes: u64,
     pub decode_ns: u64,
     pub skipped: bool,
-    /// Identifies the call, so the caller can fetch the report a stream did not deliver.
+    /// Identifies the call, so the caller can fetch the profile a stream did not deliver.
     #[serde(skip)]
     pub job_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

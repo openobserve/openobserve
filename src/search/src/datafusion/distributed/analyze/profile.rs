@@ -29,10 +29,10 @@ use flight::{
 };
 
 use crate::datafusion::distributed::remote_scan::{
-    flight_client::fetch_node_report, remote_scan_exec::RemoteScanExec,
+    flight_client::fetch_node_profile, remote_scan_exec::RemoteScanExec,
 };
 
-/// How long a caller waits for the reports its remote nodes' streams did not deliver.
+/// How long a caller waits for the profiles its remote nodes' streams did not deliver.
 pub const REMOTE_PROFILE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Keeps one remote call's entry in its scan's profiles current; the default records nothing.
@@ -76,7 +76,7 @@ impl NodeProfileRecorder {
         self.update(|p| p.skipped = true);
     }
 
-    /// The node returned a stream for `job_id`, so it holds a report to fetch under that id.
+    /// The node returned a stream for `job_id`, so it holds a profile to fetch under that id.
     pub fn record_job(&self, job_id: String) {
         self.update(|p| p.job_id = job_id);
     }
@@ -136,7 +136,7 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     }
 }
 
-/// Fetches, for every remote scan in `plan`, the plans its nodes' streams did not deliver.
+/// Fetches, for every remote scan in `plan`, the profiles its nodes' streams did not deliver.
 pub async fn complete_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duration) {
     let mut scans = Vec::new();
     collect_remote_scans(plan, &mut scans);
@@ -149,7 +149,7 @@ pub async fn complete_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duratio
                 p.end_us = now;
             }
             if p.plan.is_none() && !p.job_id.is_empty() {
-                fetches.push(fetch_report(remote, *partition, p.job_id.clone(), timeout));
+                fetches.push(fetch_profile(remote, *partition, p.job_id.clone(), timeout));
             }
         }
     }
@@ -226,7 +226,7 @@ fn collect_remote_scans<'a>(plan: &'a dyn ExecutionPlan, scans: &mut Vec<&'a Rem
     }
 }
 
-async fn fetch_report(
+async fn fetch_profile(
     remote: &RemoteScanExec,
     partition: usize,
     job_id: String,
@@ -238,14 +238,12 @@ async fn fetch_report(
     let node = scan_node.nodes[partition].clone();
     let node_name = node.get_name();
     let job = job_trace_id(&identifier.trace_id, &job_id);
-    let fetched =
-        fetch_node_report(&identifier.trace_id, &identifier.org_id, node, job, timeout).await;
-    let mut profiles = remote.state.node_profiles.lock();
-    let Some(profile) = profiles.get_mut(&partition) else {
-        return;
-    };
-    match fetched {
-        Ok(plan) => profile.plan = Some(plan),
+    match fetch_node_profile(&identifier.trace_id, &identifier.org_id, node, job, timeout).await {
+        Ok(plan) => {
+            if let Some(p) = remote.state.node_profiles.lock().get_mut(&partition) {
+                p.plan = Some(plan);
+            }
+        }
         Err(e) => log::warn!(
             "[trace_id {}] explain analyze: no profile from node {node_name}, partition {partition}: {e}",
             identifier.trace_id

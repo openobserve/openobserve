@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::profile::{ProfileNode, RemoteNodeProfile};
 
-/// Flight action that fetches a node's report on one finished run.
+/// Flight action that fetches the profile a node holds for one finished run.
 pub const QUERY_PROFILE_ACTION: &str = "query_profile";
 
 const DECODE_TIME: &str = "decode_time";
