@@ -284,6 +284,7 @@ export class PipelinesEP {
         // A pipeline's error rows render as one group, so once its function picker is up a missing org picker was not asked for.
         await this.importOrgIdTrigger.first()
             .or(this.page.locator(`[data-test="${this.destinationFunctionNameDataTest}-trigger"]`).first())
+            .first()
             .waitFor({ state: 'visible', timeout: 15000 });
         const org = process.env.ORGNAME || 'default';
         const pickers = await this.importOrgIdTrigger.count();
