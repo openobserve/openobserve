@@ -11,6 +11,20 @@ const loadHarness = () => import("./harness/setup.mjs");
 const decode = (value) =>
   Buffer.from(String(value).replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "="), "base64").toString("utf8");
 
+// Every search URL the UI sends, one-shot or streaming.
+const SEARCH_URL = /\/_search(_multi)?(_stream)?(\?|$)/;
+
+// The SQL of a search body, which the streaming endpoints send base64-encoded.
+function searchSql(body) {
+  let sql;
+  try {
+    sql = JSON.parse(body).query?.sql;
+  } catch {
+    return body;
+  }
+  return typeof sql === "string" ? decode(sql) : body;
+}
+
 test.describe("assistant evidence", () => {
   let assistant;
   let harness;
@@ -35,7 +49,7 @@ test.describe("assistant evidence", () => {
   function watchSearches(page) {
     const sent = [];
     page.on("request", (request) => {
-      if (request.method() === "POST" && /\/_search(_multi)?\b/.test(request.url())) sent.push(request.postData() ?? "");
+      if (request.method() === "POST" && SEARCH_URL.test(request.url())) sent.push(searchSql(request.postData() ?? ""));
     });
     return sent;
   }
@@ -75,14 +89,17 @@ test.describe("assistant evidence", () => {
     await expect(block).toBeVisible();
     const searched = [];
     // Only the block's query is answered here; the Logs page's own searches go to the server.
-    await page.route(/\/_search\b/, (route) => {
-      const body = route.request().postData() ?? "";
-      if (!body.includes("approx_percentile_cont")) return route.fallback();
-      searched.push(body);
+    await page.route(SEARCH_URL, (route) => {
+      const sql = searchSql(route.request().postData() ?? "");
+      if (!sql.includes("approx_percentile_cont")) return route.fallback();
+      searched.push(sql);
+      const hits = [{ service: "checkout", p95: 812 }, { service: "cart", p95: 140 }];
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ took: 12, total: 2, hits: [{ service: "checkout", p95: 812 }, { service: "cart", p95: 140 }] }),
+        contentType: "text/event-stream",
+        body:
+          `event: search_response_metadata\ndata: ${JSON.stringify({ results: { took: 12, total: 2, hits: [] } })}\n\n` +
+          `event: search_response_hits\ndata: ${JSON.stringify({ results: { hits } })}\n\n`,
       });
     });
     const turns = await page.evaluate(() => window.__o2mock.requests.length);
@@ -103,19 +120,24 @@ test.describe("assistant evidence", () => {
     await ask(page, "cite");
     const answer = assistant.answer();
     await expect(answer).not.toContainText("[^");
-    const chip = answer.locator('[data-test="assistant-claim-1"]').first();
-    await expect(chip).toHaveAttribute("aria-label", /^Evidence 1, Queried default/);
+    // A citation's number is its step's row in the queries list, so [^call_3] reads 3.
+    const chip = answer.locator('[data-test="assistant-claim-3"]').first();
+    await expect(chip).toHaveAttribute("data-call-id", "call_3");
+    await expect(chip).toHaveAttribute("aria-label", /^Citation 3, query 3, 4 rows$/);
     await chip.click();
-    await expect(answer.locator('[data-test="assistant-step-body-call_3"]')).toBeVisible();
-    await expect(answer.locator('[data-test="assistant-step-call_3"]')).toBeFocused();
-    await expect(answer.locator('[data-test="assistant-claim-2"]').first()).toHaveAttribute("data-call-id", "call_1");
+    // The chip opens the queries line and focuses the cited row; the row's own body stays closed.
+    await expect(answer.locator('[data-test="assistant-queries-line"]')).toHaveAttribute("aria-expanded", "true");
+    await expect(answer.locator('[data-test="assistant-queries-row-call_3"] button').first()).toBeFocused();
+    await expect(answer.locator('[data-test="assistant-claim-1"]').first()).toHaveAttribute("data-call-id", "call_1");
   });
 
   test("EVID-04 Re-run for now sends the same prompt over a window ending now, the draft untouched", { tag: ["@mock"] }, async ({ page }) => {
+    // Re-run for now is offered once the answer's data is an hour old, so the page runs two hours past the mock's windows.
+    await page.clock.install({ time: Date.now() + 2 * 3_600_000 });
     await openOnLogs(page);
     await ask(page, "complete", "why are checkout requests failing?");
-    await expect(assistant.answer().locator('[data-test="assistant-turn-footer"]')).toContainText(/^Evaluated /);
     await assistant.composer().fill("half typed");
+    await expect(assistant.answer().locator('[data-test="assistant-answer-age"]')).toBeVisible();
     await harness.nextScenario(page, "complete");
     await assistant.answer().locator('[data-test="assistant-rerun"]').click();
     const rerun = assistant.transcript().locator('[data-test="assistant-message-rerun"]');
@@ -131,38 +153,39 @@ test.describe("assistant evidence", () => {
     await ask(page, "findings_inconclusive");
     const card = assistant.answer().locator('[data-test="assistant-findings"]');
     await expect(card).toBeVisible();
-    await expect(card.locator('[data-test="assistant-findings-inconclusive"]')).toHaveText(
-      "Inconclusive: the assistant couldn't confirm a cause",
-    );
-    await expect(card.locator('[data-test="assistant-findings-cause"]')).toHaveCount(0);
+    await expect(card).toHaveAttribute("data-confidence", "inconclusive");
+    await expect(card.locator('[data-test="assistant-answer-confidence-label"]')).toHaveText("Inconclusive");
+    await expect(card.locator('[data-test="assistant-findings-cause"]')).toHaveText("");
     await expect(card.locator('[data-test="assistant-findings-unknown"]')).toContainText("payments pool metrics");
   });
 
   test("EVID-06 the trail is one collapsed line, honest per step, and keyed by call_id", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "complete");
-    const toggle = assistant.answer().locator('[data-test="assistant-trail-toggle"]');
-    await expect(toggle).toHaveText(/^Worked through 3 steps/);
+    const toggle = assistant.answer().locator('[data-test="assistant-queries-line"]');
+    await expect(toggle).toHaveText("3 steps");
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await toggle.click();
-    await expect(assistant.answer().locator('[data-test="assistant-step-call_1"]')).toHaveText(
-      "Listed streams · 3 streams",
-    );
-    await expect(assistant.answer().locator('[data-test="assistant-step-call_3"]')).toHaveText(
-      /^Queried default · .+ · 4 rows$/,
-    );
+    await expect(assistant.answer().locator('[data-test="assistant-queries-range"]')).toHaveText(/^Evaluated \d\d:\d\d–\d\d:\d\d$/);
+    await expect(assistant.answer().locator('[data-test="assistant-queries-row-call_1"]')).toContainText("Listed streams · 3 streams");
+    await expect(assistant.answer().locator('[data-test="assistant-queries-row-call_3"]')).toContainText('FROM "default"');
+    await expect(assistant.answer().locator('[data-test="assistant-queries-count-call_3"]')).toHaveText("4 rows");
   });
 
   test("EVID-07 a failed step stays visible under the collapsed trail and is never green", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "error");
-    await expect(assistant.answer().locator('[data-test="assistant-trail-toggle"]')).toHaveText(
-      "Worked through 1 step · 1 failed",
-    );
-    const state = assistant.answer().locator('[data-test="assistant-step-state-call_e1"]');
-    await expect(state).toHaveAttribute("data-state", "failed");
-    await expect(assistant.answer().locator('[data-test="assistant-step-call_e1"]')).toHaveText(
-      "Query failed · Search field not found: latency",
+    // The turn's outcome says it failed; the trail keeps the failed step, in the error tone, one click away.
+    await expect(assistant.outcome()).toHaveAttribute("data-kind", "failed");
+    const toggle = assistant.answer().locator('[data-test="assistant-queries-line"]');
+    await expect(toggle).toHaveText("1 step");
+    await toggle.click();
+    const row = assistant.answer().locator('[data-test="assistant-queries-row-call_e1"]');
+    await expect(row.locator(".text-status-error-text")).toHaveCount(1);
+    await expect(row.locator('[class*="success"]')).toHaveCount(0);
+    await row.locator("button").first().click();
+    await expect(assistant.answer().locator('[data-test="assistant-queries-body-call_e1"]')).toContainText(
+      "Search field not found: latency",
     );
   });
 

@@ -14,7 +14,7 @@ test.describe("assistant on Home", () => {
 
   const homeUrl = () => `${harness.ENV.appUrl}/?org_identifier=${harness.ENV.org}`;
   const askBox = () => page().locator('[data-test="assistant-launcher"][data-layout="overview"]');
-  const input = () => askBox().locator("input");
+  const input = () => askBox().locator('[data-test="assistant-launcher-input-field"]');
   let currentPage;
   const page = () => currentPage;
   const threadUrl = /[?&]tab=ai&thread=[0-9a-f-]*/;

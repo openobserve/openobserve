@@ -36,11 +36,23 @@ test.describe("assistant approval cards", () => {
   const region = () => assistant.container().locator('[data-test="assistant-status-region"]');
   const approve = () => assistant.approval().locator('[data-test="assistant-approval-approve"]');
   const deny = () => assistant.approval().locator('[data-test="assistant-approval-deny"]');
+  const heading = () => assistant.approval().locator('[data-test="assistant-approval-heading"]');
+  // Reply and the other secondary actions sit in the card's ⋯ menu, which portals out of the card.
+  const menuAction = async (page, id) => {
+    await assistant.approval().locator('[data-test="assistant-approval-more"]').click();
+    await page.locator(`[role="menu"] [data-test="assistant-approval-${id}"]`).click();
+  };
+  const tabTo = async (page, target) => {
+    for (let i = 0; i < 10 && !(await target.evaluate((el) => el === document.activeElement)); i++)
+      await page.keyboard.press("Tab");
+    await expect(target).toBeFocused();
+  };
 
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
     await harness.setFlag(context, true);
-    state = harness.createMockState();
+    // A server without split budgets gates every card to Deny only (PO A14), so this one advertises them.
+    state = harness.createMockState({ capabilitiesEnabled: true, capabilities: { approval_extend_budgets: true } });
     await harness.installMocks(context, state);
     await harness.login(page);
     assistant = new AssistantPage(page);
@@ -51,20 +63,24 @@ test.describe("assistant approval cards", () => {
     const card = assistant.approval();
     await expect(card).toHaveAttribute("role", "group");
     await expect(card.locator('[data-test="assistant-approval-heading"]')).toHaveText("Delete 1 alert");
-    await expect(card.locator('[data-test="assistant-approval-countdown"]')).toHaveText(/^Expires in \d+:\d\d$/);
-    await expect(card.locator('[data-test="assistant-approval-targets"]')).toContainText("checkout-latency-old");
-    await expect(card.locator('[data-test="assistant-approval-target-2Yx9alert"]')).toHaveAccessibleName(
-      "Open checkout-latency-old (opens in a new tab)",
-    );
+    const countdown = card.locator('[data-test="assistant-approval-countdown"]');
+    await expect(countdown).toHaveText(/^\d+:\d\d$/);
+    await expect(countdown).toHaveAttribute("aria-label", /^Expires in \d+:\d\d$/);
     await expect(approve()).toHaveText("Delete 1 alert");
     await expect(card.locator('[data-test="assistant-approval-edit"]')).toHaveCount(0);
     await expect(assistant.composer()).toBeFocused();
     await assistant.composer().press("Enter");
     expect(await confirmations(page)).toHaveLength(0);
+    // One target is named in the card's Details, which stay closed until asked for.
+    await card.locator('[data-test="assistant-approval-details"] button').first().click();
+    await expect(card.locator('[data-test="assistant-approval-args"]')).toContainText('"name": "checkout-latency-old"');
     await page.keyboard.press("ControlOrMeta+i");
-    await expect(deny()).toBeFocused();
+    await expect(heading()).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(assistant.approvalResult()).toContainText("Declined · nothing was changed");
+    expect(await confirmations(page)).toHaveLength(0);
+    await tabTo(page, deny());
+    await page.keyboard.press("Enter");
+    await expect(assistant.approvalResult()).toContainText("Denied: delete 1 alert");
     const sent = await confirmations(page);
     expect(sent).toHaveLength(1);
     expect(sent[0].approved).toBe(false);
@@ -99,10 +115,10 @@ test.describe("assistant approval cards", () => {
     await harness.setKnobs(page, { confirmStatus: 500 });
     await deny().click();
     let result = assistant.approvalResult();
-    await expect(result).toContainText("Your decision didn't reach the assistant. Nothing was changed.");
+    await expect(result).toContainText("Couldn't send your decision. The alert hasn't changed.");
     await harness.setKnobs(page, { confirmStatus: 200 });
     await result.locator('[data-test="assistant-approval-result-send-again"]').click();
-    await expect(assistant.approvalResult()).toContainText("Declined · nothing was changed");
+    await expect(assistant.approvalResult()).toContainText("Denied: delete 1 alert");
     expect((await confirmations(page)).map((c) => c.approved)).toEqual([false, false]);
     await expect(assistant.composerState()).toHaveAttribute("data-state", "empty", { timeout: 30_000 });
     await assistant.send("delete it after all", "confirmation");
@@ -122,12 +138,12 @@ test.describe("assistant approval cards", () => {
     test.setTimeout(90_000);
     await ask(page, "permission_card", "list the pods");
     await expect(region()).toContainText("Waiting for your approval: Allow bash. Expires in 2");
-    await expect(assistant.approval().locator('[data-test="assistant-approval-expiry"]')).toHaveText(
-      /^Expires in 0:\d\d$/,
-    );
+    const countdown = assistant.approval().locator('[data-test="assistant-approval-countdown"]');
+    await expect(countdown).toHaveText(/^0:\d\d$/);
+    await expect(countdown).toHaveAttribute("aria-label", /^Expires in 0:\d\d$/);
     const record = assistant.approvalResult();
     await expect(record).toHaveAttribute("data-state", "expired", { timeout: 35_000 });
-    await expect(record).toContainText("No answer in time, so the assistant didn't run this action.");
+    await expect(record).toContainText("Request expired. Nothing was changed.");
     await expect(assistant.approval()).toHaveCount(0);
     expect((await confirmations(page)).at(-1).approved).toBe(false);
     await expect(assistant.composerState()).toHaveAttribute("data-state", "empty", { timeout: 30_000 });
@@ -143,15 +159,15 @@ test.describe("assistant approval cards", () => {
 
   test("APPR-05 Reply declines with the text and sends it as the next turn naming the card", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "permission_card", "list the pods");
-    await assistant.approval().locator('[data-test="assistant-approval-reply"]').click();
+    await menuAction(page, "reply");
     await expect(assistant.composer()).toHaveAttribute("placeholder", "Reply to the assistant");
     await expect(assistant.composer()).toBeFocused();
     await assistant.composer().fill("use the staging namespace");
     await harness.nextScenario(page, "complete");
     await assistant.composer().press("Enter");
-    await expect(assistant.approvalResult()).toContainText(
-      "Declined · replied: “use the staging namespace”",
-    );
+    await expect(assistant.approvalResult()).toHaveAttribute("data-state", "replied");
+    await expect(assistant.approvalResult()).toContainText("Declined with a reply");
+    await expect(assistant.approvalResult()).toContainText("use the staging namespace");
     expect((await confirmations(page))[0].approved).toBe(false);
     await expect.poll(async () => (await requests(page)).length, { timeout: 15_000 }).toBe(2);
     const reply = (await requests(page))[1].body;
@@ -162,7 +178,7 @@ test.describe("assistant approval cards", () => {
   test("APPR-06 the decision posts on the session it was asked in, after the chat moved to the full view", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "confirmation");
     const sid = (await requests(page))[0].headers["x-o2-assistant-session-id"];
-    await assistant.container().locator('[data-test="assistant-shell-open-in-full-view"]').click();
+    await assistant.placeAs("full");
     await expect(assistant.full).toBeVisible();
     await expect(assistant.approval()).toBeVisible();
     await approve().click();
@@ -209,6 +225,7 @@ test.describe("assistant approval cards", () => {
   });
 
   test("XTAB-03 a chat whose card another tab holds waits with Stop and keeps Send locked until it is resolved", { tag: ["@mock"] }, async ({ page }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     await openOnLogs(page);
     await assistant.send("why 5xx?", "complete");
     await expect(assistant.composerState()).toHaveAttribute("data-state", "empty", { timeout: 30_000 });
@@ -230,7 +247,8 @@ test.describe("assistant approval cards", () => {
     await assistant.composer().fill("and now?");
     await assistant.composer().press("Enter");
     expect(await requests(page)).toHaveLength(1);
-    await expect(assistant.container().locator('[data-test="assistant-composer-helper"]')).toContainText(
+    // The refused send is spoken by the composer's status region; no line is drawn under the field.
+    await expect(assistant.container().locator('[data-test="assistant-composer-status"]')).toContainText(
       "Another tab is waiting for your approval on this chat.",
     );
     await post({ v: 1, type: "approval_resolved", sid, callId: "o2_delete", approved: false, at: Date.now() });
@@ -262,12 +280,6 @@ test.describe("assistant approval cards", () => {
     const spokenTimes = (text) => page.evaluate((t) => window.__spoken.filter((s) => s === t).length, text);
     const focusInAssistant = () =>
       page.evaluate(() => !!document.activeElement?.closest('[data-test="assistant-container"], [data-assistant-root]'));
-    const tabTo = async (target) => {
-      for (let i = 0; i < 10 && !(await target.evaluate((el) => el === document.activeElement)); i++)
-        await page.keyboard.press("Tab");
-      await expect(target).toBeFocused();
-    };
-
     // The logs query editor can take focus late and swallow the chord, as SHELL-01 guards against.
     await page.locator("body").click({ position: { x: 5, y: 300 } });
     await page.keyboard.press("ControlOrMeta+i");
@@ -278,11 +290,11 @@ test.describe("assistant approval cards", () => {
     await expect(assistant.approval()).toBeVisible({ timeout: 15_000 });
     await expect(assistant.composer()).toBeFocused();
     await page.keyboard.press("ControlOrMeta+i");
-    await expect(deny()).toBeFocused();
-    await tabTo(approve());
+    await expect(heading()).toBeFocused();
+    await tabTo(page, approve());
     await harness.setKnobs(page, { confirmDelayMs: 1_500 });
     await page.keyboard.press("Enter");
-    await expect(assistant.approval().locator('[data-test="assistant-approval-sending"]')).toBeVisible();
+    await expect(assistant.approval()).toHaveAttribute("aria-busy", "true");
     await expect(approve()).toBeFocused();
     await expect(approve()).toHaveAttribute("aria-disabled", "true");
     await expect(assistant.approvalResult()).toContainText("Deleted 1 alert");
@@ -300,9 +312,9 @@ test.describe("assistant approval cards", () => {
     await expect(assistant.composer()).toBeFocused();
     await page.keyboard.press("ControlOrMeta+i");
     await expect(consent.locator('[data-test="assistant-consent-card-org"]')).toBeFocused();
-    await tabTo(consent.locator('[data-test="assistant-consent-card-checkbox"] [role="checkbox"]'));
+    await tabTo(page, consent.locator('[data-test="assistant-consent-card-checkbox"] [role="checkbox"]'));
     await page.keyboard.press("Space");
-    await tabTo(consent.locator('[data-test="assistant-consent-card-enable"]'));
+    await tabTo(page, consent.locator('[data-test="assistant-consent-card-enable"]'));
     await page.keyboard.press("Enter");
     await expect(assistant.container().locator('[data-test="assistant-consent-note"]')).toBeVisible({
       timeout: 15_000,
@@ -318,9 +330,11 @@ test.describe("assistant approval cards", () => {
     // The strip offers Review only while the card is out of view, so Ctrl+I is the bridge here.
     await expect(assistant.container().locator('[data-test="assistant-strip-review"]')).toHaveCount(0);
     await page.keyboard.press("ControlOrMeta+i");
-    await expect(deny()).toBeFocused();
+    await expect(heading()).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(assistant.approval().locator('[data-test="assistant-approval-reply"]')).toBeFocused();
+    await expect(assistant.approval().locator('[data-test="assistant-approval-more"]')).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(deny()).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(approve()).toBeFocused();
     await page.keyboard.press("Tab");
@@ -328,9 +342,10 @@ test.describe("assistant approval cards", () => {
     await page.keyboard.press("Tab");
     expect(await page.evaluate(() => !!document.activeElement?.closest('[data-test="assistant-approval-card"]'))).toBe(false);
     await page.keyboard.press("Shift+Tab");
+    // Escape never decides, and on a waiting card it does not close the panel either.
     await page.keyboard.press("Escape");
-    await expect(assistant.approvalResult()).toContainText("Declined · nothing was changed");
-    expect((await confirmations(page))[0].approved).toBe(false);
+    await expect(assistant.approval()).toHaveCount(1);
+    expect(await confirmations(page)).toHaveLength(0);
     await expect(assistant.container()).toBeVisible();
   });
 

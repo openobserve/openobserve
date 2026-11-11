@@ -56,6 +56,13 @@ export class AssistantPage {
     await this.container().first().waitFor({ state: "visible" });
   }
 
+  /** Moves the visible chat through its Open as menu: `sidebar`, `full`, `window` or `dock`. */
+  async placeAs(id) {
+    await this.page.mouse.move(0, 0);
+    await this.container().locator('[data-test="assistant-open-as-button"]').filter({ visible: true }).first().click();
+    await this.page.locator(`[role="menu"] [data-test="assistant-shell-place-${id}"]`).click();
+  }
+
   async close() {
     await this.container().locator('[data-test="assistant-shell-close"]').click();
   }
@@ -115,6 +122,16 @@ export class AssistantPage {
     return this.transcript().locator("[data-answer]").last();
   }
 
+  /** The latest answer's Copy, which shows only once its turn has ended with something said. */
+  answerDone() {
+    return this.answer().locator('[data-test="assistant-msg-copy-answer"]');
+  }
+
+  /** Every ended answer's Copy in the visible container. */
+  answersDone() {
+    return this.transcript().locator('[data-answer] [data-test="assistant-msg-copy-answer"]');
+  }
+
   launcher() {
     return this.page.locator('[data-test="assistant-launcher"]');
   }
@@ -159,15 +176,19 @@ export class AssistantPage {
     return this.history().locator('[data-test="assistant-history-row"]').filter({ hasText: title }).first();
   }
 
-  /** Opens the history list from the thread header (Chats, or the overflow menu when dense). */
+  /** Opens All chats from the thread title menu; the full view's rail already is the list. */
   async openHistory() {
-    const chats = this.thread().locator('[data-test="assistant-thread-history"]');
+    if (await this.history().isVisible().catch(() => false)) return;
     // The header button's tooltip stays open under a resting pointer and covers the thread header.
     await this.page.mouse.move(0, 0);
-    if (await chats.isVisible().catch(() => false)) await chats.click();
+    await this.thread().locator('[data-test="assistant-thread-title-button"]').click();
+    const all = this.page.locator('[data-test="assistant-title-menu-all"]').filter({ visible: true });
+    await this.page.locator('[role="menu"]').filter({ visible: true }).first().waitFor();
+    if (await all.count()) await all.click();
     else {
-      await this.thread().locator('[data-test="assistant-thread-menu"]').click();
-      await this.page.locator('[data-test="assistant-thread-menu-history"]').click();
+      // With no other chat the menu offers no All chats, so the history chord opens the list.
+      await this.page.keyboard.press("Escape");
+      await this.page.keyboard.press("ControlOrMeta+Shift+h");
     }
     await this.history().waitFor({ state: "visible" });
   }
@@ -189,8 +210,29 @@ export class AssistantPage {
     return this.container().locator('[data-test="assistant-composer"]');
   }
 
+  /** The staged chips; the time chip leads the tray but is not one of them. */
   chips() {
     return this.tray().locator("[data-assistant-chip]");
+  }
+
+  timeChip() {
+    return this.tray().locator('[data-test="assistant-context-chip-time"]');
+  }
+
+  /** Opens the tray's `+N`, which folds every chip past the first at sidebar width. */
+  async expandTray() {
+    const more = this.tray().locator('[data-test="assistant-context-more"]');
+    if ((await more.count()) && (await more.getAttribute("aria-expanded")) !== "true") await more.click();
+  }
+
+  /** Staged images are chips of their own; a cap notice hides the tray for a few seconds. */
+  imageChips() {
+    return this.tray().locator('[data-test="assistant-context-chip-image"]');
+  }
+
+  /** The ⓘ that opens what the assistant sees: in the composer strip beside chips, else in the header. */
+  sees() {
+    return this.container().locator('[data-test="assistant-context-sees"]').filter({ visible: true });
   }
 
   /** A host's docked chat; `hostId` is the dock's `data-host`. */

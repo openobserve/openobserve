@@ -84,7 +84,7 @@ test.describe("assistant on a real server", () => {
     await assistant.send("why 5xx? [replay:complete]");
     await expect.poll(() => streamCalls.length, { timeout: 30_000 }).toBe(1);
     expect(streamCalls[0]).toBe(200);
-    await expect(assistant.answer().locator('[data-test="assistant-turn-footer"]')).toBeVisible({ timeout: 120_000 });
+    await expect(assistant.answerDone()).toBeVisible({ timeout: 120_000 });
     await expect(assistant.status()).toHaveCount(0);
     await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true");
     const ended = (await harness.exportTelemetry(page, "smoke-02")).filter((e) => e.name === "ai_turn_ended");

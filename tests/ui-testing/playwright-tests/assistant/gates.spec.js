@@ -77,10 +77,10 @@ test.describe("assistant gates", () => {
     await page.keyboard.press("Escape");
     await expect(assistant.headerButton).toBeFocused();
     expect(await shimStreams(), "chat_stream calls on /logs").toBe(0);
+    // /assistant is Home's AI tab, which OSS does not offer, so it lands on the Overview.
     await page.goto(url("/assistant"), { waitUntil: "domcontentloaded" });
-    await expect(
-      page.locator('[data-gate="not_entitled"][data-size="hero"]'),
-    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('[data-test="home-tab-overview"]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('[data-test="home-tab-ai"]')).toHaveCount(0);
     expect(await shimStreams(), "chat_stream calls on /assistant").toBe(0);
     expect(streamRequests).toEqual([]);
   });
@@ -97,10 +97,11 @@ test.describe("assistant gates", () => {
       timeout: 30_000,
     });
     await expect(assistant.headerButton).toHaveCount(0);
+    // /assistant is Home's AI tab, which an assistant that is not set up does not offer.
     await page.goto(url("/assistant"), { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("Page not found")).toBeVisible({
-      timeout: 30_000,
-    });
+    await expect(page.locator('[data-test="home-tab-overview"]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('[data-test="home-tab-ai"]')).toHaveCount(0);
+    await expect(page.locator("[data-gate]")).toHaveCount(0);
   });
 
   test("GATE-02 not configured mutes the door for admins and opens the setup card", { tag: ["@mock", "@stack-ee-noagent"] }, async ({
@@ -126,10 +127,10 @@ test.describe("assistant gates", () => {
         '[data-gate="not_configured"] [data-test="assistant-gate-setup"]',
       ),
     ).toBeVisible();
+    // The setup card is the header door's; /assistant lands on Home, which has no AI tab yet.
     await page.goto(url("/assistant"), { waitUntil: "domcontentloaded" });
-    await expect(
-      page.locator('[data-gate="not_configured"][data-size="hero"]'),
-    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('[data-test="home-tab-overview"]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('[data-test="home-tab-ai"]')).toHaveCount(0);
   });
 
   test("GATE-02 below lg the setup sheet closes by Escape and hands focus back", { tag: ["@mock", "@stack-ee-noagent"] }, async ({ context, page }) => {
@@ -306,7 +307,7 @@ test.describe("assistant gates", () => {
     await expect(notice).toHaveCount(0);
   });
 
-  test("GATE-06 a 403 mid-session swaps the container to the G2 gate", { tag: ["@mock"] }, async ({
+  test("GATE-06 a 403 mid-session refuses in place and locks the composer to access", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -317,8 +318,10 @@ test.describe("assistant gates", () => {
     });
     await assistant.open("header");
     await assistant.send("can I chat?", "forbidden_403");
-    await expect(assistant.gate()).toBeVisible();
-    await expect(assistant.container().locator('[data-test="assistant-composer"]')).toHaveCount(0);
+    await expect(assistant.outcome()).toHaveAttribute("data-code", "permission_denied");
+    await expect(
+      assistant.container().locator('[data-test="assistant-composer-notice"][data-notice="access"]'),
+    ).toContainText("Needs AI access");
   });
 
   test("GATE-05 B-06 overrides the heuristic", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {

@@ -11,7 +11,7 @@
     "load": {},
     "open": { "turn": ["O2 Assistant opened."] },
     "done": { "turn": ["Sending…", "Writing the answer", "Done"] },
-    "failed": { "turn": ["Sending…", "Failed. The AI provider failed: overloaded. Retry available."] },
+    "failed": { "turn": ["Sending…", "Failed. The AI provider is overloaded, so the answer stopped. Retry available."] },
     "stopped": { "turn": ["Sending…", "Stopping…", "Stopped"] },
     "refused": { "turn": ["Sending…", "Not sent. Too many answers are running. Your message wasn't sent. Retry available."] },
     "approval": {

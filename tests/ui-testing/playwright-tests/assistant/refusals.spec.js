@@ -42,6 +42,7 @@ test.describe("assistant refusals and recovery", () => {
   }
 
   const lower = () => assistant.container().locator('[data-test="assistant-shell-lower"]');
+  const notice = (id) => assistant.container().locator(`[data-test="assistant-composer-notice"][data-notice="${id}"]`);
   const region = () => assistant.container().locator('[data-test="assistant-status-region"]');
 
   test.beforeEach(async ({ context, page }) => {
@@ -57,23 +58,26 @@ test.describe("assistant refusals and recovery", () => {
     await openOnLogs(page);
     await assistant.composer().fill("why 5xx offline?");
     await pasteImage(page);
-    await expect(assistant.container().locator('[data-test="assistant-image-strip"] li')).toHaveCount(1);
+    await expect(assistant.imageChips()).toHaveCount(1);
     await harness.setOnline(page, false);
-    await refuse(page, "offline", "why 5xx offline?");
-    await expect(lower().locator('[data-test="assistant-turn-outcome"]')).toContainText(
-      "You're offline. Your message wasn't sent.",
-    );
+    await harness.nextScenario(page, "offline");
+    await assistant.send("why 5xx offline?");
+    // An offline refusal draws no block: the strip says it and the draft stays in place.
+    await expect(notice("offline")).toContainText("You're offline. Draft kept.");
+    await expect(region()).toContainText("You're offline. Your message wasn't sent.");
+    await expect(lower().locator('[data-test="assistant-turn-outcome"]')).toHaveCount(0);
     await expect(assistant.transcript()).toHaveCount(0);
     await expect(assistant.composer()).toHaveValue("why 5xx offline?");
     await expect(assistant.composer()).toBeFocused();
-    await expect(assistant.container().locator('[data-test="assistant-image-strip"] li')).toHaveCount(1);
-    await expect(assistant.outcomeAction()).toHaveAttribute("aria-disabled", "true");
     await harness.setOnline(page, true);
-    await expect(assistant.outcomeAction()).not.toHaveAttribute("aria-disabled", "true");
     await expect(region()).toHaveText("You're back online.");
     await harness.nextScenario(page, "complete");
-    await assistant.outcomeAction().click();
-    await expect(assistant.composer()).toBeFocused();
+    await assistant.composer().press("Enter");
+    await expect(assistant.answerDone()).toBeVisible({ timeout: 20_000 });
+    // The notice holds the strip until the next send, so the kept image is checked on the sent message.
+    const sent = assistant.transcript().locator('[data-test="assistant-message-user"]').last();
+    await expect(sent).toContainText("why 5xx offline?");
+    await expect(sent.locator('[data-test="assistant-message-image"]')).toHaveCount(1);
   });
 
   test("ERR-02 an expired session signs in in a new tab and keeps this page and its draft", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
@@ -93,7 +97,12 @@ test.describe("assistant refusals and recovery", () => {
     await openOnLogs(page);
     await harness.nextScenario(page, "forbidden_403");
     await assistant.send("why?");
-    await expect(assistant.gate()).toBeVisible();
+    // The chat stays readable: the refusal names the role, and the strip locks the composer to access.
+    await expect(assistant.outcome()).toHaveAttribute("data-code", "permission_denied");
+    await expect(assistant.outcome().locator('[data-test="assistant-turn-outcome-title"]')).toHaveText(
+      "Your role can no longer use O2 Assistant. Your message wasn't sent.",
+    );
+    await expect(notice("access")).toContainText("Needs AI access");
   });
 
   test("ERR-04 an org with the assistant off says so with the admin action", { tag: ["@mock"] }, async ({ page }) => {
@@ -134,21 +143,22 @@ test.describe("assistant refusals and recovery", () => {
     const title = assistant.outcome().locator('[data-test="assistant-turn-outcome-title"]');
     const lines = await title.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
     expect(lines).toBeLessThanOrEqual(2);
-    await expect(assistant.outcomeAction()).toHaveText("Retry");
+    await expect(assistant.outcomeAction()).toHaveAttribute("aria-label", "Retry");
   });
 
   test("ERR-08 a rate limit counts down without announcing each tick and never sends by itself", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await harness.setKnobs(page, { envelopeEnabled: true });
-    await refuse(page, "upstream_429");
-    await expect(assistant.outcomeAction()).toHaveText(/Retry in (30|29|28) s/);
-    await expect(assistant.outcome().locator('[data-test="assistant-turn-outcome-title"]')).toHaveText(
-      "The AI provider is limiting requests. Your message wasn't sent.",
-    );
+    await harness.nextScenario(page, "upstream_429");
+    await assistant.send("why 5xx?");
+    // A rate limit is a strip notice that counts down, not a block in the log.
+    const busy = notice("busy").locator('[data-test="assistant-composer-notice-title"]');
+    await expect(busy).toHaveText(/send again in (30|29|28) s/);
+    await expect(region()).toContainText("The AI provider is limiting requests. Your message wasn't sent.");
     await expect(assistant.container().locator('[data-test="assistant-send"]')).toHaveAttribute("aria-disabled", "true");
     const before = await region().textContent();
     await page.waitForTimeout(2_200);
-    await expect(assistant.outcomeAction()).toHaveText(/Retry in 2\d s/);
+    await expect(busy).toHaveText(/send again in 2\d s/);
     expect(await region().textContent()).toBe(before);
     expect(await page.evaluate(() => window.__o2mock.requests.length)).toBe(1);
   });
@@ -183,10 +193,10 @@ test.describe("assistant refusals and recovery", () => {
     await openOnLogs(page);
     await harness.nextScenario(page, "error");
     await assistant.send("why?");
-    await assistant.outcome().locator('[data-test="assistant-error-details"] button').first().click();
-    await assistant.outcome().locator('[data-test="assistant-error-details-copy"]').click();
-    await expect(assistant.outcome()).toContainText("Couldn't copy. Select the text and copy it.");
-    await expect(assistant.outcome().locator('[data-test="assistant-error-details-manual"] textarea')).toHaveValue(
+    await assistant.outcome().locator('[data-test="assistant-error-details-trigger"]').click();
+    await page.locator('[data-test="assistant-error-details-copy"]').click();
+    await expect(page.locator('[data-test="assistant-error-details-copy-manually"]')).toHaveText("Couldn't copy. Select the text and copy it.");
+    await expect(page.locator('[data-test="assistant-error-details-manual"] textarea')).toHaveValue(
       /Code: provider_error/,
     );
   });

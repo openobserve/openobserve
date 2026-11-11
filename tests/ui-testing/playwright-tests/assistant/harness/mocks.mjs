@@ -18,6 +18,7 @@ export const CONFIG_PATCH = {
   ai_chat_persistence_enabled: true, // server history + sharing (useAiChat.ts chatHistoryServer, chatShare.ts:103)
   public_ai_chat_enabled: true, // public link option in the share dialog (chatShare.ts:106)
   public_ai_chat_max_expiry_days: 30,
+  ai_share_redact_attachments: false, // pinned, so a server build that advertises it does not change what the share mock accepts (chatShare.ts:139)
 };
 
 // SSE frame builders (o2-ai EventType, src/server/constants.py:27-46).

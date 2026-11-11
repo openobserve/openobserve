@@ -65,8 +65,9 @@ test.describe("assistant chats in two tabs", () => {
       { timeout: 30_000 },
     );
     await expect(elsewhere(b).locator('[data-test="assistant-shell-elsewhere-stop"]')).toBeVisible();
-    await expect(b.container().locator('[data-test="assistant-stop"]')).toBeVisible();
-    await expect(b.container().locator('[data-test="assistant-send"]')).toHaveCount(0);
+    // A followed chat offers Stop in the elsewhere row; the composer keeps Send, locked.
+    await expect(b.container().locator('[data-test="assistant-stop"]')).toHaveCount(0);
+    await expect(b.container().locator('[data-test="assistant-send"]')).toHaveAttribute("aria-disabled", "true");
     await b.composer().fill("and the payments service?");
     await b.composer().press("Enter");
     expect(await tabB.evaluate(() => window.__o2mock.requests.length)).toBe(0);
@@ -145,6 +146,7 @@ test.describe("assistant chats in two tabs", () => {
   });
 
   test("XTAB-09 a browser-only chat written from two tabs keeps every turn in order", { tag: ["@mock"] }, async ({ context, page }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     test.setTimeout(150_000);
     await start(context, page, { persistence: false });
     const a = await openOnLogs(page);
@@ -156,10 +158,10 @@ test.describe("assistant chats in two tabs", () => {
     const b = new AssistantPage(tabB);
     await expect.poll(() => storedTurns(page, sid).then((row) => row.prompts.length), { timeout: 15_000 }).toBe(1);
     await tabB.goto(chatUrl(sid), { waitUntil: "domcontentloaded" });
-    await expect(b.container().locator('[data-test="assistant-stop"]')).toBeVisible({ timeout: 30_000 });
+    await expect(elsewhere(b).locator('[data-test="assistant-shell-elsewhere-stop"]')).toBeVisible({ timeout: 30_000 });
     await expect(a.composerState()).toHaveAttribute("data-state", "empty", { timeout: 60_000 });
     await expect(b.transcript()).toContainText("turn one", { timeout: 30_000 });
-    await expect(b.container().locator('[data-test="assistant-stop"]')).toHaveCount(0, { timeout: 30_000 });
+    await expect(elsewhere(b)).toHaveCount(0, { timeout: 30_000 });
     await b.send("turn two", "complete");
     await expect(b.composerState()).toHaveAttribute("data-state", "empty", { timeout: 60_000 });
     await expect(a.transcript()).toContainText("turn two", { timeout: 30_000 });
@@ -219,7 +221,7 @@ test.describe("assistant chats in two tabs", () => {
     await harness.nextScenario(tabB, "lease_409");
     await b.send("racing prompt");
     await expect(b.outcome()).toHaveAttribute("data-kind", "refused", { timeout: 15_000 });
-    await expect(b.outcome()).toContainText("Another answer is still running in this chat. Your message wasn't sent.");
+    await expect(b.outcome()).toContainText("This chat is still answering. Your message wasn't sent.");
     await expect(b.composer()).toHaveValue("racing prompt");
     await expect(a.status()).toBeVisible();
     const chat = state.chats.find((c) => c.session_id === sid);
@@ -272,6 +274,7 @@ test.describe("assistant chats in two tabs", () => {
     context,
     page,
   }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     test.setTimeout(150_000);
     await start(context, page, { persistence: false });
     const a = await openOnLogs(page);
