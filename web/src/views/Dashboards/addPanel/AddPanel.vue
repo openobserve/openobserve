@@ -654,7 +654,7 @@ export default defineComponent({
     // this is used to again assign query params on discard or save
     let routeQueryParamsOnMount: any = {};
 
-    // Any replace, even a duplicate one, supersedes a pending leave, which then ends cancelled with no URL rollback.
+    // Even a duplicate replace supersedes a pending leave, cancelling it with no URL rollback.
     let leaveInProgress = false;
     const syncRouteQuery = (query: LocationQueryRaw) => {
       if (leaveInProgress || stringifyQuery(query) === stringifyQuery(route.query)) return;
@@ -1670,11 +1670,16 @@ export default defineComponent({
 
       leaveInProgress = true;
       const leave = await resolveLeave(await askLeave());
-      // Stays set on a confirmed leave: the navigation is still pending while the next view's chunk loads.
+      // Kept on a confirmed leave: the navigation stays pending while the next view loads.
       leaveInProgress = leave;
       if (leave) next();
       else next(false);
     });
+    // A confirmed leave that fails later leaves the editor open, which must sync the URL again.
+    const stopLeaveFailureReset = router.afterEach((_to, _from, failure) => {
+      if (failure) leaveInProgress = false;
+    });
+    onBeforeUnmount(stopLeaveFailureReset);
     const panelTitle = computed(() => {
       return { title: dashboardPanelData.data.title };
     });

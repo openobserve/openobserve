@@ -164,6 +164,7 @@ vi.mock("vue-router", async () => {
     useRouter: vi.fn(() => ({
       push: vi.fn(),
       replace: vi.fn(),
+      afterEach: vi.fn(() => vi.fn()),
     })),
   };
 });
@@ -744,7 +745,7 @@ describe("AddPanel.vue", () => {
         expect(editorRouter().replace).not.toHaveBeenCalled();
       });
 
-      it("does not replace the route while the leave dialog is open, so Discard still leaves", async () => {
+      it("does not replace the route while the leave dialog is open or after Discard confirms the leave", async () => {
         const { next, done } = await openLeaveDialog();
         editorRouter().replace.mockClear();
 
@@ -767,6 +768,22 @@ describe("AddPanel.vue", () => {
 
         wrapper.vm.variablesDataUpdated(variables);
 
+        expect(editorRouter().replace).toHaveBeenCalledTimes(1);
+      });
+
+      it("syncs the URL again when the confirmed leave fails after Discard", async () => {
+        const { done } = await openLeaveDialog();
+        wrapper.vm.onLeaveChoice("discard");
+        await done;
+        const onNavigationEnd = editorRouter().afterEach.mock.calls.at(-1)![0];
+        editorRouter().replace.mockClear();
+
+        onNavigationEnd({}, {}, undefined);
+        wrapper.vm.variablesDataUpdated(variables);
+        expect(editorRouter().replace).not.toHaveBeenCalled();
+
+        onNavigationEnd({}, {}, new Error("chunk load failed"));
+        wrapper.vm.variablesDataUpdated(variables);
         expect(editorRouter().replace).toHaveBeenCalledTimes(1);
       });
     });

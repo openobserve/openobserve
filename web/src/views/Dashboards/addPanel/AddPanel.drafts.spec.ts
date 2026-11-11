@@ -154,7 +154,7 @@ vi.mock("vue-router", async () => {
     ...actual,
     onBeforeRouteLeave: vi.fn(),
     useRoute: () => nav.route,
-    useRouter: () => ({ push: nav.push, replace: nav.replace }),
+    useRouter: () => ({ push: nav.push, replace: nav.replace, afterEach: () => () => {} }),
   };
 });
 
