@@ -5223,6 +5223,14 @@ mod tests {
     }
 
     #[test]
+    fn test_promql_missing_condition_is_bad_request() {
+        assert_eq!(
+            status(AlertError::PromqlMissingCondition),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
     fn test_realtime_missing_custom_query_is_bad_request() {
         assert_eq!(
             status(AlertError::RealtimeMissingCustomQuery),

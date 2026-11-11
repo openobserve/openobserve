@@ -23,8 +23,8 @@ mod outcome;
 mod summary;
 
 pub use evidence::{
-    Citation, EvidenceEntry, EvidenceTarget, build_evidence, evidence_kind, evidence_target,
-    exit_code, observed_window, summarize_result,
+    Citation, EvidenceEntry, EvidenceTarget, build_evidence, change_rows, evidence_kind,
+    evidence_target, exit_code, observed_window, summarize_result,
 };
 pub use ledger::{
     BlindSpot, BlindSpotAxis, BlindSpotFix, EvidenceItem, EvidenceLedger, Hypothesis,
@@ -786,6 +786,7 @@ pub(crate) mod fixtures {
             signal: signal_class(tool, &input),
             target: evidence_target(tool, &input),
             observed: None,
+            change_rows: None,
             result_summary: format!("{call_id} summary"),
         }
     }
