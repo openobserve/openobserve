@@ -401,6 +401,20 @@ describe("SlackInsightsSection: save failed (S7f)", () => {
     expect(w.text()).toContain("Choose a digest time as HH:MM.");
   });
 
+  it("an_unreadable_typed_time_never_saves_the_previous_time_V_N3", async () => {
+    const w = await mountSection(settings("adminOneChannel"));
+    const input = find(w, "slack-insights-time").find("input");
+    await input.setValue("0930x");
+    await input.trigger("change");
+    await flushPromises();
+    await toggle(w, "slack-insights-trial");
+    await save(w);
+    expect(slack.putInsightsSettings).not.toHaveBeenCalled();
+    expect(find(w, "slack-insights-time").get('[role="alert"]').text()).toBe(
+      "Enter a time as HH:MM.",
+    );
+  });
+
   it("joins the server's reason and the next sentence as two sentences", async () => {
     vi.mocked(slack.putInsightsSettings).mockRejectedValue(
       Object.assign(new Error("bad"), {

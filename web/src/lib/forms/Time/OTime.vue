@@ -52,6 +52,11 @@ watch(
     typedError.value = null;
   },
 );
+// A form must not save the previous value while the field shows a refused entry.
+watch(
+  () => !!typedError.value,
+  (invalid) => emit("invalid", invalid),
+);
 const effectiveError = computed(
   () => typedError.value || props.errorMessage || (props.error ? " " : null) || null,
 );

@@ -390,6 +390,29 @@ describe("DecisionDismissDialog", () => {
     }
   });
 
+  it("an_unreadable_end_time_never_dismisses_with_the_previous_time", async () => {
+    await mountDialog();
+    await chooseReason("planned_work");
+    const time = document.body.querySelector<HTMLInputElement>(
+      '[data-test="decision-dismiss-until-time"] input',
+    )!;
+    time.value = "99:99";
+    time.dispatchEvent(new Event("change", { bubbles: true }));
+    await settle();
+    const effect = byTest("decision-dismiss-effect");
+    expect(effect?.getAttribute("data-state")).toBe("incomplete");
+    expect(effect?.textContent).not.toContain("until");
+    expect(submitButton().disabled).toBe(true);
+    (document.body.querySelector(`form`) as HTMLFormElement).requestSubmit();
+    await settle();
+    expect(autoobserveDecisions.decide).not.toHaveBeenCalled();
+    time.value = "23:30";
+    time.dispatchEvent(new Event("change", { bubbles: true }));
+    await settle();
+    expect(effect?.getAttribute("data-state")).toBe("ready");
+    expect(submitButton().disabled).toBe(false);
+  });
+
   it("shows_the_effect_from_the_preview_without_ids", async () => {
     await mountDialog();
     await chooseReason("not_needed");

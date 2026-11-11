@@ -223,6 +223,10 @@ const form = useOForm<DecisionDismissForm>({
 });
 const values = form.useStore((s) => s.values);
 const submitting = form.useStore((s) => s.isSubmitting);
+// A refused typed end time leaves the old time in the values, so the term on screen isn't the one shown.
+const untilTimeRefused = form.useStore(
+  (s) => s.values.reason === "planned_work" && (s.fieldMeta.untilTime?.errors?.length ?? 0) > 0,
+);
 
 const firstDay = computed(() => localDate(openedAt.value));
 const lastDay = computed(() => localDate(openedAt.value + PLANNED_WORK_MAX_MS));
@@ -261,7 +265,7 @@ const effectState = computed(() => {
   if (preview.error.value && !preview.data.value) return "error";
   if (!preview.data.value) return "loading";
   // Without a reason or with an end out of range the preview is of another term, so it is not shown as this one's.
-  return "reason" in params.value ? "ready" : "incomplete";
+  return "reason" in params.value && !untilTimeRefused.value ? "ready" : "incomplete";
 });
 const effectText = computed(() => {
   if (effectState.value === "error") return t("insight.decisions.dismiss.effectFailed");
@@ -274,7 +278,11 @@ const effectText = computed(() => {
 /** Nothing is written until the reader has seen what it changes. */
 const canSubmit = computed(
   () =>
-    ready.value && !!preview.data.value?.may && !refused.value && !preview.isPlaceholderData.value,
+    ready.value &&
+    !!preview.data.value?.may &&
+    !refused.value &&
+    !preview.isPlaceholderData.value &&
+    !untilTimeRefused.value,
 );
 
 async function submit(form: DecisionDismissForm) {

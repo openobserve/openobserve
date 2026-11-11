@@ -241,6 +241,24 @@ describe("OTime", () => {
       },
     );
 
+    it("tells the caller while a typed entry is unreadable (V-N3)", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, modelValue: "09:00" },
+      });
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = "99:99";
+      await input.trigger("change");
+      expect(wrapper.emitted("invalid")?.at(-1)).toEqual([true]);
+      (input.element as HTMLInputElement).value = "10:15";
+      await input.trigger("change");
+      expect(wrapper.emitted("invalid")?.at(-1)).toEqual([false]);
+      (input.element as HTMLInputElement).value = "ab";
+      await input.trigger("change");
+      await wrapper.setProps({ modelValue: "11:00" });
+      expect(wrapper.emitted("invalid")?.at(-1)).toEqual([false]);
+    });
+
     it("clears an unreadable entry when the same time as before is typed back", async () => {
       wrapper = mount(OTime, {
         attachTo: document.body,
