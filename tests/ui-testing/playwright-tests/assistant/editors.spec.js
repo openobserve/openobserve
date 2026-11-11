@@ -256,7 +256,8 @@ test.describe("assistant editors and width", () => {
     await expect(dock.locator('[data-test="assistant-composer-field"]')).toHaveValue(
       /Which regex matches values like the sample/,
     );
-    await expect(dock.locator("[data-assistant-chip]")).toContainText(["Field ·"]);
+    await expect(dock.locator("[data-assistant-chip]")).toHaveCount(1);
+    await expect(dock.locator('[data-test="assistant-context-chip-field"]')).toHaveCount(1);
     await expect(assistant.sidebar).toBeHidden();
     await expect(page.locator('[data-test="add-regex-pattern-open-close-ai-btn"]')).toHaveCount(0);
     expect(await page.evaluate(() => window.__o2mock.requests.length)).toBe(0);

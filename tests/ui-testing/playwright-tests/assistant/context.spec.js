@@ -76,11 +76,12 @@ test.describe("assistant composer and context", () => {
 
   test("CTX-01 the time chip is first and the popover tells sent from not read", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
-    const first = assistant.chips().first();
+    const first = assistant.tray().locator('button, [role="button"]').first();
     await expect(first).toHaveAttribute("data-test", "assistant-context-chip-time");
-    await expect(first).toContainText("Time ·");
-    await expect(assistant.chips().nth(1)).toContainText("Stream · e2e_automate");
-    await assistant.tray().locator('[data-test="assistant-context-sees"]').click();
+    await expect(first).toHaveAttribute("aria-label", /^Time range, \d\d:\d\d–\d\d:\d\d, from this page$/);
+    // The page's own stream is read from the page, so it is listed in the popover, not staged as a chip.
+    await expect(assistant.chips()).toHaveCount(0);
+    await assistant.sees().click();
     const popover = page.locator('[data-test="assistant-context-sees-popover"]');
     await expect(popover).toBeVisible();
     const sent = popover.locator('[data-test="assistant-context-sees-sent"]');
@@ -89,14 +90,15 @@ test.describe("assistant composer and context", () => {
     await expect(popover.locator('[data-test="assistant-context-sees-not_read"]')).toContainText("Quick mode");
     await page.keyboard.press("Escape");
     await expect(popover).toBeHidden();
-    await expect(assistant.tray().locator('[data-test="assistant-context-sees"]')).toBeFocused();
+    await expect(assistant.sees()).toBeFocused();
   });
 
   test("CTX-01 Tab past a chip popover's last control moves on and stays there; the time range opens by keyboard", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await openOnLogs(page);
-    const stream = assistant.chips().nth(1).locator('[data-test="assistant-context-chip-button"]');
+    await mentionStream(page);
+    const stream = assistant.chips().first().locator('[data-test="assistant-context-chip-button"]');
     await stream.click();
     const popover = page.locator('[data-test="assistant-chip-popover"]');
     await expect(popover).toBeVisible();
@@ -105,12 +107,15 @@ test.describe("assistant composer and context", () => {
     await expect(popover).toBeHidden();
     // The exit animation runs after Tab moved focus on; the popover must not pull it back to the chip.
     await page.waitForTimeout(400);
-    await expect(assistant.chips().nth(1).locator('[data-test="assistant-context-chip-remove"]')).toBeFocused();
+    await expect(assistant.chips().first().locator('[data-test="assistant-context-chip-remove"]')).toBeFocused();
     // The pointer still rests on the stream chip, whose hover tooltip would cover the time chip until it leaves.
     await page.mouse.move(0, 0);
 
-    await assistant.chips().first().locator('[data-test="assistant-context-chip-button"]').click();
+    await assistant.timeChip().click();
+    // The popover opens on the window in use; the custom range is the last stop of the picker.
+    await expect(page.locator('[data-test="assistant-context-time-page"]')).toBeFocused();
     const trigger = page.locator('[data-test="assistant-context-time-picker"] [data-test="datetimerange-trigger"]');
+    for (let i = 0; i < 8 && !(await trigger.evaluate((el) => el === document.activeElement)); i += 1) await page.keyboard.press("Tab");
     await expect(trigger).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator('[data-test="datetimerange-popup"]')).toBeVisible();
@@ -119,16 +124,20 @@ test.describe("assistant composer and context", () => {
   test("CTX-02 a refused turn gives back the text, the chips and the images", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await mentionStream(page);
-    await expect(assistant.chips()).toHaveCount(3);
+    await expect(assistant.chips()).toHaveCount(1);
     await pasteImages(page, 1);
-    await expect(page.locator('[data-test="assistant-image-strip"] li').filter({ visible: true })).toHaveCount(1);
+    await expect(assistant.tray().locator('[data-test="assistant-context-more"]')).toHaveText("+1");
+    await assistant.expandTray();
+    await expect(assistant.imageChips()).toHaveCount(1);
+    await expect(assistant.chips()).toHaveCount(2);
     await assistant.composer().fill("why is it slow?");
     await page.evaluate(() => (window.__o2mock.next = "turn_limit"));
     await assistant.composer().press("Enter");
     await expect.poll(async () => (await requests(page)).length).toBe(1);
     await expect(assistant.composer()).toHaveValue("why is it slow?");
-    await expect(assistant.chips()).toHaveCount(3);
-    await expect(page.locator('[data-test="assistant-image-strip"] li').filter({ visible: true })).toHaveCount(1);
+    await assistant.expandTray();
+    await expect(assistant.chips()).toHaveCount(2);
+    await expect(assistant.imageChips()).toHaveCount(1);
   });
 
   test("CTX-03 an IME Enter never sends; the Enter after composition sends once", { tag: ["@mock"] }, async ({ page }) => {
@@ -166,11 +175,15 @@ test.describe("assistant composer and context", () => {
   test("CTX-05 caps are stated where the control is; attached data stays under 32 KB", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await pasteImages(page, 6);
-    await expect(page.locator('[data-test="assistant-image-strip"] li').filter({ visible: true })).toHaveCount(4);
-    await expect(assistant.tray().locator('[data-test="assistant-context-cap"]')).toHaveText(
-      "Up to 4 images, 2 MB each",
-    );
+    // The cap is said in the composer's own strip, where the images go, and never as a toast.
+    const notice = assistant.container().locator('[data-test="assistant-composer-notice"][data-notice="cap"]');
+    await expect(notice).toContainText("wasn't added. Up to 4 images, 2 MB each.");
+    await expect(assistant.container().locator('[data-test="assistant-composer-status"]')).toContainText("Up to 4 images, 2 MB each.");
     await expect(page.locator('[data-test="o2-toast"], [role="alert"]').filter({ hasText: "images" })).toHaveCount(0);
+    // The notice gives the strip back to the tray after a few seconds.
+    await expect(notice).toHaveCount(0, { timeout: 15_000 });
+    await assistant.expandTray();
+    await expect(assistant.imageChips()).toHaveCount(4);
   });
 
   test("CTX-05 the store refuses rows past 32 KB, and a multi-row chip is cut on the wire @edition", { tag: ["@mock"] }, async ({
@@ -259,7 +272,8 @@ test.describe("assistant composer and context", () => {
     });
     await openOnLogs(page);
     await assistant.composer().fill("kept in memory");
-    await expect(assistant.container().locator('[data-test="assistant-composer-storage-blocked"]')).toHaveText(
+    // With nothing staged the strip says it; beside chips the same line moves into the ⓘ.
+    await expect(assistant.container().locator('[data-test="assistant-composer-notice"][data-notice="storage"]')).toContainText(
       "Drafts won't be kept if you reload this page.",
     );
     await expect(assistant.composer()).toHaveValue("kept in memory");

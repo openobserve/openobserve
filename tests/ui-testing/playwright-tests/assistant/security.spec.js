@@ -92,8 +92,8 @@ test.describe("assistant security", () => {
     await openOnLogs(page);
     await harness.nextScenario(page, "error");
     await assistant.send("secret prompt about checkout");
-    await assistant.outcome().locator('[data-test="assistant-error-details"] button').first().click();
-    await assistant.outcome().locator('[data-test="assistant-error-details-copy"]').click();
+    await assistant.outcome().locator('[data-test="assistant-error-details-trigger"]').click();
+    await page.locator('[data-test="assistant-error-details-copy"]').click();
     const text = await page.evaluate(() => navigator.clipboard.readText());
     expect(text).toContain("Code: provider_error");
     expect(text).not.toContain("secret prompt");

@@ -22,20 +22,34 @@ test.describe("assistant sharing", () => {
     `${harness.ENV.appUrl}/logs?org_identifier=${harness.ENV.org}&stream=e2e_automate&stream_type=logs`;
   const sharedUrl = (token) => `${harness.ENV.appUrl}/ai/shared/${token}?org_identifier=${harness.ENV.org}`;
   const shareCreates = () => state.log.filter((line) => /^POST \/api\/[^/]+\/ai\/chats\/[^/]+\/shares/.test(line));
-  const shareButton = () => assistant.container().locator('[data-test="assistant-thread-share"]');
+  // Share lives in the chat title's menu; it opens a quick popover whose Change settings opens the full form.
+  const shareItem = (page) => page.locator('[role="menu"] [data-test="assistant-thread-menu-share"]');
   const shareForm = (page) => page.locator('[data-test="assistant-share-settings"]').filter({ visible: true });
+  async function openShareMenu(page) {
+    await page.mouse.move(0, 0);
+    await assistant.thread().locator('[data-test="assistant-thread-title-button"]').click();
+    await expect(shareItem(page)).toBeVisible();
+  }
+  async function openShare(page) {
+    await openShareMenu(page);
+    await expect(shareItem(page)).not.toHaveAttribute("aria-disabled", "true");
+    await shareItem(page).click();
+    const quick = page.locator('[data-test="assistant-share-quick"]');
+    await expect(quick).toBeVisible();
+    await quick.locator('[data-test="assistant-share-quick-settings"]').click();
+    await expect(shareForm(page)).toBeVisible();
+  }
   const postedShare = (page) =>
     page.waitForRequest((r) => r.method() === "POST" && /\/ai\/chats\/[^/]+\/shares$/.test(r.url()));
 
   // Share opens the popover only; the link exists once Create and copy link is pressed.
   async function createLink(page) {
-    await shareButton().click();
+    await openShare(page);
     const form = shareForm(page);
-    await expect(form).toBeVisible();
     const posted = postedShare(page);
     await form.locator('[data-test="assistant-share-create"]').click();
     await posted;
-    await expect(shareButton()).toHaveText(/Shared/);
+    await expect(form.locator('[data-test="assistant-share-link"]')).toBeVisible();
     return form;
   }
 
@@ -62,11 +76,11 @@ test.describe("assistant sharing", () => {
     await expect(assistant.composer()).toBeVisible();
   }
 
-  // Share opens while an answer streams, so snapshot cases must wait for the done answer's footer first.
+  // Share opens while an answer streams, so snapshot cases must wait for the done answer first.
   async function answered(page, scenario = "complete") {
     await harness.nextScenario(page, scenario);
     await assistant.send("why 5xx?");
-    await expect(assistant.answer().locator('[data-test="assistant-turn-footer"]')).toBeVisible({ timeout: 30_000 });
+    await expect(assistant.answerDone()).toBeVisible({ timeout: 30_000 });
     await expect(assistant.status()).toHaveCount(0);
     await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true");
     await expect(assistant.container().locator('[data-test="assistant-stop"]')).toHaveCount(0);
@@ -89,10 +103,8 @@ test.describe("assistant sharing", () => {
     await start(context, page);
     await openOnLogs(page);
     await answered(page);
-    await expect(shareButton()).toBeEnabled({ timeout: 20_000 });
-    await shareButton().click();
+    await openShare(page);
     const form = shareForm(page);
-    await expect(form).toBeVisible();
     await expect(form).toContainText("can read it.");
     await expect(form).toContainText("Continuing it in their own chats also needs AI access.");
     expect(shareCreates()).toHaveLength(0);
@@ -102,7 +114,7 @@ test.describe("assistant sharing", () => {
     expect(body).toEqual({ mode: "snapshot", visibility: "org", redact_tools: true, expires_in_secs: NINETY_DAYS });
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("/web/ai/shared/tok-new-");
     await expect(form.locator('[data-test="assistant-share-copy"]')).toBeVisible();
-    await expect(shareButton()).toHaveText(/Shared/);
+    await expect(form.locator('[data-test="assistant-share-link"]')).toBeVisible();
     await expect(assistant.container().locator('[data-test="assistant-thread-share-chip"]')).toHaveCount(0);
     expect(shareCreates()).toHaveLength(1);
     await form.locator('[data-test="assistant-share-see-all"]').click();
@@ -114,7 +126,6 @@ test.describe("assistant sharing", () => {
     await start(context, page);
     await openOnLogs(page);
     await answered(page);
-    await expect(shareButton()).toBeEnabled({ timeout: 20_000 });
     const form = await createLink(page);
     await form.locator('[data-test="assistant-share-new-link"]').click();
     await form.locator('[data-test="assistant-share-visibility-public"]').click();
@@ -140,14 +151,12 @@ test.describe("assistant sharing", () => {
     await start(context, page);
     await openOnLogs(page);
     await answered(page);
-    await expect(shareButton()).toBeEnabled({ timeout: 20_000 });
     await createLink(page);
     await page.keyboard.press("Escape");
     await harness.nextScenario(page, "slow");
     await assistant.send("and now?");
     await expect(assistant.container().locator('[data-test="assistant-stop"]')).toBeVisible();
-    await expect(shareButton()).toBeEnabled();
-    await shareButton().click();
+    await openShare(page);
     const form = shareForm(page);
     await expect(form.locator('[data-test="assistant-share-copy"]')).toBeVisible();
     await expect(form.locator('[data-test="assistant-share-revoke"]')).toBeVisible();
@@ -165,7 +174,7 @@ test.describe("assistant sharing", () => {
     await continueButton.click();
     const title = (await renamed).postDataJSON().title;
     expect(title).toMatch(/ \(continued\)$/);
-    await expect(page).toHaveURL(new RegExp(`/assistant/${state.chats[0].session_id}`));
+    await expect(page).toHaveURL(new RegExp(`[?&]tab=ai&thread=${state.chats[0].session_id}`));
     const source = page.locator('[data-test="assistant-shell-full"] [data-test="assistant-fork-source"]');
     await expect(source).toHaveAttribute("data-state", "seeded", { timeout: 30_000 });
     await expect(source.locator('[data-test="assistant-fork-source-divider"]')).toBeVisible();
@@ -223,12 +232,12 @@ test.describe("assistant sharing", () => {
     await expect(assistant.container().locator('[data-test="assistant-turn-status"]')).toHaveCount(0, {
       timeout: 20_000,
     });
-    await expect(shareButton()).toHaveAttribute("aria-disabled", "true");
-    await expect(shareButton()).toHaveAccessibleDescription("Only admins can share chats");
+    await openShareMenu(page);
+    await expect(shareItem(page)).toHaveAttribute("aria-disabled", "true");
+    await expect(shareItem(page)).toContainText("Only admins can share chats");
     expect(shareCreates()).toHaveLength(0);
-    await assistant.thread().locator('[data-test="assistant-thread-menu"]').click();
     const menu = page.getByRole("menu");
-    await menu.getByRole("menuitem", { name: "Download chat" }).hover();
+    await menu.getByRole("menuitem", { name: "Download", exact: true }).hover();
     await expect(page.locator('[data-test="assistant-thread-menu-download-markdown"]')).toBeVisible();
     const file = page.waitForEvent("download");
     await page.locator('[data-test="assistant-thread-menu-download-markdown"]').click();
@@ -256,7 +265,6 @@ test.describe("assistant sharing", () => {
     }));
     await openOnLogs(page);
     await answered(page);
-    await expect(shareButton()).toBeEnabled({ timeout: 20_000 });
     const form = await createLink(page);
     await form.locator('[data-test="assistant-share-new-link"]').click();
     await form.locator('[data-test="assistant-share-visibility-public"]').click();
@@ -274,12 +282,10 @@ test.describe("assistant sharing", () => {
     await start(context, page);
     await openOnLogs(page);
     await pasteImage(page);
-    await expect(page.locator('[data-test="assistant-image-strip"] li').filter({ visible: true })).toHaveCount(1);
+    await expect(assistant.imageChips()).toHaveCount(1);
     await answered(page);
-    await expect(shareButton()).toBeEnabled({ timeout: 20_000 });
-    await shareButton().click();
-    const settings = page.locator('[data-test="assistant-share-settings"]');
-    await expect(settings).toBeVisible();
+    await openShare(page);
+    const settings = shareForm(page);
     expect(shareCreates()).toHaveLength(0);
     await expect(settings.locator('[data-test="assistant-share-attachments-included"]')).toHaveText(
       "Attached rows and images are included in this link.",

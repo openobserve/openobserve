@@ -109,7 +109,7 @@ test.describe("assistant settings", () => {
     await assistant.settingsTab("status").click();
     await expect(assistant.settingsControl("status-chip")).toHaveText("Off for this organization");
     await assistant.headerButton.click();
-    await expect(page.locator('[data-test="assistant-gate-state"][data-gate="off_for_org"]')).toBeVisible();
+    await expect(page.locator('[data-test="assistant-gate-state"][data-gate="off_for_org"][data-size="popover"]')).toBeVisible();
   });
 
   test("ADMIN-05 without org settings the Access tab is read-only at the deployment values", { tag: ["@mock"] }, async ({
@@ -177,6 +177,6 @@ test.describe("assistant settings", () => {
     await page.goto(url("/logs"), { waitUntil: "domcontentloaded" });
     await expect(assistant.headerButton).toBeVisible({ timeout: 30_000 });
     await assistant.headerButton.click();
-    await expect(page.locator('[data-test="assistant-gate-state"][data-gate="off_for_org"]')).toBeVisible();
+    await expect(page.locator('[data-test="assistant-gate-state"][data-gate="off_for_org"][data-size="popover"]')).toBeVisible();
   });
 });

@@ -182,8 +182,10 @@ test.describe("assistant incident chat", () => {
   }) => {
     await start(page, context);
     await openIncidentChat(page);
+    await expect(assistant.timeChip()).toBeVisible();
+    await assistant.expandTray();
     const chips = assistant.chips();
-    await expect(chips).toHaveCount(3);
+    await expect(chips).toHaveCount(2);
     await expect(chips.filter({ hasText: "Checkout latency" })).toHaveCount(1);
     await expect(
       chips.filter({ hasText: /Run 2 · .* UTC · \d+ B/ }),

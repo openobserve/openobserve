@@ -94,12 +94,12 @@ test.describe("assistant shell", () => {
     await expect(assistant.headerButton).toHaveAttribute("data-state", "open");
     await expect(assistant.headerButton).toHaveAttribute(
       "aria-label",
-      "O2 Assistant, open",
+      "Close O2 Assistant",
     );
     // The header button's tooltip stays open under a resting pointer and covers the thread header.
     await page.mouse.move(0, 0);
     await assistant.sidebar
-      .locator('[data-test="assistant-thread-menu"]')
+      .locator('[data-test="assistant-thread-title-button"]')
       .click();
     const menu = page.locator('[role="menu"]');
     await expect(menu).toBeVisible();
@@ -145,23 +145,21 @@ test.describe("assistant shell", () => {
   }) => {
     await gotoLogs(page);
     await assistant.open("header");
-    await assistant.sidebar
-      .locator('[data-test="assistant-shell-open-in-full-view"]')
-      .click();
-    await expect(page).toHaveURL(/\/assistant\//);
+    await assistant.placeAs("full");
+    // The full view is Home's AI tab at Full density.
+    await expect(page).toHaveURL(/[?&]tab=ai&thread=/);
     await expect(page.locator('[data-test="assistant-container-status"]')).not.toHaveText(/closed/);
     await expect(assistant.full).toBeVisible();
     await expect(
       page.locator('[data-test="assistant-welcome"][data-variant="roomy"]'),
     ).toBeVisible();
-    await expect(page).toHaveTitle(/O2 Assistant/);
+    await expect(page).toHaveTitle("OpenObserve - Home");
     const landmarks = page.locator(
       'aside[aria-label="O2 Assistant"], [role="region"][aria-label="O2 Assistant"]',
     );
     await expect(landmarks.filter({ visible: true })).toHaveCount(1);
     await expect(assistant.headerButton).toHaveAttribute("data-state", "open");
-    await assistant.full.locator('[data-test="assistant-thread-menu"]').click();
-    await page.locator('[data-test="assistant-shell-place-sidebar"]').click();
+    await assistant.placeAs("sidebar");
     await expect(page).toHaveURL(/\/logs/);
     await expect(assistant.sidebar).toBeVisible();
   });

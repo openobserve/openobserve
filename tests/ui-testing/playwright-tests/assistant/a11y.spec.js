@@ -29,7 +29,7 @@ test.describe("assistant accessibility", () => {
   const url = (path, query = "") => `${harness.ENV.appUrl}${path}?org_identifier=${harness.ENV.org}${query}`;
   const logsUrl = () => url("/logs", "&stream=e2e_automate&stream_type=logs");
   const card = () => assistant.container().locator('[data-test="assistant-approval-card"]');
-  const footer = () => assistant.answer().locator('[data-test="assistant-turn-footer"]');
+  const done = () => assistant.answerDone();
 
   async function start(context, page, { theme = "light", overrides = {} } = {}) {
     harness = await loadHarness();
@@ -94,14 +94,19 @@ test.describe("assistant accessibility", () => {
             const style = getComputedStyle(el);
             return r.width > 0 && r.height > 0 && style.visibility !== "hidden" && !el.closest('[aria-hidden="true"]');
           })
-          .filter((el) => {
-            const r = el.getBoundingClientRect();
-            return Math.round(r.width) < min || Math.round(r.height) < min;
-          })
           .map((el) => {
             const r = el.getBoundingClientRect();
-            return `${el.getAttribute("data-test") ?? el.tagName.toLowerCase()} ${Math.round(r.width)}x${Math.round(r.height)}`;
-          }),
+            // A chip grows its touch target with an absolutely placed ::after, so the target is the larger of the two boxes.
+            const after = getComputedStyle(el, "::after");
+            const px = (v) => parseFloat(v) || 0;
+            const hit =
+              after.content !== "none" && after.position === "absolute"
+                ? { w: r.width - px(after.left) - px(after.right), h: r.height - px(after.top) - px(after.bottom) }
+                : { w: 0, h: 0 };
+            return { el, w: Math.round(Math.max(r.width, hit.w)), h: Math.round(Math.max(r.height, hit.h)) };
+          })
+          .filter(({ w, h }) => w < min || h < min)
+          .map(({ el, w, h }) => `${el.getAttribute("data-test") ?? el.tagName.toLowerCase()} ${w}x${h}`),
       [scope, INTERACTIVE, MIN_TARGET_PX],
     );
   }
@@ -144,7 +149,7 @@ test.describe("assistant accessibility", () => {
         await expectClean(page, name("stopped"));
 
         await assistant.send("why 5xx?", "complete");
-        await expect(footer()).toBeVisible({ timeout: 20_000 });
+        await expect(done()).toBeVisible({ timeout: 20_000 });
         await expectClean(page, name("done"));
 
         await assistant.send("why 5xx?", "error");
@@ -193,8 +198,8 @@ test.describe("assistant accessibility", () => {
       await start(context, page, { theme });
       await openOnLogs(page);
       await assistant.send("why 5xx?", "complete");
-      await expect(footer()).toBeVisible({ timeout: 20_000 });
-      await assistant.sidebar.locator('[data-test="assistant-shell-open-in-full-view"]').click();
+      await expect(done()).toBeVisible({ timeout: 20_000 });
+      await assistant.placeAs("full");
       await expect(assistant.full).toBeVisible({ timeout: 15_000 });
       expect(await page.evaluate(() => document.documentElement.classList.contains("dark")), `the page is in ${theme}`).toBe(theme === "dark");
       for (const width of Object.keys(VIEWPORTS)) {
@@ -224,7 +229,7 @@ test.describe("assistant accessibility", () => {
       await until();
       await expectCase(page, name, from);
     };
-    await step("done", () => assistant.send("why 5xx?", "complete"), () => expect(footer()).toBeVisible({ timeout: 20_000 }));
+    await step("done", () => assistant.send("why 5xx?", "complete"), () => expect(done()).toBeVisible({ timeout: 20_000 }));
     await step(
       "failed",
       () => assistant.send("why 5xx?", "error"),
@@ -282,7 +287,7 @@ test.describe("assistant accessibility", () => {
     await assistant.open("header");
     await expect(assistant.composer()).toBeVisible();
     await assistant.send("why 5xx?", "complete");
-    await expect(footer()).toBeVisible({ timeout: 20_000 });
+    await expect(done()).toBeVisible({ timeout: 20_000 });
     await expectCase(page, "double-read", from);
     const all = await a11y.announcements(page, from);
     const speakers = new Map();
@@ -312,18 +317,23 @@ test.describe("assistant accessibility", () => {
     });
     await start(context, page);
     // Colour, shadow and opacity fades are not motion; anything that moves, scales or resizes is.
-    const FADES = /^(color|background-color|border-color|border-[a-z]+-color|outline-color|text-decoration-color|fill|stroke|box-shadow|opacity|--.*)$/;
+    const FADES = /^(color|background-color|scrollbar-color|border-color|border-[a-z]+-color|outline-color|text-decoration-color|fill|stroke|box-shadow|opacity|--.*)$/;
     const animations = () =>
-      page.evaluate(
-        (fades) =>
-          [...document.querySelectorAll("[data-assistant-root]")].flatMap((root) =>
-            root
-              .getAnimations({ subtree: true })
-              .filter((a) => !(a.transitionProperty && new RegExp(fades).test(a.transitionProperty)))
-              .map((a) => a.animationName ?? `${a.constructor.name}:${a.transitionProperty}`),
-          ),
-        FADES.source,
-      );
+      page.evaluate((fades) => {
+        const fade = new RegExp(fades);
+        const TIMING = new Set(["offset", "computedOffset", "easing", "composite"]);
+        // Reduced motion swaps a slide for an opacity-only keyframe animation, which is a fade too.
+        const fadesOnly = (a) => {
+          const props = (a.effect?.getKeyframes?.() ?? []).flatMap((k) => Object.keys(k)).filter((p) => !TIMING.has(p));
+          return props.length > 0 && props.every((p) => fade.test(p.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)));
+        };
+        return [...document.querySelectorAll("[data-assistant-root]")].flatMap((root) =>
+          root
+            .getAnimations({ subtree: true })
+            .filter((a) => !(a.transitionProperty && fade.test(a.transitionProperty)) && !fadesOnly(a))
+            .map((a) => a.animationName ?? `${a.constructor.name}:${a.transitionProperty}`),
+        );
+      }, FADES.source);
     const scrollBehaviours = () =>
       page.evaluate(() =>
         [...document.querySelectorAll("[data-assistant-root] *")]
@@ -335,7 +345,8 @@ test.describe("assistant accessibility", () => {
       await page.goto(logsUrl(), { waitUntil: "domcontentloaded" });
       await expect(assistant.headerButton).toHaveAttribute("data-state", /^(idle|open|unread)$/, { timeout: 30_000 });
       await page.mouse.move(0, 0);
-      if (!(await assistant.container().count())) await assistant.open("header");
+      // After a reload the button says open before the panel mounts, and a click then would close it.
+      if ((await assistant.headerButton.getAttribute("data-state")) !== "open") await assistant.open("header");
       await expect(assistant.composer()).toBeVisible();
       expect(await animations(), `open at ${width}`).toEqual([]);
       await expectClean(page, `reduced-motion-open-${width}`);
@@ -456,7 +467,7 @@ test.describe("assistant accessibility", () => {
         const scope = "[data-assistant-root]";
         const small = new Set(await smallTargets(page, scope));
         await assistant.send("why 5xx?", "complete");
-        await expect(footer()).toBeVisible({ timeout: 20_000 });
+        await expect(done()).toBeVisible({ timeout: 20_000 });
         for (const s of await smallTargets(page, scope)) small.add(s);
         await assistant.send("delete stale alerts", "confirmation");
         await expect(card()).toBeVisible({ timeout: 15_000 });
@@ -491,9 +502,9 @@ test.describe("assistant accessibility", () => {
 
           await assistant.open("header");
           await assistant.send("why 5xx?", "complete");
-          await expect(footer()).toBeVisible({ timeout: 20_000 });
+          await expect(done()).toBeVisible({ timeout: 20_000 });
           await assistant.send("and since then?", "complete");
-          await expect(assistant.container().locator('[data-test="assistant-turn-footer"]')).toHaveCount(2, { timeout: 20_000 });
+          await expect(assistant.answersDone()).toHaveCount(2, { timeout: 20_000 });
           const earlier = assistant.container().locator('[data-test="assistant-msg-actions"]:has([data-test="assistant-msg-copy-answer"])').first();
           expect(await opaque(earlier), "an earlier turn's message actions are shown without hover").toBe(true);
           const copy = earlier.locator('[data-test="assistant-msg-copy-answer"]');
@@ -514,9 +525,9 @@ test.describe("assistant accessibility", () => {
     await start(context, page);
     await openOnLogs(page);
     await assistant.send("why 5xx?", "complete");
-    await expect(footer()).toBeVisible({ timeout: 20_000 });
+    await expect(done()).toBeVisible({ timeout: 20_000 });
     await assistant.send("and since then?", "complete");
-    await expect(assistant.container().locator('[data-test="assistant-turn-footer"]')).toHaveCount(2, { timeout: 20_000 });
+    await expect(assistant.answersDone()).toHaveCount(2, { timeout: 20_000 });
     await settled(page);
     const earlier = assistant.container().locator('[data-test="assistant-msg-actions"]').first();
     expect(await earlier.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
@@ -554,7 +565,7 @@ test.describe("assistant accessibility", () => {
     await openOnLogs(page);
     await collect();
     await assistant.send("why 5xx?", "complete");
-    await expect(footer()).toBeVisible({ timeout: 20_000 });
+    await expect(done()).toBeVisible({ timeout: 20_000 });
     await collect();
     await assistant.send("delete stale alerts", "confirmation");
     await expect(card()).toBeVisible({ timeout: 15_000 });
@@ -610,7 +621,8 @@ test.describe("assistant accessibility", () => {
       const hit = await page.evaluate((selector) => {
         const el = document.activeElement;
         const over = document.querySelector(selector);
-        if (!el || !over || el.closest("[data-assistant-root]") || el.closest(selector)) return null;
+        // Focus that has left the page rests on the body, which is no control the cover can hide.
+        if (!el || el === document.body || !over || el.closest("[data-assistant-root]") || el.closest(selector)) return null;
         const a = el.getBoundingClientRect();
         const b = over.getBoundingClientRect();
         if (a.height === 0 || b.height === 0) return null;
@@ -649,8 +661,7 @@ test.describe("assistant accessibility", () => {
       await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", { timeout: 30_000 });
       await settled(page);
       await assistant.open("header");
-      await assistant.container().locator('[data-test="assistant-thread-menu"]').click();
-      await page.locator('[data-test="assistant-shell-place-window"]').click();
+      await assistant.placeAs("window");
       await expect(page.locator('[data-test="assistant-window"]')).toBeVisible();
       await page.locator('[data-test="main-content"]').evaluate((el) => el.querySelector("button, a[href], input, [tabindex='0']")?.focus());
       const hits = await obscuredWhileTabbing(page, '[data-test="assistant-window"]', 60);

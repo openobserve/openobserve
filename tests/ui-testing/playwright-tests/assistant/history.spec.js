@@ -26,9 +26,10 @@ test.describe("assistant history", () => {
 
   async function openOnLogs(page) {
     await page.goto(logsUrl(), { waitUntil: "domcontentloaded" });
-    await expect(assistant.headerButton).toHaveAttribute("data-state", /idle|open/, { timeout: 30_000 });
+    // Another device's running or waiting chat can light the header before anything opens.
+    await expect(assistant.headerButton).toHaveAttribute("data-state", /^(idle|open|unread|working|needs_you)$/, { timeout: 30_000 });
     // The container's open state survives a reload.
-    if ((await assistant.headerButton.getAttribute("data-state")) === "idle") await assistant.open("header");
+    if ((await assistant.headerButton.getAttribute("data-state")) !== "open") await assistant.open("header");
     await expect(assistant.composer()).toBeVisible();
   }
 
@@ -164,7 +165,7 @@ test.describe("assistant history", () => {
     await assistant.openHistory();
     await expect(assistant.history().locator('[data-test="assistant-history-empty"]')).toBeVisible();
     await expect(assistant.history().locator('[data-test="assistant-local-only-line"]')).toHaveText(
-      "Saved in this browser only · 0 of 100",
+      "Saved in this browser only",
     );
     await expect(assistant.history().locator('[data-test="assistant-history-kept"]')).toHaveCount(0);
   });
@@ -178,12 +179,15 @@ test.describe("assistant history", () => {
     await answered(page, "why did checkout throw 5xx?");
     await assistant.openHistory();
     await expect(assistant.history().locator('[data-test="assistant-local-only-line"]')).toHaveText(
-      "Saved in this browser only · 1 of 100",
+      "Saved in this browser only",
     );
     await expect(assistant.history().locator('[data-test="assistant-history-account"]')).toHaveCount(0);
     await expect(item("Checkout 5xx spike in prod")).toHaveCount(1);
     await page.keyboard.press("Escape");
-    await expect(assistant.thread().locator('[data-test="assistant-thread-download"]')).toBeVisible();
+    // Download and Share live in the chat title's menu; a browser-only chat offers the first and not the second.
+    await assistant.thread().locator('[data-test="assistant-thread-title-button"]').click();
+    await expect(page.getByRole("menu").getByRole("menuitem", { name: "Download", exact: true })).toBeVisible();
+    await expect(page.locator('[data-test="assistant-thread-menu-share"]')).toHaveCount(0);
     await expect(assistant.container().locator('[data-test^="assistant-share"]')).toHaveCount(0);
     expect(state.log.filter((line) => /^GET \/api\/[^/]+\/ai\/chats/.test(line))).toEqual([]);
   });
@@ -192,6 +196,7 @@ test.describe("assistant history", () => {
     context,
     page,
   }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     test.setTimeout(120_000);
     await start(context, page, { persistence: false });
     await openOnLogs(page);
@@ -253,6 +258,7 @@ test.describe("assistant history", () => {
     context,
     page,
   }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     await start(context, page, {
       capabilitiesEnabled: true,
       capabilities: { history_import: true },
@@ -346,9 +352,7 @@ test.describe("assistant history", () => {
     await expect(item(state.chats[1].title).locator('[data-test="assistant-history-row-state"]')).toHaveText(
       "Answering",
     );
-    await expect(item(state.chats[2].title).locator('[data-test="assistant-history-row-state"]')).toHaveText(
-      "Needs your approval",
-    );
+    await expect(item(state.chats[2].title).locator('[data-test="assistant-history-row-state"]')).toHaveText("Needs you");
     await page.keyboard.press("Escape");
     await assistant.close();
     await expect(assistant.headerButton).toHaveAttribute("data-state", "needs_you", { timeout: 15_000 });
@@ -358,6 +362,7 @@ test.describe("assistant history", () => {
     context,
     page,
   }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     test.setTimeout(180_000);
     await start(context, page);
     await openOnLogs(page);
@@ -385,6 +390,7 @@ test.describe("assistant history", () => {
     context,
     page,
   }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     test.setTimeout(600_000);
     await start(context, page, { persistence: false });
     await openOnLogs(page);
@@ -453,6 +459,7 @@ test.describe("assistant history", () => {
   });
 
   test("PERF-03 a 300-message chat from history paints in 300 ms and scrolls at ~60 fps (55 or more measured)", async ({ context, page }, info) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     await start(context, page, { persistence: false });
     await openOnLogs(page);
     await page.evaluate(async () => {

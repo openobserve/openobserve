@@ -48,7 +48,8 @@ test.describe("assistant settings tools", () => {
       await expect(rows(page, "settings-assistant-toolsets-table")).toHaveCount(2, { timeout: 10_000 });
       const refresh = control(page, "ai-toolsets-list-refresh-btn");
       const bubble = page.locator('[data-test="o-tooltip-content"]').filter({ hasText: "Last refreshed:" });
-      await expect(refresh).not.toHaveAttribute("aria-label");
+      // The exact time lives in the tooltip; the name leads with the action and carries the visible age.
+      await expect(refresh).toHaveAttribute("aria-label", /^Refresh, last refreshed /);
       await refresh.hover();
       await expect(bubble).toBeVisible();
       await page.mouse.move(0, 0);

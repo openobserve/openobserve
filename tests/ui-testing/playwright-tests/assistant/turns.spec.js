@@ -64,8 +64,11 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.answer().locator("h2")).toHaveText("Checkout 5xx spike — what happened");
     await expect(assistant.status()).toHaveCount(0);
     await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true");
-    // The evaluated-window footer closes a done answer.
-    await expect(assistant.answer().locator('[data-test="assistant-turn-footer"]')).toContainText(/^Evaluated .+·\s*1 query/);
+    // A done answer closes on its trail line, which opens to the window it evaluated.
+    const trail = assistant.answer().locator('[data-test="assistant-queries-line"]');
+    await expect(trail).toHaveText("3 steps");
+    await trail.click();
+    await expect(assistant.answer().locator('[data-test="assistant-queries-range"]')).toHaveText(/^Evaluated \d\d:\d\d–\d\d:\d\d$/);
     const ended = (await events(page)).filter((e) => e.name === "ai_turn_ended");
     expect(ended.at(-1)?.properties.outcome).toBe("done");
   });
@@ -125,7 +128,7 @@ test.describe("assistant honest turns", () => {
       { timeout: 45_000 },
     );
     await expect(assistant.status()).toHaveAttribute("data-tone", "warning");
-    await expect(assistant.container().locator('[data-test="assistant-stop"]')).toHaveClass(/secondary/);
+    await expect(assistant.container().locator('[data-test="assistant-stop"]')).toHaveAttribute("data-o2-variant", "primary");
   });
 
   test("TURN-03 Stop keeps findings and cancels on the server", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
@@ -140,12 +143,12 @@ test.describe("assistant honest turns", () => {
     expect(cancel.contentType).toContain("application/json");
     expect(JSON.parse(cancel.body).turn_id).toBeTruthy();
     // Steps render from WP-08, so with no answer text yet the block claims no findings.
-    await expect(assistant.outcome().locator('[data-test="assistant-turn-outcome-title"]')).toHaveText("Stopped");
+    await expect(assistant.outcome().locator('[data-test="assistant-turn-outcome-title"]')).toHaveText(/^Stopped after \d+ steps?, incomplete$/);
     await expect(assistant.outcomeAction()).toHaveText("Continue");
     const stop = (await events(page)).find((e) => e.name === "ai_stop");
     expect(typeof stop?.properties.server_cancel_ms).toBe("number");
     await assistant.outcomeAction().click();
-    await expect(assistant.composer()).toHaveValue("Continue");
+    await expect(assistant.composer()).toHaveValue("Continue the answer above");
   });
 
   test("TURN-04 an unconfirmed cancel says the server may still be finishing", { tag: ["@mock"] }, async ({ page }) => {
@@ -164,7 +167,7 @@ test.describe("assistant honest turns", () => {
     await openOnLogs(page);
     await ask(page, "drop_mid_stream");
     await expect(assistant.outcome()).toHaveAttribute("data-code", "stream_dropped");
-    await expect(assistant.outcome()).toContainText(/Connection lost( after \d+ s)?\. Nothing was changed\./);
+    await expect(assistant.outcome()).toContainText(/Connection lost( after \d+ s)?\. The answer above is incomplete\./);
     await expect(assistant.outcomeAction()).toHaveAttribute("aria-label", "Retry");
     await expect(assistant.answer().locator('[data-test="assistant-block-text"]')).not.toHaveCount(0);
   });
@@ -225,11 +228,13 @@ test.describe("assistant honest turns", () => {
     await ask(page, "error");
     const outcome = assistant.outcome();
     await expect(outcome).toHaveAttribute("data-code", "provider_error");
-    await expect(outcome).toHaveClass(/bg-banner-error-soft-bg/);
-    await expect(outcome.locator('[data-test="assistant-turn-outcome-title"]')).toHaveText(/The AI provider failed/);
+    await expect(outcome).toHaveClass(/bg-status-error-bg/);
+    await expect(outcome.locator('[data-test="assistant-turn-outcome-title"]')).toHaveText(/^The AI provider is overloaded, so the answer stopped\.$/);
     await expect(assistant.outcomeAction()).toHaveAttribute("aria-label", "Retry");
-    await outcome.locator('[data-test="assistant-error-details"] button').first().click();
-    await expect(outcome.locator('[data-test="assistant-error-details-code"]')).toHaveText("provider_error");
+    await outcome.locator('[data-test="assistant-error-details-trigger"]').click();
+    await expect(page.locator('[data-test="assistant-error-details-code"]')).toHaveText("provider_error");
+    // The details popover sits over the outcome row until it closes.
+    await page.keyboard.press("Escape");
     await expect(page.getByText(/^Error:/)).toHaveCount(0);
     // The non-AI path opens Logs with the failed step's SQL and the prompt's absolute window.
     const manual = outcome.locator('[data-test="assistant-turn-outcome-manual"]');

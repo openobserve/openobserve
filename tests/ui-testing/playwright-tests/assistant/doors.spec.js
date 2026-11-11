@@ -116,7 +116,8 @@ test.describe("assistant doors", () => {
     await expect(record).toHaveAttribute("data-door-state", "added");
     const panel = assistant.container();
     await expect(panel).toBeVisible();
-    const doorChips = assistant.chips().filter({ hasText: /(Field|Log row) · / });
+    await assistant.expandTray();
+    const doorChips = assistant.tray().locator('[data-test="assistant-context-chip-field"], [data-test="assistant-context-chip-log_row"]');
     await expect(doorChips).toHaveCount(2);
     // The drawer stops at the panel's edge instead of covering it (U4).
     const [drawerBox, panelBox] = [await drawer.boundingBox(), await panel.boundingBox()];
@@ -179,7 +180,7 @@ test.describe("assistant doors", () => {
     await expect(open).toBeFocused();
     await open.click();
     await expect(assistant.container()).toBeVisible();
-    await expect(assistant.chips().filter({ hasText: /Field · / })).toHaveCount(1);
+    await expect(assistant.tray().locator('[data-test="assistant-context-chip-field"]')).toHaveCount(1);
     await expect(drawer).toBeVisible();
   });
 
@@ -206,6 +207,7 @@ test.describe("assistant doors", () => {
   });
 
   test("DOOR-12 a second Add never removes the chip", { tag: ["@mock"] }, async ({ page }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     await gotoLogs(page);
     await openRecordDrawer(page);
     await (await fieldMenuItem(page, 0, "ai-entry-log-field-add")).click();
@@ -232,6 +234,7 @@ test.describe("assistant doors", () => {
   });
 
   test("CTX-05 a door refuses the 21st row with the cap line and no In chat tick", { tag: ["@mock"] }, async ({ page }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     await gotoLogs(page);
     const boxes = table(page).locator('tbody [role="checkbox"]');
     for (let i = 0; i < 21; i += 1) await boxes.nth(i).click();
@@ -296,6 +299,8 @@ test.describe("assistant doors", () => {
     await gotoLogs(page);
     await focusRowToolbar(page);
     await openRecordDrawer(page);
+    // The drawer's doors mount after the drawer itself.
+    await expect(page.locator('[data-test="ai-entry-log-record-add"]')).toBeVisible();
     const ids = await page.locator('[data-test^="ai-entry-"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-test")));
     expect(ids.length).toBeGreaterThan(0);
     for (const id of ids.filter((id) => id !== "ai-entry-secondary")) expect(id).toMatch(DOOR_ID);
@@ -316,7 +321,8 @@ test.describe("assistant doors", () => {
   test("DOOR-10 a deep link to a real alert stages its chip and prompt, sends nothing, and never fetches a path-shaped ref", { tag: ["@mock"] }, async ({ page }) => {
     const alert = fixture("doors-alert.json");
     const fetched = [];
-    await page.context().route(/\/api\/v2\/[^/]+\/alerts\/[^?]+/, (route) => {
+    // The threads bar lists alerts/incidents on every page; only an alert read by id is the door's.
+    await page.context().route(/\/api\/v2\/[^/]+\/alerts\/(?!incidents(?:[/?]|$))[^?]+/, (route) => {
       fetched.push(new URL(route.request().url()).pathname);
       return route.fulfill({
         status: 200,
@@ -396,6 +402,7 @@ test.describe("assistant doors", () => {
   });
 
   test("PERF-01 door activations paint their tick within 100 ms p95 at 4× CPU throttle", { tag: ["@mock"] }, async ({ page }) => {
+    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     await gotoLogs(page);
     // The composer holds at most 20 rows, so each round starts from an empty one.
     const clearChips = () =>
