@@ -129,7 +129,15 @@ pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr>
 
 /// Get all events for an incident
 pub async fn get(org_id: &str, incident_id: &str) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
-    let db = get_orm_client_ro().await;
+    get_with(get_orm_client_ro().await, org_id, incident_id).await
+}
+
+/// [get] on a given connection. A decision that a later write consumes reads the primary.
+pub async fn get_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
     let row = incident_events::Entity::find()
         .filter(incident_events::Column::OrgId.eq(org_id))
         .filter(incident_events::Column::IncidentId.eq(incident_id))
@@ -384,7 +392,12 @@ pub async fn record_alert(
     match row {
         Some(model) => {
             let mut events = decode_events(org_id, incident_id, &model.events);
-            push_alert(&mut events, alert_id, alert_name, triggered_at);
+            config::meta::alerts::incidents::push_alert_event(
+                &mut events,
+                alert_id,
+                alert_name,
+                triggered_at,
+            );
             let events_json = encode_events(&events)?;
 
             let mut active: incident_events::ActiveModel = model.into();
@@ -405,27 +418,6 @@ pub async fn record_alert(
 
     txn.commit().await?;
     Ok(())
-}
-
-/// The compaction [record_alert] applies, on the decoded timeline.
-/// Scans backwards through the trailing block of Alert events. If a matching alert_id is
-/// found within that block, its count is incremented. Otherwise a new Alert event is appended.
-pub fn push_alert(
-    events: &mut Vec<IncidentEvent>,
-    alert_id: &str,
-    alert_name: &str,
-    triggered_at: i64,
-) {
-    for event in events.iter_mut().rev() {
-        if !event.is_alert() {
-            break;
-        }
-        if event.is_alert_for(alert_id) {
-            event.increment_alert(alert_id, triggered_at);
-            return;
-        }
-    }
-    events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
 }
 
 /// Deletes all incident event entries belonging to the given org.
