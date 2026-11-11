@@ -1,15 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// AI-page date controller. Extracts the date state + URL-sync logic that was
-// near-identical across SessionsPage / LLMInsightsPage (and similar in
-// AgentGraph / AgentBehaviorPage) into a single composable wrapping the shared
-// `useAiDateRange` singleton.
-//
-// Scope: this composable owns ONLY the date state + URL sync. It does NOT own
-// the child-refresh (`sessionsRef.refresh(...)`) — that lives in
-// `useChildRefresh`. `onDateChange` here updates date state + writes URL only;
-// the page wires the child refresh off the resolved `timeRange`.
-//
 // Resolve at creation, before the picker mounts, or its seed replay writes the previous visit's range.
 
 import { ref } from "vue";

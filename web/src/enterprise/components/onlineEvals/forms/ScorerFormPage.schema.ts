@@ -1,11 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Validation schema for ScorerFormPage.vue (online-evals scorer create/edit
-// page, llm_judge + remote + code variants).
-//
-// Validation timing is owned by OForm (submit-then-change); this file only
-// describes WHAT is valid. The @submit payload carries RAW values, so the
-// component trims/coerces at save.
+// Describes only what is valid; OForm owns timing and the component trims raw values at save.
 
 import { z } from "zod";
 import { scoreFunctionParams } from "../utils/codeScorerStarters";

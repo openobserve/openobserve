@@ -1,8 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Page Object Model for the AI Observability > LLM Providers surface (online evals).
-// Covers the ProviderFormPage (create/edit) and the LlmProvidersSettings list.
-//
 // The route is enterprise/cloud-only, so navigateToLlmProviders() returns false on OSS builds for a clean skip.
 
 export class LlmProvidersPage {

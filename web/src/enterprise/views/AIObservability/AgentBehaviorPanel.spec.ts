@@ -1,13 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
 // @vitest-environment jsdom
-//
-// Regression tests for the Agent Behavior panel.
-//
-// Agent scope narrows by name + env +
-// version, using the CANONICAL serialized keys `gen_ai_agent_env` /
-// `gen_ai_agent_version` (NOT `agent_env`).
-//
+// Agent scope keys are the canonical `gen_ai_agent_env` / `gen_ai_agent_version`, not `agent_env`.
 
 import { describe, it, expect, vi } from "vitest";
 import { defineComponent, h } from "vue";
