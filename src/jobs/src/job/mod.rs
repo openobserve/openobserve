@@ -602,6 +602,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         openobserve_core::org_domain_ownership::init().await;
         tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
         tokio::task::spawn(openobserve_core::org_domain_ownership::watch());
+
+        use o2_enterprise::enterprise::cloud::contracts::entitlements;
+        if entitlements::gating_active() {
+            // watching first, so a change during the load isn't missed
+            tokio::task::spawn(entitlements::watch());
+            entitlements::reload_all().await;
+            tokio::task::spawn(entitlements::reload_periodically());
+        }
     }
 
     // check version
