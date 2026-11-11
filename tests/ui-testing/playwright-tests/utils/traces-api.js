@@ -52,6 +52,16 @@ async function waitForSearch(request, sql, { expected, message, pick = (result) 
   return last;
 }
 
+/** Gate a one-shot page load on freshly ingested rows: wait until `stream` (optionally one trace) returns `expected` rows. */
+async function waitForStreamRows(request, stream, expected, { traceId, message, ...searchOpts } = {}) {
+  const where = traceId ? ` WHERE trace_id = '${traceId}'` : '';
+  return await waitForSearch(request, `SELECT * FROM "${stream}"${where}`, {
+    expected,
+    message: message || `Precondition: ${expected} ingested rows must be searchable in ${stream}`,
+    ...searchOpts,
+  });
+}
+
 /** Field names in a stream's schema, or [] when the schema cannot be read. */
 async function streamFieldNames(request, stream, { type = 'traces', org = orgId() } = {}) {
   const response = await request.get(`${ingestionBaseUrl()}/api/${org}/streams/${stream}/schema?type=${type}`, { headers: getAuthHeaders() });
@@ -104,6 +114,7 @@ module.exports = {
   ingestRumData,
   searchStream,
   waitForSearch,
+  waitForStreamRows,
   streamFieldNames,
   deleteStream,
   createEmptyStream,

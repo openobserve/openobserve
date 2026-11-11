@@ -6,13 +6,8 @@ const {
 } = require("../../utils/enhanced-baseFixtures.js");
 const testLogger = require("../../utils/test-logger.js");
 const PageManager = require("../../../pages/page-manager.js");
-const { ingestOtlpTraces, deleteStream } = require("../../utils/traces-api.js");
-const {
-  generateHexId,
-  buildSpan,
-  buildResourceSpans,
-  buildTracePayload,
-} = require("../../utils/service-graph-ingestion.js");
+const { ingestOtlpTraces, waitForStreamRows, deleteStream } = require("../../utils/traces-api.js");
+const { generateSpanKindTrace } = require("../../utils/service-graph-ingestion.js");
 
 const KINDS = { unspecified: 0, internal: 1, server: 2, client: 3, producer: 4, consumer: 5 };
 
@@ -38,27 +33,10 @@ test.describe("Trace details span kind (#2693)", () => {
       tag: ["@bug-2693", "@P1", "@regression", "@tracesRegression"],
     },
     async ({ page }) => {
-      const traceId = generateHexId(16);
-      const rootSpanId = generateHexId(8);
-      const nowNs = BigInt(Date.now() - 60000) * 1000000n;
-      const span = (name, kind, spanId, parentSpanId) =>
-        buildSpan({
-          traceId,
-          spanId,
-          parentSpanId,
-          name,
-          kind,
-          startTimeNs: nowNs,
-          endTimeNs: nowNs + 5000000n,
-        });
-      const spans = [span("main", KINDS.internal, rootSpanId)];
-      for (const [label, kind] of Object.entries(KINDS))
-        spans.push(span(`child-${label}`, kind, generateHexId(8), rootSpanId));
-      await ingestOtlpTraces(
-        page.request,
-        stream,
-        buildTracePayload([buildResourceSpans("e2e-2693", spans)]),
-      );
+      const trace = generateSpanKindTrace({ serviceName: "e2e-2693", kinds: KINDS });
+      const { traceId } = trace.metadata;
+      await ingestOtlpTraces(page.request, stream, trace.payload);
+      await waitForStreamRows(page.request, stream, trace.metadata.spanCount, { traceId });
 
       const nowUs = Date.now() * 1000;
       await pm.tracesPage.navigateToTraceDetailsUrl({
