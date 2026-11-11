@@ -16,11 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <span
-    :class="[AGENT_PILL_CLASS, disabled ? 'opacity-45' : '']"
+    :class="[AGENT_PILL_CLASS, disabled && 'text-text-body!']"
     data-test="assistant-agent-pill"
     :data-agent="agent"
   >
-    <OIcon :name="agentGlyph[agent]" size="xs" class="text-ai-accent" />
+    <OIcon
+      :name="agentGlyph[agent]"
+      size="xs"
+      :class="['text-ai-accent', disabled && 'opacity-45']"
+    />
     <span class="truncate">{{ agentName(agent, t) }}</span>
   </span>
 </template>

@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="ghost-primary"
                     size="chip"
-                    class="h-auto! min-h-0! px-0! font-medium"
+                    :class="STRIP_LINK_CLASS"
                     data-test="assistant-composer-ask-admin"
                   >
                     {{ t("assistant.gate.noPermission.askAdmin") }}
@@ -288,6 +288,7 @@ import {
   forgetComposerUi,
   noteCap,
   noteDraftCleared,
+  STRIP_LINK_CLASS,
 } from "./composerUi";
 import { useAssistantVoice } from "./useAssistantVoice";
 import { useComposerQueue } from "./useComposerQueue";

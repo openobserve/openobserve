@@ -92,6 +92,19 @@ describe("AssistantHistoryRow", () => {
     expect(title().attributes("data-o-tooltip-off")).toBeUndefined();
   });
 
+  it("lifts the time to body text on the filled current and hovered row (AA)", () => {
+    const current = setup({}, { current: true });
+    const time = current.get('[data-test="assistant-history-row-time"]');
+    expect(time.classes()).toEqual(
+      expect.arrayContaining(["text-text-body!", "group-hover/row:text-text-body!"]),
+    );
+    document.body.innerHTML = "";
+    const other = setup();
+    expect(other.get('[data-test="assistant-history-row-time"]').classes()).not.toContain(
+      "text-text-body!",
+    );
+  });
+
   it("marks the current chat and keeps the other rows out of the Tab order", () => {
     const current = setup({}, { current: true });
     expect(current.get('[data-test="assistant-history-row"]').attributes("aria-current")).toBe(

@@ -393,7 +393,9 @@ describe("refused sends (§1)", () => {
     expect(wrapper.get(NOTICE).attributes("title")).toBe(
       "You can read your chats. Starting or continuing one needs AI access.",
     );
-    expect(wrapper.find('[data-test="assistant-composer-ask-admin"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="assistant-composer-ask-admin"]').classes()).toEqual(
+      expect.arrayContaining(["max-md:min-h-11!", "pointer-coarse:min-h-11!"]),
+    );
     expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBe("true");
     expect(wrapper.get("textarea").element.value).toBe("Why did cart start returning 503?");
     await wrapper.get("textarea").trigger("keydown", { key: "Enter" });
@@ -525,7 +527,9 @@ describe("states (`40` §1.3)", () => {
     expect(wrapper.get('[data-notice="inert"]').text()).toContain("Decide above to continue");
     for (const id of ["assistant-attach-image", "assistant-send"])
       expect(wrapper.get(`[data-test="${id}"]`).attributes("aria-disabled")).toBe("true");
-    expect(wrapper.get('[data-test="assistant-agent-pill"]').classes()).toContain("opacity-45");
+    const pill = wrapper.get('[data-test="assistant-agent-pill"]');
+    expect(pill.classes()).toContain("text-text-body!");
+    expect(pill.classes()).not.toContain("opacity-45");
     expect(wrapper.find('[data-test="assistant-composer-notice-goToRequest"]').exists()).toBe(
       false,
     );
@@ -1086,6 +1090,9 @@ describe("boards 04–06: inert field, error row, Stop and Send (S3, S4, S6, S7)
     FakeObserver.last!.fire(false);
     await flushPromises();
     expect(goTo().text()).toBe("Go to request");
+    expect(goTo().classes()).toEqual(
+      expect.arrayContaining(["max-md:min-h-11!", "pointer-coarse:min-h-11!"]),
+    );
     const focusCard = vi.fn(() => true);
     const off = registerAssistantFocusTarget("card", focusCard);
     await goTo().trigger("click");

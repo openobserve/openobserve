@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           variant="ghost-primary"
           size="chip"
-          class="h-auto! min-h-0! px-0! font-medium"
+          :class="STRIP_LINK_CLASS"
           :data-test="`assistant-composer-notice-${link.action}`"
           @click="emit('action', link.action)"
         >
@@ -58,6 +58,7 @@ import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
 import type { ComposerNotice, NoticeAction, NoticeTone } from "./composerNotice";
+import { STRIP_LINK_CLASS } from "./composerUi";
 
 export interface AssistantComposerStripProps {
   notice: ComposerNotice | null;

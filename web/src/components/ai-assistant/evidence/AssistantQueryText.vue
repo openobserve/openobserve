@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="`${dataTest}-chrome`"
   >
     <div
-      class="border-border-subtle text-text-secondary text-2xs flex h-8 min-w-0 items-center gap-2 border-b ps-3 pe-1 font-medium"
+      class="border-border-subtle text-text-body text-2xs flex h-8 min-w-0 items-center gap-2 border-b ps-3 pe-1 font-medium"
     >
       <span class="shrink-0" :data-test="`${dataTest}-lang`">{{ languageLabel(language) }}</span>
       <OTruncatedText v-if="meta" class="min-w-0 font-normal" :data-test="`${dataTest}-meta`">{{

@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           :last-run-at="list.dataUpdatedAt.value"
           :loading="list.isFetching.value"
-          :aria-label="mdUp ? undefined : t('shortcuts.actions.assistantToolsetsRefresh')"
+          v-bind="mdUp ? {} : { 'aria-label': t('shortcuts.actions.assistantToolsetsRefresh') }"
           shortcut-id="assistantToolsetsRefresh"
           data-test="ai-toolsets-list-refresh-btn"
           @click="refresh"

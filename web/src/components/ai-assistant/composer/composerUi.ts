@@ -37,6 +37,10 @@ export const CHIP_HIT_AREA_CLASS = [
   "[&>button]:relative [&>button]:z-1",
 ].join(" ");
 
+/** A strip link reads as inline text but fills the strip's 2.75 rem height on touch and below md. */
+export const STRIP_LINK_CLASS =
+  "h-auto! min-h-0! px-0! font-medium max-md:min-h-11! pointer-coarse:min-h-11!";
+
 /** Refused sends the composer counts down on its error row. */
 export const BUSY_CODES: ReadonlySet<string> = new Set(["turn_limit", "rate_limited"]);
 

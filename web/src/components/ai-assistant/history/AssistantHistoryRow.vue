@@ -130,7 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               variant="meta"
               as="span"
-              class="w-12 shrink-0 text-end tabular-nums"
+              :class="[
+                'group-hover/row:text-text-body! w-12 shrink-0 text-end tabular-nums',
+                current && 'text-text-body!',
+              ]"
               data-test="assistant-history-row-time"
               >{{ time }}</OText
             >

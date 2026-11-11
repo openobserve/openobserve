@@ -216,6 +216,14 @@ describe("ToolsetsTab", () => {
     expect(w.find('[data-test="o2-table-row-0"]').html()).not.toMatch(/primary-soft|success-soft/);
   });
 
+  it("keeps the refresh button's own name above a phone, so the tooltip time never names it", async () => {
+    const { w } = await mountTab();
+    wrapper = w;
+    expect(w.find('[data-test="ai-toolsets-list-refresh-btn"]').attributes("aria-label")).toMatch(
+      /^Refresh(, last refreshed .+)?$/,
+    );
+  });
+
   it("announces a failed test without a dangling cause", async () => {
     vi.mocked(assistantSettings.testToolset).mockResolvedValue({ ok: false });
     const { w } = await mountTab([{ ...ROWS[0], enabled: true, status: { state: "ok" } }]);

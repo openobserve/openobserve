@@ -992,6 +992,10 @@ describe("FirstEventStatus — assistant door (WP-07)", () => {
       await flushPromises();
     }
   };
+  // A cold import of the assistant barrel can outlast any fixed number of settle rounds.
+  const DOOR_WAIT = { timeout: 5_000 };
+  const waitForDoor = () =>
+    vi.waitFor(() => expect(q("ai-entry-ingestion-troubleshoot").exists()).toBe(true), DOOR_WAIT);
   beforeEach(() => {
     assistant.v2 = true;
     vi.useRealTimers();
@@ -1001,11 +1005,11 @@ describe("FirstEventStatus — assistant door (WP-07)", () => {
     mountBar();
     fake.diagnosis.value = { form: "no-requests", trigger: "auto", rejections: [] };
     fake.state.value = "no-requests";
-    await settle();
+    await waitForDoor();
     const door = q("ai-entry-ingestion-troubleshoot");
     expect(door.text()).toBe("Help me set up ingestion");
     await door.trigger("click");
-    await settle();
+    await vi.waitFor(() => expect(built.last).not.toBeNull(), DOOR_WAIT);
     const payload = built.last as { text: string; chips: unknown[] };
     expect(payload.text).toContain("nothing has arrived and no request was refused");
     expect(payload.text).not.toContain("secret-token-value");
@@ -1017,6 +1021,8 @@ describe("FirstEventStatus — assistant door (WP-07)", () => {
     mountBar();
     fake.diagnosis.value = { form: "no-requests", trigger: "auto", rejections: [] };
     fake.state.value = "no-requests";
+    // Absence proves nothing until the gate module has actually loaded.
+    await import("@/composables/assistant");
     await settle();
     expect(q("first-event-diagnosis-still-stuck").exists()).toBe(false);
   });
@@ -1024,7 +1030,6 @@ describe("FirstEventStatus — assistant door (WP-07)", () => {
   it("offers the door in the empty-page pill once the watch stops (G8)", async () => {
     mountBar({ display: "pill" });
     fake.state.value = "stopped";
-    await settle();
-    expect(q("ai-entry-ingestion-troubleshoot").exists()).toBe(true);
+    await waitForDoor();
   });
 });

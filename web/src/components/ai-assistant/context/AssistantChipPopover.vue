@@ -39,7 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon :name="chipGlyph[chip.kind]" size="sm" class="text-text-secondary mt-0.5 shrink-0" />
         <div class="flex min-w-0 flex-col gap-0.5">
           <OText variant="body-strong" class="break-words">{{ chip.label }}</OText>
-          <OText variant="meta" data-test="assistant-chip-provenance">{{ provenance }}</OText>
+          <OText variant="meta" class="text-text-body!" data-test="assistant-chip-provenance">{{
+            provenance
+          }}</OText>
         </div>
       </header>
 
