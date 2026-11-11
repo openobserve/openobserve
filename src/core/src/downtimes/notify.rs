@@ -211,7 +211,8 @@ async fn send(
 }
 
 /// The `[TEST] `-marked started message to `requested` (or every destination of the row), one
-/// result each. A request that reaches a destination counts against `user_id`'s test-send limit.
+/// result each. The first destination that passes resolve and the routing rules charges
+/// `user_id`'s test-send limit once, just before its send, so a request that sends nothing is free.
 pub async fn send_test(
     row: &Downtime,
     user_id: &str,
@@ -224,13 +225,12 @@ pub async fn send_test(
 > {
     use config::meta::downtimes::DowntimeTestResult;
 
-    use crate::alerts::notifications::notify::{NotifyError, notify};
+    use crate::alerts::notifications::notify::{NotifyError, resolve, route, send};
 
     let names = test_destinations(row, requested);
     if names.is_empty() {
         return Ok(Vec::new());
     }
-    crate::alerts::notifications::check_rate_limit(user_id)?;
     let due = DueEvent::of_window(NotificationEvent::Started, window);
     let counts = super::match_counts(row).await.ok();
     let vars = variables(
@@ -242,9 +242,22 @@ pub async fn send_test(
     );
     let ctx = mark_test(downtime_context(row, &due, now, vars));
     let mut results = Vec::new();
+    let mut charged = false;
     for name in names {
         let mut ctx = ctx.clone();
-        let sent = notify(&row.org, &name, &[], None, &mut ctx).await;
+        let sent = match resolve(&row.org, &name, &[], ctx.kind).await {
+            Ok(resolved) => match route(&resolved, &ctx) {
+                Ok(_) => {
+                    if !charged {
+                        crate::alerts::notifications::check_rate_limit(user_id)?;
+                        charged = true;
+                    }
+                    send(&row.org, &resolved, None, &mut ctx).await
+                }
+                Err(e) => Err(e),
+            },
+            Err(e) => Err(e),
+        };
         results.push(match sent {
             Ok(_) => DowntimeTestResult {
                 destination: name,

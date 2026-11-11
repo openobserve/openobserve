@@ -240,6 +240,7 @@ describe("DowntimeDetail notifications tab", () => {
       data: [
         { destination: "slack-oncall", ok: false, error: "HTTP 405" },
         { destination: "pd", ok: false, unsupported: true, error: "PlatformNotForKind" },
+        { destination: "mail", ok: false, unsupported: true, error: "NoOrgMemberRecipient" },
       ],
     } as any);
     const wrapper = await mountDetail();
@@ -247,6 +248,7 @@ describe("DowntimeDetail notifications tab", () => {
     const error = toastRecords.find((r) => r.variant === "error");
     expect(String(error?.message)).toContain("slack-oncall (HTTP 405)");
     expect(String(error?.message)).toContain("pd (skipped, a live downtime does not notify");
+    expect(String(error?.message)).toContain("mail (skipped, no recipient is a member");
     expect(String(error?.message)).not.toContain("PlatformNotForKind");
     dismissAll();
     wrapper.unmount();

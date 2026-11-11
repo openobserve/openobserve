@@ -14220,6 +14220,7 @@
           "sent": "Test sent to {count} destination | Test sent to {count} destinations",
           "failed": "The test did not reach {names}.",
           "skipped": "skipped, a live downtime does not notify this platform",
+          "noMember": "skipped, no recipient is a member of this organization",
           "confirmTitle": "Send a test message?",
           "confirmMessage": "A real message marked [TEST] goes to {names} now."
         }

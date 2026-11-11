@@ -732,9 +732,14 @@ const testDestinations = computed<TestDestination[]>(() => {
 });
 
 const testConfirmOpen = ref(false);
-// One reason per destination; a platform skip reads in words, not as the server's key.
-const failureText = (r: { destination: string; error?: string; unsupported?: boolean }) => {
-  if (r.unsupported) return `${r.destination} (${t("alerts.downtimes.notify.test.skipped")})`;
+// One reason per destination; a skip reads in words, not as the server's key.
+const SKIP_TEXT: Record<string, I18nKey> = {
+  PlatformNotForKind: "alerts.downtimes.notify.test.skipped",
+  NoOrgMemberRecipient: "alerts.downtimes.notify.test.noMember",
+};
+const failureText = (r: { destination: string; error?: string }) => {
+  const skip = r.error ? SKIP_TEXT[r.error] : undefined;
+  if (skip) return `${r.destination} (${t(skip)})`;
   return r.error ? `${r.destination} (${r.error})` : r.destination;
 };
 const sendTest = async () => {
