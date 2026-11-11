@@ -231,7 +231,9 @@
       "rum-3268-heatmap-no-view-id.spec.js",
       "rum-3268-trace-duration-skew.spec.js",
       "rum-3268-no-widen-at-30d.spec.js",
-      "rum-3268-analytics-header-1200.spec.js"
+      "rum-3268-analytics-header-1200.spec.js",
+      "rum-14694-replay-missing-segment.spec.js",
+      "rum-3129-sessions-and-trace-card.spec.js"
     ],
     "disabled": [],
     "ingest_allowed_upto": "1440",
