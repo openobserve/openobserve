@@ -3862,10 +3862,7 @@ pub async fn send_anomaly_alert(
     anomaly_send_outcome(result, &actx.anomaly_id)
 }
 
-/// Maps a notify result to the scheduler's sender contract. A missing destination, a
-/// destination that cannot take this notification (for example a pipeline destination),
-/// and no org member recipient are all `Ok(false)`: a retry cannot deliver them, and the
-/// scheduler counts an `Err` as retryable.
+/// Unsendable destinations (missing, pipeline, no org member recipient) skip as `Ok(false)`.
 #[cfg(feature = "enterprise")]
 fn anomaly_send_outcome(
     result: Result<(), crate::alerts::notifications::notify::NotifyError>,
