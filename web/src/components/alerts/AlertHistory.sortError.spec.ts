@@ -115,10 +115,9 @@ describe("AlertHistory sort failure", () => {
 
   it("retries the filter and time range that failed, not ones staged since", async () => {
     await mountHistory();
-    failSortOnce(500);
-    wrapper.vm.searchQuery = "failed-alert";
     const failedRange = { ...wrapper.vm.dateTimeValues };
-    wrapper.vm.manualSearch();
+    failSortOnce(500);
+    await wrapper.vm.onSortChange({ column: "alert_name", order: "asc" });
     await flushPromises();
     expect(wrapper.vm.refreshFailure).not.toBeNull();
 
@@ -128,9 +127,50 @@ describe("AlertHistory sort failure", () => {
     await flushPromises();
 
     const retried = vi.mocked(alertsService.getHistory).mock.calls.at(-1)?.[1];
-    expect(retried.alert_id).toBe("failed-alert");
+    expect(retried.alert_id).toBeUndefined();
     expect(retried.start_time).toBe(String(failedRange.startTime));
     expect(retried.end_time).toBe(String(failedRange.endTime));
+  });
+
+  it.each([
+    ["another alert", (vm: any) => (vm.searchQuery = "other-alert")],
+    [
+      "another time range",
+      (vm: any) =>
+        (vm.dateTimeValues = {
+          startTime: 1,
+          endTime: 2,
+          type: "absolute",
+          relativeTimePeriod: "",
+        }),
+    ],
+  ])(
+    "drops the shown rows when a read for %s fails, so they never pass for its result",
+    async (_what, change) => {
+      await mountHistory();
+      expect(wrapper.find('[data-test="o2-table-body"]').text()).toContain("checkout-latency");
+
+      failSortOnce(500);
+      change(wrapper.vm);
+      wrapper.vm.manualSearch();
+      await flushPromises();
+
+      expect(wrapper.vm.refreshFailure).toBeNull();
+      expect(wrapper.text()).not.toContain("checkout-latency");
+      expect(wrapper.text()).toContain("Can't sort by that column");
+    },
+  );
+
+  it("keeps the shown rows when a refresh of the same relative range fails", async () => {
+    await mountHistory();
+    failSortOnce(500);
+    const now = wrapper.vm.dateTimeValues;
+    wrapper.vm.dateTimeValues = { ...now, startTime: now.startTime + 5, endTime: now.endTime + 5 };
+    wrapper.vm.manualSearch();
+    await flushPromises();
+
+    expect(wrapper.vm.refreshFailure).not.toBeNull();
+    expect(wrapper.find('[data-test="o2-table-body"]').text()).toContain("checkout-latency");
   });
 
   it("puts the failed read's times on the header's inline refresh button, and takes them off once a read lands", async () => {
@@ -332,7 +372,7 @@ describe("AlertHistory failed page read", () => {
     expect(range()).toBe("Showing 1 - 50 of 60");
   });
 
-  it("keeps the shown page when a new time range that resets the page fails", async () => {
+  it("drops the shown page when a new time range fails, and the table's Retry asks for the new range", async () => {
     await mountHistory();
     await wrapper.vm.onPaginationChange({ page: 2, size: 20 });
     await flushPromises();
@@ -342,11 +382,18 @@ describe("AlertHistory failed page read", () => {
     wrapper.vm.updateDateTime({ startTime: 1, endTime: 2, relativeTimePeriod: "1h" });
     await flushPromises();
 
-    expect(wrapper.vm.currentPage).toBe(2);
-    expect(range()).toBe("Showing 21 - 40 of 60");
-    expect(wrapper.find('[data-test="o2-table-body"]').text()).toContain("alert-21");
+    expect(wrapper.find(FAILED).exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("alert-21");
+    expect(wrapper.text()).toContain("History is unavailable");
 
-    expect(await retry()).toMatchObject({ from: "0", start_time: "1", end_time: "2" });
+    const before = vi.mocked(alertsService.getHistory).mock.calls.length;
+    await wrapper.find('[data-test="o2-table-error-retry-btn"]').trigger("click");
+    await flushPromises();
+    expect(vi.mocked(alertsService.getHistory).mock.calls[before]?.[1]).toMatchObject({
+      from: "0",
+      start_time: "1",
+      end_time: "2",
+    });
     expect(range()).toBe("Showing 1 - 20 of 60");
   });
 

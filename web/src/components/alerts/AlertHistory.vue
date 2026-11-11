@@ -628,12 +628,13 @@ const rows = ref<any[]>([]);
 const historyError = ref<string | null>(null);
 // Epoch ms the rows on screen were fetched, which a failed read reports as the data still shown.
 const shownAt = ref<number | null>(null);
-// A failed read with rows on screen keeps them under the failed-refresh notice instead of the table's error state; `retry` is the view it asked for.
-// Retry re-runs exactly the request that failed, so it keeps that request's filter and range too.
+// A failed read of the shown alert and range keeps its rows under the notice, and Retry re-runs exactly that read.
 type FailedRead = HistoryView & { filter: string; range: typeof dateTimeValues.value };
 const refreshFailure = ref<{ failedAt: number; dataFrom: number; retry: FailedRead } | null>(null);
 // The view the rows on screen were read with, so a failed read puts the header and range back on it.
 let shownView: HistoryView | null = null;
+// The alert and time range the rows on screen answer; a failed read for another one must not keep them.
+let shownSource: string | null = null;
 let withdrawFailure: (() => void) | null = null;
 // A read that settles after the page is left must not announce on the page the user went to.
 let unmounted = false;
@@ -857,6 +858,7 @@ const fetchAlertHistory = async (force = false) => {
     filter: searchQuery.value,
     range: { ...dateTimeValues.value },
   };
+  const source = readSource(retry);
   historyError.value = null;
   try {
     const org = store.state.selectedOrganization.identifier;
@@ -888,6 +890,7 @@ const fetchAlertHistory = async (force = false) => {
       totalCount.value = data.total || 0;
       shownAt.value = historyList.dataUpdatedAt.value || Date.now();
       shownView = requested;
+      shownSource = source;
       clearRefreshFailure();
     };
 
@@ -931,8 +934,28 @@ const fetchAlertHistory = async (force = false) => {
     console.error("Error fetching alert history:", error);
     historyError.value =
       error?.response?.data?.message || error?.message || t("alerts.failedToFetchHistory");
-    if (rows.value.length && shownAt.value) keepRowsAfterFailure(shownAt.value, retry);
+    if (rows.value.length && shownAt.value && source === shownSource)
+      keepRowsAfterFailure(shownAt.value, retry);
+    else dropShownRows();
   }
+};
+
+// A relative range is named by its period, since its start and end move on every refresh.
+const readSource = (read: FailedRead) =>
+  JSON.stringify([
+    read.filter.trim(),
+    read.range.type === "relative"
+      ? read.range.relativeTimePeriod
+      : [read.range.startTime, read.range.endTime],
+  ]);
+
+const dropShownRows = () => {
+  rows.value = [];
+  totalCount.value = 0;
+  shownAt.value = null;
+  shownView = null;
+  shownSource = null;
+  clearRefreshFailure();
 };
 
 const currentView = (): HistoryView => ({
