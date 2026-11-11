@@ -351,6 +351,16 @@ describe("AutoObserveCoverageTab in live mode", () => {
       );
     });
 
+    it("rails a Coverage gap row in the Coverage gap chip's amber, not the warning yellow (T5-N3)", () => {
+      const tone = mountTable().findComponent(OTable).props("rowRailTone") as (r: {
+        service: string;
+      }) => string | null;
+      const rows = mountTable().findComponent(OTable).props("data") as { service: string }[];
+      const byName = (name: string) => tone(rows.find((r) => r.service === name)!);
+      expect(byName("web")).toBe("amber");
+      expect(byName("api")).toBeNull();
+    });
+
     it("sorts by every column (T2-19)", () => {
       const columns = mountTable().findComponent(OTable).props("columns") as {
         id: string;

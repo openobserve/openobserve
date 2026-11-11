@@ -3458,6 +3458,7 @@ describe("OTable row rail + row tone", () => {
     ["p3", "border-s-priority-p3"],
     ["error", "border-s-icon-chip-error-text"],
     ["neutral", "border-s-border-default"],
+    ["amber", "border-s-badge-amber-soft-text"],
   ])("rails tone %s with its own token", async (tone, expected) => {
     wrapper = mountWith({ rowRailTone: () => tone });
     await nextTick();

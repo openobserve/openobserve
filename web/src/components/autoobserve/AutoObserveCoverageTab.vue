@@ -943,7 +943,7 @@ const isSelected = (service: string, signal: Signal | LiveCheck) =>
   selected.value?.service === service && selected.value.signal === signal;
 
 const railTone = (row: CoverageRow): RowRailTone | null =>
-  (["warning", "neutral", null] as const)[rank(row)];
+  (["amber", "neutral", null] as const)[rank(row)];
 
 const rowClass = (row: CoverageRow) =>
   row.service === selected.value?.service ? "bg-table-row-selected-bg" : "";
