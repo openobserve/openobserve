@@ -1712,7 +1712,9 @@
       "rerunCancelled": "أُلغيت إعادة التشغيل بعد {elapsed}. يتم عرض النتائج السابقة.",
       "rerunCancelledNow": "أُلغيت إعادة التشغيل. يتم عرض النتائج السابقة.",
       "analyzeSucceeded": "نجح التشغيل الأخير",
-      "analyzeFailedShort": "فشل التشغيل الأخير"
+      "analyzeFailedShort": "فشل التشغيل الأخير",
+      "analyzeWarned": "اكتمل التشغيل الأخير مع تحذيرات",
+      "analyzePartial": "اكتمل التشغيل، لكن النتائج قد تكون غير مكتملة."
     },
     "errorDeletingSavedView": "خطأ أثناء حذف العرض المحفوظ.",
     "errorCreatingSavedView": "خطأ أثناء إنشاء عرض محفوظ.",

@@ -11481,6 +11481,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-opentelemetry",
+ "tracing-subscriber",
  "transform",
  "usage_reporting",
  "wal",

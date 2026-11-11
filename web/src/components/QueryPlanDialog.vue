@@ -65,11 +65,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="analyzeState === 'done' || analyzeState === 'failed'"
             role="img"
             class="ms-1.5 inline-block size-1.5 rounded-full"
-            :class="analyzeState === 'done' ? 'bg-status-positive' : 'bg-status-negative'"
+            :class="
+              analyzeState === 'failed'
+                ? 'bg-status-negative'
+                : runWarning === undefined
+                  ? 'bg-status-positive'
+                  : 'bg-status-warning-text'
+            "
             :aria-label="
-              analyzeState === 'done'
-                ? t('search.queryProfile.analyzeSucceeded')
-                : t('search.queryProfile.analyzeFailedShort')
+              analyzeState === 'failed'
+                ? t('search.queryProfile.analyzeFailedShort')
+                : runWarning === undefined
+                  ? t('search.queryProfile.analyzeSucceeded')
+                  : t('search.queryProfile.analyzeWarned')
             "
             :data-test="`query-plan-mode-analyze-${analyzeState}`"
           />
@@ -98,7 +106,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :took="lastRun ? formatTime(lastRun.tookMs) : null"
               :nodes="resultNodes"
               :busy="analyzeBusy"
+              :warning="runWarning !== undefined"
               @rerun="runAnalyze"
+            />
+            <OBanner
+              v-if="runWarning !== undefined"
+              variant="warning"
+              icon="warning"
+              class="shrink-0"
+              :content="raw(runWarning) || t('search.queryProfile.analyzePartial')"
+              data-test="query-plan-analyze-warning"
             />
             <div class="relative min-h-0 flex-1">
               <div
@@ -290,6 +307,8 @@ const showDialog = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit("update:modelValue", val),
 });
+
+const runWarning = computed(() => streamResult.value?.warning);
 
 const sqlQuery = computed(() => props.searchObj?.data?.query || "");
 const sqlOneLine = computed(() => raw(sqlQuery.value.replace(/\s+/g, " ").trim()));
