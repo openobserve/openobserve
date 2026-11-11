@@ -45,7 +45,7 @@ use opentelemetry_proto::tonic::{
 use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
-use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
+use super::{DestinationSettings, bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::otlp::{otlp_export_response, otlp_rejection_response},
     db_monitoring::server_vantage::O2_EVENT_NAME,
@@ -498,6 +498,21 @@ pub async fn handle_request(
                             )
                             .await;
                         }
+                        let settings = DestinationSettings {
+                            org_id,
+                            stream_name: &destination_stream,
+                            dbm: dest_dbm_gate,
+                            uds_fields: user_defined_schema_map
+                                .get(&destination_stream)
+                                .and_then(Option::as_ref),
+                            need_original: streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v),
+                            need_all_values: streams_need_all_values_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v),
+                            all_values_max_len: index_all_max_value_length,
+                        };
 
                         for (idx, mut res) in stream_pl_results {
                             let timestamp =
@@ -519,95 +534,21 @@ pub async fn handle_request(
                                 };
 
                             let original_size = json::estimate_json_bytes(&res);
-                            // get json object
-                            let mut local_val = match res.take() {
+                            let local_val = match res.take() {
                                 json::Value::Object(v) => v,
                                 _ => unreachable!(),
                             };
-
-                            // Carry the trusted event name across the reservation strip.
-                            //
-                            // `local_val` here is VRL *output*, so the producer-loop value may
-                            // or may not have survived the transform — but the INPUT record is
-                            // still addressable: `idx` indexes `pipeline_inputs`, exactly as it
-                            // indexes `original_options` a few lines below (`usize::MAX` is the
-                            // "no source record" sentinel). Recovering it from there means a
-                            // user pipeline on a DBM stream no longer silently reintroduces the
-                            // very ambiguity W1 exists to remove.
-                            let trusted_event_name = (idx != usize::MAX)
-                                .then(|| {
-                                    pipeline_inputs
-                                        .get(idx)
-                                        .and_then(|src| src.get(O2_EVENT_NAME))
-                                        .cloned()
-                                })
-                                .flatten();
-
-                            // Pipeline-routed records are canonicalized too: a VRL transform may
-                            // have produced the receiver fields we dispatch on.
-                            if dest_dbm_gate {
-                                crate::db_monitoring::server_vantage::canonicalize_dbm_record(
-                                    &mut local_val,
-                                );
-                            }
-
-                            if let Some(event_name) = trusted_event_name {
-                                local_val.insert(O2_EVENT_NAME.to_string(), event_name);
-                            }
-
-                            if let Some(Some(fields)) =
-                                user_defined_schema_map.get(&destination_stream)
-                            {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
-                            }
-
-                            // add `_original` and '_record_id` if required by StreamSettings
-                            if idx != usize::MAX
-                                && streams_need_original_map
-                                    .get(&destination_stream)
-                                    .is_some_and(|v| *v)
-                                && original_options[idx].is_some()
-                            {
-                                local_val.insert(
-                                    ORIGINAL_DATA_COL_NAME.to_string(),
-                                    original_options[idx].clone().unwrap().into(),
-                                );
-
-                                let record_id = crate::ingestion::generate_record_id(
-                                    org_id,
-                                    &destination_stream,
-                                    &StreamType::Logs,
-                                );
-                                local_val
-                                    .insert(ID_COL_NAME.to_string(), record_id.to_string().into());
-                            }
-
-                            // add `_all_values` if required by StreamSettings
-                            if streams_need_all_values_map
-                                .get(&destination_stream)
-                                .copied()
-                                .unwrap_or_default()
-                            {
-                                let values = local_val
-                                    .iter()
-                                    .filter(|(k, v)| {
-                                        ![
-                                            TIMESTAMP_COL_NAME,
-                                            ID_COL_NAME,
-                                            ORIGINAL_DATA_COL_NAME,
-                                            ALL_VALUES_COL_NAME,
-                                        ]
-                                        .contains(&k.as_str())
-                                            && (index_all_max_value_length == 0
-                                                || v.as_str().is_none_or(|s| {
-                                                    s.len() <= index_all_max_value_length
-                                                }))
-                                    })
-                                    .map(|(_, v)| v)
-                                    .join(" ");
-
-                                local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
-                            }
+                            // VRL may have dropped the name; the input record at idx still has it
+                            let trusted_event_name = pipeline_inputs
+                                .get(idx)
+                                .and_then(|src| src.get(O2_EVENT_NAME))
+                                .cloned();
+                            // a ResultArray record carries idx usize::MAX and has no source record
+                            let local_val = settings.apply(
+                                local_val,
+                                original_options.get(idx).and_then(Option::as_ref),
+                                trusted_event_name,
+                            );
 
                             let size: &mut usize = size_by_stream
                                 .entry(destination_stream.clone())
@@ -627,10 +568,23 @@ pub async fn handle_request(
 
         // Evaluation-only pipelines emit no downstream records. Preserve the
         // original log stream while evaluator work runs asynchronously.
-        let has_user_pipeline = executable_pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+        let has_user_pipeline = crate::ingestion::has_user_pipeline(&executable_pipelines);
         if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
+            let settings = DestinationSettings {
+                org_id,
+                stream_name: &stream_name,
+                dbm: dbm_gate,
+                uds_fields: user_defined_schema_map
+                    .get(&stream_name)
+                    .and_then(Option::as_ref),
+                need_original: streams_need_original_map
+                    .get(&stream_name)
+                    .is_some_and(|v| *v),
+                need_all_values: streams_need_all_values_map
+                    .get(&stream_name)
+                    .is_some_and(|v| *v),
+                all_values_max_len: index_all_max_value_length,
+            };
             for (idx, mut res) in pipeline_inputs.iter().cloned().enumerate() {
                 let timestamp = match super::handle_timestamp_for_value(&mut res, min_ts, max_ts) {
                     Ok(ts) => ts,
@@ -654,73 +608,17 @@ pub async fn handle_request(
 
                 res = flatten::flatten_with_level(res, flatten_level)?;
 
-                let mut local_val = match res.take() {
+                let local_val = match res.take() {
                     json::Value::Object(v) => v,
                     _ => unreachable!(),
                 };
-
-                // Carry the trusted event name across the reservation strip.
-                //
-                // These records are replayed `pipeline_inputs`, so they already hold the
-                // value the producer loop wrote — `log_record` is out of scope here, but
-                // it is not needed: the value travels on the record itself. Take it
-                // before `apply_to_record` strips it and put it back after, exactly as
-                // the non-pipeline branch does.
+                // replayed inputs still hold the name the producer loop wrote
                 let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
-
-                // DBM server-vantage canonicalization (see the note at the first call site).
-                if dbm_gate {
-                    crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
-                }
-
-                if let Some(event_name) = trusted_event_name {
-                    local_val.insert(O2_EVENT_NAME.to_string(), event_name);
-                }
-
-                if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                    local_val = crate::ingestion::refactor_map(local_val, fields);
-                }
-
-                if streams_need_original_map
-                    .get(&stream_name)
-                    .is_some_and(|v| *v)
-                    && let Some(original_data) = original_options[idx].clone()
-                {
-                    local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
-
-                    let record_id = crate::ingestion::generate_record_id(
-                        org_id,
-                        &stream_name,
-                        &StreamType::Logs,
-                    );
-
-                    local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
-                }
-
-                if streams_need_all_values_map
-                    .get(&stream_name)
-                    .copied()
-                    .unwrap_or_default()
-                {
-                    let values = local_val
-                        .iter()
-                        .filter(|(k, v)| {
-                            ![
-                                TIMESTAMP_COL_NAME,
-                                ID_COL_NAME,
-                                ORIGINAL_DATA_COL_NAME,
-                                ALL_VALUES_COL_NAME,
-                            ]
-                            .contains(&k.as_str())
-                                && (index_all_max_value_length == 0
-                                    || v.as_str()
-                                        .is_none_or(|s| s.len() <= index_all_max_value_length))
-                        })
-                        .map(|(_, v)| v)
-                        .join(" ");
-
-                    local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
-                }
+                let local_val = settings.apply(
+                    local_val,
+                    original_options[idx].as_ref(),
+                    trusted_event_name,
+                );
 
                 let (ts_data, fn_num) = json_data_by_stream
                     .entry(stream_name.clone())
