@@ -31,6 +31,9 @@ const MAX_FUTURE_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
 const MIN_MAX_WINDOW_DAYS: i64 = 3650;
 #[cfg(any(feature = "enterprise", test))]
 const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
+/// Bounds one request's concurrent per-stream OpenFGA checks.
+#[cfg(feature = "enterprise")]
+const STREAM_CHECK_CONCURRENCY: usize = 16;
 
 /// Query parameters for service graph API
 #[derive(Debug, Deserialize)]
@@ -44,6 +47,15 @@ pub struct ServiceGraphQuery {
     pub agent_env: Option<String>,
 }
 
+/// The trace streams one request reads, after its user's stream permissions are applied.
+#[cfg(any(feature = "enterprise", test))]
+#[derive(Debug, PartialEq)]
+struct StreamScope {
+    trace_stream: Option<String>,
+    /// `None` when the user may read every trace stream.
+    visible_streams: Option<Vec<String>>,
+}
+
 /// GetCurrentTopology
 #[utoipa::path(
     get,
@@ -52,7 +64,7 @@ pub struct ServiceGraphQuery {
     tag = "Traces",
     operation_id = "GetCurrentServiceGraphTopology",
     summary = "Get current service graph topology",
-    description = "Returns the service graph topology for the time range (default: last 60 minutes), read from the service graph metrics.",
+    description = "Returns the service graph topology for the time range (default: last 60 minutes), read from the service graph metrics. Only the trace streams the user may read are included.",
     security(
         ("Authorization" = [])
     ),
@@ -65,7 +77,7 @@ pub struct ServiceGraphQuery {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::service_graph::ServiceGraphData),
         (status = 400, description = "Invalid time window (negative start_time, end_time not after start_time, end_time more than a day ahead, or longer than the data retention, at least 3650 days) or a stream name the metrics query cannot quote", content_type = "application/json", body = String),
-        (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
+        (status = 403, description = "Forbidden: an enterprise feature, or the user may not read the requested trace stream or any trace stream", content_type = "application/json", body = String),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -75,8 +87,9 @@ pub struct ServiceGraphQuery {
 )]
 #[cfg(feature = "enterprise")]
 pub async fn get_current_topology(
-    axum::extract::Path(org_id): axum::extract::Path<String>,
-    axum::extract::Query(query): axum::extract::Query<ServiceGraphQuery>,
+    org_id: &str,
+    user_id: &str,
+    query: ServiceGraphQuery,
 ) -> HttpResponse {
     let (start_time, end_time) = match resolve_window(
         query.start_time,
@@ -89,11 +102,16 @@ pub async fn get_current_topology(
         Err(e) => return MetaHttpResponse::bad_request(e),
     };
 
-    let filter = v4_read_filter(&query);
+    let readable = readable_trace_streams(org_id, user_id).await;
+    let Some(scope) = scope_streams(trace_stream_filter(query.stream_name.clone()), readable)
+    else {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    };
+    let filter = v4_read_filter(&query, scope);
     if let Err(e) = filter.validate() {
         return MetaHttpResponse::bad_request(e);
     }
-    match topology_v4(&org_id, &filter, start_time, end_time).await {
+    match topology_v4(org_id, &filter, start_time, end_time).await {
         Ok(data) => MetaHttpResponse::json(data),
         Err(e) => {
             log::warn!("[ServiceGraph] v4 topology read failed for org '{org_id}': {e}");
@@ -123,10 +141,11 @@ async fn topology_v4(
 }
 
 #[cfg(feature = "enterprise")]
-fn v4_read_filter(query: &ServiceGraphQuery) -> super::v4::read::ReadFilter {
+fn v4_read_filter(query: &ServiceGraphQuery, scope: StreamScope) -> super::v4::read::ReadFilter {
     super::v4::read::ReadFilter {
-        trace_stream: trace_stream_filter(query.stream_name.clone()),
+        trace_stream: scope.trace_stream,
         agent_env: query.agent_env.clone().filter(|s| !s.is_empty()),
+        visible_streams: scope.visible_streams,
     }
 }
 
@@ -154,7 +173,7 @@ pub struct EdgeHistoryQuery {
     tag = "Traces",
     operation_id = "GetServiceGraphEdgeTrend",
     summary = "Get latency trend for a specific service graph edge",
-    description = "Returns per-step request, error and client latency points for a client→server edge (default: last 24 hours).",
+    description = "Returns per-step request, error and client latency points for a client→server edge (default: last 24 hours). Only the trace streams the user may read are included.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -167,7 +186,7 @@ pub struct EdgeHistoryQuery {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::service_graph::EdgeTrendResponse),
         (status = 400, description = "Invalid time window (negative start_time, end_time not after start_time, end_time more than a day ahead, or longer than the data retention, at least 3650 days), or a service or stream name the metrics query cannot quote", content_type = "application/json", body = String),
-        (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 403, description = "Forbidden: an enterprise feature, or the user may not read the requested trace stream or any trace stream"),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -177,8 +196,9 @@ pub struct EdgeHistoryQuery {
 )]
 #[cfg(feature = "enterprise")]
 pub async fn get_edge_history(
-    axum::extract::Path(org_id): axum::extract::Path<String>,
-    axum::extract::Query(query): axum::extract::Query<EdgeHistoryQuery>,
+    org_id: &str,
+    user_id: &str,
+    query: EdgeHistoryQuery,
 ) -> HttpResponse {
     use config::meta::service_graph::EdgeTrendResponse;
 
@@ -194,16 +214,21 @@ pub async fn get_edge_history(
         Ok(window) => window,
         Err(e) => return MetaHttpResponse::bad_request(e),
     };
+    let readable = readable_trace_streams(org_id, user_id).await;
+    let Some(scope) = scope_streams(trace_stream_filter(query.stream_name), readable) else {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    };
     let non_empty = |v: Option<String>| v.filter(|s| !s.is_empty());
     let filter = EdgeFilter {
         client: non_empty(query.client_service),
         server: non_empty(query.server_service),
-        trace_stream: trace_stream_filter(query.stream_name),
+        trace_stream: scope.trace_stream,
+        visible_streams: scope.visible_streams,
     };
     if let Err(e) = filter.validate() {
         return MetaHttpResponse::bad_request(e);
     }
-    match fetch_edge_history(&org_id, &filter, start_time, end_time).await {
+    match fetch_edge_history(org_id, &filter, start_time, end_time).await {
         Ok(data_points) => MetaHttpResponse::json(EdgeTrendResponse { data_points }),
         Err(e) => {
             log::error!("[ServiceGraph] Edge history query failed for org '{org_id}': {e}");
@@ -215,8 +240,9 @@ pub async fn get_edge_history(
 /// GetEdgeTrend (OSS - Not Supported)
 #[cfg(not(feature = "enterprise"))]
 pub async fn get_edge_history(
-    axum::extract::Path(_org_id): axum::extract::Path<String>,
-    axum::extract::Query(_query): axum::extract::Query<EdgeHistoryQuery>,
+    _org_id: &str,
+    _user_id: &str,
+    _query: EdgeHistoryQuery,
 ) -> HttpResponse {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -247,10 +273,76 @@ pub async fn get_edge_history(
 )]
 #[cfg(not(feature = "enterprise"))]
 pub async fn get_current_topology(
-    axum::extract::Path(_org_id): axum::extract::Path<String>,
-    axum::extract::Query(_query): axum::extract::Query<ServiceGraphQuery>,
+    _org_id: &str,
+    _user_id: &str,
+    _query: ServiceGraphQuery,
 ) -> HttpResponse {
     MetaHttpResponse::forbidden("Not Supported")
+}
+
+/// The trace streams `user_id` may read in `org_id`, sorted; `None` when it may read all of them.
+#[cfg(feature = "enterprise")]
+async fn readable_trace_streams(org_id: &str, user_id: &str) -> Option<Vec<String>> {
+    use config::meta::stream::StreamType;
+
+    use crate::auth::{UserReads, check_permissions};
+
+    // an org-wide reader keeps the unscoped graph, collector series included
+    if check_permissions(
+        org_id, org_id, user_id, "traces", "GET", None, true, false, false,
+    )
+    .await
+    {
+        return None;
+    }
+    let streams = crate::db::schema::list_streams_from_cache(org_id, StreamType::Traces).await;
+    let placeholder = &config::get_config().common.dashboard_placeholder;
+    Some(readable_among(streams, placeholder, &UserReads { org_id, user_id }).await)
+}
+
+/// The `streams` that `reads` allows, sorted; one named as the dashboard placeholder never is.
+#[cfg(feature = "enterprise")]
+async fn readable_among(
+    streams: Vec<String>,
+    placeholder: &str,
+    reads: &impl crate::auth::ReadCheck,
+) -> Vec<String> {
+    use futures::StreamExt;
+
+    // the engine drops a matcher whose value is the placeholder, which would unscope the read
+    let checks = streams
+        .into_iter()
+        .filter(|stream| stream != placeholder)
+        .map(|stream| async move {
+            let id = crate::auth::into_ofga_supported_format(&stream);
+            reads.can_read("traces", &id).await.then_some(stream)
+        });
+    let mut readable: Vec<String> = futures::stream::iter(checks)
+        .buffer_unordered(STREAM_CHECK_CONCURRENCY)
+        .filter_map(std::future::ready)
+        .collect()
+        .await;
+    readable.sort();
+    readable
+}
+
+/// `None` when the user may read no requested stream, which the handlers answer with 403.
+#[cfg(any(feature = "enterprise", test))]
+fn scope_streams(requested: Option<String>, readable: Option<Vec<String>>) -> Option<StreamScope> {
+    match (requested, readable) {
+        (trace_stream, None) => Some(StreamScope {
+            trace_stream,
+            visible_streams: None,
+        }),
+        (Some(stream), Some(readable)) => readable.contains(&stream).then_some(StreamScope {
+            trace_stream: Some(stream),
+            visible_streams: Some(readable),
+        }),
+        (None, Some(readable)) => (!readable.is_empty()).then_some(StreamScope {
+            trace_stream: None,
+            visible_streams: Some(readable),
+        }),
+    }
 }
 
 /// The longest window a request may ask for: the global data retention, at least 3650 days.
@@ -383,9 +475,53 @@ mod tests {
         assert_eq!(resolve_window(None, Some(-5), NOW, SPAN, MAX_DAYS), default);
     }
 
+    #[test]
+    fn test_scope_streams_keeps_a_request_inside_the_readable_streams() {
+        let names = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let scope = |requested: Option<&str>, readable: Option<&[&str]>| {
+            scope_streams(requested.map(str::to_string), readable.map(names))
+                .map(|s| (s.trace_stream, s.visible_streams))
+        };
+        let ab = names(&["a", "b"]);
+        assert_eq!(scope(None, None), Some((None, None)));
+        assert_eq!(scope(Some("a"), None), Some((Some("a".to_string()), None)));
+        assert_eq!(
+            scope(None, Some(&["a", "b"])),
+            Some((None, Some(ab.clone())))
+        );
+        assert_eq!(
+            scope(Some("a"), Some(&["a", "b"])),
+            Some((Some("a".to_string()), Some(ab)))
+        );
+        assert_eq!(scope(Some("c"), Some(&["a", "b"])), None);
+        assert_eq!(scope(None, Some(&[])), None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    struct ReadsOnly(&'static [&'static str]);
+
+    #[cfg(feature = "enterprise")]
+    impl crate::auth::ReadCheck for ReadsOnly {
+        async fn can_read(&self, resource: &str, object_id: &str) -> bool {
+            resource == "traces" && self.0.contains(&object_id)
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_readable_among_checks_each_stream_and_skips_the_placeholder() {
+        let streams = ["c", "a", "b", "_o2_all_"].map(str::to_string).to_vec();
+        let reads = ReadsOnly(&["a", "c", "_o2_all_"]);
+        assert_eq!(
+            readable_among(streams, "_o2_all_", &reads).await,
+            vec!["a".to_string(), "c".to_string()]
+        );
+        assert!(readable_among(vec![], "_o2_all_", &reads).await.is_empty());
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
-    fn test_v4_read_filter_maps_stream_and_env_only() {
+    fn test_v4_read_filter_maps_scope_and_env_only() {
         let query = |stream: Option<&str>, env: Option<&str>| ServiceGraphQuery {
             start_time: None,
             end_time: None,
@@ -395,25 +531,32 @@ mod tests {
             agent_name: Some("name".to_string()),
             agent_env: env.map(str::to_string),
         };
-        let f = v4_read_filter(&query(None, None));
-        assert!(f.is_empty());
-        let f = v4_read_filter(&query(Some("all"), Some("")));
-        assert!(f.is_empty());
-        let f = v4_read_filter(&query(Some(""), None));
-        assert!(f.is_empty());
-        let f = v4_read_filter(&query(Some("default"), Some("prod")));
+        assert_eq!(trace_stream_filter(Some("all".to_string())), None);
+        assert_eq!(trace_stream_filter(Some(String::new())), None);
+        let unscoped = || StreamScope {
+            trace_stream: None,
+            visible_streams: None,
+        };
+        assert!(v4_read_filter(&query(None, Some("")), unscoped()).is_empty());
+        let f = v4_read_filter(
+            &query(Some("ignored"), Some("prod")),
+            StreamScope {
+                trace_stream: Some("default".to_string()),
+                visible_streams: Some(vec!["default".to_string()]),
+            },
+        );
         assert_eq!(f.trace_stream.as_deref(), Some("default"));
         assert_eq!(f.agent_env.as_deref(), Some("prod"));
+        assert_eq!(f.visible_streams, Some(vec!["default".to_string()]));
     }
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_handlers_reject_an_invalid_window_with_400() {
-        use axum::extract::{Path, Query};
-
         let topology = get_current_topology(
-            Path("default".to_string()),
-            Query(ServiceGraphQuery {
+            "default",
+            "root@example.com",
+            ServiceGraphQuery {
                 start_time: Some(2_189_567),
                 end_time: Some(-1_358),
                 filter: None,
@@ -421,40 +564,43 @@ mod tests {
                 agent_id: None,
                 agent_name: None,
                 agent_env: None,
-            }),
+            },
         )
         .await;
         assert_eq!(topology.status(), axum::http::StatusCode::BAD_REQUEST);
 
         let history = get_edge_history(
-            Path("default".to_string()),
-            Query(EdgeHistoryQuery {
+            "default",
+            "root@example.com",
+            EdgeHistoryQuery {
                 client_service: None,
                 server_service: None,
                 start_time: Some(-1),
                 end_time: Some(10),
                 stream_name: None,
-            }),
+            },
         )
         .await;
         assert_eq!(history.status(), axum::http::StatusCode::BAD_REQUEST);
 
         let near_max = get_edge_history(
-            Path("default".to_string()),
-            Query(EdgeHistoryQuery {
+            "default",
+            "root@example.com",
+            EdgeHistoryQuery {
                 client_service: None,
                 server_service: None,
                 start_time: Some(i64::MAX - 1),
                 end_time: Some(i64::MAX),
                 stream_name: None,
-            }),
+            },
         )
         .await;
         assert_eq!(near_max.status(), axum::http::StatusCode::BAD_REQUEST);
 
         let near_max_topology = get_current_topology(
-            Path("default".to_string()),
-            Query(ServiceGraphQuery {
+            "default",
+            "root@example.com",
+            ServiceGraphQuery {
                 start_time: Some(i64::MAX - 1),
                 end_time: Some(i64::MAX),
                 filter: None,
@@ -462,7 +608,7 @@ mod tests {
                 agent_id: None,
                 agent_name: None,
                 agent_env: None,
-            }),
+            },
         )
         .await;
         assert_eq!(
