@@ -2615,9 +2615,19 @@ fn incident_path_notified(
     match outcome {
         Outcome::NewIncidentCreated { .. }
         | Outcome::NewAlertTypeJoined { .. }
-        | Outcome::SeverityEscalated { .. } => true,
+        | Outcome::SeverityEscalated { .. }
+        | Outcome::FiredAfterReopen { .. } => true,
         Outcome::ExistingAlertRepeated { .. } => false,
     }
+}
+
+/// `FiredAfterReopen` notifies destinations but pages nobody, so the manual trigger still pages.
+#[cfg(feature = "enterprise")]
+fn incident_path_paged(
+    outcome: &config::meta::alerts::incidents::IncidentCorrelationOutcome,
+) -> bool {
+    use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+    !matches!(outcome, Outcome::FiredAfterReopen { .. }) && incident_path_notified(outcome)
 }
 
 pub async fn trigger_by_id<C: ConnectionTrait>(
@@ -2637,7 +2647,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let (incident_notified, incident_notify_error) = if alert.creates_incident
+    let (incident_notified, incident_paged, incident_notify_error) = if alert.creates_incident
         && crate::alerts::incidents::incidents_enabled()
     {
         let synthetic_row = manual_trigger_row(&alert);
@@ -2665,6 +2675,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                 );
                 (
                     incident_path_notified(&correlated.outcome),
+                    incident_path_paged(&correlated.outcome),
                     correlated.notify_error,
                 )
             }
@@ -2673,17 +2684,17 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                (false, None)
+                (false, false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                (false, None)
+                (false, false, None)
             }
         }
     } else {
-        (false, None)
+        (false, false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
@@ -2704,7 +2715,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // somebody checks a new on-call alert pages before trusting it, and it only
     // answers that question if it pages.
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
+    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_paged {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
     #[cfg(feature = "enterprise")]
@@ -5236,8 +5247,6 @@ mod send_path_tests {
     use config::meta::destinations::{Endpoint, HTTPType, Template, TemplateKind};
 
     #[cfg(feature = "enterprise")]
-    use super::incident_path_notified;
-    #[cfg(feature = "enterprise")]
     use super::is_license_denial;
     use super::{
         Alert, AlertError, AlertExt, NotificationOutcome, WORKFLOWS_UNLICENSED_REASON,
@@ -5245,6 +5254,8 @@ mod send_path_tests {
         send_attempted, send_discord_with_attachment, send_error_message, send_failure_message,
         send_http_notification, workflows_denial_as_warning,
     };
+    #[cfg(feature = "enterprise")]
+    use super::{incident_path_notified, incident_path_paged};
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
         ssrf_test_support::{hanging_server, isolated, secret_server, truncated_server},
@@ -5677,6 +5688,23 @@ mod send_path_tests {
         // the incident path sends NOTHING for this outcome, so skipping the alert's
         // destinations here would mean nobody is notified at all
         assert!(!incident_path_notified(&Outcome::ExistingAlertRepeated {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        }));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_firing_after_reopen_skips_destinations_but_still_pages() {
+        use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+
+        let outcome = Outcome::FiredAfterReopen {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        };
+        assert!(incident_path_notified(&outcome));
+        assert!(!incident_path_paged(&outcome));
+        assert!(!incident_path_paged(&Outcome::ExistingAlertRepeated {
             incident_id: "i1".to_string(),
             service_name: "svc".to_string(),
         }));
