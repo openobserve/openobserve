@@ -48,6 +48,9 @@ export const ENV = {
   viteDev: VITE_DEV,
 };
 
+// Mock state per browser context, so an edition rewrite can change what the /config mock answers.
+const contextStates = new WeakMap();
+
 // The `role` knob as the login response names it; "custom" stands for any custom role (00 §9 probes it).
 const ROLE_NAMES = { admin: "admin", editor: "editor", viewer: "viewer", user: "user", custom: "sre-oncall" };
 
@@ -218,10 +221,16 @@ async function patchedConfig(route, request, state) {
     ...(state.persistence !== undefined && { ai_chat_persistence_enabled: state.persistence }),
     ...(state.publicLinks !== undefined && { public_ai_chat_enabled: state.publicLinks }),
     ...(state.aiEnabled !== undefined && { ai_enabled: state.aiEnabled }),
+    ...(state.licensed && body.features && { features: unlockFeatures(body.features) }),
     // A non-admin role only means something with RBAC on; the OSS test backend reports it off.
     ...(state.role !== "admin" && state.configPatch.rbac_enabled === undefined && { rbac_enabled: true }),
   };
   return route.fulfill({ status: response.status(), headers: { ...cleanHeaders(response, request), "content-type": "application/json" }, body: JSON.stringify({ ...body, ...state.configPatch, ...knobs }) });
+}
+
+/** The license map of a licensed server: an OSS binary reports every gated feature locked. */
+function unlockFeatures(features) {
+  return Object.fromEntries(Object.entries(features).map(([key, value]) => [key, value === "locked" ? "enabled" : value]));
 }
 
 /** Rewrites the signed-in role so the capability heuristic and the access probe see the `role` knob. */
@@ -561,6 +570,7 @@ export async function installMocks(context, state = createMockState()) {
       "window.__O2_TELEMETRY_SINK__ = true;\n" +
       shim,
   });
+  contextStates.set(context, state);
   await context.route(`${ENV.apiOrigin}/**`, async (route) => {
     const request = route.request();
     try {
@@ -602,6 +612,11 @@ async function requireViteDev() {
 }
 
 async function rewriteEdition(context, replacements, servedBy) {
+  // An enterprise or Cloud bundle is only ever served by a licensed server, whatever binary answers this run.
+  if (servedBy !== "stack-oss") {
+    const state = contextStates.get(context);
+    if (state) state.licensed = true;
+  }
   // A stack run of the matching edition is already that build; any other stack cannot fake it.
   if (MODE === servedBy || BUNDLE_MODES[BUNDLE_EDITION] === servedBy) return;
   await mockOnly("the edition rewrite");
