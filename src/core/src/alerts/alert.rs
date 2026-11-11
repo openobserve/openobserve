@@ -9648,6 +9648,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn prepare_alert_passes_both_autoobserve_draft_shapes_through_the_operator_checks() {
+        use config::meta::alerts::{Condition, QueryType};
+
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            a.trigger_condition.operator = Operator::GreaterThanEquals;
+            a.trigger_condition.threshold = 1;
+        })
+        .await;
+        assert!(reached_the_schema_lookup(&err), "{err:?}");
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            a.query_condition.query_type = QueryType::PromQL;
+            a.query_condition.promql = Some("rate(http_requests_total[5m])".into());
+            a.query_condition.promql_condition = Some(Condition {
+                column: "value".to_string(),
+                operator: Operator::GreaterThan,
+                value: serde_json::json!(10),
+                ignore_case: false,
+                case_insensitive: None,
+            });
+            a.query_condition.promql_multi_alert = true;
+        })
+        .await;
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn an_alert_on_the_digest_stream_with_an_accepted_in_condition_is_still_refused() {
+        let mut alert = Alert::default();
+        alert.name = "copy-findings".into();
+        alert.trigger_condition.frequency = 60;
+        with_condition_operator(&mut alert, "in");
+        let err = prepare_alert(
+            "ops",
+            "_o2_alert_calibration_digests",
+            "",
+            &mut alert,
+            true,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, AlertError::ProtectedStream(ref s) if s == "_o2_alert_calibration_digests"),
+            "{err:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn prepare_alert_rejects_an_out_of_range_frequency() {
         let err = prepare_schedule(|a| a.trigger_condition.frequency = i64::MAX).await;
         assert!(matches!(err, AlertError::FrequencyOutOfRange), "{err:?}");
