@@ -33,7 +33,7 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 import type { LLMPanelDef } from "./config/llmInsightsPanels";
 
-/** Our internal panel type → dashboard chart type id (see ChartSelection.vue). */
+/** Our internal panel type → dashboard chart type id (see chartTypeCatalog.ts). */
 const TYPE_MAP: Record<string, string> = {
   "stacked-area": "area-stacked",
   "stacked-bar": "stacked",

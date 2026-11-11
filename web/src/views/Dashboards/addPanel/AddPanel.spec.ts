@@ -294,7 +294,6 @@ describe("AddPanel.vue", () => {
             },
           },
           stubs: {
-            ChartSelection: true,
             FieldList: true,
             DashboardQueryBuilder: true,
             DateTimePickerDashboard: true,
@@ -396,7 +395,6 @@ describe("AddPanel.vue", () => {
             },
           },
           stubs: {
-            ChartSelection: true,
             FieldList: true,
             DashboardQueryBuilder: true,
             DateTimePickerDashboard: true,
@@ -509,7 +507,6 @@ describe("AddPanel.vue", () => {
     };
 
     const baseStubs = {
-      ChartSelection: true,
       FieldList: true,
       DashboardQueryBuilder: true,
       DateTimePickerDashboard: true,
