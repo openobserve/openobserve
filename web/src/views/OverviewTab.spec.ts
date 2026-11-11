@@ -772,6 +772,18 @@ describe("OverviewTab", () => {
       expect(alertsService.getHistory).toHaveBeenCalled();
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
     });
+
+    it("should request anomalies when the config reports anomaly detection on after mount", async () => {
+      givenRecentEvents();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(anomalyService.list).not.toHaveBeenCalled();
+
+      givenAnomalyDetectionOn();
+      await flushPromises();
+
+      expect(anomalyService.list).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("services under a traces license lock", () => {
