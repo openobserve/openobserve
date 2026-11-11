@@ -53,6 +53,7 @@ const REASON_KEYS: Record<PackNotIncludedReason, I18nKey> = {
 const TAG_KEYS: Record<PackNotIncludedReason, I18nKey> = {
   already_have: "starterPacks.manifest.tagHaveIt",
   no_data: "starterPacks.manifest.tagNeedsData",
+  no_flavour: "starterPacks.manifest.tagNeedsData",
   unavailable: "starterPacks.manifest.tagUnavailable",
   needs_plan: "starterPacks.manifest.tagEnterprise",
 };
