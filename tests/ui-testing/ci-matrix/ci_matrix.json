@@ -624,7 +624,8 @@
       "slo-crud.spec.js",
       "slo-form-validation.spec.js",
       "slo-required-fields.spec.js",
-      "slo-alert-sli.spec.js"
+      "slo-alert-sli.spec.js",
+      "slo-import.spec.js"
     ],
     "disabled": []
   },

@@ -50,6 +50,7 @@ import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
 import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
+import { SloImportPage } from "./sloPages/sloImportPage.js";
 import { OnCallTeamsPage } from "./oncallPages/oncallTeamsPage.js";
 import { OnCallTeamDetailPage } from "./oncallPages/oncallTeamDetailPage.js";
 import { OnCallPagesListPage } from "./oncallPages/oncallPagesListPage.js";
@@ -246,6 +247,7 @@ class PageManager {
     this.sloFormPage = new SloFormPage(page);
     this.sloDetailPage = new SloDetailPage(page);
     this.sloAlertsPage = new SloAlertsPage(page);
+    this.sloImportPage = new SloImportPage(page);
 
     // ===== ON-CALL PAGE OBJECTS (enterprise) =====
     this.oncallTeamsPage = new OnCallTeamsPage(page);
