@@ -45,6 +45,7 @@ describe("StarterPackHomeCard", () => {
     fake.matcher = {
       state: ref("matched"),
       clusters: ref([]),
+      streams: ref(["k8s_events"]),
       waitedLong: ref(false),
       check: vi.fn(),
       retry: vi.fn(async () => undefined),
@@ -134,12 +135,19 @@ describe("StarterPackHomeCard", () => {
     expect(fake.matcher.retry).toHaveBeenCalled();
   });
 
-  it("shows the unlicensed copy on a lower plan", async () => {
-    fake.flow.licensed.value = false;
+  it("shows the counts, the matched streams and Install N items without a Library link", async () => {
     const wrapper = await render();
-    expect(wrapper.get('[data-test="home-pack-card-unlicensed"]').text()).toContain(
-      "a Kubernetes dashboard",
+    expect(wrapper.get('[data-test="home-pack-card-counts"]').text()).toContain(
+      "1 dashboard2 alerts1 saved search",
     );
+    expect(wrapper.get('[data-test="home-pack-card-sub"]').text()).toContain(
+      "Matched to 1 stream you are already sending.",
+    );
+    expect(wrapper.get('[data-test="home-pack-card-setup-btn"]').text()).toBe("Install 4 items");
+    expect(has(wrapper, "home-pack-card-library-link")).toBe(false);
+    await wrapper.get('[data-test="home-pack-card-setup-btn"]').trigger("click");
+    await flushPromises();
+    expect(fake.flow.land).toHaveBeenCalledWith();
   });
 
   it("swaps to the reminder after setup and links Turn on alerts", async () => {

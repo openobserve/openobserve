@@ -90,10 +90,10 @@ describe("useStarterPackFlow", () => {
     const flow = setup();
     expect(await flow.install()).toBe(true);
     expect(fake.installPack.mock.calls[0][1].exclude).toEqual(["no", "gone", "plan"]);
-    await flow.land("staging");
+    await flow.land();
     expect(fake.push).toHaveBeenCalledWith({
-      name: "infraKubernetes",
-      query: { org_identifier: "org", cluster: "staging" },
+      name: "viewDashboard",
+      query: { org_identifier: "org", dashboard: "d1", folder: "fd", pack: "kubernetes" },
     });
   });
 
@@ -112,7 +112,7 @@ describe("useStarterPackFlow", () => {
     fake.installPack.mockResolvedValue(record());
     const flow = setup({ zoConfig: { features: { kubernetes_monitoring: "locked" } } });
     await flow.install();
-    await flow.land("staging");
+    await flow.land();
     expect(fake.push).toHaveBeenCalledWith({
       name: "viewDashboard",
       query: { org_identifier: "org", dashboard: "d1", folder: "fd", pack: "kubernetes" },

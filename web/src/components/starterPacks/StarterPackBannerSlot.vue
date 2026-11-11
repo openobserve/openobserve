@@ -16,22 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
-import { packNote, packScope } from "@/composables/starterPacks/packCopy";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
+import StarterPackInstallCard from "./StarterPackInstallCard.vue";
 
 const props = defineProps<{ org: string; clusterName?: string }>();
 const emit = defineEmits<{ offered: [offered: boolean] }>();
 
 const { t } = useI18nTyped();
-const router = useRouter();
 const flow = useStarterPackFlow(props.org, KUBERNETES_PACK);
 const matcher = useStarterPackMatcher(props.org, { poll: true });
 const drawerOpen = ref(false);
@@ -48,15 +46,6 @@ const clusters = computed(() => {
   const typed = props.clusterName ? [props.clusterName] : [];
   return [...new Set([...typed, ...matcher.clusters.value])];
 });
-const landingCluster = computed(() => props.clusterName ?? matcher.clusters.value[0]);
-const scope = computed(() => packScope(t, clusters.value));
-const note = computed(() =>
-  packNote(t, {
-    licensed: flow.licensed.value,
-    alerts: flow.alertCount.value,
-    views: flow.viewCount.value,
-  }),
-);
 const offering = computed(
   () =>
     flow.loaded.value &&
@@ -79,27 +68,16 @@ const startSetup = async () => {
   drawerOpen.value = true;
   if (await flow.install()) {
     drawerOpen.value = false;
-    await flow.land(landingCluster.value);
+    await flow.land();
   }
 };
-const library = () =>
-  router.push({ name: "alertLibrary", query: { org_identifier: props.org } }).catch(() => {});
 const copyLink = () => copyToClipboard(window.location.href, t);
 </script>
 
 <template>
   <Teleport defer to="#first-event-pack-actions">
     <OButton
-      v-if="matcher.state.value === 'none'"
-      variant="ghost-primary"
-      size="sm-action"
-      data-test="first-event-status-pack-library-link"
-      @click="library"
-    >
-      {{ t("starterPacks.library") }}
-    </OButton>
-    <OButton
-      v-else-if="matcher.state.value === 'error'"
+      v-if="matcher.state.value === 'error'"
       variant="ghost"
       size="sm-action"
       data-test="first-event-status-pack-retry-btn"
@@ -140,49 +118,25 @@ const copyLink = () => copyToClipboard(window.location.href, t);
         {{ t("starterPacks.progress.finish") }}
       </OButton>
     </template>
-    <template v-else-if="offering">
-      <OButton
-        variant="ghost"
-        size="sm-action"
-        data-test="first-event-status-pack-details-btn"
-        @click="drawerOpen = true"
-      >
-        {{ t("starterPacks.details") }}
-      </OButton>
-      <OButton
-        class="w-68"
-        variant="primary"
-        size="sm-action"
-        :data-test="
-          matcher.waitedLong.value
-            ? 'first-event-status-pack-partial-btn'
-            : 'first-event-status-pack-setup-btn'
-        "
-        @click="startSetup"
-      >
-        {{ matcher.waitedLong.value ? t("starterPacks.partial") : t("starterPacks.setUp") }}
-      </OButton>
-    </template>
   </Teleport>
-  <div
-    v-if="offering"
-    class="flex flex-col gap-1"
-    :data-test="flow.licensed.value ? undefined : 'first-event-status-pack-unlicensed'"
-  >
-    <OText variant="meta">{{ note }}</OText>
-    <OText
-      v-if="flow.preview.value?.offline"
-      variant="meta"
-      data-test="first-event-status-pack-offline"
-      >{{ t("starterPacks.offline") }}</OText
-    >
-    <OText variant="meta" data-test="first-event-status-pack-scope">{{ scope }}</OText>
-  </div>
+  <StarterPackInstallCard
+    v-if="offering && !pending && !flow.interrupted.value && !flow.forbidden.value"
+    :flow="flow"
+    :stream-count="matcher.streams.value.length"
+    test-id="first-event-status-pack-card"
+    :primary-label="matcher.waitedLong.value ? t('starterPacks.partial') : undefined"
+    :primary-test-id="
+      matcher.waitedLong.value
+        ? 'first-event-status-pack-partial-btn'
+        : 'first-event-status-pack-setup-btn'
+    "
+    @install="startSetup"
+    @details="drawerOpen = true"
+  />
   <StarterPackDrawer
     v-model:open="drawerOpen"
     :flow="flow"
     :clusters="clusters"
-    :cluster="landingCluster"
     @copy-link="copyLink"
   />
 </template>

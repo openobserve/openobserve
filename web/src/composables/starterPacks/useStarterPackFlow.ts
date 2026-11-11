@@ -156,14 +156,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     () => record.value?.items.find(isOpenable) ?? preview.value?.items.find(isOpenable),
   );
 
-  /** The built-in view when the plan has it, otherwise the pack's own dashboard. */
-  const land = async (cluster?: string) => {
+  /** The pack's first dashboard, so the user sees the installed data at once. */
+  const land = async () => {
     const query: Record<string, string> = { org_identifier: org };
-    if (licensed.value) {
-      if (cluster) query.cluster = cluster;
-      await router.push({ name: "infraKubernetes", query }).catch(() => {});
-      return;
-    }
     const item = dashboardItem.value;
     if (!item?.id) {
       await router.push({ name: "dashboards", query }).catch(() => {});

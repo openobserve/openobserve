@@ -19,8 +19,9 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
 import { packScope } from "@/composables/starterPacks/packCopy";
 import { usePackDismissal } from "@/composables/starterPacks/packDismissal";
@@ -52,10 +53,11 @@ watch(flow.record, (record, previous) => {
 const off = computed(() => flow.alertsOff.value);
 const failedCount = computed(() => flow.failed.value.length);
 const hoursLeft = computed(() => Math.floor(flow.undoLeftUs.value / HOUR_US));
-const undoLabel = computed(() =>
+const madeCount = computed(() => flow.made.value.length);
+const availableLabel = computed(() =>
   hoursLeft.value > 0
-    ? t("starterPacks.landing.undoLeft", { hours: hoursLeft.value })
-    : t("starterPacks.landing.undoLeftSoon"),
+    ? t("starterPacks.landing.available", { hours: hoursLeft.value })
+    : t("starterPacks.landing.availableSoon"),
 );
 const visible = computed(() => {
   if (!flow.record.value || dismissed.value) return false;
@@ -64,16 +66,11 @@ const visible = computed(() => {
 const readOnly = computed(() => !flow.canManage.value);
 const message = computed(() => {
   if (readOnly.value) return t("starterPacks.landing.readOnly", { count: off.value }, off.value);
-  if (failedCount.value > 0) {
-    return t(
-      "starterPacks.landing.partial",
-      { count: off.value, failed: failedCount.value },
-      off.value,
-    );
-  }
-  return off.value > 0
-    ? t("starterPacks.landing.set", { count: off.value }, off.value)
-    : t("starterPacks.landing.setAllOn");
+  return t(
+    "starterPacks.landing.installedBar",
+    { pack: t(KUBERNETES_PACK.titleKey), count: madeCount.value },
+    madeCount.value,
+  );
 });
 const resultText = computed(() => {
   const result = flow.removal.value;
@@ -112,47 +109,64 @@ const openAlerts = () => router.push(flow.alertsRoute.value).catch(() => {});
   </OBanner>
   <OBanner
     v-else-if="visible"
-    :variant="failedCount > 0 ? 'warning' : 'info'"
+    :variant="failedCount > 0 ? 'warning' : 'success'"
     dense
     inline-actions
     :data-test="readOnly ? 'kubernetes-pack-undo-row-readonly' : 'kubernetes-pack-undo-row'"
   >
-    <span>{{ message }}</span>
+    <span data-test="kubernetes-pack-installed-message">{{ message }}</span>
+    <template v-if="failedCount > 0">
+      <span data-test="kubernetes-pack-attention"
+        >{{ raw(" · ")
+        }}{{ t("starterPacks.landing.attention", { count: failedCount }, failedCount) }}</span
+      >
+      <OButton
+        variant="ghost-primary"
+        size="sm-action"
+        data-test="kubernetes-pack-see-which-btn"
+        @click="drawerOpen = true"
+      >
+        {{ t("starterPacks.landing.seeWhich") }}
+      </OButton>
+    </template>
     <template #actions>
       <div class="flex items-center gap-2">
         <OButton
-          v-if="flow.canUndo.value"
-          variant="ghost-destructive"
+          v-if="off > 0 && !readOnly"
+          variant="outline"
           size="sm-action"
-          data-test="kubernetes-pack-undo-btn"
-          @click="undoOpen = true"
+          data-test="kubernetes-pack-turn-on-btn"
+          @click="openAlerts"
         >
-          {{ undoLabel }}
+          {{ t("starterPacks.home.turnOn") }}
         </OButton>
         <OButton
           variant="ghost"
-          size="sm-action"
-          data-test="kubernetes-pack-not-now-btn"
-          @click="dismiss"
-        >
-          {{ t("starterPacks.home.notNow") }}
-        </OButton>
-        <OButton
-          variant="outline"
           size="sm-action"
           data-test="kubernetes-pack-view-btn"
           @click="drawerOpen = true"
         >
           {{ t("starterPacks.home.viewPack") }}
         </OButton>
+        <template v-if="flow.canUndo.value">
+          <OButton
+            variant="ghost-destructive"
+            size="sm-action"
+            data-test="kubernetes-pack-undo-btn"
+            @click="undoOpen = true"
+          >
+            {{ t("starterPacks.installDialog.undoAll", { count: madeCount }) }}
+          </OButton>
+          <OText variant="meta" data-test="kubernetes-pack-undo-left">{{ availableLabel }}</OText>
+        </template>
         <OButton
-          v-if="off > 0 && !readOnly"
-          variant="primary"
-          size="sm-action"
-          data-test="kubernetes-pack-turn-on-btn"
-          @click="openAlerts"
+          variant="ghost"
+          size="icon-sm"
+          :aria-label="t('starterPacks.card.close')"
+          data-test="kubernetes-pack-not-now-btn"
+          @click="dismiss"
         >
-          {{ t("starterPacks.home.turnOn") }}
+          <OIcon name="close" size="sm" />
         </OButton>
       </div>
     </template>

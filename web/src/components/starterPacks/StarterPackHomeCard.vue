@@ -19,18 +19,17 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
-import { packNote, packScope } from "@/composables/starterPacks/packCopy";
 import { usePackDismissal, usePackHiddenForOrg } from "@/composables/starterPacks/packDismissal";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
+import StarterPackInstallCard from "./StarterPackInstallCard.vue";
 
 const props = defineProps<{ org: string }>();
 
@@ -74,14 +73,6 @@ watch(matcher.state, (state) => {
 });
 
 const canHideForAll = computed(() => flow.isAdmin.value && orgHide.sharedOrg.value);
-const scope = computed(() => packScope(t, matcher.clusters.value));
-const note = computed(() =>
-  packNote(t, {
-    licensed: flow.licensed.value,
-    alerts: flow.alertCount.value,
-    views: flow.viewCount.value,
-  }),
-);
 type CardView =
   | "hidden"
   | "hiddenAdmin"
@@ -108,7 +99,7 @@ const startSetup = async () => {
   drawerOpen.value = true;
   if (await flow.install()) {
     drawerOpen.value = false;
-    await flow.land(matcher.clusters.value[0]);
+    await flow.land();
   }
 };
 const retryCheck = () => Promise.all([flow.load(), matcher.retry()]);
@@ -270,48 +261,18 @@ const copyLink = () => copyToClipboard(window.location.href, t);
       </template>
     </OBanner>
 
-    <div
+    <StarterPackInstallCard
       v-else-if="view === 'offer'"
-      class="border-border-default rounded-default flex flex-col gap-2 border p-3 text-sm"
-      data-test="home-pack-card"
+      :flow="flow"
+      :stream-count="matcher.streams.value.length"
+      test-id="home-pack-card"
+      dismissible
+      @install="startSetup"
+      @details="drawerOpen = true"
+      @dismiss="dismiss"
     >
-      <div class="flex items-center gap-2">
-        <OIcon name="hub" size="md" />
-        <strong class="text-base">{{ t("starterPacks.home.title") }}</strong>
-      </div>
-      <p :data-test="flow.licensed.value ? undefined : 'home-pack-card-unlicensed'">{{ note }}</p>
-      <OText v-if="flow.preview.value?.offline" variant="meta" data-test="home-pack-card-offline">{{
-        t("starterPacks.offline")
-      }}</OText>
-      <OText variant="meta" data-test="home-pack-card-scope">{{ scope }}</OText>
-      <div class="flex flex-wrap items-center gap-2">
+      <template v-if="canHideForAll" #actions>
         <OButton
-          variant="primary"
-          size="sm-action"
-          data-test="home-pack-card-setup-btn"
-          @click="startSetup"
-        >
-          {{ t("starterPacks.setUp") }}
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          data-test="home-pack-card-details-btn"
-          @click="drawerOpen = true"
-        >
-          {{ t("starterPacks.details") }}
-        </OButton>
-        <span class="flex-1" />
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          data-test="home-pack-card-dismiss-btn"
-          @click="dismiss"
-        >
-          {{ canHideForAll ? t("starterPacks.home.hideForMe") : t("starterPacks.home.notNow") }}
-        </OButton>
-        <OButton
-          v-if="canHideForAll"
           variant="ghost"
           size="sm-action"
           data-test="home-pack-card-hide-all-btn"
@@ -319,16 +280,8 @@ const copyLink = () => copyToClipboard(window.location.href, t);
         >
           {{ t("starterPacks.home.hideForEveryone") }}
         </OButton>
-        <OButton
-          variant="ghost-primary"
-          size="sm-action"
-          data-test="home-pack-card-library-link"
-          @click="library"
-        >
-          {{ t("starterPacks.library") }}
-        </OButton>
-      </div>
-    </div>
+      </template>
+    </StarterPackInstallCard>
 
     <OBanner v-else variant="default" dense inline-actions>
       {{ t("starterPacks.home.empty") }}
@@ -348,7 +301,6 @@ const copyLink = () => copyToClipboard(window.location.href, t);
       v-model:open="drawerOpen"
       :flow="flow"
       :clusters="matcher.clusters.value"
-      :cluster="matcher.clusters.value[0]"
       @copy-link="copyLink"
     />
   </div>

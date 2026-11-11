@@ -15025,6 +15025,43 @@
     "scopeSeen": "All clusters · {count} seen so far: {clusters}",
     "noPermission": "You can't create alerts in this org",
     "askAdmin": "Ask an admin to set this up",
+    "card": {
+      "dashboards": "{count} dashboard | {count} dashboards",
+      "savedSearches": "{count} saved search | {count} saved searches",
+      "matched": "Matched to {count} stream you are already sending. | Matched to {count} streams you are already sending.",
+      "removable": "Removable in one click for 24 hours.",
+      "install": "Install {count} item | Install {count} items",
+      "seeIncluded": "See what's included",
+      "close": "Close"
+    },
+    "manifest": {
+      "title": "{pack} pack · what gets created",
+      "subtitle": "{count} item, in a new folder called \"{folder}\" | {count} items, in a new folder called \"{folder}\"",
+      "dashboards": "{count} dashboard | {count} dashboards",
+      "alerts": "{count} alert · off until you turn them on | {count} alerts · off until you turn them on",
+      "savedSearches": "{count} saved search | {count} saved searches",
+      "leftOut": "{count} item left out | {count} items left out",
+      "savedSearch": "saved search",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "Needs data",
+      "tagHaveIt": "You have it",
+      "tagUnavailable": "Unavailable",
+      "adapted": "Adapted to your data",
+      "footerNote": "Removable in one click for 24 hours. No existing dashboard or alert is changed."
+    },
+    "installDialog": {
+      "title": "{made} of {total} items created",
+      "attention": "{title} · {count} needs your attention | {title} · {count} need your attention",
+      "couldNot": "Could not create · {count}",
+      "created": "Created · {count}",
+      "open": "Open {name}",
+      "manage": "Manage pack",
+      "failedReason": "Couldn't be created. Retry to try again.",
+      "undoAll": "Undo — remove all {count}",
+      "typeDashboard": "dashboard",
+      "typeAlert": "alert",
+      "typeSavedView": "saved search"
+    },
     "home": {
       "title": "Your Kubernetes data is ready to monitor",
       "notNow": "Not now",
@@ -15106,7 +15143,12 @@
       "remove": "Remove pack",
       "undone": "Removed {removed} item. {kept} you changed stayed. | Removed {removed} items. {kept} you changed stayed.",
       "undoneAll": "Removed {removed} item. | Removed {removed} items.",
-      "undoFailed": "Couldn't remove {count} item | Couldn't remove {count} items"
+      "undoFailed": "Couldn't remove {count} item | Couldn't remove {count} items",
+      "installedBar": "{pack} pack installed · {count} item | {pack} pack installed · {count} items",
+      "attention": "{count} item needs your attention | {count} items need your attention",
+      "seeWhich": "See which",
+      "available": "available for {hours} h",
+      "availableSoon": "available for under 1 h"
     },
     "undo": {
       "title": "Undo setup?",
