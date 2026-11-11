@@ -137,6 +137,10 @@ watch(
   { immediate: true },
 );
 const showWizard = computed(() => !isCloud.value && wizardActive.value);
+// Only the workspace page shows insights; unmounting the wizard or confirmation would reset them.
+const pageSettling = computed(
+  () => insightsSettling.value && !confirmation.value && !showWizard.value,
+);
 // Pinned by id so the wizard keeps its installation after it stops being pending.
 const wizardInstallation = computed(
   () => ordered.value.find((i) => i.id === wizardInstallationId.value) ?? null,
@@ -176,10 +180,7 @@ const openDialog = (mode: DialogMode): void => {
   <div ref="page" class="flex flex-col gap-6 pb-6" data-test="slack-settings">
     <!-- Keyed by org: every step, ticket and popup below belongs to the org it started in. -->
     <div v-if="slackState.enabled" :key="org" class="flex flex-col gap-6">
-      <div
-        v-if="installations.isPending.value || insightsSettling"
-        class="flex justify-center py-16"
-      >
+      <div v-if="installations.isPending.value || pageSettling" class="flex justify-center py-16">
         <OSpinner size="md" />
       </div>
       <OEmptyState

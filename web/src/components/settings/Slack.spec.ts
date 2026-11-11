@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ref } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import config from "@/aws-exports";
@@ -229,6 +230,38 @@ describe("Slack settings: enabled", () => {
     wizard.vm.$emit("done");
     await flushPromises();
     expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(true);
+  });
+
+  it("keeps the wizard and its steps while the settings for its new install load", async () => {
+    let mounts = 0;
+    const wizard = {
+      name: "SlackSelfHostedWizard",
+      props: ["installation"],
+      setup: () => ({ step: ref(1) }),
+      mounted: () => mounts++,
+      template: '<div data-test-stub="SlackSelfHostedWizard" :data-step="step" />',
+    };
+    vi.mocked(slack.getInsightsSettings).mockReturnValue(new Promise(() => {}) as any);
+    const w = mount(Slack, {
+      global: {
+        plugins: [i18n, makeSlackStore({ slack_enabled: true })],
+        stubs: { ...STUBS, SlackSelfHostedWizard: wizard },
+      },
+    });
+    await flushPromises();
+    w.findComponent({ name: "SlackConnectEmpty" }).vm.$emit("setup");
+    await flushPromises();
+    (w.findComponent({ name: "SlackSelfHostedWizard" }).vm as any).step = 3;
+    const pending = installationView({ status: "pending" });
+    vi.mocked(slack.listInstallations).mockReturnValue(ok({ installations: [pending] }) as any);
+    await queryClient.refetchQueries({ queryKey: slackInstallationsQuery("acme").queryKey });
+    await flushPromises();
+    expect(slack.getInsightsSettings).toHaveBeenCalledWith("acme");
+    const shown = w.findComponent({ name: "SlackSelfHostedWizard" });
+    expect(shown.exists()).toBe(true);
+    expect(shown.props("installation")).toEqual(pending);
+    expect(shown.attributes("data-step")).toBe("3");
+    expect(mounts).toBe(1);
   });
 
   it("A3: a connected workspace shows the card, linking and channel defaults", async () => {
