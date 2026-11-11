@@ -56,12 +56,7 @@ export class LlmProvidersPage {
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
-    /**
-     * Navigate directly to AI Observability > LLM Providers and wait for the page mount.
-     * Enterprise/cloud-only: on the OSS binary the route does not exist, so the
-     * mount signal never appears and this returns false for a clean SKIP.
-     * @returns {Promise<boolean>}
-     */
+    /** Opens LLM Providers; returns false on OSS, where the route does not exist. */
     async navigateToLlmProviders() {
         const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const org = process.env.ORGNAME || 'default';

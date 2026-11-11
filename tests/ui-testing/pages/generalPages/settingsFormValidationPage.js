@@ -357,13 +357,7 @@ export class SettingsFormValidationPage {
 
     // ── ModelPricingEditor helpers ────────────────────────────────────────────
 
-    /**
-     * Open the Model Pricing editor at /web/ai/model-pricing.
-     * LLM Model Pricing is an ENTERPRISE/CLOUD-only feature — the route only
-     * mounts on the enterprise (or cloud) build. Probe positively for the
-     * add button and return a boolean so callers can gate the suite to a
-     * clean SKIP on the OSS binary (mirrors navigateToDomainManagement).
-     */
+    /** Enterprise/cloud-only route; returns a boolean so OSS runs can skip cleanly. */
     async navigateToModelPricing() {
         const org = process.env.ORGNAME || 'default';
         const base = process.env.ZO_BASE_URL || 'http://localhost:5080';

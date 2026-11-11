@@ -1,8 +1,4 @@
-// modelPricingPage.js — Page object for Settings > Model Pricing
-// Feature: Enterprise/Cloud only — the route isn't registered on the OSS build (see useManagementRoutes.ts).
-// Routes:
-//   List:   /web/ai/model-pricing?org_identifier={org}
-//   Editor: /web/ai/model-pricing/edit?org_identifier={org}&id={id}
+// Enterprise/Cloud only: the route isn't registered on the OSS build.
 
 import { expect } from '@playwright/test';
 import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
