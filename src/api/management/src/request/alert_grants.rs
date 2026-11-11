@@ -331,6 +331,13 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn a_folder_lookup_reads_every_folder_not_only_the_readers_listable_ones() {
+        // Visibility filters after this lookup, so a reader-scoped list would lose alerts.
+        let params = folder_params("o", &["a1".to_string()]);
+        assert_eq!(params.listable_folder_ids, None);
+    }
+
+    #[test]
     fn grants_match_the_per_alert_checks_paths() {
         let grants = AlertGrants::from_objects(
             "o",
