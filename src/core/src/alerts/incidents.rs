@@ -2311,6 +2311,9 @@ async fn find_or_create_incident(
                 retitle_growing_case(org_id, &incident, entity).await;
             }
 
+            // Without the recorded firing the reopen stays unconsumed, so only a recorded
+            // firing may send for it, or every later firing would send again.
+            let mut after_reopen = after_reopen;
             if let Err(e) = infra::table::incident_events::record_alert(
                 org_id,
                 &incident.id,
@@ -2320,6 +2323,7 @@ async fn find_or_create_incident(
             )
             .await
             {
+                after_reopen = false;
                 log::error!(
                     "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
                     incident.id
@@ -2429,6 +2433,9 @@ async fn find_or_create_incident(
             )
             .await?;
 
+            // Without the recorded firing the reopen stays unconsumed, so only a recorded
+            // firing may send for it, or every later firing would send again.
+            let mut after_reopen = after_reopen;
             if let Err(e) = infra::table::incident_events::record_alert(
                 org_id,
                 &existing.id,
@@ -2438,6 +2445,7 @@ async fn find_or_create_incident(
             )
             .await
             {
+                after_reopen = false;
                 log::error!(
                     "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
                     existing.id

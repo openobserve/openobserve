@@ -5248,8 +5248,6 @@ mod send_path_tests {
     use config::meta::destinations::{Endpoint, HTTPType, Template, TemplateKind};
 
     #[cfg(feature = "enterprise")]
-    use super::incident_path_notified;
-    #[cfg(feature = "enterprise")]
     use super::is_license_denial;
     use super::{
         Alert, AlertError, AlertExt, NotificationOutcome, WORKFLOWS_UNLICENSED_REASON,
@@ -5257,6 +5255,8 @@ mod send_path_tests {
         send_attempted, send_discord_with_attachment, send_error_message, send_failure_message,
         send_http_notification, workflows_denial_as_warning,
     };
+    #[cfg(feature = "enterprise")]
+    use super::{incident_path_notified, incident_path_paged};
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
         ssrf_test_support::{hanging_server, isolated, secret_server, truncated_server},
