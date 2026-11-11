@@ -1025,7 +1025,8 @@ const loadUserStreams = async (force = false) => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false) => {
   sectionFailure.anomalies = null;
-  if (anomalyLocked.value) {
+  // the OSS build does not register the anomaly routes, and their 401 would end the session
+  if (!anomalyEnabled.value) {
     anomalies.value = [];
     anomalyConfigCount.value = null;
     return;
@@ -1491,5 +1492,11 @@ watch(
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available
 watch(isIncidentsEnabled, (enabled) => {
   if (enabled && incidents.value.length === 0) loadIncidents();
+});
+// a failed config fetch is retried after mount, so the flag can turn on once the first pass has skipped the section
+watch(anomalyEnabled, (enabled) => {
+  if (!enabled) return;
+  sectionState.anomalies.loaded = false;
+  void runSection("anomalies", () => loadAnomalies());
 });
 </script>
