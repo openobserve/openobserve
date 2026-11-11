@@ -170,9 +170,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ compactLine(row) }}
             </span>
-            <!-- One line on a wide screen, so a row that resolves to a threshold ask keeps its height. -->
+            <!-- On a wide screen a waiting or threshold row stays one line; Fires when and Usually say why. -->
             <OTruncatedText
-              v-if="(!row.prefill || row.block) && !(measuring(row) && !isMobile)"
+              v-if="
+                (!row.prefill || row.block) && (isMobile || !(waits(row) || asksThreshold(row)))
+              "
               :lines="isMobile ? 2 : 1"
               :class="[
                 'text-xs',
@@ -235,8 +237,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="asksThreshold(row)"
               :model-value="typed[row.key] ?? state.thresholds[row.key] ?? ''"
               type="number"
-              size="sm"
+              size="xs"
               :aria-label="t('insight.threshold.label')"
+              :placeholder="t('insight.threshold.placeholder')"
               :suffix="String(t(`insight.threshold.${thresholdKind(row)}Suffix`))"
               :disabled="locked"
               :error="badThreshold(row.key)"
@@ -245,18 +248,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="(v: string | number) => typeThreshold(row.key, v)"
             />
             <OSkeleton
-              v-else-if="measuring(row)"
+              v-else-if="waits(row)"
               animation="pulse"
               class="h-4 w-36"
               role="status"
-              :aria-label="t('insight.threshold.measuring')"
+              :aria-label="
+                measuring(row) ? t('insight.threshold.measuring') : t('insight.bulk.block.checking')
+              "
               :data-test="`bulk-review-measuring-${row.key}`"
             />
             <template v-else>{{ firesWhenOf(t, kind, row) }}</template>
           </div>
         </template>
         <template #cell-usually="{ row }">
-          <OSkeleton v-if="measuring(row)" animation="pulse" class="h-4 w-20" aria-hidden="true" />
+          <OSkeleton v-if="waits(row)" animation="pulse" class="h-4 w-20" aria-hidden="true" />
+          <span
+            v-else-if="row.block?.code === 'noBaseline'"
+            class="text-text-secondary"
+            :data-test="`bulk-review-no-usual-${row.key}`"
+            >{{ t("insight.threshold.noUsual") }}</span
+          >
           <span v-else class="text-text-body tabular-nums">{{
             usuallyOf(t, locale, row, kind)
           }}</span>
@@ -473,18 +484,25 @@ const compactLine = (row: ReviewRow) =>
 
 const measuring = (row: ReviewRow) => row.block?.code === "measuring";
 
+const waits = (row: ReviewRow) => measuring(row) || row.block?.code === "checking";
+
 const asksThreshold = (row: ReviewRow) =>
   row.block?.code === "noBaseline" || !!state.thresholds[row.key];
 
 const columns = computed<OTableColumnDef<ReviewRow>[]>(() => [
   { id: "tick", header: raw(""), size: 44 },
-  { id: "service", header: t("insight.bulk.column.service"), meta: { autoWidth: true } },
+  // `max-w-0` keeps a long line out of the auto-layout width, so Service takes only the room left.
+  {
+    id: "service",
+    header: t("insight.bulk.column.service"),
+    meta: { autoWidth: true, cellClass: "max-w-0" },
+  },
   ...(isMobile.value
     ? []
     : [
-        { id: "stream", header: t("insight.bulk.column.stream"), size: 130 },
+        { id: "stream", header: t("insight.bulk.column.stream"), size: 120 },
         { id: "firesWhen", header: t("insight.bulk.column.firesWhen"), size: 220 },
-        { id: "usually", header: t("insight.bulk.column.usually"), size: 140 },
+        { id: "usually", header: t("insight.bulk.column.usually"), size: 130 },
       ]),
 ]);
 

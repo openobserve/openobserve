@@ -412,9 +412,7 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     await openWith([{ ...row, key: "errs", kind: "errors", usually: null }]);
     await flushPromises();
     expect(measureBaseline).toHaveBeenCalledTimes(1);
-    expect(text("bulk-review-cant-errs")).toBe(
-      "AutoObserve found no usual error count for svc-ingest-b over the last 7 days. Set a threshold to add this alert.",
-    );
+    expect(text("bulk-review-no-usual-errs")).toBe("None in 7 days");
     expect(createButton().disabled).toBe(true);
     const input = document.querySelector<HTMLInputElement>(
       '[data-test="bulk-review-firesWhen-errs"] [data-test="bulk-review-threshold-errs"] input',
@@ -466,10 +464,26 @@ describe("BulkReviewDrawer — stream fields and org", () => {
       '[data-test="bulk-review-service-errs"]',
     )!.parentElement!;
     expect(service.querySelector('[data-test="bulk-review-threshold-errs"]')).toBeNull();
-    expect(q("bulk-review-cant-errs")!.className).toContain("truncate");
+    expect(q("bulk-review-cant-errs")).toBeNull();
     const field = q("bulk-review-threshold-errs")!;
     expect(field.querySelector("label")).toBeNull();
-    expect(field.querySelector("input")?.getAttribute("aria-label")).toBe("Fire above");
+    const input = field.querySelector("input")!;
+    expect(input.getAttribute("aria-label")).toBe("Fire above");
+    expect(input.getAttribute("placeholder")).toBe("Required");
+    expect(wrapper!.findComponent('[data-test="bulk-review-threshold-errs"]').props("size")).toBe(
+      "xs",
+    );
+    expect(text("bulk-review-no-usual-errs")).toBe("None in 7 days");
+  });
+
+  it("gives Service only the room the sized columns leave, so no line pushes Usually off the drawer (V-N1)", async () => {
+    await mountDrawer();
+    await openWith(fieldRows(IDS).slice(0, 1));
+    const columns = wrapper!.findComponent({ name: "OTable" }).props("columns") as {
+      id: string;
+      meta?: { cellClass?: string };
+    }[];
+    expect(columns.find((c) => c.id === "service")?.meta?.cellClass).toContain("max-w-0");
   });
 
   it("keeps Create off while a ticked row waits for its stream fields", async () => {
@@ -477,7 +491,11 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     api.schema.mockReturnValue(new Promise((resolve) => (answer = resolve)));
     await mountDrawer();
     await openWith(fieldRows(IDS).slice(0, 1));
-    expect(text("bulk-review-cant-read-b")).toBe("Checking the stream's fields…");
+    // The wait sits in the Fires when cell, so the row stays one line while its fields load (T5-N5).
+    expect(q("bulk-review-cant-read-b")).toBeNull();
+    const wait = q("bulk-review-measuring-read-b")!;
+    expect(q("bulk-review-firesWhen-read-b")!.contains(wait)).toBe(true);
+    expect(wait.getAttribute("aria-label")).toBe("Checking the stream's fields…");
     expect(text("bulk-review-rule")).toContain("no rows for 15 min");
     expect(text("bulk-review-footer")).toContain("1 alert will be created in folder ingest.");
     expect(text("bulk-review-create")).toBe("Add alerts");

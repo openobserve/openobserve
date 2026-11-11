@@ -34371,7 +34371,7 @@
       "usually": "{rate} an hour",
       "unsureTail": "Unticked: check before adding.",
       "cantBuild": "AutoObserve can't build this alert from this stream's fields. Add it by hand in Alerts.",
-      "cantBuildIn": "AutoObserve can't build this alert from this stream's fields. Add it by hand in {alerts}.",
+      "cantBuildIn": "AutoObserve can't build this from the stream's fields. Add it by hand in {alerts}.",
       "block": {
         "checking": "Checking the stream's fields…",
         "schemaFailed": "Couldn't read the fields of stream {stream}, so this alert can't be checked. Reopen the review to try again.",
@@ -34792,6 +34792,8 @@
       "errorsReason": "AutoObserve found no usual error count for {service} over the last 7 days. Set a threshold to add this alert.",
       "latencyReason": "AutoObserve found no usual latency for {service} over the last 7 days. Set a threshold to add this alert.",
       "measuring": "Measuring the usual level over the last 7 days…",
+      "noUsual": "None in 7 days",
+      "placeholder": "Required",
       "invalid": "Enter a number above 0."
     }
   }
