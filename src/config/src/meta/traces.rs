@@ -98,6 +98,8 @@ pub const GEN_AI_UDS_KEEP_FIELDS: &[&str] = &[
     "gen_ai_usage_cost_net_cache_impact",
     // product reads outside the provisioned canonical set
     "gen_ai_system",
+    "gen_ai_completion_start_time",
+    "gen_ai_user_id",
     "gen_ai_model_name",
     "gen_ai_tool_call_id",
     "gen_ai_tool_call_arguments",

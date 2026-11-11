@@ -79,19 +79,31 @@ pub fn generate_select_star_schema(
                 || schema.contains_field(ALL_VALUES_COL_NAME));
         if quick_active || skip_original_column {
             let fields = if quick_active {
-                let mut columns = columns.get(&name).cloned();
-                // filter columns by the effective UDS fields present in the schema
-                if !defined_schema_fields.is_empty()
-                    && let Some(columns) = columns.as_mut()
-                {
-                    columns.retain(|column| {
-                        uds_present.contains(column)
-                            || (need_all_column && column == cfg.common.column_all.as_str())
-                    });
-                }
+                let columns = columns.get(&name).cloned();
                 let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+                // truncate the UDS projection in schema order, never the packed full schema
+                let projected = if defined_schema_fields.is_empty() {
+                    None
+                } else {
+                    Some(Schema::new_with_metadata(
+                        schema
+                            .schema()
+                            .fields()
+                            .iter()
+                            .filter(|field| {
+                                uds_present.contains(field.name())
+                                    || field.name() == TIMESTAMP_COL_NAME
+                                    || field.name() == ID_COL_NAME
+                                    || (need_all_column
+                                        && field.name() == cfg.common.column_all.as_str())
+                            })
+                            .cloned()
+                            .collect::<Vec<_>>(),
+                        schema.schema().metadata().clone(),
+                    ))
+                };
                 generate_quick_mode_fields(
-                    schema.schema(),
+                    projected.as_ref().unwrap_or(schema.schema()),
                     columns,
                     &fts_fields,
                     skip_original_column,
@@ -746,11 +758,11 @@ mod tests {
     #[test]
     fn test_quick_mode_width_counts_required_columns() {
         let cutoff = config::get_config().limit.quick_mode_num_fields;
-        let mut fields = vec![Arc::new(Field::new(
-            TIMESTAMP_COL_NAME,
-            DataType::Int64,
-            false,
-        ))];
+        let mut fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            // packed historical column sits early in the schema, inside the truncation window
+            Arc::new(Field::new("packed_col", DataType::Utf8, true)),
+        ];
         let mut defined = Vec::new();
         for i in 0..cutoff {
             let name = format!("user_field_{i}");
@@ -758,7 +770,6 @@ mod tests {
             defined.push(name);
         }
         fields.push(Arc::new(Field::new("trace_id", DataType::Utf8, true)));
-        fields.push(Arc::new(Field::new("packed_col", DataType::Utf8, true)));
         let settings = config::meta::stream::StreamSettings {
             defined_schema_fields: defined,
             ..Default::default()
@@ -796,6 +807,8 @@ mod tests {
         assert!(names.contains("trace_id"));
         // saved + required crosses the cutoff, so quick mode truncates the saved tail
         assert!(!names.contains(&format!("user_field_{}", cutoff - 1)));
+        // truncation runs over the UDS projection, so early packed columns stay hidden
+        assert!(!names.contains("packed_col"));
 
         let mut schemas = HashMap::new();
         schemas.insert(name.clone(), schema);
