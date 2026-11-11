@@ -181,7 +181,7 @@ const absencePrefill = (
   streamType: stream.type,
   streamName: stream.name,
   queryType: "sql",
-  sql: `SELECT count(*) AS rows_seen FROM ${quoteStream(stream.name)} WHERE ${where} HAVING count(*) = 0`,
+  sql: `SELECT count(*) AS row_count FROM ${quoteStream(stream.name)} WHERE ${where} HAVING count(*) = 0`,
   periodMinutes: minutes,
   frequencyMinutes: 5,
   triggerThreshold: 1,

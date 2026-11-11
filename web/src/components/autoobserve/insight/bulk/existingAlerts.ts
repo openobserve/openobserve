@@ -37,24 +37,82 @@ export interface DraftIdentity {
   sql?: string | null;
 }
 
-// A re-measured baseline moves the threshold, so a draft of the same check differs from its alert only there.
-const HAVING_NUMBER = /(having\s.*?(?:>=|<=|<>|!=|=|>|<)\s*)-?\d+(?:\.\d+)?\s*$/;
+type Clause = "select" | "from" | "where" | "group" | "having" | "order" | "limit";
 
-// Odd parts of a split on this are string literals, whose case and spacing are data.
-const LITERAL = /('(?:[^']|'')*')/;
+// String literals, quoted identifiers, words and operators; the whitespace between them carries nothing.
+const TOKEN = /'(?:[^']|'')*'|"(?:[^"]|"")*"|`[^`]*`|[A-Za-z0-9_.$]+|>=|<=|<>|!=|\S/g;
+const PLAIN_NAME = /^[a-z_][a-z0-9_$]*$/;
+const NUMBER = /^-?\d+(?:\.\d+)?$/;
+const CLAUSES = new Set<string>(["select", "from", "where", "group", "having", "order", "limit"]);
 
-const plainSql = (part: string): string =>
-  part.toLowerCase().replace(/["`]/g, "").replace(/\s+/g, " ");
+const canonical = (token: string): string => {
+  if (token.startsWith("'")) return token;
+  if (token.startsWith('"') || token.startsWith("`")) {
+    const name = token.slice(1, -1).replace(/""/g, '"');
+    // A quoted name keeps its case; only an all-lower-case one is the same field as the unquoted spelling.
+    return PLAIN_NAME.test(name) ? name : `"${name.replace(/"/g, '""')}"`;
+  }
+  return token.toLowerCase();
+};
 
-/** The query with keyword case, identifier quoting, spacing and the HAVING threshold value set aside. */
-export const normalizedSql = (sql: string | null | undefined): string =>
-  (sql ?? "")
-    .split(LITERAL)
-    .map((part, i) => (i % 2 ? part : plainSql(part)))
-    .join("")
-    .trim()
-    .replace(/;$/, "")
-    .replace(HAVING_NUMBER, "$1?");
+const tokensOf = (sql: string | null | undefined): string[] =>
+  (String(sql ?? "").match(TOKEN) ?? []).map(canonical).filter((t) => t !== ";");
+
+const clausesOf = (tokens: string[]): Partial<Record<Clause, string[]>> => {
+  const out: Partial<Record<Clause, string[]>> = {};
+  let current: string[] | null = null;
+  let depth = 0;
+  for (const token of tokens) {
+    if (token === "(") depth += 1;
+    if (token === ")") depth -= 1;
+    if (depth === 0 && CLAUSES.has(token)) {
+      current = out[token as Clause] = [];
+    } else if (current && !(token === "by" && current.length === 0)) {
+      current.push(token);
+    }
+  }
+  return out;
+};
+
+const withoutAliases = (select: string[]): string[] => {
+  const out: string[] = [];
+  let depth = 0;
+  for (let i = 0; i < select.length; i += 1) {
+    const token = select[i];
+    if (token === "(") depth += 1;
+    if (token === ")") depth -= 1;
+    if (depth === 0 && token === "as") i += 1;
+    else out.push(token);
+  }
+  return out;
+};
+
+/** What the alert fires on: no rows, a p95 or a count above a threshold, whatever the threshold or aliases. */
+const signalOf = (c: Partial<Record<Clause, string[]>>): string => {
+  const having = (c.having ?? []).join(" ");
+  if ([...(c.select ?? []), ...(c.having ?? [])].some((t) => t.includes("percentile"))) {
+    return "latency";
+  }
+  if (/^count \( \* \) (?:= 0|< 1)$/.test(having)) return "no_data";
+  if (/^count \( \* \) >=? \S+$/.test(having)) return "count_above";
+  const masked = (c.having ?? []).map((t) => (NUMBER.test(t) ? "?" : t));
+  return [...withoutAliases(c.select ?? []), "having", ...masked].join(" ");
+};
+
+/** The check a query runs: its signal, stream and filter, with aliases, spacing and the threshold set aside. */
+export const checkKeyOf = (sql: string | null | undefined): string | null => {
+  const c = clausesOf(tokensOf(sql));
+  if (!c.select || !c.from) return null;
+  return [
+    signalOf(c),
+    "from",
+    ...c.from,
+    "where",
+    ...(c.where ?? []),
+    "group",
+    ...(c.group ?? []),
+  ].join(" ");
+};
 
 const existingOf = (a: any): ExistingAlert => ({
   id: String(a?.alert_id ?? a?.id ?? ""),
@@ -75,20 +133,20 @@ export const loadExistingAlerts = async (org: string): Promise<ExistingAlert[]> 
   return list.map(existingOf).filter((a) => a.id);
 };
 
-/** The org's alert this draft would duplicate: same name in the same folder, or the same stream and query. */
+/** The org's alert this draft would duplicate: same name in the same folder, or the same check on the same stream. */
 export const findExisting = (
   alerts: readonly ExistingAlert[],
   draft: DraftIdentity,
 ): ExistingAlert | null => {
-  const sql = normalizedSql(draft.sql);
+  const check = checkKeyOf(draft.sql);
   return (
     alerts.find((a) => a.name === draft.name && a.folderId === draft.folderId) ??
-    (sql
+    (check
       ? (alerts.find(
           (a) =>
             a.streamType === draft.streamType &&
             a.streamName === draft.streamName &&
-            normalizedSql(a.sql) === sql,
+            checkKeyOf(a.sql) === check,
         ) ?? null)
       : null)
   );

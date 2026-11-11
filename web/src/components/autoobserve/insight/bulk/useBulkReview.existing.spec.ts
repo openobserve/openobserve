@@ -31,7 +31,7 @@ vi.mock("../targets/baseline", () => ({ measureBaseline: vi.fn(async () => null)
 
 const { closeBulkReview, isTickable, loadReviewContext, openBulkReview, useBulkReview } =
   await import("./useBulkReview");
-const { findExisting, normalizedSql } = await import("./existingAlerts");
+const { findExisting, checkKeyOf } = await import("./existingAlerts");
 
 const original = config.isEnterprise;
 const review = useBulkReview();
@@ -176,7 +176,7 @@ describe("findExisting", () => {
         sql: alert.sql.replace("svc-b", "svc-c"),
       }),
     ).toBeNull();
-    expect(normalizedSql(alert.sql)).toContain("having count(*) > ?");
+    expect(checkKeyOf(alert.sql)).toMatch(/^count_above /);
   });
 });
 
