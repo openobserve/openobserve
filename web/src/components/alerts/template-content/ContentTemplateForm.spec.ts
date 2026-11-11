@@ -258,6 +258,17 @@ describe("ContentTemplateForm", () => {
     );
   });
 
+  it("offers {recovery_reason} beside {episode_id} once the full variable list is shown", async () => {
+    const w = await mountForm();
+    await w.find('[data-test="content-template-form-variable-chips-more-btn"]').trigger("click");
+    expect(
+      w.find('[data-test="content-template-form-variable-chip-episode_id-btn"]').exists(),
+    ).toBe(true);
+    expect(
+      w.find('[data-test="content-template-form-variable-chip-recovery_reason-btn"]').exists(),
+    ).toBe(true);
+  });
+
   describe("toolbar actions", () => {
     // applyToolbarAction reads bodyEditorRef.value.editorObj — the plain-div
     // stub used above has no editorObj, so it only ever exercises the

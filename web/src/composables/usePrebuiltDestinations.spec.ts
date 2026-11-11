@@ -1217,6 +1217,7 @@ describe("usePrebuiltDestinations", () => {
       "org_name",
       "alert_type",
       "episode_id",
+      "recovery_reason",
       "alert_period",
       "alert_agg_value",
       "alert_description",
@@ -1242,6 +1243,8 @@ describe("usePrebuiltDestinations", () => {
       });
       for (const key of NEW_VARIABLES) expect(parsed[key]).not.toBe(`{${key}}`);
       expect(parsed.org_name).toBe("test-org");
+      // The sample is a firing, and the server leaves recovery_reason empty on a firing.
+      expect(parsed.recovery_reason).toBe("");
       // Same shape the server sends: %Y-%m-%dT%H:%M:%S.
       expect(parsed.alert_start_time).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
       expect(parsed.alert_end_time).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);

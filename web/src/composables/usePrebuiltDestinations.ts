@@ -358,6 +358,7 @@ export function usePrebuiltDestinations() {
       org_name: orgId,
       alert_type: "scheduled",
       episode_id: "sample-episode-id",
+      recovery_reason: "",
       alert_period: "10",
       alert_agg_value: "92.5",
       alert_description: "Sample alert sent to test this destination",

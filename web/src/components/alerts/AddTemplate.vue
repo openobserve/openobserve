@@ -317,6 +317,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <b>{{ raw("episode_id") }}</b>
                 {{ t("alert_templates.variableEpisodeIdDescription") }}
               </div>
+              <div data-test="add-template-variable-recovery-reason">
+                <b>{{ raw("recovery_reason") }}</b>
+                {{ t("alert_templates.variableRecoveryReasonDescription") }}
+              </div>
               <div data-test="add-template-variable-rows">
                 <b>{{ raw("rows") }}</b> {{ t("alert_templates.variableRowsDescription") }}
               </div>
