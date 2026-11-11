@@ -44,6 +44,8 @@ use config::{
 /// alert nobody can identify belongs in the unrouted queue, not on the pager of
 /// whichever team happens to own this string.
 const UNKNOWN_SERVICE: &str = "unknown";
+/// The `incident_event` of the first notification after a manual reopen.
+const FIRED_AFTER_REOPEN_EVENT: &str = "alert_fired_after_reopen";
 /// Window behind the alert in which a service-graph edge counts as a dependency.
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 /// How many of an alert's latest firings a Firing run after a window looks through for open pages.
@@ -739,6 +741,7 @@ pub fn rca_agent_available() -> bool {
 ///   alerts.
 /// - `NewAlertTypeJoined` → same as above (new alert type joining is an escalation signal).
 /// - `ExistingAlertRepeated` → notification suppressed (same alert type already in incident).
+/// - `FiredAfterReopen` → sends once: the first repeat after a manual reopen.
 /// - A failed send is returned in `CorrelatedIncident::notify_error` for the caller to record.
 ///
 /// When `notify_rows` is empty the function still correlates but sends no notification.
@@ -1169,10 +1172,12 @@ async fn correlate_rows(
         match &outcome {
             IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
             | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. }
-            | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. } => {
+            | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. }
+            | IncidentCorrelationOutcome::FiredAfterReopen { incident_id, .. } => {
                 let event = match &outcome {
                     IncidentCorrelationOutcome::NewIncidentCreated { .. } => "new_incident_created",
                     IncidentCorrelationOutcome::SeverityEscalated { .. } => "severity_escalated",
+                    IncidentCorrelationOutcome::FiredAfterReopen { .. } => FIRED_AFTER_REOPEN_EVENT,
                     _ => "new_alert_correlated",
                 };
                 let merged_destinations =
@@ -1331,10 +1336,12 @@ pub async fn correlate_external_event(
     match &outcome {
         IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
         | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. }
-        | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. } => {
+        | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. }
+        | IncidentCorrelationOutcome::FiredAfterReopen { incident_id, .. } => {
             let event = match &outcome {
                 IncidentCorrelationOutcome::NewIncidentCreated { .. } => "new_incident_created",
                 IncidentCorrelationOutcome::SeverityEscalated { .. } => "severity_escalated",
+                IncidentCorrelationOutcome::FiredAfterReopen { .. } => FIRED_AFTER_REOPEN_EVENT,
                 _ => "new_alert_correlated",
             };
             let merged_destinations =
@@ -2227,6 +2234,16 @@ async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
     Ok(None)
 }
 
+/// A muted firing never sends, and an acknowledged incident already has a person on it.
+fn reopen_can_send(
+    incident: &infra::table::entity::alert_incidents::Model,
+    muted_by: Option<&str>,
+) -> bool {
+    muted_by.is_none()
+        && incident.muted_by_downtime_id.is_none()
+        && incident.status != "acknowledged"
+}
+
 /// Find an existing open incident or create a new one
 #[allow(clippy::too_many_arguments)]
 async fn find_or_create_incident(
@@ -2271,7 +2288,8 @@ async fn find_or_create_incident(
                 retitle_growing_case(org_id, &incident, entity).await;
             }
 
-            if let Err(e) = infra::table::incident_events::record_alert(
+            // The write decides under its row lock, so two firings cannot both take the reopen.
+            let after_reopen = match infra::table::incident_events::record_alert(
                 org_id,
                 &incident.id,
                 &alert_id,
@@ -2280,11 +2298,15 @@ async fn find_or_create_incident(
             )
             .await
             {
-                log::error!(
-                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
-                    incident.id
-                );
-            }
+                Ok(waited) => waited && reopen_can_send(&incident, muted_by),
+                Err(e) => {
+                    log::error!(
+                        "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
+                        incident.id
+                    );
+                    false
+                }
+            };
 
             if muted_by.is_none()
                 && !reopened
@@ -2342,12 +2364,11 @@ async fn find_or_create_incident(
                     },
                 ));
             }
-            return Ok(Correlation::existing(
-                IncidentCorrelationOutcome::ExistingAlertRepeated {
-                    incident_id: incident.id,
-                    service_name: service_name.to_string(),
-                },
-            ));
+            return Ok(Correlation::existing(IncidentCorrelationOutcome::repeated(
+                incident.id,
+                service_name.to_string(),
+                after_reopen,
+            )));
         }
     }
 
@@ -2388,7 +2409,8 @@ async fn find_or_create_incident(
             )
             .await?;
 
-            if let Err(e) = infra::table::incident_events::record_alert(
+            // The write decides under its row lock, so two firings cannot both take the reopen.
+            let after_reopen = match infra::table::incident_events::record_alert(
                 org_id,
                 &existing.id,
                 &subject.id,
@@ -2397,11 +2419,15 @@ async fn find_or_create_incident(
             )
             .await
             {
-                log::error!(
-                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
-                    existing.id
-                );
-            }
+                Ok(waited) => waited && reopen_can_send(&existing, muted_by),
+                Err(e) => {
+                    log::error!(
+                        "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
+                        existing.id
+                    );
+                    false
+                }
+            };
 
             if !is_new_alert_type
                 && muted_by.is_none()
@@ -2525,12 +2551,11 @@ async fn find_or_create_incident(
                     },
                 ));
             } else {
-                return Ok(Correlation::existing(
-                    IncidentCorrelationOutcome::ExistingAlertRepeated {
-                        incident_id: existing.id,
-                        service_name: service_name.to_string(),
-                    },
-                ));
+                return Ok(Correlation::existing(IncidentCorrelationOutcome::repeated(
+                    existing.id,
+                    service_name.to_string(),
+                    after_reopen,
+                )));
             }
         }
     }
@@ -3823,7 +3848,7 @@ pub async fn update_status_as(
     use config::meta::alerts::incidents::IncidentEvent;
     let event = match status {
         "resolved" => Some(IncidentEvent::resolved(Some(user_id.to_string()))),
-        "open" => Some(IncidentEvent::reopened(user_id, "Manually reopened")),
+        "open" => Some(IncidentEvent::manually_reopened(user_id)),
         _ => None,
     };
     if let Some(evt) = event.filter(|_| !again)
