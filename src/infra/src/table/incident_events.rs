@@ -368,47 +368,36 @@ fn locked_row(
 /// Scans backwards through the trailing block of consecutive Alert events; if a matching
 /// alert_id is found within that block, its count is incremented. If a non-Alert event is
 /// encountered first (or the list is empty), a new Alert event is appended.
+/// Returns whether a manual reopen waited for this firing, decided under the row lock.
 pub async fn record_alert(
     org_id: &str,
     incident_id: &str,
     alert_id: &str,
     alert_name: &str,
     triggered_at: i64,
-) -> Result<(), sea_orm::DbErr> {
+) -> Result<bool, sea_orm::DbErr> {
     let db = get_orm_client_rw().await;
 
     let txn = db.begin().await?;
 
     let row = locked_row(&txn, org_id, incident_id).one(&txn).await?;
 
-    match row {
+    let waited = match row {
         Some(model) => {
             let mut events = decode_events(org_id, incident_id, &model.events);
-
-            // Scan backwards through the trailing block of Alert events.
-            // If a matching alert_id is found within that block, increment it.
-            // Stop (and append) as soon as a non-Alert event is encountered.
-            let compacted = 'scan: {
-                for event in events.iter_mut().rev() {
-                    if !event.is_alert() {
-                        break 'scan false;
-                    }
-                    if event.is_alert_for(alert_id) {
-                        event.increment_alert(alert_id, triggered_at);
-                        break 'scan true;
-                    }
-                }
-                false
-            };
-
-            if !compacted {
-                events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
-            }
+            let waited = config::meta::alerts::incidents::manual_reopen_awaits_firing(&events);
+            config::meta::alerts::incidents::push_alert_event(
+                &mut events,
+                alert_id,
+                alert_name,
+                triggered_at,
+            );
             let events_json = encode_events(&events)?;
 
             let mut active: incident_events::ActiveModel = model.into();
             active.events = Set(events_json);
             active.update(&txn).await?;
+            waited
         }
         None => {
             // Row doesn't exist yet
@@ -419,11 +408,12 @@ pub async fn record_alert(
                 events: Set(encode_events(&events)?),
             };
             model.insert(&txn).await?;
+            false
         }
-    }
+    };
 
     txn.commit().await?;
-    Ok(())
+    Ok(waited)
 }
 
 /// Deletes all incident event entries belonging to the given org.
