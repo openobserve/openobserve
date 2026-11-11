@@ -489,6 +489,7 @@ mod tests {
         NodeMessages {
             scan_stats: ScanStats::new(),
             peak_memory: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            profile: None,
             role: NodeRole::Follower,
         }
     }

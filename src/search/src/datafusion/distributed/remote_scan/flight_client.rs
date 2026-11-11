@@ -60,7 +60,7 @@ pub async fn make_flight_client(
     Ok((client, request))
 }
 
-/// Fetches the profile a node holds for one finished run, waiting up to `timeout`.
+/// Fetches a node's profile of one run whose stream did not deliver it, waiting up to `timeout`.
 pub async fn fetch_node_report(
     trace_id: &str,
     org_id: &str,

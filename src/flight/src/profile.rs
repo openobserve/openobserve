@@ -25,8 +25,7 @@
 //! A `RemoteNodeProfile` has two parts:
 //! - what the caller observed of that node: start and end time, rows, batches and bytes received
 //!   over Flight, decode time, and the node's scan stats;
-//! - `plan`: the plan the node actually ran, with its own metrics, fetched from the node after the
-//!   query.
+//! - `plan`: the plan the node actually ran, with its own metrics, sent back by the node itself.
 //!
 //! A caller lists only the nodes it called directly; deeper nodes nest inside
 //! `plan`. In a super cluster the cluster leader's plan has its own
@@ -168,7 +167,7 @@ pub struct RemoteNodeProfile {
     pub output_bytes: u64,
     pub decode_ns: u64,
     pub skipped: bool,
-    /// Identifies the call, so the caller can fetch the node's report on it.
+    /// Identifies the call, so the caller can fetch the report a stream did not deliver.
     #[serde(skip)]
     pub job_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

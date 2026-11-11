@@ -24,7 +24,7 @@ use datafusion::physical_plan::{
     metrics::{MetricValue, MetricsSet},
 };
 use flight::{
-    common::{NodeProfiles, RemoteScanMetrics, job_trace_id},
+    common::{Metrics, NodeProfiles, RemoteScanMetrics, job_trace_id},
     profile::{MetricKind, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile},
 };
 
@@ -32,7 +32,7 @@ use crate::datafusion::distributed::remote_scan::{
     flight_client::fetch_node_report, remote_scan_exec::RemoteScanExec,
 };
 
-/// How long a caller waits for its remote nodes' reports once its query has ended.
+/// How long a caller waits for the reports its remote nodes' streams did not deliver.
 pub const REMOTE_PROFILE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Keeps one remote call's entry in its scan's profiles current; the default records nothing.
@@ -62,6 +62,13 @@ impl NodeProfileRecorder {
         profiles.lock().insert(partition, profile);
         Self {
             entry: Some((profiles, partition)),
+        }
+    }
+
+    /// Keeps the plan the node sent back about itself.
+    pub fn record_plan(&self, metrics: Vec<Metrics>) {
+        if let Some(plan) = metrics.into_iter().find_map(|m| m.profile) {
+            self.update(|p| p.plan = Some(plan));
         }
     }
 
@@ -129,7 +136,7 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     }
 }
 
-/// Fetches, for every remote scan in `plan`, the plans of the nodes that returned a stream.
+/// Fetches, for every remote scan in `plan`, the plans its nodes' streams did not deliver.
 pub async fn complete_remote_profiles(plan: &dyn ExecutionPlan, timeout: Duration) {
     let mut scans = Vec::new();
     collect_remote_scans(plan, &mut scans);

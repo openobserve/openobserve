@@ -27,11 +27,14 @@ use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::execute_stream_partitioned,
 };
-use flight::common::{NodeMessages, QUERY_PROFILE_ACTION, job_trace_id};
+use flight::common::{MetricsInfo, NodeMessages, NodeRole, QUERY_PROFILE_ACTION, job_trace_id};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
-use search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
+use search::{
+    datafusion::distributed::analyze::profile,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+};
 use search_service::{grpc::flight as grpcFlight, work_group::DeferredLock};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
@@ -159,10 +162,17 @@ impl FlightService for FlightServiceImpl {
         }
 
         let start = std::time::Instant::now();
+        let role = node_role(&plan);
+        // A cluster leader's own nodes may be cut short, so its caller always fetches its report.
+        let send_profile = req.search_info.is_analyze && matches!(role, NodeRole::Follower);
         let node_messages = NodeMessages {
             scan_stats,
             peak_memory: get_peak_memory_from_ctx(&ctx),
-            role: node_role(&plan),
+            profile: send_profile.then(|| MetricsInfo {
+                plan: plan.clone(),
+                build_profile: profile::build_profile,
+            }),
+            role,
         };
         let report_plan = plan.clone();
 
