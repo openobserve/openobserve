@@ -95,6 +95,20 @@ export class OnCallResponseDetailPage {
       ledgerEmpty: '[data-test="oncall-deliveries-empty"]',
       ledgerTruncated: '[data-test="oncall-deliveries-truncated"]',
       ackedBy: '[data-test="oncall-who-is-on-acked-by"]',
+      personTooltip: '[data-test="oncall-person-name-tooltip"]',
+      deliveryRows: '[data-test^="oncall-delivery-row-"]:not([data-test^="oncall-delivery-row-template-"])',
+      deliveryStatus: '[data-test="oncall-delivery-status"]',
+      deliveryChannel: '[data-test="oncall-delivery-channel"]',
+      refresh: '[data-test="oncall-response-refresh"]',
+
+      whoIsOn: '[data-test="oncall-who-is-on"]',
+      unackButton: '[data-test="oncall-response-unack-btn"]',
+      alertAckChip: '[data-test="alerts-alertdetail-ack-chip"]',
+
+      // The link's landing page is server-rendered HTML, so it has no data-test.
+      ackLinkHeading: 'h1',
+      ackLinkSubmit: 'form button[type="submit"]',
+      ackLinkIntoApp: 'a[href*="/web/oncall/responses/"]',
 
       // Resolve.
       resolveDialog: '[data-test="oncall-resolve-dialog"]',
@@ -126,6 +140,7 @@ export class OnCallResponseDetailPage {
   // Built rather than stored — these carry a duration or a ledger run/index.
   snoozeOption(minutes, inMenu = false) { return `[data-test="oncall-response-snooze-${minutes}${inMenu ? '-menu' : ''}"]`; }
   deliveryRow(run, index) { return `[data-test="oncall-delivery-row-${run}-${index}"]`; }
+  deliveryRecipient(email) { return `[data-test^="oncall-delivery-recipient-"][data-test-email="${email}"]`; }
 
   /** On the Causes tab: what this rule turned out to be on a previous page. */
   priorCause(cause) { return `[data-test="oncall-prior-cause-${cause}"]`; }
@@ -392,7 +407,7 @@ export class OnCallResponseDetailPage {
   /** Block until the ledger has actually drawn its rows, or report that it drew none. */
   async waitForDeliveryRows({ timeout = 60000 } = {}) {
     await expect
-      .poll(async () => await this.page.locator('[data-test^="oncall-delivery-row-"]').count(), {
+      .poll(async () => await this.page.locator(this.locators.deliveryRows).count(), {
         timeout,
         intervals: [500],
         message: 'the delivery ledger never drew a row — its fetch may still be in flight',
@@ -410,7 +425,7 @@ export class OnCallResponseDetailPage {
    * so a single-run ledger has rows and no header at all.
    */
   async readDeliveryRuns() {
-    const rows = this.page.locator('[data-test^="oncall-delivery-row-"]');
+    const rows = this.page.locator(this.locators.deliveryRows);
     const count = await rows.count();
     const runs = new Set();
     for (let i = 0; i < count; i++) {
@@ -427,6 +442,80 @@ export class OnCallResponseDetailPage {
 
 
 
+
+  /** Rows arrive out of order because sends run concurrently. */
+  ledgerRow(email, channelLabel) {
+    return this.page.locator(this.locators.deliveryRows)
+      .filter({ has: this.page.locator(this.deliveryRecipient(email)) })
+      .filter({
+        has: this.page.locator(this.locators.deliveryChannel, { hasText: new RegExp(`^\\s*${channelLabel}\\s*$`) }),
+      });
+  }
+
+  /** The record only reads its ledger on load, so a row still being sent needs a refresh to appear. */
+  async expectDelivery(email, channelLabel, status, { timeout = 120000 } = {}) {
+    const row = this.ledgerRow(email, channelLabel);
+    await expect(async () => {
+      await this.page.locator(this.locators.refresh).click();
+      await expect(row, `exactly one ${channelLabel} row for ${email}`).toHaveCount(1, { timeout: 3000 });
+      await expect(row.locator(this.locators.deliveryStatus)).toHaveText(status, { timeout: 3000 });
+    }).toPass({ timeout, intervals: [2000] });
+  }
+
+  /** One row per (step, person, channel), so the number of rows for a person is the number of channels sent. */
+  async expectDeliveryRowCount(email, expected) {
+    const rows = this.page.locator(this.locators.deliveryRows)
+      .filter({ has: this.page.locator(this.deliveryRecipient(email)) });
+    await expect(rows, `the ledger rows for ${email}`).toHaveCount(expected, { timeout: 30000 });
+  }
+
+  /** The row draws a display name, so who it names is read from its tooltip. */
+  async expectAcknowledgedBy(email) {
+    await expect(this.page.locator(this.locators.whoIsOn)).toContainText('Acknowledged by', { timeout: 30000 });
+    await this.page.locator(this.locators.ackedBy).hover({ timeout: 30000 });
+    await expect(this.page.locator(this.locators.personTooltip).first()).toContainText(email, { timeout: 15000 });
+    await this.page.mouse.move(0, 0);
+    await expect(this.page.locator(this.locators.unackButton)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.locators.ackButton), 'an acknowledged page offers no Acknowledge')
+      .toHaveCount(0);
+  }
+
+  async gotoAlertDetail(orgId, alertId) {
+    await this.page.goto(`/web/alerts/detail/${alertId}?org_identifier=${orgId}`);
+    await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  async expectAlertChipNames(email) {
+    await expect(this.page.locator(this.locators.alertAckChip))
+      .toContainText(`Acknowledged by ${email}`, { timeout: 30000 });
+  }
+
+  async openAckLink(link) {
+    await this.page.goto(link);
+    await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  async submitAckLink() {
+    const button = this.page.locator(this.locators.ackLinkSubmit);
+    await expect(button, 'an unacknowledged page must offer Acknowledge').toBeVisible({ timeout: 30000 });
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (res) => res.request().method() === 'POST' && new URL(res.url()).pathname.endsWith('/oncall/ack'),
+        { timeout: 30000 },
+      ),
+      button.click(),
+    ]);
+    return response.status();
+  }
+
+  async expectAckLinkHeading(words) {
+    await expect(this.page.locator(this.locators.ackLinkHeading)).toContainText(words, { timeout: 30000 });
+  }
+
+  async followAckLinkIntoApp() {
+    await this.page.locator(this.locators.ackLinkIntoApp).click();
+    await this.expectDetailVisible();
+  }
 
   async expectTeamLinkNames(teamName) {
     await expect(this.page.locator(this.locators.teamLink)).toContainText(teamName, { timeout: 30000 });
