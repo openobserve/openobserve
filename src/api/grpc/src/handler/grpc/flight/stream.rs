@@ -385,7 +385,14 @@ impl Drop for FlightEncoderStream {
             }
             Some(held) => {
                 self.source = FlightSource::Closed;
-                tokio::spawn(hold_profile(tasks, guards, held));
+                tokio::spawn(async move {
+                    // The profile is built once the partitions can no longer change it.
+                    tasks.shutdown().await;
+                    drop(guards);
+                    // A cluster leader must finish its own fetches within its caller's wait.
+                    complete_remote_profiles(held.plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
+                    held.slot.fill(build_profile(held.plan.as_ref()));
+                });
             }
         }
         log::info!(
@@ -393,20 +400,6 @@ impl Drop for FlightEncoderStream {
             self.ctx.trace_id,
         );
     }
-}
-
-/// Builds the run's profile once its partitions have stopped and can no longer change it.
-async fn hold_profile(
-    mut tasks: JoinSet<()>,
-    guards: (Option<DeferredLock>, Option<SessionGuard>),
-    held: HeldProfile,
-) {
-    tasks.shutdown().await;
-    // Partition tasks may read the session data until they have stopped.
-    drop(guards);
-    // A cluster leader must finish its own fetches within its caller's wait.
-    complete_remote_profiles(held.plan.as_ref(), REMOTE_PROFILE_TIMEOUT / 2).await;
-    held.slot.fill(build_profile(held.plan.as_ref()));
 }
 
 fn write_options() -> IpcWriteOptions {
