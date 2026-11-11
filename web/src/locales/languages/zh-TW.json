@@ -8,6 +8,9 @@
     "toastTitle": "未包含在您的授權中",
     "toastMessage": "您的授權不包含：{features}。請您的管理員更新授權。",
     "toastMessageGeneric": "您的授權不包含此功能。請您的管理員更新授權。",
+    "contractToastTitle": "未包含在您的合約中",
+    "contractToastMessage": "您的合約不包含：{features}。請聯絡您的客戶經理；如果此組織屬於某個帳單群組，請聯絡該群組的管理員。",
+    "contractToastMessageGeneric": "您的合約不包含此功能。請聯絡您的客戶經理；如果此組織屬於某個帳單群組，請聯絡該群組的管理員。",
     "bannerMessage": "此功能已上鎖。您的授權需要 {feature} 功能。",
     "bannerMessageGeneric": "此頁面需要一項不在您授權中的功能。",
     "headerLocked": "已上鎖：需要 {feature}"

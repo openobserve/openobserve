@@ -8,6 +8,9 @@
     "toastTitle": "未包含在您的许可证中",
     "toastMessage": "您的许可证不包含：{features}。请让管理员更新许可证。",
     "toastMessageGeneric": "您的许可证不包含此功能。请让管理员更新许可证。",
+    "contractToastTitle": "未包含在您的合同中",
+    "contractToastMessage": "您的合同不包含：{features}。请联系您的客户经理；如果此组织属于某个计费组，请联系该计费组的管理员。",
+    "contractToastMessageGeneric": "您的合同不包含此功能。请联系您的客户经理；如果此组织属于某个计费组，请联系该计费组的管理员。",
     "bannerMessage": "此功能已锁定。需要您的许可证包含 {feature} 功能。",
     "bannerMessageGeneric": "此页面需要一项不在您许可证中的功能。",
     "headerLocked": "已锁定：需要 {feature}"

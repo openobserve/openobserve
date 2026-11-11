@@ -8,6 +8,9 @@
     "toastTitle": "라이선스에 포함되지 않음",
     "toastMessage": "라이선스에 다음이 포함되어 있지 않습니다: {features}. 관리자에게 라이선스 업데이트를 요청하세요.",
     "toastMessageGeneric": "라이선스에 이 기능이 포함되어 있지 않습니다. 관리자에게 라이선스 업데이트를 요청하세요.",
+    "contractToastTitle": "계약에 포함되지 않음",
+    "contractToastMessage": "계약에 다음 기능이 포함되어 있지 않습니다: {features}. 계정 관리자에게 문의하거나, 이 조직이 청구 그룹에 속해 있다면 해당 그룹의 관리자에게 문의하세요.",
+    "contractToastMessageGeneric": "계약에 이 기능이 포함되어 있지 않습니다. 계정 관리자에게 문의하거나, 이 조직이 청구 그룹에 속해 있다면 해당 그룹의 관리자에게 문의하세요.",
     "bannerMessage": "이 기능은 잠겨 있습니다. 라이선스에 {feature} 기능이 필요합니다.",
     "bannerMessageGeneric": "이 페이지에는 라이선스에 없는 기능이 필요합니다.",
     "headerLocked": "잠김: {feature} 필요"

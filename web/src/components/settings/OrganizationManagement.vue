@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
     >
       <div
-        v-if="contractSyncActive"
+        v-if="contractStatus?.sync_active"
         class="mt-2.5 flex flex-col gap-2 text-sm"
         data-test="org-management-contract-sync-status"
       >

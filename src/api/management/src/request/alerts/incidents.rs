@@ -530,7 +530,7 @@ pub async fn trigger_incident_rca(
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
 
-    if !openobserve_core::alerts::incidents::rca_agent_available() {
+    if !openobserve_core::alerts::incidents::rca_agent_available(&org_id) {
         return axum::response::Response::builder()
             .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -1314,7 +1314,7 @@ async fn resume_run(
     if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
-    if !openobserve_core::alerts::incidents::rca_agent_available() {
+    if !openobserve_core::alerts::incidents::rca_agent_available(&org_id) {
         return rca_error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             "RCA agent is not available",

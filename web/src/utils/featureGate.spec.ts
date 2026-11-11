@@ -16,10 +16,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  deniedByContract,
+  denialCopyKeys,
   featureLockedPath,
   featureState,
   forbiddenState,
   licenseDeniedFeatures,
+  lockedByContract,
   menuState,
   streamTypeFeature,
   withLicenseFeature,
@@ -107,6 +110,12 @@ describe("licenseDeniedFeatures", () => {
     ]);
   });
 
+  it("returns the refused keys of a contract denial, code 40002, too", () => {
+    expect(licenseDeniedFeatures(forbidden({ code: 40002, error_detail: "oncall" }))).toEqual([
+      "oncall",
+    ]);
+  });
+
   it("still flags a denial whose detail is missing", () => {
     expect(licenseDeniedFeatures(forbidden({ code: 40001 }))).toEqual([]);
   });
@@ -122,6 +131,31 @@ describe("licenseDeniedFeatures", () => {
       }),
     ).toBeNull();
     expect(licenseDeniedFeatures(undefined)).toBeNull();
+  });
+});
+
+describe("deniedByContract", () => {
+  it("tells a contract denial from a license one", () => {
+    expect(deniedByContract(forbidden({ code: 40002, error_detail: "oncall" }))).toBe(true);
+    expect(deniedByContract(forbidden({ code: 40001, error_detail: "oncall" }))).toBe(false);
+    expect(deniedByContract(undefined)).toBe(false);
+  });
+});
+
+describe("lockedByContract", () => {
+  it("is true only when the contract locks every key", () => {
+    const locks = { oncall: "contract", workflows: "license" } as const;
+    expect(lockedByContract(locks, ["oncall"])).toBe(true);
+    expect(lockedByContract(locks, ["oncall", "workflows"])).toBe(false);
+    expect(lockedByContract(locks, [])).toBe(false);
+    expect(lockedByContract(undefined, ["oncall"])).toBe(false);
+  });
+});
+
+describe("denialCopyKeys", () => {
+  it("words a contract denial for the account manager and a license one for the admin", () => {
+    expect(denialCopyKeys(true).title).toBe("featureLock.contractToastTitle");
+    expect(denialCopyKeys(false).title).toBe("featureLock.toastTitle");
   });
 });
 

@@ -1098,12 +1098,18 @@ pub async fn retry_run(
 }
 
 // an error, not Ok, so alert history records the skipped delivery instead of a success
-fn require_workflows_license(entitled: bool) -> Result<(), anyhow::Error> {
-    if entitled {
-        return Ok(());
+fn require_workflows(
+    denial: Option<o2_enterprise::enterprise::license::Denial>,
+) -> Result<(), anyhow::Error> {
+    use infra::errors::ErrorCodes;
+    use o2_enterprise::enterprise::license::Denial;
+
+    let feature = <&str>::from(Feature::Workflows).to_string();
+    match denial {
+        None => Ok(()),
+        Some(Denial::License(_)) => Err(ErrorCodes::LicenseFeatureNotEntitled(feature).into()),
+        Some(Denial::Contract(_)) => Err(ErrorCodes::ContractFeatureNotEntitled(feature).into()),
     }
-    let feature: &str = Feature::Workflows.into();
-    Err(infra::errors::ErrorCodes::LicenseFeatureNotEntitled(feature.to_string()).into())
 }
 
 pub async fn send_workflow_trigger(
@@ -1118,9 +1124,10 @@ pub async fn send_workflow_trigger(
     if !get_o2_config().common.workflows_enabled {
         return Ok(String::new());
     }
-    require_workflows_license(o2_enterprise::enterprise::license::check_features(&[
-        Feature::Workflows,
-    ]))?;
+    require_workflows(o2_enterprise::enterprise::license::org_denial(
+        org_id,
+        &[Feature::Workflows],
+    ))?;
 
     let data = serde_json::to_string(data)?;
     let run_id = config::ider::uuid();
@@ -1207,9 +1214,10 @@ fn hook_history_row(
 
 pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
     if !get_o2_config().common.workflows_enabled
-        || !o2_enterprise::enterprise::license::check_features(&[
-            config::meta::feature::Feature::Workflows,
-        ])
+        || !o2_enterprise::enterprise::license::check_org_features(
+            &trigger.org_id,
+            &[config::meta::feature::Feature::Workflows],
+        )
     {
         return;
     }
@@ -1357,18 +1365,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_licensed_trigger_passes_the_license_check() {
-        assert!(require_workflows_license(true).is_ok());
+    fn an_entitled_trigger_passes_the_check() {
+        assert!(require_workflows(None).is_ok());
     }
 
     #[test]
-    fn trigger_without_workflows_license_is_an_error_naming_the_feature() {
-        let err = require_workflows_license(false).unwrap_err();
-        match err.downcast_ref::<infra::errors::ErrorCodes>() {
-            Some(infra::errors::ErrorCodes::LicenseFeatureNotEntitled(f)) => {
-                assert_eq!(f, "workflows")
-            }
+    fn a_refused_trigger_is_an_error_naming_the_feature_and_what_refused_it() {
+        use infra::errors::ErrorCodes;
+        use o2_enterprise::enterprise::license::Denial;
+
+        let err = require_workflows(Some(Denial::License(vec![Feature::Workflows]))).unwrap_err();
+        match err.downcast_ref::<ErrorCodes>() {
+            Some(ErrorCodes::LicenseFeatureNotEntitled(f)) => assert_eq!(f, "workflows"),
             other => panic!("expected LicenseFeatureNotEntitled, got {other:?}"),
+        }
+        let err = require_workflows(Some(Denial::Contract(vec![Feature::Workflows]))).unwrap_err();
+        match err.downcast_ref::<ErrorCodes>() {
+            Some(ErrorCodes::ContractFeatureNotEntitled(f)) => assert_eq!(f, "workflows"),
+            other => panic!("expected ContractFeatureNotEntitled, got {other:?}"),
         }
     }
 

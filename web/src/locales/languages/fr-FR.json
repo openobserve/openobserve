@@ -8,6 +8,9 @@
     "toastTitle": "Non inclus dans votre licence",
     "toastMessage": "Votre licence n'inclut pas : {features}. Demandez à votre administrateur de mettre à jour la licence.",
     "toastMessageGeneric": "Votre licence n'inclut pas cette fonctionnalité. Demandez à votre administrateur de mettre à jour la licence.",
+    "contractToastTitle": "Non inclus dans votre contrat",
+    "contractToastMessage": "Votre contrat n'inclut pas : {features}. Contactez votre responsable de compte ou, si cette organisation appartient à un groupe de facturation, son administrateur.",
+    "contractToastMessageGeneric": "Votre contrat n'inclut pas cette fonctionnalité. Contactez votre responsable de compte ou, si cette organisation appartient à un groupe de facturation, son administrateur.",
     "bannerMessage": "Cette fonctionnalité est verrouillée. Elle nécessite la fonctionnalité {feature} dans votre licence.",
     "bannerMessageGeneric": "Cette page nécessite une fonctionnalité qui ne fait pas partie de votre licence.",
     "headerLocked": "Verrouillé : nécessite {feature}"

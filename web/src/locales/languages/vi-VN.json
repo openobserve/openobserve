@@ -8,6 +8,9 @@
     "toastTitle": "Không có trong giấy phép của bạn",
     "toastMessage": "Giấy phép của bạn không bao gồm: {features}. Hãy yêu cầu quản trị viên cập nhật giấy phép.",
     "toastMessageGeneric": "Giấy phép của bạn không bao gồm tính năng này. Hãy yêu cầu quản trị viên cập nhật giấy phép.",
+    "contractToastTitle": "Không có trong hợp đồng của bạn",
+    "contractToastMessage": "Hợp đồng của bạn không bao gồm: {features}. Hãy liên hệ người quản lý tài khoản của bạn, hoặc quản trị viên nhóm thanh toán nếu tổ chức này thuộc một nhóm.",
+    "contractToastMessageGeneric": "Hợp đồng của bạn không bao gồm tính năng này. Hãy liên hệ người quản lý tài khoản của bạn, hoặc quản trị viên nhóm thanh toán nếu tổ chức này thuộc một nhóm.",
     "bannerMessage": "Tính năng này bị khóa. Cần có tính năng {feature} trong giấy phép của bạn.",
     "bannerMessageGeneric": "Trang này cần một tính năng không có trong giấy phép của bạn.",
     "headerLocked": "Đã khóa: cần {feature}"

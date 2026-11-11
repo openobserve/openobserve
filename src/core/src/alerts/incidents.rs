@@ -628,26 +628,28 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
     .await;
 }
 
-/// Whether the operator switched incident correlation on and the license grants it.
+/// Whether the operator switched incident correlation on and the org is entitled to it.
 #[cfg(feature = "enterprise")]
-pub fn incidents_enabled() -> bool {
+pub fn incidents_enabled(org_id: &str) -> bool {
     o2_enterprise::enterprise::common::config::get_config()
         .incidents
         .enabled
-        && o2_enterprise::enterprise::license::check_features(&[
-            config::meta::feature::Feature::Incidents,
-        ])
+        && o2_enterprise::enterprise::license::check_org_features(
+            org_id,
+            &[config::meta::feature::Feature::Incidents],
+        )
 }
 
-/// Whether O2's agent may answer an analysis: operator switch, agent target and assistant license.
+/// Whether O2's agent may answer an org's analysis: operator switch, agent target and assistant.
 #[cfg(feature = "enterprise")]
-pub fn rca_agent_available() -> bool {
+pub fn rca_agent_available(org_id: &str) -> bool {
     let cfg = o2_enterprise::enterprise::common::config::get_config();
     cfg.ai.enabled
         && cfg.ai.has_agent_target()
-        && o2_enterprise::enterprise::license::check_features(&[
-            config::meta::feature::Feature::AiAssistant,
-        ])
+        && o2_enterprise::enterprise::license::check_org_features(
+            org_id,
+            &[config::meta::feature::Feature::AiAssistant],
+        )
 }
 
 /// Correlate an alert to an incident, and send a notification if appropriate.
@@ -812,7 +814,7 @@ pub async fn correlate_alert_to_incident(
         service_name,
     } = &outcome
         && downtime.is_none()
-        && o2_enterprise::enterprise::oncall::is_enabled()
+        && o2_enterprise::enterprise::oncall::is_enabled_for(&alert.org_id)
     {
         // Single-sourced with `scheduler::handlers`: the row, then the alert's own conditions.
         let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
@@ -899,7 +901,7 @@ pub async fn correlate_alert_to_incident(
     #[cfg(feature = "enterprise")]
     if let Some(incident_id) = outcome.joined_by_new_alert()
         && downtime.is_none()
-        && o2_enterprise::enterprise::oncall::is_enabled()
+        && o2_enterprise::enterprise::oncall::is_enabled_for(&alert.org_id)
     {
         page_again_after_new_alert(&alert.org_id, incident_id).await;
     }
@@ -1055,7 +1057,7 @@ pub async fn correlate_external_event(
     // A new external alert is new evidence too, so an unanswered page may page again.
     #[cfg(feature = "enterprise")]
     if let Some(incident_id) = outcome.joined_by_new_alert()
-        && o2_enterprise::enterprise::oncall::is_enabled()
+        && o2_enterprise::enterprise::oncall::is_enabled_for(org_id)
     {
         page_again_after_new_alert(org_id, incident_id).await;
     }
@@ -1170,7 +1172,7 @@ pub async fn resolve_alert_firing(
 
 /// The on-call recovery a muted [resolve_alert_firing] skipped, over the recent resolved incidents.
 pub async fn recover_muted_resolves(org_id: &str, alert_id: &str) -> Result<(), anyhow::Error> {
-    if !o2_enterprise::enterprise::oncall::is_enabled() {
+    if !o2_enterprise::enterprise::oncall::is_enabled_for(org_id) {
         return Ok(());
     }
     let resolved = infra::table::alert_incidents::resolved_incidents_for_alert(
@@ -2446,7 +2448,8 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = incidents_enabled() && cfg.incidents.rca_enabled && rca_agent_available();
+    let will_run =
+        incidents_enabled(org_id) && cfg.incidents.rca_enabled && rca_agent_available(org_id);
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     }
@@ -2814,7 +2817,7 @@ pub async fn trigger_rca_for_incident(
 
     let config = get_o2_config();
 
-    if !incidents_enabled() || !config.incidents.rca_enabled {
+    if !incidents_enabled(&org_id) || !config.incidents.rca_enabled {
         log::debug!("[INCIDENTS::RCA] RCA not enabled, ending run {run_id}");
         end_failed(ERROR_RCA_DISABLED, RCA_DISABLED_REASON, None).await;
         return Ok(());
@@ -3229,7 +3232,7 @@ pub async fn update_status_as(
     #[cfg(feature = "enterprise")]
     if status == "resolved"
         && !muted
-        && o2_enterprise::enterprise::oncall::is_enabled()
+        && o2_enterprise::enterprise::oncall::is_enabled_for(org_id)
         && let Err(e) =
             o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
                 .await

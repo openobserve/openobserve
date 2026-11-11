@@ -8,6 +8,9 @@
     "toastTitle": "Not included in your license",
     "toastMessage": "Your license does not include: {features}. Ask your administrator to update the license.",
     "toastMessageGeneric": "Your license does not include this feature. Ask your administrator to update the license.",
+    "contractToastTitle": "Not included in your contract",
+    "contractToastMessage": "Your contract does not include: {features}. Contact your account manager, or your billing group's admin if this organization belongs to one.",
+    "contractToastMessageGeneric": "Your contract does not include this feature. Contact your account manager, or your billing group's admin if this organization belongs to one.",
     "bannerMessage": "This feature is locked. It needs the {feature} feature in your license.",
     "bannerMessageGeneric": "This page needs a feature that is not in your license.",
     "headerLocked": "Locked: needs {feature}"

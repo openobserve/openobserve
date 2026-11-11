@@ -94,8 +94,12 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
     // Convert minutes to microseconds
     let threshold_micros = (threshold_minutes as i64) * 60 * 1_000_000;
 
+    // the tick checks the license; an org's contract can still leave incidents out
+    let skipped = o2_enterprise::enterprise::license::orgs_denied(&[
+        config::meta::feature::Feature::Incidents,
+    ]);
     let (resolved_count, resolved_ids) =
-        infra::table::alert_incidents::auto_resolve_stale(threshold_micros).await?;
+        infra::table::alert_incidents::auto_resolve_stale(threshold_micros, &skipped).await?;
 
     if resolved_count > 0 {
         log::info!(

@@ -1201,9 +1201,16 @@ pub async fn upgrade_incident_group_values(
 /// Resolves the incidents with no alert within the threshold; their count and the incidents.
 pub async fn auto_resolve_stale(
     stale_threshold_micros: i64,
+    skipped_orgs: &[String],
 ) -> Result<(u64, Vec<AutoResolved>), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
-    auto_resolve_stale_with(get_orm_client_rw().await, now - stale_threshold_micros, now).await
+    auto_resolve_stale_with(
+        get_orm_client_rw().await,
+        now - stale_threshold_micros,
+        now,
+        skipped_orgs,
+    )
+    .await
 }
 
 /// [auto_resolve_stale] on a given connection, for incidents with no alert since `cutoff`.
@@ -1211,6 +1218,7 @@ pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
     client: &C,
     cutoff: i64,
     now: i64,
+    skipped_orgs: &[String],
 ) -> Result<(u64, Vec<AutoResolved>), errors::Error> {
     const PAGE_SIZE: u64 = 500;
 
@@ -1220,6 +1228,7 @@ pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
         let stale_incidents = alert_incidents::Entity::find()
             .filter(alert_incidents::Column::Status.ne("resolved"))
             .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+            .filter(alert_incidents::Column::OrgId.is_not_in(skipped_orgs.iter().cloned()))
             .limit(PAGE_SIZE)
             .all(client)
             .await
@@ -1890,12 +1899,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_bulk_auto_resolve_leaves_a_skipped_org_open() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-skip").await;
+        let now = incident.last_alert_at + 1_000;
+
+        let skipped = [incident.org_id.clone()];
+        let (count, _) = auto_resolve_stale_with(&db, now, now, &skipped)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
     async fn the_bulk_auto_resolve_clears_the_mute_and_reports_it() {
         let db = incidents_db().await;
         let incident = muted_incident(&db, "dt-1").await;
         let now = incident.last_alert_at + 1_000;
 
-        let (count, resolved) = auto_resolve_stale_with(&db, now, now).await.unwrap();
+        let (count, resolved) = auto_resolve_stale_with(&db, now, now, &[]).await.unwrap();
         assert_eq!(count, 1);
         assert_eq!(
             resolved,

@@ -8,6 +8,9 @@
     "toastTitle": "Nicht in Ihrer Lizenz enthalten",
     "toastMessage": "Ihre Lizenz enthält nicht: {features}. Bitten Sie Ihren Administrator, die Lizenz zu aktualisieren.",
     "toastMessageGeneric": "Ihre Lizenz enthält diese Funktion nicht. Bitten Sie Ihren Administrator, die Lizenz zu aktualisieren.",
+    "contractToastTitle": "Nicht in Ihrem Vertrag enthalten",
+    "contractToastMessage": "Ihr Vertrag enthält nicht: {features}. Wenden Sie sich an Ihren Account Manager oder, falls diese Organisation zu einer Abrechnungsgruppe gehört, an deren Administrator.",
+    "contractToastMessageGeneric": "Ihr Vertrag enthält diese Funktion nicht. Wenden Sie sich an Ihren Account Manager oder, falls diese Organisation zu einer Abrechnungsgruppe gehört, an deren Administrator.",
     "bannerMessage": "Diese Funktion ist gesperrt. Sie erfordert die Funktion {feature} in Ihrer Lizenz.",
     "bannerMessageGeneric": "Diese Seite benötigt eine Funktion, die nicht in Ihrer Lizenz enthalten ist.",
     "headerLocked": "Gesperrt: benötigt {feature}"

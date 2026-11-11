@@ -8,6 +8,9 @@
     "toastTitle": "No incluido en tu licencia",
     "toastMessage": "Tu licencia no incluye: {features}. Pide a tu administrador que actualice la licencia.",
     "toastMessageGeneric": "Tu licencia no incluye esta función. Pide a tu administrador que actualice la licencia.",
+    "contractToastTitle": "No incluido en tu contrato",
+    "contractToastMessage": "Tu contrato no incluye: {features}. Contacta con tu gestor de cuenta o, si esta organización pertenece a un grupo de facturación, con su administrador.",
+    "contractToastMessageGeneric": "Tu contrato no incluye esta función. Contacta con tu gestor de cuenta o, si esta organización pertenece a un grupo de facturación, con su administrador.",
     "bannerMessage": "Esta función está bloqueada. Necesita la función {feature} en tu licencia.",
     "bannerMessageGeneric": "Esta página necesita una función que no está en tu licencia.",
     "headerLocked": "Bloqueado: necesita {feature}"

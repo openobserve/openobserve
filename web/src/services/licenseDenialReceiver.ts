@@ -16,14 +16,14 @@
 import store from "../stores";
 import { addLicenseDeniedError } from "@/composables/useLicenseDenials";
 import { markLicenseDenial } from "@/composables/useFeatureLock";
-import { licenseDeniedFeatures } from "@/utils/featureGate";
+import { deniedByContract, licenseDeniedFeatures } from "@/utils/featureGate";
 
-/** Sends a license denial (403 + 40001) to the top bar; true when the error was one. */
+/** Sends a license or contract denial to the top bar; true when the error was one. */
 export const receiveLicenseDenial = (error: unknown, requestStartedAt?: number): boolean => {
   const features = licenseDeniedFeatures(error);
   if (!features) return false;
   markLicenseDenial(error);
-  addLicenseDeniedError(features, requestStartedAt);
+  addLicenseDeniedError(features, requestStartedAt, deniedByContract(error));
   return true;
 };
 

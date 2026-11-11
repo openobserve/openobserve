@@ -15,7 +15,8 @@ import {
   watchEffect,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useFeatureNames } from "@/composables/useFeatureLock";
+import { useContractLocks, useFeatureNames } from "@/composables/useFeatureLock";
+import { denialCopyKeys } from "@/utils/featureGate";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
@@ -73,6 +74,7 @@ import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const { t } = useI18nTyped();
 const { featureNames } = useFeatureNames();
+const lockedByContract = useContractLocks();
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
   pageSize: 20,
@@ -1322,6 +1324,9 @@ useTableRowShortcuts(scrollContainerRef);
 // A denied fetch and a genuinely empty list are both zero rows; only the caller
 // knows which, so `forbidden` decides and takes precedence over the empty state.
 const forbiddenState = inject(TABLE_FORBIDDEN_STATE_KEY, null);
+const forbiddenCopy = computed(() =>
+  denialCopyKeys(Array.isArray(props.forbidden) && lockedByContract(props.forbidden)),
+);
 const showForbidden = computed(
   () => !heldLoading.value && !!props.forbidden && displayRows.value.length === 0,
 );
@@ -1883,13 +1888,13 @@ defineExpose({
             v-if="Array.isArray(props.forbidden)"
             size="hero"
             preset="no-access"
-            :title="t('featureLock.toastTitle')"
+            :title="t(forbiddenCopy.title)"
             :description="
               props.forbidden.length
-                ? t('featureLock.toastMessage', {
+                ? t(forbiddenCopy.message, {
                     features: raw(featureNames(props.forbidden)),
                   })
-                : t('featureLock.toastMessageGeneric')
+                : t(forbiddenCopy.generic)
             "
             data-test="o2-table-license-denied"
           />

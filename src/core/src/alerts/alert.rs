@@ -2431,7 +2431,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
     let (incident_notified, incident_notify_error) = if alert.creates_incident
-        && crate::alerts::incidents::incidents_enabled()
+        && crate::alerts::incidents::incidents_enabled(org_id)
     {
         let synthetic_row = manual_trigger_row(&alert);
         let notify = std::slice::from_ref(&synthetic_row);
@@ -2496,7 +2496,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // somebody checks a new on-call alert pages before trusting it, and it only
     // answers that question if it pages.
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
+    if o2_enterprise::enterprise::oncall::is_enabled_for(org_id) && !incident_notified {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
     #[cfg(feature = "enterprise")]

@@ -508,7 +508,11 @@ async fn resolve(slug: &str) -> Cached {
     resolve_with(
         slug,
         |slug| async move { load(&slug).await },
-        |org_id| async move { db::org_status::read_active(&org_id).await },
+        |org_id| async move {
+            db::org_status::read_active(&org_id)
+                .await
+                .map(|active| active && serves_pages(&org_id))
+        },
     )
     .await
 }
@@ -581,6 +585,20 @@ async fn public_kind(
     }
 }
 
+// A contract that leaves out synthetics hides the org's pages, as blocking the org does.
+#[cfg(feature = "enterprise")]
+fn serves_pages(org_id: &str) -> bool {
+    o2_enterprise::enterprise::license::check_org_features(
+        org_id,
+        &[config::meta::feature::Feature::Synthetics],
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn serves_pages(_org_id: &str) -> bool {
+    true
+}
+
 /// The page when it exists and its org is active; `Err` when either read failed, already logged.
 async fn active_page_by_slug(
     conn: &sea_orm::DatabaseConnection,
@@ -595,7 +613,7 @@ async fn active_page_by_slug(
         }
     };
     match db::org_status::read_active(&page.org_id).await {
-        Ok(active) => Ok(active.then_some(page)),
+        Ok(active) => Ok((active && serves_pages(&page.org_id)).then_some(page)),
         Err(e) => {
             log::error!(
                 "[status_pages] cannot read the status of org {}: {e}",
