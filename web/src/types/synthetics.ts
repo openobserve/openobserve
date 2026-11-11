@@ -673,6 +673,8 @@ export interface BrowserCheck {
   notifications: {
     destinations: string[];
   };
+  // Template override for this check's messages; null uses each destination's template.
+  template?: string | null;
   rum: { collect: boolean; sessionReplay: boolean };
   capture: {
     screenshot: "always" | "on-fail" | "off";

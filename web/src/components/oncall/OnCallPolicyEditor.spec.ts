@@ -17,20 +17,20 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
+import { queryClient } from "@/composables/query/queryClient";
 import { resetOnCallPermissions } from "@/composables/useOnCallPermissions";
-import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { Contact, OnCallPolicy } from "@/ts/interfaces/oncall";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/oncall", () => ({
   default: {
     setPolicy: vi.fn(),
     listMembers: vi.fn(),
     whoIsOnCall: vi.fn(),
-    getRoutingConfig: vi.fn(),
     getTeamChannel: vi.fn(),
     setTeamChannel: vi.fn(),
     getContact: vi.fn(),
@@ -132,17 +132,25 @@ describe("OnCallPolicyEditor", () => {
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: ["slack-eng"], source: "policy" },
     } as any);
-    service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
-    } as any);
-    // The catch-all is cached module-wide so one screen reads it once;
-    // without this it survives into the next test.
-    __resetOnCallRoutingConfig();
     resetOnCallPermissions();
     vi.clearAllMocks();
     service.setPolicy.mockResolvedValue({ data: {} } as any);
     service.getContact.mockResolvedValue({ data: contact(true) } as any);
   });
+
+  it.each(["getContact", "getTeamChannel", "listMembers", "whoIsOnCall"] as const)(
+    "tells the page when the license refuses %s",
+    async (read) => {
+      queryClient.clear();
+      service[read].mockRejectedValueOnce({
+        response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+      });
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+    },
+  );
 
   it("offers the deliverable channels in the order Email, SMS, Voice call, Chat / webhook", async () => {
     const wrapper = render();
@@ -157,9 +165,6 @@ describe("OnCallPolicyEditor", () => {
       ["oncall-policy-channel-1-voice", "Voice call"],
       ["oncall-policy-channel-1-webhook", "Chat / webhook"],
     ]);
-    expect(wrapper.find('[data-test="oncall-policy-channels-hint"]').text()).toBe(
-      "Everyone paged at P1 gets the same set. Texts and calls go to people with a verified phone.",
-    );
   });
 
   /// DM-2: Slack is offered only while the org has Slack on, and never pages without Email.
@@ -372,6 +377,30 @@ describe("OnCallPolicyEditor", () => {
     expect(bar.find('[data-test="oncall-policy-priority-1"]').exists()).toBe(true);
   });
 
+  // The chips carry the same priority colours the Pages list does.
+  it("draws each priority chip with the shared priority badge", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const tag = wrapper
+      .find('[data-test="oncall-policy-priority-1"]')
+      .findComponent({ name: "OTag" });
+    expect(tag.attributes("type")).toBe("alertPriority");
+    expect(tag.attributes("value")).toBe("p1");
+  });
+
+  // A team's own channel list is said by the button that reverts it, not a chip.
+  it("labels only an inherited team channel", async () => {
+    service.getTeamChannel.mockResolvedValue(
+      axiosReply({ team_id: "team_1", destinations: ["slack-eng"], source: "team" }),
+    );
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-team-channel-source"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-team-channel-clear"]').attributes("variant")).toBe(
+      "outline",
+    );
+  });
+
   /// Reading P3 and pressing Edit has to land on P3. Opening on P1 asks the
   /// reader to re-find the ladder they were already looking at.
   describe("the priority the drawer opens on", () => {
@@ -506,6 +535,61 @@ describe("OnCallPolicyEditor", () => {
           data: expect.objectContaining({ destinations: ["slack-oncall"] }),
         }),
       );
+    });
+
+    it("saves the template override and null once cleared", async () => {
+      service.setPolicy.mockResolvedValue({ data: {} } as any);
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: { ...webhookPolicy, template: "ops-card" }, open: true },
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            ...stubs,
+            TemplateOverridePicker: {
+              name: "TemplateOverridePicker",
+              props: ["kind", "modelValue", "destinations"],
+              template: "<div />",
+            },
+          },
+        },
+      });
+      await flushPromises();
+      const picker = wrapper.findComponent({ name: "TemplateOverridePicker" });
+      expect(picker.props("kind")).toBe("on_call");
+      expect(picker.props("modelValue")).toBe("ops-card");
+
+      await picker.vm.$emit("update:modelValue", null);
+      await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+      await flushPromises();
+      expect(service.setPolicy).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ template: null }) }),
+      );
+    });
+
+    it("tells the team once that an email destination now receives pages", async () => {
+      destinations.list.mockResolvedValue({
+        data: [{ name: "slack-oncall" }, { name: "ops-mail", type: "email" }],
+      } as any);
+      localStorage.removeItem("oncall-mail-banner:team_1");
+      const mount_ = () =>
+        mount(OnCallPolicyEditor, {
+          props: {
+            teamId: "team_1",
+            policy: { ...webhookPolicy, destinations: ["slack-oncall", "ops-mail"] },
+            open: true,
+          },
+          global: { plugins: [i18n, store], stubs },
+        });
+      const wrapper = mount_();
+      await flushPromises();
+      const banner = wrapper.find('[data-test="oncall-policy-mail-banner"]');
+      expect(banner.text()).toContain("ops-mail");
+
+      await wrapper.find('[data-test="oncall-policy-mail-banner-dismiss"]').trigger("click");
+      expect(wrapper.find('[data-test="oncall-policy-mail-banner"]').exists()).toBe(false);
+      const again = mount_();
+      await flushPromises();
+      expect(again.find('[data-test="oncall-policy-mail-banner"]').exists()).toBe(false);
     });
 
     /// The editor is still worth using when the destination list is unreachable.
@@ -653,65 +737,6 @@ describe("OnCallPolicyEditor", () => {
     expect(text).toContain("+10m");
     expect(text).not.toContain("+15m");
   });
-  /// §G.9 #9: notify_default_team with no team nominated is indistinguishable
-  /// from stop. The warning belongs where the policy is WRITTEN — a routing
-  /// screen the author may never open cannot warn them.
-  describe("the ladder's end", () => {
-    function policyEnding(final_action: string) {
-      return {
-        ...policy,
-        repeat_count: 2,
-        final_action,
-        rungs: [
-          {
-            priority: 1,
-            steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" }] }],
-            channels: ["email"],
-          },
-        ],
-      } as any;
-    }
-
-    it("warns when the final action hands to a default team nobody nominated", async () => {
-      const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: policyEnding("notify_default_team"), open: true },
-        global: { plugins: [i18n, store], stubs },
-      });
-      await flushPromises();
-      expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-policy-ladder-end"]').text()).toContain("2 times");
-    });
-
-    it("names the default team once one exists, and does not warn", async () => {
-      service.getRoutingConfig.mockResolvedValue({
-        data: {
-          org_id: "default",
-          default_team_id: "t9",
-          default_team_name: "Platform",
-          updated_at: 1,
-        },
-      } as any);
-      const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: policyEnding("notify_default_team"), open: true },
-        global: { plugins: [i18n, store], stubs },
-      });
-      await flushPromises();
-      expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="oncall-policy-ladder-end"]').text()).toContain("Platform");
-    });
-
-    it("says a stopping ladder marks the record never answered", async () => {
-      const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: policyEnding("stop"), open: true },
-        global: { plugins: [i18n, store], stubs },
-      });
-      await flushPromises();
-      const line = wrapper.find('[data-test="oncall-policy-ladder-end"]').text();
-      expect(line).toContain("never answered");
-      expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(false);
-    });
-  });
-
   /// C15/C16. `source` is the point: precedence must be visible, or "I set
   /// the team channel and pages still go to the old room" is unanswerable.
   describe("the team channel", () => {
@@ -767,6 +792,55 @@ describe("OnCallPolicyEditor", () => {
       const wrapper = render();
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-team-channel-silent"]').exists()).toBe(false);
+    });
+
+    // Room posts use policy.template, so the override picker is not gated on a webhook rung alone.
+    describe("the template override for room posts", () => {
+      const pickerStub = {
+        TemplateOverridePicker: {
+          name: "TemplateOverridePicker",
+          props: ["kind", "modelValue", "destinations"],
+          template: "<div />",
+        },
+      };
+      const mountWithPicker = (p: OnCallPolicy = policy) =>
+        mount(OnCallPolicyEditor, {
+          props: { teamId: "team_1", policy: p, open: true, rotations: ROTATIONS },
+          global: { plugins: [i18n, store], stubs: { ...stubs, ...pickerStub } },
+        });
+
+      it("shows the picker for the team's own room without a webhook rung", async () => {
+        destinations.list.mockResolvedValue({ data: [{ name: "slack-eng", type: "http" }] } as any);
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+        } as any);
+        const wrapper = mountWithPicker();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(true);
+        const picker = wrapper.findComponent({ name: "TemplateOverridePicker" });
+        expect(picker.props("destinations")).toEqual([{ name: "slack-eng", type: "http" }]);
+      });
+
+      it("shows the picker when the room falls back to the policy's destinations", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["ops-hook"], source: "policy" },
+        } as any);
+        const wrapper = mountWithPicker({ ...policy, destinations: ["ops-hook"] });
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(true);
+      });
+
+      it("hides the picker when no rung pages by webhook and the room is empty", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: [], source: "team" },
+        } as any);
+        const wrapper = mountWithPicker();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(false);
+      });
     });
 
     /// RO-1: the Slack card sits under the team channel; its changes are written at once.
@@ -934,13 +1008,9 @@ describe("OnCallPolicyEditor", () => {
 /// beside it is seeded from that answer and saved back, so it must not be stale.
 describe("re-opening the drawer", () => {
   beforeEach(() => {
-    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: [], source: "policy" },
-    } as any);
-    service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
     } as any);
     service.listMembers.mockResolvedValue({ data: [{ user_email: "ana@o2.ai" }] } as any);
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
@@ -989,15 +1059,9 @@ describe("targets that name a rotation", () => {
   /// does not reach it — without this, `setPolicy.mock.calls[0]` is whichever
   /// test saved first, not this one's.
   beforeEach(() => {
-    // The catch-all is cached module-wide so one screen reads it once;
-    // without this it survives into the next test.
-    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: [], source: "policy" },
-    } as any);
-    service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
     } as any);
     service.setPolicy.mockResolvedValue({ data: {} } as any);
   });
@@ -1239,217 +1303,33 @@ describe("targets that name a rotation", () => {
   });
 });
 
-/// **What the ladder does when it runs out was read-only.** The editor
-/// rendered a sentence describing `repeat_count` and `final_action`, and warned
-/// that `notify_default_team` had no team nominated — for a value it would not
-/// let anybody set. A screen telling somebody to fix something it will not let
-/// them touch.
-///
-/// The two fields are ONE control now: "runs twice" and "then stops" is a
-/// single decision an operator reads as a single sentence. The wire still
-/// carries both, so the select encodes them as `<repeats>:<action>`.
-describe("the end of the ladder, as an edit", () => {
+/// #16479: the server stores no `repeat_count` or `final_action`, so the editor must not offer them.
+describe("the end of the ladder", () => {
   beforeEach(() => {
-    // The catch-all is cached module-wide so one screen reads it once;
-    // without this it survives into the next test.
-    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: [], source: "policy" },
     } as any);
-    service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
-    } as any);
     service.setPolicy.mockResolvedValue({ data: {} } as any);
   });
 
-  function renderWith(over: Record<string, unknown> = {}) {
-    return mount(OnCallPolicyEditor, {
-      props: { teamId: "team_1", policy: { ...policy, ...over }, open: true },
+  it("offers no ending the server would drop, and saves none", async () => {
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy, open: true },
       global: { plugins: [i18n, store], stubs },
     });
-  }
+    await flushPromises();
 
-  const endSelect = (wrapper: ReturnType<typeof renderWith>) =>
-    wrapper.findComponent('[data-test="oncall-policy-ladder-end-select"]');
+    expect(wrapper.findComponent('[data-test="oncall-policy-ladder-end-select"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.text()).not.toContain("When the steps run out");
 
-  const saved = () => (service.setPolicy.mock.calls.at(-1)![0] as any).data;
-
-  async function save(wrapper: ReturnType<typeof renderWith>) {
     await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
     await flushPromises();
-  }
-
-  it("opens on what the policy already says", async () => {
-    const wrapper = renderWith({ repeat_count: 3, final_action: "notify_default_team" });
-    await flushPromises();
-
-    expect(endSelect(wrapper).props("modelValue")).toBe("3:notify_default_team");
-  });
-
-  /// `repeat_count` 1 means the ladder runs once; there is no zero.
-  it("defaults to one pass, then stop", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-
-    expect(endSelect(wrapper).props("modelValue")).toBe("1:stop");
-  });
-
-  /// Every option has to be a pair the server accepts — a select offering a
-  /// repeat count it cannot send is a save that 400s.
-  it("offers every pass count against both endings", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-
-    const values = (endSelect(wrapper).props("options") as { value: string }[]).map((o) => o.value);
-    expect(values).toHaveLength(10);
-    expect(values).toContain("1:stop");
-    expect(values).toContain("5:notify_default_team");
-  });
-
-  it("sends both halves, so the ladder's end is part of the save", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-
-    endSelect(wrapper).vm.$emit("update:modelValue", "3:notify_default_team");
-    await flushPromises();
-    await save(wrapper);
-
-    expect(saved()).toMatchObject({ repeat_count: 3, final_action: "notify_default_team" });
-  });
-
-  /// The sentence has to track the control, not the last save — otherwise it
-  /// describes a ladder the reader has already changed. It says what the
-  /// option label cannot: which team the page would actually land on.
-  it("re-words itself as the control moves", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-    const line = () => wrapper.find('[data-test="oncall-policy-ladder-end"]').text();
-
-    expect(line()).toContain("never answered");
-
-    endSelect(wrapper).vm.$emit("update:modelValue", "1:notify_default_team");
-    await flushPromises();
-
-    expect(line()).not.toContain("never answered");
-  });
-
-  /// §G.9 #9: `notify_default_team` with nobody nominated is indistinguishable
-  /// from stop — the ladder ends silently while the policy reads as having a
-  /// safety net. The warning now follows the control instead of the last save.
-  it("warns as soon as the catch-all is chosen and none is nominated", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-    const warning = '[data-test="oncall-policy-no-default-warning"]';
-
-    expect(wrapper.find(warning).exists()).toBe(false);
-
-    endSelect(wrapper).vm.$emit("update:modelValue", "1:notify_default_team");
-    await flushPromises();
-
-    expect(wrapper.find(warning).exists()).toBe(true);
-  });
-
-  it("drops an abandoned edit when the drawer is reopened", async () => {
-    const wrapper = renderWith({ repeat_count: 2 });
-    await flushPromises();
-
-    endSelect(wrapper).vm.$emit("update:modelValue", "5:stop");
-    await flushPromises();
-
-    await wrapper.setProps({ open: false });
-    await wrapper.setProps({ open: true });
-    await flushPromises();
-
-    expect(endSelect(wrapper).props("modelValue")).toBe("2:stop");
-  });
-});
-
-/// **The ladder said out loud.** The editor is built out of target KINDS and
-/// absolute offsets, neither of which is how anybody describes a policy. The
-/// sentence is the plain reading of what the controls below it add up to, and
-/// it has to track them rather than the last save.
-describe("the ladder as one sentence", () => {
-  beforeEach(() => {
-    __resetOnCallRoutingConfig();
-    vi.clearAllMocks();
-    service.getTeamChannel.mockResolvedValue({
-      data: { team_id: "team_1", destinations: [], source: "policy" },
-    } as any);
-    service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
-    } as any);
-    service.setPolicy.mockResolvedValue({ data: {} } as any);
-  });
-
-  const threeSteps: OnCallPolicy = {
-    ...policy,
-    rungs: [
-      {
-        priority: 1,
-        steps: [
-          { after_micros: 0, targets: [{ kind: "rotation", rotation_id: "rot_primary" }] },
-          {
-            after_micros: 5 * 60_000_000,
-            targets: [{ kind: "rotation", rotation_id: "rot_second" }],
-          },
-          { after_micros: 15 * 60_000_000, targets: [{ kind: "whole_team" }] },
-        ],
-        channels: ["email"],
-      },
-    ],
-  };
-
-  function renderWith(over: Partial<OnCallPolicy> = {}) {
-    return mount(OnCallPolicyEditor, {
-      props: {
-        teamId: "team_1",
-        policy: { ...threeSteps, ...over },
-        open: true,
-        rotations: [
-          { id: "rot_primary", name: "Primary", shift_rules: [] },
-          { id: "rot_second", name: "Secondary", shift_rules: [] },
-        ],
-      },
-      global: { plugins: [i18n, store], stubs },
-    });
-  }
-
-  it("names every step, when it fires, and how the ladder ends", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-
-    const line = wrapper.find('[data-test="oncall-policy-sentence"]').text();
-    // Each level NAMES its rotation. "The on-call" and "the secondary" were
-    // role words two screens resolved differently, and both were right.
-    expect(line).toContain("Whoever is on call in Primary now");
-    expect(line).toContain("Whoever is on call in Secondary at 5m");
-    expect(line).toContain("The whole team at 15m");
-    expect(line).toContain("then stops");
-  });
-
-  /// A priority with no steps pages nobody. Saying "A P4 pages ." would read
-  /// as a rendering bug rather than as a decision.
-  it("says so plainly when a priority pages nobody", async () => {
-    const wrapper = mount(OnCallPolicyEditor, {
-      props: { teamId: "team_1", policy, open: true, priority: 4 },
-      global: { plugins: [i18n, store], stubs },
-    });
-    await flushPromises();
-
-    expect(wrapper.find('[data-test="oncall-policy-sentence"]').text()).toContain("pages nobody");
-  });
-
-  it("follows the controls rather than the stored policy", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-
-    wrapper
-      .findComponent('[data-test="oncall-policy-ladder-end-select"]')
-      .vm.$emit("update:modelValue", "1:notify_default_team");
-    await flushPromises();
-
-    expect(wrapper.find('[data-test="oncall-policy-sentence"]').text()).toContain("hands off");
+    const sent = (service.setPolicy.mock.calls.at(-1)![0] as any).data;
+    expect(sent).not.toHaveProperty("repeat_count");
+    expect(sent).not.toHaveProperty("final_action");
   });
 });
 
@@ -1459,13 +1339,9 @@ describe("the ladder as one sentence", () => {
 /// step's own offset cell, where the reader is already looking.
 describe("the first step's delay", () => {
   beforeEach(() => {
-    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: [], source: "policy" },
-    } as any);
-    service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
     } as any);
     service.setPolicy.mockResolvedValue({ data: {} } as any);
   });
@@ -1532,13 +1408,9 @@ describe("the first step's delay", () => {
 /// fine.
 describe("the delivery card", () => {
   beforeEach(() => {
-    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: ["seed_dest"], source: "policy" },
-    } as any);
-    service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
     } as any);
     service.setPolicy.mockResolvedValue({ data: {} } as any);
     destinations.list.mockResolvedValue({ data: [{ name: "slack-oncall" }] } as any);

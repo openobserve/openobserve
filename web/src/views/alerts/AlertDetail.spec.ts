@@ -340,6 +340,15 @@ describe("AlertDetail — History tab", () => {
       wrapper = await mountView({ alert: makeMultiAlert() });
       expect(wrapper.find('[data-otab-name="groups"]').exists()).toBe(true);
       expect(alertsService.list_groups).toHaveBeenCalledWith("default", "alert-1");
+      const table = wrapper.findComponent({ name: "AlertGroupsTable" });
+      expect(table.props("loadError")).toBe(false);
+    });
+
+    it("tells the groups table its load failed, rather than that nothing is tracked", async () => {
+      vi.mocked(alertsService.list_groups).mockRejectedValueOnce(new Error("boom"));
+      wrapper = await mountView({ alert: makeMultiAlert() });
+      const table = wrapper.findComponent({ name: "AlertGroupsTable" });
+      expect(table.props("loadError")).toBe(true);
     });
 
     it("keeps the group column and shows every group's transitions", async () => {

@@ -1,13 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Streams domain — Add Stream form validation E2E tests
-//
-// Covers:
-//   1. Empty name submit → name error visible (required)
-//   2. Name with special characters → format error visible
-//   3. Negative / zero retention value → error or save button disabled
-//   4. Valid name + type → stream created, dialog closes
-//   5. Cancel → dialog closes without saving
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -16,23 +7,25 @@ const PageManager = require('../../pages/page-manager.js');
 // Static stream name used for happy-path creation.
 // The prefix "e2e_streamfv_" is used for targeted cleanup.
 const VALID_STREAM_NAME = 'e2e_streamfv_001';
+const INHERITED_RETENTION_VALUES = ['', '0'];
 
 test.describe('Streams Add Stream form validation', { tag: ['@streams-form-validation', '@smoke', '@P0'] }, () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
     test.beforeAll(async ({ request }) => {
-        // Remove the test stream if it already exists from a previous run so TC004 can create it fresh.
         const org   = process.env.ORGNAME || 'default';
         // API calls go to INGESTION_URL (backend) not ZO_BASE_URL (Vite dev server)
         const base  = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
         const email = process.env.ZO_ROOT_USER_EMAIL;
         const pass  = process.env.ZO_ROOT_USER_PASSWORD;
         const creds = Buffer.from(`${email}:${pass}`).toString('base64');
-        await request.delete(
-            `${base}/api/${org}/streams/${VALID_STREAM_NAME}?type=logs&delete_all=false`,
-            { headers: { Authorization: `Basic ${creds}` } }
-        ).catch(() => {}); // ignore 404 if stream doesn't exist
+        for (const retention of INHERITED_RETENTION_VALUES) {
+            await request.delete(
+                `${base}/api/${org}/streams/${VALID_STREAM_NAME}_${retention || 'empty'}?type=logs&delete_all=false`,
+                { headers: { Authorization: `Basic ${creds}` } }
+            );
+        }
     });
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -101,63 +94,46 @@ test.describe('Streams Add Stream form validation', { tag: ['@streams-form-valid
         testLogger.info('Format error correctly shown for invalid stream name characters');
     });
 
-    // ── TC003: Negative retention value → error or save disabled ─────────────
-
-    test('should show error or disable save when data retention is negative', {
+    test('should show an error when data retention is negative', {
         tag: ['@streams-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
         testLogger.info('TC003: Verify retention error for negative value');
 
-        // Fill valid name and type first so the only invalid field is retention
         await pm.streamsFormValidation.fillStreamName(VALID_STREAM_NAME);
         await pm.streamsFormValidation.selectStreamType('Logs');
 
-        // Data retention section is conditionally rendered (requires zoConfig.data_retention_days).
-        // If it is not present in this environment, skip the retention assertion.
-        const retentionWrapper = pm.streamsFormValidation.getDataRetentionWrapperLocator();
-        const retentionVisible = await retentionWrapper.isVisible().catch(() => false);
-
-        if (!retentionVisible) {
-            testLogger.info('TC003: Data retention section not rendered in this environment — skipping');
-            // Still assert dialog is open (test is not vacuously passing)
-            await expect(pm.streamsFormValidation.getDialogLocator()).toBeVisible();
-            return;
-        }
-
-        // Fill an invalid value (0 is not > 0, so validation should fail)
-        await pm.streamsFormValidation.fillDataRetention('0');
+        await expect(pm.streamsFormValidation.getDataRetentionWrapperLocator()).toBeVisible();
+        await pm.streamsFormValidation.fillDataRetention('-1');
         await pm.streamsFormValidation.clickSave();
 
         const retentionError = pm.streamsFormValidation.getDataRetentionErrorLocator();
-        const saveBtn        = pm.streamsFormValidation.getSaveBtnLocator();
-
-        // Wait up to 3s for the error to appear (Vue batches re-renders)
-        const errorVisible = await retentionError.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
-        const btnDisabled  = await saveBtn.isDisabled().catch(() => false);
-
-        expect(errorVisible || btnDisabled).toBe(true);
+        await expect(retentionError).toBeVisible();
+        await expect(pm.streamsFormValidation.getDialogLocator()).toBeVisible();
         testLogger.info('Negative retention value correctly rejected');
     });
 
-    // ── TC004: Valid name + type → stream created, dialog closes ─────────────
+    for (const retention of INHERITED_RETENTION_VALUES) {
+        test(`should inherit retention when the value is ${retention || 'empty'}`, {
+            tag: ['@streams-form-validation', '@P0', '@smoke']
+        }, async ({ page }) => {
+            const streamName = `${VALID_STREAM_NAME}_${retention || 'empty'}`;
+            await pm.streamsFormValidation.fillStreamName(streamName);
+            await pm.streamsFormValidation.selectStreamType('Logs');
+            await pm.streamsFormValidation.fillDataRetention(retention);
 
-    test('should create stream and close dialog when valid name and type are provided', {
-        tag: ['@streams-form-validation', '@P0', '@smoke']
-    }, async ({ page }) => {
-        testLogger.info(`TC004: Creating stream "${VALID_STREAM_NAME}" with type Logs`);
+            await expect(pm.streamsFormValidation.getSaveBtnLocator()).toBeEnabled();
+            const responsePromise = page.waitForResponse(response =>
+                response.request().method() === 'POST' &&
+                new URL(response.url()).pathname.endsWith(`/streams/${streamName}`)
+            );
+            await pm.streamsFormValidation.clickSave();
+            const response = await responsePromise;
+            expect(response.ok()).toBe(true);
+            expect(response.request().postDataJSON().settings).not.toHaveProperty('data_retention');
 
-        await pm.streamsFormValidation.fillStreamName(VALID_STREAM_NAME);
-        await pm.streamsFormValidation.selectStreamType('Logs');
-
-        // Save should be enabled
-        await expect(pm.streamsFormValidation.getSaveBtnLocator()).toBeEnabled();
-        await pm.streamsFormValidation.clickSave();
-
-        // Dialog should close after successful creation
-        await expect(pm.streamsFormValidation.getDialogLocator()).not.toBeVisible({ timeout: 15000 });
-
-        testLogger.info('Stream created successfully and dialog closed');
-    });
+            await expect(pm.streamsFormValidation.getDialogLocator()).not.toBeVisible({ timeout: 15000 });
+        });
+    }
 
     // ── TC005: Cancel → dialog closes ────────────────────────────────────────
 

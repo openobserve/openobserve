@@ -127,8 +127,7 @@
     <ODrawer
       :open="editing"
       :width="60"
-      :title="isNew ? t('oncall.rotationAddTitle') : t('oncall.rotationTitle')"
-      :subtitle="t('oncall.rotationDrawerHint')"
+      :title="drawerTitle"
       :persistent="!draftsActive && wouldDiscardEdits"
       :close-guard="draftsActive ? guardDrawerClose : undefined"
       :show-close="false"
@@ -167,14 +166,14 @@
           <OInput
             v-model="active.name"
             :label="t('oncall.rotationName')"
-            :help-text="t('oncall.rotationNameHint')"
             :maxlength="MAX_ROTATION_NAME_CHARS"
             data-test="oncall-schedule-name"
           />
 
           <p
             v-if="nameClash"
-            class="text-status-warning-text text-xs"
+            class="text-status-error-text text-xs"
+            role="alert"
             data-test="oncall-schedule-name-clash"
           >
             {{ nameClash }}
@@ -200,11 +199,10 @@
                still the only way to add the first one. Matches the
                dashboard tab strip's own add-tab placement: snug against the
                last tab, not stretched off to the row's far edge. -->
-          <div class="flex items-center">
+          <div class="border-card-glass-border flex items-stretch border-b border-solid">
             <OTabs
               v-if="active.shift_rules.length"
               v-model="activeRuleTab"
-              bordered
               class="max-w-[calc(100%_-_2.5rem)]"
               data-test="oncall-schedule-rule-tabs"
             >
@@ -217,11 +215,13 @@
                 <!-- A status icon before the name; the rare actions sit in the trailing menu. -->
                 <OIcon
                   v-if="ruleTabIcon(rule, ruleIndex)"
-                  :name="ruleTabIcon(rule, ruleIndex) as any"
+                  :name="ruleTabIcon(rule, ruleIndex)"
                   size="sm"
                   class="shrink-0"
                   :data-test="`oncall-schedule-rule-tab-icon-${ruleIndex}`"
-                />
+                >
+                  <OTooltip side="bottom" :content="ruleTabHint(rule, ruleIndex)" />
+                </OIcon>
                 <span class="truncate">{{
                   raw(
                     rule.name?.trim()
@@ -252,7 +252,7 @@
             <OButton
               variant="ghost"
               size="icon"
-              class="ms-1"
+              class="ms-1 self-center"
               icon-left="add"
               :aria-label="t('oncall.addShiftRule')"
               data-test="oncall-schedule-rule-add"
@@ -303,6 +303,7 @@
                     :overlap-names="overlapNames(ruleIndex)"
                     :overlap-count="overlapCount(ruleIndex)"
                     :overlap-choice="overlapChoice(ruleIndex)"
+                    :all-other-hours="!rule.restrictions?.length && ruleNarrowed(ruleIndex)"
                     :set-members="setMembers"
                     :away-clashes-for="awayClashesFor"
                     :short-date="shortDate"
@@ -330,6 +331,8 @@
           :now-micros="nowMicros"
           :timezone="props.timezone"
           :error="preview.error.value"
+          :policy="policy ?? null"
+          :is-new="isNew"
           :show-empty="!preview.hasValidRule.value || preview.loaded.value"
           :name-of="nameOf"
         />
@@ -398,6 +401,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { dropRotationDrafts, newRotationVariant, rotationDraftId } from "./scheduleDrafts";
+import { nextRotationName } from "./OnCallSchedulePresets.target";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -434,7 +438,6 @@ import type {
 } from "@/ts/interfaces/oncall";
 import {
   BASE_SHIFT_RULE_NAME,
-  DEFAULT_ROTATION_NAME,
   MAX_ROTATION_NAME_CHARS,
   MICROS_PER_WEEK,
 } from "@/ts/interfaces/oncall";
@@ -460,6 +463,9 @@ import {
   stopChoices,
   stopConsequence,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
+import { serverMessageOf } from "@/utils/slackLink";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
 const props = defineProps<{
   teamId: string;
@@ -485,6 +491,7 @@ const emit = defineEmits<{
   "open-members": [];
   /** A hand-edited policy pages the rotation being removed; it has to be edited first. */
   "open-policy": [];
+  licenseDenied: [features: string[]];
 }>();
 
 const { t } = useI18nTyped();
@@ -617,7 +624,9 @@ watch(editing, async (isOpen) => {
     editorAbsences.value = await queryClient.fetchQuery(
       unavailabilityQuery(orgId.value, undefined, now, now + ABSENCE_HORIZON_DAYS * 86_400_000_000),
     );
-  } catch {
+  } catch (err) {
+    const denied = licenseDeniedFeatures(err);
+    if (denied) emit("licenseDenied", denied);
     editorAbsences.value = [];
   }
 });
@@ -648,9 +657,15 @@ const wouldDiscardEdits = computed(() => {
   return JSON.stringify(rotation) !== openedAs.value;
 });
 
-/// Two rotations with one name is a screen where "page the Secondary" names
-/// two things. The server keys on the id, so this is a legibility rule rather
-/// than a storage one — which is why it warns rather than blocks.
+/// The stored name, so the title does not retype itself while the name field is edited.
+const drawerTitle = computed<I18nText>(() => {
+  if (isNew.value) return t("oncall.rotationAddTitle");
+  const id = active.value?.id;
+  const stored = props.schedule?.rotations.find((rotation) => rotation.id === id);
+  return t("oncall.rotationEditTitle", { name: raw(stored?.name ?? active.value?.name ?? "") });
+});
+
+/// Blocks Save: two rotations with one name make every level, menu and cover that names one ambiguous.
 const nameClash = computed<I18nText | "">(() => {
   const rotation = active.value;
   if (!rotation) return "";
@@ -676,6 +691,7 @@ const scheduleWrite = useMutation(() => setTeamScheduleMutation(orgId.value, pro
 const activeIsSavable = computed(() => {
   const rotation = active.value;
   if (!rotation?.name?.trim()) return false;
+  if (nameClash.value) return false;
   if (!rotation.shift_rules.length) return false;
   if (rotation.shift_rules.some((rule) => !rule.members.length)) return false;
   // The server refuses a From == To window outright.
@@ -709,6 +725,9 @@ const preview = useRotationPreview({
   teamId: () => props.teamId,
   timezone: () => props.timezone,
   nowMicros: () => nowMicros.value,
+});
+watch(preview.licenseDenied, (denied) => {
+  if (denied) emit("licenseDenied", denied);
 });
 
 const activeRule = computed(() => active.value?.shift_rules[Number(activeRuleTab.value)] ?? null);
@@ -811,21 +830,35 @@ function setOverlapWinner(index: number, wins: boolean) {
   });
 }
 
+/// Rivals take some of this rule's minutes but not all; a rival that counts always takes some.
+function ruleNarrowed(index: number): boolean {
+  const named = namedShiftRules.value;
+  return (
+    effectiveWeekCoverage(named, index, nowMicros.value).length > 0 &&
+    effectiveRivals(named, index, nowMicros.value).length > 0
+  );
+}
+
 /// The rule's hours, then who wins where it overlaps another rule.
 function ruleSummary(index: number): I18nText {
   const rules = active.value?.shift_rules ?? [];
   const nameList = (indices: number[]) =>
     indices.map((k) => namedShiftRules.value[k].name).join(", ");
   const { winsOver, losesTo } = overlapStanding(rules, index);
-  const parts: string[] = [ruleHoursSummary(rules[index], t)];
+  const effective = effectiveWeekCoverage(namedShiftRules.value, index, nowMicros.value);
+  const narrowed = ruleNarrowed(index);
+  // A rule with no window of its own holds exactly what its rivals leave, so that is its hours.
+  const unrestricted = !rules[index].restrictions?.length;
+  const parts: string[] = [
+    narrowed && unrestricted
+      ? coverageHoursSummary(effective, t)
+      : ruleHoursSummary(rules[index], t),
+  ];
   if (winsOver.length) parts.push(t("oncall.ruleWinsOver", { names: raw(nameList(winsOver)) }));
   if (losesTo.length) {
     parts.push(t("oncall.ruleLosesTo", { names: raw(nameList(losesTo)) }, losesTo.length));
   }
-  const named = namedShiftRules.value;
-  const effective = effectiveWeekCoverage(named, index, nowMicros.value);
-  // A rival that counts always takes some minutes, so rivals mean the hours differ.
-  if (effective.length && effectiveRivals(named, index, nowMicros.value).length) {
+  if (narrowed && !unrestricted) {
     parts.push(t("oncall.ruleOnCallOnly", { hours: coverageHoursSummary(effective, t) }));
   }
   const endsAt = rules[index].ends_at;
@@ -912,11 +945,19 @@ function ruleHasProblem(rule: ShiftRule): boolean {
   return !rule.members.length || !!priorityClashFor(rule);
 }
 
-function ruleTabIcon(rule: ShiftRule, index: number): string | undefined {
+function ruleTabIcon(rule: ShiftRule, index: number): IconName | undefined {
   if (ruleHasProblem(rule)) return "error-outline";
   if (ruleUsage(index)?.kind === "never-used") return "warning-amber";
   if (isRetired(rule)) return "pause-circle-filled";
   return undefined;
+}
+
+/// What the tab's status icon means, in the order `ruleTabIcon` picks it.
+function ruleTabHint(rule: ShiftRule, index: number): I18nText {
+  if (!rule.members.length) return t("oncall.ruleTabNoPeople");
+  if (priorityClashFor(rule)) return t("oncall.ruleTabClash");
+  if (ruleUsage(index)?.kind === "never-used") return t("oncall.ruleTabNeverUsed");
+  return t("oncall.ruleTabStopped");
 }
 
 // Missing people are said out loud once the picker was used or the server stored the rule empty.
@@ -981,9 +1022,10 @@ watch(
 /// edits one roster and not the other they drift, and `config-risks` reports
 /// the collision rather than a hidden rule preventing it.
 function addRotation() {
-  const name = draft.value.length
-    ? String(t("oncall.rotationNthName", { n: draft.value.length + 1 }))
-    : DEFAULT_ROTATION_NAME;
+  const name = nextRotationName(
+    draft.value.map((r) => r.name),
+    (n) => String(t("oncall.rotationNthName", { n })),
+  );
   const rotation: Rotation = {
     id: mintRotationId(),
     name,
@@ -1143,10 +1185,10 @@ async function save(): Promise<boolean> {
     // The parent's schedule is a ref: invalidation expires it, it never repaints it.
     emit("saved");
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.saveScheduleFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.saveScheduleFailed"),
     });
     return false;
   } finally {

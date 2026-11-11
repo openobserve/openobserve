@@ -19,6 +19,9 @@ import RunningQueries from "@/components/queries/RunningQueries.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import SearchService from "@/services/search";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock SearchService
 vi.mock("@/services/search", async (importOriginal) => {
@@ -277,6 +280,24 @@ describe("RunningQueries", () => {
     ]);
     expect(wrapper.vm.selectedRow.all).toEqual([]);
     expect(wrapper.vm.deleteDialog.show).toBe(false);
+  });
+
+  it("tracks a cancel with its count and view once the request resolves", async () => {
+    vi.mocked(analytics.track).mockClear();
+    wrapper.vm.deleteDialog.data = [
+      { trace_id: "trace-1", org_id: "org-1" },
+      { trace_id: "trace-2", org_id: "org-1" },
+    ];
+    wrapper.vm.selectedQueryTypeTab = "summary";
+    (SearchService.cancel_running_queries as any).mockResolvedValue({});
+
+    await wrapper.vm.deleteQuery();
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("query_management_queries_cancelled", {
+      count: 2,
+      view: "summary",
+    });
   });
 
   it("should cancel a trace id shared by two orgs only in the org of the chosen row", async () => {

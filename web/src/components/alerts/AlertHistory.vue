@@ -558,6 +558,7 @@ import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -839,6 +840,7 @@ const clearSearch = () => {
 };
 
 const manualSearch = () => {
+  analytics.track("alert_history_searched", { alert_filtered: !!searchQuery.value });
   currentPage.value = 1;
   // The user explicitly asked for results, so this always hits the server even
   // when the filter shape is unchanged.
@@ -981,6 +983,11 @@ const updateDateTime = (value: any) => {
     type: value.relativeTimePeriod ? "relative" : "absolute",
     relativeTimePeriod: value.relativeTimePeriod || "",
   };
+  if (value.userChangedValue) {
+    analytics.track("alert_history_time_range_changed", {
+      type: value.relativeTimePeriod ? "relative" : "absolute",
+    });
+  }
 
   if (value.relativeTimePeriod) {
     dateTimeType.value = "relative";
@@ -1037,6 +1044,7 @@ const formatDuration = (microseconds: number) => {
 };
 
 const showDetailsDialog = (row: any) => {
+  analytics.track("alert_history_detail_opened");
   selectedRow.value = row;
   detailsDialog.value = true;
 };

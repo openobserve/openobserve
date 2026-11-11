@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="primary"
             size="sm-action"
+            icon-left="check"
             :data-test="`oncall-schedule-rule-rename-done-${ruleIndex}`"
             @click="renameOpen = false"
           >
@@ -169,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm-action"
             :disabled="stopAt === null"
+            icon-left="stop-circle"
             :data-test="`oncall-schedule-rule-stop-confirm-${ruleIndex}`"
             @click="confirmStop"
           >

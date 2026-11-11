@@ -34,6 +34,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- Uploaded JS source maps cannot resolve native mobile frames -->
+    <OEmptyState
+      v-else-if="isMobileError"
+      size="block"
+      :title="t('rum.mobileSourceMapsNotApplicable')"
+      :description="t('rum.mobileSourceMapsNotApplicableBody', { tab: t('rum.stackTraceRaw') })"
+      :hide-action="true"
+      data-test="rum-pretty-stack-trace-mobile-unsupported"
+    >
+      <template #illustration>
+        <OIcon name="code-off" size="xl" />
+      </template>
+    </OEmptyState>
+
     <!-- No source maps available message -->
     <!-- eslint-disable local/no-hardcoded-px -- 1px container border — a border width, optical not layout; it must not thicken with the message text -->
     <div
@@ -308,6 +322,7 @@ import {
 } from "@/utils/stackTraceCache";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 const store = useStore();
 const router = useRouter();
@@ -353,6 +368,8 @@ interface StackTraceFrame {
   error: string;
   stack: StackFrame[];
 }
+
+const isMobileError = computed(() => ["ios", "android"].includes(props.error.source));
 
 const isLoadingTranslation = ref(false);
 const translatedStackTrace = ref<StackTraceFrame[]>([]);
@@ -443,6 +460,8 @@ const highlightErrorLine = (traceIndex: number, frameIndex: number) => {
 };
 
 const translateStackTrace = async () => {
+  if (isMobileError.value) return;
+
   if (!props.error_stack || props.error_stack.length === 0) {
     console.warn("No error stack available");
     return;

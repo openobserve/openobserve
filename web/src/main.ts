@@ -69,8 +69,6 @@ contextRegistry.register("default", defaultProvider);
 
 const { reoInit } = useReo();
 
-reoInit();
-
 // app.use(SearchPlugin);
 
 // Unauthenticated bootstrap payload: only what the login page needs. The full
@@ -207,4 +205,10 @@ loadLocaleMessages(activeLocale)
   .catch(() => {})
   .finally(() => {
     app.mount("#app");
+    // reo.js is not needed to render, but the login callback identifies the user and then leaves the page.
+    const startReo = () => void reoInit();
+    if (/\/cb\/?$/.test(window.location.pathname)) startReo();
+    else if (typeof requestIdleCallback !== "undefined")
+      requestIdleCallback(startReo, { timeout: 5000 });
+    else setTimeout(startReo, 0);
   });

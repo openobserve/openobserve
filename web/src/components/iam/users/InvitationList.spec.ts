@@ -4,6 +4,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 const dismissToastMock = vi.fn();
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => dismissToastMock),
 }));
@@ -60,6 +61,7 @@ vi.mock("@/services/organizations", async (importOriginal) => {
 import InvitationList from "@/components/iam/users/InvitationList.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
+import analytics from "@/services/product_analytics";
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport).
 // Exposes the props the component forwards and emits the click events
@@ -329,6 +331,9 @@ describe("InvitationList - confirmAcceptInvitation", () => {
       "confirm",
       "org-1",
     );
+    expect(analytics.track).toHaveBeenCalledWith("invitation_accepted", {
+      source: "invitation_list",
+    });
   });
 
   it("closes the confirmAccept dialog after invoking confirm", async () => {

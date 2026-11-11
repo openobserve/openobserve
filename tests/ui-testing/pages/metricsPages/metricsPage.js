@@ -158,7 +158,7 @@ export class MetricsPage {
         this.historyButton = page.locator('[data-test="metrics-history-btn"]');
         this.historyDrawer = page.locator('[data-test="recent-searches-drawer"]');
         this.historySearch = this.historyDrawer.locator('[data-test="recent-searches-search"] input');
-        this.historyStarredOnly = this.historyDrawer.locator('[data-test="recent-searches-starred-only"]');
+        this.historyStarredOnly = this.historyDrawer.locator('[data-test="recent-searches-status-starred"]');
     }
 
     /**

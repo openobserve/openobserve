@@ -30,6 +30,9 @@ export const makeAlertSectionRouter = (): Router => {
     routes: [
       { path: "/", name: "home", component: blank },
       { path: "/alerts", name: "alertList", component: blank },
+      { path: "/alerts/firing", name: "alertFiring", component: blank },
+      { path: "/alerts/detail/:alert_id", name: "alertDetail", component: blank },
+      { path: "/incidents/:id", name: "incidentDetail", component: blank },
       { path: "/alert-library", name: "alertLibrary", component: blank },
       { path: "/alert-destinations", name: "alertDestinations", component: blank },
       { path: "/alert-templates", name: "alertTemplates", component: blank },

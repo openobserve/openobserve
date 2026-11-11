@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -31,8 +31,16 @@ vi.mock("@/aws-exports", () => ({
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
+vi.mock("@/composables/sampleData/useSampleDataPresence", () => ({
+  fetchHasUserStreams: vi.fn().mockResolvedValue(true),
+}));
+
+import { createMemoryHistory, createRouter } from "vue-router";
 import CommunitySlackInvite from "./CommunitySlackInvite.vue";
+import SampleDataWelcome from "./sampleData/SampleDataWelcome.vue";
 import analytics from "@/services/product_analytics";
+import { fetchHasUserStreams } from "@/composables/sampleData/useSampleDataPresence";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
@@ -64,7 +72,7 @@ const ODialogStub = {
   `,
 };
 
-// A `pending_day2` record left over from ConnectDataSourcePopup's touchpoint.
+// A `pending_day2` record left by the onboarding dialog's touchpoint.
 // `hoursAgo` controls whether the day-2 threshold has elapsed yet.
 function setPendingDay2(hoursAgo: number) {
   localStorage.setItem(
@@ -96,8 +104,8 @@ function buildWrapper() {
 // Child components: ODialog (stubbed), OButton (real), OIcon (real), SlackIcon (real)
 // Conditional states:
 //   - Cloud vs non-Cloud (isCloud !== "true" → nothing shown)
-//   - First-time login (isFirstTimeLogin = "true") → never opens, defers entirely
-//     to ConnectDataSourcePopup for that session
+//   - First-time login (isFirstTimeLogin = "true") → never opens, defers to the
+//     onboarding dialog for that session
 //   - Day-2 record not yet "pending_day2", or shownAt < 24h ago → stays closed
 //   - Day-2 record "pending_day2" and shownAt >= 24h ago → opens on mount
 //   - memberCount present/absent → different captionText
@@ -235,17 +243,41 @@ describe("CommunitySlackInvite", () => {
   });
 
   // ── First-login gate ─────────────────────────────────────────────────────────
-  // Never compete with ConnectDataSourcePopup/GetStarted during the user's
+  // Never compete with onboarding or the welcome dialog during the user's
   // first-login session — the day-2 clock only starts once that session ends.
 
   describe("first-login gate", () => {
-    it("does not open during first-time login even with an elapsed day-2 record", () => {
+    it("does not open during first-time login even with an elapsed day-2 record", async () => {
+      localStorage.setItem("isFirstTimeLogin", USER_EMAIL);
+      setPendingDay2(25);
+
+      wrapper = buildWrapper();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+    });
+
+    it("opens for a user whose browser holds another user's first-login flag", async () => {
+      localStorage.setItem("isFirstTimeLogin", "someone-else@example.com");
+      setPendingDay2(25);
+
+      wrapper = buildWrapper();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+      localStorage.removeItem("isFirstTimeLogin");
+    });
+
+    // a flag set before it held the email
+    it("treats a legacy 'true' flag as this user's first login, and stores their email in it", async () => {
       localStorage.setItem("isFirstTimeLogin", "true");
       setPendingDay2(25);
 
       wrapper = buildWrapper();
+      await nextTick();
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+      expect(localStorage.getItem("isFirstTimeLogin")).toBe(USER_EMAIL);
     });
 
     it("opens normally once isFirstTimeLogin is cleared (returning session)", async () => {
@@ -257,6 +289,236 @@ describe("CommunitySlackInvite", () => {
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
     });
+
+    it("stays closed in a session the onboarding page claimed", async () => {
+      sessionStorage.setItem(`connectDataSourcePromptShown:${USER_EMAIL}`, "true");
+      setPendingDay2(25);
+
+      wrapper = buildWrapper();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+      sessionStorage.clear();
+    });
+  });
+
+  // ── Sample data welcome ─────────────────────────────────────────────────────
+  // The welcome dialog wins: the invite never opens next to it.
+
+  describe("sample data welcome", () => {
+    const session = useSampleDataSession();
+    const dialogOpen = () => wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open");
+
+    afterEach(() => {
+      session.welcomeOpen.value = false;
+      session.welcomeDeciding.value = 0;
+      session.tour.value = null;
+    });
+
+    it.each([
+      ["stays closed", "this org", () => store.state.selectedOrganization.identifier, "false"],
+      ["opens", "another org", () => "other-org", "true"],
+    ])("%s while a sample tour runs in %s", async (_name, _where, tourOrg, open) => {
+      setPendingDay2(25);
+      session.tour.value = { org: tourOrg(), index: 1, minimized: false };
+
+      wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(dialogOpen()).toBe(open);
+    });
+
+    it("stays closed while the welcome is open, until a later visit", async () => {
+      setPendingDay2(25);
+      session.welcomeOpen.value = true;
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      expect(dialogOpen()).toBe("false");
+      session.welcomeOpen.value = false;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("false");
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("waits for the welcome's stream check and stays closed when the welcome opens", async () => {
+      setPendingDay2(25);
+      session.welcomeDeciding.value = 1;
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      expect(dialogOpen()).toBe("false");
+      session.welcomeOpen.value = true;
+      session.welcomeDeciding.value = 0;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("false");
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("opens once the welcome's stream check ends without a welcome", async () => {
+      setPendingDay2(25);
+      session.welcomeDeciding.value = 1;
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      session.welcomeDeciding.value = 0;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("true");
+      expect(analytics.track).toHaveBeenCalledWith(
+        "community_slack_prompt_shown",
+        expect.anything(),
+      );
+    });
+
+    it("waits until an org is selected", async () => {
+      const org = store.state.selectedOrganization;
+      store.commit("setSelectedOrganization", {});
+      setPendingDay2(25);
+      try {
+        wrapper = buildWrapper();
+        await flushPromises();
+        expect(dialogOpen()).toBe("false");
+        store.commit("setSelectedOrganization", org);
+        await flushPromises();
+        expect(dialogOpen()).toBe("true");
+      } finally {
+        store.commit("setSelectedOrganization", org);
+      }
+    });
+
+    it("never shows next to the welcome when both mount on Home, as in the main layout", async () => {
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        sample_data_onboarding_enabled: true,
+      });
+      let answer!: (hasData: boolean) => void;
+      vi.mocked(fetchHasUserStreams).mockReturnValueOnce(new Promise((r) => (answer = r)));
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", name: "home", component: { template: "<div />" } }],
+      });
+      await router.push("/");
+      await router.isReady();
+      setPendingDay2(25);
+
+      wrapper = mount(
+        {
+          components: { SampleDataWelcome, CommunitySlackInvite },
+          template: "<div><SampleDataWelcome /><CommunitySlackInvite /></div>",
+        },
+        {
+          global: {
+            plugins: [store, i18n, router],
+            stubs: { ODialog: ODialogStub, WelcomeChoices: true, SampleDataProgress: true },
+          },
+        },
+      );
+      const invite = () =>
+        wrapper
+          .findComponent(CommunitySlackInvite)
+          .find('[data-test="o-dialog-stub"]')
+          .attributes("data-open");
+      await flushPromises();
+      expect(invite()).toBe("false");
+      answer(false);
+      await flushPromises();
+
+      expect(session.welcomeOpen.value).toBe(true);
+      expect(invite()).toBe("false");
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "community_slack_prompt_shown",
+        expect.anything(),
+      );
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        sample_data_onboarding_enabled: false,
+      });
+    });
+
+    it("waits for the full config before it shows, as in the main layout", async () => {
+      const full = store.state.zoConfig;
+      const { version: _version, ...bootstrap } = full;
+      store.commit("setConfig", bootstrap);
+      let answer!: (hasData: boolean) => void;
+      vi.mocked(fetchHasUserStreams).mockReturnValueOnce(new Promise((r) => (answer = r)));
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", name: "home", component: { template: "<div />" } }],
+      });
+      await router.push("/");
+      await router.isReady();
+      setPendingDay2(25);
+      try {
+        wrapper = mount(
+          {
+            components: { SampleDataWelcome, CommunitySlackInvite },
+            template: "<div><SampleDataWelcome /><CommunitySlackInvite /></div>",
+          },
+          {
+            global: {
+              plugins: [store, i18n, router],
+              stubs: { ODialog: ODialogStub, WelcomeChoices: true, SampleDataProgress: true },
+            },
+          },
+        );
+        const invite = () =>
+          wrapper
+            .findComponent(CommunitySlackInvite)
+            .find('[data-test="o-dialog-stub"]')
+            .attributes("data-open");
+        await flushPromises();
+        expect(invite()).toBe("false");
+        store.commit("setConfig", {
+          ...full,
+          sample_data_onboarding_enabled: true,
+        });
+        await flushPromises();
+        answer(false);
+        await flushPromises();
+
+        expect(session.welcomeOpen.value).toBe(true);
+        expect(invite()).toBe("false");
+        expect(analytics.track).not.toHaveBeenCalledWith(
+          "community_slack_prompt_shown",
+          expect.anything(),
+        );
+      } finally {
+        store.commit("setConfig", full);
+      }
+    });
+
+    it("hides, without counting a dismissal, while a welcome opens over it", async () => {
+      setPendingDay2(25);
+      const record = localStorage.getItem(STATE_KEY);
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      expect(dialogOpen()).toBe("true");
+      session.welcomeOpen.value = true;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("false");
+      expect(localStorage.getItem(STATE_KEY)).toBe(record);
+    });
+
+    it("stays closed after a welcome that opened over it closes, and stays due", async () => {
+      setPendingDay2(25);
+      const record = localStorage.getItem(STATE_KEY);
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      expect(dialogOpen()).toBe("true");
+      session.welcomeOpen.value = true;
+      await flushPromises();
+      session.welcomeOpen.value = false;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("false");
+      expect(localStorage.getItem(STATE_KEY)).toBe(record);
+    });
   });
 
   // ── Day-2 trigger ────────────────────────────────────────────────────────────
@@ -266,6 +528,26 @@ describe("CommunitySlackInvite", () => {
       wrapper = buildWrapper();
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+    });
+
+    // users onboarding never reaches (invited, domain-mapped, a new browser) still get the day-two ask
+    it("starts the day-2 clock in a session past the first login", () => {
+      wrapper = buildWrapper();
+
+      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
+      expect(record.status).toBe("pending_day2");
+      expect(Date.now() - record.shownAt).toBeLessThan(60_000);
+    });
+
+    it("leaves the clock alone in the first-login session and off cloud", () => {
+      localStorage.setItem("isFirstTimeLogin", USER_EMAIL);
+      wrapper = buildWrapper();
+      wrapper.unmount();
+      localStorage.removeItem("isFirstTimeLogin");
+      mockConfig.isCloud = "false";
+      wrapper = buildWrapper();
+
+      expect(localStorage.getItem(STATE_KEY)).toBeNull();
     });
 
     it("stays closed when pending but less than 24h have elapsed", () => {

@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('telephony.title')"
-    :subtitle="t('telephony.subtitle')"
     icon="call"
     title-data-test="telephony-settings-title"
     scroll
@@ -61,18 +60,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :read-only="readOnly"
         data-test="telephony-settings-deployment"
       >
-        <span class="flex flex-wrap items-center gap-1">
-          <OText variant="meta">{{ t("telephony.deploymentOwner") }}</OText>
+        <template #actions>
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="outline"
+            size="sm-action"
+            icon-left="swap-horiz"
             :disabled="readOnly"
             data-test="telephony-settings-use-own"
             @click="openDialog('connect')"
           >
             {{ t("telephony.useOwn", { provider: PROVIDER }) }}
           </OButton>
-        </span>
+        </template>
       </TelephonyAccountCard>
 
       <TelephonyAccountCard
@@ -90,10 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="telephony-settings-connected"
         @update="openDialog('update')"
       >
-        <div class="flex flex-wrap justify-end gap-2">
+        <template #actions>
           <OButton
             variant="outline"
             size="sm-action"
+            icon-left="edit"
             :disabled="readOnly"
             data-test="telephony-settings-update"
             @click="openDialog('update')"
@@ -103,13 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline-destructive"
             size="sm-action"
+            icon-left="link-off"
             :disabled="readOnly"
             data-test="telephony-settings-disconnect"
             @click="confirmingDisconnect = true"
           >
             {{ t("telephony.disconnect") }}
           </OButton>
-        </div>
+        </template>
       </TelephonyAccountCard>
     </div>
 
@@ -131,8 +132,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'telephony.disconnectToEmail'
       "
       :message-name="view?.org ? shortSid(view.org.account_sid) : ''"
-      :ok-label="t('telephony.disconnect')"
+      :ok-label="t('telephony.disconnectConfirm', { provider: PROVIDER })"
       ok-variant="destructive"
+      focus-cancel
       @update:ok="disconnect"
     />
   </OPageLayout>
@@ -152,6 +154,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteTelephonyMutation, telephonyQuery } from "@/services/oncall.queries";
+import analytics from "@/services/product_analytics";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import TelephonyAccountCard from "./TelephonyAccountCard.vue";
@@ -196,6 +199,7 @@ function openDialog(mode: TelephonyDialogMode) {
 async function disconnect() {
   try {
     await remove.mutateAsync();
+    analytics.track("telephony_disconnected");
   } catch (err) {
     if (isForbidden(err)) {
       readOnly.value = true;

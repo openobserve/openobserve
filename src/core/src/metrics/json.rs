@@ -118,7 +118,7 @@ async fn buffer_record(
         unreachable!("flatten only returns an object")
     };
     let stream_name = match stream_name {
-        Some(name) => name.to_string(),
+        Some(name) => format_stream_name(name.to_string()),
         None => match record
             .get(NAME_LABEL)
             .ok_or_else(|| anyhow!("missing __name__"))?
@@ -216,10 +216,9 @@ async fn buffer_record(
         None => now_micros(),
         // `as_f64` is `None` for a literal out of f64 range (`1e400`), which unwrapping
         // turned into a panic on a request body anyone can send
-        Some(json::Value::Number(s)) => time::parse_i64_to_timestamp_micros(
+        Some(json::Value::Number(s)) => time::parse_f64_to_timestamp_micros(
             s.as_f64()
-                .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?
-                as i64,
+                .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?,
         ),
         Some(_) => {
             return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));

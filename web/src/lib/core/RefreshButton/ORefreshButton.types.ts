@@ -19,8 +19,8 @@ export interface RefreshButtonProps {
   shortcutId?: string;
   /** Replaces the last-refreshed time in the tooltip, for data that carries its own as-of time. */
   tooltip?: I18nText;
-  /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill, so the pill need not clip it. */
-  size?: "toolbar" | "inset";
+  /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill; `header` gives the inline button the height of `sm` header buttons. */
+  size?: "toolbar" | "inset" | "header";
   /** `clock` shows "Updated hh:mm" with the zone in the tooltip and name; `relative` (default) shows "12s ago". */
   ageFormat?: "relative" | "clock";
   /** IANA zone for clock times; the app's selected zone when absent. */

@@ -23,7 +23,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use config::{
-    meta::alerts::level::AlertLevel,
+    meta::alerts::{
+        level::AlertLevel,
+        notification_kind::{NotificationEvent, NotificationKind},
+    },
     utils::json::{Map, Value},
 };
 
@@ -99,6 +102,41 @@ pub struct NotificationContext {
     pub metadata: Vec<(String, String)>,
     pub group_labels: Option<BTreeMap<String, String>>,
     pub level: Option<AlertLevel>,
+    pub kind: NotificationKind,
+    pub event: NotificationEvent,
+    pub cluster_name: String,
+    /// Today's body for a generic webhook while no user template applies (D1).
+    pub legacy_payload: Option<LegacyPayload>,
+    pub render_hints: RenderHints,
+}
+
+/// Producer choices the renderer honors; the defaults keep the alert output unchanged.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RenderHints {
+    /// The email or SNS subject when a Custom template has no title of its own.
+    pub fallback_subject: Option<String>,
+    /// HTML-escape context attributes in email bodies, as the producer's own sender did.
+    pub escape_email_attributes: bool,
+}
+
+/// Builds a producer's pre-template JSON body only when the legacy rule selects it.
+#[derive(Clone)]
+pub struct LegacyPayload(pub std::sync::Arc<dyn Fn() -> Value + Send + Sync>);
+
+impl LegacyPayload {
+    pub fn new(f: impl Fn() -> Value + Send + Sync + 'static) -> Self {
+        Self(std::sync::Arc::new(f))
+    }
+
+    pub fn build(&self) -> Value {
+        (self.0)()
+    }
+}
+
+impl std::fmt::Debug for LegacyPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("LegacyPayload")
+    }
 }
 
 /// Collect row columns in deterministic order.

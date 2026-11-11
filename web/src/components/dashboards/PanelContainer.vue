@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="[
             curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
             titleMeta ? 'me-2!' : undefined,
+            showInlineDescription ? 'me-0.5!' : undefined,
             hasNoticeChips
               ? 'min-w-[min(10rem,40%)]! @max-[12rem]/panelbar:min-w-[35%]!'
               : undefined,
@@ -70,6 +71,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ panelTitle }}
         </OTruncatedText>
+        <OButton
+          v-if="showInlineDescription"
+          variant="ghost"
+          size="icon-xs"
+          icon-left="info-outline"
+          class="shrink-0"
+          :class="titleMeta ? 'me-2' : 'me-5'"
+          :aria-label="t('dashboard.description')"
+          data-test="dashboard-panel-title-description-info"
+        >
+          <OTooltip side="bottom" align="start" max-width="13.75rem">
+            <template #content
+              ><div class="whitespace-pre-wrap">{{ props.data.description }}</div></template
+            >
+          </OTooltip>
+        </OButton>
         <span
           v-if="titleMeta"
           class="text-2xs text-text-secondary me-5 shrink-0 font-normal whitespace-nowrap"
@@ -220,12 +237,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-exemplars-toggle"
           @toggle="setExemplarOverride(!exemplarsOn)"
         />
-        <OIcon
+        <OButton
           v-if="!viewOnly && !simplifiedPanelView && props.data.description != ''"
-          name="info-outline"
-          size="sm"
-          class="cursor-pointer"
           :class="hoverRevealClass"
+          variant="ghost"
+          size="icon"
+          icon-left="info-outline"
+          :aria-label="t('dashboard.description')"
           data-test="dashboard-panel-description-info"
         >
           <OTooltip side="bottom" align="end" max-width="13.75rem">
@@ -233,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ><div class="whitespace-pre-wrap">{{ props.data.description }}</div></template
             >
           </OTooltip>
-        </OIcon>
+        </OButton>
         <OButton
           :class="hoverRevealClass"
           v-if="!viewOnly && !simplifiedPanelView"
@@ -269,13 +287,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :content="t('dashboard.panelContainer.dependentAdhocVariableWarning')"
           />
         </OButton>
-        <OIcon
+        <OButton
           v-if="PanleSchemaRendererRef?.failedAnnotationSources?.length"
-          name="error-outline"
-          size="sm"
-          class="text-text-secondary shrink-0"
+          variant="ghost"
+          size="icon"
+          icon-left="error-outline"
+          class="shrink-0"
           data-test="dashboard-panel-annotation-source-error"
-          :label="failedAnnotationSourcesLabel"
+          :aria-label="failedAnnotationSourcesLabel"
         >
           <OTooltip
             side="bottom"
@@ -283,14 +302,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             max-width="15rem"
             :content="failedAnnotationSourcesLabel"
           />
-        </OIcon>
-        <OIcon
+        </OButton>
+        <OButton
           v-if="PanleSchemaRendererRef?.truncatedAnnotationSources?.length"
-          name="info-outline"
-          size="sm"
-          class="text-text-secondary shrink-0"
+          variant="ghost"
+          size="icon"
+          icon-left="info-outline"
+          class="shrink-0"
           data-test="dashboard-panel-annotation-source-truncated"
-          :label="truncatedAnnotationSourcesLabel"
+          :aria-label="truncatedAnnotationSourcesLabel"
         >
           <OTooltip
             side="bottom"
@@ -298,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             max-width="15rem"
             :content="truncatedAnnotationSourcesLabel"
           />
-        </OIcon>
+        </OButton>
         <!-- show error here -->
         <!-- The title gives way first; this clips only past the title's floor, so refresh and the menu always stay in the panel. -->
         <!-- On a wall screen only a failure may draw the eye; the failed panel says so in its body. -->
@@ -329,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="variablesDataUpdated || isTimeRangeWaiting ? 'ghost-warning' : 'ghost'"
           size="icon"
           @click="() => onRefreshPanel(false)"
-          :title="t('panel.refreshPanel')"
+          :aria-label="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
           :disabled="isPanelLoading"
           icon-left="refresh"
@@ -342,10 +362,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon"
           @click="deletePanelDialog"
-          :title="t('panel.deletePanel')"
+          :aria-label="t('panel.deletePanel')"
           :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
           icon-left="close"
         >
+          <OTooltip side="bottom" :content="t('panel.deletePanel')" />
         </OButton>
 
         <!-- Only in viewOnly, so it can never sit beside the panel's own Create alert. -->
@@ -858,6 +879,10 @@ export default defineComponent({
     const panelFileName = computed(() => toPanelFileName(panelTitle.value));
     // A runtime stamp from embedding pages (the traces Rate unit); stored dashboards never carry it.
     const titleMeta = computed(() => props.data?.config?.title_meta as string | undefined);
+    // The header-end info button is hidden in the simplified view, so its description sits by the title.
+    const showInlineDescription = computed(
+      () => !!props.simplifiedPanelView && !props.viewOnly && !!props.data?.description,
+    );
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -1612,6 +1637,7 @@ export default defineComponent({
       onCuratedSeriesData,
       panelTitle,
       titleMeta,
+      showInlineDescription,
       panelFileName,
       alertDisabledReason,
       canCreateAlert,

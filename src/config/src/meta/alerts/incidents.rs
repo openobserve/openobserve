@@ -100,6 +100,8 @@ pub enum CorrelationReason {
     SecondaryMatch,
     /// Fallback: no dimensions found, isolated by alert ID
     AlertId,
+    /// A security firing on the same host, user or address as the case
+    Entity,
 }
 
 impl std::fmt::Display for CorrelationReason {
@@ -109,6 +111,7 @@ impl std::fmt::Display for CorrelationReason {
             Self::PrimaryMatch => write!(f, "primary_match"),
             Self::SecondaryMatch => write!(f, "secondary_match"),
             Self::AlertId => write!(f, "alert_id"),
+            Self::Entity => write!(f, "entity"),
         }
     }
 }
@@ -122,6 +125,7 @@ impl std::str::FromStr for CorrelationReason {
             "primary_match" => Ok(Self::PrimaryMatch),
             "secondary_match" => Ok(Self::SecondaryMatch),
             "alert_id" => Ok(Self::AlertId),
+            "entity" => Ok(Self::Entity),
             unmatched => Err(format!("'{unmatched}' is not a valid CorrelationReason")),
         }
     }
@@ -352,6 +356,10 @@ pub struct Incident {
     /// Every alert that fired into the incident and how often, most-fired first; list only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_groups: Option<Vec<IncidentAlertGroup>>,
+
+    /// A security case only backfills over past data fired into.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub historical: bool,
 }
 
 /// One alert's firings within an incident, for the list row.
@@ -378,6 +386,8 @@ pub struct IncidentAlert {
     pub source_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labels: Option<std::collections::HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<std::collections::HashMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detected_source: Option<String>,
 }
@@ -580,6 +590,30 @@ impl std::fmt::Display for AnalysisTriggerType {
     }
 }
 
+/// An analyst's verdict when closing a security case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CaseVerdict {
+    TruePositive,
+    FalsePositive,
+    Benign,
+    Duplicate,
+    /// Real activity, but too old to act on, such as a backfill over past data.
+    Stale,
+}
+
+impl CaseVerdict {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TruePositive => "true_positive",
+            Self::FalsePositive => "false_positive",
+            Self::Benign => "benign",
+            Self::Duplicate => "duplicate",
+            Self::Stale => "stale",
+        }
+    }
+}
+
 /// A single event in an incident's lifecycle timeline
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IncidentEvent {
@@ -656,10 +690,34 @@ pub enum IncidentEventType {
     },
 
     /// Incident assigned/unassigned
-    /// TODO: service-layer emission is not yet implemented; wired up on the frontend.
     AssignmentChanged {
         from: Option<String>,
         to: Option<String>,
+        /// Who changed it; absent on events written before it was recorded.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        user_id: Option<String>,
+    },
+
+    /// A security case closed with the analyst's verdict.
+    Verdict {
+        user_id: String,
+        verdict: CaseVerdict,
+        reason: String,
+    },
+
+    /// Firings an analyst attached to the case by hand.
+    AlertsAttached {
+        user_id: String,
+        alert_ids: Vec<String>,
+        alert_names: Vec<String>,
+    },
+
+    /// An event an analyst opened the case from, or attached to it.
+    EventAttached {
+        user_id: String,
+        stream: String,
+        /// The event's own time, in microseconds.
+        event_at: i64,
     },
 
     /// User comment
@@ -757,6 +815,9 @@ impl IncidentEventType {
         "DimensionsUpgraded",
         "TitleChanged",
         "AssignmentChanged",
+        "Verdict",
+        "AlertsAttached",
+        "EventAttached",
         "Comment",
         "ai_analysis_begin",
         "ai_analysis_complete",
@@ -867,6 +928,54 @@ impl IncidentEvent {
             from: from.into(),
             to: to.into(),
             user_id: user_id.into(),
+        })
+    }
+
+    pub fn assignment_changed(
+        from: Option<String>,
+        to: Option<String>,
+        user_id: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::AssignmentChanged {
+            from,
+            to,
+            user_id: Some(user_id.into()),
+        })
+    }
+
+    pub fn verdict(
+        user_id: impl Into<String>,
+        verdict: CaseVerdict,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::Verdict {
+            user_id: user_id.into(),
+            verdict,
+            reason: reason.into(),
+        })
+    }
+
+    pub fn alerts_attached(
+        user_id: impl Into<String>,
+        alert_ids: Vec<String>,
+        alert_names: Vec<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::AlertsAttached {
+            user_id: user_id.into(),
+            alert_ids,
+            alert_names,
+        })
+    }
+
+    pub fn event_attached(
+        user_id: impl Into<String>,
+        stream: impl Into<String>,
+        event_at: i64,
+    ) -> Self {
+        Self::now(IncidentEventType::EventAttached {
+            user_id: user_id.into(),
+            stream: stream.into(),
+            event_at,
         })
     }
 
@@ -1118,6 +1227,22 @@ mod tests {
             IncidentEventType::AssignmentChanged {
                 from: None,
                 to: None,
+                user_id: None,
+            },
+            IncidentEventType::Verdict {
+                user_id: "u".into(),
+                verdict: CaseVerdict::FalsePositive,
+                reason: "r".into(),
+            },
+            IncidentEventType::AlertsAttached {
+                user_id: "u".into(),
+                alert_ids: vec!["a".into()],
+                alert_names: vec!["n".into()],
+            },
+            IncidentEventType::EventAttached {
+                user_id: "u".into(),
+                stream: "s".into(),
+                event_at: 1,
             },
             IncidentEventType::Comment {
                 user_id: "u".into(),
@@ -1883,6 +2008,7 @@ mod tests {
             rca: None,
             rca_off_reason: None,
             alert_groups: None,
+            historical: false,
         }
     }
 
@@ -2208,6 +2334,10 @@ mod tests {
                 "service".to_string(),
                 "checkout".to_string(),
             )])),
+            annotations: Some(std::collections::HashMap::from([(
+                "description".to_string(),
+                "p99 disk latency > 2s".to_string(),
+            )])),
             detected_source: Some("pagerduty".to_string()),
         };
 
@@ -2215,6 +2345,7 @@ mod tests {
         assert_eq!(json["alert_kind"], "external");
         assert_eq!(json["source_url"], "https://example.com/alert/1");
         assert_eq!(json["detected_source"], "pagerduty");
+        assert_eq!(json["annotations"]["description"], "p99 disk latency > 2s");
 
         let round_tripped: IncidentAlert = serde_json::from_value(json).unwrap();
         assert_eq!(round_tripped.alert_kind, AlertKind::External);
@@ -2222,6 +2353,7 @@ mod tests {
             round_tripped.source_url,
             Some("https://example.com/alert/1".to_string())
         );
+        assert_eq!(round_tripped.annotations, alert.annotations);
     }
 
     #[test]
@@ -2241,6 +2373,9 @@ mod tests {
         assert_eq!(alert.source_url, None);
         assert_eq!(alert.labels, None);
         assert_eq!(alert.detected_source, None);
+        assert_eq!(alert.annotations, None);
+        let json = serde_json::to_value(&alert).unwrap();
+        assert!(json.get("annotations").is_none());
     }
 
     #[test]
@@ -2286,5 +2421,35 @@ mod tests {
         let back: ExternalAlertEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(back.dedup_key, "abc123");
         assert_eq!(back.severity, IncidentSeverity::P1);
+    }
+
+    #[test]
+    fn test_assignment_event_without_actor_still_parses() {
+        let old = serde_json::json!({
+            "timestamp": 1,
+            "type": "AssignmentChanged",
+            "data": {"from": null, "to": "a@acme.io"}
+        });
+        let event: IncidentEvent = serde_json::from_value(old).unwrap();
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::AssignmentChanged { user_id: None, .. }
+        ));
+    }
+
+    #[test]
+    fn test_verdict_event_round_trips_with_snake_case_verdict() {
+        let event = IncidentEvent::verdict("a@acme.io", CaseVerdict::TruePositive, "confirmed");
+        let v = serde_json::to_value(&event).unwrap();
+        assert_eq!(v["type"], "Verdict");
+        assert_eq!(v["data"]["verdict"], "true_positive");
+        let back: IncidentEvent = serde_json::from_value(v).unwrap();
+        assert!(matches!(
+            back.event_type,
+            IncidentEventType::Verdict {
+                verdict: CaseVerdict::TruePositive,
+                ..
+            }
+        ));
     }
 }

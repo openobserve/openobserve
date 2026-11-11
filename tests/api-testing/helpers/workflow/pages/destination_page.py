@@ -70,7 +70,12 @@ class DestinationPage:
             "skip_tls_verify": skip_tls_verify_value
         }
         response = session.post(f"{base_url}api/{org_id}/alerts/destinations?module=pipeline", json=payload, headers=headers)
-        assert response.status_code == 200, f"Failed to create destination: {response.content}"
+        build_type = session.get(f"{base_url}config").json()["build_type"]
+        if build_type == "opensource":
+            assert response.status_code == 403, f"Pipeline destination should be refused: {response.content}"
+            assert b"open source version" in response.content, response.content
+        else:
+            assert response.status_code == 200, f"Failed to create destination: {response.content}"
         return response
 
     def retrieve_destinations_webhook(self, session, base_url, user_email, user_password, org_id):

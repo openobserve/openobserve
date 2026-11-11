@@ -33,12 +33,12 @@ use axum::{
     http::{Method, StatusCode, Uri, header, request::Parts},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
-    routing::{delete, get, patch, post, put},
+    routing::{any, delete, get, patch, post, put},
 };
 use common::meta::http::ERROR_HEADER;
 use config::{get_config, meta::feature::Feature};
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
-use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
+use openobserve_api_ingest::request::{clusters, datadog, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::org_domains;
 #[cfg(feature = "cpu-profiling")]
@@ -46,8 +46,8 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, service_accounts, service_streams, short_url, slack, slos,
-    sourcemaps, status, status_pages, stream, synthetics, users,
+    query_history, rum_analytics, sample_data, security, service_accounts, service_streams,
+    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -328,6 +328,14 @@ fn license_denial(_required: &[Feature]) -> Option<Response> {
     None
 }
 
+/// Only a refused role learns what is locked; a failed credential must not read the license state.
+fn refusal_response(error: AuthError, denial: Option<Response>) -> Response {
+    match (error, denial) {
+        (AuthError::RoleRefused(_), Some(denied)) => denied,
+        (error, _) => error.into_response(),
+    }
+}
+
 /// The route template axum matched, which a caller cannot shape the way it shapes the path.
 pub(crate) fn matched_route(request: &Request) -> Option<String> {
     request
@@ -365,7 +373,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Validate authentication using extracted data
     let result = match oo_validator(&req_data, &auth_info).await {
         Ok(result) => result,
-        Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+        Err(e) => {
+            let denial = auth_info.feature.and_then(license_denial);
+            return maybe_add_mcp_www_authenticate(&uri, refusal_response(e, denial));
+        }
     };
 
     // Outside oo_validator so the license gate holds with OpenFGA off and on bypass routes.
@@ -776,7 +787,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         let request = axum::http::Request::from_parts(parts, Body::from(bytes));
 
         // Call next
-        let mut response = next.run(request).await;
+        let (mut response, touched_security) =
+            o2_enterprise::enterprise::security::audit::tracked(next.run(request)).await;
 
         let error_msg = response
             .headers()
@@ -806,6 +818,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             });
 
             audit(AuditMessage {
+                login_ip: None,
+                user_agent: None,
                 user_email,
                 org_id,
                 _timestamp: now_micros(),
@@ -821,7 +835,11 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 },
                 delegated,
                 fleet_id: named.as_ref().and_then(|n| n.fleet_id.clone()),
-                target: named.map(|n| n.target),
+                target: named.map(|n| n.target).or_else(|| {
+                    touched_security.then(|| {
+                        o2_enterprise::enterprise::security::audit::SECURITY_TARGET.to_string()
+                    })
+                }),
             })
             .await;
             if fleet_mutation(&http_method, &path) {
@@ -1059,18 +1077,12 @@ pub fn basic_routes() -> Router {
         // Unauthenticated HMAC link; GET only renders, so a gateway prefetch cannot ack a page.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack",
-            get(oncall::ack_page)
-                .post(oncall::acknowledge)
-                .route_layer(middleware::from_fn(|req, next| {
-                    require_features(&[Feature::Oncall], req, next)
-                })),
+            get(oncall::ack_page).post(oncall::acknowledge),
         );
         // Unauthenticated like the email link: the signed token in the path is the credential.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack/voice/{token}",
-            post(oncall::voice_ack).route_layer(middleware::from_fn(|req, next| {
-                require_features(&[Feature::Oncall], req, next)
-            })),
+            post(oncall::voice_ack),
         );
     }
 
@@ -1345,6 +1357,8 @@ fn service_route_table() -> Router {
         .route("/{org_id}/announcements", get(announcements::get_announcements))
         .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
 
+        .route("/{org_id}/security/access", get(security::get_security_access))
+
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
         .route("/{org_id}/overview", get(organization::org::org_overview))
@@ -1496,6 +1510,9 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
         .route("/v2/{org_id}/folders/{folder_type}/name/{folder_name}", get(folders::get_folder_by_name))
 
+        // Sample data
+        .route("/{org_id}/sample_data", get(sample_data::get).put(sample_data::put).delete(sample_data::delete))
+
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
         .route("/v2/{org_id}/alerts/composites/validate", post(alerts::validate_composite_alert))
@@ -1581,6 +1598,40 @@ fn service_route_table() -> Router {
     #[cfg(feature = "enterprise")]
     {
         router = router
+            .route("/{org_id}/security/cases", post(security::cases::promote_to_case))
+            .route("/{org_id}/security/cases/by_alert", get(security::cases::lookup_cases))
+            .route("/{org_id}/security/cases/settings", get(security::cases::get_case_settings).put(security::cases::update_case_settings));
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        router = router
+            // Org-visible trail of Security config changes; Security is enterprise-only
+            .route("/{org_id}/security/audit", get(security::audit::list_security_audit))
+            // Threat-intel sweep, drawer timeline and list checks: reads, POST only for the body
+            .route("/{org_id}/security/intel/sweep", post(security::intel::sweep))
+            .route("/{org_id}/security/intel/sightings", post(security::intel::sightings))
+            .route("/{org_id}/security/intel/validate", post(security::intel::validate))
+            // Investigation reads (Security GET); every search runs with the caller's own permissions
+            .route("/{org_id}/security/entities", post(security::investigate::list_entities))
+            .route("/{org_id}/security/entities/graph", post(security::investigate::get_entity_graph))
+            .route("/{org_id}/security/entities/detail", post(security::investigate::get_entity_detail))
+            .route("/{org_id}/security/ueba", post(security::investigate::score_users))
+            .route("/{org_id}/security/events/search", post(security::investigate::search_events))
+            // Built-in OCSF packs: read-only, no org data
+            .route("/{org_id}/security/ocsf/packs", get(security::list_ocsf_packs))
+            // Security sources: the classifier, the source list and OCSF pack attach/detach
+            .route("/{org_id}/security/sources", get(security::sources::list_sources))
+            .route("/{org_id}/security/sources/types", get(security::sources::list_source_types))
+            .route("/{org_id}/security/sources/match", post(security::sources::match_source))
+            .route("/{org_id}/security/sources/classify", post(security::sources::classify_sources))
+            .route("/{org_id}/security/sources/{stream_name}/attach", post(security::sources::attach_pack))
+            .route("/{org_id}/security/sources/{stream_name}/detach", post(security::sources::detach_pack))
+            // Sigma catalog, compiler and ATT&CK coverage: reads, compile is POST only for the body
+            .route("/{org_id}/security/sigma/catalog", get(security::sigma::get_catalog))
+            .route("/{org_id}/security/sigma/compile", post(security::sigma::compile))
+            .route("/{org_id}/security/mitre/coverage", get(security::sigma::get_mitre_coverage))
+            .route("/{org_id}/security/detections/{alert_id}/evidence", get(security::sigma::get_detection_evidence))
             // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
             .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
             // Complexity requirements only: readable by any authenticated user, including one the
@@ -1592,7 +1643,9 @@ fn service_route_table() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
             .route("/{org_id}/anomaly_detection/{config_id}/train", delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
-            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
+            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
+
+            .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary));
         router = alert_calibration_routes(router);
     }
 
@@ -2392,6 +2445,7 @@ pub fn downtime_routes() -> Router {
         .route("/v2/{org_id}/downtimes/{downtime_id}", get(downtimes::get_downtime).put(downtimes::update_downtime).delete(downtimes::delete_downtime))
         .route("/v2/{org_id}/downtimes/{downtime_id}/cancel", post(downtimes::cancel_downtime))
         .route("/v2/{org_id}/downtimes/{downtime_id}/extend", post(downtimes::extend_downtime))
+        .route("/v2/{org_id}/downtimes/{downtime_id}/test", post(downtimes::test_downtime))
 }
 
 /// Dashboard report routes, v1 by name and v2 by id.
@@ -2878,6 +2932,7 @@ pub fn other_service_routes() -> Router {
         .nest("/aws", aws_routes)
         .nest("/gcp", gcp_routes)
         .nest("/rum", rum_routes)
+        .nest("/datadog", datadog_routes())
 }
 
 /// Splunk-compatible HEC collector routes.
@@ -3055,6 +3110,51 @@ fn es_compat_routes() -> Router {
         .route("/{org_id}/_ingest/pipeline/{name}", get(organization::es::org_pipeline).head(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
 }
 
+/// Datadog Agent intake, authenticated by an org ingestion token sent as `DD-API-KEY`.
+fn datadog_routes() -> Router {
+    let gated = |required: &'static [Feature]| {
+        middleware::from_fn(move |req: Request, next: Next| require_features(required, req, next))
+    };
+
+    // Last-added runs outermost: auth, org block, wire cap, decompression, decoded cap.
+    let intake = Router::new()
+        .route(
+            "/{org_id}/api/v2/series",
+            post(datadog::series).route_layer(gated(&[Feature::Metrics])),
+        )
+        .route(
+            "/{org_id}/api/beta/sketches",
+            post(datadog::sketches).route_layer(gated(&[Feature::Metrics])),
+        )
+        .route(
+            "/{org_id}/api/v1/check_run",
+            post(datadog::check_run).route_layer(gated(&[Feature::Metrics])),
+        )
+        .route(
+            "/{org_id}/api/v0.2/traces",
+            post(datadog::traces).route_layer(gated(&[Feature::Traces])),
+        )
+        .route(
+            "/{org_id}/api/v2/logs",
+            post(datadog::logs).route_layer(gated(&[Feature::Logs])),
+        )
+        .route(
+            "/{org_id}/v1/input",
+            post(datadog::logs).route_layer(gated(&[Feature::Logs])),
+        )
+        .route_layer(DefaultBodyLimit::max(datadog::DATADOG_MAX_BODY_BYTES))
+        .route_layer(RequestDecompressionLayer::new())
+        .route_layer(middleware::from_fn(datadog::datadog_wire_limit_middleware));
+
+    // Validate and the catch-all never read a body, so they skip the body layers.
+    Router::new()
+        .route("/{org_id}/api/v1/validate", get(datadog::validate))
+        .route("/{org_id}/{*rest}", any(datadog::unsupported))
+        .merge(intake)
+        .route_layer(middleware::from_fn(blocked_org_param))
+        .route_layer(middleware::from_fn(datadog::datadog_auth_middleware))
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{body::Body, http::Request};
@@ -3062,6 +3162,9 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
+
+    const DD_ORG: &str = "dd_routes_org";
+    const DD_KEY: &str = "o2oi_dd_routes_key";
 
     /// A router node merges `basic_routes()` beside its catch-all proxy
     /// `/api/{*path}`, and axum **panics at registration** — not at request
@@ -3967,6 +4070,179 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn router_node_tree_registers_and_claims_the_datadog_paths() {
+        // A param/wildcard clash panics at registration, so building the tree is half the test.
+        let router_routes = Router::new()
+            .merge(crate::router::http::create_router_routes())
+            .nest("/config", config_routes())
+            .merge(proxy_routes(true));
+        let app = Router::new()
+            .merge(basic_routes())
+            .merge(crate::router::http::create_splunk_collector_proxy_routes())
+            .merge(router_routes);
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/datadog/default/api/v2/series")
+            .body(Body::empty())
+            .unwrap();
+        assert_ne!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    fn dd_request(method: Method, uri: &str, key: Option<&str>, body: Body) -> Request<Body> {
+        common::infra::config::ORG_INGESTION_TOKENS
+            .insert(format!("{DD_ORG}/{DD_KEY}"), "routes".to_string());
+        let mut req = Request::builder().method(method).uri(uri);
+        if let Some(key) = key {
+            req = req.header("DD-API-KEY", key);
+        }
+        req.body(body).unwrap()
+    }
+
+    async fn dd_send(req: Request<Body>) -> (StatusCode, String) {
+        let resp = local_routes().oneshot(req).await.unwrap();
+        let status = resp.status();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, String::from_utf8_lossy(&body).into_owned())
+    }
+
+    #[tokio::test]
+    async fn datadog_unknown_paths_are_202_and_counted_but_403_without_a_key() {
+        let dropped = || {
+            config::metrics::DATADOG_DROPPED_REQUESTS_TOTAL
+                .with_label_values(&[DD_ORG])
+                .get()
+        };
+        let before = dropped();
+        for (method, path) in [
+            (Method::POST, "api/v0.2/stats"),
+            (Method::POST, "intake/"),
+            (Method::GET, "api/v1/metadata"),
+        ] {
+            let uri = format!("/datadog/{DD_ORG}/{path}");
+            let req = dd_request(method.clone(), &uri, Some(DD_KEY), Body::from("x"));
+            assert_eq!(dd_send(req).await.0, StatusCode::ACCEPTED, "{uri}");
+            let req = dd_request(method, &uri, None, Body::from("x"));
+            assert_eq!(dd_send(req).await.0, StatusCode::FORBIDDEN, "{uri}");
+        }
+        // The catch-all never reads its body, so one past the intake cap is no 413.
+        let uri = format!("/datadog/{DD_ORG}/api/v0.2/stats");
+        let body = Body::from(vec![b' '; datadog::DATADOG_MAX_BODY_BYTES + 1]);
+        let req = dd_request(Method::POST, &uri, Some(DD_KEY), body);
+        assert_eq!(dd_send(req).await.0, StatusCode::ACCEPTED);
+        assert_eq!(dropped() - before, 4);
+    }
+
+    #[tokio::test]
+    async fn datadog_validate_reads_the_query_key() {
+        let uri = format!("/datadog/{DD_ORG}/api/v1/validate?api_key={DD_KEY}");
+        let (status, body) = dd_send(dd_request(Method::GET, &uri, None, Body::empty())).await;
+        assert_eq!(
+            (status, body.as_str()),
+            (StatusCode::OK, r#"{"valid":true}"#)
+        );
+        let uri = format!("/datadog/{DD_ORG}/api/v1/validate?api_key=not-a-token");
+        let (status, _) = dd_send(dd_request(Method::GET, &uri, None, Body::empty())).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn datadog_log_routes_answer_the_probe_and_reject_garbage() {
+        for path in ["api/v2/logs", "v1/input"] {
+            let uri = format!("/datadog/{DD_ORG}/{path}");
+            for (body, encoding, expected) in [
+                (b"{}".to_vec(), None, StatusCode::OK),
+                (Vec::new(), None, StatusCode::OK),
+                (
+                    zstd::encode_all(&b"{}"[..], 3).unwrap(),
+                    Some("zstd"),
+                    StatusCode::OK,
+                ),
+                (b"{not json".to_vec(), None, StatusCode::BAD_REQUEST),
+            ] {
+                let mut req = dd_request(Method::POST, &uri, Some(DD_KEY), Body::from(body));
+                if let Some(encoding) = encoding {
+                    req.headers_mut()
+                        .insert(header::CONTENT_ENCODING, encoding.parse().unwrap());
+                }
+                assert_eq!(dd_send(req).await.0, expected, "{uri} {encoding:?}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn datadog_undecodable_payloads_are_400() {
+        for path in [
+            "api/v2/series",
+            "api/beta/sketches",
+            "api/v1/check_run",
+            "api/v0.2/traces",
+        ] {
+            let uri = format!("/datadog/{DD_ORG}/{path}");
+            let req = dd_request(Method::POST, &uri, Some(DD_KEY), Body::from(vec![0xff; 64]));
+            assert_eq!(dd_send(req).await.0, StatusCode::BAD_REQUEST, "{uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn datadog_bodies_over_the_cap_are_413_as_sent_and_after_decompression() {
+        let uri = format!("/datadog/{DD_ORG}/api/v2/logs");
+        let limit = datadog::DATADOG_MAX_BODY_BYTES;
+        let req = dd_request(
+            Method::POST,
+            &uri,
+            Some(DD_KEY),
+            Body::from(vec![b' '; limit + 1]),
+        );
+        assert_eq!(dd_send(req).await.0, StatusCode::PAYLOAD_TOO_LARGE);
+
+        let bomb = zstd::encode_all(&vec![b' '; limit + 1][..], 3).unwrap();
+        assert!(bomb.len() < 64 * 1024);
+        let mut req = dd_request(Method::POST, &uri, Some(DD_KEY), Body::from(bomb));
+        req.headers_mut()
+            .insert(header::CONTENT_ENCODING, "zstd".parse().unwrap());
+        assert_eq!(dd_send(req).await.0, StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn datadog_a_streamed_compressed_body_over_the_wire_cap_is_413() {
+        let uri = format!("/datadog/{DD_ORG}/api/v2/logs");
+        // Pseudo-random bytes do not compress, so the compressed body stays past the cap.
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let raw: Vec<u8> = (0..datadog::DATADOG_MAX_BODY_BYTES + 1024 * 1024)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                state as u8
+            })
+            .collect();
+        let compressed = zstd::encode_all(&raw[..], 1).unwrap();
+        assert!(compressed.len() > datadog::DATADOG_MAX_BODY_BYTES);
+        // A stream has no size hint, so only the streaming cap can stop it.
+        let chunks: Vec<Result<axum::body::Bytes, std::io::Error>> = compressed
+            .chunks(64 * 1024)
+            .map(|c| Ok(axum::body::Bytes::copy_from_slice(c)))
+            .collect();
+        let body = Body::from_stream(futures::stream::iter(chunks));
+        let mut req = dd_request(Method::POST, &uri, Some(DD_KEY), body);
+        req.headers_mut()
+            .insert(header::CONTENT_ENCODING, "zstd".parse().unwrap());
+        assert_eq!(dd_send(req).await.0, StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn the_datadog_key_header_does_not_authenticate_other_ingest_routes() {
+        let uri = format!("/api/{DD_ORG}/_bulk");
+        let req = dd_request(Method::POST, &uri, Some(DD_KEY), Body::from("{}"));
+        assert_eq!(dd_send(req).await.0, StatusCode::UNAUTHORIZED);
+    }
+
     // Refused before any lookup, so a 400 proves the hook handler owns the path without a DB.
     #[cfg(feature = "enterprise")]
     fn credential_in_url_probe() -> Request<Body> {
@@ -4173,10 +4449,16 @@ mod tests {
             "bootstrap build_type must carry the real build kind"
         );
 
+        let fingerprint = config::build_fingerprint();
         assert_eq!(
             payload.get("commit_hash").and_then(Value::as_str),
-            Some(config::COMMIT_HASH),
-            "bootstrap commit_hash must carry the real commit for stale-build detection"
+            Some(fingerprint.as_str()),
+            "bootstrap commit_hash must carry a per-build value for stale-build detection"
+        );
+        assert_ne!(
+            fingerprint,
+            config::COMMIT_HASH,
+            "the unauthenticated bootstrap must not disclose the commit"
         );
     }
 
@@ -5313,6 +5595,172 @@ mod tests {
         );
         let response = node_routes().oneshot(node_request(root)).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    async fn refusal_parts(error: AuthError, denied: bool) -> (StatusCode, String) {
+        let denial = denied.then(|| {
+            let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled("workflows".into());
+            (
+                StatusCode::FORBIDDEN,
+                axum::Json(common::meta::http::HttpResponse::error_code(err)),
+            )
+                .into_response()
+        });
+        let response = refusal_response(error, denial);
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, String::from_utf8_lossy(&body).into_owned())
+    }
+
+    #[tokio::test]
+    async fn only_a_refused_role_on_a_locked_route_answers_with_the_license_denial() {
+        let role = || AuthError::RoleRefused("Unauthorized Access".to_string());
+        let (status, body) = refusal_parts(role(), true).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert!(body.contains("40001"), "{body}");
+        assert!(body.contains("Workflows"), "{body}");
+
+        assert_eq!(
+            refusal_parts(role(), false).await,
+            (StatusCode::FORBIDDEN, "Unauthorized Access".to_string())
+        );
+        assert_eq!(
+            refusal_parts(AuthError::Unauthorized("no".to_string()), true).await,
+            (StatusCode::UNAUTHORIZED, "no".to_string())
+        );
+        assert_eq!(
+            refusal_parts(AuthError::Forbidden("Not allowed".to_string()), true).await,
+            (StatusCode::FORBIDDEN, "Not allowed".to_string())
+        );
+    }
+
+    /// Paths of the `.route(` calls in `source` that no `require_features` covers.
+    fn routes_without_a_gate(source: &str) -> Vec<String> {
+        const GATE: &str = "require_features";
+        fn call_args(text: &str) -> &str {
+            let mut depth = 1;
+            for (at, c) in text.char_indices() {
+                depth += match c {
+                    '(' => 1,
+                    ')' => -1,
+                    _ => 0,
+                };
+                if depth == 0 {
+                    return &text[..at];
+                }
+            }
+            text
+        }
+
+        let code = source
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut ungated = Vec::new();
+        for (at, _) in code.match_indices(".route(") {
+            let rest = &code[at + ".route(".len()..];
+            let args = call_args(rest);
+            let after = &rest[args.len()..];
+            let section_end = ["router = ", "let public"]
+                .iter()
+                .filter_map(|stop| after.find(stop))
+                .min()
+                .unwrap_or(after.len());
+            // A router-level layer covers the routes above it; a sibling's own layer does not.
+            let mut chain = String::new();
+            let mut tail = &after[..section_end];
+            while let Some(next) = tail.find(".route(") {
+                chain.push_str(&tail[..next]);
+                let sibling = &tail[next + ".route(".len()..];
+                tail = &sibling[call_args(sibling).len()..];
+            }
+            chain.push_str(tail);
+            let router_gated = chain
+                .match_indices(".route_layer(")
+                .any(|(at, _)| call_args(&chain[at + ".route_layer(".len()..]).contains(GATE));
+            if !args.contains(GATE) && !router_gated {
+                ungated.push(args.split('"').nth(1).unwrap_or(args).to_string());
+            }
+        }
+        ungated
+    }
+
+    #[test]
+    fn the_route_scan_tells_a_gate_from_a_sibling_gate() {
+        let source = r#"
+            router = router.route("/own", post(a).route_layer(require_features));
+            router = router.route("/none", get(a));
+            router = router.route("/mention_only", get(a)).named(require_features);
+            router = router
+                .route("/before_sibling", get(a))
+                .route("/sibling", get(a).route_layer(require_features));
+            // .route("/commented", get(a));
+            let public = Router::new()
+                .route("/chained", get(a))
+                .route_layer(require_features)
+                .route("/after_layer", get(a));
+            router = router.merge(public);
+        "#;
+        assert_eq!(
+            routes_without_a_gate(source),
+            ["/none", "/mention_only", "/before_sibling", "/after_layer"]
+        );
+    }
+
+    /// The route table cannot see routes served outside `auth_middleware`, so this reads them.
+    #[test]
+    fn every_public_route_has_a_license_gate_or_is_listed() {
+        let mut public_ungated = vec![
+            "/.well-known/oauth-authorization-server",
+            "/.well-known/oauth-protected-resource",
+            "/.well-known/oauth-protected-resource/{*resource_path}",
+            "/api/slack/commands",
+            "/api/slack/events",
+            "/api/slack/interactions",
+            "/api/v2/{org_id}/alerts/charts/render",
+            // These four are refused inside their handlers, only after the credential is verified.
+            "/api/v2/{org_id}/oncall/ack",
+            "/api/v2/{org_id}/oncall/ack/voice/{token}",
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}",
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}/runs/{run_id}",
+            "/azure",
+            "/docs",
+            "/healthz",
+            "/login",
+            "/marketplace/aws/register",
+            "/metrics",
+            "/presigned-url",
+            "/profile/cpu",
+            "/profile/memory",
+            "/profile/stats",
+            "/schedulez",
+            "/stripe",
+        ];
+        public_ungated.sort_unstable();
+        let src = include_str!("mod.rs");
+        let (production, _) = src
+            .split_once("\n#[cfg(test)]\nmod tests {")
+            .expect("test module marker moved; this scan would read fixtures as routes");
+        let body = |signature: &str| {
+            let start = production
+                .find(signature)
+                .unwrap_or_else(|| panic!("{signature} moved; point this scan at the new name"));
+            &production[start..start + production[start..].find("\n}\n").unwrap()]
+        };
+        let mut found = routes_without_a_gate(body("pub fn basic_routes() -> Router {"));
+        found.extend(routes_without_a_gate(body(
+            "fn workflow_hook_routes() -> Router {",
+        )));
+        found.sort_unstable();
+        assert_eq!(
+            found, public_ungated,
+            "left is what the source registers without a route gate, right is the allowed list: gate \
+             a new public route, list it if it stays open by design or checks in its handler, and \
+             remove an entry once it has a gate"
+        );
     }
 
     /// Every (method, template) the `/api` tree serves, parsed from this file's production code.

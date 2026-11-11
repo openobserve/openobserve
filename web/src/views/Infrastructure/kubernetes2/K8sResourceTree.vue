@@ -23,6 +23,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import K8sClusterPicker, { type PickerCluster } from "./K8sClusterPicker.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { filterTree, type NodeSummary, type TreeGroup } from "./k8sTree";
@@ -34,8 +35,10 @@ const props = defineProps<{
   groups: TreeGroup[];
   active: View;
   nodes: NodeSummary | null;
+  clusters?: PickerCluster[];
+  cluster?: string | null;
 }>();
-const emit = defineEmits<{ select: [view: View] }>();
+const emit = defineEmits<{ select: [view: View]; cluster: [name: string] }>();
 
 const { t } = useI18nTyped();
 
@@ -88,6 +91,17 @@ const setOpen = (id: string, open: boolean) => {
     class="bg-surface-panel border-border-default flex h-full min-h-0 w-60 shrink-0 flex-col border-e max-lg:w-48"
     data-test="k8s2-tree"
   >
+    <div
+      v-if="clusters?.length"
+      class="border-border-default shrink-0 border-b p-3"
+      data-test="k8s2-tree-cluster"
+    >
+      <K8sClusterPicker
+        :clusters="clusters"
+        :active="cluster ?? null"
+        @select="(name: string) => emit('cluster', name)"
+      />
+    </div>
     <div class="flex shrink-0 flex-col gap-2 p-3">
       <OText v-if="context" class="text-text-secondary text-xs" data-test="k8s2-tree-context">{{
         raw(context)

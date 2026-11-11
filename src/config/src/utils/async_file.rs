@@ -20,7 +20,7 @@ use std::{
     time::SystemTime,
 };
 
-use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Months, NaiveDate, TimeDelta, Utc};
 use futures::StreamExt;
 use tokio::{
     fs::{File, metadata, read_dir, remove_dir},
@@ -212,45 +212,34 @@ pub fn create_wal_dir_datetime_filter(
             None => return true,     // Not present or failed to parse, could be a skippable path
         };
 
-        let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let days =
-            month_days[(month - 1) as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
         let day = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(day)) => {
-                if 1 <= day && day <= days {
-                    day
-                } else {
-                    return false;
-                }
-            }
+            Some(Ok(day)) => Some(day),
             Some(_) => return false,
-            None => {
-                if month == start_time.month() {
-                    start_time.day()
-                } else {
-                    end_time.day()
-                }
-            }
+            None => None,
         };
 
         let hour = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(hour @ 0..24)) => hour,
+            Some(Ok(hour @ 0..24)) => Some(hour),
             Some(_) => return false,
-            None => {
-                if month == start_time.month() && day == start_time.day() {
-                    start_time.hour()
-                } else {
-                    end_time.hour()
-                }
-            }
+            None => None,
         };
 
-        let date_range_check =
-            if let Some(datetime) = Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).single() {
-                datetime >= start_time && datetime <= end_time
-            } else {
-                false
-            };
+        // A path covers a time range: a month, a day, or an hour.
+        let Some(dir_start) = NaiveDate::from_ymd_opt(year, month, day.unwrap_or(1))
+            .and_then(|date| date.and_hms_opt(hour.unwrap_or(0), 0, 0))
+            .map(|datetime| datetime.and_utc())
+        else {
+            return false; // Not a real date, such as 2025/2/30
+        };
+        let dir_end = if hour.is_some() {
+            dir_start + TimeDelta::hours(1)
+        } else if day.is_some() {
+            dir_start + TimeDelta::days(1)
+        } else {
+            dir_start + Months::new(1)
+        };
+
+        let date_range_check = dir_start <= end_time && dir_end > start_time;
 
         date_range_check
             && (!path.is_file()
@@ -516,6 +505,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_scan_files_filtered_reaches_short_months_and_later_years() {
+        let wal_root = tempfile::tempdir().expect("Temp dir");
+        let root = wal_root.path();
+        for file in [
+            "2025/10/20/3/before_start.parquet",
+            "2025/11/12/3/start_month.parquet",
+            "2026/9/15/3/short_month.parquet",
+            "2026/9/15/3/not_parquet.blink",
+            "2026/10/31/3/end_month.parquet",
+            "2026/11/1/3/after_end.parquet",
+        ] {
+            let path = root.join(file);
+            tokio::fs::create_dir_all(path.parent().unwrap())
+                .await
+                .expect("Pretest setup failure");
+            tokio::fs::File::create(path)
+                .await
+                .expect("Pretest setup failure");
+        }
+
+        let start = Utc
+            .with_ymd_and_hms(2025, 11, 11, 10, 0, 0)
+            .single()
+            .unwrap();
+        let end = Utc
+            .with_ymd_and_hms(2026, 10, 31, 18, 0, 0)
+            .single()
+            .unwrap();
+        let filter = create_wal_dir_datetime_filter(start, end, root.components().count());
+        let mut names: Vec<_> = scan_files_filtered(root, filter, None)
+            .await
+            .expect("Scan failure")
+            .iter()
+            .map(|file| file.rsplit('/').next().unwrap().to_string())
+            .collect();
+        names.sort();
+
+        assert_eq!(
+            names,
+            [
+                "end_month.parquet",
+                "short_month.parquet",
+                "start_month.parquet"
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn test_scan_files() {
         let test_dir = "test_scan_files";
         let sub_dir = format!("{}/subdir", test_dir);
@@ -641,13 +678,60 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_missing_day_uses_start_or_end_day() {
-        // start_time = 2025-09-10T02, end_time = 2025-09-10T04
-        // Missing day: if month == start_time.month → use start day (10), else end day (10)
+    fn test_filter_month_path_covers_the_whole_month() {
         let f = make_filter((2025, 9, 10, 2), (2025, 9, 10, 4));
-        // path has year+month only; day falls back to start.day=10
-        // then hour is also missing → uses start.hour=2, which is in range
         assert!(f(PathBuf::from("2025/9")));
+        assert!(!f(PathBuf::from("2025/8")));
+        assert!(!f(PathBuf::from("2025/10")));
+    }
+
+    #[test]
+    fn test_filter_keeps_the_start_hour_when_start_is_inside_it() {
+        let start = Utc
+            .with_ymd_and_hms(2025, 9, 10, 10, 30, 0)
+            .single()
+            .unwrap();
+        let end = Utc
+            .with_ymd_and_hms(2025, 9, 10, 12, 0, 0)
+            .single()
+            .unwrap();
+        let f = create_wal_dir_datetime_filter(start, end, 0);
+        assert!(f(PathBuf::from("2025/9")));
+        assert!(f(PathBuf::from("2025/9/10")));
+        assert!(f(PathBuf::from("2025/9/10/10")));
+        assert!(f(PathBuf::from("2025/9/10/12")));
+        assert!(!f(PathBuf::from("2025/9/10/9")));
+        assert!(!f(PathBuf::from("2025/9/10/13")));
+    }
+
+    #[test]
+    fn test_filter_keeps_a_month_shorter_than_the_end_day() {
+        let f = make_filter((2026, 8, 2, 18), (2026, 10, 31, 18));
+        assert!(f(PathBuf::from("2026/9")));
+        assert!(f(PathBuf::from("2026/9/15/3")));
+        assert!(!f(PathBuf::from("2026/7")));
+        assert!(!f(PathBuf::from("2026/11")));
+
+        let f = make_filter((2025, 1, 15, 0), (2025, 3, 31, 0));
+        assert!(f(PathBuf::from("2025/2")));
+
+        // 2100 is not a leap year, so February has 28 days.
+        let f = make_filter((2100, 1, 15, 0), (2100, 3, 31, 0));
+        assert!(f(PathBuf::from("2100/2")));
+        assert!(!f(PathBuf::from("2100/2/29")));
+    }
+
+    #[test]
+    fn test_filter_keeps_the_start_month_of_a_later_year() {
+        let f = make_filter((2025, 11, 11, 10), (2026, 11, 6, 10));
+        assert!(f(PathBuf::from("2026/11")));
+        assert!(!f(PathBuf::from("2026/12")));
+
+        let f = make_filter((2024, 2, 29, 0), (2025, 3, 10, 0));
+        assert!(f(PathBuf::from("2025/2")));
+
+        let f = make_filter((2025, 11, 11, 18), (2026, 11, 11, 5));
+        assert!(f(PathBuf::from("2026/11/11")));
     }
 
     #[test]
@@ -658,12 +742,11 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_missing_hour_uses_fallback() {
-        // start=2025-09-10T02, end=2025-09-10T04
+    fn test_filter_day_path_covers_the_whole_day() {
         let f = make_filter((2025, 9, 10, 2), (2025, 9, 10, 4));
-        // Path has year/month/day only; hour absent → fallback
-        // month==start.month && day==start.day → use start.hour=2 (in range)
         assert!(f(PathBuf::from("2025/9/10")));
+        assert!(!f(PathBuf::from("2025/9/9")));
+        assert!(!f(PathBuf::from("2025/9/11")));
     }
 
     #[test]

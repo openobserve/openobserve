@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   TOOLTIP_TRIGGER_ATTR,
+  INERT_TRIGGER_ATTR,
   TOOLTIP_TRIGGER_OVERFLOW,
   type TooltipEmits,
   type TooltipProps,
@@ -27,7 +28,7 @@ import {
 } from "vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import { isElementTruncated, readElementText } from "./useIsTruncated";
-import { tooltipNameTarget } from "./triggerName";
+import { isDisplayContents, tooltipHoverTarget, tooltipNameTarget } from "./triggerName";
 import { claimTooltip, releaseTooltip } from "./exclusiveTooltip";
 
 // Both modes render a fragment (provider + portalled content, or the child-mode
@@ -44,7 +45,7 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   sideOffset: 4,
   alignOffset: 0,
   arrowClass: "fill-surface-overlay",
-  delay: 700,
+  delay: 300,
   maxWidth: "20rem",
   disabled: false,
   hoverable: false,
@@ -181,10 +182,21 @@ function onChildOpenChange(next: boolean) {
   else childOpen.value = next;
 }
 
-// getComputedStyle forces a style recalc on every mount, so only ask when a class or inline style can set display:contents.
-function mayBeDisplayContents(el: Element): boolean {
-  if ((el as HTMLElement).style?.display === "contents") return true;
-  return [...el.classList].some((c) => c === "contents" || c.endsWith(":contents"));
+function isInertTrigger(): boolean {
+  return !!parentEl.value?.hasAttribute(INERT_TRIGGER_ATTR);
+}
+
+// Reka dismisses on any outside pointerdown, which would close the tooltip the click on its own trigger opens.
+function onChildPointerDownOutside(event: Event) {
+  const target = event.target as Node | null;
+  if (isInertTrigger() && target && parentEl.value?.contains(target)) event.preventDefault();
+}
+
+// A control-level tooltip yields to one owned by a hovered control nested inside it, so only the innermost opens.
+function hoversNestedTrigger(): boolean {
+  const own = parentEl.value;
+  const nested = own?.querySelector(`[${TOOLTIP_TRIGGER_ATTR}]:hover`);
+  return !!nested && nested !== own;
 }
 
 onMounted(() => {
@@ -202,14 +214,12 @@ onMounted(() => {
       // Fallback: walk up past display:contents ancestors — they have no layout box
       // and getBoundingClientRect() returns all-zeros, sending the tooltip to (0,0).
       candidate = childAnchorRef.value.parentElement;
-      while (
-        candidate &&
-        mayBeDisplayContents(candidate) &&
-        window.getComputedStyle(candidate).display === "contents"
-      ) {
+      while (candidate && isDisplayContents(candidate)) {
         candidate = candidate.parentElement;
       }
     }
+    // An overflow-only tooltip measures its own text element, so it never widens to the control.
+    if (candidate && !props.overflowOnly) candidate = tooltipHoverTarget(candidate);
     parentEl.value = candidate;
     if (parentEl.value) {
       parentEl.value.setAttribute(TOOLTIP_TRIGGER_ATTR, triggerMarker.value);
@@ -221,6 +231,7 @@ onMounted(() => {
       // cheap.
       const activateAndOpen = () => {
         childShowTimer = null;
+        if (hoversNestedTrigger()) return;
         if (props.overflowOnly) {
           // Measured now, not at mount: width and text may have changed since.
           if (!parentEl.value || !isElementTruncated(parentEl.value)) return;
@@ -256,6 +267,16 @@ onMounted(() => {
           childOpen.value = false;
         }
       };
+      // A trigger with no action of its own opens on click too, so touch and click users can read it.
+      const openOnClick = () => {
+        if (props.disabled || props.overflowOnly || !isInertTrigger()) return;
+        if (childShowTimer) {
+          clearTimeout(childShowTimer);
+          childShowTimer = null;
+        }
+        childActivated.value = true;
+        childOpen.value = true;
+      };
       // Chrome drops mouseleave when the hovered child is re-rendered, so the first move off the trigger also ends the hover.
       const hideOnMoveAway = (e: MouseEvent) => {
         if (pointerInBubble || parentEl.value?.contains(e.target as Node)) return;
@@ -271,6 +292,7 @@ onMounted(() => {
         document.removeEventListener("mousemove", hideOnMoveAway);
         hide();
       };
+      parentEl.value.addEventListener("click", openOnClick);
       parentEl.value.addEventListener("mouseenter", enter);
       parentEl.value.addEventListener("mouseleave", leave);
       // Keyboard-focus parity with hover, so a Tab-reachable trigger (e.g. an
@@ -278,6 +300,7 @@ onMounted(() => {
       parentEl.value.addEventListener("focus", show);
       parentEl.value.addEventListener("blur", hide);
       cleanupFn = () => {
+        parentEl.value?.removeEventListener("click", openOnClick);
         parentEl.value?.removeEventListener("mouseenter", enter);
         parentEl.value?.removeEventListener("mouseleave", leave);
         document.removeEventListener("mousemove", hideOnMoveAway);
@@ -424,6 +447,7 @@ const contentClasses = computed(() => [
             :align-offset="alignOffset"
             :style="contentStyle"
             :class="contentClasses"
+            @pointer-down-outside="onChildPointerDownOutside"
             @mouseenter="onContentEnter"
             @mouseleave="onContentLeave"
           >

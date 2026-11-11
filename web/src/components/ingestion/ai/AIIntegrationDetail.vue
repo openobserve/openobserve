@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
@@ -44,6 +44,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const { aiContent, endpoint } = useIngestion();
 const route = useRoute();
+const router = useRouter();
 
 const category = computed<AICategory | undefined>(() =>
   aiCategories.find((c) => c.slug === props.categorySlug),
@@ -91,9 +92,7 @@ const richContent = computed(() =>
   getRichCardContent(integration.value?.contentSlug ?? integration.value?.slug, subs.value, t),
 );
 
-// "With a coding agent" / "Step by step". `?tab=agent` (e.g. from the LLM
-// Insights empty state) opens the coding-agent tab; anything else opens the
-// stepped card, which stays the default.
+// Only a user's tab switch writes `?tab=`: a watcher would also fire on navigation away and stamp the next route.
 const tabFromQuery = (tab: unknown) =>
   tab === CODING_AGENT_TAB ? CODING_AGENT_TAB : STEP_BY_STEP_TAB;
 const activeTab = ref<string | number>(tabFromQuery(route?.query?.tab));
@@ -103,6 +102,11 @@ watch(
     activeTab.value = tabFromQuery(tab);
   },
 );
+const selectTab = (tab: string | number) => {
+  activeTab.value = tab;
+  if (!route || route.query.tab === tab) return;
+  router.replace({ query: { ...route.query, tab: String(tab) } }).catch(() => {});
+};
 
 // The stream the prompt names: the card's own stream default, else "default".
 const agentDefaultStream = computed(
@@ -116,7 +120,13 @@ const agentGuideName = computed(
 
 <template>
   <div v-if="integration" class="p-2">
-    <OTabs v-model="activeTab" dense bordered data-test="ai-integration-setup-tabs">
+    <OTabs
+      :model-value="activeTab"
+      dense
+      bordered
+      data-test="ai-integration-setup-tabs"
+      @update:model-value="selectTab"
+    >
       <OTab
         :name="CODING_AGENT_TAB"
         :label="t('ingestion.ai.codingAgent.tabAgent')"

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nText } from "@/types/i18n";
-import type { AlertGroupRef, EndOnClear } from "@/services/downtimes";
+import type { ActiveDowntime, AlertGroupRef, EndOnClear } from "@/services/downtimes";
 
 export interface Condition {
   column: string;
@@ -87,6 +87,8 @@ export interface Template {
   // "custom" raw-payload template (body is an arbitrary user string). Absent
   // on templates created before this field existed — treat as "custom".
   kind?: "content" | "custom";
+  // Notification kinds the template is meant for; [] or absent means every kind.
+  applies_to?: string[];
 }
 
 // Template object which is modified in frontend to display in table and form
@@ -186,6 +188,8 @@ export interface AlertGroup {
   firing_started_at?: number;
   /** Present only while the ack is in force for the current firing. */
   ack?: AckView;
+  /** The mute in force on this group, its own or a whole-alert one. */
+  downtime?: (ActiveDowntime & { version?: number }) | null;
 }
 
 export type AckSource = "ui" | "api" | "slack" | "oncall" | "incident";

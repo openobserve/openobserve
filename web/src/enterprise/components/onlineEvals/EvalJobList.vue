@@ -48,10 +48,7 @@
         </template>
 
         <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="eval-job-list-summary"
-          >
+          <div data-test="eval-job-list-summary">
             <OStatStrip
               :items="summaryStats"
               :loading="loading"

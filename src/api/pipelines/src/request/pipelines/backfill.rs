@@ -76,6 +76,10 @@ pub struct BackfillResponse {
         (status = 404, description = "Pipeline not found"),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
+    )
 )]
 pub async fn create_backfill(
     Path((org_id, pipeline_id)): Path<(String, String)>,
@@ -162,6 +166,10 @@ pub async fn create_backfill(
     responses(
         (status = 403, description = "Enterprise feature", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
+    )
 )]
 pub async fn create_backfill(
     Path((_org_id, _pipeline_id)): Path<(String, String)>,
@@ -193,7 +201,8 @@ pub async fn create_backfill(
             "description": "List all backfill jobs",
             "category": "pipelines",
             "summary_fields": ["job_id", "pipeline_id", "pipeline_name", "status", "progress_percent", "enabled"]
-        }))
+        })),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
     )
 )]
 pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
@@ -231,6 +240,10 @@ pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
     responses(
         (status = 403, description = "Enterprise feature", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": true}))
+    )
 )]
 pub async fn list_backfills(Path(_org_id): Path<String>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
@@ -257,6 +270,10 @@ pub async fn list_backfills(Path(_org_id): Path<String>) -> Response {
         (status = 404, description = "Job not found"),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "get"}))
+    )
 )]
 pub async fn get_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
@@ -316,6 +333,10 @@ pub async fn get_backfill(
     responses(
         (status = 403, description = "Enterprise feature", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "get"}))
+    )
 )]
 pub async fn get_backfill(
     Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
@@ -346,6 +367,10 @@ pub async fn get_backfill(
         (status = 404, description = "Job not found"),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+    )
 )]
 pub async fn enable_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
@@ -444,6 +469,10 @@ pub async fn enable_backfill(
     responses(
         (status = 403, description = "Enterprise feature", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+    )
 )]
 pub async fn enable_backfill(
     Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
@@ -473,6 +502,10 @@ pub async fn enable_backfill(
         (status = 404, description = "Job not found"),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
+    )
 )]
 pub async fn delete_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
@@ -553,6 +586,10 @@ pub async fn delete_backfill(
     responses(
         (status = 403, description = "Enterprise feature", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
+    )
 )]
 pub async fn delete_backfill(
     Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
@@ -587,7 +624,8 @@ pub async fn delete_backfill(
         (status = 500, description = "Internal server error")
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
     )
 )]
 pub async fn update_backfill(
@@ -689,7 +727,8 @@ pub async fn update_backfill(
         (status = 403, description = "Enterprise feature", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
     )
 )]
 pub async fn update_backfill(

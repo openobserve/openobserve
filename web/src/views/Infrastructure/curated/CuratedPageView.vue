@@ -20,6 +20,7 @@ import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -495,6 +496,7 @@ const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
 const jumpToLatestData = () => {
   const target = jumpTarget.value;
   if (!target) return;
+  analytics.track("infra_curated_jump_to_latest_clicked", { workload: props.workload });
   selectedWindow.value = { kind: "absolute", from: target.from, to: target.to };
   (dateTimeRef.value as any)?.setAbsoluteTime?.(target.from, target.to);
   void runRefresh(true);
@@ -578,6 +580,7 @@ const onClusterDrilldown = (event: Event) => {
   query["var-cluster"] = cluster;
   query.tab = FLEET_DRILLDOWN_TAB;
   void router.push({ query });
+  analytics.track("infra_curated_drilldown_opened", { workload: props.workload });
 };
 
 onMounted(() => document.addEventListener(FLEET_DRILLDOWN_EVENT, onClusterDrilldown));
@@ -661,6 +664,10 @@ const onDateChange = (date: {
   range.value = materialize(selectedWindow.value);
   // DateTime replays on mount with userChangedValue:false — "do not fetch"; the selection above is still recorded.
   if (date.userChangedValue === false) return;
+  analytics.track("infra_time_range_changed", {
+    page: `${props.workload}_curated`,
+    type: isRelative ? "relative" : "absolute",
+  });
   // The ONE debounce seam: refresh() itself is never delayed, so org switches and Retry stay immediate.
   if (rangeTimer) clearTimeout(rangeTimer);
   rangeTimer = setTimeout(() => void runRefresh(false), 300);

@@ -152,4 +152,25 @@ describe("K8sResourceTree", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="k8s2-tree"]').exists()).toBe(true);
   });
+
+  it("puts the cluster picker above the filter and forwards a pick", async () => {
+    const wrapper = mountTree({
+      clusters: [
+        { name: "alpha", tone: "success" },
+        { name: "beta", tone: "warning" },
+      ],
+      cluster: "alpha",
+    });
+    const tree = wrapper.find('[data-test="k8s2-tree"]').element;
+    const picker = wrapper.find('[data-test="k8s2-tree-cluster"]').element;
+    const filter = wrapper.find('[data-test="k8s2-tree-filter"]').element;
+    expect(tree.contains(picker)).toBe(true);
+    expect(picker.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    wrapper.findComponent({ name: "K8sClusterPicker" }).vm.$emit("select", "beta");
+    expect(wrapper.emitted("cluster")).toEqual([["beta"]]);
+  });
+
+  it("has no cluster picker without clusters", () => {
+    expect(mountTree().find('[data-test="k8s2-tree-cluster"]').exists()).toBe(false);
+  });
 });

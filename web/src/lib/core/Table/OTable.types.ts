@@ -478,6 +478,8 @@ export interface OTableProps<TData = any> {
   dimOnRefetch?: boolean;
   /** Show the skeleton on every load instead of keeping the last settled rows. */
   skeletonOnRefetch?: boolean;
+  /** Skeleton rows while loading, when the caller already knows how many rows will land; keeps the first paint the loaded height. */
+  skeletonRows?: number;
   /** Changing it drops the kept rows so the next load shows the skeleton; bind the folder or tab whose rows must not show under another. */
   loadingResetKey?: unknown;
   /** Draw the table's own progress line under the header while loading; turn off when the page draws one line for the whole region (default: true). */
@@ -723,6 +725,8 @@ export interface OTableSlots<TData = any> {
   error?: (props: { message: string }) => any;
   /** One `<tr>` (cells spanning the columns) rendered as the first row of the body, under the column header, before the first data row; not measured by virtual scrolling. */
   "body-start"?: () => any;
+  /** One `<tr>` (cells spanning the columns) rendered as the last row of the body, above the footer; not measured by virtual scrolling. */
+  "body-end"?: () => any;
   /** Expanded row content — scoped to the plain row data (`row.original`) */
   expansion?: (props: { row: TData }) => any;
   /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */

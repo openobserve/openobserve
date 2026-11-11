@@ -14,10 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const service_accounts = {
-  list: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/service_accounts`);
+  list: (org_identifier: string, config?: { silentForbidden?: boolean }) => {
+    const url = `/api/${org_identifier}/service_accounts`;
+    return config ? http().get(url, config) : http().get(url);
   },
   create: (data: any, org_identifier: string) => {
     return http().post(`/api/${org_identifier}/service_accounts`, data);
@@ -26,13 +28,29 @@ const service_accounts = {
     return http().put(`/api/${org_identifier}/service_accounts/${user_email}`, data);
   },
   delete: (org_identifier: string, user_email: string) => {
-    return http().delete(`/api/${org_identifier}/service_accounts/${user_email}`);
+    return http()
+      .delete(`/api/${org_identifier}/service_accounts/${user_email}`)
+      .then((res) => {
+        analytics.track("service_account_deleted", { count: 1 });
+        return res;
+      });
   },
   bulkDelete: (org_identifier: string, data: any) => {
-    return http().delete(`/api/${org_identifier}/service_accounts/bulk`, { data });
+    return http()
+      .delete(`/api/${org_identifier}/service_accounts/bulk`, { data })
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track("service_account_deleted", { count });
+        return res;
+      });
   },
   refresh_token: (org_identifier: string, user_email: string) => {
-    return http().put(`/api/${org_identifier}/service_accounts/${user_email}?rotateToken=true`, {});
+    return http()
+      .put(`/api/${org_identifier}/service_accounts/${user_email}?rotateToken=true`, {})
+      .then((res) => {
+        analytics.track("service_account_token_rotated");
+        return res;
+      });
   },
 };
 export default service_accounts;

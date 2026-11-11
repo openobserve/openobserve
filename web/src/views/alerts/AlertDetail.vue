@@ -190,6 +190,7 @@
           <OStatStrip
             :items="firingTiles"
             selectable
+            :tray="false"
             data-test="alerts-alertdetail-tiles"
             @select="openIncident"
           />
@@ -285,6 +286,7 @@
             <AlertGroupsTable
               :groups="groupData?.list || []"
               :loading="loadingGroups"
+              :load-error="groupsLoadError"
               :alert-id="alertId"
               :alert-name="alert?.name || alertId"
               :folder-id="folderId"
@@ -457,6 +459,7 @@ const downtimesEnabled = useDowntimesEnabled();
 
 const alert = ref<any>(null);
 const groupData = ref<AlertGroupsResponse | null>(null);
+const groupsLoadError = ref(false);
 const transitions = ref<AlertGroupTransition[]>([]);
 const loadingGroups = ref(false);
 const loadingTransitions = ref(false);
@@ -840,8 +843,10 @@ const fetchGroups = async () => {
   try {
     const res = await alertsService.list_groups(orgId.value, alertId.value);
     groupData.value = res.data;
+    groupsLoadError.value = false;
   } catch {
     groupData.value = null;
+    groupsLoadError.value = true;
   } finally {
     loadingGroups.value = false;
   }

@@ -228,6 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #actions>
             <OButton
+              v-if="pa.canWidenRange.value"
               variant="outline"
               size="md"
               data-test="rum-analytics-paths-no-anchor-widen-range-btn"
@@ -270,6 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("rum.analytics.pathsView.backToFunnel") }}</OButton
               >
               <OButton
+                v-if="pa.canWidenRange.value"
                 variant="outline"
                 size="md"
                 data-test="rum-analytics-paths-widen-range-btn"
@@ -412,6 +414,7 @@ import {
 } from "@/utils/rum/productAnalyticsQueries";
 import { stepLabel } from "@/utils/rum/productAnalyticsPanels";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
+import analytics from "@/services/product_analytics";
 
 defineOptions({ name: "AnalyticsPaths" });
 
@@ -763,6 +766,7 @@ const onFlowSelect = (sel: FlowSelection) => {
     expectedTotal: expected,
     pathKeys: pathKeysTo(chainEnd, chainSource),
   };
+  analytics.track("rum_path_sessions_opened", { source: sel.type });
 };
 
 const onTupleSelect = (sel: { type: "tuple"; tuple: (string | null)[] }) => {
@@ -788,12 +792,15 @@ const onTupleSelect = (sel: { type: "tuple"; tuple: (string | null)[] }) => {
     expectedTotal: row ? Number(row.sessions) : null,
     pathKeys: steps,
   };
+  analytics.track("rum_path_sessions_opened", { source: "tuple" });
 };
 
 const buildFunnel = (steps: StepRef[]) => {
   if (!steps.length) return;
   branch.value = null;
-  void funnelDraft.startNew({ ...emptyFunnel(), steps });
+  void funnelDraft.startNew({ ...emptyFunnel(), steps }).then((started) => {
+    if (started) analytics.track("rum_funnel_built_from_path", { steps: steps.length });
+  });
 };
 
 const widenRange = () => pa.widenRange(router);

@@ -4,8 +4,23 @@
 // stays i18n-driven (pass useI18n's `t`).
 
 import { z } from "zod";
+import { JOB_PRESETS } from "./jobPresets";
 
 export const roleNameRegex = /^[a-zA-Z0-9_]+$/;
+
+const START_FROM = new Set([
+  "custom",
+  "readonly",
+  "dbm",
+  "k8s",
+  "rum_viewer",
+  "rum_editor",
+  ...JOB_PRESETS.map((preset) => preset.id),
+]);
+
+/** Whether `value` names a preset the Start from list offers. */
+export const isStartFrom = (value: unknown): value is string =>
+  typeof value === "string" && START_FROM.has(value);
 
 export const makeAddRoleSchema = (t: (_key: string, _params?: Record<string, unknown>) => string) =>
   z.object({
@@ -16,9 +31,7 @@ export const makeAddRoleSchema = (t: (_key: string, _params?: Record<string, unk
       .regex(roleNameRegex, t("iam.role.name.invalidChars"))
       .max(100, t("common.nameMaxLength", { max: 100 })),
     // Every preset other than "custom" is seeded once, as pending grants, when EditRole opens.
-    startFrom: z
-      .enum(["custom", "readonly", "dbm", "k8s", "rum_viewer", "rum_editor"])
-      .default("custom"),
+    startFrom: z.string().refine(isStartFrom).default("custom"),
   });
 
 export type AddRoleForm = z.infer<ReturnType<typeof makeAddRoleSchema>>;

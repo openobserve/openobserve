@@ -125,6 +125,8 @@ const chartData = computed(() => {
           layoutIterations: 0,
           draggable: false,
           emphasis: { focus: "adjacency" },
+          // Small nodes stack closer than a two-line label is tall; the larger node keeps its label.
+          labelLayout: { hideOverlap: true },
           label: {
             color: colors.text,
             textBorderColor: colors.halo,

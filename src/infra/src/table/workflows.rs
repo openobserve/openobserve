@@ -27,7 +27,7 @@ use crate::{
     table::entity::workflow_associations,
 };
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, utoipa::ToSchema)]
 pub struct Workflow {
     pub id: String,
     pub org_id: String,
@@ -45,13 +45,13 @@ pub struct Workflow {
     pub edges: Vec<Edge>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, utoipa::ToSchema)]
 pub struct WorkflowError {
     pub node_id: String,
     pub error: Vec<String>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, utoipa::ToSchema)]
 pub struct WorkflowRunErrors {
     pub id: i32,
     pub cluster: String,
@@ -142,7 +142,7 @@ impl From<workflow_run_data::Model> for WorkflowRunData {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, utoipa::ToSchema)]
 pub struct WorkflowAssociation {
     pub id: i32,
     pub org_id: String,

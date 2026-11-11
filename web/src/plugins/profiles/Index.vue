@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-run-pending="runPending && !queryLoading ? 'true' : undefined"
           :data-test="queryLoading ? 'profiles-cancel-query' : 'profiles-run-query'"
           :class="isAutoRunAvailable ? 'border-y-0! border-s-0! border-e!' : 'border-0!'"
-          @click="queryLoading ? cancelQuery() : runQuery()"
+          @click="queryLoading ? cancelQuery() : runQuery(true)"
         >
           <span class="grid">
             <span
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
         data-test="profiles-search-cancelled"
       >
-        <OEmptyState preset="search-cancelled" size="block" @action="runQuery" />
+        <OEmptyState preset="search-cancelled" size="block" @action="runQuery(true)" />
       </div>
 
       <div
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <header
             class="border-border-default flex flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-1.5 text-sm"
           >
-            <span class="font-semibold">{{ t("profiles.timeSeriesTitle") }}</span>
+            <span class="font-semibold">{{ timeSeriesTitle }}</span>
             <div
               v-if="seriesLines.length > 1"
               class="flex min-w-0 flex-wrap items-center gap-1"
@@ -692,6 +692,7 @@ import { calleesOf, callersOf } from "./sandwich";
 import { formatPercent } from "./format";
 import { copyToClipboard } from "@/utils/clipboard";
 import streamService from "@/services/stream";
+import analytics from "@/services/product_analytics";
 import profilesService, {
   encodeProfileFilters,
   parseProfileFilters,
@@ -700,6 +701,7 @@ import profilesService, {
   type ProfilesQueryBody,
   type ProfilesSeriesPoint,
   type ProfilesSeriesResponse,
+  type ProfileTypeMeta,
   type ProfilesTreeNode,
 } from "@/services/profiles";
 import { cssToken } from "@/utils/theme";
@@ -786,7 +788,9 @@ const searchQuery = ref("");
 const activeView = ref<ProfileView>("top");
 const setView = (value: unknown) => {
   const next = PROFILE_VIEWS.find((view) => view === value);
-  if (next) activeView.value = next;
+  if (!next || next === activeView.value) return;
+  activeView.value = next;
+  analytics.track("profiles_view_changed", { view: next });
 };
 const expandedStackIds = ref<string[]>([]);
 // On phones the page body is the one scroller and the Top Table virtualizes against it; from md up each table scrolls itself.
@@ -831,6 +835,7 @@ const showInFlameGraph = (name: string) => {
 };
 const showDetails = (name: string) => {
   detailsName.value = name;
+  analytics.track("profiles_function_details_opened");
 };
 const showSandwich = (name: string) => {
   sandwichFunction.value = name;
@@ -857,7 +862,7 @@ const focusInFlameGraph = async (path: string) => {
 
 const metaResponse = ref<{
   services: string[];
-  profile_types: Array<{ type: string; unit: string }>;
+  profile_types: ProfileTypeMeta[];
   label_names: string[];
 } | null>(null);
 const seriesResponse = ref<ProfilesSeriesResponse | null>(null);
@@ -919,7 +924,7 @@ const serviceOptions = computed<SelectOption[]>(() =>
 );
 const profileTypeOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.profile_types ?? []).map((item) => ({
-    label: raw(`${item.type} (${seriesUnitLabel(item.type, item.unit)})`),
+    label: profileTypeLabel(item),
     value: `${item.type}\u0000${item.unit}`,
   })),
 );
@@ -929,7 +934,7 @@ const profileTypeSelectOptions = computed<SelectOption[]>(() => {
   const options = profileTypeOptions.value;
   if (!selected || options.some((option) => option.value === selected)) return options;
   const [type, unit = ""] = selected.split("\u0000");
-  return [...options, { label: raw(`${type} (${seriesUnitLabel(type, unit)})`), value: selected }];
+  return [...options, { label: profileTypeLabel({ type, unit }), value: selected }];
 });
 const tagKeyOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.label_names ?? []).map((value) => ({ label: raw(value), value })),
@@ -974,9 +979,10 @@ const currentUnit = computed(
 const currentType = computed(
   () => currentProfileType.value?.type || seriesResponse.value?.profile_type || "",
 );
-const isCpuMetric = computed(
-  () => currentType.value.toLowerCase() === "cpu" && /nano/i.test(currentUnit.value),
-);
+const isNanosecondsUnit = (unit: string) => /^(nanoseconds?|ns|nanos)$/i.test(unit);
+const isCpuTime = (profileType: string, unit: string) =>
+  profileType.toLowerCase() === "cpu" && isNanosecondsUnit(unit);
+const isCpuMetric = computed(() => isCpuTime(currentType.value, currentUnit.value));
 
 // Token values change with the theme, so they are re-read whenever it switches.
 const seriesColors = computed(() => {
@@ -1258,12 +1264,26 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
 });
 
 const seriesUnitLabel = (profileType: string, unit: string) => {
-  if (profileType.toLowerCase() === "cpu" && /nano/i.test(unit)) return "cores";
+  if (isCpuTime(profileType, unit)) return "cores";
   if (/nanosecond|^ns$/i.test(unit)) return "nanoseconds";
   if (/byte|^b$/i.test(unit)) return "bytes";
   if (!unit) return "count";
   return unit;
 };
+
+const profileTypeLabel = (profileType: ProfileTypeMeta) => {
+  const { type, unit } = profileType;
+  if (isCpuTime(type, unit)) return t("profiles.cpuTime", { cpu: raw("CPU") });
+  if (type === "samples" && unit === "count")
+    return t("profiles.cpuSamples", { cpu: raw("CPU"), unit: raw("count") });
+  return raw(`${type} (${seriesUnitLabel(type, unit)})`);
+};
+
+const timeSeriesTitle = computed(() =>
+  isCpuMetric.value
+    ? t("profiles.cpuUsage", { cpu: raw("CPU"), unit: raw("cores") })
+    : t("profiles.timeSeriesTitle"),
+);
 
 const tableUnitLabel = computed(() => {
   if (isCpuMetric.value) return t("profiles.cpuDuration");
@@ -1721,6 +1741,7 @@ const setBreakdown = async (value: unknown) => {
     );
     if (requestSeq !== seriesRequestSeq) return;
     seriesResponse.value = response.data;
+    analytics.track("profiles_breakdown_changed", { has_breakdown: !!label });
   } catch (error) {
     if (requestSeq !== seriesRequestSeq || abort.signal.aborted) return;
     errorMessage.value = buildErrorMessage(error);
@@ -1729,7 +1750,7 @@ const setBreakdown = async (value: unknown) => {
   }
 };
 
-const runQuery = async () => {
+const runQuery = async (userRun = false) => {
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
   const range = resolveTimeRange();
@@ -1762,6 +1783,12 @@ const runQuery = async () => {
     lastRun.value = runState;
     resetStackExpansion(mergeResponseValue.data.root);
     syncUrl();
+    if (userRun) {
+      analytics.track("profiles_query_completed", {
+        filter_count: appliedFilters.value.length,
+        has_breakdown: !!breakdownLabel.value,
+      });
+    }
   } catch (error) {
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     errorMessage.value = buildErrorMessage(error);

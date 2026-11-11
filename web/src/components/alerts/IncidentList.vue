@@ -94,10 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Severity summary strip below the toolbar (mirrors the Alerts state
              strip): Total + the four severities as selectable filter tiles. -->
         <template #subheader>
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="incident-list-summary"
-          >
+          <div data-test="incident-list-summary">
             <OStatStrip
               :items="severityStats"
               :loading="loading"

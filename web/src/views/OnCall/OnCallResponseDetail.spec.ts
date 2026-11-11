@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
 import alertsService from "@/services/alerts";
+import { alertKeys } from "@/services/alerts.querykeys";
 import oncallService from "@/services/oncall";
 import { responseProgressQuery } from "@/services/oncall.queries";
 import { oncallKeys } from "@/services/oncall.querykeys";
@@ -50,15 +52,31 @@ vi.mock("@/services/oncall", () => ({
     getPolicy: vi.fn(),
     teamReachability: vi.fn(),
     resolvedSchedule: vi.fn(),
+    responseReport: vi.fn(),
     escalateNow: vi.fn(),
   },
 }));
 
+vi.mock("@/services/incidents", () => ({ default: { get: vi.fn() } }));
+import incidentsService from "@/services/incidents";
+const incidentsGet = vi.mocked(incidentsService).get;
+
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
+import { axiosReply, deferredReply } from "@/test/unit/helpers/mockService";
+
+/// The view state a few tests read or seed directly.
+type DetailVm = {
+  response: { id: string } | null;
+  escalation: unknown;
+  teamName: string;
+  refreshRecord: () => Promise<void>;
+  deliveries: { id: string }[];
+  deliveriesLoading: boolean;
+};
 
 vi.mock("@/services/alerts", () => ({
-  default: { get_by_alert_id: vi.fn() },
+  default: { get_by_alert_id: vi.fn(), listByFolderId: vi.fn() },
 }));
 
 /// Escalate's whole point is what it reports back, and the report is a toast.
@@ -105,7 +123,7 @@ const stubs = {
     // `title-trail` carries the state tags and `subtitle` the team/firing/
     // opened line, both of which are assertions of their own.
     template:
-      "<div><slot name='subtitle' /><slot name='title-trail' /><slot name='actions' /><slot /></div>",
+      "<div><div data-test='stub-subtitle'><slot name='subtitle' /></div><div data-test='stub-title-trail'><slot name='title-trail' /></div><slot name='actions' /><div data-test='stub-header-tabs'><slot name='header-tabs' /></div><slot /></div>",
   },
   OTooltip: {
     name: "OTooltip",
@@ -185,6 +203,7 @@ const stubs = {
       "closedAt",
       "ackedBy",
       "teamDeleted",
+      "loading",
     ],
     template: "<div />",
   },
@@ -199,6 +218,8 @@ const stubs = {
       "routingReason",
       "subjectStream",
       "incidentId",
+      "incidentTitle",
+      "incidentLoading",
       "cause",
       "causeNote",
       "teamDeleted",
@@ -279,9 +300,7 @@ function render() {
 }
 
 async function renderWith(overrides: Record<string, unknown> = {}) {
-  service.getResponse.mockResolvedValue({
-    data: { response: record(overrides), events: [] },
-  } as any);
+  service.getResponse.mockResolvedValue(axiosReply({ response: record(overrides), events: [] }));
   const wrapper = render();
   await flushPromises();
   return wrapper;
@@ -296,33 +315,33 @@ enableAutoUnmount(afterEach);
 describe("OnCallResponseDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    service.getTeam.mockResolvedValue({ data: { name: "Platform" } } as any);
-    service.listMembers.mockResolvedValue({
-      data: [{ user_email: "engineer@example.com" }, { user_email: "other@example.com" }],
-    } as any);
-    service.priorCauses.mockResolvedValue({ data: [] } as any);
-    service.responseHistory.mockResolvedValue({ data: [] } as any);
-    alerts.get_by_alert_id.mockResolvedValue({
-      data: { name: "checkout_error_ratio", stream_name: "default", stream_type: "logs" },
-    } as any);
-    service.listTeams.mockResolvedValue({
-      data: [
+    service.getTeam.mockResolvedValue(axiosReply({ name: "Platform" }));
+    service.listMembers.mockResolvedValue(
+      axiosReply([{ user_email: "engineer@example.com" }, { user_email: "other@example.com" }]),
+    );
+    service.priorCauses.mockResolvedValue(axiosReply([]));
+    service.responseHistory.mockResolvedValue(axiosReply([]));
+    alerts.get_by_alert_id.mockResolvedValue(
+      axiosReply({ name: "checkout_error_ratio", stream_name: "default", stream_type: "logs" }),
+    );
+    service.listTeams.mockResolvedValue(
+      axiosReply([
         { id: "team_1", name: "Platform" },
         { id: "team_2", name: "Payments" },
-      ],
-    } as any);
-    service.listDeliveries.mockResolvedValue({ data: { total: 0, deliveries: [] } } as any);
-    service.escalationProgress.mockResolvedValue({ data: null } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.getPolicy.mockResolvedValue({ data: null } as any);
-    service.teamReachability.mockResolvedValue({ data: { smtp_configured: true } } as any);
-    service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
+      ]),
+    );
+    service.listDeliveries.mockResolvedValue(axiosReply({ total: 0, deliveries: [] }));
+    service.escalationProgress.mockResolvedValue(axiosReply(null));
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    service.getPolicy.mockResolvedValue(axiosReply(null));
+    service.teamReachability.mockResolvedValue(axiosReply({ smtp_configured: true }));
+    service.resolvedSchedule.mockResolvedValue(axiosReply([]));
   });
 
   /// "Why did this page me" was answerable only by scrolling the timeline.
   it("shows the routing decision on the overview", async () => {
-    service.getResponse.mockResolvedValue({
-      data: {
+    service.getResponse.mockResolvedValue(
+      axiosReply({
         response: record(),
         events: [
           { kind: "sys", at: 1, actor: "o2-engine", body: "opened for alert al_ckt: x" },
@@ -333,8 +352,8 @@ describe("OnCallResponseDetail", () => {
             body: "routed to tm_pay by ownership rule k8s-namespace=payments",
           },
         ],
-      },
-    } as any);
+      }),
+    );
     const wrapper = render();
     await flushPromises();
 
@@ -349,7 +368,6 @@ describe("OnCallResponseDetail", () => {
     const wrapper = await renderWith();
     const reads = [
       service.getResponse,
-      service.getTeam,
       service.listMembers,
       service.listTeams,
       service.priorCauses,
@@ -369,6 +387,8 @@ describe("OnCallResponseDetail", () => {
 
     expect(spy).toHaveBeenCalledWith({ queryKey: oncallKeys.all("default"), refetchType: "none" });
     for (const read of reads) expect(read).toHaveBeenCalledTimes(2);
+    // The team list already names the team, so its own read is never needed.
+    expect(service.getTeam).not.toHaveBeenCalled();
     expect(wrapper.findComponent({ name: "OnCallAboutPage" }).exists()).toBe(true);
     spy.mockRestore();
   });
@@ -385,27 +405,47 @@ describe("OnCallResponseDetail", () => {
   it("ignores a slower record for an id the route has already left", async () => {
     const { reactive } = await import("vue");
     const wrapper = await renderWith({ id: "resp_1", title: "First page" });
-    let answerSecond: (value: unknown) => void = () => {};
-    service.getResponse.mockImplementationOnce(
-      () => new Promise((resolve) => (answerSecond = resolve)),
-    );
+    const answerSecond = deferredReply();
+    service.getResponse.mockImplementationOnce(() => answerSecond.promise);
 
     reactive(routeState).params.responseId = "resp_2";
     await flushPromises();
     reactive(routeState).params.responseId = "resp_1";
     await flushPromises();
-    answerSecond({
-      data: { response: record({ id: "resp_2", title: "Second page" }), events: [] },
-    });
+    answerSecond.answer({ response: record({ id: "resp_2", title: "Second page" }), events: [] });
     await flushPromises();
 
-    expect((wrapper.vm as any).response?.id).toBe("resp_1");
+    expect((wrapper.vm as unknown as DetailVm).response?.id).toBe("resp_1");
+  });
+
+  /// The context reads run alongside each other, so a slow one for a page already left must not land on the current page.
+  it("ignores a slower context read for a page the route has already left", async () => {
+    const { reactive } = await import("vue");
+    const wrapper = await renderWith({ id: "resp_1" });
+    const slow = deferredReply();
+    service.listDeliveries.mockImplementation(({ response_id }) =>
+      response_id === "resp_2"
+        ? slow.promise
+        : Promise.resolve(axiosReply({ total: 1, deliveries: [{ id: "d_current" }] })),
+    );
+
+    reactive(routeState).params.responseId = "resp_2";
+    await flushPromises();
+    reactive(routeState).params.responseId = "resp_3";
+    await flushPromises();
+    slow.answer({ total: 1, deliveries: [{ id: "d_left" }] });
+    await flushPromises();
+
+    const vm = wrapper.vm as unknown as DetailVm;
+    expect(vm.deliveries.map((d) => d.id)).toEqual(["d_current"]);
+    expect(vm.deliveriesLoading).toBe(false);
+    reactive(routeState).params.responseId = "resp_1";
   });
 
   it("loads the past firings alongside the causes", async () => {
-    service.responseHistory.mockResolvedValue({
-      data: [{ id: "resp_0", state: "resolved", opened_at: 1, acked_by: null, cause: null }],
-    } as any);
+    service.responseHistory.mockResolvedValue(
+      axiosReply([{ id: "resp_0", state: "resolved", opened_at: 1, acked_by: null, cause: null }]),
+    );
     const wrapper = await renderWith();
 
     expect(service.responseHistory).toHaveBeenCalledWith({
@@ -418,9 +458,9 @@ describe("OnCallResponseDetail", () => {
   /// The history route is absent on servers that predate it, and the causes
   /// beside it must still render — the two are fetched independently.
   it("still shows the causes when the history route is missing", async () => {
-    service.priorCauses.mockResolvedValue({
-      data: [{ cause: "noisy_threshold", count: 3, last_response_id: "resp_0" }],
-    } as any);
+    service.priorCauses.mockResolvedValue(
+      axiosReply([{ cause: "noisy_threshold", count: 3, last_response_id: "resp_0" }]),
+    );
     service.responseHistory.mockRejectedValue({ response: { status: 404 } });
     const wrapper = await renderWith();
 
@@ -459,7 +499,7 @@ describe("OnCallResponseDetail", () => {
 
   it("acknowledges the page and reloads it", async () => {
     const wrapper = await renderWith();
-    service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+    service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
 
     await wrapper.find('[data-test="oncall-response-ack-btn"]').trigger("click");
     await flushPromises();
@@ -496,8 +536,8 @@ describe("OnCallResponseDetail", () => {
   it("offers Unacknowledge and Take over on a page someone else acknowledged", async () => {
     const wrapper = await renderWith({ state: "acknowledged", acked_by: "ana@acme.io" });
     expect(wrapper.find('[data-test="oncall-response-ack-btn"]').exists()).toBe(false);
-    service.unacknowledgeResponse.mockResolvedValue({ data: {} } as any);
-    service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+    service.unacknowledgeResponse.mockResolvedValue(axiosReply({}));
+    service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
 
     await wrapper.find('[data-test="oncall-response-take-over-btn"]').trigger("click");
     await flushPromises();
@@ -517,9 +557,9 @@ describe("OnCallResponseDetail", () => {
 
   it("says the page is already resolved when Acknowledge found it closed", async () => {
     const wrapper = await renderWith();
-    service.acknowledgeResponse.mockResolvedValue({
-      data: { ...record({ state: "resolved", closed_at: 1 }), ack: { changed: false } },
-    } as any);
+    service.acknowledgeResponse.mockResolvedValue(
+      axiosReply({ ...record({ state: "resolved", closed_at: 1 }), ack: { changed: false } }),
+    );
     await wrapper.find('[data-test="oncall-response-ack-btn"]').trigger("click");
     await flushPromises();
     expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
@@ -533,9 +573,9 @@ describe("OnCallResponseDetail", () => {
       state: "acknowledged",
       acked_by: store.state.userInfo.email,
     });
-    service.unacknowledgeResponse.mockResolvedValue({
-      data: { ...record({ state: "resolved", closed_at: 1 }), ack: { changed: false } },
-    } as any);
+    service.unacknowledgeResponse.mockResolvedValue(
+      axiosReply({ ...record({ state: "resolved", closed_at: 1 }), ack: { changed: false } }),
+    );
     await wrapper.find('[data-test="oncall-response-unack-btn"]').trigger("click");
     await flushPromises();
     expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
@@ -546,12 +586,12 @@ describe("OnCallResponseDetail", () => {
 
   it("says who was faster when Acknowledge changed nothing", async () => {
     const wrapper = await renderWith();
-    service.acknowledgeResponse.mockResolvedValue({
-      data: {
+    service.acknowledgeResponse.mockResolvedValue(
+      axiosReply({
         ...record({ state: "acknowledged", acked_by: "ana@acme.io" }),
         ack: { changed: false },
-      },
-    } as any);
+      }),
+    );
     await wrapper.find('[data-test="oncall-response-ack-btn"]').trigger("click");
     await flushPromises();
     expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
@@ -566,14 +606,165 @@ describe("OnCallResponseDetail", () => {
       acked_by: store.state.userInfo.email,
       title: "checkout down",
     });
-    service.unacknowledgeResponse.mockResolvedValue({
-      data: { ...record({ title: "checkout down" }), ack: { changed: false } },
-    } as any);
+    service.unacknowledgeResponse.mockResolvedValue(
+      axiosReply({ ...record({ title: "checkout down" }), ack: { changed: false } }),
+    );
     await wrapper.find('[data-test="oncall-response-unack-btn"]').trigger("click");
     await flushPromises();
     expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
       variant: "info",
       message: "checkout down was not acknowledged",
+    });
+  });
+
+  // Engine bookkeeping is folded by default; the toggle names how much it hides and appears only when there is some.
+  it("folds system activity until asked for", async () => {
+    service.getResponse.mockResolvedValue(
+      axiosReply({
+        response: record(),
+        events: [
+          { kind: "sys", at: 1, actor: "o2-engine", body: "this signal carries no service" },
+          { kind: "note", at: 2, actor: "ana@acme.io", body: "looking" },
+        ],
+      }),
+    );
+    const wrapper = render();
+    await flushPromises();
+    const toggle = wrapper.find('[data-test="oncall-response-activity-toggle-all"]');
+    expect(toggle.text()).toContain("1");
+    expect(wrapper.findComponent({ name: "OnCallActivityTimeline" }).props("showAll")).toBe(false);
+  });
+
+  it("offers no system toggle when there is no system activity", async () => {
+    const wrapper = await renderWith();
+    expect(wrapper.find('[data-test="oncall-response-activity-toggle-all"]').exists()).toBe(false);
+  });
+
+  /// A long single-token alert name must ellipsise rather than run under the state chips beside it.
+  it("cuts a long title and keeps the state chips at full width", async () => {
+    const wrapper = await renderWith({
+      state: "acknowledged",
+      acked_by: "ana@acme.io",
+      title: "composite_clone_child_a_muv1p0nee7qa",
+    });
+    const layout = wrapper.findComponent({ name: "OPageLayout" });
+    expect(layout.attributes("title")).toBe("composite_clone_child_a_muv1p0nee7qa");
+    // "visible" lets the h1 overflow instead of ellipsising, which is what ran the title under the chips.
+    expect(layout.attributes("title-overflow")).toBeUndefined();
+    expect(wrapper.find('[data-test="oncall-response-state-tag"]').classes()).toContain("shrink-0");
+  });
+
+  /// Who holds the page reads with team and time, so the title row keeps its width for the title.
+  it("names the holder of an acknowledged page in the subtitle, not beside the title", async () => {
+    const wrapper = await renderWith({ state: "acknowledged", acked_by: "ana@acme.io" });
+    expect(wrapper.find('[data-test="oncall-response-phrase"]').exists()).toBe(false);
+    const acked = wrapper.find('[data-test="oncall-response-acked-by"]');
+    expect(acked.text()).toContain("Acknowledged by");
+    expect(acked.findComponent({ name: "OnCallPersonName" }).props("email")).toBe("ana@acme.io");
+  });
+
+  /// A long ladder line beside the title ran under the header actions, so it reads on the subtitle line.
+  it("says how far the page has climbed on the subtitle line, not beside the title", async () => {
+    const wrapper = await renderWith();
+    const phrase = wrapper.find('[data-test="stub-subtitle"] [data-test="oncall-response-phrase"]');
+    expect(phrase.exists()).toBe(true);
+    expect(phrase.classes()).toContain("min-w-0");
+    expect(
+      wrapper.find('[data-test="stub-title-trail"] [data-test="oncall-response-phrase"]').exists(),
+    ).toBe(false);
+  });
+
+  /// The title row holds only state and priority; an exhausted ladder is said in words on the subtitle line.
+  it("says nobody answered on the subtitle line, not as a chip beside the title", async () => {
+    service.escalationProgress.mockResolvedValue(
+      axiosReply({
+        fired: [{ after_micros: 0, at: 1, targets: ["ana@acme.io"], reached: ["ana@acme.io"] }],
+        next_targets: [],
+        next_at: null,
+        exhausted: true,
+      }),
+    );
+    const wrapper = await renderWith();
+    const words = wrapper.find(
+      '[data-test="stub-subtitle"] [data-test="oncall-response-phrase-exhausted"]',
+    );
+    expect(words.text()).toContain("Nobody answered");
+    const trail = wrapper.find('[data-test="stub-title-trail"]');
+    expect(trail.findAllComponents({ name: "OTag" })).toHaveLength(2);
+    expect(trail.find('[data-test="oncall-response-title-trail"]').classes()).toContain(
+      "overflow-hidden",
+    );
+  });
+
+  describe("an Unacknowledge the server cannot apply", () => {
+    const held = () => ({
+      state: "acknowledged",
+      acked_by: store.state.userInfo.email,
+      title: "checkout down",
+    });
+    const unackBtn = (wrapper: VueWrapper) =>
+      wrapper.findComponent('[data-test="oncall-response-unack-btn"]');
+
+    it("warns instead of claiming the page was never acknowledged, then turns the button off", async () => {
+      const wrapper = await renderWith(held());
+      service.unacknowledgeResponse.mockResolvedValue(
+        axiosReply({ ...record(held()), ack: { changed: false } }),
+      );
+      await unackBtn(wrapper).trigger("click");
+      await flushPromises();
+
+      expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
+        variant: "warning",
+        message: "Couldn't unacknowledge this page",
+      });
+      expect(unackBtn(wrapper).props("disabled")).toBe(true);
+      expect(unackBtn(wrapper).findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Couldn't unacknowledge this page",
+      );
+    });
+
+    it("blames the deleted alert when the lookup said it is gone", async () => {
+      alerts.get_by_alert_id.mockRejectedValue({ response: { status: 404 } });
+      const wrapper = await renderWith(held());
+
+      expect(unackBtn(wrapper).props("disabled")).toBe(true);
+      expect(unackBtn(wrapper).findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Can't unacknowledge: this page's alert was deleted",
+      );
+    });
+
+    /// A cached org-wide list filled after the page opened settles it with no request at all.
+    it("learns the alert is gone from an already cached alert list", async () => {
+      queryClient.setQueryData(
+        alertKeys.dependencies(store.state.selectedOrganization.identifier),
+        [{ alert_id: "al_other" }],
+      );
+      const wrapper = await renderWith(held());
+
+      expect(alerts.get_by_alert_id).not.toHaveBeenCalled();
+      expect(alerts.listByFolderId).not.toHaveBeenCalled();
+      expect(unackBtn(wrapper).findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Can't unacknowledge: this page's alert was deleted",
+      );
+      queryClient.removeQueries({
+        queryKey: alertKeys.dependencies(store.state.selectedOrganization.identifier),
+      });
+    });
+
+    it("asks for the alert itself when no list is cached", async () => {
+      alerts.get_by_alert_id.mockResolvedValue(axiosReply({}));
+      const wrapper = await renderWith(held());
+
+      expect(alerts.listByFolderId).not.toHaveBeenCalled();
+      expect(alerts.get_by_alert_id).toHaveBeenCalledWith(expect.any(String), "al_ckt");
+      expect(unackBtn(wrapper).props("disabled")).toBe(false);
+    });
+
+    it("keeps the button on when the alert lookup failed for another reason", async () => {
+      alerts.get_by_alert_id.mockRejectedValue({ response: { status: 500 } });
+      const wrapper = await renderWith(held());
+
+      expect(unackBtn(wrapper).props("disabled")).toBe(false);
     });
   });
 
@@ -634,7 +825,7 @@ describe("OnCallResponseDetail", () => {
 
   it("snoozes for the chosen duration", async () => {
     const wrapper = await renderWith();
-    service.snoozeResponse.mockResolvedValue({ data: {} } as any);
+    service.snoozeResponse.mockResolvedValue(axiosReply({}));
 
     await wrapper.find('[data-test="oncall-response-snooze-30"]').trigger("click");
     await flushPromises();
@@ -665,7 +856,7 @@ describe("OnCallResponseDetail", () => {
   /// Snooze means paused, then continues; while it is paused the same control continues it now.
   it("swaps Snooze for Unsnooze while snoozed, and the banner offers it too", async () => {
     const wrapper = await renderWith({ snoozed_until: (Date.now() + 30 * 60_000) * 1000 });
-    service.unsnoozeResponse.mockResolvedValue({ data: {} } as any);
+    service.unsnoozeResponse.mockResolvedValue(axiosReply({}));
 
     expect(wrapper.find('[data-test="oncall-response-snooze-btn"]').exists()).toBe(false);
     for (const button of [
@@ -687,7 +878,7 @@ describe("OnCallResponseDetail", () => {
 
   it("adds a note and clears the box", async () => {
     const wrapper = await renderWith();
-    service.addNote.mockResolvedValue({ data: {} } as any);
+    service.addNote.mockResolvedValue(axiosReply({}));
 
     const box = wrapper.find('[data-test="oncall-response-note-input"]');
     await box.setValue("  restarted the pool  ");
@@ -714,7 +905,7 @@ describe("OnCallResponseDetail", () => {
   /// would leave the server to guess which one was meant.
   it("sends only the target for the chosen handoff mode", async () => {
     const wrapper = await renderWith();
-    service.handoffResponse.mockResolvedValue({ data: {} } as any);
+    service.handoffResponse.mockResolvedValue(axiosReply({}));
 
     await wrapper.find('[data-test="oncall-response-handoff-btn"]').trigger("click");
     // Emitted rather than setValue: a bare <select> stub has no <option>
@@ -799,7 +990,7 @@ describe("OnCallResponseDetail", () => {
   describe("recording the cause", () => {
     async function openResolve() {
       const wrapper = await renderWith();
-      service.resolveResponse.mockResolvedValue({ data: {} } as any);
+      service.resolveResponse.mockResolvedValue(axiosReply({}));
       await wrapper.find('[data-test="oncall-response-resolve-btn"]').trigger("click");
       return wrapper;
     }
@@ -860,16 +1051,16 @@ describe("OnCallResponseDetail", () => {
 
   describe("prior causes", () => {
     it("passes what previous firings turned out to be", async () => {
-      service.priorCauses.mockResolvedValue({
-        data: [
+      service.priorCauses.mockResolvedValue(
+        axiosReply([
           {
             cause: "config_change_or_deploy",
             count: 3,
             note: "deploy rollback",
             last_response_id: "resp_0",
           },
-        ],
-      } as any);
+        ]),
+      );
 
       const wrapper = await renderWith();
 
@@ -881,9 +1072,9 @@ describe("OnCallResponseDetail", () => {
     /// The panel links to the firing that had that cause; a count with no way
     /// to read the actual record is trivia.
     it("navigates to the firing behind a cause", async () => {
-      service.priorCauses.mockResolvedValue({
-        data: [{ cause: "genuine_defect", count: 2, last_response_id: "resp_0" }],
-      } as any);
+      service.priorCauses.mockResolvedValue(
+        axiosReply([{ cause: "genuine_defect", count: 2, last_response_id: "resp_0" }]),
+      );
       const wrapper = await renderWith();
 
       wrapper.findComponent({ name: "OnCallPriorCauses" }).vm.$emit("open", "resp_0");
@@ -924,7 +1115,7 @@ describe("OnCallResponseDetail", () => {
     });
 
     it("posts the confirmation with its note and refetches", async () => {
-      service.confirmRecovery.mockResolvedValue({ data: record() } as any);
+      service.confirmRecovery.mockResolvedValue(axiosReply(record()));
       const wrapper = await renderWith({ origin_response_id: "resp_owner" });
 
       await wrapper.find('[data-test="oncall-response-confirm-recovery-btn"]').trigger("click");
@@ -972,20 +1163,19 @@ describe("OnCallResponseDetail", () => {
       });
 
       const tag = wrapper.find('[data-test="oncall-response-liaison-tag"]');
-      const tooltip = tag.element.nextElementSibling;
-      expect(tooltip?.textContent).toContain("one chase");
+      expect(tag.text()).toContain("one chase");
     });
 
     it("leaves an owner record with no liaison language at all", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: {
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({
           fired: [],
           next_targets: [],
           next_at: null,
           exhausted: false,
           stopped_because: null,
-        },
-      } as any);
+        }),
+      );
       const wrapper = await renderWith({ responder_role: "owner" });
 
       expect(wrapper.find('[data-test="oncall-response-liaison-banner"]').exists()).toBe(false);
@@ -998,9 +1188,9 @@ describe("OnCallResponseDetail", () => {
   /// was bigger than an alert had no way to say so.
   describe("promote", () => {
     it("promotes with the record's own title and severity by default", async () => {
-      service.promoteResponse.mockResolvedValue({
-        data: { incident_id: "inc_9", severity: "P1", response: record() },
-      } as any);
+      service.promoteResponse.mockResolvedValue(
+        axiosReply({ incident_id: "inc_9", severity: "P1", response: record() }),
+      );
       const wrapper = await renderWith({ priority: 1, title: "checkout down" });
 
       await wrapper.find('[data-test="oncall-response-promote-btn"]').trigger("click");
@@ -1074,7 +1264,7 @@ describe("OnCallResponseDetail", () => {
   describe("escalate now", () => {
     it("wakes the next rung without moving ownership", async () => {
       const wrapper = await renderWith();
-      service.escalateNow.mockResolvedValue({ data: {} } as any);
+      service.escalateNow.mockResolvedValue(axiosReply({}));
 
       await wrapper.find('[data-test="oncall-response-escalate-btn"]').trigger("click");
       await flushPromises();
@@ -1090,9 +1280,9 @@ describe("OnCallResponseDetail", () => {
     /// A ladder with no rungs left has nothing to escalate to, and the server
     /// answers a 400. Refusing at the button is cheaper than a toast.
     it("is disabled once the ladder is exhausted", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: { fired: [], next_targets: [], next_at: null, exhausted: true },
-      } as any);
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({ fired: [], next_targets: [], next_at: null, exhausted: true }),
+      );
       const wrapper = await renderWith();
 
       expect(
@@ -1102,12 +1292,31 @@ describe("OnCallResponseDetail", () => {
 
     /// A disabled button that does not say why is a dead end.
     it("explains why escalate is disabled once the ladder is exhausted", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: { fired: [], next_targets: [], next_at: null, exhausted: true },
-      } as any);
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({ fired: [], next_targets: [], next_at: null, exhausted: true }),
+      );
       const wrapper = await renderWith();
 
       expect(wrapper.text()).toContain("The ladder is finished");
+    });
+
+    it("keeps an exhausted Escalate focusable and describes it by its reason", async () => {
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({ fired: [], next_targets: [], next_at: null, exhausted: true }),
+      );
+      service.getResponse.mockResolvedValue(axiosReply({ response: record(), events: [] }));
+      const wrapper = mount(OnCallResponseDetail, {
+        global: { plugins: [i18n, store], stubs: { ...stubs, OButton: false } },
+      });
+      await flushPromises();
+
+      const escalate = wrapper.find('[data-test="oncall-response-escalate-btn"]');
+      expect(escalate.attributes("disabled")).toBeUndefined();
+      expect(escalate.attributes("aria-disabled")).toBe("true");
+      const reason = wrapper.find(`[id="${escalate.attributes("aria-describedby")}"]`);
+      expect(reason.text()).toBe(String(i18n.global.t("oncall.ladderExhausted")));
+      await escalate.trigger("click");
+      expect(service.escalateNow).not.toHaveBeenCalled();
     });
   });
 
@@ -1128,26 +1337,10 @@ describe("OnCallResponseDetail", () => {
       });
     });
 
-    /// The trailing clause used to spell out "first page from this subject" /
-    /// "N earlier firings" inline; it is now a tooltip on the count instead —
-    /// still reachable, no longer read every time.
-    it("shows which firing this is, with the history behind a tooltip", async () => {
+    /// How often the alert fired before is a stat-strip fact, not tagline copy.
+    it("keeps the firing number out of the tagline", async () => {
       const wrapper = await renderWith();
-      const firing = wrapper.find('[data-test="oncall-response-firing"]');
-
-      expect(firing.text()).toContain("#2");
-      expect(firing.text()).toContain("First page from this subject");
-    });
-
-    it("shows the earlier-firings count in the same tooltip once there is history", async () => {
-      service.responseHistory.mockResolvedValue({
-        data: [{ id: "resp_0", state: "resolved", opened_at: 1, acked_by: null, cause: null }],
-      } as any);
-      const wrapper = await renderWith();
-
-      expect(wrapper.find('[data-test="oncall-response-firing"]').text()).toContain(
-        "1 earlier firing",
-      );
+      expect(wrapper.find('[data-test="oncall-response-firing"]').exists()).toBe(false);
     });
 
     /// The elapsed duration already rides the title tags — "opened" repeats it
@@ -1161,13 +1354,25 @@ describe("OnCallResponseDetail", () => {
   });
 
   describe("top stats and what fired", () => {
-    it("puts the firing count on the stat strip", async () => {
-      const wrapper = await renderWith({
-        subject: { subject_type: "alert", source_id: "al_ckt", firing: 2 },
-      });
-      const stats = wrapper.findComponent({ name: "OStatStrip" }).props("items");
+    it("says how often it fired before, and only when it did", async () => {
+      const first = await renderWith();
+      const none = first.findComponent({ name: "OStatStrip" });
+      expect(
+        none.exists()
+          ? none.props("items").some((s: { key: string }) => s.key === "firing")
+          : false,
+      ).toBe(false);
+      first.unmount();
 
-      expect(stats.find((s: any) => s.key === "firing").value).toBe("#2");
+      queryClient.clear();
+      service.responseHistory.mockResolvedValue(
+        axiosReply([
+          { id: "resp_0", state: "resolved", opened_at: 1, acked_by: null, cause: null },
+        ]),
+      );
+      const wrapper = await renderWith();
+      const stats = wrapper.findComponent({ name: "OStatStrip" }).props("items");
+      expect(stats.find((s: { key: string }) => s.key === "firing").value).toBe("1 time");
     });
 
     /// The escalation panel used to live in this rail; the section is gone
@@ -1181,9 +1386,9 @@ describe("OnCallResponseDetail", () => {
     /// The alert fetched for the subject is the same one "what fired" reads
     /// its condition from.
     it("hands the fetched alert to the what-fired card", async () => {
-      alerts.get_by_alert_id.mockResolvedValue({
-        data: { name: "checkout_error_ratio", query_condition: { sql: "count(*) > 10" } },
-      } as any);
+      alerts.get_by_alert_id.mockResolvedValue(
+        axiosReply({ name: "checkout_error_ratio", query_condition: { sql: "count(*) > 10" } }),
+      );
       const wrapper = await renderWith();
 
       expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("alert")).toEqual(
@@ -1205,17 +1410,17 @@ describe("OnCallResponseDetail", () => {
   /// every one of them fails, which is what these pin.
   describe("team context", () => {
     it("passes who is on call and the transport verdict to the rail", async () => {
-      service.whoIsOnCall.mockResolvedValue({
-        data: [
+      service.whoIsOnCall.mockResolvedValue(
+        axiosReply([
           {
             rotation_id: "rot_primary",
             rotation_name: "Primary",
             rule: "weekly",
             user_email: "ana@o2.ai",
           },
-        ],
-      } as any);
-      service.teamReachability.mockResolvedValue({ data: { smtp_configured: false } } as any);
+        ]),
+      );
+      service.teamReachability.mockResolvedValue(axiosReply({ smtp_configured: false }));
       const wrapper = await renderWith();
 
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("positions")).toHaveLength(1);
@@ -1240,8 +1445,8 @@ describe("OnCallResponseDetail", () => {
     /// at handover is one somebody inherits without being told.
     it("derives the handover from the resolved schedule", async () => {
       const now = Date.now() * 1000;
-      service.resolvedSchedule.mockResolvedValue({
-        data: [
+      service.resolvedSchedule.mockResolvedValue(
+        axiosReply([
           {
             from: now - 1_000_000,
             to: now + 1_000_000,
@@ -1254,8 +1459,8 @@ describe("OnCallResponseDetail", () => {
             rotation: "weekly",
             user_email: "bo@o2.ai",
           },
-        ],
-      } as any);
+        ]),
+      );
       const wrapper = await renderWith();
 
       const who = wrapper.findComponent({ name: "OnCallWhoIsOn" });
@@ -1267,8 +1472,8 @@ describe("OnCallResponseDetail", () => {
     it("hands over where the holder changes, not where the roster under a cover does", async () => {
       const now = Date.now() * 1000;
       const cover = { rotation: "weekly", user_email: "cy@o2.ai", override_id: "ov" };
-      service.resolvedSchedule.mockResolvedValue({
-        data: [
+      service.resolvedSchedule.mockResolvedValue(
+        axiosReply([
           { ...cover, from: now - 1_000_000, to: now + 1_000_000, scheduled_email: "ana@o2.ai" },
           { ...cover, from: now + 1_000_000, to: now + 5_000_000, scheduled_email: "bo@o2.ai" },
           {
@@ -1277,8 +1482,8 @@ describe("OnCallResponseDetail", () => {
             rotation: "weekly",
             user_email: "bo@o2.ai",
           },
-        ],
-      } as any);
+        ]),
+      );
       const wrapper = await renderWith();
 
       const who = wrapper.findComponent({ name: "OnCallWhoIsOn" });
@@ -1290,8 +1495,8 @@ describe("OnCallResponseDetail", () => {
     /// nobody — so the row must not skip forward to the next staffed span.
     it("says nobody inherits when the next span is a gap", async () => {
       const now = Date.now() * 1000;
-      service.resolvedSchedule.mockResolvedValue({
-        data: [
+      service.resolvedSchedule.mockResolvedValue(
+        axiosReply([
           {
             from: now - 1_000_000,
             to: now + 1_000_000,
@@ -1299,8 +1504,8 @@ describe("OnCallResponseDetail", () => {
             user_email: "ana@o2.ai",
           },
           { from: now + 1_000_000, to: now + 9_000_000, rotation: "weekly" },
-        ],
-      } as any);
+        ]),
+      );
       const wrapper = await renderWith();
 
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("handoverTo")).toBe(null);
@@ -1334,25 +1539,18 @@ describe("OnCallResponseDetail", () => {
     });
   });
 
-  /// The rail read "— —" on exactly the page that needs it: an open record
-  /// has no ack or resolve duration yet. Each row now says its own version of
-  /// what is actually true, on the stat strip at the top of the page.
-  it("says what the clocks are doing instead of a dash", async () => {
+  /// An open page counts how long it has waited; the time it has been open already rides the title.
+  it("says what the clock is doing instead of a dash", async () => {
     const wrapper = await renderWith();
     const stats = wrapper.findComponent({ name: "OStatStrip" }).props("items");
-    const ack = stats.find((s: any) => s.key === "ack");
-    const resolve = stats.find((s: any) => s.key === "resolve");
+    const ack = stats.find((s: { key: string }) => s.key === "ack");
 
     expect(ack.label).toBe("Unacknowledged for");
     expect(ack.value).not.toBe("—");
-
-    expect(resolve.label).toBe("Open for");
-    expect(resolve.value).not.toBe("—");
+    expect(stats.some((s: { key: string }) => s.key === "resolve")).toBe(false);
   });
 
-  /// Once it is answered the reading freezes into the metric it was always
-  /// labelled as — the running clock belongs to the open state only.
-  it("reverts to the settled durations once the page is answered", async () => {
+  it("freezes into the time it took once the page is answered", async () => {
     const wrapper = await renderWith({
       state: "acknowledged",
       acked_by: "engineer@example.com",
@@ -1361,9 +1559,9 @@ describe("OnCallResponseDetail", () => {
     const ack = wrapper
       .findComponent({ name: "OStatStrip" })
       .props("items")
-      .find((s: any) => s.key === "ack");
+      .find((s: { key: string }) => s.key === "ack");
 
-    expect(ack.label).toBe("Time to ack");
+    expect(ack.label).toBe("Acknowledged in");
     expect(ack.value).toContain("1h");
     expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("ackedBy")).toBe(
       "engineer@example.com",
@@ -1417,80 +1615,42 @@ describe("OnCallResponseDetail", () => {
 describe("OnCallResponseDetail — what the payload already knew", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    service.getTeam.mockResolvedValue({ data: { name: "Platform" } } as any);
-    service.listMembers.mockResolvedValue({ data: [] } as any);
-    service.priorCauses.mockResolvedValue({ data: [] } as any);
-    service.responseHistory.mockResolvedValue({ data: [] } as any);
+    service.getTeam.mockResolvedValue(axiosReply({ name: "Platform" }));
+    service.listMembers.mockResolvedValue(axiosReply([]));
+    service.priorCauses.mockResolvedValue(axiosReply([]));
+    service.responseHistory.mockResolvedValue(axiosReply([]));
     // The page's own team exists: an empty list would make it a deleted team, which hides Escalate.
-    service.listTeams.mockResolvedValue({ data: [{ id: "team_1", name: "Platform" }] } as any);
-    service.escalationProgress.mockResolvedValue({
-      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
-    } as any);
-    service.listDeliveries.mockResolvedValue({ data: { total: 0, deliveries: [] } } as any);
-    service.getPolicy.mockResolvedValue({ data: null } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    alerts.get_by_alert_id.mockResolvedValue({ data: {} } as any);
+    service.listTeams.mockResolvedValue(axiosReply([{ id: "team_1", name: "Platform" }]));
+    service.escalationProgress.mockResolvedValue(
+      axiosReply({ fired: [], next_targets: [], next_at: null, exhausted: false }),
+    );
+    service.listDeliveries.mockResolvedValue(axiosReply({ total: 0, deliveries: [] }));
+    service.getPolicy.mockResolvedValue(axiosReply(null));
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    alerts.get_by_alert_id.mockResolvedValue(axiosReply({}));
   });
 
-  const reachedRung = (wrapper: any) =>
-    wrapper
-      .findComponent({ name: "OStatStrip" })
-      .props("items")
-      .find((s: any) => s.key === "rung").value;
-
-  /// **`0` is a real and common value** — it means the page never left the
-  /// first rung — so `if (micros)` is a bug here. The absent case is the one
-  /// that reads as a dash: no page went out at all.
-  describe("the rung the ladder reached", () => {
-    it("says which rung of how many, matched against the team's own ladder", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: {
-          rungs: [
-            {
-              priority: 2,
-              channels: ["email"],
-              steps: [
-                { after_micros: 0, targets: [{ kind: "on_call_now" }] },
-                { after_micros: 300_000_000, targets: [{ kind: "next_on_call" }] },
-                { after_micros: 900_000_000, targets: [{ kind: "whole_team" }] },
-              ],
-            },
-          ],
-        },
-      } as any);
-
-      const wrapper = await renderWith({ priority: 2, reached_rung_micros: 300_000_000 });
-      expect(reachedRung(wrapper)).toBe("2 of 3");
-    });
-
-    it("treats never leaving the first rung as a rung, not as nothing", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: {
-          rungs: [
-            {
-              priority: 2,
-              channels: ["email"],
-              steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" }] }],
-            },
-          ],
-        },
-      } as any);
-
-      const wrapper = await renderWith({ priority: 2, reached_rung_micros: 0 });
-      expect(reachedRung(wrapper)).toBe("1 of 1");
-    });
-
-    it("reads a dash only when no page went out at all", async () => {
-      const wrapper = await renderWith({ priority: 2 });
-      expect(reachedRung(wrapper)).toBe("—");
-    });
-
-    /// With no policy to match against, the delay is still more honest than
-    /// nothing — the reader learns the ladder got 5m deep.
-    it("falls back to the delay when the ladder cannot be matched", async () => {
-      const wrapper = await renderWith({ priority: 2, reached_rung_micros: 300_000_000 });
-      expect(reachedRung(wrapper)).toBe("+5m");
-    });
+  /// The escalation phrase in the header already says how far the ladder got, so no step counter repeats it.
+  it("states no ladder-step tile, even when the step is known", async () => {
+    service.getPolicy.mockResolvedValue(
+      axiosReply({
+        rungs: [
+          {
+            priority: 2,
+            channels: ["email"],
+            steps: [
+              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+              { after_micros: 300_000_000, targets: [{ kind: "next_on_call" }] },
+            ],
+          },
+        ],
+      }),
+    );
+    const wrapper = await renderWith({ priority: 2, reached_rung_micros: 300_000_000 });
+    const strip = wrapper.findComponent({ name: "OStatStrip" });
+    const items = strip.exists() ? (strip.props("items") as { key: string }[]) : [];
+    expect(items.some((item) => item.key === "rung")).toBe(false);
+    expect(wrapper.text()).not.toContain("Paged up to");
   });
 
   /// "Escalated" alone is a claim. The person who pressed it wants to know
@@ -1498,16 +1658,16 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
   describe("what Escalate reports back", () => {
     it("names who the rung reached", async () => {
       const wrapper = await renderWith();
-      service.escalateNow.mockResolvedValue({
-        data: {
+      service.escalateNow.mockResolvedValue(
+        axiosReply({
           escalated_to: "rung",
           rung_micros: 300_000_000,
           recipients: ["ana@o2.ai"],
           chased: true,
           deduplicated: false,
           response: {},
-        },
-      } as any);
+        }),
+      );
 
       await wrapper.find('[data-test="oncall-response-escalate-btn"]').trigger("click");
       await flushPromises();
@@ -1520,16 +1680,16 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     /// saying loudest: the ladder moved and no phone rang.
     it("says so when the rung reached nobody", async () => {
       const wrapper = await renderWith();
-      service.escalateNow.mockResolvedValue({
-        data: {
+      service.escalateNow.mockResolvedValue(
+        axiosReply({
           escalated_to: "rung",
           rung_micros: 0,
           recipients: [],
           chased: false,
           deduplicated: true,
           response: {},
-        },
-      } as any);
+        }),
+      );
 
       await wrapper.find('[data-test="oncall-response-escalate-btn"]').trigger("click");
       await flushPromises();
@@ -1544,9 +1704,9 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     /// the green checkmark a real escalation earns.
     it("reports an exhausted ladder as an answer, not a success or a failure", async () => {
       const wrapper = await renderWith();
-      service.escalateNow.mockResolvedValue({
-        data: { escalated_to: "ladder_exhausted", response: {} },
-      } as any);
+      service.escalateNow.mockResolvedValue(
+        axiosReply({ escalated_to: "ladder_exhausted", response: {} }),
+      );
 
       await wrapper.find('[data-test="oncall-response-escalate-btn"]').trigger("click");
       await flushPromises();
@@ -1557,14 +1717,15 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     });
   });
 
-  /// R13, L2: the phrase keeps a readable floor and truncates past it, and the header keeps the title's floor.
+  /// On the subtitle line the phrase gives way after team and time; in the body it keeps a readable floor; the title keeps its floor.
   it("keeps the escalation phrase readable and the title floored", async () => {
     for (const lgUp of [true, false]) {
       mockViewport.lgUp = lgUp;
       const wrapper = await renderWith();
       const classes = wrapper.find('[data-test="oncall-response-phrase"]').classes();
-      expect(classes, `lg ${lgUp}`).toEqual(expect.arrayContaining(["min-w-32", "truncate"]));
-      expect(classes, `lg ${lgUp}`).not.toContain("min-w-0");
+      expect(classes, `lg ${lgUp}`).toEqual(
+        expect.arrayContaining(lgUp ? ["min-w-0", "shrink-[100]"] : ["min-w-32", "truncate"]),
+      );
       expect(wrapper.findComponent({ name: "OPageLayout" }).attributes()).toHaveProperty(
         "title-min-width",
       );
@@ -1600,7 +1761,7 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
 
     it("snoozes from the menu", async () => {
       const wrapper = await renderWith();
-      service.snoozeResponse.mockResolvedValue({ data: {} } as any);
+      service.snoozeResponse.mockResolvedValue(axiosReply({}));
 
       await wrapper.find('[data-test="oncall-response-snooze-30-menu"]').trigger("click");
       await flushPromises();
@@ -1612,7 +1773,7 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
 
     it("unsnoozes from the menu while snoozed", async () => {
       const wrapper = await renderWith({ snoozed_until: (Date.now() + 30 * 60_000) * 1000 });
-      service.unsnoozeResponse.mockResolvedValue({ data: {} } as any);
+      service.unsnoozeResponse.mockResolvedValue(axiosReply({}));
 
       expect(wrapper.find('[data-test="oncall-response-snooze-30-menu"]').exists()).toBe(false);
       await wrapper.find('[data-test="oncall-response-unsnooze-btn-menu"]').trigger("click");
@@ -1633,14 +1794,14 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
 
     /// A greyed-out verb has no tooltip to explain it on touch, so the reason is printed on the item.
     it("says on the item why escalate is unavailable", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: { fired: [], next_targets: [], next_at: null, exhausted: true },
-      } as any);
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({ fired: [], next_targets: [], next_at: null, exhausted: true }),
+      );
       const wrapper = await renderWith();
 
       const item = wrapper.find('[data-test="oncall-response-escalate-btn-menu"]');
       expect(item.attributes("disabled")).toBeDefined();
-      expect(item.text()).toContain("nobody left to escalate to");
+      expect(item.text()).toContain("nobody left to page");
     });
 
     it("drops the menu when a closed page is already tied to an incident", async () => {
@@ -1651,15 +1812,6 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       });
 
       expect(wrapper.find('[data-test="oncall-response-more-btn"]').exists()).toBe(false);
-    });
-
-    /// The title row has no room for both the alert's name and its tags, so the tags open the body instead.
-    it("leads the body with the state and elapsed time", async () => {
-      const wrapper = await renderWith();
-
-      const meta = wrapper.find('[data-test="oncall-response-meta"]');
-      expect(meta.find('[data-test="oncall-response-elapsed"]').exists()).toBe(true);
-      expect(wrapper.findAll('[data-test="oncall-response-elapsed"]')).toHaveLength(1);
     });
 
     it("applies on a phone too", async () => {
@@ -1673,36 +1825,34 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
 });
 
 /// Responding to a page (#3090): what the screen says when the ladder ran out,
-/// while triage holds the first page, once it closed, and when it cannot load.
+/// while triage holds the first page, and when it cannot load.
 describe("OnCallResponseDetail — responding", () => {
   const NOW = () => Date.now() * 1000;
-  const stats = (wrapper: any) => wrapper.findComponent({ name: "OStatStrip" }).props("items");
-  const stat = (wrapper: any, key: string) => stats(wrapper).find((s: any) => s.key === key);
 
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
-    service.getTeam.mockResolvedValue({ data: { name: "Platform" } } as any);
-    service.listMembers.mockResolvedValue({ data: [] } as any);
-    service.priorCauses.mockResolvedValue({ data: [] } as any);
-    service.responseHistory.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [{ id: "team_1", name: "Platform" }] } as any);
-    service.listDeliveries.mockResolvedValue({ data: { total: 0, deliveries: [] } } as any);
-    service.escalationProgress.mockResolvedValue({
-      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
-    } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.getPolicy.mockResolvedValue({ data: null } as any);
-    service.teamReachability.mockResolvedValue({ data: { smtp_configured: true } } as any);
-    service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
-    alerts.get_by_alert_id.mockResolvedValue({ data: {} } as any);
+    service.getTeam.mockResolvedValue(axiosReply({ name: "Platform" }));
+    service.listMembers.mockResolvedValue(axiosReply([]));
+    service.priorCauses.mockResolvedValue(axiosReply([]));
+    service.responseHistory.mockResolvedValue(axiosReply([]));
+    service.listTeams.mockResolvedValue(axiosReply([{ id: "team_1", name: "Platform" }]));
+    service.listDeliveries.mockResolvedValue(axiosReply({ total: 0, deliveries: [] }));
+    service.escalationProgress.mockResolvedValue(
+      axiosReply({ fired: [], next_targets: [], next_at: null, exhausted: false }),
+    );
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    service.getPolicy.mockResolvedValue(axiosReply(null));
+    service.teamReachability.mockResolvedValue(axiosReply({ smtp_configured: true }));
+    service.resolvedSchedule.mockResolvedValue(axiosReply([]));
+    alerts.get_by_alert_id.mockResolvedValue(axiosReply({}));
   });
 
   describe("a page nobody answered", () => {
     /// The ladder's own progress decides it, the same signal the Pages list reads.
     const ranOut = (lastAt: number) =>
-      service.escalationProgress.mockResolvedValue({
-        data: {
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({
           fired: [
             { after_micros: 0, at: lastAt - 300_000_000, targets: [], reached: ["a@o2.ai"] },
             { after_micros: 300_000_000, at: lastAt, targets: [], reached: ["b@o2.ai"] },
@@ -1710,11 +1860,7 @@ describe("OnCallResponseDetail — responding", () => {
           next_targets: [],
           next_at: null,
           exhausted: true,
-        },
-      } as any);
-    const phrase = (wrapper: any) =>
-      wrapper.find(
-        '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-level"]',
+        }),
       );
 
     it("tags it and says when the last step ran, before the record's flag lands", async () => {
@@ -1724,10 +1870,10 @@ describe("OnCallResponseDetail — responding", () => {
       expect(
         wrapper
           .find(
-            '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-exhausted"]',
+            '[data-test="oncall-response-phrase"] [data-test="oncall-response-phrase-exhausted"]',
           )
-          .exists(),
-      ).toBe(true);
+          .text(),
+      ).toContain("Nobody answered");
       const banner = wrapper.find('[data-test="oncall-response-exhausted-banner"]');
       expect(banner.text()).toMatch(
         /^Nobody answered\. Every step ran by [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}\. Acknowledge to take it, or hand it off\.$/,
@@ -1753,7 +1899,9 @@ describe("OnCallResponseDetail — responding", () => {
         exhausted_at: 1_700_000_000_000_000,
       });
 
-      expect(phrase(wrapper).text()).toMatch(/^Acknowledged by engineer@example\.com/);
+      expect(wrapper.find('[data-test="oncall-response-acked-by"]').text()).toContain(
+        "Acknowledged by",
+      );
       expect(wrapper.find('[data-test="oncall-response-exhausted-banner"]').exists()).toBe(false);
     });
   });
@@ -1761,15 +1909,15 @@ describe("OnCallResponseDetail — responding", () => {
   /// R14: a restarted ladder's due first rung is not "Not paged yet", and shows once sent.
   describe("a rung that is due", () => {
     const due = () =>
-      service.escalationProgress.mockResolvedValue({
-        data: {
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({
           fired: [],
           next_targets: ["engineer@example.com"],
           next_at: Date.now() * 1000 - 1_000_000,
           exhausted: false,
-        },
-      } as any);
-    const phrase = (wrapper: any) =>
+        }),
+      );
+    const phrase = (wrapper: VueWrapper) =>
       wrapper
         .find('[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-level"]')
         .text();
@@ -1782,14 +1930,14 @@ describe("OnCallResponseDetail — responding", () => {
       const wrapper = await renderWith();
       expect(phrase(wrapper)).toMatch(/^Paging step 1 /);
 
-      service.escalationProgress.mockResolvedValue({
-        data: {
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({
           fired: [{ after_micros: 0, at: Date.now() * 1000, targets: [], reached: ["ana@o2.ai"] }],
           next_targets: [],
           next_at: null,
           exhausted: false,
-        },
-      } as any);
+        }),
+      );
       vi.advanceTimersByTime(10_000);
       await flushPromises();
       expect(phrase(wrapper)).toMatch(/^Paging step 1 · ana@o2\.ai/);
@@ -1805,16 +1953,15 @@ describe("OnCallResponseDetail — responding", () => {
       wrapper.unmount();
     });
 
-    /// L3: once the re-read sees the rung sent, the rung card and the activity read the record again.
-    it("re-reads the record when the rung is sent, so the rung card and activity agree", async () => {
+    /// Once the re-read sees the rung sent, the activity reads the record again.
+    it("re-reads the record when the rung is sent, so the activity agrees", async () => {
       vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
       due();
       const wrapper = await renderWith();
-      expect(stat(wrapper, "rung").value).toBe("—");
 
       const sentAt = Date.now() * 1000;
-      service.getResponse.mockResolvedValue({
-        data: {
+      service.getResponse.mockResolvedValue(
+        axiosReply({
           response: record({ reached_rung_micros: 0 }),
           events: [
             {
@@ -1826,20 +1973,19 @@ describe("OnCallResponseDetail — responding", () => {
               ladder_run: 2,
             },
           ],
-        },
-      } as any);
-      service.escalationProgress.mockResolvedValue({
-        data: {
+        }),
+      );
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({
           fired: [{ after_micros: 0, at: sentAt, targets: [], reached: ["ana@o2.ai"] }],
           next_targets: [],
           next_at: null,
           exhausted: false,
-        },
-      } as any);
+        }),
+      );
       vi.advanceTimersByTime(10_000);
       await flushPromises();
 
-      expect(stat(wrapper, "rung").value).not.toBe("—");
       expect(wrapper.findComponent({ name: "OnCallActivityTimeline" }).props("events")).toEqual([
         expect.objectContaining({ kind: "page", ladder_run: 2 }),
       ]);
@@ -1848,16 +1994,16 @@ describe("OnCallResponseDetail — responding", () => {
 
     const sent = (at: number) => ({ after_micros: 0, at, targets: [], reached: ["ana@o2.ai"] });
     const sentProgress = (at: number) =>
-      service.escalationProgress.mockResolvedValue({
-        data: { fired: [sent(at)], next_targets: [], next_at: null, exhausted: false },
-      } as any);
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({ fired: [sent(at)], next_targets: [], next_at: null, exhausted: false }),
+      );
 
     /// F1: a rung of a new ladder run is new even when the run has fewer rungs than the last one.
     it("re-reads the record for a rung sent in a new ladder run", async () => {
       vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
       const now = Date.now() * 1000;
-      service.escalationProgress.mockResolvedValue({
-        data: {
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({
           fired: [
             sent(now - 600_000_000),
             { ...sent(now - 300_000_000), after_micros: 300_000_000 },
@@ -1865,8 +2011,8 @@ describe("OnCallResponseDetail — responding", () => {
           next_targets: ["engineer@example.com"],
           next_at: now - 1_000_000,
           exhausted: false,
-        },
-      } as any);
+        }),
+      );
       const wrapper = await renderWith();
       const reads = service.getResponse.mock.calls.length;
 
@@ -1904,9 +2050,12 @@ describe("OnCallResponseDetail — responding", () => {
       await wrapper.find('[data-test="oncall-response-promote-btn"]').trigger("click");
       await wrapper.find('[data-test="oncall-promote-title"]').setValue("payments outage");
 
-      service.getResponse.mockResolvedValue({
-        data: { response: record({ title: "checkout down", reached_rung_micros: 0 }), events: [] },
-      } as any);
+      service.getResponse.mockResolvedValue(
+        axiosReply({
+          response: record({ title: "checkout down", reached_rung_micros: 0 }),
+          events: [],
+        }),
+      );
       sentProgress(Date.now() * 1000);
       vi.advanceTimersByTime(10_000);
       await flushPromises();
@@ -1937,15 +2086,15 @@ describe("OnCallResponseDetail — responding", () => {
 
   describe("the AI triage hold", () => {
     const held = (heldUntil: number | null) =>
-      service.escalationProgress.mockResolvedValue({
-        data: {
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({
           fired: [],
           next_targets: [],
           next_at: null,
           exhausted: false,
           held_until_micros: heldUntil,
-        },
-      } as any);
+        }),
+      );
 
     it("counts down to the first page and offers to page now", async () => {
       held(NOW() + 54_500_000);
@@ -1953,14 +2102,13 @@ describe("OnCallResponseDetail — responding", () => {
 
       const banner = wrapper.find('[data-test="oncall-response-hold-banner"]');
       expect(banner.text()).toMatch(/^AI triage is checking first · paging within \d+s Page now$/);
-      expect(stat(wrapper, "rung").value).toBe("Waiting for AI triage");
     });
 
     it("pages rung 1 through the existing escalate action", async () => {
       held(NOW() + 54_000_000);
-      service.escalateNow.mockResolvedValue({
-        data: { escalated_to: "rung", recipients: ["engineer@example.com"] },
-      } as any);
+      service.escalateNow.mockResolvedValue(
+        axiosReply({ escalated_to: "rung", recipients: ["engineer@example.com"] }),
+      );
       const wrapper = await renderWith();
 
       await wrapper.find('[data-test="oncall-response-hold-page-now"]').trigger("click");
@@ -2020,52 +2168,13 @@ describe("OnCallResponseDetail — responding", () => {
       held(null);
       const absent = await renderWith();
       expect(absent.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
-      expect(stat(absent, "rung").value).toBe("—");
-    });
-  });
-
-  describe("a closed page", () => {
-    it("never runs an unacknowledged clock", async () => {
-      const wrapper = await renderWith({
-        state: "resolved",
-        closed_at: 1_700_000_000_000_000 + HOUR_MICROS,
-      });
-
-      expect(stat(wrapper, "ack").label).toBe("Never acknowledged");
-      expect(stat(wrapper, "ack").value).toBe("—");
-    });
-
-    it("says how far the ladder got, in the past tense", async () => {
-      service.getPolicy.mockResolvedValue({
-        data: {
-          rungs: [
-            {
-              priority: 1,
-              channels: ["email"],
-              steps: [
-                { after_micros: 0, targets: [{ kind: "on_call_now" }] },
-                { after_micros: 300_000_000, targets: [{ kind: "next_on_call" }] },
-                { after_micros: 900_000_000, targets: [{ kind: "whole_team" }] },
-              ],
-            },
-          ],
-        },
-      } as any);
-      const wrapper = await renderWith({
-        state: "resolved",
-        closed_at: 1_700_000_000_000_000 + HOUR_MICROS,
-        reached_rung_micros: 300_000_000,
-      });
-
-      expect(stat(wrapper, "rung").label).toBe("Reached step");
-      expect(stat(wrapper, "rung").value).toBe("2 of 3");
     });
   });
 
   describe("a page that cannot be loaded", () => {
     it("shows the error with a retry instead of an empty page", async () => {
       service.getResponse.mockRejectedValueOnce({ response: { status: 500, data: {} } });
-      service.getResponse.mockResolvedValue({ data: { response: record(), events: [] } } as any);
+      service.getResponse.mockResolvedValue(axiosReply({ response: record(), events: [] }));
       const wrapper = render();
       await flushPromises();
 
@@ -2078,6 +2187,218 @@ describe("OnCallResponseDetail — responding", () => {
 
       expect(wrapper.find('[data-test="oncall-response-detail-error"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-response-stats"]').exists()).toBe(true);
+    });
+
+    describe("a license denial", () => {
+      const DENIAL = {
+        response: {
+          status: 403,
+          data: {
+            code: 40001,
+            message: "Features not included in your license: oncall",
+            error_detail: "oncall",
+          },
+        },
+      };
+
+      function expectLocked(wrapper: ReturnType<typeof render>) {
+        const lock = wrapper.findComponent(LicenseDeniedState);
+        expect(lock.props("features")).toEqual(["oncall"]);
+        expect(lock.attributes("data-test")).toBe("oncall-response-detail-license-denied");
+        for (const gone of [
+          "oncall-response-detail-error",
+          "oncall-response-detail-not-found",
+          "oncall-response-stats",
+          "oncall-response-refresh",
+        ]) {
+          expect(wrapper.find(`[data-test="${gone}"]`).exists()).toBe(false);
+        }
+      }
+
+      it("replaces the body when the first load is denied", async () => {
+        service.getResponse.mockRejectedValueOnce(DENIAL);
+        const wrapper = render();
+        await flushPromises();
+
+        expectLocked(wrapper);
+      });
+
+      it("replaces a loaded page, with no error toast, when a refresh is denied", async () => {
+        const wrapper = await renderWith();
+        expect(wrapper.find('[data-test="oncall-response-stats"]').exists()).toBe(true);
+        toastSpy.mockClear();
+
+        service.getResponse.mockRejectedValueOnce(DENIAL);
+        await wrapper.find('[data-test="oncall-response-refresh"]').trigger("click");
+        await flushPromises();
+
+        expectLocked(wrapper);
+        expect(toastSpy).not.toHaveBeenCalled();
+      });
+
+      /// These forms sit outside the record's own `v-if`, so the lock has to close them.
+      it.each([
+        ["handoff", "oncall-response-handoff-btn", "oncall-handoff-submit", {}],
+        [
+          "confirm recovery",
+          "oncall-response-confirm-recovery-btn",
+          "oncall-confirm-recovery-confirm",
+          { origin_response_id: "resp_owner" },
+        ],
+        ["promote", "oncall-response-promote-btn", "oncall-promote-confirm", {}],
+        ["resolve", "oncall-response-resolve-btn", "oncall-resolve-confirm", {}],
+      ])(
+        "closes the %s form when a denial lands under it",
+        async (_form, opener, confirm, over) => {
+          const wrapper = await renderWith(over);
+          await wrapper.find(`[data-test="${opener}"]`).trigger("click");
+          expect(wrapper.find(`[data-test="${confirm}"]`).exists()).toBe(true);
+
+          service.getResponse.mockRejectedValueOnce(DENIAL);
+          await wrapper.find('[data-test="oncall-response-refresh"]').trigger("click");
+          await flushPromises();
+
+          expectLocked(wrapper);
+          expect(wrapper.find(`[data-test="${confirm}"]`).exists()).toBe(false);
+        },
+      );
+
+      /// The record can come from cache while a context read is the first to reach the server.
+      it.each([
+        "listMembers",
+        "listTeams",
+        "priorCauses",
+        "responseHistory",
+        "responseReport",
+        "escalationProgress",
+        "listDeliveries",
+        "whoIsOnCall",
+        "getPolicy",
+        "teamReachability",
+        "resolvedSchedule",
+      ] as const)("replaces the body when only %s is denied", async (read) => {
+        queryClient.clear();
+        service[read].mockRejectedValueOnce(DENIAL);
+        const wrapper = await renderWith();
+
+        expectLocked(wrapper);
+        expect(toastSpy).not.toHaveBeenCalled();
+      });
+
+      /// The team's own read only happens once the list could not name it.
+      it("replaces the body when only getTeam is denied", async () => {
+        queryClient.clear();
+        service.listTeams.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+        service.getTeam.mockRejectedValueOnce(DENIAL);
+        const wrapper = await renderWith();
+
+        expectLocked(wrapper);
+        expect(toastSpy).not.toHaveBeenCalled();
+      });
+
+      /// The reads run together, so the slowest must not hold the lock back or bring the page back when it lands.
+      it("locks while a sibling read is still out, and stays locked when it lands", async () => {
+        queryClient.clear();
+        const slow = deferredReply();
+        service.listDeliveries.mockReturnValueOnce(slow.promise as never);
+        service.priorCauses.mockRejectedValueOnce(DENIAL);
+        const wrapper = await renderWith();
+        expectLocked(wrapper);
+
+        slow.answer({ deliveries: [], total: 0 });
+        await flushPromises();
+
+        expectLocked(wrapper);
+      });
+
+      /// Incidents is its own license feature, and the rail falls back to the id.
+      it("leaves the page up when only the incident title read is denied", async () => {
+        queryClient.clear();
+        incidentsGet.mockRejectedValueOnce(DENIAL);
+        const wrapper = await renderWith({ incident_id: "inc_1" });
+
+        expect(incidentsGet).toHaveBeenCalled();
+        expect(wrapper.find('[data-test="oncall-response-stats"]').exists()).toBe(true);
+        expect(wrapper.findComponent(LicenseDeniedState).exists()).toBe(false);
+      });
+
+      it("leaves the page up when a context read fails for another reason", async () => {
+        queryClient.clear();
+        service.listDeliveries.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+        const wrapper = await renderWith();
+
+        expect(wrapper.find('[data-test="oncall-response-stats"]').exists()).toBe(true);
+        expect(wrapper.findComponent(LicenseDeniedState).exists()).toBe(false);
+      });
+
+      /// The alert only decorates the page, and its route is not an on-call one.
+      it("leaves the page up when only the subject alert read is denied", async () => {
+        queryClient.clear();
+        alerts.get_by_alert_id.mockRejectedValueOnce(DENIAL);
+        const wrapper = await renderWith();
+
+        expect(wrapper.find('[data-test="oncall-response-stats"]').exists()).toBe(true);
+        expect(wrapper.findComponent(LicenseDeniedState).exists()).toBe(false);
+      });
+
+      it("stops reading once the team list, which runs first, is denied", async () => {
+        queryClient.clear();
+        service.listTeams.mockRejectedValueOnce(DENIAL);
+        await renderWith();
+
+        expect(service.listDeliveries).not.toHaveBeenCalled();
+        expect(service.whoIsOnCall).not.toHaveBeenCalled();
+      });
+
+      it("skips the handover read once who is on call is denied", async () => {
+        queryClient.clear();
+        service.whoIsOnCall.mockRejectedValueOnce(DENIAL);
+        await renderWith();
+
+        expect(service.resolvedSchedule).not.toHaveBeenCalled();
+      });
+
+      it("locks, with no error toast, when the re-read after a sent rung is denied", async () => {
+        queryClient.clear();
+        const wrapper = await renderWith();
+        const progress = { next_targets: [], next_at: null, exhausted: false };
+        (wrapper.vm as any).escalation = { ...progress, fired: [{ at: 1 }] };
+        await flushPromises();
+        toastSpy.mockClear();
+
+        service.getResponse.mockRejectedValueOnce(DENIAL);
+        (wrapper.vm as any).escalation = { ...progress, fired: [{ at: 2 }] };
+        await flushPromises();
+
+        expectLocked(wrapper);
+        expect(toastSpy).not.toHaveBeenCalled();
+      });
+
+      it("stops the hold's progress rechecks when one is denied", async () => {
+        vi.useFakeTimers();
+        try {
+          queryClient.clear();
+          service.escalationProgress.mockResolvedValue({
+            data: {
+              fired: [],
+              next_targets: [],
+              next_at: null,
+              exhausted: false,
+              held_until_micros: Date.now() * 1000 + 600_000_000,
+            },
+          } as any);
+          const wrapper = await renderWith();
+          service.escalationProgress.mockClear();
+          service.escalationProgress.mockRejectedValue(DENIAL);
+
+          await vi.advanceTimersByTimeAsync(60_000);
+
+          expectLocked(wrapper);
+          expect(service.escalationProgress).toHaveBeenCalledTimes(1);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
     });
 
     it("says a deleted page no longer exists, and links to Pages", async () => {
@@ -2095,15 +2416,19 @@ describe("OnCallResponseDetail — responding", () => {
     it("drops the previous page's ladder and team while a linked page loads", async () => {
       const { reactive } = await import("vue");
       const wrapper = await renderWith({ id: "resp_1", title: "First page" });
-      (wrapper.vm as any).escalation = { fired: [], next_targets: [], exhausted: true };
-      (wrapper.vm as any).teamName = "Platform";
+      (wrapper.vm as unknown as DetailVm).escalation = {
+        fired: [],
+        next_targets: [],
+        exhausted: true,
+      };
+      (wrapper.vm as unknown as DetailVm).teamName = "Platform";
       service.getResponse.mockImplementationOnce(() => new Promise(() => {}));
 
       reactive(routeState).params.responseId = "resp_next";
       await flushPromises();
 
-      expect((wrapper.vm as any).escalation).toBe(null);
-      expect((wrapper.vm as any).teamName).toBe("");
+      expect((wrapper.vm as unknown as DetailVm).escalation).toBe(null);
+      expect((wrapper.vm as unknown as DetailVm).teamName).toBe("");
       reactive(routeState).params.responseId = "resp_1";
       await flushPromises();
     });
@@ -2130,7 +2455,7 @@ describe("OnCallResponseDetail — responding", () => {
       const wrapper = await renderWith({ id: "resp_1", title: "First page" });
       let fail: (e: unknown) => void = () => {};
       service.getResponse.mockImplementationOnce(() => new Promise((_, reject) => (fail = reject)));
-      const pending = (wrapper.vm as any).refreshRecord();
+      const pending = (wrapper.vm as unknown as DetailVm).refreshRecord();
       service.getResponse.mockImplementationOnce(() => new Promise(() => {}));
       reactive(routeState).params.responseId = "resp_next";
       await flushPromises();
@@ -2159,10 +2484,64 @@ describe("OnCallResponseDetail — responding", () => {
     });
   });
 
+  it("puts the activity, deliveries and causes tabs in the header", async () => {
+    const wrapper = await renderWith();
+    const header = wrapper.find('[data-test="stub-header-tabs"]');
+
+    expect(header.find('[data-test="oncall-response-tab-activity"]').exists()).toBe(true);
+    expect(header.find('[data-test="oncall-response-tab-deliveries"]').exists()).toBe(true);
+    expect(header.find('[data-test="oncall-response-tab-causes"]').exists()).toBe(true);
+  });
+
+  it("names the incident by its title in the rail", async () => {
+    incidentsGet.mockResolvedValue(axiosReply({ title: "Checkout outage" }));
+    const wrapper = await renderWith({ incident_id: "inc_9" });
+
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("incidentTitle")).toBe(
+      "Checkout outage",
+    );
+  });
+
+  /// A raw id is the one thing a responder cannot read, so the rail waits rather than flashing it.
+  it("skeletons the incident row until its title answers, never the id", async () => {
+    const answer = deferredReply();
+    incidentsGet.mockReturnValue(answer.promise);
+    const wrapper = await renderWith({ incident_id: "inc_9" });
+    const about = () => wrapper.findComponent({ name: "OnCallAboutPage" });
+
+    expect(about().props("incidentLoading")).toBe(true);
+
+    answer.answer({ title: "Checkout outage" });
+    await flushPromises();
+    expect(about().props("incidentLoading")).toBe(false);
+    expect(about().props("incidentTitle")).toBe("Checkout outage");
+  });
+
+  /// The step a rung belongs to comes from the policy, so the feed waits for it instead of growing "(step 1)" later.
+  it("holds the timeline until the team's policy has answered", async () => {
+    const answer = deferredReply();
+    service.getPolicy.mockReturnValue(answer.promise);
+    const wrapper = await renderWith();
+
+    expect(wrapper.find('[data-test="oncall-response-activity-pending"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OnCallActivityTimeline" }).exists()).toBe(false);
+
+    answer.answer(null);
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-response-activity-pending"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OnCallActivityTimeline" }).exists()).toBe(true);
+  });
+
+  /// The tab panel renders a fragment, so the hook sits on an element the panel always renders.
+  it("puts the activity hook on a rendered element", async () => {
+    const wrapper = await renderWith();
+    expect(wrapper.find('[data-test="oncall-response-activity"]').exists()).toBe(true);
+  });
+
   describe("a team that was deleted", () => {
     /// A deleted team's ladder has no rotations to reach; Hand off is the next step, and Snooze still works.
     it("offers no Escalate for a deleted team, but keeps Snooze", async () => {
-      service.listTeams.mockResolvedValue({ data: [{ id: "team_2", name: "Payments" }] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_2", name: "Payments" }]));
       const wrapper = await renderWith();
 
       expect(wrapper.find('[data-test="oncall-response-escalate-btn"]').exists()).toBe(false);
@@ -2173,7 +2552,7 @@ describe("OnCallResponseDetail — responding", () => {
 
     it("says so instead of the id, without a link", async () => {
       service.getTeam.mockRejectedValue({ response: { status: 404 } });
-      service.listTeams.mockResolvedValue({ data: [{ id: "team_2", name: "Payments" }] } as any);
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_2", name: "Payments" }]));
       const wrapper = await renderWith();
 
       expect(wrapper.find('[data-test="oncall-response-team-link"]').exists()).toBe(false);
@@ -2185,6 +2564,25 @@ describe("OnCallResponseDetail — responding", () => {
       expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);
     });
 
+    /// The list already said the team is gone, so the team and members reads would only 404.
+    it("reads neither the team nor its members once the list says it is gone", async () => {
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_2", name: "Payments" }]));
+      await renderWith();
+
+      expect(service.getTeam).not.toHaveBeenCalled();
+      expect(service.listMembers).not.toHaveBeenCalled();
+    });
+
+    /// A deleted team's roster can never load, so the card is not left waiting on a read that only 404s.
+    it("does not ask who is on call for a team that no longer exists", async () => {
+      service.listTeams.mockResolvedValue(axiosReply([{ id: "team_2", name: "Payments" }]));
+      service.whoIsOnCall.mockClear();
+      const wrapper = await renderWith();
+
+      expect(service.whoIsOnCall).not.toHaveBeenCalled();
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("loading")).toBe(false);
+    });
+
     /// An unrouted page has no team at all, which is a routing fact, not a deleted team.
     it.each([
       ["present", "team_1", [{ id: "team_1", name: "Platform" }], false],
@@ -2192,7 +2590,7 @@ describe("OnCallResponseDetail — responding", () => {
     ] as const)(
       "does not call a %s page's team deleted",
       async (_name, teamId, teams, expected) => {
-        if (teams) service.listTeams.mockResolvedValue({ data: teams } as any);
+        if (teams) service.listTeams.mockResolvedValue(axiosReply(teams));
         else service.listTeams.mockRejectedValue(new Error("down"));
         const wrapper = await renderWith({ team_id: teamId });
 
@@ -2205,9 +2603,26 @@ describe("OnCallResponseDetail — responding", () => {
     );
   });
 
+  /// A closed page's state tag says it once; the escalation phrase would only repeat it.
+  it("tags a resolved page's state beside its priority, without the ladder phrase", async () => {
+    const wrapper = await renderWith({ state: "resolved", closed_at: 1_700_000_300_000_000 });
+
+    const state = wrapper.find('[data-test="oncall-response-state-tag"]');
+    expect(state.exists()).toBe(true);
+    expect(state.findComponent({ name: "OTag" }).attributes("value")).toBe("resolved");
+    expect(wrapper.find('[data-test="oncall-response-phrase"]').exists()).toBe(false);
+  });
+
+  it("keeps the ladder phrase beside the state tag while the page is open", async () => {
+    const wrapper = await renderWith();
+
+    expect(wrapper.find('[data-test="oncall-response-state-tag"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-response-phrase"]').exists()).toBe(true);
+  });
+
   /// The header must not say "Not paged yet" before the ladder's progress has answered.
   it("makes no paging claim in the header while the progress is still loading", async () => {
-    service.escalationProgress.mockReturnValue(new Promise(() => {}) as any);
+    service.escalationProgress.mockReturnValue(new Promise<never>(() => {}));
     const wrapper = await renderWith({ reached_rung_micros: 300_000_000 });
 
     const phrase = wrapper.find(
@@ -2218,7 +2633,7 @@ describe("OnCallResponseDetail — responding", () => {
 
   /// An empty 200 body is not an answer either.
   it("makes no paging claim in the header when the progress came back empty", async () => {
-    service.escalationProgress.mockResolvedValue({ data: null } as any);
+    service.escalationProgress.mockResolvedValue(axiosReply(null));
     const wrapper = await renderWith();
 
     const phrase = wrapper.find(
@@ -2251,15 +2666,15 @@ describe("OnCallResponseDetail — responding", () => {
         mockViewport.lgUp = lgUp;
         mockViewport.mdUp = lgUp;
         try {
-          service.escalationProgress.mockResolvedValue({
-            data: {
+          service.escalationProgress.mockResolvedValue(
+            axiosReply({
               fired: [],
               next_targets: [],
               next_at: null,
               exhausted: false,
               held_until_micros: Date.now() * 1000 + 60_000_000,
-            },
-          } as any);
+            }),
+          );
           const teamless = await renderWith({ team_id: null });
           expect(teamless.find(`[data-test="${escalate}"]`).exists()).toBe(false);
           expect(teamless.find(`[data-test="${handoff}"]`).exists()).toBe(true);
@@ -2309,7 +2724,7 @@ describe("OnCallResponseDetail — responding", () => {
       expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamId")).toBeNull();
       expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);
       for (const link of wrapper.findAllComponents({ name: "RouterLink" })) {
-        const to = link.props("to") as any;
+        const to = link.props("to") as { name?: string; params: { teamId?: string } } | undefined;
         if (to?.name === "onCallTeamDetail") expect(to.params.teamId).toBeTruthy();
       }
     });

@@ -297,155 +297,164 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBanner>
           </div>
 
-          <div v-else class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
-            <!-- License details table -->
-            <div class="border-card-glass-border rounded-default overflow-hidden border">
-              <table class="w-full border-collapse">
-                <tbody>
-                  <tr class="border-table-row-divider border-b last:border-b-0">
-                    <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
-                    >
-                      {{ t("about.lincese_id_lbl") }}
-                    </td>
-                    <td class="text-text-body px-3.5 py-2.5 font-mono text-sm">
-                      <div class="flex items-center gap-1.5">
-                        <span>{{ licenseData.license.license_id }}</span>
-                        <button
-                          @click="copyToClipboard(licenseData.license.license_id)"
-                          class="rounded-default text-text-muted hover:text-accent inline-flex cursor-pointer items-center justify-center border-none bg-transparent p-0.5 transition-colors duration-150"
-                          :title="t('about.copyLicenseId')"
-                        >
-                          <OIcon name="content-copy" size="sm" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr class="border-table-row-divider border-b last:border-b-0">
-                    <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
-                    >
-                      {{ t("about.status_lbl") }}
-                    </td>
-                    <td class="text-text-body px-3.5 py-2.5 text-sm">
-                      <span
-                        class="me-1.5 inline-block h-2 w-2 rounded-full align-middle"
-                        :class="licenseData?.expired ? 'bg-status-negative' : 'bg-status-positive'"
-                      />
-                      <span
-                        :class="
-                          licenseData?.expired ? 'text-status-error-text' : 'text-status-positive'
-                        "
+          <template v-else>
+            <div class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
+              <!-- License details table -->
+              <div class="border-card-glass-border rounded-default overflow-hidden border">
+                <table class="w-full border-collapse">
+                  <tbody>
+                    <tr class="border-table-row-divider border-b last:border-b-0">
+                      <td
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
                       >
-                        {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr class="border-table-row-divider border-b last:border-b-0">
-                    <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
-                    >
-                      {{ t("about.editionLbl") }}
-                    </td>
-                    <td class="text-text-body px-3.5 py-2.5 text-sm">
-                      {{ t("about.value_license_enterprise") }}
-                    </td>
-                  </tr>
-                  <tr class="border-table-row-divider border-b last:border-b-0">
-                    <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
-                    >
-                      {{ t("about.create_at_lbl") }}
-                    </td>
-                    <td class="text-text-body px-3.5 py-2.5 text-sm">
-                      {{ formatLicenseDate(licenseData.license.created_at) }}
-                    </td>
-                  </tr>
-                  <tr class="border-table-row-divider border-b last:border-b-0">
-                    <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
-                    >
-                      {{ t("about.expires_at_lbl") }}
-                    </td>
-                    <td class="text-text-body px-3.5 py-2.5 text-sm">
-                      {{ formatLicenseDate(licenseData.license.expires_at) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                        {{ t("about.lincese_id_lbl") }}
+                      </td>
+                      <td class="text-text-body px-3.5 py-2.5 font-mono text-sm">
+                        <div class="flex items-center gap-1.5">
+                          <span>{{ licenseData.license.license_id }}</span>
+                          <button
+                            @click="copyToClipboard(licenseData.license.license_id)"
+                            class="rounded-default text-text-muted hover:text-accent inline-flex cursor-pointer items-center justify-center border-none bg-transparent p-0.5 transition-colors duration-150"
+                            :title="t('about.copyLicenseId')"
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr class="border-table-row-divider border-b last:border-b-0">
+                      <td
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                      >
+                        {{ t("about.status_lbl") }}
+                      </td>
+                      <td class="text-text-body px-3.5 py-2.5 text-sm">
+                        <span
+                          class="me-1.5 inline-block h-2 w-2 rounded-full align-middle"
+                          :class="
+                            licenseData?.expired ? 'bg-status-negative' : 'bg-status-positive'
+                          "
+                        />
+                        <span
+                          :class="
+                            licenseData?.expired ? 'text-status-error-text' : 'text-status-positive'
+                          "
+                        >
+                          {{
+                            licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl")
+                          }}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr class="border-table-row-divider border-b last:border-b-0">
+                      <td
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                      >
+                        {{ t("about.editionLbl") }}
+                      </td>
+                      <td class="text-text-body px-3.5 py-2.5 text-sm">
+                        {{ t("about.value_license_enterprise") }}
+                      </td>
+                    </tr>
+                    <tr class="border-table-row-divider border-b last:border-b-0">
+                      <td
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                      >
+                        {{ t("about.create_at_lbl") }}
+                      </td>
+                      <td class="text-text-body px-3.5 py-2.5 text-sm">
+                        {{ formatLicenseDate(licenseData.license.created_at) }}
+                      </td>
+                    </tr>
+                    <tr class="border-table-row-divider border-b last:border-b-0">
+                      <td
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                      >
+                        {{ t("about.expires_at_lbl") }}
+                      </td>
+                      <td class="text-text-body px-3.5 py-2.5 text-sm">
+                        {{ formatLicenseDate(licenseData.license.expires_at) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
-            <!-- Ingestion usage panel -->
-            <div
-              class="border-card-glass-border rounded-default bg-card-glass-tint-faint border p-5"
-            >
-              <p class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                {{ t("about.usage_limits") }}
-              </p>
-              <p class="text-text-muted m-0 mb-4 text-xs">
-                {{ licenseData.license.limits?.Ingestion?.typ || raw("PerDayCount") }}
-                {{ t("about.limitPrefix") }}
-                {{ licenseData.license.limits?.Ingestion?.value || 50 }} {{ t("about.gbPerDay") }}
-              </p>
-              <div v-if="licenseData.ingestion_used !== undefined">
-                <div class="mb-3 flex items-baseline gap-2">
-                  <span
-                    class="text-text-body text-4xl leading-none font-bold"
-                    :class="
-                      licenseData.ingestion_used > 90
-                        ? 'text-status-error-text'
-                        : licenseData.ingestion_used > 70
-                          ? 'text-status-warning-text'
-                          : ''
-                    "
-                    >{{ licenseData.ingestion_used.toFixed(2) }}%</span
-                  >
-                  <span class="text-text-secondary text-xs">{{
-                    t("about.ofDailyLimitUsedToday")
-                  }}</span>
-                </div>
-                <div class="bg-card-glass-border mb-1.5 h-1.5 overflow-hidden rounded-full">
-                  <div
-                    class="h-full min-w-1 rounded-full transition-[width] duration-[400ms]"
-                    :class="
-                      licenseData.ingestion_used > 90
-                        ? 'bg-status-negative'
-                        : licenseData.ingestion_used > 70
-                          ? 'bg-warning'
-                          : 'bg-accent'
-                    "
-                    :style="{ width: Math.min(licenseData.ingestion_used, 100) + '%' }"
-                  />
-                </div>
-                <div class="text-text-muted mb-3.5 flex justify-between text-xs">
-                  <span
-                    >{{
-                      (
-                        (licenseData.ingestion_used / 100) *
-                        (licenseData.license.limits?.Ingestion?.value || 50)
-                      ).toFixed(0)
-                    }}
-                    {{ t("about.gbToday") }}</span
-                  >
-                  <span
-                    >{{ licenseData.license.limits?.Ingestion?.value || 50 }}
-                    {{ t("about.gbPerDay") }}</span
-                  >
-                </div>
-              </div>
+              <!-- Ingestion usage panel -->
               <div
-                v-if="
-                  licenseData.license.limits?.Ingestion?.typ !== 'Unlimited' &&
-                  (licenseData.license.limits?.Ingestion?.value || 50) === 50
-                "
-                data-test="about-license-plan-detail"
-                class="text-status-positive rounded-default border-status-positive/22 bg-card-glass-tint-positive flex items-start gap-1.5 border px-3 py-2 text-xs"
+                class="border-card-glass-border rounded-default bg-card-glass-tint-faint border p-5"
               >
-                <OIcon name="check-circle" size="sm" class="mt-0.5 shrink-0" />
-                {{ t("about.feature_comparision_plan_detail") }}
+                <p class="text-text-heading m-0 mb-1 text-sm font-semibold">
+                  {{ t("about.usage_limits") }}
+                </p>
+                <p class="text-text-muted m-0 mb-4 text-xs" data-test="about-license-limit">
+                  {{
+                    limitGb === null
+                      ? t("about.license_status_unlimited")
+                      : `${limitGb} ${t("about.gbPerDay")}`
+                  }}
+                </p>
+                <div v-if="usedPercent !== null">
+                  <div class="mb-3 flex items-baseline gap-2">
+                    <span
+                      class="text-text-body text-4xl leading-none font-bold"
+                      :class="
+                        usedPercent > 90
+                          ? 'text-status-error-text'
+                          : usedPercent > 70
+                            ? 'text-status-warning-text'
+                            : ''
+                      "
+                      >{{ usedPercent }}%</span
+                    >
+                    <span class="text-text-secondary text-xs">{{
+                      t("about.ofDailyLimitUsedToday")
+                    }}</span>
+                  </div>
+                  <div class="bg-card-glass-border mb-1.5 h-1.5 overflow-hidden rounded-full">
+                    <div
+                      class="h-full min-w-1 rounded-full transition-[width] duration-[400ms]"
+                      :class="
+                        usedPercent > 90
+                          ? 'bg-status-negative'
+                          : usedPercent > 70
+                            ? 'bg-warning'
+                            : 'bg-accent'
+                      "
+                      :style="{ width: Math.min(usedPercent, 100) + '%' }"
+                    />
+                  </div>
+                </div>
+                <div
+                  v-if="usedGb !== null"
+                  class="text-text-muted mb-3.5 flex justify-between text-xs"
+                  data-test="about-license-used"
+                >
+                  <span>{{ usedGb.toFixed(0) }} {{ t("about.gbToday") }}</span>
+                  <span v-if="limitGb !== null">{{ limitGb }} {{ t("about.gbPerDay") }}</span>
+                </div>
+                <div
+                  v-if="limitGb === FREE_LIMIT_GB"
+                  data-test="about-license-plan-detail"
+                  class="text-status-positive rounded-default border-status-positive/22 bg-card-glass-tint-positive flex items-start gap-1.5 border px-3 py-2 text-xs"
+                >
+                  <OIcon name="check-circle" size="sm" class="mt-0.5 shrink-0" />
+                  {{ t("about.feature_comparision_plan_detail") }}
+                </div>
               </div>
             </div>
-          </div>
+            <div class="mt-4" data-test="about-license-features">
+              <p class="text-text-heading m-0 mb-2 text-sm font-semibold">
+                {{ t("about.features") }}
+              </p>
+              <LicenseFeatures
+                :license="licenseData.license"
+                :evaluated-at="licenseData.evaluated_at"
+                :hide-request-access="!licenseData.can_update_license"
+                @request-access="openLicenseRequest"
+              />
+            </div>
+          </template>
         </div>
 
         <!-- ── Feature Comparison ──────────────────────────────────── -->
@@ -458,15 +467,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from "vue";
+import { computed, defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../utils/zincutils";
-import { raw, useI18nTyped } from "@/types/i18n";
-import { useRouter } from "vue-router";
+import { useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
+import LicenseFeatures from "@/components/settings/LicenseFeatures.vue";
+import { useLicensePage } from "@/composables/useLicensePage";
+import { effectiveLimitGb, FREE_LIMIT_GB, licenseRequestUrl } from "@/utils/featureGate";
+import { quotaPercent } from "@/utils/licenseWaivers";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -479,6 +491,7 @@ export default defineComponent({
   name: "PageAbout",
   components: {
     FeatureComparisonTable,
+    LicenseFeatures,
     OButton,
     OIcon,
     OSpinner,
@@ -489,11 +502,33 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { isDark } = useTheme();
-    const router = useRouter();
+    const { goToLicensePage: navigateToLicense } = useLicensePage();
     const pageData = ref("Page Data");
     const { t } = useI18nTyped();
     const licenseData = ref<any>(null);
     const loadingLicense = ref(false);
+
+    const limitGb = computed(() =>
+      licenseData.value ? effectiveLimitGb(licenseData.value) : null,
+    );
+
+    // Only an evaluated decision knows today's usage; before that the stored percentage is the one figure.
+    const evaluatedDecision = computed(() =>
+      licenseData.value?.evaluated_at !== 0 ? licenseData.value?.decision : undefined,
+    );
+
+    const usedPercent = computed<number | null>(() => {
+      if (limitGb.value === null) return null;
+      if (evaluatedDecision.value) return quotaPercent(evaluatedDecision.value);
+      const stored = licenseData.value?.ingestion_used;
+      return stored === undefined ? null : Math.round(stored);
+    });
+
+    const usedGb = computed<number | null>(() => {
+      if (evaluatedDecision.value) return evaluatedDecision.value.used_today_gb;
+      const stored = licenseData.value?.ingestion_used;
+      return stored === undefined || limitGb.value === null ? null : (stored / 100) * limitGb.value;
+    });
 
     const formatDate = (dateString: string) => {
       const date = new Date(dateString);
@@ -540,38 +575,16 @@ export default defineComponent({
       });
     };
 
-    const navigateToLicense = () => {
-      const metaOrgIdentifier = store.state.zoConfig.meta_org;
-      const metaOrg = store.state.organizations?.find(
-        (org: any) => org.identifier === metaOrgIdentifier,
+    const openLicenseRequest = () => {
+      window.open(
+        licenseRequestUrl(store.state.zoConfig, licenseData.value, window.location.origin),
+        "_blank",
       );
-
-      if (metaOrg) {
-        const metaOrgOption = {
-          label: metaOrg.name,
-          id: metaOrg.id,
-          identifier: metaOrg.identifier,
-          user_email: store.state.userInfo.email,
-          ingest_threshold: metaOrg.ingest_threshold,
-          search_threshold: metaOrg.search_threshold,
-        };
-        store.dispatch("setSelectedOrganization", metaOrgOption);
-        router.push({
-          name: "license",
-          query: { org_identifier: metaOrgIdentifier },
-        });
-      } else {
-        toast({
-          message: t("toastMessages.views.youAreNotAuthorizedToManage"),
-          variant: "error",
-        });
-      }
     };
 
     return {
       isDark,
       t,
-      raw,
       store,
       config,
       pageData,
@@ -581,6 +594,11 @@ export default defineComponent({
       loadingLicense,
       formatLicenseDate,
       navigateToLicense,
+      openLicenseRequest,
+      limitGb,
+      usedPercent,
+      usedGb,
+      FREE_LIMIT_GB,
       copyToClipboard,
     };
   },

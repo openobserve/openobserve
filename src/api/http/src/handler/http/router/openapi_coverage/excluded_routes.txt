@@ -53,6 +53,14 @@ GET /config/reload | internal node config reload
 GET /debug/profile/cpu | internal debug profiling
 GET /debug/profile/memory | internal debug profiling
 GET /debug/profile/stats | internal debug profiling
+GET /datadog/{org_id}/api/v1/validate | Datadog Agent protocol handshake
+POST /datadog/{org_id}/api/v2/series | Datadog Agent protocol
+POST /datadog/{org_id}/api/beta/sketches | Datadog Agent protocol
+POST /datadog/{org_id}/api/v1/check_run | Datadog Agent protocol
+POST /datadog/{org_id}/api/v0.2/traces | Datadog Agent protocol
+POST /datadog/{org_id}/api/v2/logs | Datadog Agent protocol
+POST /datadog/{org_id}/v1/input | Datadog Agent protocol
+ANY /datadog/{org_id}/{*rest} | Datadog Agent protocol, unsupported routes answered and dropped
 GET /docs | browser redirect to the Swagger page
 HEAD /healthz | second mount of the published GET /healthz probe
 POST /marketplace/aws/register | third-party callback from AWS Marketplace

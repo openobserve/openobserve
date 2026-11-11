@@ -31,6 +31,7 @@ import {
   refusalOf,
   samePhone,
 } from "@/utils/oncall";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -57,7 +58,7 @@ const stubs = {
   OBanner: { name: "OBanner", props: ["variant"], template: "<div><slot /></div>" },
   OButton: {
     name: "OButton",
-    props: ["disabled", "loading", "variant"],
+    props: ["disabled", "loading", "variant", "iconLeft"],
     emits: ["click"],
     template: `<button :disabled="disabled" @click="$emit('click', $event)"><slot /></button>`,
   },
@@ -66,6 +67,11 @@ const stubs = {
     props: ["modelValue", "disabled", "errorMessage", "error"],
     emits: ["update:modelValue", "blur"],
     template: `<input :value="modelValue" :disabled="disabled" @input="$emit('update:modelValue', $event.target.value)" @blur="$emit('blur', $event)" />`,
+  },
+  OTooltip: {
+    name: "OTooltip",
+    props: ["content"],
+    template: "<span><slot />{{ content }}</span>",
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
@@ -92,9 +98,9 @@ function refusal(body: Partial<VerificationRefusalBody> & { reason: RefusalReaso
   return { response: { status, data: { message: "English API text", ...body } } };
 }
 
-async function render(read: Contact) {
+async function render(read: Contact, props: Record<string, unknown> = {}) {
   service.getContact.mockResolvedValue({ data: read } as any);
-  const wrapper = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs } });
+  const wrapper = mount(OnCallPhoneCard, { props, global: { plugins: [i18n, store], stubs } });
   await flushPromises();
   return wrapper;
 }
@@ -246,12 +252,29 @@ describe("OnCallPhoneCard", () => {
     failed.unmount();
   });
 
+  it("tells the page when the license refuses the read, and not for any other failure", async () => {
+    queryClient.clear();
+    service.getContact.mockRejectedValue({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall" } },
+    });
+    const denied = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs } });
+    await flushPromises();
+    expect(denied.emitted("licenseDenied")).toEqual([[["oncall"]]]);
+    denied.unmount();
+
+    queryClient.clear();
+    service.getContact.mockRejectedValue({ response: { status: 403, data: {} } });
+    const failed = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs } });
+    await flushPromises();
+    expect(failed.emitted("licenseDenied")).toBeUndefined();
+    failed.unmount();
+  });
+
   it("empty: offers a number box and Send code", async () => {
     const w = await render(contact());
     expect(find(w, "input").exists()).toBe(true);
     await find(w, "input").setValue(PHONE);
     expect(find(w, "send").attributes("disabled")).toBeUndefined();
-    expect(w.text()).toContain("We text a 6-digit code to confirm it is yours.");
   });
 
   it("an empty box cannot be sent, so Send code never clears a number", async () => {
@@ -388,14 +411,14 @@ describe("OnCallPhoneCard", () => {
   it("a number proved in another org needs no code", async () => {
     const w = await render(contact());
     service.setContact.mockResolvedValue({ data: VERIFIED } as any);
-    service.getContact.mockResolvedValue({ data: VERIFIED } as any);
+    service.getContact.mockResolvedValue(axiosReply(VERIFIED));
 
     await find(w, "input").setValue(PHONE);
     await find(w, "send").trigger("click");
     await flushPromises();
 
     expect(service.sendContactCode).not.toHaveBeenCalled();
-    expect(find(w, "state").text()).toBe("Verified");
+    expect(find(w, "state").text()).toMatch(/^Verified/);
   });
 
   it("too_soon opens the code box with the server's countdown", async () => {
@@ -466,7 +489,7 @@ describe("OnCallPhoneCard", () => {
 
   it("verified with press-4: the call can be acknowledged by key", async () => {
     const w = await render(VERIFIED);
-    expect(find(w, "state").text()).toBe("Verified");
+    expect(find(w, "state").text()).toMatch(/^Verified/);
     expect(find(w, "number").text()).toBe(PHONE);
     expect(find(w, "change").exists()).toBe(true);
     expect(w.text()).toContain(
@@ -478,6 +501,19 @@ describe("OnCallPhoneCard", () => {
     const w = await render({ ...VERIFIED, press4_available: false });
     expect(w.text()).toContain("Acknowledge from the link in the text.");
     expect(w.text()).not.toContain("Press 4");
+  });
+
+  /// Change and Remove are icon buttons on the row, named by their tooltips; no menu holds a single item.
+  it("verified: offers Change and Remove as icon buttons with tooltips", async () => {
+    const w = await render(VERIFIED);
+    const change = w.findComponent('[data-test="oncall-phone-change"]');
+    const remove = w.findComponent('[data-test="oncall-phone-remove"]');
+    expect(change.props("iconLeft")).toBe("edit");
+    expect(change.props("variant")).toBe("ghost");
+    expect(change.text()).toBe("Change phone");
+    expect(remove.props("iconLeft")).toBe("delete");
+    expect(remove.props("variant")).toBe("ghost-destructive");
+    expect(remove.text()).toBe("Remove phone");
   });
 
   it("verified: Change reopens the number box", async () => {
@@ -561,6 +597,19 @@ describe("OnCallPhoneCard", () => {
     expect(find(w, "input").exists()).toBe(true);
   });
 
+  it("opens the remove confirm from the real icon button", async () => {
+    service.getContact.mockResolvedValue(axiosReply(VERIFIED));
+    const { OButton: _button, OTooltip: _tooltip, ...rest } = stubs;
+    const w = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs: rest } });
+    await flushPromises();
+
+    const remove = find(w, "remove");
+    expect(remove.attributes("aria-label")).toBe("Remove phone");
+    expect(find(w, "change").attributes("aria-label")).toBe("Change phone");
+    await remove.trigger("click");
+    expect(w.find('[data-test="confirm"]').exists()).toBe(true);
+  });
+
   // S10: the server's format rule is said before Send, not after the round trip.
   it("says how to write the number on blur and refuses to send it", async () => {
     const w = await render(contact());
@@ -598,13 +647,18 @@ describe("OnCallPhoneCard", () => {
     );
   });
 
-  it("no provider: disabled, and the admin hint links to Telephony settings", async () => {
-    const w = await render(contact({ phone: PHONE, phone_provider_available: false }));
-    expect(find(w, "input").attributes("disabled")).toBeDefined();
-    expect(find(w, "send").attributes("disabled")).toBeDefined();
-    expect(w.text()).toContain(
-      "This organisation has no phone provider yet, so pages reach you by email.",
-    );
+  /// No disabled box with a real-looking placeholder: the row says it is not available and who can fix it.
+  it("no provider: says not available yet and asks an admin", async () => {
+    const w = await render(contact({ phone_provider_available: false }));
+    expect(find(w, "input").exists()).toBe(false);
+    expect(find(w, "no-provider").text()).toContain("Not available yet");
+    expect(find(w, "ask-admin").exists()).toBe(true);
+    expect(find(w, "telephony-link").exists()).toBe(false);
+  });
+
+  it("no provider: an admin gets the Telephony setup button", async () => {
+    const w = await render(contact({ phone_provider_available: false }), { admin: true });
+    expect(find(w, "ask-admin").exists()).toBe(false);
     await find(w, "telephony-link").trigger("click");
     expect(push).toHaveBeenCalledWith({
       name: "telephonySettings",
@@ -614,7 +668,7 @@ describe("OnCallPhoneCard", () => {
 
   it("changed: an unverified saved number is amber, not red", async () => {
     const w = await render(UNVERIFIED);
-    expect(find(w, "state").text()).toBe("Not verified");
+    expect(find(w, "state").text()).toMatch(/^Not verified/);
     expect(w.findComponent({ name: "OTag" }).props("variant")).toBe("amber-soft");
     expect(w.text()).toContain("Pages will not text or call this number until you confirm it.");
   });

@@ -221,7 +221,7 @@ fn shorten_url_stores_a_resolvable_org_scoped_short_url() {
             openobserve_core::short_url::retrieve("acme", short_id)
                 .await
                 .as_deref(),
-            Some(long)
+            Some("/web/logs?org_identifier=acme&sql=c2VsZWN0IDE")
         );
         assert_eq!(
             openobserve_core::short_url::retrieve("other", short_id).await,
@@ -268,6 +268,8 @@ fn audit_publishes_a_slack_record_to_the_meta_audit_stream() {
     run(async {
         PUBLISHED.lock().unwrap().clear();
         (hooks().audit)(AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: "alice@acme.com".to_string(),
             org_id: "acme".to_string(),
             _timestamp: 1_760_000_000_000_000,

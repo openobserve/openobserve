@@ -23,6 +23,9 @@ use tokio::{
 use super::handlers::handle_triggers;
 use crate::db::scheduler::{Trigger, TriggerModule, pull as scheduler_pull};
 
+/// A safety valve: recovery has no cut-off, and a second claim of a live run sends twice.
+const ALERT_CLAIM_LIFETIME_SECS: i64 = 86_400;
+
 #[derive(Debug, Clone)]
 pub struct ScheduledJob {
     pub trace_id: String,
@@ -619,6 +622,7 @@ fn keep_alive_lifetime_secs(
 ) -> i64 {
     match module {
         TriggerModule::AlertCalibration => super::calibration::claim_lifetime_secs(),
+        TriggerModule::Alert => ALERT_CLAIM_LIFETIME_SECS,
         _ => std::cmp::max(alert_timeout, report_timeout) * 3,
     }
 }
@@ -853,7 +857,7 @@ mod tests {
         let cfg = make_config();
         let scheduler = Scheduler::new(cfg.clone());
         assert_eq!(
-            scheduler.workers.len(),
+            shared_lane_workers(&scheduler),
             cfg.alert_schedule_concurrency as usize
         );
     }
@@ -865,7 +869,16 @@ mod tests {
             ..make_config()
         };
         let scheduler = Scheduler::new(cfg);
-        assert_eq!(scheduler.workers.len(), 1);
+        assert_eq!(shared_lane_workers(&scheduler), 1);
+    }
+
+    // On-call adds its own lanes when enabled, so only the shared lane is sized by the base config.
+    fn shared_lane_workers(scheduler: &Scheduler) -> usize {
+        scheduler
+            .workers
+            .iter()
+            .filter(|worker| worker.module.is_none())
+            .count()
     }
 
     #[test]
@@ -970,6 +983,18 @@ mod tests {
         assert!(TriggerModule::OncallSlackSync.completes_by_claim());
         assert!(TriggerModule::CompositeAlert.completes_by_claim());
         assert!(!TriggerModule::Alert.completes_by_claim());
+    }
+
+    #[test]
+    fn test_keep_alive_outlasts_a_whole_alert_run() {
+        assert_eq!(
+            keep_alive_lifetime_secs(&TriggerModule::Alert, 300, 300),
+            86_400
+        );
+        assert_eq!(
+            keep_alive_lifetime_secs(&TriggerModule::Report, 300, 300),
+            900
+        );
     }
 
     #[test]

@@ -108,6 +108,7 @@ use crate::{
         rum::ingest::data,
         rum::ingest::sessionreplay,
         openobserve_api_management::request::ingest_rejections::recent_rejections,
+        openobserve_api_management::request::security::get_security_access,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
         openobserve_api_search::search::query_functions::list,
@@ -158,6 +159,9 @@ use crate::{
         openobserve_api_management::request::dashboards::timed_annotations::delete_annotations,
         openobserve_api_management::request::dashboards::timed_annotations::update_annotations,
         openobserve_api_management::request::dashboards::timed_annotations::delete_annotation_panels,
+        openobserve_api_management::request::sample_data::get,
+        openobserve_api_management::request::sample_data::put,
+        openobserve_api_management::request::sample_data::delete,
         openobserve_api_management::request::alerts::create_alert,
         openobserve_api_management::request::alerts::validate_composite_alert,
         openobserve_api_management::request::alerts::get_composite_references,
@@ -343,6 +347,7 @@ use crate::{
         openobserve_api_management::request::downtimes::update_downtime,
         openobserve_api_management::request::downtimes::cancel_downtime,
         openobserve_api_management::request::downtimes::extend_downtime,
+        openobserve_api_management::request::downtimes::test_downtime,
         openobserve_api_management::request::downtimes::move_downtimes,
         openobserve_api_management::request::downtimes::delete_downtime,
         openobserve_api_management::request::fleet::list_collectors,
@@ -608,9 +613,13 @@ use crate::{
             config::meta::stream::StreamPartitionType,
             config::meta::stream::StreamStats,
             config::meta::stream::UpdateStreamSettings,
+            config::meta::stream::SecuritySourceSetting,
             config::meta::gen_ai::GenAiAgentMappingConfig,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
+            openobserve_core::sample_data::SampleDataStatus,
+            openobserve_core::sample_data::SampleDataState,
+            openobserve_core::sample_data::PutSampleDataRequest,
             openobserve_api_management::request::gen_ai_health::DataHealthResponse,
             openobserve_api_management::request::gen_ai_health::HealthCheck,
             openobserve_api_management::request::gen_ai_health::ModelUsage,
@@ -797,6 +806,7 @@ use crate::{
             config::meta::downtimes::NotificationEvents,
             config::meta::downtimes::NotificationEvent,
             config::meta::downtimes::DowntimeNotificationLogEntry,
+            config::meta::downtimes::DowntimeNotificationTemplate,
             config::meta::alerts::incidents::IncidentWithAlerts,
             config::meta::alerts::incidents::IncidentAlert,
             config::meta::alerts::incidents::IncidentStats,
@@ -878,6 +888,7 @@ use crate::{
             meta::organization::OrgRenameBody,
             meta::organization::OrganizationSetting,
             meta::organization::OrganizationSettingResponse,
+            config::meta::stream::DataRetentionDefaults,
             meta::organization::RumIngestionResponse,
             meta::organization::RumIngestionToken,
             openobserve_api_management::request::organization::assume_service_account::AssumeServiceAccountRequest,
@@ -1057,6 +1068,7 @@ use crate::{
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
+        (name = "Security", description = "Security sources, OCSF packs, detections, cases and investigation (enterprise)"),
         (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
         (name = "AnnotationQueues", description = "Annotation queues for human review of LLM traces (enterprise)"),
         (name = "Annotations", description = "Annotations on traces and spans (enterprise)"),
@@ -1081,12 +1093,22 @@ use crate::{
         (name = "Reports", description = "Report management"),
         (name = "Resources", description = "Resources available for role permissions"),
         (name = "Roles", description = "Role management"),
+        (name = "Sample Data", description = "Sample data state for the onboarding tour"),
         (name = "ScoreConfigs", description = "Score configurations for LLM evaluation (enterprise)"),
         (name = "Scorers", description = "LLM evaluation scorers (enterprise)"),
         (name = "ServiceAccounts", description = "Service account management"),
         (name = "Sourcemaps", description = "Source map upload and stack trace translation"),
         (name = "Status Pages", description = "Public status pages, notices and custom domains"),
         (name = "Templates", description = "Alert notification templates"),
+        (name = "SLOs", description = "Service level objectives and their alert previews"),
+        (name = "Folders", description = "Folders that group dashboards, alerts and other resources"),
+        (name = "GenAI Settings", description = "Gen-AI agent registry and agent mapping settings"),
+        (name = "Ingestion", description = "Ingestion diagnostics such as recently rejected records"),
+        (name = "Search Jobs", description = "Asynchronous search jobs and their results"),
+        (name = "Rum", description = "Real user monitoring data ingestion"),
+        (name = "Playground", description = "LLM playground runs, scores and shared snapshots (enterprise)"),
+        (name = "Prompts", description = "Versioned LLM prompts and their labels (enterprise)"),
+        (name = "RemoteTasks", description = "Remote tasks, their drafts, secrets and signing keys (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -1098,6 +1120,30 @@ pub struct ApiDoc;
 #[cfg(feature = "enterprise")]
 #[derive(OpenApi)]
 #[openapi(paths(
+    openobserve_api_management::request::security::cases::get_case_settings,
+    openobserve_api_management::request::security::cases::update_case_settings,
+    openobserve_api_management::request::security::cases::lookup_cases,
+    openobserve_api_management::request::security::cases::promote_to_case,
+    openobserve_api_management::request::security::audit::list_security_audit,
+    openobserve_api_management::request::security::investigate::list_entities,
+    openobserve_api_management::request::security::investigate::get_entity_graph,
+    openobserve_api_management::request::security::investigate::get_entity_detail,
+    openobserve_api_management::request::security::investigate::score_users,
+    openobserve_api_management::request::security::investigate::search_events,
+    openobserve_api_management::request::security::intel::sweep,
+    openobserve_api_management::request::security::intel::sightings,
+    openobserve_api_management::request::security::intel::validate,
+    openobserve_api_management::request::security::list_ocsf_packs,
+    openobserve_api_management::request::security::sources::list_sources,
+    openobserve_api_management::request::security::sources::list_source_types,
+    openobserve_api_management::request::security::sources::match_source,
+    openobserve_api_management::request::security::sources::classify_sources,
+    openobserve_api_management::request::security::sources::attach_pack,
+    openobserve_api_management::request::security::sources::detach_pack,
+    openobserve_api_management::request::security::sigma::get_catalog,
+    openobserve_api_management::request::security::sigma::compile,
+    openobserve_api_management::request::security::sigma::get_mitre_coverage,
+    openobserve_api_management::request::security::sigma::get_detection_evidence,
     openobserve_api_management::request::prompts::list_prompts,
     openobserve_api_management::request::prompts::create_prompt,
     openobserve_api_management::request::prompts::match_prompts,
@@ -1179,6 +1225,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::anomaly_detection::detect_anomalies,
     openobserve_api_management::request::anomaly_detection::get_detection_history,
     openobserve_api_management::request::alerts::history::get_all_anomaly_history,
+    openobserve_api_management::request::alerts::history_summary::get_alert_history_summary,
     openobserve_api_management::request::workflows::save_workflow,
     openobserve_api_management::request::workflows::list_workflows,
     openobserve_api_management::request::workflows::move_workflows,
@@ -1191,13 +1238,6 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
-    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
-    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
-    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
-    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
-    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
-    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
-    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
     crate::handler::http::request::ratelimit::api_modules,
     openobserve_api_management::request::ai::chat::cancel,
     openobserve_api_management::request::ai::chat::chat,
@@ -1398,6 +1438,20 @@ pub struct ApiDoc;
 )))]
 struct EnterpriseExperimentApiDoc;
 
+/// Cloud builds never mount the workflow HTTP-trigger routes, so they stay out of its spec.
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
+    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
+))]
+struct WorkflowHttpTriggerApiDoc;
+
 #[cfg(feature = "cloud")]
 #[derive(OpenApi)]
 #[openapi(paths(
@@ -1452,26 +1506,21 @@ pub struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         #[cfg(feature = "enterprise")]
-        {
-            let enterprise = EnterpriseExperimentApiDoc::openapi();
-            openapi.paths.paths.extend(enterprise.paths.paths);
-            if let (Some(components), Some(enterprise_components)) =
-                (openapi.components.as_mut(), enterprise.components)
-            {
-                components.schemas.extend(enterprise_components.schemas);
-                components.responses.extend(enterprise_components.responses);
-            }
-        }
+        overlay_doc(openapi, EnterpriseExperimentApiDoc::openapi());
+        #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+        overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
+        overlay_doc(openapi, CloudQuotaApiDoc::openapi());
+        // The hand-written history params cannot be cfg-gated, and `siem` is enterprise-only.
+        #[cfg(not(feature = "enterprise"))]
+        if let Some(params) = openapi
+            .paths
+            .paths
+            .get_mut("/api/v2/{org_id}/alerts/history")
+            .and_then(|path| path.get.as_mut())
+            .and_then(|op| op.parameters.as_mut())
         {
-            let cloud = CloudQuotaApiDoc::openapi();
-            openapi.paths.paths.extend(cloud.paths.paths);
-            if let (Some(components), Some(cloud_components)) =
-                (openapi.components.as_mut(), cloud.components)
-            {
-                components.schemas.extend(cloud_components.schemas);
-                components.responses.extend(cloud_components.responses);
-            }
+            params.retain(|param| param.name != "siem");
         }
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
@@ -1578,6 +1627,28 @@ pub async fn openapi_info() -> OpenapiInfo {
     tag_operations
 }
 
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+fn overlay_doc(openapi: &mut utoipa::openapi::OpenApi, extra: utoipa::openapi::OpenApi) {
+    overlay_paths(&mut openapi.paths, extra.paths);
+    if let (Some(components), Some(extra_components)) =
+        (openapi.components.as_mut(), extra.components)
+    {
+        components.schemas.extend(extra_components.schemas);
+        components.responses.extend(extra_components.responses);
+    }
+}
+
+/// Lays `extra` over `paths` per method: its operations win, the base keeps methods `extra` lacks.
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+fn overlay_paths(paths: &mut utoipa::openapi::Paths, extra: utoipa::openapi::Paths) {
+    for (path, mut item) in extra.paths {
+        if let Some(base) = paths.paths.remove(&path) {
+            item.merge_operations(base);
+        }
+        paths.paths.insert(path, item);
+    }
+}
+
 #[cfg(all(test, feature = "enterprise"))]
 mod experiment_tests {
     use super::*;
@@ -1590,9 +1661,9 @@ mod experiment_tests {
         let anomaly_cases = [
             (anomaly.to_string(), "get"),
             (anomaly.to_string(), "post"),
-            (format!("{anomaly}/{{anomaly_id}}"), "delete"),
-            (format!("{anomaly}/{{anomaly_id}}/train"), "post"),
-            (format!("{anomaly}/{{anomaly_id}}/detect"), "post"),
+            (format!("{anomaly}/{{config_id}}"), "delete"),
+            (format!("{anomaly}/{{config_id}}/train"), "post"),
+            (format!("{anomaly}/{{config_id}}/detect"), "post"),
             (format!("{anomaly}/history"), "get"),
         ];
         for (path, method) in &anomaly_cases {
@@ -1604,13 +1675,13 @@ mod experiment_tests {
             let ext = &paths[path.as_str()]["get"]["x-o2-mcp"];
             assert_eq!(ext["category"], "db_monitoring", "{path}");
         }
-        let delete = &paths[format!("{anomaly}/{{anomaly_id}}").as_str()]["delete"];
+        let delete = &paths[format!("{anomaly}/{{config_id}}").as_str()]["delete"];
         assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
-        let history = &paths[format!("{anomaly}/{{anomaly_id}}/history").as_str()]["get"];
+        let history = &paths[format!("{anomaly}/{{config_id}}/history").as_str()]["get"];
         assert_eq!(history["x-o2-mcp"]["enabled"], false);
         for path in [
             anomaly.to_string(),
-            format!("{anomaly}/{{anomaly_id}}/history"),
+            format!("{anomaly}/{{config_id}}/history"),
         ] {
             let body =
                 &paths[path.as_str()]["get"]["responses"]["200"]["content"]["application/json"];
@@ -1705,22 +1776,16 @@ mod tests {
         ("/api/{org_id}/anomaly_detection", "get"),
         ("/api/{org_id}/anomaly_detection", "post"),
         ("/api/{org_id}/anomaly_detection/history", "get"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "get"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "put"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "delete"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}/train", "post"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "get"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "put"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "delete"),
+        ("/api/{org_id}/anomaly_detection/{config_id}/train", "post"),
         (
-            "/api/{org_id}/anomaly_detection/{anomaly_id}/train",
+            "/api/{org_id}/anomaly_detection/{config_id}/train",
             "delete",
         ),
-        (
-            "/api/{org_id}/anomaly_detection/{anomaly_id}/detect",
-            "post",
-        ),
-        (
-            "/api/{org_id}/anomaly_detection/{anomaly_id}/history",
-            "get",
-        ),
+        ("/api/{org_id}/anomaly_detection/{config_id}/detect", "post"),
+        ("/api/{org_id}/anomaly_detection/{config_id}/history", "get"),
         ("/api/{org_id}/workflows", "get"),
         ("/api/{org_id}/workflows", "post"),
         ("/api/v2/{org_id}/workflows/move", "patch"),
@@ -2021,6 +2086,12 @@ mod tests {
         })
     }
 
+    /// Cloud never mounts the HTTP-trigger routes, so its spec leaves them out.
+    #[cfg(feature = "enterprise")]
+    fn published_in_this_edition(path: &str) -> bool {
+        !(cfg!(feature = "cloud") && path.contains("/http_trigger"))
+    }
+
     #[cfg(feature = "enterprise")]
     fn registered_gated_routes() -> BTreeSet<(String, String)> {
         // The licence-gated search routes are a separate group that service_routes() merges in.
@@ -2061,6 +2132,9 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let mut wrong = Vec::new();
         for (path, method, statuses) in expected {
+            if !published_in_this_edition(path) {
+                continue;
+            }
             let Some(operation) = paths.get(*path).and_then(|item| item.get(*method)) else {
                 wrong.push(format!("{method} {path}: absent from the spec"));
                 continue;
@@ -2241,6 +2315,195 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn siem_filters_are_not_advertised_in_oss() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/v2/{org_id}/alerts/history",
+            "/api/v2/{org_id}/alerts/incidents",
+        ] {
+            let params = spec["paths"][path]["get"]["parameters"].as_array().unwrap();
+            assert!(!params.is_empty(), "{path}");
+            assert!(params.iter().all(|p| p["name"] != "siem"), "{path}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn ocsf_packs_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/ocsf/packs"]["get"];
+        assert_eq!(op["operationId"], "ListOcsfPacks", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/OcsfPacksResponse"
+        );
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "OcsfPacksResponse",
+            "OcsfPack",
+            "OcsfPackManifest",
+            "OcsfPackKind",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sources_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id) in [
+            (
+                "/api/{org_id}/security/sources",
+                "get",
+                "ListSecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/types",
+                "get",
+                "ListSecuritySourceTypes",
+            ),
+            (
+                "/api/{org_id}/security/sources/match",
+                "post",
+                "MatchSecuritySource",
+            ),
+            (
+                "/api/{org_id}/security/sources/classify",
+                "post",
+                "ClassifySecuritySources",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/attach",
+                "post",
+                "AttachSecuritySourcePack",
+            ),
+            (
+                "/api/{org_id}/security/sources/{stream_name}/detach",
+                "post",
+                "DetachSecuritySourcePack",
+            ),
+        ] {
+            assert_eq!(spec["paths"][path][method]["operationId"], id, "{path}");
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "SourceListing",
+            "SourceRow",
+            "SourceType",
+            "MatchResponse",
+            "AttachError",
+            "AttachPlan",
+            "DetachSkip",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn security_access_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/access"]["get"];
+        assert_eq!(op["operationId"], "GetSecurityAccess", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAccessResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_investigation_paths_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, id, schema) in [
+            (
+                "/api/{org_id}/security/entities",
+                "ListSecurityEntities",
+                "EntitiesResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/graph",
+                "GetSecurityEntityGraph",
+                "EntityGraphResponse",
+            ),
+            (
+                "/api/{org_id}/security/entities/detail",
+                "GetSecurityEntityDetail",
+                "EntityDetailResponse",
+            ),
+            (
+                "/api/{org_id}/security/ueba",
+                "ScoreSecurityUsers",
+                "UebaReport",
+            ),
+            (
+                "/api/{org_id}/security/events/search",
+                "SearchSecurityEvents",
+                "EventSearchResponse",
+            ),
+        ] {
+            let op = &spec["paths"][path]["post"];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_audit_path_and_schema_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/security/audit"]["get"];
+        assert_eq!(op["operationId"], "ListSecurityAudit", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/SecurityAuditResponse"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn security_sigma_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, id, schema) in [
+            (
+                "/api/{org_id}/security/sigma/catalog",
+                "get",
+                "GetSigmaCatalog",
+                "SigmaCatalogResponse",
+            ),
+            (
+                "/api/{org_id}/security/sigma/compile",
+                "post",
+                "CompileSigmaRule",
+                "SigmaCompileResponse",
+            ),
+            (
+                "/api/{org_id}/security/mitre/coverage",
+                "get",
+                "GetMitreCoverage",
+                "MitreCoverage",
+            ),
+            (
+                "/api/{org_id}/security/detections/{alert_id}/evidence",
+                "get",
+                "GetDetectionEvidence",
+                "DetectionEvidence",
+            ),
+        ] {
+            let op = &spec["paths"][path][method];
+            assert_eq!(op["operationId"], id, "{op}");
+            assert_eq!(
+                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                format!("#/components/schemas/{schema}")
+            );
+        }
+    }
+
     #[test]
     fn unpriced_models_path_and_schemas_are_registered() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -2293,8 +2556,8 @@ mod tests {
         for (path, method) in [
             ("/api/{org_id}/roles/bulk", "delete"),
             ("/api/{org_id}/groups/bulk", "delete"),
-            ("/api/{org_id}/users/{user_email}/roles", "get"),
-            ("/api/{org_id}/users/{user_email}/groups", "get"),
+            ("/api/{org_id}/users/{user_id}/roles", "get"),
+            ("/api/{org_id}/users/{user_id}/groups", "get"),
         ] {
             let op = &spec["paths"][path][method];
             assert!(op.is_object(), "{method} {path} missing");
@@ -2558,11 +2821,32 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let missing: Vec<_> = GATED_MODULE_ROUTES
             .iter()
+            .filter(|(path, _)| published_in_this_edition(path))
             .filter(|(path, method)| paths.get(*path).and_then(|p| p.get(*method)).is_none())
             .collect();
         assert!(
             missing.is_empty(),
             "absent from the merged spec: {missing:#?}"
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn http_trigger_routes_are_absent_from_the_cloud_spec() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let hidden: Vec<_> = GATED_MODULE_ROUTES
+            .iter()
+            .filter(|(path, _)| !published_in_this_edition(path))
+            .collect();
+        assert_eq!(hidden.len(), 7, "{hidden:#?}");
+        let leaked: Vec<_> = hidden
+            .into_iter()
+            .filter(|(path, method)| paths.get(*path).and_then(|p| p.get(*method)).is_some())
+            .collect();
+        assert!(
+            leaked.is_empty(),
+            "cloud publishes unmounted routes: {leaked:#?}"
         );
     }
 
@@ -2595,6 +2879,9 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let mut invalid = Vec::new();
         for (path, method) in GATED_MODULE_ROUTES {
+            if !published_in_this_edition(path) {
+                continue;
+            }
             let Some(operation) = paths.get(*path).and_then(|p| p.get(*method)) else {
                 invalid.push(format!("{method} {path}: absent from the spec"));
                 continue;
@@ -2622,10 +2909,10 @@ mod tests {
     #[test]
     fn anomaly_detection_documents_the_statuses_its_handlers_return() {
         let base = "/api/{org_id}/anomaly_detection";
-        let by_id = "/api/{org_id}/anomaly_detection/{anomaly_id}";
-        let train = "/api/{org_id}/anomaly_detection/{anomaly_id}/train";
-        let detect = "/api/{org_id}/anomaly_detection/{anomaly_id}/detect";
-        let history = "/api/{org_id}/anomaly_detection/{anomaly_id}/history";
+        let by_id = "/api/{org_id}/anomaly_detection/{config_id}";
+        let train = "/api/{org_id}/anomaly_detection/{config_id}/train";
+        let detect = "/api/{org_id}/anomaly_detection/{config_id}/detect";
+        let history = "/api/{org_id}/anomaly_detection/{config_id}/history";
         let bulk_history = "/api/{org_id}/anomaly_detection/history";
         assert_documented_statuses(&[
             (base, "get", &["200", "403", "500"]),
@@ -2790,6 +3077,9 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let mut wrong = Vec::new();
         for (path, method, operation) in WORKFLOWS_RATELIMIT {
+            if !published_in_this_edition(path) {
+                continue;
+            }
             let Some(op) = paths.get(*path).and_then(|p| p.get(*method)) else {
                 wrong.push(format!("{method} {path}: absent from the spec"));
                 continue;
@@ -2828,7 +3118,15 @@ mod tests {
             let ok = &spec["paths"][path]["get"]["responses"]["200"];
             let schema = &ok["content"]["application/json"]["schema"];
             assert_eq!(schema["type"], "array", "{path}: {ok}");
-            assert_eq!(schema["items"]["type"], "object", "{path}: {ok}");
+            let name = schema["items"]["$ref"]
+                .as_str()
+                .and_then(|r| r.strip_prefix("#/components/schemas/"))
+                .unwrap_or_else(|| panic!("{path}: {ok}"));
+            let item = &spec["components"]["schemas"][name];
+            assert!(
+                item["type"] == "object" || item["allOf"].is_array(),
+                "{path}: {item}"
+            );
         }
     }
 

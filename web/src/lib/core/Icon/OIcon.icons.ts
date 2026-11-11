@@ -57,6 +57,8 @@ import EditNote from "~icons/material-symbols/edit-note-outline";
 import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
+import EventAvailable from "~icons/material-symbols/event-available-outline";
+import EventBusy from "~icons/material-symbols/event-busy-outline";
 import ExpandMore from "~icons/material-symbols/expand-more";
 import Extension from "~icons/material-symbols/extension-outline";
 import UploadFile from "~icons/material-symbols/upload-file-outline";
@@ -159,6 +161,7 @@ import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
 import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
+import MarkEmailUnread from "~icons/material-symbols/mark-email-unread-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
 import MoreHoriz from "~icons/material-symbols/more-horiz";
@@ -167,6 +170,7 @@ import Notifications from "~icons/material-symbols/notifications-outline";
 import OpenInFull from "~icons/material-symbols/open-in-full";
 import PlayCircle from "~icons/material-symbols/play-circle-outline";
 import SmartToy from "~icons/material-symbols/smart-toy-outline";
+import Terminal from "~icons/material-symbols/terminal";
 import Speed from "~icons/material-symbols/speed-outline";
 import Target from "~icons/material-symbols/target";
 import TrackChanges from "~icons/material-symbols/track-changes";
@@ -417,6 +421,8 @@ export const iconRegistry = {
   error: Error,
   "error-outline": ErrorOutline,
   event: Event,
+  "event-available": EventAvailable,
+  "event-busy": EventBusy,
   "expand-more": ExpandMore,
   extension: Extension,
   "upload-file": UploadFile,
@@ -551,6 +557,7 @@ export const iconRegistry = {
   layers: Layers,
   public: Public,
   mail: Mail,
+  "mark-email-unread": MarkEmailUnread,
   "manage-search": ManageSearch,
   merge: Merge,
   "more-horiz": MoreHoriz,
@@ -559,6 +566,7 @@ export const iconRegistry = {
   "open-in-full": OpenInFull,
   "play-circle": PlayCircle,
   "smart-toy": SmartToy,
+  terminal: Terminal,
   speed: Speed,
   target: Target,
   "track-changes": TrackChanges,

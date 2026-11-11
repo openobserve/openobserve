@@ -173,10 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      search/tabs and above the rows. Always rendered (skeleton
                      while loading) so data arriving never shifts the layout. -->
               <template #subheader>
-                <div
-                  class="px-page-edge border-table-row-divider border-b py-1.5"
-                  data-test="alert-list-summary"
-                >
+                <div data-test="alert-list-summary">
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
@@ -440,7 +437,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-if="row.status && row.status !== '--'" class="relative inline-flex">
                   <OTag type="alertStatus" :value="row.status" />
                   <OTooltip
-                    v-if="row.status === 'failed' && row.last_error"
+                    v-if="
+                      (row.status === 'failed' || isAnomalyDataReadinessStatus(row.status)) &&
+                      row.last_error
+                    "
                     :max-width="'25rem'"
                     :content="row.last_error"
                   />
@@ -480,22 +480,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </template>
 
-              <!-- Tags (PT-6). Three visible + overflow count, so an alert
-                   carrying 64 tags cannot blow out the row height. -->
               <template #cell-tags="{ row }">
-                <div v-if="row.tags?.length" class="flex flex-wrap items-center gap-1">
-                  <OTag
-                    v-for="tag in row.tags.slice(0, 3)"
-                    :key="tag"
-                    type="exampleChip"
-                    value="dim"
-                    :label="tag"
-                    :data-test="`alert-list-${row.name}-tag`"
-                  />
-                  <OTooltip v-if="row.tags.length > 3" :content="row.tags.join(', ')">
-                    <span class="text-text-secondary text-2xs">+{{ row.tags.length - 3 }}</span>
-                  </OTooltip>
-                </div>
+                <FitItems v-if="row.tags?.length" :items="row.tags">
+                  <template #default="{ item }">
+                    <OTag
+                      type="exampleChip"
+                      value="dim"
+                      class="max-w-full"
+                      :data-test="`alert-list-${row.name}-tag`"
+                    >
+                      <span class="truncate">{{ item }}</span>
+                    </OTag>
+                  </template>
+                  <template #more="{ count }">
+                    <OTooltip :content="row.tags.join(', ')">
+                      <span class="text-text-secondary text-2xs">+{{ count }}</span>
+                    </OTooltip>
+                  </template>
+                </FitItems>
                 <span v-else class="text-text-secondary">—</span>
               </template>
 
@@ -1219,7 +1221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ExportResourceDialog
       v-model:open="showExportDialog"
-      :items="alertsToExport"
+      :items="alertsJsonExport"
       :terraform="alertsTerraform"
       :title="
         t('alerts.exportDialogTitle', { count: alertsToExport.length }, alertsToExport.length)
@@ -1329,6 +1331,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import FitItems from "@/components/common/FitItems.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
@@ -1347,6 +1350,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { isAnomalyDataReadinessStatus } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import {
@@ -1396,6 +1400,7 @@ export default defineComponent({
     OUserCell,
     OTag,
     OTruncatedText,
+    FitItems,
     OStatStrip,
     CompositeReferencesDrawer,
     ExportResourceDialog,
@@ -3512,7 +3517,6 @@ export default defineComponent({
       // The editor reads the detail entry cache-first and a row patch cannot reach it; invalidated rather than removed so an in-flight editor read is not cancelled.
       void queryClient.invalidateQueries({
         queryKey: alertKeys.detail(org, id),
-        exact: true,
         refetchType: "none",
       });
     };
@@ -3563,8 +3567,9 @@ export default defineComponent({
         return next.length === cached.length ? undefined : next;
       });
       gone.forEach((id: string) =>
-        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id), exact: true }),
+        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id) }),
       );
+      queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
 
       // The deletes that call this are direct service calls, so the anomaly scope has no mutation to drop it from.
       if (droppedAnomaly) queryClient.invalidateQueries({ queryKey: anomalyKeys.all(org) });
@@ -3823,6 +3828,14 @@ export default defineComponent({
     // own exporter, and the dialog only renders what it is handed.
     const alertsTerraform = computed(() =>
       alertsToTerraform(alertsToExport.value, { folderId: activeFolderId.value }),
+    );
+    // Destination names only exist in the source org; Terraform keeps them for re-applying to it.
+    const alertsJsonExport = computed(() =>
+      alertsToExport.value.map((alert) =>
+        alert.alert_type === "anomaly_detection"
+          ? { ...alert, alert_destinations: [] }
+          : { ...alert, destinations: [], recovery_destinations: [] },
+      ),
     );
     const exportLoading = ref(false);
 
@@ -4349,6 +4362,9 @@ export default defineComponent({
         );
         const refused = new Set((response?.data?.unsuccessful ?? []).map(String));
         failed = alertsToToggle.filter((a: any) => refused.has(String(a.alert_id)));
+        queryClient.invalidateQueries({
+          queryKey: alertKeys.firing(store.state.selectedOrganization.identifier),
+        });
         const leftRows = alertsToToggle.filter(
           (row: any) =>
             !refused.has(String(row.alert_id)) && applyConfirmedState(row.alert_id, isResuming),
@@ -4492,6 +4508,7 @@ export default defineComponent({
           const org = String(store.state.selectedOrganization.identifier);
           const requested = selectedAlerts.value.map((row: AlertRowRef) => String(row?.alert_id));
           selectedAlerts.value = [];
+          queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
           // Forced: the point of this branch is to hear it from the server, and an
           // unforced read inside staleTime answers from cache without asking.
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
@@ -4655,6 +4672,7 @@ export default defineComponent({
       alertStateLoadingMap,
       showRunOutcome,
       isMutedFiring,
+      isAnomalyDataReadinessStatus,
       isAckedFiring,
       canAcknowledgeRow,
       acknowledgeRow,
@@ -4688,6 +4706,7 @@ export default defineComponent({
       exportAlert,
       showExportDialog,
       alertsToExport,
+      alertsJsonExport,
       alertsTerraform,
       onExportDownloaded,
       triggerAlert,

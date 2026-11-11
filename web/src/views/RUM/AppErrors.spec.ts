@@ -82,6 +82,9 @@ vi.mock("@/composables/useStreams", () => ({
         // This one is in userDataSet so it populates streamFields
         { name: "user_agent_device_brand", type: "keyword" },
         { name: "geo_info_city", type: "keyword" },
+        { name: "o2source", type: "keyword" },
+        { name: "o2_evp_origin", type: "keyword" },
+        { name: "o2_evp_origin_version", type: "keyword" },
       ],
     }),
   }),
@@ -151,7 +154,10 @@ vi.mock("@/plugins/traces/SyntaxGuide.vue", () => ({
 // ---------------------------------------------------------------------------
 // Component import (AFTER all vi.mock() calls)
 // ---------------------------------------------------------------------------
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import AppErrors from "./AppErrors.vue";
+import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -623,9 +629,35 @@ describe("AppErrors", () => {
         expect.objectContaining({
           name: "ErrorViewer",
           params: { id: ISSUE_1.latest_error_id },
-          query: { timestamp: ISSUE_1.zo_sql_timestamp },
+          query: {
+            timestamp: ISSUE_1.zo_sql_timestamp,
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
         }),
       );
+    });
+
+    it("keeps the org on the Error Viewer link, so a reload in another org reopens the same error", async () => {
+      mockIssues.value = [ISSUE_1];
+      const original = store.state.selectedOrganization.identifier;
+      store.state.selectedOrganization.identifier = "rum_errors_org";
+      try {
+        ({ wrapper, router } = await mountAppErrors());
+        await flushPromises();
+        const pushSpy = vi.spyOn(router, "push");
+
+        await wrapper.findAll('[data-test="table-row"]')[0].trigger("click");
+        await flushPromises();
+
+        expect(pushSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "ErrorViewer",
+            query: expect.objectContaining({ org_identifier: "rum_errors_org" }),
+          }),
+        );
+      } finally {
+        store.state.selectedOrganization.identifier = original;
+      }
     });
 
     it("sets errorTrackingState.data.selectedError on row click", async () => {
@@ -693,6 +725,17 @@ describe("AppErrors", () => {
           }),
         }),
       );
+    });
+
+    it("keeps the o2-prefixed SDK fields in the field sidebar (o2-enterprise#2724)", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      const names = (wrapper.vm as any).streamFields.map((f: { name: string }) => f.name);
+      expect(names).toEqual(
+        expect.arrayContaining(["o2source", "o2_evp_origin", "o2_evp_origin_version"]),
+      );
+      expect(names).not.toContain("error_message");
     });
 
     it("passes startTime and endTime from dateTime state to fetchAll", async () => {
@@ -941,6 +984,24 @@ describe("AppErrors", () => {
 
       const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
       expect(fieldList.props("baseFilter")).toBe("type='error' AND service='check''out'");
+    });
+
+    it("tracks filter chips without sending the service name", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      const bar = wrapper.findComponent({ name: "ErrorsFilterBar" });
+      await bar.vm.$emit("update:status", "new");
+      await bar.vm.$emit("update:type", "unhandled");
+      await bar.vm.$emit("update:service", "checkout");
+      await flushPromises();
+
+      expect(vi.mocked(analytics.track).mock.calls).toEqual([
+        ["rum_error_filter_applied", { filter: "status", value: "new" }],
+        ["rum_error_filter_applied", { filter: "type", value: "unhandled" }],
+        ["rum_error_filter_applied", { filter: "service", value: "set" }],
+      ]);
     });
   });
 

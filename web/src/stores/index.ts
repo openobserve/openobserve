@@ -27,6 +27,7 @@ import { clearPanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
 import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
+import config from "@/aws-exports";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -173,6 +174,8 @@ const store = createStore({
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
     pendingShortURL: null,
+    solutionMode: ((config.isEnterprise == "true" && localStorage.getItem("solutionMode")) ||
+      "observability") as "observability" | "security",
   },
   mutations: {
     login(state, payload) {
@@ -307,6 +310,10 @@ const store = createStore({
     },
     setPrintMode(state, payload) {
       state.printMode = payload;
+    },
+    setSolutionMode(state, payload: "observability" | "security") {
+      state.solutionMode = payload;
+      localStorage.setItem("solutionMode", payload);
     },
     setKioskMode(state, payload) {
       state.kioskMode = payload;

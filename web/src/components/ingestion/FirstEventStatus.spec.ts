@@ -25,7 +25,13 @@ import type {
   FirstEventState,
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStatus from "./FirstEventStatus.vue";
+import { markHeardFromPending } from "@/components/login/heardFrom";
 import { FIRST_EVENT_ASK_AI } from "./firstEventAskAi";
+import {
+  FIRST_EVENT_REPORTER,
+  FIRST_EVENT_SUCCESS_BY_HOST,
+  type FirstEventReporter,
+} from "@/composables/firstEvent/firstEventReporter";
 import analytics from "@/services/product_analytics";
 
 const fake = {
@@ -92,6 +98,8 @@ const mountBar = (
   opts: {
     askAi?: (q: string) => void;
     zoConfig?: Record<string, unknown>;
+    reporter?: FirstEventReporter;
+    successByHost?: boolean;
     org?: Record<string, unknown>;
     organizations?: unknown[];
   } = {},
@@ -101,7 +109,11 @@ const mountBar = (
     props: { org: "acme-prod", guideName: "Kubernetes", ...props },
     global: {
       plugins: [i18n, makeStore(opts.zoConfig, opts.org, opts.organizations), router],
-      provide: opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {},
+      provide: {
+        ...(opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {}),
+        ...(opts.reporter ? { [FIRST_EVENT_REPORTER as symbol]: opts.reporter } : {}),
+        ...(opts.successByHost ? { [FIRST_EVENT_SUCCESS_BY_HOST as symbol]: true } : {}),
+      },
     },
   });
   return wrapper;
@@ -201,6 +213,26 @@ describe("FirstEventStatus — waiting", () => {
     expect(q("first-event-status-troubleshoot-btn").attributes("aria-busy")).toBe("true");
     expect(fake.state.value).toBe("waiting");
   });
+
+  it("reads rejections at 2 minutes by default, as the stepped cards say", async () => {
+    mountBar();
+    const opts = watchArgs.mock.calls[0][2] as { diagnosisAtMs: { value: number } };
+    expect(opts.diagnosisAtMs.value).toBe(120_000);
+    expect(wrapper.text()).toContain("If nothing arrives in 2 minutes it shows what went wrong");
+    await vi.advanceTimersByTimeAsync(130_000);
+    expect(wrapper.text()).toContain("Checks stop after 60 minutes");
+  });
+
+  it("waits the page's longer delay before a diagnosis and says so", async () => {
+    mountBar({ diagnosisAfterMs: 900_000 });
+    const opts = watchArgs.mock.calls[0][2] as { diagnosisAtMs: { value: number } };
+    expect(opts.diagnosisAtMs.value).toBe(900_000);
+    expect(wrapper.text()).toContain("If nothing arrives in 15 min it shows what went wrong");
+    await vi.advanceTimersByTimeAsync(130_000);
+    expect(wrapper.text()).toContain("If nothing arrives in 15 min");
+    await vi.advanceTimersByTimeAsync(800_000);
+    expect(wrapper.text()).toContain("Checks stop after 60 minutes");
+  });
 });
 
 describe("FirstEventStatus — before the first decision", () => {
@@ -236,6 +268,17 @@ describe("FirstEventStatus — received", () => {
     rangeStart: NOW * 1000 - 900_000_000,
     rangeEnd: NOW * 1000 + 900_000_000,
   };
+
+  it("leaves the open and add-another buttons to an onboarding page's own success panel", async () => {
+    mountBar({}, { successByHost: true });
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("first-event-status-summary").exists()).toBe(true);
+    expect(q("first-event-status-open-btn").exists()).toBe(false);
+    expect(q("first-event-status-setup-another-btn").exists()).toBe(false);
+    expect(q("first-event-status-connect-source-btn").exists()).toBe(false);
+  });
 
   it("shows the count, stream, source and first record, and fires first_event_detected once", async () => {
     mountBar({ sourceLabel: "acme-prod-eks" });
@@ -337,6 +380,16 @@ describe("FirstEventStatus — received", () => {
       from: String(result.rangeStart),
       to: String(result.rangeEnd),
     });
+  });
+
+  it("asks how the user heard of us on a Data sources page once data arrives", async () => {
+    markHeardFromPending(undefined);
+    mountBar();
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("heard-from-prompt").exists()).toBe(true);
+    localStorage.clear();
   });
 
   it("disables Open in Traces with a lock while the traces license is locked", async () => {
@@ -505,6 +558,21 @@ describe("FirstEventStatus — diagnosis", () => {
     expect(q("first-event-diagnosis-fix").text()).toContain("Fluent Bit");
     await q("first-event-diagnosis-copy-btn").trigger("click");
     expect(wrapper.emitted("copy-command")).toHaveLength(1);
+  });
+
+  it("reads Copy prompt on the coding-agent tab and points the token fix at the .env", async () => {
+    mountBar({ snippetKind: "prompt" });
+    fake.diagnosis.value = {
+      form: "rejected",
+      trigger: "troubleshoot",
+      rejections: [rejection("invalid_credentials", 401)],
+    };
+    fake.state.value = "rejected";
+    await nextTick();
+    expect(q("first-event-diagnosis-copy-btn").text()).toBe("Copy prompt");
+    expect(q("first-event-diagnosis-fix").text()).toBe(
+      "The token in your .env doesn't match org token default. Download the .env again and ask your coding agent to re-run the request.",
+    );
   });
 
   it("names the guide's own tool in the config fix", async () => {
@@ -784,6 +852,11 @@ describe("FirstEventStatus — pill display for empty pages", () => {
   it.each([
     [{ targetStream: "system_", match: "keyword" }, "Matching streams already receive data."],
     [{ targetStream: "default", snippetKind: "config" }, "Checks start when you copy the config."],
+    [{ targetStream: "default", snippetKind: "prompt" }, "Checks start when you copy the prompt."],
+    [
+      { targetStream: "system_", match: "keyword", snippetKind: "prompt" },
+      "Matching streams already receive data. Checks start when you copy the prompt.",
+    ],
   ])("names what the idle bar waits on (%o)", async (props, text) => {
     mountBar(props);
     fake.state.value = "idle";
@@ -796,6 +869,10 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     [
       { targetStream: "syslog_ng", snippetKind: "config" },
       "Checks start when you copy the config.",
+    ],
+    [
+      { targetStream: "syslog_ng", snippetKind: "prompt" },
+      "Checks start when you copy the prompt.",
     ],
     [{ targetStream: "system_", match: "keyword" }, "Checks start when you copy the command."],
     [{ targetStream: "syslog_ng", display: "pill" }, "Checks start when you copy the command."],
@@ -849,5 +926,32 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     expect(q("first-event-status").attributes("data-display")).toBeUndefined();
     expect(q("first-event-status-troubleshoot-btn").exists()).toBe(true);
     expect(q("first-event-status").text()).not.toContain("Waiting for your first logs");
+  });
+});
+
+describe("FirstEventStatus — host page reporter", () => {
+  it("attaches on mount, reports its states and first record, and detaches on unmount", async () => {
+    const detach = vi.fn();
+    const reporter = { attach: vi.fn(() => detach), state: vi.fn(), detected: vi.fn() };
+    mountBar({}, { reporter });
+    expect(reporter.attach).toHaveBeenCalledTimes(1);
+    fake.state.value = "rejected";
+    await nextTick();
+    expect(reporter.state).toHaveBeenLastCalledWith("rejected");
+    const result: FirstEventResult = {
+      streamName: "default",
+      streamType: "logs",
+      count: 3,
+      rangeStart: 1,
+      rangeEnd: 2,
+    };
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(reporter.state).toHaveBeenLastCalledWith("received");
+    expect(reporter.detected).toHaveBeenCalledWith(result);
+    expect(detach).not.toHaveBeenCalled();
+    wrapper.unmount();
+    expect(detach).toHaveBeenCalledTimes(1);
   });
 });

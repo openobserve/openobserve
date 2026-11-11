@@ -128,6 +128,71 @@ export class IngestionConfigPage {
         return await this.page.locator(`[data-test="ai-step-${stepId}"] [data-test="ingestion-setup-code-block"]`).first().textContent();
     }
 
+    // eBPF inputs use the -field suffix; requireOneOf gates the warning and code block, so assert their absence.
+
+    async expectStepVisible(stepId) {
+        await expect(this.page.locator(`[data-test="ai-step-${stepId}"]`)).toBeVisible({ timeout: 10000 });
+    }
+
+    async getStepCodeText(stepId) {
+        return await this.page
+            .locator(`[data-test="ai-step-${stepId}"] [data-test="ingestion-setup-code-block-pre"]`)
+            .first()
+            .textContent();
+    }
+
+    async fillVariantInput(inputId, value) {
+        await this.page.locator(`[data-test="ai-input-${inputId}-field"]`).fill(value);
+    }
+
+    async getVariantInputValue(inputId) {
+        return await this.page.locator(`[data-test="ai-input-${inputId}-field"]`).inputValue();
+    }
+
+    async expectVariantInputAbsent(inputId) {
+        await expect(this.page.locator(`[data-test="ai-input-${inputId}-field"]`)).toHaveCount(0, {
+            timeout: 10000,
+        });
+    }
+
+    async expectVariantWarning(stepId, visible = true) {
+        const locator = this.page.locator(`[data-test="ai-variant-require-${stepId}"]`);
+        if (visible) {
+            await expect(locator).toBeVisible({ timeout: 10000 });
+        } else {
+            await expect(locator).toHaveCount(0, { timeout: 10000 });
+        }
+    }
+
+    async expectStepCodePresent(stepId, present = true) {
+        const locator = this.page.locator(
+            `[data-test="ai-step-${stepId}"] [data-test="ingestion-setup-code-block"]`,
+        );
+        if (present) {
+            await expect(locator).toBeVisible({ timeout: 10000 });
+        } else {
+            await expect(locator).toHaveCount(0, { timeout: 10000 });
+        }
+    }
+
+    async expectVariantTabsAbsent(stepId) {
+        await expect(
+            this.page.locator(`[data-test="ai-step-${stepId}"] [data-test="ai-variant-tabs"]`),
+        ).toHaveCount(0, { timeout: 10000 });
+    }
+
+    async expectSubvariantTabsVisible(stepId) {
+        await expect(this.page.locator(`[data-test="ai-subvariant-tabs-${stepId}"]`)).toBeVisible({
+            timeout: 10000,
+        });
+    }
+
+    async expectSubvariantTabsHidden(stepId) {
+        await expect(this.page.locator(`[data-test="ai-subvariant-tabs-${stepId}"]`)).toHaveCount(0, {
+            timeout: 10000,
+        });
+    }
+
     // ==================== Tab Interactions ====================
 
     async clickMetricsTab() {
@@ -481,18 +546,32 @@ export class IngestionConfigPage {
     }
 
     async headWithNetworkErrorRetry(href, maxRetries = 2) {
+        const transientStatuses = [502, 503, 504];
+        let timeout = 5000;
         for (let attempt = 0; ; attempt++) {
+            const started = Date.now();
+            let response = null;
+            let failure = null;
             try {
-                // 5 second timeout to prevent hanging
-                return await this.page.request.head(href, { timeout: 5000 });
+                response = await this.page.request.head(href, { timeout });
             } catch (error) {
-                const retryCostMs = 1000 * (attempt + 1) + 5000;
-                // A spent budget would push the whole test past its timeout, so the real error is reported instead
-                if (attempt >= maxRetries || retryCostMs > this.networkErrorRetryBudgetMs) throw error;
-                testLogger.warn(`[doc-links] HEAD failed (${error.message}), retry ${attempt + 1}/${maxRetries}: ${href}`);
-                this.networkErrorRetryBudgetMs -= retryCostMs;
-                await this.page.waitForTimeout(1000 * (attempt + 1));
+                failure = error;
             }
+            if (attempt > 0) this.networkErrorRetryBudgetMs -= Date.now() - started;
+            if (response && !transientStatuses.includes(response.status())) return response;
+            const backoffMs = 1000 * (attempt + 1);
+            const remainingMs = this.networkErrorRetryBudgetMs - backoffMs;
+            // A spent budget would push the whole test past its timeout, so the real error or status is reported instead
+            if (attempt >= maxRetries || remainingMs < 5000) {
+                if (failure) throw failure;
+                return response;
+            }
+            const reason = failure ? failure.message : `status ${response.status()}`;
+            testLogger.warn(`[doc-links] HEAD failed (${reason}), retry ${attempt + 1}/${maxRetries}: ${href}`);
+            await this.page.waitForTimeout(backoffMs);
+            this.networkErrorRetryBudgetMs -= backoffMs;
+            // Slow-but-alive hosts (GitHub, CDN edges) need longer than the 5s first try to answer
+            timeout = Math.min(15000, remainingMs);
         }
     }
 }

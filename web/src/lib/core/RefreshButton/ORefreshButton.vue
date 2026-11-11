@@ -140,7 +140,9 @@ function handleClick(e: MouseEvent) {
     :class="
       failedText
         ? 'border-status-error-text! bg-status-error-bg! h-6! max-w-full pe-0! sm:min-w-0'
-        : 'h-8!'
+        : size === 'header'
+          ? 'h-8.5!'
+          : 'h-8!'
     "
     :icon-left="ownsTooltip ? undefined : 'refresh'"
     :loading="loading"

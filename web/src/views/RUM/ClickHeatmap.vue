@@ -694,6 +694,7 @@ import {
   type DeviceClass,
 } from "@/utils/rum/clickHeatmapQueries";
 import { rowScope, type AnalyticsScope } from "@/utils/rum/productAnalyticsQueries";
+import analytics from "@/services/product_analytics";
 
 interface ElementRow {
   selector: string;
@@ -1366,7 +1367,33 @@ interface SnapshotSource {
   viewId: string;
 }
 
-async function pickReplayView(token: number): Promise<string | null> {
+type SnapshotHead = ({ kind: "view" } & SnapshotSource) | { kind: "none" } | { kind: "legacySdk" };
+
+type ReplayPick = { kind: "view"; viewId: string } | { kind: "none" } | { kind: "legacySdk" };
+
+async function pickReplayView(token: number): Promise<ReplayPick> {
+  let replayStream: any = null;
+  try {
+    replayStream = await getStream("_sessionreplay", "logs", true);
+  } catch (e) {
+    // Only a missing stream is the calm no-replay case; any other failure must surface.
+    const missing = t("logStream.streamNotFoundForType", {
+      stream: "_sessionreplay",
+      type: "logs",
+    });
+    if ((e as Error)?.message === missing) return { kind: "none" };
+    throw e;
+  }
+  if (token !== loadToken) return { kind: "none" };
+  // Replay from an older SDK has no view_id column, and querying it fails with 400.
+  if (!(replayStream?.schema ?? []).some((f: any) => f?.name === "view_id")) {
+    return { kind: "legacySdk" };
+  }
+  const viewId = await pickViewWithSnapshot(token, replayStream);
+  return viewId ? { kind: "view", viewId } : { kind: "none" };
+}
+
+async function pickViewWithSnapshot(token: number, replayStream: any): Promise<string | null> {
   const stream = await getStream("_rumdata", "logs", true);
   if (token !== loadToken) return null;
   const hasActions = (stream?.schema ?? []).some((f: any) => f?.name === "view_action_count");
@@ -1377,8 +1404,6 @@ async function pickReplayView(token: number): Promise<string | null> {
     views = await replayRows("replay-views", viewsSql, 30);
   }
   if (!views.length || token !== loadToken) return null;
-  const replayStream = await getStream("_sessionreplay", "logs", true);
-  if (token !== loadToken) return null;
   // Older and mobile streams have no has_full_snapshot column, so any view may hold a snapshot.
   if (!(replayStream?.schema ?? []).some((f: any) => f?.name === "has_full_snapshot")) {
     return String(views[0].view_id);
@@ -1425,9 +1450,11 @@ const hasFirstFrame = (events: any[]) =>
   events.some((e) => e.type === META) && events.some((e) => e.type === FULL_SNAPSHOT);
 
 // The earliest segments hold the meta and full snapshot, so they alone are enough to show the first frame.
-async function loadSnapshotHead(token: number): Promise<SnapshotSource | null> {
-  const viewId = await pickReplayView(token);
-  if (!viewId || token !== loadToken) return null;
+async function loadSnapshotHead(token: number): Promise<SnapshotHead> {
+  const pick = await pickReplayView(token);
+  if (pick.kind !== "view") return pick;
+  if (token !== loadToken) return { kind: "none" };
+  const viewId = pick.viewId;
   let rows = await replayRows(
     "replay-segments",
     segmentsSql(viewId, FIRST_SEGMENTS),
@@ -1444,8 +1471,8 @@ async function loadSnapshotHead(token: number): Promise<SnapshotSource | null> {
     );
     events = decodeReplayEvents(parseSegments(rows));
   }
-  if (token !== loadToken || !events.length) return null;
-  return { viewId, events };
+  if (token !== loadToken || !events.length) return { kind: "none" };
+  return { kind: "view", viewId, events };
 }
 
 async function loadSnapshot(token: number, key: string) {
@@ -1455,8 +1482,12 @@ async function loadSnapshot(token: number, key: string) {
   try {
     const head = await loadSnapshotHead(token);
     if (token !== loadToken) return;
-    const meta = head?.events.find((e) => e.type === META);
-    if (!head || !hasFirstFrame(head.events) || !meta) {
+    if (head.kind === "legacySdk") {
+      snapshotError.value = t("rum.heatmap.noReplayLegacySdk");
+      return;
+    }
+    const meta = head.kind === "view" ? head.events.find((e) => e.type === META) : undefined;
+    if (head.kind !== "view" || !hasFirstFrame(head.events) || !meta) {
       snapshotError.value = t("rum.heatmap.noReplay");
       return;
     }
@@ -1760,6 +1791,7 @@ function onDeviceChange(value: unknown) {
   syncHeatmapUrl();
   clearElementFilters();
   loadPage(false);
+  analytics.track("rum_heatmap_device_changed", { device: value });
 }
 
 function onPagePick(url: string) {
@@ -1769,6 +1801,7 @@ function onPagePick(url: string) {
   syncHeatmapUrl();
   clearElementFilters();
   loadPage();
+  analytics.track("rum_heatmap_page_selected");
 }
 
 function stopPageSearch() {
@@ -1963,6 +1996,7 @@ function rowTitle(row: ElementRow): string {
 
 function onModeChange(value: unknown) {
   if (value !== "heat" && value !== "markers" && value !== "both") return;
+  if (value !== viewMode.value) analytics.track("rum_heatmap_mode_changed", { mode: value });
   viewMode.value = value;
 }
 

@@ -40,7 +40,8 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     audit::audit,
-    config::utils::time::now_micros,
+    axum::Extension,
+    config::{axum::middlewares::RealIp, utils::time::now_micros},
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
     o2_enterprise::enterprise::password_policy::lockout::{self, LockoutState},
@@ -51,7 +52,7 @@ use {
 #[cfg(feature = "enterprise")]
 use crate::common::meta::user::UserResponse;
 #[cfg(feature = "enterprise")]
-use crate::request::password_policy::password_rotation;
+use crate::request::{LoginFailure, audit_login_failure, password_policy::password_rotation};
 use crate::{
     common::meta::{
         self,
@@ -66,6 +67,9 @@ use crate::{
 
 pub mod service_accounts;
 
+#[cfg(feature = "enterprise")]
+const MAX_LOGIN_USER_AGENT_BYTES: usize = 1024;
+
 /// One organization member, as the list endpoint reports them, plus their lockout state.
 ///
 /// The counters are an administrator's view and must not be handed to the user they describe:
@@ -78,6 +82,17 @@ pub struct UserDetailsResponse {
     pub user: UserResponse,
     pub lockout: LockoutState,
 }
+
+// Only documents save's answer: a service account also gets its token back.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+enum SaveUserVariants {
+    ServiceAccount(crate::common::meta::service_account::ServiceAccountCreateResponse),
+    User(MetaHttpResponse),
+}
+
+config::any_of_schema!(SaveUserAnswer, SaveUserVariants);
 
 /// ListUsers
 #[utoipa::path(
@@ -98,7 +113,7 @@ pub struct UserDetailsResponse {
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = common::meta::user::UserList),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
@@ -261,7 +276,7 @@ fn validate_org_id(org_id: &str) -> Option<&'static str> {
     ),
     request_body(content = inline(PostUserRequest), description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = SaveUserAnswer),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
@@ -338,11 +353,12 @@ pub async fn save(
     ),
     request_body(content = inline(UpdateUser), description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update user details", "category": "users"}))
+        // Enterprise exposes only UserGet on this path as an MCP tool.
+        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "enterprise"), "description": "Update user details", "category": "users"}))
     )
 )]
 pub async fn update(
@@ -440,11 +456,12 @@ pub async fn update(
     ),
     request_body(content = inline(UserRoleRequest), description = "User role", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Add user to organization", "category": "users"}))
+        // Enterprise exposes only UserGet on this path as an MCP tool.
+        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "enterprise"), "description": "Add user to organization", "category": "users"}))
     )
 )]
 pub async fn add_user_to_org(
@@ -519,12 +536,13 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<time::OffsetDateTime>>(
         ("email_id" = String, Path, description = "User name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Remove user from organization", "category": "users", "requires_confirmation": true}))
+        // Enterprise exposes only UserGet on this path as an MCP tool.
+        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "enterprise"), "description": "Remove user from organization", "category": "users", "requires_confirmation": true}))
     )
 )]
 pub async fn delete(
@@ -564,7 +582,7 @@ pub async fn delete(
       ),
     request_body(content = BulkDeleteRequest, description = "Emails of the users to remove", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -664,6 +682,7 @@ context_path = "/auth",
 )]
 pub async fn authentication(
     #[cfg(feature = "enterprise")] headers: HeaderMap,
+    #[cfg(feature = "enterprise")] real_ip: Option<Extension<RealIp>>,
     #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
     auth: Option<axum::Json<SignInUser>>,
 ) -> Response {
@@ -680,16 +699,11 @@ pub async fn authentication(
             .unwrap();
     }
 
-    #[cfg(feature = "enterprise")]
-    let query_string = query
-        .iter()
-        .map(|(k, v)| format!("{}={}", k, v))
-        .collect::<Vec<_>>()
-        .join("&");
-
     // Until decoding the token or body, we can not know the the user_email
     #[cfg(feature = "enterprise")]
     let mut audit_message = AuditMessage {
+        login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+        user_agent: login_user_agent(&headers),
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -698,7 +712,7 @@ pub async fn authentication(
             http_method: "POST".to_string(),
             http_path: "/auth/login".to_string(),
             http_body: "".to_string(),
-            http_query_params: query_string,
+            http_query_params: String::new(),
             http_response_code: 200,
             error_msg: None,
             trace_id: None,
@@ -717,8 +731,12 @@ pub async fn authentication(
             {
                 let auth_header = headers.get(header::AUTHORIZATION);
                 if let Some(auth_header) = auth_header {
+                    let Ok(auth_header) = auth_header.to_str() else {
+                        audit_unauthorized_error(audit_message).await;
+                        return unauthorized_error(resp);
+                    };
                     if let Some((name, password)) =
-                        o2_dex::service::auth::get_user_from_token(auth_header.to_str().unwrap())
+                        o2_dex::service::auth::get_user_from_token(auth_header)
                     {
                         SignInUser { name, password }
                     } else {
@@ -745,7 +763,12 @@ pub async fn authentication(
     #[cfg(feature = "enterprise")]
     {
         if get_dex_config().root_only_login && !db::user::is_root_user(&auth.name) {
-            audit_unauthorized_error(audit_message).await;
+            audit_login_failure(
+                audit_message,
+                LoginFailure::LoginPolicyDenied,
+                StatusCode::UNAUTHORIZED,
+            )
+            .await;
             return unauthorized_error(resp);
         }
     }
@@ -824,7 +847,7 @@ pub struct PresignedURLGenerator {
     exp_in: u32,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 struct PresignedURLGeneratorResponse {
     url: String,
 }
@@ -844,7 +867,7 @@ const fn default_exp_in() -> u32 {
         ("exp_in" = Option<u32>, Query, description = "URL lifetime in seconds, 600 by default"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = PresignedURLGeneratorResponse),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -907,6 +930,8 @@ pub async fn get_presigned_url(
             .collect::<Vec<_>>()
             .join("&");
         let audit_message = AuditMessage {
+            login_ip: None,
+            user_agent: None,
             user_email: user_id,
             org_id: "".to_string(),
             _timestamp: now_micros(),
@@ -935,6 +960,7 @@ pub async fn get_presigned_url(
 
 pub async fn get_auth(
     headers: http::HeaderMap,
+    #[cfg(feature = "enterprise")] real_ip: Option<Extension<RealIp>>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -950,6 +976,8 @@ pub async fn get_auth(
         let mut req_ts = 0;
 
         let mut audit_message = AuditMessage {
+            login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+            user_agent: login_user_agent(&headers),
             user_email: "".to_string(),
             org_id: "".to_string(),
             _timestamp: now_micros(),
@@ -976,13 +1004,23 @@ pub async fn get_auth(
                         if let Ok(ts) = config::utils::time::parse_str_to_time(req_time_str) {
                             req_ts = ts.timestamp();
                         } else {
-                            audit_unauthorized_error(audit_message).await;
+                            audit_login_failure(
+                                audit_message,
+                                LoginFailure::InvalidLoginLink,
+                                StatusCode::UNAUTHORIZED,
+                            )
+                            .await;
                             return unauthorized_error(resp);
                         }
                         request_time = Some(req_time_str);
                     }
                     None => {
-                        audit_unauthorized_error(audit_message).await;
+                        audit_login_failure(
+                            audit_message,
+                            LoginFailure::InvalidLoginLink,
+                            StatusCode::UNAUTHORIZED,
+                        )
+                        .await;
                         return unauthorized_error(resp);
                     }
                 };
@@ -992,12 +1030,22 @@ pub async fn get_auth(
                         expires_in = exp_in;
                     }
                     None => {
-                        audit_unauthorized_error(audit_message).await;
+                        audit_login_failure(
+                            audit_message,
+                            LoginFailure::InvalidLoginLink,
+                            StatusCode::UNAUTHORIZED,
+                        )
+                        .await;
                         return unauthorized_error(resp);
                     }
                 };
                 if AuthTokensExt::is_expired(req_ts, expires_in) {
-                    audit_unauthorized_error(audit_message).await;
+                    audit_login_failure(
+                        audit_message,
+                        LoginFailure::LoginLinkExpired,
+                        StatusCode::UNAUTHORIZED,
+                    )
+                    .await;
                     return unauthorized_error(resp);
                 }
                 format!("q_auth {s}")
@@ -1019,6 +1067,11 @@ pub async fn get_auth(
                 validate_user, validate_user_for_query_params,
             };
 
+            let credential_failure = if request_time.is_some() {
+                LoginFailure::InvalidLoginLink
+            } else {
+                LoginFailure::InvalidCredentials
+            };
             let (name, password) = if let Some((name, password)) = get_user_from_token(&auth_header)
             {
                 let token_validation_response = match request_time {
@@ -1040,17 +1093,37 @@ pub async fn get_auth(
                             resp.status = true;
                             (name, password)
                         } else {
-                            audit_unauthorized_error(audit_message).await;
+                            audit_login_failure(
+                                audit_message,
+                                credential_failure,
+                                StatusCode::UNAUTHORIZED,
+                            )
+                            .await;
                             return unauthorized_error(resp);
                         }
                     }
+                    Err(AuthError::Locked { .. }) => {
+                        audit_login_failure(
+                            audit_message,
+                            LoginFailure::AccountLocked,
+                            StatusCode::UNAUTHORIZED,
+                        )
+                        .await;
+                        return unauthorized_error(resp);
+                    }
                     Err(_) => {
-                        audit_unauthorized_error(audit_message).await;
+                        audit_login_failure(
+                            audit_message,
+                            credential_failure,
+                            StatusCode::UNAUTHORIZED,
+                        )
+                        .await;
                         return unauthorized_error(resp);
                     }
                 }
             } else {
-                audit_unauthorized_error(audit_message).await;
+                audit_login_failure(audit_message, credential_failure, StatusCode::UNAUTHORIZED)
+                    .await;
                 return unauthorized_error(resp);
             };
             (name, password)
@@ -1065,7 +1138,12 @@ pub async fn get_auth(
             let Some(expiry) =
                 time::OffsetDateTime::now_utc().checked_add(time::Duration::seconds(expires_in))
             else {
-                audit_unauthorized_error(audit_message).await;
+                audit_login_failure(
+                    audit_message,
+                    LoginFailure::InvalidLoginLink,
+                    StatusCode::UNAUTHORIZED,
+                )
+                .await;
                 return unauthorized_error(resp);
             };
             let cookie_name = "auth_tokens";
@@ -1166,6 +1244,18 @@ pub async fn list_roles(Path(_org_id): Path<String>) -> impl IntoResponse {
     axum::Json(roles)
 }
 
+#[cfg(feature = "enterprise")]
+pub(super) fn login_user_agent(headers: &HeaderMap) -> Option<String> {
+    let header = headers.get(header::USER_AGENT)?;
+    let Ok(agent) = header.to_str() else {
+        return None;
+    };
+    if agent.len() > MAX_LOGIN_USER_AGENT_BYTES || agent.chars().any(char::is_control) {
+        return None;
+    }
+    Some(agent.to_string())
+}
+
 fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
     if role.eq(&UserRole::Root)
         || role.eq(&UserRole::ServiceAccount)
@@ -1210,24 +1300,22 @@ fn locked_error(mut resp: SignInResponse, retry_after_secs: i64) -> Response {
 
 #[cfg(feature = "enterprise")]
 async fn audit_unauthorized_error(audit_message: AuditMessage) {
-    audit_login_failure(audit_message, 401).await;
+    audit_login_failure(
+        audit_message,
+        LoginFailure::InvalidCredentials,
+        StatusCode::UNAUTHORIZED,
+    )
+    .await;
 }
 
-/// A lockout is audited under its own status code: an audit trail that reported every refused login
-/// as a 401 would hide the difference between a wrong password and an account under attack.
 #[cfg(feature = "enterprise")]
 async fn audit_locked_error(audit_message: AuditMessage) {
-    audit_login_failure(audit_message, 429).await;
-}
-
-#[cfg(feature = "enterprise")]
-async fn audit_login_failure(mut audit_message: AuditMessage, http_response_code: u16) {
-    use chrono::Utc;
-
-    audit_message._timestamp = Utc::now().timestamp_micros();
-    audit_message.response_meta.http_response_code = http_response_code;
-    // Even if the user_email of audit_message is not set, still the event should be audited
-    audit(audit_message).await;
+    audit_login_failure(
+        audit_message,
+        LoginFailure::AccountLocked,
+        StatusCode::TOO_MANY_REQUESTS,
+    )
+    .await;
 }
 
 /// ListUserInvitations
@@ -1247,7 +1335,7 @@ async fn audit_login_failure(mut audit_message: AuditMessage, http_response_code
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = common::meta::user::UserInviteList),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
@@ -1424,7 +1512,7 @@ mod tests {
             ),
             ("exp_in".to_string(), "abc".to_string()),
         ]);
-        let resp = get_auth(http::HeaderMap::new(), Query(query)).await;
+        let resp = get_auth(http::HeaderMap::new(), None, Query(query)).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 

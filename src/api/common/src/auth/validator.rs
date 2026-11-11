@@ -72,6 +72,8 @@ pub struct RequestData {
 pub enum AuthError {
     Unauthorized(String),
     Forbidden(String),
+    /// A valid credential whose role was refused; `Forbidden` also means a failed credential.
+    RoleRefused(String),
     NotFound(String),
     /// Refused by the failed-login lockout rather than by the credential itself. Only the seconds
     /// left are disclosed: the thresholds behind them stay admin-only, since a brute-forcer who
@@ -87,7 +89,9 @@ impl std::fmt::Display for AuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AuthError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
-            AuthError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
+            AuthError::Forbidden(msg) | AuthError::RoleRefused(msg) => {
+                write!(f, "Forbidden: {}", msg)
+            }
             AuthError::NotFound(msg) => write!(f, "NotFound: {}", msg),
             AuthError::Locked { retry_after_secs } => {
                 write!(f, "Locked: {}", lockout_message(*retry_after_secs))
@@ -125,7 +129,9 @@ impl IntoResponse for AuthError {
                     .body(Body::from(msg))
                     .unwrap()
             }
-            AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg).into_response(),
+            AuthError::Forbidden(msg) | AuthError::RoleRefused(msg) => {
+                (StatusCode::FORBIDDEN, msg).into_response()
+            }
             AuthError::NotFound(msg) => (StatusCode::NOT_FOUND, msg).into_response(),
             // 429 rather than 423: `Retry-After` is canonical on it, and clients and proxies
             // already know to back off rather than retry immediately.
@@ -268,7 +274,7 @@ pub async fn validator(
                         delegation: None,
                     })
                 } else {
-                    Err(AuthError::Forbidden("Unauthorized Access".to_string()))
+                    Err(AuthError::RoleRefused("Unauthorized Access".to_string()))
                 }
             } else {
                 Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -318,6 +324,11 @@ fn is_org_agnostic_path(path: &str) -> bool {
     }
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     matches!(segments.as_slice(), [_org, "password_complexity"])
+}
+
+/// GHSA-29xv-5rx7-5q7v: matching only the last segment let `/{org}/kv/organizations` skip the org.
+fn is_top_level_org_route(path_columns: &[&str]) -> bool {
+    matches!(path_columns, ["organizations"])
 }
 
 /// Compare a password under the lockout policy, recording the attempt.
@@ -602,7 +613,7 @@ pub async fn validate_credentials(
         }
     }
 
-    let mut user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let mut user = if is_top_level_org_route(&path_columns) {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -813,7 +824,7 @@ pub async fn validate_credentials(
             given_name: user.first_name,
         })
     } else {
-        Err(AuthError::Forbidden("Not allowed".to_string()))
+        Err(AuthError::RoleRefused("Not allowed".to_string()))
     }
 }
 
@@ -835,7 +846,7 @@ pub async fn validate_credentials_ext(
         path_columns.pop();
     }
 
-    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let user = if is_top_level_org_route(&path_columns) {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -939,7 +950,7 @@ pub async fn validate_credentials_ext(
             given_name: user.first_name,
         })
     } else {
-        Err(AuthError::Forbidden("Not allowed".to_string()))
+        Err(AuthError::RoleRefused("Not allowed".to_string()))
     }
 }
 
@@ -2455,6 +2466,8 @@ CN5lTowpVXP2OIiiNTGa75Fj
         exercise_empty_password_rejected(org_id).await;
         exercise_saltless_sso_user_refused(org_id).await;
         exercise_path_org_is_the_routed_org().await;
+        exercise_object_named_organizations_stays_in_its_org(org_id).await;
+        exercise_user_path_refusal_is_a_role_refusal(org_id).await;
 
         let static_token = users::get_user(Some(org_id), init_user)
             .await
@@ -2564,6 +2577,66 @@ CN5lTowpVXP2OIiiNTGa75Fj
         db::org_users::add_with_flags(org_id, email, role, token, None, true)
             .await
             .unwrap();
+    }
+
+    // The user lookup ignores case and the email comparison does not, which reaches this refusal.
+    async fn exercise_user_path_refusal_is_a_role_refusal(org_id: &str) {
+        let pwd = "Complexpass#123";
+        let login = "Path-Viewer@example.com";
+        let stored = login.to_lowercase();
+        seed_user_without_password_ext(org_id, &stored, UserRole::Viewer, pwd, "path-viewer").await;
+        let path = "default/stream/traces/user";
+        let refused = validate_credentials(login, pwd, path, None, &Method::GET, false).await;
+        assert!(
+            matches!(&refused, Err(AuthError::RoleRefused(msg)) if msg == "Not allowed"),
+            "a verified non-admin on a /user path: {:?}",
+            refused.map(|res| res.is_valid)
+        );
+        let bad = validate_credentials(login, "wrong", path, None, &Method::GET, false).await;
+        assert!(
+            !bad.unwrap().is_valid,
+            "a bad password stays a failed login"
+        );
+    }
+
+    async fn exercise_object_named_organizations_stays_in_its_org(victim_org: &str) {
+        let pwd = "Complexpass#123";
+        let attacker = "other-org-member@example.com";
+        let _ = organization::check_and_create_org_without_ofga("attacker_org").await;
+        seed_user_without_password_ext("attacker_org", attacker, UserRole::Admin, pwd, "atk-tok")
+            .await;
+        assert!(
+            validate_credentials(
+                attacker,
+                pwd,
+                "attacker_org/kv/organizations",
+                None,
+                &Method::GET,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
+            "a member must still reach its own org"
+        );
+        for (path, method) in [
+            ("kv/organizations", Method::GET),
+            ("kv/organizations", Method::POST),
+            ("alerts/templates/organizations", Method::GET),
+            ("functions/organizations", Method::PUT),
+            ("enrichment_tables/organizations", Method::POST),
+            ("streams/organizations", Method::DELETE),
+            ("organizations", Method::DELETE),
+        ] {
+            let path = format!("{victim_org}/{path}");
+            assert!(
+                !validate_credentials(attacker, pwd, &path, None, &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "GHSA-29xv-5rx7-5q7v: a non-member was accepted on {method} /{path}"
+            );
+        }
     }
 
     // Each URI is what the auth layer sees once axum has stripped its mount.
@@ -3201,16 +3274,17 @@ CN5lTowpVXP2OIiiNTGa75Fj
     }
 
     #[test]
-    fn test_validate_credentials_path_handling() {
-        // Test path handling in validate_credentials
-        let path_columns = ["api", "v1", "organizations"];
-        let last_segment = path_columns.last().unwrap_or(&"");
-        assert_eq!(*last_segment, "organizations");
-
-        // Test path with trailing slash
-        let path_with_slash = ["api", "v1", "logs", ""];
-        let last_segment_with_slash = path_with_slash.last().unwrap_or(&"");
-        assert_eq!(*last_segment_with_slash, "");
+    fn only_the_top_level_org_route_skips_the_path_org() {
+        assert!(is_top_level_org_route(&["organizations"]));
+        for path in [
+            &["acme", "kv", "organizations"][..],
+            &["acme", "alerts", "templates", "organizations"],
+            &["acme", "streams", "organizations"],
+            &["acme", "organizations"],
+            &["_meta", "organizations"],
+        ] {
+            assert!(!is_top_level_org_route(path), "{path:?}");
+        }
     }
 
     #[test]
@@ -3282,6 +3356,40 @@ CN5lTowpVXP2OIiiNTGa75Fj
             Err(AuthError::Unauthorized(msg)) => assert_eq!(msg, "Unauthorized Access"),
             Err(other) => panic!("expected 401, got {other}"),
             Ok(_) => panic!("a forged delegated token was accepted"),
+        }
+    }
+
+    /// The source pins what may reveal a locked license; files outside this list are not read.
+    #[test]
+    fn test_role_refused_sites_are_pinned_with_no_auth_error_after_their_role_check() {
+        const GUARDS: [&str; 2] = ["check_permissions(", "path.contains(\"/user\")"];
+        for (file, source, sites) in [
+            ("validator.rs", include_str!("validator.rs"), 3),
+            ("token.rs", include_str!("token.rs"), 1),
+            ("delegation.rs", include_str!("delegation.rs"), 1),
+        ] {
+            let (production, _) = source
+                .split_once("\n#[cfg(test)]\nmod tests {")
+                .unwrap_or_else(|| panic!("{file}: test module marker moved; update this scan"));
+            let refusals: Vec<usize> = production
+                .match_indices("Err(AuthError::RoleRefused(")
+                .map(|(at, _)| at)
+                .collect();
+            assert_eq!(
+                refusals.len(),
+                sites,
+                "{file}: RoleRefused site count changed; it reveals the license, review each site"
+            );
+            for at in refusals {
+                let before = &production[..at];
+                let guard = GUARDS.iter().filter_map(|g| before.rfind(g)).max();
+                let guard = guard.unwrap_or_else(|| panic!("{file}: no role check before {at}"));
+                assert!(
+                    !before[guard..].contains("AuthError::"),
+                    "{file}: another auth error sits between the role check and RoleRefused: {}",
+                    &before[guard..]
+                );
+            }
         }
     }
 }

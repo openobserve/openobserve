@@ -1093,7 +1093,12 @@ import {
 } from "@/utils/traces/traceServiceGraph";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
-import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
+import {
+  buildFilterTerm,
+  applyFilterTerm,
+  mergeFilterTerm,
+  mergePendingFilters,
+} from "@/utils/traces/filterUtils";
 import { buildPathPatterns, buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
 import type { TreeNode as PatternTreeNode } from "@/composables/useTreeVisualization";
@@ -1658,10 +1663,16 @@ export default defineComponent({
       showFilterPopover.value = true;
     };
 
-    const applyAndViewTraces = () => {
-      searchObj.data.editorValue = searchObj.data.editorValue
-        ? searchObj.data.editorValue + " and " + localEditorValue.value
-        : localEditorValue.value;
+    // A full view opened in a new browser tab starts with the default search mode, so the URL's tab wins.
+    const originSearchTab = (): "traces" | "spans" => {
+      const tab = router.currentRoute.value.query.tab;
+      if (tab === "traces" || tab === "spans") return tab;
+      // Only the traces and spans tabs run a search, so any other tab falls back to spans.
+      return searchObj.meta.searchMode === "traces" ? "traces" : "spans";
+    };
+
+    const viewTracesWithQuery = (editorValue: string) => {
+      searchObj.data.editorValue = editorValue;
       showFilterPopover.value = false;
       localEditorValue.value = "";
       areFiltersAdded.value = false;
@@ -1673,9 +1684,18 @@ export default defineComponent({
         query.from = searchObj.data.datetime.startTime.toString();
         query.to = searchObj.data.datetime.endTime.toString();
       }
-      query.query = b64EncodeUnicode(searchObj.data.editorValue);
+      query.query = b64EncodeUnicode(editorValue);
       query["run-query"] = "true";
+      query.tab = originSearchTab();
       router.push({ name: "traces", query });
+    };
+
+    const applyAndViewTraces = () => {
+      viewTracesWithQuery(
+        searchObj.data.editorValue
+          ? searchObj.data.editorValue + " and " + localEditorValue.value
+          : localEditorValue.value,
+      );
     };
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -3338,6 +3358,7 @@ export default defineComponent({
           start_time: Math.floor(span.start_time / 1000) - 1000000,
           end_time: Math.ceil(span.end_time / 1000) + 1000000,
           event_time: span.rum_date,
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
@@ -3440,9 +3461,9 @@ export default defineComponent({
       operator: "=" | "!=";
     }) => {
       const term = buildFilterTerm(field, value, operator);
-      localEditorValue.value = applyFilterTerm(term, localEditorValue.value);
-      areFiltersAdded.value = true;
-      applyAndViewTraces();
+      // viewTracesWithQuery clears the pending sidebar filters, so they go into the query first.
+      const query = mergePendingFilters(localEditorValue.value, searchObj.data.editorValue ?? "");
+      viewTracesWithQuery(mergeFilterTerm(term, query));
     };
 
     const handleExpandToFullView = () => {
@@ -3452,6 +3473,7 @@ export default defineComponent({
         from: effectiveTimeRange.value.from.toString(),
         to: effectiveTimeRange.value.to.toString(),
         org_identifier: effectiveOrgIdentifier.value,
+        tab: originSearchTab(),
       };
 
       // Add log_stream parameter for correlation navigation

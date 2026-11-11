@@ -9,6 +9,9 @@ import type { TooltipContentProps } from "reka-ui";
 /** Set on every element that owns an OTooltip, so shared tooltips (e.g. OTable's) can avoid doubling it. */
 export const TOOLTIP_TRIGGER_ATTR = "data-o-tooltip-trigger";
 
+/** Set by OButton when clicking it does nothing, so its tooltip may open on click. */
+export const INERT_TRIGGER_ATTR = "data-o2-inert";
+
 /** `TOOLTIP_TRIGGER_ATTR` value of an overflow-only tooltip, which shows only while its element is cut. */
 export const TOOLTIP_TRIGGER_OVERFLOW = "overflow";
 

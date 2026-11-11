@@ -77,7 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTooltip
                 :content="raw(anomalyConfig.last_error)"
-                :disabled="anomalyConfig.status !== 'failed' || !anomalyConfig.last_error"
+                :disabled="
+                  (anomalyConfig.status !== 'failed' &&
+                    !isAnomalyDataReadinessStatus(anomalyConfig.status)) ||
+                  !anomalyConfig.last_error
+                "
               >
                 <OTag
                   v-if="anomalyConfig.status"
@@ -113,6 +117,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="replay"
                 >
                   {{ t("alerts.retry") }}
+                </OButton>
+              </OTooltip>
+              <OTooltip
+                v-else-if="anomalyCanCheckDataNow(anomalyConfig)"
+                :content="t('alerts.anomaly.checkDataNowTooltip')"
+              >
+                <OButton
+                  variant="ghost"
+                  size="xs"
+                  :loading="anomalyRetraining"
+                  data-test="anomaly-check-data-now"
+                  @click="anomalyTriggerRetrain"
+                  icon-left="replay"
+                >
+                  {{ t("alerts.anomaly.checkDataNow") }}
                 </OButton>
               </OTooltip>
             </div>
@@ -659,7 +678,11 @@ import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import { useAlertForm, defaultAlertValue, type AlertFormEmit } from "@/composables/useAlertForm";
 import { useAlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
-import { anomalyNoticeBadgeKeys } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
+import {
+  anomalyNoticeBadgeKeys,
+  anomalyCanCheckDataNow,
+  isAnomalyDataReadinessStatus,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -1058,6 +1081,8 @@ export default defineComponent({
       isAnomalyDetectionEnabled,
       anomalyNoticeBadge,
       anomalyNoticeTooltip,
+      isAnomalyDataReadinessStatus,
+      anomalyCanCheckDataNow,
       alertTypeOptions,
       anomalyLockedReason,
       alertTabs,

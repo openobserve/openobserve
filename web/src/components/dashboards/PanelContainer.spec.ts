@@ -374,6 +374,49 @@ describe("PanelContainer", () => {
 
       expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(false);
     });
+
+    describe("inline description info beside the title", () => {
+      const inlineInfo = '[data-test="dashboard-panel-title-description-info"]';
+
+      it("renders right after the title in the simplified view when a description exists", () => {
+        // The real tooltip only mounts its content slot once opened.
+        const OTooltip = { name: "OTooltip", template: "<div><slot name='content' /></div>" };
+        wrapper = createWrapper({ simplifiedPanelView: true }, { OTooltip });
+
+        const info = wrapper.find(inlineInfo);
+        expect(info.exists()).toBe(true);
+        expect(info.attributes("aria-label")).toBe("Description");
+        const header = wrapper.find('[data-test="dashboard-panel-header"]');
+        expect(header.element.nextElementSibling).toBe(info.element);
+        expect(info.text()).toContain("Test panel description");
+      });
+
+      it.each([
+        ["empty", ""],
+        ["missing", undefined],
+      ])("is not rendered when the description is %s", (_label, description) => {
+        wrapper = createWrapper({
+          simplifiedPanelView: true,
+          data: { ...mockPanelData, description },
+        });
+
+        expect(wrapper.find(inlineInfo).exists()).toBe(false);
+      });
+
+      it("is not rendered outside the simplified view, where the header-end info covers it", async () => {
+        wrapper = createWrapper({ simplifiedPanelView: false });
+        await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
+
+        expect(wrapper.find(inlineInfo).exists()).toBe(false);
+        expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(true);
+      });
+
+      it("is not rendered in view-only mode", () => {
+        wrapper = createWrapper({ simplifiedPanelView: true, viewOnly: true });
+
+        expect(wrapper.find(inlineInfo).exists()).toBe(false);
+      });
+    });
   });
 
   describe("Panel Controls", () => {
@@ -2886,7 +2929,7 @@ describe("PanelContainer", () => {
       },
     });
 
-    it("shows a quiet indicator naming the failed source while the panel still renders", async () => {
+    it("shows a focusable indicator naming the failed source while the panel still renders", async () => {
       wrapper = createWrapper({}, rendererWithFailures(["Incidents"]));
       await flushPromises();
       const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-error"]');
@@ -2894,7 +2937,7 @@ describe("PanelContainer", () => {
       expect(indicator.attributes("aria-label")).toBe(
         "Annotation source Incidents failed to load. Panel data is unaffected.",
       );
-      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.element.tagName).toBe("BUTTON");
       expect(indicator.attributes("aria-hidden")).toBeUndefined();
       expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
     });
@@ -2917,7 +2960,7 @@ describe("PanelContainer", () => {
       },
     });
 
-    it("shows a quiet indicator naming a source showing only its latest 500 markers", async () => {
+    it("shows a focusable indicator naming a source showing only its latest 500 markers", async () => {
       wrapper = createWrapper({}, rendererWithTruncation(["Incidents"]));
       await flushPromises();
       const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-truncated"]');
@@ -2925,7 +2968,7 @@ describe("PanelContainer", () => {
       expect(indicator.attributes("aria-label")).toBe(
         "Annotation source Incidents is showing only the latest 500 markers in this range.",
       );
-      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.element.tagName).toBe("BUTTON");
       expect(indicator.attributes("aria-hidden")).toBeUndefined();
       expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
     });

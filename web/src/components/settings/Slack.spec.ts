@@ -29,11 +29,12 @@ import {
   makeSlackStore,
   ok,
 } from "@/test/unit/helpers/slack";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 
 vi.mock("@/services/slack", () => ({
-  default: { listInstallations: vi.fn(), getPrerequisites: vi.fn() },
+  default: { listInstallations: vi.fn(), getPrerequisites: vi.fn(), listOncallUnlinked: vi.fn() },
 }));
 
 const stub = (name: string, props: string[] = []) => ({
@@ -48,7 +49,8 @@ const STUBS = {
   SlackWorkspaceCard: {
     name: "SlackWorkspaceCard",
     props: ["installation", "isCloud"],
-    template: '<div data-test-stub="SlackWorkspaceCard"><slot /></div>',
+    template:
+      '<div data-test-stub="SlackWorkspaceCard"><slot name="oncall" /><div data-test-stub="card-sections"><slot /></div></div>',
   },
   SlackLinkingSection: stub("SlackLinkingSection", ["installation"]),
   SlackChannelDefaults: stub("SlackChannelDefaults", ["installationId"]),
@@ -80,6 +82,7 @@ beforeEach(() => {
   vi.mocked(slack.listInstallations).mockReturnValue(
     ok({ installations: [], available: [] }) as any,
   );
+  vi.mocked(slack.listOncallUnlinked).mockResolvedValue(axiosReply({ members: [] }));
 });
 
 afterEach(() => {
@@ -124,6 +127,37 @@ describe("Slack settings: enabled", () => {
     expect(card.props("installation")).toMatchObject({ id: "inst-1" });
     const html = w.html();
     expect(html.indexOf("SlackSwitchAllCard")).toBeLessThan(html.indexOf("SlackWorkspaceCard"));
+  });
+
+  it("puts the on-call unlinked people in the card's on-call slot, above its other sections", async () => {
+    vi.mocked(slack.listInstallations).mockResolvedValue(
+      axiosReply({ installations: [installationView()] }),
+    );
+    vi.mocked(slack.listOncallUnlinked).mockResolvedValue(
+      axiosReply({
+        members: [
+          {
+            email: "kim@acme.io",
+            team_id: "t1",
+            team_name: "Payments",
+            next_shift_at: null,
+            reminded_at: null,
+          },
+        ],
+      }),
+    );
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    const card = w.find('[data-test-stub="SlackWorkspaceCard"]');
+    const unlinked = card.find('[data-test="slack-oncall-unlinked"]');
+    expect(unlinked.exists()).toBe(true);
+    expect(
+      card
+        .find('[data-test-stub="card-sections"]')
+        .find('[data-test="slack-oncall-unlinked"]')
+        .exists(),
+    ).toBe(false);
+    expect(slack.listOncallUnlinked).toHaveBeenCalledWith("acme", "inst-1");
   });
 
   it("shows a retryable load error for any other failure", async () => {

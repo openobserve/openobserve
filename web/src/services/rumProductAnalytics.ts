@@ -15,6 +15,7 @@
 
 import type { AxiosResponse } from "axios";
 import http from "./http";
+import analytics from "./product_analytics";
 import type {
   AppSettings,
   NamedRule,
@@ -45,21 +46,42 @@ const funnels = (org: string, id?: string) =>
   `${base(org)}/funnels${id ? `/${encodeURIComponent(id)}` : ""}`;
 // An app name is free text up to 256 characters and may hold "/", so it never goes in the path.
 const inApp = (app: string) => ({ params: { app } });
+const funnelSteps = (body: SavedFunnelBody) => (Array.isArray(body.def.s) ? body.def.s.length : 0);
 
 const rumProductAnalytics = {
   listEvents: (org: string, app: string): Promise<Rows> => http().get(events(org), inApp(app)),
   getEvent: (org: string, app: string, id: string): Promise<AxiosResponse<unknown>> =>
     http().get(events(org, id), inApp(app)),
   createEvent: (org: string, app: string, body: NamedEventBody): Promise<AxiosResponse<unknown>> =>
-    http().post(events(org), body, inApp(app)),
+    http()
+      .post(events(org), body, inApp(app))
+      .then((res) => {
+        analytics.track("rum_named_event_created", {
+          rules: body.rules.length,
+        });
+        return res;
+      }),
   updateEvent: (
     org: string,
     app: string,
     id: string,
     body: Versioned<NamedEventBody>,
-  ): Promise<AxiosResponse<unknown>> => http().put(events(org, id), body, inApp(app)),
+  ): Promise<AxiosResponse<unknown>> =>
+    http()
+      .put(events(org, id), body, inApp(app))
+      .then((res) => {
+        analytics.track("rum_named_event_updated", {
+          rules: body.rules.length,
+        });
+        return res;
+      }),
   deleteEvent: (org: string, app: string, id: string, force = false): Promise<AxiosResponse> =>
-    http().delete(events(org, id), force ? { params: { app, force: true } } : inApp(app)),
+    http()
+      .delete(events(org, id), force ? { params: { app, force: true } } : inApp(app))
+      .then((res) => {
+        analytics.track("rum_named_event_deleted", { force });
+        return res;
+      }),
   eventUsages: (
     org: string,
     app: string,
@@ -78,22 +100,53 @@ const rumProductAnalytics = {
     org: string,
     app: string,
     body: SavedFunnelBody,
-  ): Promise<AxiosResponse<unknown>> => http().post(funnels(org), body, inApp(app)),
+  ): Promise<AxiosResponse<unknown>> =>
+    http()
+      .post(funnels(org), body, inApp(app))
+      .then((res) => {
+        analytics.track("rum_funnel_saved", {
+          steps: funnelSteps(body),
+        });
+        return res;
+      }),
   updateFunnel: (
     org: string,
     app: string,
     id: string,
     body: Versioned<SavedFunnelBody>,
-  ): Promise<AxiosResponse<unknown>> => http().put(funnels(org, id), body, inApp(app)),
+  ): Promise<AxiosResponse<unknown>> =>
+    http()
+      .put(funnels(org, id), body, inApp(app))
+      .then((res) => {
+        analytics.track("rum_funnel_updated", {
+          steps: funnelSteps(body),
+        });
+        return res;
+      }),
   deleteFunnel: (org: string, app: string, id: string): Promise<AxiosResponse> =>
-    http().delete(funnels(org, id), inApp(app)),
+    http()
+      .delete(funnels(org, id), inApp(app))
+      .then((res) => {
+        analytics.track("rum_funnel_deleted");
+        return res;
+      }),
   getAppSettings: (org: string, app: string): Promise<AxiosResponse<AppSettings>> =>
     http().get(`${base(org)}/settings`, inApp(app)),
   putAppSettings: (
     org: string,
     app: string,
     body: PutAppSettingsBody,
-  ): Promise<AxiosResponse<AppSettings>> => http().put(`${base(org)}/settings`, body, inApp(app)),
+  ): Promise<AxiosResponse<AppSettings>> =>
+    http()
+      .put(`${base(org)}/settings`, body, inApp(app))
+      .then((res) => {
+        analytics.track("rum_app_settings_updated", {
+          bots: body.bots,
+          session_rules: body.sessions.length,
+          page_rules: body.pages.length,
+        });
+        return res;
+      }),
 };
 
 export default rumProductAnalytics;

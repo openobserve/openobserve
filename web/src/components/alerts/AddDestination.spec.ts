@@ -146,7 +146,7 @@ function mountComp(props: Record<string, any> = {}) {
         DestinationPreview: {
           name: "DestinationPreview",
           template: '<div data-test="destination-preview-stub"></div>',
-          props: ["modelValue", "type", "templateContent", "recipients"],
+          props: ["modelValue", "type", "templateContent", "recipients", "showBody"],
         },
         AppTabs: {
           template: '<div data-test="app-tabs-stub"></div>',
@@ -258,7 +258,64 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
         template: "tmpl1",
         headers: { H1: "V1" },
         name: "dest1",
+        metadata: {},
       },
+    });
+  });
+
+  it("shows the payload format select on a generic webhook and saves it as metadata", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toCustomHttp(wrapper);
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(true);
+    form.setFieldValue("name", "dest1");
+    form.setFieldValue("url", "https://example.com/webhook");
+    form.setFieldValue("template", "tmpl1");
+    form.setFieldValue("payload_format", "legacy");
+    await nextTick();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect((destinationService.create as any).mock.calls[0][0].data.metadata).toEqual({
+      payload_format: "legacy",
+    });
+  });
+
+  it("hides the payload format select on email and Slack destinations", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toCustomHttp(wrapper);
+    form.setFieldValue("type", "email");
+    await nextTick();
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(false);
+    form.setFieldValue("type", "http");
+    form.setFieldValue("destination_type", "slack");
+    await nextTick();
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(false);
+  });
+
+  it("an edit reads the stored payload format and automatic removes only that key", async () => {
+    wrapper = mountComp({
+      isAlerts: true,
+      destination: {
+        name: "hook",
+        url: "https://example.com/webhook",
+        method: "post",
+        type: "http",
+        template: "tmpl1",
+        metadata: { payload_format: "rendered", team: "ops" },
+      },
+    });
+    await flushPromises();
+    const form = getForm(wrapper);
+    expect(form.state.values.payload_format).toBe("rendered");
+
+    form.setFieldValue("payload_format", "auto");
+    await nextTick();
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect((destinationService.update as any).mock.calls[0][0].data.metadata).toEqual({
+      team: "ops",
     });
   });
 
@@ -790,6 +847,145 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
       },
     );
     expect(hoisted.mockCreatePrebuilt).not.toHaveBeenCalled();
+  });
+
+  it("preview: a picked prebuilt_default renders its own body, the channel default keeps the mockup", async () => {
+    hoisted.mockRenderTemplateBody.mockResolvedValue('{"text": "unified"}');
+    hoisted.mockGeneratePreview.mockResolvedValue("channel body");
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toValidSlack(wrapper);
+    const previewBtn = '[data-test="destination-preview-button"]';
+    const preview = wrapper.findComponent({ name: "DestinationPreview" });
+
+    form.setFieldValue("template", "prebuilt_default");
+    await nextTick();
+    await wrapper.find(previewBtn).trigger("click");
+    await flushPromises();
+
+    expect(hoisted.mockRenderTemplateBody).toHaveBeenCalledWith("prebuilt_default", {
+      type: "slack",
+      credentials: { webhookUrl: VALID_SLACK, channel: "alerts" },
+    });
+    expect(hoisted.mockGeneratePreview).not.toHaveBeenCalled();
+    expect(preview.props("templateContent")).toBe('{"text": "unified"}');
+    expect(preview.props("showBody")).toBe(true);
+
+    vi.clearAllMocks();
+    hoisted.mockGeneratePreview.mockResolvedValue("channel body");
+    form.setFieldValue("template", "prebuilt_slack");
+    await nextTick();
+    await wrapper.find(previewBtn).trigger("click");
+    await flushPromises();
+
+    expect(hoisted.mockGeneratePreview).toHaveBeenCalledTimes(1);
+    expect(hoisted.mockRenderTemplateBody).not.toHaveBeenCalled();
+    expect(preview.props("showBody")).toBe(false);
+  });
+
+  it("test: a picked prebuilt_default goes to testDestination, the channel default does not", async () => {
+    hoisted.mockTestPrebuilt.mockResolvedValue({ success: true });
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toValidSlack(wrapper);
+    const testBtn = '[data-test="destination-test-button"]';
+    const credentials = { webhookUrl: VALID_SLACK, channel: "alerts" };
+
+    form.setFieldValue("template", "prebuilt_default");
+    await nextTick();
+    await wrapper.find(testBtn).trigger("click");
+    await flushPromises();
+    expect(hoisted.mockTestPrebuilt).toHaveBeenLastCalledWith(
+      "slack",
+      credentials,
+      "prebuilt_default",
+    );
+
+    form.setFieldValue("template", "prebuilt_slack");
+    await nextTick();
+    await wrapper.find(testBtn).trigger("click");
+    await flushPromises();
+    expect(hoisted.mockTestPrebuilt).toHaveBeenLastCalledWith("slack", credentials, undefined);
+  });
+
+  it("create: sends a picked prebuilt_default as the template override", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toValidSlack(wrapper);
+    form.setFieldValue("template", "prebuilt_default");
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockCreatePrebuilt).toHaveBeenCalledTimes(1);
+    expect(hoisted.mockCreatePrebuilt.mock.calls[0][5]).toBe("prebuilt_default");
+  });
+
+  it("EDIT mode: a saved prebuilt_default survives the update", async () => {
+    wrapper = mountComp({
+      isAlerts: true,
+      destination: {
+        name: "old-slack",
+        url: VALID_SLACK,
+        type: "http",
+        method: "post",
+        destination_type_name: "slack",
+        template: "prebuilt_default",
+        skip_tls_verify: false,
+        headers: {},
+        metadata: { prebuilt_type: "slack", credential_channel: "#ops" },
+      } as any,
+    });
+    await flushPromises();
+    const form = getForm(wrapper);
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockUpdatePrebuilt).toHaveBeenCalledTimes(1);
+    expect(hoisted.mockUpdatePrebuilt.mock.calls[0][6]).toBe("prebuilt_default");
+  });
+
+  it("email: prebuilt_default survives create, and a saved one reopens as custom and keeps it", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    let form = getForm(wrapper);
+    form.setFieldValue("destination_type", "email");
+    form.setFieldValue("type", "email");
+    form.setFieldValue("name", "ops-mail");
+    form.setFieldValue("credentials", { recipients: ["ops@acme.co"] });
+    form.setFieldValue("template", "prebuilt_default");
+    await flushPromises();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockCreatePrebuilt).toHaveBeenCalledTimes(1);
+    expect(hoisted.mockCreatePrebuilt.mock.calls[0][0]).toBe("email");
+    expect(hoisted.mockCreatePrebuilt.mock.calls[0][5]).toBe("prebuilt_default");
+    wrapper.unmount();
+
+    wrapper = mountComp({
+      isAlerts: true,
+      templates: [
+        { name: "prebuilt_default", type: "http", kind: "content", isPrebuilt: true, body: "" },
+      ],
+      destination: {
+        name: "ops-mail",
+        type: "email",
+        emails: ["ops@acme.co"],
+        template: "prebuilt_default",
+        metadata: {},
+      } as any,
+    });
+    await flushPromises();
+    form = getForm(wrapper);
+    expect(form.state.values.destination_type).toBe("custom");
+    expect(wrapper.vm.getFormattedTemplates).toContain("prebuilt_default");
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockUpdatePrebuilt).not.toHaveBeenCalled();
+    const saved = (destinationService.update as any).mock.calls[0][0].data;
+    expect(saved.template).toBe("prebuilt_default");
+    expect(saved.emails).toEqual(["ops@acme.co"]);
   });
 
   it("EDIT mode: a custom webhook to a ServiceNow URL stays custom and keeps its token header", async () => {
@@ -1677,6 +1873,7 @@ describe("AddDestination — email destinations", () => {
     await toPrebuiltEmail(wrapper);
     expect(wrapper.vm.prebuiltTemplateOptions.map((o: any) => o.value)).toEqual([
       "prebuilt_email",
+      "prebuilt_default",
       "email_tpl",
       "content_tpl",
     ]);
