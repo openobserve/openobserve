@@ -41,6 +41,10 @@ use {
     },
     o2_enterprise::enterprise::cloud::{
         billings::{MeteringProvider, SubscriptionType},
+        contracts::{
+            admin::{contract_sync_status, sync_and_reconcile_org},
+            sync_active,
+        },
         list_customer_billings,
     },
     svix_ksuid::KsuidLike,
@@ -949,6 +953,95 @@ pub async fn set_paid_overage_status(
     }
 }
 
+#[cfg(feature = "cloud")]
+fn external_contract_gone(sync_active: bool) -> Option<Response> {
+    sync_active.then(|| {
+        (
+            StatusCode::GONE,
+            Json(MetaHttpResponse::error(
+                StatusCode::GONE,
+                "external contracts are managed in the license server; use contract sync",
+            )),
+        )
+            .into_response()
+    })
+}
+
+/// SyncOrgContract
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/contracts/{target_org_id}/sync",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "SyncOrgContract",
+    summary = "Sync an organization's contracts from the license server",
+    description = "Fetches the organization's contracts, applies them, and returns what was stored and the result.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Meta organization id"),
+        ("target_org_id" = String, Path, description = "Target organization id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn sync_org_contract(Path((org_id, target_org_id)): Path<(String, String)>) -> Response {
+    if org_id != "_meta" {
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+    if !sync_active() {
+        return MetaHttpResponse::bad_request("contract sync is off on this cluster");
+    }
+
+    let now = chrono::Utc::now().timestamp_micros();
+    match sync_and_reconcile_org(&target_org_id, now).await {
+        Ok(result) => MetaHttpResponse::json(result),
+        Err(e) => {
+            log::error!("[CONTRACTS] sync of org {target_org_id} failed: {e:#}");
+            MetaHttpResponse::internal_error(format!("{e:#}"))
+        }
+    }
+}
+
+/// GetContractSyncStatus
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/contracts/status",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetContractSyncStatus",
+    summary = "Get the state of contract sync",
+    description = "Returns whether contract sync is on, the last successful sync, the last error, and the contracts that are not applied.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Meta organization id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn get_contract_sync_status(Path(org_id): Path<String>) -> Response {
+    if org_id != "_meta" {
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+    match contract_sync_status().await {
+        Ok(status) => MetaHttpResponse::json(status),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
 /// CreateExternalContract
 #[cfg(feature = "cloud")]
 #[utoipa::path(
@@ -980,6 +1073,9 @@ pub async fn create_external_contract(
 
     if org_id != "_meta" {
         return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+    if let Some(gone) = external_contract_gone(sync_active()) {
+        return gone;
     }
 
     // Validate the target org exists
@@ -1100,6 +1196,9 @@ pub async fn extend_external_contract(
     if org_id != "_meta" {
         return MetaHttpResponse::unauthorized("not authorized to access this resource");
     }
+    if let Some(gone) = external_contract_gone(sync_active()) {
+        return gone;
+    }
 
     let mut billing = match o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(
         &req.org_id,
@@ -1170,6 +1269,9 @@ pub async fn revoke_external_contract(
 ) -> Response {
     if org_id != "_meta" {
         return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+    if let Some(gone) = external_contract_gone(sync_active()) {
+        return gone;
     }
 
     // Verify the org has an external contract before deleting
@@ -2112,6 +2214,25 @@ mod tests {
         assert!(super::may_retry_cleanup("admin@retry-rule.test", target).await);
         assert!(!super::may_retry_cleanup("editor@retry-rule.test", target).await);
         assert!(!super::may_retry_cleanup("other-admin@retry-rule.test", target).await);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn old_contract_routes_are_gone_only_while_sync_is_on() {
+        assert_eq!(
+            external_contract_gone(true).unwrap().status(),
+            StatusCode::GONE
+        );
+        assert!(external_contract_gone(false).is_none());
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn contract_sync_routes_refuse_any_org_but_meta() {
+        let sync = sync_org_contract(Path(("acme".to_string(), "target".to_string()))).await;
+        assert_eq!(sync.status(), StatusCode::FORBIDDEN);
+        let status = get_contract_sync_status(Path("acme".to_string())).await;
+        assert_eq!(status.status(), StatusCode::FORBIDDEN);
     }
 
     #[cfg(feature = "cloud")]

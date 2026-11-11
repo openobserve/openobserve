@@ -2279,6 +2279,14 @@ pub fn service_routes() -> Router {
                 delete(organization::org::revoke_external_contract),
             )
             .route(
+                "/{org_id}/contracts/{target_org_id}/sync",
+                post(organization::org::sync_org_contract),
+            )
+            .route(
+                "/{org_id}/contracts/status",
+                get(organization::org::get_contract_sync_status),
+            )
+            .route(
                 "/{org_id}/aws-marketplace/link-subscription",
                 post(cloud::aws_marketplace::link_subscription),
             )
