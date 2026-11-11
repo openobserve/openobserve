@@ -618,7 +618,6 @@
     "actual_folder": "Onboarding",
     "browser": "chrome",
     "run_files": [
-      "empty-pages-flag-off.spec.js",
       "first-data-notice.spec.js",
       "legacy-pages.spec.js",
       "token-picker.spec.js"
