@@ -310,6 +310,24 @@ describe("CreateProtocolCheck", () => {
       expect(callArgs[1]).toBe("edit-id-123");
     });
 
+    // B5: the save sent null for the hidden override, so the local name is dropped too.
+    it("drops a hidden override from the form after a save with no destination", async () => {
+      mockToast.mockReturnValue(() => {});
+      wrapper = mountPage("http");
+      await flushPromises();
+      const configure = wrapper.findComponent({ name: "CheckConfigure" });
+      await configure.vm.$emit("update:check", {
+        ...configure.props("check"),
+        template: "ops-card",
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceCreate).toHaveBeenCalledTimes(1);
+      expect(configure.props("check").template).toBeNull();
+    });
+
     // B1: the picker shows the server's template refusal through validationErrors.template.
     it("puts a refused template's reason under the picker and clears it on a new pick", async () => {
       // The loading toast's dismiss runs in the catch, so the mock must return one.

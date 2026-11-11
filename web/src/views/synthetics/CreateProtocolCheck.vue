@@ -402,6 +402,8 @@ async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
     message: t("synthetics.newCheck.saving"),
     timeout: 0,
   });
+  // A refusal names the template sent; a pick made during the request is not the one refused.
+  const submittedTemplate = check.value.template ?? null;
   try {
     const payload = buildCreateProtocolCheckPayload(check.value);
     if (props.editId) {
@@ -417,13 +419,17 @@ async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
+    // With no destination the payload sent a null template, so the hidden name must not come back.
+    if (!check.value.notifications.destinations.length && check.value.template) {
+      check.value = { ...check.value, template: null };
+    }
     isDirty.value = false;
     return "saved";
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) return "missing";
     const templateError = templateBindingError(err);
-    if (templateError)
+    if (templateError && (check.value.template ?? null) === submittedTemplate)
       validationErrors.value = { ...validationErrors.value, template: templateError };
     toast({
       variant: "error",

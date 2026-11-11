@@ -823,8 +823,9 @@ const templateEnabled = computed(() => webhookEnabled.value || roomDestinations.
 
 // A hidden picker clears the override on save, but only once the room is known to be empty:
 // a pending or failed team channel read must not drop a template the user cannot see.
+// An unsaved channel change also keeps it: the channel is written after the policy and can fail.
 const templateConfirmedOff = computed(
-  () => !templateEnabled.value && teamChannelRead.value === "loaded",
+  () => !templateEnabled.value && teamChannelRead.value === "loaded" && !teamChannelDirty.value,
 );
 
 /// The server's refusal of the picked template, shown under the picker until the pick changes.
@@ -852,18 +853,23 @@ function usePolicyChannel() {
 }
 
 // Uncached read-modify-write: a stale entry would seed the draft and be saved back.
+// Each read gets a number, so a slower earlier read cannot overwrite a newer one.
+let teamChannelReadId = 0;
 async function fetchTeamChannel() {
+  const readId = ++teamChannelReadId;
   teamChannelRead.value = "pending";
   try {
     const res = await oncallService.getTeamChannel({
       org_identifier: orgId.value,
       team_id: props.teamId,
     });
+    if (readId !== teamChannelReadId) return;
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     channelBackToPolicy.value = false;
     teamChannelRead.value = "loaded";
   } catch (err) {
+    if (readId !== teamChannelReadId) return;
     noteDenial(err);
     teamChannel.value = null;
     teamChannelRead.value = "failed";
@@ -1302,6 +1308,8 @@ async function save(): Promise<boolean> {
     return false;
   }
   saving.value = true;
+  // A refusal names the template sent; a pick made during the request is not the one refused.
+  const submittedTemplate = templateOverride.value;
   try {
     await savePolicyWrite.mutateAsync({
       rungs: draft.value,
@@ -1319,7 +1327,8 @@ async function save(): Promise<boolean> {
     return true;
   } catch (err: unknown) {
     noteConfigurationDenied(err);
-    templateError.value = templateBindingError(err);
+    if (templateOverride.value === submittedTemplate)
+      templateError.value = templateBindingError(err);
     toast({
       variant: "error",
       message: raw(serverMessageOf(err)) || t("oncall.savePolicyFailed"),

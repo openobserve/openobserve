@@ -1093,6 +1093,8 @@ async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean>
     message: t("synthetics.newCheck.saving"),
     timeout: 0,
   });
+  // A refusal names the template sent; a pick made during the request is not the one refused.
+  const submittedTemplate = check.value.template ?? null;
   try {
     if (props.editId) {
       await saveMonitor.mutateAsync({
@@ -1111,6 +1113,10 @@ async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean>
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
     isDirty.value = false;
+    // With no destination the payload sent a null template, so the hidden name must not come back.
+    if (!check.value.notifications.destinations.length && check.value.template) {
+      check.value = { ...check.value, template: null };
+    }
     savedCheck.value = cloneDeep(check.value);
     if (props.editId && after === "stay") await refreshServerCheck(props.editId);
     browserDraft.markSaved();
@@ -1130,8 +1136,11 @@ async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean>
     if (mapReferencedSaveConflict(err)) return false;
     if (mapCompositionSaveError(err)) return false;
     const templateError = templateBindingError(err);
-    if (templateError)
+    if (templateError && (check.value.template ?? null) === submittedTemplate) {
       validationErrors.value = { ...validationErrors.value, template: templateError };
+      // The picker is on Configure; Journey cannot reach an unfinished step.
+      currentStep.value = 2;
+    }
     toast({
       variant: "error",
       message: err?.response?.data?.message || t("synthetics.newCheck.saveFailed"),

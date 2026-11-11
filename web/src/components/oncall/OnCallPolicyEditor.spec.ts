@@ -873,6 +873,39 @@ describe("OnCallPolicyEditor", () => {
         expect((await saveWith(wrapper)).template).toBe("ops-card");
       });
 
+      it("keeps the override while the room is emptied by an unsaved channel change", async () => {
+        service.getTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+        } as any);
+        service.setTeamChannel.mockResolvedValue({
+          data: { team_id: "team_1", destinations: [], source: "team" },
+        } as any);
+        const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
+        await flushPromises();
+        const channelSelect = wrapper
+          .findAllComponents({ name: "OSelect" })
+          .find((c) => c.attributes("data-test") === "oncall-team-channel-select");
+        await channelSelect!.vm.$emit("update:modelValue", []);
+        await flushPromises();
+        expect(wrapper.find('[data-test="oncall-policy-template"]').exists()).toBe(false);
+        expect((await saveWith(wrapper)).template).toBe("ops-card");
+      });
+
+      it("ignores an older team channel read that lands after a newer one", async () => {
+        let resolveFirst: (v: any) => void = () => {};
+        service.getTeamChannel
+          .mockReturnValueOnce(new Promise((r) => (resolveFirst = r)) as any)
+          .mockReturnValueOnce(new Promise(() => {}) as any);
+        const wrapper = mountWithPicker({ ...policy, template: "ops-card" });
+        await flushPromises();
+        await wrapper.setProps({ open: false });
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+        resolveFirst({ data: { team_id: "team_1", destinations: [], source: "team" } });
+        await flushPromises();
+        expect((await saveWith(wrapper)).template).toBe("ops-card");
+      });
+
       // B1: the server's binding refusal shows under the picker until the pick changes.
       it("passes a refused template's reason to the picker and clears it on a new pick", async () => {
         service.getTeamChannel.mockResolvedValue({
