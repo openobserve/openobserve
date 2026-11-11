@@ -400,7 +400,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_panel_notices_/                       // panelNotices.spec.js (high-cardinality series-cap streams)
       ],
       // Protected streams to never delete
-      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
+      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json', 'triggers'] // triggers = server alert-history stream, matches the 8-9 letter pattern
     );
 
     // Clean up TRACES streams created by the traces SDR suite (sdr_traces_* — one
