@@ -5,6 +5,8 @@ export interface RefreshButtonProps {
   lastRunAt?: number | null;
   /** Mirrors the page's loading state to spin the icon and disable the button */
   loading?: boolean;
+  /** `false` keeps the button busy but static, for a region whose ORegionStatus already spins. */
+  spinner?: boolean;
   /** Disables the button independently of loading */
   disabled?: boolean;
   /** Reload icon-button style. `outline` draws a border; default is borderless `ghost`. */
@@ -19,6 +21,14 @@ export interface RefreshButtonProps {
   tooltip?: I18nText;
   /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill; `header` gives the inline button the height of `sm` header buttons. */
   size?: "toolbar" | "inset" | "header";
+  /** `clock` shows "Updated hh:mm" with the zone in the tooltip and name; `relative` (default) shows "12s ago". */
+  ageFormat?: "relative" | "clock";
+  /** IANA zone for clock times; the app's selected zone when absent. */
+  timeZone?: string;
+  /** Epoch ms of a failed refresh; set, the age turns into the red failed-refresh sentence and the button reads Retry. */
+  failedAt?: number | null;
+  /** Epoch ms of the data still shown after a failed refresh; defaults to `lastRunAt`. */
+  dataFrom?: number | null;
 }
 
 export interface RefreshButtonEmits {

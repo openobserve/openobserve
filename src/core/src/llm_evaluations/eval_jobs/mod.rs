@@ -225,6 +225,8 @@ pub async fn prepare_new_job(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    job.validate_operator_values()
+        .map_err(EvalJobError::InvalidJob)?;
     validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
     Ok(job)
@@ -274,6 +276,8 @@ pub async fn prepare_job_update(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    job.validate_operator_values()
+        .map_err(EvalJobError::InvalidJob)?;
     validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
     if existing.status == "active" {

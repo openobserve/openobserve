@@ -772,6 +772,13 @@
     }
   },
   "common": {
+    "loadingNoun": "Loading {noun}…",
+    "loadingNouns": {
+      "spans": "spans",
+      "traces": "traces",
+      "logs": "logs",
+      "charts": "charts"
+    },
     "dismiss": "Dismiss",
     "exitFullscreen": "Exit full screen",
     "moreActions": "More actions",
@@ -1050,6 +1057,7 @@
       "redirecting": "Redirecting..."
     },
     "copied": "Copied",
+    "couldntCopy": "Couldn't copy",
     "copiedExclaim": "Copied!",
     "clearAll": "Clear All",
     "unknown": "Unknown",
@@ -1241,6 +1249,98 @@
       "leaveMessageInBrowser": "Save the {entity}, keep your changes in this browser, or discard them.",
       "retentionInBrowser": "Changes are kept in this browser for {days} days, or until you sign out. Only the {max} newest of each kind are kept.",
       "dotUndated": "Unsaved draft"
+    }
+  },
+  "filterBar": {
+    "ariaLabel": "Filter by field",
+    "placeholder": "Filter by field, or type field=value. Press Enter to run",
+    "addFilter": "Add filter",
+    "searchFields": "Search fields",
+    "searchLabels": "Search labels",
+    "searchOperators": "Search conditions",
+    "searchValue": "Search or type a value",
+    "searchValues": "Search values",
+    "textField": "Text",
+    "useValue": "Use \"{value}\"",
+    "useField": "Use field \"{field}\"",
+    "useLabel": "Use label \"{field}\"",
+    "searchText": "Search all text for \"{text}\"",
+    "emptyValue": "(empty)",
+    "loadingFields": "Loading fields…",
+    "noFields": "No matching fields",
+    "noValues": "No suggestions. Type a value and press Enter",
+    "noOperators": "No matching conditions",
+    "removeFilter": "Remove filter",
+    "clearAll": "Clear all filters",
+    "toggleConnector": "Switch between AND and OR",
+    "selectedCount": "No values selected | {count} value selected | {count} values selected",
+    "query": "Query",
+    "builderTooltip": "Build filters by picking fields, conditions and values",
+    "queryTooltip": "Write the query yourself",
+    "queryNotParsableShort": "The builder can't show this query:",
+    "clearAndBuild": "Clear and build",
+    "where": "Where",
+    "addCondition": "Add condition",
+    "addGroup": "Add group",
+    "startGroup": "Start a group",
+    "addBelow": "Add condition below",
+    "ungroup": "Ungroup",
+    "collapseGroup": "Collapse group",
+    "expandGroup": "Expand group",
+    "moreInGroup": "{count} more",
+    "groupHasIssues": "Something in this group needs fixing",
+    "chooseField": "Choose a field",
+    "chooseValue": "Choose a value",
+    "lockedFilter": "This filter can't be edited here. It is kept as saved; remove it to drop it",
+    "limits": {
+      "conditions": "Up to {count} filter | Up to {count} filters",
+      "values": "Up to {count} value | Up to {count} values"
+    },
+    "validation": {
+      "incomplete": "Finish this filter or remove it",
+      "required": "Add at least one filter",
+      "uniqueField": "{field} already has a filter; edit that one or remove this one",
+      "oneUsageCondition": "A tier takes one usage condition; turn this one into a rule or remove it",
+      "rumField": "Use a built-in field or a column of lowercase letters, digits and underscores, up to 128 characters",
+      "valueLength": "Each value needs 1 to {max} characters",
+      "regexLength": "Keep the pattern to {max} characters or fewer",
+      "regexInvalid": "This pattern is invalid or not supported. Lookahead, lookbehind and backreferences cannot be used."
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "Contains (ignore case)",
+      "notStartsWith": "Not Starts With",
+      "notEndsWith": "Not Ends With",
+      "isEmpty": "Is Empty",
+      "isNotEmpty": "Is Not Empty"
+    },
+    "types": {
+      "string": "Text",
+      "number": "Number",
+      "boolean": "Boolean"
+    },
+    "operators": {
+      "eq": "is",
+      "neq": "is not",
+      "gt": "greater than",
+      "gte": "greater than or equal",
+      "lt": "less than",
+      "lte": "less than or equal",
+      "contains": "contains",
+      "containsIgnoreCase": "contains, ignoring case",
+      "notContains": "does not contain",
+      "startsWith": "starts with",
+      "notStartsWith": "does not start with",
+      "endsWith": "ends with",
+      "notEndsWith": "does not end with",
+      "in": "is any of",
+      "notIn": "is none of",
+      "regex": "matches regex",
+      "notRegex": "does not match regex",
+      "isNull": "has no value",
+      "isNotNull": "has a value",
+      "isEmpty": "is blank or has no value",
+      "isNotEmpty": "has a value that is not blank",
+      "matchAll": "matches text"
     }
   },
   "flow": {
@@ -3304,6 +3404,7 @@
         "inThisView": "In this view",
         "pagesFunnelNote": "A funnel step that names a hidden page still matches.",
         "fieldMissing": "field not in this stream",
+        "fieldMissingOn": "{field}: field not in this stream",
         "field": "Field",
         "match": "Match",
         "values": "Values",
@@ -11526,6 +11627,13 @@
     }
   },
   "alerts": {
+    "rowAction": {
+      "leftFilter": "No longer matches filter",
+      "pausedLeftFilter": "{name} paused. No longer matches filter | {count} alerts paused. No longer match filter",
+      "resumedLeftFilter": "{name} resumed. No longer matches filter | {count} alerts resumed. No longer match filter",
+      "bulkPauseFailed": "{failed} of {total} alert couldn't be paused | {failed} of {total} alerts couldn't be paused",
+      "bulkResumeFailed": "{failed} of {total} alert couldn't be resumed | {failed} of {total} alerts couldn't be resumed"
+    },
     "firing": {
       "title": "Firing",
       "drawer": {
@@ -13585,6 +13693,8 @@
     "sloColumn": "SLO",
     "sloKind": "Condition type",
     "sloLongWindow": "Long window",
+    "configNotSet": "Not set",
+    "openSlo": "Open SLO",
     "sloShortWindow": "Short window",
     "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
     "seconds": "Seconds",
@@ -14983,7 +15093,9 @@
           "empty": "No related metrics",
           "sharedLabels": "Shares {labels}",
           "noSharedLabels": "No shared labels"
-        }
+        },
+        "previewStatus": "Showing list preview · loading full chart",
+        "previewKept": "Showing list preview"
       },
       "variants": {
         "stddev": "Std dev",
@@ -16511,6 +16623,9 @@
     "noLogsAvailableForService": "No Logs available for this service",
     "noCorrelatedLogsFound": "No correlated logs found for this span",
     "spanHasNoLogsShowingTrace": "This span has no logs. Showing logs for the whole trace.",
+    "noLogStreamForTrace": "No log stream has logs for this trace.",
+    "openLogsTab": "Open Logs tab",
+    "findingLogsForTrace": "Finding logs for this trace…",
     "noData": {
       "title": "Start sending traces to {product}",
       "description": "No trace streams found in this organization yet. Instrument your services and traces will appear here automatically.",
@@ -16549,7 +16664,6 @@
     "errorSpans": "Error Spans",
     "filterByErrors": "Filter by errors",
     "clearErrorFilter": "Clear error filter",
-    "updatingResults": "Updating results",
     "error": "ERROR",
     "errorCount": "{n} ERROR | {n} ERRORS",
     "success": "SUCCESS",
@@ -20909,6 +21023,39 @@
       "notGrouped": "{name} is selected without being grouped or aggregated. Add it to {groupBy}, or remove it from the selected columns."
     }
   },
+  "dataAge": {
+    "updated": "Updated {time}",
+    "withZone": "{age} · {timeZone}",
+    "refreshUpdated": "Refresh, updated {time} {timeZone}",
+    "refreshFailed": "Refresh failed at {failedAt} · showing data from {dataFrom}",
+    "refreshFailedCharts": "Refresh failed at {failedAt} for {count} of {total} chart · showing data from {dataFrom} | Refresh failed at {failedAt} for {count} of {total} charts · showing data from {dataFrom}",
+    "refreshFailedShort": "Refresh failed"
+  },
+  "regionStatus": {
+    "elapsed": "{status} {seconds} s",
+    "searchingPartitions": "Searching {done} of {total} partitions · {seconds} s",
+    "stillLoading": "Still loading {noun}, {seconds} seconds",
+    "partitions": "{done} of {total} partitions",
+    "partialTooltip": "The search stopped after {done} of {total} partitions, so the count and rows cover only those. Narrow the time range to search everything.",
+    "found": "{count} {noun} found",
+    "foundPartial": "{count} {noun} found, partial: {done} of {total} partitions",
+    "rangeChange": "Showing last {from} · loading last {to}",
+    "rangeChangeSpoken": "Showing last {from}, loading last {to}",
+    "rangeSettled": "Charts updated for last {to}",
+    "chartsLoaded": "Charts loaded",
+    "rangeLength": {
+      "seconds": "{count} s",
+      "minutes": "{count} min",
+      "hours": "{count} h",
+      "days": "{count} d"
+    },
+    "rangeLengthSpoken": {
+      "seconds": "{count} second | {count} seconds",
+      "minutes": "{count} minute | {count} minutes",
+      "hours": "{count} hour | {count} hours",
+      "days": "{count} day | {count} days"
+    }
+  },
   "refreshButton": {
     "justNow": "just now",
     "secondsAgo": "{sec}s ago",
@@ -22877,6 +23024,14 @@
     }
   },
   "components": {
+    "value": {
+      "noValue": "No value",
+      "couldntLoad": "Couldn't load",
+      "couldntLoadTooltip": "Couldn't load: {cause}. Refresh to try again.",
+      "causeTimeout": "the request timed out",
+      "causeServer": "the server returned an error",
+      "causeAccess": "you don't have access to this data"
+    },
     "codeBlock": {
       "terminal": "Terminal",
       "tokenLink": "org token · {name}",
@@ -23387,6 +23542,9 @@
         "past": "Past days",
         "ended": "Ended"
       }
+    },
+    "chartPlaceholder": {
+      "loading": "Loading chart"
     }
   },
   "functions": {

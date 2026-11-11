@@ -67,17 +67,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="showLabelOnTop text-h7 font-bold" data-test="add-condition-query-input-title">
             <div></div>
-            <!-- SHARED body: the same ConditionBuilder the workflow Condition node
-               renders. It owns the FilterGroup, the V0/V1→V2 conversion, the zod
-               schema and the inline error. Pipelines only supply the stream
-               fields and these guidelines. -->
             <ConditionBuilder
               ref="builder"
+              profile="pipeline"
               :fields="filteredColumns"
+              :load-values="valueLoader"
               :initial-conditions="initialConditions"
-              module="pipelines"
-              :allow-custom-columns="true"
-              normalize-operators
             >
               <template #guidelines>
                 <div
@@ -146,6 +141,7 @@ import { computed, onMounted, ref, type Ref, onBeforeMount, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
+import { streamValuesLoader } from "@/components/filterBar/streamValues";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useStreams from "@/composables/useStreams";
@@ -180,6 +176,16 @@ function handleDrawerClose(v: boolean) {
 }
 
 const filteredColumns: any = ref([]);
+// Only a source stream names where the records come from; a query may read several.
+const valueStream = ref<{ streamName?: string; streamType?: string } | null>(null);
+const valueLoader = computed(() =>
+  streamValuesLoader(
+    valueStream.value && {
+      org: store.state.selectedOrganization?.identifier,
+      ...valueStream.value,
+    },
+  ),
+);
 
 const originalStreamFields: Ref<any[]> = ref([]);
 
@@ -199,8 +205,7 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-// The SHARED ConditionBuilder owns V0/V1 -> V2 conversion and the lowercase
-// operator normalization; pipelines just hand it the saved rule.
+// The shared builder reads every saved version and writes it back unchanged until edited.
 const initialConditions = computed(() =>
   pipelineObj.isEditNode ? (pipelineObj.currentSelectedNodeData?.data?.conditions ?? null) : null,
 );
@@ -233,8 +238,7 @@ const importSqlParser = async () => {
   parser = await sqlParser();
 };
 
-// The shared ConditionBuilder owns the condition tree + its OForm/zod schema.
-// We only hold a ref to it (for submit() and the cancel dirty-check).
+// Held for submit() and the cancel dirty-check.
 const builder = ref<any>(null);
 
 // Snapshot of the rule as first rendered, for the "discard changes?" prompt.
@@ -311,6 +315,10 @@ const getFields = async () => {
     );
 
     if (inputStreamNode) {
+      valueStream.value = {
+        streamName: inputStreamNode.data?.stream_name.value || inputStreamNode.data?.stream_name,
+        streamType: inputStreamNode.data?.stream_type,
+      };
       await updateStreamFields(
         inputStreamNode.data?.stream_name.value || inputStreamNode.data?.stream_name,
         inputStreamNode.data?.stream_type,
@@ -374,14 +382,9 @@ const openCancelDialog = () => {
   }
 };
 
-// @submit handler — OForm only calls it once the schema passes (at least one
-// condition via superRefine over the bridged `conditions` field), so the schema
-// gates the save. Reads the live `conditionGroup` (the bridged source of truth).
 const saveCondition = async () => {
   try {
-    // The shared builder validates against the zod schema ("at least one
-    // complete condition") and renders the error inline, returning null when the
-    // rule is empty/incomplete — so an invalid rule simply never gets here.
+    // Null when the rule is empty or unfinished; the builder marks the problem inline.
     const payload = await builder.value?.submit();
     if (!payload) return;
 
@@ -451,43 +454,3 @@ const deleteRoute = () => {
   emit("cancel:hideform");
 };
 </script>
-
-<style scoped>
-/* keep(lib-override): retarget the shared FilterGroup component's internal DOM
-   (.filter-group-box / .group-container / .group-border / .conditions-input and its
-   inline margin-left styling) for the pipeline drawer context — not addressable via
-   template utilities. */
-
-/* Force the root group box to span the full drawer width (FilterGroup defaults to w-fit).
-   Also drop its `mt-4`: as the first element in the drawer body it has no preceding
-   label to space from, and that margin collapses to the body's content edge, adding a
-   1rem gap on top of the drawer's own 0.75rem inset. Root box only (`>`) — nested groups
-   and alerts' FilterGroup keep their mt-4. */
-.pipeline-filter-group-wrapper > :deep(.filter-group-box) {
-  width: 100% !important;
-  margin-top: 0 !important;
-}
-
-.pipeline-filter-group-wrapper :deep(.group-container) {
-  white-space: normal !important;
-  overflow-x: visible !important;
-  max-width: 100%;
-  pointer-events: auto;
-}
-
-/* Reduce margins for nested groups in pipeline */
-.pipeline-filter-group-wrapper :deep([style*="margin-left"]) {
-  margin-left: 0.625rem !important;
-}
-
-/* Ensure conditions fit width */
-.pipeline-filter-group-wrapper :deep(.conditions-input) {
-  min-width: 7.5rem !important;
-  max-width: 12.5rem;
-}
-
-/* Ensure group borders don't overflow */
-.pipeline-filter-group-wrapper :deep(.group-border) {
-  max-width: calc(100% - 1.25rem);
-}
-</style>

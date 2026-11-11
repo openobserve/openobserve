@@ -231,6 +231,8 @@
   --color-tooltip-text: var(--color-text-heading);
   --color-tooltip-border: var(--d-border);
   --color-tooltip-arrow: var(--d-overlay);
+  --color-copy-confirm-bg: var(--color-grey-200);
+  --color-copy-confirm-text: var(--color-grey-900);
 
   /* ToggleGroup */
   --color-toggle-item-hover-bg: var(--color-primary-950);

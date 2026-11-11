@@ -16,18 +16,9 @@
         class="me-2 mb-1.5"
         data-test="logs-json-preview-copy-btn"
         @click="copyLogToClipboard"
-        ><OIcon
-          :name="logCopied ? 'check' : 'content-copy'"
-          size="xs"
-          :class="['me-1', logCopied ? 'text-status-success-text' : '']"
-        /><span class="grid text-start"
-          ><span :class="['col-start-1 row-start-1', { invisible: logCopied }]">{{
-            t("common.copyToClipboard")
-          }}</span
-          ><span :class="['col-start-1 row-start-1', { invisible: !logCopied }]">{{
-            t("common.copied")
-          }}</span></span
-        ></OButton
+        ><OIcon name="content-copy" size="xs" class="me-1" />{{
+          t("common.copyToClipboard")
+        }}</OButton
       >
       <OTooltip
         v-if="showViewRelatedBtn && correlationAccess.allowed && correlationLicense.locked.value"
@@ -244,12 +235,8 @@
           data-test="logs-json-preview-copy-selection-btn"
           @click="copySelectedText"
         >
-          <OIcon
-            :name="selectionCopied ? 'check' : 'content-copy'"
-            size="sm"
-            :class="['me-2', selectionCopied ? 'text-status-success-text' : '']"
-          />
-          {{ selectionCopied ? t("common.copied") : t("logs.jsonPreview.copy") }}
+          <OIcon name="content-copy" size="sm" class="me-2" />
+          {{ t("logs.jsonPreview.copy") }}
         </div>
         <div
           class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
@@ -329,7 +316,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { COPY_FEEDBACK_MS, useCopyFeedback } from "@/composables/useCopyFeedback";
+import { COPY_CONFIRM_MS } from "@/lib/feedback/Toast/copyConfirm";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
@@ -420,9 +407,6 @@ export default {
   ],
   setup(props: any, { emit }: any) {
     const { t } = useI18nTyped();
-    const { copy, isCopied } = useCopyFeedback();
-    const logCopied = computed(() => props.copyInPlace && isCopied("log"));
-    const selectionCopied = computed(() => props.copyInPlace && isCopied("selection"));
     const store = useStore();
     const { isDark } = useTheme();
     const activeTab = ref("flattened");
@@ -465,7 +449,7 @@ export default {
       const log =
         activeTab.value === "unflattened" ? JSON.parse(unflattendData.value) : props.value;
       if (props.copyInPlace) {
-        copy(JSON.stringify(log), "log");
+        copyToClipboard(JSON.stringify(log), t);
         return;
       }
       emit("copy", log);
@@ -917,11 +901,13 @@ export default {
       emit("sendToAiChat", PromptToBeAdded);
     };
 
-    const copySelectedText = () => {
+    const copySelectedText = (event?: MouseEvent) => {
       if (selectedText.value && props.copyInPlace) {
-        // The menu stays open briefly so its item can confirm the copy where it was clicked.
-        copy(selectedText.value, "selection").then((success) => {
-          if (success) setTimeout(() => (showMenu.value = false), COPY_FEEDBACK_MS / 2);
+        // The menu item is not a button, so it is named as the anchor; the menu stays open briefly so the bubble is seen there.
+        copyToClipboard(selectedText.value, t, {
+          anchor: event?.currentTarget as HTMLElement | null,
+        }).then((success) => {
+          if (success) setTimeout(() => (showMenu.value = false), COPY_CONFIRM_MS / 2);
         });
         return;
       }
@@ -1022,8 +1008,6 @@ export default {
       selectedText,
       handleCreateRegex,
       copySelectedText,
-      logCopied,
-      selectionCopied,
       regexIconForContextMenu,
       typeOfRegexPattern,
       regexPatternType,

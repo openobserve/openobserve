@@ -13377,6 +13377,12 @@
     "toastMessageGeneric": "4cf1f345d3caeb96",
     "toastTitle": "feff10da75dad3ed"
   },
+  "filterBar": {
+    "validation": {
+      "regexInvalid": "0aaa0248a076f2f1",
+      "regexLength": "940687bf4794897d"
+    }
+  },
   "fleet": {
     "addCollector": "6d30a69cb01ed55a",
     "audit": {
@@ -23064,6 +23070,7 @@
         "excludedRules": "4e904c6844e632f3",
         "field": "f45fc1dfdc96db27",
         "fieldMissing": "2b8b99672b1d6d1a",
+        "fieldMissingOn": "46e4ad2eb02f0158",
         "fields": {
           "env": "494d9aa0c0684432",
           "geo_info_city": "fc33f73246f48295",

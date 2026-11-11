@@ -2422,8 +2422,9 @@ export default defineComponent({
 
       // The route-locked page shows its locked view; the details call would only 403.
       if (licenseLockedView.value) return;
-      // Fetch from API — standalone mode, or embedded with no pre-fetched spans
-      await loadLogStreams();
+      // Flag first so the page never paints blank; the log stream list only feeds View Logs, so it runs alongside.
+      searchObj.data.traceDetails.isLoadingTraceDetails = true;
+      loadLogStreams().catch(() => {});
       const timeRange = effectiveTimeRange.value;
       await getTraceDetails({
         stream: effectiveStreamName.value,

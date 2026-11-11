@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-else
           class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left transition-opacity max-md:min-w-32"
-          :class="{ 'opacity-60': summaryDimmed }"
+          :class="{ [STALE_DIM]: summaryDimmed }"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="histogram-chart transition-opacity"
             :class="{
               invisible: !histogramPainted,
-              'opacity-50': histogramView.stale || chartPaintPending,
+              [STALE_DIM]: histogramDimmed,
             }"
             @click="onHistogramAreaClick"
           >
@@ -563,7 +563,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
                       ? 'min-h-full!'
                       : 'min-h-[calc(100%-6.25rem)]!',
-                    showStaleRows ? 'pointer-events-none opacity-60' : '',
+                    showStaleRows ? 'pointer-events-none' : '',
+                    rowsDimmed ? STALE_DIM : '',
                   ]"
                   @update:columnSizes="handleColumnSizesUpdate"
                   @column-order-change="handleColumnOrderUpdate"
@@ -911,7 +912,6 @@ import {
   nextTick,
   type PropType,
   provide,
-  shallowRef,
 } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -1012,7 +1012,12 @@ import {
   severityRowClass,
 } from "@/utils/logs/statusParser";
 import useLogSeverity from "@/composables/useLogs/useLogSeverity";
-import { useResultsLoadingIndicator } from "@/composables/useLogs/useResultsLoadingIndicator";
+import {
+  useDelayedFlag,
+  useResultsLoadingIndicator,
+} from "@/composables/useLogs/useResultsLoadingIndicator";
+import { useSettledValue } from "@/composables/useSettledValue";
+import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
@@ -2076,7 +2081,10 @@ export default defineComponent({
       failed: !!searchObj.data.errorMsg,
       pageCount: pageCount.value,
     }));
-    const summaryDimmed = computed(() => summaryView.value.updating && !autoRefreshOn());
+    const summaryDimmed = useDelayedFlag(
+      () => summaryView.value.updating && !autoRefreshOn(),
+      STALE_DIM_DELAY_MS,
+    );
     // One bar spans the rows and the histogram: once the rows finish it holds full until the histogram lands, so it never refills.
     const rowsDoneFirst = ref(false);
     watch(
@@ -2101,6 +2109,10 @@ export default defineComponent({
         histogramPoints: searchObj.data.histogram?.xData?.length ?? 0,
         liveMode: autoRefreshOn(),
       }),
+    );
+    const histogramDimmed = useDelayedFlag(
+      () => histogramView.value.stale || chartPaintPending.value,
+      STALE_DIM_DELAY_MS,
     );
     const histogramPainted = ref(false);
     const onHistogramFinished = () => {
@@ -2636,54 +2648,34 @@ export default defineComponent({
       Math.round(Math.min(100, Math.max(5, runProgressPercentage.value))),
     );
 
-    // A re-run empties the results before its first rows land, so the last rows of the same streams stay up, dimmed, meanwhile.
-    const lastRows = shallowRef<{
-      streams: string;
-      hits: Record<string, unknown>[];
-      columns: OTableColumnDef<any>[];
-    } | null>(null);
     const streamsKey = () =>
       `${searchObj.data.stream.streamType}:${searchObj.data.stream.selectedStream.join(",")}`;
-    watch(
-      () => searchObj.data.queryResults?.hits,
-      (hits) => {
-        if (hits?.length)
-          lastRows.value = { streams: streamsKey(), hits, columns: getColumns.value };
-      },
-      { immediate: true },
-    );
-    // The columns are rebuilt for an empty result as the re-run starts, so the stale rows keep the ones they were drawn with.
-    watch(
-      getColumns,
-      (columns) => {
-        if (hasResultRows.value && lastRows.value) lastRows.value = { ...lastRows.value, columns };
-      },
-      { flush: "sync" },
-    );
-    watch(
-      () => !searchObj.loading && !hasResultRows.value,
-      (settledEmpty) => {
-        if (settledEmpty) lastRows.value = null;
-      },
-    );
-    const showStaleRows = computed(
-      () =>
-        searchObj.loading &&
-        !hasResultRows.value &&
-        !!lastRows.value &&
-        lastRows.value.streams === streamsKey(),
-    );
+    // A re-run empties the results before its first rows land, so the last rows of the same streams stay up, dimmed, meanwhile; the columns stay the ones they were drawn with.
+    const keptRows = useSettledValue(() => ({
+      value: hasResultRows.value
+        ? {
+            hits: searchObj.data.queryResults.hits as Record<string, unknown>[],
+            columns: getColumns.value,
+          }
+        : null,
+      busy: !!searchObj.loading && !hasResultRows.value,
+      key: streamsKey(),
+      live: autoRefreshOn(),
+    }));
+    const showStaleRows = computed(() => keptRows.state.value.stale);
     // With no columns yet the table draws no skeleton rows; this is also what SearchResultSkeleton shows before it.
     const showTableSkeleton = computed(
       () => isResultsSkeleton.value && !showStaleRows.value && getColumns.value.length === 0,
     );
     const tableColumns = computed(() =>
-      showStaleRows.value && lastRows.value ? lastRows.value.columns : getColumns.value,
+      showStaleRows.value && keptRows.state.value.value
+        ? keptRows.state.value.value.columns
+        : getColumns.value,
     );
     // A fresh array, because the table caches cell values per data array and the stale rows may first have been drawn with restored columns that lost their formatters.
     const tableRows = computed(() =>
-      showStaleRows.value && lastRows.value
-        ? [...lastRows.value.hits]
+      showStaleRows.value && keptRows.state.value.value
+        ? [...keptRows.state.value.value.hits]
         : searchObj.data.queryResults?.hits || [],
     );
 
@@ -3149,6 +3141,9 @@ export default defineComponent({
       pageCount,
       summaryView,
       summaryDimmed,
+      histogramDimmed,
+      rowsDimmed: keptRows.dimmed,
+      STALE_DIM,
       runProgressPercentage,
       histogramView,
       histogramSettling,

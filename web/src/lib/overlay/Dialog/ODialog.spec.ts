@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, h, nextTick, ref } from "vue";
 import ODialog from "./ODialog.vue";
 import { DialogContent } from "reka-ui";
 
@@ -379,6 +380,61 @@ describe("ODialog", () => {
       await vi.waitFor(() =>
         expect(document.activeElement?.getAttribute("data-test")).toBe("o-dialog-secondary-btn"),
       );
+      wrapper.unmount();
+    });
+  });
+  describe("focus repair on body swaps", () => {
+    const editing = ref(false);
+    const swapping = defineComponent({
+      setup() {
+        return () =>
+          editing.value
+            ? h("div", { key: "after" }, [h("input", { "data-test": "after" })])
+            : h("div", { key: "before" }, [h("input", { "data-test": "before" })]);
+      },
+    });
+
+    const mountSwapping = async () => {
+      editing.value = false;
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true },
+        slots: { default: () => h(swapping) },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    const popoverSearch = () => {
+      const popper = document.createElement("div");
+      popper.setAttribute("data-reka-popper-content-wrapper", "");
+      const search = document.createElement("input");
+      popper.appendChild(search);
+      document.body.appendChild(popper);
+      return { popper, search };
+    };
+
+    it("moves focus to the swapped-in field when focus fell out of the body", async () => {
+      const wrapper = await mountSwapping();
+      (document.activeElement as HTMLElement | null)?.blur();
+      editing.value = true;
+      await flushPromises();
+      await vi.waitFor(() =>
+        expect(document.activeElement?.getAttribute("data-test")).toBe("after"),
+      );
+      wrapper.unmount();
+    });
+
+    it("keeps focus on a portaled popover search the swap opened", async () => {
+      const wrapper = await mountSwapping();
+      const { popper, search } = popoverSearch();
+      editing.value = true;
+      await nextTick();
+      search.focus();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.activeElement).toBe(search);
+      popper.remove();
       wrapper.unmount();
     });
   });

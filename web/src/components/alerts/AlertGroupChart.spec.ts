@@ -297,3 +297,102 @@ describe("AlertGroupChart — the query handed to the renderer", () => {
     expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(false);
   });
 });
+
+describe("AlertGroupChart — loading", () => {
+  const alert = {
+    stream_name: "logs",
+    stream_type: "logs",
+    query_condition: { type: "sql", sql: "SELECT 1" },
+    trigger_condition: { threshold: 500 },
+  };
+  const line = (w: any) => w.findComponent({ name: "LoadingProgress" });
+  const placeholder = (w: any) => w.find('[data-test="alerts-alertgroupchart-placeholder"]');
+  const panel = (w: any) => w.findComponent({ name: "PanelSchemaRenderer" });
+  const deferred = () => {
+    let resolve: (value: any) => void = () => {};
+    const promise = new Promise((r) => (resolve = r));
+    return { promise, resolve };
+  };
+  const sqlResponse = {
+    data: { sql: 'SELECT count(*) as cnt, _timestamp FROM "logs" GROUP BY _timestamp' },
+  };
+  const pickRange = async (w: any, value: string) => {
+    w.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", value);
+    await flushPromises();
+  };
+
+  it("holds the chart's place with the placeholder and a line before the alert arrives", async () => {
+    wrapper = await mountChart(null as any);
+
+    expect(placeholder(wrapper).exists()).toBe(true);
+    expect(line(wrapper).props("loading")).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain(i18n.global.t("alerts.groups.chartUnavailable"));
+    expect(alertsService.generate_sql).not.toHaveBeenCalled();
+  });
+
+  it("keeps the placeholder and the line, not the unavailable text, while generate_sql runs", async () => {
+    const sql = deferred();
+    vi.mocked(alertsService.generate_sql).mockReturnValue(sql.promise as any);
+    wrapper = await mountChart(alert);
+
+    expect(placeholder(wrapper).exists()).toBe(true);
+    expect(line(wrapper).props("loading")).toBe(true);
+    expect(wrapper.text()).not.toContain(i18n.global.t("alerts.groups.chartUnavailable"));
+
+    sql.resolve(sqlResponse);
+    await flushPromises();
+    expect(panel(wrapper).exists()).toBe(true);
+    expect(placeholder(wrapper).exists()).toBe(false);
+    expect(line(wrapper).props("loading")).toBe(false);
+  });
+
+  it("shows the unavailable text only once the build has settled without a chart", async () => {
+    const sql = deferred();
+    vi.mocked(alertsService.generate_sql).mockReturnValue(sql.promise as any);
+    wrapper = await mountChart(alert);
+    expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
+
+    sql.resolve({ data: { sql: "" } });
+    await flushPromises();
+    expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(true);
+    expect(line(wrapper).props("loading")).toBe(false);
+  });
+
+  it("draws the line over the kept chart while a range change rebuilds it", async () => {
+    wrapper = await mountChart(alert);
+    expect(panel(wrapper).exists()).toBe(true);
+    expect(line(wrapper).props("loading")).toBe(false);
+
+    const sql = deferred();
+    vi.mocked(alertsService.generate_sql).mockReturnValue(sql.promise as any);
+    await pickRange(wrapper, "6h");
+
+    expect(line(wrapper).props("loading")).toBe(true);
+    expect(panel(wrapper).exists()).toBe(true);
+    expect(placeholder(wrapper).exists()).toBe(false);
+
+    sql.resolve(sqlResponse);
+    await flushPromises();
+    expect(line(wrapper).props("loading")).toBe(false);
+  });
+
+  it("keeps the line until the newest of two overlapping rebuilds settles", async () => {
+    wrapper = await mountChart(alert);
+    const first = deferred();
+    const second = deferred();
+    vi.mocked(alertsService.generate_sql)
+      .mockReturnValueOnce(first.promise as any)
+      .mockReturnValueOnce(second.promise as any);
+    await pickRange(wrapper, "6h");
+    await pickRange(wrapper, "24h");
+
+    first.resolve(sqlResponse);
+    await flushPromises();
+    expect(line(wrapper).props("loading")).toBe(true);
+
+    second.resolve(sqlResponse);
+    await flushPromises();
+    expect(line(wrapper).props("loading")).toBe(false);
+  });
+});

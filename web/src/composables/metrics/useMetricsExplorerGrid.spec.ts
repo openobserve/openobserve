@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { effectScope, type EffectScope } from "vue";
+import { effectScope, watch, type EffectScope } from "vue";
 
 /**
  * The two bugs covered here are both SELF-SEALING — the grid ends up in a state
@@ -112,6 +112,7 @@ const inFlight: Array<{
   step: string;
   queryType: string;
   complete: (result: any) => void;
+  fail: (error: any) => void;
 }> = [];
 
 const storeState: any = {
@@ -155,6 +156,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
           handlers.data({}, { type: "promql_response", content: { results: result } });
           handlers.complete();
         },
+        fail: (error: any) => handlers.error({}, error),
       });
     },
     cancelStreamQueryBasedOnRequestId: vi.fn(),
@@ -507,6 +509,20 @@ describe("useMetricsExplorerGrid", () => {
       grid.removeLabelFilter(drop);
 
       expect(grid.labelFilters.value).toEqual([keep]);
+    });
+
+    it("replaces a matcher in place, dropping a duplicate of the new one", async () => {
+      const grid = await setup();
+      const job = { label: "job", value: "web", operator: "=" };
+      const code = { label: "code", value: "500", operator: "!=" };
+      const api = { label: "job", value: "api", operator: "=" };
+      await grid.addLabelFilter(job);
+      await grid.addLabelFilter(code);
+      await grid.addLabelFilter(api);
+
+      await grid.replaceLabelFilter(job, api);
+
+      expect(grid.labelFilters.value).toEqual([api, code]);
     });
   });
   it("does not blank the grid when the schema load comes back empty", async () => {
@@ -1790,6 +1806,22 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.previews.value["lat_seconds_count"].widenedRateWindow).toBe(null);
     });
 
+    it("stays sparse while it reloads its kept answer, so the card never draws a chart with no line (CS10)", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "lat_seconds_count");
+      await landRounds(grid.requestPreview(card), NO_SERIES, SERIES, NO_SERIES, NO_SERIES);
+      expect(grid.previews.value["lat_seconds_count"].sparse).toBe(true);
+
+      const reload = grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(grid.previews.value["lat_seconds_count"].status).toBe("loading");
+      expect(grid.previews.value["lat_seconds_count"].sparse).toBe(true);
+
+      await landRounds(reload, NO_SERIES, SERIES, NO_SERIES, NO_SERIES);
+      expect(grid.previews.value["lat_seconds_count"].status).toBe("done");
+      expect(grid.previews.value["lat_seconds_count"].sparse).toBe(true);
+    });
+
     it("so a histogram with real data never renders NO card at all", async () => {
       // The failure this all adds up to. A Prometheus histogram's base stream is
       // a metadata-only phantom that carries no series of its own, so it is
@@ -2675,6 +2707,545 @@ describe("useMetricsExplorerGrid", () => {
       await flush();
       expect(inFlight).toHaveLength(0);
       expect(grid.previews.value["http_requests_total"].pendingRefresh).toBeUndefined();
+    });
+  });
+
+  describe("the slice holds still until its emptiness sweep settles (M-1)", () => {
+    const shown = (grid: any) => grid.displayed.value.cards.map((c: any) => c.name);
+    const answer = (q: { query: string }) =>
+      q.query.includes("idle_metric_total") ? NO_SERIES : SERIES;
+    const drainBy = async (pick: (q: any) => any) => {
+      for (let round = 0; round < 20 && inFlight.length; round++) {
+        inFlight.splice(0, inFlight.length).forEach((q) => q.complete(pick(q)));
+        await flush();
+      }
+    };
+
+    const answerFor = async (name: string, result: any) => {
+      for (let round = 0; round < 5; round++) {
+        const mine = inFlight.filter((q) => q.query.includes(name));
+        if (!mine.length) break;
+        for (const q of mine) {
+          inFlight.splice(inFlight.indexOf(q), 1);
+          q.complete(result);
+        }
+        await flush();
+      }
+    };
+    const startsWith = (list: string[], head: string[]) => head.every((n, i) => list[i] === n);
+
+    it("appends each card once it and every card before it are known, and never moves a drawn one", async () => {
+      const grid = await setup();
+      const order = grid.pageSlice.value.map((c: any) => c.name);
+      expect(order.slice(0, 3)).toEqual([
+        "cpu_temperature",
+        "http_requests_total",
+        "idle_metric_total",
+      ]);
+      const history: { cards: string[]; slots: number }[] = [];
+      const stop = watch(
+        () => grid.displayed.value,
+        (view) =>
+          history.push({
+            cards: view.cards.map((c: any) => c.name),
+            slots: view.cards.length + view.placeholders,
+          }),
+        { immediate: true },
+      );
+
+      grid.sweepSlice();
+      await flush();
+      expect(grid.holding.value).toBe(true);
+      expect(shown(grid)).toEqual([]);
+      expect(grid.displayed.value.placeholders).toBe(order.length);
+
+      // The second card answers first: it waits for the first, so nothing can be drawn ahead of it.
+      await answerFor("http_requests_total", SERIES);
+      expect(shown(grid)).toEqual([]);
+
+      await answerFor("cpu_temperature", SERIES);
+      expect(shown(grid)).toEqual(["cpu_temperature", "http_requests_total"]);
+      expect(grid.displayed.value.placeholders).toBe(order.length - 2);
+
+      // An empty card is never drawn; one slot leaves from the end of the grid instead.
+      await answerFor("idle_metric_total", NO_SERIES);
+      expect(grid.previews.value.idle_metric_total?.status).toBe("done");
+      expect(shown(grid).slice(0, 2)).toEqual(["cpu_temperature", "http_requests_total"]);
+      expect(shown(grid)).not.toContain("idle_metric_total");
+      expect(grid.displayed.value.cards.length + grid.displayed.value.placeholders).toBe(
+        order.length - 1,
+      );
+
+      await drainBy(answer);
+      await flush();
+      stop();
+
+      expect(grid.holding.value).toBe(false);
+      expect(grid.displayed.value.placeholders).toBe(0);
+      expect(shown(grid)).toEqual(grid.pagedCards.value.map((c: any) => c.name));
+      expect(shown(grid)).not.toContain("idle_metric_total");
+      for (let i = 1; i < history.length; i++) {
+        expect(startsWith(history[i].cards, history[i - 1].cards)).toBe(true);
+        expect(history[i].slots).toBeLessThanOrEqual(history[i - 1].slots);
+      }
+    });
+
+    it("draws a new search's already-known card at once, ahead of a placeholder for the unknown one", async () => {
+      const grid = await setup();
+      await landPreview(grid.requestPreview(cardNamed(grid, "http_requests_total")), SERIES);
+
+      grid.searchTerm.value = "_total";
+      await flush();
+      expect(grid.pageSlice.value.map((c: any) => c.name)).toEqual([
+        "http_requests_total",
+        "idle_metric_total",
+      ]);
+      expect(shown(grid)).toEqual(["http_requests_total"]);
+      expect(grid.displayed.value.placeholders).toBe(1);
+
+      grid.sweepSlice();
+      await flush();
+      await answerFor("idle_metric_total", NO_SERIES);
+      await flush();
+      expect(shown(grid)).toEqual(["http_requests_total"]);
+      expect(grid.displayed.value.placeholders).toBe(0);
+      expect(grid.holding.value).toBe(false);
+    });
+
+    it("keeps the settled cards (not placeholders) on screen while a window change re-sweeps", async () => {
+      const grid = await setup();
+      grid.sweepSlice();
+      await flush();
+      await drainBy(answer);
+      const before = shown(grid);
+      expect(before.length).toBeGreaterThan(0);
+
+      grid.setTimeRange(
+        { start_time: NOW_US - 6 * HOUR_US, end_time: NOW_US },
+        { keepPreviews: true, windowChanged: true },
+      );
+      grid.sweepSlice({ skipCache: true });
+      await flush();
+
+      expect(grid.holding.value).toBe(true);
+      expect(grid.displayed.value.placeholders).toBe(0);
+      expect(shown(grid)).toEqual(before);
+
+      await drainBy(answer);
+      expect(grid.holding.value).toBe(false);
+      expect(shown(grid)).toEqual(before);
+    });
+
+    it("holds a drawn card whose new window is empty as a placeholder slot, never as an empty card, until the slice settles (CS10)", async () => {
+      const grid = await setup();
+      grid.sweepSlice();
+      await flush();
+      await drainBy(answer);
+      const before = shown(grid);
+      expect(before[0]).toBe("cpu_temperature");
+      expect(grid.displayed.value.emptyHeld.size).toBe(0);
+
+      grid.setTimeRange(
+        { start_time: NOW_US - 6 * HOUR_US, end_time: NOW_US },
+        { keepPreviews: true, windowChanged: true },
+      );
+      grid.sweepSlice({ skipCache: true });
+      await flush();
+      await answerFor("cpu_temperature", NO_SERIES);
+
+      expect(grid.holding.value).toBe(true);
+      // Its slot stays where it was, so nothing drawn after it moves.
+      expect(shown(grid)).toEqual(before);
+      expect([...grid.displayed.value.emptyHeld]).toEqual(["cpu_temperature"]);
+
+      await drainBy((q) => (q.query.includes("cpu_temperature") ? NO_SERIES : answer(q)));
+      expect(grid.holding.value).toBe(false);
+      expect(shown(grid)).not.toContain("cpu_temperature");
+      expect(grid.displayed.value.emptyHeld.size).toBe(0);
+    });
+
+    it("does not hold with the no-data filter off: the lazy per-card load owns the grid", async () => {
+      const grid = await setup();
+      grid.hideEmptyPanels.value = false;
+      expect(grid.holding.value).toBe(false);
+      expect(grid.displayed.value.placeholders).toBe(0);
+      expect(shown(grid).length).toBeGreaterThan(0);
+    });
+
+    it("ends the hold for a slice card whose sweep request ends without a preview", async () => {
+      const grid = await setup();
+      grid.sweepSlice();
+      await flush();
+      // A cancelled request writes no preview; its settled sweep still counts as an answer.
+      const card = grid.pageSlice.value.find((c: any) => !c.unsupported)!;
+      grid.cancelPreview(card);
+      await flush();
+      await drainBy(answer);
+      expect(grid.holding.value).toBe(false);
+    });
+  });
+
+  describe("slots left unresolved while the grid is paused", () => {
+    it("are swept when the grid is shown again, so the placeholders are not left waiting", async () => {
+      const grid = await setup();
+      grid.paused.value = true;
+      // A filter added from the detail view empties every preview while the grid is off screen.
+      grid.invalidateAll();
+      await new Promise((r) => setTimeout(r, SWEEP_DEBOUNCE_MS + 50));
+      inFlight.length = 0;
+      expect(grid.holding.value).toBe(true);
+
+      grid.paused.value = false;
+      await new Promise((r) => setTimeout(r, SWEEP_DEBOUNCE_MS + 50));
+      expect(inFlight.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("a kept chart whose new-window request is cancelled (scrolled away)", () => {
+    const answer = (q: { query: string }) =>
+      q.query.includes("idle_metric_total") ? NO_SERIES : SERIES;
+    const drainBy = async (pick: (q: any) => any) => {
+      for (let round = 0; round < 20 && inFlight.length; round++) {
+        inFlight.splice(0, inFlight.length).forEach((q) => q.complete(pick(q)));
+        await flush();
+      }
+    };
+
+    it("ends the hold and keeps the chart drawn, so the grid is not left loading forever", async () => {
+      const grid = await setup();
+      grid.sweepSlice();
+      await flush();
+      await drainBy(answer);
+      await flush();
+      const before = grid.displayed.value.cards.map((c: any) => c.name);
+
+      grid.setTimeRange(
+        { start_time: NOW_US - 6 * HOUR_US, end_time: NOW_US },
+        { keepPreviews: true, windowChanged: true },
+      );
+      grid.sweepSlice({ skipCache: true });
+      await flush();
+      const card = cardNamed(grid, "http_requests_total");
+      grid.cancelPreview(card);
+      await flush();
+      await drainBy(answer);
+      await flush();
+
+      const kept = grid.previews.value.http_requests_total;
+      expect(kept.status).not.toBe("loading");
+      expect(kept.windowStale).toBe(true);
+      expect(grid.holding.value).toBe(false);
+      expect(grid.displayed.value.cards.map((c: any) => c.name)).toEqual(before);
+
+      // Its next visit asks for the new window instead of reusing the old answer.
+      void grid.requestPreview(card);
+      await flush();
+      expect(inFlight.some((q) => q.query.includes("http_requests_total"))).toBe(true);
+    });
+  });
+
+  describe("no sequence of range changes, cancels and answers strands a card loading (F1)", () => {
+    const H1 = { start_time: NOW_US - HOUR_US, end_time: NOW_US };
+    const H6 = { start_time: NOW_US - 6 * HOUR_US, end_time: NOW_US };
+    const H24 = { start_time: NOW_US - 24 * HOUR_US, end_time: NOW_US };
+    const keep = { keepPreviews: true, windowChanged: true };
+    const drain = async () => {
+      for (let round = 0; round < 20 && inFlight.length; round++) {
+        inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+        await flush();
+      }
+    };
+    const drawn = async (hideEmpty: boolean) => {
+      const grid = await setup();
+      grid.hideEmptyPanels.value = hideEmpty;
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+      return { grid, card };
+    };
+
+    it.each([
+      ["With data off", false],
+      ["With data on", true],
+    ])(
+      "%s: two range changes before the first lands, then the second request is cancelled",
+      async (_label, hideEmpty) => {
+        const { grid, card } = await drawn(hideEmpty);
+        grid.setTimeRange(H6, keep);
+        void grid.requestPreview(card);
+        await flush();
+        expect(grid.previews.value[card.name].status).toBe("loading");
+
+        grid.setTimeRange(H24, keep);
+        expect(grid.previews.value[card.name].status).toBe("done");
+        void grid.requestPreview(card);
+        await flush();
+        grid.cancelPreview(card);
+        await flush();
+
+        const kept = grid.previews.value[card.name];
+        expect(kept.status).toBe("done");
+        expect(kept.windowStale).toBe(true);
+        expect(kept.results.length).toBeGreaterThan(0);
+        if (hideEmpty) {
+          grid.sweepSlice({ skipCache: true });
+          await flush();
+          grid.cancelPreview(card);
+          await drain();
+          expect(grid.holding.value).toBe(false);
+        }
+      },
+    );
+
+    it("two range changes, then the second request lands: the chart is current and nothing is stale", async () => {
+      const { grid, card } = await drawn(false);
+      grid.setTimeRange(H6, keep);
+      void grid.requestPreview(card);
+      await flush();
+      grid.setTimeRange(H24, keep);
+      const next = grid.requestPreview(card);
+      await landPreview(next, SERIES);
+
+      const preview = grid.previews.value[card.name];
+      expect(preview.status).toBe("done");
+      expect(preview.windowStale).toBeFalsy();
+      expect(inFlight.length).toBe(0);
+    });
+
+    it("three range changes in a row, each cancelling the last, then a cancel: still settled", async () => {
+      const { grid, card } = await drawn(false);
+      for (const range of [H6, H24, H1]) {
+        grid.setTimeRange(range, keep);
+        void grid.requestPreview(card);
+        await flush();
+      }
+      grid.cancelPreview(card);
+      await flush();
+      expect(grid.previews.value[card.name].status).toBe("done");
+      expect(grid.previews.value[card.name].windowStale).toBe(true);
+    });
+
+    it("a range change while a same-window refresh is in flight, then a cancel: settled", async () => {
+      const { grid, card } = await drawn(false);
+      void grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(grid.previews.value[card.name].status).toBe("loading");
+
+      grid.setTimeRange(H6, keep);
+      void grid.requestPreview(card);
+      await flush();
+      grid.cancelPreview(card);
+      await flush();
+      expect(grid.previews.value[card.name].status).toBe("done");
+    });
+
+    it("a cancelled request whose own snapshot was a chartless loading entry leaves no loading entry behind", async () => {
+      const grid = await setup();
+      grid.hideEmptyPanels.value = false;
+      const card = cardNamed(grid, "http_requests_total");
+      void grid.requestPreview(card);
+      await flush();
+      void grid.requestPreview(card);
+      await flush();
+      grid.cancelPreview(card);
+      await flush();
+      await flush();
+      expect(grid.previews.value[card.name]?.status).not.toBe("loading");
+    });
+
+    it("two refreshes of one chart, then a cancel: the chart is restored settled, not as the first refresh's loading", async () => {
+      const { grid, card } = await drawn(false);
+      void grid.requestPreview(card, { skipCache: true });
+      await flush();
+      void grid.requestPreview(card, { skipCache: true });
+      await flush();
+      grid.cancelPreview(card);
+      await flush();
+      await flush();
+      expect(grid.previews.value[card.name].status).toBe("done");
+      expect(grid.previews.value[card.name].results.length).toBeGreaterThan(0);
+    });
+
+    it("a settled kept chart answers its next visit for the new window", async () => {
+      const { grid, card } = await drawn(false);
+      grid.setTimeRange(H6, keep);
+      void grid.requestPreview(card);
+      await flush();
+      grid.setTimeRange(H24, keep);
+      inFlight.length = 0;
+      await landPreview(grid.requestPreview(card), SERIES);
+      expect(grid.previews.value[card.name].windowStale).toBeFalsy();
+    });
+  });
+
+  describe("a window change keeps each chart until its new window lands (M-2)", () => {
+    const OLD = { start_time: NOW_US - HOUR_US, end_time: NOW_US };
+    const NEW = { start_time: NOW_US - 6 * HOUR_US, end_time: NOW_US };
+
+    it("marks kept charts stale, pinned to the window they describe, until the new answer lands", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+
+      grid.setTimeRange(NEW, { keepPreviews: true, windowChanged: true });
+      const kept = grid.previews.value[card.name];
+      expect(kept.results.length).toBeGreaterThan(0);
+      expect(kept.windowStale).toBe(true);
+      expect(kept.cachedTimeRange).toEqual(OLD);
+
+      const next = grid.requestPreview(card);
+      await flush();
+      expect(grid.previews.value[card.name].status).toBe("loading");
+      expect(grid.previews.value[card.name].windowStale).toBe(true);
+      expect(inFlight.every((q) => q.start === NEW.start_time)).toBe(true);
+
+      await landPreview(next, SERIES);
+      expect(grid.previews.value[card.name].windowStale).toBeFalsy();
+      expect(grid.previews.value[card.name].cachedTimeRange).toBeNull();
+    });
+
+    it("a lazily requested stale card re-queries instead of reusing its old-window answer", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+      grid.setTimeRange(NEW, { keepPreviews: true, windowChanged: true });
+
+      void grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+    });
+
+    it("a same-window refresh keeps the charts without marking them stale", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+
+      grid.setTimeRange({ ...OLD, end_time: OLD.end_time + 5_000_000 }, { keepPreviews: true });
+      expect(grid.previews.value[card.name].windowStale).toBeFalsy();
+    });
+
+    it("the default range change still wipes, so other callers keep today's behaviour", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+
+      grid.setTimeRange(NEW);
+      expect(grid.previews.value[card.name]).toBeUndefined();
+    });
+  });
+
+  describe("a refresh that fails over a kept chart (ruling 18)", () => {
+    it("records when it failed and keeps the data age of the chart still shown", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+      const dataFrom = grid.previews.value[card.name].lastTriggeredAt;
+
+      const refresh = grid.refreshCard(card);
+      await flush();
+      inFlight
+        .splice(0, inFlight.length)
+        .forEach((q) => q.fail({ status: 403, message: "Forbidden", code: 403 }));
+      await refresh;
+
+      const preview = grid.previews.value[card.name];
+      expect(preview.stale).toBe(true);
+      expect(preview.failedAt).toEqual(expect.any(Number));
+      expect(preview.lastTriggeredAt).toBe(dataFrom);
+      expect(preview.results.length).toBeGreaterThan(0);
+    });
+
+    it("a window change that fails leaves the kept chart live-looking: no stale-window flag, no hold", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+      grid.setTimeRange(
+        { start_time: NOW_US - 6 * HOUR_US, end_time: NOW_US },
+        { keepPreviews: true, windowChanged: true },
+      );
+
+      const sweep = grid.sweepSlice();
+      await flush();
+      expect(grid.previews.value[card.name].windowStale).toBe(true);
+      expect(grid.holding.value).toBe(true);
+      for (let round = 0; round < 5 && inFlight.length; round++) {
+        inFlight
+          .splice(0, inFlight.length)
+          .forEach((q) => q.fail({ status: 403, message: "Forbidden", code: 403 }));
+        await flush();
+      }
+      await sweep;
+
+      const preview = grid.previews.value[card.name];
+      expect(preview.status).toBe("done");
+      expect(preview.windowStale).toBeFalsy();
+      expect(preview.stale).toBe(true);
+      expect(preview.failedAt).toEqual(expect.any(Number));
+      expect(grid.holding.value).toBe(false);
+    });
+
+    it("a first load that fails has nothing kept, so it is an error, not a failed refresh", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const first = grid.requestPreview(card);
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.fail({ status: 400, message: "bad" }));
+      await first;
+
+      expect(grid.previews.value[card.name].status).toBe("error");
+      expect(grid.previews.value[card.name].failedAt).toBeNull();
+    });
+  });
+
+  describe("the detail view loads only its own metric's schema (M-5)", () => {
+    it("asks each named stream's schema once, merges its labels, and skips the org-wide list", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockClear();
+      const schema = vi.fn().mockResolvedValue({
+        data: { schema: [{ name: "method" }, { name: "_timestamp" }, { name: "__name__" }] },
+      });
+      (StreamService as any).schema = schema;
+
+      await Promise.all([
+        grid.ensureStreamSchemas(["http_requests_total", "http_requests_total"]),
+        grid.ensureStreamSchemas(["http_requests_total"]),
+      ]);
+
+      expect(schema).toHaveBeenCalledTimes(1);
+      expect(schema).toHaveBeenCalledWith("org1", "http_requests_total", "metrics");
+      expect(grid.labelsByStream.value.http_requests_total).toEqual(["method"]);
+      expect(StreamService.nameList).not.toHaveBeenCalled();
+
+      await grid.ensureStreamSchemas(["http_requests_total"]);
+      expect(schema).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not let a schema request pending for the previous org stand in for the new org's", async () => {
+      const grid = await setup();
+      let landPrevious!: (value: any) => void;
+      const schema = vi
+        .fn()
+        .mockImplementationOnce(() => new Promise((resolve) => (landPrevious = resolve)))
+        .mockResolvedValueOnce({ data: { schema: [{ name: "region" }] } });
+      (StreamService as any).schema = schema;
+
+      const previous = grid.ensureStreamSchemas(["http_requests_total"]);
+      grid.onOrgChange();
+      await grid.ensureStreamSchemas(["http_requests_total"]);
+
+      expect(schema).toHaveBeenCalledTimes(2);
+      expect(grid.labelsByStream.value.http_requests_total).toEqual(["region"]);
+
+      landPrevious({ data: { schema: [{ name: "method" }] } });
+      await previous;
+      expect(grid.labelsByStream.value.http_requests_total).toEqual(["region"]);
+    });
+
+    it("leaves a stream unknown when its schema request fails, so readers fail open", async () => {
+      const grid = await setup();
+      (StreamService as any).schema = vi.fn().mockRejectedValue({ response: { status: 403 } });
+
+      await grid.ensureStreamSchemas(["http_requests_total"]);
+      expect(grid.labelsByStream.value.http_requests_total).toBeUndefined();
     });
   });
 

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col" data-test="metrics-detail">
+  <div ref="root" class="flex min-h-0 flex-1 flex-col" data-test="metrics-detail">
     <div
       v-if="loading"
       class="flex flex-1 flex-col items-center justify-center gap-2.5 opacity-80"
@@ -83,6 +83,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </OTooltip>
           </OButton>
+          <!-- The page sentence scrolls away with the overview; this header never does. -->
+          <span
+            class="inline-grid shrink-0 items-center justify-items-start"
+            data-test="metrics-detail-header-failed-slot"
+          >
+            <ODataAgeFailedReserve class="[grid-area:1/1]" />
+            <ODataAge
+              v-if="pageFailure?.dataFrom"
+              class="shrink-0 [grid-area:1/1]"
+              :at="pageFailure.dataFrom"
+              :failed-at="pageFailure.failedAt"
+              :failed-count="pageFailure.count"
+              :failed-total="pageFailure.total"
+              short
+              data-test="metrics-detail-header-refresh-failed"
+            />
+          </span>
         </template>
         <template #actions>
           <!-- An on toggle keeps its status beside it, so the viewer can see why markers are drawn. -->
@@ -363,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Selects own popovers, which the header's overflow menu would unmount, so they get a row here. -->
           <div
-            v-if="compareEligible || forecastEligible"
+            v-if="compareEligible || forecastEligible || statusShown"
             class="flex flex-wrap items-center gap-x-5 gap-y-2"
             data-test="metrics-detail-chart-options"
           >
@@ -441,24 +458,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </div>
             </template>
-            <MetricOverlayKey
-              v-if="compareShift || overviewState.forecast"
-              class="ms-auto"
-              :period="compareShift?.periodAsStr ?? null"
-              :period-empty="overviewPeriodEmpty"
-              :forecast="!!overviewState.forecast"
-              data-test="metrics-detail-overlay-key"
-            />
+            <div class="ms-auto flex items-center gap-3">
+              <MetricOverlayKey
+                v-if="compareShift || overviewState.forecast"
+                :period="compareShift?.periodAsStr ?? null"
+                :period-empty="overviewPeriodEmpty"
+                :forecast="!!overviewState.forecast"
+                data-test="metrics-detail-overlay-key"
+              />
+              <span
+                v-if="previewing"
+                role="status"
+                class="text-text-secondary text-xs whitespace-nowrap"
+                data-test="metrics-detail-preview-status"
+                >{{ t("metrics.explorer.detail.previewStatus") }}</span
+              >
+              <template v-else>
+                <!-- The kept seed is the list's window, not this one, so it stays labelled as such. -->
+                <span
+                  v-if="seedKept"
+                  class="text-text-secondary text-xs whitespace-nowrap"
+                  data-test="metrics-detail-preview-kept"
+                  >{{ t("metrics.explorer.detail.previewKept") }}</span
+                >
+                <ODataAge
+                  :at="pageFailure ? pageFailure.dataFrom : breakdownLost ? null : overviewAt"
+                  :failed-at="pageFailure?.failedAt ?? null"
+                  :failed-count="pageFailure?.count"
+                  :failed-total="pageFailure?.total"
+                  :data-test="
+                    pageFailure ? 'metrics-detail-refresh-failed' : 'metrics-detail-data-age'
+                  "
+                  @retry="retryPage"
+                />
+              </template>
+            </div>
           </div>
           <section
             class="border-border-default rounded-surface relative h-60 border"
             data-test="metrics-detail-overview"
           >
-            <OSpinner
-              v-if="overviewRefreshing"
-              size="xs"
-              class="absolute top-1 right-1 z-10"
-              data-test="metrics-detail-overview-refreshing"
+            <LoadingProgress
+              :loading="overviewState.status === 'loading' || overviewRefreshing"
+              :loading-progress-percentage="0"
             />
             <div
               v-if="overviewState.status === 'error'"
@@ -501,7 +543,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :allow-alert-creation="true"
               @error="onOverviewRenderError"
             />
-            <OSkeleton v-else class="h-full" animation="wave" />
+            <MetricCardChart
+              v-else-if="previewing && seed"
+              :class="STALE_DIM"
+              aria-busy="true"
+              :results="seed.results"
+              :queries="overviewQueries"
+              :chart-type="overview.chartType"
+              :unit="overviewUnit.unit"
+              :unit-custom="overviewUnit.unitCustom ?? undefined"
+              :bucket-unit="overviewBucketUnit.unit ?? undefined"
+              :bucket-unit-custom="overviewBucketUnit.unitCustom ?? undefined"
+              :color="color"
+              :time-range="seed.timeRange"
+              data-test="metrics-detail-preview-chart"
+            />
+            <PanelChartPlaceholder v-else data-test="metrics-detail-overview-loading" />
           </section>
         </OContent>
 
@@ -524,6 +581,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <MetricBreakdown
             v-if="activeTab === 'breakdown'"
             :card="card"
+            :labels-pending="labelsPending"
+            :retry-token="breakdownRetry"
+            :announces="!rangeChanging"
+            @busy="(busy: boolean) => (breakdownBusy = busy)"
+            @failures="(failures: BreakdownFailures) => (breakdownFailures = failures)"
             :labels-by-stream="labelsByStream"
             :filters="filters"
             :time-range="timeRange"
@@ -615,10 +677,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, ref, watch, type PropType } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import {
+  computed,
+  defineComponent,
+  nextTick,
+  onBeforeUnmount,
+  ref,
+  watch,
+  type PropType,
+} from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import MetricCardChart, { type ChartForecast, type ShiftedResult } from "./MetricCardChart.vue";
-import MetricBreakdown from "./MetricBreakdown.vue";
+import MetricBreakdown, { type BreakdownFailures } from "./MetricBreakdown.vue";
 import MetricChartTile, {
   type TileCompare,
   type TileForecast,
@@ -635,8 +705,14 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import ODataAge from "@/lib/core/RefreshButton/ODataAge.vue";
+import ODataAgeFailedReserve from "@/lib/core/RefreshButton/ODataAgeFailedReserve.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
+import { STALE_DIM } from "@/lib/styles/motion";
+import { announceAlert } from "@/lib/feedback/RegionStatus/announcer";
+import { formatRefreshFailed } from "@/utils/formatters";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -720,9 +796,22 @@ interface OverviewState {
 
 const IDLE: OverviewState = { status: "idle", results: [], error: "" };
 
+/** What the page's range status needs from the detail while it covers the grid. */
+export interface DetailStatus {
+  loading: boolean;
+  drawn: boolean;
+  /** Something on the page failed in its last run, so it must not be called updated. */
+  failed: boolean;
+  /** The page's one failed-refresh sentence, when its kept charts failed. */
+  failure: I18nText | null;
+}
+
 export default defineComponent({
   name: "MetricDetailView",
   components: {
+    ODataAge,
+    ODataAgeFailedReserve,
+    PanelChartPlaceholder,
     MetricCardChart,
     MetricBreakdown,
     MetricChartTile,
@@ -736,8 +825,8 @@ export default defineComponent({
     OTabs,
     OTab,
     OEmptyState,
-    OSkeleton,
     OSpinner,
+    LoadingProgress,
     OTooltip,
     OBanner,
     ODropdown,
@@ -750,8 +839,21 @@ export default defineComponent({
     /** `null` while loading, or when the URL names a metric that does not exist. */
     card: { type: Object as PropType<MetricCardModel | null>, default: null },
     metricName: { type: String, required: true },
-    /** The stream list or the label schemas are still loading. */
+    /** The metric list is still loading on a cold visit. */
     loading: { type: Boolean, default: false },
+    /** This metric's own schema is still loading, so Breakdown has no labels yet. */
+    labelsPending: { type: Boolean, default: false },
+    /** The page is announcing a range change for every chart, so the breakdown adds no words. */
+    rangeChanging: { type: Boolean, default: false },
+    /** The explorer card's drawn series, shown dimmed until the detail query lands. */
+    seed: {
+      type: Object as PropType<{
+        results: any[];
+        timeRange: { start_time: number; end_time: number };
+        lastTriggeredAt: number | null;
+      } | null>,
+      default: null,
+    },
     tab: { type: String as PropType<DetailTab | null>, default: null },
     breakdownLabel: { type: String as PropType<string | null>, default: null },
     /** The card's current query — its ⚙ override included — resolved by the grid. */
@@ -832,6 +934,7 @@ export default defineComponent({
     "update:compare",
     "update:forecast",
     "update:forecastHorizon",
+    "overview-status",
   ],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
@@ -888,9 +991,10 @@ export default defineComponent({
         if (!request.signal.aborted) usageStatus.value = "error";
       }
     };
+    // A string key: a fresh array would re-fire on every card rebuild and fetch the usage twice.
     watch(
-      () => [store.state.selectedOrganization?.identifier, props.card?.name] as const,
-      ([, metric]) => loadUsage(metric),
+      () => `${store.state.selectedOrganization?.identifier ?? ""}/${props.card?.name ?? ""}`,
+      () => loadUsage(props.card?.name),
       { immediate: true },
     );
     onBeforeUnmount(() => usageRequest?.abort());
@@ -1084,6 +1188,67 @@ export default defineComponent({
     let generation = 0;
     let active: AbortController | null = null;
     const overviewRefreshing = ref(false);
+    /** When the drawn overview was fetched; it never advances on a failed refresh. */
+    const overviewAt = ref<number | null>(null);
+    /** A refresh failed while the previous chart stays up (ruling 18). */
+    const overviewFailedAt = ref<number | null>(null);
+    /** The first load failed, so the drawn chart is still the list's preview. */
+    const seedKept = ref(false);
+    /** The breakdown grid's failures; while any is open, the page never says "Updated". */
+    const breakdownFailures = ref<BreakdownFailures>({ total: 0, kept: null, lost: 0 });
+    const breakdownLost = computed(() => breakdownFailures.value.lost > 0);
+    /** The page's one failed-refresh sentence (j3): the main chart and any kept breakdown chart whose refresh failed. */
+    const pageFailure = computed(() => {
+      const kept = breakdownFailures.value.kept;
+      const main = overviewFailedAt.value;
+      if (!main && !kept) return null;
+      const failedAt = Math.max(main ?? 0, kept?.failedAt ?? 0);
+      const times = [main ? overviewAt.value : null, kept?.dataFrom].filter(
+        (at): at is number => typeof at === "number",
+      );
+      const dataFrom = times.length ? Math.min(...times) : null;
+      // The main chart alone keeps the plain sentence; breakdown charts make it "for N of M charts".
+      if (!kept) return { failedAt, dataFrom, count: undefined, total: undefined };
+      return {
+        failedAt,
+        dataFrom,
+        count: kept.count + (main ? 1 : 0),
+        total: breakdownFailures.value.total + 1,
+      };
+    });
+    const breakdownRetry = ref(0);
+    const breakdownBusy = ref(false);
+    const pageFailureText = computed(() => {
+      const failure = pageFailure.value;
+      if (!failure?.dataFrom) return null;
+      return formatRefreshFailed(t, {
+        failedAt: failure.failedAt,
+        dataFrom: failure.dataFrom,
+        count: failure.count,
+        total: failure.total,
+      });
+    });
+    // Only the mounted tab's work counts: Related and Used in unmount Breakdown, which then reports nothing.
+    watch(activeTab, (tab) => {
+      if (tab === "breakdown") return;
+      breakdownBusy.value = false;
+      breakdownFailures.value = { total: 0, kept: null, lost: 0 };
+    });
+    // Said once when the page's run ends, with every chart that failed in it, not once per chart.
+    const pageLoading = computed(
+      () =>
+        overviewState.value.status === "loading" || overviewRefreshing.value || breakdownBusy.value,
+    );
+    // During a range change the explorer's region speaks for the page, failure included, so it is said once.
+    watch(pageLoading, (loading, was) => {
+      if (was && !loading && pageFailureText.value && !props.rangeChanging)
+        announceAlert(pageFailureText.value);
+    });
+    // The page's one Retry reloads every failed chart on it, not just the main one.
+    const retryPage = () => {
+      breakdownRetry.value += 1;
+      loadOverview(true);
+    };
 
     const cancelActive = () => {
       active?.abort();
@@ -1096,7 +1261,15 @@ export default defineComponent({
       cancelActive();
       overviewRefreshing.value = false;
       const exprs: string[] = props.overview.queries.map((query: any) => query.expr);
-      if (props.loading || !props.card || !exprs.length) {
+      const charting = !props.loading && !!props.card && exprs.length > 0;
+      const keeping = charting && keep && overviewState.value.status === "done";
+      if (!keeping) {
+        // The old chart is gone, so its age and failed refresh must not speak for the new one.
+        overviewAt.value = null;
+        overviewFailedAt.value = null;
+        seedKept.value = false;
+      }
+      if (!charting) {
         overviewState.value = IDLE;
         return;
       }
@@ -1105,7 +1278,7 @@ export default defineComponent({
       const compare = compareShift.value;
       active = new AbortController();
       const { signal } = active;
-      if (keep && overviewState.value.status === "done") overviewRefreshing.value = true;
+      if (keeping) overviewRefreshing.value = true;
       else overviewState.value = { status: "loading", results: [], error: "" };
       try {
         const window = compare && {
@@ -1135,6 +1308,9 @@ export default defineComponent({
           stepSeconds,
           forecast: null,
         };
+        overviewAt.value = Date.now();
+        overviewFailedAt.value = null;
+        seedKept.value = false;
         const forecast = await pendingForecast;
         if (mine !== generation) return;
         active = null;
@@ -1146,6 +1322,27 @@ export default defineComponent({
         // Not its own doing (that bumps `generation`): a shared query or bulk clear cancelled it.
         if (isCancelled(error)) {
           loadOverview(true);
+          return;
+        }
+        if (keeping) {
+          overviewFailedAt.value = Date.now();
+          return;
+        }
+        // The seed is real data, so a failed first load keeps it like any kept chart (ruling 18).
+        const seed = props.seed;
+        if (seed?.results.length) {
+          overviewState.value = {
+            status: "done",
+            results: seed.results,
+            shifted: [],
+            error: "",
+            timeRange: seed.timeRange,
+            stepSeconds,
+            forecast: null,
+          };
+          overviewAt.value = seed.lastTriggeredAt;
+          overviewFailedAt.value = Date.now();
+          seedKept.value = true;
           return;
         }
         overviewState.value = {
@@ -1224,7 +1421,77 @@ export default defineComponent({
       opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
     ) => props.runQuery(expr, signal, undefined, opts);
 
+    const previewing = computed(
+      () =>
+        !!props.seed &&
+        !!props.card &&
+        overviewState.value.status !== "done" &&
+        overviewState.value.status !== "error",
+    );
+    const statusShown = computed(() => previewing.value || overviewAt.value !== null);
+
+    // The page's range status follows this chart while the detail covers the grid.
+    watch(
+      (): DetailStatus => ({
+        loading: pageLoading.value,
+        drawn: overviewState.value.status === "done" || previewing.value,
+        failed:
+          !!pageFailure.value || breakdownLost.value || overviewState.value.status === "error",
+        failure: pageFailureText.value,
+      }),
+      (status, before) => {
+        if (
+          status.loading !== before?.loading ||
+          status.drawn !== before?.drawn ||
+          status.failed !== before?.failed ||
+          status.failure !== before?.failure
+        )
+          emit("overview-status", status);
+      },
+      { immediate: true },
+    );
+
+    // Focus lands on the heading when the detail arrives, so keyboard and screen reader users start there.
+    const root = ref<HTMLElement | null>(null);
+    const stopFocus = watch(
+      () => !props.loading && !!props.card,
+      async (ready) => {
+        if (!ready) return;
+        await nextTick();
+        const heading = root.value?.querySelector<HTMLElement>(
+          '[data-test="metrics-detail-title"]',
+        );
+        if (!heading) return;
+        heading.setAttribute("tabindex", "-1");
+        heading.focus({ preventScroll: true });
+        stopFocus();
+      },
+      { immediate: true },
+    );
+
+    // Related ranks every metric by shared labels, so only it asks for the org-wide schemas.
+    watch(
+      () => activeTab.value === "related",
+      (related) => {
+        if (related) void props.ensureSchemas();
+      },
+      { immediate: true },
+    );
+
     return {
+      root,
+      previewing,
+      statusShown,
+      overviewAt,
+      overviewFailedAt,
+      seedKept,
+      pageFailure,
+      breakdownLost,
+      breakdownFailures,
+      breakdownBusy,
+      breakdownRetry,
+      retryPage,
+      STALE_DIM,
       runBreakdownQuery,
       raw,
       t,
