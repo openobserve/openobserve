@@ -982,10 +982,7 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return byKind;
   return filterData(byKind, filterQuery.value);
 });
-// Keep the selection to rows the user can still see. A tab, filter, or search
-// change that hides a selected row unselects it, so bulk delete never removes
-// a template that is not on screen. `visibleRows` is taken before pagination,
-// so a selection across pages stays.
+// Unselect rows that tab, filter, or search hide; selections on other pages stay.
 watch(visibleRows, (rows) => {
   if (!selectedTemplates.value.length) return;
   const visible = new Map(rows.map((r: any) => [r.name, r]));
