@@ -1,10 +1,4 @@
-/**
- * SloImportPage - the SLO import screen (views/slos/ImportSlo.vue on BaseImport)
- *
- * BaseImport gets test-prefix="slo"; the folder picker is SelectFolderDropDown
- * with type="alerts", so its OSelect is `alerts-index-dropdown-stream_type`.
- */
-
+// The folder picker is SelectFolderDropDown with type="alerts", hence the alerts-index-dropdown hooks.
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
@@ -28,8 +22,6 @@ export class SloImportPage {
     return `[data-test="alerts-index-dropdown-stream_type-option"][data-test-value="${folderId}"]`;
   }
 
-  // ---------------------------------------------------------------- navigation
-
   async goto(orgId, folderId) {
     const folder = folderId ? `&folder=${encodeURIComponent(folderId)}` : '';
     await this.page.goto(`/web/slos/import?org_identifier=${orgId}${folder}`);
@@ -43,8 +35,6 @@ export class SloImportPage {
     await expect(this.page.locator(this.locators.editor)).toBeVisible({ timeout: 30000 });
     await expect(this.page.locator(this.locators.importJsonBtn)).toBeEnabled({ timeout: 30000 });
   }
-
-  // ------------------------------------------------------------------- actions
 
   async selectFolder(folderId, folderName) {
     const trigger = this.page.locator(this.locators.folderTrigger);
@@ -119,8 +109,6 @@ export class SloImportPage {
     await expect(this.page.locator(this.locators.importJsonBtn)).toBeEnabled({ timeout: 60000 });
     await expect(this.page.locator(this.locators.anyResult)).toHaveCount(count);
   }
-
-  // ---------------------------------------------------------------- assertions
 
   async expectFolderSelected(folderId) {
     await expect(this.page.locator(this.locators.folderTrigger))

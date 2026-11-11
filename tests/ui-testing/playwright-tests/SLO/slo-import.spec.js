@@ -1,14 +1,3 @@
-/**
- * SLO import (views/slos/ImportSlo.vue, added in #16546)
- *
- * The import page is UI-only on top of the create API: it strips server fields,
- * targets the chosen folder, creates SLOs one by one and reports each result.
- * Every case asserts against the server's SLO list, not just the screen.
- *
- * Self-cleaning: SLOs, folders and the stream carry a per-worker prefix and are
- * swept in afterAll (SLOs before folders, since a folder in use cannot go).
- */
-
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
