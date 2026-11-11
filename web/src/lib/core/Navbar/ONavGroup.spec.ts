@@ -1449,6 +1449,24 @@ describe("ONavGroup", () => {
       wrapper = w;
     });
 
+    it("a stale Enter on a locked item does not turn a later mouse click on the tile into a keyboard choice", async () => {
+      const { wrapper: w } = await mountLocked("/");
+      wrapper = w;
+      const flyoutEl = () => w.find('[data-test="nav-group-flyout-traces"]');
+      await w.get('[data-test="nav-group-item-traces-service-graph-locked"]').trigger("keydown", {
+        key: "Enter",
+      });
+      await w.trigger("mouseleave");
+      vi.advanceTimersByTime(CLOSE_DELAY * 10);
+      await flushPromises();
+      expect(flyoutEl().exists()).toBe(false);
+      const tileEl = w.get('[data-test="tile"]');
+      await tileEl.trigger("pointerdown");
+      click(tileEl.element, 1);
+      await flushPromises();
+      expect(flyoutEl().exists()).toBe(true);
+    });
+
     it("still lets the UNLOCKED sibling child navigate normally", async () => {
       const { wrapper: w, router } = await mountLocked("/");
 
