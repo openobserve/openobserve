@@ -27,7 +27,7 @@ use std::collections::{HashMap, HashSet};
 use config::meta::status_pages as engine;
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
-    table::{entity::status_page_notices, status_pages as table},
+    table::{entity::status_page_notices, status_pages as table, synthetics_runs},
 };
 
 const RESOLVED_LOOKBACK_MICROS: i64 = 90 * 86_400 * 1_000_000;
@@ -425,7 +425,21 @@ async fn apply_engine_actions(
     }
 
     let th_by_check = thresholds_by_check(data);
-    let mut held = false_alarm_holds(&data.notices, &data.states);
+    // Only a failing check can open an incident, so only a failing check needs the query.
+    let failing: HashSet<&str> = data
+        .states
+        .iter()
+        .filter(|s| s.down_runs > 0)
+        .map(|s| s.id.as_str())
+        .collect();
+    let mut held = HashSet::new();
+    for (check_id, starts_at) in false_alarm_marks(&data.notices) {
+        if failing.contains(check_id.as_str())
+            && !synthetics_runs::passed_since(conn, &check_id, starts_at).await?
+        {
+            held.insert(check_id);
+        }
+    }
     held.extend(data.snoozed.iter().cloned());
     let actions = engine::incident_actions_with(
         &checks,
@@ -441,31 +455,29 @@ async fn apply_engine_actions(
     Ok(())
 }
 
-/// Checks whose newest auto-incident was marked a false alarm during the failure that is still
-/// going on: the mark closed the incident, and the run class has not changed since. A new failure
-/// after a recovery changes the class, so it opens a new incident. Marking an incident that was
-/// already over holds nothing. This replaces the old six-hour snooze.
-fn false_alarm_holds(
-    notices: &[status_page_notices::Model],
-    states: &[table::CheckStateRow],
-) -> HashSet<String> {
-    let mut marked: HashMap<&str, i64> = HashMap::new();
+/// Checks whose newest auto-incident was closed by a false alarm mark, with the start of that
+/// incident. The caller holds a check until a run scheduled after that start passes in every
+/// job, so the hold ends at a recovery and never at a change of run class. A partial run or a
+/// Not measured run during the same failure keeps the hold, and a new failure after a recovery
+/// opens a new incident. Marking an incident that was already over holds nothing. This replaces
+/// the old six-hour snooze.
+fn false_alarm_marks(notices: &[status_page_notices::Model]) -> HashMap<String, i64> {
+    let mut marked: HashMap<String, (i64, i64)> = HashMap::new();
     for n in notices {
         if let (Some(check_id), Some(at)) = (n.auto_check_id.as_deref(), n.false_alarm_at)
             && n.resolved_at == Some(at)
         {
-            let e = marked.entry(check_id).or_insert(at);
-            *e = (*e).max(at);
+            let e = marked
+                .entry(check_id.to_owned())
+                .or_insert((at, n.starts_at));
+            if at > e.0 {
+                *e = (at, n.starts_at);
+            }
         }
     }
-    states
-        .iter()
-        .filter(|s| {
-            marked
-                .get(s.id.as_str())
-                .is_some_and(|at| s.last_run_class_at > 0 && s.last_run_class_at <= *at)
-        })
-        .map(|s| s.id.clone())
+    marked
+        .into_iter()
+        .map(|(id, (_, starts_at))| (id, starts_at))
         .collect()
 }
 
@@ -918,52 +930,48 @@ mod fast_pass_tests {
     }
 
     #[test]
-    fn a_false_alarm_holds_only_the_failure_it_was_marked_on() {
-        let notice = |check: &str, at: Option<i64>| status_page_notices::Model {
-            id: check.into(),
-            org_id: "org".into(),
-            kind: 0,
-            impact: 0,
-            source: 0,
-            title: String::new(),
-            body: String::new(),
-            state: 2,
-            starts_at: 0,
-            resolved_at: at,
-            segments: "[]".into(),
-            excluded_from_uptime: at.is_some(),
-            deleted_at: None,
-            auto_check_id: Some(check.into()),
-            auto_recovery_streak: 0,
-            owner: None,
-            false_alarm_by: None,
-            false_alarm_at: at,
-            false_alarm_reason: None,
-            created_at: 0,
-            updated_at: 0,
+    fn a_false_alarm_mark_gives_the_start_of_the_marked_incident() {
+        let notice = |check: &str, starts_at: i64, resolved: Option<i64>, mark: Option<i64>| {
+            status_page_notices::Model {
+                id: format!("{check}-{starts_at}"),
+                org_id: "org".into(),
+                kind: 0,
+                impact: 0,
+                source: 0,
+                title: String::new(),
+                body: String::new(),
+                state: 2,
+                starts_at,
+                resolved_at: resolved,
+                segments: "[]".into(),
+                excluded_from_uptime: mark.is_some(),
+                deleted_at: None,
+                auto_check_id: Some(check.into()),
+                auto_recovery_streak: 0,
+                owner: None,
+                false_alarm_by: None,
+                false_alarm_at: mark,
+                false_alarm_reason: None,
+                created_at: 0,
+                updated_at: 0,
+            }
         };
         let notices = vec![
-            notice("same", Some(500)),
-            notice("new", Some(500)),
-            notice("real", None),
+            // Marked while open: the mark closed it.
+            notice("same", 400, Some(500), Some(500)),
+            // Two marks on one check: the newest mark wins.
+            notice("two", 100, Some(200), Some(200)),
+            notice("two", 700, Some(800), Some(800)),
+            // Not a false alarm.
+            notice("real", 400, Some(500), None),
+            // Resolved at 300 and marked at 500: the incident was already over.
+            notice("old", 100, Some(300), Some(500)),
         ];
-        // Down since 400, marked at 500: the same failure, held.
-        let mut same = row("same", 3);
-        same.last_run_class_at = 400;
-        // Recovered and failed again at 600: a new failure, not held.
-        let mut new = row("new", 3);
-        new.last_run_class_at = 600;
-        // Not a false alarm: never held.
-        let mut real = row("real", 3);
-        real.last_run_class_at = 400;
-        // An incident over at 300, marked at 500, while a new failure began at 400: not held.
-        let mut old_notice = notice("old", Some(500));
-        old_notice.resolved_at = Some(300);
-        let notices = [notices, vec![old_notice]].concat();
-        let mut old = row("old", 3);
-        old.last_run_class_at = 400;
-        let held = false_alarm_holds(&notices, &[same, new, real, old]);
-        assert_eq!(held, HashSet::from(["same".to_string()]));
+        let marks = false_alarm_marks(&notices);
+        assert_eq!(
+            marks,
+            HashMap::from([("same".to_string(), 400), ("two".to_string(), 700)])
+        );
     }
 
     #[test]

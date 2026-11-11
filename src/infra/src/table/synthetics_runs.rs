@@ -445,6 +445,30 @@ pub async fn get_run<C: ConnectionTrait>(
         .map_err(errors::Error::from)
 }
 
+/// True when a finished run of the check, scheduled after `since`, passed in every job
+/// (`run_result` 1 = Passed or 2 = Warning). A false alarm hold ends at such a run. A partial
+/// run or a Not measured run does not end it.
+pub async fn passed_since<C: ConnectionTrait>(
+    conn: &C,
+    synthetics_id: &str,
+    since: i64,
+) -> Result<bool, errors::Error> {
+    let sql = r#"
+        SELECT id FROM synthetics_runs
+        WHERE synthetics_id = $1 AND scheduled_ts > $2
+          AND completed_at IS NOT NULL AND run_result IN (1, 2)
+        LIMIT 1
+    "#;
+    let rows = conn
+        .query_all(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            sql,
+            [Value::from(synthetics_id.to_owned()), Value::from(since)],
+        ))
+        .await?;
+    Ok(!rows.is_empty())
+}
+
 /// Counts the job and, for the caller that completes the run, writes the run result to the check
 /// row in the same transaction.
 pub async fn finalize_run<C: ConnectionTrait + TransactionTrait>(
@@ -1421,6 +1445,27 @@ mod tests {
             "badge stays the newest run's"
         );
         assert_eq!(late.check_update, Some(row));
+    }
+
+    #[tokio::test]
+    async fn only_a_run_that_passed_everywhere_ends_a_false_alarm_hold() {
+        let db = db().await;
+        // Incident opened at 150. A partial run and a Not measured run keep the hold.
+        run_with_jobs(&db, "partial", 200, 2).await;
+        ack(&db, "partial", 0, 1, 210).await;
+        ack(&db, "partial", 1, 3, 220).await;
+        run_with_jobs(&db, "gap", 300, 1).await;
+        ack(&db, "gap", 0, 4, 310).await;
+        assert!(!passed_since(&db, "mon-1", 150).await.unwrap());
+        // A passing run that finalizes after a newer Down run still ends the hold.
+        run_with_jobs(&db, "late_up", 400, 1).await;
+        run_with_jobs(&db, "down", 500, 1).await;
+        ack(&db, "down", 0, 3, 510).await;
+        assert!(!passed_since(&db, "mon-1", 150).await.unwrap());
+        ack(&db, "late_up", 0, 1, 600).await;
+        assert!(passed_since(&db, "mon-1", 150).await.unwrap());
+        // A pass before the incident start does not count.
+        assert!(!passed_since(&db, "mon-1", 400).await.unwrap());
     }
 
     #[tokio::test]
