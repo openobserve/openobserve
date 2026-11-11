@@ -220,7 +220,7 @@ pub struct ListTemplatesQuery {
     pub applies_to: Option<String>,
     #[serde(rename = "type")]
     pub template_type: Option<String>,
-    /// When true, each template carries `used_by` counts, aggregated once for the whole list.
+    /// When true, each template includes `used_by` reference counts.
     pub include_usage: Option<bool>,
 }
 
@@ -273,7 +273,7 @@ impl ListTemplatesQuery {
         ListTemplatesQuery,
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<TemplateWithUsage>)),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Template>)),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(

@@ -410,46 +410,6 @@ pub async fn all_used_by(org_id: &str) -> Result<HashMap<String, UsedBy>, Templa
     ))
 }
 
-/// Folds cache counts and one template name per consumer row into `UsedBy` per name.
-/// `rows` is anomaly, synthetics, on_call, composites, in that order.
-fn fold_used_by(
-    destinations: HashMap<String, usize>,
-    alerts: HashMap<String, usize>,
-    rows: [Vec<String>; 4],
-) -> HashMap<String, UsedBy> {
-    let mut by_name: HashMap<String, UsedBy> = HashMap::new();
-    for (name, n) in destinations {
-        by_name.entry(name).or_default().destinations += n;
-    }
-    for (name, n) in alerts {
-        by_name.entry(name).or_default().alerts += n;
-    }
-    let [anomaly, synthetics, on_call, composites] = rows;
-    for name in anomaly {
-        by_name.entry(name).or_default().anomaly += 1;
-    }
-    for name in synthetics {
-        by_name.entry(name).or_default().synthetics += 1;
-    }
-    for name in on_call {
-        by_name.entry(name).or_default().on_call += 1;
-    }
-    for name in composites {
-        by_name.entry(name).or_default().composites += 1;
-    }
-    by_name
-}
-
-/// The org whose references count for a listed template: its owner, as GET template uses.
-/// A default-org template listed in another org counts references in every org.
-fn usage_owner<'a>(request_org: &'a str, template_org: &'a str) -> &'a str {
-    if template_org.is_empty() {
-        request_org
-    } else {
-        template_org
-    }
-}
-
 /// `used_by` for each listed template, in order. One aggregate per owner org, usually one or two.
 pub async fn list_used_by(
     request_org: &str,
@@ -464,24 +424,6 @@ pub async fn list_used_by(
         }
     }
     Ok(pick_used_by(request_org, templates, &by_owner))
-}
-
-/// Each template's counts from its owner org's aggregate; a name with no references is zero.
-fn pick_used_by(
-    request_org: &str,
-    templates: &[Template],
-    by_owner: &HashMap<String, HashMap<String, UsedBy>>,
-) -> Vec<UsedBy> {
-    templates
-        .iter()
-        .map(|t| {
-            by_owner
-                .get(usage_owner(request_org, &t.org_id))
-                .and_then(|by_name| by_name.get(&t.name))
-                .cloned()
-                .unwrap_or_default()
-        })
-        .collect()
 }
 
 /// A level 1 or level 3 binding must name a user template that applies to `kind`.
@@ -766,6 +708,64 @@ async fn owners_to_disown(org_id: &str, name: &str) -> Result<Vec<String>, Templ
     let mut owners =
         db::alerts::templates::tuple_owners(org_id, std::slice::from_ref(&name)).await?;
     Ok(owners.remove(&name).unwrap_or_default())
+}
+
+/// Folds cache counts and one template name per consumer row into `UsedBy` per name.
+/// `rows` is anomaly, synthetics, on_call, composites, in that order.
+fn fold_used_by(
+    destinations: HashMap<String, usize>,
+    alerts: HashMap<String, usize>,
+    rows: [Vec<String>; 4],
+) -> HashMap<String, UsedBy> {
+    let mut by_name: HashMap<String, UsedBy> = HashMap::new();
+    for (name, n) in destinations {
+        by_name.entry(name).or_default().destinations += n;
+    }
+    for (name, n) in alerts {
+        by_name.entry(name).or_default().alerts += n;
+    }
+    let [anomaly, synthetics, on_call, composites] = rows;
+    for name in anomaly {
+        by_name.entry(name).or_default().anomaly += 1;
+    }
+    for name in synthetics {
+        by_name.entry(name).or_default().synthetics += 1;
+    }
+    for name in on_call {
+        by_name.entry(name).or_default().on_call += 1;
+    }
+    for name in composites {
+        by_name.entry(name).or_default().composites += 1;
+    }
+    by_name
+}
+
+/// The org whose references count for a listed template: its owner, as GET template uses.
+/// A default-org template listed in another org counts references in every org.
+fn usage_owner<'a>(request_org: &'a str, template_org: &'a str) -> &'a str {
+    if template_org.is_empty() {
+        request_org
+    } else {
+        template_org
+    }
+}
+
+/// Each template's counts from its owner org's aggregate; a name with no references is zero.
+fn pick_used_by(
+    request_org: &str,
+    templates: &[Template],
+    by_owner: &HashMap<String, HashMap<String, UsedBy>>,
+) -> Vec<UsedBy> {
+    templates
+        .iter()
+        .map(|t| {
+            by_owner
+                .get(usage_owner(request_org, &t.org_id))
+                .and_then(|by_name| by_name.get(&t.name))
+                .cloned()
+                .unwrap_or_default()
+        })
+        .collect()
 }
 
 #[cfg(test)]
