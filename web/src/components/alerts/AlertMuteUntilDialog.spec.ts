@@ -65,17 +65,25 @@ describe("AlertMuteUntilDialog", () => {
     wrapper.unmount();
   });
 
-  it.each(["conflict", "failed"])(
-    "stays open on %s and lets its screen refresh",
-    async (result) => {
-      extend.mockResolvedValue(result);
-      const wrapper = await mountDialog();
-      await submit();
-      expect(extend).toHaveBeenCalledTimes(1);
-      expect(wrapper.emitted("done")).toBeUndefined();
-      expect(wrapper.emitted("update:open")).toBeUndefined();
-      expect(wrapper.emitted("settled")).toHaveLength(1);
-      wrapper.unmount();
-    },
-  );
+  it("stays open on conflict and lets its screen refresh", async () => {
+    extend.mockResolvedValue("conflict");
+    const wrapper = await mountDialog();
+    await submit();
+    expect(extend).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted("done")).toBeUndefined();
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+    expect(wrapper.emitted("settled")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("stays open on failed with no refresh, since no answer came", async () => {
+    extend.mockResolvedValue("failed");
+    const wrapper = await mountDialog();
+    await submit();
+    expect(extend).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted("done")).toBeUndefined();
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+    expect(wrapper.emitted("settled")).toBeUndefined();
+    wrapper.unmount();
+  });
 });

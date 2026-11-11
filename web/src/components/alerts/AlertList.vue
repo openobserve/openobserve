@@ -1224,7 +1224,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="downtimesEnabled"
       v-model:open="downtimeRowActions.extendUntilOpen.value"
       :downtime="downtimeRowActions.extendUntilRow.value"
-      @extended="refreshAlerts"
+      :submit="downtimeRowActions.extendUntil"
+      @settled="refreshAlerts"
     />
     <ExportResourceDialog
       v-model:open="showExportDialog"

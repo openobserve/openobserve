@@ -124,6 +124,34 @@ describe("useDowntimeRowActions", () => {
     expect(lastToast()?.message).toBe("This mute changed. Open the downtime.");
   });
 
+  it("extends until a time at the row's version, with the row messages on a refusal", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: { id: "d1", folder_id: "ops", version: 5, current_window: { start: 1, end: 2 } },
+    } as any);
+    const api = mountActions();
+    expect(await api.extendUntil(9)).toBe("failed");
+    await api.openExtendUntil(mute);
+    vi.mocked(downtimes.extend).mockResolvedValue({
+      data: { id: "d1", schedule: { ends_at: 4_102_448_400_000_000 } },
+    } as any);
+    expect(await api.extendUntil(4_102_448_400_000_000)).toBe("ok");
+    expect(downtimes.extend).toHaveBeenCalledWith(
+      "acme",
+      "d1",
+      { until: 4_102_448_400_000_000, version: 3 },
+      "ops",
+    );
+    const refetch = vi.spyOn(queryClient, "invalidateQueries");
+    vi.mocked(downtimes.extend).mockRejectedValue(httpError(409));
+    expect(await api.extendUntil(4_102_448_400_000_000)).toBe("conflict");
+    expect(lastToast()?.message).toBe("This mute changed. Open the downtime.");
+    expect(refetch).toHaveBeenCalled();
+    vi.mocked(downtimes.extend).mockRejectedValue(httpError(403));
+    expect(await api.extendUntil(4_102_448_400_000_000)).toBe("conflict");
+    expect(lastToast()?.message).toBe("You do not have permission to end this mute.");
+    refetch.mockRestore();
+  });
+
   it("opens Extend until on the stored row, kept at the version the row showed", async () => {
     vi.mocked(downtimes.get).mockResolvedValue({
       data: { id: "d1", folder_id: "ops", version: 5, current_window: { start: 1, end: 2 } },

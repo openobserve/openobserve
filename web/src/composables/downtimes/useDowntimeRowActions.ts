@@ -25,11 +25,14 @@ import {
   extendDowntimeMutation,
   mutedListKeys,
 } from "@/services/downtimes.queries";
-import type { ActiveDowntime, DowntimeListItem } from "@/services/downtimes";
+import type { ActiveDowntime, DowntimeListItem, ExtendDowntimeRequest } from "@/services/downtimes";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { endTimeText } from "@/utils/downtimes/quickMute";
 import { downtimeLink } from "@/utils/downtimes/link";
 import { failureResult, failureStatus, type MuteActionResult } from "@/utils/downtimes/muteResult";
+
+/** What a write needs of the mute: the row's version guards it, the folder routes it. */
+type MuteRow = Pick<ActiveDowntime, "id" | "folder_id" | "version">;
 
 /** End and Extend of an anomaly or synthetics row's own mute, through the downtime routes. */
 export function useDowntimeRowActions() {
@@ -51,7 +54,7 @@ export function useDowntimeRowActions() {
     }
   };
 
-  const failed = (err: unknown, downtime: ActiveDowntime, fallback: "cancel" | "extend") => {
+  const failed = (err: unknown, downtime: MuteRow, fallback: "cancel" | "extend") => {
     const status = failureStatus(err);
     if (status !== undefined) refetchLists();
     if (status === 409) {
@@ -89,11 +92,14 @@ export function useDowntimeRowActions() {
     }
   };
 
-  const extendBy = async (downtime: ActiveDowntime, seconds: number): Promise<MuteActionResult> => {
+  const extendWith = async (
+    downtime: MuteRow,
+    body: ExtendDowntimeRequest,
+  ): Promise<MuteActionResult> => {
     try {
       const result = await extendWrite.mutateAsync({
         id: downtime.id,
-        body: { by_secs: seconds, version: downtime.version },
+        body: { ...body, version: downtime.version },
         folder: downtime.folder_id || undefined,
       });
       const ends = result.schedule?.ends_at;
@@ -103,6 +109,16 @@ export function useDowntimeRowActions() {
     } catch (err: unknown) {
       return failed(err, downtime, "extend");
     }
+  };
+
+  const extendBy = (downtime: ActiveDowntime, seconds: number) =>
+    extendWith(downtime, { by_secs: seconds });
+
+  /** The submit of the Extend until… dialog that [openExtendUntil] opened. */
+  const extendUntil = async (until: number): Promise<MuteActionResult> => {
+    const row = extendUntilRow.value;
+    if (!row) return "failed";
+    return extendWith(row, { until });
   };
 
   /** Extend until… needs the stored window; the row's version still guards the write. */
@@ -118,5 +134,5 @@ export function useDowntimeRowActions() {
     }
   };
 
-  return { end, extendBy, openExtendUntil, extendUntilOpen, extendUntilRow };
+  return { end, extendBy, extendUntil, openExtendUntil, extendUntilOpen, extendUntilRow };
 }

@@ -17,6 +17,7 @@
  * How an End or Extend from a row went. `conflict`: the server refused it (409, 403, 404), so
  * the row is stale and its screen refreshes. `failed`: no answer came, so nothing changed.
  */
+// Named for what the screen does next, not the HTTP status: every answer that is not ok refreshes.
 export type MuteActionResult = "ok" | "conflict" | "failed";
 
 /** Any server answer is a `conflict`; only a request with no response is `failed`. */

@@ -550,6 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="downtimesEnabled"
     v-model:open="rowMuteActions.extendUntilOpen.value"
     :downtime="rowMuteActions.extendUntilRow.value"
+    :submit="rowMuteActions.extendUntil"
   />
 
   <!-- Spark bar detail tooltip -->

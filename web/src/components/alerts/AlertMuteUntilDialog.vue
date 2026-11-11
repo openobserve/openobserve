@@ -84,7 +84,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   "update:open": [value: boolean];
   done: [];
-  /** A refused or unanswered extend: the dialog stays open and its screen refreshes. */
+  /** The server refused the extend: the dialog stays open and its screen refreshes. */
   settled: [];
 }>();
 
@@ -103,10 +103,10 @@ const form = useOForm<ExtendForm>({
     const until = extendUntil(values, timezone);
     const target = props.target;
     if (!target || !props.downtime || until === null) return;
-    if ((await actions.extend(target, props.downtime, { endsAt: until })) !== "ok") {
-      emit("settled");
-      return;
-    }
+    const result = await actions.extend(target, props.downtime, { endsAt: until });
+    // No answer means nothing changed, so only a refusal makes the screen refresh.
+    if (result === "conflict") emit("settled");
+    if (result !== "ok") return;
     emit("done");
     emit("update:open", false);
   },

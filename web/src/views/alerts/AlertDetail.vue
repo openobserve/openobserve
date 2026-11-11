@@ -401,7 +401,8 @@
       v-if="isAnomalyAlert && downtimesEnabled"
       v-model:open="anomalyMuteActions.extendUntilOpen.value"
       :downtime="anomalyMuteActions.extendUntilRow.value"
-      @extended="onAckMuteChanged"
+      :submit="anomalyMuteActions.extendUntil"
+      @settled="onAckMuteChanged"
     />
   </OPageLayout>
 </template>
