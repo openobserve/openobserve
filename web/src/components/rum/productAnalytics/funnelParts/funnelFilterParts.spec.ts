@@ -135,17 +135,28 @@ describe("FunnelFilterBar", () => {
     expect(next).not.toHaveProperty("f");
   });
 
-  it("holds back a rule the server would refuse", () => {
+  it("drops a rule the server would refuse with a toast and still applies the others", () => {
+    toastSpy.mockClear();
+    const kept = { field: "geo_info_country", op: "in" as const, values: ["India"] };
     const w = mountBar();
     builder(w).vm.$emit("update:modelValue", [
+      kept,
       { field: "usr_email", op: "regex", values: ["(?=lookahead)"] },
     ]);
-    expect(w.emitted("update:def")).toBeUndefined();
+    const [[next]] = w.emitted("update:def") as [FunnelDef][];
+    expect(next.f).toEqual([kept]);
+    expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+  });
+
+  it("applies valid rules without a toast", () => {
+    toastSpy.mockClear();
+    const w = mountBar();
     builder(w).vm.$emit("update:modelValue", [
       { field: "usr_email", op: "regex", values: ["^admin@"] },
     ]);
     const [[next]] = w.emitted("update:def") as [FunnelDef][];
     expect(next.f).toEqual([{ field: "usr_email", op: "regex", values: ["^admin@"] }]);
+    expect(toastSpy).not.toHaveBeenCalled();
   });
 
   it("asks the owner for a field's values and answers with the rows it hands down", async () => {

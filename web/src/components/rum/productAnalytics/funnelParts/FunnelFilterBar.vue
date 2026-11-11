@@ -111,6 +111,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
 import { parseFunnelFilter } from "@/utils/rum/productAnalyticsModel";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import type { FunnelDef, FunnelFilter } from "@/utils/rum/productAnalyticsQueries";
 
 defineOptions({ name: "FunnelFilterBar" });
@@ -147,10 +148,13 @@ const loadValues = valuesLoader(
   (field) => emit("filter-values", field),
 );
 
-// A rule the server would refuse stays in the builder, marked, and the funnel keeps its last valid filters.
+// A rule the server would refuse is dropped with a toast, so one bad chip never blocks later edits.
 const onChange = (next: unknown) => {
-  const rules = next as FunnelFilter[];
-  if (!rules.every((rule) => parseFunnelFilter(rule))) return;
+  const all = next as FunnelFilter[];
+  const rules = all.filter((rule) => parseFunnelFilter(rule));
+  if (rules.length < all.length) {
+    toast({ variant: "error", message: t("rum.analytics.funnel.filterRejected") });
+  }
   const out: FunnelDef = { ...props.def, f: rules };
   if (!rules.length) delete out.f;
   emit("update:def", out);
