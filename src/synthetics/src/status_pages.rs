@@ -194,6 +194,63 @@ struct RebuilderState {
     /// Highest `updated_at` consumed so far (the delta watermark).
     watermark: i64,
     tick_count: u64,
+    /// This process confirmed that the holds are safe for its build, see [`holds_ready`].
+    holds_build_checked: bool,
+    /// When the build gate was first seen open in a row, for the drain grace of [`holds_ready`].
+    gate_open_since: Option<i64>,
+}
+
+/// Metadata key with the git commit that last checked the false alarm holds.
+const HOLDS_BUILD_KEY: &str = "/synthetics/false_alarm_holds_build";
+
+/// Whether false alarm holds may apply this tick. They need every online node on this build (the
+/// gate), and once per new build a reset of all holds.
+///
+/// During a rolling deploy an old node can finish a recovery without moving the recovery stamp,
+/// so a hold armed before or during the deploy could match the next outage. An old node leaves the
+/// online list before it stops writing (it drains its HTTP requests after it goes offline), so
+/// the reset waits until the gate stayed open for longer than that drain, then moves every stamp
+/// and disarms every hold. A restart of the same build finds its commit under
+/// [`HOLDS_BUILD_KEY`]: no old node can be left, so the holds apply at once and nothing resets.
+async fn holds_ready(
+    conn: &sea_orm::DatabaseConnection,
+    now: i64,
+    rt: &mut RebuilderState,
+) -> Result<bool, infra::errors::Error> {
+    if !infra::cluster::all_online_nodes_run_this_build().await {
+        rt.gate_open_since = None;
+        return Ok(false);
+    }
+    if rt.holds_build_checked {
+        return Ok(true);
+    }
+    let db = infra::db::get_db().await;
+    if db.get(HOLDS_BUILD_KEY).await.ok().as_deref() == Some(config::COMMIT_HASH.as_bytes()) {
+        rt.holds_build_checked = true;
+        return Ok(true);
+    }
+    let since = *rt.gate_open_since.get_or_insert(now);
+    if now - since < holds_drain_grace_micros() {
+        return Ok(false);
+    }
+    infra::table::synthetics_checks::reset_false_alarm_holds(conn, now).await?;
+    db.put(
+        HOLDS_BUILD_KEY,
+        config::COMMIT_HASH.as_bytes().to_vec().into(),
+        false,
+        None,
+    )
+    .await?;
+    tracing::info!("[status_pages] new build — false alarm holds reset");
+    rt.holds_build_checked = true;
+    Ok(true)
+}
+
+/// Twice the HTTP drain timeout plus a minute, so an old node that went offline has stopped
+/// finishing runs before a new build resets the holds.
+fn holds_drain_grace_micros() -> i64 {
+    let drain = config::get_config().limit.http_shutdown_timeout.max(1) as i64;
+    (2 * drain + 60) * 1_000_000
 }
 
 /// Per-check thresholds from the pages the check is mapped to. A check on
@@ -340,7 +397,13 @@ async fn load(
         .map(|s| s.synthetics_id)
         .collect();
     snoozed.extend(muted_checks(conn, &mappings).await);
-    let holds_allowed = infra::cluster::all_online_nodes_run_this_build().await;
+    let holds_allowed = match holds_ready(conn, now, rt).await {
+        Ok(ready) => ready,
+        Err(e) => {
+            tracing::error!("[status_pages] false alarm hold check failed: {e}");
+            false
+        }
+    };
     Ok(TickData {
         pages,
         components,

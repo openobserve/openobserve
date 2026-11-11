@@ -739,6 +739,7 @@ mod tests {
             run_class: 3,
             run_class_at: 200,
             tested_at: 200,
+            recovered_at: 0,
         };
         apply_last_check_status(&db, "org1", "check-1", &newer)
             .await
@@ -753,6 +754,7 @@ mod tests {
             run_class: 1,
             run_class_at: 100,
             tested_at: 100,
+            recovered_at: 0,
         };
         apply_last_check_status(&db, "org1", "check-1", &older)
             .await
@@ -833,6 +835,7 @@ mod tests {
             run_class: 0,
             run_class_at: 0,
             tested_at: 0,
+            recovered_at: 0,
         })
         .unwrap();
         let msg = Message::new(

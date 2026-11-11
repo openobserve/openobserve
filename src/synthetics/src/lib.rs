@@ -287,7 +287,11 @@ async fn ownership_supervisor() {
                     generation,
                     "[synthetics] ownership acquired — starting workers"
                 );
-                reset_holds_if_owner_changed(generation).await;
+                // Not started until the holds are safe: the next poll tries again.
+                if !reset_holds_if_owner_changed(generation).await {
+                    tokio::time::sleep(JOB_CLUSTER_POLL).await;
+                    continue;
+                }
                 let (tx, token) = StopToken::new();
                 running = Some((tx, spawn_workers(token)));
             }
@@ -327,8 +331,10 @@ fn hold_reset_needed(marker: Result<&str, ()>, local_cluster: &str) -> bool {
 /// Run before the workers start. After a real handoff, this cluster's copy of the check rows can
 /// miss a recovery that the old owner saw, so a false alarm hold could hide a new outage. The
 /// reset disarms every hold and moves every recovery stamp; then the marker names this cluster.
+/// Returns false when the reset or the marker write failed: the workers must not start then,
+/// because a stale hold could apply, and a later restart would reset holds made after this one.
 #[cfg(feature = "enterprise")]
-async fn reset_holds_if_owner_changed(generation: u64) {
+async fn reset_holds_if_owner_changed(generation: u64) -> bool {
     use o2_enterprise::enterprise::super_cluster::kv;
 
     let local = config::get_cluster_name();
@@ -340,28 +346,30 @@ async fn reset_holds_if_owner_changed(generation: u64) {
         );
     }
     if !hold_reset_needed(marker.as_deref().map_err(|_| ()), &local) {
-        return;
+        return true;
     }
     let conn = infra::db::get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     if let Err(e) = infra::table::synthetics_checks::reset_false_alarm_holds(conn, now).await {
-        // Start anyway: the next start retries, because the marker still names another cluster.
         tracing::error!(
             generation,
             "[synthetics] false alarm hold reset failed: {e}"
         );
-        return;
+        return false;
     }
     tracing::info!(
         generation,
         "[synthetics] new owner — false alarm holds reset"
     );
+    // The reset is safe to repeat, so a failed write only costs one more reset at the next poll.
     if let Err(e) = kv::scheduler::set_synthetics_hold_owner(&local).await {
-        tracing::warn!(
+        tracing::error!(
             generation,
             "[synthetics] could not write the hold owner: {e}"
         );
+        return false;
     }
+    true
 }
 
 #[cfg(feature = "enterprise")]

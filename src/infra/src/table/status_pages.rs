@@ -297,6 +297,20 @@ pub async fn get_notice_by_id(
         .await?)
 }
 
+/// [`get_notice_by_id`] from the primary. A read right after a write must not see a replica
+/// that lags behind it.
+pub async fn get_notice_by_id_primary(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<status_page_notices::Model>, errors::Error> {
+    let conn = get_orm_client_rw().await;
+    Ok(status_page_notices::Entity::find_by_id(id)
+        .filter(status_page_notices::Column::OrgId.eq(org_id))
+        .filter(status_page_notices::Column::DeletedAt.is_null())
+        .one(conn)
+        .await?)
+}
+
 /// Full-row replace for the admin write path (create/edit/mark-false-positive
 /// all go through here) — unlike [`update_notice_runtime`] this is not a
 /// column-selective patch, so the caller supplies the complete model.

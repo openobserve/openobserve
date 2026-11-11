@@ -522,14 +522,48 @@ pub async fn get_cached_online_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| node.status == NodeStatus::Online).await
 }
 
-/// True when every online node of this cluster runs this build. A synthetics false alarm hold
-/// is armed and applied only then: during a rolling deploy an old node can finish a recovery
-/// without moving the recovery stamp, which would let a hold hide the next outage. Unknown
+/// True when every online node of this cluster runs this build, by git commit. A synthetics false
+/// alarm hold is armed and applied only then: during a rolling deploy an old node can finish a
+/// recovery without moving the recovery stamp, which would let a hold hide the next outage. Unknown
 /// counts as false.
 pub async fn all_online_nodes_run_this_build() -> bool {
-    match get_cached_online_nodes().await {
-        Some(nodes) if !nodes.is_empty() => nodes.iter().all(|n| n.version == config::VERSION),
+    all_nodes_run_commit(
+        get_cached_online_nodes().await.as_deref(),
+        config::COMMIT_HASH,
+    )
+}
+
+fn all_nodes_run_commit(nodes: Option<&[Node]>, commit: &str) -> bool {
+    match nodes {
+        Some(nodes) if !nodes.is_empty() => nodes.iter().all(|n| n.commit == commit),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod build_gate_tests {
+    use super::*;
+
+    #[test]
+    fn holds_need_every_node_on_this_commit() {
+        let node = |commit: &str| Node {
+            commit: commit.to_string(),
+            ..Node::default()
+        };
+        assert!(all_nodes_run_commit(
+            Some(&[node("abc"), node("abc")]),
+            "abc"
+        ));
+        assert!(
+            !all_nodes_run_commit(Some(&[node("abc"), node("old")]), "abc"),
+            "rolling deploy"
+        );
+        assert!(
+            !all_nodes_run_commit(Some(&[node("abc"), node("")]), "abc"),
+            "older node"
+        );
+        assert!(!all_nodes_run_commit(Some(&[]), "abc"), "empty list");
+        assert!(!all_nodes_run_commit(None, "abc"), "unknown");
     }
 }
 
