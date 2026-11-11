@@ -1949,4 +1949,10 @@ watch(isIncidentsEnabled, (enabled) => {
   sectionState.incidents.loaded = false;
   void runSection("incidents", (current) => loadIncidents(false, current));
 });
+// a failed config fetch is retried after mount, so the flag can turn on once the first pass has skipped the section
+watch(anomalyEnabled, (enabled) => {
+  if (!enabled) return;
+  sectionState.anomalies.loaded = false;
+  void runSection("anomalies", (current) => loadAnomalies(false, current));
+});
 </script>
