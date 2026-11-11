@@ -160,6 +160,8 @@ describe("isFiringNow", () => {
     [{ last_outcome: "error", groups_firing: 2 }, true],
     [{ last_outcome: "error" }, false],
     [{ last_outcome: "normal" }, false],
+    [{ last_outcome: "firing", enabled: false, firing_started_at: 5 }, false],
+    [{ last_outcome: "firing", enabled: true }, true],
   ])("reads %j", (over, expected) => {
     expect(isFiringNow(row(over))).toBe(expected);
   });
@@ -186,6 +188,10 @@ describe("isInState", () => {
     ["muted but not firing", { last_outcome: "normal", ...muted }, []],
     ["errored open single", { last_outcome: "error", firing_started_at: 10 }, ["firing"]],
     ["errored open multi", { last_outcome: "error", groups_firing: 2 }, ["firing"]],
+    ["disabled while firing", { last_outcome: "firing", enabled: false }, []],
+    ["disabled not delivered", { last_outcome: "notify_failed", enabled: false }, []],
+    ["disabled muted", { last_outcome: "firing", enabled: false, ...muted }, []],
+    ["disabled acked", { last_outcome: "firing", enabled: false, ack: ack() }, []],
   ])("classifies %s", (_name, over, expected) => {
     expect(views(over)).toEqual(expected);
   });
@@ -222,6 +228,8 @@ describe("countStates", () => {
         row({ last_outcome: "normal" }),
         row({ last_outcome: "firing", ack: ack() }),
         row({ last_outcome: "firing", active_downtime: { id: "d" } as any }),
+        row({ last_outcome: "firing", enabled: false }),
+        row({ last_outcome: "notify_failed", enabled: false }),
       ]),
     ).toEqual({ firing: 2, acked: 1, muted: 1, failed: 1 });
   });

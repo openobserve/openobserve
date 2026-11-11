@@ -818,6 +818,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             });
 
             audit(AuditMessage {
+                login_ip: None,
+                user_agent: None,
                 user_email,
                 org_id,
                 _timestamp: now_micros(),

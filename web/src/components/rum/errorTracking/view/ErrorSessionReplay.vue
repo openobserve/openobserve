@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import ErrorTag from "./ErrorTag.vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import analytics from "@/services/product_analytics";
@@ -63,6 +64,7 @@ const props = defineProps({
 });
 
 const router = useRouter();
+const store = useStore();
 
 const getSessionTags = computed(() => {
   return {
@@ -83,6 +85,7 @@ const playSessionReplay = () => {
       // SessionViewer auto-seeks to event_time (milliseconds) — opens the
       // replay at the moment of failure instead of the session start.
       event_time: Math.floor(props.error._timestamp / 1000),
+      org_identifier: store.state.selectedOrganization.identifier,
     },
   });
   analytics.track("rum_error_replay_opened");

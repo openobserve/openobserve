@@ -1939,6 +1939,7 @@ describe("TraceDetails", () => {
           },
           query: expect.objectContaining({
             event_time: 1500000000,
+            org_identifier: store.state.selectedOrganization.identifier,
           }),
         }),
       );

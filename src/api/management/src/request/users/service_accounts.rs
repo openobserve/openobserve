@@ -75,6 +75,8 @@ pub async fn exchange_token(
     let result = o2_dex::service::token_exchange::exchange_token(&body).await;
 
     let mut audit_message = AuditMessage {
+        login_ip: None,
+        user_agent: None,
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),

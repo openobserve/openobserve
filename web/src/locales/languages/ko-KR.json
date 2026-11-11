@@ -1712,7 +1712,9 @@
       "rerunCancelled": "{elapsed} 후에 다시 실행이 취소되었습니다. 이전 결과를 표시합니다.",
       "rerunCancelledNow": "다시 실행이 취소되었습니다. 이전 결과를 표시합니다.",
       "analyzeSucceeded": "마지막 실행 성공",
-      "analyzeFailedShort": "마지막 실행 실패"
+      "analyzeFailedShort": "마지막 실행 실패",
+      "analyzeWarned": "마지막 실행이 경고와 함께 완료되었습니다",
+      "analyzePartial": "실행이 완료되었지만 결과가 불완전할 수 있습니다."
     },
     "errorDeletingSavedView": "저장된 뷰를 삭제하는 중 오류가 발생했습니다.",
     "errorCreatingSavedView": "저장된 뷰를 만드는 중 오류가 발생했습니다.",

@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Re-run cancelled after {elapsed}. Showing the previous results.",
       "rerunCancelledNow": "Re-run cancelled. Showing the previous results.",
       "analyzeSucceeded": "Last run succeeded",
-      "analyzeFailedShort": "Last run failed"
+      "analyzeFailedShort": "Last run failed",
+      "analyzeWarned": "Last run finished with warnings",
+      "analyzePartial": "The run finished, but its results may be incomplete."
     },
     "errorDeletingSavedView": "Error while deleting saved view.",
     "errorCreatingSavedView": "Error while creating saved view.",

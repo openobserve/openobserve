@@ -68,6 +68,8 @@ const MAX_ROWS: usize = 10;
 /// Comments follow the alert's notifications, so a shorter silence floods the issue's watchers.
 const MIN_SILENCE_MINUTES: i64 = 10;
 
+const REFUSED_ALERTS_SHOWN: usize = 5;
+
 const PROJECTS_PAGE: usize = 50;
 const PROJECTS_MAX: usize = 1000;
 
@@ -556,6 +558,44 @@ pub(crate) fn save_refusal(alert: &Alert, destination: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Whether this save turns a stored non-Jira destination into a Jira one.
+pub(crate) fn becomes_jira(new: &Destination, stored: Option<&Destination>) -> bool {
+    let jira = |destination: &Destination| http_endpoint(destination).is_some_and(is_jira);
+    jira(new) && stored.is_some_and(|stored| !jira(stored))
+}
+
+/// Why `destination` cannot become Jira while these alerts send to it: the alert save check, per
+/// alert.
+pub(crate) fn conversion_refusal<'a>(
+    destination: &str,
+    alerts: impl IntoIterator<Item = &'a Alert>,
+) -> Option<String> {
+    let refused: Vec<String> = alerts
+        .into_iter()
+        .filter(|alert| {
+            alert
+                .destinations
+                .iter()
+                .chain(&alert.recovery_destinations)
+                .any(|name| name == destination)
+        })
+        .filter_map(|alert| {
+            save_refusal(alert, destination).map(|reason| format!("'{}': {reason}", alert.name))
+        })
+        .collect();
+    if refused.is_empty() {
+        return None;
+    }
+    let mut parts: Vec<String> = refused.iter().take(REFUSED_ALERTS_SHOWN).cloned().collect();
+    if refused.len() > REFUSED_ALERTS_SHOWN {
+        parts.push(format!("and {} more", refused.len() - REFUSED_ALERTS_SHOWN));
+    }
+    Some(format!(
+        "'{destination}' cannot become a Jira destination while these alerts send to it: {}",
+        parts.join("; ")
+    ))
 }
 
 async fn connect(jira: &Jira, cloud: bool) -> Result<Value> {
@@ -1515,6 +1555,55 @@ mod tests {
         http_endpoint(destination)
             .and_then(authorization)
             .map(|(_, value)| value.clone())
+    }
+
+    #[test]
+    fn only_a_saved_destination_turned_into_jira_is_a_conversion() {
+        let jira = jira_dest(SITE, "cloud", "ops@acme.com", SAVED_TOKEN);
+        let webhook = as_webhook(jira.clone());
+        assert!(becomes_jira(&jira, Some(&webhook)));
+        assert!(!becomes_jira(&jira, Some(&jira)), "already Jira");
+        assert!(
+            !becomes_jira(&jira, None),
+            "a new destination has no alerts"
+        );
+        assert!(!becomes_jira(&webhook, Some(&jira)), "leaving Jira");
+    }
+
+    #[test]
+    fn a_conversion_to_jira_names_every_alert_that_would_break() {
+        let alert = |name: &str, destinations: &[&str], silence: i64| {
+            let mut alert = Alert::default();
+            alert.name = name.into();
+            alert.destinations = destinations.iter().map(|d| d.to_string()).collect();
+            alert.trigger_condition.silence = silence;
+            alert
+        };
+        let mut recovery_only = alert("recovers", &[], 1);
+        recovery_only.recovery_destinations = vec!["Jira OPS".into()];
+        let alerts = [
+            alert("noisy", &["Jira OPS"], 1),
+            alert("quiet", &["Jira OPS"], MIN_SILENCE_MINUTES),
+            alert("elsewhere", &["Slack"], 1),
+            recovery_only,
+        ];
+
+        let refusal = conversion_refusal("Jira OPS", &alerts).unwrap();
+        assert!(refusal.contains("'noisy'"), "{refusal}");
+        assert!(refusal.contains("'recovers'"), "{refusal}");
+        assert!(!refusal.contains("'quiet'"), "{refusal}");
+        assert!(!refusal.contains("'elsewhere'"), "{refusal}");
+        assert_eq!(conversion_refusal("Jira OPS", &alerts[1..3]), None);
+
+        let many: Vec<Alert> = (0..7)
+            .map(|i| alert(&format!("a{i}"), &["Jira OPS"], 1))
+            .collect();
+        let capped = conversion_refusal("Jira OPS", &many).unwrap();
+        assert!(
+            capped.contains("'a4'") && !capped.contains("'a5'"),
+            "{capped}"
+        );
+        assert!(capped.ends_with("and 2 more"), "{capped}");
     }
 
     #[test]

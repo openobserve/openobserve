@@ -1712,7 +1712,9 @@
       "rerunCancelled": "Erneute Ausführung nach {elapsed} abgebrochen. Die vorherigen Ergebnisse werden angezeigt.",
       "rerunCancelledNow": "Erneute Ausführung abgebrochen. Die vorherigen Ergebnisse werden angezeigt.",
       "analyzeSucceeded": "Letzter Lauf erfolgreich",
-      "analyzeFailedShort": "Letzter Lauf fehlgeschlagen"
+      "analyzeFailedShort": "Letzter Lauf fehlgeschlagen",
+      "analyzeWarned": "Letzter Lauf mit Warnungen abgeschlossen",
+      "analyzePartial": "Der Lauf wurde abgeschlossen, aber die Ergebnisse sind möglicherweise unvollständig."
     },
     "errorDeletingSavedView": "Fehler beim Löschen der gespeicherten Ansicht.",
     "errorCreatingSavedView": "Fehler beim Erstellen der gespeicherten Ansicht.",
