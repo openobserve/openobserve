@@ -3,6 +3,7 @@
 
 const { expect } = require("@playwright/test");
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
+const MonacoEditorHelper = require("../../playwright-tests/utils/MonacoEditorHelper.js");
 import { answerPanelDraftRestore } from "./panel-leave-dialog.js";
 import DashboardactionPage from "./dashboard-panel-actions.js";
 
@@ -28,6 +29,7 @@ export default class ChartTypeSelector {
 
     // Custom query editor
     this.queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+    this.monaco = new MonacoEditorHelper(page);
 
     // JSON renderer locators (source-defined data-tests in JsonFieldRenderer.vue)
     this.jsonFieldRenderer = page.locator('[data-test="json-field-renderer"]');
@@ -57,8 +59,7 @@ export default class ChartTypeSelector {
   }
 
   async fillMarkdownEditor(markdown) {
-    await this.markdownEditor.locator(".monaco-editor").click();
-    await this.markdownEditor.locator(".inputarea").fill(markdown);
+    await this.monaco.fillInputArea(this.markdownEditor, markdown);
   }
 
   getHtmlRendererElement(selector) {
@@ -72,8 +73,7 @@ export default class ChartTypeSelector {
 
   // Enter HTML code into the HTML chart Monaco editor
   async fillHtmlEditor(html) {
-    await this.htmlEditor.locator(".monaco-editor").click();
-    await this.htmlEditor.locator(".inputarea").fill(html);
+    await this.monaco.fillInputArea(this.htmlEditor, html);
   }
 
   // Rendered HTML output: heading by accessible name
@@ -815,7 +815,7 @@ export default class ChartTypeSelector {
    * @param {string} query - The SQL query to fill
    */
   async fillQueryEditorInputArea(query) {
-    await this.queryEditor.locator(".inputarea").fill(query);
+    await this.monaco.fillInputArea(this.queryEditor, query);
   }
 
   /**

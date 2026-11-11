@@ -1561,9 +1561,7 @@ export class LogsPage {
 
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
-        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 30000 });
-        await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        await this.getMonacoEditorHelper().fillInputArea(this.page.locator(this.queryEditor), query);
     }
 
     async executeQueryWithKeyboardShortcut() {
@@ -3029,7 +3027,7 @@ export class LogsPage {
 
         if (!set) {
             // Fallback to DOM fill
-            return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
+            return await this.getMonacoEditorHelper().fillInputArea(this.page.locator(this.queryEditor), query);
         }
     }
 
@@ -3698,7 +3696,7 @@ export class LogsPage {
     }
 
     async waitForQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: "visible" });
+        return await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.queryEditor));
     }
 
     async getQueryEditorText() {
@@ -4852,7 +4850,7 @@ export class LogsPage {
     }
 
     async isVrlEditorInputVisible() {
-        return await this.page.locator(this.fnEditor).locator('.inputarea').isVisible().catch(() => false);
+        return await this.page.locator(this.fnEditor).locator('.monaco-editor').first().isVisible().catch(() => false);
     }
 
     async clickPast6DaysButton() {
@@ -4896,7 +4894,7 @@ export class LogsPage {
      */
     async expectVrlEditorReady() {
         await this.page.locator(this.vrlEditor).first().waitFor({ state: 'visible', timeout: 15000 });
-        await this.page.locator(`${this.vrlEditor} .inputarea`).first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.vrlEditor).first(), 15000);
     }
 
     /**
@@ -5060,7 +5058,7 @@ export class LogsPage {
         // initialised (setupEditor() async load completes). This prevents the
         // waitForFunction below from timing out on page reloads where window.monaco
         // is not yet set when domcontentloaded fires.
-        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 20000 });
+        await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.queryEditor), 20000);
         // Assert against Monaco's model value (not DOM view-lines which render
         // line numbers when empty — AGENT_RULES §5).
         await this.page.waitForFunction(
