@@ -1,4 +1,5 @@
 // Settings › Slack › AutoObserve on a real enterprise server: an admin edits and saves, a Slack reader and a viewer read only.
+const crypto = require('crypto');
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const testLogger = require('../utils/test-logger.js');
@@ -8,7 +9,7 @@ const { LoginPage } = require('../../pages/generalPages/loginPage.js');
 const AUTH_FILE = path.join(__dirname, '../utils/auth/user.json');
 const TEAM = { teamId: `T0PWINS${api.uniq().toUpperCase()}`, teamName: 'Acme PW Insights' };
 const ZONE = 'Europe/Berlin';
-const PASSWORD = `Pw#${api.uniq()}${api.uniq()}Aa1`;
+const PASSWORD = `Pw#${crypto.randomBytes(12).toString('base64url')}Aa1`;
 
 const settingsPath = (org) => `/api/${org}/slack/insights-settings`;
 const basic = (email, password) => ({
