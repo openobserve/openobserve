@@ -102,6 +102,14 @@ describe("StarterPackLibraryTab", () => {
     expect(wrapper.find('[data-test="library-tab-see-kubernetes"]').exists()).toBe(true);
   });
 
+  it("loads the install preview so its count matches Home and the drawer", async () => {
+    const { useStarterPackFlow } = await import("@/composables/starterPacks/useStarterPackFlow");
+    const flow = useStarterPackFlow("org", {} as never);
+    vi.mocked(flow.loadPreview).mockClear();
+    await render();
+    expect(flow.loadPreview).toHaveBeenCalledTimes(1);
+  });
+
   it("puts a pack without data under Nothing matching yet and filters it out", async () => {
     fake.ready = false;
     const wrapper = await render();
