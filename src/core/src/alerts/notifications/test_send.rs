@@ -201,13 +201,8 @@ fn build_test_message_with_title(
     Ok((title, rendered))
 }
 
-/// Build the `[TEST] `-marked message and dispatch it to the real
-/// destination transport. This is the only function in the module that
-/// performs network I/O — callers that only need to assert on the rendered
-/// shape (tests, previews) should call [`build_test_message`] instead.
-///
-/// The rate limit for `user_id` is charged only after validation, the platform
-/// rule and rendering pass, just before dispatch, so a rejected request does not count.
+/// Sends the `[TEST] `-marked message; tests call [`build_test_message`] to skip the network.
+/// Charges `user_id`'s rate limit only after validation and rendering pass.
 pub async fn test_send(
     org_id: &str,
     user_id: &str,
@@ -471,8 +466,7 @@ mod tests {
     }
 
     /// Requests that fail before dispatch do not use the caller's test-send quota.
-    // The guard only serializes tests; this single-threaded test has no other
-    // task that takes it, so holding it across the await cannot deadlock.
+    // The guard only serializes tests; no other task here takes it, so the await cannot deadlock.
     #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn an_invalid_draft_or_a_platform_skip_does_not_count_against_the_limit() {

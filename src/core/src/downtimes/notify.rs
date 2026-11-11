@@ -210,9 +210,8 @@ async fn send(
     (summarize(&results), templates)
 }
 
-/// The `[TEST] `-marked started message to `requested` (or every destination of the row), one
-/// result each. The first destination that passes resolve and the routing rules charges
-/// `user_id`'s test-send limit once, just before its send, so a request that sends nothing is free.
+/// Sends the `[TEST] `-marked started message to `requested` (or every row destination).
+/// Charges `user_id`'s test-send limit once, just before the first send.
 pub async fn send_test(
     row: &Downtime,
     user_id: &str,
@@ -357,9 +356,8 @@ fn summarize(
 /// Longest reason a test result shows.
 const MAX_TEST_REASON_CHARS: usize = 200;
 
-/// A test's reason for the person who pressed Send test: the HTTP status, or the server's own
-/// text for a lookup, render or block failure. A transport error can carry the destination
-/// URL and its secret, so it stays in the log.
+/// A test result's reason: the HTTP status, or the server text for a lookup, render or block error.
+/// A transport error can hold the URL and its secret, so it stays in the log.
 fn test_reason(e: &crate::alerts::notifications::notify::NotifyError) -> String {
     use crate::alerts::notifications::notify::NotifyError;
 
