@@ -15,7 +15,7 @@
 
 //! The digests calibration passes write, read back through the module's own permission.
 
-use std::future::ready;
+use std::{collections::BTreeSet, future::ready};
 
 use arrow_schema::Schema;
 use axum::{
@@ -549,20 +549,26 @@ pub(super) fn record_filters(
     Ok(filters)
 }
 
-/// The newest run since `since` and its alert failure findings, every page, as the server.
+/// The newest run since `since`, its alert failure findings and the ids the page lists to `reader`.
 pub(crate) async fn latest_alert_findings(
     org_id: &str,
+    reader: Option<&str>,
     since: i64,
     now: i64,
 ) -> Result<Option<DigestRun>, InfraError> {
     let schema = alert_schema(org_id).await?;
     let search = |sql, from, size| search_at(org_id, sql, (since, now + 1), from, size);
-    let mut run = alert_findings_with(&schema, search).await?;
-    if let Some(run) = run.as_mut() {
-        drop_unlisted_findings(org_id, &mut run.records).await;
-        stamp_folders(org_id, &mut run.records).await;
-    }
-    Ok(run)
+    let Some((mut run, every)) = alert_findings_with(&schema, search).await? else {
+        return Ok(None);
+    };
+    drop_unlisted_findings(org_id, &mut run.records).await;
+    stamp_folders(org_id, &mut run.records).await;
+    let visibility = match reader {
+        Some(user_id) => live_visibility(org_id, user_id, || ready(Ok(probe_of(&every)))).await?,
+        None => AlertVisibility::Org,
+    };
+    run.finding_ids = listed_finding_ids(org_id, &visibility, every).await;
+    Ok(Some(run))
 }
 
 /// The reader's destination change on each no-destination finding, as the dashboard offers it.
@@ -702,6 +708,43 @@ fn finding_alert(hit: &Value) -> Option<&str> {
         .or_else(|| hit.get("scope_key"))
         .and_then(Value::as_str)
         .filter(|id| !id.is_empty())
+}
+
+/// Every rule's findings of the run the page lists to a reader who sees `visibility`.
+async fn listed_finding_ids(
+    org_id: &str,
+    visibility: &AlertVisibility,
+    mut every: Vec<Value>,
+) -> Vec<String> {
+    drop_unlisted_findings(org_id, &mut every).await;
+    every
+        .iter()
+        .filter(|hit| sees_row(visibility, hit))
+        .filter_map(|hit| hit.get("finding_id").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect()
+}
+
+/// `alert_clause` in memory: a row without an alert is cluster-scoped, so only org-wide sees it.
+fn sees_row(visibility: &AlertVisibility, hit: &Value) -> bool {
+    let alert = hit.get("alert_id").and_then(Value::as_str);
+    match visibility {
+        AlertVisibility::Org => true,
+        AlertVisibility::AnyAlert => alert.is_some(),
+        AlertVisibility::Only(ids) => alert.is_some_and(|id| ids.contains(id)),
+    }
+}
+
+/// The distinct alerts the findings name, so the grants check reads only their folders.
+fn probe_of(every: &[Value]) -> Probe {
+    let ids: BTreeSet<&str> = every
+        .iter()
+        .filter_map(|hit| hit.get("alert_id").and_then(Value::as_str))
+        .collect();
+    Probe {
+        ids: ids.into_iter().map(str::to_string).collect(),
+        full: false,
+    }
 }
 
 async fn finding_hit(
@@ -889,7 +932,7 @@ async fn search_at(
 async fn alert_findings_with<S, F>(
     schema: &Schema,
     search: S,
-) -> Result<Option<DigestRun>, InfraError>
+) -> Result<Option<(DigestRun, Vec<Value>)>, InfraError>
 where
     S: Fn(String, i64, i64) -> F,
     F: Future<Output = Result<SearchResponse, InfraError>>,
@@ -909,18 +952,14 @@ where
     let Some(mut run) = runs.first().and_then(run_of) else {
         return Ok(None);
     };
+    let mut every = Vec::new();
     if FINDING_COLUMNS.iter().all(|column| held(column)) {
         let listed = |after: &str| alert_records_sql(&run, after);
         run.records = run_pages(&run, &search, listed).await?;
-        let every = |after: &str| finding_ids_sql(&run, after);
-        run.finding_ids = run_pages(&run, &search, every)
-            .await?
-            .iter()
-            .filter_map(|hit| hit.get("finding_id").and_then(Value::as_str))
-            .map(str::to_string)
-            .collect();
+        let all = |after: &str| finding_ids_sql(&run, after, &held);
+        every = run_pages(&run, &search, all).await?;
     }
-    Ok(Some(run))
+    Ok(Some((run, every)))
 }
 
 /// Every page of the run's records; a partial page would hide findings, so it fails the read.
@@ -990,11 +1029,16 @@ fn alert_records_sql(run: &DigestRun, after: &str) -> String {
     )
 }
 
-/// Every rule's findings of one emission, as the calibration page counts them.
-fn finding_ids_sql(run: &DigestRun, after: &str) -> String {
+/// Every rule's findings of one emission, with what decides whether the page lists them.
+fn finding_ids_sql(run: &DigestRun, after: &str, held: &dyn Fn(&str) -> bool) -> String {
+    let columns: Vec<&str> = ["finding_id", "kind", "rule_id", "alert_id", "scope_key"]
+        .into_iter()
+        .filter(|column| held(column))
+        .collect();
     format!(
-        "SELECT finding_id FROM \"{DIGEST_STREAM}\" WHERE window_start = {} AND window_end = {} \
+        "SELECT {} FROM \"{DIGEST_STREAM}\" WHERE window_start = {} AND window_end = {} \
          AND kind = 'finding' AND _timestamp = {} AND finding_id > {} ORDER BY finding_id ASC",
+        columns.join(", "),
         run.window_start,
         run.window_end,
         run.emitted_at,
@@ -1609,7 +1653,7 @@ mod tests {
     async fn finding_pages_that_share_one_emission_time_list_each_finding_once() {
         let records = 2 * MAX_SIZE as usize + 3;
         let stream = Paged::new(records, false);
-        let run = alert_findings_with(&every_column(), |sql, from, size| {
+        let (run, _) = alert_findings_with(&every_column(), |sql, from, size| {
             stream.search(sql, from, size)
         })
         .await
@@ -1646,10 +1690,11 @@ mod tests {
     async fn the_alert_findings_read_takes_every_page_and_refuses_a_partial_one() {
         let every = every_column();
         let stream = Paged::new(2 * MAX_SIZE as usize + 3, false);
-        let run = alert_findings_with(&every, |sql, from, size| stream.search(sql, from, size))
-            .await
-            .unwrap()
-            .unwrap();
+        let (run, all) =
+            alert_findings_with(&every, |sql, from, size| stream.search(sql, from, size))
+                .await
+                .unwrap()
+                .unwrap();
         assert_eq!(run.records.len(), 2 * MAX_SIZE as usize + 3);
         assert_eq!(
             (
@@ -1682,19 +1727,20 @@ mod tests {
         assert!(
             reads[4..]
                 .iter()
-                .all(|(sql, ..)| sql.starts_with("SELECT finding_id "))
+                .all(|(sql, ..)| sql.starts_with("SELECT finding_id, kind, rule_id FROM"))
         );
-        assert_eq!(run.finding_ids.len(), 2 * MAX_SIZE as usize + 3);
+        assert_eq!(all.len(), 2 * MAX_SIZE as usize + 3);
         let partial = Paged::new(3, true);
         let read =
             alert_findings_with(&every, |sql, from, size| partial.search(sql, from, size)).await;
         assert!(read.is_err(), "{read:?}");
         let markers_only = schema(&["window_start", "window_end", "kind"]);
         let old = Paged::new(3, false);
-        let run = alert_findings_with(&markers_only, |sql, from, size| old.search(sql, from, size))
-            .await
-            .unwrap()
-            .unwrap();
+        let (run, _) =
+            alert_findings_with(&markers_only, |sql, from, size| old.search(sql, from, size))
+                .await
+                .unwrap()
+                .unwrap();
         assert!(
             run.records.is_empty(),
             "no finding column, so no read that would fail on one"
@@ -1712,7 +1758,7 @@ mod tests {
     async fn the_alert_findings_read_runs_as_the_calibration_reader() {
         infra::db::create_table().await.unwrap();
         let now = now_micros();
-        let read = latest_alert_findings("ops", 0, now).await;
+        let read = latest_alert_findings("ops", None, 0, now).await;
         assert!(matches!(read, Ok(None)), "{read:?}");
         let all = |_: &str| true;
         let request = SearchRequest {
@@ -1873,5 +1919,63 @@ mod tests {
         let mut paging = Alert::default();
         paging.creates_incident = true;
         assert!(notifies(&paging, true) && !notifies(&paging, false));
+    }
+
+    #[tokio::test]
+    async fn slacks_calibration_count_is_what_the_page_lists_to_its_reader() {
+        use config::meta::{
+            alerts::alert::{Alert, SIEM_ATTRIBUTE},
+            folder::Folder,
+        };
+        use svix_ksuid::KsuidLike;
+
+        let org = format!("cal_count_{}", config::ider::uuid());
+        let id = || svix_ksuid::Ksuid::new(None, None).to_string();
+        let (detection, wired, mine, theirs) = (id(), id(), id(), id());
+        for (alert_id, siem, destinations) in [
+            (&detection, true, vec![]),
+            (&wired, false, vec!["pager".to_string()]),
+            (&mine, false, vec![]),
+            (&theirs, false, vec![]),
+        ] {
+            let mut alert = Alert::default();
+            alert.org_id = org.clone();
+            alert.destinations = destinations;
+            alert.context_attributes = siem.then(|| {
+                [(SIEM_ATTRIBUTE.to_string(), "true".to_string())]
+                    .into_iter()
+                    .collect()
+            });
+            common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key(&org, alert_id),
+                (Folder::default(), alert),
+            );
+        }
+        let finding = |fid: &str, rule: &str, alert: &str| serde_json::json!({"finding_id": fid, "kind": "finding", "rule_id": rule, "alert_id": alert});
+        let every = vec![
+            finding("f-detection", "noise", &detection),
+            finding("f-fixed", NO_DESTINATION_RULE, &wired),
+            finding("f-mine", "silent", &mine),
+            finding("f-theirs", NO_DESTINATION_RULE, &theirs),
+            serde_json::json!({"finding_id": "f-cluster", "kind": "finding", "rule_id": "scheduler_health"}),
+        ];
+        let org_wide = listed_finding_ids(&org, &AlertVisibility::Org, every.clone()).await;
+        assert_eq!(
+            org_wide,
+            ["f-mine", "f-theirs", "f-cluster"],
+            "the page hides detections and fixed no-destination findings"
+        );
+        let any_alert = listed_finding_ids(&org, &AlertVisibility::AnyAlert, every.clone()).await;
+        assert_eq!(
+            any_alert,
+            ["f-mine", "f-theirs"],
+            "a cluster row is org-wide only"
+        );
+        let scoped = AlertVisibility::Only(BTreeSet::from([mine.clone(), detection.clone()]));
+        let folder = listed_finding_ids(&org, &scoped, every.clone()).await;
+        assert_eq!(folder, ["f-mine"], "a scoped reader counts only its alerts");
+        let probed = probe_of(&every);
+        assert_eq!(probed.ids.len(), 4);
+        assert!(!probed.full);
     }
 }

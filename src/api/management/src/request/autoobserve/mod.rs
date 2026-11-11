@@ -169,7 +169,7 @@ struct LiveDigest;
 #[async_trait]
 impl AlertFindingsRead for LiveDigest {
     async fn latest(&self, org: &str, now: i64) -> Result<Option<DigestRun>, ApiError> {
-        latest_alert_findings(org, now.saturating_sub(RUN_LOOKBACK_US), now)
+        latest_alert_findings(org, None, now.saturating_sub(RUN_LOOKBACK_US), now)
             .await
             .map_err(|e| {
                 log::error!("[AUTOOBSERVE] org {org}: reading calibration findings failed: {e}");
@@ -616,6 +616,18 @@ fn refuse_query(query: Option<&str>) -> Result<(), Response> {
     Err(MetaHttpResponse::bad_request(
         "PUT takes group_key in the body and no query string",
     ))
+}
+
+/// The newest calibration run, its `finding_ids` scoped as this reader's page lists them.
+async fn run_read_by(org_id: &str, user_id: &str, now: i64) -> Option<DigestRun> {
+    let since = now.saturating_sub(RUN_LOOKBACK_US);
+    latest_alert_findings(org_id, Some(user_id), since, now)
+        .await
+        .inspect_err(|e| {
+            log::error!("[AUTOOBSERVE] org {org_id}: reading calibration findings failed: {e}")
+        })
+        .ok()
+        .flatten()
 }
 
 /// An alert subject a role cannot read org-wide is still readable through its folder or own grant.

@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::{
     },
 };
 
-use super::{LiveDigest, decisions, readable_subjects};
+use super::{LiveDigest, decisions, readable_subjects, run_read_by};
 
 /// Registered once at startup, beside the HTTP server.
 pub fn hooks() -> FeedHooks {
@@ -60,7 +60,7 @@ async fn read(at: ReadAs) -> anyhow::Result<FeedInput> {
         Ok((list.suggestions, list.total))
     })
     .await?;
-    let run = LiveDigest.latest(&at.org_id, at.now).await.ok().flatten();
+    let run = run_read_by(&at.org_id, &at.user_id, at.now).await;
     let calibration_run_at = run.as_ref().map(|run| run.emitted_at);
     let calibration_open = match &run {
         Some(run) => LiveDigest
