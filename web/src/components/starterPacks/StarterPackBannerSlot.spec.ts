@@ -26,6 +26,8 @@ const render = async (clusterName?: string) => {
   await flushPromises();
   return wrapper;
 };
+const has = (wrapper: Awaited<ReturnType<typeof render>>, id: string) =>
+  wrapper.find(`[data-test="${id}"]`).exists();
 const action = (id: string) => target.querySelector(`[data-test="${id}"]`);
 
 describe("StarterPackBannerSlot", () => {
@@ -37,6 +39,7 @@ describe("StarterPackBannerSlot", () => {
     fake.matcher = {
       state: ref("matched"),
       clusters: ref(["seen-1"]),
+      streams: ref(["k8s_events", "k8s_node_cpu"]),
       waitedLong: ref(false),
       check: vi.fn(),
       retry: vi.fn(),
@@ -55,32 +58,40 @@ describe("StarterPackBannerSlot", () => {
 
   it("keeps checking while logs arrive, then offers the partial setup after the wait", async () => {
     fake.matcher.state.value = "waiting";
-    await render();
+    const wrapper = await render();
     expect(action("first-event-status-pack-checking")).not.toBeNull();
     fake.matcher.waitedLong.value = true;
     await nextTick();
-    expect(action("first-event-status-pack-partial-btn")?.className).toContain("w-68");
-  });
-
-  it("offers setup and names the guide cluster first", async () => {
-    const wrapper = await render("typed");
-    expect(action("first-event-status-pack-setup-btn")?.className).toContain("w-68");
-    expect(wrapper.get('[data-test="first-event-status-pack-scope"]').text()).toContain(
-      "2 seen so far: typed, seen-1",
+    expect(wrapper.get('[data-test="first-event-status-pack-partial-btn"]').text()).toBe(
+      "Set up for logs now, add metrics later",
     );
   });
 
-  it("starts setup and lands on the typed cluster", async () => {
-    await render("typed");
-    (action("first-event-status-pack-setup-btn") as HTMLElement).click();
-    await flushPromises();
-    expect(fake.flow.land).toHaveBeenCalledWith("typed");
+  it("offers the same install card as Home with counts and matched streams", async () => {
+    const wrapper = await render("typed");
+    expect(wrapper.get('[data-test="first-event-status-pack-setup-btn"]').text()).toBe(
+      "Install 4 items",
+    );
+    expect(wrapper.get('[data-test="first-event-status-pack-card-counts"]').text()).toContain(
+      "1 dashboard",
+    );
+    expect(wrapper.get('[data-test="first-event-status-pack-card-sub"]').text()).toContain(
+      "Matched to 2 streams you are already sending.",
+    );
   });
 
-  it("falls back to today's banner with a Library link when nothing matches", async () => {
+  it("starts setup and lands on the pack dashboard", async () => {
+    const wrapper = await render("typed");
+    await wrapper.get('[data-test="first-event-status-pack-setup-btn"]').trigger("click");
+    await flushPromises();
+    expect(fake.flow.land).toHaveBeenCalledWith();
+  });
+
+  it("offers nothing when no pack matches", async () => {
     fake.matcher.state.value = "none";
     const wrapper = await render();
-    expect(action("first-event-status-pack-library-link")).not.toBeNull();
+    expect(target.children.length).toBe(0);
+    expect(has(wrapper, "first-event-status-pack-card")).toBe(false);
     expect(wrapper.emitted("offered")?.at(-1)).toEqual([false]);
   });
 
@@ -91,20 +102,17 @@ describe("StarterPackBannerSlot", () => {
     expect(fake.matcher.retry).toHaveBeenCalled();
   });
 
-  it("shows the admin link when setup was refused and the unlicensed copy on a lower plan", async () => {
+  it("shows the admin link instead of the card when setup was refused", async () => {
     fake.flow.forbidden.value = true;
-    fake.flow.licensed.value = false;
     const wrapper = await render();
     expect(action("first-event-status-pack-copy-link-btn")).not.toBeNull();
-    expect(wrapper.get('[data-test="first-event-status-pack-unlicensed"]').text()).toContain(
-      "a Kubernetes dashboard",
-    );
+    expect(has(wrapper, "first-event-status-pack-card-counts")).toBe(false);
   });
 
   it("offers nothing once the pack is installed", async () => {
     fake.flow.installed.value = true;
     const wrapper = await render();
-    expect(action("first-event-status-pack-setup-btn")).toBeNull();
+    expect(has(wrapper, "first-event-status-pack-setup-btn")).toBe(false);
     expect(wrapper.emitted("offered")?.at(-1)).toEqual([false]);
   });
 });

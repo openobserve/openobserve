@@ -20,6 +20,7 @@ import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackF
 
 export const PACK = {
   id: "kubernetes",
+  titleKey: "starterPacks.kubernetes.title",
   dashboards: [{ id: "overview", title: "Overview" }],
   alerts: ["a1", "a2"],
   savedViews: [{ id: "v1", name: "Events" }],

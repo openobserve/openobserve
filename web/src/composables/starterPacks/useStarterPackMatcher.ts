@@ -51,6 +51,7 @@ export function useStarterPackMatcher(org: string, { poll = false }: MatchOption
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
   const state = ref<PackMatchState>("checking");
   const clusters = ref<string[]>([]);
+  const streams = ref<string[]>([]);
   const waitingSinceMs = ref<number | null>(null);
   const nowMs = ref(Date.now());
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -102,21 +103,22 @@ export function useStarterPackMatcher(org: string, { poll = false }: MatchOption
       );
     });
 
-  const decide = async (): Promise<{ next: PackMatchState; seen: string[] }> => {
+  const decide = async (): Promise<{ next: PackMatchState; seen: string[]; found: string[] }> => {
     const [metrics, logs] = await Promise.all([readNames(org, "metrics"), readNames(org, "logs")]);
     const present = DETECTION_STREAMS.filter((name) => metrics.includes(name));
     const columns = await Promise.all(present.map((name) => hasSchema(org, name, "metrics")));
     const anchor = columns.findIndex((fields) => fields.length > 0);
+    const found = logs.includes(EVENTS_STREAM) ? [...present, EVENTS_STREAM] : present;
     if (anchor >= 0) {
       const column = CLUSTER_COLUMNS.find((name) => columns[anchor].includes(name));
       const seen = column ? await readClusters(present[anchor], "metrics", column) : [];
-      return { next: "matched", seen };
+      return { next: "matched", seen, found };
     }
     const arriving =
       present.length > 0 ||
       logs.includes(EVENTS_STREAM) ||
       workloadStateFromNames("kubernetes", { metrics, logs }) === "detected";
-    return { next: arriving ? "waiting" : "none", seen: [] };
+    return { next: arriving ? "waiting" : "none", seen: [], found };
   };
 
   const schedule = () => {
@@ -129,12 +131,13 @@ export function useStarterPackMatcher(org: string, { poll = false }: MatchOption
     generation += 1;
     const run = generation;
     try {
-      const { next, seen } = await decide();
+      const { next, seen, found } = await decide();
       if (run !== generation || stopped) return;
       nowMs.value = Date.now();
       if (next === "waiting") waitingSinceMs.value ??= nowMs.value;
       else waitingSinceMs.value = null;
       clusters.value = seen;
+      streams.value = found;
       state.value = next;
     } catch {
       if (run !== generation || stopped) return;
@@ -159,5 +162,5 @@ export function useStarterPackMatcher(org: string, { poll = false }: MatchOption
 
   onScopeDispose(stop);
 
-  return { state, clusters, waitedLong, check, retry, stop };
+  return { state, clusters, streams, waitedLong, check, retry, stop };
 }

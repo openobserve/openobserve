@@ -59,16 +59,33 @@ describe("StarterPackLandingRow", () => {
     expect(fake.matcher.check).not.toHaveBeenCalled();
   });
 
-  it("shows the row with time left, View pack and the alerts link", async () => {
+  it("shows the success bar with item count, Undo, time left and the alerts link", async () => {
+    fake.flow.made.value = [
+      { kind: "dashboard", itemId: "d" },
+      { kind: "alert", itemId: "a" },
+    ];
     const wrapper = await render();
     expect(fake.matcher.check).toHaveBeenCalledOnce();
-    expect(wrapper.get('[data-test="kubernetes-pack-undo-btn"]').text()).toBe(
-      "Undo setup · 5 h left",
+    expect(wrapper.get('[data-test="kubernetes-pack-installed-message"]').text()).toBe(
+      "Kubernetes pack installed · 2 items",
     );
+    expect(wrapper.get('[data-test="kubernetes-pack-undo-btn"]').text()).toBe(
+      "Undo — remove all 2",
+    );
+    expect(wrapper.get('[data-test="kubernetes-pack-undo-left"]').text()).toBe("available for 5 h");
     expect(has(wrapper, "kubernetes-pack-view-btn")).toBe(true);
     expect(wrapper.get('[data-test="kubernetes-pack-scope"]').text()).toContain("c1");
     await wrapper.get('[data-test="kubernetes-pack-turn-on-btn"]').trigger("click");
     expect(fake.push).toHaveBeenCalled();
+  });
+
+  it("names the items that need attention with See which", async () => {
+    fake.flow.failed.value = [{ kind: "alert", itemId: "a" }];
+    const wrapper = await render();
+    expect(wrapper.get('[data-test="kubernetes-pack-attention"]').text()).toContain(
+      "1 item needs your attention",
+    );
+    expect(has(wrapper, "kubernetes-pack-see-which-btn")).toBe(true);
   });
 
   it("goes away on Not now", async () => {
