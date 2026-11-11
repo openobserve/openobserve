@@ -245,6 +245,8 @@ struct ConfigResponse<'a> {
     /// The clamped operator refresh floor; the share form shows each range's floor from it.
     public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
+    /// Per org: an incident-only alert reaches a person, so on-call is on and the org has a team.
+    incidents_page_oncall: bool,
     slack_enabled: bool,
     /// The same reason for every org, null when on.
     slack_disabled_reason: Option<DisabledReason>,
@@ -598,6 +600,7 @@ pub async fn zo_config(
         false,
         o2cfg.oncall.enabled && check_features(&[Feature::Oncall])
     );
+    let incidents_page_oncall = enterprise_value!(false, incidents_page_oncall(&org_id).await);
     let slack_disabled_reason = enterprise_value!(
         Some(DisabledReason::Edition),
         o2_enterprise::enterprise::slack::disabled_reason(&org_id)
@@ -776,6 +779,7 @@ pub async fn zo_config(
         public_dashboards_enabled: cfg.public_dashboards.enabled,
         public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
         oncall_enabled,
+        incidents_page_oncall,
         slack_enabled: slack_disabled_reason.is_none(),
         slack_disabled_reason,
         synthetics_private_locations_enabled,
@@ -823,6 +827,17 @@ async fn license_config(license_server_url: String) -> LicenseConfig {
             now_micros(),
         ),
     }
+}
+
+// A failed team read says no one is paged: a false gap is visible, a hidden one is not.
+#[cfg(feature = "enterprise")]
+async fn incidents_page_oncall(org_id: &str) -> bool {
+    o2_enterprise::enterprise::oncall::incidents_page_oncall_for(org_id)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[CONFIG] org {org_id}: could not read on-call teams: {e}");
+            false
+        })
 }
 
 // Every org member reads this response, unlike org settings, so stream pages can rely on it.
@@ -2708,6 +2723,33 @@ mod tests {
             json["ingest_allowed_in_future"],
             cfg.limit.ingest_allowed_in_future
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_says_whether_an_orgs_incidents_page_someone() {
+        async fn paging(org: &str) -> serde_json::Value {
+            let response = zo_config(Path(org.to_string()), None).await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap()["incidents_page_oncall"]
+                .clone()
+        }
+        #[cfg(feature = "enterprise")]
+        crate::request::security::tests::meta_store().await;
+        assert_eq!(
+            paging("zo_config_no_team_org").await,
+            serde_json::json!(false)
+        );
+        #[cfg(feature = "enterprise")]
+        {
+            let org = "zo_config_team_org";
+            infra::table::oncall_teams::create(org, "platform", "UTC", None)
+                .await
+                .unwrap();
+            let gate = o2_enterprise::enterprise::oncall::incidents_page_oncall();
+            assert_eq!(paging(org).await, serde_json::json!(gate));
+        }
     }
 
     #[tokio::test]

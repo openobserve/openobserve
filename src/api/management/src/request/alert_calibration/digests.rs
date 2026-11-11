@@ -654,7 +654,12 @@ async fn notifies_now(org_id: &str, hit: &Value) -> bool {
     let Some(alert_id) = finding_alert(hit) else {
         return false;
     };
-    let incidents_page = o2_enterprise::enterprise::oncall::incidents_page_oncall();
+    let incidents_page = o2_enterprise::enterprise::oncall::incidents_page_oncall_for(org_id)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[alert_calibration] org {org_id}: could not read on-call teams: {e}");
+            false
+        });
     common::infra::config::ALERTS
         .read()
         .await
@@ -662,7 +667,7 @@ async fn notifies_now(org_id: &str, hit: &Value) -> bool {
         .is_some_and(|(_, alert)| notifies(alert, incidents_page))
 }
 
-/// The calibration rule's own test: a destination, or an incident while incidents page on-call.
+/// The calibration rule's own test: a destination, or an incident that pages someone in this org.
 fn notifies(alert: &config::meta::alerts::alert::Alert, incidents_page: bool) -> bool {
     !alert.destinations.is_empty() || (alert.creates_incident && incidents_page)
 }
@@ -1808,6 +1813,7 @@ mod tests {
         use config::meta::{alerts::alert::Alert, folder::Folder};
         use svix_ksuid::KsuidLike;
 
+        crate::request::security::tests::meta_store().await;
         let org = format!("cal_fixed_{}", config::ider::uuid());
         let id = || svix_ksuid::Ksuid::new(None, None).to_string();
         let (silent, wired, incident) = (id(), id(), id());
@@ -1836,16 +1842,29 @@ mod tests {
             finding(&wired, "failure"),
             finding(&incident, NO_DESTINATION_RULE),
         ];
-        let paging = o2_enterprise::enterprise::oncall::incidents_page_oncall();
+        let before = hits.clone();
         drop_unlisted_findings(&org, &mut hits).await;
         let mut kept = vec![
             finding(&silent, NO_DESTINATION_RULE),
             finding(&wired, "failure"),
+            finding(&incident, NO_DESTINATION_RULE),
         ];
-        if !paging {
-            kept.push(finding(&incident, NO_DESTINATION_RULE));
+        assert_eq!(
+            hits, kept,
+            "an org without an on-call team: the incident pages no one"
+        );
+        infra::table::oncall_teams::create(&org, "platform", "UTC", None)
+            .await
+            .unwrap();
+        let mut staffed = before;
+        drop_unlisted_findings(&org, &mut staffed).await;
+        if o2_enterprise::enterprise::oncall::incidents_page_oncall() {
+            kept.pop();
         }
-        assert_eq!(hits, kept);
+        assert_eq!(
+            staffed, kept,
+            "a team pages the incident wherever incidents page on-call"
+        );
         stamp_folders(&org, &mut hits).await;
         assert!(
             hits.iter().all(|hit| hit[FOLDER_COLUMN] == "ops"),
