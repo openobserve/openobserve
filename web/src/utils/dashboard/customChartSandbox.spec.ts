@@ -17,10 +17,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import { flushPromises } from "@vue/test-utils";
 import {
+  LOOP_GUARD_LIMIT_MS,
   SANDBOX_RUN_TIMEOUT_MS,
   __resetSandboxFont,
   buildSandboxDocument,
   createCustomChartSandbox,
+  guardLoops,
   parseSandboxMessage,
   usesEchartsGl,
   type CustomChartAppearance,
@@ -142,12 +144,19 @@ const bootFrame = (code: string) => {
     parentWindow,
     undefined,
   );
-  frameWindow.__o2UserChart = new Function(`${user}\nreturn __o2UserChart;`)();
+  // In the real frame the guard is a global; here the chart script gets it as a parameter.
+  frameWindow.__o2UserChart = new Function("__o2Guardn0", `${user}\nreturn __o2UserChart;`)(
+    frameWindow.__o2Guardn0,
+  );
 
   const sent: any[] = [];
   const started: any[] = [];
+  const executed: any[] = [];
   const port = {
-    postMessage: (message: any) => (message?.type === "started" ? started : sent).push(message),
+    postMessage: (message: any) =>
+      (message?.type === "started" ? started : message?.type === "executed" ? executed : sent).push(
+        message,
+      ),
     onmessage: null as any,
   };
   listeners.message[0]({ source: parentWindow, data: { type: "connect" }, ports: [port] });
@@ -160,6 +169,7 @@ const bootFrame = (code: string) => {
     run,
     sent,
     started,
+    executed,
     charts,
     echarts,
     el,
@@ -374,6 +384,31 @@ describe("sandbox runtime", () => {
     const first = frame.charts[0].setOption.mock.calls[0][0];
     expect(frame.charts[1].setOption.mock.calls[0][0].marker).toBe(first.marker);
     expect(frame.sent).toEqual([{ type: "rendered", runId: 1 }]);
+  });
+
+  it("ends a runaway loop with the timeout error instead of hanging every frame in the process", async () => {
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => (now += 100));
+    const frame = bootFrame("var i = 0; while (i >= 0) { i++; } var option = {};");
+    frame.run(1);
+    await settle();
+    vi.restoreAllMocks();
+
+    expect(now).toBeGreaterThan(LOOP_GUARD_LIMIT_MS);
+    expect(frame.sent).toHaveLength(1);
+    expect(frame.sent[0]).toMatchObject({ type: "error", runId: 1 });
+    expect(frame.sent[0].message).toContain("Script took too long to run");
+    expect(frame.executed).toEqual([]);
+  });
+
+  it("reports when the chart code returned, before drawing", async () => {
+    const frame = bootFrame("var option = {};");
+    frame.send({ type: "appearance", ...LIGHT });
+    frame.run(4);
+    await settle();
+
+    expect(frame.executed).toEqual([{ type: "executed", runId: 4 }]);
+    expect(frame.sent).toEqual([{ type: "rendered", runId: 4 }]);
   });
 
   it("reports a thrown error with the execution error prefix", async () => {
@@ -729,6 +764,22 @@ describe("createCustomChartSandbox", () => {
     expect(host.querySelector("iframe")).toBeNull();
   });
 
+  it("stops timing once the chart code returned, so a frame waiting behind a sibling never times out", async () => {
+    const h = handlers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const sandbox = make(host, h);
+    sandbox.render(run(), LIGHT);
+    const { port } = await connect(host.querySelector("iframe")!);
+    port!.postMessage({ type: "started", runId: 1 });
+    port!.postMessage({ type: "executed", runId: 1 });
+    vi.advanceTimersByTime(SANDBOX_RUN_TIMEOUT_MS * 3);
+    port!.postMessage({ type: "rendered", runId: 1 });
+
+    expect(h.onError).not.toHaveBeenCalled();
+    expect(h.onRendered).toHaveBeenCalledTimes(1);
+    expect(host.querySelector("iframe")).not.toBeNull();
+  });
+
   it("does not time out a run that rendered", async () => {
     const h = handlers();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -846,6 +897,54 @@ describe("createCustomChartSandbox", () => {
 
     expect(host.querySelector("iframe")).toBeNull();
     expect(remove).toHaveBeenCalledWith("message", expect.any(Function));
+  });
+});
+
+describe("guardLoops", () => {
+  const evaluate = (code: string, guard?: (started?: number) => number | void) =>
+    guard
+      ? new Function("g", `${code}\nreturn out;`)(guard)
+      : new Function(`${code}\nreturn out;`)();
+  const noLimit = (started?: number) => (started === undefined ? 0 : undefined);
+
+  it.each([
+    [
+      "labelled continue",
+      "var out = []; outer: for (var i = 0; i < 3; i++) { for (var j = 0; j < 3; j++) { if (j === 1) continue outer; out.push(i + ':' + j); } }",
+    ],
+    [
+      "loops without braces",
+      "var out = 0; for (var i = 0; i < 3; i++) for (var j = 0; j < 2; j++) out += j;",
+    ],
+    [
+      "a loop as the body of if/else",
+      "var out = 0; if (true) while (out < 4) out++; else out = -1;",
+    ],
+    ["do-while", "var out = 0; do out++; while (out < 5)"],
+    [
+      "for-in and for-of",
+      "var out = []; for (var k in { a: 1, b: 2 }) out.push(k); for (var v of [3, 4]) out.push(v);",
+    ],
+    ["back-to-back loops", "var out = 0;for(var i=0;i<2;i++){out++}while(out<5){out++}"],
+    ["an empty loop body", "var out = 0; for (; out < 3; out++);"],
+  ])("keeps %s working", (_name, code) => {
+    expect(evaluate(guardLoops(code, "g"), noLimit)).toEqual(evaluate(code));
+  });
+
+  it("checks the guard in every loop", () => {
+    const guarded = guardLoops(
+      "var out = 0; while (out < 2) out++; for (;out < 4;) { out++; }",
+      "g",
+    );
+    const guard = vi.fn(noLimit);
+    evaluate(guarded, guard);
+
+    expect(guard.mock.calls.filter((args) => args.length === 0)).toHaveLength(2);
+    expect(guard.mock.calls.filter((args) => args[0] !== undefined)).toHaveLength(4);
+  });
+
+  it("leaves code it cannot parse unchanged", () => {
+    expect(guardLoops("while (", "g")).toBe("while (");
   });
 });
 

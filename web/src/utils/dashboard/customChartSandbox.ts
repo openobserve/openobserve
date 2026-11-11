@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import * as acorn from "acorn";
+import * as walk from "acorn-walk";
 import { gt } from "@/types/i18n";
 import echartsUrl from "echarts/dist/echarts.min.js?url";
 import echartsGlUrl from "echarts-gl/dist/echarts-gl.min.js?url";
@@ -24,8 +26,11 @@ const sandboxEchartsUrl = new URL(echartsUrl, import.meta.url).href;
 const sandboxEchartsGlUrl = new URL(echartsGlUrl, import.meta.url).href;
 const sandboxFontUrl = new URL(geistFontUrl, import.meta.url).href;
 
-// Counted from the frame's "started", so boot and queueing behind other frames never count; a loop stops the frame's own timers.
+// Covers only the chart code itself ("started" to "executed"), since a frame waiting to draw may be starved by a sibling frame.
 export const SANDBOX_RUN_TIMEOUT_MS = 10000;
+
+// Removing a frame does not stop its loop: sandboxed frames share one process, so a loop must end itself to free its siblings.
+export const LOOP_GUARD_LIMIT_MS = 5000;
 
 const MAX_ERROR_LENGTH = 2000;
 const MAX_DRILLDOWN_VALUE_LENGTH = 512;
@@ -61,6 +66,7 @@ export interface CustomChartDrilldown {
 
 export type SandboxMessage =
   | { type: "started"; runId: number }
+  | { type: "executed"; runId: number }
   | { type: "rendered"; runId: number }
   | { type: "error"; runId: number; message: string }
   | { type: "drilldown"; drilldown: CustomChartDrilldown }
@@ -118,7 +124,10 @@ export const buildSandboxDocument = (options: {
     executionErrorPrefix: gt("dashboard.utils.executionErrorPrefix"),
     cspViolationBlocked: gt("dashboard.utils.cspViolationBlocked"),
     renderError: gt("dashboard.customChartRenderer.errorExecutingCode"),
+    executionTimeout: gt("dashboard.utils.executionTimeout"),
   });
+  // Unpredictable per frame, so chart code cannot declare a local of the same name to shadow the guard.
+  const guard = `__o2Guard${nonce}`;
   const gl = usesEchartsGl(code);
   const glScript = gl ? `<script src="${sandboxEchartsGlUrl}" nonce="${nonce}"></script>` : "";
   // echarts-gl (claygl) compiles its compositor size expressions with new Function, which throws without 'unsafe-eval'.
@@ -134,8 +143,8 @@ export const buildSandboxDocument = (options: {
 <div id="chart"></div>
 <script src="${sandboxEchartsUrl}" nonce="${nonce}"></script>
 ${glScript}
-<script nonce="${nonce}">${sandboxRuntime(messages)}</script>
-<script nonce="${nonce}">${userChartScript(code)}</script>
+<script nonce="${nonce}">${sandboxRuntime(messages, guard)}</script>
+<script nonce="${nonce}">${userChartScript(guardLoops(code, guard))}</script>
 <script nonce="${nonce}">parent.postMessage({ type: "ready", token: "${readyToken}" }, "*");</script>
 </body>
 </html>`;
@@ -144,7 +153,10 @@ ${glScript}
 /** Accepts only well-formed messages of a known type; returns null for anything else. */
 export const parseSandboxMessage = (data: unknown): SandboxMessage | null => {
   if (!isRecord(data)) return null;
-  if ((data.type === "started" || data.type === "rendered") && isRunId(data.runId)) {
+  if (
+    (data.type === "started" || data.type === "executed" || data.type === "rendered") &&
+    isRunId(data.runId)
+  ) {
     return { type: data.type, runId: data.runId };
   }
   if (data.type === "error" && isRunId(data.runId) && typeof data.message === "string") {
@@ -156,6 +168,51 @@ export const parseSandboxMessage = (data: unknown): SandboxMessage | null => {
     return drilldown ? { type: "drilldown", drilldown } : null;
   }
   return null;
+};
+
+/** Adds a time check to every loop in chart code, so a runaway loop throws instead of hanging every chart frame. */
+export const guardLoops = (code: string, guard: string): string => {
+  let ast: acorn.Node;
+  try {
+    ast = acorn.parse(code, { ecmaVersion: 2020 });
+  } catch {
+    return code;
+  }
+  const started = `${guard}t`;
+  const inserts: { at: number; depth: number; text: string }[] = [];
+  const close = (at: number) => inserts.push({ at, depth: -1, text: "}" });
+  const onLoop = (node: acorn.Node, _state: unknown, ancestors: acorn.Node[]) => {
+    const body = (node as acorn.Node & { body: acorn.Node }).body;
+    // Wrapping the label too keeps `continue label` pointing at the loop itself.
+    let depth = ancestors.length - 1;
+    while (depth > 0 && ancestors[depth - 1].type === "LabeledStatement") depth--;
+    const target = ancestors[depth];
+    inserts.push({ at: target.start, depth, text: `{let ${started}=${guard}();` });
+    close(target.end);
+    const check = `${guard}(${started});`;
+    if (body.type === "BlockStatement") {
+      inserts.push({ at: body.start + 1, depth: depth + 0.5, text: check });
+    } else {
+      inserts.push({ at: body.start, depth: depth + 0.5, text: `{${check}` });
+      close(body.end);
+    }
+  };
+  walk.ancestor(ast, {
+    WhileStatement: onLoop,
+    DoWhileStatement: onLoop,
+    ForStatement: onLoop,
+    ForInStatement: onLoop,
+    ForOfStatement: onLoop,
+  });
+  // At one offset, closers (depth -1) end earlier constructs, then openers nest outermost first.
+  inserts.sort((a, b) => a.at - b.at || a.depth - b.depth);
+  let out = "";
+  let from = 0;
+  for (const insert of inserts) {
+    out += code.slice(from, insert.at) + insert.text;
+    from = insert.at;
+  }
+  return out + code.slice(from);
 };
 
 /** Mounts a sandboxed chart frame in `host` and keeps it for every run of the same code. */
@@ -224,6 +281,7 @@ export const createCustomChartSandbox = (
       return;
     }
     if (message.runId === watchedRunId) stopWatchdog();
+    if (message.type === "executed") return;
     if (message.runId !== activeRunId) return;
     activeRunId = null;
     if (message.type === "error") handlers.onError(message.message);
@@ -401,8 +459,18 @@ ${escapeInlineScript(code)}
 }`;
 
 // Runs inside the frame; it reads globals only, since it is shipped as text.
-const sandboxRuntime = (messagesJson: string): string => `(function () {
+const sandboxRuntime = (messagesJson: string, guard: string): string => `(function () {
   var messages = ${messagesJson};
+  var clock = performance.now.bind(performance);
+  var guardTicks = 0;
+  Object.defineProperty(window, "${guard}", {
+    value: function (started) {
+      if (started === undefined) return clock();
+      if ((++guardTicks & 1023) === 0 && clock() - started > ${LOOP_GUARD_LIMIT_MS}) {
+        throw new Error(messages.executionTimeout);
+      }
+    },
+  });
   var port = null;
   var chart = null;
   var chartDark = null;
@@ -509,6 +577,7 @@ const sandboxRuntime = (messagesJson: string): string => `(function () {
       var data = JSON.parse(message.data);
       var context = deepFreeze(JSON.parse(message.context || "{}"));
       option = window.__o2UserChart(data, window.echarts, context, o2);
+      post({ type: "executed", runId: runId });
     } catch (err) {
       finish(runId, messages.executionErrorPrefix + (err && err.message !== undefined ? err.message : String(err)));
       return;
