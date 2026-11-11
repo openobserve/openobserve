@@ -1332,6 +1332,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FitItems from "@/components/common/FitItems.vue";
+import { activates } from "@/lib/core/Button/activation";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
@@ -4405,12 +4406,7 @@ export default defineComponent({
     // While one bulk write runs, the other bulk actions are inactive, so two writes never race on one selection.
     const bulkWriteBusy = computed(() => bulkToggleBusy.value !== null || bulkDeleteLoading.value);
     const swallowWhileBulkBusy = (event: Event) => {
-      if (!bulkWriteBusy.value) return;
-      if (
-        event instanceof KeyboardEvent &&
-        !["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)
-      )
-        return;
+      if (!bulkWriteBusy.value || !activates(event)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
     };

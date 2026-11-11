@@ -258,8 +258,7 @@
           <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
         </OTabs>
 
-        <!-- With no Groups tab, a line per group on the chart reads as a bug, not the opt-in it is (M-9). -->
-        <!-- Below the tabs: it lands with the alert, like the tab content, so nothing already painted moves. -->
+        <!-- Without a Groups tab a line per group reads as a bug (M-9); it lands with the alert, so nothing painted moves. -->
         <OContent v-if="isGroupedButSimple" class="shrink-0 pt-3">
           <OBanner variant="info" data-test="alerts-alertdetail-simple-grouped-banner">
             {{

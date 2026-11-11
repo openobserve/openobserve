@@ -131,7 +131,6 @@ function handleClick(e: MouseEvent) {
 </script>
 
 <template>
-  <!-- `h-8!` beats sm-toolbar's own 30px, so this matches the 32px icon-sm buttons beside it. -->
   <!-- A failed refresh restyles this same button rather than swapping it, so focus stays on it. -->
   <OButton
     v-if="layout === 'inline'"

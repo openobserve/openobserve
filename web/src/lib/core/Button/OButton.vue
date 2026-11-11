@@ -15,6 +15,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useFeatureLock } from "@/composables/useFeatureLock";
 import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
 import { LOADER_DELAY_MS } from "@/lib/styles/motion";
+import { activates } from "./activation";
 
 defineOptions({ inheritAttrs: false });
 
@@ -502,10 +503,8 @@ const classes = computed<string[]>(() => [
   sizeClasses[props.size],
 ]);
 
-// A menu trigger also opens on the arrow keys, so a busy one must swallow those too.
-const ACTIVATION_KEYS = new Set(["Enter", " ", "ArrowDown", "ArrowUp"]);
 function handleKeydown(event: KeyboardEvent): void {
-  if (inactive.value && ACTIVATION_KEYS.has(event.key)) {
+  if (inactive.value && activates(event)) {
     event.preventDefault();
     event.stopImmediatePropagation();
   }

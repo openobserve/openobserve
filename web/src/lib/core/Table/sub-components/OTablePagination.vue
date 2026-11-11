@@ -8,6 +8,7 @@ import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { activates } from "@/lib/core/Button/activation";
 
 const { t } = useI18nTyped();
 const slots = useSlots();
@@ -56,14 +57,13 @@ const emit = defineEmits<{
 
 const showSkeleton = useDelayedFlag(() => !!props.loading, LOADER_DELAY_MS);
 
-const ACTIVATION_KEYS = new Set(["Enter", " ", "ArrowDown", "ArrowUp"]);
 // A second "next" before the first page arrives would count from the requested page, so paging waits for it.
 const pagingInactive = computed(() => !!props.pending || !!props.stale);
 
 // Controls a consumer renders or a select owns cannot take aria-disabled themselves, so their wrapper swallows activation.
 function swallowActivation(event: Event, inactive: boolean): void {
   if (!inactive) return;
-  if (event instanceof KeyboardEvent && !ACTIVATION_KEYS.has(event.key)) return;
+  if (!activates(event)) return;
   event.preventDefault();
   event.stopPropagation();
 }
@@ -104,7 +104,7 @@ function openMenus(root: HTMLElement | null): Element[] {
 function guardMenusWhile(root: () => HTMLElement | null, active: () => boolean): void {
   let menus: Element[] = [];
   const block = (event: Event): void => {
-    if (event instanceof KeyboardEvent && !ACTIVATION_KEYS.has(event.key)) return;
+    if (!activates(event)) return;
     const target = event.target;
     if (!(target instanceof Node)) return;
     if (![...menus, ...openMenus(root())].some((menu) => menu.contains(target))) return;
