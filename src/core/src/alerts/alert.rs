@@ -9573,6 +9573,7 @@ mod tests {
                 operator: config::meta::alerts::Operator::GreaterThanEquals,
                 value: json!(10),
                 ignore_case: false,
+                case_insensitive: None,
             },
             warning_value: None,
             multi_alert: true,
