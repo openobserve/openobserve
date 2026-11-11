@@ -278,7 +278,7 @@ pub async fn send_test(
                     row.id
                 );
                 DowntimeTestResult {
-                    error: Some(outcome_summary(&e)),
+                    error: Some(test_reason(&e)),
                     destination: name,
                     ok: false,
                     unsupported: false,
@@ -342,6 +342,33 @@ fn summarize(
         .iter()
         .any(|(_, r)| matches!(r, Err(e) if !matches!(e, NotifyError::Skipped(_))));
     if failed { Err(summary) } else { Ok(summary) }
+}
+
+/// Longest reason a test result shows.
+const MAX_TEST_REASON_CHARS: usize = 200;
+
+/// A test's reason for the person who pressed Send test: the HTTP status, or the server's own
+/// text for a lookup, render or block failure. A transport error can carry the destination
+/// URL and its secret, so it stays in the log.
+fn test_reason(e: &crate::alerts::notifications::notify::NotifyError) -> String {
+    use crate::alerts::notifications::notify::NotifyError;
+
+    match e {
+        NotifyError::DestinationNotFound(_)
+        | NotifyError::NotAlertDestination(_)
+        | NotifyError::TemplateNotFound { .. }
+        | NotifyError::Render(_)
+        | NotifyError::Blocked(_) => {
+            let text = e.to_string();
+            if text.chars().count() <= MAX_TEST_REASON_CHARS {
+                text
+            } else {
+                let cut: String = text.chars().take(MAX_TEST_REASON_CHARS).collect();
+                format!("{cut}…")
+            }
+        }
+        _ => outcome_summary(e),
+    }
 }
 
 /// One destination's stored outcome: its HTTP status or skip reason, never the reply body.
@@ -867,6 +894,37 @@ mod tests {
             text(&test)
         );
         assert!(!live.render_hints.test_marker);
+    }
+
+    #[test]
+    fn a_test_result_names_a_render_or_block_reason_but_never_a_reply_body_or_transport_error() {
+        use crate::alerts::notifications::notify::NotifyError;
+
+        assert_eq!(
+            test_reason(&NotifyError::Render("unknown variable".into())),
+            "render failed: unknown variable"
+        );
+        assert_eq!(
+            test_reason(&NotifyError::Blocked(
+                "Destination URL blocked by SSRF guard".into()
+            )),
+            "Destination URL blocked by SSRF guard"
+        );
+        assert_eq!(
+            test_reason(&NotifyError::Rejected {
+                status: 405,
+                body: "<!doctype html>secret".into(),
+            }),
+            "HTTP 405"
+        );
+        assert_eq!(
+            test_reason(&NotifyError::Transport(
+                "error sending request for url (https://hooks.example/T0/secret)".into()
+            )),
+            RESULT_FAILED
+        );
+        let long = test_reason(&NotifyError::Blocked("x".repeat(500)));
+        assert_eq!(long.chars().count(), MAX_TEST_REASON_CHARS + 1);
     }
 
     #[tokio::test]
