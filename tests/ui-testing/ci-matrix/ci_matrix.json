@@ -620,6 +620,7 @@
     "browser": "chrome",
     "run_files": [
       "first-data-notice.spec.js",
+      "first-event.spec.js",
       "legacy-pages.spec.js",
       "token-picker.spec.js"
     ],
